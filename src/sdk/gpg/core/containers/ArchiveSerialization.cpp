@@ -11,6 +11,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
@@ -229,6 +230,44 @@ namespace
   static_assert(offsetof(PathNeighborCellWeightPairRuntime, mWeight) == 0x04,
     "PathNeighborCellWeightPairRuntime::mWeight offset must be 0x04");
 
+  /**
+   * Address: 0x0076D3C0 (FUN_0076D3C0, Moho::SPathNeighborTypeInfo::Init)
+   * Address: 0x0076D3E0 (FUN_0076D3E0, Moho::SPathNeighborTypeInfo::GetName)
+   * Address: 0x0076D3F0 (FUN_0076D3F0, Moho::SPathNeighborTypeInfo::dtr)
+   *
+   * What it does:
+   * Reflected leaf `RType` descriptor for `std::pair<Moho::HPathCell,float>`
+   * (the `{cell, weight}` neighbor-distance pair the A* pathfinder reflects
+   * for save/load, modeled at runtime by `PathNeighborCellWeightPairRuntime`
+   * above). Matches the same scalar-`RType`-leaf shape as
+   * `moho::SCollisionInfoTypeInfo` (CAiPathSpline.h/.cpp) and
+   * `SUnitOffsetInfoTypeInfo` (CAiFormationInstance.cpp): only `GetName`/
+   * `Init` are overridden - the dtor is the compiler-generated `~RType()`,
+   * and `GetLexical`/`SetLexical`/`IsIndexed`/`IsPointer`/`IsEnumType`/
+   * `Finish` keep the `gpg::RType` base implementation. RTTI-confirmed at
+   * `??_7SPathNeighborTypeInfo@Moho@@6B@` (0xE36130, 11 primary slots; only
+   * slots 2/3/9 diverge from the RType base, matching dtor/GetName/Init
+   * above).
+   */
+  class SPathNeighborTypeInfo final : public gpg::RType
+  {
+  public:
+    ~SPathNeighborTypeInfo() override = default;
+
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SPathNeighbor";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(PathNeighborCellWeightPairRuntime);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+  static_assert(sizeof(SPathNeighborTypeInfo) == 0x64, "SPathNeighborTypeInfo size must be 0x64");
+
   void RegisterPathNeighborCellWeightSerializerCallbacks(SerSaveLoadHelperNodeRuntime* helper);
 
   void* gSPathNeighborSerializerVtableRuntime[1] = {
@@ -236,6 +275,28 @@ namespace
   };
 
   gpg::RType* gPathNeighborCellWeightType = nullptr;
+
+  /**
+   * Address: 0x0076D360 (FUN_0076D360, preregister_SPathNeighborTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `std::pair<Moho::HPathCell,float>`. Reached from `sub_BDCAD0`
+   * (`.CRT$XCL`/`__xc_a` static-init table), the same shape as every other
+   * scalar `RType` leaf preregistration this session. Fixes a real gap:
+   * `RegisterPathNeighborCellWeightSerializerCallbacks` below resolves this
+   * type via a lazy `gpg::LookupRType(typeid(std::pair<moho::HPathCell,
+   * float>))`, which throws `std::runtime_error` if nothing preregistered
+   * the type first - this is what the real binary runs before that consumer
+   * can ever execute.
+   */
+  [[nodiscard]] gpg::RType* preregister_SPathNeighborTypeInfo()
+  {
+    static SPathNeighborTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(std::pair<moho::HPathCell, float>), &typeInfo);
+    gPathNeighborCellWeightType = &typeInfo;
+    return &typeInfo;
+  }
 
   SerSaveLoadHelperNodeRuntime gHPathCellSerializerHelper{};
   SerSaveLoadHelperNodeRuntime gNavPathSerializerHelper{};
@@ -564,6 +625,10 @@ namespace
     return sType;
   }
 } // namespace
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SPathNeighborTypeInfo_a41c9e, preregister_SPathNeighborTypeInfo)
 
 namespace gpg
 {
