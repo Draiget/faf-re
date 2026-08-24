@@ -3606,6 +3606,10 @@ namespace msvc8
          * (already recovered, `Mesh.cpp`), which "appends `count`
          * value-initialized (zeroed) entries to the palette buffer".)
          *
+         * Address: 0x0088AB00 (FUN_0088AB00, `Moho::WaveParameters`'s
+         * compiler-generated copy constructor, invoked by the uninit_fill_n
+         * and _Insert_n emissions below wherever a `WaveParameters` value is
+         * copy-constructed into fresh storage)
          * Address: 0x0088B090 (FUN_0088B090, `msvc8::vector<Moho::
          * WaveParameters>::uninit_fill_n` for the 136-byte polymorphic
          * element -- copy-constructs `n` copies of `value` at `dst` through
