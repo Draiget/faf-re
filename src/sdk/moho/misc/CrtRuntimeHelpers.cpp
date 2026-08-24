@@ -882,6 +882,16 @@ public:
     return reinterpret_cast<const CollateView*>(locinfo_);
   }
 
+  /**
+   * Legacy-sync view of the effective locale, for lanes that need the
+   * `lc_time_curr` (+0xD4) weekday/month/format table pointer (e.g.
+   * `__Getdays_l`/`__Getmonths_l`).
+   */
+  [[nodiscard]] const RuntimeLocaleLegacySyncView* timeView() const noexcept
+  {
+    return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locinfo_);
+  }
+
   /** Raw `_locale_t` view of this scope, for forwarding to nested `*_l` lanes. */
   [[nodiscard]] _locale_t asLocale() const noexcept
   {
@@ -7641,6 +7651,68 @@ extern "C" void __cdecl __free_lc_time(void* const lcTimeData)
 }
 
 /**
+ * Address: 0x00A8B1C5 (FUN_00A8B1C5, __Getdays_l)
+ *
+ * IDA signature:
+ * char *__cdecl __Getdays_l(_locale_t plocinfo);
+ *
+ * What it does:
+ * Builds one heap-allocated `:abbrev:full:abbrev:full:...` weekday-name
+ * catalog (seven `wday_abbr[]`/`wday[]` pairs) for the effective locale's
+ * `lc_time_curr` table, resolved through the `_LocaleUpdate` lane. Matches
+ * the CRT's internal `__Getdays` contract: a `strcpy_s` failure while
+ * assembling the catalog routes to Watson, exactly like the rest of this
+ * file's `_l` helpers.
+ */
+extern "C" char* __cdecl __Getdays_l(_locale_t const localeInfo)
+{
+  const RuntimeLocaleUpdateScope locale(localeInfo);
+  const RuntimeLcTimeData* const lcTime = locale.timeView()->lcTimeCurrent;
+
+  std::size_t totalLength = 0u;
+  for (int dayIndex = 0; dayIndex < 7; ++dayIndex) {
+    totalLength += std::strlen(lcTime->wday_abbr[dayIndex]) + std::strlen(lcTime->wday[dayIndex]) + 2u;
+  }
+
+  char* const daysCatalog = static_cast<char*>(std::malloc(totalLength + 1u));
+  if (daysCatalog != nullptr) {
+    char* cursor = daysCatalog;
+    for (int dayIndex = 0; dayIndex < 7; ++dayIndex) {
+      *cursor++ = ':';
+      if (::strcpy_s(cursor, totalLength + 1u - static_cast<std::size_t>(cursor - daysCatalog), lcTime->wday_abbr[dayIndex]) != 0) {
+        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+      }
+      cursor += std::strlen(cursor);
+
+      *cursor++ = ':';
+      if (::strcpy_s(cursor, totalLength + 1u - static_cast<std::size_t>(cursor - daysCatalog), lcTime->wday[dayIndex]) != 0) {
+        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+      }
+      cursor += std::strlen(cursor);
+    }
+    *cursor = '\0';
+  }
+
+  return daysCatalog;
+}
+
+/**
+ * Address: 0x00A8B2C3 (IDA-unclassified 9-byte chunk between __Getdays_l's
+ * end at 0x00A8B2C3 and __Getmonths_l's start at 0x00A8B2CC; real caller of
+ * __Getdays_l per raw-byte disassembly: `push 0; call __Getdays_l; pop ecx;
+ * retn`. No `FUN_*` token exists for this address because IDA folded it
+ * into the surrounding gap rather than exporting it as its own function.)
+ *
+ * What it does:
+ * Public `_Getdays()` entry point; forwards to `__Getdays_l` with the
+ * current thread/global locale (no explicit `_locale_t` override).
+ */
+extern "C" char* __cdecl _Getdays()
+{
+  return __Getdays_l(nullptr);
+}
+
+/**
  * Address: 0x00AA5AC6 (FUN_00AA5AC6, _init_time)
  *
  * What it does:
@@ -13713,6 +13785,124 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     *cursor = L'\0';
     return destination;
+  }
+
+  /**
+   * Address: 0x00AB8823 (FUN_00AB8823, _mbsnbcmp_l)
+   *
+   * IDA signature:
+   * int __cdecl _mbsnbcmp_l(unsigned char *lhsText, unsigned char *rhsText,
+   *   size_t maxCount, _locale_t localeInfo);
+   *
+   * What it does:
+   * Locale-aware, byte-count-bounded multibyte string compare. Under a
+   * single-byte code page it defers straight to `strncmp`. Under a DBCS
+   * code page it walks both strings, pairing a lead byte with its trailing
+   * byte into one 16-bit character unit via `isLeadByte()` before
+   * comparing, and returns a value with the same sign as `lhsValue -
+   * rhsValue` for the first differing unit (matching `strncmp` semantics).
+   *
+   * `maxCount` bounds bytes read from `lhsText`'s lead byte and from
+   * `rhsText`'s *trailing* byte specifically -- this asymmetry (a lead byte
+   * read never itself decrements the budget a second time when consuming
+   * its own trailing byte on the `lhsText` side, but does on the
+   * `rhsText` side) is preserved exactly from the CRT body, quirks
+   * included: if the budget runs out immediately after reading a lead byte
+   * from `lhsText`, the CRT peeks (without consuming) `rhsText`'s current
+   * byte and declares the strings equal outright when that peeked byte is
+   * itself a lead byte.
+   */
+  extern "C" int __cdecl _mbsnbcmp_l(
+    const unsigned char* lhsText,
+    const unsigned char* rhsText,
+    std::size_t maxCount,
+    _locale_t const localeInfo
+  )
+  {
+    if (maxCount == 0u) {
+      return 0;
+    }
+
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (!locale.isMultibyteCodePage()) {
+      return std::strncmp(
+        reinterpret_cast<const char*>(lhsText),
+        reinterpret_cast<const char*>(rhsText),
+        maxCount);
+    }
+
+    if (lhsText == nullptr || rhsText == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    const unsigned char* p1 = lhsText;
+    const unsigned char* p2 = rhsText;
+
+    for (;;) {
+      // lhsText side: the lead/single byte read always consumes one unit of
+      // budget; consuming its trailing byte (if any) does not.
+      const unsigned int c1 = *p1++;
+      --maxCount;
+
+      unsigned int value1;
+      bool p1TruncatedAtBudget = false;
+      unsigned int peekedValue2 = 0u;
+
+      if (!locale.isLeadByte(c1)) {
+        value1 = c1;
+      } else if (maxCount == 0u) {
+        // Budget exhausted right after the lead byte: peek (do not consume)
+        // rhsText's current byte. If it is itself a lead byte, the CRT body
+        // declares the strings equal immediately.
+        peekedValue2 = *p2;
+        if (locale.isLeadByte(peekedValue2)) {
+          return 0;
+        }
+        value1 = 0u;
+        p1TruncatedAtBudget = true;
+      } else {
+        const unsigned int c1Trail = p1[0];
+        if (c1Trail == 0u) {
+          value1 = 0u;
+        } else {
+          ++p1;
+          value1 = (c1 << 8) | c1Trail;
+        }
+      }
+
+      // rhsText side.
+      unsigned int value2;
+      if (p1TruncatedAtBudget) {
+        value2 = peekedValue2;
+      } else {
+        const unsigned int c2 = *p2++;
+        if (!locale.isLeadByte(c2)) {
+          value2 = c2;
+        } else if (maxCount == 0u) {
+          value2 = 0u;
+        } else {
+          const unsigned int c2Trail = p2[0];
+          --maxCount;
+          if (c2Trail == 0u) {
+            value2 = 0u;
+          } else {
+            ++p2;
+            value2 = (c2 << 8) | c2Trail;
+          }
+        }
+      }
+
+      if (value2 != value1) {
+        return (value2 < value1) ? 1 : -1;
+      }
+
+      if (value1 == 0u || maxCount == 0u) {
+        return 0;
+      }
+    }
   }
 
   /**
