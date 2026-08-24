@@ -3299,6 +3299,14 @@ namespace
     return node->color;
   }
 
+  /**
+   * Address: 0x00849D40 (FUN_00849D40)
+   *
+   * What it does:
+   * Left-rotates one node of the special-files map, relinking the pivot's
+   * left subtree, parent pointer, and the parent's child slot.
+   */
+
   void RotateSpecialFilesMapLeft(
     SpecialFilesMapStorageRuntimeView& map,
     SpecialFilesMapNodeRuntimeView* const node
@@ -3330,6 +3338,8 @@ namespace
     SpecialFilesMapNodeRuntimeView* const node
   ) noexcept
   {
+    // Address: 0x00849DB0 (FUN_00849DB0) -- right-rotates one node of the
+    // special-files map, the mirror of RotateSpecialFilesMapLeft above.
     SpecialFilesMapNodeRuntimeView* const head = map.head;
     SpecialFilesMapNodeRuntimeView* const pivot = node->left;
 

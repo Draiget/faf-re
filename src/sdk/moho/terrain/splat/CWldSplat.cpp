@@ -1583,6 +1583,9 @@ namespace moho
     for (int decile = 1; decile < 10; ++decile) {
       const std::size_t index =
         static_cast<std::size_t>(static_cast<float>(count) * (static_cast<float>(decile) * 0.1f));
+      // Addresses 0x0087D750/0x0087DC80/0x0087E390 are this std::nth_element's
+      // own MSVC8 STL-internal partition/median-of-3/insertion-sort trio for
+      // the float distinctAreas element -- already reproduced by this call.
       std::nth_element(distinctAreas.begin(), distinctAreas.begin() + index, distinctAreas.end());
       mLodThresholds[decile] = distinctAreas[index];
     }
