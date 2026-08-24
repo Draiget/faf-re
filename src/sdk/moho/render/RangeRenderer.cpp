@@ -2097,6 +2097,18 @@ namespace moho
     }
   }
 
+  /**
+   * The head allocation below is FUN_007F26D0's checked-allocate-and-
+   * default-init emission (`sub_7F3670(1)`, the 192-byte lane already
+   * cited on `AllocateCheckedElementBlock` in Vector.cpp): allocates
+   * `sizeof(SRangeRenderCategoryTreeNode)` (192 bytes, mIsSentinel@+0xB9,
+   * matching this type's own static_assert), zero-inits, sets
+   * color@+0xB8=1/isNil@+0xB9=0. This function then overwrites isNil to 1
+   * and self-links left/parent/right to promote the fresh node into the
+   * sentinel head -- the same buy_head()-equivalent inline promotion
+   * pattern already documented on CAiFormationInstance.cpp's
+   * InitializeDefaultFormationLaneEntry for a different hand-rolled tree.
+   */
   void RangeRenderer::InitRangeProfileTree(
     SRangeRenderCategoryTree& tree
   )
