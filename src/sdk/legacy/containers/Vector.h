@@ -1840,6 +1840,14 @@ namespace msvc8
          * `SNetCommandArg` both real callers (`FUN_007BB080`'s copy-ctor
          * unwind and `FUN_007BB71D`'s count/value-ctor unwind) reach this one
          * shared emission.
+         *
+         * Address: 0x0082DE60 (FUN_0082DE60, msvc8::vector<void*>::tidy --
+         * 4-byte trivially-destructible element, so no destroy loop: just
+         * `operator delete(first_)` then zeros `{first_, last_, end_}`,
+         * leaving `myProxy_` untouched. This is the EH-unwind cleanup for
+         * the `assign(9, sentinel)` MapD emission FUN_0082FB80 -- its
+         * `catch (...) { tidy(); throw; }` funclet calls this address when
+         * the fill after `operator new(9 * 4)` throws.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3455,6 +3463,7 @@ namespace msvc8
             }
         }
 
+    public:
         /**
          * The VC8 `vector<T>::_Grow_to(_Count)` lane.
          *
@@ -3464,6 +3473,13 @@ namespace msvc8
          * shows the same `shr reg, 1` + `add` pair -- e.g. `0x005C7043` /
          * `0x005C705C` in `msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n`
          * (FUN_005C6F90), preceded by the `sub_5C3C70` max_size clamp.
+         *
+         * Exposed publicly (was private) so per-element-type helpers that
+         * can't route through `reallocate_to` directly -- because their `T`
+         * needs relocation semantics this template doesn't model, e.g.
+         * `moho::EnsureWeakPtrVectorCapacity` for `WeakPtr<T>`'s intrusive
+         * owner-chain relink -- can still reuse the real growth formula
+         * instead of re-deriving it.
          */
         [[nodiscard]] std::size_t recommended_capacity(const std::size_t need) const noexcept {
             const std::size_t cur = capacity();
@@ -3474,6 +3490,7 @@ namespace msvc8
             return grown;
         }
 
+    private:
         /**
          * Ensure capacity for 'add' more elements
          */
