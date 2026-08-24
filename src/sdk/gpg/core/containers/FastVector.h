@@ -926,6 +926,10 @@ namespace gpg::core
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
      * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::InsertAt)
+     * Address: 0x00570590 (FUN_00570590, the per-element 4-DWORD copy-loop
+     * form of the SAssignedLocInfo blit step -- sizeof(SAssignedLocInfo)==
+     * 0x10 confirmed via its own static_assert. Reached from the InsertAt
+     * instantiation already cited at 0x0059CC10 above.)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -2089,6 +2093,10 @@ namespace gpg
    * copy-constructs rather than relocating bitwise)
    * Address: 0x0054DF50 (FUN_0054DF50, the forward copy-assign range lane for
    * the same element, used to rewind mLast after a shrink)
+   * Address: 0x005625D0 (FUN_005625D0, the generic 4-byte emission for
+   * `fastvector<WeakPtr<CUnitCommand>>`, reached from the reallocate-insert
+   * instantiation already cited on FastVectorRuntimeReallocateInsert below
+   * at 0x00562350)
    *
    * What it does:
    * Copy-constructs [sourceBegin, sourceEnd) into `destination` and returns the
