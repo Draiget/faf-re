@@ -244,6 +244,25 @@ namespace moho
   );
   static_assert(sizeof(TerrainEnvironmentLookupEntry) == 0x24, "TerrainEnvironmentLookupEntry size must be 0x24");
 
+  /**
+   * Address: 0x004CD320 (FUN_004CD320, compiler-generated
+   * `std::pair<msvc8::string,msvc8::string>::~pair()`)
+   *
+   * What it does:
+   * Implicit pair destructor, member-destroyed in reverse declaration order:
+   * tears down `second` (the `msvc8::string` at offset +0x1C, fields at
+   * +0x34/+0x20/+0x30 relative to the pair) then `first` (offset +0x00,
+   * fields at +0x18/+0x04/+0x14) -- releasing each string's heap buffer when
+   * its capacity is >= 0x10 (the SSO threshold) and resetting it to the
+   * empty-SSO state (`_Myres=0xF, _Mysize=0, buffer[0]=0`), matching the
+   * inline-expanded form of `msvc8::string::tidy()` (FUN_00402740) applied
+   * twice. No 2007 source line wrote this body -- it is the compiler's
+   * implicit destructor for the pair, triggered wherever a
+   * `TerrainEnvironmentLookupPair` is destroyed, e.g.
+   * `EraseTerrainEnvironmentLookupPairRange`'s `pairs.erase(first, last)`
+   * call in CWldMap.cpp (reached from `IWldTerrainRes::EnumerateEnvLookup`,
+   * FUN_008A1500).
+   */
   using TerrainEnvironmentLookupPair = std::pair<msvc8::string, msvc8::string>;
   using TerrainEnvironmentLookupPairs = msvc8::vector<TerrainEnvironmentLookupPair>;
   static_assert(sizeof(TerrainEnvironmentLookupPair) == 0x38, "TerrainEnvironmentLookupPair size must be 0x38");

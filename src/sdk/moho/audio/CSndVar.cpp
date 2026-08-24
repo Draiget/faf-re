@@ -15,6 +15,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Vector.h"
 #include "moho/audio/AudioEngine.h"
 
 namespace gpg
@@ -37,7 +38,7 @@ namespace
   constexpr std::uint32_t kSndVarHashSalt = 0x7BEF2693u;
 
   std::recursive_mutex gSndVarRegistryMutex;
-  std::vector<moho::CSndVar*> gSndVarRegistry;
+  msvc8::list<moho::CSndVar*> gSndVarRegistry;
   std::unordered_multimap<std::uint32_t, moho::CSndVar*> gSndVarNameCache;
 
   struct SndVarRegistryEntryRuntimeView
@@ -687,6 +688,12 @@ namespace
    *
    * What it does:
    * Registers one `CSndVar` instance in the process-global variable-name lane.
+   * `push_back` on the `msvc8::list<CSndVar*>` registry instantiates the
+   * generic `list<T>::insert` node-buy/`_Incsize` pair (see
+   * `Address: 0x004E3490` cited on `msvc8::list<T>::insert` in
+   * legacy/containers/Vector.h) -- the same emission shape as the sibling
+   * `msvc8::list<CSndParams*>` registry's `FUN_004E32D0`/`FUN_004E3310` pair
+   * used by `func_RegisterCSndParams` (CSndParams.cpp).
    */
   void RegisterSndVarInstance(moho::CSndVar* const value)
   {
@@ -704,8 +711,13 @@ namespace
   {
     std::lock_guard<std::recursive_mutex> lock(gSndVarRegistryMutex);
     RemoveCachedSndVarByPointerLocked(value);
-    const auto it = std::remove(gSndVarRegistry.begin(), gSndVarRegistry.end(), value);
-    gSndVarRegistry.erase(it, gSndVarRegistry.end());
+    for (auto it = gSndVarRegistry.begin(); it != gSndVarRegistry.end();) {
+      if (*it == value) {
+        it = gSndVarRegistry.erase(it);
+      } else {
+        ++it;
+      }
+    }
   }
 
   /**

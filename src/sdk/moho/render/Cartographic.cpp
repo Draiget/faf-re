@@ -10,6 +10,7 @@
 
 #include <d3d9.h>
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/Device.hpp"
@@ -209,9 +210,18 @@ namespace
     return ::operator new(static_cast<std::size_t>(count) * kCartographicDecalNodeStorageSize);
   }
 
+  /**
+   * Address: 0x007D4300 (FUN_007D4300, sub_7D4300)
+   *
+   * What it does:
+   * Allocates one 48-byte `CartographicDecalNode` lane through the shared
+   * checked-array allocator and self-links it (`mNext = mPrev = this`) so it
+   * can serve as an empty intrusive-list sentinel.
+   */
   [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalSentinelNode()
   {
-    auto* const sentinel = static_cast<moho::CartographicDecalNode*>(AllocateCartographicDecalNodeStorage(1u));
+    auto* const sentinel =
+      static_cast<moho::CartographicDecalNode*>(gpg::core::legacy::AllocateChecked48ByteLane(1u));
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
     return sentinel;
