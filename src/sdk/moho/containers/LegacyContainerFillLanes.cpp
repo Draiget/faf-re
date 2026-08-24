@@ -12,6 +12,8 @@
 #include <boost/function/function_base.hpp>
 #include <boost/throw_exception.hpp>
 
+#include "gpg/core/utils/BoostWrappers.h"
+
 namespace
 {
   [[nodiscard]] std::uint32_t* FillDwordSpanByCount(
@@ -217,57 +219,18 @@ namespace
     return result;
   }
 
-  using SharedOwnerReleaseCall = std::intptr_t(__thiscall*)(void* self);
-
-  struct SharedOwnerControlBlockRuntimeView
-  {
-    void** vtable;          // +0x00
-    volatile LONG useCount; // +0x04
-    volatile LONG weakCount; // +0x08
-  };
-#if defined(_M_IX86)
-  static_assert(
-    sizeof(SharedOwnerControlBlockRuntimeView) == 0x0C,
-    "SharedOwnerControlBlockRuntimeView size must be 0x0C"
-  );
-  static_assert(
-    offsetof(SharedOwnerControlBlockRuntimeView, useCount) == 0x04,
-    "SharedOwnerControlBlockRuntimeView::useCount offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SharedOwnerControlBlockRuntimeView, weakCount) == 0x08,
-    "SharedOwnerControlBlockRuntimeView::weakCount offset must be 0x08"
-  );
-#endif
-
-  [[nodiscard]] std::intptr_t InvokeSharedOwnerReleaseSlot(
-    SharedOwnerControlBlockRuntimeView* const owner,
-    const std::size_t slot
-  ) noexcept
-  {
-    const auto callback = reinterpret_cast<SharedOwnerReleaseCall>(owner->vtable[slot]);
-    return callback(owner);
-  }
-
-  [[nodiscard]] std::intptr_t ReleaseSharedOwnerControlBlock(
-    SharedOwnerControlBlockRuntimeView* const owner
-  ) noexcept
-  {
-    std::intptr_t result = 0;
-    if (owner == nullptr) {
-      return result;
-    }
-
-    result = reinterpret_cast<std::intptr_t>(const_cast<LONG*>(&owner->useCount));
-    if (InterlockedExchangeAdd(&owner->useCount, -1) == 1) {
-      result = InvokeSharedOwnerReleaseSlot(owner, 1u);
-      if (InterlockedExchangeAdd(&owner->weakCount, -1) == 1) {
-        result = InvokeSharedOwnerReleaseSlot(owner, 2u);
-      }
-    }
-
-    return result;
-  }
+  // NOTE (boost shared_ptr / sp_counted_base migration): this file used to
+  // reach into `boost::detail::sp_counted_base`'s real layout via a local
+  // `SharedOwnerControlBlockRuntimeView` (vtable+useCount+weakCount, exact
+  // ABI match) plus two hand-rolled dispatch helpers
+  // (`InvokeSharedOwnerReleaseSlot`/`ReleaseSharedOwnerControlBlock`) that
+  // duplicated `boost::detail::sp_counted_base::release()`
+  // (`dependencies/boost_1_34_1/boost/detail/sp_counted_base_w32.hpp`),
+  // already fully modeled in `gpg/core/utils/BoostWrappers.h/.cpp` as
+  // `boost::detail::sp_counted_base` (a complete, polymorphic type here) and
+  // its free-function wrapper `boost::ReleaseSharedCount`. Every consumer
+  // below now names the real type/API directly instead of the reach-in
+  // stand-in.
 
   struct IntrusiveRefCountedObjectRuntimeView
   {
@@ -309,8 +272,8 @@ namespace
 
   struct SmallBufferArrayRuntimeView
   {
-    std::uint32_t lane00;                       // +0x00
-    SharedOwnerControlBlockRuntimeView* owner; // +0x04
+    std::uint32_t lane00;                    // +0x00
+    boost::detail::sp_counted_base* owner;   // +0x04
     std::byte pad08_27[0x20];
     void* begin;                // +0x28
     void* cursor;               // +0x2C
@@ -349,7 +312,8 @@ namespace
     }
 
     array.cursor = array.begin;
-    return ReleaseSharedOwnerControlBlock(array.owner);
+    boost::ReleaseSharedCount(array.owner);
+    return reinterpret_cast<std::intptr_t>(array.cursor);
   }
 
   /**
@@ -3986,7 +3950,7 @@ namespace
   struct Stride28SharedOwnerElementRuntimeView
   {
     std::byte lane00_13[0x14]{};
-    SharedOwnerControlBlockRuntimeView* owner = nullptr; // +0x14
+    boost::detail::sp_counted_base* owner = nullptr; // +0x14
     std::byte lane18_1B[0x04]{};
   };
 #if defined(_M_IX86)
@@ -4015,7 +3979,8 @@ namespace
     std::intptr_t result = reinterpret_cast<std::intptr_t>(begin);
     while (begin != end) {
       if (begin->owner != nullptr) {
-        result = ReleaseSharedOwnerControlBlock(begin->owner);
+        boost::ReleaseSharedCount(begin->owner);
+        result = reinterpret_cast<std::intptr_t>(begin->owner);
       }
       ++begin;
     }
@@ -10601,30 +10566,13 @@ namespace
   static_assert(offsetof(ByteAtE0RuntimeView, laneE0) == 0xE0, "ByteAtE0RuntimeView::laneE0 offset must be 0xE0");
 #endif
 
-  struct SharedOwnerUseCountAt4RuntimeView
-  {
-    std::byte pad00_03[0x04];
-    volatile LONG useCount; // +0x04
-  };
-#if defined(_M_IX86)
-  static_assert(
-    offsetof(SharedOwnerUseCountAt4RuntimeView, useCount) == 0x04,
-    "SharedOwnerUseCountAt4RuntimeView::useCount offset must be 0x04"
-  );
-#endif
-
-  struct SharedOwnerPairRuntimeView
-  {
-    std::uint32_t objectWord; // +0x00
-    std::uint32_t ownerWord;  // +0x04
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(SharedOwnerPairRuntimeView) == 0x08, "SharedOwnerPairRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(SharedOwnerPairRuntimeView, ownerWord) == 0x04,
-    "SharedOwnerPairRuntimeView::ownerWord offset must be 0x04"
-  );
-#endif
+  // NOTE (boost shared_ptr / shared_count migration): a local
+  // `SharedOwnerPairRuntimeView{objectWord,ownerWord}` + a
+  // `SharedOwnerUseCountAt4RuntimeView` reach-in used to model the raw
+  // `boost::shared_ptr<T>` `(px,pi)` pair here. That is exactly
+  // `boost::SharedCountPair` (`gpg/core/utils/BoostWrappers.h`), already used
+  // by every other `(px,pi)` site in that header/`.cpp` -- consumers below now
+  // spell it that way.
 
   struct SelfRelativeLaneBlockTail30RuntimeView
   {
@@ -10945,27 +10893,11 @@ namespace
     return source->laneE0;
   }
 
-  /**
-   * Address: 0x006FE350 (FUN_006FE350)
-   *
-   * What it does:
-   * Copy-assigns one `{object, owner}` pair and increments owner use-count
-   * lane `+0x04` when owner is present.
-   */
-  SharedOwnerPairRuntimeView* CopySharedOwnerPairAndRetain(
-    SharedOwnerPairRuntimeView* const destination,
-    const SharedOwnerPairRuntimeView* const source
-  ) noexcept
-  {
-    destination->objectWord = source->objectWord;
-    const std::uint32_t ownerWord = source->ownerWord;
-    destination->ownerWord = ownerWord;
-    if (ownerWord != 0u) {
-      auto* const owner = reinterpret_cast<SharedOwnerUseCountAt4RuntimeView*>(ownerWord);
-      InterlockedExchangeAdd(&owner->useCount, 1);
-    }
-    return destination;
-  }
+  // NOTE: FUN_006FE350 (copy `{px,pi}`, `add_ref_copy()` when `pi` present)
+  // used to live here as `CopySharedOwnerPairAndRetain`. It is byte-for-byte
+  // `boost::AssignSharedPairRetainCore` (`BoostWrappers.cpp`); the address is
+  // now cited on `boost::AssignSharedPairRetain` instead of duplicating the
+  // body.
 
   /**
    * Address: 0x00701B40 (FUN_00701B40)
@@ -16135,30 +16067,13 @@ namespace
   );
 #endif
 
-  struct WeakOwnerPairRuntimeView
-  {
-    std::uint32_t objectWord; // +0x00
-    SharedOwnerControlBlockRuntimeView* owner; // +0x04
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(WeakOwnerPairRuntimeView) == 0x08, "WeakOwnerPairRuntimeView size must be 0x08");
-  static_assert(offsetof(WeakOwnerPairRuntimeView, owner) == 0x04, "WeakOwnerPairRuntimeView::owner offset");
-#endif
-
-  [[nodiscard]] std::intptr_t ReleaseWeakOwnerControlBlock(
-    SharedOwnerControlBlockRuntimeView* const owner
-  ) noexcept
-  {
-    if (owner == nullptr) {
-      return 0;
-    }
-
-    const LONG priorWeakCount = InterlockedExchangeAdd(&owner->weakCount, -1);
-    if (priorWeakCount == 1) {
-      return InvokeSharedOwnerReleaseSlot(owner, 2u);
-    }
-    return priorWeakCount;
-  }
+  // NOTE: a local `WeakOwnerPairRuntimeView{objectWord,owner}` used to model
+  // this raw weak-owner `(px,pi)` pair; it is `boost::SharedCountPair`
+  // (`gpg/core/utils/BoostWrappers.h`). Likewise `ReleaseWeakOwnerControlBlock`
+  // (decrement `weakCount` at `+0x08`, call vtable slot `+0x08` on the final
+  // ref) duplicated `boost::detail::sp_counted_base::weak_release()`, already
+  // a public member of the real (complete, polymorphic) `sp_counted_base`
+  // type -- call sites below invoke `->weak_release()` directly.
 
   using DeleteFlagVirtualCall = std::intptr_t(__thiscall*)(void* self, std::int32_t deleteFlag);
 
@@ -16279,30 +16194,22 @@ namespace
    * Releases weak owner control block at lane `+0x04`.
    */
   std::intptr_t ReleaseWeakOwnerFromPairLane(
-    const SharedOwnerPairRuntimeView* const pair
+    const boost::SharedCountPair* const pair
   ) noexcept
   {
     std::intptr_t result = reinterpret_cast<std::intptr_t>(pair);
-    auto* const owner = reinterpret_cast<SharedOwnerControlBlockRuntimeView*>(pair->ownerWord);
+    boost::detail::sp_counted_base* const owner = pair->pi;
     if (owner != nullptr) {
-      result = ReleaseWeakOwnerControlBlock(owner);
+      owner->weak_release();
+      result = reinterpret_cast<std::intptr_t>(owner);
     }
     return result;
   }
 
-  /**
-   * Address: 0x00796DC0 (FUN_00796DC0)
-   *
-   * What it does:
-   * Copy-assigns one `{object, owner}` pair and increments owner use-count.
-   */
-  SharedOwnerPairRuntimeView* CopySharedOwnerPairWithUseRetain(
-    SharedOwnerPairRuntimeView* const destination,
-    const SharedOwnerPairRuntimeView* const source
-  ) noexcept
-  {
-    return CopySharedOwnerPairAndRetain(destination, source);
-  }
+  // NOTE: FUN_00796DC0 (`CopySharedOwnerPairWithUseRetain`) used to live
+  // here as a thin forward to the deleted `CopySharedOwnerPairAndRetain`.
+  // Both are byte-for-byte `boost::AssignSharedPairRetainCore`; the address
+  // is now cited on `boost::AssignSharedPairRetain` instead.
 
   /**
    * Address: 0x00796DE0 (FUN_00796DE0)
@@ -16326,26 +16233,20 @@ namespace
    */
   std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming(
     const std::uint32_t objectWord,
-    SharedOwnerControlBlockRuntimeView* const* const incomingOwnerSlot,
-    WeakOwnerPairRuntimeView* const destination
+    boost::detail::sp_counted_base* const* const incomingOwnerSlot,
+    boost::SharedCountPair* const destination
   ) noexcept
   {
-    std::intptr_t result = static_cast<std::intptr_t>(objectWord);
-    if (destination != nullptr) {
-      destination->objectWord = objectWord;
-      SharedOwnerControlBlockRuntimeView* const incomingOwner = *incomingOwnerSlot;
-      if (incomingOwner != nullptr) {
-        result = InterlockedExchangeAdd(&incomingOwner->weakCount, 1);
-      }
-
-      SharedOwnerControlBlockRuntimeView* const previousOwner = destination->owner;
-      if (previousOwner != nullptr) {
-        result = ReleaseWeakOwnerControlBlock(previousOwner);
-      }
-
-      destination->owner = incomingOwner;
+    if (destination == nullptr) {
+      return static_cast<std::intptr_t>(objectWord);
     }
-    return result;
+
+    boost::AssignWeakPairFromSharedControlSlot(
+      destination,
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(objectWord)),
+      incomingOwnerSlot
+    );
+    return reinterpret_cast<std::intptr_t>(destination->pi);
   }
 
   /**
@@ -17841,8 +17742,8 @@ namespace
    */
   std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming7BD790(
     const std::uint32_t objectWord,
-    SharedOwnerControlBlockRuntimeView* const* const incomingOwnerSlot,
-    WeakOwnerPairRuntimeView* const destination
+    boost::detail::sp_counted_base* const* const incomingOwnerSlot,
+    boost::SharedCountPair* const destination
   ) noexcept
   {
     return ReplaceWeakOwnerPairAndRetainIncoming(objectWord, incomingOwnerSlot, destination);
@@ -20106,19 +20007,11 @@ namespace
   static_assert(offsetof(FloatAt20RuntimeView, lane20) == 0x20, "FloatAt20RuntimeView::lane20 offset must be 0x20");
 #endif
 
-  [[nodiscard]] std::intptr_t ResetSharedOwnerPairAndReleaseControlBlock(
-    SharedOwnerPairRuntimeView* const pair
-  ) noexcept
-  {
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(pair);
-    pair->objectWord = 0u;
-    auto* const owner = reinterpret_cast<SharedOwnerControlBlockRuntimeView*>(pair->ownerWord);
-    pair->ownerWord = 0u;
-    if (owner != nullptr) {
-      result = ReleaseSharedOwnerControlBlock(owner);
-    }
-    return result;
-  }
+  // NOTE: `ResetSharedOwnerPairAndReleaseControlBlock` used to live here as a
+  // local reach-in (clear `{px,pi}` to null, release the previous `pi`). It
+  // is byte-for-byte `boost::ReleaseSharedPairAndClear` (`BoostWrappers.h`),
+  // decompiled straight from the three real per-T bodies now cited on that
+  // function (`ResetSharedOwnerPairAndReleaseBatchA/B/C` below).
 
   /**
    * Address: 0x007D8F80 (FUN_007D8F80)
@@ -20454,10 +20347,10 @@ namespace
    * Clears one `{object, owner}` pair and releases owner use/weak counts.
    */
   std::intptr_t ResetSharedOwnerPairAndReleaseBatchA(
-    SharedOwnerPairRuntimeView* const pair
+    boost::SharedCountPair* const pair
   ) noexcept
   {
-    return ResetSharedOwnerPairAndReleaseControlBlock(pair);
+    return reinterpret_cast<std::intptr_t>(boost::ReleaseSharedPairAndClear(pair));
   }
 
   /**
@@ -20480,10 +20373,10 @@ namespace
    * Alias lane for clearing one `{object, owner}` pair and releasing owner.
    */
   std::intptr_t ResetSharedOwnerPairAndReleaseBatchB(
-    SharedOwnerPairRuntimeView* const pair
+    boost::SharedCountPair* const pair
   ) noexcept
   {
-    return ResetSharedOwnerPairAndReleaseControlBlock(pair);
+    return reinterpret_cast<std::intptr_t>(boost::ReleaseSharedPairAndClear(pair));
   }
 
   /**
@@ -20519,10 +20412,10 @@ namespace
    * Alias lane for clearing one `{object, owner}` pair and releasing owner.
    */
   std::intptr_t ResetSharedOwnerPairAndReleaseBatchC(
-    SharedOwnerPairRuntimeView* const pair
+    boost::SharedCountPair* const pair
   ) noexcept
   {
-    return ResetSharedOwnerPairAndReleaseControlBlock(pair);
+    return reinterpret_cast<std::intptr_t>(boost::ReleaseSharedPairAndClear(pair));
   }
 
   struct WordLaneAt488RuntimeView
@@ -24326,101 +24219,17 @@ namespace
     return StoreScalarDwordLane(outValue, value);
   }
 
-  struct HeapComparableNodeLane14RuntimeView
-  {
-    std::byte pad00_13[0x14];
-    std::uint32_t keyLane14; // +0x14
-  };
-#if defined(_M_IX86)
-  static_assert(
-    offsetof(HeapComparableNodeLane14RuntimeView, keyLane14) == 0x14,
-    "HeapComparableNodeLane14RuntimeView::keyLane14 offset must be 0x14"
-  );
-#endif
-
-  /**
-   * Address: 0x0087E850 (FUN_0087E850)
-   *
-   * What it does:
-   * Sifts one heap slot down through the larger-child path, then sifts the
-   * pending node upward so max-heap ordering by key lane `+0x14` is preserved.
-   */
-  std::int32_t SiftHeapNodeDownThenUpByKeyLane14(
-    std::int32_t startIndex,
-    const std::int32_t heapCount,
-    HeapComparableNodeLane14RuntimeView** const heapSlots,
-    HeapComparableNodeLane14RuntimeView* const pendingNode
-  ) noexcept
-  {
-    std::int32_t writeIndex = startIndex;
-    std::int32_t childIndex = writeIndex * 2 + 2;
-    bool childEqualsHeapCount = (childIndex == heapCount);
-
-    if (childIndex < heapCount) {
-      do {
-        HeapComparableNodeLane14RuntimeView* const rightChild = heapSlots[childIndex];
-        HeapComparableNodeLane14RuntimeView* const leftChild = heapSlots[childIndex - 1];
-        if (rightChild->keyLane14 < leftChild->keyLane14) {
-          --childIndex;
-        }
-
-        heapSlots[writeIndex] = heapSlots[childIndex];
-        writeIndex = childIndex;
-        childIndex = childIndex * 2 + 2;
-        childEqualsHeapCount = (childIndex == heapCount);
-      } while (childIndex < heapCount);
-    }
-
-    if (childEqualsHeapCount) {
-      heapSlots[writeIndex] = heapSlots[heapCount - 1];
-      writeIndex = heapCount - 1;
-    }
-
-    std::int32_t parentIndex = (writeIndex - 1) / 2;
-    while (startIndex < writeIndex) {
-      HeapComparableNodeLane14RuntimeView* const parentNode = heapSlots[parentIndex];
-      if (parentNode->keyLane14 >= pendingNode->keyLane14) {
-        break;
-      }
-
-      heapSlots[writeIndex] = parentNode;
-      writeIndex = parentIndex;
-      parentIndex = (parentIndex - 1) / 2;
-    }
-
-    heapSlots[writeIndex] = pendingNode;
-    return parentIndex;
-  }
-
-  /**
-   * Address: 0x0087EA30 (FUN_0087EA30)
-   *
-   * What it does:
-   * Sifts one node pointer upward in a max-heap lane while parent key `+0x14`
-   * is smaller than the inserted node key.
-   */
-  std::int32_t SiftHeapNodeUpByKeyLane14(
-    std::int32_t writeIndex,
-    const std::int32_t stopIndex,
-    HeapComparableNodeLane14RuntimeView* const insertedNode,
-    HeapComparableNodeLane14RuntimeView** const heapSlots
-  ) noexcept
-  {
-    std::int32_t parentIndex = (writeIndex - 1) / 2;
-    while (stopIndex < writeIndex) {
-      HeapComparableNodeLane14RuntimeView* const parentNode = heapSlots[parentIndex];
-      if (parentNode->keyLane14 >= insertedNode->keyLane14) {
-        break;
-      }
-
-      heapSlots[writeIndex] = parentNode;
-      writeIndex = parentIndex;
-      parentIndex = (parentIndex - 1) / 2;
-    }
-
-    heapSlots[writeIndex] = insertedNode;
-    return parentIndex;
-  }
+  // `HeapComparableNodeLane14RuntimeView` +
+  // `SiftHeapNodeDownThenUpByKeyLane14`/`SiftHeapNodeUpByKeyLane14`
+  // (formerly here, addresses 0x0087E850/0x0087EA30) hand-rolled a max-heap
+  // sift that duplicated the canonical `_Adjust_heap`/`_Push_heap` templates
+  // already in `legacy/algorithms/Sort.h`. Both addresses are now cited on
+  // `msvc8::detail::adjust_heap` there as the `Moho::UserEntity*`
+  // instantiation (key = `UserEntity::mSpatialDbEntry.mEntryId` at +0x14),
+  // and the real call site --
+  // `CDecalManager::EntitiesInView`/`PropsInView`'s `SortUserEntityPointerRange`
+  // helper in `moho/terrain/splat/CWldSplat.cpp` -- now calls `msvc8::sort`
+  // directly instead of this file's duplicate.
 
   /**
    * Address: 0x008823A0 (FUN_008823A0)
