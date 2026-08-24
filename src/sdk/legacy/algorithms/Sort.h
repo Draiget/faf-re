@@ -160,6 +160,12 @@ namespace msvc8
          * back empty): the `UserEntity*` collections in `CDecalManager` are
          * always rebuilt with a full `msvc8::sort`, never incrementally
          * pushed. Same citation-only pattern as `0x0089C350` above.)
+         * Address: 0x00760590 (FUN_00760590, the 8-byte `DumpUnitsCountEntry`
+         * instantiation -- sift-down half only, called recursively from the
+         * heapify driver `sub_75FDB0` for `SortDumpUnitsCountEntries`'s
+         * descending-population-count sort. Element stride confirmed from
+         * `(a2 - a1) >> 3`; recurses into `sub_760720` for the child compare,
+         * the same two-way split this template's `comp` calls encode.)
          */
         template <class T, class Compare>
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)

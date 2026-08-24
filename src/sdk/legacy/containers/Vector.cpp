@@ -7301,6 +7301,9 @@ VectorVoidStorageView* CopyAssignSPointVectorStorage(
  * Copy-assigns one `vector<SEntitySetTemplateUnit>` lane, copying only per-set
  * fastvector payload for existing nodes and preserving intrusive list lanes.
  *
+ * Address: 0x00703040 (FUN_00703040, `sub_703040`, the shared empty-dest
+ * teardown helper inlined below)
+ *
  * The `sourceCount == 0u` branch below is the recovered body of
  * 0x00703040 (FUN_00703040, `sub_703040`) as invoked from this call
  * site: `sub_703040(&a2, destination.first, destination.last)`, where
