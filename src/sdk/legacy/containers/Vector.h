@@ -2712,6 +2712,23 @@ namespace msvc8
          * on `push_back`) when `mAttackVectors` is at capacity -- emitted via
          * `CAiBrain`'s `mAttackVectors.push_back(...)` call sites (CAiBrain.cpp),
          * the only lane this element type is appended through.)
+         * Address: 0x00592460 (FUN_00592460, `msvc8::vector<T>::insert(iterator,
+         * const T&)` for a 12-byte three-float element (`imul` by `2AAAAAABh`
+         * then `sar 1` is the divide-by-3 dword-stride calc). The reallocation
+         * branch reads the caller-supplied value's three dwords into a stack-
+         * local before touching storage (matching this method's `const T
+         * localValue(value)` copy-out) and, on the empty/full-buffer path,
+         * routes the prefix-copy and single-value-fill through the
+         * `uninit_move_n`/`uninit_fill_n` per-T emissions FUN_005940F0 and
+         * FUN_00592030 (both cited on those methods below); the in-place
+         * tail-shift path calls the same two templates' non-reallocating
+         * siblings, FUN_00595F10 and FUN_00594A20, directly. Reachable from a
+         * static initializer (`ctor_static`/`__xc_a`, depth 6 via its own
+         * caller FUN_00591F40) -- the owning `vector<T>` field has not been
+         * pinned to a named engine type beyond "12-byte, three float lanes",
+         * consistent with this file's practice of citing structurally-proven
+         * but not fully name-identified instantiations (cf. the "unidentified
+         * map<int32_t,T>" family in RbTree.h).)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -2767,6 +2784,37 @@ namespace msvc8
          * reallocation branches call the range-copy body FUN_00832B80
          * directly for the head/tail relocation (all cited on
          * `uninit_copy_n` above).)
+         * Address: 0x00768090 (FUN_00768090, `msvc8::vector<T>::insert` for
+         * `hash_map<Key,T,Traits>::iterator` -- a 4-byte pointer-wrapper
+         * element (`max_size` folds to `0x3FFFFFFF`, matching the 4-byte-
+         * pointer family cited elsewhere on this method). This is `mVec`'s
+         * grow lane in `legacy/containers/HashMap.h`'s `hash_map` (the
+         * `PathQueue::ImplBase` node-table instantiation): `_Init()`'s
+         * `mVec.clear(); mVec.resize(Traits::min_buckets + 1, mList.end())`
+         * calls this template's own `resize(n, value)` -> `insert(last_, n,
+         * value)` path on first construction, when `mVec` is still empty and
+         * the resize forces a full reallocation. `_Init()` itself is
+         * `FUN_00767C70` (already recovered/address-annotated,
+         * `legacy/containers/HashMap.h` + `moho/path/PathTables.cpp`), which
+         * is this function's direct, confirmed caller (`call sub_768090` at
+         * its own body). The other two call sites, FUN_00767EC0 (`skip`,
+         * one-instruction tail-call thunk) and FUN_00769B90
+         * (`external_dependency`), are not needed to satisfy this
+         * instantiation's caller evidence.)
+         * Address: 0x0052DBE0 (FUN_0052DBE0, `msvc8::vector<T>::insert` for a
+         * 16-byte element (`max_size` folds to `0x0FFFFFFF`, `sar
+         * reg,4`/`shl reg,4` stride) in the `RRuleGameRulesImpl` area --
+         * confirmed reachable at depth 1 from
+         * `??_7RRuleGameRulesImpl@Moho@@6B@` and, by direct disassembly,
+         * called from `RRuleGameRulesImpl::ExportToLuaState`
+         * (`FUN_00529F70`, recovered/address-annotated at
+         * `moho/sim/RRuleGameRules.cpp:2005`) at `call sub_52DBE0`,
+         * 0x0052A31D -- the currently-committed `ExportToLuaState` body is a
+         * partial reconstruction that does not yet show this specific
+         * insert; the call is present in the shipped binary regardless. The
+         * grow half calls `uninit_move_n`/`uninit_fill_n` instantiations for
+         * this element through FUN_005334B0 (cited on `uninit_move_n`
+         * below).)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3115,6 +3163,31 @@ namespace msvc8
          * Address: 0x0064E420 (FUN_0064E420, the advance-returning `_Ufill`
          * adapter around FUN_0064F9A0: fills then returns `dst + count`)
          *
+         * Address: 0x00592030 (FUN_00592030, `uninit_fill_n` for the same
+         * 12-byte three-float element as `insert(iterator, const T&)`'s
+         * FUN_00592460 above -- broadcast-copies a stack-local prototype
+         * (populated from the caller's `value` argument before storage is
+         * touched) via three `mov`-per-dword steps, dest stride `+0x0C`.
+         * Reached from FUN_00592460's reallocation branch with count folded
+         * to the single-element case; the non-reallocating in-place path
+         * calls the ICF-identical sibling FUN_00594A20 directly for the same
+         * fill. See FUN_00592460's citation on `insert(iterator, const T&)`
+         * above for the caller chain and reachability evidence.)
+         * Address: 0x005EAA10 (FUN_005EAA10, `uninit_fill_n` for the 20-byte
+         * `moho::SAttachPoint` element (`CAiTransportImpl.h`,
+         * `sizeof(SAttachPoint) == 0x14`) -- broadcast-copies a stack-local
+         * prototype (one dword id/bone field plus four floats) via
+         * `mov`+`fld`/`fstp` steps, dest stride `+0x14`, source pointer never
+         * advanced. Reached from FUN_005EB320's reallocation branch --
+         * FUN_005EB320's own body invokes the IDA-recognised
+         * `std::vector<SAttachPoint>::size`/`::_Buy` helpers directly,
+         * independently confirming the element type -- which is itself an
+         * `msvc8::vector<SAttachPoint>::insert(iterator, count, value)`
+         * emission reachable from `WinMain` at depth 24. This is a distinct
+         * insert-at-position call chain from the already-recovered
+         * `RVectorType_SAttachPoint::SerLoad` (0x005EA260,
+         * `IAiTransport.cpp`), which only appends via `push_back`.)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
@@ -3190,6 +3263,38 @@ namespace msvc8
          * not byte-identical (different register allocation from being
          * compiled as part of different enclosing functions) so `/OPT:ICF`
          * left them as separate symbols.
+         *
+         * Address: 0x005940F0 (FUN_005940F0, `uninit_move_n` for the same
+         * 12-byte three-float element as `insert(iterator, const T&)`'s
+         * FUN_00592460 above (`[first_, first_+offset)` -> `newBuf` prefix
+         * copy). Register-shuffle wrapper: takes `first`/`dest` on the stack
+         * and `last` passed through unmodified from its own caller's `edx`
+         * (the reallocation branch computes the prefix length there before
+         * the call), then forwards `(dest=eax, first=ecx, last=edx)` into
+         * the range-copy body FUN_00595F10 -- a plain trivially-copyable
+         * forward loop, `while (first != last) { copy 12 bytes; first +=
+         * 0xC; dest += 0xC; }`. The local dword written and read back before
+         * the call is dead in this instantiation (its low byte would be a
+         * `bool` argument in the tree/node family this wrapper shape also
+         * appears in, but the range-copy callee here never reads the stack
+         * arg it is packaged with). Reached from FUN_00592460's reallocation
+         * branch; see that citation above for the full caller chain.)
+         * Address: 0x005334B0 (FUN_005334B0, `uninit_move_n` for a 16-byte
+         * element in the same `RRuleGameRulesImpl`-area `vector<T>::insert`
+         * family as FUN_0052DBE0 (cited on `insert(pos, count, value)`
+         * above). Per-element loop: raw dword copy of the first 4 bytes,
+         * then a call through FUN_00537860-style copy-construct helper
+         * (`sub_52D9C0`) for the remaining 12 bytes, followed immediately by
+         * a destroy call on the source slot (`sub_530EE0`) -- i.e. the
+         * element is not trivially copyable and the binary interleaves
+         * construct-new/destroy-old per slot rather than batching the
+         * destroy pass at the end the way this template's generic
+         * `uninit_move_n` does; behaviourally equivalent net effect (each
+         * source slot is copy-constructed into `dst` and torn down exactly
+         * once), same divergence class already documented for the
+         * shared_ptr and `msvc8::string` entries above. Reached from
+         * FUN_0052DBE0's reallocation branch; caller-chain evidence is
+         * FUN_0052DBE0's own citation above.)
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -3477,6 +3582,36 @@ namespace msvc8
          * Address: 0x008B3700 (FUN_008B3700)
          * Address: 0x0094F1B0 (FUN_0094F1B0, `msvc8::vector<gpg::TypeHandle>`'s
          * `_Insert_n` reallocation path, FUN_00951F30)
+         *
+         * sizeof(T) == 28 (`count > 0x0F5C28F5` throws):
+         * Address: 0x00883870 (FUN_00883870, `msvc8::vector<msvc8::string>`'s
+         * checked-allocate lane, reached from the `_Insert_n` reallocation path
+         * FUN_00882BA0 already cited above on `_Insert_n` -- `reallocate_to`'s
+         * `allocate_slots_checked(newCap)` call for this element. Five call
+         * sites converge on it (0x00882610/0x00882920/0x00882BA0/0x00882FAF/
+         * 0x00883B30), all within the `msvc8::vector<msvc8::string>`
+         * reallocation family around `Moho::LaunchInfoLoad`; 0x00882BA0's own
+         * citation traces a real source-level trigger through
+         * `ResizeLegacyStringVectorExact`'s `outStrings.resize(n, fillValue)`
+         * (CSaveGameRequestImpl.cpp:125).)
+         *
+         * sizeof(T) == 152 (`count > 0x01B4E81A` throws):
+         * Address: 0x0077DD10 (FUN_0077DD10, checked-allocate lane for
+         * `msvc8::list<moho::SDecalInfo>`'s internal 0x98-byte node
+         * (`_Node{_Next(4), _Prev(4), SDecalInfo(0x90)}` -- `SDecalInfo` is
+         * confirmed 0x90 bytes in `CDecalTypes.h`, so 8+0x90=0x98 matches
+         * exactly). Reached from the node-buy wrappers FUN_0077D1D0
+         * (`_Buynode(next,prev)`, default-constructs the node's `SDecalInfo`
+         * value in place -- confirmed from its own disassembly, which default-
+         * constructs via `call SDecalInfo::SDecalInfo()` after writing the
+         * caller-supplied `prev`/`next` link fields) and FUN_0077D3E0 (`mov
+         * ecx,1; jmp FUN_0077DD10`, the with-value `_Buynode` overload's
+         * shared allocate step). FUN_0077D1D0 is called directly from
+         * `gpg::RListType_SDecalInfo::SerLoad` (0x0077B260, recovered and
+         * address-annotated in CDecalTypes.cpp), whose current source
+         * (`list->push_back(value)`, calling into this template's own
+         * `insert()`/`al.allocate(1)` path) is the source-level trigger for
+         * this exact `list<SDecalInfo>` instantiation.)
          *
          * sizeof(T) == 12 / 16 / 52 / 60 / 64 / 116 / 388:
          * Address: 0x007E5650 (FUN_007E5650, 12B, e.g. `Wm3::Vector3<float>`)
@@ -4135,6 +4270,21 @@ namespace msvc8
          * ctor with the `??_7length_error@std@@6B@` vftable patched in before
          * `_CxxThrowException`, exactly mirroring FUN_004E3310. Reached from
          * `RegisterSndVarInstance`'s (FUN_004DF990) `push_back` call.)
+         * Address: 0x00AC2D10 (FUN_00AC2D10, another 12-byte-node
+         * `msvc8::list<T*>` node-buy lane for a 4-byte pointer/scalar T --
+         * `operator new(0xC)`, writes `_Next`/`_Prev` from its first two
+         * stack args directly and `_Value` from `*arg_8` (the third arg is a
+         * pointer to the value, dereferenced once, matching `insert`'s
+         * `const value_type&` parameter). Called from FUN_00AC31E0, which
+         * matches this method's shape exactly: loads `head=[ebx+4]`, buys
+         * the node via this lane, calls the sibling `_Incsize`-style
+         * overflow check (`sub_AC3140(1)`, same family as FUN_004E3310/
+         * FUN_004E3490 above), then links the fresh node as the new list
+         * head and fixes up the old head's back-link -- a `push_front`-shape
+         * insert at `begin()`. Two further callers of this node-buy lane
+         * (FUN_00AC3220, `recovered`; FUN_00AC3420, `external_dependency`)
+         * exist in the same address neighbourhood but are not needed to
+         * satisfy this instantiation's caller evidence.)
          *
          * What it does:
          * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
