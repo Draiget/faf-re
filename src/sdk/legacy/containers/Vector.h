@@ -1354,6 +1354,24 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x007BB6A0 (FUN_007BB6A0, msvc8::vector<Moho::
+         * SNetCommandArg>::vector(count, value) -- the count/value
+         * constructor for the 36-byte element, which VC8 implements as
+         * `_Buy(count)` (see `reserve`) followed by an `insert(begin(),
+         * count, value)` fill on the fresh empty storage -- exactly this
+         * constructor's body. Reached from `CGpgNetInterface::ReadFromSocket`
+         * (`FUN_007BAF70`'s real per-command arg-vector prefill, each slot
+         * overwritten in place with its decoded value afterward).
+         *
+         * Construct with count copies of value
+         */
+        vector(std::size_t count, const T& value) : vector() {
+            if (count) {
+                insert(first_, count, value);
+            }
+        }
+
+        /**
          * Construct from std::vector (copy)
          */
         explicit vector(const std::vector<T>& src) : vector() {
@@ -2459,6 +2477,15 @@ namespace msvc8
          * every section, not just `.text`), so it is a dead template instantiation
          * and is not wired into recovered source; only the push_back caller chain
          * above is load-bearing)
+         * Address: 0x007F3500 (FUN_007F3500, sibling emission in the same
+         * SRangeExtractionPayload `_Insert_n` count=1 in-place-growth family: the
+         * calling-convention adapter that MSVC8 split out for the "move the single
+         * trailing element into the newly uninitialized slot past `mLast`" step.
+         * Repackages its four stack args (dest, srcFirst, srcLast, ...) into the
+         * order FUN_007F3EF0's forward-copy primitive expects and tail-calls it;
+         * no independent logic of its own. Reached only from the in-place growth
+         * path of FUN_007F1D50 (cited above), which is itself only reachable
+         * through push_back — same load-bearing caller chain.)
          * Address: 0x006DBAE0 (FUN_006DBAE0, msvc8::vector<moho::EntityCategorySet>::insert
          * single-value lane — `insert(end(), 1, val)` for the 0x28-byte element. Computes
          * the insert offset twice with the 66666667h/`sar 4` magic pair (0x006DBAF8 and
@@ -2710,14 +2737,6 @@ namespace msvc8
          * reallocation branches call the range-copy body FUN_00832B80
          * directly for the head/tail relocation (all cited on
          * `uninit_copy_n` above).)
-         * Address: 0x007BB6A0 (FUN_007BB6A0, msvc8::vector<Moho::
-         * SNetCommandArg>::vector(count, value) -- the count/value
-         * constructor for the 36-byte element, which VC8 implements as
-         * `_Buy(count)` (see `reserve`) followed by exactly this
-         * `insert(begin(), count, value)` fill on the fresh empty storage.
-         * Reached from `FUN_007BAF70`'s `moho::BuildDefaultFilledCommandArgVector`
-         * -- `CGpgNetInterface::ReadFromSocket`'s real per-command arg-vector
-         * prefill, overwritten in place per element afterward.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);

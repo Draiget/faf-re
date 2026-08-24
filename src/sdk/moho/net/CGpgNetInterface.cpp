@@ -368,27 +368,6 @@ namespace
     return cursor;
   }
 
-  /**
-   * Address: 0x007BAF70 (FUN_007BAF70)
-   *
-   * What it does:
-   * Prefills an empty `*args` with `count` default-valued (`NETARG_Num`, 0)
-   * command arguments and returns the storage begin pointer.
-   * `ReadFromSocket`'s real per-command loop calls this once per command
-   * before decoding each argument's real value in place over the default it
-   * left behind, rather than building the vector via `push_back`.
-   */
-  SNetCommandArg* BuildDefaultFilledCommandArgVector(
-    const std::size_t count,
-    msvc8::vector<SNetCommandArg>* const args
-  )
-  {
-    if (count != 0u) {
-      args->insert(args->begin(), count, SNetCommandArg{0});
-    }
-    return args->begin();
-  }
-
 } // namespace
 
 /**
@@ -2032,8 +2011,7 @@ void CGpgNetInterface::ReadFromSocket()
       uint32_t argCount = 0;
       reader.ReadExact(argCount);
 
-      msvc8::vector<SNetCommandArg> args;
-      BuildDefaultFilledCommandArgVector(argCount, &args);
+      msvc8::vector<SNetCommandArg> args(argCount, SNetCommandArg{0});
       for (uint32_t i = 0; i < argCount; ++i) {
         args[i] = moho::NET_DecodeSocketArg(reader);
       }
