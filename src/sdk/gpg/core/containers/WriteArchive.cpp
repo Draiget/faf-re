@@ -422,6 +422,8 @@ public:
      * `std::basic_ostream<char, char_traits<char>>::put(char)` at
      * `0x008CCE10` (FUN_008CCE10), which is the shared CRT stream-put body
      * consumed by every `TextWriteArchive::Write*` lane in this TU.
+     *
+     * Address: 0x008CCE10 (FUN_008CCE10, the shared CRT stream-put body cited above)
      */
     void WriteMarker(int marker) override
     {
@@ -943,6 +945,9 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
  * path above -- no hand-written call corresponds to either, matching the
  * "compiler-emitted glue is not source at all" case for member dtor
  * chaining).
+ *
+ * Address: 0x00952300 (FUN_00952300, mObjRefs's `~map()`/`erase(begin(),end())`
+ * body described above)
  */
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
