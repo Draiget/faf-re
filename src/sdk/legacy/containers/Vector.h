@@ -1736,6 +1736,17 @@ namespace msvc8
          * value-initialized `_Ty()` temporary on the stack and tail-calls the
          * two-argument overload FUN_005C5460, which is precisely VC8's
          * `resize(_Newsize) { resize(_Newsize, _Ty()); }`.)
+         * Address: 0x00867890 (FUN_00867890,
+         * msvc8::vector<Moho::WeakEntitySetUserEntity>::resize(size_type) for the
+         * bucket vector `Moho::SelectionDragger::DragRelease`'s priority-bucket
+         * path grows -- builds the empty-tree `WeakEntitySetUserEntity()`
+         * temporary on the stack (`sub_7B08D0` head-alloc + self-link, matching
+         * `WeakEntitySetUserEntity::BuyNode`/`InitWeakEntitySetHead` in
+         * WeakEntitySet.h) and tail-calls the two-argument overload FUN_00867B90.
+         * Real call site: `priorityBuckets.resize(bucketIndex)`
+         * (moho/ui/SelectionDragger.cpp), the exact source line
+         * `Moho::SelectionDragger::DragRelease` (0x00863870) reaches this from at
+         * 0x00863C4F in the shipped binary.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -1798,6 +1809,18 @@ namespace msvc8
          * notes already document (0x0082C750/0x0082C950/0x0082C480/
          * 0x0082B5E0) -- this is the one-bucket-rehash growth/shrink for
          * `UICommandGraph`'s other hash table's bucket array.)
+         * Address: 0x00867B90 (FUN_00867B90,
+         * msvc8::vector<Moho::WeakEntitySetUserEntity>::resize(size_type,
+         * const_reference) for the 12-byte-stride selection-priority bucket
+         * vector -- computes `size()` via the exact `(mLast-mFirst)/12` shape
+         * this template's `size()` already produces, tail-calls the
+         * `_Insert_n` grow lane FUN_00868040 at `end()` when growing, `erase`
+         * (FUN_00867FC0) when shrinking, and always destroys the by-value
+         * `_Val` temporary on exit (`sub_7AF740` + `operator delete`, matching
+         * `WeakEntitySetUserEntity`'s new destructor in WeakEntitySet.h) --
+         * this is VC8's take-`_Val`-by-value shape the note below already
+         * describes. Reached from the one-argument overload above, itself
+         * reached from `DragRelease`'s bucket-vector growth.)
          *
          * What it does:
          * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
@@ -2835,6 +2858,21 @@ namespace msvc8
          * grow half calls `uninit_move_n`/`uninit_fill_n` instantiations for
          * this element through FUN_005334B0 (cited on `uninit_move_n`
          * below).)
+         * Address: 0x00868040 (FUN_00868040, `msvc8::vector<
+         * Moho::WeakEntitySetUserEntity>::insert(end(), count, value)` core for
+         * the 12-byte selection-priority bucket vector -- `max_size` folds to
+         * `357913941` (`0xFFFFFFFF/12`, checked against `count` before
+         * growing), reallocation growth is `(size>>1)+size` clamped to the
+         * needed size (this method's `recommended_capacity`), the new buffer
+         * is filled by copying the live range with the `uninit_copy_n`
+         * instantiation FUN_00868FD0 and the new tail with the `uninit_fill_n`
+         * instantiation FUN_00868DB0 (cited below); the in-place (capacity
+         * already sufficient) branch shifts the tail with the `uninit_move_n`
+         * instantiation FUN_00868920 and fills the vacated gap through the
+         * advance-returning `_Ufill` adapter FUN_00868580 (cited on
+         * `uninit_fill_n` below), matching this method's own two-branch shape
+         * exactly. Reached from the two-argument `resize` overload above
+         * (FUN_00867B90) when growing.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3316,6 +3354,24 @@ namespace msvc8
          * insert-at-position call chain from the already-recovered
          * `RVectorType_SAttachPoint::SerLoad` (0x005EA260,
          * `IAiTransport.cpp`), which only appends via `push_back`.)
+         *
+         * Address: 0x00868DB0 (FUN_00868DB0, `msvc8::vector<
+         * Moho::WeakEntitySetUserEntity>::uninit_fill_n` for the 12-byte
+         * selection-priority bucket element -- the non-trivial-element shape
+         * this method's `try`/`catch` guards: copy-constructs `n` copies of
+         * `value` at `dst` through the element's own copy constructor
+         * (`sub_822210`, matching `WeakEntitySetUserEntity`'s copy constructor
+         * in WeakEntitySet.h, which clones the source tree via `find`/
+         * `Iterator_inc`/`InsertSelectionEntity`), and on a mid-loop throw
+         * destroys the already-constructed prefix `[dst, dst+i)` one element at
+         * a time (`sub_868E50`, matching this type's destructor) before
+         * rethrowing via `CxxThrowException` -- byte-for-byte the same
+         * construct/rollback shape `destroy_n` below implements generically.
+         * Reached from the `insert`/`_Insert_n` core FUN_00868040 (both
+         * branches: the reallocation tail-fill directly, and the in-place gap
+         * fill through the advance-returning `_Ufill` adapter FUN_00868580,
+         * `int __usercall sub_868580(dest, value, count) { uninit_fill_n(dest,
+         * count, value); return dest + 12*count; }`) cited above on `insert`.)
          *
          * Uninitialized fill N with value starting at dst
          */

@@ -180,10 +180,15 @@ namespace
    * selection into a fresh scratch set, once to merge the dragged set into
    * the current selection on the "genuinely new entities" path, and once to
    * pull the winning priority bucket's entries into the final result set.
+   *
+   * `source` takes the bare `WeakEntitySetUserEntity&` header (not
+   * `SSelectionSetUserEntity&`): the body only ever passes it to `find`,
+   * which is already declared on the shared header, so it can walk either the
+   * derived selection sets or a bare `priorityBuckets` element unchanged.
    */
   moho::SSelectionNodeUserEntity* AddSelectionRange(
     moho::SSelectionSetUserEntity& destination,
-    moho::SSelectionSetUserEntity& source,
+    moho::WeakEntitySetUserEntity& source,
     moho::SSelectionNodeUserEntity* first,
     moho::SSelectionNodeUserEntity* const last
   )
@@ -454,7 +459,22 @@ namespace moho
       // select the first non-empty one. Buckets are indexed 1-based in the
       // binary (bucket 0 is never used), so `priorityBuckets[i]` holds
       // priority `i + 1`.
-      msvc8::vector<SSelectionSetUserEntity> priorityBuckets;
+      //
+      // Element type is the bare 12-byte `WeakEntitySetUserEntity` (not the
+      // 16-byte `SSelectionSetUserEntity`), matching the binary's own
+      // 12-byte-stride bucket vector exactly: `priorityBuckets.resize(...)`
+      // below is the real, literal source-level call site for the vector's
+      // growth machinery (FUN_00867890 -> FUN_00867B90 -> FUN_00868040 ->
+      // FUN_00868580 -> FUN_00868DB0, cited on `msvc8::vector<T>::resize`/
+      // `insert`/`uninit_fill_n` in Vector.h), and the 1-arg `resize(n)`
+      // overload's implicit `T()` default value, copy-constructed into every
+      // new slot, is what used to need the explicit post-hoc
+      // `InitializeLocalSelectionSet()` loop this replaces -- the fresh empty
+      // head each new bucket needs now comes from
+      // `WeakEntitySetUserEntity`'s own copy constructor (WeakEntitySet.h),
+      // exactly as the binary's per-element defensive-copy-of-an-empty-source
+      // does.
+      msvc8::vector<WeakEntitySetUserEntity> priorityBuckets;
       const CGeomSolid3 selectionSolid = BuildSelectionSolid();
 
       SSelectionNodeUserEntity* node = draggedSelection.mHead->mLeft;
@@ -484,15 +504,18 @@ namespace moho
                 const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
 
                 if (priorityBuckets.size() < bucketIndex) {
-                  const std::size_t oldSize = priorityBuckets.size();
+                  // `resize(bucketIndex)` alone is now the whole story: the
+                  // 1-arg overload default-constructs one blank
+                  // `WeakEntitySetUserEntity` temporary and copy-constructs it
+                  // into every new slot (Vector.h `resize`/`uninit_fill_n`,
+                  // element ctor/copy-ctor in WeakEntitySet.h) - each new
+                  // bucket comes up as a real, freshly-headed empty set
+                  // without a separate post-hoc init pass.
                   priorityBuckets.resize(bucketIndex);
-                  for (std::size_t i = oldSize; i < bucketIndex; ++i) {
-                    InitializeLocalSelectionSet(priorityBuckets[i]);
-                  }
                 }
 
-                SSelectionSetUserEntity::AddResult addResult{};
-                (void)SSelectionSetUserEntity::Add(&addResult, &priorityBuckets[bucketIndex - 1u], unit);
+                WeakEntitySetUserEntity::AddResult addResult{};
+                (void)WeakEntitySetUserEntity::Add(&addResult, &priorityBuckets[bucketIndex - 1u], unit);
               }
             }
           }
@@ -504,8 +527,8 @@ namespace moho
 
       ScopedLocalSelectionSet resultSelectionGuard{};
       SSelectionSetUserEntity& resultSelection = resultSelectionGuard.get();
-      for (SSelectionSetUserEntity& bucket : priorityBuckets) {
-        if (!bucket.IsEmptyAfterPrune()) {
+      for (WeakEntitySetUserEntity& bucket : priorityBuckets) {
+        if (bucket.mHead != nullptr && !bucket.IsEmptyAfterPrune()) {
           SSelectionNodeUserEntity* first = bucket.mHead->mLeft;
           first = SSelectionSetUserEntity::find(&bucket, first, &first);
           (void)AddSelectionRange(resultSelection, bucket, first, bucket.mHead);
@@ -515,7 +538,12 @@ namespace moho
 
       mSess->SetSelection(resultSelection);
 
-      for (SSelectionSetUserEntity& bucket : priorityBuckets) {
+      // Explicit release here (rather than waiting on `priorityBuckets`'s own
+      // destructor at scope-exit) keeps the binary's observed teardown point;
+      // `WeakEntitySetUserEntity::~WeakEntitySetUserEntity` still runs after,
+      // but `ReleaseStorage()` is idempotent (no-ops once `mHead` is null), so
+      // that second pass is a no-op rather than a double-free.
+      for (WeakEntitySetUserEntity& bucket : priorityBuckets) {
         (void)bucket.ReleaseStorage();
       }
     }

@@ -79,6 +79,44 @@ namespace moho
     std::uint32_t mSize;             // +0x08
 
     /**
+     * Trivial/zero-initializing by design: every existing embedding of this
+     * type (`CWldSession::mSelection`, `UserArmy::mEngineers/mFactories`,
+     * `CFormation::mParticipants`, the transient `ScopedLocalSelectionSet`
+     * guards) constructs a blank `{nullptr,nullptr,0}` header and brings it up
+     * through the explicit `InitWeakEntitySetHead`/`InitializeLocalSelectionSet`
+     * family rather than through the constructor. Do not change this to an
+     * allocating default constructor - `CWldSession`'s own constructor
+     * (CWldSession.cpp) writes `mSelection.mHead = nullptr` immediately after
+     * default-constructing it, so an allocating default ctor would leak the
+     * head this ctor built on every session construction.
+     */
+    WeakEntitySetUserEntity() = default;
+
+    /**
+     * Address: 0x00868DB0 (FUN_00868DB0, `msvc8::vector<WeakSet<UserEntity>>::
+     * uninit_fill_n`'s per-element copy) + 0x00822210 (FUN_00822210,
+     * `CopySelectionSetFromOther`'s underlying single-element clone step)
+     *
+     * What it does:
+     * Deep-clones one weak-entity-set tree into a fresh head/sentinel, walking
+     * the source's live (tombstone-pruned) entries through `find`/`Iterator_inc`
+     * and re-inserting each one via `InsertSelectionEntity` - the same
+     * range-clone shape `CopySelectionSetFromOther` already uses for
+     * `SSelectionSetUserEntity`, generalized to the bare 12-byte header so the
+     * vector-of-sets growth lane below can copy-construct it. Defined in
+     * CWldSession.cpp alongside the rest of this header's out-of-line members.
+     */
+    WeakEntitySetUserEntity(const WeakEntitySetUserEntity& other);
+
+    /**
+     * Address: 0x00868E50 (FUN_00868E50, `sub_868E50`) - same body as
+     * `ReleaseSelectionWeakSetStorageCompat`'s null-head-checked branch,
+     * generalized onto the owning type itself: erases every node and frees the
+     * head sentinel through `ReleaseStorage()`.
+     */
+    ~WeakEntitySetUserEntity();
+
+    /**
      * One `{owning set, current node}` iteration cursor - the shape every
      * weak-set walk in the engine keeps on the stack while it scans.
      *
@@ -168,6 +206,57 @@ namespace moho
      * member state at all, only the nodes it is handed.
      */
     void DestroySubtree(SSelectionNodeUserEntity* node);
+
+    /** One `{owning set, tree node}` iterator pair, mirroring `WeakUnitSetUserUnit::Index`. */
+    struct Index
+    {
+      WeakEntitySetUserEntity* mOwnerSet; // +0x00
+      SSelectionNodeUserEntity* mNode;    // +0x04
+    };
+
+    /** `std::pair<iterator, bool>` shape `Add` returns, mirroring `WeakUnitSetUserUnit::AddResult`. */
+    struct AddResult : Index
+    {
+      std::uint8_t mWasInserted;        // +0x08
+      std::uint8_t mReserved09_0B[3]{}; // +0x09
+    };
+
+    /**
+     * Address: 0x00867890/0x00867B90/0x00868040/0x00868580/0x00868DB0 wire this
+     * class into the `msvc8::vector<WeakSet<UserEntity>>::resize` growth lane
+     * below via the copy constructor; this `Add` is the bare-header sibling of
+     * `SSelectionSetUserEntity::Add` (0x007AE1B0-family), generalized the same
+     * way `find`/`Iterator_inc`/`EraseRange` already are on this header because
+     * `InsertSelectionEntity`'s body only ever touches `mHead`/`mSize`.
+     *
+     * What it does:
+     * Inserts one user-entity pointer key into the weak-set tree and returns
+     * `{ownerSet,node,inserted}` in `outResult`.
+     */
+    [[nodiscard]] static AddResult* Add(AddResult* outResult, WeakEntitySetUserEntity* set, UserEntity* entity);
+
+    /**
+     * Address: 0x0066A090-family (`IsEmptyAfterPrune`, generalized onto the
+     * bare header the same way `EraseRange`/`ReleaseStorage` are, since the
+     * body only reads `mHead`).
+     *
+     * What it does:
+     * Returns true when tombstone pruning from the left-most node reaches the
+     * head sentinel immediately (no live weak-set entries remain).
+     */
+    [[nodiscard]] bool IsEmptyAfterPrune();
+
+    /**
+     * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
+     * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
+     *
+     * What it does:
+     * Clears all weak-set nodes, destroys the tree head sentinel, and resets
+     * storage links/counters for this set. Bare-header sibling of
+     * `SSelectionSetUserEntity::ReleaseStorage`; the destructor above forwards
+     * to this.
+     */
+    std::int32_t ReleaseStorage();
 
     /**
      * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
