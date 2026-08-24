@@ -188,6 +188,8 @@ constexpr int kOsfhndLock = 11;  // _OSFHND_LOCK, confirmed via `push 0Bh` at 0x
 constexpr int kLocktabLock = 10; // _LOCKTAB_LOCK, confirmed via `push 0Ah` at 0x00A96C26
 extern "C" int __cdecl RuntimeInitCrtLockNumber(int lockId);
 extern "C" void __cdecl RuntimeLockCrtLock(int lockId);
+extern "C" int __cdecl _isatty(int fileDescriptor);
+extern "C" int __cdecl isleadbyte(int character);
 extern "C" int _nhandle;
 extern "C" int _commode;
 extern "C" int _cflush;
@@ -8766,6 +8768,358 @@ namespace moho::runtime
       return previousUnicodeSubmode != 0 ? kOModeWText : kOModeText;
     }
     return kOModeBinary;
+  }
+
+  namespace detail {
+    /**
+     * Shared tail for `_write_nolock`: when nothing was written, maps the
+     * captured async Win32 error (if any) through `_dosmaperr`, special-cases
+     * "wrote 0 of a leading Ctrl-Z byte into a piped/char device" as success,
+     * and otherwise reports `ENOSPC`; when something was written, returns the
+     * byte count minus the bytes inserted purely for `\n`->`\r\n` expansion.
+     * Mirrors the real function's shared `LABEL_83` exit.
+     */
+    int FinalizeNolockWrite(
+      const int fileDescriptor, const unsigned int totalWritten, const unsigned int crInsertedCount,
+      const DWORD asyncError, const char firstByte)
+    {
+      if (totalWritten != 0) {
+        return static_cast<int>(totalWritten - crInsertedCount);
+      }
+
+      DWORD mappedDosError = 0;
+      if (asyncError != 0) {
+        mappedDosError = 5;
+        if (asyncError != 5) {
+          _dosmaperr(asyncError);
+          return -1;
+        }
+        *_errno() = EBADF;
+      } else {
+        RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+        if ((slot->osfile & 0x40) != 0 && firstByte == 0x1A) {
+          return 0;
+        }
+        *_errno() = ENOSPC;
+      }
+      *RuntimeDosErrno() = mappedDosError;
+      return -1;
+    }
+  } // namespace detail
+
+  /**
+   * Address: 0x00A9B4E6 (FUN_00A9B4E6, _write_nolock)
+   *
+   * What it does:
+   * Low-level buffered write for `fileDescriptor`. For a TTY in text mode,
+   * writes character-by-character through the console, converting between
+   * the file's translation submode (ANSI/UTF-16/UTF-8) and the console's
+   * active code page, expanding `\n` to `\r\n`. For a regular file: binary
+   * mode writes the buffer directly; ANSI/UTF-16/UTF-8 text modes buffer
+   * through a fixed scratch page doing the same `\n`->`\r\n` expansion
+   * (re-encoding via `WideCharToMultiByte` for the UTF-8 submode) before
+   * calling `WriteFile`.
+   */
+  extern "C" int __cdecl _write_nolock(const int fileDescriptor, const char* const buffer, const unsigned int count)
+  {
+    if (count == 0) {
+      return 0;
+    }
+    if (buffer == nullptr) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return -1;
+    }
+
+    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    const int submode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
+
+    if ((submode == 1 || submode == 2) && (count & 1u) != 0) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return -1;
+    }
+
+    if ((slot->osfile & 0x20) != 0) {
+      _lseeki64_nolock(fileDescriptor, 0, FILE_END);
+    }
+
+    // Console path: only taken for a TTY currently in text mode (osfile
+    // sign bit, matching _setmode_nolock's O_TEXT bit).
+    if (_isatty(fileDescriptor) != 0 && static_cast<std::int8_t>(slot->osfile) < 0) {
+      const HANDLE consoleHandle = reinterpret_cast<HANDLE>(slot->osfhnd);
+      DWORD consoleMode = 0;
+      if (::GetConsoleMode(consoleHandle, &consoleMode) != 0) {
+        RuntimeTidDataLocaleView* const threadData = __getptd();
+        const bool usesDefaultLocale = (threadData->ptlocinfo->lcHandle[2] == 0);
+
+        if (!usesDefaultLocale || submode != 0) {
+          const UINT consoleCp = ::GetConsoleCP();
+          const char* readCursor = buffer;
+          unsigned int consumed = 0;
+          unsigned int totalWritten = 0;
+          unsigned int crInsertedCount = 0;
+          DWORD asyncError = 0;
+          bool failed = false;
+
+          while (consumed < count && !failed) {
+            bool isNewline = false;
+
+            if (submode != 0) {
+              const std::uint16_t wch = *reinterpret_cast<const std::uint16_t*>(readCursor);
+              readCursor += 2;
+              ++consumed;
+              isNewline = (wch == static_cast<std::uint16_t>(L'\n'));
+
+              if (static_cast<std::uint16_t>(::putwch_nolock(static_cast<wchar_t>(wch))) != wch) {
+                failed = true;
+                asyncError = ::GetLastError();
+              } else {
+                ++totalWritten;
+                if (isNewline) {
+                  if (static_cast<std::uint16_t>(::putwch_nolock(L'\r')) != static_cast<std::uint16_t>(L'\r')) {
+                    failed = true;
+                    asyncError = ::GetLastError();
+                  } else {
+                    ++totalWritten;
+                    ++crInsertedCount;
+                  }
+                }
+              }
+            } else {
+              const int leadByte = static_cast<unsigned char>(*readCursor);
+              isNewline = (leadByte == '\n');
+              wchar_t decoded = 0;
+              bool decodeOk = true;
+
+              if (isleadbyte(leadByte) != 0) {
+                if (count - consumed <= 1 || mbtowc(&decoded, readCursor, 2) == -1) {
+                  decodeOk = false;
+                } else {
+                  ++readCursor;
+                }
+              } else if (mbtowc(&decoded, readCursor, 1) == -1) {
+                decodeOk = false;
+              }
+
+              if (!decodeOk) {
+                failed = true;
+              } else {
+                ++readCursor;
+                ++consumed;
+
+                char multiByte[5] = {};
+                const int mbLen = ::WideCharToMultiByte(consoleCp, 0, &decoded, 1, multiByte, 5, nullptr, nullptr);
+                DWORD bytesWritten = 0;
+                if (mbLen == 0) {
+                  failed = true;
+                } else if (!::WriteFile(consoleHandle, multiByte, static_cast<DWORD>(mbLen), &bytesWritten, nullptr)) {
+                  failed = true;
+                  asyncError = ::GetLastError();
+                } else {
+                  totalWritten += bytesWritten;
+                  if (static_cast<int>(bytesWritten) < mbLen) {
+                    failed = true;
+                  } else if (isNewline) {
+                    multiByte[0] = '\r';
+                    if (!::WriteFile(consoleHandle, multiByte, 1u, &bytesWritten, nullptr)) {
+                      failed = true;
+                      asyncError = ::GetLastError();
+                    } else if (bytesWritten < 1) {
+                      failed = true;
+                    } else {
+                      ++crInsertedCount;
+                      ++totalWritten;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          return detail::FinalizeNolockWrite(fileDescriptor, totalWritten, crInsertedCount, asyncError, buffer[0]);
+        }
+      }
+    }
+
+    // Regular-file path.
+    if (static_cast<std::int8_t>(slot->osfile) >= 0) {
+      DWORD bytesWritten = 0;
+      DWORD asyncError = 0;
+      unsigned int totalWritten = 0;
+      if (::WriteFile(reinterpret_cast<HANDLE>(slot->osfhnd), buffer, count, &bytesWritten, nullptr)) {
+        totalWritten = bytesWritten;
+      } else {
+        asyncError = ::GetLastError();
+      }
+      return detail::FinalizeNolockWrite(fileDescriptor, totalWritten, 0u, asyncError, buffer[0]);
+    }
+
+    if (submode == 0) {
+      // ANSI text mode: buffer through a scratch page, expanding
+      // '\n' -> "\r\n", flushing in <=0x400-byte chunks.
+      const char* readCursor = buffer;
+      unsigned int consumed = 0;
+      unsigned int totalWritten = 0;
+      unsigned int crInsertedCount = 0;
+      DWORD asyncError = 0;
+      while (consumed < count) {
+        char scratch[0x400];
+        char* dst = scratch;
+        while (consumed < count && (dst - scratch) < 0x400) {
+          const char ch = *readCursor++;
+          ++consumed;
+          if (ch == '\n') {
+            ++crInsertedCount;
+            *dst++ = '\r';
+          }
+          *dst++ = ch;
+        }
+        const unsigned int producedThisChunk = static_cast<unsigned int>(dst - scratch);
+        DWORD bytesWritten = 0;
+        if (!::WriteFile(reinterpret_cast<HANDLE>(slot->osfhnd), scratch, producedThisChunk, &bytesWritten, nullptr)) {
+          asyncError = ::GetLastError();
+          break;
+        }
+        totalWritten += bytesWritten;
+        if (bytesWritten < producedThisChunk) {
+          break;
+        }
+      }
+      return detail::FinalizeNolockWrite(fileDescriptor, totalWritten, crInsertedCount, asyncError, buffer[0]);
+    }
+
+    if (submode == 2) {
+      // Wide (_O_WTEXT/_O_U16TEXT) mode into a non-console file: source is
+      // wchar_t data; expand L'\n'->L"\r\n", write the wide bytes as-is.
+      const char* readCursor = buffer;
+      unsigned int consumed = 0;
+      unsigned int totalWritten = 0;
+      unsigned int crInsertedCount = 0;
+      DWORD asyncError = 0;
+      while (consumed < count) {
+        char scratch[0x400];
+        char* dst = scratch;
+        while (consumed < count && (dst - scratch) < 0x3FE) {
+          const std::uint16_t wch = *reinterpret_cast<const std::uint16_t*>(readCursor);
+          readCursor += 2;
+          consumed += 2;
+          if (wch == static_cast<std::uint16_t>(L'\n')) {
+            crInsertedCount += 2;
+            *reinterpret_cast<std::uint16_t*>(dst) = static_cast<std::uint16_t>(L'\r');
+            dst += 2;
+          }
+          *reinterpret_cast<std::uint16_t*>(dst) = wch;
+          dst += 2;
+        }
+        const unsigned int producedThisChunk = static_cast<unsigned int>(dst - scratch);
+        DWORD bytesWritten = 0;
+        if (!::WriteFile(reinterpret_cast<HANDLE>(slot->osfhnd), scratch, producedThisChunk, &bytesWritten, nullptr)) {
+          asyncError = ::GetLastError();
+          break;
+        }
+        totalWritten += bytesWritten;
+        if (bytesWritten < producedThisChunk) {
+          break;
+        }
+      }
+      return detail::FinalizeNolockWrite(fileDescriptor, totalWritten, crInsertedCount, asyncError, buffer[0]);
+    }
+
+    // UTF-8 (_O_U8TEXT) mode into a non-console file: source is wchar_t
+    // data; expand L'\n'->L"\r\n" in a wide scratch buffer, re-encode to
+    // UTF-8 via WideCharToMultiByte, then WriteFile the encoded bytes.
+    {
+      const auto* wideCursor = reinterpret_cast<const std::uint16_t*>(buffer);
+      const auto* const wideBase = wideCursor;
+      unsigned int totalWritten = 0;
+      DWORD asyncError = 0;
+      bool stop = false;
+      while (!stop && static_cast<unsigned int>(reinterpret_cast<const char*>(wideCursor) - buffer) < count) {
+        wchar_t wideScratch[0xA9 + 1];
+        wchar_t* wDst = wideScratch;
+        while (static_cast<unsigned int>(reinterpret_cast<const char*>(wideCursor) - buffer) < count &&
+               (wDst - wideScratch) < 0xA9) {
+          const std::uint16_t wch = *wideCursor++;
+          if (wch == static_cast<std::uint16_t>(L'\n')) {
+            *wDst++ = L'\r';
+          }
+          *wDst++ = static_cast<wchar_t>(wch);
+        }
+
+        char utf8Scratch[688];
+        const int encodedLen = ::WideCharToMultiByte(
+          CP_UTF8, 0, wideScratch, static_cast<int>(wDst - wideScratch), utf8Scratch, 683, nullptr, nullptr
+        );
+        if (encodedLen == 0) {
+          break;
+        }
+
+        int flushed = 0;
+        DWORD bytesWritten = 0;
+        bool chunkOk = false;
+        while (::WriteFile(reinterpret_cast<HANDLE>(slot->osfhnd), &utf8Scratch[flushed], encodedLen - flushed, &bytesWritten, nullptr)) {
+          flushed += static_cast<int>(bytesWritten);
+          if (encodedLen <= flushed) {
+            chunkOk = true;
+            break;
+          }
+        }
+        if (!chunkOk && encodedLen > flushed) {
+          asyncError = ::GetLastError();
+          stop = true;
+        } else {
+          totalWritten = static_cast<unsigned int>(reinterpret_cast<const char*>(wideCursor) - buffer);
+          if (totalWritten >= count) {
+            stop = true;
+          }
+        }
+      }
+      (void)wideBase;
+      return detail::FinalizeNolockWrite(fileDescriptor, totalWritten, 0u, asyncError, buffer[0]);
+    }
+  }
+
+  /**
+   * Address: 0x00A9BAAC (FUN_00A9BAAC, write / _write)
+   *
+   * What it does:
+   * Public fd-based write entry point: validates `fileDescriptor` is open,
+   * acquires its per-fd lock, forwards to `_write_nolock`, releases the
+   * lock, and returns its result.
+   */
+  extern "C" int __cdecl _write(const int fileDescriptor, const void* const buffer, const unsigned int count)
+  {
+    if (fileDescriptor == -2) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      return -1;
+    }
+
+    if (fileDescriptor < 0 || fileDescriptor >= _nhandle ||
+        ((__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile & 1) == 0)
+    {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return -1;
+    }
+
+    _lock_fhandle(fileDescriptor);
+
+    int result;
+    if (((__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile & 1) != 0) {
+      result = _write_nolock(fileDescriptor, static_cast<const char*>(buffer), count);
+    } else {
+      *_errno() = EBADF;
+      *RuntimeDosErrno() = 0;
+      result = -1;
+    }
+
+    _unlock_fhandle(fileDescriptor);
+    return result;
   }
 
   /**
