@@ -1841,6 +1841,16 @@ namespace msvc8
          * `resize(size_type, _Ty)`), which is why FUN_005C5460 destroys a stack
          * temporary on exit; taking it by const-ref here is equivalent because
          * `insert` copies into its own local before any reallocation.
+         *
+         * Address: 0x0082DB00 (FUN_0082DB00, `msvc8::vector<UICommandGraph::
+         * HashListNode2C*>::resize` for the 4-byte pointer element -- shrinks
+         * via the destroy-range helper FUN_0082F750 (recovered,
+         * LegacyContainerRuntime.cpp) or grows via the `_Insert_n` emission
+         * FUN_0082F7A0 (already cited on this template, stride 4). Reached
+         * from `UICommandGraph::ObtainHashListNodePair<TNode,TValue>`'s
+         * rehash-growth branch, `table.mBuckets.resize(newMask + 2u,
+         * table.mListHead)` -- the fill value is the table's sentinel head
+         * pointer, not a raw byte, matching this member's `const T&` shape.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
