@@ -905,84 +905,6 @@ namespace
     return destination;
   }
 
-  struct RuntimeSharedPtrLikeLane
-  {
-    void* object = nullptr;                 // +0x00
-    boost::detail::shared_count count{};    // +0x04
-  };
-  static_assert(sizeof(RuntimeSharedPtrLikeLane) == 0x08, "RuntimeSharedPtrLikeLane size must be 0x08");
-
-  struct RuntimeWeakPtrLikeLane
-  {
-    void* object = nullptr;               // +0x00
-    boost::detail::weak_count count{};    // +0x04
-  };
-  static_assert(sizeof(RuntimeWeakPtrLikeLane) == 0x08, "RuntimeWeakPtrLikeLane size must be 0x08");
-
-  /**
-   * Address: 0x007BCB30 (FUN_007BCB30)
-   *
-   * What it does:
-   * Copies one pointer lane and rebuilds one weak-count lane from source
-   * shared-count ownership.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeWeakPtrLikeLane* CopyWeakPtrLikeLaneFromSharedLaneA(
-    const RuntimeSharedPtrLikeLane* const source,
-    RuntimeWeakPtrLikeLane* const destination
-  )
-  {
-    if (source == nullptr || destination == nullptr) {
-      return destination;
-    }
-
-    destination->count = boost::detail::weak_count(source->count);
-    destination->object = source->object;
-    return destination;
-  }
-
-  /**
-   * Address: 0x007BCB70 (FUN_007BCB70)
-   *
-   * What it does:
-   * Secondary copy lane for shared-to-weak pointer payload cloning.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeWeakPtrLikeLane* CopyWeakPtrLikeLaneFromSharedLaneB(
-    const RuntimeSharedPtrLikeLane* const source,
-    RuntimeWeakPtrLikeLane* const destination
-  )
-  {
-    return CopyWeakPtrLikeLaneFromSharedLaneA(source, destination);
-  }
-
-  struct RuntimeCommandDispatchLane
-  {
-    using DispatchFn = int(__thiscall*)(std::uint32_t adjustedThis, std::uint32_t dwordArg, std::uint32_t wordArg);
-
-    DispatchFn dispatch;        // +0x00
-    std::uint32_t thisBase;     // +0x04
-    std::uint32_t thisOffset;   // +0x08
-    std::uint32_t dwordArg;     // +0x0C
-    std::uint16_t wordArg;      // +0x10
-    std::uint16_t reserved12;   // +0x12
-  };
-  static_assert(sizeof(RuntimeCommandDispatchLane) == 0x14, "RuntimeCommandDispatchLane size must be 0x14");
-
-  /**
-   * Address: 0x007BEE50 (FUN_007BEE50)
-   *
-   * What it does:
-   * Rebuilds one adjusted this-pointer lane (`base + offset`) and dispatches
-   * through the stored thiscall function pointer with one dword and one
-   * zero-extended word payload argument.
-   */
-  [[maybe_unused]] int DispatchCommandThroughAdjustedThiscall(
-    RuntimeCommandDispatchLane* const lane
-  )
-  {
-    const std::uint32_t adjustedThis = lane->thisBase + lane->thisOffset;
-    return lane->dispatch(adjustedThis, lane->dwordArg, static_cast<std::uint32_t>(lane->wordArg));
-  }
-
   /**
    * Address: 0x007BD8F0 (FUN_007BD8F0)
    *
@@ -1015,47 +937,6 @@ namespace
     DestroyCommandArgRange(rangeBegin, rangeEnd);
   }
 
-  [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresent(
-    moho::SNetCommand* const destination,
-    const moho::SNetCommand* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (destination) moho::SNetCommand(*source);
-  }
-
-  /**
-   * Address: 0x007BBB90 (FUN_007BBB90)
-   *
-   * What it does:
-   * Primary adapter lane for nullable `SNetCommand` copy-construction into
-   * caller-provided queue storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresentPrimary(
-    moho::SNetCommand* const destination,
-    const moho::SNetCommand* const source
-  )
-  {
-    return CopyConstructSNetCommandIfPresent(destination, source);
-  }
-
-  /**
-   * Address: 0x007BCC60 (FUN_007BCC60)
-   *
-   * What it does:
-   * Secondary adapter lane for nullable `SNetCommand` copy-construction into
-   * caller-provided queue storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresentSecondary(
-    moho::SNetCommand* const destination,
-    const moho::SNetCommand* const source
-  )
-  {
-    return CopyConstructSNetCommandIfPresent(destination, source);
-  }
 } // namespace
 
 /**
@@ -1751,6 +1632,48 @@ void CGpgNetInterface::EnqueueCommand0(
   EnqueueCommand(str, args, val);
 }
 
+namespace
+{
+  /**
+   * Address: 0x007BC3F0 (FUN_007BC3F0, boost::bind_CGpgNetInterfaceConnect)
+   *          0x007BD560 (FUN_007BD560) - basic_vtable<F>::get_vtable(), magic-static
+   *                       guarded install of the shared manager/invoker pair
+   *          0x007BE9A0 (FUN_007BE9A0) - stores the bound target (ConnectThread
+   *                       pointer, `this`, `address`, `port`) into the
+   *                       function_buffer
+   *          0x007BEE50 (FUN_007BEE50) - basic_vtable<F>::invoker: adjusts
+   *                       `this` by the stored offset and dispatches through
+   *                       the stored thiscall function pointer with the two
+   *                       bound (DWORD, WORD) payload args
+   *          0x007BEE70 (FUN_007BEE70) - basic_vtable<F>::manager: publishes
+   *                       functor-type RTTI for `check_functor_type_tag`,
+   *                       delegates clone/destroy to FUN_007BEFA0
+   *
+   * What it does:
+   * Builds the callable handed to the address/port connect worker thread.
+   *
+   * `Connect(u_long,u_short)` binds `this`, `address`, and `port` to
+   * `ConnectThread` and hands the result to `boost::thread`'s `function0<void>`
+   * constructor. This Functor's bound-argument list (two plain DWORD-sized
+   * values plus `this`) fits boost::function's small-object buffer, so MSVC8
+   * emits the flat this-adjusted-thiscall invoker/manager pair instead of the
+   * heap-allocating path the sibling `Connect(const msvc8::string&)` overload
+   * needs for its `std::string`-bound Functor (see `MakeConnectThreadLaunchCallback`
+   * below). IDA's own analysis names the bind assembler
+   * `boost::bind_CGpgNetInterfaceConnect`, confirming the correspondence.
+   */
+  [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
+    CGpgNetInterface* const self,
+    const u_long address,
+    const u_short port
+  )
+  {
+    return boost::function0<void>(
+      boost::bind(&CGpgNetInterface::ConnectThread, self, address, port)
+    );
+  }
+} // namespace
+
 /**
  * Address: 0x007B6A30 (FUN_007B6A30)
  *
@@ -1770,14 +1693,13 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread([this, address, port] {
-    ConnectThread(address, port);
-  });
+  boost::thread* const thread = new boost::thread(
+    MakeConnectThreadLaunchCallback(this, address, port)
+  );
 
   boost::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
-  if (oldThread) {
-    oldThread->join();
+  if (oldThread != nullptr) {
     delete oldThread;
   }
 }
