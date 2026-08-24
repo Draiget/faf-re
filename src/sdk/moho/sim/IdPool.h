@@ -61,7 +61,31 @@ namespace moho
   static_assert(offsetof(SimSubRes2, mEnd) == 0x0C84, "SimSubRes2::mEnd offset must be 0x0C84");
   static_assert(sizeof(SimSubRes2) == 0xC88, "SimSubRes2 size must be 0xC88");
 
-  class IdPool
+  /**
+   * `IdPool` requires 8-byte alignment in the shipped binary, even though every
+   * member declared below is individually 4-byte (or smaller) aligned. Evidence,
+   * converging from four independent sites:
+   *   - `CEntityDb::mIdPoolTree`'s node (`msvc8::map<std::uint32_t, IdPool>`,
+   *     `EntityDb.h`) places `IdPool` at node+0x18, one 4-byte word after the
+   *     node's `key`+0x10..0x14 -- i.e. a forced pad word between key and
+   *     payload that only 8-byte alignment on the payload explains
+   *     (`FUN_006881C0`, the `map<uint,IdPool>::_Buynode` emission, writes the
+   *     key at `node+0x10` and copy-constructs the pool at `node+0x18`).
+   *   - The already-recovered `IdPoolMapLaneCopyView` (`IdPool.cpp`) independently
+   *     derived the same `{key@0x00, reserved@0x04, IdPool@0x08}` shape from
+   *     `FUN_00686D10`/`FUN_00688A10`'s map-lane copy bodies.
+   *   - `Moho::CDecalBuffer` (`CDecalBuffer.h`) carries a hand-inserted
+   *     `mReserved04` pad dword between its 4-byte `Sim*` and `IdPool mPool` --
+   *     without an alignment requirement on `IdPool` the compiler would place
+   *     `mPool` at +0x04 with no pad needed, so that manual pad is itself
+   *     evidence of the same requirement, worked around instead of modelled.
+   *   - `sizeof(IdPool) == 0xCB0` is already a multiple of 8, and every existing
+   *     embedding (`CommandManager::mIdPool`@0x00, `CDecalBuffer::mPool`@0x08,
+   *     `CCommandDbRuntimeView::pool`@0x10) sits at an offset that is *also* a
+   *     multiple of 8, so this alignment is free everywhere `IdPool` is already
+   *     embedded -- it changes no existing `offsetof`/`sizeof` assertion.
+   */
+  class alignas(8) IdPool
   {
   public:
     static gpg::RType* sType;
@@ -118,4 +142,5 @@ namespace moho
   static_assert(offsetof(IdPool, mReleasedLows) == 0x08, "IdPool::mReleasedLows offset must be 0x08");
   static_assert(offsetof(IdPool, mSubRes2) == 0x28, "IdPool::mSubRes2 offset must be 0x28");
   static_assert(sizeof(IdPool) == 0xCB0, "IdPool size must be 0xCB0");
+  static_assert(alignof(IdPool) == 8, "IdPool alignment must be 8");
 } // namespace moho

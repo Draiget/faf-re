@@ -3,8 +3,10 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
+#include "moho/sim/IdPool.h"
 
 namespace gpg
 {
@@ -22,7 +24,6 @@ namespace moho
   class CArmyImpl;
   class Sim;
   class Unit;
-  struct CEntityDbIdPoolNode;
   struct CEntityDbBoundedPropQueueNode;
 
   struct CEntityDbListHead
@@ -46,14 +47,6 @@ namespace moho
     offsetof(CEntityDbAllUnitsNode, unitListNode) == 0x10, "CEntityDbAllUnitsNode::unitListNode offset must be 0x10"
   );
   static_assert(sizeof(CEntityDbAllUnitsNode) == 0x18, "CEntityDbAllUnitsNode size must be 0x18");
-
-  struct CEntityDbIdPoolTreeRuntime
-  {
-    std::uint32_t iteratorProxy; // +0x00
-    CEntityDbIdPoolNode* head;   // +0x04
-    std::uint32_t size;          // +0x08
-  };
-  static_assert(sizeof(CEntityDbIdPoolTreeRuntime) == 0x0C, "CEntityDbIdPoolTreeRuntime size must be 0x0C");
 
   struct CEntityDbEntityListRuntime
   {
@@ -329,7 +322,15 @@ namespace moho
     std::uint32_t mAllUnitsIteratorProxy;           // +0x00
     CEntityDbAllUnitsNode* mAllUnits;               // +0x04
     std::uint32_t mAllUnitsSize;                    // +0x08
-    CEntityDbIdPoolTreeRuntime mIdPoolTree;         // +0x0C
+    // `std::map<unsigned int, Moho::IdPool>` (`Moho::EntityDB::mIdPool` in the
+    // binary). Confirmed against `gpg/core/containers/ArchiveSerialization.cpp`
+    // and `EntityDb.cpp`'s own reflection typing, both of which read this field
+    // through `typeid(std::map<unsigned int, moho::IdPool>)`. Real tree-insert
+    // machinery: `FUN_006870D0` (insert_unique), `FUN_00687280` (insert_at),
+    // `FUN_006881C0` (buy_node), `FUN_006880A0`/`FUN_00688120` (rotate_left/
+    // rotate_right) -- all cited on `legacy/containers/RbTree.h`'s shared
+    // members, not reimplemented here (RULE ONE).
+    msvc8::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
     CEntityDbListHead mRegisteredEntitySets;        // +0x18
     CEntityDbEntityListRuntime mEntityList;         // +0x20
     CEntityDbBoundedPropQueueRuntime mBoundedProps; // +0x2C

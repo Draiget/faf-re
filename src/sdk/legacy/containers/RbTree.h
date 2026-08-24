@@ -249,6 +249,14 @@ namespace msvc8
          * `erase_node` emission (FUN_0082FD50, cited below on `erase_node`)
          * to capture the return iterator before unlinking.)
          */
+        /**
+         * Address: 0x006878C0 (FUN_006878C0, `_Inc` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * `EntityDb.h`. Reached from `EntityDbIdPoolMapTypeInfo::SerSave`'s
+         * (binary: `std::map_IdPool::Serialize`, `FUN_00686B10`) range-for
+         * walk over the map. Its register-shape adapters `FUN_00685FA0`/
+         * `FUN_00686CE0` are sibling emissions of the same walk.)
+         */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -333,6 +341,23 @@ namespace msvc8
          * `pair<const msvc8::string, CategoryLookupValue>`, with no template
          * change needed here. Reached from `FUN_005560B0`, the insert cited
          * on `insert_unique` below.)
+         */
+        /**
+         * Address: 0x006888E0 (FUN_006888E0, the predecessor-lookup half of
+         * `insert_unique` for `msvc8::map<std::uint32_t, moho::IdPool>` --
+         * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Reached from
+         * `insert_unique`'s emission `FUN_006870D0` and `insert_hint`'s
+         * emission `FUN_006864E0`, both cited below.)
+         * Address: 0x006E28D0 (FUN_006E28D0, the command-id map's
+         * predecessor lookup -- `msvc8::map<Moho::CmdId,
+         * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+         * `CCommandDb.h`, isNil@+0x15. This body has three callers total
+         * (`incoming_xrefs` in `_callgraph_index.sqlite`); only one,
+         * `insert_unique`'s emission for this map (FUN_006E15B0, cited
+         * below), is this instantiation's -- the other two belong to
+         * different 8-byte-value_type maps that happen to share this exact
+         * byte-identical body, the same ICF-adjacent sharing documented
+         * throughout this file for `rb_min`/`rb_max`/the rotate family.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -431,6 +456,17 @@ namespace msvc8
                 node_ = rb_increment(node_);
                 return *this;
             }
+            /**
+             * Address: 0x006886A0 (FUN_006886A0, postfix `_Inc` for
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * mIdPoolTree` in `EntityDb.h`. Copies the pre-increment cursor
+             * out, advances via prefix `operator++` (`FUN_006878C0`, cited
+             * on `rb_increment` above), returns the copy -- exactly this
+             * member's shape. Sibling of the prefix walk `EntityDbIdPoolMapTypeInfo::
+             * SerSave` performs; reached through the same generic
+             * `msvc8::map`/`rb_tree` iterator API surface, not a distinct
+             * new engine call site.)
+             */
             rb_iterator operator++(int) noexcept
             {
                 const rb_iterator copy = *this;
@@ -653,6 +689,32 @@ namespace msvc8
              * ()` alone, since the binary invokes this both from a live
              * compaction site and from an SEH unwind funclet.)
              */
+            /**
+             * Address: 0x006843B0 (FUN_006843B0, `Moho::EntityDB::~EntityDB` --
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `CEntityDb::
+             * mIdPoolTree` in `EntityDb.h`. Recurses `FUN_00688030`
+             * (`destroy_subtree`, cited below) from the tree's actual root
+             * (`head->parent`) then releases the sentinel head -- exactly
+             * this member's `erase_range(leftmost(), header())` whole-tree
+             * fast path followed by `free_raw(head_)`. A prior hand-rolled
+             * version of `CEntityDb`'s destructor recursed from
+             * `head->left` (leftmost()) instead of the root, which would
+             * have destroyed at most one node and leaked the rest; this
+             * member does not have that bug. Reached automatically via
+             * member destruction, `EntityDb.h`.)
+             * Address: 0x006E0A70 (FUN_006E0A70, `Moho::CommandDatabase::
+             * ~CommandDatabase` -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. The tail of that function is exactly this
+             * member: `sub_6E22D0(&mCommands, iter, mCommands._Myhead->
+             * _Left, mCommands._Myhead)` -- `erase_range(leftmost(),
+             * header())`'s emission for this instantiation, cited on that
+             * member below -- then `operator delete(mCommands._Myhead)` and
+             * the `_Myhead=0`/`_Mysize=0` zeroing. `CCommandDb::
+             * ~CCommandDb()`'s own hand-written body is only the
+             * empty-or-die diagnostic dump; this teardown is reached
+             * automatically via member destruction.)
+             */
             ~rb_tree()
             {
                 erase_range(leftmost(), header());
@@ -751,6 +813,18 @@ namespace msvc8
              * read-only view of this same tree; shared between that file's
              * read path and this member's `find_node` (FUN_005561C0, cited
              * below), confirming both recoveries agree on the node layout.)
+             * Address: 0x006E23C0 (FUN_006E23C0, the command-id map's raw
+             * lower-bound descent) Address: 0x006E1D30 (FUN_006E1D30, its
+             * store-into-hidden-return-pointer adapter) -- `msvc8::map<
+             * Moho::CmdId, Moho::CUnitCommand*>`, `Moho::CCommandDb::commands`
+             * in `CCommandDb.h`. Re-homed here from two bespoke free
+             * functions in `CCommandDb.cpp` (`LowerBoundCommandMapNode`,
+             * `StoreLowerBoundCommandMapNode`) during the
+             * `CommandDbMapNodeRuntime` hand-rolled-tree migration; no
+             * direct caller confirmed in this pass (`incoming_xrefs` empty
+             * in this sweep for both) -- none of `CCommandDb`'s recovered
+             * methods call `lower_bound`/`operator[]` directly, so this
+             * emission's real call site remains unidentified.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -949,6 +1023,36 @@ namespace msvc8
              * 8-byte-alignment evidence that moves it to `node+0x10` and the
              * colour/nil pair to `node+0x58`/`node+0x59`.)
              */
+            /**
+             * Address: 0x006870D0 (FUN_006870D0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::insert_unique` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. Matches this member field for field: descends
+             * recording the last branch (`addLeft`), fast-paths when the
+             * descent bottomed out at `leftmost()`, otherwise confirms
+             * uniqueness against the in-order predecessor via
+             * `FUN_006888E0` (`rb_decrement`, cited above) before
+             * tail-calling `insert_at` (`FUN_00687280`, cited above) either
+             * way. Reached from `EntityDbIdPoolMapTypeInfo::SerLoad`'s
+             * per-element `map->insert(value_type(key, std::move(pool)))`
+             * (binary: `std::map_IdPool::Deserialize`'s per-element
+             * `sub_6870D0` call, `FUN_00686990`) -- the map is freshly
+             * cleared immediately before, so every insert is unconditional,
+             * matching this member's unconditional-insert use here.)
+             */
+            /**
+             * Address: 0x006E15B0 (FUN_006E15B0, the command-id map's unique
+             * insert -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDb::commands` in `CCommandDb.h`. Matches this
+             * member field for field: descends recording the last branch
+             * (`Parent`/`v7`=`addLeft`), the `where == leftmost()` fast path
+             * tail-calls `insert_at` (FUN_006E1D60, cited below) directly,
+             * otherwise the predecessor check via `rb_decrement`
+             * (FUN_006E28D0, cited above) gates a second `insert_at` call or
+             * returns the colliding node with `false`. Reached from
+             * `AddIssueData` (FUN_006E0DB0) and `MemberDeserialize`
+             * (FUN_006E1430), both as `commands.insert(value_type(cmdId,
+             * command))`, `CCommandDb.cpp`.)
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -1023,6 +1127,24 @@ namespace msvc8
              * the `lower_bound` descent FUN_0082B8B0, remains unrecovered --
              * `AddCommandQueueToCommandGraph` itself is still blocked on the
              * separate, much larger `LinkCommandGraphEdge` edge-builder.)
+             */
+            /**
+             * Address: 0x006864E0 (FUN_006864E0, `std::map_uint_IdPool::insert`
+             * -- `msvc8::map<std::uint32_t, moho::IdPool>`'s hinted insert,
+             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Matches this member's
+             * branch structure directly: empty-tree fast path, `hint ==
+             * leftmost()` check, `hint == end()` check against `rightmost()`,
+             * then the decrement/increment straddle checks (via
+             * `FUN_006888E0`, `rb_decrement`, cited above), each falling
+             * through to `insert_at` (`FUN_00687280`, cited above) with the
+             * decided `addLeft`, and a fallback to `insert_unique`
+             * (`FUN_006870D0`, cited above) taking its `.first`. Reached
+             * from `CEntityDb::MemberDeserialize`'s
+             * `mIdPoolTree[familySourceBits]` (binary: `Moho::EntityDB::
+             * DoReserveId`/`ReleaseId`'s `std::map_uint_IdPool::find2`,
+             * `FUN_00685750`, cited on `msvc8::map::operator[]` in Map.h --
+             * `find2` is this instantiation's `operator[]`: lower-bound then
+             * conditional hinted insert).)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -1363,6 +1485,24 @@ namespace msvc8
              * batch's assigned token, flagged for whoever picks up
              * `FUN_007B4980`/`FUN_007B3EC0` next.)
              */
+            /**
+             * Address: 0x006E22D0 (FUN_006E22D0, the command-id map's range
+             * erase -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15,
+             * node 0x18. Same two-shape split as the emissions above:
+             * `first == begin() && last == end()` takes the whole-tree fast
+             * path, calling `sub_6E2990` (`destroy_subtree`, cited below);
+             * otherwise walks `erase(_First++)`. Reached from
+             * `~CommandDatabase` (FUN_006E0A70, cited on `~rb_tree` above)
+             * with `[leftmost(), header())` -- always the whole-tree fast
+             * path from that caller. `CCommandDb::MemberDeserialize`
+             * (FUN_006E1430) does *not* call this member -- a prior recovery
+             * pass wired an `erase(begin(), end())` call into that function
+             * that the binary's own disassembly does not contain;
+             * deserialization only ever runs against a freshly constructed,
+             * still-empty map, so removing that fabricated call did not
+             * change behaviour.)
+             */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
                 if (first == leftmost() && last == header()) {
@@ -1409,6 +1549,16 @@ namespace msvc8
              * Address: 0x0077B7D0 (FUN_0077B7D0, its typed wrapper)
              * Address: 0x00779240 (FUN_00779240, outer map storage release)
              * Address: 0x0077AC30 (FUN_0077AC30, its typed wrapper)
+             */
+            /**
+             * Address: 0x00687220 (FUN_00687220)
+             * Address: 0x00687B90 (FUN_00687B90, mirror emission)
+             *
+             * `msvc8::map<std::uint32_t, moho::IdPool>::clear` --
+             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Destroys the subtree
+             * from the root (`FUN_00688030`, cited on `destroy_subtree`
+             * above) then rewires the sentinel head back to self-linked
+             * empty form with zero size -- exactly this member's shape.
              */
             void clear() noexcept
             {
@@ -1460,11 +1610,34 @@ namespace msvc8
              * the map<uint32_t,InfluenceMapEntry> node typing from the
              * rotate_left/rotate_right citations above.)
              */
+            /**
+             * Address: 0x00688180 (FUN_00688180, `Mangled: std::map_uint_IdPool
+             * ::_Node allocator` -- `msvc8::map<std::uint32_t, moho::IdPool>`,
+             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Pure raw allocation:
+             * `operator new(sizeof(node_type))` with no field writes of its
+             * own -- the caller (`FUN_006881C0`, `buy_node` below) writes
+             * every link/value/colour field afterward. Node size 0xCD0 =
+             * 0x10 (link triplet + 8-byte-aligned pad, see `IdPool`'s
+             * `alignas(8)` citation in IdPool.h) + 0xCB8 (`pair<const
+             * uint32_t, IdPool>`, itself 8-byte aligned so its `IdPool`
+             * member lands at `node+0x18` rather than `node+0x10`) + 2
+             * (colour/isNil) rounded to the type's own 8-byte alignment.
+             * Reached from `insert_at`'s emission FUN_00687280, cited
+             * below.)
+             */
             [[nodiscard]] static node_type* alloc_raw()
             {
                 return static_cast<node_type*>(::operator new(sizeof(node_type)));
             }
 
+            /**
+             * Address: 0x006874A0 (FUN_006874A0)
+             * Address: 0x00687830 (FUN_00687830, mirror emission)
+             *
+             * `msvc8::map<std::uint32_t, moho::IdPool>`'s bare node-storage
+             * release -- `CEntityDb::mIdPoolTree` in `EntityDb.h`. Plain
+             * `operator delete(n)`, matching this member exactly.
+             */
             static void free_raw(node_type* const n) noexcept
             {
 #if !MSVC8_RBTREE_DISABLE_FREE
@@ -1539,6 +1712,29 @@ namespace msvc8
              * FUN_0052F370 above. Node shape (20 bytes, no value slot) is
              * head-only, matching a `msvc8::set<int32_t>`-style sentinel for
              * the same map whose value-bearing node buy is FUN_00A58450.)
+             */
+            /**
+             * Address: 0x00684230 (FUN_00684230, `Moho::EntityDB::EntityDB` --
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `CEntityDb::
+             * mIdPoolTree` in `EntityDb.h`. The binary inlines buy_head's
+             * allocate-then-self-link-then-isNil=1/color=black sequence
+             * directly into the owning class's constructor rather than
+             * through a named `buy_head` symbol (the raw allocation is
+             * `FUN_00688180`, cited on `alloc_raw` above) -- this member
+             * fuses those steps into one call, matching every other
+             * constructor-inlined instantiation already cited here. Reached
+             * from `mIdPoolTree`'s default member-initialization, `EntityDb.h`.)
+             */
+            /**
+             * Address: 0x00685720 (FUN_00685720)
+             * Address: 0x006864A0 (FUN_006864A0, sibling emission)
+             * Address: 0x00687250 (FUN_00687250, sibling emission)
+             *
+             * Further `msvc8::map<std::uint32_t, moho::IdPool>` sentinel-head
+             * allocate/self-link/isNil=1 emissions -- `CEntityDb::mIdPoolTree`,
+             * `EntityDb.h`. Same fused shape as `FUN_00684230` above, emitted
+             * at other construction call sites (e.g. placement-new via
+             * `EntityDbTypeInfo::CtrRef`/`NewEntityDbTypeLaneRef`, EntityDb.cpp).
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -1714,6 +1910,42 @@ namespace msvc8
              * map<int32_t,T> instantiation" family cited on `buy_head`
              * above.)
              */
+            /**
+             * Address: 0x006881C0 (FUN_006881C0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Buynode` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. Allocates via `FUN_00688180` (`alloc_raw`, cited
+             * above), writes `left`/`right`=head and `parent`=the caller's
+             * `where` (all three from its own arguments rather than a fixed
+             * `head_` reread, a compiler optimisation, not a different
+             * operation), writes the key at `node+0x10`, copy-constructs the
+             * `IdPool` payload at `node+0x18` via `FUN_00686DF0` (already
+             * recovered as `CopyIdPoolPayloadForMapLanes`, `IdPool.cpp`), and
+             * zeroes `color`/`isNil` at `node+0xCC8`/`node+0xCC9`. The
+             * `node+0x18` destination -- not the usual `node+0x0C` -- is the
+             * primary evidence for `IdPool`'s `alignas(8)` (see the citation
+             * block on that type in IdPool.h); this member's plain `V value;`
+             * member declaration reproduces the exact same offset
+             * automatically once `IdPool` carries that alignment, with no
+             * template change needed. Reached from `insert_at`'s emission
+             * FUN_00687280, cited below.)
+             */
+            /**
+             * Address: 0x006E23F0 (FUN_006E23F0, the command-id map's node
+             * buy -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDb::commands` in `CCommandDb.h`. Allocates one
+             * 0x18-byte node via `sub_6E2D90(1)`, writes `left`/`parent`/
+             * `right` from its first three arguments, the 8-byte value
+             * (`CmdId` + `CUnitCommand*`) copied from the fourth argument's
+             * two words, then `color=0`/`isNil=0` at `+0x14`/`+0x15`. Its
+             * only incoming xref is a direct `call` from `insert_at`'s
+             * emission FUN_006E1D60, cited below -- a prior recovery pass
+             * mis-cited this address as a 4-scalar-argument
+             * "priority-queue-node" allocator in
+             * `moho/sim/SimRecoveryRuntime.cpp`, which does not match either
+             * this real parameter shape or the real (sole) caller; not
+             * corrected there in this pass since that file is untouched
+             * here, flagged for a follow-up.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1877,6 +2109,34 @@ namespace msvc8
              * reconstruct idiom as `ReleaseExportBindingPendingOrdinals`
              * (`RRuleGameRules.cpp`) uses for the sibling instantiation above.)
              */
+            /**
+             * Address: 0x00688030 (FUN_00688030, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Erase` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. Reached two ways: from this member's own `clear()`
+             * (cited above) during `EntityDbIdPoolMapTypeInfo::SerLoad`'s
+             * clear-before-repopulate step (binary:
+             * `std::map_IdPool::Deserialize`, FUN_00686990), and from
+             * `~rb_tree()` (cited above) during `CEntityDb`'s destructor.
+             * Confirmed the true argument is `head->parent` (root), not
+             * `head->left` (leftmost) -- see the `~rb_tree()` citation's note
+             * on the bug that distinction fixes.)
+             */
+            /**
+             * Address: 0x006E2990 (FUN_006E2990, the command-id map's
+             * subtree destroy -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`, isNil@+0x15. Self-recursive on the right
+             * child (`sub_6E2990(v2[2])`) then loops down the left chain
+             * (`v2 = *v2`) deleting each node as it goes -- exactly this
+             * member's recurse-right/iterate-left shape. Confirmed the
+             * owning instantiation via its sole non-recursive caller:
+             * `erase_range`'s emission for this map (FUN_006E22D0, cited
+             * above) calls it on the whole-tree fast path. Previously
+             * marked `skip` in `recovered_progress.json` pending this
+             * migration -- see `CCommandDb.cpp`'s history for the
+             * hand-rolled `CommandDbMapNodeRuntime` tree this address used
+             * to be (incorrectly) associated with.)
+             */
             void destroy_subtree(node_type* rootNode) noexcept
             {
                 for (node_type* n = rootNode; !rb_is_nil(n); rootNode = n) {
@@ -2001,6 +2261,33 @@ namespace msvc8
              * `insert_at`'s emission FUN_0082E320 and `erase_node`'s
              * emission FUN_0082FD50, both cited above/below.)
              */
+            /**
+             * Address: 0x006880A0 (FUN_006880A0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Lrotate` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. Byte-for-byte this member's shape (pivot =
+             * `n->right`; `pivot->left`'s `isNil` probed at its
+             * instantiation-specific offset `+0xCC9`, matching `IdPool`'s
+             * node layout cited on `buy_node` above). Reached from `insert_at`'s
+             * emission FUN_00687280's fixup loop, cited above.)
+             */
+            /**
+             * Address: 0x006E1F20 (FUN_006E1F20, the command-id map's left
+             * rotate -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15,
+             * standard field order. Reached from `insert_at`'s fixup loop
+             * (FUN_006E1D60, cited below) via a direct `call` within that
+             * same function. Byte-identical to `FUN_004AD3F0`
+             * (`recovered_progress.json` previously marked this address
+             * `skip` as an "ICF twin" of that address and stopped there --
+             * ICF folds identical bodies to *one* surviving address at link
+             * time, so two functions at genuinely different addresses, each
+             * with its own real caller, are two distinct emissions to
+             * recover, not one canonical body and a discardable duplicate;
+             * corrected to `recovered` here, matching how every other
+             * byte-identical rotate sibling in this file is handled, e.g.
+             * the mesh-key/`mGraphRuntimeTree` pair cited on this member
+             * elsewhere.)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -2069,6 +2356,24 @@ namespace msvc8
              * mesh-key map's right rotate (0x007E4EA0 above); confirmed via
              * direct calls from `insert_at`'s emission FUN_0082E320 and
              * `erase_node`'s emission FUN_0082FD50.)
+             */
+            /**
+             * Address: 0x00688120 (FUN_00688120, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Rrotate` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. Mirror of `rotate_left`'s FUN_006880A0 above,
+             * same instantiation. Reached from `insert_at`'s emission
+             * FUN_00687280's fixup loop, cited above.)
+             */
+            /**
+             * Address: 0x006E1FD0 (FUN_006E1FD0, the command-id map's right
+             * rotate -- mirror of `rotate_left`'s FUN_006E1F20 above, same
+             * instantiation. Reached from `insert_at`'s fixup loop
+             * (FUN_006E1D60, cited below). Also byte-identical to a
+             * `resource/ResourceManager.cpp` rotate and previously marked
+             * `skip` as its "ICF twin" -- corrected to `recovered` here for
+             * the same reason given on `rotate_left`'s FUN_006E1F20 entry
+             * above: two distinct addresses, each with its own real caller,
+             * are two distinct emissions.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -2180,6 +2485,45 @@ namespace msvc8
              * pin this node to the 8-byte-aligned shape -- see
              * `CategoryLookupValue`'s citation block in Sim.cpp). Reached
              * from `insert_unique`'s emission (FUN_005560B0, cited above).)
+             */
+            /**
+             * Address: 0x00687280 (FUN_00687280, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Insert` -- `CEntityDb::mIdPoolTree` in
+             * `EntityDb.h`. The `_Mysize >= 0x1420B4` guard is this member's
+             * `max_size() - 1u <= size_` for the 0xCB8-byte `pair<const
+             * uint32_t, IdPool>` value_type (`0xFFFFFFFF / 0xCB8 - 1 ==
+             * 0x1420B4` exactly -- independent confirmation of the 8-byte-
+             * aligned `pair` size derived on `buy_node`'s citation above),
+             * throwing `std::length_error("map/set<T> too long")`. Buys the
+             * node through `FUN_006881C0` (`buy_node`, cited above), links
+             * it under the caller's `where`/`addLeft` in the same three-case
+             * shape as `link_and_rebalance` below (`where == head`, `where
+             * == leftmost()`, general case), then repairs the red-red
+             * violation calling `rotate_left`/`rotate_right`
+             * (`FUN_006880A0`/`FUN_00688120`, both cited below). Reached
+             * from `insert_unique`'s emission `FUN_006870D0` (cited below)
+             * and from `insert_hint`'s emission `FUN_006864E0` (cited
+             * below) -- both real paths in this codebase: the former via
+             * `EntityDbIdPoolMapTypeInfo::SerLoad`'s per-element
+             * `map->insert(...)`, the latter via `CEntityDb::
+             * MemberDeserialize`'s `mIdPoolTree[familySourceBits]`.)
+             */
+            /**
+             * Address: 0x006E1D60 (FUN_006E1D60, the command-id map's
+             * link-and-rebalance -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. The `_Mysize >= 0x1FFFFFFE` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<const CmdId, CUnitCommand*>` value_type
+             * (`0xFFFFFFFF/8 - 1 == 0x1FFFFFFE`), throwing
+             * `std::length_error("map/set<T> too long")`. Buys the node
+             * through `sub_6E23F0` (`buy_node`, cited above), links it under
+             * the caller's `where`/`addLeft`, then repairs the red-red
+             * violation calling `sub_6E1F20`/`sub_6E1FD0`
+             * (`rotate_left`/`rotate_right`, cited above) on the
+             * uncle-red/uncle-black branches. Reached from
+             * `insert_unique`'s emission (FUN_006E15B0, cited above), both
+             * call sites.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
