@@ -4807,6 +4807,17 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    * emission (`SetCurrentFocusControlLink` below); 0x00873810 is the
    * `IMauiDragger` one (`BindWorldViewOverlayDragger`, further down), whose
    * `+0x04` is the `WeakObject` sub-object rather than a list node.
+   *
+   * A third address, 0x0079DB60 (`FUN_0079DB60`, 13 instructions), is the
+   * unlink-only half of this same splice, factored out as its own shared
+   * subroutine and reached by tail-jump (`jmp sub_79DB60`) from at least six
+   * call sites, including the out-of-line chunk of `MAUI_SetKeyboardFocus`
+   * (call site 0x00B78323, owner 0x0079CC10). It has no separate C++ body
+   * here because the unlink branch below already reproduces it exactly:
+   * `RebindIntrusiveOwnerLink`'s `if (currentFocusField != 0u) { ... }`
+   * block is 0x0079DB60's full behavior (walk by `kCMauiControlListNodeNextOffset`
+   * until the slot pointing back at `focusState` is found, splice it out),
+   * with the rebind-to-new-head tail folded in around it.
    */
   void RebindIntrusiveOwnerLink(
     moho::CMauiCurrentFocusControlRuntimeView* const focusState,
@@ -28372,9 +28383,18 @@ namespace
   }
   /**
    * Address: 0x008584F0 (FUN_008584F0)
+   * Address: 0x00858730 (FUN_00858730, checked-allocate helper)
    *
    * What it does:
    * Allocates one command-feedback list node and seeds next/prev/value lanes.
+   *
+   * Notes:
+   * `FUN_00858730` is the VC8 checked-allocate helper this inlines - the
+   * overflow guard `0xFFFFFFFF/count < 0x14` is unreachable at `count == 1`,
+   * so `::operator new(sizeof(CommandFeedbackListNodeRuntimeView))` here is
+   * the same call with the dead overflow branch elided. Element size 0x14
+   * matches `sizeof(CommandFeedbackListNodeRuntimeView)` (static_assert
+   * above).
    */
   [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView* AllocateCommandFeedbackBlipNodeLane(
     const CommandFeedbackBlipRuntimeView* const value,
