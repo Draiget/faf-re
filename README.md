@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `52,756` (81.91%)
-- `skip`: `6,230` (9.67%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,425` (8.42%) — proven third-party/import-boundary code
+- `recovered`: `52,750` (81.90%)
+- `skip`: `6,233` (9.68%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,428` (8.43%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `408` (0.61%)
 - `in_progress`: `0` (0.00%)
@@ -30,7 +30,7 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,756 functions) — binary caller context
+### Recovered (52,750 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
@@ -38,7 +38,7 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Vtable-anchored (virtual override of a recovered class) | `5,880` | 11.15% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,557` | 10.53% |
 | No recovered caller token yet (orphan risk) | `1,862` | 3.53% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,932` | 43.47% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,926` | 43.46% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
