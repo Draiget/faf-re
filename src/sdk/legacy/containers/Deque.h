@@ -209,6 +209,10 @@ namespace msvc8
          * at the computed slot and bumps `_Mysize`. Emitted via
          * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
          * (Entity.cpp:4559).
+         * Address: 0x007408F0 (FUN_007408F0, msvc8::deque<Moho::SSyncData*>::
+         *          push_back -- same body, 4-byte T / kBlockSize==4
+         *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
+         *          guard `FUN_0073F940`, see SimDriver.cpp).
          */
         void push_back(const T& v)
         {
