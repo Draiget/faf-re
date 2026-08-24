@@ -5185,6 +5185,11 @@ namespace gpg::gal
             std::vector<char> compiledBytes(compiledSize);
             if (compiledSize != 0U)
             {
+                // Address: 0x008F0230 (FUN_008F0230) -- std::basic_istream<char>::read(),
+                // a genuine CRT/STL <istream> body (sentry guard, virtual
+                // streambuf::_Sgetn_s dispatch, std::ios_base::clear on short read,
+                // std::_Mutex::_Unlock) with zero engine-specific behavior. Not a
+                // recovery target; this call is its real, already-wired invocation.
                 compiledCache.read(compiledBytes.data(), static_cast<std::streamsize>(compiledSize));
             }
             compiledCache.close();
