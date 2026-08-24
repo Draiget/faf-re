@@ -575,6 +575,16 @@ namespace msvc8
              * Matches the same shape: erase_range via FUN_00592230
              * (cited above), then `operator delete` on the head and zeroed
              * head/size lanes.)
+             * Address: 0x0052A390 (FUN_0052A390, the destructor for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`. Erase-range via `sub_52D9C0`
+             * (`erase_range`, cited below) then `operator delete` on the
+             * head, matching this body exactly. Recovered as
+             * `ReleaseExportBindingPendingOrdinals` in RRuleGameRules.cpp --
+             * that helper explicitly destroys and reconstructs the member
+             * in place rather than relying on `~RRuleGameRulesLuaExportBinding
+             * ()` alone, since the binary invokes this both from a live
+             * compaction site and from an SEH unwind funclet.)
              */
             ~rb_tree()
             {
@@ -780,6 +790,27 @@ namespace msvc8
              * identical across all seven call sites -- the 2007 compiler did not
              * fold them despite the shared instantiation.
              */
+            /**
+             * Address: 0x0052BC60 (FUN_0052BC60, func_MapInsert -- the
+             * `msvc8::set<uint32_t>` embedded at `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals`, node 0x14 with `_Isnil` at +0x11
+             * (0x0D + sizeof(uint32_t)), matching the same shape as
+             * `Moho::SPeer::establishedUids` cited on `buy_head` below).
+             * `insert_at` half is FUN_0052CD30, predecessor lookup (`sub_530DD0`)
+             * is `rb_decrement`'s sibling emission for this instantiation.
+             * Called once per existing binding from `func_Add__blueprints`
+             * (0x00529B30, RRuleGameRulesImpl::mMaps loop at
+             * 0x00529BF0-0x00529C0B) -- recovered as
+             * `RegisterBlueprintInCategoryMaps` in Sim.cpp, which walks
+             * `rules->mMaps` and calls `mPendingBlueprintOrdinals.insert(ordinal)`
+             * on each binding.
+             *
+             * The node's value is 4 bytes (just the ordinal -- see the
+             * `buy_node` citation below), not the 8-byte
+             * `pair<const uint32_t, RBlueprint*>` a `msvc8::map` would need,
+             * which is what pins the instantiation to `msvc8::set<uint32_t>`
+             * rather than `msvc8::map<uint32_t, RBlueprint*>`.
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -976,6 +1007,13 @@ namespace msvc8
              * Address: 0x0077A9F0 (FUN_0077A9F0, its erase-by-key wrapper -- what
              * `mStartTickBuckets[tick].erase(handle)` compiles to)
              */
+            /**
+             * Address: 0x0052F0A0 (FUN_0052F0A0, the single-node erase-and-
+             * rebalance for `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals` -- `msvc8::set<uint32_t>`. Called
+             * once per node from `erase_range`'s (`sub_52D9C0`) walk-one-at-
+             * a-time loop, cited below.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -1091,6 +1129,19 @@ namespace msvc8
              * cursor is passed to `erase(const_iterator)` and that call's returned
              * iterator is discarded. Recovering it as `first = erase(first)` would
              * drop the second `_Inc` the shipped code performs.
+             */
+            /**
+             * Address: 0x0052D9C0 (FUN_0052D9C0, erase-range for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, `_Isnil` at +0x11. Same two-shape
+             * split as the emissions above: the whole-tree fast path calls
+             * `sub_52CCF0` on the root (`destroy_subtree`, cited below) when
+             * `first == begin() && last == end()`; otherwise it walks
+             * `erase(_First++)` with the successor computed inline and
+             * `sub_52F0A0` (`erase_node`, cited above) erasing the old
+             * cursor each turn. Reached from `FUN_0052A390`
+             * (`~rb_tree`, cited above) with `[leftmost(), header())` --
+             * always the whole-tree fast path in that caller.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -1241,6 +1292,19 @@ namespace msvc8
              * isNil@+0x2D matches the batch-bucket node shape. Reached
              * from `GetBlueprintExtractorRegistry()`'s lazy first-time
              * static-local construction, RangeExtractor.cpp.)
+             * Address: 0x0052F370 (FUN_0052F370, buy_head for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`, same 12+4+2=18-rounded-to-20 node
+             * shape as `Moho::SPeer::establishedUids` above, isNil@+0x11.
+             * The binary splits allocation and self-link across the call
+             * site: `ExportToLuaState` (0x0052A28E-0x0052A2AF) calls
+             * `sub_52F370` for the raw node, then self-links
+             * `left=parent=right=self` and sets `isNil=1` inline -- this
+             * template fuses both steps into `buy_head()` itself, matching
+             * every other instantiation's citation style in this file.
+             * Reached from `AddOrGetExportBinding`'s claim of a fresh
+             * binding slot in RRuleGameRules.cpp, via
+             * `msvc8::set<uint32_t>`'s default constructor.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -1306,6 +1370,20 @@ namespace msvc8
              * Address: 0x0077CAE0 (FUN_0077CAE0, outer map value node; emitted again at
              * 0x0077DC40)
              */
+            /**
+             * Address: 0x0052DB50 (FUN_0052DB50, the node buy for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`. `_Buynode(_Larg, _Parg, _Rarg,
+             * ordinal, _Color)` shape: allocates via `sub_533620(1)`, writes
+             * `left@+0`/`parent@+4`/`right@+8` from its first three
+             * arguments directly (parent is the caller's `where` node, not
+             * re-parented after the fact the way this template's `buy_node`
+             * + `link_and_rebalance` split it), copies the 4-byte ordinal
+             * value at `+0x0C` -- confirming a `uint32_t` value_type, not an
+             * 8-byte `pair<const uint32_t, RBlueprint*>` -- then writes
+             * `color@+0x10` and `isNil=0@+0x11`. Reached from `insert_at`,
+             * 0x0052CD30.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1357,6 +1435,19 @@ namespace msvc8
              * `operator delete` on the carried-over pointer). Recursing on both
              * children would destroy the same set of nodes but is not what the
              * shipped code does, and it doubles the stack depth on left spines.
+             */
+            /**
+             * Address: 0x0052CCF0 (FUN_0052CCF0, the whole-subtree destroy for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`. Reached from `FUN_0052D9C0`
+             * (`erase_range`, cited above) with the root
+             * (`_Myhead->_Parent`) when `erase_range`'s whole-tree fast path
+             * is taken, matching the other three sibling emissions' shape.)
+             * Address: 0x00592C00 (FUN_00592C00, the whole-subtree destroy for
+             * `CArmyStatItem::mBlueprintStats` -- 8-byte value_type, isNil
+             * confirmed at +0x15 (0x0D + 8). Reached from `clear()`
+             * (0x00592230, cited above) via `CArmyStatItem::~CArmyStatItem`
+             * at 0x00585C39.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -1463,6 +1554,14 @@ namespace msvc8
              * rotate -- `_Isnil` at +0x25, same instantiation as the
              * `erase_node` sibling emission 0x007E4DD0 cited above.)
              */
+            /**
+             * Address: 0x0052DAB0 (FUN_0052DAB0, the left rotate for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`, node 0x14, `_Isnil` at +0x11,
+             * standard field order (`left@0`/`parent@+4`/`right@+8`), unlike
+             * the swapped `[node+0x10]`/`[node+0x11]` instantiation cited
+             * above. Reached from `insert_at`'s fixup loop, 0x0052CD30.)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1519,6 +1618,11 @@ namespace msvc8
              * rotate -- `_Isnil` at +0x25, sibling of `rotate_left`'s
              * 0x007E4E10 above.)
              */
+            /**
+             * Address: 0x0052DB00 (FUN_0052DB00, the right rotate for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * mirror of `rotate_left`'s 0x0052DAB0 above, same instantiation.)
+             */
             void rotate_right(node_type* const n) noexcept
             {
                 node_type* const pivot = n->left;
@@ -1574,6 +1678,17 @@ namespace msvc8
              * and the successor at 0x0077CE50 are all reached from it. This was
              * the CreateHandle insert-side left deferred when the CDecalBuffer
              * tree first landed in 90e6ffa.)
+             */
+            /**
+             * Address: 0x0052CD30 (FUN_0052CD30, the link-and-rebalance half of
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`'s
+             * insert -- `msvc8::set<uint32_t>`. Matches this template body
+             * field for field: the `_Mysize >= 0x3FFFFFFE` guard throwing
+             * `std::length_error("map/set<T> too long")`, the `sub_52DB50`
+             * buy-node call, then the red/black fixup loop calling
+             * `sub_52DAB0`/`sub_52DB00` (`rotate_left`/`rotate_right`, cited
+             * below) on the uncle-red vs. uncle-black branches. Reached from
+             * `insert_unique`'s emission at 0x0052BC60, cited above.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
