@@ -196,10 +196,21 @@ void msvc8::string::eos(const uint32_t newSize) noexcept {
 
 /**
  * Address: 0x00402740 (FUN_00402740)
+ * Address: 0x008846B0 (FUN_008846B0, tidy(true, 0) destructor-path emission)
  *
  * What it does:
  * Resets string storage to SSO lane and optionally preserves `newSize` bytes
  * from the old heap buffer before freeing it.
+ *
+ * FUN_008846B0 is a per-TU specialized emission of this same body for the
+ * constant arguments `tidy(true, 0)` (the `newSize != 0` memcpy_s branch is
+ * dead-code-eliminated): `if (myRes >= 0x10) operator delete(bx.ptr); myRes =
+ * 15; mySize = 0; bx.buf[0] = 0;`. Field offsets match exactly against
+ * `msvc8::string` (`bx.ptr`@0x04, `mySize`@0x14, `myRes`@0x18,
+ * `sizeof(string) == 0x1C`, see the `static_assert` below). Reached as the
+ * per-element exception-unwind destructor from
+ * `wxUninitializedCopyMsvc8StringRange` (FUN_00884FD0) in
+ * moho/app/WxRuntimeTypes.cpp.
  */
 void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
     // Preserve legacy lane shape:
