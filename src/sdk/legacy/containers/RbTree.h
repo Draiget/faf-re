@@ -909,6 +909,16 @@ namespace msvc8
             /**
              * Address: 0x0089A540 (FUN_0089A540, `erase(const_iterator)`)
              * Address: 0x007E4430 (FUN_007E4430, sibling emission)
+             * Address: 0x0083A640 (FUN_0083A640, msvc8::map<UiKeyMask,
+             * msvc8::string>::erase(const_iterator) -- same `map<uint32,
+             * string>` node shape as 0x0089A540 (`_Isnil` at +0x2D). The
+             * compiled body constant-folds `this` to the fixed address of
+             * the sole call-site global (`gUiKeyActionMap`, since this
+             * instantiation has exactly one call site) rather than reading
+             * it from the passed tree pointer -- a compiler optimization,
+             * not a different operation. Reached from `gUiKeyActionMap.
+             * erase(keyMask)`'s inner iterator-erase in
+             * RemoveUiKeyMapEntries, UiRuntimeTypes.cpp.)
              *
              * 0x0089A540 is the session save-node map `map<uint32, string>`
              * (`_Isnil` at +0x2D); 0x007E4430 is the same member for the

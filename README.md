@@ -8,49 +8,49 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`95.86%`**
+- Progress coverage:  **`95.87%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,389`*
+  - *Total amount of completed tokens: `64,393`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,738` (81.91%)
-- `skip`: `6,230` (9.68%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `52,742` (81.91%)
+- `skip`: `6,230` (9.67%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,421` (8.42%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `408` (0.61%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `2,440` (3.63%)**
+- **`blocked`: `2,436` (3.63%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,848`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,848`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,844`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,844`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,738 functions) — binary caller context
+### Recovered (52,742 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,265` | 30.84% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,277` | 30.86% |
 | Vtable-anchored (virtual override of a recovered class) | `5,880` | 11.15% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,557` | 10.54% |
-| No recovered caller token yet (orphan risk) | `1,873` | 3.55% |
+| No recovered caller token yet (orphan risk) | `1,865` | 3.54% |
 | No callsite evidence (no recorded code/data caller in the index) | `22,943` | 43.50% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,848 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,844 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `415` | 14.57% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `411` | 14.45% |
 | Vtable-anchored (recover with the owning class) | `144` | 5.06% |
 | Framework dispatch (wx/EH/Lua/reflection) | `13` | 0.46% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,035` | 36.34% |
-| No indexed callsite evidence (needs investigation/evidence) | `1,238` | 43.47% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,035` | 36.39% |
+| No indexed callsite evidence (needs investigation/evidence) | `1,238` | 43.53% |
 | Unclassified data xref (manual review) | `2` | 0.07% |
 | RTTI-only | `1` | 0.04% |
 
