@@ -3064,6 +3064,12 @@ namespace msvc8
          * dword-triple fill loop, reached from QueueCreateEntityParams's
          * `mNewEntities.push_back(params)` in Entity.cpp via its push_back grow
          * lane FUN_0067B6F0)
+         * Address: 0x0067C730 (FUN_0067C730, the advance-returning `_Ufill`
+         * adapter around FUN_00680940 for the same `SCreateEntityParams`
+         * instantiation: fills then returns `dst + count*0xC`. Called from
+         * the capacity-full `_Insert_n` grow path FUN_0067D090, still open;
+         * not needed to satisfy this instantiation's own caller evidence,
+         * which is the `mNewEntities.push_back(params)` source line above)
          * Address: 0x008EA090 (FUN_008EA090, msvc8::vector<gpg::gal::HeadAdapterMode>::
          * uninit_fill_n for the 12-byte trivially-copyable element (width/height/
          * refreshRate dwords) -- the same count-driven dword-triple fill loop,
