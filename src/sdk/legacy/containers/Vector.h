@@ -3699,6 +3699,9 @@ namespace msvc8
          * Address: 0x00561900 (FUN_00561900, the 0x78-byte-stride throw lane
          * for `msvc8::vector<Moho::SSyncPublishedCommandPacket>`, reached
          * from the `reserve()` guard FUN_00561160, already cited above)
+         * Address: 0x009514A0 (FUN_009514A0, the 8-byte-stride throw lane for
+         * `msvc8::vector<gpg::TypeHandle>`, reached from the `_Insert_n`
+         * grow lane FUN_00951F30, already cited above)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

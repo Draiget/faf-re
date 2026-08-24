@@ -2,6 +2,7 @@
 
 #include "gpg/core/time/Timer.h"
 #include "lua/LuaObject.h"
+#include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -7045,36 +7046,6 @@ Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntimeC(
   return InsertElement12LaneAndStoreRebasedCursorRuntimeB(vector, outCursor, insertPosition, valueLane);
 }
 
-/**
- * Address: 0x00930070 (FUN_00930070)
- *
- * What it does:
- * Resets one 16-bit vector storage lane, optionally allocates `count` entries,
- * and sets `{begin,end,capacity}` to the allocated range.
- */
-bool InitializeWordVectorStorageRuntime(
-  LegacyVectorStorageRuntime<std::uint16_t>* const vector,
-  const std::uint32_t count
-)
-{
-  vector->begin = nullptr;
-  vector->end = nullptr;
-  vector->capacity = nullptr;
-
-  if (count == 0u) {
-    return false;
-  }
-
-  if (count > 0x7FFFFFFFu) {
-    throw std::length_error("vector<T> too long");
-  }
-
-  auto* const storage = static_cast<std::uint16_t*>(::operator new(static_cast<std::size_t>(count) * sizeof(std::uint16_t)));
-  vector->begin = storage;
-  vector->end = storage;
-  vector->capacity = storage + count;
-  return true;
-}
 
 /**
  * Address: 0x00930220 (FUN_00930220)
@@ -9953,8 +9924,21 @@ void* ResolveOwnerFromIndexWeakSlotRuntime(
  * Address: 0x007B2940 (FUN_007B2940)
  *
  * What it does:
- * Clears one RB-tree storage lane, frees the storage block, and resets owner
- * pointers/count.
+ * Explicitly destroys and reconstructs one `msvc8::set<std::uint32_t>` lane
+ * in place -- `owner`'s `{proxy, head, size}` layout is byte-identical to
+ * `msvc8::set<T>` (`legacy/containers/Set.h`), so `.~set()` compiles to
+ * exactly this shape: `rb_tree::~rb_tree()`'s `erase_range(leftmost(),
+ * header())` (`FUN_007B3E00`, whole-tree fast path -> `destroy_subtree`
+ * `FUN_007B4D10`) followed by `operator delete(head)`. Matches the same
+ * explicit-destroy-and-reconstruct idiom as `ReleaseExportBindingPendingOrdinals`
+ * (`RRuleGameRules.cpp`) for the sibling `msvc8::set<uint32_t>` instantiation
+ * at `0x0052A390`/`0x0052D9C0`/`0x0052CCF0` -- same isNil@+0x11 node shape,
+ * different owning field. The formerly-generic `TreeClearFn clearFn` runtime
+ * indirection this superseded did not match the binary: the shipped body
+ * hardcodes `call sub_7B3E00`, a compile-time-fixed direct call verified
+ * directly against `.asm`, not a runtime-configurable one. The parameter is
+ * kept for signature stability (nothing in `src/sdk/**` calls this function
+ * yet) but is no longer used.
  */
 int ClearTreeStorageLaneC21Runtime(
   TreeStorageOwnerRuntime* const owner,
@@ -9965,15 +9949,9 @@ int ClearTreeStorageLaneC21Runtime(
     return 0;
   }
 
-  std::uint32_t scratch = 0u;
-  if (owner->treeStorage != nullptr && clearFn != nullptr) {
-    void* const root = *reinterpret_cast<void**>(owner->treeStorage);
-    clearFn(&scratch, root, owner->treeStorage);
-  }
-
-  ::operator delete(owner->treeStorage);
-  owner->treeStorage = nullptr;
-  owner->size = 0u;
+  (void)clearFn;
+  reinterpret_cast<msvc8::set<std::uint32_t>*>(owner)->~set();
+  ::new (static_cast<void*>(owner)) msvc8::set<std::uint32_t>();
   return 0;
 }
 
@@ -9981,8 +9959,13 @@ int ClearTreeStorageLaneC21Runtime(
  * Address: 0x007B2970 (FUN_007B2970)
  *
  * What it does:
- * Clears one embedded secondary RB-tree lane at owner offset `+0x08`, frees
- * its storage block, and resets owner pointers/count.
+ * Explicitly destroys and reconstructs one embedded `msvc8::set<std::uint32_t>`
+ * lane at owner offset `+0x04` in place -- same `.~set()` compiles-to-
+ * `~rb_tree()` shape as `ClearTreeStorageLaneC21Runtime` above (`erase_range`
+ * `FUN_007B3E00` whole-tree fast path -> `destroy_subtree` `FUN_007B4D10`,
+ * then `operator delete(head)`), verified directly against `.asm`
+ * (`call sub_7B3E00`, hardcoded, not runtime-configurable). The `clearFn`
+ * parameter is kept for signature stability but is no longer used.
  */
 int ClearEmbeddedSecondaryTreeLaneRuntime(
   std::byte* const ownerBytes,
@@ -9994,15 +9977,9 @@ int ClearEmbeddedSecondaryTreeLaneRuntime(
   }
 
   auto* const embeddedOwner = reinterpret_cast<TreeStorageOwnerRuntime*>(ownerBytes + 4u);
-  std::uint32_t scratch = 0u;
-  if (embeddedOwner->treeStorage != nullptr && clearFn != nullptr) {
-    void* const root = *reinterpret_cast<void**>(embeddedOwner->treeStorage);
-    clearFn(&scratch, root, embeddedOwner->treeStorage);
-  }
-
-  ::operator delete(embeddedOwner->treeStorage);
-  embeddedOwner->treeStorage = nullptr;
-  embeddedOwner->size = 0u;
+  (void)clearFn;
+  reinterpret_cast<msvc8::set<std::uint32_t>*>(embeddedOwner)->~set();
+  ::new (static_cast<void*>(embeddedOwner)) msvc8::set<std::uint32_t>();
   return 0;
 }
 
@@ -10010,8 +9987,13 @@ int ClearEmbeddedSecondaryTreeLaneRuntime(
  * Address: 0x007B36A0 (FUN_007B36A0)
  *
  * What it does:
- * Clears one RB-tree storage lane, frees the storage block, and resets owner
- * pointers/count.
+ * Explicitly destroys and reconstructs one `msvc8::set<std::uint32_t>` lane
+ * in place -- sibling emission of `ClearTreeStorageLaneC21Runtime` above for
+ * a different owning field (same `.~set()` -> `~rb_tree()` -> `erase_range`
+ * `FUN_007B3E00` whole-tree fast path -> `destroy_subtree` `FUN_007B4D10` ->
+ * `operator delete(head)` shape, verified directly against `.asm`: `call
+ * sub_7B3E00`, hardcoded, not runtime-configurable). The `clearFn` parameter
+ * is kept for signature stability but is no longer used.
  */
 int ClearTreeStorageLaneD21Runtime(
   TreeStorageOwnerRuntime* const owner,
@@ -10022,15 +10004,9 @@ int ClearTreeStorageLaneD21Runtime(
     return 0;
   }
 
-  std::uint32_t scratch = 0u;
-  if (owner->treeStorage != nullptr && clearFn != nullptr) {
-    void* const root = *reinterpret_cast<void**>(owner->treeStorage);
-    clearFn(&scratch, root, owner->treeStorage);
-  }
-
-  ::operator delete(owner->treeStorage);
-  owner->treeStorage = nullptr;
-  owner->size = 0u;
+  (void)clearFn;
+  reinterpret_cast<msvc8::set<std::uint32_t>*>(owner)->~set();
+  ::new (static_cast<void*>(owner)) msvc8::set<std::uint32_t>();
   return 0;
 }
 
