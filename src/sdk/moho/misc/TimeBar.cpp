@@ -119,6 +119,15 @@ namespace moho
      * What it does:
      * Finds the case-insensitive lower-bound insertion point for one event-name
      * key in the track-layout map.
+     *
+     * Address: 0x004E9A20 (FUN_004E9A20, this map's predecessor-lookup /
+     * `_Dec` emission -- isNil@+0x15 matches the same `std::map<const
+     * char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` node shape
+     * already established on this map's rotate/erase citations. The
+     * callgraph shows FUN_004E8EB0 -- this function's own binary address --
+     * calling FUN_004E9A20 directly; the recovered `lower_bound` call below
+     * is the source-level invocation, whatever internal predecessor step
+     * the real STL implementation takes to satisfy it.)
      */
     [[nodiscard]] TimeBarTrackMap::iterator FindTimeBarTrackLowerBound(
       TimeBarTrackMap& tracks,
