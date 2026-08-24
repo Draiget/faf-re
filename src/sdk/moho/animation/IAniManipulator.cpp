@@ -509,21 +509,33 @@ namespace
     return BuildBoneEntityManipulatorRef(object);
   }
 
-  [[maybe_unused]] void DeleteBoneEntityManipulatorCallback(void* const object)
+  void DeleteBoneEntityManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
       delete static_cast<moho::CBoneEntityManipulator*>(object);
     }
   }
 
-  [[maybe_unused]] void DestructBoneEntityManipulatorCallback(void* const object)
+  void DestructBoneEntityManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
       static_cast<moho::CBoneEntityManipulator*>(object)->~CBoneEntityManipulator();
     }
   }
 
-  [[maybe_unused]] void AddIAniManipulatorBase(gpg::RType* const typeInfo)
+  /**
+   * Address: 0x00635310 (FUN_00635310, Moho::CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator)
+   * Address: 0x0063A150 (FUN_0063A150, Moho::CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator)
+   *
+   * What it does:
+   * Registers `IAniManipulator` as one reflected base lane at offset `+0x00`.
+   * The binary emits one byte-identical copy of this body per manipulator
+   * TypeInfo class (compare `Moho::CAimManipulatorTypeInfo::AddBase_IAniManipulator`,
+   * `CAimManipulatorTypeInfo.cpp`); both addresses above resolve to this same
+   * mechanic, so it is recovered once and shared by both `Init` overrides
+   * below rather than duplicated per type.
+   */
+  void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedIAniManipulatorType();
     gpg::RField baseField{};
@@ -547,7 +559,7 @@ namespace
    * Initializes reflected lifecycle callbacks for `CBoneEntityManipulator`,
    * adds `IAniManipulator` as base RTTI, then finalizes the type descriptor.
    */
-  [[maybe_unused]] gpg::RType* InitBoneEntityManipulatorTypeInfo(gpg::RType* const typeInfo)
+  gpg::RType* InitBoneEntityManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     if (typeInfo == nullptr) {
       return nullptr;
@@ -571,7 +583,7 @@ namespace
    * Initializes reflected lifecycle callbacks for `CFootPlantManipulator`,
    * adds `IAniManipulator` as base RTTI, then finalizes the type descriptor.
    */
-  [[maybe_unused]] gpg::RType* InitFootPlantManipulatorTypeInfo(gpg::RType* const typeInfo)
+  gpg::RType* InitFootPlantManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     if (typeInfo == nullptr) {
       return nullptr;
@@ -628,6 +640,66 @@ namespace
     if (object != nullptr) {
       static_cast<moho::CFootPlantManipulator*>(object)->~CFootPlantManipulator();
     }
+  }
+
+  alignas(moho::CBoneEntityManipulatorTypeInfo)
+  unsigned char gCBoneEntityManipulatorTypeInfoStorage[sizeof(moho::CBoneEntityManipulatorTypeInfo)] = {};
+  bool gCBoneEntityManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CBoneEntityManipulatorTypeInfo* AcquireCBoneEntityManipulatorTypeInfo()
+  {
+    if (!gCBoneEntityManipulatorTypeInfoConstructed) {
+      new (gCBoneEntityManipulatorTypeInfoStorage) moho::CBoneEntityManipulatorTypeInfo();
+      gCBoneEntityManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CBoneEntityManipulatorTypeInfo*>(gCBoneEntityManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BFA9B0 (FUN_00BFA9B0, cleanup_CBoneEntityManipulatorTypeInfo)
+   *
+   * What it does:
+   * Tears down static `CBoneEntityManipulatorTypeInfo` storage at process exit.
+   */
+  void cleanup_CBoneEntityManipulatorTypeInfo()
+  {
+    if (!gCBoneEntityManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCBoneEntityManipulatorTypeInfo()->~CBoneEntityManipulatorTypeInfo();
+    gCBoneEntityManipulatorTypeInfoConstructed = false;
+  }
+
+  alignas(moho::CFootPlantManipulatorTypeInfo)
+  unsigned char gCFootPlantManipulatorTypeInfoStorage[sizeof(moho::CFootPlantManipulatorTypeInfo)] = {};
+  bool gCFootPlantManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CFootPlantManipulatorTypeInfo* AcquireCFootPlantManipulatorTypeInfo()
+  {
+    if (!gCFootPlantManipulatorTypeInfoConstructed) {
+      new (gCFootPlantManipulatorTypeInfoStorage) moho::CFootPlantManipulatorTypeInfo();
+      gCFootPlantManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CFootPlantManipulatorTypeInfo*>(gCFootPlantManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BFABC0 (FUN_00BFABC0, cleanup_CFootPlantManipulatorTypeInfo)
+   *
+   * What it does:
+   * Tears down static `CFootPlantManipulatorTypeInfo` storage at process exit.
+   */
+  void cleanup_CFootPlantManipulatorTypeInfo()
+  {
+    if (!gCFootPlantManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCFootPlantManipulatorTypeInfo()->~CFootPlantManipulatorTypeInfo();
+    gCFootPlantManipulatorTypeInfoConstructed = false;
   }
 
   /**
@@ -2663,6 +2735,89 @@ namespace moho
     gCFootPlantManipulatorSerializer.mSerSaveFunc = &SerializeCFootPlantManipulatorSerializerCallback;
     (void)std::atexit(&cleanup_CFootPlantManipulatorSerializer_atexit);
   }
+
+  gpg::RType* CBoneEntityManipulator::sType = nullptr;
+  gpg::RType* CFootPlantManipulator::sType = nullptr;
+
+  /**
+   * Address: 0x00634A60 (FUN_00634A60, ctor lane)
+   */
+  CBoneEntityManipulatorTypeInfo::CBoneEntityManipulatorTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(CBoneEntityManipulator), this);
+  }
+
+  /**
+   * Address: 0x00634B00 (FUN_00634B00, Moho::CBoneEntityManipulatorTypeInfo::GetName)
+   */
+  const char* CBoneEntityManipulatorTypeInfo::GetName() const
+  {
+    return "CBoneEntityManipulator";
+  }
+
+  /**
+   * Address: 0x00634AC0 (FUN_00634AC0, Moho::CBoneEntityManipulatorTypeInfo::Init)
+   */
+  void CBoneEntityManipulatorTypeInfo::Init()
+  {
+    (void)InitBoneEntityManipulatorTypeInfo(this);
+  }
+
+  /**
+   * Address: 0x00BD2440 (FUN_00BD2440, register_CBoneEntityManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CBoneEntityManipulatorTypeInfo` singleton
+   * and installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`);
+   * the binary has exactly one call site and no reentry guard, matching the
+   * `AcquireCBoneEntityManipulatorTypeInfo` guarded-singleton idiom used
+   * throughout this file.
+   */
+  void register_CBoneEntityManipulatorTypeInfo()
+  {
+    (void)AcquireCBoneEntityManipulatorTypeInfo();
+    (void)std::atexit(&cleanup_CBoneEntityManipulatorTypeInfo);
+  }
+
+  /**
+   * Address: 0x006390C0 (FUN_006390C0, ctor lane)
+   */
+  CFootPlantManipulatorTypeInfo::CFootPlantManipulatorTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(CFootPlantManipulator), this);
+  }
+
+  /**
+   * Address: 0x00639160 (FUN_00639160, Moho::CFootPlantManipulatorTypeInfo::GetName)
+   */
+  const char* CFootPlantManipulatorTypeInfo::GetName() const
+  {
+    return "CFootPlantManipulator";
+  }
+
+  /**
+   * Address: 0x00639120 (FUN_00639120, Moho::CFootPlantManipulatorTypeInfo::Init)
+   */
+  void CFootPlantManipulatorTypeInfo::Init()
+  {
+    (void)InitFootPlantManipulatorTypeInfo(this);
+  }
+
+  /**
+   * Address: 0x00BD2A00 (FUN_00BD2A00, register_CFootPlantManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CFootPlantManipulatorTypeInfo` singleton
+   * and installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`);
+   * the binary has exactly one call site and no reentry guard, matching the
+   * `AcquireCFootPlantManipulatorTypeInfo` guarded-singleton idiom used
+   * throughout this file.
+   */
+  void register_CFootPlantManipulatorTypeInfo()
+  {
+    (void)AcquireCFootPlantManipulatorTypeInfo();
+    (void)std::atexit(&cleanup_CFootPlantManipulatorTypeInfo);
+  }
 } // namespace moho
 
 namespace
@@ -2674,6 +2829,8 @@ namespace
       (void)moho::register_IAniManipulatorTypeInfo_AtExit();
       moho::register_IAniManipulatorSerializer();
       moho::register_CFootPlantManipulatorSerializer();
+      moho::register_CBoneEntityManipulatorTypeInfo();
+      moho::register_CFootPlantManipulatorTypeInfo();
     }
   };
 
@@ -2684,6 +2841,8 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(AcquireIAniManipulatorTypeInfo_80a9e7, AcquireIAniManipulatorTypeInfo)
 GPG_PREREGISTER_INIT(PreregisterIAniManipulatorPointerType_80a9e7, moho::PreregisterIAniManipulatorPointerType)
+GPG_PREREGISTER_INIT(register_CBoneEntityManipulatorTypeInfo_5c2e91, moho::register_CBoneEntityManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(register_CFootPlantManipulatorTypeInfo_5c2e91, moho::register_CFootPlantManipulatorTypeInfo)
 
 namespace
 {
