@@ -257,6 +257,32 @@ static_assert(
   "VectorElementTripleWordStringTailFlagsLane size must be 0x30"
 );
 
+/**
+ * Address: 0x00544680 (FUN_00544680, 36-byte lane, reached from
+ * BuyVectorStorage36Byte/FUN_00543480's BuyVectorStorageByElementWidth call)
+ * Address: 0x00768DB0 (FUN_00768DB0, 36-byte lane)
+ * Address: 0x007BCD70 (FUN_007BCD70, 36-byte lane)
+ * Address: 0x00831BA0 (FUN_00831BA0, 44-byte lane)
+ * Address: 0x00506330 (FUN_00506330, 56-byte lane)
+ * Address: 0x00571780 (FUN_00571780, 68-byte lane)
+ * Address: 0x0054E0C0 (FUN_0054E0C0, 88-byte lane)
+ * Address: 0x005579D0 (FUN_005579D0, 96-byte lane)
+ * Address: 0x00751A50 (FUN_00751A50, 144-byte lane)
+ * Address: 0x007F3670 (FUN_007F3670, 192-byte lane)
+ * Address: 0x007EBFD0 (FUN_007EBFD0, 784-byte lane)
+ * Address: 0x00688F00 (FUN_00688F00, 3280-byte lane)
+ *
+ * These 12 addresses are per-stride compiled instances of the exact same
+ * `_Allocate(count, elementSize)` overflow-guard-and-new body (asm-verified:
+ * `0xFFFFFFFF/count < elementSize` throws `std::bad_alloc`, else
+ * `operator new(elementSize*count)`) for strides that only have a single
+ * caller path in this recovery -- `BuyVectorStorage<N>Byte` ->
+ * `BuyVectorStorageByElementWidth(storage,count,N)` -> here -- rather than
+ * a dedicated `AllocateChecked<N>ByteElements` typed wrapper like the other
+ * strides above. No dedicated wrapper is added for these strides since
+ * nothing in src/sdk would call it; the binary's per-stride specialization
+ * collapses into this one runtime-width helper instead.
+ */
 [[nodiscard]] void* AllocateCheckedElementBlock(const std::uint32_t count, const std::uint32_t elementSize)
 {
   if (elementSize == 0u || count > (std::numeric_limits<std::uint32_t>::max() / elementSize)) {
