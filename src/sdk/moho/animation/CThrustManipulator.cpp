@@ -12,6 +12,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniActor.h"
@@ -506,6 +507,25 @@ namespace
 
 namespace moho
 {
+  /**
+   * Minimal RTTI-identity completion for `moho::CThrustManipulator`
+   * (forward-declared in `Reflection.h`, used everywhere else in this file
+   * only as an incomplete pointer type for `reinterpret_cast`/`typeid`
+   * purposes). Real member layout is already fully known and modeled by
+   * `CThrustManipulatorSerializerRuntimeView` above (which already properly
+   * derives from `IAniManipulator`) -- this stub exists only so
+   * `typeid(CThrustManipulator)` is legal for `CThrustManipulatorTypeInfo`'s
+   * RTTI preregistration below, and produces the same mangled
+   * `??_R0?AVCThrustManipulator@Moho@@@8` RTTI descriptor identity as the
+   * binary regardless of which fields are modeled on it. Folding
+   * `CThrustManipulatorSerializerRuntimeView` into this class (and renaming
+   * it) is a follow-up, not required for the reflection wiring recovered
+   * here.
+   */
+  class CThrustManipulator : public IAniManipulator
+  {
+  };
+
   [[nodiscard]] gpg::RType* CachedIAniManipulatorTypeForThrustManipulatorTypeInfo()
   {
     gpg::RType* type = moho::IAniManipulator::sType;
@@ -516,8 +536,8 @@ namespace moho
     return type;
   }
 
-  [[maybe_unused]] gpg::RRef* BuildNewCThrustManipulatorRef(gpg::RRef* outRef);
-  [[maybe_unused]] gpg::RRef* ConstructCThrustManipulatorRefInPlaceRuntime(
+  gpg::RRef* BuildNewCThrustManipulatorRef(gpg::RRef* outRef);
+  gpg::RRef* ConstructCThrustManipulatorRefInPlaceRuntime(
     gpg::RRef* outRef,
     void* objectStorage
   );
@@ -530,7 +550,7 @@ namespace moho
    * `IAniManipulator`, initializes weak-unit/string state, and seeds thrust cap
    * and turn scalar defaults used by typeinfo new/ctr callbacks.
    */
-  [[maybe_unused]] CThrustManipulatorSerializerRuntimeView* InitializeCThrustManipulatorDefaultRuntime(
+  CThrustManipulatorSerializerRuntimeView* InitializeCThrustManipulatorDefaultRuntime(
     CThrustManipulatorSerializerRuntimeView* const runtime
   ) noexcept
   {
@@ -564,7 +584,7 @@ namespace moho
    * lanes, registers `IAniManipulator` as a zero-offset base, then finalizes
    * reflected metadata.
    */
-  [[maybe_unused]] void InitCThrustManipulatorTypeInfo(gpg::RType* const typeInfo);
+  void InitCThrustManipulatorTypeInfo(gpg::RType* const typeInfo);
 
   /**
    * Address: 0x0064A4A0 (FUN_0064A4A0, Moho::CThrustManipulator::CThrustManipulator)
@@ -777,7 +797,14 @@ namespace moho
     runtime->mOrientation = blendedOrientation;
   }
 
-  [[maybe_unused]] void DeleteCThrustManipulatorStorageRuntime(void* const objectStorage)
+  /**
+   * Address: 0x0064B260 (FUN_0064B260, Moho::CThrustManipulatorTypeInfo::Delete)
+   *
+   * What it does:
+   * Runs scalar-deleting destructor slot `0` with delete flag `1` when object
+   * storage is non-null.
+   */
+  void DeleteCThrustManipulatorStorageRuntime(void* const objectStorage)
   {
     if (objectStorage == nullptr) {
       return;
@@ -786,7 +813,13 @@ namespace moho
     reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectStorage)->operator_delete(1);
   }
 
-  [[maybe_unused]] void DestructCThrustManipulatorStorageRuntime(void* const objectStorage)
+  /**
+   * Address: 0x0064B2F0 (FUN_0064B2F0, Moho::CThrustManipulatorTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs scalar-deleting destructor slot `0` with delete flag `0`.
+   */
+  void DestructCThrustManipulatorStorageRuntime(void* const objectStorage)
   {
     reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectStorage)->operator_delete(0);
   }
@@ -832,30 +865,33 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 
-  /**
-   * Address: 0x0064B100 (FUN_0064B100, sub_64B100)
-   *
-   * What it does:
-   * Installs thrust-manipulator type-info lifecycle callbacks into one
-   * `gpg::RType` callback slot lane.
-   */
-  [[maybe_unused]] gpg::RType* BindCThrustManipulatorTypeInfoLifecycleCallbacks(gpg::RType* const typeInfo)
-  {
-    typeInfo->newRefFunc_ = &NewCThrustManipulatorRefForTypeInfo;
-    typeInfo->ctorRefFunc_ = &ConstructCThrustManipulatorRefForTypeInfo;
-    typeInfo->deleteFunc_ = &DeleteCThrustManipulatorStorageRuntime;
-    typeInfo->dtrFunc_ = &DestructCThrustManipulatorStorageRuntime;
-    return typeInfo;
-  }
+  // NOTE: 0x0064B100 (5-instruction field-write body, zero incoming xrefs of
+  // any kind in the callgraph index) is not called by the real
+  // `CThrustManipulatorTypeInfo::Init` (0x0064A230) -- that function writes
+  // its four lifecycle-callback fields inline (see the shared
+  // `gpg::BindRTypeLifecycleCallbacks` template below, which already cites
+  // ~40 identically-shaped inline bodies) rather than calling out to a
+  // separate helper. A prior pass here wrote a local
+  // `BindCThrustManipulatorTypeInfoLifecycleCallbacks` duplicate and claimed
+  // it was "wired" to 0x0064B100 without any citation evidence; removed.
 
-  [[maybe_unused]] void InitCThrustManipulatorTypeInfo(gpg::RType* const typeInfo)
+  /**
+   * Address: 0x0064A230 (FUN_0064A230, Moho::CThrustManipulatorTypeInfo::Init)
+   */
+  void InitCThrustManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     if (typeInfo == nullptr) {
       return;
     }
 
     typeInfo->size_ = sizeof(CThrustManipulatorSerializerRuntimeView);
-    (void)BindCThrustManipulatorTypeInfoLifecycleCallbacks(typeInfo);
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      typeInfo,
+      &NewCThrustManipulatorRefForTypeInfo,
+      &ConstructCThrustManipulatorRefForTypeInfo,
+      &DeleteCThrustManipulatorStorageRuntime,
+      &DestructCThrustManipulatorStorageRuntime
+    );
     AddBaseIAniManipulatorToCThrustManipulatorTypeInfo(typeInfo);
     typeInfo->gpg::RType::Init();
     typeInfo->Finish();
@@ -868,7 +904,7 @@ namespace moho
    * Allocates one thrust manipulator runtime object, runs detached default
    * constructor lanes, and writes the resulting reflected reference.
    */
-  [[maybe_unused]] gpg::RRef* BuildNewCThrustManipulatorRef(gpg::RRef* const outRef)
+  gpg::RRef* BuildNewCThrustManipulatorRef(gpg::RRef* const outRef)
   {
     auto deleteRuntime = [](CThrustManipulatorSerializerRuntimeView* const runtime) noexcept {
       ::operator delete(static_cast<void*>(runtime));
@@ -898,7 +934,7 @@ namespace moho
    * Placement-constructs one thrust manipulator runtime object into caller
    * storage and writes the resulting reflected reference.
    */
-  [[maybe_unused]] gpg::RRef* ConstructCThrustManipulatorRefInPlaceRuntime(
+  gpg::RRef* ConstructCThrustManipulatorRefInPlaceRuntime(
     gpg::RRef* const outRef,
     void* const objectStorage
   )
@@ -914,3 +950,133 @@ namespace moho
     return outRef;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * Owns reflected metadata for `CThrustManipulator`.
+   */
+  class CThrustManipulatorTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x0064A1D0 (FUN_0064A1D0, ctor lane)
+     *
+     * What it does:
+     * Preregisters the `CThrustManipulator` RTTI descriptor during startup.
+     * In the binary this constructor body is inlined into the `.CRT$XCL`
+     * provider wrapper (`register_CThrustManipulatorTypeInfo`, 0x00BD3780)
+     * that constructs the file-scope singleton, rather than being emitted as
+     * a standalone `__thiscall` symbol.
+     */
+    CThrustManipulatorTypeInfo();
+
+    /**
+     * Address: 0x0064A280 (FUN_0064A280, Moho::CThrustManipulatorTypeInfo::dtr)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * restores the `gpg::RObject` vftable. Defaulted in source: the
+     * compiler-generated `~RType()` reproduces this behavior, matching every
+     * other manipulator TypeInfo dtor in this family.
+     */
+    ~CThrustManipulatorTypeInfo() override = default;
+
+    /**
+     * Address: 0x0064A270 (FUN_0064A270, Moho::CThrustManipulatorTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0064A230 (FUN_0064A230, Moho::CThrustManipulatorTypeInfo::Init)
+     *
+     * What it does:
+     * Forwards to the already-recovered `InitCThrustManipulatorTypeInfo` free
+     * helper, which sets `size_`, binds the NewRef/CtrRef/Delete/Destruct
+     * lifecycle callbacks, registers `IAniManipulator` as the reflected base,
+     * and finalizes the type descriptor.
+     */
+    void Init() override;
+  };
+
+  static_assert(sizeof(CThrustManipulatorTypeInfo) == 0x64, "CThrustManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x0064A1D0 (FUN_0064A1D0, ctor lane)
+   */
+  CThrustManipulatorTypeInfo::CThrustManipulatorTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(CThrustManipulator), this);
+  }
+
+  /**
+   * Address: 0x0064A270 (FUN_0064A270, Moho::CThrustManipulatorTypeInfo::GetName)
+   */
+  const char* CThrustManipulatorTypeInfo::GetName() const
+  {
+    return "CThrustManipulator";
+  }
+
+  /**
+   * Address: 0x0064A230 (FUN_0064A230, Moho::CThrustManipulatorTypeInfo::Init)
+   */
+  void CThrustManipulatorTypeInfo::Init()
+  {
+    InitCThrustManipulatorTypeInfo(this);
+  }
+} // namespace moho
+
+namespace
+{
+  alignas(moho::CThrustManipulatorTypeInfo)
+  unsigned char gCThrustManipulatorTypeInfoStorage[sizeof(moho::CThrustManipulatorTypeInfo)] = {};
+  bool gCThrustManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CThrustManipulatorTypeInfo* AcquireCThrustManipulatorTypeInfo()
+  {
+    if (!gCThrustManipulatorTypeInfoConstructed) {
+      new (gCThrustManipulatorTypeInfoStorage) moho::CThrustManipulatorTypeInfo();
+      gCThrustManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CThrustManipulatorTypeInfo*>(gCThrustManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BFB3C0 (FUN_00BFB3C0, cleanup_CThrustManipulatorTypeInfo)
+   *
+   * What it does:
+   * Tears down static `CThrustManipulatorTypeInfo` storage at process exit.
+   */
+  void cleanup_CThrustManipulatorTypeInfo()
+  {
+    if (!gCThrustManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCThrustManipulatorTypeInfo()->~CThrustManipulatorTypeInfo();
+    gCThrustManipulatorTypeInfoConstructed = false;
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BD3780 (FUN_00BD3780, register_CThrustManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CThrustManipulatorTypeInfo` singleton and
+   * installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`); the
+   * binary has exactly one call site and no reentry guard, matching the
+   * guarded-singleton idiom used throughout this manipulator family.
+   */
+  void register_CThrustManipulatorTypeInfo()
+  {
+    (void)AcquireCThrustManipulatorTypeInfo();
+    (void)std::atexit(&cleanup_CThrustManipulatorTypeInfo);
+  }
+} // namespace moho
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CThrustManipulatorTypeInfo_9f14be, moho::register_CThrustManipulatorTypeInfo)
