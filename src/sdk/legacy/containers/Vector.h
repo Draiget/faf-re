@@ -3556,7 +3556,12 @@ namespace msvc8
          * `[first@edx,last@ecx) -> dst@eax`, per-slot dword-pair copy.
          * Reached from the `_Insert_n` grow lane `FUN_0075F810` (already
          * recovered above), `Sim::DumpUnits`'s `counts.push_back({blueprint,
-         * 1})` capacity-full path.)
+         * 1})` capacity-full path. `FUN_0075FCF0` is a thin calling-
+         * convention bridge in front of this same address -- zeroes the
+         * low byte of its `this`-shaped third argument and forwards
+         * `(a3, this, this)` on to `sub_760810`, adapting `FUN_0075F810`'s
+         * call-site register layout to this member's `[edx,ecx)->eax`
+         * convention; same logical operation, no separate behavior.)
          *
          * Uninitialized copy N from src to dst
          */
