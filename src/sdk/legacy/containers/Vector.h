@@ -2029,6 +2029,15 @@ namespace msvc8
          * calls — FUN_0085A920 for the in-place fast path and FUN_0085A0E0
          * for the grow path)
          *
+         * Address: 0x0064E1B0 (FUN_0064E1B0, msvc8::vector<moho::SDebugDecal>::
+         * push_back for the 52-byte element (`4EC4EC4Fh`/`sar 4` stride) --
+         * fast path via the `uninit_fill_n` emission FUN_0064F9A0 (cited
+         * above on `uninit_fill_n`), grow path tail-calls the single-value
+         * `insert` grow-core FUN_0064E3B0 (cited below on `insert`).
+         * Source-level invocation: `canvas->decals.push_back(decal)` in
+         * `RDebugGrid.cpp`/`RDebugRadar.cpp`, the two direct binary callers
+         * at 0x0064F336/0x0064F67C.)
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
@@ -2791,6 +2800,20 @@ namespace msvc8
          * consistent with this file's practice of citing structurally-proven
          * but not fully name-identified instantiations (cf. the "unidentified
          * map<int32_t,T>" family in RbTree.h).)
+         *
+         * Address: 0x0064E3B0 (FUN_0064E3B0, `msvc8::vector<moho::SDebugDecal>::
+         * insert(iterator, const T&)` for the 52-byte element -- captures
+         * `off = (pos - first_) / 52`, tail-calls the `_Insert_n` grow core
+         * FUN_0064E770 with `count = 1`, rebuilds the returned iterator as
+         * `first_ + off * 52` (`imul esi, 34h`). Reached from `push_back`'s
+         * grow path, FUN_0064E1B0, cited above.)
+         * Address: 0x0064E770 (FUN_0064E770, the `_Insert_n` grow core this
+         * `insert` tail-calls -- `max_size` guard `0x4EC4EC4`
+         * (`0xFFFFFFFF/52`), throw lane FUN_0064EEE0 (cited on
+         * `throw_too_long` below), 1.5x growth falling back to `size()+1`
+         * through the size thunk FUN_004521B0, checked 52-byte allocation
+         * FUN_0064F8C0, memberwise `_Tmp` copy since `SDebugDecal` is
+         * trivially copyable (no ctor/dtor call in the shipped body).)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
