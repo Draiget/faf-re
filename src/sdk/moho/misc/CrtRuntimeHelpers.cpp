@@ -160,6 +160,34 @@ extern "C" int __cdecl _tsopen_nolock(
   int permissionFlags
 );
 extern "C" void __cdecl _unlock_fhandle(int fileDescriptor);
+extern "C" int __cdecl _alloc_osfhnd();
+extern "C" int __cdecl _free_osfhnd(int fileDescriptor);
+extern "C" BOOL __cdecl _lock_fhandle(int fileDescriptor);
+// Not named `_get_osfhandle`: that symbol is a real public UCRT export
+// (corecrt_io.h, returns intptr_t) whose own internal fd table is unrelated
+// to this project's __pioinfo; a same-name redeclaration with a different
+// return type is a hard compile error, and even a compatible-signature
+// redeclaration would silently resolve to the wrong (host-toolchain) table.
+extern "C" HANDLE __cdecl RuntimeGetOsfHandle(int fileDescriptor);
+extern "C" long __cdecl _lseek_nolock(int fileDescriptor, long offset, int moveMethod);
+extern "C" __int64 __cdecl _lseeki64_nolock(int fileDescriptor, __int64 offset, int moveMethod);
+extern "C" int __cdecl _close_nolock(int fileDescriptor);
+extern "C" int __cdecl _setmode_nolock(int fileDescriptor, int mode);
+extern "C" int __cdecl _write_nolock(int fileDescriptor, const char* buffer, unsigned int count);
+extern "C" int __cdecl _write(int fileDescriptor, const void* buffer, unsigned int count);
+extern "C" unsigned int __cdecl _read_nolock(int fileDescriptor, char* buffer, unsigned int count);
+extern "C" int __cdecl _wsopen_nolock(
+  int* outFileHandle,
+  int* unlockFlag,
+  const wchar_t* fileName,
+  int openFlags,
+  int shareFlags,
+  int permissionFlags
+);
+constexpr int kOsfhndLock = 11;  // _OSFHND_LOCK, confirmed via `push 0Bh` at 0x00AAF529
+constexpr int kLocktabLock = 10; // _LOCKTAB_LOCK, confirmed via `push 0Ah` at 0x00A96C26
+extern "C" int __cdecl RuntimeInitCrtLockNumber(int lockId);
+extern "C" void __cdecl RuntimeLockCrtLock(int lockId);
 extern "C" int _nhandle;
 extern "C" int _commode;
 extern "C" int _cflush;
@@ -472,16 +500,24 @@ struct RuntimeIoInfo
 {
   std::intptr_t osfhnd;        // +0x00
   std::uint8_t osfile;         // +0x04
-  std::uint8_t reserved05[0x1F];
+  std::uint8_t pipech;         // +0x05, one-char pushback for text-mode reads
+  std::uint8_t pipech2[2];     // +0x06, second/third pushback byte for wide-char reads
+  std::int32_t lockinitflag;   // +0x08
+  CRITICAL_SECTION lock;       // +0x0C, per-fd lock lazily initialized via lockinitflag
   std::int8_t textmodeUnicode; // +0x24
   std::uint8_t reserved25[0x13];
 };
 static_assert(offsetof(RuntimeIoInfo, osfhnd) == 0x00, "RuntimeIoInfo::osfhnd offset must be 0x00");
 static_assert(offsetof(RuntimeIoInfo, osfile) == 0x04, "RuntimeIoInfo::osfile offset must be 0x04");
+static_assert(offsetof(RuntimeIoInfo, pipech) == 0x05, "RuntimeIoInfo::pipech offset must be 0x05");
+static_assert(offsetof(RuntimeIoInfo, pipech2) == 0x06, "RuntimeIoInfo::pipech2 offset must be 0x06");
+static_assert(offsetof(RuntimeIoInfo, lockinitflag) == 0x08, "RuntimeIoInfo::lockinitflag offset must be 0x08");
+static_assert(offsetof(RuntimeIoInfo, lock) == 0x0C, "RuntimeIoInfo::lock offset must be 0x0C");
 static_assert(offsetof(RuntimeIoInfo, textmodeUnicode) == 0x24, "RuntimeIoInfo::textmodeUnicode offset must be 0x24");
 static_assert(sizeof(RuntimeIoInfo) == 0x38, "RuntimeIoInfo size must be 0x38");
 extern "C" RuntimeIoInfo __badioinfo;
 extern "C" RuntimeIoInfo* __pioinfo[];
+extern "C" unsigned int umaskval;
 struct RuntimeThreadLocInfo
 {
   volatile long refcount;
@@ -636,8 +672,13 @@ struct RuntimeLocaleCodePageView
 {
   std::int32_t reserved00;
   std::int32_t codepage;
+  std::int32_t lcCollateCp;    // +0x08
+  LCID lcHandle[6];            // +0x0C, per-category locale handles (matches
+                                // RuntimeLocaleUpdateScope::CollateView)
 };
 static_assert(offsetof(RuntimeLocaleCodePageView, codepage) == 0x4, "RuntimeLocaleCodePageView::codepage offset must be 0x4");
+static_assert(offsetof(RuntimeLocaleCodePageView, lcCollateCp) == 0x8, "RuntimeLocaleCodePageView::lcCollateCp offset must be 0x8");
+static_assert(offsetof(RuntimeLocaleCodePageView, lcHandle) == 0xC, "RuntimeLocaleCodePageView::lcHandle offset must be 0xC");
 
 struct RuntimeLocaleCTypeTableView
 {
@@ -8412,6 +8453,322 @@ namespace moho::runtime
   }
 
   /**
+   * Address: 0x00AAF500 (FUN_00AAF500, _alloc_osfhnd)
+   *
+   * What it does:
+   * Finds or allocates a free file-descriptor slot in the `__pioinfo` paged
+   * table (32 slots/page, growing lazily). Scans existing pages for a free
+   * (`osfile&1==0`) slot under its own lazily-initialized per-slot lock; if
+   * none exists, allocates and zero-initializes a fresh 32-slot page.
+   * Returns the new descriptor index, or -1 on failure.
+   */
+  extern "C" int __cdecl _alloc_osfhnd()
+  {
+    if (!RuntimeInitCrtLockNumber(kOsfhndLock)) {
+      return -1;
+    }
+
+    RuntimeLockCrtLock(kOsfhndLock);
+
+    int newDescriptor = -1;
+    bool lockFailed = false;
+    for (int page = 0; page < 64; ++page) {
+      RuntimeIoInfo* const slot = __pioinfo[page];
+
+      if (slot == nullptr) {
+        auto* const newPage = static_cast<RuntimeIoInfo*>(_calloc_crt(32u, sizeof(RuntimeIoInfo)));
+        if (newPage != nullptr) {
+          __pioinfo[page] = newPage;
+          _nhandle += 32;
+          for (RuntimeIoInfo* init = newPage; init < newPage + 32; ++init) {
+            init->osfile = 0;
+            init->osfhnd = -1;
+            init->pipech = 10;
+            init->lockinitflag = 0;
+          }
+
+          newDescriptor = 32 * page;
+          newPage->osfile = 1;
+          if (!_lock_fhandle(newDescriptor)) {
+            newDescriptor = -1;
+          }
+        }
+        break;
+      }
+
+      for (RuntimeIoInfo* candidate = slot; candidate < slot + 32; ++candidate) {
+        if ((candidate->osfile & 1) != 0) {
+          continue;
+        }
+
+        if (candidate->lockinitflag == 0) {
+          RuntimeLockCrtLock(kLocktabLock);
+          if (candidate->lockinitflag == 0) {
+            if (__crtInitCritSecAndSpinCount(&candidate->lock, 4000u)) {
+              ++candidate->lockinitflag;
+            } else {
+              lockFailed = true;
+            }
+          }
+          RuntimeUnlockCrtLock(kLocktabLock);
+        }
+
+        if (!lockFailed) {
+          ::EnterCriticalSection(&candidate->lock);
+          if ((candidate->osfile & 1) == 0) {
+            candidate->osfile = 1;
+            candidate->osfhnd = -1;
+            newDescriptor = 32 * page + static_cast<int>(candidate - slot);
+            break;
+          }
+          ::LeaveCriticalSection(&candidate->lock);
+        }
+      }
+
+      if (newDescriptor != -1) {
+        break;
+      }
+    }
+
+    RuntimeUnlockCrtLock(kOsfhndLock);
+    return newDescriptor;
+  }
+
+  /**
+   * Address: 0x00AAF34C (FUN_00AAF34C, _free_osfhnd)
+   *
+   * What it does:
+   * Releases the OS handle slot for `fileDescriptor` back to closed
+   * (`osfhnd = -1`), clearing the matching std handle when releasing one of
+   * the three console standard streams under a console-subsystem app.
+   */
+  extern "C" int __cdecl _free_osfhnd(const int fileDescriptor)
+  {
+    if (fileDescriptor < 0 || fileDescriptor >= _nhandle) {
+      *_errno() = EBADF;
+      *RuntimeDosErrno() = 0;
+      return -1;
+    }
+
+    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    if ((slot->osfile & 1) == 0 || slot->osfhnd == -1) {
+      *_errno() = EBADF;
+      *RuntimeDosErrno() = 0;
+      return -1;
+    }
+
+    constexpr int kConsoleAppType = 1;
+    if (__app_type == kConsoleAppType) {
+      if (fileDescriptor == 0) {
+        ::SetStdHandle(STD_INPUT_HANDLE, nullptr);
+      } else if (fileDescriptor == 1) {
+        ::SetStdHandle(STD_OUTPUT_HANDLE, nullptr);
+      } else if (fileDescriptor == 2) {
+        ::SetStdHandle(STD_ERROR_HANDLE, nullptr);
+      }
+    }
+
+    slot->osfhnd = -1;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AAF43E (FUN_00AAF43E, _lock_fhandle)
+   *
+   * What it does:
+   * Enters the per-fd critical section for `fileDescriptor`, lazily
+   * initializing it (under the lock-table lock) on first use.
+   */
+  extern "C" BOOL __cdecl _lock_fhandle(const int fileDescriptor)
+  {
+    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+
+    BOOL status = TRUE;
+    if (slot->lockinitflag == 0) {
+      RuntimeLockCrtLock(kLocktabLock);
+      if (slot->lockinitflag == 0) {
+        status = __crtInitCritSecAndSpinCount(&slot->lock, 4000u);
+        ++slot->lockinitflag;
+      }
+      RuntimeUnlockCrtLock(kLocktabLock);
+    }
+
+    if (status) {
+      ::EnterCriticalSection(&slot->lock);
+    }
+    return status;
+  }
+
+  /**
+   * Address: 0x00AAF4DE (FUN_00AAF4DE, _unlock_fhandle)
+   *
+   * What it does:
+   * Leaves the per-fd critical section for `fileDescriptor`.
+   */
+  extern "C" void __cdecl _unlock_fhandle(const int fileDescriptor)
+  {
+    ::LeaveCriticalSection(&(__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->lock);
+  }
+
+  /**
+   * Address: 0x00AAF3CD (FUN_00AAF3CD, _get_osfhandle)
+   *
+   * What it does:
+   * Returns the raw OS `HANDLE` backing `fileDescriptor`, or `(HANDLE)-1`
+   * with `errno=EBADF` if the descriptor is the sentinel `-2` value, out of
+   * range, or not currently open.
+   */
+  extern "C" HANDLE __cdecl RuntimeGetOsfHandle(const int fileDescriptor)
+  {
+    if (fileDescriptor == -2) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+    }
+
+    if (fileDescriptor >= 0 && fileDescriptor < _nhandle) {
+      RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+      if ((slot->osfile & 1) != 0) {
+        return reinterpret_cast<HANDLE>(slot->osfhnd);
+      }
+    }
+
+    *RuntimeDosErrno() = 0;
+    *_errno() = EBADF;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+    return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+  }
+
+  /**
+   * Address: 0x00A9CAE6 (FUN_00A9CAE6, _lseek_nolock)
+   *
+   * What it does:
+   * Repositions the file pointer for `fileDescriptor` via `SetFilePointer`,
+   * clearing the "ungetc pending" flag (`osfile & 0x02`) on success.
+   */
+  extern "C" long __cdecl _lseek_nolock(const int fileDescriptor, const long offset, const int moveMethod)
+  {
+    const HANDLE osHandle = RuntimeGetOsfHandle(fileDescriptor);
+    if (osHandle == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) {
+      *_errno() = EBADF;
+      return -1;
+    }
+
+    const DWORD newPos = ::SetFilePointer(osHandle, offset, nullptr, static_cast<DWORD>(moveMethod));
+    const DWORD lastError = (newPos == 0xFFFFFFFFu) ? ::GetLastError() : 0u;
+    if (lastError != 0) {
+      _dosmaperr(lastError);
+      return -1;
+    }
+
+    (__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile &= static_cast<std::uint8_t>(~0x02u);
+    return static_cast<long>(newPos);
+  }
+
+  /**
+   * Address: 0x00AB629A (FUN_00AB629A, _lseeki64_nolock)
+   *
+   * What it does:
+   * 64-bit-offset counterpart of `_lseek_nolock`, using the high/low
+   * `SetFilePointer` overload.
+   */
+  extern "C" __int64 __cdecl _lseeki64_nolock(const int fileDescriptor, const __int64 offset, const int moveMethod)
+  {
+    const HANDLE osHandle = RuntimeGetOsfHandle(fileDescriptor);
+    if (osHandle == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) {
+      *_errno() = EBADF;
+      return -1;
+    }
+
+    LONG highPart = static_cast<LONG>(offset >> 32);
+    const DWORD lowResult = ::SetFilePointer(
+      osHandle, static_cast<LONG>(offset), &highPart, static_cast<DWORD>(moveMethod)
+    );
+    if (lowResult == 0xFFFFFFFFu) {
+      const DWORD lastError = ::GetLastError();
+      if (lastError != 0) {
+        _dosmaperr(lastError);
+        return -1;
+      }
+    }
+
+    (__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile &= static_cast<std::uint8_t>(~0x02u);
+    return (static_cast<__int64>(highPart) << 32) | lowResult;
+  }
+
+  /**
+   * Address: 0x00A9BBB5 (FUN_00A9BBB5, close_nolock / _close_nolock)
+   *
+   * What it does:
+   * Closes the OS handle for `fileDescriptor`, skipping the actual
+   * `CloseHandle` when fd 1/2 alias the same handle (real CRT stdout/stderr
+   * handle-sharing special case), then frees the descriptor slot.
+   */
+  extern "C" int __cdecl _close_nolock(const int fileDescriptor)
+  {
+    // The fd-1/fd-2 aliasing check reads a flag bit off the *adjacent*
+    // ioinfo slot's textmodeUnicode (fd 2 when closing fd 1) or off fd 1's
+    // own CRITICAL_SECTION RecursionCount word (when closing fd 2) --
+    // preserved verbatim from the decompiled shape; the exact intended flag
+    // semantics for the second case are not independently confirmed.
+    const bool skipClose =
+      (RuntimeGetOsfHandle(fileDescriptor) == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) ||
+      (((fileDescriptor == 1 && (__pioinfo[0][2].textmodeUnicode & 1) != 0) ||
+        (fileDescriptor == 2 && (reinterpret_cast<int*>(&__pioinfo[0][1].lock)[2] & 1) != 0)) &&
+       RuntimeGetOsfHandle(2) == RuntimeGetOsfHandle(1));
+
+    const bool closedOk = skipClose || ::CloseHandle(RuntimeGetOsfHandle(fileDescriptor)) != 0;
+    const DWORD lastError = closedOk ? 0u : ::GetLastError();
+
+    _free_osfhnd(fileDescriptor);
+    (__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile = 0;
+
+    if (lastError == 0) {
+      return 0;
+    }
+    _dosmaperr(lastError);
+    return -1;
+  }
+
+  constexpr int kOModeText = 0x4000;
+  constexpr int kOModeBinary = 0x8000;
+  constexpr int kOModeWText = 0x10000;
+  constexpr int kOModeU16Text = 0x20000;
+  constexpr int kOModeU8Text = 0x40000;
+
+  /**
+   * Address: 0x00AB97D0 (FUN_00AB97D0, _setmode_nolock)
+   *
+   * What it does:
+   * Switches the text/binary/Unicode translation mode for `fileDescriptor`,
+   * returning the previous mode (`_O_TEXT`/`_O_WTEXT`/`_O_BINARY`).
+   */
+  extern "C" int __cdecl _setmode_nolock(const int fileDescriptor, const int mode)
+  {
+    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    const bool wasTextMode = (slot->osfile & 0x80) != 0;
+    const int previousUnicodeSubmode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
+
+    if (mode == kOModeText) {
+      slot->osfile |= 0x80;
+      slot->textmodeUnicode &= static_cast<std::int8_t>(0x80);
+    } else if (mode == kOModeBinary) {
+      slot->osfile &= static_cast<std::uint8_t>(~0x80);
+    } else if (mode == kOModeWText || mode == kOModeU16Text) {
+      slot->osfile |= 0x80;
+      slot->textmodeUnicode = static_cast<std::int8_t>((slot->textmodeUnicode & 0x80) | 2);
+    } else if (mode == kOModeU8Text) {
+      slot->osfile |= 0x80;
+      slot->textmodeUnicode = static_cast<std::int8_t>((slot->textmodeUnicode & 0x80) | 1);
+    }
+
+    if (wasTextMode) {
+      return previousUnicodeSubmode != 0 ? kOModeWText : kOModeText;
+    }
+    return kOModeBinary;
+  }
+
+  /**
    * Address: 0x00AAFFC4 (FUN_00AAFFC4, _wsopen_s / _wsopen_helper)
    *
    * What it does:
@@ -9343,6 +9700,66 @@ namespace moho::runtime
     // The table is pairs of {lock, kind}; _locktable is typed as a flat
     // LPCRITICAL_SECTION array, so the lock lives at index 2*lockId.
     ::LeaveCriticalSection(_locktable[2 * static_cast<std::size_t>(lockId)]);
+  }
+
+  constexpr int kRtCrtNotInit = 0x1E;
+
+  /**
+   * Address: 0x00A96BC3 (FUN_00A96BC3, _mtinitlocknum)
+   *
+   * What it does:
+   * Lazily allocates and initializes the CRT lock-table entry for `lockId`
+   * (a `CRITICAL_SECTION` behind `_locktable[2*lockId]`), guarded by the
+   * lock-table's own lock (`_LOCKTAB_LOCK`). Fatal-exits via the CRT
+   * not-initialized banner if the process heap isn't up yet.
+   */
+  extern "C" int __cdecl RuntimeInitCrtLockNumber(const int lockId)
+  {
+    if (_crtheap == nullptr) {
+      __FF_MSGBANNER();
+      __NMSG_WRITE(kRtCrtNotInit);
+      crtExitProcess(0xFFu);
+    }
+
+    if (_locktable[2 * static_cast<std::size_t>(lockId)] != nullptr) {
+      return 1;
+    }
+
+    auto* const newLock = static_cast<LPCRITICAL_SECTION>(std::malloc(sizeof(CRITICAL_SECTION)));
+    if (newLock == nullptr) {
+      *_errno() = ENOMEM;
+      return 0;
+    }
+
+    int status = 1;
+    RuntimeLockCrtLock(kLocktabLock);
+    if (_locktable[2 * static_cast<std::size_t>(lockId)] != nullptr) {
+      _free_crt(newLock);
+    } else if (__crtInitCritSecAndSpinCount(newLock, 4000u)) {
+      _locktable[2 * static_cast<std::size_t>(lockId)] = newLock;
+    } else {
+      _free_crt(newLock);
+      *_errno() = ENOMEM;
+      status = 0;
+    }
+    RuntimeUnlockCrtLock(kLocktabLock);
+    return status;
+  }
+
+  /**
+   * Address: 0x00A96C86 (FUN_00A96C86, _lock)
+   *
+   * What it does:
+   * Enters the CRT lock-table entry for `lockId`, initializing it on first
+   * use via `RuntimeInitCrtLockNumber`. Fatal-exits (`__amsg_exit`) if
+   * initialization fails.
+   */
+  extern "C" void __cdecl RuntimeLockCrtLock(const int lockId)
+  {
+    if (_locktable[2 * static_cast<std::size_t>(lockId)] == nullptr && !RuntimeInitCrtLockNumber(lockId)) {
+      __amsg_exit(17);
+    }
+    ::EnterCriticalSection(_locktable[2 * static_cast<std::size_t>(lockId)]);
   }
 
   /**
