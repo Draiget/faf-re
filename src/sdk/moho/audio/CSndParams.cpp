@@ -16,6 +16,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/List.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/SParamKey.h"
@@ -53,7 +54,7 @@ namespace
   constexpr const char* kSndParamsSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\SndParams.cpp";
 
   std::recursive_mutex gSndParamsRegistryMutex;
-  std::vector<moho::CSndParams*> gSndParamsRegistry;
+  msvc8::list<moho::CSndParams*> gSndParamsRegistry;
   std::unordered_multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
   std::mutex gSharedAmbientLoopMutex;
   std::unordered_map<moho::CSndParams*, std::unique_ptr<moho::HSndEntityLoop>> gSharedAmbientLoopsByParams;

@@ -2744,6 +2744,15 @@ namespace msvc8
          * (0x004028E0). On a partial range it tears the in-flight slots down
          * and rethrows, which is the strong guarantee this member already
          * provides.)
+         * Address: 0x008D9FA0 (FUN_008D9FA0, msvc8::vector<gpg::REnumType::
+         * ROptionValue>::uninit_copy_n for the 8-byte trivially-copyable
+         * `{int mValue; const char* mName}` element -- a range-form
+         * dword-pair copy loop (`[first,last) -> dst`, `+= 2` stride,
+         * returns the advanced `dst`). Reached from the `_Insert_n` grow
+         * lane FUN_008DCB70 (cited above on `insert`), which relocates the
+         * existing option slots into the reallocated buffer for
+         * `gpg::AppendEnumOptionValue`'s `options.insert(options.end(), 1,
+         * value)` on the capacity-full path)
          *
          * Uninitialized copy N from src to dst
          */
@@ -2797,6 +2806,12 @@ namespace msvc8
          * element -- a count-driven dword-pair fill loop, reached from both
          * `Moho::Sim::DumpUnits` (0x0075EE50) and its `push_back` grow lane
          * (0x0075F1A0, cited on `push_back` above))
+         * Address: 0x008DA380 (FUN_008DA380, msvc8::vector<gpg::REnumType::
+         * ROptionValue>::uninit_fill_n for the 8-byte trivially-copyable
+         * `{int mValue; const char* mName}` element -- the same count-driven
+         * dword-pair fill loop, called with n=1 from `push_back`'s in-place
+         * fast path FUN_008DF290 (cited on `AppendEnumOptionValue`,
+         * Reflection.cpp) when the vector still has spare capacity)
          * Address: 0x00680940 (FUN_00680940, msvc8::vector<moho::SCreateEntityParams>::
          * uninit_fill_n for the 12-byte trivially-copyable element -- a count-driven
          * dword-triple fill loop, reached from QueueCreateEntityParams's
@@ -3071,6 +3086,12 @@ namespace msvc8
          * all the *same* function template specialised on different element
          * widths -- they are grouped here rather than duplicated as per-width
          * free functions.
+         *
+         * sizeof(T) == 2 (`count > 0x7FFFFFFF` throws):
+         * Address: 0x0092C000 (FUN_0092C000, called from
+         * `msvc8::vector<std::uint16_t>`'s initial-reserve path,
+         * `InitializeWordVectorStorageRuntime` / FUN_00930070 in
+         * `moho/sim/SimRecoveryRuntime.cpp`)
          *
          * sizeof(T) == 4 (`count > 0x3FFFFFFF` throws):
          * Address: 0x00445B80 (FUN_00445B80)
@@ -3736,11 +3757,37 @@ namespace msvc8
             insert(begin(), v);
         }
 
+        /**
+         * Address: 0x004E32D0 (FUN_004E32D0, `msvc8::list<Moho::CSndParams*>`'s
+         * node-buy lane, called from `func_RegisterCSndParams`/FUN_004DFA50)
+         * Address: 0x004E3310 (FUN_004E3310, the same list's `_Incsize`-style
+         * overflow-checked size increment, called immediately after the node
+         * buy in the same caller)
+         *
+         * What it does:
+         * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
+         * node through the checked 12-byte-element lane (`AllocateChecked12ByteLane`,
+         * FUN_004E4F70, folded onto many other 12-byte instantiations) and writes
+         * `_Next`/`_Prev`/`_Value` directly into the fresh block; the recovered
+         * form expresses the same net state via placement-new followed by the
+         * explicit link reassignment below. FUN_004E3310 checks `_Mysize` against
+         * the Dinkumware-generic `0x3FFFFFFF` cap (the same fixed bound used by
+         * this file's `sizeof(T)==4` vector `max_size()`, unrelated to the
+         * 12-byte node size) and throws `std::length_error("list<T> too long")`
+         * before incrementing; the binary performs the node buy *before* this
+         * check, so the node is not freed on the overflow path -- preserved here
+         * for fidelity.
+         */
         iterator insert(const_iterator pos, const value_type& v)
         {
             _Node_alloc_type al;
             _Node* node = al.allocate(1);
             new (node) _Node(v);
+
+            if (_Mysize == static_cast<size_type>(0x3FFFFFFF)) {
+                throw std::length_error("list<T> too long");
+            }
+            ++_Mysize;
 
             _Nodeptr where = pos._Ptr;
             _Nodeptr prev = where->_Prev;
@@ -3750,7 +3797,6 @@ namespace msvc8
             prev->_Next = node;
             where->_Prev = node;
 
-            ++_Mysize;
             return iterator(node);
         }
 
