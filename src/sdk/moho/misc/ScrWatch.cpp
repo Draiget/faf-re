@@ -43,24 +43,6 @@ namespace moho
       }
     }
 
-    /**
-     * Address: 0x004B9070 (FUN_004B9070)
-     *
-     * What it does:
-     * Executes one deleting-destructor thunk lane for `ScrWatch` by
-     * running teardown and conditionally freeing storage.
-     */
-    [[maybe_unused]] ScrWatch* DestructScrWatchDeleting(
-      ScrWatch* const self,
-      const unsigned char deleteFlag
-    ) noexcept
-    {
-      self->~ScrWatch();
-      if ((deleteFlag & 1U) != 0U) {
-        ::operator delete(static_cast<void*>(self));
-      }
-      return self;
-    }
   } // namespace
 
   /**
@@ -109,6 +91,12 @@ namespace moho
 
   /**
    * Address: 0x004D6B70 (FUN_004D6B70, Moho::ScrWatch::~ScrWatch)
+   * Also emitted at: 0x004B9070 -- the scalar deleting destructor MSVC
+   * generates for any polymorphic class with a virtual destructor (this
+   * class declares `virtual ~ScrWatch()`, no other base). No source line
+   * maps to that emission; a standalone `DestructScrWatchDeleting` free
+   * function previously modelled it as if it needed its own source-level
+   * caller, but nothing ever called it (removed).
    */
   ScrWatch::~ScrWatch() = default;
 

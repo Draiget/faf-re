@@ -9,24 +9,6 @@
 namespace
 {
   /**
-   * Address: 0x004C1C40 (FUN_004C1C40)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for `ScrFileLine`.
-   */
-  [[maybe_unused]] moho::ScrFileLine* DestructScrFileLineDeleting(
-    moho::ScrFileLine* const self,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    self->~ScrFileLine();
-    if ((deleteFlag & 1U) != 0U) {
-      ::operator delete(static_cast<void*>(self));
-    }
-    return self;
-  }
-
-  /**
    * Address: 0x004C6AB0 (FUN_004C6AB0)
    *
    * IDA signature:
@@ -258,6 +240,12 @@ moho::ScrFileLine::ScrFileLine(const ScrFileLine& other)
 
 /**
  * Address: 0x004C1E10 (FUN_004C1E10, Moho::ScrFileLine::~ScrFileLine)
+ * Also emitted at: 0x004C1C40 -- the scalar deleting destructor MSVC
+ * generates for any polymorphic class with a virtual destructor (this class
+ * declares `virtual ~ScrFileLine()`, no other base). No source line maps to
+ * that emission; a standalone `DestructScrFileLineDeleting` free function
+ * previously modelled it as if it needed its own source-level caller, but
+ * nothing ever called it (removed).
  *
  * What it does:
  * Releases both line-text storage lanes.
