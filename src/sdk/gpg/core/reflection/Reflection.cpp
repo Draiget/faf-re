@@ -1994,20 +1994,35 @@ T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
     return upcast.mObj;
   }
 
+  // Address: 0x00557D50 (FUN_00557D50, TryUpcastRefObjectVariantB<moho::RBlueprint> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::RBlueprint>(gpg::RRef* const);
+  // Address: 0x0059E7F0 (FUN_0059E7F0, TryUpcastRefObjectVariantB<moho::IFormationInstance> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::IFormationInstance>(gpg::RRef* const);
+  // Address: 0x005A2420 (FUN_005A2420, TryUpcastRefObjectVariantB<moho::RUnitBlueprint> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::RUnitBlueprint>(gpg::RRef* const);
+  // Address: 0x005CC300 (FUN_005CC300, TryUpcastRefObjectVariantB<moho::ReconBlip> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::ReconBlip>(gpg::RRef* const);
+  // Address: 0x005E1030 (FUN_005E1030, TryUpcastRefObjectVariantB<moho::UnitWeapon> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::UnitWeapon>(gpg::RRef* const);
+  // Address: 0x005E1050 (FUN_005E1050, TryUpcastRefObjectVariantB<moho::CAcquireTargetTask> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CAcquireTargetTask>(gpg::RRef* const);
+  // Address: 0x0063E970 (FUN_0063E970, TryUpcastRefObjectVariantB<moho::IAniManipulator> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::IAniManipulator>(gpg::RRef* const);
+  // Address: 0x0066D190 (FUN_0066D190, TryUpcastRefObjectVariantB<moho::IEffect> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::IEffect>(gpg::RRef* const);
+  // Address: 0x00680F70 (FUN_00680F70, TryUpcastRefObjectVariantB<moho::Entity> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::Entity>(gpg::RRef* const);
+  // Address: 0x006B4410 (FUN_006B4410, TryUpcastRefObjectVariantB<moho::CEconomyEvent> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CEconomyEvent>(gpg::RRef* const);
+  // Address: 0x006E3EF0 (FUN_006E3EF0, TryUpcastRefObjectVariantB<moho::CUnitCommand> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CUnitCommand>(gpg::RRef* const);
+  // Address: 0x00713F10 (FUN_00713F10, TryUpcastRefObjectVariantB<moho::CArmyStatItem> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CArmyStatItem>(gpg::RRef* const);
+  // Address: 0x007542D0 (FUN_007542D0, TryUpcastRefObjectVariantB<moho::SimArmy> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::SimArmy>(gpg::RRef* const);
+  // Address: 0x00754470 (FUN_00754470, TryUpcastRefObjectVariantB<moho::Shield> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::Shield>(gpg::RRef* const);
+  // Address: 0x0077F600 (FUN_0077F600, TryUpcastRefObjectVariantB<moho::CDecalHandle> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CDecalHandle>(gpg::RRef* const);
 
 // FUN_00750100 is the AssignPointer vtable slot of RPointerType<moho::SimArmy>,
@@ -3774,6 +3789,7 @@ void PreRegisterRType(const std::type_info& typeInfo, RType* type)
  */
 void REF_RegisterAllTypes()
 {
+  // Address: 0x008D49F0 (FUN_008D49F0, std::basic_stringstream<char>::~basic_stringstream)
   // The `std::basic_stringstream<char>` destructor used to tear down `errs`
   // below compiles to the shared CRT body at `0x008D49F0` (FUN_008D49F0):
   // it reseats the ios/iostream/ostream/istream vtable lanes back to their
@@ -3792,6 +3808,7 @@ void REF_RegisterAllTypes()
 
   const std::string aggregated = errs.str();
   if (!aggregated.empty()) {
+    // Address: 0x008D4A80 (FUN_008D4A80, std::runtime_error::runtime_error(const std::string&))
     // The `std::runtime_error(const std::string&)` constructor the compiler
     // inlines here is at `0x008D4A80` (FUN_008D4A80): it stores the message
     // into the exception's `std::string` member via the runtime string-copy
