@@ -3209,6 +3209,26 @@ namespace msvc8
          * msvc8::vector<Moho::SDecalInfo>::uninit_copy_n, with the
          * destroy-what-was-built rollback on throw)
          * Address: 0x0077E910 (FUN_0077E910, its fastcall-shape adapter)
+         * Address: 0x0077F560 (FUN_0077F560, the shared canonical body that
+         * both FUN_0077E7B0's and FUN_0077E910's adapters tail-call into --
+         * the actual 62-instruction range-copy-construct-with-rollback-on-throw
+         * loop for this specialization. Also reached, through the same shape-
+         * adapter pattern, from FUN_0077DA50, FUN_0077F310, and FUN_0077F3D0,
+         * and directly from FUN_0077B990)
+         * Address: 0x0077DA50 (FUN_0077DA50, fastcall-shape adapter for
+         * FUN_0077F560 -- a linker-emitted calling-convention trampoline
+         * previously mis-cited as having its canonical body in
+         * CDecalTypes.cpp; the real canonical body is FUN_0077F560, above)
+         * Address: 0x0077F310 (FUN_0077F310, register-shape adapter for FUN_0077F560)
+         * Address: 0x0077F3D0 (FUN_0077F3D0, register-shape adapter for FUN_0077F560)
+         * Address: 0x0077F4C0 (FUN_0077F4C0, a second, independently-emitted
+         * `uninit_copy_n` body for this same specialization -- the same
+         * range-copy/rollback-on-throw shape as FUN_0077F560, under a
+         * slightly different local-frame layout and parameter-passing
+         * convention. Reached through its own pair of shape adapters,
+         * FUN_0077E8B0 and FUN_0077F370)
+         * Address: 0x0077E8B0 (FUN_0077E8B0, fastcall-shape adapter for FUN_0077F4C0)
+         * Address: 0x0077F370 (FUN_0077F370, register-shape adapter for FUN_0077F4C0)
          * Address: 0x00563430 (FUN_00563430,
          * msvc8::vector<Moho::SUnitVariableUpdateEntry>::uninit_copy_n -- the
          * range form, with the destroy-what-was-built rollback on throw)
@@ -4178,6 +4198,8 @@ namespace msvc8
          * (`list->push_back(value)`, calling into this template's own
          * `insert()`/`al.allocate(1)` path) is the source-level trigger for
          * this exact `list<SDecalInfo>` instantiation.)
+         * Address: 0x0077D1D0 (FUN_0077D1D0, the `_Buynode(next,prev)`
+         * node-buy wrapper described above)
          *
          * sizeof(T) == 12 / 16 / 52 / 60 / 64 / 116 / 388:
          * Address: 0x007E5650 (FUN_007E5650, 12B, e.g. `Wm3::Vector3<float>`)
