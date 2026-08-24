@@ -693,6 +693,33 @@ namespace msvc8
              * Address: 0x0077A250 (FUN_0077A250, the outer map's `operator[]`, which the
              * same expression compiles to on the outer map)
              */
+            /**
+             * Address: 0x00534030 (FUN_00534030, RRuleGameRulesBlueprintMap insert --
+             * `GetOrCreateRegisteredBlueprint<RUnitBlueprint,...>`'s
+             * `map.insert(RRuleGameRulesBlueprintMap::value_type(normalizedId, blueprint))`
+             * at Sim.cpp; insert_at half is FUN_005349E0, predecessor lookup is FUN_005364D0)
+             * Address: 0x00534140 (FUN_00534140, same map insert, T=RProjectileBlueprint;
+             * insert_at FUN_00534B90, predecessor lookup FUN_00536530)
+             * Address: 0x00534250 (FUN_00534250, same map insert, T=RPropBlueprint;
+             * insert_at FUN_00534D40, predecessor lookup FUN_00536590)
+             * Address: 0x00534360 (FUN_00534360, same map insert, T=RMeshBlueprint;
+             * insert_at FUN_00534EF0, predecessor lookup FUN_005365F0)
+             * Address: 0x00534470 (FUN_00534470, same map insert reached from
+             * `GetOrCreateRegisteredEffectBlueprint<REmitterBlueprint,...>`; insert_at
+             * FUN_005350A0, predecessor lookup FUN_00536410)
+             * Address: 0x00534580 (FUN_00534580, same map insert, T=RBeamBlueprint;
+             * insert_at FUN_00535250, predecessor lookup FUN_005363B0)
+             * Address: 0x00534690 (FUN_00534690, same map insert, T=RTrailBlueprint;
+             * insert_at FUN_00535400, predecessor lookup FUN_00536470)
+             *
+             * All seven are byte-for-byte the same `insert_unique` shape (descend
+             * recording the last branch, confirm uniqueness against the in-order
+             * predecessor when the descent bottomed out on a left branch, link via
+             * `insert_at`) compiled once per `RRuleGameRulesImpl::Get*Blueprint()`
+             * owner even though the map type (`msvc8::map<msvc8::string,void*>`) is
+             * identical across all seven call sites -- the 2007 compiler did not
+             * fold them despite the shared instantiation.
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
