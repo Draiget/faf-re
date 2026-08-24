@@ -127,25 +127,6 @@ namespace
   }
 
   /**
-   * Address: 0x004B0130 (FUN_004B0130)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for `ScrBreakpoint` by
-   * running object teardown and conditionally freeing storage.
-   */
-  [[maybe_unused]] moho::ScrBreakpoint* DestructScrBreakpointDeleting(
-    moho::ScrBreakpoint* const self,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    self->~ScrBreakpoint();
-    if ((deleteFlag & 1U) != 0U) {
-      ::operator delete(static_cast<void*>(self));
-    }
-    return self;
-  }
-
-  /**
    * Address: 0x004B0170 (FUN_004B0170)
    *
    * What it does:
@@ -193,6 +174,12 @@ moho::ScrBreakpoint::ScrBreakpoint(
 
 /**
  * Address: 0x004B0210 (FUN_004B0210, Moho::ScrBreakpoint::~ScrBreakpoint)
+ * Also emitted at: 0x004B0130 -- the scalar deleting destructor MSVC
+ * generates for any polymorphic class with a virtual destructor (this class
+ * declares `virtual ~ScrBreakpoint()`, no other base). No source line maps
+ * to that emission; a standalone `DestructScrBreakpointDeleting` free
+ * function previously modelled it as if it needed its own source-level
+ * caller, but nothing ever called it (removed).
  *
  * What it does:
  * Resets breakpoint name storage to empty SSO state.

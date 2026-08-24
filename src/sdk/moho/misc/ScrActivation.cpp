@@ -12,24 +12,6 @@ namespace
    */
   [[maybe_unused]] void NoOpHelperThunk() noexcept {}
 
-  /**
-   * Address: 0x004AFF60 (FUN_004AFF60)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for `ScrActivation` by
-   * running object teardown and conditionally freeing storage.
-   */
-  [[maybe_unused]] moho::ScrActivation* DestructScrActivationDeleting(
-    moho::ScrActivation* const self,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    self->~ScrActivation();
-    if ((deleteFlag & 1U) != 0U) {
-      ::operator delete(static_cast<void*>(self));
-    }
-    return self;
-  }
 } // namespace
 
 /**
@@ -75,6 +57,12 @@ moho::ScrActivation::ScrActivation(
 
 /**
  * Address: 0x004B0000 (FUN_004B0000, Moho::ScrActivation::~ScrActivation)
+ * Also emitted at: 0x004AFF60 -- the scalar deleting destructor MSVC
+ * generates for any polymorphic class with a virtual destructor (this class
+ * declares `virtual ~ScrActivation()`, no other base). No source line maps
+ * to that emission; a standalone `DestructScrActivationDeleting` free
+ * function previously modelled it as if it needed its own source-level
+ * caller, but nothing ever called it (removed).
  *
  * What it does:
  * Resets script activation string lanes and releases heap-backed storage.
