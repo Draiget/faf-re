@@ -3112,6 +3112,18 @@ namespace msvc8
          * Address: 0x00549A50 (FUN_00549A50, register-shape adapter for FUN_00549BC0)
          * Address: 0x00549750 (FUN_00549750, source-first adapter for FUN_00549A90)
          * Address: 0x00549940 (FUN_00549940, source-first adapter for FUN_00549A90)
+         * Address: 0x00868FD0 (FUN_00868FD0, `msvc8::vector<
+         * Moho::WeakEntitySetUserEntity>::uninit_copy_n` for the 12-byte
+         * selection-priority bucket element -- copy-constructs the live
+         * range into the freshly grown buffer via the element's own copy
+         * constructor (`sub_822210`, `WeakEntitySetUserEntity`'s copy ctor
+         * in WeakEntitySet.h), with the same construct/rollback-on-throw
+         * shape as `uninit_fill_n`'s sibling emission for this type
+         * (`sub_868E50` destroys the constructed prefix on a mid-loop
+         * throw). Reached from the `insert`/`_Insert_n` core FUN_00868040's
+         * reallocation branch (cited above on `insert`), which copies the
+         * live range through this before filling the new tail with
+         * FUN_00868DB0.)
          * Address: 0x006E0400 (FUN_006E0400,
          * msvc8::vector<Moho::EntityCategorySet>::uninit_copy_n for the
          * 0x28-byte element -- copy-constructs each `BVSet`, writing the
