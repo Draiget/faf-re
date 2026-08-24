@@ -1526,6 +1526,28 @@ namespace
   {
   public:
     /**
+     * Address: 0x00582830 (FUN_00582830)
+     * Demangled: gpg::RMapType_IVector2i_SBuildReserveInfo::dtr (scalar-deleting)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
+     * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
+     * source: the compiler-generated `~RType()` reproduces this behavior,
+     * matching `RVectorType<moho::SimArmy*>::~RVectorType()`'s and
+     * `RVectorType<moho::SPointVector>::~RVectorType()`'s identical emission
+     * shape (Reflection.h / SPointVector.h) for the same base-layout reason
+     * (`sizeof(BuildReserveMapTypeInfo) == 0x64`, same as `gpg::RType` — this
+     * descriptor has no `RIndexed` sub-object and adds no data members).
+     * Vtable-confirmed: `??_7?$RMapType@V?$IVector2@H@Wm3@@USBuildReserveInfo@Moho@@@gpg@@6B@+0x8`
+     * writes this address; that vtable is constructed by `FUN_00582610`
+     * (`preregister_BuildReserveMapTypeInfo`, recovered, this file), which
+     * placement-news the singleton `BuildReserveMapTypeInfo` and so writes
+     * its vptr on construction.
+     */
+    ~BuildReserveMapTypeInfo() override = default;
+
+    /**
      * Address: 0x0057E240 (FUN_0057E240, gpg::RMapType_IVector2i_SBuildReserveInfo::GetName)
      *
      * IDA signature:
@@ -1578,6 +1600,18 @@ namespace
       return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
     }
 
+    /**
+     * Address: 0x0057F480 (FUN_0057F480, gpg::RMapType_IVector2i_SBuildReserveInfo::SerLoad)
+     *
+     * What it does:
+     * Clears destination storage, then reads `count` serialized
+     * `Wm3::IVector2<int> -> Moho::SBuildReserveInfo` pairs from the archive
+     * and inserts them by key. The binary reads each pair's key/value into
+     * scratch nodes and then rewires the deserialized value's two intrusive
+     * link lanes (`mResourceLink`/`mPlacementLink`) into the map entry
+     * in-place rather than copying the raw link fields; `RebindBuildResourceInfoLinks`
+     * / `UnlinkBuildResourceInfoLink` reproduce that hand-off.
+     */
     static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(
@@ -1653,6 +1687,14 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x0057E300 (FUN_0057E300, gpg::RMapType_IVector2i_SBuildReserveInfo::Init)
+     *
+     * What it does:
+     * Sets reflected size/version metadata (`size_ = 0x0C`, matching every
+     * other `RMapType<K,V>` specialization's shared tree control-block size)
+     * and binds the key/value pair (de)serialize callbacks.
+     */
     void Init() override
     {
       size_ = 0x0C;
@@ -1661,6 +1703,8 @@ namespace
       serSaveFunc_ = &BuildReserveMapTypeInfo::SerSave;
     }
   };
+
+  static_assert(sizeof(BuildReserveMapTypeInfo) == 0x64, "BuildReserveMapTypeInfo size must be 0x64");
 
   alignas(BuildReserveMapTypeInfo) unsigned char gBuildReserveMapTypeInfoStorage[sizeof(BuildReserveMapTypeInfo)]{};
   bool gBuildReserveMapTypeInfoConstructed = false;
