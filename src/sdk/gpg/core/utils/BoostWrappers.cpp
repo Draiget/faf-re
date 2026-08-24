@@ -700,6 +700,16 @@ namespace boost
    * Address: 0x00539AA0 (FUN_00539AA0)
    * Address: 0x00539F70 (FUN_00539F70)
    * Address: 0x00544340 (FUN_00544340)
+   * Address: 0x006FE350 (FUN_006FE350, ex `CopySharedOwnerPairAndRetain` in
+   * `LegacyContainerFillLanes.cpp`)
+   * Address: 0x00796DC0 (FUN_00796DC0, ex `CopySharedOwnerPairWithUseRetain`
+   * in `LegacyContainerFillLanes.cpp`)
+   * Address: 0x00895F50 (FUN_00895F50, ex
+   * `LegacyCopySharedOwnerPairRetainedRuntimeSlot1` in
+   * `WinApiImportThunks.cpp`)
+   * Address: 0x008971D0 (FUN_008971D0, ex
+   * `LegacyCopySharedOwnerPairRetainedRuntimeSlot2` in
+   * `WinApiImportThunks.cpp`)
    *
    * What it does:
    * Copies one `(px,pi)` pair and retains one shared control-block reference.
@@ -1173,6 +1183,24 @@ namespace boost
     }
 
     return cursor;
+  }
+
+  /**
+   * Address: 0x007E27C0 (FUN_007E27C0)
+   * Address: 0x007E2820 (FUN_007E2820)
+   * Address: 0x007E28A0 (FUN_007E28A0)
+   *
+   * What it does:
+   * Clears one `(px,pi)` pair to `{nullptr,nullptr}` and releases the shared
+   * control block that used to be bound.
+   */
+  SharedCountPair* ReleaseSharedPairAndClear(SharedCountPair* const pair) noexcept
+  {
+    pair->px = nullptr;
+    detail::sp_counted_base* const control = pair->pi;
+    pair->pi = nullptr;
+    ReleaseSharedCount(control);
+    return pair;
   }
 
   /**
@@ -1985,6 +2013,26 @@ namespace boost
 
     *targetControlSlot = incomingControl;
     return targetControlSlot;
+  }
+
+  /**
+   * Address: 0x00796FC0 (FUN_00796FC0)
+   * Address: 0x007BD790 (FUN_007BD790)
+   *
+   * What it does:
+   * Rebinds one weak-owner `(px,pi)` pair from a raw incoming shared control
+   * slot: copies the new `px`, then delegates the control-block rebind to
+   * `SpCountedBaseWeakAssignSlot`.
+   */
+  SharedCountPair* AssignWeakPairFromSharedControlSlot(
+    SharedCountPair* const destination,
+    void* const incomingObject,
+    detail::sp_counted_base* const* const incomingControlSlot
+  ) noexcept
+  {
+    destination->px = incomingObject;
+    (void)SpCountedBaseWeakAssignSlot(&destination->pi, incomingControlSlot);
+    return destination;
   }
 
   /**

@@ -3727,6 +3727,27 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x00796FC0 (FUN_00796FC0)
+     * Address: 0x007BD790 (FUN_007BD790)
+     *
+     * What it does:
+     * Rebinds one weak-owner `(px,pi)` pair from a raw incoming shared
+     * control slot: copies the new `px`, then delegates the control-block
+     * rebind to `SpCountedBaseWeakAssignSlot` (weak-retain the incoming
+     * control, weak-release the previously bound one). This is
+     * `boost::detail::weak_count::operator=(shared_count const&)` composed
+     * with the `px` copy that `weak_ptr<T>::operator=(shared_ptr<T> const&)`
+     * performs around it, decompiled straight from one real per-T binary
+     * emission (see `LegacyContainerFillLanes.cpp`'s
+     * `ReplaceWeakOwnerPairAndRetainIncoming`/`...7BD790` call sites).
+     */
+    [[nodiscard]] SharedCountPair* AssignWeakPairFromSharedControlSlot(
+        SharedCountPair* destination,
+        void* incomingObject,
+        detail::sp_counted_base* const* incomingControlSlot
+    ) noexcept;
+
+    /**
      * Address: 0x00447020 (FUN_00447020)
      *
      * What it does:
@@ -3943,6 +3964,16 @@ namespace boost
      * Address: 0x004462F0 (FUN_004462F0)
      * Address: 0x00539AA0 (FUN_00539AA0)
      * Address: 0x00539F70 (FUN_00539F70)
+     * Address: 0x006FE350 (FUN_006FE350, ex `CopySharedOwnerPairAndRetain` in
+     * `LegacyContainerFillLanes.cpp`)
+     * Address: 0x00796DC0 (FUN_00796DC0, ex `CopySharedOwnerPairWithUseRetain`
+     * in `LegacyContainerFillLanes.cpp`)
+     * Address: 0x00895F50 (FUN_00895F50, ex
+     * `LegacyCopySharedOwnerPairRetainedRuntimeSlot1` in
+     * `WinApiImportThunks.cpp`)
+     * Address: 0x008971D0 (FUN_008971D0, ex
+     * `LegacyCopySharedOwnerPairRetainedRuntimeSlot2` in
+     * `WinApiImportThunks.cpp`)
      *
      * What it does:
      * Copies one `(px,pi)` pair and retains one shared control-block reference.
@@ -4067,6 +4098,20 @@ namespace boost
         SharedCountPair* begin,
         SharedCountPair* end
     ) noexcept;
+
+    /**
+     * Address: 0x007E27C0 (FUN_007E27C0)
+     * Address: 0x007E2820 (FUN_007E2820)
+     * Address: 0x007E28A0 (FUN_007E28A0)
+     *
+     * What it does:
+     * Clears one `(px,pi)` pair to `{nullptr,nullptr}` and releases the
+     * shared control block that used to be bound, disposing/destroying it on
+     * the final strong/weak transitions. Decompiled straight from three real
+     * per-T binary emissions (see `LegacyContainerFillLanes.cpp`'s
+     * `ResetSharedOwnerPairAndReleaseBatchA/B/C` call sites).
+     */
+    [[nodiscard]] SharedCountPair* ReleaseSharedPairAndClear(SharedCountPair* pair) noexcept;
 
     template <class T>
     [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(const boost::shared_ptr<T>& source) noexcept

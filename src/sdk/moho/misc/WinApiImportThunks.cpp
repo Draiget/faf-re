@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/utils/BoostWrappers.h"
+
 struct hostent;
 
 namespace moho { class CameraImpl; }
@@ -72551,30 +72553,16 @@ namespace moho::runtime
     return laneValue == static_cast<std::uint32_t>(address);
   }
 
-  struct LegacySharedOwnerPairRuntimeView
-  {
-    std::uint32_t objectLane;
-    std::uint32_t ownerLane;
-  };
-  static_assert(sizeof(LegacySharedOwnerPairRuntimeView) == 0x8, "LegacySharedOwnerPairRuntimeView size must be 0x8");
-
-  [[nodiscard]] LegacySharedOwnerPairRuntimeView* LegacyCopySharedOwnerPairRetainedCommon(
-    LegacySharedOwnerPairRuntimeView* const outPair,
-    const LegacySharedOwnerPairRuntimeView* const sourcePair
-  )
-  {
-    outPair->objectLane = sourcePair->objectLane;
-    const std::uint32_t ownerLane = sourcePair->ownerLane;
-    outPair->ownerLane = ownerLane;
-
-    if (ownerLane != 0U) {
-      auto* const ownerRefCount = reinterpret_cast<volatile LONG*>(
-        static_cast<std::uintptr_t>(ownerLane) + 4U
-      );
-      (void)_InterlockedExchangeAdd(ownerRefCount, 1);
-    }
-    return outPair;
-  }
+  // NOTE (boost shared_ptr / shared_count migration): a local
+  // `LegacySharedOwnerPairRuntimeView{objectLane,ownerLane}` +
+  // `LegacyCopySharedOwnerPairRetainedCommon` used to duplicate the raw
+  // `boost::shared_ptr<T>` `(px,pi)` copy-retain here -- byte-for-byte the
+  // same body as `LegacyContainerFillLanes.cpp`'s (deleted)
+  // `CopySharedOwnerPairAndRetain`, both of which are
+  // `boost::AssignSharedPairRetainCore` (`gpg/core/utils/BoostWrappers.cpp`).
+  // The real type is `boost::SharedCountPair`
+  // (`gpg/core/utils/BoostWrappers.h`); the two real per-address bodies below
+  // now call `boost::AssignSharedPairRetain` directly.
 
   /**
    * Address: 0x008918D0 (FUN_008918D0)
@@ -72744,12 +72732,12 @@ namespace moho::runtime
    * What it does:
    * Copies one two-lane shared-owner pair and retains the owner ref-count when present.
    */
-  LegacySharedOwnerPairRuntimeView* LegacyCopySharedOwnerPairRetainedRuntimeSlot1(
-    LegacySharedOwnerPairRuntimeView* outPair,
-    const LegacySharedOwnerPairRuntimeView* sourcePair
+  boost::SharedCountPair* LegacyCopySharedOwnerPairRetainedRuntimeSlot1(
+    boost::SharedCountPair* outPair,
+    const boost::SharedCountPair* sourcePair
   )
   {
-    return LegacyCopySharedOwnerPairRetainedCommon(outPair, sourcePair);
+    return boost::AssignSharedPairRetain(outPair, sourcePair);
   }
 
   /**
@@ -72758,12 +72746,12 @@ namespace moho::runtime
    * What it does:
    * Copies one two-lane shared-owner pair and retains the owner ref-count when present.
    */
-  LegacySharedOwnerPairRuntimeView* LegacyCopySharedOwnerPairRetainedRuntimeSlot2(
-    LegacySharedOwnerPairRuntimeView* outPair,
-    const LegacySharedOwnerPairRuntimeView* sourcePair
+  boost::SharedCountPair* LegacyCopySharedOwnerPairRetainedRuntimeSlot2(
+    boost::SharedCountPair* outPair,
+    const boost::SharedCountPair* sourcePair
   )
   {
-    return LegacyCopySharedOwnerPairRetainedCommon(outPair, sourcePair);
+    return boost::AssignSharedPairRetain(outPair, sourcePair);
   }
 
   /**
