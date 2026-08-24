@@ -11937,9 +11937,11 @@ namespace
    * Sorts one contiguous `DumpUnitsCountEntry` range by descending population
    * count using the binary lane's non-stable ordering contract.
    *
-   * Absorbs FUN_00760590 (the MSVC8 `_Push_heap`/`_Adjust_heap` inner lane that
-   * the binary's hand-rolled introsort variant invokes recursively on each
-   * partition). `std::sort` in modern C++20 encapsulates the same heapify +
+   * The binary's hand-rolled introsort variant recursively invokes the MSVC8
+   * `_Adjust_heap` sift-down lane on this element type -- see
+   * `Address: 0x00760590 (FUN_00760590` on the `DumpUnitsCountEntry`
+   * instantiation cited in `legacy/algorithms/Sort.h`'s `adjust_heap`
+   * template. `std::sort` in modern C++20 encapsulates the same heapify +
    * partition + insertion-sort machinery with identical worst-case order,
    * so the explicit heapify helper disappears at the intent-first source
    * level while preserving binary-equivalent ordering for finite inputs.
