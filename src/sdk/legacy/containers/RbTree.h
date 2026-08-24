@@ -1466,6 +1466,20 @@ namespace msvc8
              * Reached from `AddOrGetExportBinding`'s claim of a fresh
              * binding slot in RRuleGameRules.cpp, via
              * `msvc8::set<uint32_t>`'s default constructor.)
+             * Address: 0x00A583C0 (FUN_00A583C0, `alloc_raw` half of buy_head
+             * for the "unidentified map<int32_t,T> instantiation" family
+             * already cited on `buy_node` below (sibling node-buy
+             * FUN_00A58450, 36-byte node, at 0x00A58450 -- immediately
+             * adjacent in the binary): `operator new(0x14)`, zeroes the
+             * three link dwords, sets byte+0x10=1/byte+0x11=0. Its caller
+             * FUN_00A5A000 (4 callers of its own: FUN_00A5A000/
+             * FUN_00A5D943/FUN_00A66233/FUN_00A67840) does the self-link and
+             * flag fixup this template's `buy_head()` performs inline --
+             * `left=parent=right=self`, then overwrites byte+0x11=1 (isNil)
+             * -- the same allocate/self-link split already documented for
+             * FUN_0052F370 above. Node shape (20 bytes, no value slot) is
+             * head-only, matching a `msvc8::set<int32_t>`-style sentinel for
+             * the same map whose value-bearing node buy is FUN_00A58450.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -1615,6 +1629,32 @@ namespace msvc8
              * FUN_00535400, itself reached from `insert_unique`'s emission
              * FUN_00534690 cited above.)
              */
+            /**
+             * Address: 0x00950430 (FUN_00950430, node buy for an unidentified
+             * `msvc8::map<K,V>`/`msvc8::set<T>` instantiation with a 24-byte
+             * `value_type` -- `operator new(0x28)` (40 bytes: 12 link dwords
+             * + 24-byte value + 2 flag bytes, rounded), `_Buynode(_Larg,
+             * _Parg, _Rarg, val, _Color)` shape: `left`/`parent`/`right`
+             * written from its first three arguments (the caller passes the
+             * same `where` node for both `left` and `right`, matching this
+             * template's head-initialised `n->left = n->parent = n->right =
+             * head_`), the 24-byte value block-copied (6 dwords) from a
+             * `const value_type&` fourth argument, then `color` from a
+             * literal-0 fifth argument and `isNil = 0`. Reached from
+             * FUN_009512B0, which matches `insert_at`'s shape precisely:
+             * checks the tree's size against the `0xAAAAAAA9` max_size
+             * bound for a 24-byte-ish node family and throws
+             * `std::length_error("map/set<T> too long")` on overflow (the
+             * exact message this template's own `insert_at`/`_Xlen` overflow
+             * guard uses elsewhere in this file), then calls this node-buy
+             * lane, links the fresh node in as the RB-tree insertion target,
+             * and rebalances via sub_94FA60/sub_94FAB0 (the tree's rotation
+             * helpers). No source-level owner has been pinned down for this
+             * specific `K,V` pair beyond the 24-byte value size; documented
+             * at the same confidence level as the "unidentified
+             * map<int32_t,T> instantiation" family cited on `buy_head`
+             * above.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1738,6 +1778,27 @@ namespace msvc8
              * confirmed at +0x15 (0x0D + 8). Reached from `clear()`
              * (0x00592230, cited above) via `CArmyStatItem::~CArmyStatItem`
              * at 0x00585C39.)
+             * Address: 0x00531490 (FUN_00531490, the whole-subtree destroy for
+             * `RRuleGameRulesImpl`'s seven blueprint maps -- `RRuleGameRulesBlueprintMap`
+             * = `msvc8::map<msvc8::string, void*>` (`moho/sim/RRuleGameRules.h`),
+             * isNil confirmed at +0x2D (0x0D + sizeof(pair<string(28), void*(4)>) = 0x2D).
+             * The recursed-into left/right lanes match this shape exactly, and the
+             * per-node teardown additionally frees the key's heap SSO buffer when
+             * `_Myres >= 0x10` before resetting `_Myres=0xF`/`_Mysize=0`/first SSO
+             * byte and `operator delete`-ing the node -- the `msvc8::string`
+             * destructor inlined ahead of `free_node`'s node release, exactly like
+             * the mesh-key map's `value_type::~value_type()` inlining documented on
+             * `free_node` below. Reached from `erase_range`'s (`FUN_0052E510`)
+             * whole-tree fast path, itself reached implicitly: `mUnitBlueprints`,
+             * `mProjectileBlueprints`, `mPropBlueprints`, `mMeshBlueprints`,
+             * `mEmitterBlueprints`, `mBeamBlueprints` and `mTrailBlueprints` are
+             * direct-value members of `RRuleGameRulesImpl` (`RRuleGameRules.h`), so
+             * `~RRuleGameRulesImpl()`'s implicit member teardown -- documented in
+             * that destructor's own comment as "each map's destructor frees its own
+             * nodes and sentinel head... open-coded seven times" -- instantiates
+             * `msvc8::map<msvc8::string, void*>::~map()` for each one, which is
+             * this `clear()`/`destroy_subtree` pair. No hand-written call site is
+             * needed beyond the member declarations already in `RRuleGameRules.h`.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
