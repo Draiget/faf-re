@@ -251,6 +251,28 @@ namespace msvc8
          * through a separate `gRuntimePools` runtime cache rather than this
          * member directly, a known follow-up documented in the EntityDb.cpp
          * `MemberSerialize`/`MemberDeserialize` citations.)
+         * Address: 0x007B27D0 (FUN_007B27D0, `msvc8::map<std::uint32_t,
+         * msvc8::set<std::uint32_t>>::operator[]` -- confirmed via raw
+         * `.asm`: real `this`=ecx (thiscall), descend loop testing isNil at
+         * `[node+0x1D]` (29 decimal, this instantiation's outer 32-byte
+         * node) updating the candidate only on left turns (`lower_bound`'s
+         * shape, not `insert_unique`'s unconditional descend). On a miss,
+         * builds the `value_type(k, mapped_type())` temporary --
+         * `sub_7B4A50` (already-cited `alloc_raw()`, RbTree.h) plus an
+         * inlined empty-set head-ify at byte offset 0x11 (the *inner*
+         * `msvc8::set<std::uint32_t>`'s isNil offset) for the raw node, then
+         * `sub_7B3500` (a full `msvc8::set<std::uint32_t>` default-ctor
+         * emission) for the `mapped_type()` temporary proper -- then
+         * `sub_7B2DF0` (`insert_hint`, RbTree.h, matched by its empty/
+         * leftmost/rightmost/predecessor-successor branch structure and its
+         * isNil check at the *outer* offset) inserts it, and `sub_7B3E00`
+         * (already-cited `erase_range` for `msvc8::set<std::uint32_t>`)
+         * tears down the scratch temporaries in reverse construction order.
+         * Builds `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map, keyed
+         * by parent-bone-pointer, each entry holding the set of that
+         * parent's already-visited child-bone pointers -- `dedupTree[
+         * parentPtr]` inside the per-bone walk loop (CAniSkel.cpp, not yet
+         * recovered).)
          *
          * IDA signature:
          * mapped_type *__thiscall operator[](const key_type *key, _Tree *this);

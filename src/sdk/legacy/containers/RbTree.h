@@ -1479,6 +1479,30 @@ namespace msvc8
              * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
              * instead of calling it.)
              */
+            /**
+             * Address: 0x007B26B0 (FUN_007B26B0, `msvc8::set<std::uint32_t>::
+             * insert_unique` for the per-parent-bone child-set nested inside
+             * `Map.h`'s `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::
+             * operator[]` instantiation (cited there as `FUN_007B27D0`) --
+             * confirmed via raw `.asm`: `this`=eax is a direct register
+             * carry-over of that `operator[]` call's return value (a pointer
+             * into the found/created entry's embedded-set control block),
+             * `a2`=ebx is the key read once via `mov edx,[ebx]`. Descend loop
+             * tests isNil at `[node+0x11]` (17 decimal, matching the flat
+             * `msvc8::set<std::uint32_t>` shape already documented in this
+             * file's `AniSkeletonVisitedBoneNodeLanes` family) and updates
+             * the candidate every iteration with an explicit `addLeft` flag
+             * -- this member's shape, not `lower_bound_node`'s. `where ==
+             * leftmost()` fast path tail-calls `insert_at` (`sub_7B2B30`,
+             * buys via `sub_7B3660` then runs the standard recolor/rotate
+             * climb) directly; otherwise a predecessor check via
+             * `sub_7B3FC0` (`rb_decrement`) gates a second `insert_at` call
+             * or returns the colliding node with `false`. Inserts the
+             * current bone's own pointer (reinterpreted as `uint32_t`) into
+             * its parent's just-obtained child-set, `dedupTree[parentPtr]
+             * .insert(bonePtr)` inside `CON_ANI_DumpSkeleton`'s per-bone walk
+             * loop (CAniSkel.cpp, not yet recovered).)
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -2189,6 +2213,24 @@ namespace msvc8
              *     `sub_947EC0`/`sub_947F50` -- three more zero-incoming-
              *     reference `~rb_tree()` emissions for this same node shape,
              *     cited on `~rb_tree()` below.
+             */
+            /**
+             * Address: 0x007B3820 (FUN_007B3820, `msvc8::map<std::uint32_t,
+             * msvc8::set<std::uint32_t>>::erase_range` -- the *outer*
+             * per-parent-bone dedup map's own `erase_range` (isNil@+0x1D,
+             * same 32-byte-node instantiation as `Map.h`'s `operator[]`
+             * citation `FUN_007B27D0`). Same two-shape split as the other
+             * instantiations in this file: whole-range fast path
+             * (`first==begin() && last==end()`) calls a `destroy_subtree`-
+             * shaped helper (`sub_7B4AA0`) and resets head/size; walk path
+             * does an iterative successor-walk erase via `sub_7B4040`
+             * (`erase_node`-shaped, single-node erase-and-rebalance).
+             * Reached from `CON_ANI_DumpSkeleton`'s cleanup,
+             * `dedupTree.erase(dedupTree.begin(), dedupTree.end())` right
+             * before `operator delete`-ing the tree header (CAniSkel.cpp,
+             * not yet recovered). `sub_7B4AA0`/`sub_7B4040` would need their
+             * own citations as `destroy_subtree`/`erase_node` for this same
+             * node shape, not yet done.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {

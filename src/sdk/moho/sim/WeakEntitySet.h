@@ -195,6 +195,22 @@ namespace moho
       EraseRange(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* first, SSelectionNodeUserEntity* last);
 
     /**
+     * Address: 0x007B33B0 (FUN_007B33B0, sub_7B33B0) -- a second, per-call-
+     * site binary emission of the range-erase member declared above, same
+     * fused-shape pattern as `FUN_007B3C60` above on
+     * `AllocateWeakEntitySetHead`: whole-range fast path calls `sub_7B45E0`
+     * (destroy-subtree-shaped) and resets `mParent`/`mLeft`/`mRight`/
+     * `mSize` to the empty-sentinel state; slow path does a successor-walk
+     * erasing one node per iteration. The decompiler's own type
+     * recognition independently confirms the owning class
+     * (`std::map_uint_WeakPtr_UserEntity::erase`, isNil check at offset
+     * 0x19/25 decimal, matching `SSelectionNodeUserEntity::mIsSentinel`'s
+     * documented offset). Reached from `CON_ANI_DumpSkeleton`'s cleanup of
+     * its selection-units set, tearing down the selection set's range
+     * right before releasing its header (CAniSkel.cpp, not yet recovered).
+     */
+
+    /**
      * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
      *
      * What it does:
