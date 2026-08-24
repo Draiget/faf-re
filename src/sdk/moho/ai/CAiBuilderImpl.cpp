@@ -646,6 +646,8 @@ namespace
   /**
    * Absorbs binary helper:
    * Address: 0x005A0040 (FUN_005A0040, msvc8::map<uint, RUnitBlueprint*>::operator[])
+   * Address: 0x005A08B0 (FUN_005A08B0, RB-tree node allocate-and-link inner
+   * helper for the operator[] emission above)
    *
    * The binary's `BuilderAddRebuildStructure` used the MSVC8
    * `map<uint, RUnitBlueprint*>::operator[]` template emission to
