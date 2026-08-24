@@ -43012,6 +43012,17 @@ moho::WD3DViewport::WD3DViewport(
  * Address: 0x0042BA90 (FUN_0042BA90)
  * Mangled: ??1WD3DViewport@Moho@@UAE@XZ
  *
+ * Also emitted at: 0x0042BB60 (FUN_0042BB60) -- the scalar deleting
+ * destructor MSVC generates for any polymorphic class with a virtual
+ * destructor (`WD3DViewport` has one, per its declaration in
+ * WxRuntimeTypes.h). No source line maps to that emission -- it is the
+ * compiler's own glue for `delete` through a base pointer, matching the
+ * real destructor's body exactly (non-deleting teardown, then conditionally
+ * `operator delete` this) plus the bit0 delete-flag dispatch. A standalone
+ * `DeleteWD3DViewportThunk` free function previously modelled this as if it
+ * needed its own source-level caller; it did not, and nothing ever called
+ * it (removed).
+ *
  * What it does:
  * Releases one held D3D-device reference before base window teardown.
  */
@@ -43255,28 +43266,6 @@ long moho::WD3DViewport::MSWWindowProc(
   }
 
   return WRenViewport::MSWWindowProc(message, wParam, lParam);
-}
-
-/**
- * Address: 0x0042BB60 (FUN_0042BB60)
- *
- * What it does:
- * Deleting-dtor thunk lane for `WD3DViewport`.
- */
-[[maybe_unused]] static moho::WD3DViewport* DeleteWD3DViewportThunk(
-  moho::WD3DViewport* const viewport,
-  const std::uint8_t deleteFlags
-)
-{
-  if (viewport == nullptr) {
-    return nullptr;
-  }
-
-  viewport->~WD3DViewport();
-  if ((deleteFlags & 1u) != 0u) {
-    operator delete(viewport);
-  }
-  return viewport;
 }
 
 namespace
