@@ -8576,6 +8576,20 @@ namespace moho
       return node == nullptr || node->mIsSentinel != 0u;
     }
 
+    /**
+     * Address: 0x007B3D00 (FUN_007B3D00, sub_7B3D00)
+     *
+     * What it does:
+     * Leftmost-descent half of `EraseSelectionNodeAndAdvance`'s two-child
+     * splice case (`spliceTarget = SelectionMin(node->mRight, head)`):
+     * walks `_Left` while `!_Isnil` (`_Isnil` confirmed at node+0x19 from the
+     * `.asm`, matching `SSelectionNodeUserEntity::mIsSentinel`). IDA typed
+     * the tree `std::map_uint_WeakPtr_UserEntity` here, but it is the same
+     * `WeakEntitySetUserEntity` node this file already models -- the
+     * `_Isnil` offset and the sole caller (`FUN_007B30D0`, this file's
+     * `EraseSelectionNodeAndAdvance`) both confirm it. No separate loop
+     * body needed; the shape is byte-for-byte this member's own.
+     */
     [[nodiscard]] SSelectionNodeUserEntity*
     SelectionMin(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
     {
@@ -8585,6 +8599,24 @@ namespace moho
       return IsSelectionNil(node) ? head : node;
     }
 
+    /**
+     * Address: 0x0066AC70 (FUN_0066AC70, Moho::WeakSet_UserEntity::next's
+     * rightmost-descent step -- called from `FUN_0066A550`, this file's
+     * `EraseSelectionNodeAndAdvance` emission for the `mSelection`
+     * call-site instantiation)
+     * Address: 0x007B3CE0 (FUN_007B3CE0, sub_7B3CE0 -- the sibling
+     * emission reached from `FUN_007B30D0`, the other
+     * `EraseSelectionNodeAndAdvance` call-site instantiation)
+     *
+     * What it does:
+     * Rightmost-descent half of the same erase (`SelectionMax`): walks
+     * `_Right` (node+0x08) while `!_Isnil` (node+0x19). Both addresses are
+     * the same `SelectionMax` algorithm compiled once per call site of
+     * `EraseSelectionNodeAndAdvance` (`CWldSession::mSelection` and the
+     * `CFormation::mParticipants`/other weak-set callers hoisted onto this
+     * shared function); confirmed against the `.asm` (`cmp byte ptr
+     * [ecx+19h], 0` in both).
+     */
     [[nodiscard]] SSelectionNodeUserEntity*
     SelectionMax(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
     {

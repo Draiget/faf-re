@@ -1350,6 +1350,16 @@ namespace gpg::core
      * header is stamped empty (`myRes=15, mySize=0, buf[0]=0`) and then
      * `std::string::assign`ed from the source -- the same
      * copy-construct-then-assign shape this method expresses generically.)
+     * Address: 0x0084EC30 (FUN_0084EC30,
+     * gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>'s
+     * per-element copy-construct-forward lane -- per slot, the `{px,pn}`
+     * pair is copied verbatim and, when `pn` is non-null, its refcount word
+     * at `pn+4` is atomically incremented (`_InterlockedExchangeAdd`),
+     * exactly `boost::shared_ptr`'s copy constructor placement-newed in
+     * place. Reached from the `InsertAt` deep-copy lane `FUN_0084E570`
+     * (already recovered, cited above), which shifts elements one at a time
+     * via this member for the non-trivially-relocatable `shared_ptr<
+     * CMauiFrame>` element.)
      *
      * What it does:
      * Copy-CONSTRUCTS `[copyBegin, copyEnd)` into raw storage at `dest` and

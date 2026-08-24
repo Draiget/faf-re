@@ -187,6 +187,16 @@ namespace msvc8
          * Mirror of `rb_min`, stepping `_Right` at +0x08. Reached from
          * `erase(const_iterator)` at 0x0089A540 when the erased node was the
          * rightmost one.
+         *
+         * Address: 0x007B4A30 (FUN_007B4A30, sub_7B4A30)
+         *
+         * `msvc8::set<std::uint32_t>` instantiation, `_Isnil` at +0x11
+         * (4-byte value_type) -- the same tree cited on `destroy_subtree`/
+         * `erase_node` above. Walks `_Right` (node+0x08) while `!_Isnil`
+         * (node+0x11), confirmed against the `.asm`. Called from
+         * `erase_node`'s emission for this instantiation (`FUN_007B46A0`,
+         * cited above) to re-seat `head->right` when the erased node was
+         * the tree's rightmost.
          */
         template<class V>
         /**
@@ -409,6 +419,21 @@ namespace msvc8
          * emission FUN_008B5DF0, cited on that member. Re-homed here from
          * the same bespoke `InsertCommandNodeFixup` free function in
          * Sim.cpp cited on `insert_unique`/`insert_at` above.)
+         */
+        /**
+         * Address: 0x004E4440 (FUN_004E4440, sub_4E4440)
+         *
+         * `msvc8::map<CSndParams*, HSndEntityLoop*>`, isNil@+0x15 (8-byte
+         * `pair<const CSndParams*, HSndEntityLoop*>` value_type; confirmed
+         * against the `.asm`). A thin `_Node**` slot-pointer wrapper adapter
+         * around this member -- `if(isNil(*slot)) *slot=(*slot)->right; else
+         * if(!isNil((*slot)->left)) *slot=rb_max((*slot)->left); else {
+         * ancestor-walk }` -- advancing `*slot` in place and returning the
+         * new node, matching the `FUN_006E2200`/`FUN_006E27D0` adapter shape
+         * already documented above. Reached from `CSndParams.cpp`'s
+         * `_Insert_lower_bound` (`FUN_004E1890`, the per-T canonical-
+         * template-helper binding for this map), which uses the predecessor
+         * check during hinted/unique insert.
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -1047,6 +1072,25 @@ namespace msvc8
              * from the same bespoke `FindCommandNode` free-function reach-in
              * cited above, called through `CommandIssueMapOf` for this
              * member instead.)
+             */
+            /**
+             * Address: 0x00948DF0 (FUN_00948DF0, sub_948DF0)
+             * Address: 0x00948E60 (FUN_00948E60, sub_948E60)
+             *
+             * `gpg::gal::backends::d3d9::StateManagerD3D9`'s sampler-state
+             * and texture-stage `CacheValue<>` instantiations respectively
+             * (`StateManagerD3D9.cpp`, isNil@+0x15, 8-byte value_type). Same
+             * inlined-lower-bound-then-verify shape as FUN_006E1940/
+             * FUN_008B6160 above, taking an output-parameter slot
+             * (`*outSlot = found`) rather than returning the node directly --
+             * the store-into-hidden-return-pointer convention already
+             * documented on `lower_bound_node`'s `FUN_006E1D30` adapter.
+             * Called at the very start of each instantiation (`this+0x14`
+             * into the function), matching `map.find(key)` being the first
+             * statement of `CacheValue<>`: FUN_00948DF0 from `FUN_00949CE0`
+             * (sampler-state), FUN_00948E60 from `FUN_00949D40`
+             * (texture-stage), both already recovered as this template's
+             * citation above.
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -1887,6 +1931,41 @@ namespace msvc8
              * sweep. Re-homed here from a bespoke
              * `AllocateSingleCommandDbMapNodeStorage` free function in
              * Sim.cpp.)
+             */
+            /**
+             * Address: 0x00946F90 (FUN_00946F90, sub_946F90)
+             *
+             * This instantiation's `alloc_raw` half is a value-initializing
+             * variant the compiler fused with the neutral-node init:
+             * `operator new(0x18)`, zero the three link dwords, `color=1`
+             * (black), `isNil=0` -- one step further than this member's own
+             * plain `operator new`, but the extra stores are exactly what
+             * `buy_head()` needs next. Its caller, `FUN_009471A0` (already
+             * recovered, cited on `buy_head` below), performs the
+             * self-link-to-head and `isNil=1` fixup that finishes the head
+             * sentinel -- the same two-function split documented there for
+             * `FUN_00947FE0`'s sibling `sub_947030`. isNil@+0x15, node 0x18
+             * (8-byte value_type). Owning field/class not yet pinned down,
+             * matching the sibling citation on `buy_head` below.
+             *
+             * Address: 0x007B4410 (FUN_007B4410, sub_7B4410)
+             *
+             * Same value-initializing `alloc_raw` shape: `operator new(0x20)`,
+             * zero the three link dwords, `color=1`/`isNil=0` at
+             * `[eax+0x1C]`/`[eax+0x1D]` (confirmed via `.asm`) -- isNil@+0x1D,
+             * node 0x20 (16-byte value_type). Reached from `Moho::
+             * ANI_DumpSkeleton` (partial, `FUN_007B22B0`, CAniSkel.cpp),
+             * which builds a dedup tree over skeleton bone data while
+             * walking the animation hierarchy.
+             *
+             * Address: 0x0087C990 (FUN_0087C990, sub_87C990)
+             *
+             * Same shape again: `operator new(0x18)`, zero the three link
+             * dwords, `color=1`/`isNil=0` at `[eax+0x10]`/`[eax+0x11]` --
+             * isNil@+0x11, node 0x18 (4-byte value_type, e.g. a dedup
+             * `set<float>`/`set<uint32_t>`). Reached from `Moho::
+             * CDecalManager::RebuildLodHistogram` (CWldSplat.cpp/.h), which
+             * dedups the 10-entry decal-area decile histogram.
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
