@@ -3583,6 +3583,14 @@ namespace msvc8
          * pair for 568-byte `Moho::SUnitVariableUpdateEntry` -- ICF-folded to one
          * address)
          * Address: 0x005C9E00 (FUN_005C9E00, register-shape adapter for FUN_005CD1F0)
+         * Address: 0x005C9E10 (FUN_005C9E10, sibling register-shape adapter for
+         * FUN_005CD1F0 -- tail-calls it with the same value in both source
+         * cursor slots and both destination cursor slots (`sub_5CD1F0(a2, a2,
+         * this, this)`, `this`'s low byte cleared, upper bits preserved as
+         * the real pointer), i.e. the degenerate empty-range call this
+         * calling convention produces when the shift distance is zero.
+         * Reached from the same `_Insert_n` grow core FUN_005C68E0 as
+         * FUN_005C9E00.)
          * Address: 0x005EC880 (FUN_005EC880, the `std::copy_backward` emission for
          * the 0x20-byte `Moho::SAiReservedTransportBone` -- two cursors walking
          * down together, `dst -= 0x20; src -= 0x20;` then

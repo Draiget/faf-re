@@ -10,47 +10,47 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`97.34%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,381`*
+  - *Total amount of completed tokens: `65,382`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,788` (80.74%)
+- `recovered`: `52,789` (80.74%)
 - `skip`: `7,088` (10.84%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,505` (8.42%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `34` (0.05%)
 - `in_progress`: `12` (0.02%)
-- **`blocked`: `1,811` (2.70%)**
+- **`blocked`: `1,810` (2.69%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,845`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,845`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,844`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,844`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,788 functions) — binary caller context
+### Recovered (52,789 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,396` | 31.06% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,398` | 31.06% |
 | Vtable-anchored (virtual override of a recovered class) | `5,884` | 11.15% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,559` | 10.53% |
-| No recovered caller token yet (orphan risk) | `1,868` | 3.54% |
+| No recovered caller token yet (orphan risk) | `1,867` | 3.54% |
 | No callsite evidence (no recorded code/data caller in the index) | `22,861` | 43.31% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (1,845 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (1,844 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `237` | 12.85% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `236` | 12.80% |
 | Vtable-anchored (recover with the owning class) | `131` | 7.10% |
 | Framework dispatch (wx/EH/Lua/reflection) | `8` | 0.43% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `859` | 46.56% |
-| No indexed callsite evidence (needs investigation/evidence) | `608` | 32.95% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `859` | 46.58% |
+| No indexed callsite evidence (needs investigation/evidence) | `608` | 32.97% |
 | Unclassified data xref (manual review) | `1` | 0.05% |
 | RTTI-only | `1` | 0.05% |
 
