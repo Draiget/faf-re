@@ -4528,6 +4528,9 @@ namespace moho
    * - is proven directly from that inlined copy, which the recovered
    * `operator new` (`CAiFormationInstance.cpp`) already invokes.
    *
+   * Address: 0x005692D0 (FUN_005692D0, the inlined base `CFormationInstance`
+   * state-initialization lane described above)
+   *
    * What it does:
    * See above.
    */
