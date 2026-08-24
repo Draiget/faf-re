@@ -294,6 +294,20 @@ namespace msvc8
         /**
          * Unlinks the node under `pos`, frees it and returns a cursor on the
          * following element.
+         *
+         * Address: 0x0057DA50 (FUN_0057DA50, sub_57DA50) --
+         * `SBuildStructurePositionMap`/`msvc8::map<Wm3::Vector2i,
+         * SBuildReserveInfo>::erase(const_iterator)`
+         * (`moho::CAiBrain::mBuildStructureMap`, `CAiBrain.h:68/266`).
+         * Reached from `EraseBuildReservation` (`CAiBrain.cpp:1417`,
+         * already recovered: `map.erase(position)`), which is itself
+         * called mid-walk from `CanBuildStructureAt`'s (`FUN_0057CBB0`)
+         * Stage 3 reservation scan -- a genuinely mid-iteration erase, not
+         * a whole-range destructor call, so (unlike the RRuleGameRules/
+         * WriteArchive cases elsewhere in this file) this instantiation's
+         * `_SECURE_SCL` checked-iterator guard is on a REACHED code path;
+         * it just never trips, since `position` is always a live, valid
+         * cursor from the enclosing walk.
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
