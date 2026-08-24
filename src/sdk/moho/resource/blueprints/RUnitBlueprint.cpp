@@ -787,6 +787,10 @@ namespace moho
    * destructor: tail-calls `Moho::RUnitBlueprint::~RUnitBlueprint(this)` then
    * conditionally frees the object -- ordinary C++ `delete` semantics, not
    * modeled as a separate function here)
+   * Address: 0x00523A40 (FUN_00523A40, the `Weapons.WeaponBlueprints`
+   * teardown lane this destructor reaches directly at offset +0x4D4 --
+   * `msvc8::vector<RUnitBlueprintWeapon>::~vector`, modeled once in
+   * legacy/containers/Vector.h and not duplicated here)
    * Mangled: ??1RUnitBlueprint@Moho@@QAE@@Z
    *
    * What it does:
