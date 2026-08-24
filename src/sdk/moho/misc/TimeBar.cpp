@@ -943,6 +943,24 @@ namespace moho
     }
 
 
+    /**
+     * Address: 0x004E7130 (FUN_004E7130, boost::thread_specific_ptr<
+     * Moho::STimeBarThreadInfo>::ctor)
+     *
+     * What it does:
+     * The binary constructs a `boost::thread_specific_ptr<STimeBarThreadInfo>`
+     * whose cleanup callback is bound through the `tss_adapter<STimeBarThreadInfo>`
+     * boost::function1 manage/clear chain documented in moho/app/WinApp.cpp
+     * (FUN_004E7B40/FUN_004E7BA0/FUN_004E7C50/FUN_004E7D30/FUN_004E7DF0/
+     * FUN_004E8010/FUN_004E80B0). This `thread_local TimeBarThreadSlot`
+     * declaration is the source-level equivalent -- both mechanisms bind a
+     * per-thread `STimeBarThreadInfo*` slot to an automatic teardown callback
+     * (`ReleaseThreadInfo`), just via VC8-era boost TLS emulation on the
+     * binary side versus C++11 `thread_local` storage here. The whole
+     * boost::detail::tss/tss_adapter machinery this ctor would otherwise
+     * require is intentionally not replicated; `thread_local` reproduces the
+     * same per-thread lifetime/cleanup behavior directly.
+     */
     struct TimeBarThreadSlot
     {
       STimeBarThreadInfo* mInfo = nullptr;
