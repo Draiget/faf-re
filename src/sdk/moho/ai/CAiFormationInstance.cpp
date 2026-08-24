@@ -59,6 +59,16 @@ namespace
     const moho::SCoordsVec2& position
   );
 
+  // Forward declarations: bodies are defined later in this anonymous
+  // namespace, after the lane-map RB-tree helpers they call; referenced by
+  // address from RMapType_EntId_SUnitOffsetInfo::Init above their definition.
+  void RMapType_EntId_SUnitOffsetInfo_SerSave(
+    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  );
+  void RMapType_EntId_SUnitOffsetInfo_SerLoad(
+    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  );
+
   [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
   {
     static gpg::RType* type = nullptr;
@@ -704,40 +714,93 @@ namespace
      * Address: 0x0056DC00 (FUN_0056DC00, gpg::RMapType_EntId_SUnitOffsetInfo::SerSave)
      *
      * What it does:
-     * Serializes one `std::map<EntId,SUnitOffsetInfo>` payload by writing key/value
-     * pairs with reflected EntId and SUnitOffsetInfo RTTI lanes.
+     * Serializes one lane's `unitMap` payload by writing key/value pairs with
+     * reflected EntId and SUnitOffsetInfo RTTI lanes, walking the real
+     * `SFormationLaneUnitMap` RB-tree in order.
+     *
+     * `objectPtr` is `&SOffsetInfo::unitMap` (`SOffsetInfo::MemberSerialize`
+     * hands this type `this`, and `unitMap` is the class's first member, so
+     * the two addresses coincide) -- a `SFormationLaneUnitMap`, not a real
+     * `std::map<EntId,SUnitOffsetInfo>`. `Init` below sets `size_ = 0x0C`,
+     * matching `SFormationLaneUnitMap` exactly (allocator cookie + head +
+     * size), which is what proves the binary layout here and not the
+     * abstract map shape. Each node's value payload (`linkedUnitOwnerWord`
+     * onward) is byte-identical to `SUnitOffsetInfo` -- proven field-by-field
+     * against `FUN_005683F0`'s copy body -- so a scratch `SUnitOffsetInfo` is
+     * populated from the node's named fields (never linked into any real
+     * weak chain, via `BindObjectUnlinked`) and handed to the reflected
+     * `SUnitOffsetInfo` writer.
+     *
+     * Body lives as the free function `RMapType_EntId_SUnitOffsetInfo_SerSave`
+     * below `InsertLaneMapNode`'s definition later in this file (needs the
+     * lane-map RB-tree helpers that function calls; matches the free-function
+     * `serSaveFunc_`/`serLoadFunc_` style `RBroadcasterRType_EFormationdStatus`
+     * already uses above for the same reason). Wired into `serSaveFunc_` in
+     * `Init` below.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-    {
-      const auto* const mapObject = reinterpret_cast<const FormationUnitOffsetMap*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-      );
-      if (!archive || !mapObject) {
-        return;
-      }
 
-      archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
-
-      gpg::RType* const keyType = CachedEntIdType();
-      gpg::RType* const valueType = CachedSUnitOffsetInfoType();
-      GPG_ASSERT(keyType != nullptr);
-      GPG_ASSERT(valueType != nullptr);
-      if (!keyType || !valueType) {
-        return;
-      }
-
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      for (const auto& [key, value] : *mapObject) {
-        archive->Write(keyType, &key, owner);
-        archive->Write(valueType, &value, owner);
-      }
-    }
+    /**
+     * Address: 0x0056D9D0 (FUN_0056D9D0, gpg::RMapType_EntId_SUnitOffsetInfo::SerLoad)
+     *
+     * IDA signature:
+     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, int objectPtr, int version, gpg::RRef *ownerRef);
+     *
+     * What it does:
+     * Read mirror of `SerSave`: resets `unitMap` to empty (the binary's inline
+     * `sub_56CE70` recursive-destroy + head-reset sequence, matching
+     * `ResetLaneMap` exactly -- verified instruction-for-instruction against
+     * `FUN_0056D9D0.asm` 0x0056D9F4-0x0056DA34), then reads the element count
+     * and, for each element, reads one EntId key and one reflected
+     * `SUnitOffsetInfo` value (`gpg::ReadArchive::Read` at 0x0056DA97 /
+     * 0x0056DAC0) into a scratch `SUnitOffsetInfo` and inserts a matching
+     * `SFormationLaneUnitNode` via `InsertLaneMapNode` (CAiFormationInstance.cpp),
+     * the find-or-update RB-tree insert every other writer of this map already
+     * uses.
+     *
+     * `InsertLaneMapNode` is also where the following `RunScript`-closure
+     * addresses resolve, since it is the direct-typed recovery of the same
+     * compiler-emitted `std::map<EntId,SUnitOffsetInfo>` insert body they are
+     * all sub-parts or call sites of (no separate bespoke function is written
+     * for any of them -- RULE ONE in CLAUDE.md):
+     *   - Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0) -- the `operator[]`/
+     *     find-or-insert emission itself. Direct callsite:
+     *     `CAiFormationInstance::RunScript` 0x00567E06 and 0x00567F9A -- the
+     *     binary calls it twice per assigned candidate (find-or-default-insert,
+     *     then find-again-and-overwrite); nothing is observably read from the
+     *     map between the two calls, so `InsertLaneMapNode`'s single
+     *     find-or-update call with the final computed field values produces
+     *     identical final tree contents.
+     *   - Address: 0x005683F0 (FUN_005683F0) -- `SUnitOffsetInfo` default-node
+     *     value copy (splices a fresh copy's weak-link word pair into the
+     *     source's owner chain, then copies the ten remaining scalar fields).
+     *     Superseded by `InsertLaneMapNode`'s own `RelinkWeakWordNode` call and
+     *     direct field writes.
+     *   - Address: 0x0056CCE0 (FUN_0056CCE0) -- the RB-tree unique-insert
+     *     descent with duplicate detection (calls the predecessor/successor
+     *     navigation lanes below to disambiguate). Superseded by
+     *     `InsertLaneMapNode`'s simpler single-pass descending-compare loop,
+     *     which detects an exact key match at the same point without a
+     *     separate predecessor probe.
+     *   - Address: 0x00570530 (FUN_00570530) -- in-order predecessor
+     *     navigation (`_Tree::_Dec`), used only by the duplicate-detection
+     *     dance above (also called from three other tree-erase/-iterate sites
+     *     outside `RunScript`'s closure, none of which this pass touches).
+     *
+     * The scratch value's weak link is explicitly unlinked afterward since the
+     * map node above now owns the real link (mirrors every other
+     * construct-then-transfer-then-unlink dance in this file).
+     *
+     * Body lives as the free function `RMapType_EntId_SUnitOffsetInfo_SerLoad`
+     * below `InsertLaneMapNode`'s definition later in this file, for the same
+     * reason as `SerSave` above. Wired into `serLoadFunc_` in `Init` below.
+     */
 
     void Init() override
     {
       size_ = 0x0C;
       version_ = 1;
-      serSaveFunc_ = &RMapType_EntId_SUnitOffsetInfo::SerSave;
+      serSaveFunc_ = &RMapType_EntId_SUnitOffsetInfo_SerSave;
+      serLoadFunc_ = &RMapType_EntId_SUnitOffsetInfo_SerLoad;
       gpg::RType::Init();
       Finish();
     }
@@ -2243,6 +2306,117 @@ namespace
 
     ++map.size;
     return inserted;
+  }
+
+  // Out-of-line RMapType_EntId_SUnitOffsetInfo::SerSave/SerLoad bodies (class
+  // declared earlier in this file, doc comments there). Placed here, after
+  // the lane-map RB-tree helpers above, so they call those helpers directly
+  // instead of needing forward declarations.
+  void RMapType_EntId_SUnitOffsetInfo_SerSave(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const map = reinterpret_cast<const moho::SFormationLaneUnitMap*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    if (!archive || !map) {
+      return;
+    }
+
+    archive->WriteUInt(map->size);
+
+    gpg::RType* const keyType = CachedEntIdType();
+    gpg::RType* const valueType = CachedSUnitOffsetInfoType();
+    GPG_ASSERT(keyType != nullptr);
+    GPG_ASSERT(valueType != nullptr);
+    if (!keyType || !valueType) {
+      return;
+    }
+
+    moho::SFormationLaneUnitNode* const head = map->head;
+    if (!head) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    moho::SFormationLaneUnitNode* node = LaneMapLeftmostNode(head->parent);
+    while (node != nullptr && node != head) {
+      const std::uint32_t key = node->unitEntityId;
+      archive->Write(keyType, &key, owner);
+
+      moho::SUnitOffsetInfo value{};
+      value.mUnit.BindObjectUnlinked(DecodeUnitOwnerSlotWord(node->linkedUnitOwnerWord));
+      value.mLeaderPriority = node->leaderPriority;
+      value.mOffset = moho::SCoordsVec2{node->formationOffsetX, node->formationOffsetZ};
+      value.mDirection = node->formationVector;
+      value.mWeight = node->formationWeight;
+      value.mSpeedBandLow = node->speedBandLow;
+      value.mSpeedBandMid = node->speedBandMid;
+      value.mSpeedBandHigh = node->speedBandHigh;
+      archive->Write(valueType, &value, owner);
+
+      (void)AdvanceLaneMapNodeCursor(node);
+    }
+  }
+
+  void RMapType_EntId_SUnitOffsetInfo_SerLoad(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+  )
+  {
+    auto* const map = reinterpret_cast<moho::SFormationLaneUnitMap*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    if (!archive) {
+      return;
+    }
+
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+
+    if (map) {
+      ResetLaneMap(*map);
+    }
+    if (!map || count == 0u) {
+      return;
+    }
+
+    gpg::RType* const keyType = CachedEntIdType();
+    gpg::RType* const valueType = CachedSUnitOffsetInfoType();
+    GPG_ASSERT(keyType != nullptr);
+    GPG_ASSERT(valueType != nullptr);
+    if (!keyType || !valueType) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      std::uint32_t key = 0u;
+      archive->Read(keyType, &key, owner);
+
+      moho::SUnitOffsetInfo value{};
+      archive->Read(valueType, &value, owner);
+
+      moho::SFormationLaneUnitNode node{};
+      node.unitEntityId = key;
+      node.leaderPriority = value.mLeaderPriority;
+      node.formationOffsetX = value.mOffset.x;
+      node.formationOffsetZ = value.mOffset.z;
+      node.formationVector = value.mDirection;
+      node.formationWeight = value.mWeight;
+      node.speedBandLow = value.mSpeedBandLow;
+      node.speedBandMid = value.mSpeedBandMid;
+      node.speedBandHigh = value.mSpeedBandHigh;
+      node.linkedUnitOwnerWord = EncodeUnitOwnerSlotWord(static_cast<moho::Unit*>(value.mUnit.GetObjectPtr()));
+      (void)InsertLaneMapNode(*map, node);
+
+      // The scratch value's mUnit may have been linked into the resolved
+      // unit's real weak chain by the reflected Read above
+      // (WeakPtr<IUnit>::ResetFromObject); the map node's own link now owns
+      // that membership, so unlink the transient stage explicitly
+      // (WeakPtr<T>'s destructor is a no-op -- every other transient weak
+      // slot in this file is unlinked the same explicit way).
+      value.mUnit.UnlinkFromOwnerChain();
+    }
   }
 
   void EraseLaneMapNodeByEntityId(moho::SFormationLaneUnitMap& map, const std::uint32_t unitEntityId)
