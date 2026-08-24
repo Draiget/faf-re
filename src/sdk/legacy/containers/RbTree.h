@@ -2410,6 +2410,15 @@ namespace msvc8
              * Address: 0x0087C5F0 (FUN_0087C5F0, sibling emission described
              * above -- a second, distinct `CDecalManager` map/set instantiation)
              */
+            /**
+             * Address: 0x008D6940 (FUN_008D6940, fused allocate/self-link/
+             * isNil=1 buy_head for an unidentified map/set instantiation --
+             * writes `left=parent=right=0`, then `isNil@+0x1C=1`, `color@+0x1D=0`.
+             * Reached from `moho::SetupPrimaryAdapterSettings` (0x008D21E0,
+             * recovered in StartupHelpers.cpp), which publishes primary-adapter
+             * option states for the startup options UI; owning member not yet
+             * pinned down.)
+             */
             [[nodiscard]] static node_type* buy_head()
             {
                 node_type* const h = alloc_raw();
