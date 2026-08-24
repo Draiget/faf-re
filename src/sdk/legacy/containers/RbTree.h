@@ -1590,6 +1590,31 @@ namespace msvc8
              * block). Reached from `insert_at`'s emission (FUN_005565D0,
              * cited above).)
              */
+            /**
+             * Address: 0x00535CA0 (FUN_00535CA0, the RRuleGameRulesBlueprintMap
+             * (`msvc8::map<msvc8::string, void*>`) node buy for the
+             * RTrailBlueprint instantiation -- same family as the seven
+             * `insert_unique`/predecessor-lookup addresses cited above
+             * (0x00534690 / insert_at FUN_00535400 / predecessor lookup
+             * FUN_00536470). Allocates one node via `sub_533AD0(1)`
+             * (`operator new(count)`), writes `left`/`parent`/`right` from
+             * the caller's `where`/`head` arguments, then constructs
+             * `value_type` (`pair<const msvc8::string, void*>`) in place at
+             * `node+0x0C` from the `const value_type&` argument: the key is
+             * built via `msvc8::string::assign(src, 0, 0xFFFFFFFF)` (full
+             * copy into the SSO buffer at `node+0x10`, `_Mysize`@+0x20,
+             * `_Myres`@+0x24=0xF) and the `void*` value is copied straight
+             * from the source pair's `+0x1C` (`.second`) into `node+0x28`,
+             * matching the `isNil@+0x2D = 0x0D + sizeof(pair<string(28),
+             * void*(4)>)=0x20` node size FUN_005364D0's citation already
+             * established for this map type. This is a compiler/template
+             * emission of `::new (...) value_type(args...)` with no
+             * hand-written body of its own (RULE ONE), exactly like
+             * FUN_005569C0 above -- `recovered_progress.json` tracks it
+             * `skip` for that reason. Reached from `insert_at`'s emission
+             * FUN_00535400, itself reached from `insert_unique`'s emission
+             * FUN_00534690 cited above.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
