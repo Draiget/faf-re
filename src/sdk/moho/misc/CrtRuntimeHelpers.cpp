@@ -190,6 +190,7 @@ extern "C" int __cdecl RuntimeInitCrtLockNumber(int lockId);
 extern "C" void __cdecl RuntimeLockCrtLock(int lockId);
 extern "C" int __cdecl _isatty(int fileDescriptor);
 extern "C" int __cdecl isleadbyte(int character);
+extern "C" errno_t __cdecl _chsize_nolock(int fileDescriptor, __int64 size);
 extern "C" int _nhandle;
 extern "C" int _commode;
 extern "C" int _cflush;
@@ -9480,6 +9481,463 @@ namespace moho::runtime
     return forced ? forcedValue : result;
   }
 
+  constexpr int kOFlagWronly = 1;
+  constexpr int kOFlagRdwr = 2;
+  constexpr int kOFlagAppend = 8;
+  constexpr int kOFlagRandom = 0x10;
+  constexpr int kOFlagSequential = 0x20;
+  constexpr int kOFlagTemporary = 0x40;
+  constexpr int kOFlagNoinherit = 0x80;
+  constexpr int kOFlagCreat = 0x100;
+  constexpr int kOFlagTrunc = 0x200;
+  constexpr int kOFlagExcl = 0x400;
+  constexpr int kOFlagShortLived = 0x1000;
+  constexpr int kOFlagWText = 0x10000;
+  constexpr int kOFlagU16Text = 0x20000;
+  constexpr int kOFlagU8Text = 0x40000;
+  constexpr int kUtf8Bom = 0x00BFBBEF; // "EF BB BF" read little-endian into a 3-byte int
+  constexpr std::uint16_t kUtf16LeBom = 0xFEFF;
+  constexpr std::uint16_t kUtf16ReversedBom = 0xFFFE;
+
+  /**
+   * Address: 0x00AB9517 (FUN_00AB9517, chsize_nolock / _chsize_nolock)
+   *
+   * What it does:
+   * Resizes the file behind `fileDescriptor` to `size` bytes. Growing
+   * zero-fills the new tail in 0x1000-byte chunks via `_write_nolock`
+   * (temporarily forcing binary mode so no text-mode translation touches
+   * the padding); shrinking seeks to `size` and calls `SetEndOfFile`.
+   * Restores the original file position before returning.
+   */
+  extern "C" errno_t __cdecl _chsize_nolock(const int fileDescriptor, const __int64 size)
+  {
+    const __int64 originalPosition = _lseeki64_nolock(fileDescriptor, 0, FILE_CURRENT);
+    if (originalPosition == -1) {
+      return *_errno();
+    }
+    const __int64 currentSize = _lseeki64_nolock(fileDescriptor, 0, FILE_END);
+    if (currentSize == -1) {
+      return *_errno();
+    }
+
+    errno_t result = 0;
+
+    if (size > currentSize) {
+      const HANDLE processHeap = ::GetProcessHeap();
+      auto* const zeroBuffer = static_cast<char*>(::HeapAlloc(processHeap, HEAP_ZERO_MEMORY, 0x1000u));
+      if (zeroBuffer == nullptr) {
+        *_errno() = ENOMEM;
+        return *_errno();
+      }
+
+      const int previousMode = _setmode_nolock(fileDescriptor, kOModeBinary);
+      __int64 remaining = size - currentSize;
+      bool failed = false;
+      while (remaining > 0) {
+        const unsigned int chunkSize = remaining < 0x1000 ? static_cast<unsigned int>(remaining) : 0x1000u;
+        const int written = _write_nolock(fileDescriptor, zeroBuffer, chunkSize);
+        if (written == -1) {
+          failed = true;
+          break;
+        }
+        remaining -= written;
+      }
+      _setmode_nolock(fileDescriptor, previousMode);
+      ::HeapFree(processHeap, 0, zeroBuffer);
+
+      if (failed) {
+        if (*RuntimeDosErrno() == ERROR_ACCESS_DENIED) {
+          *_errno() = EACCES;
+        }
+        result = *_errno();
+      }
+    } else if (size < currentSize) {
+      if (_lseeki64_nolock(fileDescriptor, size, FILE_BEGIN) == -1) {
+        return *_errno();
+      }
+      if (!::SetEndOfFile(RuntimeGetOsfHandle(fileDescriptor))) {
+        *_errno() = EACCES;
+        *RuntimeDosErrno() = ::GetLastError();
+        result = *_errno();
+      }
+    }
+
+    if (result == 0) {
+      if (_lseeki64_nolock(fileDescriptor, originalPosition, FILE_BEGIN) == -1) {
+        return *_errno();
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00AAF7B4 (FUN_00AAF7B4, _wsopen_nolock)
+   *
+   * What it does:
+   * MSVC CRT wide-path file-open worker (the body `_wsopen_helper` forwards
+   * to). Decodes the `_O_*` open-flag bitmask into Win32
+   * access/share/creation-disposition/flags-and-attributes, allocates a
+   * descriptor slot, calls `CreateFileW` (retrying write-only if a
+   * read+write open against read-only media fails), classifies the handle
+   * via `GetFileType`. For a regular disk file opened with `_O_RDWR` in
+   * text mode, peeks the trailing byte and truncates a lone Ctrl-Z. For a
+   * text-mode open with `_O_WTEXT`/`_O_U16TEXT`/`_O_U8TEXT`, sniffs (and,
+   * for a fresh/truncated/write-only file, writes) the UTF-16LE or UTF-8
+   * byte-order mark. Finally re-opens as a plain `OPEN_EXISTING` handle
+   * when the original access combined `GENERIC_READ|GENERIC_WRITE` with
+   * `_O_WRONLY`.
+   */
+  extern "C" int __cdecl _wsopen_nolock(
+    int* const outFileHandle,
+    int* const unlockFlag,
+    const wchar_t* const lpFileName,
+    const int openFlags,
+    const int shareFlags,
+    const int permissionFlags
+  )
+  {
+    int defaultFileMode = 0;
+    unsigned int osPlatform = 0;
+    if (_get_fmode(&defaultFileMode) != 0) {
+      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+    }
+    if (_get_osplatform(&osPlatform) != 0) {
+      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+    }
+
+    SECURITY_ATTRIBUTES securityAttributes;
+    securityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+    securityAttributes.lpSecurityDescriptor = nullptr;
+    securityAttributes.bInheritHandle = (openFlags & kOFlagNoinherit) == 0 ? TRUE : FALSE;
+
+    std::uint8_t pendingOsfileFlags = ((openFlags & kOFlagNoinherit) != 0) ? 0x10 : 0;
+    if ((openFlags & 0x8000 /* _O_BINARY */) == 0 &&
+        ((openFlags & 0x74000 /* _O_WTEXT|_O_U16TEXT|_O_U8TEXT|_O_TEXT */) != 0 || defaultFileMode != 0x8000))
+    {
+      pendingOsfileFlags |= 0x80;
+    }
+
+    auto invalidArgument = [&]() -> int {
+      *RuntimeDosErrno() = 0;
+      *outFileHandle = -1;
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return EINVAL;
+    };
+
+    DWORD dwDesiredAccess;
+    if ((openFlags & 3) != 0) {
+      if ((openFlags & 3) == kOFlagWronly) {
+        if ((openFlags & kOFlagAppend) != 0 && (openFlags & 0x70000) != 0) {
+          dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
+        } else {
+          dwDesiredAccess = GENERIC_WRITE;
+        }
+      } else if ((openFlags & 3) == kOFlagRdwr) {
+        dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
+      } else {
+        return invalidArgument();
+      }
+    } else {
+      dwDesiredAccess = GENERIC_READ;
+    }
+
+    DWORD dwShareMode;
+    switch (shareFlags) {
+      case 16: dwShareMode = 0; break;
+      case 32: dwShareMode = FILE_SHARE_READ; break;
+      case 48: dwShareMode = FILE_SHARE_WRITE; break;
+      case 64: dwShareMode = FILE_SHARE_READ | FILE_SHARE_WRITE; break;
+      case 128: dwShareMode = (dwDesiredAccess == GENERIC_READ) ? FILE_SHARE_READ : 0; break;
+      default: return invalidArgument();
+    }
+
+    DWORD dwCreationDisposition;
+    const int creationBits = openFlags & 0x700;
+    if (creationBits > 0x400) {
+      if (creationBits == 0x500) {
+        dwCreationDisposition = CREATE_NEW;
+      } else if (creationBits == 0x600) {
+        dwCreationDisposition = TRUNCATE_EXISTING;
+      } else if (creationBits == 0x700) {
+        dwCreationDisposition = CREATE_NEW;
+      } else {
+        return invalidArgument();
+      }
+    } else if (creationBits == 0x400 || creationBits == 0) {
+      dwCreationDisposition = OPEN_EXISTING;
+    } else if (creationBits == 0x100 /* kOFlagCreat alone */) {
+      dwCreationDisposition = OPEN_ALWAYS;
+    } else if (creationBits == 0x200 /* kOFlagTrunc alone */) {
+      dwCreationDisposition = TRUNCATE_EXISTING;
+    } else if (creationBits == 0x300 /* CREAT|TRUNC */) {
+      dwCreationDisposition = CREATE_ALWAYS;
+    } else {
+      return invalidArgument();
+    }
+
+    DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL;
+    if ((openFlags & kOFlagCreat) != 0 && (permissionFlags & ~umaskval & 0x80) == 0) {
+      dwFlagsAndAttributes = FILE_ATTRIBUTE_READONLY;
+    }
+    if ((openFlags & kOFlagTemporary) != 0) {
+      dwFlagsAndAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
+      dwDesiredAccess |= DELETE;
+      if (osPlatform == 2 /* VER_PLATFORM_WIN32_NT */) {
+        dwShareMode |= FILE_SHARE_DELETE;
+      }
+    }
+    if ((openFlags & kOFlagShortLived) != 0) {
+      dwFlagsAndAttributes |= FILE_ATTRIBUTE_TEMPORARY;
+    }
+    if ((openFlags & kOFlagSequential) != 0) {
+      dwFlagsAndAttributes |= FILE_FLAG_SEQUENTIAL_SCAN;
+    } else if ((openFlags & kOFlagRandom) != 0) {
+      dwFlagsAndAttributes |= FILE_FLAG_RANDOM_ACCESS;
+    }
+
+    const int newDescriptor = _alloc_osfhnd();
+    *outFileHandle = newDescriptor;
+    if (newDescriptor == -1) {
+      *RuntimeDosErrno() = 0;
+      *outFileHandle = -1;
+      *_errno() = EMFILE;
+      return *_errno();
+    }
+
+    *unlockFlag = 1;
+    RuntimeIoInfo* const slot = __pioinfo[newDescriptor >> 5] + (newDescriptor & 0x1F);
+
+    HANDLE hFile = ::CreateFileW(
+      lpFileName, dwDesiredAccess, dwShareMode, &securityAttributes, dwCreationDisposition, dwFlagsAndAttributes, nullptr
+    );
+    if (hFile == INVALID_HANDLE_VALUE) {
+      bool retryOk = false;
+      if ((dwDesiredAccess & (GENERIC_READ | GENERIC_WRITE)) == (GENERIC_READ | GENERIC_WRITE) &&
+          (openFlags & 1) != 0)
+      {
+        dwDesiredAccess &= ~GENERIC_READ;
+        hFile = ::CreateFileW(
+          lpFileName, dwDesiredAccess, dwShareMode, &securityAttributes, dwCreationDisposition, dwFlagsAndAttributes, nullptr
+        );
+        retryOk = (hFile != INVALID_HANDLE_VALUE);
+      }
+      if (!retryOk) {
+        slot->osfile &= static_cast<std::uint8_t>(~0x01u);
+        _dosmaperr(::GetLastError());
+        return *_errno();
+      }
+    }
+
+    switch (::GetFileType(hFile)) {
+      case FILE_TYPE_UNKNOWN: {
+        slot->osfile &= static_cast<std::uint8_t>(~0x01u);
+        const DWORD lastError = ::GetLastError();
+        _dosmaperr(lastError);
+        ::CloseHandle(hFile);
+        if (lastError == 0) {
+          *_errno() = EACCES;
+        }
+        return *_errno();
+      }
+      case FILE_TYPE_CHAR: pendingOsfileFlags |= 0x40; break;
+      case FILE_TYPE_PIPE: pendingOsfileFlags |= 0x08; break;
+      default: break;
+    }
+
+    _set_osfhnd(newDescriptor, reinterpret_cast<std::intptr_t>(hFile));
+    pendingOsfileFlags |= 0x01;
+    slot->osfile = pendingOsfileFlags;
+    slot->textmodeUnicode &= static_cast<std::int8_t>(0x80);
+    const std::uint8_t wasPipeOrChar = pendingOsfileFlags & 0x48;
+
+    if (wasPipeOrChar == 0 && static_cast<std::int8_t>(pendingOsfileFlags) < 0 && (openFlags & kOFlagRdwr) != 0) {
+      // Regular disk file, text mode, opened for read+write: peek the
+      // trailing byte and truncate a lone Ctrl-Z (real _wsopen_nolock
+      // behavior for text-mode read+write opens).
+      const long tailPos = _lseek_nolock(newDescriptor, -1, FILE_END);
+      if (tailPos == -1) {
+        if (*RuntimeDosErrno() != 131 /* ERROR_NEGATIVE_SEEK: empty file, nothing to truncate */) {
+          _close_nolock(newDescriptor);
+          return *_errno();
+        }
+      } else {
+        char tailByte = 0;
+        const unsigned int readResult = _read_nolock(newDescriptor, &tailByte, 1u);
+        const bool isTrailingCtrlZ = (readResult == 0 && tailByte == 0x1A);
+        if ((isTrailingCtrlZ && _chsize_nolock(newDescriptor, tailPos) == -1) ||
+            _lseek_nolock(newDescriptor, 0, FILE_BEGIN) == -1)
+        {
+          _close_nolock(newDescriptor);
+          return *_errno();
+        }
+      }
+    }
+
+    int bomSubmode = 0; // 0 = none, 1 = UTF-8, 2 = UTF-16LE
+    if (static_cast<std::int8_t>(pendingOsfileFlags) < 0) {
+      int effectiveFlags = openFlags;
+      if ((effectiveFlags & 0x74000) == 0) {
+        if ((defaultFileMode & 0x74000) != 0) {
+          effectiveFlags |= (defaultFileMode & 0x74000);
+        } else {
+          effectiveFlags |= 0x4000 /* _O_TEXT */;
+        }
+      }
+      const int textKind = effectiveFlags & 0x74000;
+
+      bool wantsBomLogic = false;
+      if (textKind == 0x4000 /* plain _O_TEXT */) {
+        bomSubmode = 0;
+      } else if (textKind == kOFlagWText || textKind == (kOFlagWText | 0x4000)) {
+        wantsBomLogic = (effectiveFlags & 0x301) == 0x301;
+      } else if (textKind == kOFlagU16Text || textKind == (kOFlagU16Text | 0x4000)) {
+        bomSubmode = 2;
+        wantsBomLogic = true;
+      } else if (textKind == kOFlagU8Text || textKind == (kOFlagU8Text | 0x4000)) {
+        bomSubmode = 1;
+        wantsBomLogic = true;
+      }
+
+      if (wantsBomLogic && (effectiveFlags & 0x70000) != 0 && (pendingOsfileFlags & 0x40) == 0) {
+        bool shouldWriteBom = false;
+        bool aborted = false;
+        bool bailedOut = false;
+
+        // Peeks up to 3 bytes for a UTF-8/UTF-16LE BOM, consuming it (and
+        // setting bomSubmode) on a match, or rewinding to the start
+        // otherwise. Shared by the read-only path and the read+write
+        // OPEN_ALWAYS-existing-content path.
+        const auto sniffBom = [&]() -> bool {
+          unsigned char bomBytes[3] = {};
+          const unsigned int peeked = _read_nolock(newDescriptor, reinterpret_cast<char*>(bomBytes), 3u);
+          if (peeked == static_cast<unsigned int>(-1)) {
+            _close_nolock(newDescriptor);
+            return false;
+          }
+          bool rewind = true;
+          if (peeked == 3 &&
+              (static_cast<unsigned int>(bomBytes[0]) | (static_cast<unsigned int>(bomBytes[1]) << 8) |
+               (static_cast<unsigned int>(bomBytes[2]) << 16)) == static_cast<unsigned int>(kUtf8Bom))
+          {
+            bomSubmode = 1;
+            rewind = false;
+          } else if (peeked >= 2) {
+            const std::uint16_t leading16 =
+              static_cast<std::uint16_t>(bomBytes[0]) | static_cast<std::uint16_t>(static_cast<std::uint16_t>(bomBytes[1]) << 8);
+            if (leading16 == kUtf16ReversedBom) {
+              _close_nolock(newDescriptor);
+              *_errno() = EINVAL;
+              return false;
+            }
+            if (leading16 == kUtf16LeBom) {
+              if (_lseek_nolock(newDescriptor, 2, FILE_BEGIN) == -1) {
+                _close_nolock(newDescriptor);
+                return false;
+              }
+              bomSubmode = 2;
+              rewind = false;
+            }
+          }
+          if (rewind && _lseek_nolock(newDescriptor, 0, FILE_BEGIN) == -1) {
+            _close_nolock(newDescriptor);
+            return false;
+          }
+          return true;
+        };
+
+        const DWORD accessKind = dwDesiredAccess & (GENERIC_READ | GENERIC_WRITE);
+        if (accessKind == GENERIC_WRITE) {
+          if (dwCreationDisposition == CREATE_NEW || dwCreationDisposition == CREATE_ALWAYS) {
+            shouldWriteBom = true;
+          } else if (dwCreationDisposition == OPEN_ALWAYS) {
+            if (_lseeki64_nolock(newDescriptor, 0, FILE_END) != 0) {
+              _lseeki64_nolock(newDescriptor, 0, FILE_BEGIN);
+              // File already had content: nothing to sniff or write for a
+              // write-only handle -- leave bomSubmode as detected above.
+            } else {
+              shouldWriteBom = true;
+            }
+          } else if (dwCreationDisposition == TRUNCATE_EXISTING) {
+            shouldWriteBom = true;
+          }
+        } else if (accessKind == GENERIC_READ) {
+          bailedOut = !sniffBom();
+        } else if (accessKind == (GENERIC_READ | GENERIC_WRITE)) {
+          if (dwCreationDisposition == 0) {
+            // nothing to do
+          } else if (dwCreationDisposition == CREATE_NEW || dwCreationDisposition == CREATE_ALWAYS) {
+            shouldWriteBom = true;
+          } else if (dwCreationDisposition == TRUNCATE_EXISTING) {
+            shouldWriteBom = true;
+          } else if (dwCreationDisposition == OPEN_ALWAYS) {
+            if (_lseeki64_nolock(newDescriptor, 0, FILE_END) == 0) {
+              shouldWriteBom = true;
+            } else {
+              const __int64 rewound = _lseeki64_nolock(newDescriptor, 0, FILE_BEGIN);
+              if (rewound == -1) {
+                _close_nolock(newDescriptor);
+                return *_errno();
+              }
+              bailedOut = !sniffBom();
+            }
+          }
+        } else {
+          aborted = true;
+        }
+
+        if (bailedOut) {
+          return *_errno();
+        }
+
+        if (!aborted && shouldWriteBom) {
+          unsigned char bomToWrite[3] = {};
+          int bomLength = 0;
+          if (bomSubmode == 1) {
+            bomToWrite[0] = 0xEF; bomToWrite[1] = 0xBB; bomToWrite[2] = 0xBF;
+            bomLength = 3;
+          } else if (bomSubmode == 2) {
+            bomToWrite[0] = 0xFF; bomToWrite[1] = 0xFE;
+            bomLength = 2;
+          }
+          if (bomLength != 0) {
+            int written = 0;
+            while (written < bomLength) {
+              const int chunk = _write(newDescriptor, bomToWrite + written, static_cast<unsigned int>(bomLength - written));
+              if (chunk == -1) {
+                _close_nolock(newDescriptor);
+                return *_errno();
+              }
+              written += chunk;
+            }
+          }
+        }
+      }
+    }
+
+    slot->textmodeUnicode = static_cast<std::int8_t>((slot->textmodeUnicode & ~0x7F) | (bomSubmode & 0x7F));
+    slot->textmodeUnicode = static_cast<std::int8_t>((slot->textmodeUnicode & 0x7F) | (((openFlags >> 16) & 1) << 7));
+    if (wasPipeOrChar == 0 && (openFlags & kOFlagAppend) != 0) {
+      slot->osfile |= 0x20;
+    }
+
+    if ((dwDesiredAccess & (GENERIC_READ | GENERIC_WRITE)) == (GENERIC_READ | GENERIC_WRITE) && (openFlags & 1) != 0) {
+      ::CloseHandle(hFile);
+      hFile = ::CreateFileW(
+        lpFileName, dwDesiredAccess & 0x7FFFFFFFu, dwShareMode, &securityAttributes, OPEN_EXISTING, dwFlagsAndAttributes, nullptr
+      );
+      if (hFile == INVALID_HANDLE_VALUE) {
+        _dosmaperr(::GetLastError());
+        slot->osfile &= static_cast<std::uint8_t>(~0x01u);
+        _free_osfhnd(newDescriptor);
+        return *_errno();
+      }
+      slot->osfhnd = reinterpret_cast<std::intptr_t>(hFile);
+    }
+
+    return 0;
+  }
+
   /**
    * Address: 0x00AAFFC4 (FUN_00AAFFC4, _wsopen_s / _wsopen_helper)
    *
@@ -9489,9 +9947,9 @@ namespace moho::runtime
    * secure subset of open flags, and that the `open-flag` bitmask excludes
    * reserved bits when secure. On argument violation, sets `EINVAL`, calls
    * `_invalid_parameter`, and returns `EINVAL` (`22`). Otherwise dispatches to
-   * `_wsopen_nolock` via the shared worker; on failure it clears the `FOPEN`
-   * bit in `_pioinfo` for the freshly-opened slot and releases the per-handle
-   * lock so the descriptor is not leaked, then resets `*outFileHandle` to `-1`.
+   * `_wsopen_nolock`; on failure it clears the "in use" bit in `_pioinfo` for
+   * the freshly-allocated slot and releases the per-handle lock so the
+   * descriptor is not leaked, then resets `*outFileHandle` to `-1`.
    *
    * IDA signature:
    * int __cdecl sub_AAFFC4(LPCWSTR lpFileName, int a2, int a3, int a4, int *a5, int a6);
@@ -9524,10 +9982,19 @@ namespace moho::runtime
     }
 
     // Forwards to the CRT `_wsopen_nolock` worker (IDA `sub_AAF7B4`), which
-    // returns the errno-valued status and sets `*holdsPerFdLock` when the
-    // caller must release the per-fd lock on exit.
-    ::_wsopen_s(outFileHandle, lpFileName, openFlags, shareFlags, permissionFlags);
-    const int openStatus = *_errno();
+    // returns the errno-valued status and sets `*unlockNeeded` when the
+    // caller must release the per-fd lock on exit (mirrors `_open`'s
+    // `_tsopen_nolock`/`shouldUnlockHandle` pattern above).
+    int unlockNeeded = 0;
+    const int openStatus = _wsopen_nolock(outFileHandle, &unlockNeeded, lpFileName, openFlags, shareFlags, permissionFlags);
+
+    if (unlockNeeded != 0) {
+      if (openStatus != 0) {
+        RuntimeIoInfo* const slot = __pioinfo[*outFileHandle >> 5] + (*outFileHandle & 0x1F);
+        slot->osfile &= static_cast<std::uint8_t>(~0x01u);
+      }
+      _unlock_fhandle(*outFileHandle);
+    }
 
     if (openStatus != 0) {
       *outFileHandle = -1;
