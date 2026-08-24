@@ -1404,6 +1404,40 @@ namespace msvc8
             /**
              * Address: 0x0077C6F0 (FUN_0077C6F0, the decal tree node delete lane;
              * emitted again at 0x0077CF50)
+             * Address: 0x007E5850 (FUN_007E5850, `value_type::~value_type()` for the
+             * mesh-key map -- `moho::MeshRendererMeshCacheEntry` in
+             * `moho/mesh/Mesh.h`, `_Isnil` at +0x25 (`sizeof(value_type)` == 0x18,
+             * matching `0x0D + 0x18`). Reached from that map's `erase_node`
+             * (0x007E4430) and `destroy_subtree` (0x007E4DD0), both already cited
+             * above as sibling emissions.
+             *
+             * The two members are torn down in reverse declaration order, exactly
+             * matching a plain `~MeshRendererMeshCacheEntry()`:
+             *   - first, the second-declared member's boost control-block pointer
+             *     at value+0x14 (`[esi+0x14]`) is released with a lone
+             *     `weak_count_` decrement (value+0x14+0x08) followed by a single
+             *     dispatch through vtable slot +0x08 (`destroy()`) -- there is no
+             *     `use_count_` touch and no `dispose()` call anywhere in that
+             *     block. That is `boost::detail::sp_counted_base::weak_release()`
+             *     (see `BoostWrappers.h`'s `weak_release()` and the
+             *     0x00446FC0/FUN_004229B0 audit note there), not a shared-owner
+             *     release. `Mesh.h` currently types that member
+             *     `boost::shared_ptr<Mesh>`, which would compile to a two-step
+             *     use_count_-then-weak_count_ release (the shape `~MeshKey`
+             *     itself shows below) -- this emission proves the shipped field is
+             *     `boost::weak_ptr<Mesh>` instead. `Mesh.h`/`Mesh.cpp` are under
+             *     concurrent edit by another recovery pass as of this citation, so
+             *     the field is not retyped here; this note is the handoff.
+             *   - second, the first-declared member (`MeshKey`) is released
+             *     in-line with the exact same vtable-restore-plus-shared_ptr-
+             *     release body as `Moho::MeshKey::~MeshKey` (0x007DAF60):
+             *     `this->__vftable = &MeshKey::vftable`, then the two-step
+             *     use_count_/weak_count_ release of `meshMaterial`'s control
+             *     block. MSVC inlines the base's destructor body here rather
+             *     than calling 0x007DAF60, which is why 0x007DAF60 shows only as
+             *     a data ref from this function's SEH unwind funclet
+             *     (`mov ecx,[ebp+4]; jmp ??1MeshKey@Moho@@UAE@XZ`), not as a
+             *     direct call.
              */
             static void free_node(node_type* const n) noexcept
             {
