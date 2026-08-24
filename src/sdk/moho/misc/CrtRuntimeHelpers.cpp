@@ -14269,5 +14269,43 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   using RuntimeSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
 
+  /**
+   * Address: 0x00A48A40 (FUN_00A48A40)
+   *
+   * What it does:
+   * Reverses the byte order of `count` fixed-size records (each `recordSize`
+   * bytes) in place starting at `buffer` -- an in-place endian-swap utility
+   * applied to arrays of small binary records read directly off disk.
+   */
+  void ReverseRecordByteOrder(const std::int32_t recordSize, const std::int32_t count, void* const buffer)
+  {
+    if (buffer == nullptr || recordSize <= 0 || count <= 0) {
+      return;
+    }
+
+    auto* cursor = static_cast<std::uint8_t*>(buffer);
+    const std::int32_t halfSize = recordSize / 2;
+    for (std::int32_t i = 0; i < count; ++i, cursor += recordSize) {
+      for (std::int32_t j = 0; j < halfSize; ++j) {
+        std::swap(cursor[j], cursor[recordSize - 1 - j]);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00A48C90 (FUN_00A48C90)
+   *
+   * What it does:
+   * Reads `count` 16-bit values from `file` into `buffer` via `fread`, then
+   * byte-swaps each one in place (`ReverseRecordByteOrder`) -- a foreign-
+   * endian array read helper. Returns the byte count requested (`count*2`).
+   */
+  std::size_t ReadAndByteSwapU16Array(void* const buffer, const std::size_t count, std::FILE* const file)
+  {
+    (void)std::fread(buffer, 2u, count, file);
+    ReverseRecordByteOrder(2, static_cast<std::int32_t>(count), buffer);
+    return count * 2u;
+  }
+
 } // namespace moho::runtime
 
