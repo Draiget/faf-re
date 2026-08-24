@@ -490,6 +490,54 @@ namespace
   static_assert(sizeof(ScalarAndIntVectorLane) == 0x14, "ScalarAndIntVectorLane size must be 0x14");
 
   /**
+   * Records whether one grid cell holds enemy units, advancing the row's
+   * next-cell cursor. `row.mValues` holds the row's occupancy flags packed
+   * one bit per 32-bit word; growing it one `int` word at a time via the
+   * container's own `push_back` is the faithful modern expression of the
+   * inlined bit-insert-and-grow mechanic `CAiBrain::ProcessAttackVectors`
+   * (0x0057BDB0) performs once per grid column via `sub_57FB30`/`sub_443D90`
+   * (the same insert-one-bit + word-array-grow shape already recovered
+   * generically as `VectorBoolInsertOneBit`/`VectorBoolReserveWordCapacity`
+   * in ManipulatorStartupRegistrations.cpp). `row.mValues` is proven to be
+   * the binary's per-row payload by `sub_5837F0`'s cleanup shape, see
+   * `ResetScalarAndIntVectorLaneRange` above.
+   */
+  void MarkGridCellEnemyPresence(ScalarAndIntVectorLane& row, const bool hasEnemyUnits)
+  {
+    const auto cellIndex = static_cast<std::uint32_t>(row.mScalar);
+    const std::uint32_t wordIndex = cellIndex >> 5;
+    if (wordIndex >= row.mValues.size()) {
+      row.mValues.push_back(0);
+    }
+
+    if (hasEnemyUnits) {
+      row.mValues[wordIndex] |= (1 << (cellIndex & 0x1Fu));
+    }
+
+    ++row.mScalar;
+  }
+
+  /**
+   * Reports whether grid cell `column` was previously marked as holding
+   * enemy units. A column the row never grew to (past its last written
+   * word) reads as empty, matching the binary's zero-filled tail-word
+   * semantics.
+   */
+  [[nodiscard]] bool GridCellHasEnemyPresence(const ScalarAndIntVectorLane& row, const std::int32_t column)
+  {
+    if (column < 0) {
+      return false;
+    }
+
+    const auto wordIndex = static_cast<std::uint32_t>(column) >> 5;
+    if (wordIndex >= row.mValues.size()) {
+      return false;
+    }
+
+    return (row.mValues[wordIndex] & (1 << (column & 0x1F))) != 0;
+  }
+
+  /**
    * Address: 0x005837F0 (FUN_005837F0, scalar+vector reset range lane)
    * Address: 0x00580D10 (FUN_00580D10)
    *
@@ -2640,70 +2688,107 @@ bool CAiBrain::BuildUnit(const char* const blueprintId, CAiBrain* const brain, U
 /**
  * Address: 0x0057BDB0 (FUN_0057BDB0, Moho::CAiBrain::ProcessAttackVectors)
  *
+ * IDA signature:
+ * void __stdcall Moho::CAiBrain::ProcessAttackVectors(Moho::CAiBrain *a1);
+ *
  * What it does:
- * Rebuilds attack-vector debug lanes from current enemy army unit positions.
+ * Rebuilds the attack-vector debug lane by scanning the map heightfield in
+ * 32-unit cells (`kAiDebugGridStep`, the same constant `DrawDebug` uses just
+ * below). For each cell, `mCurrentEnemy->CountUnitsInBoundsXZ` (vtable slot
+ * 0x8C, `CArmyImpl::CountUnitsInBoundsXZ`) tests whether any unit from the
+ * enemy army's `mBuildCategoryRange`-filtered unit set falls inside that
+ * cell's XZ bounds; the result is recorded into a per-row growable bitset
+ * (`grid`, one `ScalarAndIntVectorLane` per row). A second pass walks every
+ * cell whose bit is clear (no enemy presence) and, for each of its up-to-3x3
+ * edge-clamped neighbor cells whose bit IS set, appends one
+ * `SAiAttackVectorDebug` arrow that starts at the empty cell and points
+ * toward the enemy-occupied neighbor -- the visual "attack vector" frontier
+ * between the enemy's grid presence and the surrounding empty cells.
  */
 void CAiBrain::ProcessAttackVectors()
 {
   mAttackVectors.clear();
 
-  if (mCurrentEnemy == nullptr || mArmy == nullptr) {
+  if (mCurrentEnemy == nullptr) {
     return;
   }
+
+  CHeightField* const heightField = mSim->mMapData->mHeightField.get();
+  const std::int32_t colCount = (heightField->width - 1) / kAiDebugGridStep;
+  const std::int32_t rowCount = (heightField->height - 1) / kAiDebugGridStep;
 
   SEntitySetTemplateUnit enemyUnits{};
   mCurrentEnemy->GetUnits(&enemyUnits, &mBuildCategoryRange);
 
-  float sumX = 0.0f;
-  float sumY = 0.0f;
-  float sumZ = 0.0f;
-  std::uint32_t enemyUnitCount = 0u;
-
-  for (Entity* const* unitIt = enemyUnits.mVec.begin(); unitIt != enemyUnits.mVec.end(); ++unitIt) {
-    Unit* const enemyUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitIt);
-    if (enemyUnit == nullptr || enemyUnit->IsDead() || enemyUnit->DestroyQueued()) {
-      continue;
-    }
-
-    const Wm3::Vec3f& enemyPosition = enemyUnit->GetPosition();
-    sumX += enemyPosition.x;
-    sumY += enemyPosition.y;
-    sumZ += enemyPosition.z;
-    ++enemyUnitCount;
-  }
-
-  if (enemyUnitCount == 0u) {
+  if (rowCount <= 0) {
     return;
   }
 
-  const float inverseEnemyCount = 1.0f / static_cast<float>(enemyUnitCount);
+  const float halfCell = static_cast<float>(kAiDebugGridStep) * 0.5f;
 
-  SAiAttackVectorDebug debugVector{};
-  debugVector.mOrigin.x = sumX * inverseEnemyCount;
-  debugVector.mOrigin.y = sumY * inverseEnemyCount;
-  debugVector.mOrigin.z = sumZ * inverseEnemyCount;
+  // One growable per-row bitset, one bit per column: bit set means the
+  // enemy has at least one unit inside that grid cell.
+  msvc8::vector<ScalarAndIntVectorLane> grid;
 
-  Wm3::Vector2f armyStartPosition{};
-  mArmy->GetArmyStartPos(armyStartPosition);
+  float cellZ = halfCell;
+  for (std::int32_t row = 0; row < rowCount; ++row, cellZ += static_cast<float>(kAiDebugGridStep)) {
+    grid.push_back(ScalarAndIntVectorLane{});
+    ScalarAndIntVectorLane& gridRow = grid.back();
 
-  float directionX = debugVector.mOrigin.x - armyStartPosition.x;
-  float directionZ = debugVector.mOrigin.z - armyStartPosition.y;
-  const float directionLength = std::sqrt((directionX * directionX) + (directionZ * directionZ));
-  if (directionLength > 0.0001f) {
-    const float inverseDirectionLength = 1.0f / directionLength;
-    directionX *= inverseDirectionLength;
-    directionZ *= inverseDirectionLength;
-  } else {
-    directionX = 0.0f;
-    directionZ = 1.0f;
+    float cellX = halfCell;
+    for (std::int32_t col = 0; col < colCount; ++col, cellX += static_cast<float>(kAiDebugGridStep)) {
+      Wm3::Vector3f minBounds{};
+      minBounds.x = cellX - halfCell;
+      minBounds.y = 0.0f;
+      minBounds.z = cellZ - halfCell;
+
+      Wm3::Vector3f maxBounds{};
+      maxBounds.x = cellX + halfCell;
+      maxBounds.y = 0.0f;
+      maxBounds.z = cellZ + halfCell;
+
+      const bool hasEnemyUnits = mCurrentEnemy->CountUnitsInBoundsXZ(minBounds, maxBounds, enemyUnits) > 0;
+      MarkGridCellEnemyPresence(gridRow, hasEnemyUnits);
+    }
   }
 
-  constexpr float kAttackVectorDebugLength = 32.0f;
-  debugVector.mDirection.x = directionX * kAttackVectorDebugLength;
-  debugVector.mDirection.y = 0.0f;
-  debugVector.mDirection.z = directionZ * kAttackVectorDebugLength;
+  for (std::int32_t row = 0; row < rowCount; ++row) {
+    for (std::int32_t col = 0; col < colCount; ++col) {
+      if (GridCellHasEnemyPresence(grid[row], col)) {
+        continue;
+      }
 
-  mAttackVectors.push_back(debugVector);
+      const float emptyX = halfCell + static_cast<float>(kAiDebugGridStep * col);
+      const float emptyZ = halfCell + static_cast<float>(kAiDebugGridStep * row);
+
+      const std::int32_t rowLo = std::max(row - 1, 0);
+      const std::int32_t rowHi = std::min(row + 1, rowCount - 1);
+      const std::int32_t colLo = std::max(col - 1, 0);
+      const std::int32_t colHi = std::min(col + 1, colCount - 1);
+
+      for (std::int32_t neighborRow = rowLo; neighborRow <= rowHi; ++neighborRow) {
+        const float neighborZ = halfCell + static_cast<float>(kAiDebugGridStep * neighborRow);
+
+        for (std::int32_t neighborCol = colLo; neighborCol <= colHi; ++neighborCol) {
+          if (!GridCellHasEnemyPresence(grid[neighborRow], neighborCol)) {
+            continue;
+          }
+
+          const float neighborX = halfCell + static_cast<float>(kAiDebugGridStep * neighborCol);
+
+          SAiAttackVectorDebug debugVector{};
+          debugVector.mOrigin.x = emptyX;
+          debugVector.mOrigin.y = 0.0f;
+          debugVector.mOrigin.z = emptyZ;
+          debugVector.mDirection.x = neighborX - emptyX;
+          debugVector.mDirection.y = 0.0f;
+          debugVector.mDirection.z = neighborZ - emptyZ;
+
+          mAttackVectors.push_back(debugVector);
+        }
+      }
+    }
+  }
 }
 
 /**
