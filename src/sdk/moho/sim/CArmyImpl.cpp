@@ -159,39 +159,33 @@ namespace
     economyInfo = nullptr;
   }
 
-  void ResetCategorySetStorage(moho::SEntitySetTemplateUnit& set)
+  /**
+   * Address: 0x007056D0 (FUN_007056D0)
+   *
+   * What it does:
+   * Per element across `[first, last)`: releases the category set's own
+   * heap-backed entity storage (if any), rebinds it to inline storage, and
+   * unlinks it from its current intrusive ring (or re-seats it as a
+   * singleton when it was never linked). The binary takes the whole range
+   * in one call -- confirmed by its real two-register signature
+   * (`eax`=range start, `ebx`=range end, a `while (cursor != end)` loop
+   * striding by 0x28) -- not a per-element helper called from an external
+   * loop. Its sole caller, `~CArmyImpl`'s complete-object body
+   * (FUN_006FF9A0 at 0x006FFA46), passes `UnitCategorySetsBegin`/`End`.
+   */
+  void TeardownEntitySetRange(moho::SEntitySetTemplateUnit* const first, moho::SEntitySetTemplateUnit* const last)
   {
-    // Address: 0x007056D0 (FUN_007056D0), per-set teardown mechanics.
-    set.mVec.ResetStorageToInline();
+    for (moho::SEntitySetTemplateUnit* it = first; it != last; ++it) {
+      it->mVec.ResetStorageToInline();
 
-    if (set.mNext != nullptr && set.mPrev != nullptr) {
-      set.ListUnlink();
-      return;
+      if (it->mNext != nullptr && it->mPrev != nullptr) {
+        it->ListUnlink();
+        continue;
+      }
+
+      it->mNext = it;
+      it->mPrev = it;
     }
-
-    set.mNext = &set;
-    set.mPrev = &set;
-  }
-
-  void DestroyArmyCategorySets(moho::CArmyImpl& army)
-  {
-    moho::SEntitySetTemplateUnit* const begin = army.UnitCategorySetsBegin;
-    moho::SEntitySetTemplateUnit* const end = army.UnitCategorySetsEnd;
-    if (begin == nullptr || end == nullptr || begin >= end) {
-      army.UnitCategorySetsBegin = nullptr;
-      army.UnitCategorySetsEnd = nullptr;
-      army.UnitCategorySetsCapacityEnd = nullptr;
-      return;
-    }
-
-    for (moho::SEntitySetTemplateUnit* it = begin; it != end; ++it) {
-      ResetCategorySetStorage(*it);
-    }
-
-    operator delete(begin);
-    army.UnitCategorySetsBegin = nullptr;
-    army.UnitCategorySetsEnd = nullptr;
-    army.UnitCategorySetsCapacityEnd = nullptr;
   }
 
   [[nodiscard]] moho::SSTIArmyConstantData* GetArmyConstantData(moho::CArmyImpl* army)
@@ -221,23 +215,6 @@ namespace
     // Evidence: FUN_006FDE70 targets (this + 0x17C), modeled as CArmyImpl::RuntimeWordVectorWithMeta.
     return &army->RuntimeWordVectorWithMeta;
   }
-
-  struct UnitCategorySetVectorView
-  {
-    moho::SEntitySetTemplateUnit* begin;
-    moho::SEntitySetTemplateUnit* end;
-    moho::SEntitySetTemplateUnit* capacityEnd;
-  };
-
-  static_assert(sizeof(UnitCategorySetVectorView) == 0x0C, "UnitCategorySetVectorView size must be 0x0C");
-  static_assert(
-    offsetof(UnitCategorySetVectorView, begin) == 0x00, "UnitCategorySetVectorView::begin offset must be 0x00"
-  );
-  static_assert(offsetof(UnitCategorySetVectorView, end) == 0x04, "UnitCategorySetVectorView::end offset must be 0x04");
-  static_assert(
-    offsetof(UnitCategorySetVectorView, capacityEnd) == 0x08,
-    "UnitCategorySetVectorView::capacityEnd offset must be 0x08"
-  );
 
   constexpr const char* kCAiBrainTypeNames[] = {"Moho::CAiBrain", "CAiBrain"};
   constexpr const char* kCAiReconDBImplTypeNames[] = {"Moho::CAiReconDBImpl", "CAiReconDBImpl"};
@@ -545,16 +522,6 @@ namespace
     DestroyArmyEconomyInfo(prior);
   }
 
-  [[nodiscard]] UnitCategorySetVectorView& UnitCategorySetVector(moho::CArmyImpl& army)
-  {
-    return *reinterpret_cast<UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
-  }
-
-  [[nodiscard]] const UnitCategorySetVectorView& UnitCategorySetVector(const moho::CArmyImpl& army)
-  {
-    return *reinterpret_cast<const UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
-  }
-
   [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::CategoryWordRangeView& range) noexcept
   {
     return range.mBits;
@@ -773,14 +740,14 @@ namespace
       return nullptr;
     }
 
-    moho::SEntitySetTemplateUnit* const setsBegin = army->UnitCategorySetsBegin;
+    moho::SEntitySetTemplateUnit* const setsBegin = army->UnitCategorySets.begin();
     if (setsBegin == nullptr) {
       return nullptr;
     }
 
     const std::size_t relativeIndex = static_cast<std::size_t>(categoryBitIndex - army->UnitCategoryBaseIndex);
     moho::SEntitySetTemplateUnit* const target = setsBegin + relativeIndex;
-    if (army->UnitCategorySetsEnd != nullptr && target >= army->UnitCategorySetsEnd) {
+    if (moho::SEntitySetTemplateUnit* const setsEnd = army->UnitCategorySets.end(); setsEnd != nullptr && target >= setsEnd) {
       return nullptr;
     }
 
@@ -1145,17 +1112,15 @@ namespace
       return;
     }
 
+    // Evidence: CArmyImpl::CArmyImpl (0x006FE690) computes `edx = maxBit -
+    // minBit`, `ecx = edx + 1` (the count), builds a default
+    // `SEntitySetTemplateUnit` value on the stack, and calls `sub_702450`
+    // with `ecx` = count and `edx = lea [ebp+258h]` = &UnitCategorySets --
+    // exactly `UnitCategorySets.resize(categorySetCount)` (the one-arg VC8
+    // `resize(_Newsize, _Ty())` shape; `sub_702450` is the two-arg body,
+    // Vector.h `resize(std::size_t, const T&)`).
     const std::size_t categorySetCount = static_cast<std::size_t>(maxCategoryBit - minCategoryBit) + 1u;
-    auto* const storage =
-      static_cast<moho::SEntitySetTemplateUnit*>(::operator new(sizeof(moho::SEntitySetTemplateUnit) * categorySetCount));
-    moho::SEntitySetTemplateUnit* constructed = storage;
-    for (std::size_t index = 0; index < categorySetCount; ++index, ++constructed) {
-      ::new (constructed) moho::SEntitySetTemplateUnit();
-    }
-
-    army.UnitCategorySetsBegin = storage;
-    army.UnitCategorySetsEnd = storage + categorySetCount;
-    army.UnitCategorySetsCapacityEnd = army.UnitCategorySetsEnd;
+    army.UnitCategorySets.resize(categorySetCount);
     army.UnitCategoryBaseIndex = minCategoryBit;
     army.UnitCategoryMaxIndex = maxCategoryBit;
   }
@@ -1397,9 +1362,7 @@ namespace moho
     , InfluenceMap(nullptr)
     , PathFinder(nullptr)
     , UnknownShared220{}
-    , UnitCategorySetsBegin(nullptr)
-    , UnitCategorySetsEnd(nullptr)
-    , UnitCategorySetsCapacityEnd(nullptr)
+    , UnitCategorySets()
   {
     PlatoonPool.platoons.start_ = PlatoonPool.platoons.inlineVec_;
     PlatoonPool.platoons.end_ = PlatoonPool.platoons.inlineVec_;
@@ -1524,7 +1487,16 @@ namespace moho
   CArmyImpl::~CArmyImpl()
   {
     DestroyPlatoonPool(PlatoonPool);
-    DestroyArmyCategorySets(*this);
+
+    // Evidence: FUN_006FF9A0 at 0x006FFA46 calls FUN_007056D0(begin, end)
+    // once over the whole range, then frees the raw array block.
+    if (moho::SEntitySetTemplateUnit* const categorySetsBegin = UnitCategorySets.begin();
+        categorySetsBegin != nullptr) {
+      TeardownEntitySetRange(categorySetsBegin, UnitCategorySets.end());
+      operator delete(categorySetsBegin);
+    }
+    UnitCategorySets.reset_range_lanes_preserve_proxy();
+
     DestroyPlatoonPool(PlatoonPool);
     UnknownShared220.release();
     ReplacePathFinderOwnedPointer(PathFinder, nullptr);
@@ -1711,7 +1683,12 @@ namespace moho
     gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
     GPG_ASSERT(categoryVectorType != nullptr);
     if (categoryVectorType != nullptr) {
-      archive->Read(categoryVectorType, &UnitCategorySetVector(*this), owner);
+      // `RVectorType<SEntitySetTemplateUnit>::Init()` sets `size_ =
+      // sizeof(msvc8::vector<SEntitySetTemplateUnit>)` (0x10) and its
+      // SubscriptIndex/GetCount/SetCount cast `obj` straight to the real
+      // vector type -- the reflected object is `UnitCategorySets` itself,
+      // not a 3-word begin/end/capacityEnd view starting 4 bytes into it.
+      archive->Read(categoryVectorType, &UnitCategorySets, owner);
     }
 
     archive->ReadUInt(&UnitCategoryBaseIndex);
@@ -1795,7 +1772,7 @@ namespace moho
     gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
     GPG_ASSERT(categoryVectorType != nullptr);
     if (categoryVectorType != nullptr) {
-      archive->Write(categoryVectorType, &UnitCategorySetVector(*this), owner);
+      archive->Write(categoryVectorType, &UnitCategorySets, owner);
     }
 
     archive->WriteUInt(UnitCategoryBaseIndex);
@@ -2564,13 +2541,14 @@ namespace moho
         continue;
       }
 
-      if (UnitCategorySetsBegin == nullptr) {
+      SEntitySetTemplateUnit* const setsBegin = UnitCategorySets.begin();
+      if (setsBegin == nullptr) {
         continue;
       }
 
       const std::size_t relativeIndex = static_cast<std::size_t>(categoryBitIndex - UnitCategoryBaseIndex);
-      SEntitySetTemplateUnit* const set = UnitCategorySetsBegin + relativeIndex;
-      if (UnitCategorySetsEnd != nullptr && set >= UnitCategorySetsEnd) {
+      SEntitySetTemplateUnit* const set = setsBegin + relativeIndex;
+      if (SEntitySetTemplateUnit* const setsEnd = UnitCategorySets.end(); setsEnd != nullptr && set >= setsEnd) {
         continue;
       }
 

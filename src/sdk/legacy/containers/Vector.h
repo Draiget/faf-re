@@ -1821,6 +1821,15 @@ namespace msvc8
          * this is VC8's take-`_Val`-by-value shape the note below already
          * describes. Reached from the one-argument overload above, itself
          * reached from `DragRelease`'s bucket-vector growth.)
+         * Address: 0x00702450 (FUN_00702450,
+         * msvc8::vector<SEntitySetTemplateUnit>::resize for the 0x28-byte
+         * element -- `size()` via `(mLast-mFirst)/40`, growth tail-calling
+         * the `_Insert_n` lane FUN_007030C0 at `end()`, shrink tail-calling
+         * the erase lane FUN_00703040. Reached from
+         * `InitializeArmyUnitCategorySets` (CArmyImpl.cpp), the one-argument
+         * overload above inlined into `CArmyImpl::CArmyImpl` at 0x006FF2E1,
+         * which builds the default `SEntitySetTemplateUnit()` value on the
+         * stack before the call -- VC8's `resize(_Newsize, _Ty())` shape.)
          *
          * What it does:
          * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
@@ -2873,6 +2882,22 @@ namespace msvc8
          * `uninit_fill_n` below), matching this method's own two-branch shape
          * exactly. Reached from the two-argument `resize` overload above
          * (FUN_00867B90) when growing.)
+         * Address: 0x007030C0 (FUN_007030C0,
+         * msvc8::vector<SEntitySetTemplateUnit>::insert(end(), count, value)
+         * core for the 0x28-byte element -- copies `value` into a local
+         * first (VC8's aliasing-safe idiom; the copy itself is the
+         * `uninit_fill_n`-shaped emission FUN_007046F0, called twice from
+         * inside this function, once per branch), checks `max_size` via the
+         * `0xFFFFFFFF/40` fold and calls `throw_too_long` (FUN_00703410) on
+         * overflow, allocates through `allocate_slots_checked`
+         * (FUN_00704750), and moves the pre-gap/post-gap ranges into the new
+         * buffer through the `uninit_move_n` emissions FUN_00706900 /
+         * FUN_00705980 (reached via the thin trampolines FUN_007046C0 /
+         * FUN_00703B90), whose own EH-unwind cleanup destroys the
+         * already-constructed prefix through the `~SEntitySetTemplateUnit`
+         * emission FUN_00705B30 (cited on the destructor, ArmyUnitSet.h).
+         * Reached from `resize`'s two-argument overload above (FUN_00702450)
+         * when growing `CArmyImpl::UnitCategorySets`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3214,6 +3239,44 @@ namespace msvc8
          * 0x005C9D60, 0x005CBCA0, 0x005CD0E0, 0x005CD9E0) are recovered
          * source yet.)
          *
+         * Address: 0x00832BC0 (FUN_00832BC0, `msvc8::vector<void*>::
+         * uninit_copy_n` for a 4-byte pointer element -- `[first@ecx,
+         * last@edx) -> dst@eax`, same shape as `FUN_00832B80` above, a
+         * distinct instantiation for `Moho::UICommandGraph`'s "MapC"
+         * hash-bucket vector. Reached from the `_Insert_n` grow lane
+         * `FUN_0082F210` (`msvc8::vector<void*>::_Insert_n` for `MapC`).)
+         * Address: 0x006829B0 (FUN_006829B0, `msvc8::vector<moho::Entity*>::
+         * uninit_copy_n` for the 4-byte pointer element -- `[first,last) ->
+         * dst`, stack-passed range form. Reached from `moho::
+         * LoadEntityPointerVector`'s `reserve(count)` path (`FUN_0067D9B0`,
+         * already recovered above), which uninit-copies the live range into
+         * the freshly reallocated buffer.)
+         * Address: 0x005E2160 (FUN_005E2160, `msvc8::vector<
+         * Moho::CAcquireTargetTask*>::uninit_copy_n` for the 4-byte pointer
+         * element -- byte-identical shape to FUN_006829B0 above, a separate
+         * instantiation. Reached from `gpg::RVectorType_CAcquireTargetTask_P::
+         * SerLoad`'s `reserve(count)` path (`FUN_005DD400`, already recovered
+         * above).)
+         * Address: 0x00642F30 (FUN_00642F30, `gpg::RVectorType_bool`'s
+         * backing `msvc8::vector<uint32_t>::uninit_copy_n` for the 4-byte
+         * word element -- same shape again. Reached from `gpg::
+         * RVectorType_bool::reserve_word_capacity` (`FUN_006421C0`, already
+         * recovered, `ManipulatorStartupRegistrations.cpp`).)
+         * Address: 0x00720220 (FUN_00720220, `msvc8::vector<
+         * moho::SPositionThreat>::uninit_copy_n` for the 0x10-byte
+         * (4-float) element -- `[first@edx,last@ecx) -> dst@eax`, per-slot
+         * 4-dword copy. Reached from the `_Insert_n` grow lane
+         * `FUN_0071BEE0` (already recovered above), which relocates the
+         * live range into the reallocated buffer for
+         * `InfluenceGrid::mThreats` (CInfluenceMap.cpp).)
+         * Address: 0x00760810 (FUN_00760810, `msvc8::vector<
+         * Moho::Sim::DumpUnitsCountEntry>::uninit_copy_n` for the 8-byte
+         * `{const RUnitBlueprint* blueprint; int count}` element --
+         * `[first@edx,last@ecx) -> dst@eax`, per-slot dword-pair copy.
+         * Reached from the `_Insert_n` grow lane `FUN_0075F810` (already
+         * recovered above), `Sim::DumpUnits`'s `counts.push_back({blueprint,
+         * 1})` capacity-full path.)
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -3272,6 +3335,18 @@ namespace msvc8
          * dword-pair fill loop, called with n=1 from `push_back`'s in-place
          * fast path FUN_008DF290 (cited on `AppendEnumOptionValue`,
          * Reflection.cpp) when the vector still has spare capacity)
+         * Address: 0x007046F0 (FUN_007046F0,
+         * msvc8::vector<SEntitySetTemplateUnit>::uninit_fill_n for the
+         * 0x28-byte element -- a count-driven loop over `[dst, dstEnd)`
+         * that, per slot, calls `gpg::fastvector_Entity::AddAll(slot.mVec,
+         * value.mVec)` against the SAME fixed `value` source every
+         * iteration (confirmed in the .asm: the source register is loaded
+         * once before the loop and never advances) -- this type's own
+         * "fill with N copies" idiom is a merge-into-an-already-constructed
+         * slot rather than a placement-new copy ctor. Called twice from
+         * `insert(pos, count, value)`'s `_Insert_n` core FUN_007030C0, once
+         * per branch (in-place gap fill and reallocation gap fill), matching
+         * this template's own two `uninit_fill_n` call sites exactly.)
          * Address: 0x00680940 (FUN_00680940, msvc8::vector<moho::SCreateEntityParams>::
          * uninit_fill_n for the 12-byte trivially-copyable element -- a count-driven
          * dword-triple fill loop, reached from QueueCreateEntityParams's
@@ -3384,6 +3459,20 @@ namespace msvc8
          * fill through the advance-returning `_Ufill` adapter FUN_00868580,
          * `int __usercall sub_868580(dest, value, count) { uninit_fill_n(dest,
          * count, value); return dest + 12*count; }`) cited above on `insert`.)
+         *
+         * Address: 0x00583180 (FUN_00583180, `msvc8::vector<
+         * SAiAttackVectorDebug>::uninit_fill_n` for the 24-byte (6-float)
+         * element -- broadcasts the single source struct into `count` slots,
+         * counting down from the incoming count in `eax`. Reached from
+         * `push_back`'s (`FUN_0057D820`, already recovered above)
+         * capacity-full path, whose `insert(end(), 1, value)` fallback calls
+         * this with `n=1`.)
+         * Address: 0x007E9700 (FUN_007E9700, `msvc8::vector<
+         * Moho::MeshRenderer's palette entry type>::uninit_fill_n` for the
+         * 0x10-byte (4-float) element -- broadcasts the caller's zeroed
+         * source struct into `[dst, dstEnd)`. Reached from `sub_7E9280`
+         * (already recovered, `Mesh.cpp`), which "appends `count`
+         * value-initialized (zeroed) entries to the palette buffer".)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -3514,6 +3603,31 @@ namespace msvc8
          * shared_ptr and `msvc8::string` entries above. Reached from
          * FUN_0052DBE0's reallocation branch; caller-chain evidence is
          * FUN_0052DBE0's own citation above.)
+         *
+         * Address: 0x00706900 (FUN_00706900,
+         * msvc8::vector<SEntitySetTemplateUnit>::uninit_move_n for the
+         * 0x28-byte element, forward-direction shape -- per slot,
+         * default-constructs the destination node in place (self-referential
+         * list-link pointers, inline-storage fastvector header) then calls
+         * `gpg::fastvector_Entity::AddAll(dst.mVec, src.mVec)` to copy the
+         * payload, with both cursors advancing together by 0x28; a trailing
+         * `while(1) { destroy already-built prefix via FUN_00705B30;
+         * rethrow; }` funclet is the EH-unwind cleanup on a mid-range throw.
+         * Reached via the thin trampoline FUN_007046C0.)
+         * Address: 0x00705980 (FUN_00705980, a second, independently-emitted
+         * copy of the same `uninit_move_n` shape for the same element --
+         * identical default-construct + `AddAll` + EH-unwind-destroy body,
+         * just a countdown loop (`while(v4) { ...; --v4; }`) instead of a
+         * `while(cursor != end)` forward loop. Reached via the thin
+         * trampoline FUN_00703B90.)
+         * Address: 0x007046C0 (FUN_007046C0, thin argument-reordering
+         * trampoline into FUN_00706900)
+         * Address: 0x00703B90 (FUN_00703B90, thin argument-reordering
+         * trampoline into FUN_00705980)
+         * Both pairs are called from `insert(pos, count, value)`'s
+         * reallocation branch (FUN_007030C0) to move the pre-gap and
+         * post-gap live ranges into the freshly allocated buffer, growing
+         * `CArmyImpl::UnitCategorySets`.
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -3907,6 +4021,14 @@ namespace msvc8
          * CrtRuntimeHelpers.cpp cluster, so no concrete `T` is identified
          * yet)
          *
+         * sizeof(T) == 0x28 (40, `Moho::EntitySetTemplate<Moho::Unit>` a.k.a.
+         * `SEntitySetTemplateUnit` -- checks `0xFFFFFFFF/40 < count` before
+         * `operator new(40*count)`):
+         * Address: 0x00704750 (FUN_00704750, msvc8::vector<
+         * SEntitySetTemplateUnit>::allocate_slots_checked -- reached from the
+         * `_Insert_n` reallocation path FUN_007030C0, which grows
+         * `CArmyImpl::UnitCategorySets`)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
@@ -3974,6 +4096,9 @@ namespace msvc8
          * Address: 0x009514A0 (FUN_009514A0, the 8-byte-stride throw lane for
          * `msvc8::vector<gpg::TypeHandle>`, reached from the `_Insert_n`
          * grow lane FUN_00951F30, already cited above)
+         * Address: 0x00703410 (FUN_00703410, the 40-byte-stride throw lane for
+         * `msvc8::vector<SEntitySetTemplateUnit>`, reached from the
+         * `_Insert_n` grow lane FUN_007030C0 for `CArmyImpl::UnitCategorySets`)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
