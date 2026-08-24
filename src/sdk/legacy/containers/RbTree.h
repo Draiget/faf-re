@@ -316,6 +316,31 @@ namespace msvc8
          * already recorded for this map's `begin`/`empty`/`lower_bound_node`
          * orphan accessor lanes above.)
          */
+        /**
+         * Address: 0x007B4C40 (FUN_007B4C40, `_Inc` for an unidentified
+         * `msvc8::map`/`msvc8::set` instantiation with a 16-byte value_type --
+         * isNil@+0x1D (0x0D + 0x10). Same recurse-right-then-climb-parent
+         * shape as this member. Byte-identical ICF twin of FUN_005C7A90
+         * (cited in CAiReconDBImpl.cpp), FUN_0077CE50 (cited on this member
+         * above, CDecalBuffer start-tick table) and FUN_008D6C90 (cited in
+         * SimRecoveryRuntime.cpp) -- those three are unrelated instantiations
+         * that happen to compile to the same bytes; this citation covers a
+         * fourth, distinct 16-byte-value_type instantiation reached from a
+         * genuinely checked-iterator erase lane (FUN_007B4040, which throws
+         * `std::out_of_range("invalid map/set<T> iterator")` on a nil
+         * dereference before calling this). Owning class not yet pinned
+         * down -- reached via the CRT static-init array (`__xc_a`) at depth
+         * 4, source_paths previously misattributed to CrtRuntimeHelpers.cpp
+         * with zero real citation there (DB-integrity fix).
+         * Address: 0x007B4540 (FUN_007B4540, `operator++(int)` -- copies the
+         * old node into the return slot, then advances via this member,
+         * matching the post-increment shape documented on the sibling
+         * `FUN_006E28C0` adapter above)
+         * Address: 0x007B4570 (FUN_007B4570, `operator++()` -- advances via
+         * this member and returns the same slot, matching the prefix-
+         * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`
+         * adapters above)
+         */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
