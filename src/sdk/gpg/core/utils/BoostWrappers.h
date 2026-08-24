@@ -250,6 +250,9 @@ namespace boost
          * / dispose via vtable+0x04, then weak_count decrement at +0x08 /
          * destroy via vtable+0x08. Reached from 19 real call sites in
          * Mesh.cpp's mesh-instance/spatial-shard teardown paths.)
+         * Address: 0x0053A9A0 (FUN_0053A9A0, another ICF-shape twin,
+         * branch-for-branch identical. Reached from 8 real call sites in
+         * CAnimationManipulator.cpp's manipulator teardown paths.)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
