@@ -2486,6 +2486,35 @@ namespace msvc8
          * _Insert_n -- same 4-byte-pointer shape, max_size 0x3FFFFFFF.
          * Reached from `cfunc_CoordinateAttacksL`'s `commands.push_back(command)`
          * in CCommandLuaFunctionRegistrations.cpp.)
+         * Address: 0x0066A860 (FUN_0066A860, msvc8::vector<moho::WCurveEditorPanel*>::
+         * _Insert_n -- same 4-byte-pointer shape, max_size 0x3FFFFFFF checked via
+         * `cur == max_size` folded for `count == 1` (throw lane FUN_0066AA70,
+         * already cited as the VC8 length_error closure in
+         * CrtRuntimeHelpers.cpp). The in-place shift sub-path (`pos != end()`)
+         * moves the single trailing element past the old end and shifts
+         * `[pos, oldLast)` up by one slot through two calls to the generic
+         * dword-memmove helper (FUN_0066AE50 / FUN_0066AE90, both already
+         * cited as sibling emissions of `MoveDwordRangeAndReturnEnd` /
+         * `MoveDwordRangeToEnd` in Vector.cpp), then fills the vacated slot
+         * with a raw single-dword store (count folded to 1, no fill-helper
+         * call needed for one element). The in-place append sub-path
+         * (`pos == end()`) and the reallocation path both construct the new
+         * element through FUN_0066A460 (`uninit_fill_n`,
+         * LegacyContainerFillLanes.cpp); the realloc buffer comes from the
+         * checked allocator FUN_0066AEC0 (CheckedArrayAllocationLanes.{h,cpp}).
+         * 1.5x growth clamp (`0x3FFFFFFF - (cap>>1) >= cap`) matches
+         * `recommended_capacity` exactly.
+         * Reached from two confirmed call sites: `msvc8::vector<T*>::push_back`'s
+         * own capacity-full path (FUN_0066A150, `sub_66A860(this, *(_Mylast))` at
+         * 0x0066A18C -- push_back itself has no further caller the exhaustive
+         * byte scan can find, so it is a dead-but-correct sibling instantiation)
+         * and directly from `Moho::WEmitterWx::WEmitterWx` (0x00666EBE, inside
+         * FUN_00663900, already cited in WEmitterWx.cpp) -- the compiled ctor
+         * inlines push_back's capacity check and calls straight through to this
+         * grow lane on `mCurvePanels.push_back(curvePanel)`'s capacity-full turn,
+         * one of 5 iterations building the curve-editor notebook tabs. A third
+         * code xref at 0x0066A3C7 sits in an anonymous, IDA-unclassified chunk
+         * this pass could not trace to a named owner.)
          * Address: 0x00680BD0 (FUN_00680BD0, the out-of-line `std::fill` emission
          * this method's gap-overwrite compiles to for the 0xD8-byte
          * `Moho::SEntityVariableUpdateEntry` -- `for (p = first; p != last;
