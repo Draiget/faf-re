@@ -11,6 +11,8 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/time/Timer.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/math/MathReflection.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/particles/CWorldParticles.h"
@@ -234,6 +236,177 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00886EE0 (FUN_00886EE0)
+   *
+   * What it does:
+   * Default-initializes every scalar lane via the member initializers, then
+   * delegates to `PopulateFromLua` for the real field population.
+   */
+  WaveParameters::WaveParameters(LuaPlus::LuaObject& source)
+  {
+    PopulateFromLua(source);
+  }
+
+  /**
+   * Address: 0x00886DA0 (FUN_00886DA0)
+   *
+   * What it does:
+   * Builds one preset directly from typed engine values.
+   */
+  WaveParameters::WaveParameters(
+    const msvc8::string& texturePath,
+    const msvc8::string& rampPath,
+    const Wm3::Vec3f& position,
+    const float period,
+    const float periodVariance,
+    const float speed,
+    const float speedVariance,
+    const float lifetime,
+    const float lifetimeVariance,
+    const Wm3::Vector2f& scale,
+    const float scaleVariance,
+    const Wm3::Vec3f& velocityDelta,
+    const float frameCount,
+    const float frameRate,
+    const float frameRateVariance,
+    const float stripCount
+  )
+    : mTexturePath(texturePath)
+    , mRampPath(rampPath)
+    , mPosition(position)
+    , mPeriod(period)
+    , mPeriodVariance(periodVariance)
+    , mSpeed(speed)
+    , mSpeedVariance(speedVariance)
+    , mLifetime(lifetime)
+    , mLifetimeVariance(lifetimeVariance)
+    , mScale(scale)
+    , mScaleVariance(scaleVariance)
+    , mVelocityDelta(velocityDelta)
+    , mFrameCount(frameCount)
+    , mFrameRate(frameRate)
+    , mFrameRateVariance(frameRateVariance)
+    , mStripCount(stripCount)
+  {
+  }
+
+  /**
+   * Address: 0x00886FB0 (FUN_00886FB0, complete-object destructor)
+   * Address: 0x00886D80 (FUN_00886D80, vtable-slot-0 scalar deleting destructor)
+   *
+   * What it does:
+   * Tidies `mRampPath` then `mTexturePath` (reverse declaration order).
+   */
+  WaveParameters::~WaveParameters()
+  {
+    mRampPath.tidy(true, 0u);
+    mTexturePath.tidy(true, 0u);
+  }
+
+  /**
+   * Address: 0x00887000 (FUN_00887000)
+   *
+   * What it does:
+   * Reads `texture`/`ramp` (strings), `position`/`velocityDelta` (1-based
+   * 3-element Lua arrays), the unconditional scalar lanes
+   * (period/periodVariance/speed/speedVariance/lifetime/lifetimeVariance/
+   * scale/scaleVariance), and the nil-defaulted lanes
+   * (frameCount/frameRate/frameRateVariance/stripCount) out of `source`.
+   * Matches the binary's field-by-field shape exactly, including which
+   * lanes get an `IsNil` guard and which do not.
+   */
+  void WaveParameters::PopulateFromLua(LuaPlus::LuaObject& source)
+  {
+    mTexturePath = source["texture"].GetString();
+    mRampPath = source["ramp"].GetString();
+
+    LuaPlus::LuaObject positionTable = source["position"];
+    mPosition.x = static_cast<float>(positionTable[1].GetNumber());
+    mPosition.y = static_cast<float>(positionTable[2].GetNumber());
+    mPosition.z = static_cast<float>(positionTable[3].GetNumber());
+
+    mPeriod = static_cast<float>(source["period"].GetNumber());
+    mPeriodVariance = static_cast<float>(source["periodVariance"].GetNumber());
+    mSpeed = static_cast<float>(source["speed"].GetNumber());
+    mSpeedVariance = static_cast<float>(source["speedVariance"].GetNumber());
+    mLifetime = static_cast<float>(source["lifetime"].GetNumber());
+    mLifetimeVariance = static_cast<float>(source["lifetimeVariance"].GetNumber());
+
+    mScale.x = static_cast<float>(source["scale"][1].GetNumber());
+    mScale.y = static_cast<float>(source["scale"][2].GetNumber());
+    mScaleVariance = static_cast<float>(source["scaleVariance"].GetNumber());
+
+    LuaPlus::LuaObject velocityDeltaTable = source["velocityDelta"];
+    mVelocityDelta.x = static_cast<float>(velocityDeltaTable[1].GetNumber());
+    mVelocityDelta.y = static_cast<float>(velocityDeltaTable[2].GetNumber());
+    mVelocityDelta.z = static_cast<float>(velocityDeltaTable[3].GetNumber());
+
+    mFrameCount = source["frameCount"].IsNil() ? 1.0f : static_cast<float>(source["frameCount"].GetNumber());
+    mFrameRate = source["frameRate"].IsNil() ? 1.0f : static_cast<float>(source["frameRate"].GetNumber());
+    mFrameRateVariance =
+      source["frameRateVariance"].IsNil() ? 0.0f : static_cast<float>(source["frameRateVariance"].GetNumber());
+    mStripCount = source["stripCount"].IsNil() ? 1.0f : static_cast<float>(source["stripCount"].GetNumber());
+  }
+
+  /**
+   * Address: 0x00887770 (FUN_00887770)
+   *
+   * What it does:
+   * Default-initializes `mName`/`mPreview`/`mWaves` via the member
+   * initializers, then delegates to `LoadParametersFromLua`.
+   */
+  WavePattern::WavePattern(LuaPlus::LuaObject& source)
+  {
+    LoadParametersFromLua(source);
+  }
+
+  /**
+   * Address: 0x008877E0 (FUN_008877E0, complete-object destructor)
+   * Address: 0x00887750 (FUN_00887750, vtable-slot-0 scalar deleting destructor)
+   *
+   * What it does:
+   * Tidies `mPreview` then `mName`. `mWaves` (the last-declared member) is
+   * torn down automatically by `msvc8::vector<WaveParameters>::~vector()`,
+   * which is the recovered body of `FUN_0088A150` -- per-element destruction
+   * dispatches through `WaveParameters`'s own vtable slot 0 (see
+   * `legacy/containers/Vector.h`'s `destroy_range`), matching the binary's
+   * `(**it)(it, 0)` deleting-destructor call exactly.
+   */
+  WavePattern::~WavePattern()
+  {
+    mPreview.tidy(true, 0u);
+    mName.tidy(true, 0u);
+  }
+
+  /**
+   * Address: 0x00887870 (FUN_00887870)
+   *
+   * What it does:
+   * Clears any existing `mWaves` contents (`FUN_0088A0C0`, cited on
+   * `legacy/containers/Vector.h`'s `clear` -- a no-op here since the
+   * constructor path always starts from a freshly-built empty vector, but
+   * present in the binary because this helper is written generically), reads
+   * `name`/`preview`, then appends one `WaveParameters` per entry of the
+   * `parameters` array table. Each append is the binary's
+   * `msvc8::vector<WaveParameters>::push_back` (`FUN_00889C90`, cited on
+   * `legacy/containers/Vector.h`'s `push_back` for this 136-byte polymorphic
+   * element): the fast path copy-constructs directly into spare capacity,
+   * the capacity-full path reallocates through `insert(end(), value)`.
+   */
+  void WavePattern::LoadParametersFromLua(LuaPlus::LuaObject& source)
+  {
+    mWaves.clear();
+
+    mName = source["name"].GetString();
+    mPreview = source["preview"].GetString();
+
+    LuaPlus::LuaObject parametersTable = source["parameters"];
+    for (LuaPlus::LuaTableIterator iter(parametersTable, 1); iter; iter.Next()) {
+      mWaves.push_back(WaveParameters(iter.GetValue()));
+    }
+  }
+
   /**
    * Address: 0x00887FC0 (FUN_00887FC0, sub_887FC0)
    *
