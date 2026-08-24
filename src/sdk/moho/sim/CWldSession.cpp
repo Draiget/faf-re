@@ -1367,16 +1367,33 @@ namespace moho
   public:
     using CommandGraphNode = UICommandGraphNode;
 
-    template <std::size_t kNodeSize>
-    struct HashListNode
+    /**
+     * `mMapD`'s node: keyed by the edge's own touch count (the same 32-bit
+     * `key ^ 0xDEADBEEF` Park-Miller-Schrage hash `mMapAB0`/`mMapAB1` use -
+     * see `FindHashListNode10`/`InsertOrFindHashListNode10` below), payload
+     * is the memoized orderline width `CalculateWaypointLineWidth` returned
+     * for that touch count. `LinkCommandGraphEdge` (0x00826960) uses this
+     * table purely as a per-frame cache so it can skip re-invoking the Lua
+     * width calculation on every visit of an edge it has already priced.
+     * Confirmed 2-dword payload from `sub_82FB10`'s (0x0082FB10) construct
+     * body: `result[2] = *a1; result[3] = a1[1];`, no third field.
+     */
+    struct HashListNode10
     {
-      HashListNode* mNext;
-      HashListNode* mPrev;
-      std::uint8_t mPayload[kNodeSize - 8];
+      HashListNode10* mNext; // +0x00
+      HashListNode10* mPrev; // +0x04
+      std::uint32_t mKey;    // +0x08, CommandGraphEdge::mTouchCount at cache time
+      float mWidth;          // +0x0C, cached CalculateWaypointLineWidth() result
     };
+    static_assert(sizeof(HashListNode10) == 0x10, "UICommandGraph::HashListNode10 size must be 0x10");
 
-    using HashListNode2C = HashListNode<0x2C>;
-    using HashListNode10 = HashListNode<0x10>;
+    /**
+     * `mMapC`'s node forward declaration - its payload is a full
+     * `CommandGraphEdge`, which isn't a complete type yet at this point in
+     * the class; the full definition sits just after `CommandGraphEdge`
+     * below.
+     */
+    struct HashListNode2C;
 
     /**
      * Head of the intrusive chain of graph nodes that reference one command.
@@ -1671,6 +1688,27 @@ namespace moho
     static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
 
     /**
+     * `mMapC`'s node (forward-declared above `CommandGraphEdge`): keyed by
+     * the 64-bit `{fromNode, toNode}` draw-node pointer pair as two raw
+     * dwords, payload is the edge itself. `LinkCommandGraphEdge`'s
+     * find-or-create (0x0082B490 / 0x0082C750 / 0x0082C480) confirmed this
+     * shape - 0x008269AA/0x008269AD write `mFromNode`/`mToNode` through the
+     * pointer `FindOrInsertCommandGraphEdge` returns, which is exactly
+     * `&node->mEdge` (node+0x10).
+     */
+    struct HashListNode2C
+    {
+      HashListNode2C* mNext;   // +0x00
+      HashListNode2C* mPrev;   // +0x04
+      std::uint32_t mKeyLow;   // +0x08, fromNode (draw-node pointer, as key dword)
+      std::uint32_t mKeyHigh;  // +0x0C, toNode
+      CommandGraphEdge mEdge;  // +0x10
+    };
+    static_assert(sizeof(HashListNode2C) == 0x2C, "UICommandGraph::HashListNode2C size must be 0x2C");
+    static_assert(offsetof(HashListNode2C, mKeyHigh) == 0x0C, "UICommandGraph::HashListNode2C::mKeyHigh offset must be 0x0C");
+    static_assert(offsetof(HashListNode2C, mEdge) == 0x10, "UICommandGraph::HashListNode2C::mEdge offset must be 0x10");
+
+    /**
      * Typed view over `CommandGraphTreeNode::mPayload` - a texture-keyed
      * bucket of orderline edges. `mGraphRuntimeTree` is a real msvc8-shaped
      * red-black tree (matching `mColorOrAllocated`/`mIsSentinel` at the same
@@ -1962,6 +2000,196 @@ namespace moho
       FindOrInsertCommandGraphDrawNode(std::uint32_t key, HashTable<HashListNode88>& table);
 
     /**
+     * The value portion of one HashListNode2C - `mMapC`'s payload,
+     * everything after the intrusive mNext/mPrev link header. Mirrors
+     * HashListNode88Value's role for the 88-byte table: `MakeHashListNode2C`
+     * copy-constructs a fresh node's `mKeyLow`/`mKeyHigh`/`mEdge` from one of
+     * these (0x00830700's `qmemcpy(result + 2, a3, 0x24u)` copies exactly
+     * this 0x24-byte shape).
+     */
+    struct HashListNode2CValue
+    {
+      std::uint32_t mKeyLow;   // +0x00
+      std::uint32_t mKeyHigh;  // +0x04
+      CommandGraphEdge mEdge;  // +0x08
+    };
+    static_assert(sizeof(HashListNode2CValue) == 0x24, "UICommandGraph::HashListNode2CValue size must be 0x24");
+
+    /**
+     * The value portion of one HashListNode10 - `mMapD`'s payload.
+     * `MakeHashListNode10` copies both dwords from one of these
+     * (0x0082FB10's `result[2] = *a1; result[3] = a1[1];`).
+     */
+    struct HashListNode10Value
+    {
+      std::uint32_t mKey;  // +0x00
+      float mWidth;         // +0x04
+    };
+    static_assert(sizeof(HashListNode10Value) == 0x08, "UICommandGraph::HashListNode10Value size must be 0x08");
+
+    /**
+     * Addresses: 0x00831BA0 (FUN_00831BA0, HashListNode2C's overflow-checked
+     * `operator new`) and 0x00831C90 (FUN_00831C90, HashListNode10's).
+     * Same shape as `AllocateHashListNode88Storage` for each node's own
+     * size, generalised over `TNode` instead of forked per node size.
+     */
+    template <typename TNode>
+    [[nodiscard]] static void* NewHashListNodeStorage(std::size_t count);
+
+    /**
+     * Address: 0x00830700 (FUN_00830700, sub_830700)
+     *
+     * What it does:
+     * Allocates one HashListNode2C, links it via the caller-supplied
+     * `next`/`prev`, and copies its value from `valueSource` - the binary
+     * uses a flat `qmemcpy` here rather than a placement-construct chain,
+     * because `CommandGraphEdge` (and the key dwords) are trivially
+     * copyable, unlike `HashListNode88Value`'s owned draw-node payload.
+     */
+    [[nodiscard]] static HashListNode2C* MakeHashListNode2C(
+      HashListNode2C* next, HashListNode2C* prev, HashListNode2CValue& valueSource
+    );
+
+    /**
+     * Address: 0x0082FB10 (FUN_0082FB10, sub_82FB10)
+     *
+     * What it does:
+     * Allocates one HashListNode10, links it via the caller-supplied
+     * `next`/`prev`, and copies its 2-dword value from `valueSource`.
+     */
+    [[nodiscard]] static HashListNode10* MakeHashListNode10(
+      HashListNode10* next, HashListNode10* prev, HashListNode10Value& valueSource
+    );
+
+    /**
+     * Address: 0x0082F5D0 (FUN_0082F5D0, sub_82F5D0)
+     *
+     * What it does:
+     * `CheckedIncrementListSize` for `HashListNode2C`'s own Dinkumware
+     * `list<T>::max_size()` bound (`119304647`, i.e. `0xFFFFFFFF / 0x24 - 1`
+     * for the 0x24-byte `HashListNode2CValue`). Byte-identical shape to
+     * `CheckedIncrementListSize` (0x0082F050) apart from that constant.
+     */
+    static std::uint32_t CheckedIncrementListSize2C(std::uint32_t count, std::uint32_t& sizeField);
+
+    /**
+     * Address: 0x0082DD60 (FUN_0082DD60, sub_82DD60)
+     *
+     * What it does:
+     * `CheckedIncrementListSize` for `HashListNode10`'s own max-size bound
+     * (`0x1FFFFFFF`). Byte-identical shape to `CheckedIncrementListSize`
+     * (0x0082F050) apart from that constant.
+     */
+    static std::uint32_t CheckedIncrementListSize10(std::uint32_t count, std::uint32_t& sizeField);
+
+    /**
+     * Not a distinct binary function - the scalar 32-bit-key half of
+     * `HashKeyToBucketIndex`'s scramble, generalised over `TNode` so
+     * `HashListNode10` (`mMapD`) shares this template with `HashListNode88`
+     * (`mMapAB0`/`mMapAB1`) rather than forking a copy - both tables hash
+     * the exact same way (0x0082C240's scramble == 0x0082C950's).
+     */
+    template <typename TNode>
+    [[nodiscard]] static std::uint32_t HashKeyToBucketIndex(const HashTable<TNode>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Not a distinct binary function - the 64-bit pair-key half of
+     * `HashKeyToBucketIndex`'s scramble, used only by `HashListNode2C`
+     * (`mMapC`). Diffed against the scalar scramble above: identical
+     * Park-Miller-Schrage tail, different combine step
+     * (`3863*lo + 7919*hi + 53849*(lo^hi)` vs `key ^ 0xDEADBEEF`) -
+     * confirmed from 0x0082D960 (the 2C lane's dedicated hash function,
+     * called by both 0x0082C750/`FindHashListNode2C` and
+     * 0x0082C480/`ObtainHashListNode2C`).
+     */
+    template <typename TNode>
+    [[nodiscard]] static std::uint32_t
+      HashKeyToBucketIndex(const HashTable<TNode>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
+
+    /**
+     * Not a distinct binary function - the shared scalar-key find shape
+     * `FindHashListNode88` (0x0082C240) and `FindHashListNode10`
+     * (0x0082C950) both compile to (same load-factor-free bucket walk,
+     * same "== bucketEnd -> sentinel" miss convention), generalised over
+     * `TNode` per RULE ONE rather than duplicated per node size.
+     */
+    template <typename TNode>
+    [[nodiscard]] static TNode* FindHashListNode(HashTable<TNode>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Not a distinct binary function - the shared 64-bit pair-key find
+     * shape, used only by `FindHashListNode2C` (0x0082C750).
+     */
+    template <typename TNode>
+    [[nodiscard]] static TNode*
+      FindHashListNode(HashTable<TNode>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
+
+    /**
+     * Not a distinct binary function - the shared scalar-key
+     * rehash/insert-point-walk shape `InsertOrFindHashListNode88`
+     * (0x0082BFB0) and `ObtainHashListNode10` (0x0082B5E0) both compile to.
+     * `constructNode`/`incrementListSize` are the two points where the two
+     * instantiations genuinely differ (node size, max-size bound), passed
+     * in rather than duplicating the ~80-line rehash body per node size.
+     */
+    template <typename TNode, typename TValue>
+    [[nodiscard]] static TNode* ObtainHashListNode(
+      HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
+      TNode* (*constructNode)(TNode*, TNode*, TValue&), std::uint32_t (*incrementListSize)(std::uint32_t, std::uint32_t&)
+    );
+
+    /**
+     * Not a distinct binary function - the shared 64-bit pair-key
+     * rehash/insert-point-walk shape, used only by `ObtainHashListNode2C`
+     * (0x0082C480).
+     */
+    template <typename TNode, typename TValue>
+    [[nodiscard]] static TNode* ObtainHashListNodePair(
+      HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
+      TNode* (*constructNode)(TNode*, TNode*, TValue&), std::uint32_t (*incrementListSize)(std::uint32_t, std::uint32_t&)
+    );
+
+    /**
+     * Address: 0x0082C750 (FUN_0082C750, sub_82C750)
+     */
+    [[nodiscard]] static HashListNode2C*
+      FindHashListNode2C(HashTable<HashListNode2C>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
+
+    /**
+     * Address: 0x0082C480 (FUN_0082C480, sub_82C480)
+     */
+    static HashListNode2C* ObtainHashListNode2C(
+      HashTable<HashListNode2C>& table, HashListNode2CValue& valueSource, bool& outInserted
+    );
+
+    /**
+     * Address: 0x0082C950 (FUN_0082C950, sub_82C950)
+     */
+    [[nodiscard]] static HashListNode10* FindHashListNode10(HashTable<HashListNode10>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Address: 0x0082B5E0 (FUN_0082B5E0, sub_82B5E0)
+     */
+    static HashListNode10*
+      ObtainHashListNode10(HashTable<HashListNode10>& table, HashListNode10Value& valueSource, bool& outInserted);
+
+    /**
+     * Address: 0x0082B490 (FUN_0082B490, sub_82B490)
+     *
+     * What it does:
+     * `mMapC`'s public find-or-insert entry point, the exact analogue of
+     * `FindOrInsertCommandGraphDrawNode` for the edge table: looks the
+     * `{fromNode, toNode}` pair up via `FindHashListNode2C` first; on a
+     * miss, inserts a zero-initialized `CommandGraphEdge` (the binary
+     * `memset`s the value composite before the insert - a fresh edge has no
+     * source line of its own, matching `CommandGraphEdge`'s in-class
+     * default member initializers). Always returns `&node->mEdge`.
+     */
+    [[nodiscard]] static CommandGraphEdge* FindOrInsertCommandGraphEdge(
+      UICommandGraphDrawNode* fromNode, UICommandGraphDrawNode* toNode, HashTable<HashListNode2C>& table
+    );
+
+    /**
      * Address: 0x008300D0 (FUN_008300D0)
      */
     static CommandGraphTreeNode* AllocateTreeSentinelNode();
@@ -2005,6 +2233,107 @@ namespace moho
      * `ReleaseCommandGraphTreeBucket` before freeing the node.
      */
     static void DestroyTree(CommandGraphTree& tree);
+
+    /**
+     * Address: 0x0082D330 (FUN_0082D330, sub_82D330)
+     *
+     * What it does:
+     * Constructs one `CommandGraphTreeBucket` in place: retains a new
+     * strong reference on `texture`'s shared control block (matching
+     * `boost::shared_ptr`'s copy constructor - `_InterlockedExchangeAdd`
+     * on the control block in the binary) and default-constructs the edge
+     * vector.
+     */
+    static CommandGraphTreeBucket* InitCommandGraphTreeBucketValue(
+      CommandGraphTreeBucket* destination, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    );
+
+    /**
+     * Address: 0x00830010 (FUN_00830010)
+     *
+     * What it does:
+     * Standard red-black left rotation, transcribed against
+     * `CommandGraphTreeNode`'s own field names - same shape as
+     * `legacy/containers/RbTree.h`'s `rotate_left` (already cited there for
+     * this exact tree instantiation).
+     */
+    static void PivotLeftGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
+
+    /**
+     * Address: 0x00830080 (FUN_00830080)
+     *
+     * What it does:
+     * Mirror of `PivotLeftGraphRuntimeTreeNode` - same shape as
+     * `legacy/containers/RbTree.h`'s `rotate_right` (already cited there
+     * for this exact tree instantiation).
+     */
+    static void PivotRightGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
+
+    /**
+     * Address: 0x0082E320 (FUN_0082E320, sub_82E320), buy+link+rebalance half
+     *
+     * What it does:
+     * Allocates one fresh tree node, retains `texture` into its bucket
+     * payload, links it under `where`/`addLeft`, then repairs the
+     * red-red violation - the exact shape `legacy/containers/RbTree.h`'s
+     * `insert_at` (`buy_node` + `link_and_rebalance`) already documents for
+     * this map instantiation, transcribed against `CommandGraphTreeNode`'s
+     * own field names rather than routed through `detail::rb_tree<Traits>`:
+     * `boost::SharedPtrRaw<T>` is an explicit-retain, non-owning view by
+     * design (see `BoostWrappers.h`), so a generic value-type copy
+     * constructor would silently skip the add-ref the binary performs
+     * explicitly via `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
+     */
+    static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAt(
+      CommandGraphTree& tree, bool addLeft, CommandGraphTreeNode* where, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    );
+
+    /**
+     * Address: 0x0082E170 (FUN_0082E170, sub_82E170)
+     *
+     * What it does:
+     * Plain unique insert: descends comparing the owner-based key (the
+     * texture's control-block pointer), confirms uniqueness against the
+     * in-order predecessor when the descent bottomed out on a left branch,
+     * and links via `AttachGraphRuntimeTreeNodeAt`. Same shape as
+     * `legacy/containers/RbTree.h`'s `insert_unique`, already cited there
+     * for this map instantiation.
+     */
+    static CommandGraphTreeNode*
+      AttachGraphRuntimeTreeNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture);
+
+    /**
+     * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
+     *
+     * What it does:
+     * Hinted unique insert: the empty-tree fast path, `hint == leftmost()`
+     * check, `hint == end()` check against `rightmost()`, then the
+     * decrement/increment straddle checks, each tailing into
+     * `AttachGraphRuntimeTreeNodeAt` with the decided `addLeft`, and a final
+     * fallback to `AttachGraphRuntimeTreeNodeUnique`. Same shape as
+     * `legacy/containers/RbTree.h`'s `insert_hint`, already cited there for
+     * this exact map instantiation - `mGraphRuntimeTree[texture]`'s
+     * `lower_bound` result feeding straight back in as the hint.
+     */
+    static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAtHint(
+      CommandGraphTree& tree, CommandGraphTreeNode* hint, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    );
+
+    /**
+     * Address: 0x0082B8B0 (FUN_0082B8B0, sub_82B8B0)
+     *
+     * What it does:
+     * `mGraphRuntimeTree[texture]` (VC8 `map::operator[]`): descends
+     * comparing the owner-based key (the texture's control-block pointer,
+     * `pi`) against each candidate bucket's own `pi` lane, records the last
+     * node the search went left at, and on a miss inserts a fresh bucket
+     * retaining `texture` via `AttachGraphRuntimeTreeNodeAtHint`. Returns
+     * the resolved bucket's edge vector - `LinkCommandGraphEdge`
+     * (0x00826960) pushes the new edge straight into it via
+     * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
+     */
+    static msvc8::vector<CommandGraphEdge*>&
+      FindOrInsertGraphRuntimeTreeBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)
@@ -4359,7 +4688,8 @@ namespace moho
   /**
    * Not a distinct binary function - see the declaration's doc comment.
    */
-  std::uint32_t UICommandGraph::HashKeyToBucketIndex(const HashTable<HashListNode88>& table, const std::uint32_t key) noexcept
+  template <typename TNode>
+  std::uint32_t UICommandGraph::HashKeyToBucketIndex(const HashTable<TNode>& table, const std::uint32_t key) noexcept
   {
     const std::ldiv_t split = std::ldiv(static_cast<long>(key ^ 0xDEADBEEFu), 127773L);
     long scrambled = 16807L * split.rem - 2836L * split.quot;
@@ -4371,6 +4701,84 @@ namespace moho
       bucketIndex += static_cast<std::uint32_t>(-1) - (table.mBucketMask >> 1u);
     }
     return bucketIndex;
+  }
+
+  /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   * Address: 0x0082D960 (FUN_0082D960, sub_82D960, the pair-key combine step).
+   */
+  template <typename TNode>
+  std::uint32_t UICommandGraph::HashKeyToBucketIndex(
+    const HashTable<TNode>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
+  ) noexcept
+  {
+    const std::ldiv_t split =
+      std::ldiv(static_cast<long>(3863u * keyLow + 7919u * keyHigh + 53849u * (keyLow ^ keyHigh)), 127773L);
+    long scrambled = 16807L * split.rem - 2836L * split.quot;
+    if (scrambled < 0) {
+      scrambled += 0x7FFFFFFFL;
+    }
+    std::uint32_t bucketIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
+    if (table.mBucketCount <= bucketIndex) {
+      bucketIndex += static_cast<std::uint32_t>(-1) - (table.mBucketMask >> 1u);
+    }
+    return bucketIndex;
+  }
+
+  /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   * Shared scalar-key find shape (`FindHashListNode10` = 0x0082C950).
+   */
+  template <typename TNode>
+  TNode* UICommandGraph::FindHashListNode(HashTable<TNode>& table, const std::uint32_t key) noexcept
+  {
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
+    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+    TNode* node = bucketSlots[bucketIndex];
+    TNode* const bucketEnd = bucketSlots[bucketIndex + 1u];
+
+    if (node == bucketEnd) {
+      return table.mListHead;
+    }
+    while (node->mKey < key) {
+      node = node->mNext;
+      if (node == bucketEnd) {
+        return table.mListHead;
+      }
+    }
+    return (key >= node->mKey) ? node : table.mListHead;
+  }
+
+  /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   * Shared pair-key find shape (`FindHashListNode2C` = 0x0082C750).
+   */
+  template <typename TNode>
+  TNode* UICommandGraph::FindHashListNode(
+    HashTable<TNode>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
+  ) noexcept
+  {
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, keyLow, keyHigh);
+    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+    TNode* node = bucketSlots[bucketIndex];
+    TNode* const bucketEnd = bucketSlots[bucketIndex + 1u];
+
+    if (node == bucketEnd) {
+      return table.mListHead;
+    }
+
+    const auto lexicographicLessEqual = [](const std::uint32_t lhsLow, const std::uint32_t lhsHigh,
+                                            const std::uint32_t rhsLow, const std::uint32_t rhsHigh) {
+      return lhsLow < rhsLow || (lhsLow == rhsLow && lhsHigh <= rhsHigh);
+    };
+
+    while (!lexicographicLessEqual(keyLow, keyHigh, node->mKeyLow, node->mKeyHigh)) {
+      node = node->mNext;
+      if (node == bucketEnd) {
+        return table.mListHead;
+      }
+    }
+    return lexicographicLessEqual(node->mKeyLow, node->mKeyHigh, keyLow, keyHigh) ? node : table.mListHead;
   }
 
   /**
@@ -4618,6 +5026,429 @@ namespace moho
   }
 
   /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   * Shared scalar-key rehash/insert-point-walk shape
+   * (`ObtainHashListNode10` = 0x0082B5E0). Direct generalisation of
+   * `InsertOrFindHashListNode88`'s body above over `TNode`, with the two
+   * genuinely per-node-type steps (allocate+link a fresh node, bump the
+   * checked list-size counter) passed in as function pointers rather than
+   * duplicated.
+   */
+  template <typename TNode, typename TValue>
+  TNode* UICommandGraph::ObtainHashListNode(
+    HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
+    TNode* (*const constructNode)(TNode*, TNode*, TValue&),
+    std::uint32_t (*const incrementListSize)(std::uint32_t, std::uint32_t&)
+  )
+  {
+    if (table.mBucketCount <= (table.mListSize >> 2u)) {
+      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
+
+      if ((bucketVectorLength - 1u) > table.mBucketCount) {
+        if (table.mBucketMask < table.mBucketCount) {
+          table.mBucketMask = 2u * table.mBucketMask + 1u;
+        }
+      } else {
+        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
+        table.mBucketMask = newMask;
+        table.mBuckets.resize(newMask + 2u, table.mListHead);
+      }
+
+      auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
+      TNode* node = rehashBucketSlots[splitBucketIndex];
+      TNode* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
+
+      if (splitBucketEnd != node) {
+        for (;;) {
+          const std::ldiv_t split = std::ldiv(static_cast<long>(node->mKey ^ 0xDEADBEEFu), 127773L);
+          long scrambled = 16807L * split.rem - 2836L * split.quot;
+          if (scrambled < 0) {
+            scrambled += 0x7FFFFFFFL;
+          }
+          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
+
+          if (rehashedIndex == splitBucketIndex) {
+            node = node->mNext;
+          } else {
+            TNode* const next = node->mNext;
+            if (next != table.mListHead) {
+              if (rehashBucketSlots[splitBucketIndex] == node) {
+                std::uint32_t walkIndex = splitBucketIndex;
+                for (;;) {
+                  rehashBucketSlots[walkIndex] = next;
+                  if (walkIndex == 0u) {
+                    break;
+                  }
+                  --walkIndex;
+                  if (rehashBucketSlots[walkIndex] != node) {
+                    break;
+                  }
+                }
+              }
+
+              TNode* const sentinel = table.mListHead;
+              TNode* const oldTail = sentinel->mPrev;
+              node->mPrev->mNext = next;
+              next->mPrev = node->mPrev;
+              node->mNext = sentinel;
+              node->mPrev = oldTail;
+              oldTail->mNext = node;
+              sentinel->mPrev = node;
+            }
+
+            std::uint32_t cascadeIndex = table.mBucketCount;
+            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
+              rehashBucketSlots[cascadeIndex] = node;
+              --cascadeIndex;
+            }
+
+            if (next == table.mListHead) {
+              break;
+            }
+            node = next;
+          }
+        }
+      }
+
+      ++table.mBucketCount;
+    }
+
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKey);
+    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+    TNode* insertionPoint = bucketSlots[bucketIndex + 1u];
+
+    if (bucketSlots[bucketIndex] != insertionPoint) {
+      bool reachedBegin = false;
+      for (;;) {
+        insertionPoint = insertionPoint->mPrev;
+        if (insertionPoint->mKey <= valueSource.mKey) {
+          break;
+        }
+        if (bucketSlots[bucketIndex] == insertionPoint) {
+          reachedBegin = true;
+          break;
+        }
+      }
+
+      if (!reachedBegin) {
+        if (insertionPoint->mKey >= valueSource.mKey) {
+          outInserted = false;
+          return insertionPoint;
+        }
+        insertionPoint = insertionPoint->mNext;
+      }
+    }
+
+    TNode* const newNode = constructNode(insertionPoint, insertionPoint->mPrev, valueSource);
+    incrementListSize(1u, table.mListSize);
+
+    TNode* const oldPrev = newNode->mPrev;
+    insertionPoint->mPrev = newNode;
+    oldPrev->mNext = newNode;
+
+    if (bucketSlots[bucketIndex] == insertionPoint) {
+      std::uint32_t cascadeIndex = bucketIndex;
+      for (;;) {
+        bucketSlots[cascadeIndex] = newNode;
+        if (cascadeIndex == 0u) {
+          break;
+        }
+        --cascadeIndex;
+        if (bucketSlots[cascadeIndex] != insertionPoint) {
+          break;
+        }
+      }
+    }
+
+    outInserted = true;
+    return newNode;
+  }
+
+  /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   * Shared pair-key rehash/insert-point-walk shape
+   * (`ObtainHashListNode2C` = 0x0082C480). Same structure as
+   * `ObtainHashListNode` above; only the rehash split-index hash and the
+   * insertion-point comparisons switch from scalar `<` to lexicographic
+   * `(lo, hi)` ordering.
+   */
+  template <typename TNode, typename TValue>
+  TNode* UICommandGraph::ObtainHashListNodePair(
+    HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
+    TNode* (*const constructNode)(TNode*, TNode*, TValue&),
+    std::uint32_t (*const incrementListSize)(std::uint32_t, std::uint32_t&)
+  )
+  {
+    const auto lexicographicLessEqual = [](const std::uint32_t lhsLow, const std::uint32_t lhsHigh,
+                                            const std::uint32_t rhsLow, const std::uint32_t rhsHigh) {
+      return lhsLow < rhsLow || (lhsLow == rhsLow && lhsHigh <= rhsHigh);
+    };
+
+    if (table.mBucketCount <= (table.mListSize >> 2u)) {
+      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
+
+      if ((bucketVectorLength - 1u) > table.mBucketCount) {
+        if (table.mBucketMask < table.mBucketCount) {
+          table.mBucketMask = 2u * table.mBucketMask + 1u;
+        }
+      } else {
+        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
+        table.mBucketMask = newMask;
+        table.mBuckets.resize(newMask + 2u, table.mListHead);
+      }
+
+      auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
+      TNode* node = rehashBucketSlots[splitBucketIndex];
+      TNode* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
+
+      if (splitBucketEnd != node) {
+        for (;;) {
+          const std::ldiv_t split = std::ldiv(
+            static_cast<long>(3863u * node->mKeyLow + 7919u * node->mKeyHigh + 53849u * (node->mKeyLow ^ node->mKeyHigh)),
+            127773L
+          );
+          long scrambled = 16807L * split.rem - 2836L * split.quot;
+          if (scrambled < 0) {
+            scrambled += 0x7FFFFFFFL;
+          }
+          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
+
+          if (rehashedIndex == splitBucketIndex) {
+            node = node->mNext;
+          } else {
+            TNode* const next = node->mNext;
+            if (next != table.mListHead) {
+              if (rehashBucketSlots[splitBucketIndex] == node) {
+                std::uint32_t walkIndex = splitBucketIndex;
+                for (;;) {
+                  rehashBucketSlots[walkIndex] = next;
+                  if (walkIndex == 0u) {
+                    break;
+                  }
+                  --walkIndex;
+                  if (rehashBucketSlots[walkIndex] != node) {
+                    break;
+                  }
+                }
+              }
+
+              TNode* const sentinel = table.mListHead;
+              TNode* const oldTail = sentinel->mPrev;
+              node->mPrev->mNext = next;
+              next->mPrev = node->mPrev;
+              node->mNext = sentinel;
+              node->mPrev = oldTail;
+              oldTail->mNext = node;
+              sentinel->mPrev = node;
+            }
+
+            std::uint32_t cascadeIndex = table.mBucketCount;
+            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
+              rehashBucketSlots[cascadeIndex] = node;
+              --cascadeIndex;
+            }
+
+            if (next == table.mListHead) {
+              break;
+            }
+            node = next;
+          }
+        }
+      }
+
+      ++table.mBucketCount;
+    }
+
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKeyLow, valueSource.mKeyHigh);
+    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
+    TNode* insertionPoint = bucketSlots[bucketIndex + 1u];
+
+    if (bucketSlots[bucketIndex] != insertionPoint) {
+      bool reachedBegin = false;
+      for (;;) {
+        insertionPoint = insertionPoint->mPrev;
+        if (lexicographicLessEqual(insertionPoint->mKeyLow, insertionPoint->mKeyHigh, valueSource.mKeyLow, valueSource.mKeyHigh)) {
+          break;
+        }
+        if (bucketSlots[bucketIndex] == insertionPoint) {
+          reachedBegin = true;
+          break;
+        }
+      }
+
+      if (!reachedBegin) {
+        if (lexicographicLessEqual(valueSource.mKeyLow, valueSource.mKeyHigh, insertionPoint->mKeyLow, insertionPoint->mKeyHigh)) {
+          outInserted = false;
+          return insertionPoint;
+        }
+        insertionPoint = insertionPoint->mNext;
+      }
+    }
+
+    TNode* const newNode = constructNode(insertionPoint, insertionPoint->mPrev, valueSource);
+    incrementListSize(1u, table.mListSize);
+
+    TNode* const oldPrev = newNode->mPrev;
+    insertionPoint->mPrev = newNode;
+    oldPrev->mNext = newNode;
+
+    if (bucketSlots[bucketIndex] == insertionPoint) {
+      std::uint32_t cascadeIndex = bucketIndex;
+      for (;;) {
+        bucketSlots[cascadeIndex] = newNode;
+        if (cascadeIndex == 0u) {
+          break;
+        }
+        --cascadeIndex;
+        if (bucketSlots[cascadeIndex] != insertionPoint) {
+          break;
+        }
+      }
+    }
+
+    outInserted = true;
+    return newNode;
+  }
+
+  /**
+   * Addresses: 0x00831BA0 (FUN_00831BA0) and 0x00831C90 (FUN_00831C90) -
+   * see the declaration's doc comment.
+   */
+  template <typename TNode>
+  void* UICommandGraph::NewHashListNodeStorage(const std::size_t count)
+  {
+    if ((0xFFFFFFFFu / static_cast<std::uint32_t>(count)) < sizeof(TNode)) {
+      throw std::bad_alloc();
+    }
+    return ::operator new(sizeof(TNode) * count);
+  }
+
+  /**
+   * Address: 0x00830700 (FUN_00830700, sub_830700)
+   */
+  UICommandGraph::HashListNode2C* UICommandGraph::MakeHashListNode2C(
+    HashListNode2C* const next, HashListNode2C* const prev, HashListNode2CValue& valueSource
+  )
+  {
+    auto* const node = static_cast<HashListNode2C*>(NewHashListNodeStorage<HashListNode2C>(1));
+    node->mNext = next;
+    node->mPrev = prev;
+    node->mKeyLow = valueSource.mKeyLow;
+    node->mKeyHigh = valueSource.mKeyHigh;
+    node->mEdge = valueSource.mEdge;
+    return node;
+  }
+
+  /**
+   * Address: 0x0082FB10 (FUN_0082FB10, sub_82FB10)
+   */
+  UICommandGraph::HashListNode10* UICommandGraph::MakeHashListNode10(
+    HashListNode10* const next, HashListNode10* const prev, HashListNode10Value& valueSource
+  )
+  {
+    auto* const node = static_cast<HashListNode10*>(NewHashListNodeStorage<HashListNode10>(1));
+    node->mNext = next;
+    node->mPrev = prev;
+    node->mKey = valueSource.mKey;
+    node->mWidth = valueSource.mWidth;
+    return node;
+  }
+
+  /**
+   * Address: 0x0082F5D0 (FUN_0082F5D0, sub_82F5D0)
+   */
+  std::uint32_t UICommandGraph::CheckedIncrementListSize2C(const std::uint32_t count, std::uint32_t& sizeField)
+  {
+    if ((119304647u - sizeField) < count) {
+      RuntimeThrowContainerTooLong("list<T> too long");
+    }
+    sizeField += count;
+    return sizeField;
+  }
+
+  /**
+   * Address: 0x0082DD60 (FUN_0082DD60, sub_82DD60)
+   */
+  std::uint32_t UICommandGraph::CheckedIncrementListSize10(const std::uint32_t count, std::uint32_t& sizeField)
+  {
+    if ((0x1FFFFFFFu - sizeField) < count) {
+      RuntimeThrowContainerTooLong("list<T> too long");
+    }
+    sizeField += count;
+    return sizeField;
+  }
+
+  /**
+   * Address: 0x0082C750 (FUN_0082C750, sub_82C750)
+   */
+  UICommandGraph::HashListNode2C* UICommandGraph::FindHashListNode2C(
+    HashTable<HashListNode2C>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
+  ) noexcept
+  {
+    return FindHashListNode(table, keyLow, keyHigh);
+  }
+
+  /**
+   * Address: 0x0082C480 (FUN_0082C480, sub_82C480)
+   */
+  UICommandGraph::HashListNode2C* UICommandGraph::ObtainHashListNode2C(
+    HashTable<HashListNode2C>& table, HashListNode2CValue& valueSource, bool& outInserted
+  )
+  {
+    return ObtainHashListNodePair(table, valueSource, outInserted, &MakeHashListNode2C, &CheckedIncrementListSize2C);
+  }
+
+  /**
+   * Address: 0x0082C950 (FUN_0082C950, sub_82C950)
+   */
+  UICommandGraph::HashListNode10* UICommandGraph::FindHashListNode10(
+    HashTable<HashListNode10>& table, const std::uint32_t key
+  ) noexcept
+  {
+    return FindHashListNode(table, key);
+  }
+
+  /**
+   * Address: 0x0082B5E0 (FUN_0082B5E0, sub_82B5E0)
+   */
+  UICommandGraph::HashListNode10* UICommandGraph::ObtainHashListNode10(
+    HashTable<HashListNode10>& table, HashListNode10Value& valueSource, bool& outInserted
+  )
+  {
+    return ObtainHashListNode(table, valueSource, outInserted, &MakeHashListNode10, &CheckedIncrementListSize10);
+  }
+
+  /**
+   * Address: 0x0082B490 (FUN_0082B490, sub_82B490)
+   */
+  UICommandGraph::CommandGraphEdge* UICommandGraph::FindOrInsertCommandGraphEdge(
+    UICommandGraphDrawNode* const fromNode, UICommandGraphDrawNode* const toNode, HashTable<HashListNode2C>& table
+  )
+  {
+    const auto fromKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(fromNode));
+    const auto toKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(toNode));
+
+    HashListNode2C* found = FindHashListNode2C(table, fromKey, toKey);
+    if (found != table.mListHead) {
+      return &found->mEdge;
+    }
+
+    // Miss: the binary zero-initializes the value composite before the
+    // insert (sub_82B490's memset), matching `CommandGraphEdge`'s in-class
+    // default member initializers - a fresh edge has no source line of its
+    // own, so a value-initialized temporary is the natural expression.
+    HashListNode2CValue insertValue{};
+    insertValue.mKeyLow = fromKey;
+    insertValue.mKeyHigh = toKey;
+
+    bool inserted = false;
+    HashListNode2C* const resultNode = ObtainHashListNode2C(table, insertValue, inserted);
+    return &resultNode->mEdge;
+  }
+
+  /**
    * Address: 0x0082B300 (FUN_0082B300, sub_82B300)
    */
   UICommandGraph::UICommandGraphDrawNode* UICommandGraph::FindOrInsertCommandGraphDrawNode(
@@ -4723,6 +5554,268 @@ namespace moho
     tree.mHead = nullptr;
     tree.mSize = 0u;
     tree.mAllocProxy = nullptr;
+  }
+
+  // Forward declarations: reopens the same file-scope anonymous namespace
+  // that defines these two sentinel-headed RB-tree walkers further below,
+  // so `AttachGraphRuntimeTreeNodeUnique`/`AttachGraphRuntimeTreeNodeAtHint`
+  // below - the first command-graph callers that need them - can call them
+  // here, ahead of their point of definition (mirrors the later reopening
+  // for `DrawCommandGraphMesh`'s own needs).
+  namespace
+  {
+    template <typename TNode>
+    [[nodiscard]] bool IsSentinelNode(const TNode* node);
+    template <typename TNode>
+    [[nodiscard]] TNode* NextTreeNode(TNode* node);
+    template <typename TNode>
+    [[nodiscard]] TNode* PrevTreeNode(TNode* node);
+  }
+
+  /**
+   * Address: 0x0082D330 (FUN_0082D330, sub_82D330) - see the declaration's
+   * doc comment.
+   */
+  UICommandGraph::CommandGraphTreeBucket* UICommandGraph::InitCommandGraphTreeBucketValue(
+    CommandGraphTreeBucket* const destination, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+  )
+  {
+    ::new (static_cast<void*>(destination)) CommandGraphTreeBucket();
+    destination->mTexture = texture.clone_retained();
+    return destination;
+  }
+
+  /**
+   * Address: 0x00830010 (FUN_00830010) - see the declaration's doc comment.
+   */
+  void UICommandGraph::PivotLeftGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  {
+    CommandGraphTreeNode* const pivot = n->mRight;
+    n->mRight = pivot->mLeft;
+    if (pivot->mLeft->mIsSentinel == 0u) {
+      pivot->mLeft->mParent = n;
+    }
+    pivot->mParent = n->mParent;
+
+    if (n == tree.mHead->mParent) {
+      tree.mHead->mParent = pivot;
+    } else if (n == n->mParent->mLeft) {
+      n->mParent->mLeft = pivot;
+    } else {
+      n->mParent->mRight = pivot;
+    }
+
+    pivot->mLeft = n;
+    n->mParent = pivot;
+  }
+
+  /**
+   * Address: 0x00830080 (FUN_00830080) - see the declaration's doc comment.
+   */
+  void UICommandGraph::PivotRightGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  {
+    CommandGraphTreeNode* const pivot = n->mLeft;
+    n->mLeft = pivot->mRight;
+    if (pivot->mRight->mIsSentinel == 0u) {
+      pivot->mRight->mParent = n;
+    }
+    pivot->mParent = n->mParent;
+
+    if (n == tree.mHead->mParent) {
+      tree.mHead->mParent = pivot;
+    } else if (n == n->mParent->mRight) {
+      n->mParent->mRight = pivot;
+    } else {
+      n->mParent->mLeft = pivot;
+    }
+
+    pivot->mRight = n;
+    n->mParent = pivot;
+  }
+
+  /**
+   * Address: 0x0082E320 (FUN_0082E320, sub_82E320) - see the declaration's
+   * doc comment. `0xAAAAAA9u` is this map's own `max_size() - 1u` bound for
+   * its 0x18-byte `pair<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`
+   * value_type (`0xFFFFFFFF / 0x18 - 1 == 0xAAAAAA9`), already confirmed
+   * against this exact instantiation in `legacy/containers/RbTree.h`'s
+   * `insert_at` citation.
+   */
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAt(
+    CommandGraphTree& tree, const bool addLeft, CommandGraphTreeNode* const where,
+    const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+  )
+  {
+    if (0xAAAAAA9u <= tree.mSize) {
+      RuntimeThrowContainerTooLong("map/set<T> too long");
+    }
+
+    auto* const fresh = static_cast<CommandGraphTreeNode*>(::operator new(sizeof(CommandGraphTreeNode)));
+    fresh->mLeft = tree.mHead;
+    fresh->mParent = tree.mHead;
+    fresh->mRight = tree.mHead;
+    fresh->mColorOrAllocated = 0u; // kRbRed
+    fresh->mIsSentinel = 0u;
+    try {
+      InitCommandGraphTreeBucketValue(&BucketOf(*fresh), texture);
+    } catch (...) {
+      ::operator delete(fresh);
+      throw;
+    }
+
+    ++tree.mSize;
+    if (where == tree.mHead) {
+      tree.mHead->mParent = fresh;
+      tree.mHead->mLeft = fresh;
+      tree.mHead->mRight = fresh;
+    } else if (addLeft) {
+      where->mLeft = fresh;
+      if (where == tree.mHead->mLeft) {
+        tree.mHead->mLeft = fresh;
+      }
+    } else {
+      where->mRight = fresh;
+      if (where == tree.mHead->mRight) {
+        tree.mHead->mRight = fresh;
+      }
+    }
+    fresh->mParent = where;
+
+    for (CommandGraphTreeNode* n = fresh; n->mParent->mColorOrAllocated == 0u;) {
+      CommandGraphTreeNode* const parent = n->mParent;
+      CommandGraphTreeNode* const grand = parent->mParent;
+
+      if (parent == grand->mLeft) {
+        CommandGraphTreeNode* const uncle = grand->mRight;
+        if (uncle->mColorOrAllocated == 0u) {
+          parent->mColorOrAllocated = 1u;
+          uncle->mColorOrAllocated = 1u;
+          grand->mColorOrAllocated = 0u;
+          n = grand;
+        } else {
+          if (n == parent->mRight) {
+            n = parent;
+            PivotLeftGraphRuntimeTreeNode(tree, n);
+          }
+          n->mParent->mColorOrAllocated = 1u;
+          n->mParent->mParent->mColorOrAllocated = 0u;
+          PivotRightGraphRuntimeTreeNode(tree, n->mParent->mParent);
+        }
+      } else {
+        CommandGraphTreeNode* const uncle = grand->mLeft;
+        if (uncle->mColorOrAllocated == 0u) {
+          parent->mColorOrAllocated = 1u;
+          uncle->mColorOrAllocated = 1u;
+          grand->mColorOrAllocated = 0u;
+          n = grand;
+        } else {
+          if (n == parent->mLeft) {
+            n = parent;
+            PivotRightGraphRuntimeTreeNode(tree, n);
+          }
+          n->mParent->mColorOrAllocated = 1u;
+          n->mParent->mParent->mColorOrAllocated = 0u;
+          PivotLeftGraphRuntimeTreeNode(tree, n->mParent->mParent);
+        }
+      }
+    }
+
+    tree.mHead->mParent->mColorOrAllocated = 1u; // root()->color = black
+    return fresh;
+  }
+
+  /**
+   * Address: 0x0082E170 (FUN_0082E170, sub_82E170) - see the declaration's
+   * doc comment.
+   */
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeUnique(
+    CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+  )
+  {
+    CommandGraphTreeNode* where = tree.mHead;
+    bool addLeft = true;
+    for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
+      where = node;
+      addLeft = texture.pi < BucketOf(*node).mTexture.pi;
+      node = addLeft ? node->mLeft : node->mRight;
+    }
+
+    CommandGraphTreeNode* probe = where;
+    if (addLeft) {
+      if (where == tree.mHead->mLeft) {
+        return AttachGraphRuntimeTreeNodeAt(tree, true, where, texture);
+      }
+      probe = PrevTreeNode(where);
+    }
+
+    if (BucketOf(*probe).mTexture.pi < texture.pi) {
+      return AttachGraphRuntimeTreeNodeAt(tree, addLeft, where, texture);
+    }
+    return probe;
+  }
+
+  /**
+   * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80) - see the declaration's
+   * doc comment.
+   */
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAtHint(
+    CommandGraphTree& tree, CommandGraphTreeNode* const hint, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+  )
+  {
+    if (tree.mSize == 0u) {
+      return AttachGraphRuntimeTreeNodeAt(tree, true, tree.mHead, texture);
+    }
+
+    if (hint == tree.mHead->mLeft) {
+      if (texture.pi < BucketOf(*hint).mTexture.pi) {
+        return AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
+      }
+    } else if (hint->mIsSentinel != 0u) {
+      CommandGraphTreeNode* const rightmost = tree.mHead->mRight;
+      if (BucketOf(*rightmost).mTexture.pi < texture.pi) {
+        return AttachGraphRuntimeTreeNodeAt(tree, false, rightmost, texture);
+      }
+    } else if (texture.pi < BucketOf(*hint).mTexture.pi) {
+      CommandGraphTreeNode* const before = PrevTreeNode(hint);
+      if (BucketOf(*before).mTexture.pi < texture.pi) {
+        return (before->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, before, texture)
+                                                     : AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
+      }
+    } else if (BucketOf(*hint).mTexture.pi < texture.pi) {
+      CommandGraphTreeNode* const after = NextTreeNode(hint);
+      if (after->mIsSentinel != 0u || texture.pi < BucketOf(*after).mTexture.pi) {
+        return (hint->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, hint, texture)
+                                                  : AttachGraphRuntimeTreeNodeAt(tree, true, after, texture);
+      }
+    }
+
+    return AttachGraphRuntimeTreeNodeUnique(tree, texture);
+  }
+
+  /**
+   * Address: 0x0082B8B0 (FUN_0082B8B0, sub_82B8B0) - see the declaration's
+   * doc comment.
+   */
+  msvc8::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
+    CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+  )
+  {
+    CommandGraphTreeNode* candidate = tree.mHead;
+    for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
+      if (texture.pi <= BucketOf(*node).mTexture.pi) {
+        candidate = node;
+        node = node->mLeft;
+      } else {
+        node = node->mRight;
+      }
+    }
+
+    if (candidate != tree.mHead && !(texture.pi < BucketOf(*candidate).mTexture.pi)) {
+      return BucketOf(*candidate).mEdges;
+    }
+
+    CommandGraphTreeNode* const inserted = AttachGraphRuntimeTreeNodeAtHint(tree, candidate, texture);
+    return BucketOf(*inserted).mEdges;
   }
 
   /**
@@ -5933,6 +7026,8 @@ namespace moho
     [[nodiscard]] bool IsSentinelNode(const TNode* node);
     template <typename TNode>
     [[nodiscard]] TNode* NextTreeNode(TNode* node);
+    template <typename TNode>
+    [[nodiscard]] TNode* PrevTreeNode(TNode* node);
   }
 
   /**
@@ -6588,6 +7683,41 @@ namespace moho
 
       TNode* parent = node->mParent;
       while (!IsSentinelNode(parent) && node == parent->mRight) {
+        node = parent;
+        parent = parent->mParent;
+      }
+      return parent;
+    }
+
+    /**
+     * Predecessor mirror of `NextTreeNode` above - not separately confirmed
+     * against a `mGraphRuntimeTree`-specific `rb_decrement` address (only
+     * its increment sibling, 0x0082EC10, is directly cited for this tree in
+     * `legacy/containers/RbTree.h`), but the shape is the generic VC8
+     * `_Dec` walk every other instantiation in that file uses - left
+     * subtree's rightmost node, or the nearest ancestor whose right
+     * subtree contains `node`. Used only by
+     * `AttachGraphRuntimeTreeNodeAtHint`'s straddle checks below, which
+     * never call it on the header sentinel itself, so the `_Dec`-specific
+     * "`--end()` yields rightmost" header case does not apply here.
+     */
+    template <typename TNode>
+    [[nodiscard]] TNode* PrevTreeNode(TNode* node)
+    {
+      if (!node || IsSentinelNode(node)) {
+        return node;
+      }
+
+      if (!IsSentinelNode(node->mLeft)) {
+        node = node->mLeft;
+        while (!IsSentinelNode(node->mRight)) {
+          node = node->mRight;
+        }
+        return node;
+      }
+
+      TNode* parent = node->mParent;
+      while (!IsSentinelNode(parent) && node == parent->mLeft) {
         node = parent;
         parent = parent->mParent;
       }
@@ -7913,8 +9043,18 @@ namespace moho
       head->mParent->mColor = 1u;
     }
 
+    /**
+     * Takes the bare 12-byte header (not `SSelectionSetUserEntity&`): the body
+     * below only ever touches `selection.mHead`/`selection.mSize` plus the
+     * already base-typed `FixupAfterSelectionInsert`/`RecomputeSelectionExtrema`,
+     * never the derived `mSizeMirrorOrUnused` lane, so it is one more entry in
+     * the same "declared on the bare header" family as `EraseRange`/`find`/
+     * `Iterator_inc`/`RecomputeSelectionExtrema` above. Widened (originally
+     * `SSelectionSetUserEntity&`) so `WeakEntitySetUserEntity::Add` can reuse it
+     * for the bare-header vector-of-sets growth lane (see WeakEntitySet.h).
+     */
     [[nodiscard]] bool InsertSelectionEntity(
-      SSelectionSetUserEntity& selection,
+      WeakEntitySetUserEntity& selection,
       UserEntity* const entity,
       SSelectionNodeUserEntity** const outNode = nullptr
     )
@@ -12771,6 +13911,130 @@ namespace moho
 
     *outNode = node;
     return outNode;
+  }
+
+  // Forward declaration: the free-function definition sits further down this
+  // file (right after WeakEntitySetUserEntity::Next), but WeakEntitySetUserEntity
+  // ::IsEmptyAfterPrune below needs it in scope earlier.
+  SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
+    WeakEntitySetUserEntity& set, SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* start
+  );
+
+  /**
+   * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
+   * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
+   *
+   * What it does:
+   * Clears all weak-set nodes, destroys the tree head sentinel, and resets
+   * storage links/counters for this set. Bare-header sibling of
+   * `SSelectionSetUserEntity::ReleaseStorage` (same body, declared separately
+   * there because that call site is reached with the derived type already in
+   * hand); the destructor below forwards to this one.
+   */
+  std::int32_t WeakEntitySetUserEntity::ReleaseStorage()
+  {
+    if (mHead == nullptr) {
+      mSize = 0u;
+      return 0;
+    }
+
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)EraseRange(&node, mHead->mLeft, mHead);
+    ::operator delete(mHead);
+    mHead = nullptr;
+    mSize = 0u;
+    return 0;
+  }
+
+  WeakEntitySetUserEntity::~WeakEntitySetUserEntity()
+  {
+    (void)ReleaseStorage();
+  }
+
+  /**
+   * Address: 0x00868DB0 (FUN_00868DB0) + 0x00822210 (FUN_00822210) - see the
+   * declaration in WeakEntitySet.h for the full evidence trail. Mirrors
+   * `CopySelectionSetFromOther`'s range-clone shape (find the first live
+   * source node, walk it with `Iterator_inc`/`find`, insert each live entity
+   * into the fresh destination), generalized onto the bare header so it can
+   * serve as this type's copy constructor.
+   */
+  WeakEntitySetUserEntity::WeakEntitySetUserEntity(const WeakEntitySetUserEntity& other)
+  {
+    InitWeakEntitySetHead(*this);
+    if (other.mHead == nullptr) {
+      return;
+    }
+
+    auto& otherMutable = const_cast<WeakEntitySetUserEntity&>(other);
+    SSelectionNodeUserEntity* node = otherMutable.mHead->mLeft;
+    node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
+    while (node != otherMutable.mHead) {
+      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
+        (void)InsertSelectionEntity(*this, entity);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
+    }
+  }
+
+  /**
+   * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add) - bare-
+   * header sibling of `SSelectionSetUserEntity::Add` below, generalized the
+   * same way `find`/`Iterator_inc`/`EraseRange` already are on this header.
+   * Feeds the `msvc8::vector<WeakSet<UserEntity>>::resize` growth lane cited
+   * on `msvc8::vector<T>::insert`/`uninit_fill_n` in Vector.h.
+   *
+   * What it does:
+   * Inserts one user-entity pointer key into the weak-set tree and returns
+   * `{ownerSet,node,inserted}` in `outResult`.
+   */
+  WeakEntitySetUserEntity::AddResult* WeakEntitySetUserEntity::Add(
+    AddResult* const outResult,
+    WeakEntitySetUserEntity* const set,
+    UserEntity* const entity
+  )
+  {
+    GPG_ASSERT(outResult != nullptr);
+    if (!outResult) {
+      return nullptr;
+    }
+
+    outResult->mOwnerSet = set;
+    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
+    outResult->mWasInserted = 0u;
+    outResult->mReserved09_0B[0] = 0u;
+    outResult->mReserved09_0B[1] = 0u;
+    outResult->mReserved09_0B[2] = 0u;
+
+    if (set == nullptr) {
+      return outResult;
+    }
+
+    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
+    SSelectionNodeUserEntity* node = set->mHead;
+    const bool inserted = InsertSelectionEntity(*set, entity, &node);
+    outResult->mNode = node;
+    outResult->mWasInserted = inserted ? 1u : 0u;
+    return outResult;
+  }
+
+  /**
+   * Address: 0x0066A090 (FUN_0066A090, sub_66A090) - bare-header sibling of
+   * `SSelectionSetUserEntity::IsEmptyAfterPrune`, generalized the same way
+   * `EraseRange`/`ReleaseStorage` are on this header.
+   *
+   * What it does:
+   * Returns true when tombstone pruning from the left-most node reaches the
+   * head sentinel immediately (no live weak-set entries remain).
+   */
+  bool WeakEntitySetUserEntity::IsEmptyAfterPrune()
+  {
+    SSelectionNodeUserEntity* firstLive = nullptr;
+    SSelectionNodeUserEntity* const head = mHead;
+    (void)moho::PruneTombstonesAndFindLive(*this, &firstLive, head->mLeft);
+    return firstLive == head;
   }
 
   /**
