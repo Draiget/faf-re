@@ -1525,6 +1525,21 @@ namespace moho
     // The binary keeps a std::set<float> purely for dedup and a std::vector<float>
     // of the distinct areas in first-seen order; a decal's area is stored only the
     // first time it is seen (insert reports "no existing equal element").
+    //
+    // Address: 0x0087D510 (FUN_0087D510, the MSVC8 `_Tree_val<...>::_Alloc::
+    // allocate` emission for this set's 0x14-byte node: `max_size` folds to
+    // `0xFFFFFFFF / 0x14 = 0xCCCCCCC`, and an over-large request throws
+    // `std::bad_alloc` through `_CxxThrowException` before falling through to
+    // `operator new(count*0x14)`.) This std::set<float> local is what
+    // instantiates it; two sibling `_Buynode` node-initializers share the
+    // same allocator call: 0x0087C990 (the no-argument overload used once,
+    // when this local is default-constructed, to build the empty tree's
+    // self-linked sentinel: `{left=parent=right=0, color=1, isnil=0}`, later
+    // self-linked by the tree ctor) and 0x0087C060 (the value-carrying
+    // overload used by `seenAreas.insert(area)` below to buy each real node:
+    // `{left, parent, right = the three link args, value = *area, color =
+    // 0}`). Both are plain MSVC8 `std::set<float>` template emissions with no
+    // CDecalManager-specific behavior of their own.
     std::set<float> seenAreas;
     std::vector<float> distinctAreas;
 
