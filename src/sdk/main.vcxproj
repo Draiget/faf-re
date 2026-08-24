@@ -341,6 +341,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\containers\LegacyContainerRuntime.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorUIntReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorEntIdReflection.cpp" />
+    <ClCompile Include="gpg\core\containers\FastVectorIFormationInstanceReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorSOCellPosReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorInsertLanes.cpp" />
     <ClCompile Include="gpg\core\containers\CheckedArrayAllocationLanes.cpp" />
@@ -1441,6 +1442,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\reflection\StaticTypeInfoStorage.h" />
     <ClInclude Include="gpg\core\containers\FastVectorUIntReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorEntIdReflection.h" />
+    <ClInclude Include="gpg\core\containers\FastVectorIFormationInstanceReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorSOCellPosReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorInsertLanes.h" />
     <ClInclude Include="gpg\core\containers\CheckedArrayAllocationLanes.h" />

@@ -813,6 +813,9 @@
     <ClCompile Include="gpg\core\containers\FastVectorEntIdReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\core\containers\FastVectorIFormationInstanceReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\core\containers\FastVectorSOCellPosReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3664,6 +3667,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\FastVectorEntIdReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\containers\FastVectorIFormationInstanceReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\FastVectorSOCellPosReflection.h">

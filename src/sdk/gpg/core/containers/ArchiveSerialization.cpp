@@ -7681,7 +7681,7 @@ namespace
    * `gpg::RRef_ManyToOneListener_ECollisionBeamEvent` lane as `unowned`
    * tracked-pointer state into one write archive lane.
    */
-  void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1(
+  void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(
     gpg::WriteArchive* archive,
     std::uint32_t* intrusiveListHeadSlot
   )
@@ -11404,6 +11404,31 @@ namespace gpg
   )
   {
     ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
+      archive, intrusiveListHeadSlot
+    );
+  }
+
+  /**
+   * Address: 0x00675170 (FUN_00675170,
+   *   `gpg::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1`)
+   *
+   * File-scope trampoline that exposes the global mangled symbol the
+   * cross-TU caller expects. The real body lives in an anonymous
+   * namespace earlier in this TU (around line 7684, now suffixed
+   * `_Impl`) so it has internal linkage; the call site is
+   * `CollisionBeamStartupRegistrations.cpp`'s
+   * `RManyToOneBroadcasterCollisionBeamEventTypeInfo::Init`, which stores
+   * `&gpg::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1`
+   * into the `serSaveFunc_` reflection-table save-callback slot -- the
+   * exact sibling pattern already established for
+   * `SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1`
+   * immediately above.
+   */
+  void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1(
+    gpg::WriteArchive* archive, std::uint32_t* intrusiveListHeadSlot
+  )
+  {
+    ::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(
       archive, intrusiveListHeadSlot
     );
   }
