@@ -509,6 +509,13 @@ namespace
     return BuildBoneEntityManipulatorRef(object);
   }
 
+  /**
+   * Address: 0x00635250 (FUN_00635250, Moho::CBoneEntityManipulatorTypeInfo::Delete)
+   *
+   * What it does:
+   * Deletes a heap-allocated `CBoneEntityManipulator` through the reflected
+   * delete callback slot; wired via `typeInfo->deleteFunc_` below.
+   */
   void DeleteBoneEntityManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
@@ -516,6 +523,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x006352E0 (FUN_006352E0, Moho::CBoneEntityManipulatorTypeInfo::Destruct)
+   *
+   * What it does:
+   * In-place destructs a `CBoneEntityManipulator` through the reflected
+   * destruct callback slot, without freeing storage; wired via
+   * `typeInfo->dtrFunc_` below.
+   */
   void DestructBoneEntityManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
@@ -628,6 +643,13 @@ namespace
     return BuildFootPlantManipulatorRef(object);
   }
 
+  /**
+   * Address: 0x0063A0B0 (FUN_0063A0B0, Moho::CFootPlantManipulatorTypeInfo::Delete)
+   *
+   * What it does:
+   * Deletes a heap-allocated `CFootPlantManipulator` through the reflected
+   * delete callback slot; wired via `typeInfo->deleteFunc_` below.
+   */
   void DeleteFootPlantManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
@@ -635,6 +657,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0063A140 (FUN_0063A140, Moho::CFootPlantManipulatorTypeInfo::Destruct)
+   *
+   * What it does:
+   * In-place destructs a `CFootPlantManipulator` through the reflected
+   * destruct callback slot, without freeing storage; wired via
+   * `typeInfo->dtrFunc_` below.
+   */
   void DestructFootPlantManipulatorCallback(void* const object)
   {
     if (object != nullptr) {
@@ -1286,6 +1316,22 @@ namespace
       reinterpret_cast<const moho::CFootPlantManipulator*>(static_cast<std::uintptr_t>(objectPtr)), archive
     );
   }
+
+  /**
+   * Address: 0x00639280 (FUN_00639280, cleanup_CFootPlantManipulatorSerializerStartupThunkA)
+   * Address: 0x006392B0 (FUN_006392B0, cleanup_CFootPlantManipulatorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the global CFootPlantManipulator serializer helper node from the
+   * intrusive helper list and rebinds it to a self-linked sentinel. The
+   * binary emits this mechanic as two near-identical 10-instruction bodies
+   * with no incoming code xrefs of their own (compare the
+   * IAniManipulatorSerializer sibling pair
+   * `cleanup_IAniManipulatorSerializerStartupThunkA`/`ThunkB` above); both
+   * addresses fold into this single shared helper, called once from
+   * `cleanup_CFootPlantManipulatorSerializer_atexit()` below and once from
+   * `register_CFootPlantManipulatorSerializer()`.
+   */
 
   [[nodiscard]] gpg::SerHelperBase* UnlinkCFootPlantManipulatorSerializerNode() noexcept
   {
