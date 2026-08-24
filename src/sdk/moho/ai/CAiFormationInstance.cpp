@@ -4385,6 +4385,29 @@ namespace
   };
   static_assert(sizeof(SFormationRunScriptCandidate) == 0x48, "SFormationRunScriptCandidate size must be 0x48");
 
+  /**
+   * Comparator for the `std::sort(candidates.begin(), candidates.end(), ...)`
+   * call in `RunScript` phase 6 below.
+   *
+   * Address: 0x00572350 (FUN_00572350, sub_572350 -- msvc8 STL's
+   * `std::sort<Cand72*>` introsort entry for this instantiation) and its own
+   * callees, all sub-parts of that same compiler-emitted `std::sort` body and
+   * not independent engine functions:
+   *   - Address: 0x005734F0 (FUN_005734F0, 809 instructions) -- the
+   *     introsort main loop (partition + recurse, falling back to heapsort
+   *     past the recursion-depth limit).
+   *   - Address: 0x00574170 (FUN_00574170) -- reads `elem+0x18` (`distanceSq`)
+   *     as the partition pivot comparison, confirming the sort key offset.
+   *   - Address: 0x00574A30 / 0x00574B40 (FUN_00574A30 / FUN_00574B40) --
+   *     `std::_Med3`/`std::_Insertion_sort`-shaped helpers for the same
+   *     instantiation.
+   * A real `std::sort` call over `Cand72*` iterators with this comparator
+   * (below) is the direct, natural C++ source for exactly this family of
+   * out-of-line bodies -- RULE ONE in CLAUDE.md: recover the container/
+   * algorithm operation, not the compiler's internal decomposition of it.
+   * `FUN_005734F0` is the only one of the five actually in the RunScript
+   * dependency ladder (the other three are unreached from this closure).
+   */
   [[nodiscard]] bool CompareRunScriptCandidateByDistanceSq(
     const SFormationRunScriptCandidate& lhs,
     const SFormationRunScriptCandidate& rhs
@@ -5603,9 +5626,21 @@ namespace moho
    * escalation doc's behavioral description and partial asm tracing
    * (0x005677E4-0x00567FE4); the anchor/weight/speed-band values in
    * particular were not independently double-verified to the same
-   * confidence as phases 1-4. Landed as a genuine, non-stub implementation
-   * using only real evidence -- no invented control flow -- but flagged
-   * `wip` in the progress DB for that reason.
+   * confidence as phases 1-4 and remain a known lower-confidence area for a
+   * future dedicated pass -- documented here rather than silently dropped.
+   *
+   * This function's full 13-token dependency closure (`no_block_guard.py
+   * plan FUN_00567300`) is now resolved. `unitDescs`/`candidates` were
+   * `std::vector` until this pass; both are `gpg::fastvector_n<T,16>` now,
+   * matching the escalation doc's funclet-proven binary locals
+   * (`fastvector_n<Desc32,16>` / `fastvector_n<Cand72,16>`) -- that
+   * container-type correction is what let the closure's remaining tokens
+   * (`sub_56C940`/`sub_56E620`/`sub_56FAB0`/`sub_56FB90`/`sub_573000`
+   * push_back/InsertAt/grow family, `sub_572350`/`sub_5734F0` std::sort,
+   * `sub_56AAF0` map-insert family) resolve as citations on the canonical
+   * `gpg::fastvector_n<T,N>` template (FastVector.h) and the `InsertLaneMapNode`
+   * typed helper instead of staying open. Landed as a genuine, non-stub
+   * implementation using only real evidence -- no invented control flow.
    *
    * What it does (seven phases):
    *  1. Builds a Lua table of unit LuaObjects from `units`.
@@ -5673,9 +5708,11 @@ namespace moho
     }
 
     // Phase 4 (0x00567526-0x005677CD): per-unit relative descriptors +
-    // preferred speed.
-    std::vector<SFormationRunScriptUnitDesc> unitDescs;
-    unitDescs.reserve(units.size());
+    // preferred speed. `gpg::fastvector_n<Desc32,16>` (not std::vector) --
+    // the local's real binary shape, per the escalation doc's funclet table
+    // (0x00BADE3C, D=0x154). Left un-reserved: the binary never reserves it
+    // either, relying on the 16 inline slots plus `push_back`'s own grow.
+    gpg::fastvector_n<SFormationRunScriptUnitDesc, 16> unitDescs;
     float preferredSpeed = std::numeric_limits<float>::max();
     for (moho::SWeakRefSlot& slot : units) {
       Unit* const unit = static_cast<Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
@@ -5731,8 +5768,13 @@ namespace moho
 
     // Phase 6 (0x00567A40-0x00567C71): one candidate per script slot,
     // sorted ascending by squared distance from the formation mean.
-    std::vector<SFormationRunScriptCandidate> candidates;
-    candidates.reserve(scriptResult.mObjs.size());
+    // `gpg::fastvector_n<Cand72,16>` (not std::vector) -- the local's real
+    // binary shape, per the escalation doc's funclet table (0x00BADE47,
+    // D=0x364); `push_back`'s grow lane is FUN_0056C940 / FUN_0056E620 /
+    // FUN_0056FAB0 / FUN_0056FB90 / FUN_00573000 (RunScript closure), cited
+    // on FastVector.h's push_back/InsertAt/GrowInsertDeepCopy/
+    // UninitializedCopyForward/CopyBackwardAssign for this element type.
+    gpg::fastvector_n<SFormationRunScriptCandidate, 16> candidates;
     for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
       SCoordsVec2 rotatedOffset{};
       ComputeRunScriptOffset(&slot.mOffset, &rotatedOffset);
