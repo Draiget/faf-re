@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiBrain.h"
-#include "moho/script/CScriptObject.h"
+#include "moho/script/CScriptObject.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -70,17 +70,33 @@ namespace
    * Address: 0x00581890 (FUN_00581890)
    *
    * What it does:
-   * Runs deleting-dtor semantics for one reflected type-info object when the
-   * input pointer is non-null.
+   * Generic, type-erased "delete this reflected object" callback: reads the
+   * object's own vtable slot 2 (`+0x08`) and calls it with the scalar-delete
+   * flag hardcoded to 1 -- `gpg::RObject::~RObject()` sits at exactly that
+   * slot (VFTable SLOT: 2, per its declaration in Reflection.h), so this is
+   * the same generic dispatch every `RObject`-derived class's own
+   * compiler-generated scalar deleting destructor performs, just invoked
+   * through a `void*` rather than a statically-typed pointer. Suitable as a
+   * `gpg::RType::delete_func_t` callback for reflected types that don't
+   * need (or don't yet have) their own typed specialization, matching how
+   * `moho::CAiBrainConstruct::mDeleteCallback` uses a typed
+   * `DeleteConstructedCAiBrain` instead for that specific registration
+   * (CAiBrainConstruct.cpp) -- both compile to the same real dispatch when
+   * the concrete type has a virtual destructor at this slot.
+   *
+   * DB-integrity fix: this previously cast to `gpg::RType*` (a reflection
+   * type *descriptor*, unrelated to the objects being reflected) instead of
+   * `gpg::RObject*` (the actual base every reflected object derives from,
+   * whose own destructor is confirmed at this exact vtable slot) -- the cast
+   * target didn't match the binary's `[vtable+8]` dispatch at all.
    */
-  [[maybe_unused]] void DeleteTypeInfoWithDeleteFlagOneIfPresent(void* const object)
+  [[maybe_unused]] void DeleteReflectedObjectViaVirtualDtor(void* const object)
   {
-    auto* const typeInfo = static_cast<gpg::RType*>(object);
-    if (!typeInfo) {
+    if (object == nullptr) {
       return;
     }
 
-    delete typeInfo;
+    delete static_cast<gpg::RObject*>(object);
   }
 
   void cleanup_CAiBrainTypeInfoStartup()
