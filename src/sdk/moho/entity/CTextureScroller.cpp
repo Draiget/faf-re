@@ -11,6 +11,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/camera/VTransform.h"
@@ -472,20 +473,15 @@ namespace
   void DestructTextureScrollerObject(void* const)
   {}
 
-  /**
-   * Address: 0x00777F30 (FUN_00777F30)
-   *
-   * What it does:
-   * Assigns texture-scroller lifecycle callbacks to reflected type-info slots.
-   */
-  [[maybe_unused]] gpg::RType* AssignTextureScrollerTypeLifecycleCallbacks(gpg::RType* const typeInfo)
-  {
-    typeInfo->newRefFunc_ = &NewTextureScrollerRef;
-    typeInfo->ctorRefFunc_ = &CtrTextureScrollerRef;
-    typeInfo->deleteFunc_ = &DeleteTextureScrollerObject;
-    typeInfo->dtrFunc_ = &DestructTextureScrollerObject;
-    return typeInfo;
-  }
+  // NOTE: 0x00777F30 (the "assign lifecycle callbacks" shape) had zero code
+  // callers and zero data xrefs in the callgraph index (verified,
+  // NO_CALLSITE_EVIDENCE/UNREACHED) -- the real CTextureScrollerTypeInfo::Init
+  // (0x00777590) writes its four lifecycle-callback fields inline (confirmed
+  // via decompile), matching the shared gpg::BindRTypeLifecycleCallbacks
+  // helper's other ~40 citations (Reflection.h), not a call to a separate
+  // function. The local AssignTextureScrollerTypeLifecycleCallbacks duplicate
+  // that carried this false citation has been removed; Init calls the shared
+  // helper directly with the four callbacks below.
 
   /**
    * Address: 0x00777F80 (FUN_00777F80, gpg::SerSaveLoadHelper_CTextureScroller::Init)
@@ -559,6 +555,39 @@ namespace moho
     }
 
     return type;
+  }
+
+  /**
+   * Address: 0x00777530 (FUN_00777530, ctor lane)
+   */
+  CTextureScrollerTypeInfo::CTextureScrollerTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(CTextureScroller), this);
+  }
+
+  /**
+   * Address: 0x007775D0 (FUN_007775D0, Moho::CTextureScrollerTypeInfo::GetName)
+   */
+  const char* CTextureScrollerTypeInfo::GetName() const
+  {
+    return "CTextureScroller";
+  }
+
+  /**
+   * Address: 0x00777590 (FUN_00777590, Moho::CTextureScrollerTypeInfo::Init)
+   */
+  void CTextureScrollerTypeInfo::Init()
+  {
+    size_ = sizeof(CTextureScroller);
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &NewTextureScrollerRef,
+      &CtrTextureScrollerRef,
+      &DeleteTextureScrollerObject,
+      &DestructTextureScrollerObject
+    );
+    gpg::RType::Init();
+    Finish();
   }
 
   /**
@@ -954,4 +983,56 @@ namespace
   };
 
   [[maybe_unused]] CTextureScrollerSerializerStartupBootstrap gCTextureScrollerSerializerStartupBootstrap;
+
+  alignas(moho::CTextureScrollerTypeInfo)
+  unsigned char gCTextureScrollerTypeInfoStorage[sizeof(moho::CTextureScrollerTypeInfo)] = {};
+  bool gCTextureScrollerTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CTextureScrollerTypeInfo* AcquireCTextureScrollerTypeInfo()
+  {
+    if (!gCTextureScrollerTypeInfoConstructed) {
+      new (gCTextureScrollerTypeInfoStorage) moho::CTextureScrollerTypeInfo();
+      gCTextureScrollerTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CTextureScrollerTypeInfo*>(gCTextureScrollerTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00C02710 (FUN_00C02710, cleanup_CTextureScrollerTypeInfo)
+   *
+   * What it does:
+   * Tears down static `CTextureScrollerTypeInfo` storage at process exit.
+   */
+  void cleanup_CTextureScrollerTypeInfo()
+  {
+    if (!gCTextureScrollerTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCTextureScrollerTypeInfo()->~CTextureScrollerTypeInfo();
+    gCTextureScrollerTypeInfoConstructed = false;
+  }
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BDD730 (FUN_00BDD730, register_CTextureScrollerTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CTextureScrollerTypeInfo` singleton and
+   * installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`); the
+   * binary has exactly one call site and no reentry guard, matching the
+   * guarded-singleton idiom used throughout this reflection family.
+   */
+  void register_CTextureScrollerTypeInfo()
+  {
+    (void)AcquireCTextureScrollerTypeInfo();
+    (void)std::atexit(&cleanup_CTextureScrollerTypeInfo);
+  }
+} // namespace moho
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CTextureScrollerTypeInfo_6b8f21, moho::register_CTextureScrollerTypeInfo)
