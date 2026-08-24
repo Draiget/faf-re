@@ -247,374 +247,6 @@ namespace
       return outEdges.end;
     }
 
-    struct ClusterCacheTreeLayout
-    {
-        std::uint8_t pad_00[0x2C];
-        std::uint8_t mSubclusterTree;
-    };
-    static_assert(offsetof(ClusterCacheTreeLayout, mSubclusterTree) == 0x2C, "Cluster cache subcluster tree offset must be 0x2C");
-
-    struct SubclusterTreeHeader
-    {
-        std::uint32_t mCompareToken;
-        void* mHead;
-        std::uint32_t mSize;
-    };
-
-    struct SubclusterBucketVectorStorage
-    {
-        void* mIteratorProxy;
-        std::uint32_t* mFirst;
-        std::uint32_t* mLast;
-        std::uint32_t* mEnd;
-    };
-
-    struct SubclusterCacheVectorState
-    {
-        bool mBool;
-        std::uint8_t pad_01[3];
-        SubclusterTreeHeader mList;
-        SubclusterBucketVectorStorage mVec;
-        std::uint32_t mMask;
-        std::uint32_t mMaxIndex;
-
-        /**
-         * Address: 0x00934B60 (FUN_00934B60, ??0vector_SubclusterData@@QAE@@Z)
-         * Mangled: ??0vector_SubclusterData@@QAE@@Z
-         *
-         * What it does:
-         * Initializes subcluster-cache lookup lanes with one tree sentinel,
-         * nine sentinel-token bucket entries, and default mask/max values.
-         */
-        SubclusterCacheVectorState(bool* cacheEnabledFlag, int stackAnchorHint);
-
-        /**
-         * What it does:
-         * Releases the subcluster ring-list backing storage and bucket
-         * vector when the container is destroyed. Mirrors the binary
-         * teardown path that runs FUN_00933380 before freeing
-         * `mVec.mFirst` storage.
-         */
-        ~SubclusterCacheVectorState();
-    };
-
-    static_assert(sizeof(SubclusterTreeHeader) == 0x0C, "SubclusterTreeHeader size must be 0x0C");
-    static_assert(sizeof(SubclusterBucketVectorStorage) == 0x10, "SubclusterBucketVectorStorage size must be 0x10");
-    static_assert(sizeof(SubclusterCacheVectorState) == 0x28, "SubclusterCacheVectorState size must be 0x28");
-    static_assert(offsetof(SubclusterCacheVectorState, mList) == 0x04, "SubclusterCacheVectorState::mList offset must be 0x04");
-    static_assert(offsetof(SubclusterCacheVectorState, mVec) == 0x10, "SubclusterCacheVectorState::mVec offset must be 0x10");
-    static_assert(
-        offsetof(SubclusterCacheVectorState, mMask) == 0x20, "SubclusterCacheVectorState::mMask offset must be 0x20"
-    );
-    static_assert(
-        offsetof(SubclusterCacheVectorState, mMaxIndex) == 0x24, "SubclusterCacheVectorState::mMaxIndex offset must be 0x24"
-    );
-
-    struct ClusterArray16WithTailLanesRuntimeView
-    {
-        gpg::HaStar::Cluster lanes[16];
-        std::uint32_t lane40;
-        std::uint32_t lane44;
-    };
-    static_assert(
-        sizeof(ClusterArray16WithTailLanesRuntimeView) == 0x48,
-        "ClusterArray16WithTailLanesRuntimeView size must be 0x48"
-    );
-    static_assert(
-        offsetof(ClusterArray16WithTailLanesRuntimeView, lane40) == 0x40,
-        "ClusterArray16WithTailLanesRuntimeView::lane40 offset must be 0x40"
-    );
-    static_assert(
-        offsetof(ClusterArray16WithTailLanesRuntimeView, lane44) == 0x44,
-        "ClusterArray16WithTailLanesRuntimeView::lane44 offset must be 0x44"
-    );
-
-    /**
-     * Address: 0x00932500 (FUN_00932500, sub_932500)
-     *
-     * What it does:
-     * Copy-constructs one 16-cluster lane block and copies both tail dword
-     * metadata lanes.
-     */
-    ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanes(
-        ClusterArray16WithTailLanesRuntimeView* const destination,
-        const ClusterArray16WithTailLanesRuntimeView& source
-    )
-    {
-        std::size_t constructedCount = 0u;
-        try {
-            while (constructedCount < 16u) {
-                ::new (static_cast<void*>(&destination->lanes[constructedCount]))
-                    gpg::HaStar::Cluster(source.lanes[constructedCount]);
-                ++constructedCount;
-            }
-        }
-        catch (...) {
-            while (constructedCount != 0u) {
-                --constructedCount;
-                destination->lanes[constructedCount].~Cluster();
-            }
-            throw;
-        }
-
-        destination->lane40 = source.lane40;
-        destination->lane44 = source.lane44;
-        return destination;
-    }
-
-    /**
-     * Address: 0x009326C0 (FUN_009326C0, sub_9326C0)
-     *
-     * What it does:
-     * Copy-constructs one 16-cluster lane block, copies lane `+0x40`, and
-     * overrides lane `+0x44` from caller-provided metadata.
-     */
-    ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanesOverrideTail44(
-        ClusterArray16WithTailLanesRuntimeView* const destination,
-        const ClusterArray16WithTailLanesRuntimeView& source,
-        const std::uint32_t* const lane44Source
-    )
-    {
-        ClusterArray16WithTailLanesRuntimeView* const result = CopyConstructClusterArray16WithTailLanes(destination, source);
-        result->lane44 = *lane44Source;
-        return result;
-    }
-
-    /**
-     * Address: 0x009327E0 (FUN_009327E0, sub_9327E0)
-     *
-     * What it does:
-     * Allocates and seeds one tree-head sentinel node for the subcluster cache.
-     */
-    [[nodiscard]] void* AllocateSubclusterTreeHead()
-    {
-        auto* const node = static_cast<std::uint8_t*>(::operator new(0x50u));
-        *reinterpret_cast<void**>(node + 0x00) = node;
-        *reinterpret_cast<void**>(node + 0x04) = node;
-        return node;
-    }
-
-    /**
-     * Address: 0x00932A80 (FUN_00932A80, sub_932A80)
-     *
-     * What it does:
-     * Fills one 32-bit value range with the same sentinel token.
-     */
-    void FillU32Range(std::uint32_t* dst, const unsigned int count, const std::uint32_t value)
-    {
-        for (unsigned int i = 0; i < count; ++i) {
-            dst[i] = value;
-        }
-    }
-
-    /**
-     * Address: 0x00932E40 (FUN_00932E40, sub_932E40)
-     *
-     * What it does:
-     * Dispatch adapter lane for one 32-bit range fill request.
-     */
-    void FillU32RangeDispatchA(
-        std::uint32_t* const dst,
-        const unsigned int count,
-        const std::uint32_t value
-    )
-    {
-        FillU32Range(dst, count, value);
-    }
-
-    /**
-     * Address: 0x00933060 (FUN_00933060, sub_933060)
-     *
-     * What it does:
-     * Fills one 32-bit value range with the same sentinel token and returns
-     * one-past-end output cursor.
-     */
-    [[nodiscard]] std::uint32_t* FillU32RangeAndReturnEnd(
-        std::uint32_t* const dst, const unsigned int count, const std::uint32_t value
-    )
-    {
-        FillU32Range(dst, count, value);
-        const auto beginAddress = reinterpret_cast<std::uintptr_t>(dst);
-        const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(std::uint32_t);
-        return reinterpret_cast<std::uint32_t*>(beginAddress + byteAdvance);
-    }
-
-    /**
-     * Address: 0x00934250 (FUN_00934250, sub_934250)
-     *
-     * What it does:
-     * Initializes 32-bit bucket-vector lanes used by subcluster cache buckets.
-     */
-    void InitializeSubclusterBucketVector(
-        SubclusterBucketVectorStorage& vectorStorage, const unsigned int count, const std::uint32_t* const fillValueRef
-    )
-    {
-        vectorStorage.mFirst = nullptr;
-        vectorStorage.mLast = nullptr;
-        vectorStorage.mEnd = nullptr;
-
-        if (count == 0u) {
-            return;
-        }
-        // Binary codegen at `FUN_00931CE0` (0x00931CE0) combines the
-        // `count > UINT_MAX/4 -> throw std::bad_alloc()` guard and the
-        // `operator new(4 * count)` call into a single allocator helper
-        // (`std::_Allocate<unsigned>` specialization for 4-byte elements);
-        // this source expresses the same two-step behavior explicitly.
-        if (count > 0x3FFFFFFFu) {
-            throw std::bad_alloc();
-        }
-
-        auto* const values =
-            static_cast<std::uint32_t*>(::operator new(static_cast<std::size_t>(count) * sizeof(std::uint32_t)));
-        vectorStorage.mFirst = values;
-        vectorStorage.mLast = values;
-        vectorStorage.mEnd = values + count;
-
-        FillU32Range(values, count, *fillValueRef);
-        vectorStorage.mLast = values + count;
-    }
-
-    /**
-     * Address: 0x00934B60 (FUN_00934B60, ??0vector_SubclusterData@@QAE@@Z)
-     */
-    SubclusterCacheVectorState::SubclusterCacheVectorState(bool* const cacheEnabledFlag, const int /*stackAnchorHint*/)
-    {
-        mBool = *cacheEnabledFlag;
-        mList.mHead = AllocateSubclusterTreeHead();
-        mList.mSize = 0;
-
-        const auto treeHeadToken = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mList.mHead));
-        InitializeSubclusterBucketVector(mVec, 9u, &treeHeadToken);
-
-        mMask = 1u;
-        mMaxIndex = 1u;
-    }
-
-    void ClearSubclusterCacheRingList(SubclusterTreeHeader* header) noexcept;
-
-    SubclusterCacheVectorState::~SubclusterCacheVectorState()
-    {
-        // Walk the subcluster ring and run the per-handle `~Cluster`
-        // release path on every buffered 16-cluster node before freeing
-        // the head sentinel itself. This is the FUN_00933380 lane the
-        // binary runs from every container-teardown path.
-        ClearSubclusterCacheRingList(&mList);
-        ::operator delete(mList.mHead);
-        mList.mHead = nullptr;
-
-        if (mVec.mFirst != nullptr) {
-            ::operator delete(mVec.mFirst);
-            mVec.mFirst = nullptr;
-            mVec.mLast = nullptr;
-            mVec.mEnd = nullptr;
-        }
-    }
-
-    /**
-     * Intrusive ring-list node used by `SubclusterCacheVectorState::mList`.
-     * Each non-sentinel node carries a trailing fixed-count array of 16
-     * `Cluster` handles that must be destroyed via the per-handle `~Cluster`
-     * release path before the node storage is freed.
-     */
-    struct SubclusterTreeNode
-    {
-        SubclusterTreeNode* mNext;                // +0x00
-        SubclusterTreeNode* mPrev;                // +0x04
-        gpg::HaStar::Cluster mClusters[16];       // +0x08
-        // Trailing 8 bytes (+0x48..+0x4F) observed in the binary allocator
-        // (`AllocateSubclusterTreeHead` at FUN_009327E0 allocates 0x50 bytes)
-        // but not touched by the destroy pass; keep padding to preserve the
-        // node footprint so allocations stay binary-shape-equivalent.
-        std::uint8_t mTail48[0x08]{};             // +0x48
-    };
-    static_assert(offsetof(SubclusterTreeNode, mNext) == 0x00, "SubclusterTreeNode::mNext offset must be 0x00");
-    static_assert(offsetof(SubclusterTreeNode, mPrev) == 0x04, "SubclusterTreeNode::mPrev offset must be 0x04");
-    static_assert(offsetof(SubclusterTreeNode, mClusters) == 0x08, "SubclusterTreeNode::mClusters offset must be 0x08");
-    static_assert(sizeof(SubclusterTreeNode) == 0x50, "SubclusterTreeNode size must be 0x50");
-
-    /**
-     * Address: 0x00933380 (FUN_00933380)
-     *
-     * IDA signature:
-     * void __thiscall sub_933380(_DWORD *this);
-     *
-     * What it does:
-     * Clears one subcluster-cache ring-list in place: snapshots the head
-     * sentinel's `next` pointer, relinks the sentinel's `next`/`prev` to
-     * self, zeros the size counter, then walks the snapshot chain
-     * destroying each non-sentinel node. Each node's trailing
-     * `Cluster[16]` array is run through the per-element `~Cluster`
-     * destructor (binary uses `eh vector destructor iterator` with
-     * element count 16 and element size 4) before the node storage is
-     * released.
-     *
-     * The `this` parameter is a `SubclusterTreeHeader*`; its `mHead`
-     * field (at +0x04) holds the sentinel node pointer. Invoked from the
-     * subcluster-cache teardown lanes (binary callers 0x009335E3,
-     * 0x009338D0, 0x009343B4, 0x00934500, 0x00934B60, 0x00934F07,
-     * 0x009352E0).
-     */
-    void ClearSubclusterCacheRingList(SubclusterTreeHeader* const header) noexcept
-    {
-        if (header == nullptr || header->mHead == nullptr) {
-            return;
-        }
-
-        auto* const sentinel = static_cast<SubclusterTreeNode*>(header->mHead);
-        SubclusterTreeNode* cursor = sentinel->mNext;
-        sentinel->mNext = sentinel;
-        sentinel->mPrev = sentinel;
-        header->mSize = 0u;
-
-        while (cursor != sentinel) {
-            SubclusterTreeNode* const nextNode = cursor->mNext;
-            // Per-handle `Cluster` release (binary invokes
-            // `eh vector destructor iterator` with n=16 over `cursor+0x08`).
-            for (auto& clusterHandle : cursor->mClusters) {
-                clusterHandle.~Cluster();
-            }
-            ::operator delete(cursor);
-            cursor = nextNode;
-        }
-    }
-
-    // Process-wide registry keyed by `ClusterCache::mCacheTree` base that
-    // tracks any active subcluster ring-lists built against the cache. The
-    // binary keeps these lists as `SubclusterCacheVectorState::mList` values
-    // linked into the cache's lookup-bucket lane; when the outer cache is
-    // released, each attached ring must be drained via FUN_00933380.
-    using SubclusterRingRegistry = std::unordered_map<void*, std::vector<SubclusterTreeHeader*>>;
-    [[nodiscard]] SubclusterRingRegistry& SubclusterRingsByCacheBase()
-    {
-        static SubclusterRingRegistry sRegistry;
-        return sRegistry;
-    }
-
-    void DrainSubclusterRingsAttachedToCacheBase(void* const cacheTreeBase) noexcept
-    {
-        auto& registry = SubclusterRingsByCacheBase();
-        const auto it = registry.find(cacheTreeBase);
-        if (it == registry.end()) {
-            return;
-        }
-
-        for (SubclusterTreeHeader* const header : it->second) {
-            ClearSubclusterCacheRingList(header);
-        }
-        registry.erase(it);
-    }
-
-    void AttachSubclusterRingToCacheBase(
-        void* const cacheTreeBase, SubclusterTreeHeader* const header
-    )
-    {
-        if (cacheTreeBase == nullptr || header == nullptr) {
-            return;
-        }
-        SubclusterRingsByCacheBase()[cacheTreeBase].push_back(header);
-    }
-
     struct TripleWordValueRuntime
     {
         std::uint32_t lane0;
@@ -1940,9 +1572,25 @@ namespace
         std::array<std::uint8_t, 0x12> mBytes{};
     };
 
+    /**
+     * Value type stored in `ClusterInternalCache<SubclusterData>::mVec`'s
+     * hash_map keys. This is deliberately the *same fields* as
+     * `gpg::HaStar::SubclusterData` (16 `Cluster` handles + `mLevel`), typed
+     * instead of a raw byte blob: the binary's insert lane copy-constructs
+     * this key through an `eh vector copy constructor iterator` over the 16
+     * `Cluster` handles (0x009329A0, see `MakeSubclusterCacheKey`), which
+     * retains each handle's refcount exactly like any other `Cluster` copy.
+     * A `std::array<uint8_t,...>` raw-byte model would have to `memcpy` the
+     * handles in (no retain) and would never run their destructors on
+     * teardown (no release) - `ClusterInternalCache<SubclusterData>`'s real
+     * destructor (`FUN_00934500`) needs those sixteen `~Cluster()` calls to
+     * happen, and typing the key this way is what makes `msvc8::list`'s
+     * generic node destructor perform them for free.
+     */
     struct SubclusterCacheKey
     {
-        std::array<std::uint8_t, sizeof(gpg::HaStar::SubclusterData)> mBytes{};
+        gpg::HaStar::Cluster mClusters[16];
+        std::int32_t mLevel{};
     };
 
     /**
@@ -1987,11 +1635,9 @@ namespace
         constexpr std::uint32_t kMul = 0x106D643Du;
         constexpr std::uint32_t kLevelXor = 0x7BEF2693u;
 
-        const auto& subclusterData = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(key.mBytes.data());
-
-        std::uint32_t mixed = kMul * (static_cast<std::uint32_t>(subclusterData.mLevel) ^ kLevelXor);
+        std::uint32_t mixed = kMul * (static_cast<std::uint32_t>(key.mLevel) ^ kLevelXor);
         std::uint32_t hash = mixed ^ (mixed >> 13);
-        for (const gpg::HaStar::Cluster& cluster : subclusterData.mClusters) {
+        for (const gpg::HaStar::Cluster& cluster : key.mClusters) {
             mixed = kMul * (hash ^ gpg::HaStar::hash_value(cluster));
             hash = mixed ^ (mixed >> 13);
         }
@@ -2006,18 +1652,13 @@ namespace
      */
     [[nodiscard]] bool SubclusterKeyLess(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs)
     {
-        // The key holds a raw byte copy of a SubclusterData (see the memcpy at
-        // key construction), so view it back as one and order it exactly as the
-        // binary does: by level first, then each of the 16 cluster handles by
-        // payload (Cluster::cmp). Reference-cast only -- Cluster owns a refcount,
-        // so a value copy here would run its dtor over borrowed payloads.
-        const auto& a = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(lhs.mBytes.data());
-        const auto& b = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(rhs.mBytes.data());
-        if (a.mLevel != b.mLevel) {
-            return a.mLevel < b.mLevel;
+        // Orders exactly as the binary does: by level first, then each of the
+        // 16 cluster handles by payload (Cluster::cmp).
+        if (lhs.mLevel != rhs.mLevel) {
+            return lhs.mLevel < rhs.mLevel;
         }
         for (int i = 0; i < 16; ++i) {
-            const int order = a.mClusters[i].cmp(b.mClusters[i]);
+            const int order = lhs.mClusters[i].cmp(rhs.mClusters[i]);
             if (order != 0) {
                 return order < 0;
             }
@@ -3829,26 +3470,6 @@ namespace
             gpg::HaStar::Cluster::Data*,
             msvc8::hash_compare<SubclusterCacheKey, SubclusterKeyOrder>>;
 
-    struct RuntimeClusterCacheStore
-    {
-        OccupationCacheRuntimeMap mOccupation;
-        SubclusterCacheRuntimeMap mSubcluster;
-    };
-
-    struct CacheLookupResult
-    {
-        gpg::HaStar::Cluster::Data* mData{};
-        bool mFound{};
-    };
-
-    struct CacheInsertResult
-    {
-        gpg::HaStar::Cluster::Data* mData{};
-        bool mInserted{};
-    };
-
-    std::unordered_map<void*, RuntimeClusterCacheStore> gRuntimeClusterCacheStores;
-
     void RetainClusterData(gpg::HaStar::Cluster::Data* data)
     {
         if (data) {
@@ -3868,10 +3489,10 @@ namespace
         }
 
         if (data->mReleaseObject) {
-            using ReleaseFn = void(__thiscall*)(void*, std::uint32_t);
-            auto** const vtable = *reinterpret_cast<void***>(data->mReleaseObject);
-            auto* const releaseFn = reinterpret_cast<ReleaseFn>(vtable[0]);
-            releaseFn(data->mReleaseObject, data->mReleaseArg);
+            // Binary: `mov edx,[ecx]; mov edx,[edx]; call edx` at
+            // 0x009350A0..0x009350AB - a slot-0 virtual dispatch through
+            // `Cluster::Data::mReleaseObject`. `ICache::Evict` is that slot.
+            data->mReleaseObject->Evict(data->mReleaseArg);
         }
         operator delete[](data);
     }
@@ -3976,312 +3597,353 @@ namespace
       return destination;
     }
 
-    /**
-     * Address: 0x009355F0 (gpg::HaStar::ClusterInternalCache_OccupationData::Func)
-     * Mangled: ??_7?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
-     *
-     * IDA signature:
-     * void __thiscall gpg__HaStar__ClusterInternalCache_OccupationData__Func(
-     *     ClusterInternalCache<OccupationData> *this, const OccupationData *key);
-     *
-     * What it does:
-     * Drops the cache entry whose payload just lost its last handle. This is
-     * slot 0 of `ClusterInternalCache<OccupationData>`'s vtable (0x00D47884)
-     * and the concrete override of the single virtual `gpg::HaStar::Cluster::
-     * ICache` declares; the body is two instructions, `add ecx, 4` to step from
-     * the `ICache` sub-object onto the `stdext::hash_map` the cache holds at
-     * +0x04, then a tail `jmp` into `hash_map::erase(const key_type&)`
-     * (0x00935480).
-     *
-     * `ClusterInternalCache<OccupationData>::Fetch` is what arms this: once its
-     * insert reports success it stores the owning cache into
-     * `Cluster::Data::mReleaseObject` and the address of the key inside the
-     * freshly linked node into `Cluster::Data::mReleaseArg`
-     * (`mov [ecx+4], edi` / `add edx, 8; mov [eax+8], edx` at 0x00935063 and
-     * 0x0093506A), so that `ReleaseClusterData` can dispatch back through slot
-     * 0 when the refcount reaches zero (`mov edx,[ecx]; mov edx,[edx];
-     * call edx` at 0x009350A0..0x009350AB).
-     *
-     * Not yet reachable from recovered source, and deliberately left that way:
-     * `ReleaseClusterData` reads `Cluster::Data::mReleaseObject`, which
-     * `gpg/core/algorithms/Cluster.h` still types as `void*`, and `ICache`
-     * still declares its slot-0 virtual with no parameters. Naming this
-     * function from that dispatch needs both retyped - an `ICache*` field and a
-     * `virtual void Evict(const OccupationData&)` slot - which is a `Cluster.h`
-     * change, not a `Cluster.cpp` one. Until then nothing in `src/sdk/**`
-     * populates `mReleaseObject`, so the eviction lane is inert rather than
-     * wrong.
-     */
-    [[maybe_unused]] void EvictOccupationCacheEntry(
-        RuntimeClusterCacheStore& store,
-        const gpg::HaStar::OccupationData& occupationData
-    )
-    {
-        store.mOccupation.erase(MakeOccupationCacheKey(occupationData));
-    }
-
     [[nodiscard]] SubclusterCacheKey MakeSubclusterCacheKey(const gpg::HaStar::SubclusterData& subclusterData)
     {
+        // Binary evidence (0x009329A0, "eh vector copy constructor iterator"
+        // over the 16 `Cluster` handles): the key is copy-constructed from
+        // the source `SubclusterData`, retaining each handle's refcount -
+        // not `memcpy`'d, which is why `SubclusterCacheKey` now holds real
+        // `Cluster` fields instead of a raw byte blob (see its declaration).
         SubclusterCacheKey key{};
-        std::memcpy(key.mBytes.data(), &subclusterData, key.mBytes.size());
+        for (int i = 0; i < 16; ++i) {
+            key.mClusters[i] = subclusterData.mClusters[i];
+        }
+        key.mLevel = subclusterData.mLevel;
         return key;
     }
 
-    [[nodiscard]] RuntimeClusterCacheStore& RuntimeClusterCacheForBase(void* const cacheTreeBase)
-    {
-        return gRuntimeClusterCacheStores[cacheTreeBase];
-    }
-
-    [[nodiscard]] void* ResolveCacheTreeBaseFromSubclusterPtr(void* const subclusterTree)
-    {
-        if (!subclusterTree) {
-            return nullptr;
-        }
-
-        auto* const bytes = static_cast<std::uint8_t*>(subclusterTree);
-        return static_cast<void*>(bytes - offsetof(ClusterCacheTreeLayout, mSubclusterTree));
-    }
-
-    void ReleaseRuntimeClusterCacheStore(void* const cacheTreeBase)
-    {
-        const auto it = gRuntimeClusterCacheStores.find(cacheTreeBase);
-        if (it == gRuntimeClusterCacheStores.end()) {
-            return;
-        }
-
-        RuntimeClusterCacheStore& store = it->second;
-        for (const auto& node : store.mOccupation) {
-            ReleaseClusterData(node.second);
-        }
-        for (const auto& node : store.mSubcluster) {
-            ReleaseClusterData(node.second);
-        }
-
-        gRuntimeClusterCacheStores.erase(it);
-    }
+    /**
+     * The real `ClusterInternalCache<T>` this subsystem builds, keyed
+     * directly on `T` (`OccupationData` / `SubclusterData`) rather than a
+     * side table. `ClusterCache::ClusterCache()` (0x00935580) constructs two
+     * of these in place - `mOccupationData` at `this+0x00`, `mSubclusterData`
+     * at `this+0x2C` - each `sizeof == 0x2C` (vtable + one
+     * `msvc8::hash_map<Key, Cluster::Data*, hash_compare<Key, Order>>`,
+     * itself `sizeof == 0x28`, matching FUN_00934820/FUN_00934B60's `mMask`/
+     * `mMaxidx` writes at `this+0x20`/`this+0x24` and the head/size writes at
+     * `this+0x0C`/`this+0x10`).
+     *
+     * `msvc8::hash_map`'s own default constructor already reproduces
+     * FUN_00934820/FUN_00934B60 exactly: `_Init()` seeds the same 9 bucket
+     * copies of `mList.end()` those functions build by hand via
+     * `sub_9327A0`/`sub_9327E0` + `sub_9341A0`/`sub_934250`. Only one binary
+     * write is not reproduced - `this->mBool = *cacheEnabledFlag` writes a
+     * caller-supplied byte at the container's `+0x00` (the `hash_compare`
+     * traits slot msvc8::hash_map's own layout already reserves there) -
+     * because both call sites that construct one of these
+     * (`ClusterCache::ClusterCache`, 0x0093559B/0x009355A0) pass the address
+     * of the *same uninitialized stack byte* to every field that would read
+     * it downstream, and no `ClusterInternalCache<T>` method (dtor, `Fetch`,
+     * `Evict`) ever reads it back out. It is a dead field at the binary
+     * level; the recovered constructor does not fabricate a reader for it.
+     */
+    template <typename T>
+    class ClusterInternalCache; // no generic body - only the two explicit specializations below exist.
 
     /**
-     * Address: 0x00932B70 (FUN_00932B70, sub_932B70)
+     * Address: 0x00933DE0 (FUN_00933DE0)
+     * Mangled: ??1?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@UAE@XZ
+     *
+     * IDA signature:
+     * void __thiscall sub_933DE0(gpg::HaStar::ClusterInternalCache_OccupationData *this);
      *
      * What it does:
-     * Finds an occupation-key cache entry.
+     * `ClusterInternalCache<OccupationData>::~ClusterInternalCache`. Walks
+     * every live entry severing its `Cluster::Data` backpointer (asserting
+     * `data->mCache == this` - `ClusterCache.cpp:70` - then zeroing
+     * `mReleaseObject`/`mReleaseArg`) so a handle that outlives this cache
+     * never calls back into a destroyed `ICache::Evict`. `mVec`'s own
+     * destructor (implicit, after this body runs) then tears down the
+     * bucket-index vector, walks the node list freeing each 0x20-byte node
+     * (`{Next, Prev, OccupationCacheKey, Cluster::Data*}` - a trivial key,
+     * no per-node destructor work needed), and frees the head sentinel -
+     * exactly the binary's `[esi+18h]` vector-storage free, `[esi+0Ch]`
+     * node walk, then final head `operator delete`.
      */
-    [[nodiscard]] CacheLookupResult FindOccupationCacheEntry(
-        void* const cacheTreeBase,
+    template <>
+    class ClusterInternalCache<gpg::HaStar::OccupationData> final : public gpg::HaStar::ICache
+    {
+    public:
+        ClusterInternalCache() = default;
+
+        // Not `override`: `ICache`'s vtable has a single documented slot
+        // (`Evict`, slot 0, `_purecall`) - no virtual destructor evidence.
+        // The vtable-repoint at this destructor's start (standard codegen
+        // for any class with at least one virtual member) is reproduced
+        // automatically since this class still derives from `ICache`.
+        ~ClusterInternalCache();
+
+        /**
+         * Address: 0x00934F80 (FUN_00934F80, sub_934F80)
+         *
+         * What it does:
+         * Returns the cached cluster for `occupationData`, building and
+         * caching one on a miss. A successful insert arms this cache's
+         * `ICache::Evict` slot on the freshly-cached `Cluster::Data` (the
+         * `mov [ecx+4], edi` / `add edx, 8; mov [eax+8], edx` pair at
+         * 0x00935063/0x0093506A) so `ReleaseClusterData` can drop the entry
+         * once every outstanding `Cluster` handle to it releases.
+         */
+        [[nodiscard]] gpg::HaStar::Cluster Fetch(const gpg::HaStar::OccupationData& occupationData);
+
+    private:
+        /**
+         * Address: 0x009355F0 (gpg::HaStar::ClusterInternalCache_OccupationData::Func)
+         * Mangled: ??_7?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
+         *
+         * What it does:
+         * Slot 0 of this class's vtable (0x00D47884): `add ecx, 4` to step
+         * from the `ICache` sub-object onto `mVec`, then a tail `jmp` into
+         * `hash_map::erase(const key_type&)` (0x00935480, already the
+         * `OccupationCacheKey` instantiation of `msvc8::hash_map::erase`
+         * cited in `legacy/containers/HashMap.h`).
+         */
+        void Evict(const void* key) override;
+
+        OccupationCacheRuntimeMap mVec;
+    };
+    static_assert(sizeof(ClusterInternalCache<gpg::HaStar::OccupationData>) == 0x2C,
+        "ClusterInternalCache<OccupationData> size must be 0x2C");
+
+    ClusterInternalCache<gpg::HaStar::OccupationData>::~ClusterInternalCache()
+    {
+        for (auto& entry : mVec) {
+            gpg::HaStar::Cluster::Data* const data = entry.second;
+            if (data->mReleaseObject != this) {
+                gpg::HandleAssertFailure(
+                    "data->mCache == this",
+                    70,
+                    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
+                );
+            }
+            data->mReleaseObject = nullptr;
+            data->mReleaseArg = nullptr;
+        }
+    }
+
+    void ClusterInternalCache<gpg::HaStar::OccupationData>::Evict(const void* const key)
+    {
+        mVec.erase(*static_cast<const OccupationCacheKey*>(key));
+    }
+
+    gpg::HaStar::Cluster ClusterInternalCache<gpg::HaStar::OccupationData>::Fetch(
         const gpg::HaStar::OccupationData& occupationData
     )
     {
-        RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
         const OccupationCacheKey key = MakeOccupationCacheKey(occupationData);
-        const auto it = store.mOccupation.find(key);
-        if (it == store.mOccupation.end()) {
-            return {};
+        gpg::HaStar::Cluster result{};
+
+        const auto found = mVec.find(key);
+        if (found != mVec.end()) {
+            SetClusterData(result, found->second);
+            return result;
         }
 
-        CacheLookupResult result{};
-        result.mData = it->second;
-        result.mFound = true;
+        gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(occupationData);
+        const auto inserted = mVec.insert(OccupationCacheRuntimeMap::value_type(key, built.mData));
+        if (!inserted.second) {
+            gpg::HandleAssertFailure(
+                "ins.second",
+                87,
+                "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
+            );
+        } else {
+            RetainClusterData(inserted.first->second);
+            inserted.first->second->mReleaseObject = this;
+            inserted.first->second->mReleaseArg = &inserted.first->first;
+        }
+
+        SetClusterData(result, inserted.first->second);
         return result;
     }
 
     /**
-     * Address: 0x00932C60 (FUN_00932C60, sub_932C60)
+     * Address: 0x00934500 (FUN_00934500)
+     * Mangled: ??1?$ClusterInternalCache@USubclusterData@HaStar@gpg@@@HaStar@gpg@@UAE@XZ
      *
      * What it does:
-     * Finds a subcluster-key cache entry. 0x00932C60 is the subcluster-key
-     * emission of `msvc8::hash_map::find` - the same bucket-window walk
-     * 0x00932B70 performs for the occupation key.
+     * `ClusterInternalCache<SubclusterData>::~ClusterInternalCache` - same
+     * backpointer-severing prepass as the `OccupationData` sibling above,
+     * over a 0x50-byte-node hash_map instead of a 0x20-byte one. `mVec`'s
+     * implicit destructor then does the rest, and here that "rest" also
+     * covers what a hand-written `ClearSubclusterCacheRingList` used to do
+     * by hand: `SubclusterCacheKey` embeds 16 real `Cluster` handles, so the
+     * node's implicit `~pair<const SubclusterCacheKey, Cluster::Data*>()`
+     * already runs `~Cluster()` on each of them before the node is freed -
+     * exactly the binary's `eh vector destructor iterator` sweep.
      */
-    [[nodiscard]] CacheLookupResult FindSubclusterCacheEntry(
-        void* const cacheTreeBase,
+    template <>
+    class ClusterInternalCache<gpg::HaStar::SubclusterData> final : public gpg::HaStar::ICache
+    {
+    public:
+        ClusterInternalCache() = default;
+
+        // Not `override`: `ICache`'s vtable has a single documented slot
+        // (`Evict`, slot 0, `_purecall`) - no virtual destructor evidence.
+        // The vtable-repoint at this destructor's start (standard codegen
+        // for any class with at least one virtual member) is reproduced
+        // automatically since this class still derives from `ICache`.
+        ~ClusterInternalCache();
+
+        /**
+         * Address: 0x009350F0 (FUN_009350F0, sub_9350F0)
+         *
+         * What it does:
+         * Returns the cached cluster for `subclusterData`, building and
+         * caching one on a miss, and arming `ICache::Evict` on success -
+         * mirrors `ClusterInternalCache<OccupationData>::Fetch` one for one.
+         */
+        [[nodiscard]] gpg::HaStar::Cluster Fetch(const gpg::HaStar::SubclusterData& subclusterData);
+
+    private:
+        /**
+         * Address: 0x00935600 (gpg::HaStar::ClusterInternalCache_SubclusterData::Func)
+         * Mangled: ??_7?$ClusterInternalCache@USubclusterData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
+         *
+         * What it does:
+         * The `SubclusterData` instantiation of the same vtable-slot-0
+         * pattern as `ClusterInternalCache<OccupationData>::Evict`: steps
+         * onto `mVec` and tails into `hash_map::erase(const key_type&)`
+         * (0x009354D0, the `SubclusterCacheKey` instantiation).
+         */
+        void Evict(const void* key) override;
+
+        SubclusterCacheRuntimeMap mVec;
+    };
+    static_assert(sizeof(ClusterInternalCache<gpg::HaStar::SubclusterData>) == 0x2C,
+        "ClusterInternalCache<SubclusterData> size must be 0x2C");
+
+    ClusterInternalCache<gpg::HaStar::SubclusterData>::~ClusterInternalCache()
+    {
+        for (auto& entry : mVec) {
+            gpg::HaStar::Cluster::Data* const data = entry.second;
+            if (data->mReleaseObject != this) {
+                gpg::HandleAssertFailure(
+                    "data->mCache == this",
+                    70,
+                    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
+                );
+            }
+            data->mReleaseObject = nullptr;
+            data->mReleaseArg = nullptr;
+        }
+    }
+
+    void ClusterInternalCache<gpg::HaStar::SubclusterData>::Evict(const void* const key)
+    {
+        mVec.erase(*static_cast<const SubclusterCacheKey*>(key));
+    }
+
+    gpg::HaStar::Cluster ClusterInternalCache<gpg::HaStar::SubclusterData>::Fetch(
         const gpg::HaStar::SubclusterData& subclusterData
     )
     {
-        RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
         const SubclusterCacheKey key = MakeSubclusterCacheKey(subclusterData);
-        const auto it = store.mSubcluster.find(key);
-        if (it == store.mSubcluster.end()) {
-            return {};
+        gpg::HaStar::Cluster result{};
+
+        const auto found = mVec.find(key);
+        if (found != mVec.end()) {
+            SetClusterData(result, found->second);
+            return result;
         }
 
-        CacheLookupResult result{};
-        result.mData = it->second;
-        result.mFound = true;
-        return result;
-    }
-
-    /**
-     * Address: 0x009348A0 (FUN_009348A0, sub_9348A0)
-     *
-     * What it does:
-     * Inserts an occupation-key cache entry and reports insertion status.
-     *
-     * 0x009348A0 is the occupation-key emission of
-     * `msvc8::hash_map::insert(const value_type&)` - the same body the
-     * subcluster key gets at 0x00934BE0. Calling it by name here is what emits
-     * the rest of this instantiation's out-of-line bodies:
-     *
-     *   0x009328C0 - `msvc8::list<value_type>::_Buynode`
-     *                (`operator new(0x20)` = 8 link bytes + a 0x18-byte
-     *                `pair<const key, Cluster::Data*>`, copied as six dwords;
-     *                0x18 fits both readings of the key - an 18-byte key
-     *                padded to 20, or `OccupationData` itself at 20 bytes with
-     *                only its first 18 hashed and compared - so the node size
-     *                does not settle which one the original template was
-     *                instantiated on),
-     *   0x009332E0 - `msvc8::list::_Incsize`, with the `0AAAAAAAh` max_size
-     *                check and its "list<T> too long" `length_error`,
-     *   0x00934080 - `msvc8::vector<iterator>::resize(n, end())` from `_Grow`,
-     *                itself reaching `vector::insert(pos, n, value)`
-     *                (0x00933640), whose element-range copy/shift step is
-     *                0x00932610 (a plain forward 4-byte-element copy loop,
-     *                matching `iterator`'s pointer-sized storage).
-     *
-     * The bucket fold is inlined into this body rather than shared with
-     * 0x00932080: `gpg::HashBytes` is called directly at the top and
-     * `OccupationKeyLess` (0x00931460) drives the backwards window scan.
-     */
-    [[nodiscard]] CacheInsertResult InsertOccupationCacheEntry(
-        void* const cacheTreeBase,
-        const gpg::HaStar::OccupationData& occupationData,
-        gpg::HaStar::Cluster::Data* const clusterData
-    )
-    {
-        RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
-        const OccupationCacheKey key = MakeOccupationCacheKey(occupationData);
-        const auto insertResult =
-          store.mOccupation.insert(OccupationCacheRuntimeMap::value_type(key, clusterData));
-        const auto it = insertResult.first;
-        const bool inserted = insertResult.second;
-        if (inserted) {
-            RetainClusterData(clusterData);
-        }
-
-        CacheInsertResult result{};
-        result.mData = it->second;
-        result.mInserted = inserted;
-        return result;
-    }
-
-    /**
-     * Address: 0x00934BE0 (FUN_00934BE0, sub_934BE0)
-     *
-     * What it does:
-     * Inserts a subcluster-key cache entry and reports insertion status.
-     *
-     * 0x00934BE0 is the subcluster-key emission of
-     * `msvc8::hash_map::insert(const value_type&)`: grow when
-     * `mMaxidx <= size() / 4`, locate the sorted insertion point by scanning
-     * the bucket window backwards, bail out with `{position, false}` on an
-     * equivalent key, otherwise link the node and retarget every bucket
-     * boundary that still names the displaced node. Calling it by name here
-     * is what emits the rest of that instantiation's out-of-line bodies:
-     *
-     *   0x00932FD0 - `msvc8::list<value_type>::insert`'s node buy
-     *                (`operator new(0x50)` = 8 link bytes + the 0x48-byte
-     *                `pair<const SubclusterCacheKey, Cluster::Data*>`),
-     *   0x009329A0 - the pair's placement copy-construct (an
-     *                `eh vector copy constructor iterator` over the 16
-     *                `Cluster` handles, then `mLevel` at +0x40 and the
-     *                mapped pointer at +0x44),
-     *   0x009333D0 - `msvc8::list::_Incsize`,
-     *   0x00934130 - `msvc8::vector<iterator>::resize(n, end())` from `_Grow`.
-     */
-    [[nodiscard]] CacheInsertResult InsertSubclusterCacheEntry(
-        void* const cacheTreeBase,
-        const gpg::HaStar::SubclusterData& subclusterData,
-        gpg::HaStar::Cluster::Data* const clusterData
-    )
-    {
-        RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
-        const SubclusterCacheKey key = MakeSubclusterCacheKey(subclusterData);
-        const auto insertResult =
-          store.mSubcluster.insert(SubclusterCacheRuntimeMap::value_type(key, clusterData));
-        const auto it = insertResult.first;
-        const bool inserted = insertResult.second;
-        if (inserted) {
-            RetainClusterData(clusterData);
-        }
-
-        CacheInsertResult result{};
-        result.mData = it->second;
-        result.mInserted = inserted;
-        return result;
-    }
-
-    /**
-     * Address: 0x00934F80 (FUN_00934F80, sub_934F80)
-     *
-     * What it does:
-     * Fetches/builds occupation cache entry and returns a retained cluster handle.
-     */
-    gpg::HaStar::Cluster* ClusterCacheFetchFromOccupationTree(
-        void* const cacheTreeBase,
-        gpg::HaStar::Cluster* const outCluster,
-        const gpg::HaStar::OccupationData* const occupationData
-    )
-    {
-        if (!outCluster || !occupationData) {
-            return outCluster;
-        }
-
-        const CacheLookupResult found = FindOccupationCacheEntry(cacheTreeBase, *occupationData);
-        if (found.mFound) {
-            SetClusterData(*outCluster, found.mData);
-            return outCluster;
-        }
-
-        gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(*occupationData);
-        const CacheInsertResult inserted = InsertOccupationCacheEntry(cacheTreeBase, *occupationData, built.mData);
-        if (!inserted.mInserted) {
+        gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(subclusterData);
+        const auto inserted = mVec.insert(SubclusterCacheRuntimeMap::value_type(key, built.mData));
+        if (!inserted.second) {
             gpg::HandleAssertFailure(
                 "ins.second",
                 87,
                 "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
             );
+        } else {
+            RetainClusterData(inserted.first->second);
+            inserted.first->second->mReleaseObject = this;
+            inserted.first->second->mReleaseArg = &inserted.first->first;
         }
 
-        SetClusterData(*outCluster, inserted.mData);
-        return outCluster;
+        SetClusterData(result, inserted.first->second);
+        return result;
     }
 
+} // namespace
+
+namespace gpg::HaStar
+{
     /**
-     * Address: 0x009350F0 (FUN_009350F0, sub_9350F0)
+     * The real backing object behind `ClusterCache`'s shared handle (see
+     * that class's Doxygen block in `Cluster.h` for the handle/impl split's
+     * evidence trail). Constructs/destroys its two `ClusterInternalCache<T>`
+     * members in declaration order - reverse order on the way out, which is
+     * exactly what FUN_00934F30 does by explicit call
+     * (`sub_934500(this+44)` then `sub_933DE0(this)`) and what
+     * FUN_00935580 does by explicit vtable-write-then-construct
+     * (`mOccupationData` at `this+0`, `mSubclusterData` at `this+0x2C`).
      *
-     * What it does:
-     * Fetches/builds subcluster cache entry and returns a retained cluster handle.
+     * `ClusterInternalCache<T>`'s two specializations live in this TU's
+     * anonymous namespace (they hold `msvc8::hash_map` instantiations keyed
+     * on equally TU-local `OccupationCacheKey`/`SubclusterCacheKey` types);
+     * ordinary unqualified lookup from this namespace still finds them
+     * because an anonymous namespace's members are implicitly visible from
+     * every enclosing scope in the same translation unit.
      */
-    gpg::HaStar::Cluster* ClusterCacheFetchFromSubclusterTree(
-        void* const subclusterTree,
-        gpg::HaStar::Cluster* const outCluster,
-        const gpg::HaStar::SubclusterData* const subclusterData
-    )
+    class ClusterCacheImpl
     {
-        if (!outCluster || !subclusterData) {
-            return outCluster;
+    public:
+        /**
+         * Address: 0x00935580 (FUN_00935580, ??0ClusterCache@HaStar@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Constructs `mOccupationData` then `mSubclusterData` in place -
+         * `operator new(0x58)` for the block this lands in is the caller's
+         * job (`boost::shared_ptr<ClusterCacheImpl>`'s own constructor,
+         * FUN_009356E0). If `mSubclusterData`'s construction were to throw,
+         * the compiler-generated unwind funclet for this constructor runs
+         * `mOccupationData.~ClusterInternalCache()` (FUN_00933DE0) - the
+         * `owner_ea=FUN_00935580` unwind edge recorded against that token.
+         */
+        ClusterCacheImpl() = default;
+
+        /**
+         * Address: 0x00934F30 (FUN_00934F30)
+         *
+         * What it does:
+         * Destroys `mSubclusterData` then `mOccupationData` - the binary's
+         * `sub_934500(this+44)` then `sub_933DE0(this)` pair, reproduced
+         * here by ordinary reverse-declaration-order member destruction.
+         */
+        ~ClusterCacheImpl() = default;
+
+        /**
+         * Address: 0x00935420 (FUN_00935420,
+         * ?FetchCluster@ClusterCache@HaStar@gpg@@QAE?AVCluster@23@ABUOccupationData@23@@Z)
+         */
+        [[nodiscard]] gpg::HaStar::Cluster FetchCluster(const gpg::HaStar::OccupationData& occupationData)
+        {
+            return mOccupationData.Fetch(occupationData);
         }
 
-        void* const cacheTreeBase = ResolveCacheTreeBaseFromSubclusterPtr(subclusterTree);
-        const CacheLookupResult found = FindSubclusterCacheEntry(cacheTreeBase, *subclusterData);
-        if (found.mFound) {
-            SetClusterData(*outCluster, found.mData);
-            return outCluster;
+        /**
+         * Address: 0x00935450 (FUN_00935450,
+         * ?FetchCluster@ClusterCache@HaStar@gpg@@QAE?AVCluster@23@ABUSubclusterData@23@@Z)
+         */
+        [[nodiscard]] gpg::HaStar::Cluster FetchCluster(const gpg::HaStar::SubclusterData& subclusterData)
+        {
+            return mSubclusterData.Fetch(subclusterData);
         }
 
-        gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(*subclusterData);
-        const CacheInsertResult inserted = InsertSubclusterCacheEntry(cacheTreeBase, *subclusterData, built.mData);
-        if (!inserted.mInserted) {
-            gpg::HandleAssertFailure(
-                "ins.second",
-                87,
-                "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
-            );
-        }
+        // Layout-transparent: `ClusterCache::FetchCluster` (below) is
+        // handle-forwarding only and never reaches in here, so there is no
+        // encapsulation to buy by hiding these - keeping them public lets
+        // the offset asserts below run as ordinary namespace-scope checks.
+        ClusterInternalCache<gpg::HaStar::OccupationData> mOccupationData; // +0x00
+        ClusterInternalCache<gpg::HaStar::SubclusterData> mSubclusterData; // +0x2C
+    };
+    static_assert(sizeof(ClusterCacheImpl) == 0x58, "ClusterCacheImpl size must be 0x58");
+    static_assert(offsetof(ClusterCacheImpl, mSubclusterData) == 0x2C, "ClusterCacheImpl::mSubclusterData offset must be 0x2C");
+} // namespace gpg::HaStar
 
-        SetClusterData(*outCluster, inserted.mData);
-        return outCluster;
-    }
-
+namespace
+{
     void DestroySubclusterStorage(gpg::HaStar::Subcluster& subcluster)
     {
         if (!subcluster.mArray) {
@@ -4822,7 +4484,7 @@ void Cluster::SetData(
         auto* const replacement = static_cast<Cluster::Data*>(::operator new[](totalBytes));
         replacement->mRefs = 1;
         replacement->mReleaseObject = nullptr;
-        replacement->mReleaseArg = 0u;
+        replacement->mReleaseArg = nullptr;
         replacement->mNodeCount = static_cast<std::uint8_t>(nodeCount);
 
         if (mData != nullptr) {
@@ -4830,10 +4492,11 @@ void Cluster::SetData(
             Cluster::Data* const prior = mData;
             if (prior->mRefs == 0) {
                 if (prior->mReleaseObject != nullptr) {
-                    using ReleaseFn = void(__thiscall*)(void*, std::uint32_t);
-                    auto** const vtable = *reinterpret_cast<void***>(prior->mReleaseObject);
-                    auto* const releaseFn = reinterpret_cast<ReleaseFn>(vtable[0]);
-                    releaseFn(prior->mReleaseObject, prior->mReleaseArg);
+                    // Slot-0 virtual dispatch through `mReleaseObject` - see
+                    // `ICache::Evict`'s Doxygen block in Cluster.h for the
+                    // binary evidence (`mov edx,[ecx]; mov edx,[edx];
+                    // call edx` at 0x009350A0..0x009350AB).
+                    prior->mReleaseObject->Evict(prior->mReleaseArg);
                 }
                 ::operator delete[](prior);
             }
@@ -4987,20 +4650,23 @@ Cluster ClusterBuild(const SubclusterData& subclusterData)
  * Address: 0x00931FB0 (FUN_00931FB0, ??1WeakPtr_ClusterCache@Moho@@QAE@@Z)
  *
  * Note:
- * ClusterCache shares the same two-word layout as the weak/shared cache handle in the original binary.
+ * `ClusterCache` shares the same two-word layout as the weak/shared cache
+ * handle in the original binary: `mCacheTree` is `ClusterCacheImpl*` (the
+ * raw pointer `boost::shared_ptr<ClusterCacheImpl>` keeps for fast
+ * dereference - see `ClusterCacheImpl`'s Doxygen block for the
+ * handle/impl split's evidence trail) and `mCacheRefs` its shared control
+ * block. `ReleaseSharedCount` mirrors the control block's own
+ * `release()`; the real `ClusterCacheImpl` teardown this drives - when the
+ * last shared reference drops - is `delete mCacheTree`, which invokes
+ * `ClusterCacheImpl::~ClusterCacheImpl()` (FUN_00934F30), in turn
+ * destroying `mSubclusterData` then `mOccupationData`
+ * (FUN_00934500/FUN_00933DE0).
  */
 ClusterCache::~ClusterCache()
 {
     const bool releasedLast = ReleaseSharedCount(mCacheRefs);
     if (!mCacheRefs || releasedLast) {
-        // Drain any ring-list-style subcluster cache buckets that were
-        // attached to this cache base (binary runs FUN_00933380 over the
-        // ring head before freeing the bucket vector storage).
-        // `DrainSubclusterRingsAttachedToCacheBase` lives in the
-        // anonymous namespace at the top of this TU (resolved via the
-        // same unqualified-lookup rule used for `ReleaseRuntimeClusterCacheStore`).
-        ReleaseRuntimeClusterCacheStore(mCacheTree);
-        DrainSubclusterRingsAttachedToCacheBase(mCacheTree);
+        delete mCacheTree;
     }
     mCacheRefs = nullptr;
     mCacheTree = nullptr;
@@ -5105,9 +4771,10 @@ ClusterMap::~ClusterMap() = default;
  */
 Cluster ClusterCache::FetchCluster(const OccupationData& occupationData)
 {
-    Cluster outCluster{};
-    ClusterCacheFetchFromOccupationTree(mCacheTree, &outCluster, &occupationData);
-    return outCluster;
+    if (!mCacheTree) {
+        return Cluster{};
+    }
+    return mCacheTree->FetchCluster(occupationData);
 }
 
 /**
@@ -5116,14 +4783,10 @@ Cluster ClusterCache::FetchCluster(const OccupationData& occupationData)
  */
 Cluster ClusterCache::FetchCluster(const SubclusterData& subclusterData)
 {
-    Cluster outCluster{};
-    void* subclusterTree = nullptr;
-    if (mCacheTree) {
-        auto* const cacheTree = reinterpret_cast<ClusterCacheTreeLayout*>(mCacheTree);
-        subclusterTree = &cacheTree->mSubclusterTree;
+    if (!mCacheTree) {
+        return Cluster{};
     }
-    ClusterCacheFetchFromSubclusterTree(subclusterTree, &outCluster, &subclusterData);
-    return outCluster;
+    return mCacheTree->FetchCluster(subclusterData);
 }
 
 /**
