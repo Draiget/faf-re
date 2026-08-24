@@ -2960,6 +2960,19 @@ namespace msvc8
          * (D3D9Interfaces.cpp, `adapterModes.push_back(mode); return
          * &adapterModes.back();`).)
          *
+         * Address: 0x0082E950 (FUN_0082E950, msvc8::vector<UICommandGraph::
+         * CommandGraphEdge*>::insert for the 4-byte pointer element -- the
+         * full grow-core implementation this instantiation's push_back
+         * (`FUN_0082BCB0`, cited above) tail-calls on its capacity-full
+         * path: `max_size` guard folds to `0x3FFFFFFF` (`>>2` pointer
+         * stride), 1.5x growth (`(size>>1)+size`, falling back to
+         * `size()+1` on overflow), in-place tail-shift-then-fill when
+         * capacity already covers the request, full reallocate-and-
+         * relocate via `memmove_s` otherwise. Reached from
+         * `LinkCommandGraphEdge`'s `bucket.push_back(edge)`
+         * (`CWldSession.cpp:14703`, already recovered) when the bucket's
+         * `mEdges` vector is at capacity.)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the

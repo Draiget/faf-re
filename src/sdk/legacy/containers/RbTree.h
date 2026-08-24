@@ -1978,6 +1978,19 @@ namespace msvc8
              * too... not yet done" -- landed here). `Moho::
              * CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
              * unrecovered.)
+             * Address: 0x00951A40 (FUN_00951A40, sub_951A40) --
+             * `gpg::WriteArchive::mObjRefs`'s (`std::map<const void*,
+             * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
+             * checked-erase-per-node half of its `~map()`/`erase(begin(),
+             * end())` emission `FUN_00952300` (already cited above on
+             * `~rb_tree()`/`destroy_subtree`). Sole caller is that same
+             * emission; same `_SECURE_SCL` provably-unreachable-from-a-
+             * full-range-erase situation as the `RRuleGameRulesImpl`
+             * blueprint-map cluster resolved earlier this session
+             * (`mObjRefs.clear()`, `WriteArchive.cpp:970`, always calls with
+             * the full range). Not modeled for the same reason those were
+             * skipped -- compiled into the binary, never exercised by the
+             * one call site that reaches it.
              */
             node_type* erase_node(node_type* const erased)
             {
