@@ -1199,6 +1199,14 @@ namespace msvc8
              * MSVC8 buys a full node for the header and leaves `_Myval`
              * unconstructed - the colour/nil bytes live behind the value, so a
              * short allocation would place them out of bounds.
+             *
+             * Address: 0x00581330 (FUN_00581330, msvc8::map<Wm3::Vector2i,
+             * SBuildReserveInfo>::buy_head -- via alloc_raw's 40-byte lane
+             * FUN_00582460, already cited on AllocateCheckedElementBlock in
+             * Vector.cpp. Node size 12+sizeof(pair<Vector2i(8),
+             * SBuildReserveInfo(16)>)+2 = 38, rounded to 40; isNil@+0x25
+             * matches. Reached from `CAiBrain::mBuildStructureMap{}`'s
+             * default member-init in CAiBrain.cpp.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
