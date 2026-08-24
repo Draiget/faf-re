@@ -39175,10 +39175,19 @@ void wxWindowBase::PushEventHandler(wxWindowBase* const handler)
     return;
   }
 
+  // `GetEventHandler()` returns `this` both when the slot is genuinely empty
+  // (raw-null `eventHandler`) and when it has been explicitly self-seeded to
+  // the window (wxAssociateWinWithHandle, wxConstructFrameRuntimeBase, and
+  // window-creation set `state.eventHandler = window` up front, matching
+  // real wx's constructor default `m_eventHandler = this`). Either
+  // representation means "nothing pushed yet" -- `oldFront == this` is the
+  // one check that recognizes both, so `previousHandler` bookkeeping (unused
+  // by any reader today, kept for structural fidelity with real wx) must be
+  // skipped for it exactly as real wx skips it for its own sentinel.
   wxWindowBase* const oldFront = GetEventHandler();
   EnsureWxWindowBaseRuntimeState(handler).nextHandler = oldFront;
 
-  if (oldFront != nullptr) {
+  if (oldFront != this) {
     EnsureWxWindowBaseRuntimeState(oldFront).previousHandler = handler;
   }
 
@@ -39196,29 +39205,36 @@ void wxWindowBase::PushEventHandler(wxWindowBase* const handler)
  */
 wxWindowBase* wxWindowBase::PopEventHandler(const bool deleteHandler)
 {
-  // `GetEventHandler()` intentionally falls back to `this` when nothing has
-  // been pushed -- that is the right default for its 25+ ProcessEvent()
-  // call sites, but it means it can never be used here to detect an empty
-  // stack. Popping from a genuinely empty stack must check this window's
-  // own pushed-handler slot directly and no-op, matching real wx's
-  // "stack is empty" guard -- otherwise this treats `this` itself as a
-  // poppable handler, pushes it back onto itself on restore, and corrupts
-  // its own `nextHandler` into a self-reference (an infinite ProcessEvent
-  // recursion; see SuspendInputWindowEventHandlersAndFlushQueue's
-  // pop-two/push-two, which relies on a genuine empty-stack no-op here for
-  // windows that were never pushed onto via this member function at all).
-  const WxWindowBaseRuntimeState* const selfState = FindWxWindowBaseRuntimeState(this);
-  if (selfState == nullptr || selfState->eventHandler == nullptr) {
+  // Real wx's empty-stack sentinel is the window itself, not a null pointer
+  // -- `GetEventHandler()` already normalizes both encodings this codebase
+  // uses for "nothing pushed" (a raw-null `eventHandler` field, and the
+  // several call sites that explicitly self-seed it to the window) into
+  // `this`. Checking `front == this` here, instead of null-checking the
+  // field directly, is what correctly no-ops for both encodings; a null-only
+  // check misses the self-seeded case and previously caused
+  // SuspendInputWindowEventHandlersAndFlushQueue's pop-two/push-two to hand
+  // a window back to itself as its own `nextHandler`, corrupting the chain
+  // into a self-reference and stack-overflowing the next ProcessEvent that
+  // walked it.
+  wxWindowBase* const front = GetEventHandler();
+  if (front == this) {
     return nullptr;
   }
 
-  wxWindowBase* const front = selfState->eventHandler;
   WxWindowBaseRuntimeState& frontState = EnsureWxWindowBaseRuntimeState(front);
-  wxWindowBase* const next = frontState.nextHandler;
+  wxWindowBase* next = frontState.nextHandler;
   frontState.nextHandler = nullptr;
 
-  if (next != nullptr) {
-    EnsureWxWindowBaseRuntimeState(next).previousHandler = nullptr;
+  if (next != this) {
+    if (next != nullptr) {
+      EnsureWxWindowBaseRuntimeState(next).previousHandler = nullptr;
+    }
+  } else {
+    // The popped handler's `nextHandler` chains back to this window itself
+    // (the case when exactly one handler was pushed) -- that is the bottom
+    // of the stack, not a real next handler, so normalize it to null the
+    // same way the raw-empty encoding represents "nothing pushed."
+    next = nullptr;
   }
 
   EnsureWxWindowBaseRuntimeState(this).eventHandler = next;
