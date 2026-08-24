@@ -177,20 +177,6 @@ namespace
   }
 
   /**
-   * Address: 0x007B8190 (FUN_007B8190)
-   *
-   * What it does:
-   * Drops one shared pointer lane and releases the last ownership reference
-   * when this was the final live handle.
-   */
-  void ReleaseGlobalGpgNetPtr(
-    boost::shared_ptr<CGpgNetInterface>& ptr
-  ) noexcept
-  {
-    ptr.reset();
-  }
-
-  /**
    * Address: 0x007BB0E0 (FUN_007BB0E0)
    *
    * What it does:
@@ -516,13 +502,8 @@ void moho::ConstructVectorOfSNetCommandArgFilled(
     return;
   }
 
-  if (!moho::BuyVectorOfSNetCommandArgStorage(storage, count)) {
-    return;
-  }
-
   try {
-    CopyAssignCommandArgRangeWithRollback(prototype, static_cast<std::uint32_t>(count), storage.begin());
-    storage.resize(count, prototype);
+    storage.insert(storage.begin(), count, prototype);
   } catch (...) {
     moho::TidyVectorOfSNetCommandArg(storage);
     throw;
@@ -714,7 +695,7 @@ void moho::GPGNET_Attach(
  */
 void moho::GPGNET_Shutdown()
 {
-  ReleaseGlobalGpgNetPtr(sGPGNet);
+  sGPGNet.reset();
 }
 
 /**
