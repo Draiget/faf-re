@@ -8,18 +8,18 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`96.32%`**
+- Progress coverage:  **`96.41%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,698`*
+  - *Total amount of completed tokens: `64,757`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,708` (81.47%)
-- `skip`: `6,516` (10.07%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,474` (8.46%) — proven third-party/import-boundary code
+- `recovered`: `52,704` (81.39%)
+- `skip`: `6,579` (10.16%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,474` (8.45%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `407` (0.61%)
-- `in_progress`: `269` (0.40%)
+- `in_progress`: `210` (0.31%)
 - **`blocked`: `1,864` (2.78%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,271`*
@@ -30,14 +30,14 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,708 functions) — binary caller context
+### Recovered (52,704 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,342` | 31.00% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,335` | 30.99% |
 | Vtable-anchored (virtual override of a recovered class) | `5,879` | 11.15% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,556` | 10.54% |
-| No recovered caller token yet (orphan risk) | `1,856` | 3.52% |
+| No recovered caller token yet (orphan risk) | `1,859` | 3.53% |
 | No callsite evidence (no recorded code/data caller in the index) | `22,855` | 43.36% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
