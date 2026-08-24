@@ -236,6 +236,26 @@ namespace msvc8
          * Address: 0x0077D160 (FUN_0077D160, the start-tick map's; its two
          * register-shape adapters are 0x0077C7A0 and 0x0077CE30)
          */
+        /**
+         * Address: 0x005364D0 (FUN_005364D0, the predecessor-lookup half of
+         * `insert_unique` for RRuleGameRulesBlueprintMap =
+         * msvc8::map<msvc8::string,void*>; isNil at +0x2D = 0x0D +
+         * sizeof(pair<msvc8::string(28),void*(4)>)=0x20, confirming the
+         * node type. Reached from FUN_00534030, the Unit-blueprint insert
+         * cited on `insert_unique` above.)
+         * Address: 0x00536410 (FUN_00536410, same instantiation, reached
+         * from FUN_00534470 -- Emitter-blueprint insert)
+         * Address: 0x00536590 (FUN_00536590, reached from FUN_00534250 --
+         * Prop-blueprint insert)
+         * Address: 0x00536530 (FUN_00536530, reached from FUN_00534140 --
+         * Projectile-blueprint insert)
+         * Address: 0x005365F0 (FUN_005365F0, reached from FUN_00534360 --
+         * Mesh-blueprint insert)
+         * Address: 0x00536470 (FUN_00536470, reached from FUN_00534690 --
+         * Trail-blueprint insert)
+         * Address: 0x005363B0 (FUN_005363B0, reached from FUN_00534580 --
+         * Beam-blueprint insert)
+         */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
