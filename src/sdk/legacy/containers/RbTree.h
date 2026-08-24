@@ -123,6 +123,22 @@ namespace msvc8
          * descent)
          * Address: 0x0077B120 (FUN_0077B120, the start-tick map's)
          */
+        /**
+         * Address: 0x00592EC0 (FUN_00592EC0, the name-index map's leftmost
+         * descent -- CArmyStats::mNameIndex, isNil@+0x2D, node 0x30.
+         * Reached from the name-index erase helper FUN_00703700.)
+         */
+        /**
+         * Address: 0x007E4E80 (FUN_007E4E80, the mesh-key map's leftmost
+         * descent -- isNil@+0x25, sibling of the erase_node/rotate
+         * instantiations already cited above for this map.)
+         */
+        /**
+         * Address: 0x00592320 (FUN_00592320, the blueprint-stat map's
+         * leftmost descent -- `std::map<const RBlueprint*, float>`, isNil@
+         * +0x15, node 0x18. Reached from the erase-with-rebalance helper
+         * FUN_00592920 cited above.)
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -152,6 +168,19 @@ namespace msvc8
          * Address: 0x0077CC90 (FUN_0077CC90, the decal bucket set's right-chain
          * descent)
          * Address: 0x0077B100 (FUN_0077B100, the start-tick map's)
+         */
+        /**
+         * Address: 0x00592EA0 (FUN_00592EA0, the name-index map's rightmost
+         * descent -- sibling of `rb_min`'s 0x00592EC0 above, same map.)
+         */
+        /**
+         * Address: 0x007E4E60 (FUN_007E4E60, the mesh-key map's rightmost
+         * descent -- sibling of `rb_min`'s 0x007E4E80 above, same map.)
+         */
+        /**
+         * Address: 0x00592300 (FUN_00592300, the blueprint-stat map's
+         * rightmost descent -- sibling of `rb_min`'s 0x00592320 above,
+         * same map.)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -255,6 +284,10 @@ namespace msvc8
          * Trail-blueprint insert)
          * Address: 0x005363B0 (FUN_005363B0, reached from FUN_00534580 --
          * Beam-blueprint insert)
+         * Address: 0x00712030 (FUN_00712030, the blueprint-stat map's
+         * predecessor lookup -- isNil@+0x15, node 0x18. Reached from
+         * FUN_0070F6C0/FUN_007108D0, the copy-driver call sites already
+         * cited on the copy constructor above.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -535,6 +568,13 @@ namespace msvc8
              * so the range always takes the member's whole-tree fast path. Calling
              * `clear()` here instead would collapse to the same stores but would
              * stop the range member from being emitted at all.
+             */
+            /**
+             * Address: 0x00591ED0 (FUN_00591ED0, the blueprint-stat map's
+             * destructor -- `std::map<const RBlueprint*, float>`, node 0x18.
+             * Matches the same shape: erase_range via FUN_00592230
+             * (cited above), then `operator delete` on the head and zeroed
+             * head/size lanes.)
              */
             ~rb_tree()
             {
