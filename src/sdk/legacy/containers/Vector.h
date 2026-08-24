@@ -2575,6 +2575,13 @@ namespace msvc8
          * which captures the index, inserts, then rebuilds the cursor -- the
          * single-element `insert` shape recovered onto this template in
          * f3e3858c.)
+         * Address: 0x00933950 (FUN_00933950, the `_Insert_n` core for
+         * `msvc8::vector<iterator>` -- the HaStar cluster-cache bucket
+         * vector (Cluster.cpp's `InsertOccupationCacheEntry`/
+         * `InsertSubclusterCacheEntry` block). Carries the same 0x3FFFFFFF
+         * `max_size` overflow guard and grow/shift/throw-cleanup shape as
+         * the other instantiations here. Reached from `resize(n, end())`
+         * (0x00934130, cited above) via `_Grow`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
