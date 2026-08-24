@@ -1905,6 +1905,23 @@ namespace moho
   void ProcessCommandDrag(const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released);
 
   /**
+   * Address: 0x0082A030 (FUN_0082A030, sub_82A030)
+   *
+   * What it does:
+   * Worker for `Moho::UICommandDragger::OnCurrentDraggerReplaced` (0x00824290,
+   * UiRuntimeTypes.h/.cpp): looks the dragged command's live helper up by id;
+   * if it has none, or its `mMapAB0` draw node hasn't been created yet (the
+   * drag never moved the mouse), does nothing. Otherwise re-anchors that
+   * node's position to the command's own real anchor (undoing whatever
+   * `ProcessCommandDrag` wrote into it while the drag was live), resets its
+   * weight to a single contributor, and clears `mHasResolvedPosition` so the
+   * per-tick rebuild recomputes it from real queue data instead of the
+   * abandoned drag preview. Only forward-declares `UICommandGraph` here for
+   * the same reason `ProcessCommandDrag` does. Defined in CWldSession.cpp.
+   */
+  void ReanchorCommandGraphDrawNode(UICommandGraph& graph, CmdId cmdId);
+
+  /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
    * clones one source selection weak-set into `destination`, returning it.
    * Wraps the CWldSession.cpp-local `CopySelectionSetFromOther` (FUN_00822210).
