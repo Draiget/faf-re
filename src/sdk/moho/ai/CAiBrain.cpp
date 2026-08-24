@@ -84,9 +84,19 @@ namespace moho
 
   // Recovered in CUnitCallTeleport.cpp; forward-declared here so the build-order
   // helper below can invoke it by name (matches the binary's cross-TU call).
+  //
+  // The top-level `const` on every pointer parameter is required, not
+  // cosmetic: MSVC encodes a by-value pointer parameter's top-level const
+  // into the mangled name (`Q` instead of `P`), and CUnitCallTeleport.cpp's
+  // real definition declares every pointer parameter `T* const`. Dropping the
+  // `const` here compiles fine (top-level const doesn't affect C++ overload
+  // resolution) but mangles to a different symbol the linker can never match
+  // against that definition -- confirmed by comparing this TU's requested
+  // symbol against `dumpbin /symbols` on CUnitCallTeleport.obj, which showed
+  // the `Q`-prefixed definition sitting right there, unmatched.
   [[nodiscard]] bool TryBuildStructureAt(
-    SCoordsVec2* tryPos, const RUnitBlueprint* blueprint, Sim* sim,
-    int border, bool wholeMap, bool doCoerce, bool useSkirt);
+    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
+    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
 
   /**
    * Address: 0x0057A790 (FUN_0057A790, func_OrderBuildStructure)
