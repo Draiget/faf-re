@@ -3278,6 +3278,20 @@ namespace msvc8
          * Address: 0x0064E420 (FUN_0064E420, the advance-returning `_Ufill`
          * adapter around FUN_0064F9A0: fills then returns `dst + count`)
          *
+         * Address: 0x006501F0 (FUN_006501F0, `uninit_copy_n`/relocation-copy
+         * step for the same `msvc8::vector<moho::SDebugDecal>` 52-byte
+         * (13-dword) element -- per-slot memberwise copy (13 `mov`-per-dword
+         * steps, no ctor/dtor call, matching the trivially-copyable element
+         * confirmed on FUN_0064F9A0 above), stride advances all four tracked
+         * pointers (`result`/`v3`/`v4`/`v5`) every iteration but only
+         * performs the actual dword stores when `result` is non-null -- a
+         * defensive null-destination guard the compiler emitted for this
+         * call site rather than the usual unconditional copy shape. Called
+         * from the `_Insert_n` grow core FUN_0064E770 (still open, cited
+         * above and on `insert`/`_Insert_n`; recovered as the caller of this
+         * token regardless -- see the evidence note on FUN_0064F9A0) to
+         * relocate the live decal range into the freshly grown buffer.)
+         *
          * Address: 0x00592030 (FUN_00592030, `uninit_fill_n` for the same
          * 12-byte three-float element as `insert(iterator, const T&)`'s
          * FUN_00592460 above -- broadcast-copies a stack-local prototype
