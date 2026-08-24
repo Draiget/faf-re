@@ -2464,7 +2464,9 @@ namespace msvc8
          * Address: 0x00524780 (FUN_00524780, msvc8::vector<float>::_Insert_n --
          * max_size 0x3FFFFFFF, in-place tail-shift when capacity covers the new
          * size, otherwise geometric grow. Reached from push_back in the
-         * reflected vector<float> SerLoad lane.)
+         * reflected vector<float> SerLoad lane. Its in-place tail-shift step is
+         * FUN_005260D0, the memmove_s-based dword-range relocate for this
+         * 4-byte element.)
          * Address: 0x008FE010 (FUN_008FE010, msvc8::vector<void*>::_Insert_n for
          * the D3D10 backend swap-chain vector -- same 4-byte-element shape:
          * length-error throw / in-place tail-shift / grow-and-copy at

@@ -1228,6 +1228,12 @@ namespace msvc8
              * the in-flight MeshBatchBucketTree/msvc8::map conversion
              * currently in progress in Mesh.cpp/MeshBatchKey.*, since this
              * file is under active concurrent edit.)
+             * Address: 0x007CAB70 (FUN_007CAB70, buy_head for
+             * `Moho::SPeer::establishedUids` -- msvc8::set<int32_t>, node
+             * 12+4+2=18 rounded to 20, isNil@+0x11 matches, via alloc_raw's
+             * already-cited 20-byte lane FUN_007CC1C0. Reached from
+             * `establishedUids()`'s default member-init in SPeer's ctor,
+             * SPeer.cpp.)
              */
             [[nodiscard]] static node_type* buy_head()
             {

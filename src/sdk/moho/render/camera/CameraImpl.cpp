@@ -977,6 +977,13 @@ namespace
    * What it does:
    * Appends one target weak-ref node into the camera's target list and returns
    * the newly appended node so follow state can keep a typed active cursor.
+   *
+   * `::operator new(sizeof(CameraTargetEntityNode))` below is FUN_007AFA40's
+   * checked-allocate-and-init emission (via the checked wrapper FUN_007B1160,
+   * elementSize=0x10 matching CameraTargetEntityNode's own static_assert)
+   * plus the same field-init/list-link sequence this function performs
+   * inline; behaviorally identical for the fixed count=1 call pattern used
+   * here (the overflow guard is unreachable for a 16-byte single-node alloc).
    */
   [[nodiscard]] CameraTargetEntityNode* CameraTargetListAppendWeakRef(
     CameraTargetEntityList& list, const moho::SSelectionWeakRefUserEntity& weakRef
