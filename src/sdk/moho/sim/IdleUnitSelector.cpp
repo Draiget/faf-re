@@ -27,6 +27,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x00865780 (FUN_00865780, IdleUnitSelector process-global
+   * destructor)
+   *
+   * What it does:
+   * Tears `mIdleSet` down completely - full-range erase followed by
+   * `operator delete` on the head sentinel - then unlinks
+   * `mListenerLink` from its current session-listener lane, leaving it
+   * self-linked. Both the tree teardown and the link-unlink are hand-written
+   * (`WeakEntitySetUserEntity`/`Broadcaster`/`TDatList` have no destructors
+   * of their own that would do this implicitly), so this is a real,
+   * explicit `~IdleUnitSelector()` body, not compiler-generated glue.
+   *
+   * The binary reaches this destructor through a compiler-generated,
+   * argument-less thunk (`FUN_00C07510`, `void sub_C07510() { sub_865780();
+   * }`) registered with `atexit()` by the static-init thunk at
+   * `FUN_00BE6160` (`sub_865490(); return atexit(sub_C07510);`) - the
+   * standard MSVC "destroy this one function-local static" pattern, the
+   * same shape already established for `SelectionListener`'s
+   * `FUN_00C075D0`/`FUN_00BE62E0` pair. `GlobalIdleUnitSelector()`'s
+   * `static IdleUnitSelector sSelector;` magic static reproduces that
+   * atexit registration automatically, so `FUN_00C07510`/the explicit
+   * `atexit()` call have no separate source-level counterpart here.
+   */
+  IdleUnitSelector::~IdleUnitSelector()
+  {
+    DestroyWeakEntitySet(mIdleSet);
+    mListenerLink.ListUnlink();
+  }
+
+  /**
    * Address: 0x008656A0 (FUN_008656A0)
    *
    * What it does:
