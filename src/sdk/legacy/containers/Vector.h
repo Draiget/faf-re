@@ -3493,6 +3493,17 @@ namespace msvc8
          * called with n=1 from push_back's in-place fast path FUN_008EFDD0 (cited
          * on `AppendHeadAdapterMode`, D3D9Interfaces.cpp) when the vector still has
          * spare capacity)
+         * Address: 0x0076AAB0 (FUN_0076AAB0, msvc8::vector<gpg::AStarOpenHeap<TCell>::
+         * Entry>::uninit_fill_n for the 12-byte `{float mPriority; AStarNode<TCell>*
+         * mNode; std::int32_t mHandle}` element -- a dst/dstEnd-bounded dword-triple
+         * fill loop (compares `result != dstEnd` each iteration instead of a
+         * decrementing count -- the same n=1 semantics expressed in end-pointer
+         * form) that writes the single inserted entry's fields into the vacated
+         * gap. Called from the `insert(pos, 1, value)` core FUN_00769F60 (already
+         * `recovered`, cited on `push_back` above) once its `copy_backward` sibling
+         * FUN_0076AAD0 (cited below on `copy_or_move_assign`) has shifted the live
+         * tail right by one slot. Source-level invocation: `mEntries.push_back(entry)`
+         * in `gpg::AStarOpenHeap<TCell>::Push`, `AStarSearch.h`)
          * Address: 0x007B1830 (FUN_007B1830, msvc8::vector<moho::GeomCamera3>::
          * uninit_fill_n for the 0x2C8 (712)-byte non-trivial element -- an
          * SEH-framed count-driven loop that copy-constructs `count` copies of the
@@ -3918,6 +3929,17 @@ namespace msvc8
          * lane -- copy-assigns `[srcBegin, srcEnd)` backward into
          * `[destEnd - n, destEnd)`; used by FUN_005C6F90's in-place branch to
          * shift the live tail right without overlap corruption)
+         * Address: 0x0076AAD0 (FUN_0076AAD0, the `std::copy_backward` lane for
+         * `gpg::AStarOpenHeap<TCell>::Entry` (the same 12-byte `{float; AStarNode<TCell>*;
+         * std::int32_t}` element as FUN_0076AAB0 above) -- walks two cursors downward
+         * together (`dst -= 0x0C; src -= 0x0C;`), copying the trivially-copyable
+         * element three dwords at a time. Called from the `insert(pos, 1, value)`
+         * core FUN_00769F60 (already `recovered`, cited on `push_back` above) to
+         * shift the live tail right by one slot, immediately before its
+         * `uninit_fill_n` sibling FUN_0076AAB0 (cited above) writes the newly
+         * inserted entry into the vacated gap. Source-level invocation:
+         * `mEntries.push_back(entry)` in `gpg::AStarOpenHeap<TCell>::Push`,
+         * `AStarSearch.h`)
          * Address: 0x00548C00 (FUN_00548C00, the `std::copy` emission for the
          * 20-byte `Moho::ResourceDeposit` -- the same five-dword stride-0x14
          * loop as FUN_00549BC0 but with all three cursors in registers and
