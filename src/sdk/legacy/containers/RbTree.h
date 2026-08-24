@@ -1331,10 +1331,18 @@ namespace msvc8
              */
             /**
              * Address: 0x00719690 (FUN_00719690, `InfluenceGrid::entries`'s
-             * left rotate -- `msvc8::set<InfluenceMapEntry,
-             * InfluenceMapEntryLess>`, `mIsSentinel` at +0x3D. Reached from
-             * `EraseInfluenceEntryAndAdvance`'s `grid.entries.erase(current)`
-             * at CInfluenceMap.cpp via FUN_00717EF0.)
+             * left rotate. Reached from `EraseInfluenceEntryAndAdvance`'s
+             * `grid.entries.erase(current)` at CInfluenceMap.cpp via
+             * FUN_00717EF0, whose own IDA type inference names the node
+             * `std::map_uint_InfluenceMapEntry::_Node` -- i.e. the binary's
+             * container is `map<uint32_t, InfluenceMapEntry>` keyed by
+             * entityId, not the `msvc8::set<InfluenceMapEntry,
+             * InfluenceMapEntryLess>` the current `entries` field is typed
+             * as (isNil at +0x3D only lines up with a 4-byte key + 0x2C
+             * value node, 0x0C+4+0x2C=0x3C/0x3D, not a bare 0x2C value node
+             * at 0x38/0x39). The `entries` field type is a follow-up fix;
+             * this rotate citation is unaffected since it targets the real
+             * physical node regardless of the C++ container tag.)
              */
             /**
              * Address: 0x007E4E10 (FUN_007E4E10, the mesh-key map's left
@@ -1389,7 +1397,8 @@ namespace msvc8
             /**
              * Address: 0x00719740 (FUN_00719740, `InfluenceGrid::entries`'s
              * right rotate -- same instantiation as `rotate_left`'s
-             * 0x00719690 above, `mIsSentinel` at +0x3D.)
+             * 0x00719690 above; see that citation for the map<uint32_t,
+             * InfluenceMapEntry> vs. set<InfluenceMapEntry> node-typing note.)
              */
             /**
              * Address: 0x007E4EA0 (FUN_007E4EA0, the mesh-key map's right
