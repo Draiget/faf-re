@@ -2848,6 +2848,31 @@ namespace msvc8
          * called with n=1 from push_back's in-place fast path FUN_008EFDD0 (cited
          * on `AppendHeadAdapterMode`, D3D9Interfaces.cpp) when the vector still has
          * spare capacity)
+         * Address: 0x007B1830 (FUN_007B1830, msvc8::vector<moho::GeomCamera3>::
+         * uninit_fill_n for the 0x2C8 (712)-byte non-trivial element -- an
+         * SEH-framed count-driven loop that copy-constructs `count` copies of the
+         * by-ref prototype via `func_CpyCamera` (the element's field-copy body,
+         * recovered as `CopyGeomCameraStatePreservingFlags` in GeomCamera3.cpp),
+         * advancing the destination cursor by `0x2C8` per slot; the exception
+         * handler destroys the already-constructed prefix `[dst, cursor)` via
+         * `Moho::GeomCamera3::~GeomCamera3` and rethrows the in-flight exception
+         * (`CxxThrowException(0,0)`) -- `CGeomSolid3`'s heap-backed frustum-plane
+         * storage inside the element means the per-slot copy genuinely can throw,
+         * so this rollback is load-bearing, not defensive boilerplate. Reached
+         * with n=1 from `push_back`'s in-place fast path at `Moho::GeomCamera3
+         * *__cdecl` helper FUN_007AEB10 (recovered as
+         * `AppendGeomCameraViewAndReturnEnd`, GeomCamera3.cpp) when the vector
+         * still has spare capacity -- confirmed from `FUN_007AEB10.asm`, whose
+         * fast-path block constructs the element then returns directly at
+         * `0x007AEB8B`, never falling into the capacity-full `_Insert_n` growth
+         * call at `0x007AEB8E` (the linear decompiler pseudocode misrepresents
+         * these as one unconditional tail call; the two `jz`/`jnb` branches to
+         * `loc_7AEB8E` prove they are mutually exclusive). The other three xrefs
+         * (FUN_007AF4C0, FUN_007B0010, FUN_007B1100) are call sites inside the
+         * still-`blocked` `_Insert_n` growth core for this element and are not
+         * needed to satisfy this instantiation's caller evidence. Source-level
+         * invocation: `cameras.push_back(camera)` in
+         * `AppendGeomCameraViewAndReturnEnd`)
          *
          * Uninitialized fill N with value starting at dst
          */
