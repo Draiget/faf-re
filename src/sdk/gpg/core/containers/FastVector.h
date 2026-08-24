@@ -854,6 +854,14 @@ namespace gpg::core
      * Address: 0x0059C750 (FUN_0059C750, gpg::fastvector_n64_SAssignedLocInfo::push_back)
      * Address: 0x0061C5E0 (FUN_0061C5E0, gpg::fastvector_n<SWeakRefSlot,20>::push_back —
      *   the mBlipsInRange intrusive weak-ref lane)
+     * Address: 0x0056C940 (FUN_0056C940, gpg::fastvector_n<Moho::SFormationRunScriptCandidate,16>::
+     *   push_back — the 72-byte "Cand72" candidate local in
+     *   CAiFormationInstance::RunScript's phase 6 (`candidates.push_back(candidate)`).
+     *   Asm-verified: `ecx=end_` vs `[edi+8]`=capacity_ test at 0x0056C962; full arm
+     *   calls `sub_56E620(this, pos=end_, insStart=&value, insEnd=&value+0x48)` —
+     *   `InsertAt(this->end_, &value, &value+1)` below; non-full arm calls
+     *   `sub_56CB60(dest=end_, src=&value)` — `*end_ = value` (copy-assign into the
+     *   already-live inline/heap slot) — then `end_ += 0x48`.)
      *
      * What it does:
      * Appends one element into the active lane. If storage is full, routes
@@ -980,6 +988,17 @@ namespace gpg::core
      * form of the SAssignedLocInfo blit step -- sizeof(SAssignedLocInfo)==
      * 0x10 confirmed via its own static_assert. Reached from the InsertAt
      * instantiation already cited at 0x0059CC10 above.)
+     * Address: 0x0056E620 (FUN_0056E620, gpg::fastvector_n<Moho::
+     * SFormationRunScriptCandidate,16>::InsertAt -- the deep-copy lane for the
+     * 72-byte "Cand72" candidate (`EntityCategorySet mCategory` owns a nested
+     * `fastvector_n<uint,2>`, so the element is non-trivially-copyable). Only
+     * reached from `push_back` with `pos == end_` (see 0x0056C940 above), so
+     * always takes the "spills past end" branch. Asm-verified against
+     * FUN_0056E620.asm: element-count division by 0x48 via the 0x38E38E39
+     * magic + `sar 4`, `requiredSize > currentCapacity` grow test with the
+     * doubling clamp calling `sub_56FAB0` (`GrowInsertDeepCopy` below) when
+     * exceeded, else the non-grow "spills past end" copy-construct dance
+     * calling `sub_56FB90` (`UninitializedCopyForward` below) directly.)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -991,7 +1010,8 @@ namespace gpg::core
      *    SAssignedLocInfo @0x0059CC10, SFormationLinkedUnitRef @0x0056B2F0) blit
      *    the tail with memcpy/memmove (the fast path below).
      *  - Deep-copy T (msvc8::string @0x0083B6F0, LuaPlus::LuaObject @0x004C7EB0,
-     *    boost::shared_ptr<CMauiFrame> @0x0084E570) must NOT relocate raw bytes
+     *    boost::shared_ptr<CMauiFrame> @0x0084E570, SFormationRunScriptCandidate
+     *    @0x0056E620) must NOT relocate raw bytes
      *    (that would shallow-copy owned heap pointers and double-free). Those
      *    emissions shift elements one at a time via copy-construct
      *    (UninitializedCopyForward, binary _Ucopy) into the freshly grown tail
@@ -1367,6 +1387,23 @@ namespace gpg::core
      * (already recovered, cited above), which shifts elements one at a time
      * via this member for the non-trivially-relocatable `shared_ptr<
      * CMauiFrame>` element.)
+     * Address: 0x0056FB90 (FUN_0056FB90, gpg::fastvector_n<Moho::
+     * SFormationRunScriptCandidate,16>'s per-element copy-construct-forward
+     * lane for the 72-byte "Cand72" candidate -- per slot, copies the two
+     * `Vec3f` lanes and the sort-key/weight floats directly, then calls
+     * `gpg::fastvector_uint::cpy` for the nested `EntityCategorySet::mWords`
+     * word buffer (`mCategory` is not trivially copyable, so this is a real
+     * per-field deep copy, not a memcpy). Reached from two places for this
+     * instantiation: `InsertAt`'s (0x0056E620) own non-grow branches A/B
+     * below, and -- for `push_back`'s always-full grow call specifically --
+     * from *inside* `GrowInsertDeepCopy` (0x0056FAB0), which calls this same
+     * address three times for the `[start,pos)+[insStart,insEnd)+[pos,end)`
+     * slices. This typed reconstruction reaches that second call site through
+     * `CopyRangeForward` (assignment into an already-default-constructed
+     * `new T[]` slot) rather than through this method directly, per
+     * `GrowInsertDeepCopy`'s own documented construct-then-assign divergence
+     * from the binary's raw-storage `operator new` + `_Ucopy` shape -- both
+     * produce the same per-element deep copy this address performs.)
      *
      * What it does:
      * Copy-CONSTRUCTS `[copyBegin, copyEnd)` into raw storage at `dest` and
@@ -1404,6 +1441,19 @@ namespace gpg::core
      * `Moho::SFormationScriptSlot` -- the same per-element assignment as
      * 0x00577450 but walked down, `sub 38h` on each cursor, so an overlapping
      * shift cannot clobber the tail. 38 instructions to the forward pair's 36.)
+     * Address: 0x00573000 (FUN_00573000, gpg::fastvector_n<Moho::
+     * SFormationRunScriptCandidate,16>'s backward per-element copy-assign lane
+     * for the 72-byte "Cand72" candidate -- walks `[first,last)` backward
+     * (`sub esi/ebx/eax, 0x48` each step, asm-verified), assigning the two
+     * `Vec3f` lanes and sort-key/weight floats directly, then calling
+     * `gpg::fastvector_uint::cpy` for `mCategory.mWords` per element, exactly
+     * mirroring the forward per-element copy above. Reached from `InsertAt`'s
+     * (0x0056E620) Branch B (spills-past-end) for this instantiation; not
+     * reached by `RunScript`'s specific `candidates.push_back(...)` call
+     * (`push_back` only invokes `InsertAt` when already full, which always
+     * takes the grow branch to `GrowInsertDeepCopy` instead) but is still
+     * part of `InsertAt`'s one compiled body for this element type, which
+     * this template reproduces branch-for-branch.)
      */
     static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
     {
@@ -1479,6 +1529,20 @@ namespace gpg::core
      * genuinely unallocated) and is the same accepted trade-off already made
      * for every other deep-copy element type on this method
      * (`msvc8::string`, `LuaPlus::LuaObject`, `boost::shared_ptr<CMauiFrame>`).)
+     * Address: 0x0056FAB0 (FUN_0056FAB0, gpg::fastvector_n<Moho::
+     * SFormationRunScriptCandidate,16>::GrowInsert lane -- the reallocate arm
+     * of `InsertAt` (0x0056E620) for the 72-byte "Cand72" candidate, and the
+     * only branch `RunScript`'s `candidates.push_back(candidate)` actually
+     * reaches (push_back only calls InsertAt when already full, so
+     * requiredSize always exceeds currentCapacity here). Asm-verified:
+     * `operator new(newCapacity*0x48)`, then three calls to `sub_56FB90`
+     * (cited on `UninitializedCopyForward` above) for the
+     * `[start,pos)+[insStart,insEnd)+[pos,end)` slices into the fresh raw
+     * buffer, then `sub_56E7E0` (per-element destroy of the old range) and a
+     * conditional `operator delete[]` of the old buffer (skipped when it was
+     * the inline window) -- the exact shape this method already implements,
+     * modulo the same typed-`new T[]`-then-assign divergence documented above
+     * for every other instantiation.)
      *
      * What it does:
      * Deep-copy grow-and-insert for non-trivially-relocatable T (the reallocate
