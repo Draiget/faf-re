@@ -1234,6 +1234,13 @@ namespace msvc8
              * already-cited 20-byte lane FUN_007CC1C0. Reached from
              * `establishedUids()`'s default member-init in SPeer's ctor,
              * SPeer.cpp.)
+             * Address: 0x007F2BB0 (FUN_007F2BB0, buy_head for the
+             * function-local static `BlueprintExtractorRegistry registry`
+             * -- std::map<std::string,unique_ptr<RangeExtractor>>, node
+             * 12+sizeof(pair<string(28),ptr(4)>)+2 = 46, rounded to 48;
+             * isNil@+0x2D matches the batch-bucket node shape. Reached
+             * from `GetBlueprintExtractorRegistry()`'s lazy first-time
+             * static-local construction, RangeExtractor.cpp.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
