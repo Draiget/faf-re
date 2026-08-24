@@ -1606,6 +1606,28 @@ namespace msvc8
          * through FUN_00549BC0, frees the old block and rebases the lanes.
          * Reached from `RVectorType_ResourceDeposit::SerLoad` (0x00547950),
          * which reserves the archived count before filling.)
+         * Address: 0x00560D60 (FUN_00560D60,
+         * msvc8::vector<Moho::SSTIArmyVariableData>::reserve -- exact-capacity
+         * grow for the 0x160-byte element: max_size guard against 0x1999999
+         * (`0xFFFFFFFF / 0x160`), allocates via the checked allocator
+         * FUN_00562700, uninit-copies the live range through FUN_005632D0
+         * (both already recovered), frees the old block implicitly and
+         * rebases the lanes. Reached from `Moho::SSyncData::ReserveSizes`
+         * (FUN_00560A00) as `syncData->mArmyUpdates.reserve(sizes->mArmyData)`
+         * -- recovered as `ReserveSyncDataSizes` in Sim.cpp, called from
+         * `Sim::Sync` right after `SnapshotSyncReserveCounts`.)
+         * Address: 0x00560EB0 (FUN_00560EB0,
+         * msvc8::vector<Moho::SEntityVariableUpdateEntry>::reserve --
+         * exact-capacity grow for the 0xD8-byte
+         * `pair<EntId, SSTIEntityVariableData>` element: max_size guard
+         * against 0x12F684B (`0xFFFFFFFF / 0xD8`), allocates via the checked
+         * allocator FUN_00562770, uninit-copies the live range through
+         * FUN_00563380 (both already recovered), frees the old block
+         * implicitly and rebases the lanes. Reached from
+         * `Moho::SSyncData::ReserveSizes` (FUN_00560A00) as
+         * `syncData->mEntityUpdates.reserve(sizes->mEntityData)` -- recovered
+         * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
+         * `mArmyUpdates.reserve` above.)
          *
          * Reserve at least `newCap` elements without changing size.
          */
