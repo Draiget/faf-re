@@ -403,6 +403,20 @@ namespace
     return map.mTerrainType.data[terrainIndex];
   }
 
+  /**
+   * Address: 0x007D90E0 (FUN_007D90E0)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_7D90E0@<eax>(_DWORD *result@<eax>);
+   *
+   * What it does:
+   * `rb_tree<ClutterRegionKeyNode>::_Min`: walks `node->left` (offset +0x00)
+   * while the child's `isNil` byte (offset +0x19, matching
+   * `ClutterRegionKeyNode::isNil`) is clear, returning the leftmost
+   * descendant. Called from `EraseRegionKeyNode` (FUN_007D8AE0) both
+   * directly (successor lookup) and via `RefreshTreeEndpoints`'s
+   * head-endpoint recompute.
+   */
   [[nodiscard]] moho::ClutterRegionKeyNode* TreeMinimum(
     const moho::ClutterRegionKeyTreeState* const tree,
     moho::ClutterRegionKeyNode* node
@@ -414,6 +428,20 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x007D90C0 (FUN_007D90C0)
+   *
+   * IDA signature:
+   * int __usercall sub_7D90C0@<eax>(int result@<eax>);
+   *
+   * What it does:
+   * `rb_tree<ClutterRegionKeyNode>::_Max`: mirror of `TreeMinimum`, walking
+   * `node->right` (offset +0x08) while the child's `isNil` byte is clear,
+   * returning the rightmost descendant. Called from `EraseRegionKeyNode`
+   * (FUN_007D8AE0) via `RefreshTreeEndpoints`'s head-endpoint recompute
+   * (the binary's inline cached-endpoint shortcut is expressed here as an
+   * unconditional recompute from root, which is behaviorally equivalent).
+   */
   [[nodiscard]] moho::ClutterRegionKeyNode* TreeMaximum(
     const moho::ClutterRegionKeyTreeState* const tree,
     moho::ClutterRegionKeyNode* node
