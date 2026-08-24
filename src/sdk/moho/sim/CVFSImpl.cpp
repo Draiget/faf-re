@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
+#include <io.h>
 #include <new>
 #include <string_view>
 #include <utility>
@@ -82,6 +83,18 @@ namespace
     }
   }
 
+  /**
+   * What it does:
+   * Wildcard-expansion core of `AddMountPoint` (0x00466370). The binary
+   * walks matches through the CRT find-first/find-next/find-close triad
+   * (`_findfirst64` at 0x00A84379, `_findnext64` at 0x00A844A9, `_findclose`
+   * at 0x00A8460D -- all genuine statically-linked CRT bodies, not
+   * `__imp_*` thunks, per their decompiled bodies; documented external
+   * runtime symbols per CLAUDE.md, so cited here rather than reimplemented)
+   * on a `__finddata64_t` record, not the raw `WIN32_FIND_DATAA`/
+   * `FindFirstFileA` triad -- matches the same CRT calls already used by
+   * `lua::io_dir` (LuaObject.cpp, 0x00915F60).
+   */
   [[nodiscard]] std::vector<SearchPathCandidate> CollectSearchPathCandidates(const msvc8::string& canonicalPattern)
   {
     std::vector<SearchPathCandidate> candidates{};
@@ -102,15 +115,15 @@ namespace
       return candidates;
     }
 
-    WIN32_FIND_DATAA findData{};
-    HANDLE findHandle = ::FindFirstFileA(canonicalPattern.c_str(), &findData);
-    if (findHandle == INVALID_HANDLE_VALUE) {
+    __finddata64_t findData{};
+    const intptr_t findHandle = ::_findfirst64(canonicalPattern.c_str(), &findData);
+    if (findHandle == -1) {
       return candidates;
     }
 
     const msvc8::string parentDirectory = ParentDirectoryFromPattern(canonicalPattern);
     do {
-      if (std::strcmp(findData.cFileName, ".") == 0 || std::strcmp(findData.cFileName, "..") == 0) {
+      if (std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
         continue;
       }
 
@@ -121,7 +134,7 @@ namespace
           (void)candidatePath.push_back('\\');
         }
       }
-      (void)candidatePath.append(findData.cFileName, std::strlen(findData.cFileName));
+      (void)candidatePath.append(findData.name, std::strlen(findData.name));
 
       msvc8::string canonicalCandidate{};
       gpg::STR_CanonizeFilename(&canonicalCandidate, candidatePath.c_str());
@@ -131,11 +144,11 @@ namespace
 
       SearchPathCandidate candidate{};
       candidate.mResolvedPath.assign_owned(canonicalCandidate.view());
-      candidate.mIsDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+      candidate.mIsDirectory = (findData.attrib & _A_SUBDIR) != 0;
       candidates.push_back(std::move(candidate));
-    } while (::FindNextFileA(findHandle, &findData) != FALSE);
+    } while (::_findnext64(findHandle, &findData) == 0);
 
-    (void)::FindClose(findHandle);
+    (void)::_findclose(findHandle);
     return candidates;
   }
 
@@ -286,7 +299,10 @@ namespace
    *
    * What it does:
    * Enumerates disk-backed mounted files recursively (when enabled) and appends
-   * wildcard-matching mounted paths.
+   * wildcard-matching mounted paths. Walks matches through the CRT
+   * find-first/find-next/find-close triad (`_findfirst64` at 0x00A84379,
+   * `_findnext64` at 0x00A844A9, `_findclose` at 0x00A8460D) on a
+   * `__finddata64_t` record, matching the binary exactly.
    */
   void EnumerateDirectoryFiles(
     const msvc8::string& diskDirectory,
@@ -303,17 +319,17 @@ namespace
     msvc8::string searchPattern = diskDirectory;
     (void)searchPattern.append("\\*.*", 4u);
 
-    WIN32_FIND_DATAA findData{};
-    HANDLE findHandle = ::FindFirstFileA(searchPattern.c_str(), &findData);
-    if (findHandle == INVALID_HANDLE_VALUE) {
+    __finddata64_t findData{};
+    const intptr_t findHandle = ::_findfirst64(searchPattern.c_str(), &findData);
+    if (findHandle == -1) {
       return;
     }
 
     do {
-      msvc8::string loweredName = gpg::STR_ToLower(findData.cFileName);
-      const bool isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u;
+      msvc8::string loweredName = gpg::STR_ToLower(findData.name);
+      const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
       if (isDirectory) {
-        if (!recursive || std::strcmp(findData.cFileName, ".") == 0 || std::strcmp(findData.cFileName, "..") == 0) {
+        if (!recursive || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
           continue;
         }
 
@@ -323,7 +339,7 @@ namespace
 
         msvc8::string childDiskDirectory = diskDirectory;
         (void)childDiskDirectory.push_back('\\');
-        (void)childDiskDirectory.append(findData.cFileName, std::strlen(findData.cFileName));
+        (void)childDiskDirectory.append(findData.name, std::strlen(findData.name));
         EnumerateDirectoryFiles(childDiskDirectory, childMountedDirectory, wildcardPattern, true, outPaths);
         continue;
       }
@@ -335,9 +351,9 @@ namespace
       msvc8::string mountedPath = mountedDirectory;
       (void)mountedPath.append(loweredName.c_str(), loweredName.size());
       outPaths.push_back(std::move(mountedPath));
-    } while (::FindNextFileA(findHandle, &findData) != FALSE);
+    } while (::_findnext64(findHandle, &findData) == 0);
 
-    (void)::FindClose(findHandle);
+    (void)::_findclose(findHandle);
   }
 
   /**
@@ -345,7 +361,10 @@ namespace
    *
    * What it does:
    * Enumerates immediate child directories from one disk-backed mount root and
-   * appends normalized mounted paths.
+   * appends normalized mounted paths. Walks matches through the CRT
+   * find-first/find-next/find-close triad (`_findfirst64` at 0x00A84379,
+   * `_findnext64` at 0x00A844A9, `_findclose` at 0x00A8460D) on a
+   * `__finddata64_t` record, matching the binary exactly.
    */
   void EnumerateDirectoryChildren(
     const msvc8::string& diskDirectory,
@@ -356,25 +375,25 @@ namespace
     msvc8::string searchPattern = diskDirectory;
     (void)searchPattern.append("\\*.*", 4u);
 
-    WIN32_FIND_DATAA findData{};
-    HANDLE findHandle = ::FindFirstFileA(searchPattern.c_str(), &findData);
-    if (findHandle == INVALID_HANDLE_VALUE) {
+    __finddata64_t findData{};
+    const intptr_t findHandle = ::_findfirst64(searchPattern.c_str(), &findData);
+    if (findHandle == -1) {
       return;
     }
 
     do {
-      const bool isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u;
-      if (!isDirectory || std::strcmp(findData.cFileName, ".") == 0 || std::strcmp(findData.cFileName, "..") == 0) {
+      const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
+      if (!isDirectory || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
         continue;
       }
 
-      msvc8::string loweredName = gpg::STR_ToLower(findData.cFileName);
+      msvc8::string loweredName = gpg::STR_ToLower(findData.name);
       msvc8::string mountedPath = mountedDirectory;
       (void)mountedPath.append(loweredName.c_str(), loweredName.size());
       outPaths.push_back(std::move(mountedPath));
-    } while (::FindNextFileA(findHandle, &findData) != FALSE);
+    } while (::_findnext64(findHandle, &findData) == 0);
 
-    (void)::FindClose(findHandle);
+    (void)::_findclose(findHandle);
   }
 
   void RetainMountedZipHandle(moho::SFileWaitHandle* const handle)
