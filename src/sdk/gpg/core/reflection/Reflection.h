@@ -6237,6 +6237,7 @@ namespace gpg
    * Address: 0x00657B30 (FUN_00657B30)
    * Address: 0x0065F100 (FUN_0065F100)
    * Address: 0x00699E80 (FUN_00699E80)
+   * Address: 0x006498E0 (FUN_006498E0, Moho::CStorageManipulatorTypeInfo lane)
    * Address: 0x006DB800 (FUN_006DB800)
    * Address: 0x0076E7C0 (FUN_0076E7C0)
    * Address: 0x00897450 (FUN_00897450)

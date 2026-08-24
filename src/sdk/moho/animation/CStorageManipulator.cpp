@@ -2,6 +2,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
@@ -79,7 +80,7 @@ namespace
    * `IAniManipulator`, installs storage-manipulator vtable lanes, clears
    * tracked min/max/current vectors, and defaults resource type to energy.
    */
-  [[maybe_unused]] CStorageManipulatorRuntimeView* InitializeCStorageManipulatorDefaultRuntime(
+  CStorageManipulatorRuntimeView* InitializeCStorageManipulatorDefaultRuntime(
     CStorageManipulatorRuntimeView* const runtime
   ) noexcept
   {
@@ -113,35 +114,6 @@ namespace
 
   CStorageManipulatorSerializerHelperNode gCStorageManipulatorSerializer;
   gpg::RType* gCStorageManipulatorCachedType = nullptr;
-
-  struct CStorageManipulatorTypeLifecycleSlotsRuntimeView
-  {
-    std::uint8_t mPad00_47[0x48]{}; // +0x00
-    void* mNewRefFunc = nullptr;    // +0x48
-    void* mPad4C = nullptr;         // +0x4C
-    void* mDeleteFunc = nullptr;    // +0x50
-    void* mCtorRefFunc = nullptr;   // +0x54
-    void* mPad58 = nullptr;         // +0x58
-    void* mDestructFunc = nullptr;  // +0x5C
-  };
-#if INTPTR_MAX == INT32_MAX
-  static_assert(
-    offsetof(CStorageManipulatorTypeLifecycleSlotsRuntimeView, mNewRefFunc) == 0x48,
-    "CStorageManipulatorTypeLifecycleSlotsRuntimeView::mNewRefFunc offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CStorageManipulatorTypeLifecycleSlotsRuntimeView, mDeleteFunc) == 0x50,
-    "CStorageManipulatorTypeLifecycleSlotsRuntimeView::mDeleteFunc offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CStorageManipulatorTypeLifecycleSlotsRuntimeView, mCtorRefFunc) == 0x54,
-    "CStorageManipulatorTypeLifecycleSlotsRuntimeView::mCtorRefFunc offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CStorageManipulatorTypeLifecycleSlotsRuntimeView, mDestructFunc) == 0x5C,
-    "CStorageManipulatorTypeLifecycleSlotsRuntimeView::mDestructFunc offset must be 0x5C"
-  );
-#endif
 
   using ScalarDeletingDtorFn = int(__thiscall*)(void* self, int deleteFlag);
 
@@ -241,6 +213,25 @@ namespace
 
 namespace moho
 {
+  /**
+   * Minimal RTTI-identity completion for `moho::CStorageManipulator`
+   * (forward-declared in `Reflection.h`, used everywhere else in this file
+   * only as an incomplete pointer type for `reinterpret_cast`/`typeid`
+   * purposes). Real member layout (`mUnit`/`mMax`/`mMin`/`mCur`/
+   * `mResourceType` past the `IAniManipulator` base at `+0x80`) is already
+   * fully known and modeled by `CStorageManipulatorRuntimeView` above --
+   * this stub exists only so `typeid(CStorageManipulator)` is legal for
+   * `CStorageManipulatorTypeInfo`'s RTTI preregistration below, and produces
+   * the same mangled `??_R0?AVCStorageManipulator@Moho@@@8` RTTI descriptor
+   * identity as the binary regardless of which fields are modeled on it.
+   * Promoting this to the full field-typed class (folding
+   * `CStorageManipulatorRuntimeView` into it) is a follow-up, not required
+   * for the reflection wiring recovered here.
+   */
+  class CStorageManipulator : public IAniManipulator
+  {
+  };
+
   LuaPlus::LuaObject* func_CreateLuaCStorageManipulator(
     LuaPlus::LuaObject* object,
     LuaPlus::LuaState* state
@@ -489,7 +480,7 @@ namespace moho
    * Allocates one `CStorageManipulator` runtime object, runs default
    * constructor lanes, and writes its reflected `RRef` into caller storage.
    */
-  [[maybe_unused]] gpg::RRef* BuildNewCStorageManipulatorRef(gpg::RRef* const outRef)
+  gpg::RRef* BuildNewCStorageManipulatorRef(gpg::RRef* const outRef)
   {
     auto deleteRuntime = [](CStorageManipulatorRuntimeView* const runtime) noexcept {
       ::operator delete(static_cast<void*>(runtime));
@@ -519,7 +510,7 @@ namespace moho
    * Runs scalar-deleting destructor slot `0` with delete flag `1` when object
    * storage is non-null.
    */
-  [[maybe_unused]] void DeleteCStorageManipulatorStorageRuntime(void* const objectStorage)
+  void DeleteCStorageManipulatorStorageRuntime(void* const objectStorage)
   {
     if (objectStorage == nullptr) {
       return;
@@ -558,30 +549,19 @@ namespace moho
    * What it does:
    * Runs scalar-deleting destructor slot `0` with delete flag `0`.
    */
-  [[maybe_unused]] void DestructCStorageManipulatorStorageRuntime(void* const objectStorage)
+  void DestructCStorageManipulatorStorageRuntime(void* const objectStorage)
   {
     auto* const vtable = *reinterpret_cast<ScalarDeletingDtorFn**>(objectStorage);
     (void)vtable[0](objectStorage, 0);
   }
 
-  /**
-   * Address: 0x006498E0 (FUN_006498E0)
-   *
-   * What it does:
-   * Installs `CStorageManipulator` type lifecycle callback lanes (new/ctor/
-   * delete/destruct) on one reflected type descriptor.
-   */
-  [[maybe_unused]] gpg::RType* InstallCStorageManipulatorTypeLifecycleCallbacksRuntime(
-    gpg::RType* const reflectedType
-  )
-  {
-    auto* const slots = reinterpret_cast<CStorageManipulatorTypeLifecycleSlotsRuntimeView*>(reflectedType);
-    slots->mNewRefFunc = reinterpret_cast<void*>(&BuildNewCStorageManipulatorRef);
-    slots->mCtorRefFunc = reinterpret_cast<void*>(&ConstructCStorageManipulatorRefInPlaceRuntime);
-    slots->mDeleteFunc = reinterpret_cast<void*>(&DeleteCStorageManipulatorStorageRuntime);
-    slots->mDestructFunc = reinterpret_cast<void*>(&DestructCStorageManipulatorStorageRuntime);
-    return reflectedType;
-  }
+  // NOTE: 0x006498E0 (field-write shape identical to the other ~39 manipulator
+  // TypeInfo Init bodies) is recovered as the shared `gpg::BindRTypeLifecycleCallbacks`
+  // helper (Reflection.h/.cpp) -- not as a per-type duplicate here. This file's
+  // prior `InstallCStorageManipulatorTypeLifecycleCallbacksRuntime` was an
+  // unwired [[maybe_unused]] duplicate of that same mechanic; removed in favor
+  // of `InitCStorageManipulatorTypeInfo`'s existing `BindRTypeLifecycleCallbacks`
+  // call below, which is the single canonical, actually-called citation.
 
   [[nodiscard]] gpg::RRef NewCStorageManipulatorRefForTypeInfo()
   {
@@ -604,7 +584,7 @@ namespace moho
    * Adds `IAniManipulator` as a zero-offset base record on one
    * `CStorageManipulator` type descriptor.
    */
-  [[maybe_unused]] void AddBaseIAniManipulatorToCStorageManipulatorTypeInfo(gpg::RType* const typeInfo)
+  void AddBaseIAniManipulatorToCStorageManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedIAniManipulatorTypeForStorageManipulatorTypeInfo();
     if (!baseType) {
@@ -628,7 +608,7 @@ namespace moho
    * lanes, registers `IAniManipulator` base ownership, initializes base RTTI,
    * and finalizes field/base metadata.
    */
-  [[maybe_unused]] void InitCStorageManipulatorTypeInfo(gpg::RType* const typeInfo)
+  void InitCStorageManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     typeInfo->size_ = sizeof(CStorageManipulatorRuntimeView);
     (void)gpg::BindRTypeLifecycleCallbacks(
@@ -641,6 +621,132 @@ namespace moho
     AddBaseIAniManipulatorToCStorageManipulatorTypeInfo(typeInfo);
     typeInfo->gpg::RType::Init();
     typeInfo->Finish();
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * Owns reflected metadata for `CStorageManipulator`.
+   */
+  class CStorageManipulatorTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00648DB0 (FUN_00648DB0, ctor lane)
+     *
+     * What it does:
+     * Preregisters the `CStorageManipulator` RTTI descriptor during startup.
+     * In the binary this constructor body is inlined into the `.CRT$XCL`
+     * provider wrapper (`register_CStorageManipulatorTypeInfo`, 0x00BD3640)
+     * that constructs the file-scope singleton, rather than being emitted as
+     * a standalone `__thiscall` symbol.
+     */
+    CStorageManipulatorTypeInfo();
+
+    /**
+     * Address: 0x00648E60 (FUN_00648E60, Moho::CStorageManipulatorTypeInfo::dtr)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * restores the `gpg::RObject` vftable. Defaulted in source: the
+     * compiler-generated `~RType()` reproduces this behavior, matching every
+     * other manipulator TypeInfo dtor in this family.
+     */
+    ~CStorageManipulatorTypeInfo() override = default;
+
+    /**
+     * Address: 0x00648E50 (FUN_00648E50, Moho::CStorageManipulatorTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00648E10 (FUN_00648E10, Moho::CStorageManipulatorTypeInfo::Init)
+     *
+     * What it does:
+     * Forwards to the already-recovered `InitCStorageManipulatorTypeInfo`
+     * free helper, which sets `size_`, binds the NewRef/CtrRef/Delete/Destruct
+     * lifecycle callbacks, registers `IAniManipulator` as the reflected base,
+     * and finalizes the type descriptor.
+     */
+    void Init() override;
+  };
+
+  static_assert(sizeof(CStorageManipulatorTypeInfo) == 0x64, "CStorageManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00648DB0 (FUN_00648DB0, ctor lane)
+   */
+  CStorageManipulatorTypeInfo::CStorageManipulatorTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(CStorageManipulator), this);
+  }
+
+  /**
+   * Address: 0x00648E50 (FUN_00648E50, Moho::CStorageManipulatorTypeInfo::GetName)
+   */
+  const char* CStorageManipulatorTypeInfo::GetName() const
+  {
+    return "CStorageManipulator";
+  }
+
+  /**
+   * Address: 0x00648E10 (FUN_00648E10, Moho::CStorageManipulatorTypeInfo::Init)
+   */
+  void CStorageManipulatorTypeInfo::Init()
+  {
+    InitCStorageManipulatorTypeInfo(this);
+  }
+} // namespace moho
+
+namespace
+{
+  alignas(moho::CStorageManipulatorTypeInfo)
+  unsigned char gCStorageManipulatorTypeInfoStorage[sizeof(moho::CStorageManipulatorTypeInfo)] = {};
+  bool gCStorageManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CStorageManipulatorTypeInfo* AcquireCStorageManipulatorTypeInfo()
+  {
+    if (!gCStorageManipulatorTypeInfoConstructed) {
+      new (gCStorageManipulatorTypeInfoStorage) moho::CStorageManipulatorTypeInfo();
+      gCStorageManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CStorageManipulatorTypeInfo*>(gCStorageManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BFB310 (FUN_00BFB310, cleanup_CStorageManipulatorTypeInfo)
+   *
+   * What it does:
+   * Tears down static `CStorageManipulatorTypeInfo` storage at process exit.
+   */
+  void cleanup_CStorageManipulatorTypeInfo()
+  {
+    if (!gCStorageManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCStorageManipulatorTypeInfo()->~CStorageManipulatorTypeInfo();
+    gCStorageManipulatorTypeInfoConstructed = false;
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BD3640 (FUN_00BD3640, register_CStorageManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CStorageManipulatorTypeInfo` singleton and
+   * installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`); the
+   * binary has exactly one call site and no reentry guard, matching the
+   * guarded-singleton idiom used throughout this manipulator family.
+   */
+  void register_CStorageManipulatorTypeInfo()
+  {
+    (void)AcquireCStorageManipulatorTypeInfo();
+    (void)std::atexit(&cleanup_CStorageManipulatorTypeInfo);
   }
 
   /**
@@ -809,8 +915,13 @@ namespace
     CStorageManipulatorSerializerBootstrap()
     {
       (void)InstallCStorageManipulatorSerializerCallbackStorage();
+      moho::register_CStorageManipulatorTypeInfo();
     }
   };
 
   [[maybe_unused]] CStorageManipulatorSerializerBootstrap gCStorageManipulatorSerializerBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CStorageManipulatorTypeInfo_7d3a2f, moho::register_CStorageManipulatorTypeInfo)
