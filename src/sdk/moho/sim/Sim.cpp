@@ -9114,9 +9114,11 @@ namespace
    * lane); the other four reserve through `msvc8::vector<T>::reserve`
    * (legacy/containers/Vector.h) -- `mArmyUpdates` via FUN_00560D60,
    * `mEntityUpdates` via FUN_00560EB0 (both cited there), `mUnitUpdates`
-   * via FUN_00561000 and `mPublishedCommandPackets` via FUN_00561160
-   * (neither of the last two individually re-verified in this pass, but
-   * they are the same generic `reserve()` template emission).
+   * via FUN_00561000, and `mPublishedCommandPackets` via FUN_00561160
+   * (verified: the 0x78-byte `SSyncPublishedCommandPacket` element's
+   * `reserve()` grow chain -- max_size guard FUN_00561900, allocator
+   * FUN_00562850, uninit-copy FUN_005634F0 -- all cited on their
+   * respective `Vector.h` template members).
    */
   void ReserveSyncDataSizes(const SyncReserveCountsRuntimeView& sizes, SSyncData& syncData) noexcept
   {
