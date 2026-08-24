@@ -290,12 +290,17 @@ namespace msvc8
          * (binary: `std::map_IdPool::Serialize`, `FUN_00686B10`) range-for
          * walk over the map. Its register-shape adapters `FUN_00685FA0`/
          * `FUN_00686CE0` are sibling emissions of the same walk.)
+         * Address: 0x00685FA0 (FUN_00685FA0, first register-shape adapter described above)
+         * Address: 0x00686CE0 (FUN_00686CE0, second register-shape adapter described above)
          */
         /**
          * Address: 0x006E2220 (FUN_006E2220, `std::map_uint_CUnitCommand::
          * Iterator::inc`) -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
          * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
-         * Matches this member exactly. `FUN_006E1A90`/`FUN_006E1AB0` are two
+         * Matches this member exactly.
+         * Address: 0x006E1A90 (FUN_006E1A90, first of the two thin adapters described below)
+         * Address: 0x006E1AB0 (FUN_006E1AB0, second of the two thin adapters described below)
+         * `FUN_006E1A90`/`FUN_006E1AB0` are two
          * thin `_Node**` slot-pointer wrapper adapters around it (advance
          * `*slot` in place, return `slot`, matching `rb_iterator::
          * operator++()`'s `node_ = rb_increment(node_)` shape one level up
@@ -355,6 +360,10 @@ namespace msvc8
          * Address: 0x0077CD80 (FUN_0077CD80, the decal bucket iterator retreat)
          * Address: 0x0077D160 (FUN_0077D160, the start-tick map's; its two
          * register-shape adapters are 0x0077C7A0 and 0x0077CE30)
+         * Address: 0x0077C7A0 (FUN_0077C7A0, first register-shape adapter
+         * described above)
+         * Address: 0x0077CE30 (FUN_0077CE30, second register-shape adapter
+         * described above)
          */
         /**
          * Address: 0x005364D0 (FUN_005364D0, the predecessor-lookup half of
@@ -673,6 +682,8 @@ namespace msvc8
              * not a behavioural difference) -- another instantiation of this
              * same allocate/self-link split, isNil@+0x15 (8-byte value_type,
              * node size 0x18: `0x0C` links + 8 value + color + isNil, rounded).
+             * Address: 0x00947FE0 (FUN_00947FE0, the `this`-returning sibling
+             * emission described above)
              * Both call a dedicated alloc_raw half (`sub_946F90`/`sub_947030`
              * respectively -- `operator new(0x18)`, zero the three link dwords,
              * `color=1`/`isNil=0`) then perform the self-link and `isNil=1`
@@ -732,6 +743,10 @@ namespace msvc8
              * subtree, carries the size across and re-seats the extrema. All four of its
              * binary callers -- 0x0070C160, 0x0070CC10, 0x0070E320, 0x0070E3A0 -- are
              * blueprint-stat-map sites.)
+             * Address: 0x0070CC10 (FUN_0070CC10, one of the four blueprint-stat-map
+             * call sites into FUN_0070F810 described above)
+             * Address: 0x0070E3A0 (FUN_0070E3A0, another of the four blueprint-stat-map
+             * call sites into FUN_0070F810 described above)
              * Address: 0x00710990 (FUN_00710990, the recursive subtree clone underneath
              * it)
              */
@@ -742,6 +757,10 @@ namespace msvc8
              * finishes it)
              * Address: 0x0077C5B0 (FUN_0077C5B0, the head-sentinel build the copy starts
              * from; emitted again at 0x0077A8B0 and 0x0077B4C0)
+             * Address: 0x0077A8B0 (FUN_0077A8B0, first sibling emission of the
+             * head-sentinel build described above)
+             * Address: 0x0077B4C0 (FUN_0077B4C0, second sibling emission of the
+             * head-sentinel build described above)
              */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
@@ -874,6 +893,7 @@ namespace msvc8
             /**
              * Address: 0x00498060 (FUN_00498060, the trail-segment pool's maximum;
              * emitted again at 0x0087CC20)
+             * Address: 0x0087CC20 (FUN_0087CC20, sibling emission of FUN_00498060 described above)
              */
             [[nodiscard]] node_type* header() const noexcept { return head_; }
             [[nodiscard]] node_type* root() const noexcept { return head_->parent; }
@@ -892,6 +912,7 @@ namespace msvc8
             /**
              * Address: 0x00498080 (FUN_00498080, the trail-segment pool's minimum;
              * emitted again at 0x0087CC40)
+             * Address: 0x0087CC40 (FUN_0087CC40, sibling emission of FUN_00498080 described above)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
@@ -1059,6 +1080,8 @@ namespace msvc8
              * `try_get()` provides, just by-value instead of by-pointer.
              * Zero incoming xrefs in this sweep. Re-homed here from a
              * bespoke `FindCommandByIdRuntimeMap` free function in Sim.cpp.)
+             * Address: 0x006E0E90 (FUN_006E0E90, the find-and-extract wrapper
+             * described above)
              */
             /**
              * Address: 0x008B6160 (FUN_008B6160, `std::map_uint_
@@ -2180,6 +2203,7 @@ namespace msvc8
              * Address: 0x0077C690 (FUN_0077C690, its clone-from-source form)
              * Address: 0x0077CAE0 (FUN_0077CAE0, outer map value node; emitted again at
              * 0x0077DC40)
+             * Address: 0x0077DC40 (FUN_0077DC40, sibling emission of FUN_0077CAE0 described above)
              */
             /**
              * Address: 0x0052DB50 (FUN_0052DB50, the node buy for
@@ -2359,6 +2383,8 @@ namespace msvc8
             /**
              * Address: 0x0077C6F0 (FUN_0077C6F0, the decal tree node delete lane;
              * emitted again at 0x0077CF50)
+             * Address: 0x0077CF50 (FUN_0077CF50, sibling emission of the decal tree
+             * node delete lane described above)
              * Address: 0x007E5850 (FUN_007E5850, `value_type::~value_type()` for the
              * mesh-key map -- `moho::MeshRendererMeshCacheEntry` in
              * `moho/mesh/Mesh.h`, `_Isnil` at +0x25 (`sizeof(value_type)` == 0x18,
