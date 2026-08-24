@@ -392,6 +392,10 @@ namespace moho
     if (!outTexture) {
       const SolidTextureHandle createdTexture = BuildSolidTextureSharedHandle(new CD3DSolidBatchTexture(rgba));
 
+      /**
+       * Address: 0x004496E0 (FUN_004496E0, SolidTextureMap::operator[] --
+       * what `solidTextureMap[rgba] = createdTexture` compiles to below)
+       */
       // Subscripting is what the binary does here: one call to the map's
       // operator[] (0x004496E0), which lower-bounds the key (0x0044B1A0) and
       // default-constructs the slot through _Insert (0x0044B070) on a miss,
