@@ -2669,6 +2669,9 @@ namespace msvc8
          * reflected vector<float> SerLoad lane. Its in-place tail-shift step is
          * FUN_005260D0, the memmove_s-based dword-range relocate for this
          * 4-byte element.)
+         * Address: 0x005260D0 (FUN_005260D0, the in-place tail-shift relocate
+         * described immediately above -- `memmove_s(dst, n*4, src, n*4)` for
+         * the 4-byte `float` element, reached from `_Insert_n` FUN_00524780.)
          * Address: 0x008FE010 (FUN_008FE010, msvc8::vector<void*>::_Insert_n for
          * the D3D10 backend swap-chain vector -- same 4-byte-element shape:
          * length-error throw / in-place tail-shift / grow-and-copy at
@@ -3087,6 +3090,13 @@ namespace msvc8
          * (`EraseTerrainEnvironmentLookupPairRange`, CWldMap.cpp) after the
          * `std::copy` shift cited above on `0x008A9DC0`, to tear down the
          * vacated tail.)
+         * Address: 0x008FA890 (FUN_008FA890, msvc8::vector<gpg::gal::
+         * AdapterD3D10>::destroy_range for the 0x13C-byte polymorphic
+         * element -- a vtbl-slot-0 virtual dtor loop, `flag=0` (destroy in
+         * place, no `operator delete` per element since the buffer itself
+         * is freed by the caller). Reached from the `_Insert_n` grow lane
+         * FUN_00900630, cited above on `insert`, which destroys the old
+         * range after relocating into the reallocated buffer.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -3228,6 +3238,10 @@ namespace msvc8
          * All four adapters are unreachable except through `_Insert_n`'s
          * degenerate-range branches, so they carry no independent behaviour
          * beyond forwarding into this body.)
+         * Address: 0x00831640 (FUN_00831640, first of the four adapters described above)
+         * Address: 0x008323F0 (FUN_008323F0, second of the four adapters described above)
+         * Address: 0x00832850 (FUN_00832850, third of the four adapters described above)
+         * Address: 0x00832AB0 (FUN_00832AB0, fourth of the four adapters described above)
          *
          * Address: 0x00658490 (FUN_00658490, `uninit_copy_n` for a 4-byte
          * element that is a single refcounted-handle slot (`refCountBlockPtr`
@@ -3492,6 +3506,9 @@ namespace msvc8
          * fill through the advance-returning `_Ufill` adapter FUN_00868580,
          * `int __usercall sub_868580(dest, value, count) { uninit_fill_n(dest,
          * count, value); return dest + 12*count; }`) cited above on `insert`.)
+         * Address: 0x00868580 (FUN_00868580, the advance-returning `_Ufill`
+         * adapter described immediately above, around `uninit_fill_n` for
+         * this same `WeakEntitySetUserEntity` specialization.)
          *
          * Address: 0x00583180 (FUN_00583180, `msvc8::vector<
          * SAiAttackVectorDebug>::uninit_fill_n` for the 24-byte (6-float)
@@ -3604,6 +3621,9 @@ namespace msvc8
          * not byte-identical (different register allocation from being
          * compiled as part of different enclosing functions) so `/OPT:ICF`
          * left them as separate symbols.
+         * Address: 0x008837F0 (FUN_008837F0, the register-shape adapter into
+         * FUN_00885070 described immediately above, reached from within
+         * FUN_00882BA0 at both 0x00882E1F and 0x00882EA6.)
          *
          * Address: 0x005940F0 (FUN_005940F0, `uninit_move_n` for the same
          * 12-byte three-float element as `insert(iterator, const T&)`'s
@@ -4169,6 +4189,10 @@ namespace msvc8
          * Address: 0x00703410 (FUN_00703410, the 40-byte-stride throw lane for
          * `msvc8::vector<SEntitySetTemplateUnit>`, reached from the
          * `_Insert_n` grow lane FUN_007030C0 for `CArmyImpl::UnitCategorySets`)
+         * Address: 0x0064EEE0 (FUN_0064EEE0, the 52-byte-stride throw lane for
+         * `msvc8::vector<moho::SDebugDecal>`, reached from the `_Insert_n`
+         * grow lane FUN_0064E770's `size() == 0x4EC4EC4` max_size test,
+         * already cited above on `insert`)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
