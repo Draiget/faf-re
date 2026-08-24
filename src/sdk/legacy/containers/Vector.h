@@ -2121,6 +2121,11 @@ namespace msvc8
          * push_back (Sim.cpp:5045)).
          * Address: 0x00692930 (FUN_00692930, msvc8::vector<Moho::SyncCameraShakeRequest>::_Insert_n
          * grow lane; emitted via mSyncCamShake.push_back (Entity.cpp:879)).
+         * Address: 0x006928E0 (FUN_006928E0, sibling emission in the same
+         * SyncCameraShakeRequest _Insert_n family: computes the destination
+         * slot `base + 28*index` for the 28-byte element and forwards to the
+         * per-element field-copy loop FUN_00693200, i.e. the tail-shift/copy
+         * sub-step this grow lane calls into).
          * Address: 0x00940D40 (FUN_00940D40, msvc8::vector<gpg::gal::AdapterModeD3D9>::_Insert_n
          * 16-byte-element grow lane; emitted via PushBackAdapterModeD3D9 modes.push_back
          * (D3D9Interfaces.cpp:3258)).
