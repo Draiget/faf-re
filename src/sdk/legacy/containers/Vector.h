@@ -2791,6 +2791,11 @@ namespace msvc8
          * element -- a count-driven dword-pair fill loop, reached from both
          * `Moho::Sim::DumpUnits` (0x0075EE50) and its `push_back` grow lane
          * (0x0075F1A0, cited on `push_back` above))
+         * Address: 0x00680940 (FUN_00680940, msvc8::vector<moho::SCreateEntityParams>::
+         * uninit_fill_n for the 12-byte trivially-copyable element -- a count-driven
+         * dword-triple fill loop, reached from QueueCreateEntityParams's
+         * `mNewEntities.push_back(params)` in Entity.cpp via its push_back grow
+         * lane FUN_0067B6F0)
          *
          * Uninitialized fill N with value starting at dst
          */

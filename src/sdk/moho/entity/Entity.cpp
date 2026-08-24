@@ -1498,6 +1498,10 @@ namespace
    * What it does:
    * Pushes one chunk-base pointer into the grid chunk-pointer vector
    * (layout at +0x28/+0x2C/+0x30).
+   *
+   * The `std::memmove(newBegin, begin, size * sizeof(*begin))` below is
+   * Address: 0x004FDE50 (FUN_004FDE50, `memmove_s`-based relocate of the
+   * live 4-byte-pointer range into the new buffer during growth)
    */
   void AppendCollisionChunkPointer(moho::EntityCollisionSpatialGrid& grid, moho::EntityCollisionCellNode* chunkBase)
   {
