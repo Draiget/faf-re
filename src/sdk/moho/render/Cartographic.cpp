@@ -993,6 +993,18 @@ namespace moho
    * (mangled symbol suffix `_0` — second ctor overload alongside the
    * copy ctor at FUN_007D40E0). Called from `Cartographic::ReadDecals`
    * to construct each archived batch in turn.
+   *
+   * Address: 0x007D4B50 (FUN_007D4B50) is the compiler's out-of-line
+   * emission of this constructor's member-initializer-list prologue
+   * (`: mTechniqueName(), mTexturePath(), mDecalTexture(), ...,
+   * mDecals{}` below) -- sets the vtable, resets both `msvc8::string`
+   * lanes to empty SSO state, nulls the five `shared_ptr` resource
+   * handles, sets `mNeedsVertexUpload = true`, and self-links the decal
+   * list sentinel via `sub_7D4300` (already-recovered list-init helper),
+   * all before this constructor's own body forwards into `Read`. No
+   * separate call corresponds to it; it is produced directly by the
+   * member-initializer list, the same "compiler-emitted glue" case as
+   * an implicit copy constructor.
    */
   CartographicDecalBatch::CartographicDecalBatch(
     const std::uint32_t version, gpg::BinaryReader& reader)
