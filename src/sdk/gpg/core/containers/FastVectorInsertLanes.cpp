@@ -2519,6 +2519,21 @@ namespace gpg::core::legacy
   }
 
   /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   */
+  void PushBackDwordElementLaneRaw(
+    std::byte*& begin, std::byte*& end, std::byte*& capacity, std::byte* const inlineOrigin,
+    const std::byte* const sourceElement
+  )
+  {
+    FastVectorInsertRuntimeView view{begin, end, capacity, inlineOrigin};
+    (void)PushBackDwordElementLane(view, sourceElement);
+    begin = view.start;
+    end = view.finish;
+    capacity = view.capacity;
+  }
+
+  /**
    * Address: 0x008D8190 (FUN_008D8190)
    * Address: 0x008D81C0 (FUN_008D81C0)
    *
