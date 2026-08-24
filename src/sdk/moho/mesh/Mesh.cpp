@@ -1308,6 +1308,20 @@ namespace
    * block. Returns the post-insert capacity in element units. This per-T
    * named free helper preserves the binary's 1:1 symbol shape for the
    * `T = moho::SpatialShard*` instantiation.
+   *
+   * Address: 0x00506160 (FUN_00506160, 4-byte-element move-range helper)
+   *
+   * What it does:
+   * `char *__usercall(Destination@<ecx>, Source@<edx>, sourceEnd@<eax>)`:
+   * computes `n = (sourceEnd - Source) >> 2` (4-byte stride, matching
+   * `sizeof(moho::SpatialShard*) == 4`), `memmove_s`s `n * 4` bytes from
+   * `Source` to `Destination` when `n != 0`, and returns `Destination +
+   * n * 4`. This is the shared-shift step the binary splits out of the
+   * in-place branch below: called as the tail-shift memmove
+   * (`insertPos + count` from `insertPos`, `shiftCount` elements) whose
+   * returned end pointer is exactly the `insertPos + count + shiftCount`
+   * value assigned to `mEnd` in the `shiftCount < count` branch. Sole
+   * binary caller is 0x00505530.
    */
   [[nodiscard]] std::size_t InsertNullSpatialShardSlots(
     moho::SpatialShardArray<moho::SpatialShard>& shards,
@@ -1404,6 +1418,19 @@ namespace
    * for `T = moho::SpatialShardData*`. Same semantics on the leaf-lane
    * element type. Separate symbol because MSVC8 emits one template body per
    * `T`.
+   *
+   * Address: 0x00506230 (FUN_00506230, 4-byte-element move-range helper)
+   *
+   * What it does:
+   * Byte-identical shape to FUN_00506160 (see `InsertNullSpatialShardSlots`
+   * above): `n = (sourceEnd - Source) >> 2` on 4-byte strides, matching
+   * `sizeof(moho::SpatialShardData*) == 4`, `memmove_s`s `n * 4` bytes when
+   * `n != 0`, returns `Destination + n * 4`. Not ICF-folded onto
+   * FUN_00506160 despite the identical decompiled shape (separate register
+   * scheduling from the sibling `T = moho::SpatialShardData*`
+   * instantiation). Sole binary caller is 0x00505850 (this function),
+   * matching the tail-shift memmove and `dataArray.mEnd = insertPos +
+   * count + shiftCount` computation in the `shiftCount < count` branch.
    */
   [[nodiscard]] std::size_t InsertNullSpatialShardDataSlots(
     moho::SpatialShardArray<moho::SpatialShardData>& dataArray,
@@ -2989,6 +3016,23 @@ namespace
     ::operator delete(node);
   }
 
+  /**
+   * Address: 0x007E4770 (FUN_007E4770, mesh-cache tree head-node allocator)
+   *
+   * What it does:
+   * Allocates one raw 40-byte `MeshRendererMeshCacheNode` block through the
+   * shared VC8 checked allocator (`sub_7E56B0`, an ICF twin of
+   * `AllocateChecked40ByteElements` -- see its address list in
+   * `legacy/containers/Vector.cpp`), zeroes the `left`/`parent`/`right`
+   * link triplet at +0x00/+0x04/+0x08, and defaults `color` (+0x24) to
+   * `kRbNodeBlack` and `isSentinel` (+0x25) to `0`. Leaves `entry`
+   * (+0x0C..+0x24) unconstructed, matching the RbTree.h `buy_head()`
+   * pattern of buying a full node while leaving the value payload for the
+   * caller. Reached from the ctor-inlined sentinel build at 0x007DF150
+   * (`MeshRenderer::MeshRenderer`) and from `InitializeMeshCacheTreeStorageAdapter`
+   * (0x007E2B50); both finish the sentinel by self-linking the node and
+   * placing it in `head`, which this function fuses with the allocation.
+   */
   [[nodiscard]] moho::MeshRendererMeshCacheNode* CreateMeshCacheTreeSentinel()
   {
     const boost::shared_ptr<moho::MeshMaterial> emptyMaterial;
