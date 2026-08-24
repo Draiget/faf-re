@@ -18,6 +18,13 @@ namespace gpg
    * `str`, clamping at the NUL terminator.
    */
   int STR_Utf8ByteOffset(StrArg str, int pos);
+  /**
+   * Address: 0x00938070 (FUN_00938070, gpg::STR_Utf8Len)
+   *
+   * What it does:
+   * Counts UTF-8 codepoints in `str` by walking codepoint boundaries via
+   * `STR_NextUtf8Char` until the terminating NUL.
+   */
   int STR_Utf8Len(char const*);                                         // 0x00938070
   /**
    * Address: 0x00938040 (FUN_00938040, gpg::STR_NextUtf8Char)
@@ -60,7 +67,22 @@ namespace gpg
    * the first byte after the consumed sequence.
    */
   const char* STR_DecodeUtf8Char(const char*, wchar_t&);
+  /**
+   * Address: 0x00938680 (FUN_00938680, gpg::STR_WideToUtf8)
+   *
+   * What it does:
+   * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
+   * appending each codepoint until the terminating NUL.
+   */
   msvc8::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
+  /**
+   * Address: 0x00938720 (FUN_00938720, gpg::STR_Utf8ToWide)
+   *
+   * What it does:
+   * Decodes a UTF-8 byte string into a wide-character string via
+   * `STR_DecodeUtf8Char`, appending each codepoint until the terminating
+   * NUL.
+   */
   std::wstring STR_Utf8ToWide(StrArg str);                              // 0x00938720
 
   /**

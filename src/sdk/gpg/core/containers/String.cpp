@@ -29,7 +29,13 @@ int gpg::STR_Utf8ByteOffset(
   return itr - str;
 }
 
-// 0x00938070
+/**
+ * Address: 0x00938070 (FUN_00938070, gpg::STR_Utf8Len)
+ *
+ * What it does:
+ * Counts UTF-8 codepoints in `str` by walking codepoint boundaries via
+ * `STR_NextUtf8Char` until the terminating NUL.
+ */
 int gpg::STR_Utf8Len(
   char const* str
 )
@@ -211,7 +217,13 @@ const char* gpg::STR_DecodeUtf8Char(
   return cursor;
 }
 
-// 0x00938680
+/**
+ * Address: 0x00938680 (FUN_00938680, gpg::STR_WideToUtf8)
+ *
+ * What it does:
+ * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
+ * appending each codepoint until the terminating NUL.
+ */
 msvc8::string gpg::STR_WideToUtf8(
   const wchar_t* str
 )
@@ -227,7 +239,14 @@ msvc8::string gpg::STR_WideToUtf8(
   return builder;
 }
 
-// 0x00938720
+/**
+ * Address: 0x00938720 (FUN_00938720, gpg::STR_Utf8ToWide)
+ *
+ * What it does:
+ * Decodes a UTF-8 byte string into a wide-character string via
+ * `STR_DecodeUtf8Char`, appending each codepoint until the terminating
+ * NUL.
+ */
 std::wstring gpg::STR_Utf8ToWide(
   StrArg str
 )
