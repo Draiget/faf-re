@@ -670,6 +670,21 @@ namespace gpg::core::legacy
   );
 
   /**
+   * Pointer-quad-only wrapper around `PushBackDwordElementLane` for callers
+   * outside this container home whose own dword-lane member has the
+   * identical `{begin, end, capacity, inlineOrigin}` layout as
+   * `FastVectorInsertRuntimeView` but is declared as a distinct, per-file
+   * type (e.g. `Moho::UICommandGraph::CommandGraphDwordLane` in
+   * CWldSession.cpp, `LinkCommandGraphEdge`'s `mLaneA`/`mLaneB` edge-pointer
+   * appends at 0x008269C8/0x008269F4). Takes/returns the four lane fields
+   * by reference instead of the named view type, so a caller never needs to
+   * reach into this container's runtime-view shape directly.
+   */
+  void PushBackDwordElementLaneRaw(
+    std::byte*& begin, std::byte*& end, std::byte*& capacity, std::byte* inlineOrigin, const std::byte* sourceElement
+  );
+
+  /**
    * Address: 0x008D8000 (FUN_008D8000)
    *
    * What it does:

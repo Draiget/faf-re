@@ -1740,6 +1740,25 @@ namespace moho
     );
 
     /**
+     * `LinkCommandGraphEdge` (0x00826960) needs `mMapC`/`mMapD`/`mNodes` and
+     * the private find-or-insert primitives built on them - declared here
+     * (rather than with the other friends above) for the same reason
+     * `EstimateDrawNodeWorkTicks` is: it names `UICommandGraphDrawNode`,
+     * only complete from this point on. See its own doc comment, on the
+     * out-of-line definition, for the full address decomposition.
+     */
+    friend void LinkCommandGraphEdge(
+      UICommandGraphDrawNode& toNode, UICommandGraphDrawNode& fromNode, UICommandGraph& graph, bool forceHighlight
+    );
+
+    /**
+     * `AddCommandQueueToCommandGraph` (0x00826140) needs `mMapAB0`/`mMapAB1`/
+     * `mSession` and `FindOrInsertCommandGraphDrawNode` - declared here for
+     * the same reason `LinkCommandGraphEdge` is.
+     */
+    friend void AddCommandQueueToCommandGraph(UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue);
+
+    /**
      * Tri-state highlight the render pass picks a waypoint/orderline style
      * color and scale from - see `ResolveDrawNodeHighlightState`.
      */
@@ -6126,94 +6145,17 @@ namespace moho
   }
 
   /**
-   * The command-graph rebuild frontier: the one body `CreateMeshes`'s chain
-   * calls that is analyzed but not yet recovered. It is declared here at
-   * namespace scope - deliberately NOT in an anonymous namespace - so that a
-   * link reports it by name instead of silently folding it away.
-   *
-   * Its two former neighbours, `EstimateEdgeTravelTicks` (0x00826C50) and
-   * `EstimateDrawNodeWorkTicks` (0x00826F10), are recovered; they keep a
-   * declaration here only because `ResolveDrawNodeCompletionTick` below calls
-   * them ahead of the anonymous-namespace helpers their bodies need.
-   *
-   * Address: 0x00826140 (FUN_00826140, sub_826140)
-   *
-   * IDA signature:
-   * void __thiscall sub_826140(Moho::UserEntity *this, Moho::UICommandGraph *graph,
-   *                            Moho::UserCommandQueue *queue);
-   *
-   * What it does:
-   * Folds one entity's command queue into the graph: walks the queue's resolved
-   * command-issue helpers, finds-or-creates a draw node per command, adds this
-   * entity's position into the queue-head node's centroid accumulator, and
-   * chains consecutive orders together through `LinkCommandGraphEdge`
-   * (0x00826960).
-   *
-   * Still blocked on that edge builder, but *not* on unknown layout - every
-   * offset below is now pinned, and the earlier "the `mMapC`/tree/`mMapD`
-   * container primitives" reading was wrong about what those primitives are.
-   * They are not bespoke containers: each is an emission of a template this
-   * file (or `legacy/containers`) already models, so the remaining work is
-   * instantiating the existing templates, not writing new per-type bodies.
-   *
-   * `LinkCommandGraphEdge(toNode@ecx, fromNode@edx, graph, forceHighlight)`
-   * decomposes as:
-   *  - 0x0082B490 - find-or-create the edge in `mMapC`, keyed by the 64-bit
-   *    `{fromNode, toNode}` pair, returning `&node->mEdge` (node+0x10). It is
-   *    the exact analogue of `FindOrInsertCommandGraphDrawNode` (0x0082B300),
-   *    and confirms `HashListNode2C` is
-   *    `{mNext, mPrev, mKeyLow@0x08, mKeyHigh@0x0C, mEdge@0x10}` - the edge's
-   *    own `mFromNode`/`mToNode` at +0x08/+0x0C are written *through* that
-   *    returned payload pointer at 0x008269AA/0x008269AD.
-   *  - 0x0082C750 / 0x0082C950 / 0x0082C480 / 0x0082B5E0 - `FindHashListNode`
-   *    and `InsertOrFindHashListNode` again, for `HashListNode2C` and
-   *    `HashListNode10`. 0x0082C480 was diffed against the recovered
-   *    0x0082BFB0 body: identical load-factor test, identical incremental
-   *    one-bucket rehash, identical cascade and insert-point walks. Only the
-   *    key traits differ - the 2C lane hashes a 64-bit key as
-   *    `3863*lo + 7919*hi + 53849*(lo ^ hi)` before the same Park-Miller
-   *    Schrage tail, and compares `(lo, hi)` lexicographically. So these are
-   *    one source template over `<TNode, TKey>`, and recovering them means
-   *    generalising `FindHashListNode88`/`InsertOrFindHashListNode88` rather
-   *    than forking a copy per node size.
-   *  - 0x0082B8B0 - `mGraphRuntimeTree[texture]`, i.e. VC8
-   *    `map::operator[]`: a `lower_bound` descent whose result is handed to
-   *    the hinted insert at 0x0082CC80. That hinted insert is the same
-   *    template `legacy/containers/RbTree.h` already carries as
-   *    `insert_hint` (its batch-bucket emission is cited there at
-   *    0x007E3340), over `insert_at`(0x0082E320) and `insert_unique`
-   *    (0x0082E170). The tree is keyed on the texture's *control block*
-   *    (0x008B8D0's compare reads node+0x10 against key+0x04, both `pi`
-   *    lanes), which is precisely boost's owner-based `shared_ptr::operator<`
-   *    - so the modelled type is
-   *    `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>` and the
-   *    0x18-byte payload is that pair. 0x0082D330 is just its value ctor
-   *    (retain the texture, default the vector).
-   *  - 0x0082BCB0 is `bucket.mEdges.push_back(edge)`, and the two lane
-   *    appends at 0x008269C8/0x008269F4 are `AppendRangeDwordLane`
-   *    (0x0082CF20), already recovered.
-   *
-   * Two decompiler artifacts in 0x00826140/0x00826960 that must not be
-   * transcribed literally, both MSVC stack-slot reuse rather than real
-   * aliasing:
-   *  - `LinkCommandGraphEdge`'s 4th parameter looks like it is both a `bool`
-   *    and a dereferenced pointer. It is a `bool` by value; the callee
-   *    reuses that incoming slot as a local `HashListNode10*` (0x00826AA5
-   *    passes `&arg_4` to the `mMapD` find, which overwrites it).
-   *  - in 0x00826140 the slot IDA calls `var_D0` holds the hovered entity
-   *    during the pre-scan, is reset to 0 at 0x008262EA, and thereafter holds
-   *    the previous command's type. Two distinct source locals with disjoint
-   *    lifetimes.
-   *
-   * The one genuine layout gap left is `CWldSession+0x4C0`, still
-   * `char pad_04C0[8]` in the header: 0x0082624C loads it, subtracts 8, and
-   * dispatches virtual slot 3 on the result to get the entity the cursor is
-   * hovering, which the pre-scan then looks up in each command's
-   * `GetEntitiesUnderCursor` set.
+   * `LinkCommandGraphEdge` (0x00826960) and `AddCommandQueueToCommandGraph`
+   * (0x00826140) are both defined later in this file, after
+   * `LowerBoundWeakEntitySetNode`/`ResolveCommandGraphAnchorSampleFromHistory`/
+   * `ResolveCommandGraphAnchorWorldPosition` and the rest of the
+   * command-issue-history helper cluster they call - see the doc comment on
+   * `AddCommandQueueToCommandGraph`'s real definition for the full address
+   * decomposition. `RebuildCommandQueueNodes` below still calls
+   * `AddCommandQueueToCommandGraph` by name; that resolves through the
+   * `friend` declarations on `UICommandGraph` (found via ADL on the
+   * `UICommandGraph&` argument), so textual order here does not matter.
    */
-  void AddCommandQueueToCommandGraph(
-    UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue
-  );
 
   /**
    * Address: 0x00826C50 (FUN_00826C50, sub_826C50)
@@ -14637,6 +14579,332 @@ namespace moho
       &position, reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
     );
     return position;
+  }
+
+  /**
+   * Address: 0x00826960 (FUN_00826960, sub_826960)
+   *
+   * IDA signature:
+   * void __fastcall sub_826960(int a1, int a2, int a3, int a4);
+   * (a1@ecx = toNode, a2@edx = fromNode, a3 = graph, a4 = forceHighlight)
+   *
+   * What it does:
+   * Finds-or-creates the `{fromNode, toNode}` edge in `graph.mMapC`
+   * (`FindOrInsertCommandGraphEdge`, 0x0082B490), and on first touch wires
+   * its `mFromNode`/`mToNode`, appends it into both endpoints' dword lanes
+   * (`fromNode.mLaneB`, `toNode.mLaneA`), retains its owning command's
+   * per-command-type orderline texture (`graph.mNodes[commandType]`) into
+   * `graph.mGraphRuntimeTree[texture]`'s edge bucket
+   * (`FindOrInsertGraphRuntimeTreeBucket`, 0x0082B8B0) and pushes the edge
+   * into it. Every call bumps the edge's touch count and (re)prices its
+   * orderline width: `graph.mMapD` caches `CalculateWaypointLineWidth`'s
+   * Lua result keyed by touch count, so repeat visits within the same
+   * rebuild skip the Lua round-trip.
+   *
+   * Recovered by generalising `FindHashListNode88`/`InsertOrFindHashListNode88`
+   * into the `FindHashListNode`/`ObtainHashListNode` templates in
+   * `UICommandGraph`'s class body (RULE ONE: `HashListNode2C`/`HashListNode10`
+   * are emissions of the same hash-list template, not bespoke containers -
+   * 0x0082C480 diffed byte-for-byte against 0x0082BFB0's
+   * rehash/insert-point-walk shape, differing only in the pair-key hash and
+   * lexicographic compare), and by transcribing
+   * `legacy/containers/RbTree.h`'s already-cited `insert_at` / `insert_hint`
+   * / `insert_unique` / `rotate_left` / `rotate_right` shape against
+   * `CommandGraphTreeNode`'s own field names for
+   * `AttachGraphRuntimeTreeNodeAt`/`AtHint`/`Unique` and
+   * `PivotLeft`/`PivotRightGraphRuntimeTreeNode` (also in the class body;
+   * kept as a transcription rather than a literal `detail::rb_tree<Traits>`
+   * instantiation because `boost::SharedPtrRaw<T>` is an explicit-retain,
+   * non-owning view by design - see `BoostWrappers.h` - so `rb_tree`'s
+   * generic value-type copy construction would silently skip the add-ref
+   * the binary performs explicitly via 0x0082D330).
+   *
+   * Two decompiler artifacts that must not be transcribed literally, both
+   * MSVC stack-slot reuse rather than real aliasing:
+   *  - the 4th parameter looks like it is both a `bool` and a dereferenced
+   *    pointer in the decompile. It is a `bool` by value; the callee reuses
+   *    that incoming stack slot as a local `HashListNode10*`
+   *    (0x00826AA5 passes `&arg_4` to the `mMapD` find, which overwrites
+   *    it) - expressed here as an ordinary local instead.
+   *  - `graph.mNodes[commandType]`'s texture retain/release around the
+   *    tree-bucket lookup (`_InterlockedExchangeAdd`/vtable-dispatched
+   *    release in the binary) is expressed as a scoped
+   *    `boost::shared_ptr<CD3DBatchTexture>` (RAII), matching
+   *    `DrawWaypointMarker`'s already-established
+   *    `boost::SharedPtrFromRawRetained` pattern for the same
+   *    `SharedPtrRaw<void>`-typed style-table field.
+   */
+  void LinkCommandGraphEdge(
+    UICommandGraph::UICommandGraphDrawNode& toNode, UICommandGraph::UICommandGraphDrawNode& fromNode,
+    UICommandGraph& graph, const bool forceHighlight
+  )
+  {
+    UICommandGraph::CommandGraphEdge* const edge =
+      UICommandGraph::FindOrInsertCommandGraphEdge(&fromNode, &toNode, graph.mMapC);
+
+    if (edge->mToNode == nullptr) {
+      edge->mFromNode = &fromNode;
+      edge->mToNode = &toNode;
+
+      const auto appendToLane = [](UICommandGraph::CommandGraphDwordLane& lane, const void* const value) {
+        const auto rawValue = reinterpret_cast<std::uintptr_t>(value);
+        gpg::core::legacy::PushBackDwordElementLaneRaw(
+          reinterpret_cast<std::byte*&>(lane.mBegin), reinterpret_cast<std::byte*&>(lane.mEnd),
+          reinterpret_cast<std::byte*&>(lane.mCapacity), reinterpret_cast<std::byte*>(lane.mInlineOrigin),
+          reinterpret_cast<const std::byte*>(&rawValue)
+        );
+      };
+      appendToLane(fromNode.mLaneB, edge);
+      appendToLane(toNode.mLaneA, edge);
+
+      auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(toNode.mHelperLink.mHead);
+      const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
+      const UICommandGraph::CommandGraphNode& style = graph.mNodes[static_cast<std::size_t>(commandType)];
+
+      const boost::shared_ptr<CD3DBatchTexture> texture = boost::SharedPtrFromRawRetained(
+        reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(style.mOrderlineTexture)
+      );
+      if (texture) {
+        msvc8::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
+          graph.mGraphRuntimeTree, boost::SharedPtrRawFromSharedBorrow(texture)
+        );
+        bucket.push_back(edge);
+      }
+    }
+
+    ++edge->mTouchCount;
+    edge->mForceHighlightStyle = forceHighlight;
+
+    UICommandGraph::HashListNode10* const cached =
+      UICommandGraph::FindHashListNode10(graph.mMapD, edge->mTouchCount);
+    float width;
+    if (cached == graph.mMapD.mListHead) {
+      const LuaPlus::LuaObject waypointModule = SCR_Import(g_UIManager->mLuaState, "/lua/ui/game/commandwaypoint.lua");
+      LuaPlus::LuaFunction<float> calculateWaypointLineWidth{waypointModule["CalculateWaypointLineWidth"]};
+      width = calculateWaypointLineWidth(edge->mTouchCount);
+
+      UICommandGraph::HashListNode10Value insertValue{};
+      insertValue.mKey = edge->mTouchCount;
+      insertValue.mWidth = width;
+      bool inserted = false;
+      (void)UICommandGraph::ObtainHashListNode10(graph.mMapD, insertValue, inserted);
+    } else {
+      width = cached->mWidth;
+    }
+    edge->mBaseWidth = width;
+  }
+
+  /**
+   * The command-graph rebuild frontier: `CreateMeshes`'s chain calls this.
+   *
+   * Address: 0x00826140 (FUN_00826140, sub_826140)
+   *
+   * IDA signature:
+   * void __thiscall sub_826140(Moho::UserEntity *this, Moho::UICommandGraph *graph,
+   *                            Moho::UserCommandQueue *queue);
+   *
+   * What it does:
+   * Folds one entity's command queue into the graph: walks the queue's resolved
+   * command-issue helpers, finds-or-creates a draw node per command, adds this
+   * entity's position into the queue-head node's centroid accumulator, and
+   * chains consecutive orders together through `LinkCommandGraphEdge`
+   * (0x00826960, recovered above).
+   *
+   * `CWldSession+0x4C0`'s former layout gap - `0x0082624C`'s
+   * load/subtract-8/vtable-slot-3 dispatch - is `CWldSession::GetHoveredUserEntity()`
+   * (already promoted to a public accessor "so the command-graph render pass
+   * can call it too" - its own doc comment already anticipated this exact
+   * call site).
+   *
+   * The queue pre-scan (0x00826295-0x008262E2) walks `queue`'s
+   * `UserCommandQueueEntry` range calling `func_GetEntitiesUnderCursor` per
+   * entry and testing membership via `sub_82CEA0` (0x0082CEA0). Resolved by
+   * reading 0x0082CEA0 and its own `sub_82E560` callee directly, rather than
+   * assuming the shape from that address's other two recovered call sites
+   * (`IsCandidateExcludedByCachedRelation` above and
+   * `LowerBoundWeakEntitySetNode`'s own caller, both of which wrap a *fixed*
+   * lookup key baked into the caller - here the key is
+   * `GetHoveredUserEntity()`'s result, which is genuinely a third distinct
+   * calling shape): `sub_82CEA0(hoveredEntity@eax, outSlot@edi,
+   * cursorSet@stack)` threads a transient node through `hoveredEntity+8`'s
+   * own chain around the call (an inert scope-guard dance, per
+   * `IsCandidateExcludedByCachedRelation`'s own note on this same address),
+   * then calls `sub_82E560(cursorSet@ecx, outSlot@eax, &hoveredEntity@ebx)` -
+   * `sub_82E560` itself (read directly, not just its cited shape) loads
+   * `[ebx]` as the raw search key and descends comparing it against
+   * `node+0xC`, the exact `LowerBoundWeakEntitySetNode` shape. So the
+   * pre-scan's cursor-membership test is
+   * `LowerBoundWeakEntitySetNode(*cursorEntities, (uint32_t)hoveredEntity)
+   * != cursorEntities->mHead`, with `cursorEntities` the
+   * `SSelectionSetUserEntity` (`: WeakEntitySetUserEntity`)
+   * `ResolveCommandIssueCursorEntities` returns for that command's helper -
+   * confirmed reachable via `WeakEntitySetUserEntity::First`'s own doc
+   * comment ("CUIWorldView::HandleEvent... at 0x00871065 over a command
+   * helper's under-cursor set").
+   *
+   * The intrusive helper-link splice (`v25->val0` chain walk at
+   * 0x008261B0-0x00826200) is `CommandGraphHelperLink::UnlinkFromChain()` +
+   * `LinkInto()` on a freshly-defaulted node, whose `mHelperLink.mHead` is
+   * always null - `UnlinkFromChain()` is a no-op on a null head, so the
+   * splice collapses to a plain `LinkInto(&helper's chain head)`, expressed
+   * below as such (no fresh node has ever been linked to a *different*
+   * helper for `UnlinkFromChain` to have real work to do).
+   *
+   * The Attack/FormAttack anchor test reads its target-kind sample through
+   * `ResolveCommandGraphAnchorSampleFromHistory` (0x008B4080, already
+   * recovered) via the same whole-helper reinterpret
+   * `ResolveCommandGraphAnchorWorldPosition` above uses, and releases the
+   * sample's embedded weak ref through `UnlinkSelectionWeakOwnerRefAfterLeadingDword`
+   * (0x0081D010) - `CommandGraphAnchorSampleRuntimeView`'s
+   * `{mSampleKind, mWeakRef}` header is byte-identical to
+   * `SelectionWeakOwnerLinkNodeLane`'s `{mLeadingDword, mWeakRef}`, so the
+   * same cleanup lane applies.
+   */
+  void AddCommandQueueToCommandGraph(UserEntity& entity, UICommandGraph& graph, UserCommandQueue* const queue)
+  {
+    if (queue == nullptr) {
+      return;
+    }
+    if (queue->resolvedLinks.begin == queue->resolvedLinks.end) {
+      return;
+    }
+
+    UserUnit* const asUnit = entity.IsUserUnit();
+    IUnit* const iunit = asUnit != nullptr ? GetIUnitBridge(asUnit) : nullptr;
+    if (asUnit != nullptr && iunit != nullptr && iunit->IsUnitState(UNITSTATE_BeingUpgraded)) {
+      return;
+    }
+
+    // UserCommandQueueEntry is opaque outside UserUnit.cpp's own TU (see
+    // UserCommandQueue.h) - this is its byte-compatible {helper, link} view.
+    struct UserCommandQueueEntryView
+    {
+      UserCommandIssueHelper* helper; // +0x00
+      void* link;                     // +0x04
+    };
+    static_assert(sizeof(UserCommandQueueEntryView) == 0x08, "UserCommandQueueEntryView size must be 0x08");
+
+    auto* const entries = reinterpret_cast<UserCommandQueueEntryView*>(queue->resolvedLinks.begin);
+    auto* const entriesEnd = reinterpret_cast<UserCommandQueueEntryView*>(queue->resolvedLinks.end);
+
+    // Queue-head node: keyed by the first resolved link's helper pointer,
+    // accumulates every unit sharing this queue's centroid.
+    const auto queueHeadKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entries[0].helper));
+    UICommandGraph::UICommandGraphDrawNode* queueHeadNode =
+      UICommandGraph::FindOrInsertCommandGraphDrawNode(queueHeadKey, graph.mMapAB1);
+    queueHeadNode->mPositionSum.x += entity.mVariableData.mCurTransform.pos_.x;
+    queueHeadNode->mPositionSum.y += entity.mVariableData.mCurTransform.pos_.y;
+    queueHeadNode->mPositionSum.z += entity.mVariableData.mCurTransform.pos_.z;
+    queueHeadNode->mWeight += 1.0f;
+
+    UserEntity* const hoveredEntity = graph.mSession->GetHoveredUserEntity();
+
+    // Pre-scan: does any queued command's entities-under-cursor set contain
+    // the hovered entity, or does any command's id match the session's
+    // currently-highlighted command? Either forces every edge in this
+    // queue's chain to render highlighted, until the matching command is
+    // reached.
+    bool anyHighlight = false;
+    for (UserCommandQueueEntryView* entry = entries; entry != entriesEnd; ++entry) {
+      UserCommandIssueHelper* const helper = entry->helper;
+      if (helper == nullptr) {
+        continue;
+      }
+
+      if (hoveredEntity != nullptr) {
+        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
+        const auto hoveredKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(hoveredEntity));
+        if (LowerBoundWeakEntitySetNode(*cursorEntities, hoveredKey) != cursorEntities->mHead) {
+          anyHighlight = true;
+          break;
+        }
+      }
+      if (helper->mConstantData.cmd == graph.mSession->HighlightCommandId) {
+        anyHighlight = true;
+        break;
+      }
+    }
+
+    // Command types this graph never draws an order node for.
+    constexpr std::uint64_t kExcludedCommandTypeMask = 0x2D80000EAULL;
+
+    UICommandGraph::UICommandGraphDrawNode* previousNode = queueHeadNode;
+    std::int32_t previousCommandType = 0;
+    UICommandGraph::UICommandGraphDrawNode* anchorNode = nullptr;
+
+    for (UserCommandQueueEntryView* entry = entries; entry != entriesEnd; ++entry) {
+      UserCommandIssueHelper* const helper = entry->helper;
+      if (helper == nullptr) {
+        continue;
+      }
+
+      const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
+      const std::uint64_t typeBit = std::uint64_t{1} << static_cast<std::int32_t>(commandType);
+      if ((typeBit & kExcludedCommandTypeMask) != 0u) {
+        continue;
+      }
+
+      const auto helperKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(helper));
+      UICommandGraph::UICommandGraphDrawNode* const currentNode =
+        UICommandGraph::FindOrInsertCommandGraphDrawNode(helperKey, graph.mMapAB0);
+
+      if (currentNode->mHelperLink.mHead == nullptr) {
+        // First touch: publish the command id, join the owning helper's
+        // draw-node chain, and seed the node's own anchor position/weight
+        // from the helper's command history.
+        currentNode->mCommandId = static_cast<CmdId>(helper->mConstantData.cmd);
+        currentNode->mHelperLink.LinkInto(reinterpret_cast<UICommandGraph::CommandGraphHelperHead*>(helper));
+        currentNode->mPositionSum = ResolveCommandGraphAnchorWorldPosition(*helper);
+        currentNode->mWeight = 1.0f;
+      }
+
+      currentNode->mIsChainBoundary = 0u;
+      if (previousCommandType != 0 && previousCommandType != static_cast<std::int32_t>(commandType)) {
+        previousNode->mIsChainBoundary = 1u;
+      }
+      previousCommandType = static_cast<std::int32_t>(commandType);
+
+      const float invWeight = 1.0f / previousNode->mWeight;
+      currentNode->mPreviousCentroid.x = previousNode->mPositionSum.x * invWeight;
+      currentNode->mPreviousCentroid.y = previousNode->mPositionSum.y * invWeight;
+      currentNode->mPreviousCentroid.z = previousNode->mPositionSum.z * invWeight;
+
+      if (anchorNode == nullptr) {
+        switch (commandType) {
+        case EUnitCommandType::UNITCOMMAND_Attack:
+        case EUnitCommandType::UNITCOMMAND_FormAttack: {
+          CommandGraphAnchorSampleRuntimeView sample{};
+          (void)ResolveCommandGraphAnchorSampleFromHistory(
+            &sample, reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper)
+          );
+          (void)UnlinkSelectionWeakOwnerRefAfterLeadingDword(reinterpret_cast<SelectionWeakOwnerLinkNodeLane&>(sample));
+          if (sample.mSampleKind == 2) {
+            anchorNode = currentNode;
+          }
+          break;
+        }
+        case EUnitCommandType::UNITCOMMAND_Guard:
+        case EUnitCommandType::UNITCOMMAND_Patrol:
+        case EUnitCommandType::UNITCOMMAND_FormPatrol:
+          anchorNode = currentNode;
+          break;
+        default:
+          break;
+        }
+      }
+
+      if (anyHighlight && helper->mConstantData.cmd == graph.mSession->HighlightCommandId) {
+        anyHighlight = false;
+      }
+      LinkCommandGraphEdge(*currentNode, *previousNode, graph, anyHighlight);
+
+      previousNode = currentNode;
+    }
+
+    previousNode->mIsChainBoundary = 1u;
+    if (anchorNode != nullptr && anchorNode != previousNode) {
+      LinkCommandGraphEdge(*anchorNode, *previousNode, graph, anyHighlight);
+    }
   }
 
   /**
