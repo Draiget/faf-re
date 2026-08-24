@@ -1107,6 +1107,18 @@ namespace msvc8
              * `lea edx,[ecx+ecx*2] / shl edx,4` (n * 0x30) into `operator new`.
              * This is a *sizing* helper, not a second `_Buynode` emission.
              */
+            /**
+             * Address: 0x0071D740 (FUN_0071D740, `map<uint32_t,
+             * InfluenceMapEntry>::allocator<_Node>::allocate` -- same shape,
+             * node size 0x40 (0xFFFFFFFF/n compared against 0x40, then
+             * operator new(n<<6)). Reached from `InfluenceGrid::entries`'s
+             * node-buy path via FUN_0071C2C0, called from
+             * `EraseInfluenceEntryAndAdvance`'s caller chain at
+             * CInfluenceMap.cpp. 0x40 = 0x0C header + 0x04 key + 0x2C
+             * InfluenceMapEntry value + color/isNil, rounded up -- confirms
+             * the map<uint32_t,InfluenceMapEntry> node typing from the
+             * rotate_left/rotate_right citations above.)
+             */
             [[nodiscard]] static node_type* alloc_raw()
             {
                 return static_cast<node_type*>(::operator new(sizeof(node_type)));
