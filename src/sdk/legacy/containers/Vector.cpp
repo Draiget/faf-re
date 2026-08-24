@@ -282,6 +282,15 @@ static_assert(
  * strides above. No dedicated wrapper is added for these strides since
  * nothing in src/sdk would call it; the binary's per-stride specialization
  * collapses into this one runtime-width helper instead.
+ *
+ * Address: 0x00A72080 (FUN_00A72080, 8-byte lane, called directly from
+ * `InitializeFilled8ByteVectorStorageLane` (0x00A74370, cited below) via
+ * `AllocateCheckedElementBlock(count, sizeof(VectorElement8DwordPairLane))`
+ * -- same `0xFFFFFFFF/count < 8` guard shape, zero-count short-circuited
+ * ahead of the reciprocal division.)
+ * Address: 0x00A720E0 (FUN_00A720E0, 16-byte lane, same relationship to
+ * `InitializeFilled16ByteVectorStorageLane` (0x00A74430, cited below) via
+ * `AllocateCheckedElementBlock(count, sizeof(VectorElement16DwordQuadLane))`.)
  */
 [[nodiscard]] void* AllocateCheckedElementBlock(const std::uint32_t count, const std::uint32_t elementSize)
 {

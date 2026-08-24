@@ -4500,6 +4500,13 @@ namespace msvc8
          * Address: 0x005C9F40 (FUN_005C9F40, 0x34B, the
          * `msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n` reallocation path,
          * FUN_005C6F90)
+         * Address: 0x0064F8C0 (FUN_0064F8C0, 0x34B,
+         * `msvc8::vector<moho::SDebugDecal>::allocate_slots_checked` --
+         * reached from the `_Insert_n` grow core `FUN_0064E770` (still open,
+         * cited on `uninit_fill_n`/`uninit_copy_n` above; recovered as the
+         * caller of this token regardless, same evidence basis as those two
+         * citations), which relocates `canvas->decals` into freshly-grown
+         * storage on `push_back`'s capacity-full path)
          * Address: 0x007FB950 (FUN_007FB950, 0x3CB)
          * Address: 0x004C6520 (FUN_004C6520, 64B)
          * Address: 0x008F6040 (FUN_008F6040, 0x74B)
