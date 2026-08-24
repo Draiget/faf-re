@@ -1698,6 +1698,17 @@ namespace msvc8
          * zeroes all five dwords to build the `ResourceDeposit()` temporary,
          * loads `edi`/`ebx` with the vector and the new count and falls into
          * this body, which pops the by-value `_Val` with `retn 14h`.)
+         * Address: 0x0082CBA0 (FUN_0082CBA0, `msvc8::vector<void*>::resize`
+         * for one of `Moho::UICommandGraph`'s hash-bucket vectors -- `size()`
+         * via a plain `(finish - start) >> 2` (4-byte pointer stride),
+         * shrinking through the erase lane FUN_0082DE20, growing through the
+         * `_Insert_n` lane FUN_0082DE90 (both cited on their own members).
+         * Reached from `InsertOrFindHashListNode` FUN_0082B5E0, the sibling
+         * of the `HashListNode10`/`HashListNode2C` insert helper
+         * CWldSession.cpp's `AddCommandQueueToCommandGraph` reconstruction
+         * notes already document (0x0082C750/0x0082C950/0x0082C480/
+         * 0x0082B5E0) -- this is the one-bucket-rehash growth/shrink for
+         * `UICommandGraph`'s other hash table's bucket array.)
          *
          * What it does:
          * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
@@ -2575,6 +2586,17 @@ namespace msvc8
          * reallocated. Reached from the grow half of `push_back`, itself
          * reached from `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
          * (Sim.cpp).)
+         * Address: 0x0057EDB0 (FUN_0057EDB0,
+         * msvc8::vector<moho::SAiAttackVectorDebug>::insert(iterator, const T&)
+         * for the 0x18-byte element -- recovers the insertion index via
+         * `(pos - mFirst) / 24` *before* the insert, tail-calls the `_Insert_n`
+         * lane at 0x00580150 (already `skip`-classified as this template's
+         * generic body) with a count of one, then rebuilds the iterator as
+         * `mFirst + off * 24` because the insert may have reallocated. Reached
+         * from the grow half of `push_back` (FUN_0057D820, already cited above
+         * on `push_back`) when `mAttackVectors` is at capacity -- emitted via
+         * `CAiBrain`'s `mAttackVectors.push_back(...)` call sites (CAiBrain.cpp),
+         * the only lane this element type is appended through.)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -2611,6 +2633,25 @@ namespace msvc8
          * `max_size` overflow guard and grow/shift/throw-cleanup shape as
          * the other instantiations here. Reached from `resize(n, end())`
          * (0x00934130, cited above) via `_Grow`.)
+         * Address: 0x0082DE90 (FUN_0082DE90, `msvc8::vector<void*>::
+         * _Insert_n` for a 4-byte pointer element on one of
+         * `Moho::UICommandGraph`'s hash-bucket vectors -- same 4-byte-
+         * pointer shape as the sibling UICommandGraph instantiation
+         * FUN_0082F210 above (`max_size` 0x3FFFFFFF, `0x3FFFFFFF - size <
+         * count` overflow guard, 1.5x growth `(cap>>1)+cap`), but a
+         * distinct address/call chain: reached from `resize` FUN_0082CBA0
+         * (itself `msvc8::vector<void*>::resize(n, val)`, calling this as
+         * its grow half), which is in turn called from
+         * `InsertOrFindHashListNode` FUN_0082B5E0 -- the sibling of the
+         * `HashListNode10`/`HashListNode2C` insert helper CWldSession.cpp's
+         * `AddCommandQueueToCommandGraph` notes already document
+         * (0x0082C750/0x0082C950/0x0082C480/0x0082B5E0), so this is
+         * `UICommandGraph`'s *other* hash table's bucket array growing on a
+         * one-bucket rehash. The in-place tail-shift branch calls the
+         * register-shape adapter FUN_00831640; both the in-place and
+         * reallocation branches call the range-copy body FUN_00832B80
+         * directly for the head/tail relocation (all cited on
+         * `uninit_copy_n` above).)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -2807,6 +2848,34 @@ namespace msvc8
          * existing option slots into the reallocated buffer for
          * `gpg::AppendEnumOptionValue`'s `options.insert(options.end(), 1,
          * value)` on the capacity-full path)
+         * Address: 0x00832B80 (FUN_00832B80, `msvc8::vector<void*>::
+         * uninit_copy_n` for a 4-byte pointer element on
+         * `Moho::UICommandGraph`'s hash-bucket vector(s) -- `cmp ecx,edx /
+         * jz done / test eax,eax / jz skip-store / mov esi,[ecx] / mov
+         * [eax],esi / add ecx,4 / add eax,4 / loop`, i.e. `[first@ecx,
+         * last@edx) -> dst@eax`, one dword per iteration, `dst` advanced
+         * even when null. The `test eax,eax` null-tolerance is the same
+         * defensive-null shape already noted on FUN_00549BC0 above; it never
+         * observably fires from a real `_Insert_n` call (count > 0 implies a
+         * non-null freshly-allocated or in-place destination). Reached from
+         * the `_Insert_n` grow lane FUN_0082DE90 (cited below on `insert`)
+         * both directly (head/tail range copies on the reallocation path)
+         * and through four calling-convention adapters that reshuffle a
+         * stack-passed `(first, last)` pair plus a passed-through `edx`
+         * `dst` into this body's `eax`/`edx`/`ecx` form:
+         *   - 0x00831640, 0x008323F0, 0x00832850 -- byte-identical register-
+         *     shape adapters (differing only in their own return-cleanup:
+         *     `retn 8` for the first, plain `retn` for the other two),
+         *     reached from `_Insert_n`'s in-place tail-shift branch with an
+         *     empty source range (`first == last`) at the shift's boundary.
+         *   - 0x00832AB0 -- a `__thiscall`-shaped register/stack-shape
+         *     adapter with the same dead-code register-save-then-discard
+         *     preamble as the other three, called with all three logical
+         *     arguments collapsed to the same value (degenerate empty-range
+         *     no-op call).
+         * All four adapters are unreachable except through `_Insert_n`'s
+         * degenerate-range branches, so they carry no independent behaviour
+         * beyond forwarding into this body.)
          *
          * Uninitialized copy N from src to dst
          */
