@@ -8,6 +8,12 @@ namespace moho
 {
   /**
    * Address: 0x00813D90 (FUN_00813D90, boost::shared_ptr_ID3DVertexSheet::shared_ptr_ID3DVertexSheet)
+   * Address: 0x007FF580 (FUN_007FF580, second independent emission of the
+   * same `shared_ptr<ID3DVertexSheet>(ID3DVertexSheet*)` constructor --
+   * identical inline `sp_counted_impl_p<ID3DVertexSheet>` construction plus
+   * retain/release-old and refcount-settle shape, reached from a different
+   * call site (`Moho::WRenViewport`'s vtable neighbourhood, via
+   * FUN_007FF4C0) than the one above)
    *
    * What it does:
    * Constructs one `shared_ptr<ID3DVertexSheet>` from one raw vertex-sheet pointer lane.
