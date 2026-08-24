@@ -27,8 +27,19 @@ namespace gpg::HaStar
          * Address: 0x00A82547
          * Slot: 0
          * Demangled: _purecall
+         *
+         * What it does:
+         * Drops the cache entry that owns `key` once its last `Cluster` handle
+         * released. `ClusterInternalCache<T>::Fetch` arms this by storing the
+         * owning cache into `Cluster::Data::mReleaseObject` and the address of
+         * the freshly-linked node's key into `Cluster::Data::mReleaseArg`
+         * (`FUN_00935063`/`FUN_0093506A`); `ReleaseClusterData` dispatches back
+         * through this slot when the handle's refcount reaches zero. Each
+         * concrete `ClusterInternalCache<T>` override (`FUN_009355F0` for
+         * `OccupationData`, `FUN_00935600` for `SubclusterData`) forwards
+         * straight into its own `mVec.erase(*static_cast<const KeyT*>(key))`.
          */
-        virtual void Unknown() = 0;
+        virtual void Evict(const void* key) = 0;
     };
 
     struct OccupationData
@@ -69,14 +80,22 @@ namespace gpg::HaStar
          *   +0x08 mReleaseArg    dispose-callback argument
          *   +0x0C mNodeCount     trailing-array element count
          *   +0x0D mNodes[]       followed by edges (allocated inline)
+         *
+         * `mReleaseObject`/`mReleaseArg` are only ever populated by
+         * `ClusterInternalCache<T>::Fetch` (a cache that hands out this
+         * handle arms its own eviction callback here) and only ever read by
+         * `ReleaseClusterData`'s refcount-zero path
+         * (`gpg/core/algorithms/Cluster.cpp`), which dispatches through
+         * `ICache::Evict` - see that virtual's Doxygen block for the binary
+         * evidence tying the two together.
          */
         struct Data
         {
-            std::int32_t mRefs;        // +0x00
-            void* mReleaseObject;      // +0x04
-            std::uint32_t mReleaseArg; // +0x08
-            std::uint8_t mNodeCount;   // +0x0C
-            Node mNodes[1];            // +0x0D flexible tail
+            std::int32_t mRefs;         // +0x00
+            ICache* mReleaseObject;     // +0x04
+            const void* mReleaseArg;    // +0x08
+            std::uint8_t mNodeCount;    // +0x0C
+            Node mNodes[1];             // +0x0D flexible tail
         };
         static_assert(offsetof(Data, mNodeCount) == 0x0C, "Cluster::Data::mNodeCount offset must be 0x0C");
         static_assert(offsetof(Data, mNodes) == 0x0D, "Cluster::Data::mNodes offset must be 0x0D");
@@ -275,9 +294,28 @@ namespace gpg::HaStar
      */
     [[nodiscard]] IOccupationSource* InitializeOccupationSourceVTableCloneB(IOccupationSource* source);
 
+    /**
+     * The real backing object referenced by `ClusterCache`'s shared handle.
+     * `gpg::HaStar::ClusterCache::ClusterCache()` (0x00935580) constructs it
+     * directly in place - two vtable writes at `this+0x00`/`this+0x2C`, no
+     * allocation of its own - so it is `ClusterCache`'s target, not
+     * `ClusterCache` itself: `boost::shared_ptr<ClusterCacheImpl>`'s own
+     * constructor (`FUN_009356E0`,
+     * `boost::shared_ptr_HaStar_ClusterCache_Impl::shared_ptr_HaStar_ClusterCache_Impl`)
+     * is what allocates the `operator new(0x58)` block this type is built
+     * into, matching `sizeof(ClusterCacheImpl) == 0x58` exactly. This is the
+     * `ClusterCache::Impl` `BoostWrappers.h`'s `sp_counted_impl_p` comments
+     * already name as the managed type of that shared_ptr.
+     *
+     * Full definition lives in `Cluster.cpp` (it embeds `ClusterInternalCache<T>`,
+     * whose own storage is a TU-local `msvc8::hash_map` instantiation) -
+     * only a pointer to it escapes this header.
+     */
+    class ClusterCacheImpl;
+
     struct ClusterCache
     {
-        void* mCacheTree{};
+        ClusterCacheImpl* mCacheTree{};
         void* mCacheRefs{};
 
         /**
