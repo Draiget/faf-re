@@ -4163,6 +4163,7 @@ extern "C" int __cdecl ___mb_cur_max_func()
   return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale)->mbCurMax;
 }
 
+
 /**
  * Address: 0x00AA64C8 (FUN_00AA64C8, ___lc_codepage_func)
  *
@@ -12740,20 +12741,17 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   [[nodiscard]] int RuntimeGetCodePageMaxCharBytes(const RuntimeLocaleHandle* const locale, const UINT fallbackCodePage)
   {
-    struct RuntimeThreadLocInfoMbCurMaxView
-    {
-      std::uint8_t reserved00[0xAC];
-      std::int32_t mbCurMax;
-    };
-    static_assert(
-      offsetof(RuntimeThreadLocInfoMbCurMaxView, mbCurMax) == 0xAC,
-      "RuntimeThreadLocInfoMbCurMaxView::mbCurMax offset must be 0xAC"
-    );
-
+    // `RuntimeLocaleHandle` is layout-identical to the real `_locale_tstruct`
+    // (`{locinfo, mbcinfo}`, both single pointers) -- FUN_00AA64B2's real body
+    // (`___mb_cur_max_l_func`) is a documented, exported UCRT symbol
+    // (declared in <ctype.h>), so it is called directly here instead of being
+    // reimplemented as engine source (matching this project's `_findfirst64`/
+    // `_ftime64_s` precedent for CRT functions the modern UCRT still exports).
+    static_assert(sizeof(RuntimeLocaleHandle) == sizeof(__crt_locale_pointers), "RuntimeLocaleHandle must match _locale_tstruct layout");
     if (locale != nullptr && locale->locinfo != nullptr) {
-      const auto* const localeView = reinterpret_cast<const RuntimeThreadLocInfoMbCurMaxView*>(locale->locinfo);
-      if (localeView->mbCurMax > 0) {
-        return localeView->mbCurMax;
+      const int mbCurMax = ___mb_cur_max_l_func(reinterpret_cast<_locale_t>(const_cast<RuntimeLocaleHandle*>(locale)));
+      if (mbCurMax > 0) {
+        return mbCurMax;
       }
     }
 
