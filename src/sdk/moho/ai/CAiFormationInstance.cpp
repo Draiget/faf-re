@@ -3027,6 +3027,16 @@ namespace
    * fresh sentinel-backed lane map, clears dynamic/overlap lanes, seeds
    * default anchor/speed values, and unlinks any prior weak-unit backlink
    * chain.
+   *
+   * `new moho::SFormationLaneUnitNode{}` below is FUN_0056FE00 (checked
+   * `operator new(68)` via FUN_00571780, the 68-byte lane already cited on
+   * `AllocateCheckedElementBlock` in RbTree.h's sibling Vector.cpp) plus a
+   * zero/default field init (isNil=0, color=1). The binary then overwrites
+   * `isNil` back to 1 and self-links left/parent/right here to promote the
+   * fresh node into the sentinel head -- exactly what `head->left = head;
+   * head->parent = head; head->right = head; head->color = 1u; head->isNil
+   * = 1u;` below expresses; no separate `buy_head()`-style helper exists
+   * for this hand-rolled node type.
    */
   moho::SFormationLaneEntry* InitializeDefaultFormationLaneEntry(
     moho::SFormationLaneEntry* const laneEntry
@@ -3065,8 +3075,13 @@ namespace
    * What it does:
    * Initializes one lane-entry map head as sentinel (`isNil=1`, self-linked)
    * and clones source lane-map topology/payload into that fresh storage.
+   *
+   * `new moho::SFormationLaneUnitNode{}` below is the same FUN_0056FE00
+   * checked-allocate-and-default-init emission cited on
+   * `InitializeDefaultFormationLaneEntry` above, followed by the same
+   * isNil/self-link sentinel promotion.
    */
-  [[maybe_unused]] moho::SFormationLaneEntry* InitializeLaneEntryMapAndCloneSource(
+  moho::SFormationLaneEntry* InitializeLaneEntryMapAndCloneSource(
     moho::SFormationLaneEntry* const destination,
     const moho::SFormationLaneEntry* const source
   )

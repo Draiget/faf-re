@@ -3866,6 +3866,19 @@ namespace moho
 
   /**
    * Address: 0x00715030 (FUN_00715030, ??0InfluenceGrid@Moho@@QAE@@Z)
+   *
+   * The binary does not delegate `entries`' construction to a nested
+   * `map<uint32_t,InfluenceMapEntry>` default ctor -- it inlines the
+   * equivalent directly: `sub_71C2C0()` (FUN_0071C2C0, the checked
+   * allocate-and-default-init emission for this tree's node, isNil=0/
+   * color=1) is called, then this ctor overwrites `isNil` to 1 at +0x3D
+   * and self-links `_Parent`/`_Left`/`_Right` to promote the fresh node
+   * into the sentinel head -- the same buy_head()-equivalent inline
+   * promotion pattern seen on `CAiFormationInstance.cpp`'s
+   * `InitializeDefaultFormationLaneEntry`/`InitializeLaneEntryMapAndCloneSource`
+   * for their own hand-rolled node type. `entries()`'s member-init syntax
+   * here reaches the same final state (empty tree, self-linked isNil=1
+   * head) that the binary's inline sequence produces.
    */
   InfluenceGrid::InfluenceGrid()
     : entries()
