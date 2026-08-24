@@ -1217,6 +1217,17 @@ namespace msvc8
              * SBuildReserveInfo(16)>)+2 = 38, rounded to 40; isNil@+0x25
              * matches. Reached from `CAiBrain::mBuildStructureMap{}`'s
              * default member-init in CAiBrain.cpp.)
+             * Address: 0x007E4B80 (FUN_007E4B80, buy_head for the
+             * `Moho::MeshRenderer::meshes` batch-bucket map -- via
+             * alloc_raw's already-cited FUN_007E5740 ("batch-bucket map
+             * allocator<_Node>::allocate", 0x30=48-byte node). isNil@+0x2D
+             * matches the same batch-bucket node shape documented
+             * throughout this file. Reached from `meshes()`'s default
+             * member-init in `MeshRenderer::MeshRenderer` -- editing that
+             * caller's own citation is deferred to whichever pass lands
+             * the in-flight MeshBatchBucketTree/msvc8::map conversion
+             * currently in progress in Mesh.cpp/MeshBatchKey.*, since this
+             * file is under active concurrent edit.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
