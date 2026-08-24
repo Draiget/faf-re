@@ -1019,7 +1019,15 @@ namespace
    * uses one caller-provided fill lane for growth. Routes growth through the
    * canonical `vector<REmitterCurveKey>::_Insert_n` lane (`FUN_00516970`,
    * `InsertNCopiesEmitterCurveKeyVector`) to preserve the MSVC8 per-T symbol
-   * shape; shrink remains an inline tail erase.
+   * shape; shrink routes through `storage.resize(requestedCount)` below,
+   * whose MSVC8 emission is the sibling truncate-tail lane at 0x00516910
+   * (`FUN_00516910`, `vector<REmitterCurveKey>::_Assign_n_reuse_storage`
+   * shape): destroys `[_Myfirst + 16*requestedCount, _Myfinish)` via the
+   * element's vtable dtor slot, confirmed by the direct call site at
+   * 0x0051649C inside this function's own disassembly. No separate engine-T
+   * free helper is authored for FUN_00516910 — it is `resize()`'s own
+   * shrink-path emission, the shrink-side counterpart to
+   * `InsertNCopiesEmitterCurveKeyVector` above.
    */
   [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithFill(
     CurveKeyVector& storage,
