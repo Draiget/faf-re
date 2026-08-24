@@ -146,6 +146,8 @@ namespace moho
   class CFootPlantManipulator : public IAniManipulator
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x006392E0 (FUN_006392E0, ??0CFootPlantManipulator@Moho@@QAE@XZ)
      *
@@ -226,6 +228,8 @@ namespace moho
   class CBoneEntityManipulator : public IAniManipulator
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00634400 (FUN_00634400, ??0CBoneEntityManipulator@Moho@@QAE@@Z)
      *
@@ -317,6 +321,108 @@ namespace moho
     "CBoneEntityManipulator::mPivot offset must be 0x94"
   );
   static_assert(sizeof(CBoneEntityManipulator) == 0xA0, "CBoneEntityManipulator size must be 0xA0");
+
+  /**
+   * Owns reflected metadata for `CFootPlantManipulator`.
+   */
+  class CFootPlantManipulatorTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x006390C0 (FUN_006390C0, ctor lane)
+     *
+     * What it does:
+     * Preregisters the `CFootPlantManipulator` RTTI descriptor during startup.
+     * In the binary this constructor body is inlined into the `.CRT$XCL`
+     * provider wrapper (`register_CFootPlantManipulatorTypeInfo`, 0x00BD2A00)
+     * that constructs the file-scope singleton, rather than being emitted as
+     * a standalone `__thiscall` symbol.
+     */
+    CFootPlantManipulatorTypeInfo();
+
+    /**
+     * Address: 0x00639170 (FUN_00639170, Moho::CFootPlantManipulatorTypeInfo::dtr)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * restores the `gpg::RObject` vftable. Defaulted in source: the
+     * compiler-generated `~RType()` reproduces this behavior, matching every
+     * other manipulator TypeInfo dtor in this family.
+     */
+    ~CFootPlantManipulatorTypeInfo() override = default;
+
+    /**
+     * Address: 0x00639160 (FUN_00639160, Moho::CFootPlantManipulatorTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00639120 (FUN_00639120, Moho::CFootPlantManipulatorTypeInfo::Init)
+     */
+    void Init() override;
+  };
+
+  static_assert(sizeof(CFootPlantManipulatorTypeInfo) == 0x64, "CFootPlantManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BD2A00 (FUN_00BD2A00, register_CFootPlantManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CFootPlantManipulatorTypeInfo` singleton
+   * and installs process-exit cleanup.
+   */
+  void register_CFootPlantManipulatorTypeInfo();
+
+  /**
+   * Owns reflected metadata for `CBoneEntityManipulator`.
+   */
+  class CBoneEntityManipulatorTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00634A60 (FUN_00634A60, ctor lane)
+     *
+     * What it does:
+     * Preregisters the `CBoneEntityManipulator` RTTI descriptor during
+     * startup. In the binary this constructor body is inlined into the
+     * `.CRT$XCL` provider wrapper (`register_CBoneEntityManipulatorTypeInfo`,
+     * 0x00BD2440) that constructs the file-scope singleton, rather than being
+     * emitted as a standalone `__thiscall` symbol.
+     */
+    CBoneEntityManipulatorTypeInfo();
+
+    /**
+     * Address: 0x00634B10 (FUN_00634B10, Moho::CBoneEntityManipulatorTypeInfo::dtr)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * restores the `gpg::RObject` vftable. Defaulted in source: the
+     * compiler-generated `~RType()` reproduces this behavior, matching every
+     * other manipulator TypeInfo dtor in this family.
+     */
+    ~CBoneEntityManipulatorTypeInfo() override = default;
+
+    /**
+     * Address: 0x00634B00 (FUN_00634B00, Moho::CBoneEntityManipulatorTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00634AC0 (FUN_00634AC0, Moho::CBoneEntityManipulatorTypeInfo::Init)
+     */
+    void Init() override;
+  };
+
+  static_assert(sizeof(CBoneEntityManipulatorTypeInfo) == 0x64, "CBoneEntityManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BD2440 (FUN_00BD2440, register_CBoneEntityManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CBoneEntityManipulatorTypeInfo` singleton
+   * and installs process-exit cleanup.
+   */
+  void register_CBoneEntityManipulatorTypeInfo();
 
   using IAniManipulatorSetPrecedence_LuaFuncDef = ::moho::CScrLuaBinder;
   using IAniManipulatorEnable_LuaFuncDef = ::moho::CScrLuaBinder;
