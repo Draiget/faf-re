@@ -2781,6 +2781,12 @@ namespace gpg::gal
 
     /**
      * Address: 0x008F7230 (FUN_008F7230, sub_8F7230)
+     * Address: 0x008F65B0 (FUN_008F65B0, the recovered byte-copy lane
+     * described below -- `msvc8::vector<DXGI_MODE_DESC>::push_back`'s
+     * in-place fast-path fill: `qmemcpy` of one 28-byte `DXGI_MODE_DESC`
+     * per call, `result += 28` stride, matching this method's
+     * `uninit_fill_n(dst, 1, value)` shape reproduced generically by
+     * `entry.modes_.push_back(mode)` below)
      *
      * IDA signature:
      * int __thiscall sub_8F7230(_DWORD *this, int a2);
