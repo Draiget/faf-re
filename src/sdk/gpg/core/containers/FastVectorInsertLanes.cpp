@@ -2291,6 +2291,14 @@ namespace gpg::core::legacy
    * Address: 0x006E2D10 (FUN_006E2D10)
    * Address: 0x006E35A0 (FUN_006E35A0)
    * Address: 0x00704270 (FUN_00704270)
+   * Address: 0x00658470 (FUN_00658470, fastvector<float> dword forward-copy
+   * leaf called from GrowInsertDwordLane instantiation FUN_00657F60)
+   * Address: 0x00559270 (FUN_00559270, SSTIEntityAttachInfo dword
+   * forward-copy leaf called from GrowInsertDwordLane instantiations
+   * FUN_00559190/FUN_00561FC0)
+   * Address: 0x00553C70 (FUN_00553C70, SSyncData uint dword forward-copy
+   * leaf called from GrowInsertDwordLane instantiations
+   * FUN_00553B90/FUN_00562100)
    *
    * What it does:
    * Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination`
