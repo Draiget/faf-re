@@ -1224,6 +1224,24 @@ namespace moho
     return *reinterpret_cast<const WeakPtrVectorRuntimeView<T>*>(&weakVector);
   }
 
+  /**
+   * Address: 0x008B2B70 (FUN_008B2B70, msvc8::vector<Moho::WeakPtr<UserUnit>>
+   * ::insert(pos, 1, value) for the 8-byte `WeakPtr<T>` element -- the real
+   * `_Insert_n` shape: max_size guard (`0x1FFFFFFF`), in-place tail-shift
+   * when capacity allows (`sub_8B39A0`), else VC8's real 1.5x growth
+   * (`(cap>>1)+cap`, floored to `size+1` when that's not enough --
+   * `msvc8::vector<T>::recommended_capacity()`'s own formula, reused below
+   * rather than re-derived, since this element's move-with-relink semantics
+   * don't go through `Vector.h`'s generic `reallocate_to`) followed by an
+   * allocate (`sub_8B3700`), head/gap/tail relocate
+   * (`sub_8B39A0`/`sub_8B3D30`), and old-block release. The capacity-growth
+   * divergence this citation caught (this function was doubling from a
+   * capacity-4 floor; the binary grows 1.5x from an exact-fit-at-1 floor,
+   * matching every other `_Insert_n` in this codebase) is fixed below by
+   * calling `recommended_capacity()` directly instead of re-deriving the
+   * formula. Reached from `Moho::AddArmyAvatar` (FUN_008B2300,
+   * UserUnit.cpp) via `InsertWeakPtrVectorObjectAt`.
+   */
   template <class T>
   void EnsureWeakPtrVectorCapacity(msvc8::vector<WeakPtr<T>>& weakVector, const std::size_t requiredCount)
   {
@@ -1235,10 +1253,7 @@ namespace moho
       return;
     }
 
-    std::size_t newCapacity = capacity != 0 ? capacity : 4u;
-    while (newCapacity < requiredCount) {
-      newCapacity *= 2u;
-    }
+    const std::size_t newCapacity = weakVector.recommended_capacity(requiredCount);
 
     auto* const newBegin = static_cast<WeakPtr<T>*>(::operator new(sizeof(WeakPtr<T>) * newCapacity));
     for (std::size_t i = 0; i < newCapacity; ++i) {
