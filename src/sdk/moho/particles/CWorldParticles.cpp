@@ -2276,7 +2276,11 @@ namespace
   void InitializeTrailSegmentPool(moho::TrailSegmentPoolRuntime& poolRuntime)
   {
     // `msvc8::set`'s constructor seats the sentinel head and zeroes the
-    // size; the binary open-codes both branches of that here.
+    // size; the binary open-codes both branches of that here. Callers must
+    // ensure `poolRuntime` has already been through a real construction
+    // (placement-new or normal member init) before reaching this -- `clear()`
+    // dereferences `root() == head_->parent` unconditionally and does not
+    // tolerate a still-zeroed `head_`.
     poolRuntime.clear();
   }
 
@@ -8158,7 +8162,14 @@ namespace moho
 
     InitializeParticleBufferPoolList(runtime.allParticleBuffers);
     InitializeParticleBufferPoolList(runtime.availableParticleBuffers);
-    InitializeTrailSegmentPool(runtime.trailSegmentPool);
+    // `trailSegmentPool` is a real `msvc8::set<TrailSegmentBufferRuntime*>`,
+    // reached here through `CWorldParticlesRuntimeView`'s reinterpret_cast
+    // over this object's raw storage -- unlike its POD `*Runtime` siblings
+    // above, its own constructor (which seats the sentinel head via
+    // `buy_head()`) never runs through that reach-in. Placement-construct
+    // it for real before any other code (including `InitializeTrailSegmentPool`
+    // itself, on a later `Init()` call) touches it.
+    new (&runtime.trailSegmentPool) moho::TrailSegmentPoolRuntime();
 
     InitializeParticleBucketTree(runtime.particleBuckets);
     InitializeParticleBucketTree(runtime.refractingParticleBuckets);
