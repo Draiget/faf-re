@@ -2534,125 +2534,20 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     return out;
 }
 
-/**
- * Address: 0x00672380 (FUN_00672380)
- *
- * What it does:
- * Allocates one `CEfxTrailEmitter` object and wraps it as
- * `gpg::RRef_CEfxTrailEmitter`.
- */
-[[maybe_unused]] RRef NewCEfxTrailEmitterRef()
-{
-    moho::CEfxTrailEmitter* const emitter = new (std::nothrow) moho::CEfxTrailEmitter();
-
-    RRef out{};
-    gpg::RRef_CEfxTrailEmitter(&out, emitter);
-    return out;
-}
-
-/**
- * Address: 0x00672410 (FUN_00672410)
- *
- * What it does:
- * Constructs one in-place `CEfxTrailEmitter` object when storage is provided
- * and wraps it as one `gpg::RRef_CEfxTrailEmitter` payload.
- */
-[[maybe_unused]] RRef ConstructCEfxTrailEmitterRefInPlace(void* const objectStorage)
-{
-    auto* emitter = static_cast<moho::CEfxTrailEmitter*>(objectStorage);
-    if (emitter != nullptr) {
-        emitter = new (emitter) moho::CEfxTrailEmitter();
-    }
-
-    RRef out{};
-    gpg::RRef_CEfxTrailEmitter(&out, emitter);
-    return out;
-}
-
-struct DeletingDestructorSlot8VTable
-{
-    void* reserved0;
-    int(__thiscall* invoke)(void* self, unsigned int deleteFlag);
-};
-
-struct DeletingDestructorSlot8Runtime
-{
-    DeletingDestructorSlot8VTable* vtable;
-};
-
-void InvokeDeletingDestructorSlot8(void* const objectStorage, const unsigned int deleteFlag)
-{
-    auto* const runtime = static_cast<DeletingDestructorSlot8Runtime*>(objectStorage);
-    (void)runtime->vtable->invoke(objectStorage, deleteFlag);
-}
-
-/**
- * Address: 0x006723F0 (FUN_006723F0)
- *
- * What it does:
- * Calls the polymorphic deleting-destructor lane (`+0x08`) for one
- * `CEfxTrailEmitter` instance when storage is non-null.
- */
-[[maybe_unused]] void DeleteCEfxTrailEmitterStorage(void* const objectStorage)
-{
-    if (objectStorage != nullptr) {
-        InvokeDeletingDestructorSlot8(objectStorage, 1u);
-    }
-}
-
-/**
- * Address: 0x00672480 (FUN_00672480)
- *
- * What it does:
- * Calls the polymorphic non-deleting destructor lane (`+0x08`) for one
- * `CEfxTrailEmitter` instance.
- */
-[[maybe_unused]] void DestructCEfxTrailEmitterStorage(void* const objectStorage)
-{
-    InvokeDeletingDestructorSlot8(objectStorage, 0u);
-}
-
-/**
- * Address: 0x006722A0 (FUN_006722A0)
- *
- * What it does:
- * Binds `CEfxTrailEmitter` lifecycle callback lanes (`newRef`, `ctorRef`,
- * `delete`, `destruct`) onto one runtime `RType` descriptor.
- */
-[[maybe_unused]] gpg::RType* BindCEfxTrailEmitterLifecycleCallbacks(gpg::RType* const typeInfo)
-{
-    return gpg::BindRTypeLifecycleCallbacks(
-      typeInfo,
-      &NewCEfxTrailEmitterRef,
-      &ConstructCEfxTrailEmitterRefInPlace,
-      &DeleteCEfxTrailEmitterStorage,
-      &DestructCEfxTrailEmitterStorage
-    );
-}
-
-/**
- * Address: 0x00672490 (FUN_00672490)
- *
- * What it does:
- * Resolves cached reflection type for `CEffectImpl`, builds a zero-offset base
- * descriptor, and appends it to the target `RType`.
- */
-[[maybe_unused]] void AddCEffectImplBaseField(gpg::RType* const typeInfo)
-{
-    gpg::RType* baseType = moho::CEffectImpl::sType;
-    if (!baseType) {
-        baseType = gpg::LookupRType(typeid(moho::CEffectImpl));
-        moho::CEffectImpl::sType = baseType;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType ? baseType->GetName() : nullptr;
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-}
+// NOTE: 0x00672380/0x00672410/0x006723F0/0x00672480/0x00672490 (CEfxTrailEmitter
+// TypeInfo NewRef/CtrRef/Delete/Destruct/AddBase_CEffectImpl) are recovered and
+// wired at their real caller, `CEfxTrailEmitterTypeInfo::Init`
+// (moho/effects/rendering/CEfxTrailEmitterTypeInfo.cpp) -- not here. This
+// file's NewCEfxTrailEmitterRef/ConstructCEfxTrailEmitterRefInPlace/
+// DeleteCEfxTrailEmitterStorage/DestructCEfxTrailEmitterStorage/
+// AddCEffectImplBaseField were unwired [[maybe_unused]] duplicates; removed
+// in favor of the single canonical, actually-called citations on the real
+// class. 0x006722A0 (BindCEfxTrailEmitterLifecycleCallbacks) was also removed:
+// it had zero code callers and zero data xrefs in the callgraph index
+// (verified, NO_CALLSITE_EVIDENCE/UNREACHED) -- the real Init (0x00671F30)
+// writes its four lifecycle-callback fields inline (confirmed via .asm),
+// matching the already-evidenced shared gpg::BindRTypeLifecycleCallbacks
+// helper's other ~40 citations, not a call to a separate function.
 
 /**
  * Address: 0x0059DA50 (FUN_0059DA50, gpg::RPointerType_IFormationInstance::CtrRef)
