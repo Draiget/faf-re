@@ -2620,6 +2620,8 @@ std::int32_t SiftElement8LanePairDownThenInsertBySecondWordRuntime(
  * do not: each is a 5-byte linker bridge — `E9 4B 03 00 00  jmp sub_7605E0` and
  * `E9 BB 02 00 00  jmp sub_734210` respectively. The body exists only at the two
  * addresses named above.
+ * Address: 0x00733F50 (FUN_00733F50, the 5-byte `jmp sub_734210` linker bridge
+ * described above -- not a second copy of this body)
  *
  * Second, 0x007605E0 and 0x00734210 are two *different* functions folded into
  * one C++ body here: they dispatch to different sift helpers (sub_760720 versus
@@ -5550,6 +5552,8 @@ RefCountedPayload49Runtime* CopyRefCountedPayload49Runtime(
  * 0x0085F910 was previously co-claimed here. It does not carry this loop: it is
  * 11 instructions of argument shuffling ending in `call sub_85FDB0`, i.e. a
  * distinct register-shape adapter for this body, not a second copy of it.
+ * Address: 0x0085F910 (FUN_0085F910, the register-shape adapter described
+ * above -- argument shuffle into a tail call to this body, not a second copy)
  */
 RefCountedPayload49Runtime* FillStride52RefCountedPayload49LaneRuntime(
   std::uint32_t count,
@@ -5774,6 +5778,8 @@ std::uint32_t* FillStride4DwordLaneRuntimeA(
  * 0x007CBF00 was previously co-claimed here. It does not carry this loop: it is
  * 11 instructions ending in `call sub_7CCEF0`, with no `add esi, 18h` stride and
  * no LuaObject placement-new — a register-shape adapter, not a second copy.
+ * Address: 0x007CBF00 (FUN_007CBF00, the register-shape adapter described
+ * above -- argument shuffle into a tail call to this body, not a second copy)
  */
 LuaPlus::LuaObject* FillStride24WordLuaObjectLaneRuntime(
   std::uint32_t count,
