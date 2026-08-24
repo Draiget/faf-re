@@ -3059,6 +3059,19 @@ namespace msvc8
          * degenerate-range branches, so they carry no independent behaviour
          * beyond forwarding into this body.)
          *
+         * Address: 0x0085AB80 (FUN_0085AB80, `uninit_copy_n` for a 16-byte
+         * element containing two independent shared/weak-pointer-style
+         * handles (`{rawPtr, refCountBlockPtr}` pairs at +0x00 and +0x08):
+         * per slot, both handle pairs are copied verbatim, and whichever
+         * `refCountBlockPtr` is non-null gets its refcount word (at
+         * `blockPtr+4`) atomically incremented (`lock xadd`), matching
+         * `boost::shared_ptr`/`weak_ptr`'s copy-construct semantics without
+         * calling a named copy-ctor per element. Reached via
+         * `Moho::CUIWorldView`'s vtable; owning element type and exact
+         * caller not yet identified -- none of the five candidate callers
+         * (0x0085A2D0, 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60) are
+         * recovered source yet.)
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
