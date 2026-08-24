@@ -14459,6 +14459,40 @@ namespace
     rules.mBlueprintsByOrdinal.push_back(static_cast<RBlueprint*>(blueprintObject));
   }
 
+  /**
+   * Address: 0x00529B30 (FUN_00529B30, func_Add__blueprints) -- `mMaps` lane
+   *
+   * What it does:
+   * Inserts the newly registered blueprint's ordinal into every currently
+   * connected Lua export binding's pending-ordinal set
+   * (`RRuleGameRulesImpl::mMaps[i].mPendingBlueprintOrdinals`), so
+   * `RRuleGameRulesImpl::UpdateLuaState`'s next `SynchronizeBlueprintTable`
+   * pass for that target state knows this blueprint needs to be (re-)pushed
+   * -- `UpdateLuaState` clears the set right after synchronizing
+   * (RRuleGameRules.cpp), matching a pending/dirty-set role.
+   *
+   * The binary performs this as the loop at 0x00529BE3-0x00529C0B, calling
+   * `func_MapInsert` / `FUN_0052BC60` (`msvc8::detail::rb_tree<...>::
+   * insert_unique` for the `msvc8::set<uint32_t>` embedded at
+   * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` -- see the
+   * citation block on `insert_unique` in RbTree.h) on `binding + 4` for
+   * every existing `[mMaps.mBegin, mMaps.mEnd)` binding, using the
+   * blueprint's `mBlueprintOrdinal` (+0x5C) as the key.
+   */
+  void RegisterBlueprintInCategoryMaps(RRuleGameRulesImpl& rules, void* const blueprintObject)
+  {
+    if (blueprintObject == nullptr) {
+      return;
+    }
+
+    const auto* const blueprint = reinterpret_cast<const RBlueprint*>(blueprintObject);
+    const auto ordinal = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
+
+    for (RRuleGameRulesLuaExportBinding* it = rules.mMaps.mBegin; it != rules.mMaps.mEnd; ++it) {
+      (void)it->mPendingBlueprintOrdinals.insert(ordinal);
+    }
+  }
+
   [[nodiscard]] EntityCategoryLookupTableView* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept
   {
     return reinterpret_cast<EntityCategoryLookupTableView*>(rules.mEntityCategoryLookup);
@@ -14651,36 +14685,25 @@ namespace
   }
 
   /**
-   * Absorbs binary helpers:
-   * Address: 0x00529B30 (FUN_00529B30, func_Add__blueprints)
-   * Address: 0x0052BC60 (FUN_0052BC60, func_MapInsert per-T template
-   *   emission for `std::map<uint, ?>::operator[]`)
+   * Address: 0x00529B30 (FUN_00529B30, func_Add__blueprints) -- by-ordinal
+   * and by-name Lua publication lanes
    *
-   * The binary's blueprint registration chain called `func_Add__blueprints`
-   * after each blueprint registration to:
-   *   1. Publish the blueprint into `__blueprints` Lua global by ordinal
-   *      and by string-name keys.
-   *   2. Iterate `rules->mMaps` array and call `func_MapInsert` to
-   *      register the blueprint's ordinal into each category map.
+   * What it does:
+   * The binary's blueprint registration chain calls `func_Add__blueprints`
+   * after each blueprint registration to publish the blueprint into
+   * `__blueprints` Lua global by ordinal and by string-name keys, then
+   * iterate `rules->mMaps` and register the blueprint's ordinal into every
+   * connected export binding's pending set. The recovered code retains the
+   * by-string-name Lua publication via `PublishLuaBlueprint`, the
+   * ordinal-vector append via `AppendBlueprintOrdinal`, and (now that
+   * `RRuleGameRulesImpl::mMaps` is modeled -- see RRuleGameRules.h) the
+   * `mMaps` iteration via `RegisterBlueprintInCategoryMaps`, which is what
+   * `func_MapInsert` / `FUN_0052BC60`'s role in this loop absorbs into.
    *
-   * The recovered code retains the by-string-name Lua publication via
-   * `PublishLuaBlueprint` and the ordinal-vector append via
-   * `AppendBlueprintOrdinal`. The by-ordinal Lua SetObject path and the
-   * `mMaps` category-map iteration are elided in the current pass —
-   * `RRuleGameRulesImpl::mMaps` is not yet modeled in the recovered
-   * layout, and the category bit-set / Lua ordinal publication is
-   * routed through `mEntityCategoryLookup` + `BlueprintOrdinalVector`
-   * which take a different shape than the binary's flat std::map
-   * array.
-   *
-   * The per-T `std::map<uint, RBlueprint*>::operator[]` template
-   * emission (FUN_0052BC60) used by `func_Add__blueprints`'s loop is
-   * therefore never invoked from the modern source; its role is
-   * absorbed by the elision of the `mMaps`-iteration lane. When the
-   * `mMaps` array is recovered into the typed
-   * `RRuleGameRulesImpl::mMaps` layout, both helpers can be re-wired
-   * via a named `RegisterBlueprintInCategoryMaps(rules, blueprint)`
-   * helper that absorbs `func_Add__blueprints` shape.
+   * The by-ordinal Lua `SetObject` path is still elided: the category
+   * bit-set / Lua ordinal publication for that specific lane is routed
+   * through `mEntityCategoryLookup` + `BlueprintOrdinalVector`, which take
+   * a different shape than the binary's flat array here.
    */
   template <typename TBlueprint, typename Initializer>
   [[nodiscard]] TBlueprint* GetOrCreateRegisteredBlueprint(
@@ -14726,6 +14749,7 @@ namespace
       }
 
       AppendBlueprintOrdinal(*rules, blueprint);
+      RegisterBlueprintInCategoryMaps(*rules, blueprint);
     }
 
     initializer(blueprintSpec, blueprint);

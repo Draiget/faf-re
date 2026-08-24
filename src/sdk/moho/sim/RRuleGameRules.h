@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "legacy/containers/Map.h"
+#include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
@@ -84,15 +85,59 @@ namespace moho
 
   static_assert(sizeof(RRuleGameRulesBlueprintMap) == 0x0C, "RRuleGameRulesBlueprintMap size must be 0x0C");
 
+  /**
+   * One per-target-LuaState export binding tracked by `RRuleGameRulesImpl::
+   * mMaps` (real IDA-recovered field name -- see `ExportToLuaState`,
+   * 0x00529F70, which reads/writes `this->mMaps` directly).
+   *
+   * Layout is confirmed independently from three call sites:
+   *   - `ExportToLuaState` (0x0052A28A-0x0052A2AF) constructs a fresh
+   *     binding: `mRootState` = the target root state, then `sub_52F370`
+   *     buys a red-black-tree header node and self-links its three
+   *     pointers with `_Isnil=1` at `[node+0x11]` -- byte-for-byte
+   *     `msvc8::detail::rb_tree<...>::buy_head()` (RbTree.h).
+   *   - `func_Add__blueprints` (0x00529B30) walks every existing binding
+   *     ([`mMaps.mBegin`, `mMaps.mEnd`)) and calls `func_MapInsert` /
+   *     `FUN_0052BC60` on `binding + 4` for each newly registered
+   *     blueprint's ordinal -- `FUN_0052BC60` is
+   *     `msvc8::detail::rb_tree<uint32_t...>::insert_unique` byte-for-byte
+   *     (lower-bound descent, `where == leftmost()` fast path, else
+   *     `rb_decrement` probe -- see the citation on `insert_unique` in
+   *     RbTree.h). `FUN_0052DB50`'s node-buy stores only 4 bytes at
+   *     `node+0x0C` (the ordinal itself, no paired pointer), so the
+   *     embedded container is `msvc8::set<uint32_t>`, not
+   *     `msvc8::map<uint32_t, RBlueprint*>`.
+   *   - `FUN_0052A390` destroys one binding's set by erasing the full
+   *     range and deleting the header node -- exactly `msvc8::set<uint32_t>
+   *     >`'s own destructor (`rb_tree::~rb_tree`).
+   *
+   * The embedded node is 0x14 bytes with `_Isnil` at +0x11
+   * (0x0D + sizeof(uint32_t)), the same shape already precedented by
+   * `Moho::SPeer::establishedUids` (`msvc8::set<int32_t>`, RbTree.h
+   * `buy_head` citation block).
+   *
+   * A previous pass modeled this same memory as an intrusive doubly-linked
+   * "Lua task list" (`mReserved04` / `mTaskListSentinel` / `mTaskListSize`,
+   * with a `LuaTaskListNode` of the same 0x14-byte shape). That model
+   * happened to match the byte layout -- a self-linked 3-pointer header
+   * looks identical whether it anchors a list or an empty tree -- but had
+   * no per-function address citation of its own and directly contradicted
+   * the genuine `_Insert` / `_Lrotate` / `_Rrotate` / `_Buynode` bodies at
+   * 0x0052CD30 / 0x0052DAB0 / 0x0052DB00 / 0x0052DB50 that this binding's
+   * set is actually built from. Corrected here; see RRuleGameRules.cpp for
+   * the replacement wiring.
+   */
   struct RRuleGameRulesLuaExportBinding
   {
-    LuaPlus::LuaState* mRootState; // +0x00
-    std::uint32_t mReserved04;     // +0x04
-    void* mTaskListSentinel;       // +0x08
-    std::uint32_t mTaskListSize;   // +0x0C
+    LuaPlus::LuaState* mRootState;                       // +0x00
+    msvc8::set<std::uint32_t> mPendingBlueprintOrdinals; // +0x04 (proxy_@+04, head_@+08, size_@+0C)
   };
 
   static_assert(sizeof(RRuleGameRulesLuaExportBinding) == 0x10, "RRuleGameRulesLuaExportBinding size must be 0x10");
+  static_assert(
+    offsetof(RRuleGameRulesLuaExportBinding, mPendingBlueprintOrdinals) == 0x04,
+    "RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals offset must be 0x04"
+  );
 
   struct RRuleGameRulesLuaExportBindingArray
   {
@@ -453,7 +498,15 @@ namespace moho
     std::uint8_t pad_0004[0x34];                      // +0x04
     std::uint8_t mLockStorage[0x08];                  // +0x38
     LuaPlus::LuaState* mLuaState;                     // +0x40
-    RRuleGameRulesLuaExportBindingArray mLuaExports;  // +0x44
+    /**
+     * Array of per-target-LuaState export bindings. Real field name per
+     * IDA's own decompilation of `ExportToLuaState` (`this->mMaps`,
+     * 0x00529F70) and `func_Add__blueprints`'s `rules->mMaps` walk
+     * (0x00529B30) -- see `RRuleGameRulesLuaExportBinding` above for the
+     * per-element layout evidence. Previously modeled under the name
+     * `mLuaExports`; renamed here to match the binary-recovered name.
+     */
+    RRuleGameRulesLuaExportBindingArray mMaps;        // +0x44
     SRuleFootprintsBlueprint mFootprints;             // +0x54
     RRuleGameRulesBlueprintMap mUnitBlueprints;       // +0x60
     RRuleGameRulesBlueprintMap mProjectileBlueprints; // +0x6C
@@ -489,7 +542,7 @@ namespace moho
 
   static_assert(offsetof(RRuleGameRulesImpl, mLuaState) == 0x40, "RRuleGameRulesImpl::mLuaState offset must be 0x40");
   static_assert(
-    offsetof(RRuleGameRulesImpl, mLuaExports) == 0x44, "RRuleGameRulesImpl::mLuaExports offset must be 0x44"
+    offsetof(RRuleGameRulesImpl, mMaps) == 0x44, "RRuleGameRulesImpl::mMaps offset must be 0x44"
   );
   static_assert(
     offsetof(RRuleGameRulesImpl, mFootprints) == 0x54, "RRuleGameRulesImpl::mFootprints offset must be 0x54"
