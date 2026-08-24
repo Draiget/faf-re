@@ -272,6 +272,13 @@ namespace
     return static_cast<RectHistoryNode*>(history.mHead);
   }
 
+  /**
+   * Address: 0x005AB3A0 (FUN_005AB3A0, checked-allocate-and-self-link
+   * emission for `std::list<Rect2i>::_Node` per IDA's own type library --
+   * via the checked wrapper FUN_005ABB00, elementSize=0x18 matching
+   * RectHistoryNode's own static_assert. Reached from CAiPathFinder's
+   * default and reset paths via this function.)
+   */
   [[nodiscard]] RectHistoryNode* AllocateRectSentinel()
   {
     auto* const node = static_cast<RectHistoryNode*>(::operator new(sizeof(RectHistoryNode)));

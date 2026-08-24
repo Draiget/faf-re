@@ -2675,6 +2675,13 @@ namespace msvc8
          * Address: 0x0085A1D0 (FUN_0085A1D0 — 0x10-byte element, the
          * formation-preview ghost pair; walks the span forward calling the
          * pair's destructor, FUN_00859E90, on each slot)
+         * Address: 0x00884260 (FUN_00884260, msvc8::vector<Moho::
+         * SSavedGameArmyInfo>::destroy_range -- 28-byte element,
+         * SSavedGameArmyInfo's entire content is one msvc8::string
+         * (mPlayerName), so the loop is exactly `~msvc8::string()`'s SSO
+         * capacity-check-then-free shape at stride 28. Reached implicitly
+         * from `SSavedGameHeader::~SSavedGameHeader()`'s compiler-generated
+         * `mArmyInfo` member teardown, SSavedGameHeader.cpp.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
