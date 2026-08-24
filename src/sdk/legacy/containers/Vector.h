@@ -1646,6 +1646,18 @@ namespace msvc8
          * `syncData->mEntityUpdates.reserve(sizes->mEntityData)` -- recovered
          * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
          * `mArmyUpdates.reserve` above.)
+         * Address: 0x00561000 (FUN_00561000,
+         * msvc8::vector<Moho::SUnitVariableUpdateEntry>::reserve --
+         * exact-capacity grow for the 0x238-byte element: max_size guard
+         * against 0xB60B60 (`0xFFFFFFFF / 0x238`, throw lane FUN_005617E0,
+         * already cited as this specialization's `throw_too_long`),
+         * allocates via the checked allocator FUN_005627E0, uninit-copies
+         * the live range through FUN_00563430 (the `uninit_copy_n` range
+         * form cited above), frees the old block implicitly and rebases the
+         * lanes. Reached from `Moho::SSyncData::ReserveSizes` (FUN_00560A00)
+         * as `syncData->mUnitUpdates.reserve(sizes->mUnitData)` -- recovered
+         * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
+         * `mArmyUpdates.reserve`/`mEntityUpdates.reserve` above.)
          * Address: 0x00561160 (FUN_00561160,
          * msvc8::vector<Moho::SSyncPublishedCommandPacket>::reserve --
          * exact-capacity grow for the 0x78-byte element: max_size guard
