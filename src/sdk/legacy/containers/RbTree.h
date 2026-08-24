@@ -526,6 +526,28 @@ namespace msvc8
              * `mov [esi+4], eax` / `mov byte ptr [eax+2Dh], 1` (`_Isnil`) /
              * `[eax+4] = eax` / `[eax] = eax` / `[eax+8] = eax` /
              * `mov dword ptr [esi+8], 0`.
+             *
+             * Address: 0x009471A0 (FUN_009471A0) and 0x00947FE0 (FUN_00947FE0,
+             * sibling emission that additionally returns `this` in `eax` --
+             * an MSVC ctor-calling-convention variant of the same source line,
+             * not a behavioural difference) -- another instantiation of this
+             * same allocate/self-link split, isNil@+0x15 (8-byte value_type,
+             * node size 0x18: `0x0C` links + 8 value + color + isNil, rounded).
+             * Both call a dedicated alloc_raw half (`sub_946F90`/`sub_947030`
+             * respectively -- `operator new(0x18)`, zero the three link dwords,
+             * `color=1`/`isNil=0`) then perform the self-link and `isNil=1`
+             * flag fixup this template's `buy_head()` performs inline, exactly
+             * matching the already-cited `FUN_00A583C0`/`FUN_00A5A000` split
+             * below on `buy_head()` itself. Neither writes `this->proxy_`
+             * (offset +0) -- consistent with `rb_tree()`'s constructor running
+             * against storage the caller already zero-initialised (e.g. a
+             * `new T()` value-initialisation of the owning object), which
+             * makes the redundant `proxy_ = nullptr` store foldable away.
+             * Owning field/class not yet pinned down -- this isNil@+0x15,
+             * 8-byte-value node shape recurs across many Sim-subsystem
+             * containers (see `MapNodeNil21Runtime` and its many instantiation
+             * sites in `moho/sim/SimRecoveryRuntime.cpp`); flagged as an open
+             * item for whoever narrows the specific owner next.
              */
             rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
 
@@ -1175,6 +1197,17 @@ namespace msvc8
              * pure-pointer-arithmetic rotate/walk helpers it does not fold
              * with the mesh-key map's sibling emission.)
              */
+            /**
+             * Address: 0x007B46A0 (FUN_007B46A0, single-node erase-and-rebalance
+             * for the `msvc8::set<std::uint32_t>` instantiation cited on
+             * `destroy_subtree` above -- isNil@+0x11, opens with the same
+             * `_Isnil` guard throwing `out_of_range("invalid map/set<T>
+             * iterator")` byte-for-byte (same string literal, same
+             * `std::out_of_range` vftable patch, same `_CxxThrowException`
+             * tail) as the other emissions of this member. Called once per
+             * node from `erase_range`'s (`FUN_007B3E00`, cited below)
+             * walk-one-at-a-time loop.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -1303,6 +1336,32 @@ namespace msvc8
              * cursor each turn. Reached from `FUN_0052A390`
              * (`~rb_tree`, cited above) with `[leftmost(), header())` --
              * always the whole-tree fast path in that caller.)
+             * Address: 0x007B3E00 (FUN_007B3E00, erase-range for the sibling
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `destroy_subtree`/`erase_node` above -- `_Isnil` at +0x11. Same
+             * two-shape split: whole-tree fast path calls `sub_7B4D10`
+             * (`destroy_subtree`) on the root when `first == begin() && last
+             * == end()`; otherwise walks `erase(_First++)` via `sub_7B46A0`
+             * (`erase_node`). Reached from three explicit destroy-and-
+             * reconstruct helpers in `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneC21Runtime` 0x007B2940,
+             * `ClearEmbeddedSecondaryTreeLaneRuntime` 0x007B2970,
+             * `ClearTreeStorageLaneD21Runtime` 0x007B36A0), each calling
+             * `.~set()` on its owner lane, always with `[leftmost(),
+             * header())` (verified directly against each caller's `.asm` --
+             * `mov ecx,[eax]`/push header pair pushed as `first`/`last` before
+             * `call sub_7B3E00`) -- always the whole-tree fast path from
+             * those three callers, matching `FUN_0052A390`'s sibling shape.
+             * Also reached from the same tree's copy machinery on the
+             * exception path: `_Copy`'s emission (`FUN_007B4980`) calls this
+             * member's `destroy_subtree` half directly (not through
+             * `erase_range`) to unwind a partially-copied subtree before
+             * rethrowing, and `FUN_007B3EC0` (the copy constructor) is
+             * `_Copy`'s only caller -- both currently misclassified
+             * `external_dependency` in `recovered_progress.json` pending a
+             * dedicated pass; not corrected here since neither is this
+             * batch's assigned token, flagged for whoever picks up
+             * `FUN_007B4980`/`FUN_007B3EC0` next.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -1799,6 +1858,24 @@ namespace msvc8
              * `msvc8::map<msvc8::string, void*>::~map()` for each one, which is
              * this `clear()`/`destroy_subtree` pair. No hand-written call site is
              * needed beyond the member declarations already in `RRuleGameRules.h`.)
+             * Address: 0x007B4D10 (FUN_007B4D10, whole-subtree destroy for an
+             * `msvc8::set<std::uint32_t>` instantiation -- isNil@+0x11
+             * (0x0D + sizeof(std::uint32_t) = 0x11), plain 4-byte value with no
+             * heap-owning member, matching a bare `operator delete(node)` release
+             * with no inlined value-dtor work. Owning field not yet pinned to a
+             * specific class (multiple owners share this exact node shape, e.g.
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` at the
+             * unrelated address 0x0052CCF0 above); reached from `erase_range`'s
+             * (`FUN_007B3E00`, cited below) whole-tree fast path, itself called
+             * directly (`call sub_7B3E00`, hardcoded) from three sibling
+             * `msvc8::set<std::uint32_t>` explicit destroy-and-reconstruct helpers
+             * in `moho/sim/SimRecoveryRuntime.cpp` --
+             * `ClearTreeStorageLaneC21Runtime` (0x007B2940),
+             * `ClearEmbeddedSecondaryTreeLaneRuntime` (0x007B2970) and
+             * `ClearTreeStorageLaneD21Runtime` (0x007B36A0), each of which calls
+             * `.~set()` on its owner lane -- the same explicit-destroy-and-
+             * reconstruct idiom as `ReleaseExportBindingPendingOrdinals`
+             * (`RRuleGameRules.cpp`) uses for the sibling instantiation above.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {

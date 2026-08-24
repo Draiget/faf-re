@@ -192,6 +192,17 @@ namespace moho
      * MSVC8 `std::_Tree<...>::erase(first, last)` emission for the
      * `std::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>`
      * instantiation.
+     *
+     * Address: 0x004E9AB0 (FUN_004E9AB0, this map's recursive `_Tree::_Erase`
+     * subtree destroy -- `this@ecx` is the tree object, `[esi+0x15]` the
+     * `_Isnil` byte, `[esi+8]`/`[esi]` the left/right child lanes; each node
+     * is released with a plain `operator delete` since neither `const char*`
+     * nor `TimeBarTrackLayout{const char*, float}` owns heap storage of its
+     * own. Called directly from the fast-clear branch below at `0x004E93E2`
+     * -- `tracks.clear()` triggers the same MSVC8 `_Tree::_Erase` emission
+     * for this instantiation when this SDK is built, so no separate
+     * hand-written call site is needed beyond the `tracks.clear()` already
+     * here.
      */
     TimeBarTrackMap::iterator EraseRangeTimeBarTrackMap(
       TimeBarTrackMap& tracks,

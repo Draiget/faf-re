@@ -749,11 +749,16 @@ namespace gpg::core
      * at 0x00576F10, which is `ResetFrom`.)
      * Address: 0x00898E50 (FUN_00898E50,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>'s copy constructor --
-     * `Moho::CWldSession::GetActiveBuildTemplate` (0x00896A40) return-slot
-     * copy-constructs its by-value result through this lane; recovered as
-     * `new (result) SBuildTemplateBuffer(mBuildTemplates)` at the call site
-     * (CWldSession.cpp), matching the hidden-return-slot ABI for a non-trivial
-     * by-value return.)
+     * `Moho::CWldSession::GetActiveBuildTemplate` (0x00896A40) copy-constructs
+     * its hidden-return-slot result through this lane at the true ABI level
+     * (`sub_898E50(&this->mBuildTemplate, a4)`, `a4` being raw not-yet-live
+     * storage there). Every recovered caller instead declares the
+     * destination as an ordinary local first, so by the time
+     * `GetActiveBuildTemplate` runs it is already a live, default-constructed
+     * object; the recovered body therefore assigns (`*result =
+     * mBuildTemplates;`, CWldSession.cpp) rather than placement-constructs,
+     * reaching this same `ResetFrom` machinery through `operator=` instead
+     * -- identical end state, without constructing over a live object.)
      */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
