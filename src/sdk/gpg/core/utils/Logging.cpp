@@ -119,6 +119,14 @@ public:
      *   this constructor's own original list-init sequence and from
      *   HistoryLogTarget::Log's original per-message list insert, both
      *   superseded by mEntries' (msvc8::vector<Entry>) push_back below.)
+     * Also emitted at: 0x008E4B10 (FUN_008E4B10, HistoryLogTarget::dtr) --
+     *   the scalar deleting destructor MSVC generates for any polymorphic
+     *   class with a virtual destructor override, matching this override
+     *   exactly. No source line maps to that emission; DestroyLogHistoryTarget's
+     *   plain `delete gLogHistoryTarget` below already reaches it implicitly.
+     *   A standalone `func_HistoryLogTargetDeletingDtor` free function
+     *   previously modelled it as if it needed its own source-level caller;
+     *   nothing ever called it (removed).
      *
      * What it does:
      * Destroys retained history storage, releases lock state, and runs
@@ -311,24 +319,6 @@ private:
     std::int32_t mMessageCount = 0;
     std::int32_t mReplayDepth = 0;
 };
-
-/**
- * Address: 0x008E4B10 (FUN_008E4B10, HistoryLogTarget::dtr)
- *
- * What it does:
- * Runs `HistoryLogTarget` destructor behavior and frees storage when the
- * scalar-delete flag is set.
- */
-[[maybe_unused]] static HistoryLogTarget* func_HistoryLogTargetDeletingDtor(
-  HistoryLogTarget* const target, const char deleteFlags
-)
-{
-  target->~HistoryLogTarget();
-  if ((deleteFlags & 1) != 0) {
-    ::operator delete(target);
-  }
-  return target;
-}
 
 HistoryLogTarget* gLogHistoryTarget = nullptr;
 std::once_flag gLogHistoryAtexitOnce;
