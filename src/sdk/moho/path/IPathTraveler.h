@@ -29,6 +29,17 @@ namespace moho
     IPathTraveler();
 
     /**
+     * Address: 0x007657A0 (FUN_007657A0, `PathPreviewFinder`'s scalar-deleting
+     * dtor emission -- see IPathTraveler.cpp for the shared unlink body)
+     *
+     * What it does:
+     * Unlinks `mPathQueueNode` from the path-queue ring before base teardown,
+     * so a traveler destroyed while still queued does not leave a dangling
+     * node behind.
+     */
+    virtual ~IPathTraveler();
+
+    /**
      * Address: 0x00A82547 (_purecall in FA binary)
      */
     [[nodiscard]]

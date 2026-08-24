@@ -199,6 +199,34 @@ namespace
     }
   };
 
+  /**
+   * Address: 0x005667A0 (FUN_005667A0, ctor)
+   *
+   * What it does:
+   * Preregisters `SAssignedLocInfo` RTTI so lookup resolves to this type
+   * helper. `GetName`/`Init` follow the same shape as every other scalar
+   * `RType` leaf in this file (`SUnitOffsetInfoTypeInfo` above,
+   * `IFormationInstanceTypeInfo` below): no dedicated `FUN_*` addresses were
+   * found for them, matching the pattern where MSVC folds a trivial
+   * override into the same COMDAT group as its neighbors when the bodies
+   * are byte-identical apart from the constant they return.
+   */
+  class SAssignedLocInfoTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SAssignedLocInfo";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SAssignedLocInfo);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
   class IFormationInstanceTypeInfo final : public gpg::RType
   {
   public:
@@ -4381,6 +4409,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x005667A0 (FUN_005667A0, preregister_SAssignedLocInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SAssignedLocInfo`. Reached
+   * from `sub_BCABC0` (`0x00BCABC0`, `.CRT$XCL` phase via `__xc_a`), which
+   * additionally schedules teardown for the constructed descriptor
+   * (`FUN_00BF59B0`) - reproduced here by the local static's own destructor
+   * running at process exit, the same simplification already used for
+   * `preregister_SUnitOffsetInfoTypeInfo` above.
+   */
+  gpg::RType* preregister_SAssignedLocInfoTypeInfo()
+  {
+    static SAssignedLocInfoTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SAssignedLocInfo), &typeInfo);
+    SAssignedLocInfo::sType = &typeInfo;
+    return &typeInfo;
+  }
+
+  /**
    * Address: 0x005665B0 (FUN_005665B0, preregister_IFormationInstanceTypeInfo)
    *
    * What it does:
@@ -6561,6 +6608,7 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SUnitOffsetInfoTypeInfo_12dfcf, moho::preregister_SUnitOffsetInfoTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SAssignedLocInfoTypeInfo_12dfcf, moho::preregister_SAssignedLocInfoTypeInfo)
 GPG_PREREGISTER_INIT(preregister_IFormationInstanceTypeInfo_12dfcf, moho::preregister_IFormationInstanceTypeInfo)
 GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SUnitOffsetInfo_12dfcf, moho::preregister_RMapType_EntId_SUnitOffsetInfo)
 GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EFormationdStatus_12dfcf, moho::preregister_RBroadcasterRType_EFormationdStatus)

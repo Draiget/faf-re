@@ -269,9 +269,14 @@ namespace moho
   struct SAssignedLocInfo
   {
     /// Element-type reflection cache. The binary keeps this as the
-    /// `Moho::SAssignedLocInfo::sType` global that
-    /// `RFastVectorType<SAssignedLocInfo>::SerLoad` (0x0056E000) fills on first
-    /// use. Static storage, so it does not affect the 0x10 layout below.
+    /// `Moho::SAssignedLocInfo::sType` global. It is filled once, at static
+    /// initialization, by `preregister_SAssignedLocInfoTypeInfo` (0x005667A0,
+    /// `.CRT$XCL`-phase, run from `sub_BCABC0`/`__xc_a`) rather than lazily by
+    /// `RFastVectorType<SAssignedLocInfo>::SerLoad` (0x0056E000): that
+    /// consumer calls `gpg::LookupRType`, which throws if the type was not
+    /// already preregistered, so the real binary always publishes this
+    /// descriptor before any `SerLoad`/`SerSave` call can run. Static
+    /// storage, so it does not affect the 0x10 layout below.
     inline static gpg::RType* sType = nullptr;
 
     SCoordsVec2 position;      // +0x00
@@ -1125,6 +1130,16 @@ namespace moho
    * Constructs/preregisters RTTI metadata for `SUnitOffsetInfo`.
    */
   [[nodiscard]] gpg::RType* preregister_SUnitOffsetInfoTypeInfo();
+
+  /**
+   * Address: 0x005667A0 (FUN_005667A0, preregister_SAssignedLocInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SAssignedLocInfo`. Reached
+   * from `sub_BCABC0` (`.CRT$XCL`/`__xc_a` static-init table), matching the
+   * `preregister_SUnitOffsetInfoTypeInfo` reachability shape above.
+   */
+  [[nodiscard]] gpg::RType* preregister_SAssignedLocInfoTypeInfo();
 
   /**
    * Address: 0x005665B0 (FUN_005665B0, preregister_IFormationInstanceTypeInfo)
