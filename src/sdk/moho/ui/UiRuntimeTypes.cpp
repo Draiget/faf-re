@@ -4809,6 +4809,9 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    * `IMauiDragger` one (`BindWorldViewOverlayDragger`, further down), whose
    * `+0x04` is the `WeakObject` sub-object rather than a list node.
    *
+   * Address: 0x0079DB60 (FUN_0079DB60, the unlink-only shared subroutine
+   * described below -- reproduced exactly by this function's unlink branch)
+   *
    * A third address, 0x0079DB60 (`FUN_0079DB60`, 13 instructions), is the
    * unlink-only half of this same splice, factored out as its own shared
    * subroutine and reached by tail-jump (`jmp sub_79DB60`) from at least six
