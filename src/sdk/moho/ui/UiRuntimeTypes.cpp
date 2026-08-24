@@ -2,6 +2,7 @@
 
 #include "moho/sim/BuildQueueCommandDecrement.h"
 
+#include <boost/bind.hpp>
 #include <Windows.h>
 
 #include <algorithm>
@@ -27022,19 +27023,34 @@ namespace
 
 /**
  * Address: 0x0088B960 (FUN_0088B960, Moho::CWldUiInterface::NoteGameSpeedChanged)
+ * Address: 0x0088F410 (FUN_0088F410) - boost::function0<void>::assign_to<F>,
+ *          magic-static-guarded install of the manager/invoker pair for this
+ *          bind_t<>
+ * Address: 0x0088F6A0 (FUN_0088F6A0) - vtable_type::assign_to payload store:
+ *          writes {&UI_DriverNoteGameSpeedChanged, slotZeroBased, gameSpeed}
+ *          into the function_buffer
+ * Address: 0x0088FD00 (FUN_0088FD00) - basic_vtable<F>::manager (RTTI-
+ *          confirmed via the embedded `bind_t<void,void(__cdecl*)(int,int),
+ *          list2<value<unsigned int>,value<int>>>` type descriptor)
+ * Address: 0x0088FCE0 (FUN_0088FCE0) - basic_vtable<F>::invoker: calls
+ *          `(*buf[0])(buf[1], buf[2])`
  *
  * What it does:
  * IClientMgrUIInterface::NoteGameSpeedChanged override for the game UI: posts
  * the driver-gated game-speed-changed notice for this interface's local player
  * slot onto the main thread (via THREAD_InvokeAsync -> UI_DriverNoteGameSpeedChanged,
- * which forwards to the Lua UI when a sim driver is active).
+ * which forwards to the Lua UI when a sim driver is active). The binary builds
+ * this callback via `boost::bind(&UI_DriverNoteGameSpeedChanged, slotZeroBased,
+ * gameSpeed)` (a free-function bind, flat function_buffer, no this-adjustment)
+ * rather than a closure object -- expressed here the same way to keep this
+ * call site the one that actually instantiates the cited manager/invoker pair.
  */
 void moho::UI_InterfaceNoteGameSpeedChanged(const IClientMgrUIInterface* const self, const std::int32_t gameSpeed)
 {
   const std::int32_t slotZeroBased =
     reinterpret_cast<const CWldUiInterfaceRuntimeView*>(self)->mLocalSlotZeroBased;
   boost::function<void(), std::allocator<void>> callback =
-    [slotZeroBased, gameSpeed]() { UI_DriverNoteGameSpeedChanged(slotZeroBased, gameSpeed); };
+    boost::bind(&UI_DriverNoteGameSpeedChanged, slotZeroBased, gameSpeed);
   THREAD_InvokeAsync(callback, 0u);
 }
 
