@@ -8,49 +8,49 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`96.46%`**
+- Progress coverage:  **`96.54%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,789`*
+  - *Total amount of completed tokens: `64,844`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,712` (81.36%)
-- `skip`: `6,591` (10.17%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,486` (8.47%) — proven third-party/import-boundary code
+- `recovered`: `52,715` (81.30%)
+- `skip`: `6,641` (10.24%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,488` (8.46%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `407` (0.61%)
-- `in_progress`: `181` (0.27%)
-- **`blocked`: `1,861` (2.77%)**
+- `in_progress`: `127` (0.19%)
+- **`blocked`: `1,860` (2.77%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,268`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,268`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,267`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,267`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,712 functions) — binary caller context
+### Recovered (52,715 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,349` | 31.02% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,351` | 31.02% |
 | Vtable-anchored (virtual override of a recovered class) | `5,879` | 11.15% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,556` | 10.54% |
-| No recovered caller token yet (orphan risk) | `1,858` | 3.52% |
+| No recovered caller token yet (orphan risk) | `1,859` | 3.53% |
 | No callsite evidence (no recorded code/data caller in the index) | `22,850` | 43.35% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,268 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,267 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `245` | 10.80% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `244` | 10.76% |
 | Vtable-anchored (recover with the owning class) | `136` | 6.00% |
 | Framework dispatch (wx/EH/Lua/reflection) | `10` | 0.44% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `882` | 38.89% |
-| No indexed callsite evidence (needs investigation/evidence) | `993` | 43.78% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `882` | 38.91% |
+| No indexed callsite evidence (needs investigation/evidence) | `993` | 43.80% |
 | Unclassified data xref (manual review) | `1` | 0.04% |
 | RTTI-only | `1` | 0.04% |
 
