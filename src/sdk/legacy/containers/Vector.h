@@ -3302,6 +3302,15 @@ namespace msvc8
          * is freed by the caller). Reached from the `_Insert_n` grow lane
          * FUN_00900630, cited above on `insert`, which destroys the old
          * range after relocating into the reallocated buffer.)
+         * Address: 0x008EA5F0 (FUN_008EA5F0, msvc8::vector<gpg::gal::
+         * AdapterModeD3D9>::destroy_range for the 16-byte polymorphic
+         * element (`gpg::gal::AdapterModeD3D9` -- confirmed via its own
+         * vtable symbol referenced in the caller) -- the same vtbl-slot-0
+         * virtual dtor loop shape as the `AdapterD3D10` entry above,
+         * `flag=0`. Reached from the `_Insert_n` grow lane FUN_00940D40
+         * (cited above on `insert`, `PushBackAdapterModeD3D9`
+         * modes.push_back, D3D9Interfaces.cpp:3258), which destroys the old
+         * range after relocating into the reallocated buffer.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
