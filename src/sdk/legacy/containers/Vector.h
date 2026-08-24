@@ -2903,6 +2903,21 @@ namespace msvc8
          * the inserted value, and releases the old storage, matching this
          * method's own reallocation-branch shape.)
          *
+         * Address: 0x007BB780 (FUN_007BB780, msvc8::vector<Moho::
+         * SNetCommandArg>::insert(iterator, const T&) for the 36-byte
+         * `{EType mType; int32_t mNum; msvc8::string mStr}` element --
+         * captures `off = (pos - first_) / 36` before touching storage
+         * (mirrored here as `offset`), tail-calls the `_Insert_n` grow core
+         * FUN_007BBD60 with the fixed `count = 1` (no explicit count
+         * parameter -- both this wrapper and the core it calls are
+         * count=1-specialized emissions, not the general N-count body),
+         * then rebuilds the returned iterator as `first_ + offset` since a
+         * capacity-full call reallocates and invalidates `pos`. Reached
+         * from push_back's capacity-full path, FUN_007BB120 (cited above on
+         * `push_back` -- `moho::cfunc_GpgNetSendL`'s three
+         * `args.push_back(SNetCommandArg(...))` call sites,
+         * CGpgNetInterface.cpp).)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -3027,6 +3042,78 @@ namespace msvc8
          * emission FUN_00705B30 (cited on the destructor, ArmyUnitSet.h).
          * Reached from `resize`'s two-argument overload above (FUN_00702450)
          * when growing `CArmyImpl::UnitCategorySets`.)
+         *
+         * Address: 0x007BBD60 (FUN_007BBD60, msvc8::vector<Moho::
+         * SNetCommandArg>::_Insert_n grow/insert core for the 36-byte
+         * element, count=1-specialized (no `count` parameter -- every
+         * arithmetic step in the body is folded for exactly one inserted
+         * element). Reached only through the single-element wrapper
+         * FUN_007BB780 (cited above on the single-value `insert`
+         * overload), which is itself push_back's capacity-full tail-call
+         * target (FUN_007BB120, `moho::cfunc_GpgNetSendL`'s
+         * `args.push_back(...)` sites, CGpgNetInterface.cpp). Builds a
+         * local copy of `value` on the stack first (VC8's aliasing-safety
+         * idiom, matching this method's own `const T localValue(value)`),
+         * then:
+         *   - `_Xlen`/`max_size` guard: divides by 36 via the
+         *     `38E38E39h`/`sar 3` magic pair, throws through
+         *     `throw_too_long`'s FUN_007BC060 (cited below) when
+         *     `0xFFFFFFFF/36 (=119304647) - size < 1`;
+         *   - capacity check `capacity >= size+1`; if true, takes the
+         *     in-place branch (below); if false, takes the reallocation
+         *     branch: 1.5x growth (`(cap>>1)+cap`) falling back to
+         *     `size()+1` through the `size()` accessor FUN_007BB0E0
+         *     (cited as `GetCommandArgCount`, CGpgNetInterface.cpp) when
+         *     1.5x is still insufficient, allocates through the checked
+         *     36-byte lane FUN_007BCD70 (`AllocateCheckedElementBlock`,
+         *     the runtime-width `_Allocate` sibling cited on
+         *     `allocate_slots_checked` below, Vector.cpp), relocates
+         *     `[first,pos)` and `[pos,last)` into the new buffer via two
+         *     calls to the `uninit_move_n` realization FUN_007BED70 (cited
+         *     below), constructs the inserted value between them via the
+         *     `uninit_fill_n` realization FUN_007BD810 (cited below as
+         *     `CopyAssignCommandArgRangeWithRollback`, CGpgNetInterface.cpp),
+         *     destroys the old range through `destroy_range`'s FUN_007BD8F0
+         *     (cited above on `destroy_range`), and frees the old block;
+         *   - in-place branch (capacity already sufficient): when
+         *     `pos == last_` (count_after == 0, true append-with-spare-
+         *     capacity), constructs the new element directly at `last_`
+         *     through the `uninit_fill_n` trampoline FUN_007BB880 ->
+         *     FUN_007BD810 (both cited below); when `pos != last_` (true
+         *     middle-insert), relocates the current last live element into
+         *     the new one-past-end slot through the single-element
+         *     `uninit_move_n` adapter FUN_007BCD00 (cited below), shifts
+         *     the remaining `[pos, last_-1)` run one slot right via the
+         *     in-place tail-shift-by-move-assign loop FUN_007BCD40 (cited
+         *     below), then writes `value` into the vacated `pos` slot
+         *     through the fill helper FUN_007BD950 (cited as
+         *     `FillCommandArgRangeFromPrototype`, CGpgNetInterface.cpp) --
+         *     the append case reaches the same tail-shift/fill calls with a
+         *     degenerate empty range (`pos == last_` collapses both to
+         *     no-ops), so no separate append-only body exists in the
+         *     binary.)
+         * Address: 0x007BCD40 (FUN_007BCD40, msvc8::vector<Moho::
+         * SNetCommandArg>::insert(pos, count, value)'s in-place
+         * tail-shift-by-move-assign loop for the 36-byte element -- a thin
+         * register-shape adapter (no logic of its own beyond reshuffling
+         * `(oldLast-36, oldLast)` onto the stack) that tail-calls the real
+         * backward-copy loop FUN_007BDF00 (cited below). Called once from
+         * FUN_007BBD60's middle-insert branch, cited above.)
+         * Address: 0x007BDF00 (FUN_007BDF00, the `copy_backward`-shaped
+         * per-element move-assign loop FUN_007BCD40 forwards into -- walks
+         * `[pos, oldLast-36)` backward (decrementing both cursors by 36
+         * each step, so it starts with the element just before the one
+         * already relocated by `uninit_move_n`/FUN_007BCD00 above, and
+         * never re-touches an unread source slot), assigning `mType`/
+         * `mNum` as raw dwords and `mStr` through `std::string::assign`
+         * per slot. This is the tail-shift half of `insert`'s in-place
+         * branch: it assigns into *already-constructed* destination slots
+         * -- unlike `uninit_move_n` (FUN_007BED70/FUN_007BCD00, which
+         * construct into fresh memory) -- matching this method's own
+         * `for (i = tail-count; i>0; --i) insertAt[count+i-1] =
+         * std::move(insertAt[i-1])` branch for a non-trivial element, the
+         * same shape already documented for FUN_00653E80/SDebugWorldText
+         * above.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3662,6 +3749,29 @@ namespace msvc8
          * before rethrowing. Reached from `push_back`'s fast path
          * (FUN_00889C90, cited above, `n=1`).)
          *
+         * Address: 0x007BD810 (FUN_007BD810, msvc8::vector<Moho::
+         * SNetCommandArg>::uninit_fill_n for the 36-byte element --
+         * recovered as the free function
+         * `CopyAssignCommandArgRangeWithRollback(prototype, count,
+         * destination)` in CGpgNetInterface.cpp: loops `count` times
+         * constructing one copy of `prototype` per slot through the same
+         * per-element helper FUN_007BE4B0 this method's `uninit_move_n`
+         * sibling uses (cited above), destroying the already-written
+         * prefix through FUN_007BDBB0 on exception. Called directly from
+         * push_back's fast (capacity-available) path FUN_007BB120 with
+         * `count = 1` (cited above on `push_back`), and from `_Insert_n`'s
+         * reallocation branch FUN_007BBD60 (cited above on `insert`) to
+         * construct the inserted value between the relocated
+         * prefix/suffix ranges.)
+         * Address: 0x007BB880 (FUN_007BB880, register-shape trampoline
+         * into FUN_007BD810 above -- reshuffles a caller's `(prototype,
+         * count, dest)` triplet from a mix of its own stack arg and the
+         * caller's live `esi`/`edi` registers onto FUN_007BD810's own
+         * calling convention. Called once from `_Insert_n`'s in-place
+         * append branch, FUN_007BBD60 (cited above on `insert`), with
+         * `count = 1` to construct the new back element when
+         * `pos == last_`.)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
@@ -3909,6 +4019,59 @@ namespace msvc8
          * `FUN_00813900` (already recovered above), `AppendShoreCellRef`'s
          * (Shoreline.cpp) `shorelineCells.push_back(cell)` capacity-full
          * path.)
+         * Address: 0x007BED70 (FUN_007BED70, msvc8::vector<Moho::
+         * SNetCommandArg>::uninit_move_n (copy-construct, no real move --
+         * see this method's own note below) for the 36-byte element. Loops
+         * `[srcBegin@ecx, srcEnd@edx)` (0x24 stride) constructing each
+         * destination slot through the per-element helper FUN_007BE4B0
+         * (writes `mType`/`mNum` as raw dwords, resets the `mStr` header to
+         * empty-SSO state, then calls `std::string::assign` -- exactly this
+         * method's placement-new-then-copy-ctor shape, just with the SSO
+         * reset inlined instead of a separate ctor call), and on exception
+         * destroys the already-constructed prefix through FUN_007BDBB0
+         * (this element's `~msvc8::string`-equivalent: frees the heap
+         * buffer when `_Myres >= 0x10`, resets to empty SSO) before
+         * rethrowing -- matching this method's own
+         * `try { ... } catch (...) { destroy_n(dst, i); throw; }` shape.
+         * All 4 of FUN_007BE4B0's own xrefs and all 3 of FUN_007BDBB0's are
+         * this address family (FUN_007BD810/FUN_007BDBA0/FUN_007BDE40/
+         * FUN_007BED70 for the construct step; the matching
+         * FUN_007BD810/FUN_007BDE40/FUN_007BED70 rollback blocks for the
+         * destroy step) -- CGpgNetInterface.h separately cites FUN_007BE4B0
+         * as `SNetCommandArg::operator=` (ICF-plausible: `operator=`'s
+         * `reset_and_assign`-then-copy shape folds to the same bytes as a
+         * fresh-slot construct for this SSO string type), but that citation
+         * has no independent callsite evidence of its own beyond this
+         * construct-helper role; treat the range-copy attribution here as
+         * the evidence-backed one. Called twice from `_Insert_n`'s
+         * reallocation branch, FUN_007BBD60 (cited above on `insert`): once
+         * for the `[first,pos)` prefix, once for the `[pos,last)` suffix.
+         * Also reached, via the register-shape adapters FUN_007BD930/
+         * FUN_007BCD00/FUN_007BEC10, from three call sites this recovery
+         * previously mis-attributed to a same-size `SSTICommandSource`
+         * copy-with-rollback in SSTICommandSource.cpp
+         * (`CopySSTICommandSourceRangeWithRollback` and its three
+         * `RegisterContextAdapter` siblings) -- `SSTICommandSource` is also
+         * 36 bytes but has a *different* field layout (`mIndex` at +0x00,
+         * `mName` string at +0x04, `mTimeouts` at +0x20; see
+         * SSTICommandSource.h), so it cannot share this address's compiled
+         * body, which explicitly writes two leading dwords (+0x00/+0x04)
+         * before touching the string at +0x08 and never touches +0x20 at
+         * all -- that shape only matches `SNetCommandArg`
+         * (`{EType mType; int32_t mNum; msvc8::string mStr}`,
+         * CGpgNetInterface.h). Corrected in SSTICommandSource.cpp alongside
+         * this citation.)
+         * Address: 0x007BCD00 (FUN_007BCD00, the single-element
+         * specialization of the `uninit_move_n` realization above --
+         * forwards `(srcBegin=oldLast-36, srcEnd=oldLast, dest=oldLast)`
+         * into FUN_007BED70 to relocate exactly the current last live
+         * element into the freshly-grown one-past-end slot. Called once
+         * from `_Insert_n`'s in-place middle-insert branch, FUN_007BBD60
+         * (cited above on `insert`) -- the "construct the vacated back-slot
+         * from the old last element" step this method's own
+         * `uninit_move_n(oldLast - count, count, oldLast)` call models.
+         * Same SSTICommandSource mis-attribution and correction as
+         * FUN_007BED70 immediately above.)
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -4397,6 +4560,12 @@ namespace msvc8
          * `msvc8::vector<moho::SDebugDecal>`, reached from the `_Insert_n`
          * grow lane FUN_0064E770's `size() == 0x4EC4EC4` max_size test,
          * already cited above on `insert`)
+         * Address: 0x007BC060 (FUN_007BC060, the 36-byte-stride throw lane
+         * for `msvc8::vector<Moho::SNetCommandArg>`, reached from the
+         * `_Insert_n` grow lane FUN_007BBD60's `0xFFFFFFFF/36 (=119304647)`
+         * max_size test, already cited above on `insert`. Throws
+         * `std::length_error("vector<T> too long")` exactly like the other
+         * per-stride throw lanes in this cluster.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
