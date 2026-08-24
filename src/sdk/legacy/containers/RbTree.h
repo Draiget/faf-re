@@ -152,6 +152,18 @@ namespace msvc8
          * `mGraphRuntimeTree[texture]` lookup/insert is documented in
          * CWldSession.cpp; that call chain is what reaches this tree.)
          */
+        /**
+         * Address: 0x006E1F90 (FUN_006E1F90, the command-id map's leftmost
+         * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Walks `_Left` (offset 0) while `!_Isnil`, matching this member
+         * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
+         * below) to re-seat `head->left` when the erased node was the
+         * tree's leftmost. A prior Sim.cpp recovery pass mis-labelled this
+         * address `TreeMinNode` but had it walk the `right` field -- this
+         * member's real behaviour, confirmed against the disassembly, is
+         * the leftmost (not rightmost) descent.)
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -202,6 +214,18 @@ namespace msvc8
          * mesh-key map's rightmost descent (0x007E4E60 above); confirmed a
          * distinct instantiation via direct call from `erase_node`'s
          * emission FUN_0082FD50.)
+         */
+        /**
+         * Address: 0x006E1F70 (FUN_006E1F70, the command-id map's rightmost
+         * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Walks `_Right` (offset +8) while `!_Isnil`, matching this member
+         * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
+         * below) to re-seat `head->right` when the erased node was the
+         * tree's rightmost. A prior Sim.cpp recovery pass mis-labelled this
+         * address `TreeMaxNode` but had it walk the `left` field -- this
+         * member's real behaviour, confirmed against the disassembly, is
+         * the rightmost (not leftmost) descent.)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -256,6 +280,26 @@ namespace msvc8
          * (binary: `std::map_IdPool::Serialize`, `FUN_00686B10`) range-for
          * walk over the map. Its register-shape adapters `FUN_00685FA0`/
          * `FUN_00686CE0` are sibling emissions of the same walk.)
+         */
+        /**
+         * Address: 0x006E2220 (FUN_006E2220, `std::map_uint_CUnitCommand::
+         * Iterator::inc`) -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Matches this member exactly. `FUN_006E1A90`/`FUN_006E1AB0` are two
+         * thin `_Node**` slot-pointer wrapper adapters around it (advance
+         * `*slot` in place, return `slot`, matching `rb_iterator::
+         * operator++()`'s `node_ = rb_increment(node_)` shape one level up
+         * through an indirection); `FUN_006E28C0` is the copy-then-advance
+         * adapter matching `operator++(int)`'s shape, cited on that member
+         * below. All three, plus this address, have zero incoming xrefs in
+         * this sweep -- re-homed here from bespoke `AdvanceCommandDbIteratorNode`/
+         * `AdvanceCommandDbIteratorSlotLaneA`/`AdvanceCommandDbIteratorSlotLaneB`/
+         * `CopyAndAdvanceCommandDbIteratorSlot` free functions in Sim.cpp
+         * that hand-walked the same successor step over a
+         * `CommandDbMapNodeView` reach-in instead of calling it, matching
+         * the same "no direct caller confirmed in this pass" disclosure
+         * already recorded for this map's `begin`/`empty`/`lower_bound_node`
+         * orphan accessor lanes above.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -358,6 +402,13 @@ namespace msvc8
          * different 8-byte-value_type maps that happen to share this exact
          * byte-identical body, the same ICF-adjacent sharing documented
          * throughout this file for `rb_min`/`rb_max`/the rotate family.)
+         * Address: 0x008B6950 (FUN_008B6950, sub_8B6950, the predecessor
+         * lookup half of `insert_unique` for `msvc8::map<Moho::CmdId,
+         * Moho::UserCommandIssueHelper*>` -- `CommandManager::mCommands` in
+         * `CommandManager.h`, isNil@+0x15. Reached from `insert_unique`'s
+         * emission FUN_008B5DF0, cited on that member. Re-homed here from
+         * the same bespoke `InsertCommandNodeFixup` free function in
+         * Sim.cpp cited on `insert_unique`/`insert_at` above.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -467,6 +518,18 @@ namespace msvc8
              * `msvc8::map`/`rb_tree` iterator API surface, not a distinct
              * new engine call site.)
              */
+            /**
+             * Address: 0x006E28C0 (FUN_006E28C0) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. Same copy-then-advance shape as FUN_006886A0
+             * above (a separate instantiation): copies `*sourceSlot` into
+             * `*outSlot`, advances `*sourceSlot` via `FUN_006E2220`
+             * (`rb_increment`, cited above), returns `outSlot`. Zero
+             * incoming xrefs in this sweep. Re-homed here from a bespoke
+             * `CopyAndAdvanceCommandDbIteratorSlot` free function in Sim.cpp
+             * that hand-rolled this same copy-and-advance over a
+             * `CommandDbMapNodeView` reach-in instead of calling it.)
+             */
             rb_iterator operator++(int) noexcept
             {
                 const rb_iterator copy = *this;
@@ -474,6 +537,22 @@ namespace msvc8
                 return copy;
             }
 
+            /**
+             * Address: 0x006E2200 (FUN_006E2200) Address: 0x006E27D0
+             * (FUN_006E27D0, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. Both are thin `_Node**` slot-pointer wrapper
+             * adapters around `FUN_006E28D0` (`rb_decrement`, cited above),
+             * matching this member's `node_ = rb_decrement(node_)` shape one
+             * level up through an indirection. Zero incoming xrefs in this
+             * sweep. Re-homed here from bespoke
+             * `AdvanceCommandDbIteratorCursorSlotLaneA`/`...LaneB` free
+             * functions in Sim.cpp that hand-rolled this same predecessor
+             * step over a `CommandDbMapNodeView` reach-in instead of calling
+             * it -- those two functions actually called the *increment*
+             * (successor) walk instead of the real decrement one, a latent
+             * mismatch harmless only because neither had a real caller.)
+             */
             rb_iterator& operator--() noexcept
             {
                 node_ = rb_decrement(node_);
@@ -584,6 +663,27 @@ namespace msvc8
              * containers (see `MapNodeNil21Runtime` and its many instantiation
              * sites in `moho/sim/SimRecoveryRuntime.cpp`); flagged as an open
              * item for whoever narrows the specific owner next.
+             */
+            /**
+             * Address: 0x006E1520 (FUN_006E1520) Address: 0x006E1CF0
+             * (FUN_006E1CF0, duplicate emission) Address: 0x006E2390
+             * (FUN_006E2390, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`, isNil@+0x15. All three call `FUN_006E2840`
+             * (the raw head-node allocator already cited on `CCommandDb`'s
+             * own constructor in `CCommandDb.h` as the `buy_head()` split
+             * half), patch `isNil=1`, self-link `parent`/`left`/`right`, and
+             * zero `size_` -- exactly this constructor's shape -- without
+             * touching `proxy_` at offset 0, matching the "storage already
+             * zero-initialised" pattern documented above. Three compiler
+             * emissions of the same ctor body for different inlining
+             * contexts inside `CCommandDb`'s own methods; zero incoming
+             * xrefs in this sweep for any of the three. Re-homed here from
+             * bespoke `InitializeCommandDbMapHead`/`InitializeCommandDbMapStorageLaneA`/
+             * `...LaneB`/`...LaneC` free functions in Sim.cpp that hand-
+             * rolled this same construction over a `CommandDbMapStorageView`/
+             * `CCommandDbRuntimeView` reach-in instead of relying on the
+             * member's default construction.)
              */
             rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
 
@@ -910,6 +1010,44 @@ namespace msvc8
              * this same member reached from the read-only lookup path
              * instead.)
              */
+            /**
+             * Address: 0x006E1940 (FUN_006E1940, sub_6E1940 --
+             * `Moho::CCommandDB::RemoveCmd`'s (FUN_006E0EC0, cited below on
+             * `erase_node`) and `Moho::Sim::ValidateNewCommandId`'s
+             * (FUN_007491C0) find call) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`, isNil@+0x15. Same shape as `find_node`'s
+             * generic body with `lower_bound_node`'s descent inlined rather
+             * than called out to a separate emission -- opens with the same
+             * "descend recording the last branch, `>=` comparison walks
+             * left" loop as `lower_bound_node`, then the same
+             * nil-or-key-less rejection this member performs. Re-homed here
+             * from a bespoke `FindCommandNode` free function in Sim.cpp
+             * (four overloads reaching in through `CommandDbMapStorageView`/
+             * `CommandDbMapNodeView`/`CCommandDbRuntimeView`) that hand-
+             * walked the same real member instead of calling it.
+             *
+             * `FUN_006E0E90` is a thin wrapper over this same address:
+             * calls it, then returns the mapped `CUnitCommand*` value
+             * directly (nil-or-absent -> `nullptr`) rather than the node --
+             * the same "find, extract mapped value or null" convenience
+             * `try_get()` provides, just by-value instead of by-pointer.
+             * Zero incoming xrefs in this sweep. Re-homed here from a
+             * bespoke `FindCommandByIdRuntimeMap` free function in Sim.cpp.)
+             */
+            /**
+             * Address: 0x008B6160 (FUN_008B6160, `std::map_uint_
+             * IssueCommandHelper::find`, called from `struct_CommandManager::
+             * FindDataFor`/`NewCommand` FUN_008B5A70, `struct_CommandManager::
+             * DeleteCommands` FUN_008B5C20, and `sub_8B5BB0`) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`, isNil@+0x15.
+             * Same inlined-lower-bound-then-verify shape as FUN_006E1940
+             * above, a separate instantiation (different `T`). Re-homed here
+             * from the same bespoke `FindCommandNode` free-function reach-in
+             * cited above, called through `CommandIssueMapOf` for this
+             * member instead.)
+             */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
                 node_type* const found = lower_bound_node(k);
@@ -1063,6 +1201,23 @@ namespace msvc8
              * `AddIssueData` (FUN_006E0DB0) and `MemberDeserialize`
              * (FUN_006E1430), both as `commands.insert(value_type(cmdId,
              * command))`, `CCommandDb.cpp`.)
+             */
+            /**
+             * Address: 0x008B5DF0 (FUN_008B5DF0, sub_8B5DF0, called from
+             * `struct_CommandManager::FindDataFor`/`NewCommand` FUN_008B5A70
+             * as `insert(value_type(commandId, helper))`) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E15B0 above (a separate instantiation): descends
+             * recording the last branch, `where == leftmost()` fast path
+             * tail-calls `insert_at` (FUN_008B6310, cited below) directly,
+             * otherwise a predecessor check via `rb_decrement` (FUN_008B6950,
+             * cited above) gates a second `insert_at` call or returns the
+             * colliding node with `false`. Re-homed here from a bespoke
+             * `InsertCommandNode`/`InsertCommandNodeFixup` free-function pair
+             * in Sim.cpp that hand-rolled unique-insert-plus-fixup over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
+             * instead of calling it.)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -1358,6 +1513,30 @@ namespace msvc8
              * in `RenderProjectileArcs` (FUN_008600E0, ProjectileArcRenderer.cpp)
              * via the erase-by-key overload's inner `erase(find(key))` call.)
              */
+            /**
+             * Address: 0x006E1670 (FUN_006E1670, sub_6E1670) --
+             * `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+             * Matches this member exactly: `_Isnil` guard throwing
+             * `out_of_range("invalid map/set<T> iterator")`, captures the
+             * successor via the map's `Iterator::inc` (`rb_increment`) before
+             * unlinking, calls `sub_6E1F90`/`sub_6E1F70` (`rb_min`/`rb_max`,
+             * cited above) to re-seat `head->left`/`head->right` only when the
+             * erased node was an extremum, and `sub_6E1F20`/`sub_6E1FD0`
+             * (`rotate_left`/`rotate_right`, cited above) in the rebalance
+             * loop. Reached from `Moho::CCommandDB::RemoveCmd`
+             * (FUN_006E0EC0) with three further real callers
+             * (`Moho::CUnitCommand::~CUnitCommand`, `Moho::UNIT_IssueCommand`,
+             * `Moho::UNIT_IssueFactoryCommand`). Re-homed here from a bespoke
+             * `EraseCommandNode` free function in Sim.cpp that hand-rolled
+             * this same CLRS-style transplant-and-rescan erase over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in --
+             * that hand-rolled version did not match this address's real
+             * disassembly (it recomputed both header extrema unconditionally
+             * via a full-tree rescan instead of this member's targeted
+             * `rb_min`/`rb_max` patch), so it was deleted rather than kept as
+             * an alternate-but-equivalent implementation.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -1621,6 +1800,18 @@ namespace msvc8
              * above) then rewires the sentinel head back to self-linked
              * empty form with zero size -- exactly this member's shape.
              */
+            /**
+             * Address: 0x006E2810 (FUN_006E2810) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. Destroys the subtree from the root via
+             * `FUN_006E2990` (`destroy_subtree`, cited above) then rewires
+             * `head->parent`/`head->left`/`head->right` back to self-linked
+             * empty form with `size=0` -- exactly this member's shape. Zero
+             * incoming xrefs in this sweep. Re-homed here from a bespoke
+             * `ClearCommandDbMapAndResetHead` free function in Sim.cpp that
+             * hand-rolled this same operation over a `CCommandDbRuntimeView`
+             * reach-in instead of calling it.)
+             */
             void clear() noexcept
             {
                 destroy_subtree(root());
@@ -1686,6 +1877,17 @@ namespace msvc8
              * Reached from `insert_at`'s emission FUN_00687280, cited
              * below.)
              */
+            /**
+             * Address: 0x006E28A0 (FUN_006E28A0) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. Thin wrapper over `FUN_006E2D90` (the
+             * `operator new(sizeof(node_type))` call proper, matching
+             * `buy_node`'s own `sub_6E23F0` allocation path's inner shape),
+             * matching this member's role. Zero incoming xrefs in this
+             * sweep. Re-homed here from a bespoke
+             * `AllocateSingleCommandDbMapNodeStorage` free function in
+             * Sim.cpp.)
+             */
             [[nodiscard]] static node_type* alloc_raw()
             {
                 return static_cast<node_type*>(::operator new(sizeof(node_type)));
@@ -1698,6 +1900,16 @@ namespace msvc8
              * `msvc8::map<std::uint32_t, moho::IdPool>`'s bare node-storage
              * release -- `CEntityDb::mIdPoolTree` in `EntityDb.h`. Plain
              * `operator delete(n)`, matching this member exactly.
+             */
+            /**
+             * Address: 0x006E2080 (FUN_006E2080) Address: 0x006E2470
+             * (FUN_006E2470, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * `CCommandDb.h`. Both are plain `::operator delete(n)`
+             * one-liners with no value_type-specific behaviour, matching
+             * this member exactly. Zero incoming xrefs in this sweep.
+             * Re-homed here from bespoke `DeleteCommandDbAllocationLaneA`/
+             * `...LaneB` free functions in Sim.cpp.)
              */
             static void free_raw(node_type* const n) noexcept
             {
@@ -2035,6 +2247,18 @@ namespace msvc8
              * this real parameter shape or the real (sole) caller; not
              * corrected there in this pass since that file is untouched
              * here, flagged for a follow-up.)
+             */
+            /**
+             * Address: 0x008B67F0 (FUN_008B67F0, sub_8B67F0) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E23F0 above (a separate instantiation): allocates one
+             * raw node via `sub_8B6AC0(1)` (`alloc_raw`), writes the key/
+             * value pair from its arguments, then `color=0`/`isNil=0`.
+             * Reached from `insert_at`'s emission FUN_008B6310, cited below.
+             * Re-homed here from the same bespoke `AllocateCommandNode`/
+             * `InsertCommandNode` free-function pair in Sim.cpp cited on
+             * `insert_unique` above.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -2425,6 +2649,18 @@ namespace msvc8
              * the mesh-key/`mGraphRuntimeTree` pair cited on this member
              * elsewhere.)
              */
+            /**
+             * Address: 0x008B64C0 (FUN_008B64C0, `struct_CommandManager::
+             * FindDataFor`'s left rotate -- `msvc8::map<Moho::CmdId,
+             * Moho::UserCommandIssueHelper*>`, `CommandManager::mCommands` in
+             * `CommandManager.h`, isNil@+0x15, standard field order
+             * (`result = this->_Right; this->_Right = result->_Left; ...;
+             * result->_Left = this;`). Reached from `insert_at`'s emission
+             * FUN_008B6310's fixup loop, cited below. Re-homed here from a
+             * bespoke `RotateLeft` free function in Sim.cpp that hand-rolled
+             * this same rotation over a `CommandDbMapStorageView`/
+             * `CommandDbMapNodeView` reach-in instead of calling it.)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -2528,6 +2764,19 @@ namespace msvc8
              * the same reason given on `rotate_left`'s FUN_006E1F20 entry
              * above: two distinct addresses, each with its own real caller,
              * are two distinct emissions.)
+             */
+            /**
+             * Address: 0x008B6550 (FUN_008B6550, `struct_CommandManager::
+             * FindDataFor`'s right rotate -- `msvc8::map<Moho::CmdId,
+             * Moho::UserCommandIssueHelper*>`, `CommandManager::mCommands` in
+             * `CommandManager.h`. Mirror of `rotate_left`'s FUN_008B64C0
+             * above, same instantiation (`result = this->_Left; this->_Left =
+             * result->_Right; ...; result->_Right = this;`). Reached from
+             * `insert_at`'s emission FUN_008B6310's fixup loop, cited below.
+             * Re-homed here from a bespoke `RotateRight` free function in
+             * Sim.cpp that hand-rolled this same rotation over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
+             * instead of calling it.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -2678,6 +2927,21 @@ namespace msvc8
              * uncle-red/uncle-black branches. Reached from
              * `insert_unique`'s emission (FUN_006E15B0, cited above), both
              * call sites.)
+             */
+            /**
+             * Address: 0x008B6310 (FUN_008B6310, sub_8B6310) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E1D60 above (a separate instantiation): the
+             * `_Mysize >= 0x1FFFFFFE` overflow guard throws
+             * `std::length_error("map/set<T> too long")`, buys the node
+             * through `sub_8B67F0` (`buy_node`, cited above), links it under
+             * the caller's `where`/`addLeft`, then repairs the red-red
+             * violation calling `sub_8B64C0`/`sub_8B6550`
+             * (`rotate_left`/`rotate_right`, cited above). Reached from
+             * `insert_unique`'s emission (FUN_008B5DF0, cited above). Re-
+             * homed here from the same bespoke `InsertCommandNodeFixup` free
+             * function in Sim.cpp cited on `insert_unique`/`buy_node` above.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
