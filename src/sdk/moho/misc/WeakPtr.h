@@ -700,9 +700,13 @@ namespace moho
    * Address: 0x0061CE90 (FUN_0061CE90)
    * Address: 0x0061CF00 (FUN_0061CF00)
    * Address: 0x006ED0F0 (FUN_006ED0F0)
+   * Address: 0x006EB820 (FUN_006EB820) - __cdecl calling-convention
+   *          trampoline into 0x006ED0F0; no separate logic of its own.
    * Address: 0x006EC580 (FUN_006EC580)
    * Address: 0x007A6090 (FUN_007A6090)
    * Address: 0x007A6120 (FUN_007A6120)
+   * Address: 0x007A5EC0 (FUN_007A5EC0) - __cdecl calling-convention
+   *          trampoline into 0x007A6120; no separate logic of its own.
    *
    * What it does:
    * Copy-assigns one contiguous weak-link pair range in backward order and
