@@ -124,4 +124,63 @@ namespace moho
   static_assert(offsetof(CTextureScroller, mDir) == 0x30, "CTextureScroller::mDir offset must be 0x30");
   static_assert(offsetof(CTextureScroller, mSpeed) == 0x34, "CTextureScroller::mSpeed offset must be 0x34");
   static_assert(sizeof(CTextureScroller) == 0x3C, "CTextureScroller size must be 0x3C");
+
+  /**
+   * Owns reflected metadata for `CTextureScroller`. Standalone data payload
+   * (no reflected base -- `Init` never calls `AddBase`).
+   */
+  class CTextureScrollerTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00777530 (FUN_00777530, ctor lane)
+     *
+     * What it does:
+     * Preregisters the `CTextureScroller` RTTI descriptor during startup. In
+     * the binary this constructor body is inlined into the `.CRT$XCL`
+     * provider wrapper (`register_CTextureScrollerTypeInfo`, 0x00BDD730) that
+     * constructs the file-scope singleton, rather than being emitted as a
+     * standalone `__thiscall` symbol.
+     */
+    CTextureScrollerTypeInfo();
+
+    /**
+     * Address: 0x007775E0 (FUN_007775E0, Moho::CTextureScrollerTypeInfo::dtr)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * restores the `gpg::RObject` vftable. Defaulted in source: the
+     * compiler-generated `~RType()` reproduces this behavior.
+     */
+    ~CTextureScrollerTypeInfo() override = default;
+
+    /**
+     * Address: 0x007775D0 (FUN_007775D0, Moho::CTextureScrollerTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00777590 (FUN_00777590, Moho::CTextureScrollerTypeInfo::Init)
+     *
+     * What it does:
+     * Sets `size_ = sizeof(CTextureScroller)`, binds the NewRef/CtrRef/Delete/
+     * Destruct lifecycle callbacks (the pre-existing NewTextureScrollerRef/
+     * CtrTextureScrollerRef/DeleteTextureScrollerObject/
+     * DestructTextureScrollerObject bodies in CTextureScroller.cpp), and
+     * finalizes the type descriptor. No `AddBase` call -- `CTextureScroller`
+     * has no reflected base.
+     */
+    void Init() override;
+  };
+
+  static_assert(sizeof(CTextureScrollerTypeInfo) == 0x64, "CTextureScrollerTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BDD730 (FUN_00BDD730, register_CTextureScrollerTypeInfo)
+   *
+   * What it does:
+   * Constructs the startup-owned `CTextureScrollerTypeInfo` singleton and
+   * installs process-exit cleanup.
+   */
+  void register_CTextureScrollerTypeInfo();
 } // namespace moho
