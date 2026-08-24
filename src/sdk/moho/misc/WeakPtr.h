@@ -1017,6 +1017,31 @@ namespace moho
   }
 
   /**
+   * Address: 0x00689310 (FUN_00689310)
+   *
+   * What it does:
+   * Constructs `count` prefixed weak-payload records from one repeated
+   * source record, relinking each written record's embedded weak pointer
+   * into the source's owner chain via `CopyPrefixedWeakPtrDwordPayloadLane`.
+   * Count-based sibling of `FillPrefixedWeakPtrDwordPayloadRangeFromSingleLane`
+   * (0x00689520 below), which takes an end-pointer instead of a count.
+   */
+  [[nodiscard]] inline PrefixedWeakPtrDwordPayloadLane* ConstructPrefixedWeakPtrDwordPayloadRepeated(
+    PrefixedWeakPtrDwordPayloadLane* destination,
+    std::uint32_t count,
+    const PrefixedWeakPtrDwordPayloadLane* const source
+  ) noexcept
+  {
+    for (; count != 0u; --count, ++destination) {
+      if (destination == nullptr) {
+        continue;
+      }
+      (void)CopyPrefixedWeakPtrDwordPayloadLane(destination, source);
+    }
+    return destination;
+  }
+
+  /**
    * Address: 0x00689520 (FUN_00689520)
    *
    * What it does:
