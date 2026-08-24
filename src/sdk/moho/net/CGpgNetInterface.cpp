@@ -245,58 +245,6 @@ namespace
     ptr.reset();
   }
 
-  struct SharedCountControlBlockVTable
-  {
-    std::uint8_t reserved_00[0x04];
-    void(__thiscall* disposeObject)(void* self); // +0x04
-    void(__thiscall* destroySelf)(void* self);   // +0x08
-  };
-
-  struct SharedCountControlBlockRuntime
-  {
-    SharedCountControlBlockVTable* vtable; // +0x00
-    volatile long useCount;                // +0x04
-    volatile long weakCount;               // +0x08
-  };
-
-  struct SharedCountRuntimeLane
-  {
-    std::uint32_t reserved_00 = 0u;
-    SharedCountControlBlockRuntime* control = nullptr; // +0x04
-  };
-
-  /**
-   * Address: 0x007B8DE0 (FUN_007B8DE0)
-   *
-   * What it does:
-   * Releases one shared-count control block lane by decrementing strong/weak
-   * reference counts and dispatching dispose/destroy virtual callbacks on the
-   * last references.
-   */
-  [[maybe_unused]] SharedCountRuntimeLane* ReleaseSharedCountRuntimeLane(
-    SharedCountRuntimeLane* const lane
-  ) noexcept
-  {
-    if (lane == nullptr || lane->control == nullptr) {
-      return lane;
-    }
-
-    SharedCountControlBlockRuntime* const control = lane->control;
-    if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-      if (control->vtable != nullptr && control->vtable->disposeObject != nullptr) {
-        control->vtable->disposeObject(control);
-      }
-
-      if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
-        if (control->vtable != nullptr && control->vtable->destroySelf != nullptr) {
-          control->vtable->destroySelf(control);
-        }
-      }
-    }
-
-    return lane;
-  }
-
   /**
    * Address: 0x007BB0E0 (FUN_007BB0E0)
    *
@@ -383,65 +331,6 @@ namespace
   }
 
   /**
-   * Address: 0x007BE4B0 (FUN_007BE4B0)
-   *
-   * What it does:
-   * Copy-assigns one `SNetCommandArg` lane by mirroring scalar fields and
-   * rebuilding the legacy string payload from source text.
-   */
-  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArg(
-    SNetCommandArg* const destination,
-    const SNetCommandArg& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->mType = source.mType;
-    destination->mNum = source.mNum;
-    destination->mStr.reset_and_assign(source.mStr);
-    return destination;
-  }
-
-  /**
-   * Address: 0x007BDBA0 (FUN_007BDBA0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one single-lane command-argument
-   * copy-assignment into the canonical `CopyAssignSingleCommandArg` helper.
-   */
-  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArgRegisterAdapter(
-    SNetCommandArg* const destination,
-    const SNetCommandArg& source
-  )
-  {
-    return CopyAssignSingleCommandArg(destination, source);
-  }
-
-  /**
-   * Address: 0x007BAE30 (FUN_007BAE30)
-   *
-   * What it does:
-   * Copy-assigns one command-argument lane by mirroring scalar fields and
-   * assigning the full legacy string payload via `assign`.
-   */
-  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArgLaneA(
-    SNetCommandArg* const destination,
-    const SNetCommandArg& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->mType = source.mType;
-    destination->mNum = source.mNum;
-    destination->mStr.assign(source.mStr, 0, msvc8::string::npos);
-    return destination;
-  }
-
-  /**
    * Address: 0x007BD950 (FUN_007BD950)
    *
    * What it does:
@@ -485,7 +374,7 @@ namespace
     SNetCommandArg* cursor = destination;
     try {
       for (std::uint32_t i = 0; i < count; ++i, ++cursor) {
-        (void)CopyAssignSingleCommandArg(cursor, prototype);
+        *cursor = prototype;
       }
     } catch (...) {
       for (SNetCommandArg* rollback = begin; rollback != cursor; ++rollback) {
@@ -493,25 +382,6 @@ namespace
       }
       throw;
     }
-  }
-
-  /**
-   * Address: 0x007BCB90 (FUN_007BCB90)
-   *
-   * What it does:
-   * Register-order adapter for prototype-range copy/rollback; forwards to
-   * `CopyAssignCommandArgRangeWithRollback` and returns destination lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackAdapterA(
-    const SNetCommandArg* const prototype,
-    const std::uint32_t count,
-    SNetCommandArg* const destination
-  )
-  {
-    if (prototype != nullptr) {
-      CopyAssignCommandArgRangeWithRollback(*prototype, count, destination);
-    }
-    return destination;
   }
 
   /**
@@ -554,7 +424,7 @@ namespace
     SNetCommandArg* cursor = destination;
     try {
       while (sourceBegin != sourceEnd) {
-        (void)CopyAssignSingleCommandArg(cursor, *sourceBegin);
+        *cursor = *sourceBegin;
         ++cursor;
         ++sourceBegin;
       }
@@ -567,37 +437,6 @@ namespace
     return cursor;
   }
 
-  /**
-   * Address: 0x007BD7D0 (FUN_007BD7D0)
-   *
-   * What it does:
-   * Register-lane adapter that forwards source-range command-argument
-   * copy/rollback into `CopyAssignCommandArgRangeWithRollbackFromSourceLaneA`.
-   */
-  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollbackFromSourceAdapterRegisterLane(
-    SNetCommandArg* const destination,
-    const SNetCommandArg* const sourceBegin,
-    const SNetCommandArg* const sourceEnd
-  )
-  {
-    (void)CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(sourceBegin, sourceEnd, destination);
-  }
-
-  /**
-   * Address: 0x007BCB00 (FUN_007BCB00)
-   *
-   * What it does:
-   * Adapter lane that forwards source-range command-argument copy/rollback
-   * into `CopyAssignCommandArgRangeWithRollbackFromSourceLaneA`.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackFromSourceAdapterA(
-    const SNetCommandArg* const sourceBegin,
-    const SNetCommandArg* const sourceEnd,
-    SNetCommandArg* const destination
-  )
-  {
-    return CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(sourceBegin, sourceEnd, destination);
-  }
 
   /**
    * Address: 0x007BD1B0 (FUN_007BD1B0)
