@@ -472,6 +472,25 @@ namespace
   class FastVectorCPathPointTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005B5990 (FUN_005B5990)
+     * Demangled: gpg::RFastVectorType_CPathPoint::dtr (scalar-deleting)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
+     * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
+     * source: the compiler-generated `~RType()` reproduces this behavior,
+     * identical shape to `RVectorType<moho::SimArmy*>::~RVectorType()`
+     * (Reflection.h) and `RVectorType<moho::SPointVector>::~RVectorType()`
+     * (SPointVector.h). Vtable-confirmed:
+     * `??_7?$RFastVectorType@VCPathPoint@Moho@@@gpg@@6B@+0x8` writes this
+     * address; the class has no declared destructor otherwise, so this is
+     * an explicit declaration purely to carry the address citation (the
+     * implicit destructor already produces the same base-chaining behavior).
+     */
+    ~FastVectorCPathPointTypeInfo() override = default;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
@@ -1711,6 +1730,21 @@ SCollisionInfoTypeInfo::SCollisionInfoTypeInfo()
   gSCollisionInfoType = this;
 }
 
+/**
+ * Address: 0x005967C0 (FUN_005967C0)
+ * Demangled: Moho::SCollisionInfoTypeInfo::dtr (scalar-deleting)
+ *
+ * What it does:
+ * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+ * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
+ * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
+ * source: the compiler-generated `~RType()` reproduces this behavior,
+ * identical shape to `RVectorType<moho::SimArmy*>::~RVectorType()`
+ * (Reflection.h) and `RVectorType<moho::SPointVector>::~RVectorType()`
+ * (SPointVector.h). Vtable-confirmed:
+ * `??_7SCollisionInfoTypeInfo@Moho@@6B@+0x8` writes this address, and that
+ * vtable is constructed by this class's own ctor (0x00596730, above).
+ */
 SCollisionInfoTypeInfo::~SCollisionInfoTypeInfo() = default;
 
 /**
