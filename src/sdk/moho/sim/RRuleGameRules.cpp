@@ -1304,6 +1304,20 @@ namespace moho
      * the owning vector's `end` by one 16-byte element after the shift
      * loop completes. The loop below already reproduces this exactly via
      * `*it = *(it + 1)`, which resolves to this same compiled operator=.)
+     * Address: 0x00536DA0 (FUN_00536DA0, sub_536DA0) -- the
+     * `RRuleGameRulesLuaExportBinding::operator=` emission itself,
+     * called from `FUN_0052BEE0` above. Per destination slot: raw-copies
+     * `mRootState` (offset +0x00), then -- matching `FUN_00537420`'s
+     * documented shape in Vector.h exactly -- erases the destination's
+     * live `mPendingBlueprintOrdinals` tree via `sub_52D9C0` (the shared
+     * `erase_range`, RbTree.h) and deep-clones the source tree in via
+     * `sub_530EE0` (`copy_from`, RbTree.h), guarded by `if (this !=
+     * &other)`. Sibling emission of `FUN_00537420` -- same compiled
+     * operator=, different register allocation from being inlined at a
+     * different call site (`insert`'s tail-shift there, this loop's
+     * forward shift here) -- so `/OPT:ICF` left them as separate symbols.
+     * Two real callers: `FUN_0052BEE0` above and `FUN_005333B0`
+     * (unrecovered, out of scope here).
      */
     void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
     {
