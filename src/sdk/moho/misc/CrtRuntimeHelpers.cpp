@@ -4694,6 +4694,26 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
 }
 
 /**
+ * Address: 0x00A48EC0 (FUN_00A48EC0)
+ *
+ * What it does:
+ * Opens `filePath` with `mode` via `RuntimeFopenS` (fopen_0) and returns
+ * the resulting `FILE*` only when it reports success (return value `0`),
+ * masking the result to `nullptr` on any failure -- the classic
+ * `neg/sbb/not/and` all-ones-or-all-zeros boolean mask idiom compiled down
+ * to a plain conditional here.
+ *
+ * No recovered caller identified yet in this pass; kept as a free function
+ * since the owning call site is not yet located.
+ */
+[[maybe_unused]] std::FILE* OpenFileOrNull(char* const filePath, char* const mode)
+{
+  std::FILE* file = nullptr;
+  const int status = RuntimeFopenS(&file, filePath, mode);
+  return (status == 0) ? file : nullptr;
+}
+
+/**
  * Address: 0x00AB8486 (FUN_00AB8486, _putwch)
  *
  * What it does:
@@ -4845,10 +4865,18 @@ static void write_multi_char(
 
 /**
  * Address: 0x00A9F5E0 (FUN_00A9F5E0, write_string)
+ * Address: 0x00A96E6E (FUN_00A96E6E, unfolded twin)
  *
  * What it does:
  * Writes one bounded narrow string lane into a legacy CRT stream, preserving
- * buffered-output semantics and `_errno()`-driven fallback behavior.
+ * buffered-output semantics and `_errno()`-driven fallback behavior. The
+ * 0x00A96E6E instantiation is byte-for-byte the same shape (fast-path direct
+ * counter bump when `_flag&0x40` is set and `_base==nullptr`, else a
+ * per-character `write_char_0` loop substituting `'?'` once
+ * `errno=='*'`(0x2A) is observed) reached from `_output_l`'s formatter core
+ * (FUN_00A96EE3 -- its `external_dependency` DB tag is a stale mis-tag from
+ * the same contamination sweep this cluster is being drained from; it is
+ * ~2.4KB of real `_output_l` code, not an import).
  */
 static void write_string(int* const pnumwritten, char* string, std::FILE* const f, int len)
 {
@@ -9351,6 +9379,32 @@ namespace moho::runtime
     }
 
     return nullptr;
+  }
+
+  /**
+   * Address: 0x00AB09E0 (FUN_00AB09E0)
+   *
+   * What it does:
+   * Locale-explicit `strpbrk` entry point: forwards `(text, accept, nullptr)`
+   * into `_strpbrk_l` (FUN_00AB0916). With a null locale argument,
+   * `_strpbrk_l`'s `_LocaleUpdate` always resolves to the global/classic
+   * locale and its `[localeState+8]==0` fast path calls straight into the
+   * plain `strpbrk` above -- so a null-locale call is behaviourally just
+   * `strpbrk(text, accept)`.
+   *
+   * Real callers: FUN_00AB055B (a `_findfirst`-family wildcard check doing
+   * `strpbrk(lpFileName, "?*")`) and FUN_00A95010 -- neither is recovered
+   * source yet (FUN_00AB055B is a ~0x309-byte path/wildcard validator; its
+   * DB status of `external_dependency` is a stale mis-tag from the same
+   * contamination sweep this cluster is being drained from -- it is real
+   * code, not an import). Kept as a free function rather than wired to a
+   * caller here since neither owner is identified/recovered yet;
+   * address-taken-by-name is the intended source invocation once
+   * FUN_00AB055B is recovered.
+   */
+  [[maybe_unused]] char* StrpbrkWithGlobalLocale(const char* const text, const char* const accept)
+  {
+    return strpbrk(text, accept);
   }
 
   /**
