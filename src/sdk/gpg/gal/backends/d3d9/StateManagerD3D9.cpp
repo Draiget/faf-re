@@ -57,6 +57,14 @@ namespace gpg::gal
      * find-or-default-insert contract with a different underlying data
      * structure; behavior is identical, so this modern rewrite already
      * absorbs both binary helpers' role.
+     *
+     * The render-state and sampler-state specializations (0x00949C80/
+     * 0x00949CE0) emit the same `operator[]` shape as their own
+     * `std::map<...>::operator[]` pair: `FUN_00949B30`/`FUN_00949BA0` are
+     * their RB-tree-descend halves (isNil@+0x15, same shape as
+     * `FUN_00949C10` above -- lower_bound loop, hit returns the existing
+     * slot, miss falls through to an insert-hint core via `sub_9496E0`),
+     * absorbed into `std::unordered_map::operator[]` the same way.
      */
     template <typename MapT, typename KeyT, typename ValueT>
     bool CacheValue(MapT& map, const KeyT key, const ValueT value)
