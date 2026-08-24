@@ -3089,12 +3089,6 @@ namespace msvc8
          * widths -- they are grouped here rather than duplicated as per-width
          * free functions.
          *
-         * sizeof(T) == 2 (`count > 0x7FFFFFFF` throws):
-         * Address: 0x0092C000 (FUN_0092C000, called from
-         * `msvc8::vector<std::uint16_t>`'s initial-reserve path,
-         * `InitializeWordVectorStorageRuntime` / FUN_00930070 in
-         * `moho/sim/SimRecoveryRuntime.cpp`)
-         *
          * sizeof(T) == 4 (`count > 0x3FFFFFFF` throws):
          * Address: 0x00445B80 (FUN_00445B80)
          * Address: 0x00445C90 (FUN_00445C90)
