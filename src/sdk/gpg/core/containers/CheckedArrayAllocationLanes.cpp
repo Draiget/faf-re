@@ -742,6 +742,7 @@ namespace gpg::core::legacy
    * Address: 0x0083C670 (FUN_0083C670)
    * Address: 0x00890080 (FUN_00890080)
    * Address: 0x0089B210 (FUN_0089B210)
+   * Address: 0x008E4100 (FUN_008E4100)
    *
    * What it does:
    * Allocates a contiguous lane of 48-byte elements and applies the legacy
