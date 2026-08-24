@@ -1004,6 +1004,17 @@ namespace LuaPlus
 		 * current Lua stack slot.
 		 */
 		[[nodiscard]] double ToNumber() const;
+
+		/**
+		 * Address: 0x005459F0 (FUN_005459F0, LuaPlus::LuaStackObject::GetNumber)
+		 *
+		 * What it does:
+		 * Second compiler emission of this inline forwarder (a distinct TU
+		 * instantiated the identical instruction sequence at a different
+		 * address than ToNumber() at 0x004CCB00): validates numeric stack
+		 * type, raises a type error for non-numeric values, and returns the
+		 * numeric payload.
+		 */
 		[[nodiscard]] double GetNumber() const { return ToNumber(); }
 
 		/**
