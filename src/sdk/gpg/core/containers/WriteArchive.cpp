@@ -694,6 +694,16 @@ private:
  * What it does:
  * Initializes write-archive map bookkeeping and refreshes global serializer
  * helper registrations used by reflection save lanes.
+ *
+ * `mRefCounts()` below reaches the checked node-allocate-and-default-init
+ * emission for `std::map<const RType*, int>` (24-byte node, isNil@+0x15,
+ * matching the sibling destroy_subtree cited on EndSection's
+ * `mRefCounts.clear()`):
+ * Address: 0x00950540 (FUN_00950540, allocates 0x18=24 bytes, sets
+ * color@+0x14=1/isNil@+0x15=0; the caller then promotes isNil to 1 and
+ * self-links to form the empty-tree sentinel head, mirroring the pattern
+ * already documented on CAiFormationInstance.cpp's
+ * InitializeDefaultFormationLaneEntry for a different hand-rolled tree)
  */
 WriteArchive::WriteArchive()
     : mRefCounts()
@@ -901,6 +911,13 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
  *
  * What it does:
  * Finalizes section ownership checks and clears pointer/type bookkeeping.
+ *
+ * `mRefCounts.clear()` below reaches a node-teardown emission for
+ * `std::map<const RType*, int>` (pair<RType*,int>=8 bytes, node isNil@
+ * +0x0D+8=+0x15):
+ * Address: 0x00950380 (FUN_00950380, isNil@+0x15) -- a recursive-right/
+ * iterative-left subtree teardown (matches `destroy_subtree` in
+ * RbTree.h: `destroy_subtree(n->right); n = n->left; free_node(...)`).
  */
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
