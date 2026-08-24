@@ -942,6 +942,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\mesh\MeshThumbnail.cpp" />
     <ClCompile Include="moho\mesh\MeshThumbnailRenderer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp" />
+    <ClCompile Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitter.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitterSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxTrailEmitter.cpp" />
@@ -1706,6 +1707,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\CEfxBeam.h" />
     <ClInclude Include="moho\effects\rendering\CEfxBeamSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h" />
+    <ClInclude Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />

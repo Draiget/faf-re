@@ -2094,6 +2094,9 @@
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\effects\rendering\CEfxEmitterSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4978,6 +4981,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h">
