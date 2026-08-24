@@ -1329,6 +1329,18 @@ namespace msvc8
              *
              * CDecalBuffer's start-tick table is `std::map<unsigned, std::set<CDecalHandle*>>`, so each member is emitted twice -- once for the 0x20 outer node (colour/nil at +0x1C/+0x1D) and once for the 0x14 inner node (+0x10/+0x11).
              */
+            /**
+             * Address: 0x00719690 (FUN_00719690, `InfluenceGrid::entries`'s
+             * left rotate -- `msvc8::set<InfluenceMapEntry,
+             * InfluenceMapEntryLess>`, `mIsSentinel` at +0x3D. Reached from
+             * `EraseInfluenceEntryAndAdvance`'s `grid.entries.erase(current)`
+             * at CInfluenceMap.cpp via FUN_00717EF0.)
+             */
+            /**
+             * Address: 0x007E4E10 (FUN_007E4E10, the mesh-key map's left
+             * rotate -- `_Isnil` at +0x25, same instantiation as the
+             * `erase_node` sibling emission 0x007E4DD0 cited above.)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1373,6 +1385,16 @@ namespace msvc8
             /**
              * Address: 0x0077B160 (FUN_0077B160, outer map)
              * Address: 0x0077C640 (FUN_0077C640, inner bucket set)
+             */
+            /**
+             * Address: 0x00719740 (FUN_00719740, `InfluenceGrid::entries`'s
+             * right rotate -- same instantiation as `rotate_left`'s
+             * 0x00719690 above, `mIsSentinel` at +0x3D.)
+             */
+            /**
+             * Address: 0x007E4EA0 (FUN_007E4EA0, the mesh-key map's right
+             * rotate -- `_Isnil` at +0x25, sibling of `rotate_left`'s
+             * 0x007E4E10 above.)
              */
             void rotate_right(node_type* const n) noexcept
             {
