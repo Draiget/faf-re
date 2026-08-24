@@ -1,9 +1,11 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <new>
 #include <stdexcept>
 #include <cassert>
+#include <utility>
 
 #ifndef MSVC8_DEQUE_DISABLE_FREE
 #define MSVC8_DEQUE_DISABLE_FREE 0
@@ -36,9 +38,23 @@ namespace msvc8
         using reference = T&;
         using const_reference = const T&;
 
-        /** Elements-per-node follows classic 512-byte chunks. */
-        static constexpr size_type kBlockBytes = 512;
-        static constexpr size_type kBlockSize = (sizeof(T) < kBlockBytes ? (kBlockBytes / (sizeof(T) ? sizeof(T) : 1)) : 1);
+        /**
+         * Elements-per-node follows the classic Dinkumware/MSVC8 `_DEQUESIZ`
+         * stepped policy, confirmed against two real emissions with
+         * different element sizes: `FUN_0067B870` (`std::deque<Entity*>`,
+         * sizeof(T)==4, block index math uses `>> 2`/`& 3` i.e. block size
+         * 4) and `FUN_007BB920`/`FUN_007BB400` (`std::deque<SNetCommand>`,
+         * sizeof(T)==0x30, block index is the raw node index with no
+         * intra-node math at all, i.e. block size 1). This is NOT a
+         * flat "512-byte chunk" division -- that formula gives block size
+         * 128 for a 4-byte element and 10 for a 0x30-byte element, neither
+         * of which matches the binary.
+         */
+        static constexpr size_type kBlockSize =
+          sizeof(T) <= 1 ? 16 :
+          sizeof(T) <= 2 ? 8 :
+          sizeof(T) <= 4 ? 4 :
+          sizeof(T) <= 8 ? 2 : 1;
 
         /** Minimal initial map slots (power-of-two not required). */
         static constexpr size_type kInitMapSlots = 8;
@@ -172,23 +188,64 @@ namespace msvc8
             ++_Mysize;
         }
 
+        /**
+         * Address: 0x007BC110 (FUN_007BC110, msvc8::deque<Moho::SNetCommand>::pop_back)
+         *
+         * What it does:
+         * Destroys the back element and decrements size, additionally
+         * resetting the begin offset back to 0 when the deque becomes
+         * empty (the binary does this so a fully-drained deque restarts
+         * writes at map slot 0 instead of wherever the last element
+         * happened to sit).
+         */
         void pop_back()
         {
             assert(!empty());
             T* p = ptr_at(_Mysize - 1);
             p->~T();
             --_Mysize;
+            if (_Mysize == 0)
+                _Myoff = 0;
         }
 
+        /**
+         * Address: 0x007BB400 (FUN_007BB400, msvc8::deque<Moho::SNetCommand>::pop_front)
+         *
+         * What it does:
+         * Destroys the front element, advances the begin offset (wrapping
+         * at `capacity()`), decrements size, and resets the begin offset
+         * back to 0 when the deque becomes empty.
+         */
         void pop_front()
         {
             assert(!empty());
             T* p = ptr_at(0);
             p->~T();
             ++_Myoff;
-            if (_Myoff == capacity())
+            if (_Myoff >= capacity())
                 _Myoff = 0;
             --_Mysize;
+            if (_Mysize == 0)
+                _Myoff = 0;
+        }
+
+        /**
+         * Address: 0x007BCF50 (FUN_007BCF50, msvc8::deque<Moho::SNetCommand>::swap)
+         * Address: 0x007BC5B0 (FUN_007BC5B0) - linker-emitted thunk that
+         *          tail-calls 0x007BCF50 directly (IDA marks it
+         *          `attributes: thunk`); no separate body to recover.
+         *
+         * What it does:
+         * Swaps the map/mapsize/offset/size storage lanes with another
+         * deque of the same type, leaving each object's debug proxy
+         * pointer untouched.
+         */
+        void swap(deque& other) noexcept
+        {
+            std::swap(_Map, other._Map);
+            std::swap(_Mapsize, other._Mapsize);
+            std::swap(_Myoff, other._Myoff);
+            std::swap(_Mysize, other._Mysize);
         }
 
         allocator_type get_allocator() const { return allocator_type(); }
@@ -294,55 +351,82 @@ namespace msvc8
             if (need <= capacity())
                 return;
 
-            // Determine new map size (simple doubling strategy).
-            size_type new_slots = _Mapsize ? _Mapsize * 2 : kInitMapSlots;
-            while (need > new_slots * kBlockSize)
-                new_slots *= 2;
-
-            remap_preserving_data(new_slots);
+            grow_map();
         }
 
-        void remap_preserving_data(size_type new_slots)
+        /**
+         * Address: 0x007BB920 (FUN_007BB920, msvc8::deque<Moho::SNetCommand>::_Growmap)
+         *
+         * What it does:
+         * Classic Dinkumware `_Growmap`: grows the node map by
+         * `max(mapsize / 2, 8)` slots (falling back to 1 slot when that
+         * would overflow the 0x05555555-slot ceiling, which itself throws
+         * `length_error` once actually reached), then reshuffles existing
+         * node pointers with three `memmove`-shaped ranges so the new,
+         * empty slots land contiguously right after the map's previous end
+         * (wrapping around slot 0) instead of recentering the whole map.
+         * The begin node index (`_Myoff / kBlockSize`) is provably
+         * unchanged by this reshuffle -- the "tail" range `[beginNode,
+         * oldMapSize)` always maps to itself -- so `_Myoff` itself is
+         * left untouched, matching the binary (which never writes
+         * `view.mOffset` in this function).
+         */
+        void grow_map()
         {
-            // Compute used node span in old map
-            const size_type old_slots = _Mapsize;
-            T** old_map = _Map;
+            constexpr size_type kMaxSlots = 0x05555555u;
+            if (_Mapsize == kMaxSlots)
+                throw std::length_error("deque<T> too long");
 
-            // Choose a centered new begin offset
-            const size_type new_begin_node = new_slots / 2;
-            const size_type new_off = new_begin_node * kBlockSize + (_Myoff % kBlockSize);
+            size_type growth = 1;
+            const size_type half = _Mapsize >> 1;
+            if (half >= 8)
+                growth = half;
+            else
+                growth = 8;
+            if (_Mapsize > kMaxSlots - growth)
+                growth = 1;
 
-            // Allocate new map and clear
-            T** new_map = static_cast<T**>(::operator new(sizeof(T*) * new_slots));
-            for (size_type i = 0; i < new_slots; ++i) new_map[i] = nullptr;
+            const size_type oldMapSize = _Mapsize;
+            const size_type beginNode = _Myoff / kBlockSize;
+            T** const oldMap = _Map;
 
-            if (_Mysize)
+            const size_type newMapSize = oldMapSize + growth;
+            T** const newMap = static_cast<T**>(::operator new(sizeof(T*) * newMapSize));
+            std::memset(newMap, 0, sizeof(T*) * newMapSize);
+
+            if (oldMap != nullptr && oldMapSize != 0)
             {
-                // Determine the first and last global element indices (half-open)
-                const size_type first_global = _Myoff;
-                const size_type last_global = _Myoff + _Mysize;
+                const size_type tailCount = beginNode < oldMapSize ? oldMapSize - beginNode : 0;
+                if (tailCount != 0)
+                    std::memmove(newMap + beginNode, oldMap + beginNode, tailCount * sizeof(T*));
 
-                const size_type first_node = first_global / kBlockSize;
-                const size_type last_node = (last_global + kBlockSize - 1) / kBlockSize; // one past
-
-                const size_type used_nodes = last_node - first_node;
-
-                // Copy node pointers in order so elements keep their storage
-                for (size_type i = 0; i < used_nodes; ++i)
+                if (beginNode > growth)
                 {
-                    const size_type old_node_idx = (first_node + i) % old_slots;
-                    const size_type new_node_idx = (new_begin_node + i) % new_slots;
-                    new_map[new_node_idx] = old_map[old_node_idx];
+                    const size_type prefixCount = growth;
+                    if (prefixCount != 0)
+                        std::memmove(newMap + oldMapSize, oldMap, prefixCount * sizeof(T*));
+
+                    const size_type middleCount = beginNode - growth;
+                    if (middleCount != 0)
+                        std::memmove(newMap, oldMap + growth, middleCount * sizeof(T*));
+                }
+                else
+                {
+                    const size_type copiedCount = beginNode;
+                    if (copiedCount != 0)
+                        std::memmove(newMap + oldMapSize, oldMap, copiedCount * sizeof(T*));
+
+                    if (growth > copiedCount)
+                        std::memset(newMap + oldMapSize + copiedCount, 0, (growth - copiedCount) * sizeof(T*));
                 }
             }
 
-            // Install new map
 #if !MSVC8_DEQUE_DISABLE_FREE
-            ::operator delete(static_cast<void*>(_Map));
+            if (oldMap != nullptr)
+                ::operator delete(static_cast<void*>(oldMap));
 #endif
-            _Map = new_map;
-            _Mapsize = new_slots;
-            _Myoff = new_off;
+            _Map = newMap;
+            _Mapsize = newMapSize;
         }
     };
 
