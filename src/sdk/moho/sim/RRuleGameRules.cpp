@@ -1140,16 +1140,22 @@ namespace moho
      * Address: 0x0052D590 (FUN_0052D590)
      *
      * What it does:
-     * Releases one Lua-export binding storage allocation and zeros begin/end/
-     * capacity pointer lanes.
+     * Releases one Lua-export binding array allocation and zeros its
+     * begin/end/capacity pointer lanes.
+     *
+     * Uses `delete[]`, not a raw `operator delete`: each element owns a
+     * `msvc8::set<uint32_t>` (`mPendingBlueprintOrdinals`) with a real
+     * destructor now that the embedded field is correctly modeled (see the
+     * `RRuleGameRulesLuaExportBinding` layout note in RRuleGameRules.h), and
+     * the array was allocated with `new RRuleGameRulesLuaExportBinding[N]{}`
+     * in `ReserveExportBindingCapacity` -- the two must pair or every
+     * live binding's header node leaks.
      */
-    void ResetLuaExportBindingStorageAdapterLane(
+    void ReleaseLuaExportBindingArray(
       RRuleGameRulesLuaExportBindingArray* const storage
     ) noexcept
     {
-      if (storage->mBegin != nullptr) {
-        ::operator delete(static_cast<void*>(storage->mBegin));
-      }
+      delete[] storage->mBegin;
       storage->mBegin = nullptr;
       storage->mEnd = nullptr;
       storage->mCapacityEnd = nullptr;
@@ -1166,84 +1172,44 @@ namespace moho
       ::operator delete(storage);
     }
 
-    [[nodiscard]] LuaTaskListNode* CreateLuaTaskListSentinel()
-    {
-      auto* const sentinel = new LuaTaskListNode{};
-      sentinel->next = sentinel;
-      sentinel->prev = sentinel;
-      sentinel->taskThread = sentinel;
-      sentinel->reserved0C = 0u;
-      sentinel->isOwning = 0u;
-      sentinel->isSentinel = 1u;
-      return sentinel;
-    }
-
-    void ClearLuaTaskList(LuaTaskListNode* const sentinel)
-    {
-      if (!sentinel) {
-        return;
-      }
-
-      LuaTaskListNode* node = sentinel->next;
-      while (node && node != sentinel) {
-        LuaTaskListNode* const next = node->next;
-        delete node;
-        node = next;
-      }
-
-      sentinel->next = sentinel;
-      sentinel->prev = sentinel;
-      sentinel->taskThread = sentinel;
-    }
-
-    void DestroyLuaTaskListSentinel(LuaTaskListNode* const sentinel)
-    {
-      if (!sentinel) {
-        return;
-      }
-
-      ClearLuaTaskList(sentinel);
-      delete sentinel;
-    }
-
     [[nodiscard]] std::size_t ExportBindingCount(const RRuleGameRulesImpl& rules) noexcept
     {
-      if (!rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd || rules.mLuaExports.mEnd < rules.mLuaExports.mBegin) {
+      if (!rules.mMaps.mBegin || !rules.mMaps.mEnd || rules.mMaps.mEnd < rules.mMaps.mBegin) {
         return 0u;
       }
-      return static_cast<std::size_t>(rules.mLuaExports.mEnd - rules.mLuaExports.mBegin);
+      return static_cast<std::size_t>(rules.mMaps.mEnd - rules.mMaps.mBegin);
     }
 
     void ReserveExportBindingCapacity(RRuleGameRulesImpl& rules, const std::size_t requestedCapacity)
     {
       const std::size_t currentCount = ExportBindingCount(rules);
-      const std::size_t currentCapacity = (rules.mLuaExports.mBegin && rules.mLuaExports.mCapacityEnd)
-        ? static_cast<std::size_t>(rules.mLuaExports.mCapacityEnd - rules.mLuaExports.mBegin)
+      const std::size_t currentCapacity = (rules.mMaps.mBegin && rules.mMaps.mCapacityEnd)
+        ? static_cast<std::size_t>(rules.mMaps.mCapacityEnd - rules.mMaps.mBegin)
         : 0u;
       if (currentCapacity >= requestedCapacity) {
         return;
       }
 
-      RRuleGameRulesLuaExportBinding* const oldBegin = rules.mLuaExports.mBegin;
+      RRuleGameRulesLuaExportBinding* const oldBegin = rules.mMaps.mBegin;
       auto* const newBegin = new RRuleGameRulesLuaExportBinding[requestedCapacity]{};
       for (std::size_t i = 0; i < currentCount; ++i) {
         newBegin[i] = oldBegin[i];
       }
 
       delete[] oldBegin;
-      rules.mLuaExports.mBegin = newBegin;
-      rules.mLuaExports.mEnd = newBegin + currentCount;
-      rules.mLuaExports.mCapacityEnd = newBegin + requestedCapacity;
+      rules.mMaps.mBegin = newBegin;
+      rules.mMaps.mEnd = newBegin + currentCount;
+      rules.mMaps.mCapacityEnd = newBegin + requestedCapacity;
     }
 
     [[nodiscard]] RRuleGameRulesLuaExportBinding*
     FindExportBinding(RRuleGameRulesImpl& rules, LuaPlus::LuaState* const rootState) noexcept
     {
-      if (!rootState || !rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd) {
+      if (!rootState || !rules.mMaps.mBegin || !rules.mMaps.mEnd) {
         return nullptr;
       }
 
-      for (auto* it = rules.mLuaExports.mBegin; it != rules.mLuaExports.mEnd; ++it) {
+      for (auto* it = rules.mMaps.mBegin; it != rules.mMaps.mEnd; ++it) {
         if (it->mRootState == rootState) {
           return it;
         }
@@ -1269,22 +1235,27 @@ namespace moho
       }
 
       const std::size_t count = ExportBindingCount(rules);
-      const std::size_t capacity = (rules.mLuaExports.mBegin && rules.mLuaExports.mCapacityEnd)
-        ? static_cast<std::size_t>(rules.mLuaExports.mCapacityEnd - rules.mLuaExports.mBegin)
+      const std::size_t capacity = (rules.mMaps.mBegin && rules.mMaps.mCapacityEnd)
+        ? static_cast<std::size_t>(rules.mMaps.mCapacityEnd - rules.mMaps.mBegin)
         : 0u;
       if (count >= capacity) {
         ReserveExportBindingCapacity(rules, capacity > 0u ? (capacity * 2u) : 4u);
       }
 
-      if (!rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd) {
+      if (!rules.mMaps.mBegin || !rules.mMaps.mEnd) {
         return nullptr;
       }
 
-      RRuleGameRulesLuaExportBinding* const slot = rules.mLuaExports.mEnd++;
+      RRuleGameRulesLuaExportBinding* const slot = rules.mMaps.mEnd++;
       slot->mRootState = rootState;
-      slot->mReserved04 = 0u;
-      slot->mTaskListSentinel = CreateLuaTaskListSentinel();
-      slot->mTaskListSize = 0u;
+      // The slot is already a live, default-constructed
+      // `RRuleGameRulesLuaExportBinding` (the array was allocated with
+      // `new RRuleGameRulesLuaExportBinding[N]{}` in
+      // `ReserveExportBindingCapacity`) -- `clear()` is a no-op on a fresh
+      // slot and correctly empties one left over from `EraseExportBinding`
+      // compaction either way, so no separate sentinel/header construction
+      // is needed here.
+      slot->mPendingBlueprintOrdinals.clear();
       return slot;
     }
 
@@ -1296,44 +1267,48 @@ namespace moho
      *
      * What it does:
      * Runs the in-place dtor lane for one `RRuleGameRulesLuaExportBinding`
-     * entry: clears every pending Lua task from the sentinel-anchored task
-     * list (`mTaskListSentinel->next..sentinel` via FUN_0052D9C0 which
-     * behaves like `std::list::erase(first, last)` on the intrusive task
-     * chain), releases the sentinel itself with `operator delete`, then
-     * nulls out `mTaskListSentinel` and zeroes `mTaskListSize` so the slot
-     * is safe to either compact away or re-use.
+     * entry's pending-blueprint-ordinal set: erases every node
+     * (`FUN_0052D9C0` = `msvc8::detail::rb_tree<...>::erase_range`, not a
+     * list erase -- see the `RRuleGameRulesLuaExportBinding` layout note in
+     * RRuleGameRules.h for why the earlier "Lua task list" reading of this
+     * memory was wrong), releases the header node with `operator delete`,
+     * then nulls/zeroes the header/size lanes -- exactly
+     * `msvc8::detail::rb_tree<...>::~rb_tree()` (RbTree.h). Reconstructing a
+     * fresh empty set immediately after keeps the slot a valid C++ object
+     * until the array itself is freed or the slot is reused (which
+     * `AddOrGetExportBinding` re-clears regardless).
      *
      * The binary references this function both from
-     * `RRuleGameRulesImpl::ExportToLuaState`'s SEH unwind table (to roll
-     * back a partially-initialized binding slot on `new`/OOM) and from the
-     * vector-erase compaction lane at 0x0052DBE0 where a live binding is
-     * being dropped. Both use-sites converge on the same
-     * sentinel+task-list teardown, so the recovery lifts it into one
-     * named helper and callers invoke it by name.
+     * `RRuleGameRulesImpl::ExportToLuaState`'s SEH unwind table (rolling
+     * back a partially-constructed local binding on `new`/OOM -- the
+     * compiler's own unwind cleanup for that stack-local RAII object, which
+     * the modernized `ExportToLuaState` gets for free from real object
+     * lifetime and therefore has no equivalent call for) and from the
+     * vector-erase compaction lane mirrored by `EraseExportBinding` below,
+     * where a live binding is being dropped.
      */
-    void DestroyLuaExportBindingTaskList(RRuleGameRulesLuaExportBinding* const binding)
+    void ReleaseExportBindingPendingOrdinals(RRuleGameRulesLuaExportBinding& binding) noexcept
     {
-      if (binding == nullptr) {
-        return;
-      }
-
-      DestroyLuaTaskListSentinel(static_cast<LuaTaskListNode*>(binding->mTaskListSentinel));
-      binding->mTaskListSentinel = nullptr;
-      binding->mTaskListSize = 0u;
+      binding.mPendingBlueprintOrdinals.~set();
+      ::new (static_cast<void*>(&binding.mPendingBlueprintOrdinals)) msvc8::set<std::uint32_t>();
     }
 
     void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
     {
-      if (!binding || !rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd) {
+      if (!binding || !rules.mMaps.mBegin || !rules.mMaps.mEnd) {
         return;
       }
 
-      DestroyLuaExportBindingTaskList(binding);
-
-      for (auto* it = binding; (it + 1) < rules.mLuaExports.mEnd; ++it) {
+      for (auto* it = binding; (it + 1) < rules.mMaps.mEnd; ++it) {
         *it = *(it + 1);
       }
-      --rules.mLuaExports.mEnd;
+
+      // The slot vacated at `mEnd - 1` is no longer reachable through
+      // [mBegin, mEnd) after the shift; release its pending-ordinal set's
+      // header node now rather than leaving it allocated until the whole
+      // array is eventually freed.
+      ReleaseExportBindingPendingOrdinals(*(rules.mMaps.mEnd - 1));
+      --rules.mMaps.mEnd;
     }
 
     [[nodiscard]] LuaReloadRequestNode* ReloadQueueSentinel(RRuleGameRulesImpl& rules) noexcept
@@ -1779,7 +1754,7 @@ namespace moho
     : pad_0004{}
     , mLockStorage{}
     , mLuaState(nullptr)
-    , mLuaExports{}
+    , mMaps{}
     , mFootprints{}
     , mUnitBlueprints{}
     , mProjectileBlueprints{}
@@ -1802,10 +1777,10 @@ namespace moho
 
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
 
-    mLuaExports.mProxy = nullptr;
-    mLuaExports.mBegin = nullptr;
-    mLuaExports.mEnd = nullptr;
-    mLuaExports.mCapacityEnd = nullptr;
+    mMaps.mProxy = nullptr;
+    mMaps.mBegin = nullptr;
+    mMaps.mEnd = nullptr;
+    mMaps.mCapacityEnd = nullptr;
 
     mFootprints.mAllocProxy = nullptr;
     mFootprints.mHead = AllocateFootprintSentinelNode();
@@ -1953,18 +1928,17 @@ namespace moho
     DestroyBlueprintObjectsFromMap(mEmitterBlueprints);
     DestroyBlueprintObjectsFromMap(mTrailBlueprints);
 
-    if (mLuaExports.mBegin && mLuaExports.mEnd) {
-      for (auto* it = mLuaExports.mBegin; it != mLuaExports.mEnd; ++it) {
-        DestroyLuaTaskListSentinel(static_cast<LuaTaskListNode*>(it->mTaskListSentinel));
-        it->mTaskListSentinel = nullptr;
-        it->mTaskListSize = 0u;
-      }
-    }
-
-    delete[] mLuaExports.mBegin;
-    mLuaExports.mBegin = nullptr;
-    mLuaExports.mEnd = nullptr;
-    mLuaExports.mCapacityEnd = nullptr;
+    // `delete[]` now runs each element's real destructor -- including
+    // `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`'s
+    // (`msvc8::set<uint32_t>::~set`, matching `FUN_0052A390`'s
+    // erase-range-then-delete-header shape) -- so no manual per-binding
+    // teardown loop is needed here anymore; the array was allocated with
+    // `new RRuleGameRulesLuaExportBinding[N]{}` (see
+    // `ReserveExportBindingCapacity`), which pairs with `delete[]`.
+    delete[] mMaps.mBegin;
+    mMaps.mBegin = nullptr;
+    mMaps.mEnd = nullptr;
+    mMaps.mCapacityEnd = nullptr;
 
     EnsureReloadQueueSentinelInitialized(*this);
     LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(*this);
@@ -2108,8 +2082,7 @@ namespace moho
     }
 
     SynchronizeBlueprintTable(*this, rootState);
-    ClearLuaTaskList(static_cast<LuaTaskListNode*>(binding->mTaskListSentinel));
-    binding->mTaskListSize = 0u;
+    binding->mPendingBlueprintOrdinals.clear();
   }
 
   /**
