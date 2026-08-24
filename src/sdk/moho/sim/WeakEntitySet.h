@@ -309,6 +309,29 @@ namespace moho
     return head;
   }
 
+  /**
+   * Address: 0x007B3C60 (FUN_007B3C60, sub_7B3C60) -- a second, per-call-site
+   * binary emission of this function fused with the assignment into the
+   * owning container: `head = BuyNode(); this->mHead = head; head->
+   * mIsSentinel = 1; head->mParent = head; head->mLeft = head; head->mRight
+   * = head; this->mSize = 0;`. It does not touch `this->mAllocProxy` (left
+   * to whatever the caller already set, e.g. a zero-initialized object) and
+   * does not zero `head->mKey`/`head->mEnt` the way `InitWeakEntitySetHead`
+   * below does -- this call site's node payload is left exactly as
+   * `WeakEntitySetUserEntity::BuyNode` returned it (garbage key/owner-link
+   * bytes on the header node, which real Dinkumware `_Tree::_Init` never
+   * reads back since the header's value slot is never a live element).
+   * DB-integrity fix: this token was marked `recovered` with
+   * `source_paths=null` and a boilerplate "batch 0x007B**** pass" note
+   * that cited nothing; a full `src/sdk` sweep found zero real citations
+   * anywhere. The callee (`0x007B4640`) and the shape (buy + flip
+   * sentinel + self-link + zero container size) are an unambiguous match
+   * for this function's fused `AllocateWeakEntitySetHead` +
+   * `set.mHead`/`set.mSize` assignment below; cited here rather than
+   * adding a bespoke duplicate free function, matching every other
+   * per-call-site-emission citation in this file.
+   */
+
   /** Brings one weak-entity set up empty, head sentinel included. */
   inline void InitWeakEntitySetHead(WeakEntitySetUserEntity& set)
   {

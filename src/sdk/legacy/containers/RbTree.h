@@ -253,6 +253,21 @@ namespace msvc8
          * reached from `Moho::UICommandGraph`'s edge-travel-time and
          * draw-node-work-time estimators (CWldSession.cpp) when they iterate a
          * command's targeted `WeakSet<UserEntity>`/`SSelectionSetUserEntity`)
+         * Address: 0x007B4500 (FUN_007B4500, `operator++()` -- advances via
+         * this member (through `sub_7B4D90`) and returns the same slot,
+         * matching the prefix-increment shape documented on the
+         * `FUN_006E1A90`/`FUN_006E1AB0`/`FUN_007B4570` adapters. DB-integrity
+         * fix: `source_paths=null`, boilerplate batch note, zero real
+         * citations found in a full `src/sdk` sweep.)
+         * Address: 0x007B4BC0 (FUN_007B4BC0, byte-identical duplicate
+         * emission of `FUN_007B4500` -- same `operator++()` prefix shape,
+         * same `sub_7B4D90` callee, a distinct per-call-site copy. Same
+         * DB-integrity provenance as `FUN_007B4500`.)
+         * Address: 0x007B4510 (FUN_007B4510, `operator++(int)` -- copies the
+         * old node into the return slot, then advances via this member
+         * (through `sub_7B4D90`), matching the post-increment shape
+         * documented on the `FUN_006E28C0`/`FUN_007B4540` adapters. Same
+         * DB-integrity provenance as `FUN_007B4500`.)
          *
          * IDA signature:
          * _Node *__thiscall operator(_Node **this);
@@ -340,6 +355,39 @@ namespace msvc8
          * this member and returns the same slot, matching the prefix-
          * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`
          * adapters above)
+         */
+        /**
+         * Address: 0x007B2D40 (FUN_007B2D40, `_Inc` for the
+         * `msvc8::set<std::uint32_t>` instantiation cited on `alloc_raw`/
+         * `free_raw`/`buy_head`/`clear`/`destroy_subtree` throughout this
+         * file (isNil@+0x11). Same recurse-right-then-climb-parent shape as
+         * this member: `if (!isNil(n->right)) return rb_min(n->right);`
+         * else climb `parent` while `n == ancestor->right`. Takes an
+         * `_Node**` out-parameter slot rather than returning by value
+         * (`__fastcall(int, int* slot)`, mutates `*slot` in place and
+         * returns it), matching the `FUN_006E1A90`/`FUN_006E1AB0`
+         * slot-pointer adapter shape one level up through an indirection --
+         * except here the slot mutation is inlined into the walk itself
+         * rather than split into a separate adapter. On `isNil(n)` it
+         * returns without touching `*slot` at all (no `--end()`-style
+         * redirect), matching this member's `if (rb_is_nil(n)) return n;`
+         * no-op exactly. DB-integrity fix: this token was previously
+         * flipped `blocked` citing a `CrtRuntimeHelpers.cpp` source path
+         * the address never appeared in (2026-08-21 citation-audit
+         * revert); this is the real source, evidenced by its two real
+         * callers below (paired bottom-up recovery, same DB-integrity
+         * pass). Owning field not yet pinned to a specific class.
+         * Address: 0x007B4BD0 (FUN_007B4BD0, `operator++(int)` -- copies
+         * the old node into the return slot, then advances via this
+         * member, matching the post-increment shape documented on the
+         * `FUN_006E28C0`/`FUN_007B4540` adapters above. DB-integrity fix:
+         * `source_paths=null`, boilerplate batch note, zero real citations
+         * found in a full `src/sdk` sweep.)
+         * Address: 0x007B4DE0 (FUN_007B4DE0, `operator++()` -- advances via
+         * this member and returns the same slot, matching the prefix-
+         * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`/
+         * `FUN_007B4570`/`FUN_007B4500` adapters above. Same DB-integrity
+         * provenance as `FUN_007B4BD0`.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -2156,6 +2204,25 @@ namespace msvc8
              * 0x00947160, cited on `erase_range` above). Same zero-
              * incoming-reference status as 0x00947290.)
              */
+            /**
+             * Address: 0x007B4950 (FUN_007B4950, `msvc8::set<std::uint32_t>`'s
+             * `clear()` -- isNil@+0x11, the same instantiation cited on
+             * `destroy_subtree`/`alloc_raw`/`free_raw`/`buy_head`/
+             * `rb_increment` throughout this file. Destroys the subtree from
+             * the root via `sub_7B4D10` (`destroy_subtree`, cited above) then
+             * self-links `head->parent`/`head->left`/`head->right` back to
+             * `head` and zeroes `size` -- matches this member's body
+             * instruction for instruction. DB-integrity fix: this token was
+             * marked `recovered` with `source_paths=null` and a
+             * boilerplate "batch 0x007B**** pass" note that cited nothing;
+             * a full `src/sdk` sweep found zero real citations anywhere.
+             * Owning field not yet pinned to a specific class -- reached
+             * through the same `msvc8::set<std::uint32_t>` neighbourhood as
+             * `alloc_raw`/`buy_head`/`rb_increment`'s 0x007B**** citations
+             * below, whose only confirmed callers are the three explicit
+             * destroy-and-reconstruct helpers in `moho/sim/
+             * SimRecoveryRuntime.cpp` cited on `destroy_subtree` above.)
+             */
             void clear() noexcept
             {
                 destroy_subtree(root());
@@ -2266,6 +2333,26 @@ namespace msvc8
              * `set<float>`/`set<uint32_t>`). Reached from `Moho::
              * CDecalManager::RebuildLodHistogram` (CWldSplat.cpp/.h), which
              * dedups the 10-entry decal-area decile histogram.
+             *
+             * Address: 0x007B4A50 (FUN_007B4A50, sub_7B4A50) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on `buy_head`/
+             * `rb_increment`/`clear`/`destroy_subtree` elsewhere in this
+             * file (isNil@+0x11, node 0x14=20 bytes, "12+4+2=18 rounded to
+             * 20" -- the same formula as `FUN_007CAB70`/`FUN_0052F370`
+             * above). `operator new(20)` via `sub_7B4E50` (the shared
+             * checked-20-byte lane, `AllocateChecked20ByteElements` in
+             * `Vector.cpp`), zero the three link dwords, `color=1`/
+             * `isNil=0` at `[eax+0x10]`/`[eax+0x11]` -- matches this member
+             * exactly, with the same "null tests the binary emits after
+             * each derived pointer are compiler artifacts that cannot
+             * fire" caveat already documented on `WeakEntitySetUserEntity::
+             * BuyNode` (WeakEntitySet.h). DB-integrity fix: this token was
+             * previously flipped `blocked` citing a `CrtRuntimeHelpers.cpp`
+             * source path the address never appeared in (2026-08-21
+             * citation-audit revert); this is the real source. Called by
+             * this member's fused `buy_head()` emission `FUN_007B3F30`
+             * (cited there) for header construction; owning field not yet
+             * pinned to a specific class.)
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -2289,6 +2376,18 @@ namespace msvc8
              * this member exactly. Zero incoming xrefs in this sweep.
              * Re-homed here from bespoke `DeleteCommandDbAllocationLaneA`/
              * `...LaneB` free functions in Sim.cpp.)
+             */
+            /**
+             * Address: 0x007B3F90 (FUN_007B3F90, sub_7B3F90) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `alloc_raw`/`buy_head`/`rb_increment`/`clear`/
+             * `destroy_subtree` throughout this file (isNil@+0x11). Plain
+             * `::operator delete(a1)`, matching this member exactly. Zero
+             * incoming xrefs in this sweep. DB-integrity fix: this token
+             * was marked `recovered` with `source_paths=null` and a
+             * boilerplate "batch 0x007B**** pass" note that cited nothing;
+             * a full `src/sdk` sweep found zero real citations anywhere.
+             * Owning field not yet pinned to a specific class.)
              */
             static void free_raw(node_type* const n) noexcept
             {
@@ -2418,6 +2517,25 @@ namespace msvc8
              * recovered in StartupHelpers.cpp), which publishes primary-adapter
              * option states for the startup options UI; owning member not yet
              * pinned down.)
+             */
+            /**
+             * Address: 0x007B3F30 (FUN_007B3F30, sub_7B3F30) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `alloc_raw`/`free_raw`/`rb_increment`/`clear`/`destroy_subtree`
+             * throughout this file (isNil@+0x11). `alloc_raw`'s work
+             * (buy + link-zero + color=black + isNil=0) is split out into a
+             * separate callee (`sub_7B4A50`, cited on `alloc_raw` above)
+             * exactly like `FUN_0052F370`'s split documented above; this
+             * emission does the rest inline: stores the bought node into the
+             * owning container's head slot (`this+4`), flips `isNil@+0x11`
+             * to 1, self-links `left=parent=right=self`, and zeroes the
+             * owning container's `size` (`this+8`) -- the same
+             * constructor-inlined `buy_head()`-plus-container-field pattern
+             * already documented on `FUN_00684230` above. DB-integrity fix:
+             * this token was marked `recovered` with `source_paths=null`
+             * and a boilerplate "batch 0x007B**** pass" note that cited
+             * nothing; a full `src/sdk` sweep found zero real citations
+             * anywhere. Owning field not yet pinned to a specific class.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
