@@ -139,6 +139,19 @@ namespace msvc8
          * +0x15, node 0x18. Reached from the erase-with-rebalance helper
          * FUN_00592920 cited above.)
          */
+        /**
+         * Address: 0x00830060 (FUN_00830060, `Moho::UICommandGraph::
+         * mGraphRuntimeTree`'s leftmost descent -- `map<shared_ptr<
+         * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, 0x18-byte
+         * value_type (`max_size() - 1 == 0xAAAAAA9` in `erase_node`'s
+         * sibling `insert_at` emission FUN_0082E320, cited below), isNil@
+         * +0x25 -- byte-identical ICF twin of the mesh-key map's leftmost
+         * descent (0x007E4E80 above); confirmed a distinct instantiation
+         * via direct call from `erase_node`'s emission FUN_0082FD50.
+         * `Moho::UICommandGraph::AddCommandQueueToCommandGraph`'s
+         * `mGraphRuntimeTree[texture]` lookup/insert is documented in
+         * CWldSession.cpp; that call chain is what reaches this tree.)
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -182,6 +195,14 @@ namespace msvc8
          * rightmost descent -- sibling of `rb_min`'s 0x00592320 above,
          * same map.)
          */
+        /**
+         * Address: 0x00830920 (FUN_00830920, `Moho::UICommandGraph::
+         * mGraphRuntimeTree`'s rightmost descent -- sibling of `rb_min`'s
+         * 0x00830060 above, same map. Byte-identical ICF twin of the
+         * mesh-key map's rightmost descent (0x007E4E60 above); confirmed a
+         * distinct instantiation via direct call from `erase_node`'s
+         * emission FUN_0082FD50.)
+         */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->right)) {
@@ -219,6 +240,14 @@ namespace msvc8
         /**
          * Address: 0x0077C740 (FUN_0077C740, the decal bucket set's successor walk)
          * Address: 0x0077CE50 (FUN_0077CE50, the start-tick map's)
+         */
+        /**
+         * Address: 0x0082EC10 (FUN_0082EC10, `Moho::UICommandGraph::
+         * mGraphRuntimeTree`'s successor walk -- isNil@+0x25, 0x18-byte
+         * value_type, byte-identical ICF twin of the mesh-key map's
+         * successor walk family. Called at the top of that map's
+         * `erase_node` emission (FUN_0082FD50, cited below on `erase_node`)
+         * to capture the return iterator before unlinking.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1014,6 +1043,24 @@ namespace msvc8
              * once per node from `erase_range`'s (`sub_52D9C0`) walk-one-at-
              * a-time loop, cited below.)
              */
+            /**
+             * Address: 0x0082FD50 (FUN_0082FD50, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s erase-with-rebalance -- `map<shared_ptr<
+             * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, isNil@+0x25,
+             * 0x18-byte value_type. Opens with the same `_Isnil` guard
+             * throwing `out_of_range("invalid map/set<T> iterator")` seen on
+             * the other emissions of this member, captures the successor
+             * through `rb_increment` (0x0082EC10, cited above) before
+             * unlinking, and its rebalance loop calls `rotate_left`
+             * (0x00830010) / `rotate_right` (0x00830080), both cited below,
+             * confirming this is the same tree as `insert_at`'s emission
+             * FUN_0082E320. `sub_82BEE0` (cited on `free_node` below) is the
+             * inlined `value_type::~value_type()` call ahead of `operator
+             * delete`. Unique body, no ICF twins -- the node-buy/value-dtor
+             * calls it makes are specific to this value_type, so unlike the
+             * pure-pointer-arithmetic rotate/walk helpers it does not fold
+             * with the mesh-key map's sibling emission.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -1384,6 +1431,21 @@ namespace msvc8
              * `color@+0x10` and `isNil=0@+0x11`. Reached from `insert_at`,
              * 0x0052CD30.)
              */
+            /**
+             * Address: 0x00830110 (FUN_00830110, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s node buy -- allocates one node via
+             * `sub_831D10(1)`, writes `left`/`parent`/`right` from its first
+             * three arguments (the caller passes `where` for both `left` and
+             * `right` initially, matching this template's head-initialised
+             * `n->left = n->parent = n->right = head_` before the value is
+             * constructed), constructs the 0x18-byte value in place through
+             * `sub_830B20` (the `pair<shared_ptr<CD3DBatchTexture>,
+             * vector<CommandGraphEdge*>>` value ctor CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes name 0x0082D330 for --
+             * "retain the texture, default the vector"), then writes
+             * `color=0@+0x24`/`isNil=0@+0x25`. Unique body (no ICF twins);
+             * reached from `insert_at`'s emission FUN_0082E320 above.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1438,6 +1500,31 @@ namespace msvc8
              *     a data ref from this function's SEH unwind funclet
              *     (`mov ecx,[ebp+4]; jmp ??1MeshKey@Moho@@UAE@XZ`), not as a
              *     direct call.
+             */
+            /**
+             * Address: 0x0082BEE0 (FUN_0082BEE0, `value_type::~value_type()`
+             * for `Moho::UICommandGraph::mGraphRuntimeTree` --
+             * `pair<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
+             * isNil@+0x25. Inlined ahead of `operator delete(node)` in the
+             * `erase_node` emission FUN_0082FD50 (cited above) rather than
+             * called out-of-line as a separate `free_node` body -- the
+             * generic `n->value.~value_type()` this member already performs
+             * covers it. Tears the second-declared member (the
+             * `vector<CommandGraphEdge*>`) down first: frees its buffer with
+             * `operator delete` when non-null and zeroes the three
+             * begin/end/capacity words, then releases the first-declared
+             * `shared_ptr<CD3DBatchTexture>`'s control block with the same
+             * interlocked use-count/weak-count decrement and vtable
+             * `dispose()`/`destroy()` dispatch pair documented for
+             * `sp_counted_base::release()` elsewhere in this codebase (see
+             * `BoostWrappers.h`'s `weak_release()`/`release()` note and the
+             * 0x004229B0 audit). Members are torn down in reverse
+             * declaration order, matching a plain compiler-generated
+             * `~pair()` -- there is no hand-written source for this
+             * function; it is the implicit destructor MSVC emits for the
+             * pair once `shared_ptr<T>` and `vector<U*>` are recovered
+             * types, exactly like the mesh-key map's 0x007E5850 sibling
+             * above.)
              */
             static void free_node(node_type* const n) noexcept
             {
@@ -1596,6 +1683,17 @@ namespace msvc8
              * the swapped `[node+0x10]`/`[node+0x11]` instantiation cited
              * above. Reached from `insert_at`'s fixup loop, 0x0052CD30.)
              */
+            /**
+             * Address: 0x00830010 (FUN_00830010, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s left rotate -- isNil@+0x25, 0x18-byte
+             * value_type. Byte-identical ICF twin of the mesh-key map's left
+             * rotate (0x007E4E10 above) and of FUN_0044BF90/FUN_0057F160
+             * (unidentified same-layout instantiations, not traced to an
+             * owning class in this pass); this address specifically is
+             * confirmed `mGraphRuntimeTree`'s via direct calls from both
+             * `insert_at`'s emission FUN_0082E320 and `erase_node`'s
+             * emission FUN_0082FD50, both cited above/below.)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1656,6 +1754,14 @@ namespace msvc8
              * Address: 0x0052DB00 (FUN_0052DB00, the right rotate for
              * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
              * mirror of `rotate_left`'s 0x0052DAB0 above, same instantiation.)
+             */
+            /**
+             * Address: 0x00830080 (FUN_00830080, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s right rotate -- sibling of `rotate_left`'s
+             * 0x00830010 above, same map. Byte-identical ICF twin of the
+             * mesh-key map's right rotate (0x007E4EA0 above); confirmed via
+             * direct calls from `insert_at`'s emission FUN_0082E320 and
+             * `erase_node`'s emission FUN_0082FD50.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -1723,6 +1829,27 @@ namespace msvc8
              * `sub_52DAB0`/`sub_52DB00` (`rotate_left`/`rotate_right`, cited
              * below) on the uncle-red vs. uncle-black branches. Reached from
              * `insert_unique`'s emission at 0x0052BC60, cited above.
+             */
+            /**
+             * Address: 0x0082E320 (FUN_0082E320, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s combined buy-node/link/rebalance emission
+             * -- `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
+             * isNil@+0x25. The `_Mysize >= 0xAAAAAA9` guard is exactly this
+             * template's `max_size() - 1u <= size_` for a 0x18-byte
+             * value_type (`0xFFFFFFFF / 0x18 - 1 == 0xAAAAAA9`), throwing
+             * `std::length_error("map/set<T> too long")`. Buys the node
+             * through `sub_830110` (cited on `buy_node` below), links it,
+             * then repairs the red-red violation calling `rotate_left`
+             * (0x00830010) / `rotate_right` (0x00830080), both cited below.
+             * `CWldSession.cpp`'s `AddCommandQueueToCommandGraph` reconstruction
+             * notes already name this address `insert_at`, reached via the
+             * hinted insert at 0x0082CC80 for `mGraphRuntimeTree[texture]`
+             * (VC8 `map::operator[]`); that hinted-insert caller itself
+             * remains unrecovered (`AddCommandQueueToCommandGraph` is still
+             * blocked on `LinkCommandGraphEdge`), so this member's
+             * source-level invocation is the same generic `msvc8::map`/
+             * `rb_tree` API surface every other instantiation on this
+             * member already uses, not a new engine call site.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
