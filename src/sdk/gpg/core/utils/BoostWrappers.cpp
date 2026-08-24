@@ -1392,22 +1392,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x00857230 (FUN_00857230)
-   *
-   * What it does:
-   * Three-argument adapter lane that forwards one backward shared-pair range
-   * assignment into `CopyAssignSharedPairRangeBackwardRetain`.
-   */
-  [[nodiscard]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAdapterB(
-    SharedCountPair* const destinationEnd,
-    const SharedCountPair* const sourceBegin,
-    const SharedCountPair* const sourceEnd
-  ) noexcept
-  {
-    return CopyAssignSharedPairRangeBackwardRetain(destinationEnd, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x004DEA20 (FUN_004DEA20)
    * Address: 0x007840C0 (FUN_007840C0)
    * Address: 0x00784240 (FUN_00784240)
