@@ -10114,7 +10114,6 @@ static void IssueBuildDragOrders(
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
   moho::SBuildTemplateBuffer templates;
-  templates.InitInlineStorage();
   (void)session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &templates);
 
   BuildDragStepStateRuntimeView dragStep{};
@@ -10143,8 +10142,8 @@ static void IssueBuildDragOrders(
       // By value: the binary copy-constructs a whole SBuildTemplateInfo per
       // iteration (0x008234E0-0x00823735, four POD dwords plus the blueprint-id
       // string) and destroys it at the bottom of the loop.
-      for (const moho::SBuildTemplateInfo* entry = templates.mStart; entry != templates.mFinish; ++entry) {
-        const moho::SBuildTemplateInfo templateEntry(*entry);
+      for (const moho::SBuildTemplateInfo& entry : templates) {
+        const moho::SBuildTemplateInfo templateEntry(entry);
         const float placeX = anchorX + templateEntry.mPos.x;
         const float placeZ = anchorZ + templateEntry.mPos.z;
 
@@ -10239,8 +10238,8 @@ static void IssueBuildDragOrders(
   }
 
   // 0x00823A4F-0x00823A93: destroy every entry's blueprint-id string and drop
-  // any spilled heap storage.
-  templates.DestroyStorage();
+  // any spilled heap storage. `templates` is a local `gpg::fastvector_n<
+  // SBuildTemplateInfo, 16>`; its own destructor does this at scope exit.
 }
 
 /**
@@ -10402,17 +10401,17 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
       const Wm3::Vector3f stampOrigin =
         moho::COORDS_ToWorldPos(map, cell, moho::LAYER_None, 1, 1);
 
-      for (const moho::SBuildTemplateInfo* entry = buildTemplate.mStart; entry != buildTemplate.mFinish; ++entry) {
+      for (const moho::SBuildTemplateInfo& entry : buildTemplate) {
         const Wm3::Vector3f entryPosition{
-          stampOrigin.x + entry->mPos.x,
-          stampOrigin.y + entry->mPos.y,
-          stampOrigin.z + entry->mPos.z
+          stampOrigin.x + entry.mPos.x,
+          stampOrigin.y + entry.mPos.y,
+          stampOrigin.z + entry.mPos.z
         };
 
         // `RResId` is a bare `msvc8::string` wrapper, which is why the binary
         // hands the canonicalised path buffer straight to the rules lookup.
         moho::RResId blueprintPath;
-        (void)gpg::STR_InitFilename(&blueprintPath.name, entry->mBlueprintId.c_str());
+        (void)gpg::STR_InitFilename(&blueprintPath.name, entry.mBlueprintId.c_str());
         auto* const entryBlueprint = mSession->mRules->GetUnitBlueprint(blueprintPath);
 
         const auto cellX = static_cast<std::int32_t>(entryPosition.x);
@@ -10503,7 +10502,8 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
     mBlueprints.resize(static_cast<std::size_t>(placedCount));
   }
 
-  buildTemplate.DestroyStorage();
+  // `buildTemplate` is a local `gpg::fastvector_n<SBuildTemplateInfo, 16>`;
+  // its own destructor releases every entry and any spilled heap storage.
 }
 
 /**
@@ -22550,7 +22550,6 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
   SBuildTemplateBuffer activeTemplate{};
-  activeTemplate.InitInlineStorage();
   (void)mWldSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
   if (activeTemplate.Empty()) {

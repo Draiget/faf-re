@@ -3268,86 +3268,18 @@ namespace moho
       }
     }
 
-    /**
-     * Address: 0x00823E10 (FUN_00823E10, sub_823E10)
-     *
-     * What it does:
-     * Releases one build-template blueprint-id string lane and restores
-     * SSO-empty string state in-place.
-     */
-    [[nodiscard]] SBuildTemplateInfo* DestroyBuildTemplateInfo(SBuildTemplateInfo* const info)
-    {
-      if (info->mBlueprintId.myRes >= 0x10u) {
-        ::operator delete(info->mBlueprintId.bx.ptr);
-      }
-
-      info->mBlueprintId.mySize = 0;
-      info->mBlueprintId.myRes = 15;
-      info->mBlueprintId.bx.buf[0] = '\0';
-      return info;
-    }
-
-    /**
-     * Address: 0x00823DD0 (FUN_00823DD0, sub_823DD0)
-     *
-     * What it does:
-     * Releases one half-open build-template range `[first,last)` by destroying
-     * each blueprint-id string lane in 0x2C-byte record strides.
-     */
-    void DestroyBuildTemplateRange(SBuildTemplateInfo* first, SBuildTemplateInfo* last)
-    {
-      while (first != last) {
-        (void)DestroyBuildTemplateInfo(first);
-        ++first;
-      }
-    }
-
-    void EnsureBuildTemplateCapacityForAppend(SBuildTemplateBuffer& buffer)
-    {
-      if (buffer.mFinish != buffer.mCapacity) {
-        return;
-      }
-
-      const std::size_t currentSize = static_cast<std::size_t>(buffer.mFinish - buffer.mStart);
-      const std::size_t currentCapacity = static_cast<std::size_t>(buffer.mCapacity - buffer.mStart);
-      std::size_t nextCapacity = currentCapacity + (currentCapacity >> 1u);
-      if (nextCapacity < currentSize + 1u) {
-        nextCapacity = currentSize + 1u;
-      }
-      if (nextCapacity == 0u) {
-        nextCapacity = 1u;
-      }
-
-      auto* const nextStorage = static_cast<SBuildTemplateInfo*>(::operator new[](nextCapacity * sizeof(SBuildTemplateInfo)));
-      SBuildTemplateInfo* writeCursor = nextStorage;
-
-      try {
-        for (std::size_t i = 0; i < currentSize; ++i) {
-          new (writeCursor) SBuildTemplateInfo(buffer.mStart[i]);
-          ++writeCursor;
-        }
-      } catch (...) {
-        DestroyBuildTemplateRange(nextStorage, writeCursor);
-        ::operator delete[](nextStorage);
-        throw;
-      }
-
-      DestroyBuildTemplateRange(buffer.mStart, buffer.mFinish);
-      if (buffer.mStart != buffer.mOriginalStart) {
-        ::operator delete[](buffer.mStart);
-      }
-
-      buffer.mStart = nextStorage;
-      buffer.mFinish = writeCursor;
-      buffer.mCapacity = nextStorage + nextCapacity;
-    }
-
-    void AppendBuildTemplateEntry(SBuildTemplateBuffer& buffer, const SBuildTemplateInfo& info)
-    {
-      EnsureBuildTemplateCapacityForAppend(buffer);
-      new (buffer.mFinish) SBuildTemplateInfo(info);
-      ++buffer.mFinish;
-    }
+    // `DestroyBuildTemplateInfo` (0x00823E10, per-element blueprint-id string
+    // release) and `DestroyBuildTemplateRange` (0x00823DD0, the loop over it)
+    // are the compiler's per-element/range release for `SBuildTemplateInfo`'s
+    // `msvc8::string mBlueprintId` member -- the same release
+    // `SBuildTemplateInfo`'s implicit destructor already performs. Now that
+    // `SBuildTemplateBuffer` is `gpg::fastvector_n<SBuildTemplateInfo, 16>`
+    // (CWldSession.h), that release happens through the container's own
+    // element lifetime (array-new/delete[] on the heap arm, implicit dtor on
+    // scope exit / overwrite-by-assignment on the inline arm -- see
+    // `FastVectorN::ResetInline_`/`GrowInsertDeepCopy` in FastVector.h) rather
+    // than a hand-rolled per-type free function; there is no separate body to
+    // recover them into.
 
     void SortBuildTemplateRangeByOrder(SBuildTemplateInfo* const begin, SBuildTemplateInfo* const end)
     {
@@ -3369,64 +3301,15 @@ namespace moho
       );
     }
 
-    /**
-     * Address: 0x00898E50 (FUN_00898E50, sub_898E50)
-     *
-     * What it does:
-     * Rebinds one build-template fastvector lane to inline storage and copies
-     * source entries in-order, allocating spill storage when source size
-     * exceeds inline capacity.
-     */
-    SBuildTemplateBuffer* RebindAndCopyBuildTemplateBufferInline(
-      SBuildTemplateBuffer* const destination,
-      const SBuildTemplateBuffer& source
-    )
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      constexpr std::size_t kInlineCount = 16u;
-      auto* const inlineStart = reinterpret_cast<SBuildTemplateInfo*>(&destination->mInlineStorage[0]);
-      destination->mStart = inlineStart;
-      destination->mFinish = inlineStart;
-      destination->mCapacity = inlineStart + kInlineCount;
-      destination->mOriginalStart = inlineStart;
-
-      const SBuildTemplateInfo* const sourceStart = source.mStart;
-      const SBuildTemplateInfo* const sourceFinish = source.mFinish;
-      if (sourceStart == nullptr || sourceFinish == nullptr || sourceFinish <= sourceStart) {
-        return destination;
-      }
-
-      const std::size_t sourceCount = static_cast<std::size_t>(sourceFinish - sourceStart);
-      SBuildTemplateInfo* writeStart = destination->mStart;
-      if (sourceCount > kInlineCount) {
-        writeStart = static_cast<SBuildTemplateInfo*>(::operator new[](sourceCount * sizeof(SBuildTemplateInfo)));
-        destination->mStart = writeStart;
-        destination->mFinish = writeStart;
-        destination->mCapacity = writeStart + sourceCount;
-      }
-
-      try {
-        for (std::size_t i = 0; i < sourceCount; ++i) {
-          new (destination->mFinish) SBuildTemplateInfo(sourceStart[i]);
-          ++destination->mFinish;
-        }
-      } catch (...) {
-        DestroyBuildTemplateRange(destination->mStart, destination->mFinish);
-        if (destination->mStart != inlineStart) {
-          ::operator delete[](destination->mStart);
-        }
-        destination->mStart = inlineStart;
-        destination->mFinish = inlineStart;
-        destination->mCapacity = inlineStart + kInlineCount;
-        destination->mOriginalStart = inlineStart;
-        throw;
-      }
-
-      return destination;
-    }
+    // `RebindAndCopyBuildTemplateBufferInline` (0x00898E50) was the hand-rolled
+    // rebind-to-inline + copy-construct pass that duplicated
+    // `gpg::core::FastVectorN<SBuildTemplateInfo, 16>`'s own copy constructor
+    // (`FastVectorN(const FastVectorN&) : FastVectorN() { ResetFrom(other); }`,
+    // FastVector.h). `SBuildTemplateBuffer` now being that template directly
+    // (CWldSession.h), the address is cited on that constructor instead; call
+    // sites use placement-new (`GetActiveBuildTemplate` below) or plain
+    // copy-construction, matching the binary's hidden-return-slot ABI for
+    // returning a non-trivial type by value.
 
     /**
      * Address: 0x00823D30 (FUN_00823D30, sub_823D30)
@@ -13148,13 +13031,10 @@ namespace moho
     mSaveSourceTreeSize = 0u;
 
     std::memset(mEntitySpatialDbStorage, 0, sizeof(mEntitySpatialDbStorage));
-    SBuildTemplateInfo* const inlineStart = reinterpret_cast<SBuildTemplateInfo*>(&mBuildTemplates.mInlineStorage[0]);
-    SBuildTemplateInfo* const inlineCapacity =
-      reinterpret_cast<SBuildTemplateInfo*>(mBuildTemplates.mInlineStorage + sizeof(mBuildTemplates.mInlineStorage));
-    mBuildTemplates.mStart = inlineStart;
-    mBuildTemplates.mFinish = inlineStart;
-    mBuildTemplates.mCapacity = inlineCapacity;
-    mBuildTemplates.mOriginalStart = inlineStart;
+    // mBuildTemplates (gpg::fastvector_n<SBuildTemplateInfo, 16>) already rebound
+    // itself to inline storage via its own default constructor, which runs
+    // implicitly before this body -- matching the binary's per-member subobject
+    // construction ahead of the constructor body. No manual lane wiring needed.
     mBuildTemplateArg1 = 0.0f;
     mBuildTemplateArg2 = 0.0f;
 
@@ -14007,9 +13887,23 @@ namespace moho
   /**
    * Address: 0x00896A40 (FUN_00896A40, ?GetActiveBuildTemplate@CWldSession@Moho@@QBE?AV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@AAH0@Z)
    *
+   * IDA signature:
+   * gpg::fastvector_n16_SBuildTemplateInfo *__thiscall sub_896A40(
+   *     Moho::CWldSession *this, float *a2, float *a3,
+   *     gpg::fastvector_n16_SBuildTemplateInfo *a4);
+   *
    * What it does:
    * Copies the active build-template buffer into one caller-owned inline
-   * fastvector lane and returns the current template X/Z extents.
+   * fastvector lane and returns the current template X/Z extents. The
+   * binary's hidden-return-slot ABI copy-constructs directly into `a4`
+   * (`sub_898E50(&this->mBuildTemplate, a4)`, cited on `FastVectorN`'s copy
+   * ctor in FastVector.h at 0x00898E50) because at the true ABI level `a4` is
+   * raw, not-yet-constructed return-slot storage. Every recovered caller in
+   * this tree instead declares `result` as an ordinary local first (so it is
+   * already a live, default-constructed `SBuildTemplateBuffer` by the time
+   * this runs) -- placement-constructing over that would skip its destructor.
+   * Assignment (`ResetFrom`, the same machinery the copy ctor delegates to)
+   * gives the identical end state without that hazard.
    */
   SBuildTemplateBuffer* CWldSession::GetActiveBuildTemplate(
     float* const outTemplateSpanZ,
@@ -14019,7 +13913,8 @@ namespace moho
   {
     *outTemplateSpanX = mBuildTemplateArg1;
     *outTemplateSpanZ = mBuildTemplateArg2;
-    return RebindAndCopyBuildTemplateBufferInline(result, mBuildTemplates);
+    *result = mBuildTemplates;
+    return result;
   }
 
   /**
@@ -14081,118 +13976,39 @@ namespace moho
         maxX = std::max(maxX, skirtRect.x1);
         maxY = std::max(maxY, skirtRect.z1);
 
-        AppendBuildTemplateEntry(mBuildTemplates, templateInfo);
+        mBuildTemplates.push_back(templateInfo);
       }
 
       SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
       cursor.mRes = SSelectionSetUserEntity::find(&mSelection, cursor.mRes, &cursor.mRes);
     }
 
-    SortBuildTemplateRangeByOrder(mBuildTemplates.mStart, mBuildTemplates.mFinish);
+    SortBuildTemplateRangeByOrder(mBuildTemplates.begin(), mBuildTemplates.end());
     mBuildTemplateArg1 = maxX - minX;
     mBuildTemplateArg2 = maxY - minY;
 
-    const Wm3::Vector3f origin = mBuildTemplates.mStart->mPos;
-    for (SBuildTemplateInfo* entry = mBuildTemplates.mStart; entry != mBuildTemplates.mFinish; ++entry) {
-      entry->mPos.x -= origin.x;
-      entry->mPos.y -= origin.y;
-      entry->mPos.z -= origin.z;
+    const Wm3::Vector3f origin = mBuildTemplates.front().mPos;
+    for (SBuildTemplateInfo& entry : mBuildTemplates) {
+      entry.mPos.x -= origin.x;
+      entry.mPos.y -= origin.y;
+      entry.mPos.z -= origin.z;
     }
   }
 
   /**
    * Address: 0x008969E0 (FUN_008969E0, ?ClearBuildTemplates@CWldSession@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Destroys every build-template entry and rebinds storage back to the
+   * inline buffer, discarding any spilled heap allocation --
+   * `FastVectorN::ResetStorageToInline` (FastVector.h), the same lane every
+   * `gpg::fastvector_n<T, N>` instantiation resets through.
    */
   void CWldSession::ClearBuildTemplates()
   {
-    SBuildTemplateInfo* start = mBuildTemplates.mStart;
-    SBuildTemplateInfo* finish = mBuildTemplates.mFinish;
-    if (start && finish && start <= finish) {
-      DestroyBuildTemplateRange(start, finish);
-    }
-
-    SBuildTemplateInfo* const inlineStart = mBuildTemplates.mOriginalStart
-      ? mBuildTemplates.mOriginalStart
-      : reinterpret_cast<SBuildTemplateInfo*>(&mBuildTemplates.mInlineStorage[0]);
-    if (start && start != inlineStart) {
-      ::operator delete[](start);
-      mBuildTemplates.mStart = inlineStart;
-      mBuildTemplates.mCapacity =
-        reinterpret_cast<SBuildTemplateInfo*>(mBuildTemplates.mInlineStorage + sizeof(mBuildTemplates.mInlineStorage));
-    }
-
-    mBuildTemplates.mFinish = mBuildTemplates.mStart;
+    mBuildTemplates.ResetStorageToInline();
     mBuildTemplateArg1 = 0.0f;
     mBuildTemplateArg2 = 0.0f;
-  }
-
-  // gpg::fastvector_n<SBuildTemplateInfo, 16> behaviour, out-of-line so the
-  // inline-buffer growth/teardown helpers above are in scope. Used by callers in
-  // other translation units (e.g. the SetActiveBuildTemplate Lua callback) that
-  // build a template buffer before handing it to CWldSession::SetActiveBuildTemplate.
-  void SBuildTemplateBuffer::InitInlineStorage() noexcept
-  {
-    mStart = reinterpret_cast<SBuildTemplateInfo*>(&mInlineStorage[0]);
-    mFinish = mStart;
-    mCapacity = mStart + (sizeof(mInlineStorage) / sizeof(SBuildTemplateInfo)); // 16 inline entries
-    mOriginalStart = mStart;
-  }
-
-  void SBuildTemplateBuffer::PushBack(const SBuildTemplateInfo& info)
-  {
-    AppendBuildTemplateEntry(*this, info);
-  }
-
-  void SBuildTemplateBuffer::DestroyStorage()
-  {
-    DestroyBuildTemplateRange(mStart, mFinish);
-    if (mStart != mOriginalStart) {
-      ::operator delete[](mStart);
-    }
-    mStart = mOriginalStart;
-    mFinish = mOriginalStart;
-  }
-
-  /**
-   * Address: 0x00899790 (FUN_00899790,
-   *   gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator=)
-   *
-   * What it does:
-   * Per-T named helper that drives the engine-emitted assignment-operator
-   * body of `gpg::fastvector_n<SBuildTemplateInfo, 16>`. Performs the
-   * self-assignment guard, then either copies into the existing tail when
-   * destination has spare capacity, grows storage and copies otherwise, or
-   * truncates+copies when destination already has more elements than source.
-   *
-   * The body is expressed in terms of the recovered build-template helpers
-   * (`DestroyBuildTemplateRange`, `RebindAndCopyBuildTemplateBufferInline`)
-   * so we preserve the existing source-level invocation graph; the linker
-   * keeps the FUN_00899790 symbol bound because the call from
-   * `CWldSession::SetActiveBuildTemplate` invokes this named entry directly.
-   */
-  void AssignBuildTemplateBuffer(SBuildTemplateBuffer& destination, const SBuildTemplateBuffer& source)
-  {
-    if (&destination == &source) {
-      return;
-    }
-
-    SBuildTemplateInfo* const oldStart = destination.mStart;
-    SBuildTemplateInfo* const oldFinish = destination.mFinish;
-    if (oldStart && oldFinish && oldStart <= oldFinish) {
-      DestroyBuildTemplateRange(oldStart, oldFinish);
-    }
-
-    SBuildTemplateInfo* const inlineStart = reinterpret_cast<SBuildTemplateInfo*>(&destination.mInlineStorage[0]);
-    if (oldStart && oldStart != inlineStart && oldStart != destination.mOriginalStart) {
-      ::operator delete[](oldStart);
-    }
-
-    destination.mStart = inlineStart;
-    destination.mFinish = inlineStart;
-    destination.mCapacity = inlineStart + 16u;
-    destination.mOriginalStart = inlineStart;
-
-    (void)RebindAndCopyBuildTemplateBufferInline(&destination, source);
   }
 
   /**
@@ -14202,9 +14018,9 @@ namespace moho
    * What it does:
    * Replaces the active build-template fastvector buffer with `templates`
    * and records the placement preview anchor as (`templateSpanX`,
-   * `templateSpanZ`). The buffer copy is delegated to the per-T named
-   * assignment helper `moho::AssignBuildTemplateBuffer` (FUN_00899790) so
-   * the linker keeps the engine-emitted assignment symbol bound.
+   * `templateSpanZ`). The buffer copy is
+   * `gpg::fastvector_n<SBuildTemplateInfo, 16>::operator=`, cited at
+   * 0x00899790 on `FastVectorN::operator=` in FastVector.h.
    */
   void CWldSession::SetActiveBuildTemplate(
     const SBuildTemplateBuffer& templates,
@@ -14212,7 +14028,7 @@ namespace moho
     const float templateSpanZ
   )
   {
-    AssignBuildTemplateBuffer(mBuildTemplates, templates);
+    mBuildTemplates = templates;
     mBuildTemplateArg1 = templateSpanX;
     mBuildTemplateArg2 = templateSpanZ;
   }

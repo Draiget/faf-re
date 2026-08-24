@@ -10,16 +10,16 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`96.29%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,675`*
+  - *Total amount of completed tokens: `64,676`*
 
 Progress DB status breakdown:
 
 - `recovered`: `52,719` (81.51%)
-- `skip`: `6,483` (10.02%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `skip`: `6,484` (10.03%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,473` (8.46%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `407` (0.61%)
-- `in_progress`: `1` (0.00%)
+- `in_progress`: `0` (0.00%)
 - **`blocked`: `2,155` (3.21%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,562`*

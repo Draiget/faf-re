@@ -83,60 +83,21 @@ namespace moho
   );
   struct GeomCamera3;
 
-  struct SBuildTemplateBuffer
-  {
-    SBuildTemplateInfo* mStart;         // +0x00
-    SBuildTemplateInfo* mFinish;        // +0x04
-    SBuildTemplateInfo* mCapacity;      // +0x08
-    SBuildTemplateInfo* mOriginalStart; // +0x0C
-    std::uint8_t mInlineStorage[0x2C0]; // +0x10 (16 * sizeof(SBuildTemplateInfo), 0x2C each)
-
-    // gpg::fastvector_n<SBuildTemplateInfo, 16> behaviour. Declared as named
-    // methods (not ctor/dtor) so the struct stays trivially-copyable POD for the
-    // callers that manipulate the lanes directly; defined out-of-line in
-    // CWldSession.cpp where the inline-buffer growth/teardown helpers live.
-    void InitInlineStorage() noexcept;                     // rebind lanes to the inline buffer (empty)
-    void PushBack(const SBuildTemplateInfo& info);         // append one entry, growing off-inline as needed
-    void DestroyStorage();                                 // destroy entries + free any spilled buffer
-    [[nodiscard]] bool Empty() const noexcept { return mFinish == mStart; }
-  };
-
-  static_assert(sizeof(SBuildTemplateBuffer) == 0x2D0, "SBuildTemplateBuffer size must be 0x2D0");
-  static_assert(offsetof(SBuildTemplateBuffer, mStart) == 0x00, "SBuildTemplateBuffer::mStart offset must be 0x00");
-  static_assert(offsetof(SBuildTemplateBuffer, mFinish) == 0x04, "SBuildTemplateBuffer::mFinish offset must be 0x04");
-  static_assert(
-    offsetof(SBuildTemplateBuffer, mCapacity) == 0x08, "SBuildTemplateBuffer::mCapacity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SBuildTemplateBuffer, mOriginalStart) == 0x0C, "SBuildTemplateBuffer::mOriginalStart offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SBuildTemplateBuffer, mInlineStorage) == 0x10, "SBuildTemplateBuffer::mInlineStorage offset must be 0x10"
-  );
-
   /**
-   * Address: 0x00899790 (FUN_00899790,
-   *   gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator=)
-   *
-   * IDA signature:
-   * void __userpurge sub_899790(
-   *     gpg::fastvector_n16_SBuildTemplateInfo *result@<eax>,
-   *     gpg::fastvector_n16_SBuildTemplateInfo *a2);
-   *
-   * What it does:
-   * Per-T named helper for the engine-instantiated assignment-operator body
-   * of `gpg::fastvector_n<SBuildTemplateInfo, 16>` (inline-buffer variant
-   * with stride 0x2C). Performs self-assignment guard, then either copies
-   * the existing elements into the destination's pre-allocated tail and
-   * grows when the source size exceeds destination capacity, falling back
-   * to the per-element copy/destroy split path otherwise.
-   *
-   * Caller: `Moho::CWldSession::SetActiveBuildTemplate` (FUN_00896A70) —
-   * the single binary call site that replaces the build-template buffer
-   * before the placement preview is re-anchored.
+   * `gpg::fastvector_n<SBuildTemplateInfo, 16>` — confirmed by the RTTI/export
+   * mangled name on `GetActiveBuildTemplate`/`SetActiveBuildTemplate` below
+   * (`?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@`) and by exact
+   * layout match against `gpg::core::FastVectorN<T,16>` (FastVector.h):
+   * `{start_,end_,capacity_}` inherited @0x00/0x04/0x08, `originalVec_` @0x0C,
+   * `inlineVec_[16]` @0x10 — byte-identical to the binary's
+   * `mStart/mFinish/mCapacity/mOriginalStart/mInlineStorage` fields this type
+   * used to declare by hand. The per-T emissions for this element
+   * (`operator=` @0x00899790, copy-ctor @0x00898E50, `InsertAt`'s deep-copy
+   * lane @0x008489D0/0x00848F50/0x00849030) are cited on the matching
+   * `FastVectorN` members in FastVector.h.
    */
-  void AssignBuildTemplateBuffer(SBuildTemplateBuffer& destination, const SBuildTemplateBuffer& source);
-
+  using SBuildTemplateBuffer = gpg::fastvector_n<SBuildTemplateInfo, 16>;
+  static_assert(sizeof(SBuildTemplateBuffer) == 0x2D0, "SBuildTemplateBuffer size must be 0x2D0");
 
   struct MouseInfo
   {

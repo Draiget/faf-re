@@ -3687,18 +3687,18 @@ namespace moho
     SBuildTemplateBuffer activeTemplate{};
     session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
-    if (activeTemplate.mStart != activeTemplate.mFinish) {
+    if (!activeTemplate.Empty()) {
       resultTable.SetNumber(1, templateSpanX);
       resultTable.SetNumber(2, templateSpanZ);
 
       std::int32_t nextResultIndex = 3;
-      for (const SBuildTemplateInfo* entry = activeTemplate.mStart; entry != activeTemplate.mFinish; ++entry) {
+      for (const SBuildTemplateInfo& entry : activeTemplate) {
         LuaPlus::LuaObject entryTable;
         entryTable.AssignNewTable(state, 0, 0);
-        entryTable.SetString(1, entry->mBlueprintId.c_str());
-        entryTable.SetInteger(2, entry->mBuildOrder);
-        entryTable.SetNumber(3, entry->mPos.x);
-        entryTable.SetNumber(4, entry->mPos.z);
+        entryTable.SetString(1, entry.mBlueprintId.c_str());
+        entryTable.SetInteger(2, entry.mBuildOrder);
+        entryTable.SetNumber(3, entry.mPos.x);
+        entryTable.SetNumber(4, entry.mPos.z);
         resultTable.SetObject(nextResultIndex, entryTable);
         ++nextResultIndex;
       }
@@ -3706,17 +3706,10 @@ namespace moho
 
     resultTable.PushStack(state);
 
-    for (SBuildTemplateInfo* entry = activeTemplate.mStart; entry != activeTemplate.mFinish; ++entry) {
-      entry->~SBuildTemplateInfo();
-    }
-    if (activeTemplate.mStart != nullptr && activeTemplate.mStart != activeTemplate.mOriginalStart) {
-      ::operator delete[](activeTemplate.mStart);
-      activeTemplate.mStart = activeTemplate.mOriginalStart;
-      activeTemplate.mCapacity =
-        reinterpret_cast<SBuildTemplateInfo*>(activeTemplate.mInlineStorage + sizeof(activeTemplate.mInlineStorage));
-    }
-    activeTemplate.mFinish = activeTemplate.mStart;
-
+    // `activeTemplate` is a local `gpg::fastvector_n<SBuildTemplateInfo, 16>`;
+    // its own destructor releases every entry's blueprint-id string and any
+    // spilled heap storage at scope exit -- the compiler-emitted teardown the
+    // binary also runs here, not a hand-rolled release loop.
     return 1;
   }
 
@@ -3761,7 +3754,6 @@ namespace moho
     }
 
     SBuildTemplateBuffer templates;
-    templates.InitInlineStorage();
 
     const float templateSpanX = static_cast<float>(buildTemplate[1].GetNumber());
     const float templateSpanZ = static_cast<float>(buildTemplate[2].GetNumber());
@@ -3788,7 +3780,8 @@ namespace moho
       session->SetActiveBuildTemplate(templates, templateSpanX, templateSpanZ);
     }
 
-    templates.DestroyStorage();
+    // `templates` releases its entries and any spilled heap storage in its
+    // own destructor at scope exit; no hand-rolled teardown needed here.
     return 0;
   }
 
