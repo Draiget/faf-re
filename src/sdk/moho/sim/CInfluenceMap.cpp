@@ -154,7 +154,15 @@ namespace gpg
   };
   static_assert(sizeof(RVectorType_InfluenceGrid) == 0x68, "RVectorType_InfluenceGrid size must be 0x68");
 
-  class RVectorType_SThreat final : public gpg::RType
+  /**
+   * VFTABLE (gpg::RIndexed subobject @ +0x64): 0x00E31890
+   *   ??_7?$RVectorType@USThreat@Moho@@@gpg@@6BRIndexed@gpg@@@
+   *   +0x00 SubscriptIndex   0x00719300
+   *   +0x04 GetCount         0x007192B0
+   *   +0x08 SetCount         0x007192E0
+   *   +0x0C AssignPointer    0x00401320 (inherited gpg::RIndexed base impl)
+   */
+  class RVectorType_SThreat final : public gpg::RType, public gpg::RIndexed
   {
   public:
     /**
@@ -175,8 +183,42 @@ namespace gpg
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
+    /**
+     * Address: 0x007192A0 (FUN_007192A0, gpg::RVectorType_SThreat::IsIndexed)
+     *
+     * What it does:
+     * Returns the `gpg::RIndexed` subobject (`this ? this + 0x64 : nullptr`).
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
     void Init() override;
+
+    /**
+     * Address: 0x00719300 (FUN_00719300, gpg::RVectorType_SThreat::SubscriptIndex)
+     *
+     * What it does:
+     * Wraps `&vec[ind]` (stride 0x38) as one `gpg::RRef_SThreat` reference.
+     */
+    [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x007192B0 (FUN_007192B0, gpg::RVectorType_SThreat::GetCount)
+     *
+     * What it does:
+     * Returns `(last - first) / sizeof(SThreat)`, or 0 for an empty lane.
+     */
+    [[nodiscard]] std::size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x007192E0 (FUN_007192E0, gpg::RVectorType_SThreat::SetCount)
+     *
+     * What it does:
+     * Resizes the reflected `vector<SThreat>` to `count`, filling any appended
+     * cells with a zeroed `SThreat` (0x00719820 -> `ResizeSThreatVectorWithZeroFill`).
+     */
+    void SetCount(void* obj, int count) const override;
   };
+  static_assert(sizeof(RVectorType_SThreat) == 0x68, "RVectorType_SThreat size must be 0x68");
 } // namespace gpg
 
 namespace
@@ -2557,6 +2599,43 @@ void gpg::RMapType_uint_InfluenceMapEntry::Init()
 }
 
 /**
+ * Address: 0x0071D9E0 (FUN_0071D9E0, preregister_RVectorType_InfluenceGrid)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `std::vector<moho::InfluenceGrid>`.
+ * The binary also installs the `gpg::RIndexed` subobject vtable
+ * (`dword_1106A6C`) at this address; the `static gpg::RVectorType_InfluenceGrid
+ * typeInfo` global's own (compiler-generated) constructor reproduces that
+ * side effect, since the class inherits both `gpg::RType` and `gpg::RIndexed`.
+ * Reached from `sub_BDA840` (`.CRT$XCL`/`__xc_a` static-init table), matching
+ * the `preregister_RMapType_uint_InfluenceMapEntry` reachability shape above.
+ */
+[[nodiscard]] gpg::RType* preregister_RVectorType_InfluenceGrid()
+{
+  static gpg::RVectorType_InfluenceGrid typeInfo;
+  gpg::PreRegisterRType(typeid(InfluenceGridVector), &typeInfo);
+  return &typeInfo;
+}
+
+/**
+ * Address: 0x0071DAB0 (FUN_0071DAB0, preregister_RVectorType_SThreat)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `std::vector<moho::SThreat>`. The
+ * binary also installs the `gpg::RIndexed` subobject vtable (`dword_1106A04`)
+ * at this address; the `static gpg::RVectorType_SThreat typeInfo` global's own
+ * (compiler-generated) constructor reproduces that side effect, the same
+ * simplification as `preregister_RVectorType_InfluenceGrid` above. Reached
+ * from `sub_BDA880` (`.CRT$XCL`/`__xc_a` static-init table).
+ */
+[[nodiscard]] gpg::RType* preregister_RVectorType_SThreat()
+{
+  static gpg::RVectorType_SThreat typeInfo;
+  gpg::PreRegisterRType(typeid(SThreatVector), &typeInfo);
+  return &typeInfo;
+}
+
+/**
  * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
  *
  * What it does:
@@ -2730,6 +2809,94 @@ void gpg::RVectorType_SThreat::Init()
   version_ = 1;
   serLoadFunc_ = &LoadSThreatVectorArchive;
   serSaveFunc_ = &SaveSThreatVectorArchive;
+}
+
+/**
+ * Address: 0x007192A0 (FUN_007192A0, gpg::RVectorType_SThreat::IsIndexed)
+ *
+ * IDA signature:
+ * gpg::RIndexed *__thiscall gpg::RVectorType_SThreat::IsIndexed(
+ *     gpg::RVectorType_SThreat *this);
+ *
+ * What it does:
+ * Returns the `gpg::RIndexed` subobject at `this + 0x64`.
+ */
+const gpg::RIndexed* gpg::RVectorType_SThreat::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x00719300 (FUN_00719300, gpg::RVectorType_SThreat::SubscriptIndex)
+ * VFTable SLOT: gpg::RIndexed +0x00 (??_7?$RVectorType@USThreat@Moho@@@gpg@@6BRIndexed@gpg@@@ @ 0x00E31890)
+ *
+ * IDA signature:
+ * gpg::RRef *__userpurge gpg::RVectorType_SThreat::SubscriptIndex(
+ *     gpg::RRef *result, void *obj, int ind);
+ *
+ * What it does:
+ * Forms `&vec[ind]` as `first + ind * 0x38` and wraps it as one
+ * `gpg::RRef_SThreat` reference, returned by value.
+ */
+gpg::RRef gpg::RVectorType_SThreat::SubscriptIndex(void* const obj, const int ind) const
+{
+  auto* const storage = static_cast<SThreatVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(ind >= 0);
+  GPG_ASSERT(storage != nullptr && static_cast<std::size_t>(ind) < storage->size());
+
+  gpg::RRef out{};
+  if (!storage || ind < 0) {
+    (void)gpg::RRef_SThreat(&out, nullptr);
+    return out;
+  }
+
+  (void)gpg::RRef_SThreat(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  return out;
+}
+
+/**
+ * Address: 0x007192B0 (FUN_007192B0, gpg::RVectorType_SThreat::GetCount)
+ * VFTable SLOT: gpg::RIndexed +0x04 (0x00E31894)
+ *
+ * IDA signature:
+ * unsigned int __userpurge gpg::RVectorType_SThreat::GetCount(void *obj);
+ *
+ * What it does:
+ * Returns `(last - first) / 0x38`, short-circuiting to 0 when the lane has no
+ * storage.
+ */
+std::size_t gpg::RVectorType_SThreat::GetCount(void* const obj) const
+{
+  if (!obj) {
+    return 0u;
+  }
+
+  return static_cast<const SThreatVector*>(obj)->size();
+}
+
+/**
+ * Address: 0x007192E0 (FUN_007192E0, gpg::RVectorType_SThreat::SetCount)
+ * VFTable SLOT: gpg::RIndexed +0x08 (0x00E31898)
+ *
+ * IDA signature:
+ * void __userpurge gpg::RVectorType_SThreat::SetCount(void *obj, int count);
+ *
+ * What it does:
+ * Tail-calls 0x00719820 (`ResizeSThreatVectorWithZeroFill`), which resizes
+ * the reflected `vector<SThreat>` to `count`, filling any appended cells with
+ * a zero-initialized `SThreat`.
+ */
+void gpg::RVectorType_SThreat::SetCount(void* const obj, const int count) const
+{
+  auto* const storage = static_cast<SThreatVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(count >= 0);
+  if (!storage || count < 0) {
+    return;
+  }
+
+  (void)ResizeSThreatVectorWithZeroFill(*storage, static_cast<std::size_t>(count));
 }
 
 namespace moho
@@ -5355,3 +5522,5 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_RMapType_uint_int_9e247f, preregister_RMapType_uint_int)
 GPG_PREREGISTER_INIT(preregister_RMapType_uint_InfluenceMapEntry_9e247f, preregister_RMapType_uint_InfluenceMapEntry)
+GPG_PREREGISTER_INIT(preregister_RVectorType_InfluenceGrid_9e247f, preregister_RVectorType_InfluenceGrid)
+GPG_PREREGISTER_INIT(preregister_RVectorType_SThreat_9e247f, preregister_RVectorType_SThreat)
