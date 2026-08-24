@@ -117,6 +117,24 @@ constexpr std::int32_t wxEVT_LEAVE_WINDOW = 1011;
 constexpr std::int32_t wxEVT_COMMAND_MENU_SELECTED = 2000;
 const wxSize wxDefaultSize{-1, -1};
 
+/**
+ * wx's default-position sentinel, the data global at 0x00F33E00: (-1, -1),
+ * not the origin. `MSWGetCreateWindowCoords` keys off that -1 to pass
+ * `CW_USEDEFAULT` to `CreateWindowEx`, so the distinction is not cosmetic.
+ * Several call sites in this file previously kept their own local
+ * `constexpr wxPoint{-1, -1}` mirror of this value because no real global
+ * existed yet to reference (e.g. `WD3DViewport`'s constructor, which forwards
+ * this sentinel to `wxWindow::wxWindow` regardless of any caller-side
+ * position argument, per `FUN_00430980`/0x004309EB).
+ *
+ * `extern` is required, not stylistic: a `const` at namespace scope has
+ * internal linkage by default in C++, so without it this global would never
+ * become visible to WEmitterWx.cpp's `extern const wxPoint wxDefaultPosition;`
+ * -- exactly the failure mode this fix hit before adding it (the symbol
+ * compiled fine and simply never appeared in this TU's object file at all).
+ */
+extern const wxPoint wxDefaultPosition{-1, -1};
+
 namespace
 {
   class WxHttpProxyRuntime

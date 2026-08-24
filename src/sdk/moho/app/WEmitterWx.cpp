@@ -24,14 +24,23 @@
  */
 extern const std::int32_t wxEVT_COMMAND_BUTTON_CLICKED;
 
+class wxPen;
+
 /**
  * wx's stock red pen, read from the library global at 0x00F8F634 by
  * FUN_00661B90 (`mov eax, wxRED_PEN`).
+ *
+ * Declared with the real wx type (`gdicmn.h`: `extern wxPen* wxRED_PEN;`),
+ * not `void*`: MSVC encodes a global's declared type into its mangled name,
+ * so a `void*`-typed extern here can never match the vendored library's
+ * `wxPen*`-typed export. `wxPen` only needs a forward declaration -- every
+ * use in this file passes the pointer on opaquely (`mSetPen`'s `const void*`
+ * parameter).
  */
-extern void* const wxRED_PEN;
+extern wxPen* wxRED_PEN;
 
 /** wx's stock cyan pen, used to highlight the selected curve key. */
-extern void* const wxCYAN_PEN;
+extern wxPen* wxCYAN_PEN;
 
 // Mouse-button event types, read from the wx library globals by FUN_00661820
 // (`cmp edx, wxEVT_LEFT_DOWN` / `cmp eax, wxEVT_MIDDLE_DOWN`). They are
@@ -46,8 +55,14 @@ extern void* const wxCYAN_PEN;
  * Recovered in `moho/sim/SimRecoveryRuntime.cpp`. The curve panel's field sink
  * calls it on the committed `wxCommandEvent` text; a failed parse leaves the
  * caller's seed value untouched.
+ *
+ * The top-level `const` on both pointer parameters must match the real
+ * definition exactly: MSVC encodes a by-value pointer parameter's top-level
+ * const into the mangled name, so dropping it here compiles fine but mangles
+ * to a symbol the linker can never match against SimRecoveryRuntime.cpp's
+ * `const wchar_t** const, double* const` definition.
  */
-bool ParseWideDoubleStrictRuntime(const wchar_t** sourceText, double* outValue);
+bool ParseWideDoubleStrictRuntime(const wchar_t** const sourceText, double* const outValue);
 
 /**
  * Address: 0x009B1460 (FUN_009B1460, wxFileDialog::wxFileDialog)
@@ -55,20 +70,34 @@ bool ParseWideDoubleStrictRuntime(const wchar_t** sourceText, double* outValue);
  * wxWidgets-2.4.2 library constructor (classified `external_dependency`). The
  * emitter frame allocates 0x1A0 bytes and runs it with
  * `(parent, title, defaultDir, defaultFile, wildcard, style, position)`.
+ *
+ * Recovered (as engine-side placement-construction glue, not a real wx DLL
+ * import) in `moho/app/WxRuntimeTypes.cpp`; every parameter there is
+ * top-level `const`, which this forward declaration must match exactly for
+ * the same MSVC by-value-pointer-parameter mangling reason documented on
+ * `ParseWideDoubleStrictRuntime` above.
  */
 void* ConstructWxFileDialog(
-  void* storage,
-  void* parentFrame,
-  const wxStringRuntime* title,
-  const wxStringRuntime* defaultDirectory,
-  const wxStringRuntime* defaultFile,
-  const wxStringRuntime* wildcard,
-  std::int32_t style,
-  const void* position
+  void* const storage,
+  void* const parentFrame,
+  const wxStringRuntime* const title,
+  const wxStringRuntime* const defaultDirectory,
+  const wxStringRuntime* const defaultFile,
+  const wxStringRuntime* const wildcard,
+  const std::int32_t style,
+  const void* const position
 );
 
-/** wx's default window position sentinel, passed to every dialog here. */
-extern const void* const wxDefaultPosition;
+class wxPoint;
+
+/**
+ * wx's default window position sentinel, passed to every dialog here.
+ * Declared with the real wx type (`gdicmn.h`: `extern const wxPoint
+ * wxDefaultPosition;`), a value not a pointer -- `wxPoint` only needs a
+ * forward declaration since every use here takes this symbol's address
+ * opaquely rather than accessing its members.
+ */
+extern const wxPoint wxDefaultPosition;
 
 namespace
 {
