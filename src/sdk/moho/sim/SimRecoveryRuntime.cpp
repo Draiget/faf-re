@@ -3461,6 +3461,31 @@ std::uint32_t ResizeReconBlipPointerVectorRuntime(
 }
 
 /**
+ * Address: 0x006DEB10 (FUN_006DEB10)
+ *
+ * IDA signature:
+ * void __usercall sub_6DEB10(void *dst@<eax>, const void *source@<esi>, uint count@<edx>);
+ *
+ * What it does:
+ * Broadcast-fills `count` copies of one 12-byte lane at `dst`, advancing by
+ * 0xC per slot. `lane0` is copied verbatim from `source`; when non-null it is
+ * treated as the address of an intrusive list head slot: the slot's current
+ * value is captured into the new copy's `lane1` ("next"), then the slot is
+ * overwritten with the new copy's own address (classic `push_front`-style
+ * intrusive-list insert). When `source->lane0` is null, `lane1` is zeroed
+ * instead. `lane2` is a plain verbatim field copy. Called with count=1 from
+ * the function below (0x006DB1B0) and from 0x006DBE81.
+ *
+ * Known divergence: the callers' capacity-available fast paths dispatch
+ * through this link-aware fill, but their existing recovered bodies below
+ * call the generic `AppendTrivialValue` helper instead, which elides the
+ * link side effect (it treats the 12-byte element as plain-copy trivial).
+ * Not reworked in this pass: the element type is shared by several unrelated
+ * 12-byte lane kinds in this file, so retyping it needs its own dedicated
+ * pass rather than a narrow fix here.
+ */
+
+/**
  * Address: 0x006DB150 (FUN_006DB150)
  *
  * What it does:
