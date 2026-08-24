@@ -8,18 +8,18 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`96.54%`**
+- Progress coverage:  **`96.55%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,844`*
+  - *Total amount of completed tokens: `64,850`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,715` (81.30%)
-- `skip`: `6,641` (10.24%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `52,715` (81.29%)
+- `skip`: `6,647` (10.25%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,488` (8.46%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `407` (0.61%)
-- `in_progress`: `127` (0.19%)
+- `in_progress`: `121` (0.18%)
 - **`blocked`: `1,860` (2.77%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,267`*
