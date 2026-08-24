@@ -99,6 +99,23 @@ namespace moho
     {
       mStr.tidy(true, 0U);
     }
+
+    /**
+     * Address: 0x007BE4B0 (FUN_007BE4B0)
+     *
+     * What it does:
+     * Copy-assigns scalar `mType`/`mNum` fields and rebuilds the string
+     * payload from source text via `reset_and_assign` (tidy-then-copy,
+     * rather than `msvc8::string::operator=`'s self-assignment-safe
+     * copy/swap path).
+     */
+    SNetCommandArg& operator=(const SNetCommandArg& source)
+    {
+      mType = source.mType;
+      mNum = source.mNum;
+      mStr.reset_and_assign(source.mStr);
+      return *this;
+    }
   };
   static_assert(sizeof(SNetCommandArg) == 0x24, "SNetCommandArg size must be 0x24");
 

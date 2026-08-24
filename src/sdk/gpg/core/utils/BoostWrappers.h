@@ -254,6 +254,10 @@ namespace boost
          * Address: 0x0053A9A0 (FUN_0053A9A0, another ICF-shape twin,
          * branch-for-branch identical. Reached from 8 real call sites in
          * CAnimationManipulator.cpp's manipulator teardown paths.)
+         * Address: 0x007B8DE0 (FUN_007B8DE0, another ICF-shape twin,
+         * branch-for-branch identical -- 31 total twins for this body,
+         * canonical=FUN_004260B0. Reached from
+         * Moho::CGpgNetInterface::SendNatPacket (0x007B8BC0).)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
