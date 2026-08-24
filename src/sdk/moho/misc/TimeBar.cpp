@@ -159,6 +159,15 @@ namespace moho
 
     /**
      * Address: 0x004E96A0 (FUN_004E96A0)
+     * Address: 0x004E9650 (FUN_004E9650, this map's `_Tree::_Inc` successor
+     * computation -- isNil@+0x15, the same recurse-right-then-climb-parent
+     * shape as this project's other `rb_increment` instantiations. Called
+     * from FUN_004E96A0 to find the erased node's replacement/successor
+     * before splicing it out.)
+     * Address: 0x004E94F0 (FUN_004E94F0, this map's node splice/rebalance
+     * half of `_Tree::erase(iterator)` -- unlinks the node from its
+     * parent/left/right links and fixes the head sentinel's begin/end
+     * lanes. Called from FUN_004E96A0.)
      *
      * What it does:
      * `_Erase` helper for one iterator into the time-bar track-name map's
@@ -168,7 +177,11 @@ namespace moho
      * storage. Mirrors the MSVC8 `std::_Tree<...>::erase(iterator)` emission
      * for `std::map<const char*, TimeBarTrackLayout,
      * CaseInsensitiveCStringLess>`. The recovered modern equivalent is the
-     * typed `erase` single-iterator overload.
+     * typed `erase` single-iterator overload -- FUN_004E9650/FUN_004E94F0
+     * are internal `_Tree::erase` sub-steps that `std::map::erase(pos)`'s
+     * own implementation already reproduces behaviorally, so neither needs
+     * its own hand-written body (this map is deliberately real `std::map`,
+     * not `msvc8::map` -- see the `using TimeBarTrackMap` declaration above).
      */
     TimeBarTrackMap::iterator EraseSingleTimeBarTrackMap(
       TimeBarTrackMap& tracks,
