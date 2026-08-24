@@ -1605,6 +1605,20 @@ namespace msvc8
              * `FUN_00685750`, cited on `msvc8::map::operator[]` in Map.h --
              * `find2` is this instantiation's `operator[]`: lower-bound then
              * conditional hinted insert).)
+             * Address: 0x007B2DF0 (FUN_007B2DF0, sub_7B2DF0) -- `msvc8::map<
+             * std::uint32_t, msvc8::set<std::uint32_t>>::insert_hint` for
+             * `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map (isNil@0x1D,
+             * the same outer-map instantiation cited on `operator[]` in
+             * `Map.h` for `FUN_007B27D0`). Matches this member's full branch
+             * structure: empty/leftmost/rightmost checks, predecessor/
+             * successor straddle checks, falls through to `insert_at`
+             * (`sub_7B2B30`, cited on `insert_unique` above) with the
+             * decided `addLeft`, fallback to `insert_unique` taking its
+             * `.first`. Called from `operator[]`'s miss path (`FUN_007B27D0`)
+             * with the just-descended `hint` and a freshly-built
+             * `value_type(parentPtr, mapped_type())` temporary -- exactly
+             * this member's documented role. `Moho::CON_ANI_DumpSkeleton`
+             * itself (CAniSkel.cpp) is not yet recovered.)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
