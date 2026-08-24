@@ -2812,6 +2812,13 @@ namespace moho
     }
 
     // --- Phase 3: distance-sort candidates and assign dock commands. ---
+    // Address: 0x0084A890 (FUN_0084A890) is this std::sort's own introsort
+    // partition/insertion-sort internals for the 12-byte DockCandidate
+    // element (confirmed: `(last-first)/12` element-count divisor, the
+    // <=32-element insertion-sort threshold, tail-calling the by-distSq
+    // comparator at 0x0084B3F0) -- MSVC8 STL-internal code the compiler
+    // emits for this call, not engine logic; the call below already
+    // reproduces it via the real, linked <algorithm> std::sort.
     std::sort(candidates.begin(), candidates.end(), [](const DockCandidate& a, const DockCandidate& b) {
       return a.distSq < b.distSq;
     });
@@ -2842,6 +2849,11 @@ namespace moho
         }
 
         // Order the chosen platforms by ascending free capacity, then distance.
+        // Address: 0x0084A9D0 (FUN_0084A9D0) is this std::sort's own
+        // introsort internals for the same 12-byte DockCandidate element,
+        // same shape as 0x0084A890 above but tail-calling the by-capacity-
+        // then-distance comparator at 0x0084B7E0 -- same MSVC8 STL-internal
+        // provenance, already reproduced by the real std::sort call below.
         std::sort(
           nearbyPlatforms.begin(),
           nearbyPlatforms.end(),
