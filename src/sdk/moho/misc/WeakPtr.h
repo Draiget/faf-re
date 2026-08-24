@@ -918,6 +918,9 @@ namespace moho
    * Address: 0x006EBC10 (FUN_006EBC10)
    * Address: 0x006EC950 (FUN_006EC950)
    * Address: 0x006ED260 (FUN_006ED260)
+   * Address: 0x008B7DA0 (FUN_008B7DA0, sibling emission for the
+   * `UserCommandQueueEntry` instantiation -- reached from
+   * `CopyQueueLinkRangeWithOwnerRelink` in UserUnit.cpp)
    *
    * What it does:
    * Copies one contiguous weak-link range `[sourceBegin, sourceEnd)` into
