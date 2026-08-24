@@ -90,6 +90,18 @@ namespace moho
      * Address: 0x0057DF30 (FUN_0057DF30) for the `TSimConVar<int>` instantiation -
      * not explicitly specialized like `<bool>`/`<float>` below, so this generic
      * body is what the compiler actually emits for `int`.
+     * Address: 0x00735400 (FUN_00735400, `TSimConVar<std::uint8_t>::CreateInstance`
+     * -- same generic shape: `operator new(0xC)`, copies `mName` (`this+4`) and
+     * the byte `mDefaultValue` (`this+0x10`) into the new instance's `+0x08`
+     * `mValue` lane. Real vtable-construction evidence via `??_7?$TSimConVar@E@
+     * Moho@@6B@+0x8` (`E` is IDA's demangled shorthand for `unsigned char`
+     * here, not a real enum).)
+     * Address: 0x00735A30 (FUN_00735A30, `TSimConVar<msvc8::string>::CreateInstance`
+     * -- same generic shape, but `mValue = mDefaultValue` compiles to
+     * `msvc8::string`'s real assignment (SSO-reset the new instance's `mValue`
+     * then `assign()` from `mDefaultValue`) instead of a raw byte copy, since
+     * `operator=` is non-trivial for this `T`. Reached from
+     * `TSimConVar<msvc8::string>`'s own constructor (FUN_007354E0).)
      */
     CSimConVarInstanceBase* CreateInstance() override
     {
