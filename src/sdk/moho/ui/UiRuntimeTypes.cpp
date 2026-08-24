@@ -9618,6 +9618,27 @@ void moho::UICommandDragger::DragRelease(const moho::SMauiEventData* const event
   delete this;
 }
 
+/**
+ * Address: 0x00824290 (FUN_00824290, slot +0x0C of ??_7UICommandDragger@Moho@@6B@)
+ * Mangled: ?OnCurrentDraggerReplaced@UICommandDragger@Moho@@UAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::UICommandDragger::OnCurrentDraggerReplaced(
+ *     Moho::UICommandDragger *this@<ecx>);
+ *
+ * What it does:
+ * Drops the drag preview this dragger's command left on its `mMapAB0` draw
+ * node - `Moho::ReanchorCommandGraphDrawNode` (0x0082A030) re-anchors that
+ * node to the command's own real position, resets its weight to a single
+ * contributor and clears its resolved-position flag - then deletes this
+ * dragger, the inherited `IMauiDragger` `delete this` shape (slot +0x00).
+ */
+void moho::UICommandDragger::OnCurrentDraggerReplaced()
+{
+  moho::ReanchorCommandGraphDrawNode(*mGraph.px, mCommandId);
+  delete this;
+}
+
 namespace
 {
   constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);

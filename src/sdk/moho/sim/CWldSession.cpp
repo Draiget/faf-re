@@ -1344,6 +1344,13 @@ namespace moho
     );
 
     /**
+     * `sub_82A030` (`UICommandDragger::OnCurrentDraggerReplaced`'s worker in
+     * UiRuntimeTypes.cpp) needs `mSession` and `mMapAB0` for the same reason
+     * `ProcessCommandDrag` does.
+     */
+    friend void ReanchorCommandGraphDrawNode(UICommandGraph& graph, CmdId cmdId);
+
+    /**
      * Address: 0x00824810 (FUN_00824810, ??0UICommandGraph@Moho@@QAE@@Z)
      *
      * What it does:
@@ -12426,6 +12433,58 @@ namespace moho
       reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
     );
     return out;
+  }
+
+  /**
+   * Address: 0x0082A030 (FUN_0082A030, sub_82A030)
+   *
+   * IDA signature:
+   * void __userpurge sub_82A030(Moho::UICommandGraph *graph@<eax>, unsigned int a2);
+   *
+   * What it does:
+   * Looks the dragged command up in the session's command manager; a command
+   * with no live helper (already retired) is left alone. `mMapAB0` keys its
+   * draw nodes by the helper's own pointer identity, not the command id
+   * (0x0082A039/0x0082A051, the same convention `ProcessCommandDrag` uses) -
+   * a node only exists here if the drag actually moved the mouse at least
+   * once, so a helper with no existing node is also left alone
+   * (0x0082A085..0x0082A0AE: an inlined equal-range walk over
+   * `EqualRangeHashListNode88`'s `[first,last)`, exactly what
+   * `CountHashListNode88` already does). Otherwise finds that node
+   * (0x0082A0BD, `FindOrInsertCommandGraphDrawNode`) and snaps it back to a
+   * single-contributor anchor at the command's own real position
+   * (0x0082A0D2, `ResolveCommandIssueHelperAnchorPosition`), replacing
+   * `mPositionSum`, forcing `mWeight` back to `1.0f`, and clearing
+   * `mHasResolvedPosition` so the next per-tick rebuild recomputes the node
+   * from real queue data rather than leaving the drag preview position
+   * sitting there. This is "drop the dragged command's highlight": the
+   * only thing `OnCurrentDraggerReplaced` (0x00824290) does before
+   * `delete this`.
+   */
+  void ReanchorCommandGraphDrawNode(UICommandGraph& graph, const CmdId cmdId)
+  {
+    CommandManager* const commandManager = graph.mSession->mCommandManager;
+
+    UserCommandIssueHelper* helper = nullptr;
+    if (const auto found = commandManager->mCommands.find(cmdId); found != commandManager->mCommands.end()) {
+      helper = found->second;
+    }
+    if (helper == nullptr) {
+      return;
+    }
+
+    // Same keying convention as ProcessCommandDrag's own note: mMapAB0's
+    // draw-node hash is keyed by the helper's own pointer identity.
+    const auto drawNodeKey = reinterpret_cast<std::uint32_t>(helper);
+
+    if (UICommandGraph::CountHashListNode88(graph.mMapAB0, drawNodeKey) != 0) {
+      UICommandGraph::UICommandGraphDrawNode* const drawNode =
+        UICommandGraph::FindOrInsertCommandGraphDrawNode(drawNodeKey, graph.mMapAB0);
+
+      drawNode->mPositionSum = ResolveCommandIssueHelperAnchorPosition(*helper);
+      drawNode->mWeight = 1.0f;
+      drawNode->mHasResolvedPosition = 0u;
+    }
   }
 
   std::uint32_t EvaluateBuildTemplatePlacementPreview(

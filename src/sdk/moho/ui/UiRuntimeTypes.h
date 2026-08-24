@@ -1183,6 +1183,26 @@ namespace moho
      */
     void DragRelease(const SMauiEventData* eventData) override;
 
+    /**
+     * Address: 0x00824290 (FUN_00824290, slot +0x0C of ??_7UICommandDragger@Moho@@6B@)
+     * Mangled: ?OnCurrentDraggerReplaced@UICommandDragger@Moho@@UAEXXZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::UICommandDragger::OnCurrentDraggerReplaced(
+     *     Moho::UICommandDragger *this@<ecx>);
+     *
+     * What it does:
+     * Unlike the sibling `UIBuildDragger::OnCurrentDraggerReplaced` (a bare
+     * `delete this`), this override does real work first: it reads
+     * `mCommandId`/`mGraph` (0x00824293/0x00824297) and calls
+     * `Moho::ReanchorCommandGraphDrawNode` (0x0082A030, CWldSession.h/.cpp) to
+     * drop the drag preview the abandoned drag left on the command's
+     * `mMapAB0` draw node - re-anchoring it to the command's own real
+     * position - before deleting this dragger (the inherited `IMauiDragger`
+     * `delete this` shape, slot +0x00).
+     */
+    void OnCurrentDraggerReplaced() override;
+
   public:
     // +0x00 vptr and +0x04 WeakObject::weakLinkHead_ both belong to the
     // IMauiDragger base; this class's own storage starts at +0x08.
