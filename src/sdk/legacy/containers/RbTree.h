@@ -388,6 +388,16 @@ namespace msvc8
          * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`/
          * `FUN_007B4570`/`FUN_007B4500` adapters above. Same DB-integrity
          * provenance as `FUN_007B4BD0`.)
+         * Address: 0x0052EE50 (FUN_0052EE50, sub_52EE50) -- another
+         * `_Node**` out-parameter-slot instantiation of this member, isNil
+         * at `[node+0x11]`, same recurse-right-then-climb-parent shape and
+         * same "on `isNil(n)` return without touching `*slot`" no-op path
+         * as `FUN_007B2D40` above. Distinct address range from that
+         * instantiation's family (0x0052xxxx vs 0x007Bxxxx) -- a separate
+         * class sharing the same isNil@0x11 4-byte-value shape, not a
+         * sibling emission of it. Three real callers (`FUN_0052D730`,
+         * `FUN_0052F0A0`, `FUN_00530DC4`); owning field/class not yet
+         * pinned down.
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
