@@ -1024,6 +1024,45 @@ namespace msvc8
              * range and both point at `StateCache`-shaped trees, but nothing
              * in this pass proves that beyond adjacency.)
              */
+            /**
+             * Address: 0x006FD8B0 (FUN_006FD8B0) -- `Moho::CArmyStats::mNameIndex`'s
+             * own `~rb_tree()` for `msvc8::map<msvc8::string, CArmyStatItem*>`
+             * (isNil@+0x2D, 0x20-byte value_type, 0x30-byte node -- matches
+             * `moho::ArmyNameIndexNode` in `CArmyStats.h` exactly): `erase_range(
+             * leftmost(), header())` via `sub_702A70` (cited below), `operator
+             * delete(head)`, then zero `head`/`size` -- this member's body
+             * instruction for instruction. Its only caller is
+             * `Moho::CArmyStats::CArmyStats` (0x006FD7C0, confirmed by that
+             * address's own decompiled body: `Moho::CArmyStats *__stdcall
+             * Moho::CArmyStats::CArmyStats(...)`) -- specifically that
+             * constructor's exception-unwind funclet, not its normal body (the
+             * normal path never reaches a member destructor). `~CArmyStats`
+             * itself (0x00704A40, confirmed the same way) does NOT call this
+             * symbol: its own decompiled body inlines `mNameIndex`'s
+             * `erase_range`-then-`delete`-then-zero sequence directly --
+             * `sub_702A70((int)v2, (int)a2->mStats._Myhead->_Left, (int)
+             * a2->mStats._Myhead)` followed by `operator delete(a2->mStats.
+             * _Myhead)` and the zeroing -- rather than calling out to a
+             * separate `~rb_tree()` symbol. `CArmyStats.cpp`'s destructor
+             * previously called an invented `DestroyNameIndexTree()` helper
+             * with no real address behind it (no source line maps to it: this
+             * member's automatic destruction in the destructor's compiler-
+             * generated epilogue, cited here and on `erase_range` below, is
+             * the entire real emission); that call has been removed in favour
+             * of letting `mNameIndex`'s real destructor run implicitly, as
+             * the binary does.
+             * Address: 0x00701570 (FUN_00701570) -- byte-for-byte identical to
+             * 0x006FD8B0 above (same `sub_702A70` call, same tail), zero
+             * incoming references anywhere in the binary (`.xrefs.txt` empty,
+             * `_callgraph_index.sqlite` `call_edges`/`incoming_xrefs` have no
+             * rows), per the same "recovered as an additional zero-xref
+             * instantiation" precedent used throughout this file (e.g.
+             * 0x00947E00/0x00947E90/0x00947F20 above).
+             * Address: 0x00702060 (FUN_00702060) -- a fourth `erase_range`
+             * caller (cited below) of the same address-neighbourhood and
+             * calling shape per the callgraph index; not independently
+             * exported/decompiled in this namespace pass.
+             */
             ~rb_tree()
             {
                 erase_range(leftmost(), header());
@@ -1647,11 +1686,29 @@ namespace msvc8
             /**
              * Address: 0x00703700 (FUN_00703700, the name-index map's erase with
              * rebalance -- the densest colour/nil traffic in the family, rewriting
-             * `[node+0x2C]`/`[node+0x2D]` across every rebalance branch)
-             * Address: 0x006FD7C0 (FUN_006FD7C0, the erase-and-advance wrapper that
-             * `CArmyStats::Delete`'s erase-while-iterating loop drives)
-             * Address: 0x00704A40 (FUN_00704A40, the same lane reached from
-             * `~CArmyStats`)
+             * `[node+0x2C]`/`[node+0x2D]` across every rebalance branch). Two real
+             * callers, confirmed via the callgraph index and each address's own
+             * decompiled body:
+             *   - 0x00702A70, inside this tree's `erase_range` (cited above) --
+             *     its per-node walk path erases one node and advances via this
+             *     member;
+             *   - 0x0070B980, inside `Moho::CArmyStats::Delete` (`CArmyStats
+             *     vtable slot 0`, cited on that method in `CArmyStats.cpp`) --
+             *     its `for (auto it = mNameIndex.begin(); ...) it =
+             *     mNameIndex.erase(it);` walk calls this member directly through
+             *     `msvc8::map::erase(iterator)`.
+             * DB-integrity fix: this paragraph previously also attributed
+             * 0x006FD7C0 and 0x00704A40 to this member ("the erase-and-advance
+             * wrapper that CArmyStats::Delete's loop drives" / "the same lane
+             * reached from ~CArmyStats"). Both were wrong -- 0x006FD7C0 is
+             * confirmed by its own decompiled signature to be
+             * `Moho::CArmyStats::CArmyStats(CArmyStats*, CAiBrain*)`, the
+             * constructor, not a helper `Delete` calls; and 0x00704A40's own
+             * decompiled body (confirmed `Moho::CArmyStats::~CArmyStats`) never
+             * calls this member at all -- it inlines `mNameIndex`'s whole-tree
+             * `erase_range` directly (cited on `erase_range`/`~rb_tree` above),
+             * which is a different member of this same class entirely. Neither
+             * claim survived checking the primary decompiled evidence.
              */
             /**
              * Address: 0x00A633D0 (FUN_00A633D0, `std::set<HullTriangle3<float>*>::
@@ -2084,6 +2141,30 @@ namespace msvc8
              *     other body in this address range, per the callgraph
              *     index's `reachable` table), not pinned down further in
              *     this pass.
+             */
+            /**
+             * Address: 0x00702A70 (FUN_00702A70) -- `Moho::CArmyStats::
+             * mNameIndex`'s own `erase_range` for `msvc8::map<msvc8::string,
+             * CArmyStatItem*>` (isNil@+0x2D, 0x20-byte value_type, 0x30-byte
+             * node -- `moho::ArmyNameIndexNode` in `CArmyStats.h`). Four real
+             * callers, all confirmed via the callgraph index:
+             *   - 0x006FD8B0/0x00701570 -- two `~rb_tree()` emissions for this
+             *     tree, cited on `~rb_tree()` above (one reached from
+             *     `CArmyStats::CArmyStats`'s exception-unwind funclet, one a
+             *     zero-incoming-reference duplicate);
+             *   - 0x00702060 -- not independently exported in this pass;
+             *   - 0x00704A40, inside `Moho::CArmyStats::~CArmyStats` itself --
+             *     confirmed by that address's own decompiled body, which calls
+             *     this member directly and inline rather than through a named
+             *     wrapper: `sub_702A70((int)v2, (int)a2->mStats._Myhead->
+             *     _Left, (int)a2->mStats._Myhead)` followed by `operator
+             *     delete(a2->mStats._Myhead)` and zeroing `_Myhead`/`_Mysize`
+             *     -- this member's whole-tree fast path, instruction for
+             *     instruction. `~CArmyStats`'s recovered source previously
+             *     called an invented `DestroyNameIndexTree()` for this; no
+             *     such symbol exists anywhere in the binary; `mNameIndex`'s
+             *     automatic member destruction (which reaches this member
+             *     implicitly) is the entire real emission.
              */
             /**
              * Address: 0x00947D10 (FUN_00947D10, sub_947D10) -- `gpg::gal::

@@ -35,7 +35,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SConditionTriggerTypes.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -149,18 +149,6 @@ namespace
     }
 
     return static_cast<moho::CArmyStatItem*>(parent->FindDirectChildByName(token));
-  }
-
-  template <typename TNode>
-  void DestroyNilTree(TNode* node, const std::uint8_t TNode::* nilField)
-  {
-    if (node == nullptr || node->*nilField != 0u) {
-      return;
-    }
-
-    DestroyNilTree(node->left, nilField);
-    DestroyNilTree(node->right, nilField);
-    delete node;
   }
 
   void AppendMsvcString(std::string& out, const msvc8::string& text)
@@ -415,25 +403,6 @@ namespace
   [[nodiscard]] const ArmyTriggerListRuntime* TriggerListRuntimeView(const moho::CArmyStats* const object)
   {
     return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mAuxProxy);
-  }
-
-  /**
-   * Address: 0x00701570 (FUN_00701570)
-   *
-   * What it does:
-   * Clears one name-index tree payload, frees the map-header sentinel node,
-   * and zeros `{head,size}` lanes.
-   */
-  [[maybe_unused]] int ReleaseArmyNameIndexStorage(ArmyNameIndexMapRuntime& nameIndexRuntime) noexcept
-  {
-    if (nameIndexRuntime.head != nullptr) {
-      DestroyNilTree(nameIndexRuntime.head->parent, &moho::ArmyNameIndexNode::isNil);
-      delete nameIndexRuntime.head;
-    }
-
-    nameIndexRuntime.head = nullptr;
-    nameIndexRuntime.size = 0u;
-    return 0;
   }
 
   /**
@@ -852,10 +821,21 @@ namespace moho
 
   /**
    * Address: 0x00704A40 (FUN_00704A40, CArmyStats destructor)
+   *
+   * What it does:
+   * Explicitly tears down the trigger list, then returns; `mNameIndex` (a real
+   * `msvc8::map<msvc8::string, CArmyStatItem*>`) and the `Stats<CArmyStatItem>`
+   * base class are destroyed automatically by the compiler-generated epilogue
+   * that follows. The binary's own body confirms this directly: it inlines
+   * `mNameIndex`'s `erase_range`-then-`delete`-then-zero sequence in place
+   * (cited on `msvc8::rb_tree::erase_range`/`~rb_tree` in RbTree.h) rather than
+   * calling out to any separate "destroy the name index" symbol, then tail-calls
+   * `Stats<CArmyStatItem>::~Stats()` (0x006FD850). No such symbol as a
+   * standalone `DestroyNameIndexTree` exists anywhere in this binary; an
+   * earlier pass invented one with no address behind it.
    */
   CArmyStats::~CArmyStats()
   {
-    DestroyNameIndexTree();
     DestroyAuxList();
   }
 
