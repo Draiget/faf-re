@@ -1293,6 +1293,18 @@ namespace moho
       ::new (static_cast<void*>(&binding.mPendingBlueprintOrdinals)) msvc8::set<std::uint32_t>();
     }
 
+    /**
+     * Address: 0x0052BEE0 (FUN_0052BEE0, the per-slot shift-assign step of
+     * this method's loop -- `sub_536DA0`/`sub_536DF0` are two calls into the
+     * shared `erase_range` (FUN_0052D9C0, RbTree.h) tearing down the
+     * destination slot's old `mPendingBlueprintOrdinals` tree before the
+     * source slot's tree is deep-cloned in over it, matching
+     * `RRuleGameRulesLuaExportBinding::operator=`'s divergence class already
+     * documented on `FUN_00537420` in Vector.h. `*(a2+8) -= 16` decrements
+     * the owning vector's `end` by one 16-byte element after the shift
+     * loop completes. The loop below already reproduces this exactly via
+     * `*it = *(it + 1)`, which resolves to this same compiled operator=.)
+     */
     void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
     {
       if (!binding || !rules.mMaps.mBegin || !rules.mMaps.mEnd) {
