@@ -2495,6 +2495,9 @@ namespace msvc8
          * 16-byte-stride (`shl eax,4`) element-count loop that forwards to the
          * shared FPU-based 4-float block copy at FUN_0071E8E0, returning
          * `dest + count*16` as the post-copy cursor.)
+         * Address: 0x0071E8E0 (FUN_0071E8E0, the shared FPU-based 4-float
+         * block copy described above -- a plain forward per-element 16-byte
+         * copy loop, called from FUN_0071A1F0's `uninit_copy_n` sibling)
          * Address: 0x00535D60 (FUN_00535D60, msvc8::vector<Moho::RBlueprint*>::_Insert_n
          * grow lane for the 4-byte pointer element (`sar 2` stride, max_size 0x3FFFFFFF
          * = 0xFFFFFFFF/4 loaded at 0x00535D96, overflow test `max_size() - size() < 1`
@@ -2982,9 +2985,17 @@ namespace msvc8
          * 0x0052A31D -- the currently-committed `ExportToLuaState` body is a
          * partial reconstruction that does not yet show this specific
          * insert; the call is present in the shipped binary regardless. The
-         * grow half calls `uninit_move_n`/`uninit_fill_n` instantiations for
-         * this element through FUN_005334B0 (cited on `uninit_move_n`
-         * below).)
+         * in-place (capacity-already-sufficient) branch's tail-shift-assign
+         * step for this element is FUN_005334B0 -> its wrapped body
+         * FUN_00537420 (cited on this method's in-place branch below --
+         * corrected from a prior pass on that citation, which mis-attributed
+         * it to this method's reallocation branch and mis-described it as
+         * `uninit_move_n`; verified against 0x0052DBE0's own `.asm`, which
+         * calls `FUN_005334B0` only from the `loc_52DDA0`-rooted block that
+         * contains no `operator new` call, unlike the preceding reallocation
+         * block at 0x0052DCB2-0x0052DCC8). The reallocation branch instead
+         * relocates elements through FUN_00537860 (unrecovered, out of
+         * scope here).)
          * Address: 0x00868040 (FUN_00868040, `msvc8::vector<
          * Moho::WeakEntitySetUserEntity>::insert(end(), count, value)` core for
          * the 12-byte selection-priority bucket vector -- `max_size` folds to
@@ -3767,22 +3778,75 @@ namespace msvc8
          * appears in, but the range-copy callee here never reads the stack
          * arg it is packaged with). Reached from FUN_00592460's reallocation
          * branch; see that citation above for the full caller chain.)
-         * Address: 0x005334B0 (FUN_005334B0, `uninit_move_n` for a 16-byte
-         * element in the same `RRuleGameRulesImpl`-area `vector<T>::insert`
-         * family as FUN_0052DBE0 (cited on `insert(pos, count, value)`
-         * above). Per-element loop: raw dword copy of the first 4 bytes,
-         * then a call through FUN_00537860-style copy-construct helper
-         * (`sub_52D9C0`) for the remaining 12 bytes, followed immediately by
-         * a destroy call on the source slot (`sub_530EE0`) -- i.e. the
-         * element is not trivially copyable and the binary interleaves
-         * construct-new/destroy-old per slot rather than batching the
-         * destroy pass at the end the way this template's generic
-         * `uninit_move_n` does; behaviourally equivalent net effect (each
-         * source slot is copy-constructed into `dst` and torn down exactly
-         * once), same divergence class already documented for the
-         * shared_ptr and `msvc8::string` entries above. Reached from
-         * FUN_0052DBE0's reallocation branch; caller-chain evidence is
-         * FUN_0052DBE0's own citation above.)
+         * Address: 0x00537420 (FUN_00537420, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::insert(pos, count,
+         * value)`'s in-place tail-SHIFT-ASSIGN loop for the 16-byte
+         * `RRuleGameRulesLuaExportBinding` element (`RRuleGameRules.h`) --
+         * this is *not* `uninit_move_n`. It is this method's own
+         * `tail >= count` branch's second step above: `for (i = tail -
+         * count; i > 0; --i) insertAt[count + i - 1] =
+         * std::move(insertAt[i - 1]);`, backward per-element ASSIGNMENT
+         * over an already-live range, not construction into raw storage
+         * (proven by the callee shapes below, which erase real,
+         * currently-live tree content at the destination before
+         * overwriting it -- erasing uninitialised memory would crash).
+         * Reached from `FUN_0052DBE0` (`insert(pos, count, value)`, cited
+         * above) at 0x0052DE2B via the register-shape wrapper
+         * `FUN_005334B0` (cited immediately below) -- from the in-place,
+         * capacity-already-sufficient branch (no `operator new` between
+         * `loc_52DDA0` and this call), *not* the reallocation branch as a
+         * prior pass on this citation mis-stated; the reallocation branch
+         * relocates elements through `FUN_00537860` instead (unrecovered,
+         * out of scope here).
+         *
+         * Per destination slot the loop performs a raw dword copy of
+         * `mRootState` (offset +0x00, trivially copyable) followed by
+         * `mPendingBlueprintOrdinals`'s (`msvc8::set<uint32_t>`, offset
+         * +0x04) implicit `operator=`, inlined here rather than called as
+         * a standalone function -- the `cmp edi,ebx` / `jz` guarding the
+         * two callee calls is `rb_tree::operator=`'s own `if (this !=
+         * &other)` self-assignment check (`operator=`, RbTree.h), compiled
+         * per-slot because the compiler cannot prove `&dest.tree !=
+         * &src.tree` at compile time; it is only taken (calls skipped) in
+         * the degenerate `insertAt == oldLast` case. When it fires:
+         *   - `sub_52D9C0` (0x0052D9C0) is the *same* shared `erase_range`
+         *     body already cited on that member (RbTree.h) -- here erasing
+         *     the DESTINATION slot's own currently-live tree
+         *     (`erase_range(leftmost(), header())`, always the whole-tree
+         *     fast path) before it is overwritten. This is the load-
+         *     bearing evidence that the destination is live, already-
+         *     constructed data being reassigned, not uninitialised memory
+         *     being constructed into -- a prior pass on this citation
+         *     misread this call as a "copy-construct helper", which is not
+         *     what `erase_range` does anywhere else in this codebase.
+         *   - `sub_530EE0` (0x00530EE0) is `copy_from`'s emission for this
+         *     same instantiation (cited on that member, RbTree.h) -- deep-
+         *     clones the source slot's tree into the now-empty destination
+         *     and re-seats `header()->left`/`header()->right`. A prior
+         *     pass on this citation called it "a destroy call on the
+         *     source slot"; its own `.asm` has no `operator delete`/free of
+         *     any kind and instead walks live node pointers and calls two
+         *     more real engine helpers (`sub_531B30`, cited on `copy_from`,
+         *     RbTree.h) -- it is a copy, not a destroy, and it reads from
+         *     the source side while writing the destination side.
+         *
+         * Net effect matches `insertAt[count+i-1] = insertAt[i-1]` exactly:
+         * each destination slot's own prior tree is torn down and replaced
+         * by a structural clone of the source slot's tree, once per slot,
+         * walking backward from `oldLast` toward `insertAt` (the same
+         * direction this method's own `tail >= count` branch shifts in, for
+         * the same reason: overlapping source/destination ranges within one
+         * live buffer). Also reached, unverified in this pass, from
+         * `FUN_00536F70` at 0x00536F90 -- a second, sibling call site on
+         * the same body not further investigated here.)
+         * Address: 0x005334B0 (FUN_005334B0, the register-shape wrapper
+         * into `FUN_00537420` described immediately above -- repackages the
+         * same three range pointers from its own incoming stack arguments
+         * into `FUN_00537420`'s eax/stack calling convention, no logic of
+         * its own beyond that (same pattern as this file's other
+         * register-shape adapters, e.g. `FUN_008837F0` and `FUN_005940F0`
+         * above). Sole caller is `FUN_0052DBE0` at 0x0052DE2B, from the
+         * in-place tail-shift branch described above.)
          *
          * Address: 0x00706900 (FUN_00706900,
          * msvc8::vector<SEntitySetTemplateUnit>::uninit_move_n for the
