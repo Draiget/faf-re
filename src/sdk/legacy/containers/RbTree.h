@@ -840,6 +840,20 @@ namespace msvc8
              * which is what pins the instantiation to `msvc8::set<uint32_t>`
              * rather than `msvc8::map<uint32_t, RBlueprint*>`.
              */
+            /**
+             * Address: 0x0082E170 (FUN_0082E170, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s plain unique insert -- descends comparing
+             * the owner-based key at `node+4` against the sought key
+             * directly (no separate comparator call for the common case;
+             * `sub_8309D0` is called only on the tie-break branch, matching
+             * the `owner_before`-style `shared_ptr` compare CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes describe for
+             * `mGraphRuntimeTree`'s `0x008B8D0` comparator), then confirms
+             * uniqueness and links via `insert_at` (0x0082E320, cited
+             * above). Called from `insert_hint`'s fallback branch,
+             * FUN_0082CC80 (cited below), matching this member's own
+             * `insert_unique(v).first` tail call.)
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -896,6 +910,24 @@ namespace msvc8
              * empty tree, hint == begin, hint == end -- each falling through to the
              * general insert at 0x00710A40, and it is reached from `operator[]`
              * (0x0070E2B0), which is where VC8 puts its only hinted-insert call.)
+             */
+            /**
+             * Address: 0x0082CC80 (FUN_0082CC80, `Moho::UICommandGraph::
+             * mGraphRuntimeTree`'s hinted insert -- matches this member's
+             * branch structure directly: empty-tree fast path straight to
+             * `insert_at`, `hint == leftmost()` check, `rb_is_nil(hint)`
+             * (== `end()`) check against `rightmost()`, then the
+             * decrement/increment straddle checks, each tailing into
+             * `insert_at` (0x0082E320, cited above) with the decided
+             * `addLeft`, and a final fallback to `insert_unique`
+             * (0x0082E170, cited above) taking its `.first`. This is the
+             * `map::operator[]`-shaped hinted insert CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes already name at this
+             * address, for `mGraphRuntimeTree[texture]`'s `lower_bound`
+             * result feeding straight back in as the hint. Its own caller,
+             * the `lower_bound` descent FUN_0082B8B0, remains unrecovered --
+             * `AddCommandQueueToCommandGraph` itself is still blocked on the
+             * separate, much larger `LinkCommandGraphEdge` edge-builder.)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
