@@ -1177,32 +1177,6 @@ namespace
   }
 
   /**
-   * Address: 0x00830060 (FUN_00830060)
-   *
-   * What it does:
-   * Walks one tree-link lane via `link0` until the 0x25 sentinel byte is set.
-   */
-  SentinelNodeOffset25RuntimeView** AscendLink0ToOffset25Sentinel(
-    SentinelNodeOffset25RuntimeView** linkSlot
-  ) noexcept
-  {
-    return AscendLink0UntilSentinel(linkSlot);
-  }
-
-  /**
-   * Address: 0x00830920 (FUN_00830920)
-   *
-   * What it does:
-   * Walks one tree branch via `link8` until the 0x25 sentinel lane is reached.
-   */
-  SentinelNodeOffset25RuntimeView* WalkLink8ToOffset25Sentinel(
-    SentinelNodeOffset25RuntimeView* node
-  ) noexcept
-  {
-    return WalkLink8UntilSentinel(node);
-  }
-
-  /**
    * Address: 0x00831690 (FUN_00831690)
    *
    * What it does:
