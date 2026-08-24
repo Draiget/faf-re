@@ -6395,6 +6395,20 @@ namespace
 
   RuntimeNonLocalGotoContext gRuntimeNonLocalGotoContext{};
 
+  /**
+   * Address: 0x00AA3B2C (FUN_00AA3B2C)
+   *
+   * IDA signature:
+   * void __usercall sub_AA3B2C(int eaxValue@<eax>, int notifyCode@<ecx>, int ebpValue@<ebp>);
+   *
+   * What it does:
+   * Register-argument entry into the non-local-goto context publication lane:
+   * assumes the notify code is already loaded in the caller's ecx (unlike the
+   * sibling stack-argument entry at 0x00AA3B35), then falls into the shared
+   * tail that stores eax/ecx/ebp into the fixed `dword_F3F110` scratch block
+   * and returns eax unchanged. Both real call sites in `_CallSettingFrame`
+   * (0x00AA39A0) dispatch through this entry.
+   */
   [[nodiscard]] std::uint32_t RuntimePublishNonLocalGotoState(
     const std::uint32_t eaxValue,
     const std::uint32_t ebpValue,
