@@ -1102,6 +1102,18 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
     ? static_cast<std::size_t>(sim->mArmiesList.end() - sim->mArmiesList.begin())
     : 0u;
   const SPerArmyReconInfo defaultReconInfo{};
+  // Address: 0x005CE020 (FUN_005CE020, msvc8::vector<Moho::SPerArmyReconInfo>::
+  // uninit_move_n for the 0x34-byte element -- the per-element old-range
+  // transfer step `resize`'s reallocation path takes. VC8 predates C++11 move
+  // semantics, so the "move" is implemented by calling the copy constructor
+  // `SPerArmyReconInfo::SPerArmyReconInfo` (FUN_005C84D0, recovered above at
+  // ReconBlip.h:76-84) once per live element while walking [first,last),
+  // advancing both cursors by sizeof(SPerArmyReconInfo)=0x34, then returning
+  // the advanced destination pointer. On this specific call site `mReconDat`
+  // is freshly default-constructed (empty, capacity 0), so the old range is
+  // empty and the loop's `cmp esi,ebx; jz` early-out fires immediately --
+  // the instantiation is still emitted because the template is instantiated
+  // for `vector<SPerArmyReconInfo>` regardless of the runtime branch taken.
   mReconDat.resize(armyCount, defaultReconInfo);
   Refresh();
 }
