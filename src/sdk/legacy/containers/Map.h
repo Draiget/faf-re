@@ -204,6 +204,11 @@ namespace msvc8
          * Address: 0x007E2C60 (FUN_007E2C60, std::map<MeshBatchKey, vector<MeshInstance*>>::operator[])
          * Address: 0x005A0040 (FUN_005A0040, std::map<uint, Moho::RUnitBlueprint*>::operator[])
          * Address: 0x00718360 (FUN_00718360, std::map<uint32, cellIndex>::operator[])
+         * Address: 0x0083A9D0 (FUN_0083A9D0, msvc8::map<UiKeyMask,bool>::operator[] --
+         * verified via the returned offset (`v1+16`): node header 12 + key
+         * uint32 4 = 16, matching the pair<UiKeyMask,bool>'s mapped_type
+         * offset exactly. Emitted via gUiKeyRepeatMap[keyMask] = true in
+         * AddUiKeyMapEntries, UiRuntimeTypes.cpp)
          *
          * IDA signature:
          * mapped_type *__thiscall operator[](const key_type *key, _Tree *this);

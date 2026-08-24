@@ -1835,6 +1835,12 @@ namespace msvc8
          * (FUN_00540330) on overflow. Emitted via
          * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
          * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
+         * Address: 0x0078A330 (FUN_0078A330, msvc8::vector<moho::CMauiControl*>::
+         * insert(end(),1,value) grow-core (IDA's own type library names the
+         * element `std::vector_CMauiControl`, i.e. this exact instantiation) —
+         * the capacity-full path of `mRenderedChildren.push_back(controlCursor)`
+         * in RebuildRenderedChildrenLane (UiRuntimeTypes.cpp), reached from
+         * Moho::CMauiControl::Render (0x00786FA0))
          *
          * Address: 0x00859F70 (FUN_00859F70 — 0x10-byte element, the
          * formation-preview ghost pair held by `gFormationPreviews` in
@@ -2976,6 +2982,10 @@ namespace msvc8
          * Address: 0x00443C50 (FUN_00443C50)
          * Address: 0x00443F30 (FUN_00443F30)
          * Address: 0x004440A0 (FUN_004440A0)
+         * Address: 0x00848BD0 (FUN_00848BD0, msvc8::vector<moho::UserArmy*>::
+         * deallocate_all -- exact match: `if(first_) operator delete(first_);
+         * first_=last_=end_=nullptr;`. Reached from SnapshotUserArmyVector's
+         * `*outSnapshot = source` operator= in Sim.cpp)
          *
          * What it does:
          * Frees retained heap storage and clears all pointer lanes.
