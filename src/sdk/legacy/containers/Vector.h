@@ -2119,6 +2119,13 @@ namespace msvc8
          * confirmed by address ordering: this dispatcher's only call site is
          * at 0x0073E084, immediately before the 0x0073E098 `columns[0]`
          * push cited at that line.)
+         * Address: 0x0082BCB0 (FUN_0082BCB0, msvc8::vector<UICommandGraph::
+         * CommandGraphEdge*>::push_back for the 4-byte pointer element --
+         * checked-capacity fast append, else tail-calls the grow path
+         * FUN_0082E950. Emitted via `bucket.push_back(edge)` in
+         * `LinkCommandGraphEdge` (0x00826960, CWldSession.cpp:14703,
+         * already recovered), which pushes the new edge into the owning
+         * `CommandGraphTreeBucket::mEdges` vector.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
