@@ -2048,7 +2048,7 @@ namespace
   }
 
   /**
-   * Inlined block from FUN_006AEF60 (MSVC8 map tree erase helper).
+   * Address: 0x006AEF60 (FUN_006AEF60, MSVC8 map tree erase helper)
    *
    * What it does:
    * Erases armor-multiplier map nodes in the same right/current/left order
@@ -14111,13 +14111,13 @@ Unit* Unit::IsUnit()
   return this;
 }
 
-// 0x006A48E0
+// Address: 0x006A48E0 (FUN_006A48E0, Unit::IsUserUnit() const)
 UserUnit const* Unit::IsUserUnit() const
 {
   return nullptr;
 }
 
-// 0x006A48D0
+// Address: 0x006A48D0 (FUN_006A48D0, Unit::IsUserUnit())
 UserUnit* Unit::IsUserUnit()
 {
   return nullptr;

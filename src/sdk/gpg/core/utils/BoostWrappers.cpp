@@ -4394,6 +4394,9 @@ namespace boost
    * and passes it to the callee in `esi` with no explicit push -- an
    * `@<esi>`-register `this` convention, not a stack argument.
    *
+   * Address: 0x00579250 (FUN_00579250, the compiler's own re-inlined clone of
+   * CHeightField::~CHeightField() plus operator delete, reproduced below)
+   *
    * The callee, `FUN_00579250` (0x00579250), is the compiler's own re-inlined
    * clone of `CHeightField::~CHeightField()` (0x004784F0 / 0x00478420):
    * it releases `mGrids`'s tier range through the same per-tier

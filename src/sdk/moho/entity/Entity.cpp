@@ -2811,7 +2811,8 @@ namespace moho
 
   /**
    * Address: 0x006785D0 (FUN_006785D0, ??1Entity@Moho@@MAE@XZ)
-   * Deleting thunk: 0x00677C60 (FUN_00677C60)
+   * Address: 0x00677C60 (FUN_00677C60, the compiler-generated scalar deleting
+   * destructor thunk for the destructor above)
    *
    * What it does:
    * Releases entity id ownership, tears down runtime-owned collision/intel/
