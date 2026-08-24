@@ -5582,50 +5582,20 @@ namespace
   static_assert(sizeof(LargeRuntimeWordAccessView) == 0x90C, "LargeRuntimeWordAccessView size must be 0x90C");
 #endif
 
-  struct EntityFieldAccessorRuntimeView
-  {
-    std::byte pad0000_005F[0x60];
-    std::uint32_t coordNodeLinkWord; // +0x60
-    std::byte pad0064_0067[0x04];
-    std::uint32_t entityIdWord; // +0x68
-    std::uint32_t blueprintWord; // +0x6C
-    std::byte pad0070_0098[0x29];
-    std::uint8_t deadFlag; // +0x99
-    std::byte pad009A_014B[0xB2];
-    std::uint32_t armyWord; // +0x14C
-    std::byte pad0150_01B8[0x69];
-    std::uint8_t destroyQueuedFlag; // +0x1B9
-    std::byte pad01BA_0553[0x39A];
-    std::uint32_t builderSubsystemWord; // +0x554
-  };
-#if defined(_M_IX86)
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, coordNodeLinkWord) == 0x60,
-    "EntityFieldAccessorRuntimeView::coordNodeLinkWord offset"
-  );
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, entityIdWord) == 0x68,
-    "EntityFieldAccessorRuntimeView::entityIdWord offset"
-  );
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, blueprintWord) == 0x6C,
-    "EntityFieldAccessorRuntimeView::blueprintWord offset"
-  );
-  static_assert(offsetof(EntityFieldAccessorRuntimeView, deadFlag) == 0x99, "EntityFieldAccessorRuntimeView::deadFlag offset");
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, armyWord) == 0x14C,
-    "EntityFieldAccessorRuntimeView::armyWord offset"
-  );
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, destroyQueuedFlag) == 0x1B9,
-    "EntityFieldAccessorRuntimeView::destroyQueuedFlag offset"
-  );
-  static_assert(
-    offsetof(EntityFieldAccessorRuntimeView, builderSubsystemWord) == 0x554,
-    "EntityFieldAccessorRuntimeView::builderSubsystemWord offset"
-  );
-  static_assert(sizeof(EntityFieldAccessorRuntimeView) == 0x558, "EntityFieldAccessorRuntimeView size must be 0x558");
-#endif
+  // EntityFieldAccessorRuntimeView (formerly here) was a raw-offset reach-in
+  // over Moho::Entity/Moho::unit::Unit (coord-node link @0x60, id_ @0x68,
+  // BluePrint @0x6C, Dead @0x99, ArmyRef @0x14C, DestroyQueuedFlag @0x1B9,
+  // Unit::AiBuilder @0x554) forbidden by CLAUDE.md RULE ONE. All 7 offsets
+  // are already typed, named members with static_assert-verified offsets in
+  // src/sdk/moho/entity/Entity.h and src/sdk/moho/unit/core/Unit.h. The 7
+  // FUN_ bodies built on this struct (FUN_005795D0, FUN_005795E0,
+  // FUN_005795F0, FUN_00579600, FUN_00579610, FUN_00579630, FUN_00579660)
+  // were removed: exhaustive search (IDA .xrefs.txt code=0/data=0 for all 7,
+  // zero code callers/data xrefs in the callgraph index, and a raw
+  // absolute-address byte scan of the complete shipped
+  // bin/2025.7.1/ForgedAlliance.exe) found no reference to any of these
+  // addresses anywhere in the binary. Marked `skip` in recovered_progress.json
+  // (namespace fa_full_2026_03_26) - see LegacyContainerFillLanes.cpp.reconstruction.md.
 
   struct DualAnchorListHeaderRuntimeView
   {
@@ -5926,86 +5896,6 @@ namespace
   std::uint32_t* InitializeDualAnchorListHeaderPrimary(DualAnchorListHeaderRuntimeView* const header) noexcept
   {
     return InitializeDualAnchorListHeader(header);
-  }
-
-  /**
-   * Address: 0x005795D0 (FUN_005795D0)
-   *
-   * What it does:
-   * Copies one entity-id runtime lane (`+0x68`) into caller-provided output.
-   */
-  std::uint32_t* CopyEntityIdWordToOutput(
-    std::uint32_t* const output,
-    const EntityFieldAccessorRuntimeView* const source
-  ) noexcept
-  {
-    return CopyWordToOutput(output, source->entityIdWord);
-  }
-
-  /**
-   * Address: 0x005795E0 (FUN_005795E0)
-   *
-   * What it does:
-   * Reads one entity blueprint/runtime word lane (`+0x6C`).
-   */
-  std::uint32_t LoadEntityBlueprintWord(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->blueprintWord;
-  }
-
-  /**
-   * Address: 0x005795F0 (FUN_005795F0)
-   *
-   * What it does:
-   * Reads one entity army-owner lane (`+0x14C`).
-   */
-  std::uint32_t LoadEntityArmyWord(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->armyWord;
-  }
-
-  /**
-   * Address: 0x00579600 (FUN_00579600)
-   *
-   * What it does:
-   * Reads one entity dead-flag lane (`+0x99`).
-   */
-  std::uint8_t LoadEntityDeadFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->deadFlag;
-  }
-
-  /**
-   * Address: 0x00579610 (FUN_00579610)
-   *
-   * What it does:
-   * Reads one entity destroy-queued flag lane (`+0x1B9`).
-   */
-  std::uint8_t LoadEntityDestroyQueuedFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->destroyQueuedFlag;
-  }
-
-  /**
-   * Address: 0x00579630 (FUN_00579630)
-   *
-   * What it does:
-   * Reads one builder-subsystem pointer lane from offset `+0x554`.
-   */
-  std::uint32_t LoadEntityBuilderSubsystemWord(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->builderSubsystemWord;
-  }
-
-  /**
-   * Address: 0x00579660 (FUN_00579660)
-   *
-   * What it does:
-   * Reads one intrusive link/runtime word from offset `+0x60`.
-   */
-  std::uint32_t LoadEntityCoordNodeLinkWord(const EntityFieldAccessorRuntimeView* const view) noexcept
-  {
-    return view->coordNodeLinkWord;
   }
 
   /**
