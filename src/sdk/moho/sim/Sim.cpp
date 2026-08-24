@@ -4717,6 +4717,18 @@ namespace
     gpg::FastVectorN2RebindAndCopy<SOCellPos>(&destination.cells, &source.cells);
   }
 
+  /**
+   * Address: 0x008B55D0 (FUN_008B55D0, checked allocator for
+   * CommandIssueUpdateEventRuntimeView, elementSize=0x50, reached from
+   * EnqueueCommandIssueUpdateEvent via this function)
+   *
+   * The binary routes the allocation through a checked `_Allocate(count,
+   * elementSize)`-shaped wrapper (`0xFFFFFFFF/count < 0x50` throws
+   * `std::bad_alloc`, else `operator new(0x50*count)`) called with count=1;
+   * for a hardcoded count of 1 this is behaviorally identical to the plain
+   * `::operator new` below (the guard cannot be reached), so no separate
+   * checked-allocator call is introduced here.
+   */
   [[nodiscard]] CommandIssueUpdateEventRuntimeView* AllocateCommandIssueUpdateSlot()
   {
     auto* const storage = static_cast<CommandIssueUpdateEventRuntimeView*>(::operator new(sizeof(CommandIssueUpdateEventRuntimeView)));
