@@ -9926,6 +9926,11 @@ namespace
 
   /**
    * Address: 0x009B6B50 (FUN_009B6B50)
+   * Address: 0x0083C8C0 (FUN_0083C8C0, the `epochDays *= 86400000` step --
+   * `_QWORD *__thiscall sub_83C8C0(_QWORD *this, int a2) { *this *= a2;
+   * return this; }`, called as `sub_83C8C0(86400000)` at 0x009B6BB0 to
+   * convert the Julian-day-number-relative `epochDays` into milliseconds
+   * before the time-of-day offset is added below)
    *
    * What it does:
    * Builds one date-time millisecond lane from `(day,month,year,h,m,s,ms)`,
@@ -39191,11 +39196,23 @@ void wxWindowBase::PushEventHandler(wxWindowBase* const handler)
  */
 wxWindowBase* wxWindowBase::PopEventHandler(const bool deleteHandler)
 {
-  wxWindowBase* const front = GetEventHandler();
-  if (front == nullptr) {
+  // `GetEventHandler()` intentionally falls back to `this` when nothing has
+  // been pushed -- that is the right default for its 25+ ProcessEvent()
+  // call sites, but it means it can never be used here to detect an empty
+  // stack. Popping from a genuinely empty stack must check this window's
+  // own pushed-handler slot directly and no-op, matching real wx's
+  // "stack is empty" guard -- otherwise this treats `this` itself as a
+  // poppable handler, pushes it back onto itself on restore, and corrupts
+  // its own `nextHandler` into a self-reference (an infinite ProcessEvent
+  // recursion; see SuspendInputWindowEventHandlersAndFlushQueue's
+  // pop-two/push-two, which relies on a genuine empty-stack no-op here for
+  // windows that were never pushed onto via this member function at all).
+  const WxWindowBaseRuntimeState* const selfState = FindWxWindowBaseRuntimeState(this);
+  if (selfState == nullptr || selfState->eventHandler == nullptr) {
     return nullptr;
   }
 
+  wxWindowBase* const front = selfState->eventHandler;
   WxWindowBaseRuntimeState& frontState = EnsureWxWindowBaseRuntimeState(front);
   wxWindowBase* const next = frontState.nextHandler;
   frontState.nextHandler = nullptr;
@@ -98573,6 +98590,18 @@ namespace
     "WxInputStreamPushbackRuntimeView::readOffset offset must be 0x14"
   );
 
+  /**
+   * Address: 0x009DCFA0 (FUN_009DCFA0)
+   *
+   * What it does:
+   * Reallocates the pushback buffer to make room for `prefixBytes` new bytes
+   * ahead of the still-unread span, relocating `[readOffset, writeOffset)`
+   * to the tail of the fresh block and resetting `readOffset` to 0. Field
+   * offsets match `WxInputStreamPushbackRuntimeView` exactly: buffer@0x0C,
+   * writeOffset@0x10, readOffset@0x14. Reached from
+   * `wxInputStreamPushbackWriteRuntime` (0x009DD080) and
+   * `wxInputStreamPushbackWriteSingleByteRuntime` (0x009DD0D0) below.
+   */
   [[nodiscard]] std::uint8_t* wxInputStreamReservePushbackPrefixGap(
     WxInputStreamPushbackRuntimeView* const runtime,
     const std::uint32_t prefixBytes
