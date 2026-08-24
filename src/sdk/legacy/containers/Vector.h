@@ -1418,6 +1418,25 @@ namespace msvc8
          * emits for the same destructor when reached from a constructor's
          * unwind funclet)
          *
+         * Address: 0x0088A150 (FUN_0088A150, msvc8::vector<Moho::WaveParameters>::
+         * ~vector for the 136-byte polymorphic element -- same `_Tidy()` shape
+         * as the SPerArmyReconInfo instantiation above: `for (it = myFirst;
+         * it != myLast; it += 34 dwords) (**it)(it, 0)` then
+         * `operator delete(myFirst)` and null all three pointer lanes. The
+         * per-element teardown dispatches through `WaveParameters`'s own
+         * vtable slot 0 (the `(**it)(it, 0)` call, `0` = "don't free, this is
+         * placement destroy only" per the standard MSVC deleting-destructor
+         * ABI) because `WaveParameters` declares a virtual destructor; this
+         * `destroy_range` member already expresses that as an ordinary
+         * `first->~T()` call, which is what a polymorphic `T`'s explicit
+         * destructor call compiles to here -- no raw vtable/offset dispatch
+         * needed in the recovered source. Called from `WavePattern`'s
+         * destructor (`FUN_008877E0`, `moho/terrain/water/WaveSystem.cpp`)
+         * automatically, since `mWaves` is `WavePattern`'s last-declared
+         * member. `FUN_00889C50` (a one-instruction tail-call thunk,
+         * `skip`-classified as an ICF-foldable shard) also reaches this same
+         * body from `WavePattern`'s Lua constructor's EH unwind funclet.)
+         *
          * Destructor: destroy elements and free storage if allowed
          */
         ~vector() {
@@ -1874,6 +1893,18 @@ namespace msvc8
          * Address: 0x0077E2D0 (FUN_0077E2D0,
          * msvc8::vector<Moho::SDecalInfo>::clear -- destroys the live run and
          * rewinds mLast to mFirst without releasing capacity)
+         * Address: 0x0088A0C0 (FUN_0088A0C0, msvc8::vector<Moho::
+         * WaveParameters>::clear for the 136-byte polymorphic element --
+         * guards on `first_ != last_`, destroys the live run through the
+         * same vtable-slot-0 deleting-destructor loop `destroy_range`/
+         * `~vector` use for this type (via `sub_88AD60`, which resolves to
+         * `first_`), then rewinds `last_` to `first_`. Reached from
+         * `WavePattern::LoadParametersFromLua` (`FUN_00887870`,
+         * `moho/terrain/water/WaveSystem.cpp`), which clears any existing
+         * `mWaves` contents before repopulating from the `parameters` Lua
+         * array -- a no-op on the freshly-default-constructed vector the
+         * `WavePattern(LuaObject&)` constructor path always starts from, but
+         * present in the binary because the helper is written generically.)
          */
         void clear() noexcept {
             destroy_all();
@@ -2037,6 +2068,22 @@ namespace msvc8
          * Source-level invocation: `canvas->decals.push_back(decal)` in
          * `RDebugGrid.cpp`/`RDebugRadar.cpp`, the two direct binary callers
          * at 0x0064F336/0x0064F67C.)
+         *
+         * Address: 0x00889C90 (FUN_00889C90, msvc8::vector<Moho::WaveParameters>::
+         * push_back for the 136-byte (`0x88`) polymorphic element -- the
+         * `78787879h`/`sar 6` magic-multiply pair is the divide-by-136 size/
+         * capacity computation, done twice (current size, then capacity).
+         * Fast path (`size < capacity`) copy-constructs the pushed value
+         * directly at `myLast` via the `uninit_fill_n` emission FUN_0088B090
+         * (cited below on `uninit_fill_n`; its own copy is
+         * `WaveParameters`'s compiler-generated copy constructor,
+         * FUN_0088AB00) and advances `myLast` by `0x88`. Capacity-full path
+         * tail-calls the single-value `insert(pos, value)` overload
+         * (FUN_0088A050, cited below on `insert`), whose grow core is
+         * FUN_0088A400. Source-level invocation:
+         * `WavePattern::LoadParametersFromLua`'s `mWaves.push_back(...)`
+         * (moho/terrain/water/WaveSystem.cpp), the per-entry append while
+         * loading a `WavePattern`'s `parameters` array from Lua.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -2824,6 +2871,25 @@ namespace msvc8
          * FUN_0064F8C0, memberwise `_Tmp` copy since `SDebugDecal` is
          * trivially copyable (no ctor/dtor call in the shipped body).)
          *
+         * Address: 0x0088A050 (FUN_0088A050, `msvc8::vector<Moho::
+         * WaveParameters>::insert(iterator, const T&)` for the 136-byte
+         * polymorphic element -- push_back's capacity-full path
+         * (FUN_00889C90, cited above) tail-calls this with `pos = myLast`.
+         * Computes the current size and (when non-empty) the requested
+         * insertion offset via the same `78787879h`/`sar 6` divide-by-136
+         * pair `push_back` uses, then tail-calls the `_Insert_n` grow core
+         * FUN_0088A400 with the resolved offset/position. `vectorThis`
+         * (`edi`) stays live across both calls -- the shape IDA renders as a
+         * bare `sub_88A400(a1, a3)` with the intermediate size arithmetic
+         * elided is a decompiler artifact; the actual disassembly carries the
+         * full offset computation.)
+         * Address: 0x0088A400 (FUN_0088A400, the `_Insert_n` grow core this
+         * `insert` tail-calls for the same 136-byte polymorphic element --
+         * reallocates, copy-constructs the head/tail ranges through
+         * `uninit_copy_n`/the class's copy constructor (FUN_0088AB00), places
+         * the inserted value, and releases the old storage, matching this
+         * method's own reallocation-branch shape.)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -3529,6 +3595,16 @@ namespace msvc8
          * source struct into `[dst, dstEnd)`. Reached from `sub_7E9280`
          * (already recovered, `Mesh.cpp`), which "appends `count`
          * value-initialized (zeroed) entries to the palette buffer".)
+         *
+         * Address: 0x0088B090 (FUN_0088B090, `msvc8::vector<Moho::
+         * WaveParameters>::uninit_fill_n` for the 136-byte polymorphic
+         * element -- copy-constructs `n` copies of `value` at `dst` through
+         * the class's own compiler-generated copy constructor (FUN_0088AB00),
+         * and on a mid-loop throw destroys the already-constructed prefix
+         * through the vtable-slot-0 deleting destructor (`(**it)(it, 0)`,
+         * the same mechanism `destroy_range` above documents for this type)
+         * before rethrowing. Reached from `push_back`'s fast path
+         * (FUN_00889C90, cited above, `n=1`).)
          *
          * Uninitialized fill N with value starting at dst
          */
