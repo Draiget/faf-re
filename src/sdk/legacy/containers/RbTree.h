@@ -1123,18 +1123,27 @@ namespace msvc8
              * `~CArmyStats`)
              */
             /**
-             * Address: 0x00A633D0 (FUN_00A633D0, unidentified map/set instantiation
-             * -- colour/nil pair at `[node+0x10]`/`[node+0x11]`, a smaller node than
-             * every other instantiation cited above)
+             * Address: 0x00A633D0 (FUN_00A633D0, `std::set<HullTriangle3<float>*>::
+             * erase(const_iterator)` -- colour/nil pair at `[node+0x10]`/
+             * `[node+0x11]`, a smaller node than every other instantiation cited
+             * above since the value_type is a bare 4-byte pointer)
              * Address: 0x00A63690 (FUN_00A63690, sibling emission of the same
-             * member for a second, differently-value-typed instantiation in the
-             * same address neighbourhood as the `rotate_left`/`insert_at`
-             * instantiation cited above -- same colour/nil offsets, same
-             * `invalid map/set<T> iterator` throw and guarded `_Mysize` decrement)
+             * member for `std::set<HullTriangle3<double>*>` -- same colour/nil
+             * offsets, same `invalid map/set<T> iterator` throw and guarded
+             * `_Mysize` decrement, byte-for-byte the same node shape since a
+             * `HullTriangle3<double>*` is still a 4-byte pointer)
              *
-             * Neither traced to a named owning class in this pass; the algorithm
-             * match (transplant-and-recolour shape, identical throw string,
-             * identical guarded decrement) is the evidence.
+             * Owner identified in a later pass: `Wm3::ConvexHull3<Real>::m_kHull`
+             * (`dependencies/WildMagic3p8/Foundation/Containment/Wm3ConvexHull3.h:89`),
+             * reached from `m_kHull.erase(pkTri)` in `ConvexHull3<Real>::Update`
+             * (`Wm3ConvexHull3.cpp:324`) via the range-erase entry point
+             * (`sub_A65320`/`sub_A65430`, `external_dependency` -- WildMagic vendor
+             * code, not engine source; see those tokens' recovery notes). Both
+             * `sub_A65320` and `sub_A65430` are compiled with checked iterators
+             * (Secure SCL), unlike this codebase's own `msvc8::set`/`msvc8::map`
+             * instantiations, but this member's own isNil-guard-and-throw shape is
+             * identical either way, so the algorithm match alone remains sufficient
+             * evidence for the citation.
              */
             /**
              * Address: 0x0077C270 (FUN_0077C270, inner bucket erase with rebalance)
