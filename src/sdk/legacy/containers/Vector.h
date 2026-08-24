@@ -2921,10 +2921,64 @@ namespace msvc8
          * `worldViews->push_back(entry)` capacity-full path, whose `insert(end(),1,
          * value)` full-reallocation branch moves the whole existing range with
          * `uninit_move_n(first_, cur, newBuf)`)
+         * Address: 0x00885070 (FUN_00885070, msvc8::vector<msvc8::string>::
+         * uninit_move_n for the 0x1C-byte `msvc8::string` element -- range-form
+         * loop that default-tidies each destination slot in place
+         * (`_Myres=15, _Mysize=0, _Bx._Buf[0]=0`, i.e. `msvc8::string`'s
+         * `_Tidy`) and then calls `std::string::assign(dst, *src, 0, npos)`,
+         * exactly `msvc8::string`'s own copy constructor inlined into the
+         * loop body; a trailing SEH funclet (unreachable from the normal
+         * control-flow graph, dispatched only on unwind) destroys the
+         * already-constructed prefix via `sub_8846B0`
+         * (`msvc8::string::tidy(true,0)`, already recovered in String.cpp)
+         * and rethrows. This is the `_Insert_n` reallocation path's element
+         * relocation step -- called twice from within `msvc8::vector<
+         * msvc8::string>::_Insert_n` (FUN_00882BA0, at 0x00882CFE for the
+         * head span `[first_, first_+offset)` and 0x00882D49 for the tail
+         * span, which is always empty here because `resize(n, fillValue)`
+         * inserts at `end()`), and twice more via the register-shape
+         * adapter FUN_008837F0 (0x00882E1F / 0x00882EA6, also inside
+         * FUN_00882BA0 -- the compiler folded the fast-path tail-shift's two
+         * mutually exclusive branches into one shared local thunk). Reached
+         * from `ResizeLegacyStringVectorExact`'s `outStrings.resize(n,
+         * fillValue)` (CSaveGameRequestImpl.cpp:125). Sibling emission of
+         * the already-recovered `wxUninitializedCopyMsvc8StringRange`
+         * (FUN_00884FD0, WxRuntimeTypes.cpp), which is the same algorithm
+         * instantiated at the vector-clone/copy-construction call site
+         * instead of `_Insert_n`'s relocation step -- the two emissions are
+         * not byte-identical (different register allocation from being
+         * compiled as part of different enclosing functions) so `/OPT:ICF`
+         * left them as separate symbols.
+         *
+         * NOTE on why this is `uninit_move_n` and not a true move: proving
+         * this address is what pinned down a real divergence in this
+         * template. `msvc8::string` declares a `noexcept` move constructor
+         * (String.h) added purely for reconstruction-side leak prevention --
+         * MSVC8's real `std::basic_string` had no move operations at all in
+         * this C++03-era binary (see the comment on that ctor). Before the
+         * fix below, `std::move_if_noexcept(src[i])` would have selected
+         * that move ctor here and produced a buffer-steal, not the
+         * default-tidy-then-assign shape this address actually has. No
+         * currently-cited `uninit_move_n` instantiation relies on real move
+         * behaviour (shared_ptr and SDebugWorldText above both explicitly
+         * degrade to copy already), so forcing copy unconditionally matches
+         * every existing citation and fixes this one.
          *
          * Uninitialized move (or copy if non-movable) N elements src->dst.
          * Used by `insert(pos, count, value)` to shift the tail and to
          * populate the reallocated buffer's head/tail spans.
+         *
+         * MSVC8/C++03 vector growth never moved elements -- there was no
+         * move constructor to move with -- so the relocation step always
+         * copy-constructed the old element into the new slot and destroyed
+         * the old one afterwards. Some element types in this reconstruction
+         * have since gained a real (modern, `noexcept`) move constructor for
+         * reasons unrelated to binary fidelity (e.g. `msvc8::string`, added
+         * to stop leaks from the reconstruction's missing destructor). Using
+         * `std::move_if_noexcept` here would let such a type's move ctor
+         * silently take over this loop and diverge from the binary, which is
+         * exactly what happened at FUN_00885070 above. Always copy-construct
+         * instead, matching every emission seen for this member so far.
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -2933,7 +2987,7 @@ namespace msvc8
                 std::size_t i = 0;
                 try {
                     for (; i < n; ++i) {
-                        ::new (static_cast<void*>(dst + i)) T(std::move_if_noexcept(src[i]));
+                        ::new (static_cast<void*>(dst + i)) T(src[i]);
                     }
                 } catch (...) {
                     destroy_n(dst, i);
