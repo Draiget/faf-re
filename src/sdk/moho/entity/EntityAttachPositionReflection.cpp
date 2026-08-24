@@ -865,6 +865,9 @@ namespace
     }
 
     const moho::PositionHistory* const sourceHistory = UpcastPositionHistoryOrThrow(*sourceRef);
+    // Address: 0x004FFE40 (FUN_004FFE40) -- compiler-emitted implicit
+    // PositionHistory(const PositionHistory&) copy ctor invoked here and by
+    // ConstructPositionHistoryRefFromSource below.
     auto* const copiedHistory = new (std::nothrow) moho::PositionHistory(*sourceHistory);
 
     gpg::RRef out{};
