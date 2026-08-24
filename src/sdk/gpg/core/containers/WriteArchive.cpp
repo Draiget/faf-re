@@ -927,6 +927,22 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
  * Address: 0x00950380 (FUN_00950380, isNil@+0x15) -- a recursive-right/
  * iterative-left subtree teardown (matches `destroy_subtree` in
  * RbTree.h: `destroy_subtree(n->right); n = n->left; free_node(...)`).
+ *
+ * `mObjRefs.clear()` below reaches the sibling teardown emission for
+ * `std::map<const void*, TrackedPointerRecord>` (40-byte value_type,
+ * isNil@+0x25 = 0x0D + 0x28):
+ * Address: 0x009503E0 (FUN_009503E0, isNil@+0x25) -- identical
+ * recursive-right/iterative-left `destroy_subtree` shape to FUN_00950380
+ * above, just sized for the wider value. No inlined value-destructor work
+ * precedes `operator delete`, so `TrackedPointerRecord` is trivially
+ * destructible. Also self-recursive (right-child call) and called from
+ * FUN_00952300 (this map's `~map()`/`erase(begin(),end())` body, reached
+ * implicitly through `WriteArchive::~WriteArchive() = default`'s
+ * compiler-generated member teardown and through `WriteArchive::WriteArchive`'s
+ * own EH cleanup funclet on the `SerHelperBase::InitNewHelpers()` throw
+ * path above -- no hand-written call corresponds to either, matching the
+ * "compiler-emitted glue is not source at all" case for member dtor
+ * chaining).
  */
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
