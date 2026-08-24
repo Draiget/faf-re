@@ -107,6 +107,13 @@ namespace
     return ResetSSTICommandConstantDataSerializerHelperLinks();
   }
 
+  /**
+   * Address: 0x00BC9CA0 (FUN_00BC9CA0, register_SSTICommandConstantDataSerializer)
+   *
+   * What it does:
+   * Constructs the `SSTICommandConstantDataSerializer` helper-list sentinel,
+   * wires its load/save function pointers, and schedules exit-time cleanup.
+   */
   void register_SSTICommandConstantDataSerializer()
   {
     InitializeHelperNode(gSSTICommandConstantDataSerializer);
@@ -250,6 +257,8 @@ namespace
 
   /**
    * Address: 0x006ED750 (FUN_006ED750, SSTICommandConstantData uninit-copy range)
+   * Address: 0x006EBB30 (FUN_006EBB30, __cdecl calling-convention adapter that
+   *   forwards into this uninitialized-copy range)
    *
    * IDA signature:
    * void __thiscall __noreturn sub_6ED750(char *this, char *a2, int a3);
