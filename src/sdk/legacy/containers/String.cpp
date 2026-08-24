@@ -197,6 +197,11 @@ void msvc8::string::eos(const uint32_t newSize) noexcept {
 /**
  * Address: 0x00402740 (FUN_00402740)
  * Address: 0x008846B0 (FUN_008846B0, tidy(true, 0) destructor-path emission)
+ * Address: 0x007B7DB0 (FUN_007B7DB0, another `tidy(true, 0)` specialized
+ *          emission, same shape as FUN_008846B0. 11 real callers across
+ *          moho/net/CGpgNetInterface.cpp -- every `SNetCommandArg`/
+ *          `SNetCommand` string-payload reset/construct/rollback path
+ *          reaches it through normal `msvc8::string` member operations.)
  *
  * What it does:
  * Resets string storage to SSO lane and optionally preserves `newSize` bytes
