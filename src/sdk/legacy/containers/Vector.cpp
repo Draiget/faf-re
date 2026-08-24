@@ -5895,6 +5895,9 @@ std::uint32_t* MoveDwordRangeToEnd(
  * Address: 0x0078B550 (FUN_0078B550)
  * Address: 0x0078BA30 (FUN_0078BA30)
  * Address: 0x007BCBB0 (FUN_007BCBB0)
+ * Address: 0x0087D250 (FUN_0087D250, msvc8::vector<Moho::CWldTerrainDecal*>::
+ * _Insert_n's in-place tail-shift step -- called from FUN_0087A830, the
+ * per-T `_Insert_n` grow lane for CDecalManager's mDecals vector.)
  *
  * What it does:
  * Copies one dword range `[sourceBegin, sourceEnd)` into `destinationBegin`
@@ -6740,18 +6743,40 @@ void CopyAssignReservedTransportBoneLane(
   return UninitializedCopyReservedTransportBoneRange(destinationBegin, sourceBegin, destinationEnd);
 }
 
+/**
+ * What it does:
+ * Assigns just the `mVec` entity-set payload from `source` onto
+ * `destination` via `fastvector_Entity::AddAll` -- an in-place,
+ * capacity-reusing replace (shrink-and-truncate when `destination`
+ * already holds at least as many entries, grow-and-fill otherwise) --
+ * leaving `destination`'s intrusive `TDatList` links untouched. This is
+ * the per-element body `CopyAssignEntitySetRange`/FUN_007056A0 drives;
+ * it deliberately does not reset to inline storage first, since `AddAll`
+ * already reuses an existing heap allocation when it is large enough.
+ */
 void CopyEntitySetStorageOnly(
   moho::SEntitySetTemplateUnit& destination,
   const moho::SEntitySetTemplateUnit& source
 )
 {
-  destination.mVec.ResetStorageToInline();
-  destination.mVec.reserve(source.mVec.size());
-  for (moho::Entity* const entry : source.mVec) {
-    destination.mVec.push_back(entry);
-  }
+  destination.mVec.AddAll(&source.mVec);
 }
 
+/**
+ * Address: 0x007056A0 (FUN_007056A0, sub_7056A0)
+ *
+ * What it does:
+ * Forward pairwise walk over two `SEntitySetTemplateUnit` ranges of equal
+ * length, assigning `sourceBegin[i].mVec` onto `destination[i].mVec` (via
+ * `CopyEntitySetStorageOnly`/`AddAll`) for each slot and returning the
+ * advanced destination cursor. Reached from `CopyAssignEntitySetTemplateUnitVectorStorage`
+ * (FUN_00704D80) through the `FUN_00704670` calling-convention trampoline,
+ * which forwards `(sourceFirst, sourceLast, destFirst)` into this
+ * function's `(this=destFirst, ecx=sourceFirst, arg0=sourceLast)` ABI --
+ * used both for the "enough existing elements" overlap-assign prefix and
+ * for the "enough capacity, still need construction" overlap-assign
+ * prefix ahead of `UninitializedCopyEntitySetRange`.
+ */
 [[nodiscard]] moho::SEntitySetTemplateUnit* CopyAssignEntitySetRange(
   moho::SEntitySetTemplateUnit* destination,
   const moho::SEntitySetTemplateUnit* sourceBegin,
@@ -6767,6 +6792,15 @@ void CopyEntitySetStorageOnly(
   return destination;
 }
 
+/**
+ * Address: 0x007056D0 (FUN_007056D0, range form -- ecx=begin, ebx=end)
+ * Address: 0x00705B30 (FUN_00705B30, single-element SEH-unwind-cleanup
+ * emission of the same `~SEntitySetTemplateUnit` body, reached from
+ * `UninitializedFillNEntitySetRange`'s exception path)
+ *
+ * What it does:
+ * Destroys every `SEntitySetTemplateUnit` in `[begin, end)`.
+ */
 void DestroyEntitySetRange(
   moho::SEntitySetTemplateUnit* begin,
   moho::SEntitySetTemplateUnit* end
@@ -7266,6 +7300,18 @@ VectorVoidStorageView* CopyAssignSPointVectorStorage(
  * What it does:
  * Copy-assigns one `vector<SEntitySetTemplateUnit>` lane, copying only per-set
  * fastvector payload for existing nodes and preserving intrusive list lanes.
+ *
+ * The `sourceCount == 0u` branch below is the recovered body of
+ * 0x00703040 (FUN_00703040, `sub_703040`) as invoked from this call
+ * site: `sub_703040(&a2, destination.first, destination.last)`, where
+ * `a1` (an implicit `edi`-carried destination-view pointer, ambient from
+ * this caller's register state) is this same `destination`. That shared
+ * helper is also called from `Moho::ArmyUnitSet`-adjacent resize/erase
+ * lanes (FUN_00702450) with a genuinely non-empty source sub-range, where
+ * its trailing `*(&a2) = destination.first` store feeds a real out
+ * parameter; at *this* call site the store lands in a dead stack slot
+ * (`FUN_00704D80` returns immediately afterward without reading `source`
+ * again), so it has no observable effect here and is not reproduced.
  */
 VectorVoidStorageView* CopyAssignEntitySetTemplateUnitVectorStorage(
   VectorVoidStorageView& destination,
@@ -7283,6 +7329,7 @@ VectorVoidStorageView* CopyAssignEntitySetTemplateUnitVectorStorage(
   auto* destinationEnd = reinterpret_cast<moho::SEntitySetTemplateUnit*>(destination.last);
 
   if (sourceCount == 0u) {
+    // FUN_00703040: dest already empty -> no-op; else destroy+clear it.
     if (destinationBegin != destinationEnd) {
       DestroyEntitySetRange(destinationBegin, destinationEnd);
       destination.last = reinterpret_cast<void**>(destinationBegin);
