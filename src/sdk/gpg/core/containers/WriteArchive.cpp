@@ -704,6 +704,15 @@ private:
  * self-links to form the empty-tree sentinel head, mirroring the pattern
  * already documented on CAiFormationInstance.cpp's
  * InitializeDefaultFormationLaneEntry for a different hand-rolled tree)
+ *
+ * `mObjRefs()` below reaches the same checked node-allocate-and-default-init
+ * emission for `std::map<const void*, TrackedPointerRecord>` (40-byte node,
+ * isNil@+0x25, same shape as `mRefCounts`'s sentinel allocator above, just
+ * sized for the wider `TrackedPointerRecord` value):
+ * Address: 0x009505D0 (FUN_009505D0, allocates 0x28=40 bytes, zeroes the
+ * pair<key,value> payload at +0x00/+0x04/+0x08, sets color@+0x24=1/
+ * isNil@+0x25=0; the caller then promotes isNil to 1 and self-links to form
+ * the empty-tree sentinel head, identical pattern to FUN_00950540 above)
  */
 WriteArchive::WriteArchive()
     : mRefCounts()
