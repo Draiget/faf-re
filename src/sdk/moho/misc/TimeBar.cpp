@@ -246,8 +246,9 @@ namespace moho
         , mOldestHistoryIndex(0)
         , mNextHistoryIndex(0)
       {
-        mThreadListSentinel.mPrevNode = &mThreadListSentinel;
-        mThreadListSentinel.mNextNode = &mThreadListSentinel;
+        // TDatListItem's default ctor already self-links mThreadListSentinel
+        // (mPrev == mNext == &mThreadListSentinel); only the payload needs
+        // setting here.
         mThreadListSentinel.mCurrentSection = nullptr;
         mThreadListSentinel.mColorTag = kDefaultThreadColorTag;
       }
@@ -308,14 +309,11 @@ namespace moho
 
     void UnlinkThreadInfoNoLock(STimeBarThreadInfo* const info) noexcept
     {
-      if (!info || !info->mPrevNode || !info->mNextNode) {
+      if (!info) {
         return;
       }
 
-      info->mPrevNode->mNextNode = info->mNextNode;
-      info->mNextNode->mPrevNode = info->mPrevNode;
-      info->mPrevNode = info;
-      info->mNextNode = info;
+      info->ListUnlink();
     }
 
     void ReleaseThreadInfo(STimeBarThreadInfo* info) noexcept
@@ -367,12 +365,7 @@ namespace moho
 
     void LinkThreadInfoNoLock(TimeBarState& state, STimeBarThreadInfo* const info) noexcept
     {
-      STimeBarThreadInfo* const sentinel = &state.mThreadListSentinel;
-
-      info->mPrevNode = sentinel;
-      info->mNextNode = sentinel->mNextNode;
-      sentinel->mNextNode->mPrevNode = info;
-      sentinel->mNextNode = info;
+      info->ListLinkAfter(&state.mThreadListSentinel);
     }
 
     [[nodiscard]] STimeBarThreadInfo* GetOrCreateThreadInfo(TimeBarState& state)
@@ -381,9 +374,8 @@ namespace moho
         return gThreadSlot.mInfo;
       }
 
+      // TDatListItem's default ctor already self-links info.
       auto* info = new STimeBarThreadInfo{};
-      info->mPrevNode = info;
-      info->mNextNode = info;
       info->mCurrentSection = nullptr;
       info->mColorTag = kDefaultThreadColorTag;
 
@@ -693,8 +685,8 @@ namespace moho
 
     boost::mutex::scoped_lock guard(state.mLock);
 
-    for (STimeBarThreadInfo* node = state.mThreadListSentinel.mNextNode; node != &state.mThreadListSentinel;
-         node = node->mNextNode) {
+    for (auto* node = static_cast<STimeBarThreadInfo*>(state.mThreadListSentinel.mNext); node != &state.mThreadListSentinel;
+         node = static_cast<STimeBarThreadInfo*>(node->mNext)) {
       if (!node->mCurrentSection) {
         continue;
       }
