@@ -36,14 +36,29 @@ namespace moho
   struct ArmyPool
   {
     // +0x00..+0x2F: fastvector_n header + inline platoon pointer storage
-    // (start_, end_, capacity_, originalVec_, inlineVec_[8])
+    // (start_, end_, capacity_, originalVec_, inlineVec_[8]). This is the
+    // whole struct -- what was previously modeled as a trailing `unknown30`
+    // scalar at ArmyPool+0x30 is not part of ArmyPool at all: it is the
+    // `myProxy_` (debug-iterator) lane of the adjacent, separate
+    // `CArmyImpl::UnitCategorySets` real `msvc8::vector<SEntitySetTemplateUnit>`
+    // member that starts immediately after this struct (CArmyImpl+0x258).
+    // Evidence: `CArmyImpl::CArmyImpl` (0x006FE690) builds the category-set
+    // count/value arguments and calls `sub_702450` (`resize`) at 0x006FF2E1
+    // with `edx = lea [ebp+258h]` -- i.e. the vector object's own address,
+    // one dword *before* `UnitCategorySetsBegin` (formerly modeled at
+    // CArmyImpl+0x25C). `sub_702450`/`sub_7030C0` (`_Insert_n`) only ever
+    // read/write `*(obj+4)`/`*(obj+8)`/`*(obj+0xC)` (first_/last_/end_),
+    // never `*(obj+0)` -- exactly the `msvc8::vector<T>` shape (leading
+    // unused proxy slot). Independently confirmed by
+    // `gpg::RVectorType<SEntitySetTemplateUnit>::Init()`
+    // (ArmyUnitSetVectorReflection.cpp), which sets
+    // `size_ = sizeof(msvc8::vector<SEntitySetTemplateUnit>)` == 0x10 (16
+    // bytes) for the exact same reflected field.
     gpg::fastvector_n<CPlatoon*, 8> platoons;
-    // +0x30: unknown scalar (layout-owned, currently unresolved)
-    std::uint32_t unknown30;
   };
 
   static_assert(sizeof(gpg::fastvector_n<CPlatoon*, 8>) == 0x30, "gpg::fastvector_n<CPlatoon*,8> size must be 0x30");
-  static_assert(sizeof(ArmyPool) == 0x34, "ArmyPool size must be 0x34");
+  static_assert(sizeof(ArmyPool) == 0x30, "ArmyPool size must be 0x30");
   static_assert(offsetof(ArmyPool, platoons) == 0x00, "ArmyPool::platoons offset must be 0x00");
   static_assert(offsetof(ArmyPool, platoons.start_) == 0x00, "ArmyPool::platoons.start_ offset must be 0x00");
   static_assert(offsetof(ArmyPool, platoons.end_) == 0x04, "ArmyPool::platoons.end_ offset must be 0x04");
@@ -52,7 +67,6 @@ namespace moho
     offsetof(ArmyPool, platoons.originalVec_) == 0x0C, "ArmyPool::platoons.originalVec_ offset must be 0x0C"
   );
   static_assert(offsetof(ArmyPool, platoons.inlineVec_) == 0x10, "ArmyPool::platoons.inlineVec_ offset must be 0x10");
-  static_assert(offsetof(ArmyPool, unknown30) == 0x30, "ArmyPool::unknown30 offset must be 0x30");
 
   class CArmyImpl : public SimArmy
   {
@@ -361,9 +375,16 @@ namespace moho
     void* PathFinder;                                    // 0x021C
     boost::SharedPtrRaw<void> UnknownShared220;          // 0x0220
     ArmyPool PlatoonPool;                                // 0x0228
-    SEntitySetTemplateUnit* UnitCategorySetsBegin;       // 0x025C
-    SEntitySetTemplateUnit* UnitCategorySetsEnd;         // 0x0260
-    SEntitySetTemplateUnit* UnitCategorySetsCapacityEnd; // 0x0264
+    /**
+     * Real `msvc8::vector<SEntitySetTemplateUnit>` (0x258: myProxy_,
+     * 0x25C: first_/begin, 0x260: last_/end, 0x264: end_/capacityEnd),
+     * one per-category-bit-index cached unit set. Built by
+     * `InitializeArmyUnitCategorySets` (FUN_006FE690 tail via
+     * `sub_702450`/`sub_7030C0`, i.e. `resize(count)`) and consumed by
+     * `ResolveCategorySetForUnit`, `~CArmyImpl` (via `TeardownEntitySetRange`),
+     * and the `MemberSerialize`/`MemberDeserialize` reflection lanes.
+     */
+    msvc8::vector<SEntitySetTemplateUnit> UnitCategorySets; // 0x0258
     std::uint32_t UnitCategoryBaseIndex;                 // 0x0268
     std::uint32_t UnitCategoryMaxIndex;                  // 0x026C
     float UnitCapacity;                                  // 0x0270
@@ -395,16 +416,7 @@ namespace moho
   static_assert(offsetof(CArmyImpl, PathFinder) == 0x21C, "CArmyImpl::PathFinder offset must be 0x21C");
   static_assert(offsetof(CArmyImpl, UnknownShared220) == 0x220, "CArmyImpl::UnknownShared220 offset must be 0x220");
   static_assert(offsetof(CArmyImpl, PlatoonPool) == 0x228, "CArmyImpl::PlatoonPool offset must be 0x228");
-  static_assert(
-    offsetof(CArmyImpl, UnitCategorySetsBegin) == 0x25C, "CArmyImpl::UnitCategorySetsBegin offset must be 0x25C"
-  );
-  static_assert(
-    offsetof(CArmyImpl, UnitCategorySetsEnd) == 0x260, "CArmyImpl::UnitCategorySetsEnd offset must be 0x260"
-  );
-  static_assert(
-    offsetof(CArmyImpl, UnitCategorySetsCapacityEnd) == 0x264,
-    "CArmyImpl::UnitCategorySetsCapacityEnd offset must be 0x264"
-  );
+  static_assert(offsetof(CArmyImpl, UnitCategorySets) == 0x258, "CArmyImpl::UnitCategorySets offset must be 0x258");
   static_assert(
     offsetof(CArmyImpl, UnitCategoryBaseIndex) == 0x268, "CArmyImpl::UnitCategoryBaseIndex offset must be 0x268"
   );

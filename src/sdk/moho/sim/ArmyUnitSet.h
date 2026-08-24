@@ -54,6 +54,13 @@ namespace moho
 
     /**
      * Address: 0x005796A0 (FUN_005796A0, Moho::EntitySetTemplate_Entity::~EntitySetTemplate_Entity)
+     * Address: 0x00705B30 (FUN_00705B30, a second, independently-emitted copy
+     * of the same destructor body -- byte-for-byte the same
+     * release-heap-storage / rebind-inline / list-unlink shape as
+     * FUN_005796A0, just emitted again for the `msvc8::vector<
+     * SEntitySetTemplateUnit>::_Insert_n`/`resize` reallocation path's
+     * EH-unwind cleanup loop (`CArmyImpl::UnitCategorySets`,
+     * `Vector.h`'s `uninit_move_n` emissions FUN_00706900/FUN_00705980).
      *
      * What it does:
      * Releases heap-backed set storage (if any), restores inline-vector lanes,
