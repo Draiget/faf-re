@@ -2786,6 +2786,11 @@ namespace msvc8
          * already-constructed prefix and rethrows on a `catch(...)`. Reached via the
          * thin dispatcher FUN_00653330 from the `_Insert_n` grow lane FUN_00653380,
          * already cited above)
+         * Address: 0x0075FEF0 (FUN_0075FEF0, msvc8::vector<Moho::Sim::
+         * DumpUnitsCountEntry>::uninit_fill_n for the 8-byte trivially-copyable
+         * element -- a count-driven dword-pair fill loop, reached from both
+         * `Moho::Sim::DumpUnits` (0x0075EE50) and its `push_back` grow lane
+         * (0x0075F1A0, cited on `push_back` above))
          *
          * Uninitialized fill N with value starting at dst
          */
