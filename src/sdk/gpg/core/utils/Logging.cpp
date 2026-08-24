@@ -107,6 +107,11 @@ public:
 
     /**
      * Address: 0x008E4960 (FUN_008E4960, HistoryLogTarget::~HistoryLogTarget)
+     * Address: 0x008E45E0 (FUN_008E45E0, the binary's std::list<Entry> node
+     *   teardown walk this destructor ran over its original list-backed
+     *   retention lane -- confirmed callsite at 0x008E498B inside this
+     *   destructor's own body; absorbed here by mEntries' (msvc8::vector<Entry>)
+     *   implicit destructor immediately below, same per-entry teardown)
      *
      * What it does:
      * Destroys retained history storage, releases lock state, and runs
@@ -232,6 +237,11 @@ public:
 private:
     /**
      * Address: 0x008E4770 (FUN_008E4770, HistoryLogTarget::TrimLocked)
+     * Address: 0x008E4660 (FUN_008E4660, the binary's std::list<Entry>::erase
+     *   node-unlink this trim loop called on its original list-backed
+     *   retention lane -- confirmed callsite at 0x008E4833 inside this
+     *   function's own body; absorbed here by the mEntries.erase(...) call
+     *   below, same per-entry drop)
      *
      * What it does:
      * Removes oldest retained message entries (and stale context lanes) until
