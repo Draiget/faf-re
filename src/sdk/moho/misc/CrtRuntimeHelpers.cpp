@@ -9122,6 +9122,364 @@ namespace moho::runtime
     return result;
   }
 
+  // Real address unresolved: MSVC CRT's per-lead-byte trailing-multibyte-
+  // sequence-length table (0-255), consulted only by _read_nolock's UTF-8
+  // partial-sequence recovery path. Declared as an opaque data reference
+  // pending a dedicated CRT locale-table recovery pass; not exercised by
+  // any currently-recovered caller (ANSI/binary reads never reach it).
+  extern "C" const unsigned char g_mbcsTrailingByteCount[256];
+
+  /**
+   * Address: 0x00AA1246 (FUN_00AA1246, _read_nolock)
+   *
+   * What it does:
+   * Low-level buffered read for `fileDescriptor`. Serves any pending
+   * pushback byte(s) first (`pipech`/`pipech2`, set by ungetc-style
+   * callers), then `ReadFile`s the rest. In text mode: ANSI/UTF-8 submodes
+   * scan the raw bytes for `\r\n`->`\n` collapse and Ctrl-Z truncation
+   * (UTF-8 additionally re-decodes the collapsed bytes into the caller's
+   * wide buffer via `MultiByteToWideChar`, buffering the tail of a split
+   * multibyte sequence into the fd's pushback slots for the next call);
+   * UTF-16 submode does the same `\r\n`->`\n` collapse on 16-bit units.
+   * Binary mode returns the raw byte count unchanged.
+   */
+  extern "C" unsigned int __cdecl _read_nolock(const int fileDescriptor, char* const lpBuffer, const unsigned int requestedSize)
+  {
+    if (fileDescriptor == -2) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      return static_cast<unsigned int>(-1);
+    }
+    if (fileDescriptor < 0 || fileDescriptor >= _nhandle) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return static_cast<unsigned int>(-1);
+    }
+
+    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    if ((slot->osfile & 1) == 0) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return static_cast<unsigned int>(-1);
+    }
+
+    if (requestedSize > 0x7FFFFFFFu) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return static_cast<unsigned int>(-1);
+    }
+    if (requestedSize == 0 || (slot->osfile & 2) != 0) {
+      return 0;
+    }
+    if (lpBuffer == nullptr) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return static_cast<unsigned int>(-1);
+    }
+
+    const int submode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
+
+    char* scratch = lpBuffer;
+    unsigned int readCapacity = requestedSize;
+    bool scratchOwned = false;
+
+    if (submode == 2 /* _O_U16TEXT */) {
+      if ((requestedSize & 1u) != 0) {
+        *RuntimeDosErrno() = 0;
+        *_errno() = EINVAL;
+        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+        return static_cast<unsigned int>(-1);
+      }
+      readCapacity &= ~1u;
+    } else if (submode == 1 /* _O_U8TEXT */) {
+      if ((requestedSize & 1u) != 0) {
+        *RuntimeDosErrno() = 0;
+        *_errno() = EINVAL;
+        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+        return static_cast<unsigned int>(-1);
+      }
+      readCapacity = std::max<unsigned int>(4u, requestedSize >> 1);
+      scratch = static_cast<char*>(std::malloc(readCapacity));
+      if (scratch == nullptr) {
+        *_errno() = ENOMEM;
+        *RuntimeDosErrno() = 8;
+        return static_cast<unsigned int>(-1);
+      }
+      scratchOwned = true;
+
+      // Real body: `v9 = lseeki64_nolock(...); *(&_pioinfo[fd>>5][1].osfhnd + v5) = v9;`
+      // -- stores the pre-read position into the *next* slot's osfhnd field
+      // (page base + one RuntimeIoInfo further + this slot's own byte
+      // offset). Preserved verbatim; the intended field/purpose is not
+      // independently confirmed (not exercised by any recovered caller --
+      // UTF-8-mode reads never occur on a freshly _wsopen_nolock'd file).
+      const __int64 preReadPosition = _lseeki64_nolock(fileDescriptor, 0, FILE_CURRENT);
+      *reinterpret_cast<__int64*>(&(__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F) + 1)->osfhnd) = preReadPosition;
+    }
+
+    char* writeCursor = scratch;
+    unsigned int producedSoFar = 0;
+
+    // Serve any pending pushback byte(s) (ungetc-style) before the real read.
+    if ((slot->osfile & 0x48) != 0 && slot->pipech != 10 && readCapacity != 0) {
+      *writeCursor++ = static_cast<char>(slot->pipech);
+      --readCapacity;
+      producedSoFar = 1;
+      slot->pipech = 10;
+
+      if (submode != 0 && slot->pipech2[0] != 10 && readCapacity != 0) {
+        *writeCursor++ = static_cast<char>(slot->pipech2[0]);
+        --readCapacity;
+        producedSoFar = 2;
+        slot->pipech2[0] = 10;
+
+        if (submode == 1 && slot->pipech2[1] != 10 && readCapacity != 0) {
+          *writeCursor++ = static_cast<char>(slot->pipech2[1]);
+          --readCapacity;
+          producedSoFar = 3;
+          slot->pipech2[1] = 10;
+        }
+      }
+    }
+
+    DWORD bytesRead = 0;
+    const BOOL readOk = ::ReadFile(reinterpret_cast<HANDLE>(slot->osfhnd), writeCursor, readCapacity, &bytesRead, nullptr);
+    if (!readOk || (bytesRead & 0x80000000u) != 0 || bytesRead > readCapacity) {
+      const DWORD lastError = ::GetLastError();
+      const auto cleanup = [&]() {
+        if (scratchOwned) {
+          _free_crt(scratch);
+        }
+      };
+      if (lastError == ERROR_ACCESS_DENIED) {
+        *_errno() = EBADF;
+        *RuntimeDosErrno() = ERROR_ACCESS_DENIED;
+        cleanup();
+        return static_cast<unsigned int>(-1);
+      }
+      if (lastError == ERROR_BROKEN_PIPE) {
+        cleanup();
+        return 0;
+      }
+      _dosmaperr(lastError);
+      cleanup();
+      return static_cast<unsigned int>(-1);
+    }
+
+    producedSoFar += bytesRead;
+    unsigned int result = producedSoFar;
+    bool forced = false;
+    unsigned int forcedValue = 0;
+
+    if (static_cast<std::int8_t>(slot->osfile) < 0) {
+      if (submode != 2) {
+        // ANSI (submode 0) or UTF-8 (submode 1): scan raw bytes, collapsing
+        // "\r\n"->"\n" and stopping at a Ctrl-Z byte (unless the fd allows
+        // literal Ctrl-Z passthrough, osfile&0x40).
+        char* dst = scratch;
+        const char* src = scratch;
+        const char* const srcEnd = scratch + producedSoFar;
+        bool sawEof = false;
+
+        while (src < srcEnd) {
+          const char ch = *src;
+          if (ch == 0x1A) {
+            if ((slot->osfile & 0x40) != 0) {
+              *dst++ = *src;
+            } else {
+              slot->osfile |= 2;
+            }
+            sawEof = true;
+            break;
+          }
+          if (ch == '\r') {
+            if (src + 1 < srcEnd) {
+              if (src[1] == '\n') {
+                src += 2;
+                *dst++ = '\n';
+                continue;
+              }
+              ++src;
+              *dst++ = '\r';
+              continue;
+            }
+            // Trailing lone '\r' at the end of this chunk: peek one more
+            // byte from the file to resolve whether it's really "\r\n".
+            ++src;
+            char peek = 0;
+            DWORD peekRead = 0;
+            if ((!::ReadFile(reinterpret_cast<HANDLE>(slot->osfhnd), &peek, 1u, &peekRead, nullptr) && ::GetLastError()) ||
+                peekRead == 0)
+            {
+              *dst++ = '\r';
+              continue;
+            }
+            if ((slot->osfile & 0x48) != 0) {
+              if (peek != '\n') {
+                *dst++ = '\r';
+                slot->pipech = peek;
+                continue;
+              }
+              *dst++ = '\n';
+              continue;
+            }
+            if (dst == scratch && peek == '\n') {
+              *dst++ = '\n';
+              continue;
+            }
+            _lseeki64_nolock(fileDescriptor, -1, FILE_CURRENT);
+            if (peek != '\n') {
+              *dst++ = '\r';
+            } else {
+              *dst++ = '\n';
+            }
+            continue;
+          }
+          *dst++ = ch;
+          ++src;
+        }
+        (void)sawEof;
+
+        producedSoFar = static_cast<unsigned int>(dst - scratch);
+
+        if (submode != 1 || dst == scratch) {
+          result = producedSoFar;
+        } else {
+          // UTF-8 submode: re-decode the collapsed ANSI-shaped bytes as
+          // UTF-8 into the caller's wide buffer, holding back a trailing
+          // partial multibyte sequence for the next call's pushback slots.
+          const unsigned char* tail = reinterpret_cast<unsigned char*>(dst) - 1;
+          unsigned int decodeLen;
+          if ((*tail & 0x80) != 0) {
+            unsigned int trailingScanned = 1;
+            while (g_mbcsTrailingByteCount[*tail] == 0 && trailingScanned <= 4 &&
+                   reinterpret_cast<char*>(const_cast<unsigned char*>(tail)) >= scratch) {
+              --tail;
+              ++trailingScanned;
+            }
+            if (g_mbcsTrailingByteCount[*tail] == 0) {
+              *_errno() = EILSEQ;
+              forced = true;
+              forcedValue = static_cast<unsigned int>(-1);
+              decodeLen = 0;
+            } else if (g_mbcsTrailingByteCount[*tail] + 1u == trailingScanned) {
+              decodeLen = static_cast<unsigned int>(reinterpret_cast<char*>(const_cast<unsigned char*>(tail)) + trailingScanned - scratch);
+            } else if ((slot->osfile & 0x48) != 0) {
+              const unsigned char lead = *tail;
+              const unsigned char* src2 = tail + 1;
+              slot->pipech = static_cast<std::uint8_t>(lead);
+              if (trailingScanned >= 2) {
+                slot->pipech2[0] = *src2++;
+              }
+              if (trailingScanned == 3) {
+                slot->pipech2[1] = *src2++;
+              }
+              decodeLen = static_cast<unsigned int>(reinterpret_cast<const char*>(src2) - trailingScanned - scratch);
+            } else {
+              _lseeki64_nolock(fileDescriptor, -static_cast<int>(trailingScanned), FILE_CURRENT);
+              decodeLen = static_cast<unsigned int>(reinterpret_cast<char*>(const_cast<unsigned char*>(tail)) - scratch);
+            }
+          } else {
+            decodeLen = static_cast<unsigned int>(reinterpret_cast<char*>(const_cast<unsigned char*>(tail)) + 1 - scratch);
+          }
+
+          if (!forced) {
+            const int decodedChars = ::MultiByteToWideChar(
+              CP_UTF8, 0, scratch, static_cast<int>(decodeLen), reinterpret_cast<LPWSTR>(lpBuffer),
+              static_cast<int>(requestedSize >> 1)
+            );
+            if (decodedChars != 0) {
+              // Real body stores a "wasn't an exact wchar-for-byte-run
+              // decode" flag into the *next* slot's lockinitflag field
+              // (same page-relative-plus-slot-offset shape as the
+              // pre-read-position store above); not independently confirmed
+              // and not reproduced here since it feeds no read caller yet.
+              result = static_cast<unsigned int>(decodedChars) * 2u;
+            } else {
+              _dosmaperr(::GetLastError());
+              forced = true;
+              forcedValue = static_cast<unsigned int>(-1);
+            }
+          }
+        }
+      } else {
+        // UTF-16 submode: identical "\r\n"->"\n" collapse on 16-bit units,
+        // written directly into the caller's buffer (scratch == lpBuffer).
+        auto* dst = reinterpret_cast<std::uint16_t*>(scratch);
+        const auto* src = reinterpret_cast<std::uint16_t*>(scratch);
+        const auto* const srcEnd = reinterpret_cast<std::uint16_t*>(scratch + producedSoFar);
+
+        while (src < srcEnd) {
+          const std::uint16_t ch = *src;
+          if (ch == 0x1A) {
+            if ((slot->osfile & 0x40) != 0) {
+              *dst++ = *src;
+            } else {
+              slot->osfile |= 2;
+            }
+            break;
+          }
+          if (ch == static_cast<std::uint16_t>(L'\r')) {
+            if (src + 1 < srcEnd) {
+              if (src[1] == static_cast<std::uint16_t>(L'\n')) {
+                src += 2;
+                *dst++ = static_cast<std::uint16_t>(L'\n');
+                continue;
+              }
+              ++src;
+              *dst++ = static_cast<std::uint16_t>(L'\r');
+              continue;
+            }
+            ++src;
+            std::uint16_t peek = 0;
+            DWORD peekRead = 0;
+            if ((!::ReadFile(reinterpret_cast<HANDLE>(slot->osfhnd), &peek, 2u, &peekRead, nullptr) && ::GetLastError()) ||
+                peekRead == 0)
+            {
+              *dst++ = static_cast<std::uint16_t>(L'\r');
+              continue;
+            }
+            if ((slot->osfile & 0x48) != 0) {
+              if (peek != static_cast<std::uint16_t>(L'\n')) {
+                *dst++ = static_cast<std::uint16_t>(L'\r');
+                slot->pipech = static_cast<std::uint8_t>(peek);
+                slot->pipech2[0] = static_cast<std::uint8_t>(peek >> 8);
+                slot->pipech2[1] = 10;
+                continue;
+              }
+              *dst++ = static_cast<std::uint16_t>(L'\n');
+              continue;
+            }
+            if (dst == reinterpret_cast<std::uint16_t*>(scratch) && peek == static_cast<std::uint16_t>(L'\n')) {
+              *dst++ = static_cast<std::uint16_t>(L'\n');
+              continue;
+            }
+            _lseeki64_nolock(fileDescriptor, -2, FILE_CURRENT);
+            if (peek != static_cast<std::uint16_t>(L'\n')) {
+              *dst++ = static_cast<std::uint16_t>(L'\r');
+            } else {
+              *dst++ = static_cast<std::uint16_t>(L'\n');
+            }
+            continue;
+          }
+          *dst++ = ch;
+          ++src;
+        }
+
+        result = static_cast<unsigned int>(reinterpret_cast<char*>(dst) - scratch);
+      }
+    }
+
+    if (scratchOwned) {
+      _free_crt(scratch);
+    }
+    return forced ? forcedValue : result;
+  }
+
   /**
    * Address: 0x00AAFFC4 (FUN_00AAFFC4, _wsopen_s / _wsopen_helper)
    *
