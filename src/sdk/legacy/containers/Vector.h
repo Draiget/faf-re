@@ -2095,6 +2095,31 @@ namespace msvc8
          * (moho/terrain/water/WaveSystem.cpp), the per-entry append while
          * loading a `WavePattern`'s `parameters` array from Lua.)
          *
+         * Address: 0x007409D0 (FUN_007409D0, msvc8::vector<msvc8::string>::
+         * push_back dispatcher for the 16-byte `msvc8::string` element —
+         * `__thiscall` with the element count in `ecx` (always 1 at every
+         * confirmed call site) rather than a genuine `this`. Checked-grow via
+         * `FUN_00741270` (validates count, throws via `FUN_00741630` past
+         * `0xFFFFFFF`, allocates through `FUN_00741BE0`-style storage,
+         * matching `allocate_slots_checked`); on success, constructs the
+         * element(s) in place via `FUN_00741FC0`, then advances `last_` by
+         * `count * 16`. `FUN_00741FC0`'s decompiled body looks `__noreturn`
+         * (a destroy-loop into `CxxThrowException`) but raw `.asm` at the
+         * call site (0x00740A1E) confirms execution continues normally after
+         * it on the fast path -- that shape is `FUN_00741FC0`'s own
+         * exception-cleanup tail, not its whole behavior, and is not
+         * reachable from the normal push_back flow. `FUN_00740A60` is called
+         * only from `sub_7409D0`'s own SEH funclet (a disjoint code chunk at
+         * 0x00740A41, wired through `SEH_7409D0`/`___CxxFrameHandler3_0`) to
+         * destroy a partially-constructed range on exception -- compiler-
+         * generated unwind scaffolding with no source-level call, per RULE
+         * ONE. Emitted via `columns[0].push_back(msvc8::string(""))`, the
+         * first of many `msvc8::vector<msvc8::string> columns[8]` appends in
+         * `Moho::CSimDriver::DrawNetworkStats` (SimDriver.cpp:2493) --
+         * confirmed by address ordering: this dispatcher's only call site is
+         * at 0x0073E084, immediately before the 0x0073E098 `columns[0]`
+         * push cited at that line.)
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
