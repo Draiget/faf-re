@@ -1143,6 +1143,11 @@ CAiReconDBImpl::CAiReconDBImpl()
 
 /**
  * Address: 0x005BFF90 (FUN_005BFF90, ??0CAiReconDBImpl@Moho@@QAE@PAVSimArmy@1@_N1@Z)
+ *
+ * Address: 0x005C91F0 (FUN_005C91F0, ??4shared_ptr_CIntelGrid@boost@@QAE@@Z) --
+ * boost::shared_ptr<CIntelGrid>::operator=, the emission invoked via
+ * boost::ResetSharedPtrRawOwning at all 8 grid-assignment call sites below
+ * (e.g. 0x005C00D7).
  */
 CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
     mBlipMap{},
