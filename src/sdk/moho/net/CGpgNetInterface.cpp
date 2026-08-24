@@ -383,63 +383,6 @@ namespace
   }
 
   /**
-   * Address: 0x007BDBB0 (FUN_007BDBB0)
-   *
-   * What it does:
-   * Resets one command-argument string lane to empty SSO storage while
-   * preserving the scalar `mType/mNum` lanes.
-   */
-  [[maybe_unused]] void ResetSingleCommandArgStorage(
-    SNetCommandArg& arg
-  ) noexcept
-  {
-    ResetLegacyStringStorage(arg.mStr);
-  }
-
-  /**
-   * Address: 0x007B6D80 (FUN_007B6D80)
-   *
-   * What it does:
-   * Resets one `SNetCommandArg` string payload lane back to empty storage
-   * while preserving `mType/mNum` scalars and returns `0`.
-   */
-  [[maybe_unused]] int ResetSingleCommandArgStringStorageLaneA(
-    SNetCommandArg* const arg
-  ) noexcept
-  {
-    if (arg != nullptr) {
-      ResetLegacyStringStorage(arg->mStr);
-    }
-    return 0;
-  }
-
-  /**
-   * Address: 0x007B6570 (FUN_007B6570)
-   *
-   * What it does:
-   * Initializes one `SNetCommandArg` as `NETARG_Data` and copies a byte range
-   * into the embedded legacy string payload.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* ConstructDataCommandArgFromRangeLaneA(
-    const std::size_t length,
-    const char* const begin,
-    SNetCommandArg* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    out->mType = SNetCommandArg::NETARG_Data;
-    out->mNum = 0;
-    ResetLegacyStringStorage(out->mStr);
-    if (begin != nullptr && length != 0U) {
-      out->mStr.assign(begin, length);
-    }
-    return out;
-  }
-
-  /**
    * Address: 0x007BE4B0 (FUN_007BE4B0)
    *
    * What it does:
@@ -546,7 +489,7 @@ namespace
       }
     } catch (...) {
       for (SNetCommandArg* rollback = begin; rollback != cursor; ++rollback) {
-        ResetSingleCommandArgStorage(*rollback);
+        rollback->ResetPayload();
       }
       throw;
     }
@@ -617,7 +560,7 @@ namespace
       }
     } catch (...) {
       for (SNetCommandArg* rollback = writtenBegin; rollback != cursor; ++rollback) {
-        ResetSingleCommandArgStorage(*rollback);
+        rollback->ResetPayload();
       }
       throw;
     }
@@ -1340,8 +1283,7 @@ void CGpgNetInterface::ReceivePacket(
   const msvc8::string connStr = gpg::STR_Printf("%s:%d", ip.c_str(), static_cast<int>(port));
   SNetCommandArg argFrom(connStr);
 
-  SNetCommandArg argData(0);
-  (void)ConstructDataCommandArgFromRangeLaneA(size, data, &argData);
+  const SNetCommandArg argData(data, size);
 
   WriteCommandWith2Args("ProcessNatPacket", &argFrom, &argData);
 }

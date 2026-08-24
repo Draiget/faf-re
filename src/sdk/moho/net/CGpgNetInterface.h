@@ -63,6 +63,42 @@ namespace moho
       , mNum{0}
       , mStr{str}
     {}
+
+    /**
+     * Address: 0x007B6570 (FUN_007B6570)
+     *
+     * What it does:
+     * Initializes one command argument as a binary data payload: sets
+     * `mType = NETARG_Data`, zeroes `mNum`, default-inits `mStr` into SSO
+     * state, then copies `length` bytes starting at `data` into the arg
+     * payload. Mirrors the `NETARG_String` constructor above for the raw
+     * byte-range case instead of a `msvc8::string` source.
+     */
+    SNetCommandArg(
+      const char* const data,
+      const std::size_t length
+    )
+      : mType{NETARG_Data}
+      , mNum{0}
+    {
+      if (data != nullptr && length != 0U) {
+        mStr.assign(data, length);
+      }
+    }
+
+    /**
+     * Address: 0x007BDBB0 (FUN_007BDBB0)
+     *
+     * What it does:
+     * Resets the string payload back to empty SSO storage, releasing any
+     * heap buffer it owns, while preserving `mType`/`mNum` as-is. Used to
+     * unwind an already-constructed argument slot on the rollback path of
+     * a partially-completed range copy.
+     */
+    void ResetPayload() noexcept
+    {
+      mStr.tidy(true, 0U);
+    }
   };
   static_assert(sizeof(SNetCommandArg) == 0x24, "SNetCommandArg size must be 0x24");
 
