@@ -1299,6 +1299,11 @@ namespace
 
   /**
    * Address: 0x007F2210 (FUN_007F2210, sub_7F2210)
+   * Address: 0x007F2670 (FUN_007F2670, this method's left-rotation rebalance
+   * step -- classic `_Lrotate` shape (promote right child, relink parent,
+   * fix up the promoted node's left-child parent pointer), one of the
+   * rotation calls in the color-fixup loop below the transplant. Sentinel
+   * test at `+0xB9`, matching this node's `mIsSentinel` offset.)
    *
    * What it does:
    * Erases one range-profile map node from the RB-tree, preserves iterator
