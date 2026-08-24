@@ -245,6 +245,20 @@ namespace
   }
 
   /**
+   * Address: 0x006BA910 (FUN_006BA910, interior `call eax` instruction inside
+   * Serialize_EUnitMotionState above - not a separate entry point)
+   */
+
+  /**
+   * Address: 0x006BA940 (FUN_006BA940, dead owner-none setup block spanning
+   * 0x006BA920-0x006BA94D immediately after Serialize_EUnitMotionState above; it
+   * redundantly re-derives gEUnitMotionStatePrimitiveSerializer's vtable/mDeserialize/
+   * mSerialize fields, but has zero incoming code or data xrefs anywhere in the
+   * callgraph index - unreachable, superseded by the live
+   * register_EUnitMotionStatePrimitiveSerializer at 0x00BD7000 below)
+   */
+
+  /**
    * Address: 0x006BA950 (FUN_006BA950)
    */
   void Deserialize_EUnitMotionCarrierEvent(
@@ -284,6 +298,11 @@ namespace
   }
 
   /**
+   * Address: 0x006BA9D0 (FUN_006BA9D0, interior `mov ecx, [esp+arg_4]` instruction
+   * inside Deserialize_EUnitMotionHorzEvent above - not a separate entry point)
+   */
+
+  /**
    * Address: 0x006BA9E0 (FUN_006BA9E0)
    */
   void Serialize_EUnitMotionHorzEvent(
@@ -321,6 +340,20 @@ namespace
   {
     SerializeEnumIntLane<moho::EUnitMotionVertEvent>(archive, objectPtr, version, ownerRef);
   }
+
+  /**
+   * Address: 0x006BAA60 (FUN_006BAA60, interior `call eax` instruction inside
+   * Serialize_EUnitMotionVertEvent above - not a separate entry point)
+   */
+
+  /**
+   * Address: 0x006BAA90 (FUN_006BAA90, dead owner-none setup block spanning
+   * 0x006BAA70-0x006BAA9D immediately after Serialize_EUnitMotionVertEvent above; it
+   * redundantly re-derives gEUnitMotionVertEventPrimitiveSerializer's vtable/mDeserialize/
+   * mSerialize fields, but has zero incoming code or data xrefs anywhere in the
+   * callgraph index - unreachable, superseded by the live
+   * register_EUnitMotionVertEventPrimitiveSerializer at 0x00BD7120 below)
+   */
 
   /**
    * Address: 0x006BAAA0 (FUN_006BAAA0)
