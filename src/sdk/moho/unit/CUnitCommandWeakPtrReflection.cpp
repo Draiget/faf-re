@@ -949,6 +949,16 @@ namespace gpg
       }
     }
 
+    // Address: 0x006EA710 (FUN_006EA710, msvc8::vector<WeakPtr<CUnitCommand>>::uninit_fill_n
+    // grow lane for the default-value case). VC8's single-arg `resize(_Newsize)`
+    // is `resize(_Newsize, _Ty())` -- when `requested` grows the vector, the
+    // compiler materializes a zeroed `WeakPtr<CUnitCommand>{}` temporary directly
+    // in the outgoing argument slots and forwards it to the owner-chain-aware
+    // fill lane FUN_006EC5B0 (`FillConstructWeakPtrCUnitCommandLanes`, already
+    // cited above at 0x006EC5B0/0x007A5FE0) -- generic byte-fill can't be used
+    // here because a live `WeakPtr` must be linked into its owner's chain, even
+    // when the owner slot is null. Returns `destination + requested` (8-byte
+    // lane stride), matching `_Insert_n`'s post-fill cursor.
     storage->resize(requested);
   }
 

@@ -4875,6 +4875,13 @@ namespace moho
         const SPositionThreat sample{worldX, 0.0f, worldZ, threat};
         // push_back's capacity-full path is `msvc8::vector<SPositionThreat>::insert`
         // (FUN_0071BEE0), reached through the binary's push_back at FUN_00718A40.
+        // `_Insert_n` (0071BEE0) itself calls FUN_0071A1F0 to relocate the
+        // existing `[begin, insertPos)` run into the freshly-grown buffer: a
+        // 16-byte-stride (`shl eax,4`) element-count loop that forwards to the
+        // shared FPU-based 4-float block copy at FUN_0071E8E0, then returns
+        // `dest + count*16` as the post-copy cursor -- the `uninit_copy_n`
+        // sibling of `_Insert_n`'s own inline `_Tmp` fill for this 0x10-byte
+        // `SPositionThreat` instantiation.
         out.push_back(sample);
 
         if (sim) {
