@@ -175,7 +175,21 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
 }
 
 /**
- * Address: 0x007BED70 (FUN_007BED70, copy_SSTICommandSource_range_with_rollback)
+ * NOT a citation of 0x007BED70 -- corrected. A prior pass attributed
+ * `FUN_007BED70` to this function ("copy_SSTICommandSource_range_with_rollback"),
+ * but 0x007BED70's own per-element callee (`FUN_007BE4B0`) writes two leading
+ * dwords (+0x00/+0x04) before touching a string at +0x08 and never touches
+ * +0x20 -- that shape is `Moho::SNetCommandArg`
+ * (`{EType mType; int32_t mNum; msvc8::string mStr}`, CGpgNetInterface.h),
+ * not `SSTICommandSource` (`{uint32_t mIndex; msvc8::string mName; int32_t
+ * mTimeouts}`, string at +0x04, trailing dword at +0x20 -- see
+ * SSTICommandSource.h). 0x007BED70 is `msvc8::vector<Moho::SNetCommandArg>::
+ * uninit_move_n`, cited there in legacy/containers/Vector.h. This function
+ * has no proven binary address; it is a hand-written, behaviorally-plausible
+ * (but uncited) range-copy-with-rollback, kept only in case a real address
+ * for this operation is found later. It has no source-level caller in
+ * `src/sdk/**` (see the three adapters below, all `[[maybe_unused]]`
+ * themselves).
  *
  * What it does:
  * Copy-constructs one half-open `SSTICommandSource` range into destination
@@ -216,7 +230,11 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
 }
 
 /**
- * Address: 0x007BD930 (FUN_007BD930)
+ * NOT a citation of 0x007BD930 -- corrected (see the note on
+ * `CopySSTICommandSourceRangeWithRollback` above). 0x007BD930 is a
+ * register-shape adapter that forwards into 0x007BED70
+ * (`msvc8::vector<Moho::SNetCommandArg>::uninit_move_n`, Vector.h), not a
+ * `SSTICommandSource` operation. This function has no proven binary address.
  *
  * What it does:
  * Register-shape adapter that normalizes one low-byte-cleared context lane
@@ -236,7 +254,12 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
 }
 
 /**
- * Address: 0x007BCD00 (FUN_007BCD00)
+ * NOT a citation of 0x007BCD00 -- corrected (see the note on
+ * `CopySSTICommandSourceRangeWithRollback` above). 0x007BCD00 is the
+ * single-element `uninit_move_n` adapter used by
+ * `msvc8::vector<Moho::SNetCommandArg>::insert`'s in-place middle-insert
+ * branch (cited on `insert`/`uninit_move_n`, Vector.h), not a
+ * `SSTICommandSource` operation. This function has no proven binary address.
  *
  * What it does:
  * Secondary register-context adapter for command-source copy-construction range
@@ -255,7 +278,11 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
 }
 
 /**
- * Address: 0x007BEC10 (FUN_007BEC10)
+ * NOT a citation of 0x007BEC10 -- corrected (see the note on
+ * `CopySSTICommandSourceRangeWithRollback` above). 0x007BEC10 is another
+ * register-shape adapter that forwards into 0x007BED70
+ * (`msvc8::vector<Moho::SNetCommandArg>::uninit_move_n`, Vector.h), not a
+ * `SSTICommandSource` operation. This function has no proven binary address.
  *
  * What it does:
  * Tertiary register-context adapter for command-source copy-construction range
