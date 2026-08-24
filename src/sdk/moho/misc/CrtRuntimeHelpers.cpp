@@ -1265,6 +1265,93 @@ extern "C" double __cdecl strtod(const char* text, char** endPtr)
   return std::strtod(text, endPtr);
 }
 
+namespace
+{
+  /**
+   * Address: 0x00AC0EE9 (FUN_00AC0EE9)
+   *
+   * IDA signature:
+   * int __cdecl sub_AC0EE9(const char **inOutCursor, const char **outConsumedEnd);
+   *
+   * What it does:
+   * The CRT `_Stopfx`-family special-value token recognizer used by the real
+   * `strtod` lane: skips leading whitespace, consumes an optional `+`/`-`
+   * sign, then case-insensitively matches `"inf"` / `"infinity"` or `"nan"`
+   * (with an optional `(alnum|'_')*` payload in parens after `"nan"`).
+   * Returns a bitfield (bit 0x8 = negative sign, bits 0x1/0x3 = no-match /
+   * infinity, 0x4 = nan-with-payload) inferred from control flow rather than
+   * a documented header constant. Advances `*inOutCursor` past the matched
+   * token (or leaves it unmoved on no match) and optionally reports the
+   * match end through `outConsumedEnd`.
+   *
+   * Known divergence: `strtod` above is currently a simplified forward to
+   * `std::strtod` and does not yet invoke this lane; flagged as technical
+   * debt for a dedicated `strtod` fidelity pass rather than reworked here.
+   */
+  [[maybe_unused]] int RuntimeParseSpecialFloatToken(const char** const inOutCursor, const char** const outConsumedEnd)
+  {
+    const char* cursor = *inOutCursor;
+    while (std::isspace(static_cast<unsigned char>(*cursor))) {
+      ++cursor;
+    }
+
+    int flags = 0;
+    if (*cursor == '-') {
+      flags = 0x8;
+      ++cursor;
+    } else if (*cursor == '+') {
+      ++cursor;
+    }
+
+    const char* const signedStart = cursor;
+    const char first = *cursor;
+    if (first == 'n' || first == 'N') {
+      ++cursor;
+      if ((*cursor == 'a' || *cursor == 'A') && (cursor[1] == 'n' || cursor[1] == 'N')) {
+        cursor += 2;
+        if (*cursor == '(') {
+          const char* payload = cursor + 1;
+          while (std::isalnum(static_cast<unsigned char>(*payload)) || *payload == '_') {
+            ++payload;
+          }
+          flags = 0x4;
+          if (*payload == ')') {
+            cursor = payload + 1;
+          }
+        } else {
+          flags = 0x4;
+        }
+      } else {
+        cursor = *inOutCursor;
+        flags = 0;
+      }
+    } else if (first == 'i' || first == 'I') {
+      ++cursor;
+      if ((*cursor == 'n' || *cursor == 'N') && (cursor[1] == 'f' || cursor[1] == 'F')) {
+        cursor += 2;
+        flags |= 0x3;
+        if ((cursor[0] == 'i' || cursor[0] == 'I') && (cursor[1] == 'n' || cursor[1] == 'N')
+          && (cursor[2] == 'i' || cursor[2] == 'I') && (cursor[3] == 't' || cursor[3] == 'T')
+          && (cursor[4] == 'y' || cursor[4] == 'Y')) {
+          cursor += 5;
+        }
+      } else {
+        cursor = *inOutCursor;
+        flags = 0;
+      }
+    } else {
+      flags |= 0x1;
+    }
+    (void)signedStart;
+
+    if (outConsumedEnd != nullptr) {
+      *outConsumedEnd = cursor;
+    }
+    *inOutCursor = cursor;
+    return flags;
+  }
+} // namespace
+
 /**
  * Address: 0x00AC04F1 (FUN_00AC04F1)
  *
@@ -4674,6 +4761,20 @@ extern "C" int __fastcall RuntimeReadBufferedByteNoLockLaneB(
 using RuntimeOutputFn = int(__cdecl*)(std::FILE* stream, const char* format, _locale_t localeInfo, va_list arguments);
 using RuntimeWideOutputFn = int(__cdecl*)(std::FILE* stream, const wchar_t* format, _locale_t localeInfo, va_list arguments);
 
+/**
+ * Address: 0x00A96E17 (FUN_00A96E17, write_char_0)
+ *
+ * IDA signature:
+ * void __usercall sub_A96E17(std::FILE *f@<ecx>, char ch@<al>, int *pnumwritten@<esi>);
+ *
+ * What it does:
+ * The register-convention entry point for the same buffered-char-write logic
+ * implemented below (`RuntimeWriteBufferedCharImpl`) -- field-for-field
+ * identical: tests `_flag & 0x40` / `_base != nullptr`, decrements `_cnt`,
+ * either writes through `_ptr` or falls back to `_flsbuf`, then updates
+ * `*pnumwritten`. Called from `_output_l`'s (external) hot loop with the
+ * stream/count-pointer already resident in ecx/esi.
+ */
 static void RuntimeWriteBufferedCharImpl(std::FILE* const f, int ch, int* const pnumwritten)
 {
   if ((legacy_file(f)._flag & 0x40) == 0 || legacy_file(f)._base != nullptr) {
@@ -13402,6 +13503,35 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   *_errno() = EINVAL;
   return 0.0;
 }
+
+  /**
+   * Address: 0x009F2330 (FUN_009F2330, difftime)
+   *
+   * What it does:
+   * Public `difftime(__time64_t, __time64_t)` entry point; forwards both
+   * arguments to `_difftime64` unchanged.
+   */
+  extern "C" double __cdecl difftime(const __time64_t timeA, const __time64_t timeB)
+  {
+    return _difftime64(timeA, timeB);
+  }
+
+  /**
+   * Address: 0x00AB7F03 (FUN_00AB7F03)
+   *
+   * IDA signature:
+   * double __cdecl sub_AB7F03(double value);
+   *
+   * What it does:
+   * Rounds `value` to the nearest integer using the x87 FPU's current
+   * rounding-control-word mode (`frndint`) -- the round-to-nearest-per-mode
+   * CRT internal used by the printf/scanf float formatting family, distinct
+   * from `floor`/`ceil`'s fixed-direction rounding.
+   */
+  extern "C" double __cdecl RuntimeRoundDoubleToNearestFpuMode(const double value)
+  {
+    return std::nearbyint(value);
+  }
 
   /**
    * Address: 0x009EFF10 (FUN_009EFF10, wcstombs)
