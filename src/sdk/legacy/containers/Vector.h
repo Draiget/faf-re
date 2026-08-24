@@ -1646,6 +1646,17 @@ namespace msvc8
          * `syncData->mEntityUpdates.reserve(sizes->mEntityData)` -- recovered
          * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
          * `mArmyUpdates.reserve` above.)
+         * Address: 0x00561160 (FUN_00561160,
+         * msvc8::vector<Moho::SSyncPublishedCommandPacket>::reserve --
+         * exact-capacity grow for the 0x78-byte element: max_size guard
+         * against 0x2222222 (`0xFFFFFFFF / 0x78`, throw lane FUN_00561900),
+         * allocates via the checked allocator FUN_00562850, uninit-copies
+         * the live range through FUN_005634F0, frees the old block
+         * implicitly and rebases the lanes. Reached from
+         * `Moho::SSyncData::ReserveSizes` (FUN_00560A00) as
+         * `syncData->mPublishedCommandPackets.reserve(sizes->mCommandData)`
+         * -- recovered as `ReserveSyncDataSizes` in Sim.cpp, same call site
+         * as `mArmyUpdates.reserve`/`mEntityUpdates.reserve` above.)
          *
          * Reserve at least `newCap` elements without changing size.
          *
@@ -3478,6 +3489,11 @@ namespace msvc8
          * intrusive sentinel/head node used by `CD3DFileBatchTexture.cpp`'s
          * BVSet lanes)
          *
+         * sizeof(T) == 0x78:
+         * Address: 0x00562850 (FUN_00562850,
+         * `msvc8::vector<Moho::SSyncPublishedCommandPacket>::allocate_slots_checked`,
+         * reached from the `reserve()` guard FUN_00561160)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
@@ -3539,6 +3555,9 @@ namespace msvc8
          * Address: 0x00653860 (FUN_00653860, the 48-byte-stride throw lane for
          * `msvc8::vector<moho::SDebugWorldText>`, reached from the
          * `_Insert_n` grow lane FUN_00653380, already cited above)
+         * Address: 0x00561900 (FUN_00561900, the 0x78-byte-stride throw lane
+         * for `msvc8::vector<Moho::SSyncPublishedCommandPacket>`, reached
+         * from the `reserve()` guard FUN_00561160, already cited above)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
@@ -4102,6 +4121,14 @@ namespace msvc8
          * Address: 0x004E3310 (FUN_004E3310, the same list's `_Incsize`-style
          * overflow-checked size increment, called immediately after the node
          * buy in the same caller)
+         * Address: 0x004E3490 (FUN_004E3490, sibling `_Incsize`-style
+         * overflow-checked size increment for `msvc8::list<Moho::CSndVar*>`
+         * -- `gSndVarRegistry` in moho/audio/CSndVar.cpp, same `_Mysize@+0x08`
+         * offset and the same `0x3FFFFFFF` cap, throwing
+         * `std::length_error("list<T> too long")` via `std::logic_error`'s
+         * ctor with the `??_7length_error@std@@6B@` vftable patched in before
+         * `_CxxThrowException`, exactly mirroring FUN_004E3310. Reached from
+         * `RegisterSndVarInstance`'s (FUN_004DF990) `push_back` call.)
          *
          * What it does:
          * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
