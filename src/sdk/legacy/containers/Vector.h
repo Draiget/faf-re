@@ -2948,6 +2948,27 @@ namespace msvc8
          * Address: 0x007BBD40 (FUN_007BBD40, register-shape thiscall adapter
          * for FUN_007BD8F0, taking `(rangeEnd, rangeBegin)` in swapped
          * argument order.)
+         * Address: 0x007FBBA0 (FUN_007FBBA0, msvc8::vector<moho::
+         * WRenViewportWorldViewParamRuntime>::destroy_range -- the same
+         * 20-byte `{IRenderWorldView* view; int head; int depth;
+         * boost::shared_ptr<TerrainCommon> terrain}` element as this
+         * method's `uninit_move_n` sibling FUN_007FC2F0 below (stride 0x14
+         * confirmed). Per slot, `terrain`'s destructor releases the control
+         * block at `+0x10` through `sp_counted_base::release()` (interlocked
+         * decrement of `use_count` at `pi+4`, vtable `dispose()` dispatch
+         * when it hits zero, then the same pattern on `weak_count` at `pi+8`
+         * with `destroy()` -- the exact release() shape documented in
+         * BoostWrappers.h, address 0x004229B0); `view`/`head`/`depth` are
+         * trivially destructible and need no per-slot work. `view` and
+         * `terrain.px` are not released here -- only the control block, since
+         * `view` is a non-owning raw pointer and `terrain.px` needs no
+         * separate teardown once its control block is dropped. Reached from
+         * six recovered `WRenViewport` call sites in WxRuntimeTypes.cpp (the
+         * ctor 0x007F66A0, dtor 0x007F6900, `RenderPreviewImage` 0x007F7400,
+         * the `CD3DDevice::Paint`-reached override 0x007F7B30,
+         * `RemoveWorldView` 0x007FA090, and `InsertWorldViewParamAt`
+         * 0x007FB060's capacity-full erase/clear path) -- not edited here,
+         * WxRuntimeTypes.cpp is under active concurrent edit this pass.)
          * Address: 0x008A9F10 (FUN_008A9F10, msvc8::vector<Moho::
          * TerrainEnvironmentLookupPair>::destroy_range -- 56-byte element
          * (`std::pair<msvc8::string, msvc8::string>`); the forward sweep
@@ -2994,10 +3015,31 @@ namespace msvc8
          * Address: 0x00562B70 (FUN_00562B70, register-shape adapter for FUN_00563430)
          * Address: 0x00563070 (FUN_00563070, register-shape adapter for FUN_00563430)
          * Address: 0x00563250 (FUN_00563250, register-shape adapter for FUN_00563430)
-         * Address: 0x005CD1C0 (FUN_005CD1C0, source-first adapter for FUN_00563430)
          * Address: 0x00562680 (FUN_00562680, register-shape adapter for FUN_00563430)
          * Address: 0x005CBB20 (FUN_005CBB20, the counted form of the same)
          * Address: 0x005C9AD0 (FUN_005C9AD0, register-shape adapter for FUN_005CBB20)
+         * Address: 0x005CDF60 (FUN_005CDF60, a second, independently-emitted
+         * `uninit_copy_n` body for this same specialization -- byte-for-byte
+         * the same range-copy/rollback-on-throw shape as FUN_00563430 (per-slot
+         * copy through the nested `SSTIUnitVariableData` copy ctor at
+         * `sub_560680`, plus the trailing dword at record+0x230), just under a
+         * different parameter-passing convention. Called directly, twice, from
+         * `_Insert_n`'s reallocation path (FUN_005C68E0) to copy the pre-gap
+         * head range into the freshly allocated buffer)
+         * Address: 0x005C9DD0 (FUN_005C9DD0, thin forwarder to FUN_005CDF60 --
+         * also called directly from FUN_005C68E0, for the post-gap tail range)
+         * Address: 0x005CD1C0 (FUN_005CD1C0, compiler-emitted EH cleanup
+         * funclet: `call FUN_005CDF60(a1,a2)` then falls into the unwind
+         * continuation. Zero code/data xrefs in the IDA export -- funclets are
+         * entered through the `__CxxFrameHandler3` unwind table, not a `call`
+         * instruction, matching FUN_005C68E0's own EH state variable (`v25` in
+         * its decompile) around this same reallocation region. No source line
+         * produced this; it is the compiler's own lowering of the `try`/`catch`
+         * inside `uninit_copy_n` above, for this call site)
+         * Address: 0x005CBDB0 (FUN_005CBDB0, sibling EH cleanup funclet of
+         * FUN_005CD1C0 -- identical shape, zero xrefs, same mechanism)
+         * Address: 0x005CDA00 (FUN_005CDA00, sibling EH cleanup funclet of
+         * FUN_005CD1C0 -- identical shape, zero xrefs, same mechanism)
          * Address: 0x005CDAE0 (FUN_005CDAE0, msvc8::vector<Moho::SPerArmyReconInfo>::
          * uninit_copy_n for the 52-byte element -- the `_Insert_n` reallocation
          * path's head/tail range copies, FUN_005C6F90)
@@ -3067,6 +3109,20 @@ namespace msvc8
          * degenerate-range branches, so they carry no independent behaviour
          * beyond forwarding into this body.)
          *
+         * Address: 0x00658490 (FUN_00658490, `uninit_copy_n` for a 4-byte
+         * element that is a single refcounted-handle slot (`refCountBlockPtr`
+         * only, no paired raw pointer): per slot, the block pointer is copied
+         * verbatim from `[src]` to `[dst]` and, when non-null, its refcount
+         * word at `blockPtr+4` is atomically incremented (`lock xadd`) --
+         * the same `boost::shared_ptr`/`weak_ptr` control-block bump seen on
+         * the 8-byte and 16-byte instantiations elsewhere in this method,
+         * but for a bare single-pointer handle array rather than a full
+         * `{rawPtr, block}` pair. Reached via WinMain (depth 18); sole caller
+         * FUN_00658090 is not recovered source yet, matching this method's
+         * established practice of citing algorithm-shape-confirmed
+         * instantiations ahead of their caller (cf. FUN_0085AB80 below, none
+         * of whose five candidate callers are recovered either). Owning
+         * element type and class not yet identified.)
          * Address: 0x0085AB80 (FUN_0085AB80, `uninit_copy_n` for a 16-byte
          * element containing two independent shared/weak-pointer-style
          * handles (`{rawPtr, refCountBlockPtr}` pairs at +0x00 and +0x08):
@@ -3079,6 +3135,22 @@ namespace msvc8
          * caller not yet identified -- none of the five candidate callers
          * (0x0085A2D0, 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60) are
          * recovered source yet.)
+         *
+         * Address: 0x005CDEF0 (FUN_005CDEF0, `uninit_copy_n` for a 0x1C-byte
+         * element containing a leading 3-dword header, a 1-byte tag at
+         * +0x0C, a raw pointer at +0x10, and a `boost::shared_ptr`/
+         * `weak_ptr`-style `{rawPtr@+0x10, refCountBlockPtr@+0x14}` handle
+         * pair whose block pointer is atomically refcount-bumped
+         * (`lock xadd [block+4], 1`) when non-null, followed by a trailing
+         * byte at +0x18: per slot, the three header dwords, the tag byte,
+         * both handle-pair words and the trailing byte are all copied
+         * verbatim; the `test eax,eax` dst-null guard wraps only the copy
+         * body (same defensive-null shape as FUN_00549BC0/FUN_00832B80
+         * above) while all four cursors still advance by the 0x1C stride
+         * every iteration. Owning element type and caller not yet
+         * identified -- none of the five candidate callers (0x005C6580,
+         * 0x005C9D60, 0x005CBCA0, 0x005CD0E0, 0x005CD9E0) are recovered
+         * source yet.)
          *
          * Uninitialized copy N from src to dst
          */
@@ -3266,6 +3338,28 @@ namespace msvc8
          * `worldViews->push_back(entry)` capacity-full path, whose `insert(end(),1,
          * value)` full-reallocation branch moves the whole existing range with
          * `uninit_move_n(first_, cur, newBuf)`)
+         * Address: 0x00813E40 (FUN_00813E40, msvc8::vector<boost::shared_ptr<
+         * moho::ShoreCell>>::uninit_move_n register-shuffle wrapper for the
+         * 8-byte `{ShoreCell* px; sp_counted_base* pn}` element -- same
+         * pattern as FUN_005940F0 below: takes `first`/`dest` on the stack
+         * (this member's two args are `first` and `first+elementSize`, i.e.
+         * a single-element range) and forwards `(dest=eax, first=ecx,
+         * last=esi)` into the range-copy body FUN_00814480 (`this`
+         * unrecovered in this pass), whose loop copies `px`/`pn` per element
+         * and, when `pn` is non-null, refcount-bumps the control block via
+         * `lock xadd [pn+4]` -- Boost 1.34.1's vendored `shared_ptr` has no
+         * move ctor, so `move_if_noexcept` degrades to copy here exactly as
+         * for the `shared_ptr<TerrainCommon>` entry above. Called twice from
+         * the `_Insert_n` grow lane FUN_00813900 (cited on `insert(pos,
+         * count, value)` above): once for the tail>=count branch's
+         * `uninit_move_n(oldLast-count, count, oldLast)` step (moving the
+         * single trailing element past the old end, `last` supplied by the
+         * caller's inherited `esi`), and once for the tail<count branch's
+         * `uninit_move_n(insertAt, tail, insertAt+count)` step, which is a
+         * no-op here since `tail==0` (both call sites land at `pos==end()`
+         * in this instantiation, verified against FUN_00813900's own
+         * `.asm`). Reached from `AppendShoreCellRef` (Shoreline.cpp)'s
+         * `shorelineCells.push_back(cell)` on the capacity-full path.)
          * Address: 0x00885070 (FUN_00885070, msvc8::vector<msvc8::string>::
          * uninit_move_n for the 0x1C-byte `msvc8::string` element -- range-form
          * loop that default-tidies each destination slot in place
@@ -3677,11 +3771,39 @@ namespace msvc8
          * Address: 0x0044E650 (FUN_0044E650, allocator for one 56-byte
          * intrusive sentinel/head node used by `CD3DFileBatchTexture.cpp`'s
          * BVSet lanes)
+         * Address: 0x00892B00 (FUN_00892B00, second 56-byte-stride emission,
+         * same `count > 0xFFFFFFFF/56` guard via the reciprocal-division
+         * codegen (`0xFFFFFFFF/count < 0x38`) rather than a folded
+         * `0x04924924` immediate -- not ICF-folded with 0x0044E650 because
+         * the two TUs picked different register allocations. Callers
+         * unclassified (0x00892400/0x008928EF, not their own tracked
+         * tokens) plus a `skip`-marked ICF thunk (FUN_008924C0); no
+         * concrete `T` identified yet.)
          *
          * sizeof(T) == 0x78:
          * Address: 0x00562850 (FUN_00562850,
          * `msvc8::vector<Moho::SSyncPublishedCommandPacket>::allocate_slots_checked`,
          * reached from the `reserve()` guard FUN_00561160)
+         *
+         * sizeof(T) == 0x14 (20, `count > 0xFFFFFFFF/20` throws, zero-count
+         * guarded ahead of the reciprocal division to avoid a div-by-zero
+         * trap):
+         * Address: 0x00A53BD0 (FUN_00A53BD0, sole caller FUN_00A55857 is an
+         * untracked code fragment, not a separately recovered function; no
+         * concrete `T` identified yet)
+         *
+         * sizeof(T) == 0x18 (24, same zero-count-guarded reciprocal-division
+         * shape as the 0x14 emission above):
+         * Address: 0x008D9190 (FUN_008D9190, sole caller FUN_008D9CC7 is an
+         * untracked code fragment; no concrete `T` identified yet)
+         *
+         * sizeof(T) == 0x80 (128, `count > 0xFFFFFFFF/128` throws via the
+         * reciprocal-division form `0xFFFFFFFF/count < 0x80`):
+         * Address: 0x00751950 (FUN_00751950, reachable from `WinMain` at
+         * callgraph depth 16; its three callers -- FUN_0074D272,
+         * FUN_0074E770 (blocked), FUN_0074EA9F -- are all still open in the
+         * CrtRuntimeHelpers.cpp cluster, so no concrete `T` is identified
+         * yet)
          *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
