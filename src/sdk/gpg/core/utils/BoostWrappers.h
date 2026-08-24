@@ -6,6 +6,7 @@
 #include <new>
 
 #include "boost/shared_ptr.h"
+#include "boost/weak_ptr.h"
 
 namespace moho
 {
@@ -352,6 +353,34 @@ namespace boost
     };
 
     static_assert(sizeof(SharedCountPairWithTail) == 0x10, "SharedCountPairWithTail size must be 0x10");
+
+    /**
+     * Address: 0x007BB4E0 (FUN_007BB4E0,
+     * boost::weak_ptr<Moho::INetNATTraversalHandler>::weak_ptr(const shared_ptr&))
+     * Address: 0x007BC5C0 (FUN_007BC5C0,
+     * boost::weak_ptr<Moho::INetNATTraversalProvider>(const
+     * shared_ptr<Moho::CGpgNetInterface>&) -- the aliasing/upcast form:
+     * `CGpgNetInterface` derives from `INetNATTraversalProvider`, so the
+     * binary shares the source's `shared_count`/`weak_count` control block
+     * while rebinding the raw pointer to the base sub-object. Same
+     * `_InterlockedExchangeAdd(&pi->weak_count_, 1)` shape as the
+     * same-type case; the type difference only changes which `px` is
+     * stored, not the refcount mechanics.)
+     *
+     * What it does:
+     * Per-T binding of `boost::weak_ptr<TWeak>`'s converting constructor
+     * from `boost::shared_ptr<TShared>` -- generic across same-type and
+     * base/derived-aliasing instantiations. Named explicitly (rather than
+     * left as the natural `destination = source;` expression at each call
+     * site) so the MSVC8 per-T template emission symbol stays
+     * source-reachable even when a modern compiler would inline the
+     * assignment.
+     */
+    template <class TWeak, class TShared>
+    void AssignWeakFromShared(boost::weak_ptr<TWeak>& destination, const boost::shared_ptr<TShared>& source)
+    {
+        destination = source;
+    }
 
     struct SharedControlTriplet
     {

@@ -443,38 +443,11 @@ namespace moho
   };
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
 
-  /**
-   * Address: 0x007BB4E0 (FUN_007BB4E0, boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
-   *
-   * What it does:
-   * Per-T named helper binding the engine-instantiated
-   * `boost::weak_ptr<INetNATTraversalHandler>::weak_ptr(const shared_ptr&)`
-   * conversion-ctor body. Forwards to `destination = source;` so the MSVC8
-   * per-T template emission symbol is preserved even when the modern
-   * compiler would inline the natural weak/shared interconversion.
-   */
-  void AssignWeakNATHandlerFromShared(
-    boost::weak_ptr<INetNATTraversalHandler>& destination,
-    const boost::shared_ptr<INetNATTraversalHandler>& source);
-
-  /**
-   * Address: 0x007BC5C0 (FUN_007BC5C0,
-   * boost::weak_ptr<INetNATTraversalProvider>(const shared_ptr<CGpgNetInterface>&))
-   *
-   * What it does:
-   * Per-T named helper binding the engine-instantiated aliasing
-   * `boost::weak_ptr<INetNATTraversalProvider>::weak_ptr(const
-   * shared_ptr<CGpgNetInterface>&)` converting-ctor body -- `CGpgNetInterface`
-   * derives from `INetNATTraversalProvider`, so the binary upcasts the raw
-   * pointer sub-object while sharing the same `shared_count`/`weak_count`
-   * control block (`_InterlockedExchangeAdd(&pi->weak_count_, 1)` when the
-   * source is non-empty). Forwards to `destination = source;` so the MSVC8
-   * per-T template emission symbol is preserved even when the modern
-   * compiler would inline the natural weak/shared interconversion.
-   */
-  void AssignWeakNATProviderFromGpgNetShared(
-    boost::weak_ptr<INetNATTraversalProvider>& destination,
-    const boost::shared_ptr<CGpgNetInterface>& source);
+  // FUN_007BB4E0 (boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
+  // and FUN_007BC5C0 (the CGpgNetInterface->INetNATTraversalProvider aliasing
+  // form) are both instantiations of the generic `boost::AssignWeakFromShared`
+  // template -- see BoostWrappers.h for the shared per-T binding and both
+  // addresses' citations.
 
   /**
    * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)
