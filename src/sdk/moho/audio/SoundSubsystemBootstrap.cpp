@@ -161,6 +161,55 @@ namespace
     node->value = 0;
     return node;
   }
+
+  /**
+   * Address: 0x004E2030 (FUN_004E2030)
+   *
+   * IDA signature:
+   * void __usercall sub_4E2030(SoundTreeHeadNode **outResult@<eax>, const std::uint32_t *keyPtr);
+   *
+   * What it does:
+   * `lower_bound`-style walk of the `sSndParamsCache` RB-tree: returns the
+   * first node whose key (the leading 4 bytes of `reservedValue`) is not
+   * less than `*keyPtr`, or the header itself (`end()`) when none qualifies
+   * or the tree is empty.
+   *
+   * Field-offset note: the binary reads the header's search root from the
+   * fixed `[head+4]` slot and descends toward smaller keys via each node's
+   * fixed `[node+0]` slot -- i.e. this walk treats `SoundTreeHeadNode::left`
+   * as the root pointer and `::parent` as the "go smaller" link, which is
+   * the reverse of their declared names above (real MSVC8 `_Tree_nod::_Node`
+   * layout is `{_Left, _Parent, _Right}`; the header's `_Parent` is root,
+   * a regular node's `_Left` is its smaller-child link). `AllocateSentinelTreeHead`
+   * sets all three slots to the same self-reference at init time so this
+   * naming mismatch has no observable effect there; not renamed here to
+   * avoid touching the shared declaration mid-batch. Not yet wired to a
+   * source-level caller -- its real caller (0x004E1710) is unrecovered, and
+   * this file's own mirrors are documented as "not read by the modern
+   * runtime path" (see file header), so kept `[[maybe_unused]]` pending
+   * that caller's recovery.
+   */
+  [[maybe_unused]] SoundTreeHeadNode* LowerBoundSoundParamsCacheByHash(const std::uint32_t* const keyPtr)
+  {
+    SoundTreeHeadNode* const head = gSSndParamsCacheMirror.head;
+    auto* node = reinterpret_cast<SoundTreeHeadNode*>(head->left);
+    SoundTreeHeadNode* best = head;
+
+    if (node->isNil == 0) {
+      const std::uint32_t key = *keyPtr;
+      while (node->isNil == 0) {
+        const std::uint32_t nodeKey = *reinterpret_cast<const std::uint32_t*>(node->reservedValue);
+        if (nodeKey >= key) {
+          best = node;
+          node = reinterpret_cast<SoundTreeHeadNode*>(node->parent);
+        } else {
+          node = reinterpret_cast<SoundTreeHeadNode*>(node->right);
+        }
+      }
+    }
+
+    return best;
+  }
 } // namespace
 
 namespace moho
