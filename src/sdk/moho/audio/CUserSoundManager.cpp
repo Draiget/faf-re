@@ -967,6 +967,18 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x008AECF0 (FUN_008AECF0, per-element SoundHandleRecord
+   * copy-with-splice from the mSoundHandles growth path)
+   *
+   * What it does:
+   * The binary spliced each copied record into its owner's chain head
+   * inline while deep-copying SoundHandleRecord during storage growth
+   * (called from FUN_008AEA40 / EnsureSoundHandleStorage). This helper
+   * reproduces the same final chain state in one aggregate pass after
+   * Resize(): clear every owner's chain head, then re-thread every
+   * record whose mOwnerHandle is non-null onto that head.
+   */
   void RebuildSoundHandleOwnerChains(moho::CUserSoundManager* const manager)
   {
     if (manager == nullptr) {
