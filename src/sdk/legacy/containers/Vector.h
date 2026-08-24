@@ -4530,6 +4530,13 @@ namespace msvc8
          * `msvc8::vector<Moho::SSyncPublishedCommandPacket>::allocate_slots_checked`,
          * reached from the `reserve()` guard FUN_00561160)
          *
+         * sizeof(T) == 0x1C (28, `DXGI_MODE_DESC` -- Width/Height/
+         * RefreshRate{Num,Denom}/Format/ScanlineOrdering/Scaling):
+         * Address: 0x008F5FD0 (FUN_008F5FD0,
+         * `msvc8::vector<DXGI_MODE_DESC>::allocate_slots_checked`, reached
+         * from the `_Insert_n` grow lane `FUN_008F6A50` (cited on `insert`
+         * above), the display-mode-enumeration vector's capacity-full path)
+         *
          * sizeof(T) == 0x14 (20, `count > 0xFFFFFFFF/20` throws, zero-count
          * guarded ahead of the reciprocal division to avoid a div-by-zero
          * trap):
