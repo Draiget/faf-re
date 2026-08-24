@@ -3394,7 +3394,11 @@ namespace msvc8
          * FUN_005CD1C0 -- identical shape, zero xrefs, same mechanism)
          * Address: 0x005CDAE0 (FUN_005CDAE0, msvc8::vector<Moho::SPerArmyReconInfo>::
          * uninit_copy_n for the 52-byte element -- the `_Insert_n` reallocation
-         * path's head/tail range copies, FUN_005C6F90)
+         * path's head/tail range copies, FUN_005C6F90. `FUN_005CC4E0` is the
+         * same thin calling-convention bridge shape documented on
+         * `DumpUnitsCountEntry`'s uninit_copy_n above -- zeroes the low byte
+         * of its `this`-shaped third argument and forwards `(a3, this,
+         * this)` on to `sub_5CDAE0`.)
          * Address: 0x005C9EC0 (FUN_005C9EC0, the same specialisation emitted a
          * second time for FUN_005C6F90's in-place-insert branch, where it
          * copy-constructs the relocated tail past the old `mLast`)
@@ -3525,7 +3529,12 @@ namespace msvc8
          * last@edx) -> dst@eax`, same shape as `FUN_00832B80` above, a
          * distinct instantiation for `Moho::UICommandGraph`'s "MapC"
          * hash-bucket vector. Reached from the `_Insert_n` grow lane
-         * `FUN_0082F210` (`msvc8::vector<void*>::_Insert_n` for `MapC`).)
+         * `FUN_0082F210` (`msvc8::vector<void*>::_Insert_n` for `MapC`), and
+         * from `assign(9, sentinel)`'s insert step (`FUN_0082F680`, the
+         * MapC `assign` emission cited above) via the thin calling-
+         * convention bridge `FUN_00831860` -- `LOBYTE(this)=0; return
+         * sub_832BC0(a3, this);`, same adapter shape as the bridges cited
+         * elsewhere in this file.)
          * Address: 0x006829B0 (FUN_006829B0, `msvc8::vector<moho::Entity*>::
          * uninit_copy_n` for the 4-byte pointer element -- `[first,last) ->
          * dst`, stack-passed range form. Reached from `moho::
@@ -3723,7 +3732,10 @@ namespace msvc8
          * from the `_Insert_n` grow core FUN_0064E770 (still open, cited
          * above and on `insert`/`_Insert_n`; recovered as the caller of this
          * token regardless -- see the evidence note on FUN_0064F9A0) to
-         * relocate the live decal range into the freshly grown buffer.)
+         * relocate the live decal range into the freshly grown buffer, via
+         * the thin calling-convention bridge `FUN_0064F790` -- `LOBYTE(this)
+         * =0; return sub_6501F0(a3, this, this);`, same adapter shape cited
+         * elsewhere in this file.)
          *
          * Address: 0x00592030 (FUN_00592030, `uninit_fill_n` for the same
          * 12-byte three-float element as `insert(iterator, const T&)`'s
@@ -3868,7 +3880,10 @@ namespace msvc8
          * `InsertWorldViewParamAt` (0x007FB060, WxRuntimeTypes.cpp)'s
          * `worldViews->push_back(entry)` capacity-full path, whose `insert(end(),1,
          * value)` full-reallocation branch moves the whole existing range with
-         * `uninit_move_n(first_, cur, newBuf)`)
+         * `uninit_move_n(first_, cur, newBuf)`, via the thin argument-
+         * reordering dispatcher `FUN_007FB890` (`return sub_7FC2F0(a3, a2,
+         * a1);`) that `InsertWorldViewParamAt`'s own real body calls
+         * directly.)
          * Address: 0x00813E40 (FUN_00813E40, msvc8::vector<boost::shared_ptr<
          * moho::ShoreCell>>::uninit_move_n register-shuffle wrapper for the
          * 8-byte `{ShoreCell* px; sp_counted_base* pn}` element -- same
