@@ -79,6 +79,18 @@ namespace msvc8
         [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
 
         [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
+        /**
+         * Address: 0x006E15A0 (FUN_006E15A0, `msvc8::map<Moho::CmdId,
+         * Moho::CUnitCommand*>::empty` -- `Moho::CCommandDb::commands` in
+         * `CCommandDb.h`. `return map->size == 0u;`, matching `tree_.empty()`
+         * exactly. Re-homed here from a bespoke free function in
+         * `CCommandDb.cpp` (`IsCommandMapEmptyBySize`) during the
+         * `CommandDbMapNodeRuntime` hand-rolled-tree migration; no direct
+         * caller confirmed in this pass (`incoming_xrefs` empty in this
+         * sweep) beyond this member's own generic API surface, which
+         * `ValidateCommandMapEmptyOrDie` (`CCommandDb.cpp`) now calls as
+         * `commands.empty()`.)
+         */
         [[nodiscard]] bool empty() const noexcept { return tree_.empty(); }
 
         /** Header sentinel pointer (for low-level diagnostics). */
@@ -106,6 +118,20 @@ namespace msvc8
          * The map-header initialisers for the seven `RRuleGameRulesImpl` blueprint
          * tables: seat the sentinel head, self-link it and zero the size. The
          * binary open-codes this once per table where the constructor now does it.
+         */
+        /**
+         * Address: 0x006E1580 (FUN_006E1580, `msvc8::map<Moho::CmdId,
+         * Moho::CUnitCommand*>::begin` -- `Moho::CCommandDb::commands` in
+         * `CCommandDb.h`. `*outNode = map->head->left; return outNode;` --
+         * the store-into-hidden-return-pointer form MSVC8 uses for a
+         * non-trivial-return-type accessor, matching `iterator(tree_.
+         * leftmost())`'s single-field write. Re-homed here from a bespoke
+         * free function in `CCommandDb.cpp` (`StoreCommandMapBeginNode`)
+         * during the `CommandDbMapNodeRuntime` hand-rolled-tree migration;
+         * no direct caller confirmed in this pass (`incoming_xrefs` empty in
+         * this sweep) beyond this member's own generic API surface, which
+         * every range-for loop over `commands` in `CCommandDb.cpp` now
+         * uses.)
          */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
@@ -209,6 +235,22 @@ namespace msvc8
          * uint32 4 = 16, matching the pair<UiKeyMask,bool>'s mapped_type
          * offset exactly. Emitted via gUiKeyRepeatMap[keyMask] = true in
          * AddUiKeyMapEntries, UiRuntimeTypes.cpp)
+         * Address: 0x00685750 (FUN_00685750, `std::map_uint_IdPool::find2` --
+         * `msvc8::map<std::uint32_t, moho::IdPool>::operator[]`,
+         * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Matches this member
+         * exactly: calls `find` (this instantiation's `lower_bound_node`
+         * emission), and on a miss (`result == head || key < result->key`)
+         * default-constructs a fresh `IdPool` and inserts it via
+         * `std::map_uint_IdPool::insert` (`FUN_006864E0`, cited on
+         * `insert_hint` in RbTree.h) -- the same lower-bound-then-hinted-
+         * insert shape this member performs. Reached from `Moho::EntityDB::
+         * DoReserveId`/`ReleaseId` (`FUN_00684480`/`FUN_00684690`) in the
+         * binary; the current recovery reaches the same instantiation from
+         * `CEntityDb::MemberDeserialize`'s `mIdPoolTree[familySourceBits]`
+         * -- `DoReserveId`/`ReleaseId` themselves still route id allocation
+         * through a separate `gRuntimePools` runtime cache rather than this
+         * member directly, a known follow-up documented in the EntityDb.cpp
+         * `MemberSerialize`/`MemberDeserialize` citations.)
          *
          * IDA signature:
          * mapped_type *__thiscall operator[](const key_type *key, _Tree *this);

@@ -30,23 +30,6 @@
 
 namespace moho
 {
-  struct CEntityDbIdPoolNode
-  {
-    CEntityDbIdPoolNode* left;               // +0x000
-    CEntityDbIdPoolNode* parent;             // +0x004
-    CEntityDbIdPoolNode* right;              // +0x008
-    std::uint8_t pad_00C_00F[0x04]{};        // +0x00C
-    std::uint32_t key;                       // +0x010
-    std::uint8_t payload_014_0CC7[0xCB4]{};  // +0x014
-    std::uint8_t color;                      // +0xCC8
-    std::uint8_t isNil;                      // +0xCC9
-    std::uint8_t tail_0CCA_0CCF[0x06]{};     // +0xCCA
-  };
-  static_assert(offsetof(CEntityDbIdPoolNode, key) == 0x10, "CEntityDbIdPoolNode::key offset must be 0x10");
-  static_assert(offsetof(CEntityDbIdPoolNode, color) == 0xCC8, "CEntityDbIdPoolNode::color offset must be 0xCC8");
-  static_assert(offsetof(CEntityDbIdPoolNode, isNil) == 0xCC9, "CEntityDbIdPoolNode::isNil offset must be 0xCC9");
-  static_assert(sizeof(CEntityDbIdPoolNode) == 0xCD0, "CEntityDbIdPoolNode size must be 0xCD0");
-
   struct CEntityDbBoundedPropQueueNode
   {
     std::uint8_t mUnknown0000_0007[0x08]{};        // +0x00
@@ -669,20 +652,6 @@ namespace
   }
 
   /**
-   * Address: 0x00685C50 (FUN_00685C50)
-   *
-   * What it does:
-   * Returns one id-pool tree node key lane (`node->key`) from an indirect
-   * node-slot pointer.
-   */
-  std::uint32_t LoadIdPoolNodeKeyFromSlot(
-    const moho::CEntityDbIdPoolNode* const* const nodeSlot
-  ) noexcept
-  {
-    return (*nodeSlot)->key;
-  }
-
-  /**
    * Address: 0x00685F20 (FUN_00685F20)
    *
    * What it does:
@@ -963,64 +932,6 @@ namespace
       node->next = nullptr;
     }
     return node;
-  }
-
-  /**
-   * Address: 0x006870B0 (FUN_006870B0)
-   *
-   * What it does:
-   * Stores one id-pool tree head-left lane (`head->left`) into output storage.
-   */
-  moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodePrimary(
-    moho::CEntityDbIdPoolNode** const outNode,
-    const moho::CEntityDbIdPoolTreeRuntime* const tree
-  ) noexcept
-  {
-    *outNode = tree->head->left;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00687430 (FUN_00687430)
-   *
-   * What it does:
-   * Runs lower-bound search on one id-pool sentinel tree and returns the first
-   * node with `node->key >= key` (or sentinel head when none).
-   */
-  moho::CEntityDbIdPoolNode* LowerBoundIdPoolNodeByKey(
-    const moho::CEntityDbIdPoolTreeRuntime* const tree,
-    const std::uint32_t* const keySlot
-  ) noexcept
-  {
-    moho::CEntityDbIdPoolNode* result = tree->head;
-    moho::CEntityDbIdPoolNode* cursor = result->parent;
-    if (cursor->isNil == 0u) {
-      const std::uint32_t key = *keySlot;
-      do {
-        if (cursor->key >= key) {
-          result = cursor;
-          cursor = cursor->left;
-        } else {
-          cursor = cursor->right;
-        }
-      } while (cursor->isNil == 0u);
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x006874C0 (FUN_006874C0)
-   *
-   * What it does:
-   * Secondary lane that stores id-pool `head->left` into output storage.
-   */
-  moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodeSecondary(
-    moho::CEntityDbIdPoolNode** const outNode,
-    const moho::CEntityDbIdPoolTreeRuntime* const tree
-  ) noexcept
-  {
-    *outNode = tree->head->left;
-    return outNode;
   }
 
   /**
@@ -2436,107 +2347,6 @@ namespace
     return reinterpret_cast<moho::Unit*>(encodedNode - 0x8u);
   }
 
-  template <typename TNode>
-  [[nodiscard]] TNode* NextNodeInSentinelTree(TNode* node) noexcept
-  {
-    if (node == nullptr || node->isNil != 0u) {
-      return node;
-    }
-
-    TNode* childOrParent = node->right;
-    if (childOrParent == nullptr) {
-      return nullptr;
-    }
-
-    if (childOrParent->isNil != 0u) {
-      for (TNode* next = node->parent; next != nullptr && next->isNil == 0u; next = next->parent) {
-        if (node != next->right) {
-          return next;
-        }
-        node = next;
-      }
-      return node != nullptr ? node->parent : nullptr;
-    }
-
-    TNode* next = childOrParent->left;
-    while (next != nullptr && next->isNil == 0u) {
-      childOrParent = next;
-      next = next->left;
-    }
-    return childOrParent;
-  }
-
-  /**
-   * Address: 0x006878C0 (FUN_006878C0)
-   *
-   * What it does:
-   * Advances one id-pool map node cursor to the next in-order sentinel-tree
-   * node and mirrors the advanced node back to the caller cursor lane.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode*
-  AdvanceIdPoolNodeCursor(moho::CEntityDbIdPoolNode*& cursor) noexcept
-  {
-    cursor = NextNodeInSentinelTree(cursor);
-    return cursor;
-  }
-
-  /**
-   * Address: 0x00685FA0 (FUN_00685FA0)
-   * Address: 0x00686CE0 (FUN_00686CE0)
-   *
-   * What it does:
-   * Register-shape adapter that advances one id-pool cursor slot in-place and
-   * returns the original slot pointer.
-   */
-  moho::CEntityDbIdPoolNode** AdvanceIdPoolNodeCursorSlot(
-    moho::CEntityDbIdPoolNode** const cursorSlot
-  ) noexcept
-  {
-    if (cursorSlot != nullptr) {
-      (void)AdvanceIdPoolNodeCursor(*cursorSlot);
-    }
-    return cursorSlot;
-  }
-
-  /**
-   * Address: 0x006886A0 (FUN_006886A0)
-   *
-   * What it does:
-   * Copies one id-pool tree cursor lane into output storage and advances the
-   * source cursor to the next in-order sentinel-tree node.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode** SnapshotAndAdvanceIdPoolNodeCursor(
-    moho::CEntityDbIdPoolNode** const sourceCursorSlot,
-    moho::CEntityDbIdPoolNode** const outCursorSlot
-  ) noexcept
-  {
-    if (sourceCursorSlot == nullptr || outCursorSlot == nullptr) {
-      return outCursorSlot;
-    }
-
-    *outCursorSlot = *sourceCursorSlot;
-    (void)AdvanceIdPoolNodeCursor(*sourceCursorSlot);
-    return outCursorSlot;
-  }
-
-  template <typename TNode>
-  void ClearSentinelTreeNodes(TNode* const head) noexcept
-  {
-    if (!head) {
-      return;
-    }
-
-    for (TNode* node = head->left; node && node != head && node->isNil == 0u;) {
-      TNode* const next = NextNodeInSentinelTree(node);
-      ::operator delete(node);
-      node = next;
-    }
-
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-  }
-
   /**
    * Address: 0x006887D0 (FUN_006887D0)
    *
@@ -2551,12 +2361,8 @@ namespace
    * `left` at offset 0x00), releases the previous node storage, and
    * repeats until the `isNil` byte (offset 0x15) is set.
    *
-   * This is the recursive binary counterpart to the iterative
-   * `ClearSentinelTreeNodes<CEntityDbAllUnitsNode>` used in the
-   * `CEntityDb::~CEntityDb` teardown path. Both produce identical
-   * post-state (all non-sentinel nodes freed, sentinel head untouched)
-   * but the recursive form matches the exact binary shape used in the
-   * original 2007 teardown routine.
+   * Reached directly from `CEntityDb::~CEntityDb`'s `mAllUnits` teardown,
+   * matching the exact recursive shape the original 2007 destructor used.
    */
   void DestroyAllUnitsSubtreeRecursive(moho::CEntityDbAllUnitsNode* node) noexcept
   {
@@ -2942,52 +2748,6 @@ namespace
   }
 
   /**
-   * Address: 0x00688030 (FUN_00688030)
-   *
-   * IDA signature:
-   * void __stdcall sub_688030(int *node);
-   *
-   * What it does:
-   * Post-order recursive destroy pass over one `CEntityDbIdPoolNode`
-   * sentinel-RB subtree. For each non-sentinel node (`isNil` at offset
-   * 0xCC9 is zero): recursively destroys the right child (`node[2]` at
-   * offset 0x08), advances the working cursor to the left child (`*node`
-   * at offset 0x00), runs the embedded id-pool sub-resource reset (binary
-   * invokes `SimSubRes2::Reset()` via the FUN_00403E70 entry point at
-   * `node + 0x40`, which drains all active recycle-history slots), frees
-   * the `BVIntSet` released-lows backing storage when the inline buffer
-   * is no longer in use (checks `node+0x28 != node+0x34` / raw base vs
-   * capacity pointer), and releases the tree-node itself. Repeats until
-   * the sentinel is hit.
-   *
-   * Semantic equivalent of the iterative
-   * `ClearSentinelTreeNodes<CEntityDbIdPoolNode>` path plus the per-node
-   * id-pool payload dtor; the binary uses the recursive form in
-   * `std::map_IdPool::Deserialize`, `sub_687190`, and `sub_687220` to
-   * wipe the tree on reload/reset.
-   */
-  void DestroyIdPoolSubtreeRecursive(moho::CEntityDbIdPoolNode* node) noexcept
-  {
-    while (node != nullptr && node->isNil == 0u) {
-      DestroyIdPoolSubtreeRecursive(node->right);
-      moho::CEntityDbIdPoolNode* const leftChild = node->left;
-
-      // The id-pool payload starts at +0x14 (right after the RB header +
-      // pad + key words). Its embedded `SimSubRes2` sits at +0x28 within
-      // the IdPool (= node+0x3C) and its `BVIntSet` released-lows at
-      // +0x08 (= node+0x1C). Binary lane at `lea edi, [esi+0x40]` targets
-      // the SimSubRes2 slot and invokes `SimSubRes2::Reset()` (FUN_00403E70).
-      // The subsequent `[esi+0x28]..[esi+0x34]` manipulation is the
-      // BVIntSet internal buffer release. Rather than reach into opaque
-      // offsets here we just delete the node; the node's own destructor
-      // path runs the payload teardown when the IdPool wrapper is wired
-      // up (handled elsewhere when the layout is fully typed).
-      ::operator delete(node);
-      node = leftChild;
-    }
-  }
-
-  /**
    * Address: 0x00687BC0 (FUN_00687BC0, sub_687BC0)
    *
    * What it does:
@@ -3056,131 +2816,6 @@ namespace
     return initialized != nullptr ? initialized->head : nullptr;
   }
 
-  /**
-   * Address: 0x00688180 (FUN_00688180, sub_688180)
-   * Mangled: std::map_uint_IdPool::_Node allocator
-   *
-   * What it does:
-   * Raw node allocator only (left/parent/right left null); the immediate
-   * caller (InitializeIdPoolTreeHeadLane below) overwrites isNil=1 and
-   * self-links left/parent/right, matching the binary's split shape.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode* AllocateIdPoolTreeNode()
-  {
-    auto* const node = static_cast<moho::CEntityDbIdPoolNode*>(::operator new(sizeof(moho::CEntityDbIdPoolNode)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
-
-  /**
-   * Address: 0x00685720 (FUN_00685720)
-   * Address: 0x006864A0 (FUN_006864A0)
-   *
-   * What it does:
-   * Allocates one id-pool tree head node, marks it sentinel/self-linked, and
-   * clears the tree-size lane.
-   */
-  moho::CEntityDbIdPoolTreeRuntime* InitializeIdPoolTreeHeadLane(
-    moho::CEntityDbIdPoolTreeRuntime* const tree
-  ) noexcept
-  {
-    if (tree == nullptr) {
-      return nullptr;
-    }
-
-    tree->head = AllocateIdPoolTreeNode();
-    tree->head->isNil = 1u;
-    tree->head->parent = tree->head;
-    tree->head->left = tree->head;
-    tree->head->right = tree->head;
-    tree->size = 0u;
-    return tree;
-  }
-
-  /**
-   * Address: 0x006874A0 (FUN_006874A0)
-   *
-   * What it does:
-   * Releases one id-pool tree node storage lane.
-   */
-  void DeleteIdPoolTreeNodeStoragePrimary(void* const nodeStorage) noexcept
-  {
-    ::operator delete(nodeStorage);
-  }
-
-  /**
-   * Address: 0x00687830 (FUN_00687830)
-   *
-   * What it does:
-   * Secondary lane that releases one id-pool tree node storage allocation.
-   */
-  void DeleteIdPoolTreeNodeStorageSecondary(void* const nodeStorage) noexcept
-  {
-    ::operator delete(nodeStorage);
-  }
-
-  /**
-   * Address: 0x00687250 (FUN_00687250)
-   *
-   * What it does:
-   * Initializes one id-pool sentinel tree runtime lane with a fresh nil head
-   * node and zero node-count.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode* InitializeIdPoolTreeRuntimeSentinel(
-    moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
-  )
-  {
-    if (treeRuntime == nullptr) {
-      return nullptr;
-    }
-
-    moho::CEntityDbIdPoolNode* const head = AllocateIdPoolTreeNode();
-    treeRuntime->head = head;
-    head->isNil = 1u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    treeRuntime->size = 0u;
-    return head;
-  }
-
-  /**
-   * Address: 0x00687220 (FUN_00687220)
-   *
-   * What it does:
-   * Clears one id-pool sentinel tree runtime, then rewires the head node back
-   * to self-linked sentinel form with zero node-count.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimePrimary(
-    moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
-  ) noexcept
-  {
-    if (treeRuntime == nullptr || treeRuntime->head == nullptr) {
-      return nullptr;
-    }
-
-    ClearSentinelTreeNodes(treeRuntime->head);
-    treeRuntime->size = 0u;
-    return treeRuntime->head;
-  }
-
-  /**
-   * Address: 0x00687B90 (FUN_00687B90)
-   *
-   * What it does:
-   * Mirror lane of `FUN_00687220` that clears one id-pool sentinel tree
-   * runtime and restores self-linked sentinel head links.
-   */
-  [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimeSecondary(
-    moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
-  ) noexcept
-  {
-    return ResetIdPoolTreeRuntimePrimary(treeRuntime);
-  }
 
   [[nodiscard]] moho::CEntityDbListHead* AllocateEntityListHeadNode()
   {
@@ -3619,6 +3254,20 @@ namespace
   extern std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard;
   void cleanup_EntityDbIdPoolMapTypeName();
 
+  /**
+   * Shared `IdPool` RTTI cache lookup, used by `EntityDbIdPoolMapTypeInfo::
+   * GetName`/`SerLoad`/`SerSave` (all three resolve the same element type).
+   */
+  [[nodiscard]] gpg::RType* CachedIdPoolElementType()
+  {
+    gpg::RType* type = moho::IdPool::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::IdPool));
+      moho::IdPool::sType = type;
+    }
+    return type;
+  }
+
   extern msvc8::string gEntityDbEntityListTypeName;
   extern std::uint32_t gEntityDbEntityListTypeNameInitGuard;
   void cleanup_EntityDbEntityListTypeName();
@@ -3643,12 +3292,7 @@ namespace
       if ((gEntityDbIdPoolMapTypeNameInitGuard & 1u) == 0u) {
         gEntityDbIdPoolMapTypeNameInitGuard |= 1u;
 
-        gpg::RType* valueType = moho::IdPool::sType;
-        if (valueType == nullptr) {
-          valueType = gpg::LookupRType(typeid(moho::IdPool));
-          moho::IdPool::sType = valueType;
-        }
-
+        gpg::RType* const valueType = CachedIdPoolElementType();
         gpg::RType* keyType = gpg::LookupRType(typeid(unsigned int));
         const char* const keyName = keyType != nullptr ? keyType->GetName() : "unsigned int";
         const char* const valueName = valueType != nullptr ? valueType->GetName() : "Moho::IdPool";
@@ -3669,17 +3313,59 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const map = static_cast<const std::map<unsigned int, moho::IdPool>*>(ref.mObj);
+      const auto* const map = static_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
       const int size = map ? static_cast<int>(map->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
 
+    /**
+     * Address: 0x00685D40 (FUN_00685D40, gpg::RMapType_uint_IdPool::Init)
+     *
+     * What it does:
+     * Sets the reflected object size to the real `map<uint,IdPool>` ABI
+     * footprint (12 bytes: `{proxy, head, size}`, matching
+     * `msvc8::map<std::uint32_t, IdPool>` exactly -- not the unrelated size a
+     * modern `std::map<>` local variable would report) and installs the
+     * map's load/save reflection callbacks. The binary writes these two
+     * function pointers directly at `this+0x1C`/`this+0x14`; this override
+     * assigns the same two members by name.
+     */
     void Init() override
     {
-      size_ = sizeof(std::map<unsigned int, moho::IdPool>);
-      gpg::RType::Init();
-      Finish();
+      size_ = sizeof(msvc8::map<std::uint32_t, moho::IdPool>);
+      version_ = 1;
+      serLoadFunc_ = &EntityDbIdPoolMapTypeInfo::SerLoad;
+      serSaveFunc_ = &EntityDbIdPoolMapTypeInfo::SerSave;
     }
+
+    /**
+     * Address: 0x00686990 (FUN_00686990, std::map_IdPool::Deserialize)
+     *
+     * What it does:
+     * Clears the destination map, reads the element count, then reads and
+     * inserts `count` `(key, IdPool)` pairs in archive order. Clearing is
+     * `msvc8::map::clear()` (binary: `FUN_00688030` destroys the subtree from
+     * the real root, then self-links the header -- see the
+     * `rb_tree::destroy_subtree`/`clear()` citations in RbTree.h); each
+     * insert is `msvc8::map::insert()`, i.e. `rb_tree::insert_unique()`
+     * (`FUN_006870D0`) linking through `insert_at`/`buy_node`/the rotate pair
+     * (`FUN_00687280`/`FUN_006881C0`/`FUN_006880A0`/`FUN_00688120`, all cited
+     * on their RbTree.h members) exactly as every other `msvc8::map`
+     * instantiation in this codebase does -- no per-map reimplementation.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00686B10 (FUN_00686B10, std::map_IdPool::Serialize)
+     *
+     * What it does:
+     * Writes the element count, then walks the map in ascending key order
+     * writing each `(key, IdPool)` pair. The walk is `msvc8::map`'s
+     * `begin()`/`operator++` (`FUN_006878C0`/its register-shape adapters
+     * `FUN_00685FA0`/`FUN_00686CE0`, cited on `rb_increment` in RbTree.h) --
+     * no separate iteration mechanic is introduced here.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
   static_assert(sizeof(EntityDbIdPoolMapTypeInfo) == 0x64, "EntityDbIdPoolMapTypeInfo size must be 0x64");
 
@@ -3703,6 +3389,75 @@ namespace
   EntityDbIdPoolMapTypeInfo::~EntityDbIdPoolMapTypeInfo()
   {
     DestroyEntityDbIdPoolMapTypeInfoBody(this);
+  }
+
+  /**
+   * Address: 0x00686990 (FUN_00686990, std::map_IdPool::Deserialize)
+   *
+   * What it does:
+   * Clears the destination map, reads the element count, then reads and
+   * inserts that many `(key, IdPool)` pairs in archive order.
+   */
+  void EntityDbIdPoolMapTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const map =
+      reinterpret_cast<msvc8::map<std::uint32_t, moho::IdPool>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || map == nullptr) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+    map->clear();
+
+    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+
+    for (unsigned int i = 0; i < count; ++i) {
+      std::uint32_t key = 0;
+      archive->ReadUInt(&key);
+
+      moho::IdPool pool{};
+      archive->Read(idPoolType, &pool, owner);
+
+      (void)map->insert(msvc8::map<std::uint32_t, moho::IdPool>::value_type(key, std::move(pool)));
+    }
+  }
+
+  /**
+   * Address: 0x00686B10 (FUN_00686B10, std::map_IdPool::Serialize)
+   *
+   * What it does:
+   * Writes the element count, then walks the map in ascending key order
+   * writing each `(key, IdPool)` pair.
+   */
+  void EntityDbIdPoolMapTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const map =
+      reinterpret_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || map == nullptr) {
+      return;
+    }
+
+    archive->WriteUInt(static_cast<unsigned int>(map->size()));
+
+    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+
+    for (const auto& [key, pool] : *map) {
+      archive->WriteUInt(key);
+      archive->Write(idPoolType, &pool, owner);
+    }
   }
 
   class EntityDbEntityListTypeInfo final : public gpg::RType
@@ -3922,6 +3677,13 @@ namespace moho
 {
   /**
    * Address: 0x00684230 (FUN_00684230, Moho::EntityDB::EntityDB)
+   *
+   * `mIdPoolTree`'s sentinel-head allocate/self-link/isNil=1 sequence, inlined
+   * here in the binary via the raw node allocator (`FUN_00688180`, cited on
+   * `rb_tree::alloc_raw` in RbTree.h) rather than a named `buy_head` symbol,
+   * is now `msvc8::map<std::uint32_t, IdPool>`'s own default constructor --
+   * see the `buy_head()` citation on that member in RbTree.h. No source-level
+   * call is needed here; member default-initialization runs it automatically.
    */
   CEntityDb::CEntityDb()
   {
@@ -3931,13 +3693,6 @@ namespace moho
     mAllUnits->left = mAllUnits;
     mAllUnits->right = mAllUnits;
     mAllUnitsSize = 0u;
-
-    mIdPoolTree.head = AllocateIdPoolTreeNode();
-    mIdPoolTree.head->isNil = 1u;
-    mIdPoolTree.head->parent = mIdPoolTree.head;
-    mIdPoolTree.head->left = mIdPoolTree.head;
-    mIdPoolTree.head->right = mIdPoolTree.head;
-    mIdPoolTree.size = 0u;
 
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
@@ -3949,6 +3704,18 @@ namespace moho
 
   /**
    * Address: 0x006843B0 (FUN_006843B0, Moho::EntityDB::~EntityDB)
+   *
+   * `mIdPoolTree`'s teardown -- recursive subtree destroy from the tree's
+   * root (`FUN_00688030`, cited on `rb_tree::destroy_subtree` in RbTree.h),
+   * then release the sentinel head -- is now `msvc8::map<std::uint32_t,
+   * IdPool>`'s own destructor (see the `~rb_tree()` citation on that member),
+   * run automatically by member destruction right after this body returns.
+   * (A prior hand-rolled version of this teardown recursed from
+   * `mIdPoolTree.head->left`, i.e. leftmost(), instead of `head->parent`
+   * (root) -- a genuine bug that would have destroyed at most one node and
+   * leaked the rest; `sub_688030`'s real argument, confirmed from
+   * `std::map_IdPool::Deserialize`'s call site, is `head->parent`. The
+   * container's own destructor does not have that bug.)
    */
   CEntityDb::~CEntityDb()
   {
@@ -3961,19 +3728,6 @@ namespace moho
       mRegisteredEntitySets.next->prev = mRegisteredEntitySets.prev;
     }
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
-
-    // Recursive post-order tree teardown first (FUN_00688030 +
-    // FUN_006887D0 binary path), then re-wire the sentinel head and
-    // release its storage. This matches the original 2007 dtor shape.
-    if (mIdPoolTree.head != nullptr) {
-      DestroyIdPoolSubtreeRecursive(mIdPoolTree.head->left);
-      mIdPoolTree.head->parent = mIdPoolTree.head;
-      mIdPoolTree.head->left = mIdPoolTree.head;
-      mIdPoolTree.head->right = mIdPoolTree.head;
-    }
-    ::operator delete(mIdPoolTree.head);
-    mIdPoolTree.head = nullptr;
-    mIdPoolTree.size = 0u;
 
     if (mAllUnits != nullptr) {
       DestroyAllUnitsSubtreeRecursive(mAllUnits->left);
@@ -4448,15 +4202,20 @@ namespace moho
 
     SerEntities(archive);
 
+    // Reads directly into the real `mIdPoolTree` member (binary:
+    // `gpg::ReadArchive::Read(a1, v4, &a2->mIdPool, ...)`, FUN_00689760) --
+    // no local staging map. `gRuntimePools` is a separate, already-existing
+    // runtime allocator-side cache (see `DoReserveId`/`ReleaseId`) kept in
+    // sync from the now-authoritative `mIdPoolTree` values; it is not part
+    // of the binary's own serialize path.
     if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
           {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
         )) {
-      std::map<unsigned int, moho::IdPool> serializedIdPools;
-      archive->Read(idPoolMapType, &serializedIdPools, NullOwnerRef());
+      archive->Read(idPoolMapType, &mIdPoolTree, NullOwnerRef());
 
       FamilyPoolMap& runtimePools = gRuntimePools[this];
       runtimePools.clear();
-      for (const auto& [familySourceBits, serializedPool] : serializedIdPools) {
+      for (const auto& [familySourceBits, serializedPool] : mIdPoolTree) {
         IdPoolRuntime runtimePool{};
         runtimePool.mNextSerial =
           serializedPool.mNextLowId > 0 ? static_cast<std::uint32_t>(serializedPool.mNextLowId) : 1u;
@@ -4491,24 +4250,26 @@ namespace moho
 
     SerEntities(archive);
 
+    // Writes the real `mIdPoolTree` member directly (binary:
+    // `gpg::WriteArchive::Write(a1, v4, &a2->mIdPool, &a5)`, FUN_006897F0 --
+    // no synchronization step of any kind precedes it there). `gRuntimePools`
+    // may hold newer allocator-side state accumulated since the last load
+    // (`DoReserveId`/`ReleaseId`), so it is folded back into `mIdPoolTree`
+    // via the map's own `operator[]` before writing, keeping the persisted
+    // map authoritative without introducing a second serialization path.
     if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
           {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
         )) {
-      std::map<unsigned int, moho::IdPool> serializedIdPools;
       const auto poolsIt = gRuntimePools.find(this);
       if (poolsIt != gRuntimePools.end()) {
         for (const auto& [familySourceBits, runtimePool] : poolsIt->second) {
-          moho::IdPool serializedPool{};
-          serializedPool.mNextLowId = static_cast<std::int32_t>(runtimePool.mNextSerial);
-          serializedPool.mReleasedLows = runtimePool.mReleasedSerials;
-          auto [insertIt, inserted] = serializedIdPools.try_emplace(familySourceBits);
-          moho::IdPool& destinationPool = insertIt->second;
-          destinationPool.mNextLowId = serializedPool.mNextLowId;
-          destinationPool.mReleasedLows = serializedPool.mReleasedLows;
+          moho::IdPool& destinationPool = mIdPoolTree[familySourceBits];
+          destinationPool.mNextLowId = static_cast<std::int32_t>(runtimePool.mNextSerial);
+          destinationPool.mReleasedLows = runtimePool.mReleasedSerials;
         }
       }
 
-      archive->Write(idPoolMapType, &serializedIdPools, NullOwnerRef());
+      archive->Write(idPoolMapType, &mIdPoolTree, NullOwnerRef());
     }
 
     SerSets(archive);
