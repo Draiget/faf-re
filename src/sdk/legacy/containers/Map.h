@@ -297,6 +297,19 @@ namespace msvc8
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
+        /**
+         * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) --
+         * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>::erase(const
+         * key_type&)` (`gUiKeyActionMap`, `UiRuntimeTypes.cpp:1394`,
+         * isNil@+0x15). `find_node`-then-conditionally-`erase_node` shape
+         * matching this member exactly (`RemoveUiKeyMapEntries`'s
+         * `gUiKeyActionMap.erase(keyMask)`, `UiRuntimeTypes.cpp:1465`,
+         * already recovered). The `out_of_range` guard this compiles in
+         * (via `erase_node`'s own `_SECURE_SCL` checked-iterator machinery,
+         * see this file's `~rb_tree()` note in `RbTree.h`) is unreachable
+         * here since `n` is always either nil (short-circuited before the
+         * call) or a genuinely-found, valid node.)
+         */
         size_type erase(const key_type& k)
         {
             node_type* const n = tree_.find_node(k);
