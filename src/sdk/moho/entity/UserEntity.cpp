@@ -429,6 +429,13 @@ namespace moho
 
   /**
    * Address: 0x008B87A0 (FUN_008B87A0, ??1UserEntity@Moho@@UAE@XZ)
+   * Also emitted at: 0x008B8760 -- the scalar deleting destructor MSVC
+   * generates for any polymorphic class with a virtual destructor
+   * (`UserEntity : public WeakObject` declares `virtual ~UserEntity()`,
+   * single inheritance, so no adjustor complexity). No source line maps to
+   * that emission; a standalone `UserEntityDeletingDestructorThunk` free
+   * function previously modelled it as if it needed its own source-level
+   * caller, but nothing ever called it (removed).
    */
   UserEntity::~UserEntity()
   {
@@ -446,22 +453,6 @@ namespace moho
 
     DestroySpatialDbMeshInstanceStorage(mSpatialDbEntry);
     ResetLinkChain(mIUnitChainHead);
-  }
-
-  /**
-   * Address: 0x008B8760 (FUN_008B8760, scalar deleting destructor thunk)
-   *
-   * What it does:
-   * Calls `UserEntity::~UserEntity` and conditionally invokes `operator delete`
-   * when the low bit of `flags` is set.
-   */
-  [[maybe_unused]] UserEntity* UserEntityDeletingDestructorThunk(UserEntity* self, const std::uint8_t flags)
-  {
-    self->~UserEntity();
-    if ((flags & 0x01u) != 0u) {
-      ::operator delete(self);
-    }
-    return self;
   }
 
   /**

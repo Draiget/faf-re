@@ -156,6 +156,18 @@ namespace moho
      */
     Resolution(const Resolution& other);
 
+    /**
+     * Also emitted at: 0x008CD880 -- the scalar deleting destructor MSVC
+     * generates for any polymorphic class with a virtual destructor. The
+     * defaulted destructor body itself is trivial (all members are plain
+     * ints), which is why the emission's decompiled body has no visible
+     * destructor call, just the conditional `operator delete` -- the
+     * compiler folded the no-op destructor call away but still emitted the
+     * wrapper. No source line maps to this emission; a standalone
+     * `DestructResolutionRuntime` free function previously modelled it as if
+     * it needed its own source-level caller, but nothing ever called it
+     * (removed).
+     */
     virtual ~Resolution() = default;
 
     std::int32_t width;

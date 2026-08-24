@@ -2643,24 +2643,6 @@ moho::Resolution::Resolution(const Resolution& other)
 namespace
 {
   /**
-   * Address: 0x008CD880 (FUN_008CD880, Resolution scalar-deleting destructor)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for one `Resolution` runtime
-   * object and conditionally frees it when `deleteFlag & 1` is set.
-   */
-  [[maybe_unused]] moho::Resolution* DestructResolutionRuntime(
-    moho::Resolution* const resolution,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(resolution));
-    }
-    return resolution;
-  }
-
-  /**
    * Address: 0x008CD840 (FUN_008CD840)
    *
    * What it does:
