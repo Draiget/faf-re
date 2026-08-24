@@ -747,6 +747,13 @@ namespace gpg::core
      * `this + 0x10` and the capacity on `this + 0x10 + 0x460` -- 0x460 being
      * twenty slots of 0x38 -- and then rebinds through the uninitialised copy
      * at 0x00576F10, which is `ResetFrom`.)
+     * Address: 0x00898E50 (FUN_00898E50,
+     * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>'s copy constructor --
+     * `Moho::CWldSession::GetActiveBuildTemplate` (0x00896A40) return-slot
+     * copy-constructs its by-value result through this lane; recovered as
+     * `new (result) SBuildTemplateBuffer(mBuildTemplates)` at the call site
+     * (CWldSession.cpp), matching the hidden-return-slot ABI for a non-trivial
+     * by-value return.)
      */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
@@ -754,6 +761,17 @@ namespace gpg::core
       this->ResetFrom(other);
     }
 
+    /**
+     * Address: 0x00899790 (FUN_00899790,
+     * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator= -- reached
+     * from `Moho::CWldSession::SetActiveBuildTemplate` (0x00896A70), recovered
+     * as `mBuildTemplates = templates;` at the call site (CWldSession.cpp).
+     * Self-assignment guard, then `ResetFrom` -- destroy/rebind-to-inline,
+     * copy the source range.)
+     *
+     * Copy assignment: self-assignment guard, then reset to inline storage
+     * and copy the source range (`ResetFrom`).
+     */
     FastVectorN& operator=(const FastVectorN& other)
     {
       if (this != &other) {
@@ -836,6 +854,13 @@ namespace gpg::core
      * (`*slot = target; slot[1] = *target; *target = slot`), leaving `slot[1] = 0`
      * when the appended value carries no target. The full-storage arm forwards to
      * the same `InsertAt` grow lane as every other element type.
+     *
+     * Address: 0x006AD6E0 (FUN_006AD6E0, gpg::fastvector_n<Moho::
+     * SExtraUnitDataPair, 1>::push_back for the 8-byte `{key,value}` element --
+     * plain in-place `*end_ = value; ++end_;` on the general-element path,
+     * grow-full arm forwards to `InsertAt` (0x006AEAD0). Reached from
+     * `Moho::Unit::GetExtraData`'s `out->pairs.PushBack(pair)` calls,
+     * Unit.cpp.)
      */
     void push_back(const T& value)
     {
@@ -926,6 +951,19 @@ namespace gpg::core
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
      * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::InsertAt)
+     * Address: 0x008489D0 (FUN_008489D0,
+     * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::InsertAt -- the
+     * deep-copy lane (44-byte element owning an `msvc8::string`). Confirmed
+     * via `sub_899790`'s IDA-typed call `sub_8489D0(result, result->finish, v7,
+     * v2->finish)` (`gpg::fastvector_n16_SBuildTemplateInfo *result`), and via
+     * its own asm: `(a4-a3)/44` insert-count division, `requiredSize >
+     * currentCapacity` grow test with the doubling clamp, then either the
+     * `posAfter <= end` in-place tail-shift branch or the `posAfter > end`
+     * spill-past-end branch -- the same three-way shape as every other
+     * deep-copy `InsertAt` instantiation above. Reached from
+     * `Moho::AssignBuildTemplateBuffer`'s emission (`operator=` above) and
+     * from `std::vector_BuildTemplate::append` (0x00848540,
+     * `external_dependency` -- an ICF-shared STL body, not engine code).)
      * Address: 0x00570590 (FUN_00570590, the per-element 4-DWORD copy-loop
      * form of the SAssignedLocInfo blit step -- sizeof(SAssignedLocInfo)==
      * 0x10 confirmed via its own static_assert. Reached from the InsertAt
@@ -1178,6 +1216,10 @@ namespace gpg::core
     /**
      * Address: 0x004021F0 (FUN_004021F0)
      * Address: 0x004022A0 (FUN_004022A0)
+     * Address: 0x008969E0 (FUN_008969E0,
+     * Moho::CWldSession::ClearBuildTemplates -- the `SBuildTemplateInfo, 16>`
+     * instantiation, recovered as `mBuildTemplates.ResetStorageToInline();`
+     * at the call site (CWldSession.cpp).)
      *
      * What it does:
      * if heap-backed -> free heap and restore inline pointers from saved header;
@@ -1294,6 +1336,15 @@ namespace gpg::core
 
     /**
      * Address: 0x006584C0 (FUN_006584C0, std::_Uninit_copy<std::string> lane == _Ucopy)
+     * Address: 0x00849030 (FUN_00849030,
+     * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>'s per-element
+     * copy-construct-forward lane -- reached from both `InsertAt`'s grow arm
+     * (FUN_00848F50) and its in-place Branch A/B tail relocation. The binary
+     * inlines `SBuildTemplateInfo`'s copy constructor into the loop: floats
+     * `mPos` and dword `mBuildOrder` are copied directly, `mBlueprintId`'s SSO
+     * header is stamped empty (`myRes=15, mySize=0, buf[0]=0`) and then
+     * `std::string::assign`ed from the source -- the same
+     * copy-construct-then-assign shape this method expresses generically.)
      *
      * What it does:
      * Copy-CONSTRUCTS `[copyBegin, copyEnd)` into raw storage at `dest` and
@@ -1389,6 +1440,23 @@ namespace gpg::core
 
     /**
      * Address: 0x00658200 (FUN_00658200, std::vector<std::string>::_Insert_n grow lane)
+     * Address: 0x00848F50 (FUN_00848F50,
+     * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::GrowInsert lane -- the
+     * reallocate arm of `InsertAt` (FUN_008489D0) for this element. The binary
+     * allocates raw storage (`operator new(44 * newCapacity)`, not a typed
+     * array-new) and placement-constructs only the live three-slice union into
+     * it via the per-element copy-construct lane (FUN_00849030, cited on
+     * `UninitializedCopyForward` above), leaving any slack capacity past that
+     * union genuinely uninitialized. This method instead performs a typed
+     * `new T[newCapacity]` (default-constructing every slot, slack included)
+     * and then copy-*assigns* the three slices over it via `CopyRangeForward`
+     * -- a construct-then-assign shape rather than the binary's
+     * construct-once-into-raw-storage shape. Both leave the same observable
+     * `[start_, end_)` element values; the divergence is memory-footprint
+     * only (slack slots hold default-constructed values instead of being
+     * genuinely unallocated) and is the same accepted trade-off already made
+     * for every other deep-copy element type on this method
+     * (`msvc8::string`, `LuaPlus::LuaObject`, `boost::shared_ptr<CMauiFrame>`).)
      *
      * What it does:
      * Deep-copy grow-and-insert for non-trivially-relocatable T (the reallocate

@@ -2940,6 +2940,16 @@ namespace msvc8
          * Address: 0x007BBD40 (FUN_007BBD40, register-shape thiscall adapter
          * for FUN_007BD8F0, taking `(rangeEnd, rangeBegin)` in swapped
          * argument order.)
+         * Address: 0x008A9F10 (FUN_008A9F10, msvc8::vector<Moho::
+         * TerrainEnvironmentLookupPair>::destroy_range -- 56-byte element
+         * (`std::pair<msvc8::string, msvc8::string>`); the forward sweep
+         * inlines both strings' SSO capacity-check-then-free teardown per
+         * slot (capacity>=0x10 -> `operator delete` the heap buffer) instead
+         * of calling a named pair destructor, matching `std::pair`'s
+         * memberwise-destroy semantics. Used by `erase(first, last)`
+         * (`EraseTerrainEnvironmentLookupPairRange`, CWldMap.cpp) after the
+         * `std::copy` shift cited above on `0x008A9DC0`, to tear down the
+         * vacated tail.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -3415,6 +3425,14 @@ namespace msvc8
          * Address: 0x0085A9F0 (FUN_0085A9F0 — 0x10-byte element, the
          * formation-preview ghost pair; the single-slot shared-handle assign
          * the erase shift-down loop at FUN_0085A130 drives)
+         * Address: 0x005CBDE0 (FUN_005CBDE0 — 568-byte (0x238)
+         * `Moho::SUnitVariableUpdateEntry`: per-element loop assigning the
+         * leading key dword directly, forwarding the `SSTIUnitVariableData`
+         * payload at `+0x08` to its own `Assign` member, then the trailing
+         * dword at `+0x230` — the non-trivial per-field assign this
+         * element's `is_trivially_copy_assignable_v<T>` branch takes.
+         * Reached from the `_Insert_n` grow lane FUN_005C68E0, already
+         * cited above.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
