@@ -132,7 +132,7 @@ namespace moho
     try {
       destination = source;
     } catch (...) {
-      TidyVectorOfSNetCommandArg(destination);
+      destination.tidy();
       throw;
     }
   }

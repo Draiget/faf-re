@@ -1630,10 +1630,26 @@ namespace msvc8
          * `mArmyUpdates.reserve` above.)
          *
          * Reserve at least `newCap` elements without changing size.
+         *
+         * Address: 0x007BB7F0 (FUN_007BB7F0, msvc8::vector<Moho::
+         * SNetCommandArg>::_Buy on an empty vector -- allocates raw storage
+         * for `count` elements and arms the triplet with nothing constructed
+         * yet. The folded guard constant `0x71C71C7` is exactly `max_size()`
+         * for the 36-byte `SNetCommandArg` -- `0xFFFFFFFF / 0x24`.)
+         *
+         * VC8's `reserve()` guards against an unrepresentable request itself
+         * (`_Xlen()`, `std::length_error("vector<T> too long")`) before ever
+         * reaching the allocator -- the same guard `_Buy` opens with.
+         * `allocate_slots_checked`'s `bad_alloc` guard below is `_Allocate<T>`'s
+         * own backstop for internal grow paths that call it directly; the two
+         * are separate real guards, not duplicates.
          */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
                 return;
+            }
+            if (newCap > max_size()) {
+                throw_too_long();
             }
             reallocate_to(newCap);
         }
@@ -1769,6 +1785,26 @@ namespace msvc8
         void clear() noexcept {
             destroy_all();
             last_ = first_;
+        }
+
+        /**
+         * Address: 0x007BB840 (FUN_007BB840, msvc8::vector<Moho::SNetCommandArg>::_Tidy)
+         *
+         * What it does:
+         * Full teardown while leaving the vector reusable: destroys the live
+         * element range, releases the storage block, and clears the
+         * `{first_, last_, end_}` triplet. The debug-iterator proxy lane
+         * (`myProxy_`) is deliberately left alone, matching the binary. This is
+         * the destructor's own body (`~vector() { destroy_all(); deallocate_all(); }`)
+         * exposed as a callable member for the ctor-rollback `catch (...) { _Tidy(); throw; }`
+         * shape MSVC emits around a partially-built vector -- for
+         * `SNetCommandArg` both real callers (`FUN_007BB080`'s copy-ctor
+         * unwind and `FUN_007BB71D`'s count/value-ctor unwind) reach this one
+         * shared emission.
+         */
+        void tidy() noexcept {
+            destroy_all();
+            deallocate_all();
         }
 
         /**
@@ -2674,6 +2710,14 @@ namespace msvc8
          * reallocation branches call the range-copy body FUN_00832B80
          * directly for the head/tail relocation (all cited on
          * `uninit_copy_n` above).)
+         * Address: 0x007BB6A0 (FUN_007BB6A0, msvc8::vector<Moho::
+         * SNetCommandArg>::vector(count, value) -- the count/value
+         * constructor for the 36-byte element, which VC8 implements as
+         * `_Buy(count)` (see `reserve`) followed by exactly this
+         * `insert(begin(), count, value)` fill on the fresh empty storage.
+         * Reached from `FUN_007BAF70`'s `moho::BuildDefaultFilledCommandArgVector`
+         * -- `CGpgNetInterface::ReadFromSocket`'s real per-command arg-vector
+         * prefill, overwritten in place per element afterward.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -2790,6 +2834,15 @@ namespace msvc8
          * capacity-check-then-free shape at stride 28. Reached implicitly
          * from `SSavedGameHeader::~SSavedGameHeader()`'s compiler-generated
          * `mArmyInfo` member teardown, SSavedGameHeader.cpp.)
+         * Address: 0x007BD8F0 (FUN_007BD8F0, msvc8::vector<Moho::
+         * SNetCommandArg>::destroy_range -- 36-byte element, forward `~T()`
+         * sweep releasing each element's `mStr` payload; `SNetCommandArg`'s
+         * explicit destructor is what makes this generic loop non-trivial for
+         * that element, matching the binary. Used by `_Tidy`
+         * (`vector<T>::tidy()`, FUN_007BB840) and by `clear()`.)
+         * Address: 0x007BBD40 (FUN_007BBD40, register-shape thiscall adapter
+         * for FUN_007BD8F0, taking `(rangeEnd, rangeBegin)` in swapped
+         * argument order.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
