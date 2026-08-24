@@ -175,6 +175,26 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x005827D0 (FUN_005827D0)
+     * Demangled: gpg::RVectorType_SPointVector::dtr (scalar-deleting)
+     *
+     * What it does:
+     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
+     * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
+     * source: the compiler-generated `~RType()` reproduces this behavior,
+     * matching `RVectorType<moho::SimArmy*>::~RVectorType()`'s identical
+     * emission shape (Reflection.h) for the same base-layout reason
+     * (`sizeof(RVectorType<SPointVector>) == 0x68`, same as `RVectorTypeBase`).
+     * Vtable-confirmed: `??_7?$RVectorType@USPointVector@Moho@@@gpg@@6B@+0x8`
+     * writes this address; that vtable is constructed by `FUN_005825A0`
+     * (`register_SPointVectorVectorType`, recovered, `SPointVectorTypeInfo.cpp`),
+     * which placement-news the singleton `RVectorType<SPointVector>` and so
+     * writes its vptr on construction.
+     */
+    ~RVectorType() override = default;
+
+    /**
      * Address: 0x0057DF60 (FUN_0057DF60, gpg::RVectorType_SPointVector::GetName)
      *
      * What it does:
