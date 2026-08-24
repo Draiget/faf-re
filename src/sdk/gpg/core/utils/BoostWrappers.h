@@ -245,6 +245,11 @@ namespace boost
          * Address: 0x005BE250 (FUN_005BE250, Moho::WeakPtr_CIntelGrid::release)
          * Address: 0x0055FC60 (FUN_0055FC60, boost::shared_ptr_RScmResource::release)
          * Address: 0x005CE460 (FUN_005CE460, boost::shared_ptr_CIntelGrid::release)
+         * Address: 0x007D5D90 (FUN_007D5D90, another ICF-shape twin of this
+         * body -- branch-for-branch identical: use_count decrement at +0x04
+         * / dispose via vtable+0x04, then weak_count decrement at +0x08 /
+         * destroy via vtable+0x08. Reached from 19 real call sites in
+         * Mesh.cpp's mesh-instance/spatial-shard teardown paths.)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
