@@ -367,6 +367,9 @@ namespace gpg::core::legacy
    * Address: 0x00762850 (FUN_00762850)
    * Address: 0x00561E60 (FUN_00561E60)
    * Address: 0x005B5250 (FUN_005B5250)
+   * Address: 0x00754740 (FUN_00754740, register-shape adapter that
+   * reorders arguments and tail-calls FUN_00693430 above; reached from
+   * CopyAssignFloatSeptupleVector28Storage in Vector.cpp)
    *
    * What it does:
    * Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination`
