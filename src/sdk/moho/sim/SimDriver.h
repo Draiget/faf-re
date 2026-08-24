@@ -14,6 +14,7 @@
 #include "gpg/core/time/Timer.h"
 #include "ISTIDriver.h"
 #include "legacy/containers/AutoPtr.h"
+#include "legacy/containers/Deque.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/command/CmdDefs.h"
@@ -509,41 +510,44 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SDriverMutex) == 0x8, "SDriverMutex size must be 0x8");
 
   /**
-   * Ring buffer used for pending sync packets.
+   * Paged deque of pending sync-data payload pointers, matching a
+   * `boost::ptr_deque<SSyncData>` binding over `std::deque<SSyncData*>`.
    *
-   * Reconstructed from queue fields at +0x90..+0xA3.
+   * Field layout is exactly `msvc8::deque<SSyncData*>`'s 0x14-byte ABI
+   * (`_Myproxy`/`_Map`/`_Mapsize`/`_Myoff`/`_Mysize`) -- confirmed by IDA's
+   * own field recovery for `Moho::CSimDriver::mSyncdat` in `FUN_0073B570`
+   * (the ctor zero-inits `mSyncdat._Map/_Mapsize/_Myoff/_Mysize` directly)
+   * and by the paged double-indirection (`pages[block][lane]`) addressing
+   * in `FUN_00741980`/`FUN_007408F0`/`FUN_0073F9C0`. This is NOT a flat
+   * single-array ring buffer; every live element sits behind a `_Map`
+   * page-pointer lookup, exactly like every other `msvc8::deque<T>` user
+   * in this codebase.
    */
   struct SSyncDataQueue
   {
-    uint32_t reserved = 0;
-    SSyncData** map = nullptr;
-    uint32_t mapSize = 0;
-    uint32_t head = 0;
-    uint32_t size = 0;
+    msvc8::deque<SSyncData*> mSyncdat; // +0x00, binary field name (IDA: mSyncdat)
 
     ~SSyncDataQueue();
 
     bool Empty() const;
+    [[nodiscard]] uint32_t Size() const noexcept { return static_cast<uint32_t>(mSyncdat.size()); }
     void PushBack(SSyncData* data);
     SSyncData* PopFront();
 
     /**
-     * Address: 0x007407F0 (FUN_007407F0)
+     * Address: 0x007407F0 (FUN_007407F0, dispatches the inclusive range
+     *          `[head, head + size)` into 0x00741980)
+     * Address: 0x00741980 (FUN_00741980, per-slot payload destroy loop)
      *
      * What it does:
-     * Destroys every live payload in the active ring-buffer range
-     * `[head, head + size)` without touching the map allocation.
+     * Destroys and null-clears every live payload currently queued,
+     * walking the deque's real page/lane storage via its iterators.
+     * Ownership semantics (deleting the pointed-to `SSyncData`) belong to
+     * this ptr_deque-shaped wrapper, not to `msvc8::deque<T>` itself --
+     * the generic container only ever destroys the pointer value, never
+     * the pointee.
      */
     void DrainLiveRingBufferRange() noexcept;
-
-    /**
-     * Address: 0x007411A0 (FUN_007411A0)
-     *
-     * What it does:
-     * Destroys every non-null queued sync payload slot, releases queue storage,
-     * and resets ring bookkeeping lanes.
-     */
-    void ReleaseOwnedSlotsAndReset();
 
     void ClearAndDelete();
   };

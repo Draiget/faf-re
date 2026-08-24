@@ -732,16 +732,6 @@ namespace
   };
 
   template <typename T>
-  struct FourLanePagedRuntime
-  {
-    std::uint32_t reserved0;
-    T** pages;
-    std::uint32_t pageCount;
-    std::uint32_t baseIndex;
-    std::uint32_t size;
-  };
-
-  template <typename T>
   struct RangeOwnerRuntime
   {
     std::uint32_t reserved0;
@@ -768,59 +758,6 @@ namespace
   static_assert(sizeof(StringRangeBlock16Runtime) == 0x10, "StringRangeBlock16Runtime size must be 0x10");
   static_assert(sizeof(SharedControlLane12Runtime) == 0x0C, "SharedControlLane12Runtime size must be 0x0C");
 
-  template <typename T>
-  [[nodiscard]] T** GrowPagedArray(T** const pages, const std::uint32_t currentPageCount, const std::uint32_t desiredPageCount)
-  {
-    if (desiredPageCount <= currentPageCount) {
-      return pages;
-    }
-
-    auto* const newPages = static_cast<T**>(::operator new(sizeof(T*) * desiredPageCount, std::nothrow));
-    if (newPages == nullptr) {
-      return pages;
-    }
-
-    for (std::uint32_t i = 0u; i < desiredPageCount; ++i) {
-      newPages[i] = nullptr;
-    }
-
-    for (std::uint32_t i = 0u; i < currentPageCount; ++i) {
-      newPages[i] = pages != nullptr ? pages[i] : nullptr;
-    }
-
-    ::operator delete(static_cast<void*>(pages));
-    return newPages;
-  }
-
-  template <typename T>
-  [[nodiscard]] T** EnsurePagedFourLanePage(
-    FourLanePagedRuntime<T>* const runtime,
-    const std::uint32_t logicalIndex
-  )
-  {
-    if (runtime == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t pageIndex = logicalIndex >> 2u;
-    if (runtime->pages == nullptr || pageIndex >= runtime->pageCount) {
-      const std::uint32_t desiredPageCount = std::max(runtime->pageCount == 0u ? 8u : runtime->pageCount * 2u, pageIndex + 1u);
-      runtime->pages = GrowPagedArray(runtime->pages, runtime->pageCount, desiredPageCount);
-      if (runtime->pages == nullptr) {
-        return nullptr;
-      }
-      runtime->pageCount = desiredPageCount;
-    }
-
-    if (runtime->pages[pageIndex] == nullptr) {
-      runtime->pages[pageIndex] = static_cast<T*>(::operator new(sizeof(T) * 4u, std::nothrow));
-      if (runtime->pages[pageIndex] == nullptr) {
-        return nullptr;
-      }
-    }
-
-    return &runtime->pages[pageIndex];
-  }
 
   template <typename T>
   void DestroyRangeAndRelease(T* begin, T* end)
@@ -831,34 +768,6 @@ namespace
 
     for (T* cursor = begin; cursor != end; ++cursor) {
       std::destroy_at(cursor);
-    }
-  }
-
-  template <typename T>
-  void DestroyPagedFourLaneRange(
-    FourLanePagedRuntime<T>* const runtime,
-    std::uint32_t beginIndex,
-    const std::uint32_t endIndex
-  )
-  {
-    if (runtime == nullptr || runtime->pages == nullptr) {
-      return;
-    }
-
-    while (beginIndex != endIndex) {
-      const std::uint32_t pageIndex = beginIndex >> 2u;
-      const std::uint32_t laneIndex = beginIndex & 3u;
-      if (pageIndex < runtime->pageCount && runtime->pages[pageIndex] != nullptr) {
-        T& entry = runtime->pages[pageIndex][laneIndex];
-        if constexpr (std::is_pointer_v<T>) {
-          if (entry != nullptr) {
-            delete entry;
-          }
-        } else {
-          std::destroy_at(&entry);
-        }
-      }
-      ++beginIndex;
     }
   }
 
@@ -11034,34 +10943,6 @@ void EmitPatchTrianglesFromTesselatorRuntime(
 }
 
 /**
- * Address: 0x007408F0 (FUN_007408F0)
- *
- * What it does:
- * Appends one 32-bit lane into a paged four-slot runtime buffer, allocating a
- * backing page when the destination page has not been materialized yet.
- */
-std::uint32_t* AppendPagedWordRuntime(
-  FourLanePagedRuntime<std::uint32_t>* const runtime,
-  const std::uint32_t* const value
-)
-{
-  if (runtime == nullptr || value == nullptr) {
-    return nullptr;
-  }
-
-  const std::uint32_t logicalIndex = runtime->baseIndex + runtime->size;
-  std::uint32_t** const pageSlot = EnsurePagedFourLanePage(runtime, logicalIndex);
-  if (pageSlot == nullptr || *pageSlot == nullptr) {
-    return nullptr;
-  }
-
-  std::uint32_t* const lane = *pageSlot + (logicalIndex & 3u);
-  *lane = *value;
-  ++runtime->size;
-  return lane;
-}
-
-/**
  * Address: 0x00740A60 (FUN_00740A60)
  *
  * What it does:
@@ -11181,37 +11062,6 @@ void DestroyStringRangeOwnerRuntime(
   owner->begin = nullptr;
   owner->end = nullptr;
   owner->reserved12 = 0u;
-}
-
-/**
- * Address: 0x00741980 (FUN_00741980)
- *
- * What it does:
- * Destroys every live `SSyncData` pointer in one four-slot paged range.
- */
-void DestroyPagedSyncDataRangeRuntime(
-  FourLanePagedRuntime<moho::SSyncData*>* const runtime,
-  const std::uint32_t beginIndex,
-  const std::uint32_t endIndex
-)
-{
-  if (runtime == nullptr || runtime->pages == nullptr) {
-    return;
-  }
-
-  for (std::uint32_t logicalIndex = beginIndex; logicalIndex != endIndex; ++logicalIndex) {
-    const std::uint32_t pageIndex = logicalIndex >> 2u;
-    const std::uint32_t laneIndex = logicalIndex & 3u;
-    if (pageIndex >= runtime->pageCount || runtime->pages[pageIndex] == nullptr) {
-      continue;
-    }
-
-    moho::SSyncData*& queued = runtime->pages[pageIndex][laneIndex];
-    if (queued != nullptr) {
-      delete queued;
-      queued = nullptr;
-    }
-  }
 }
 
 /**
