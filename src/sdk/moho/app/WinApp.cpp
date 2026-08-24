@@ -122,6 +122,15 @@ namespace
   WxAppInitAllocatorLane gWxAppInitAllocatorLane = nullptr;
   std::uint8_t gWxAppInitAnchorLane = 0u;
 
+  /**
+   * Address: 0x004E82D0 (FUN_004E82D0)
+   *
+   * What it does:
+   * Invokes one stored unary cdecl callback with the given value. Installed
+   * into `gLegacyTimeBarUnaryDispatchAdapter`/`gLegacyTssAdapterUnaryDispatchAdapter`
+   * as the manager/invoker install for a `boost::function1<void,
+   * Moho::STimeBarThreadInfo*>`-shaped TSS-slot dispatcher.
+   */
   int __cdecl LegacyInvokeUnaryCallback(
     LegacyUnaryCdeclCallback* const callbackLane,
     const int value
@@ -130,6 +139,16 @@ namespace
     return (*callbackLane)(value);
   }
 
+  /**
+   * Address: 0x004E82E0 (FUN_004E82E0)
+   *
+   * What it does:
+   * `basic_vtable<F>::manager`-shaped RTTI/clone/reset dispatcher for the
+   * same TSS-slot deleter Functor `LegacyInvokeUnaryCallback` invokes:
+   * publishes `typeid(TimeBarThreadCallback)` on the publish-type query,
+   * copies/resets/compares the stored callback slot on the other query
+   * codes. Installed into `gLegacyTimeBarTypeInfoDispatchAdapter`.
+   */
   LegacyTypeInfoLane* __cdecl LegacyResolveTimeBarThreadCallbackTypeInfo(
     LegacyTypeInfoLane* const sourceLane,
     LegacyTypeInfoLane* const destinationLane,
