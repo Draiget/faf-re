@@ -2893,13 +2893,8 @@ moho::PrefixedWeakPtrDwordPayloadLane* ConstructPrefixedWeakPtrDwordLaneRangeFro
     return nullptr;
   }
 
-  moho::PrefixedWeakPtrDwordPayloadLane zeroLane{};
-  auto* cursor = destination;
-  for (std::uint32_t index = 0u; index < count; ++index) {
-    cursor = moho::CopyPrefixedWeakPtrDwordPayloadLane(cursor, &zeroLane);
-    ++cursor;
-  }
-  return cursor;
+  const moho::PrefixedWeakPtrDwordPayloadLane zeroLane{};
+  return moho::ConstructPrefixedWeakPtrDwordPayloadRepeated(destination, count, &zeroLane);
 }
 
 /**
