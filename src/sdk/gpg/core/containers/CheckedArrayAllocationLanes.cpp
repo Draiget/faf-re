@@ -159,10 +159,39 @@ namespace gpg::core::legacy
    * What it does:
    * Allocates a contiguous lane of 24-byte elements and applies the legacy
    * 32-bit overflow guard before forwarding to global `operator new`.
+   *
+   * Address: 0x008B6AC0 (FUN_008B6AC0, sub_8B6AC0)
+   *
+   * Same instantiation, the `std::exception`+vftable-patch+
+   * `CxxThrowException` throw form (matching `FUN_008620F0`'s cited shape
+   * above): `if (0xFFFFFFFF/a1 < 0x18) throw bad_alloc; return operator
+   * new(24*a1);`. This is `RbTree.h`'s `alloc_raw()` for `msvc8::map<
+   * Moho::CmdId, Moho::UserCommandIssueHelper*>` (`CommandManager::
+   * mCommands`, node size 0x18) -- called `sub_8B6AC0(1)` from `buy_node`'s
+   * emission `FUN_008B67F0` (already recovered, `RbTree.h`), itself reached
+   * from `insert_at`'s emission `FUN_008B6310`.
    */
   void* AllocateChecked24ByteLane(const std::uint32_t elementCount)
   {
     return AllocateCheckedElements(elementCount, 24u);
+  }
+
+  /**
+   * Address: 0x00540C40 (FUN_00540C40, sub_540C40)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 8-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`. Same
+   * `std::exception`+vftable-patch+`CxxThrowException` throw form as
+   * `FUN_008620F0` above: `if (0xFFFFFFFF/a1 < 8) throw bad_alloc; return
+   * operator new(8*a1);`. Reached from the `_Insert_n` grow lane
+   * `FUN_00540330` (already recovered, `Vector.h`), `msvc8::vector<
+   * Moho::SEjectRequest>`'s checked capacity allocation for the 8-byte
+   * `{const CClientBase* mRequester, int mAfterBeat}` element.
+   */
+  void* AllocateChecked8ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 8u);
   }
 
   /**

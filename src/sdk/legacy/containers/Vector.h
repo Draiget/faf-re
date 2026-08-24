@@ -3639,6 +3639,43 @@ namespace msvc8
          * post-gap live ranges into the freshly allocated buffer, growing
          * `CArmyImpl::UnitCategorySets`.
          *
+         * Address: 0x00536FF0 (FUN_00536FF0, `msvc8::vector<
+         * Moho::RBlueprint*>::uninit_move_n` for the trivially-relocatable
+         * 4-byte pointer element -- `memmove_s(dst, n*4, src, n*4)` range
+         * form, `[Source,a3) -> Destination`. Reached from the `_Insert_n`
+         * grow lane `FUN_00535D60` (already recovered above).)
+         * Address: 0x0087D320 (FUN_0087D320, `msvc8::vector<
+         * Moho::CDecalGroup*>::uninit_move_n` for the same 4-byte pointer
+         * shape. Reached from the `_Insert_n` grow lane `FUN_0087B1C0`
+         * (already recovered above), `Moho::CDecalManager::mDecalGroups`.)
+         * Address: 0x0087D3F0 (FUN_0087D3F0, `msvc8::vector<
+         * Moho::CWldSplat*>::uninit_move_n` for the same 4-byte pointer
+         * shape. Reached from the `_Insert_n` grow lane `FUN_0087BB40`
+         * (already recovered above), `Moho::CDecalManager::mSplats`.)
+         * Address: 0x0088AEE0 (FUN_0088AEE0, `msvc8::vector<
+         * Moho::WaveGenerator*>::uninit_move_n` for the same 4-byte pointer
+         * shape. Reached from the `_Insert_n` grow lane `FUN_0088A7B0`
+         * (already recovered above), `WaveSystem.cpp`.)
+         * Address: 0x008DB240 (FUN_008DB240, `msvc8::vector<gpg::RType*>::
+         * uninit_move_n` for the same 4-byte pointer shape. Reached from the
+         * `_Insert_n` grow lane `FUN_008DD050` (already recovered above),
+         * the global reflection TypeVec.)
+         * Address: 0x008FA8F0 (FUN_008FA8F0, `msvc8::vector<void*>::
+         * uninit_move_n` for the same 4-byte pointer shape, the D3D10
+         * backend swap-chain vector. Reached from the `_Insert_n` grow lane
+         * `FUN_008FE010` (already recovered above).)
+         * Address: 0x00814480 (FUN_00814480, `msvc8::vector<
+         * boost::shared_ptr<moho::ShoreCell>>::uninit_move_n` -- the
+         * range-copy body FUN_00813E40's register-shuffle wrapper (cited
+         * above) forwards into; per-element `{px,pn}` copy with an
+         * `_InterlockedExchangeAdd`-based refcount bump on `pn` when
+         * non-null, matching Boost 1.34.1's copy-degrades-move shape already
+         * documented for the other `shared_ptr`/`weak_ptr` entries in this
+         * method. Reached (via FUN_00813E40) from the `_Insert_n` grow lane
+         * `FUN_00813900` (already recovered above), `AppendShoreCellRef`'s
+         * (Shoreline.cpp) `shorelineCells.push_back(cell)` capacity-full
+         * path.)
+         *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
          * template. `msvc8::string` declares a `noexcept` move constructor
