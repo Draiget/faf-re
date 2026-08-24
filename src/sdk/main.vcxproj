@@ -1318,6 +1318,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\app\IWinApp.cpp" />
     <ClCompile Include="moho\app\WEmitterWx.cpp" />
     <ClCompile Include="moho\app\FrameDumpCommands.cpp" />
+    <ClCompile Include="moho\app\ResolutionCommands.cpp" />
     <ClCompile Include="moho\app\WinMain.cpp" />
     <ClCompile Include="moho\unit\core\UserUnitTypeInfo.cpp" />
     <ClCompile Include="moho\sim\ESpecialFileTypeTypeInfo.cpp" />
@@ -1615,6 +1616,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\app\IWinApp.h" />
     <ClInclude Include="moho\app\WEmitterWx.h" />
     <ClInclude Include="moho\app\FrameDumpCommands.h" />
+    <ClInclude Include="moho\app\ResolutionCommands.h" />
     <ClInclude Include="moho\app\WxAppRuntime.h" />
     <ClInclude Include="moho\app\WxAppVectorHelpers.h" />
     <ClInclude Include="moho\app\WxRuntimeTypes.h" />

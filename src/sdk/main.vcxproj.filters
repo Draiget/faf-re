@@ -1671,6 +1671,9 @@
     <ClCompile Include="moho\app\FrameDumpCommands.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\app\ResolutionCommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\app\WxAppRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4699,6 +4702,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\FrameDumpCommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\app\ResolutionCommands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\WxAppRuntime.h">
