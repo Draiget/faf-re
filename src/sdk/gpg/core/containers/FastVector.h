@@ -454,6 +454,13 @@ namespace gpg::core
      * gpg::fastvector<Moho::CAniPoseBone>::Reserve -- grows to exactly the
      * requested count through the reallocate-insert lane with a zero-length
      * insert range, so the live elements are preserved 1:1)
+     * Address: 0x0067EA30 (FUN_0067EA30, gpg::fastvector<Wm3::Sphere3f>'s
+     * old-range-into-new-buffer copy step for this method's 16-byte
+     * `Sphere3f` instantiation (center xyz + radius, trivially copyable) --
+     * a plain forward per-element 4-float copy loop, the compiled shape
+     * `std::memcpy`'s trivially-copyable branch reproduces. Reached from
+     * `GrowInsertSphere3fFastVector` (FUN_0067E190, recovered in Entity.cpp)
+     * via `spheres.resize(targetCount, fillValue)`'s reallocation path.)
      *
      * Reserve at least n elements; does not shrink.
      */
