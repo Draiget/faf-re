@@ -6926,6 +6926,11 @@ void ReleaseRefcountedLaneRange(
   return destination;
 }
 
+/**
+ * Address: 0x00755B30 (FUN_00755B30, 28-byte/7-float-stride forward range
+ * copy, reached from CopyAssignFloatSeptupleVector28Storage's grow/tail
+ * copy branches via FUN_007525C0)
+ */
 [[nodiscard]] VectorElement28FloatSeptupleLane* CopyFloatSeptupleLaneRange(
   VectorElement28FloatSeptupleLane* destination,
   const VectorElement28FloatSeptupleLane* sourceBegin,
@@ -7623,6 +7628,13 @@ VectorVoidStorageView* CopyConstructDwordDecupleVector40Storage(
  * What it does:
  * Copy-assigns one 4-byte dword vector storage lane using the legacy
  * overwrite/append/reallocate split and updates `_Mylast` accordingly.
+ *
+ * Address: 0x005275F0 (FUN_005275F0, the memmove_s-based dword-range
+ * relocate the binary factors into a separate symbol for one of this
+ * function's two memmove_s call sites below -- the recovered source
+ * inlines the call directly via `memmove_s`, which is the same operation.)
+ * Address: 0x00754A30 (FUN_00754A30, sibling emission for this function's
+ * other memmove_s call site)
  */
 VectorVoidStorageView* CopyAssignDwordVectorStorage(
   VectorVoidStorageView& destination,
