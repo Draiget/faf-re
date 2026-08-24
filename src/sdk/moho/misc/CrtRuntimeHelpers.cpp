@@ -243,7 +243,7 @@ extern "C" int __cdecl __init_collate()
 }
 
 /**
-  * Alias of FUN_00ACE110 (non-canonical helper lane).
+ * Address: 0x00ACE110 (FUN_00ACE110, _SFUO_Init -- non-canonical helper lane)
  *
  * What it does:
  * Preserves one CRT SFUO startup lane as a success no-op.
@@ -254,7 +254,7 @@ extern "C" int __cdecl _SFUO_Init()
 }
 
 /**
-  * Alias of FUN_00ACE120 (non-canonical helper lane).
+ * Address: 0x00ACE120 (FUN_00ACE120, _SFUO_Finish -- non-canonical helper lane)
  *
  * What it does:
  * Preserves one CRT SFUO finish lane as a success no-op.
@@ -265,7 +265,7 @@ extern "C" int __cdecl _SFUO_Finish()
 }
 
 /**
-  * Alias of FUN_00ACE2E0 (non-canonical helper lane).
+ * Address: 0x00ACE2E0 (FUN_00ACE2E0, _SFUO_Destroy -- non-canonical helper lane)
  *
  * What it does:
  * Preserves one CRT SFUO teardown lane as a success no-op.
