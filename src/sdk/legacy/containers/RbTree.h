@@ -2476,6 +2476,17 @@ namespace msvc8
              * this member's fused `buy_head()` emission `FUN_007B3F30`
              * (cited there) for header construction; owning field not yet
              * pinned to a specific class.)
+             * Address: 0x00947030 (FUN_00947030, sub_947030) -- another
+             * instantiation of this member, 8-byte value_type (node 0x18=24
+             * bytes), `color`/`isNil` at `[eax+0x14]`/`[eax+0x15]` --
+             * `operator new(0x18)`, zero the three link dwords, `color=1`/
+             * `isNil=0`, exactly this member's shape. Called by the
+             * `buy_head()`-equivalent ctor emission `FUN_00947FE0` (cited
+             * above on `rb_tree()`, "the `this`-returning sibling emission"
+             * paragraph) as its dedicated `alloc_raw` half; owning
+             * field/class not yet pinned down (isNil@+0x15, 8-byte-value
+             * shape recurs across many Sim-subsystem containers per that
+             * same paragraph).
              */
             [[nodiscard]] static node_type* alloc_raw()
             {

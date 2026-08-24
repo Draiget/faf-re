@@ -361,6 +361,15 @@ namespace
     return list->size;
   }
 
+  /**
+   * Address: 0x0092DED0 (FUN_0092DED0, sub_92DED0)
+   *
+   * What it does:
+   * Allocates one 40-byte intrusive node (`operator new(0x28)`) and
+   * initializes its next/prev links and 32-byte payload, guarded against
+   * null on the original allocator-failure path.
+   */
+
   [[nodiscard]] IntrusivePayloadNode32Runtime* AllocateIntrusivePayloadNode32(
     IntrusivePayloadNode32Runtime* const next,
     IntrusivePayloadNode32Runtime* const prev,
