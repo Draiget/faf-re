@@ -21042,6 +21042,46 @@ void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
 }
 
 /**
+ * Address: 0x00909AF0 (FUN_00909AF0, LuaPlus::LuaObject::Insert)
+ *
+ * What it does:
+ * Runs `table.insert(this, obj)` (no explicit index -- appends at the end)
+ * by constructing one Lua call-frame view (FUN_00909A00) over the resolved
+ * `table.insert` function, pushing `this` and the value `obj` as arguments
+ * onto it, invoking the frame, and restoring the original Lua stack top.
+ * Same shape as the two-argument overload above with the numeric-key push
+ * omitted.
+ */
+void LuaObject::Insert(const LuaObject& obj) const
+{
+	if (m_state != obj.m_state) {
+		throw LuaAssertion("m_state == obj.m_state");
+	}
+
+	LuaState* const activeState = m_state->GetActiveState();
+	lua_State* const lstate = activeState->m_state;
+	const int oldTop = lua_gettop(lstate);
+
+	{
+		LuaObject tableObject = activeState->GetGlobal("table");
+		LuaObject insertFunction = tableObject["insert"];
+
+		LuaObject thisCopy(*this);
+		LuaObject objCopy(obj);
+		RunLuaTableMethodCallFrame(
+			activeState,
+			insertFunction,
+			&thisCopy,
+			false,
+			0.0,
+			&objCopy
+		);
+	}
+
+	lua_settop(lstate, oldTop);
+}
+
+/**
  * Address: 0x00909EB0 (FUN_00909EB0, LuaPlus::LuaObject::Remove)
  *
  * What it does:
