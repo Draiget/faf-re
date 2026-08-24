@@ -5503,6 +5503,12 @@ void* AllocateChecked16ByteElements(const std::uint32_t count)
  * Address: 0x00712A70 (FUN_00712A70)
  * Address: 0x0077DB80 (FUN_0077DB80)
  * Address: 0x00798B60 (FUN_00798B60)
+ * Address: 0x007B3FA0 (FUN_007B3FA0, `mov ecx,1; jmp` thin adapter that
+ * always calls this with count=1 -- a distinct per-call-site emission, not
+ * an ICF twin, matching the `0x007B1420`-on-`AllocateChecked28ByteElements`
+ * single-count-adapter convention already used below. DB-integrity fix:
+ * `source_paths=null`, boilerplate batch note, zero real citations found
+ * in a full `src/sdk` sweep.)
  * Address: 0x007B4E50 (FUN_007B4E50)
  * Address: 0x007CC1C0 (FUN_007CC1C0)
  * Address: 0x007FB9B0 (FUN_007FB9B0)
@@ -5542,6 +5548,11 @@ void* AllocateChecked24ByteElements(const std::uint32_t count)
  * Address: 0x00571800 (FUN_00571800)
  * Address: 0x005CA1E0 (FUN_005CA1E0)
  * Address: 0x007B1420 (FUN_007B1420)
+ * Address: 0x007B4CF0 (FUN_007B4CF0, `mov ecx,1; jmp` thin adapter that
+ * always calls this with count=1 -- same single-count-adapter shape as
+ * `0x007B1420` above, a distinct per-call-site emission. DB-integrity
+ * fix: `source_paths=null`, boilerplate batch note, zero real citations
+ * found in a full `src/sdk` sweep.)
  * Address: 0x007B4FA0 (FUN_007B4FA0)
  *
  * What it does:
@@ -5571,6 +5582,12 @@ void* AllocateChecked28ByteElementsZeroAware(const std::uint32_t count)
  * Address: 0x004E8170 (FUN_004E8170)
  * Address: 0x005CA280 (FUN_005CA280)
  * Address: 0x00751C40 (FUN_00751C40)
+ * Address: 0x007B4B60 (FUN_007B4B60, `mov ecx,1; jmp` thin adapter that
+ * always calls this with count=1 -- same single-count-adapter shape as
+ * `0x007B1420`-on-`AllocateChecked28ByteElements` above, a distinct
+ * per-call-site emission. DB-integrity fix: `source_paths=null`,
+ * boilerplate batch note, zero real citations found in a full `src/sdk`
+ * sweep.)
  * Address: 0x007B4EF0 (FUN_007B4EF0)
  *
  * What it does:
