@@ -688,6 +688,17 @@ namespace msvc8
              * in place rather than relying on `~RRuleGameRulesLuaExportBinding
              * ()` alone, since the binary invokes this both from a live
              * compaction site and from an SEH unwind funclet.)
+             * Address: 0x0052CF10 (FUN_0052CF10, the SEH-unwind-path duplicate
+             * of the same `mPendingBlueprintOrdinals` teardown -- byte-for-byte
+             * the same three steps (`erase_range(leftmost(), header())` via
+             * `sub_52D9C0`, `operator delete(head_)`, then `head_=nullptr`/
+             * `size_=0` at `[this+4]`/`[this+8]`) but entered with `this` handed
+             * in `eax` and moved to `edi` rather than arriving in `ecx`, which
+             * is the unwind-funclet calling convention referenced on
+             * 0x0052A390 above rather than an ordinary thiscall member-function
+             * entry. No separate source line -- this is the compiler-generated
+             * unwind-path clone of the same destructor, not a distinct
+             * function.)
              */
             /**
              * Address: 0x006843B0 (FUN_006843B0, `Moho::EntityDB::~EntityDB` --
@@ -1502,6 +1513,39 @@ namespace msvc8
              * deserialization only ever runs against a freshly constructed,
              * still-empty map, so removing that fabricated call did not
              * change behaviour.)
+             *
+             * Address: 0x00947B90 (FUN_00947B90, isNil@+0x15 -- same two-shape
+             * split confirmed against the walked callee bodies: the whole-tree
+             * fast path calls `sub_9470E0` (recursive delete-all with no
+             * rebalancing, matching `destroy_subtree`'s shape exactly) on
+             * `header()->parent` (the root), then resets `header()->parent`,
+             * `_Mysize` and `header()->left`/`header()->right` to `header()`
+             * and returns `leftmost()`; otherwise walks `erase(_First++)` via
+             * `sub_947380`, whose body is a full RB-tree single-node
+             * erase-with-rebalance (out_of_range throw on an already-nil
+             * iterator, unlink, recolour/rotate through sibling helpers,
+             * `operator delete` the node, decrement size) matching
+             * `erase_node` exactly. Reached from
+             * `gpg::gal::StateCache<_D3DRENDERSTATETYPE,unsigned int>::~StateCache`
+             * (FUN_00948190, StateCache.cpp) -- its own disassembly at
+             * 0x009481AC calls `sub_947B90(&tree_, &cursor, *(*(this+8)),
+             * *(this+8))`, i.e. `tree_.erase_range(tree_.begin(), tree_.end())`,
+             * followed by an explicit `operator delete` on the pointer that
+             * was passed as `last`/`header()`. NOTE FOR A FUTURE STATECACHE
+             * PASS: this proves `StateCache<StateT,ValueT>::tree_`'s real
+             * layout is a proper header-pointer-owning RB-tree (the header
+             * node is separately heap-allocated and must be explicitly
+             * freed after the erase), not the currently-modelled
+             * `msvc8::EmbeddedTree<>` (`legacy/containers/Tree.h`, embedded
+             * by-value head, no-arg `clear()`) that
+             * `StateCache_D3DRENDERSTATETYPE.hpp`/`StateCache.cpp` use today
+             * -- `~StateCache`'s recovered body currently calls
+             * `tree_.clear()`, which is a different, narrower operation than
+             * the two-arg `erase_range(begin,end)` + separate header
+             * `delete` this address actually performs. Not corrected here
+             * (would require retyping `tree_` across all three `StateCache`
+             * specialisations, out of scope for this token); flagged for
+             * whoever next touches `StateCache`.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -1712,6 +1756,16 @@ namespace msvc8
              * FUN_0052F370 above. Node shape (20 bytes, no value slot) is
              * head-only, matching a `msvc8::set<int32_t>`-style sentinel for
              * the same map whose value-bearing node buy is FUN_00A58450.)
+             * Address: 0x00A58370 (FUN_00A58370, another `alloc_raw` half of
+             * buy_head for a sibling "unidentified map<int32_t,T>
+             * instantiation" -- byte-for-byte the same shape as FUN_00A583C0
+             * above (`operator new(0x14)`, zero the three link dwords,
+             * byte+0x10=1/byte+0x11=0), but a distinct COMDAT with its own
+             * caller family: FUN_00A59FC0 (call at 0x00A59FC3), FUN_00A5D913,
+             * FUN_00A66203, and FUN_00A67120 (call at 0x00A671E2) -- none
+             * recovered yet, so the owning map/set instantiation is not
+             * identified. Same 20-byte headless-node shape as FUN_00A583C0's
+             * cluster.)
              */
             /**
              * Address: 0x00684230 (FUN_00684230, `Moho::EntityDB::EntityDB` --
@@ -1793,6 +1847,25 @@ namespace msvc8
              * link fields at `+0x00`/`+0x04`/`+0x08`, copy-constructs the 20-byte
              * value at `+0x0C`, colour at `+0x20`, nil at `+0x21`. Reached from
              * `insert_at`'s call site cited above (0x00A63950).)
+             */
+            /**
+             * Address: 0x00581370 (FUN_00581370, `msvc8::map<Wm3::Vector2i,
+             * SBuildReserveInfo>::buy_node` -- `CAiBrain::mBuildStructureMap`,
+             * the node-buy sibling of `buy_head` (0x00581330, cited above on
+             * `alloc_raw`). `_Buynode(_Larg, _Parg, _Rarg, value)` shape:
+             * allocates one 40-byte node via the same `alloc_raw` lane
+             * (`sub_582460(1)`, already cited on `AllocateCheckedElementBlock`
+             * in Vector.cpp), writes `left@+0`/`parent@+4`/`right@+8` straight
+             * from its first three arguments (the caller, `_Insert`
+             * FUN_00580720, passes the tree's `head_` for both `left` and
+             * `right` and the insertion-point `where` node for `parent`),
+             * copy-constructs the 24-byte `pair<const Wm3::Vector2i,
+             * SBuildReserveInfo>` value in place at `+0x0C` through
+             * `sub_5816C0` (the pair's copy ctor -- not independently cited
+             * yet), then zeroes `color@+0x24`/`isNil@+0x25` -- matching
+             * `buy_head`'s "38, rounded to 40" node-size note exactly. Reached
+             * from FUN_00580720's `_Insert`, which is not yet recovered
+             * source itself.)
              */
             /**
              * Address: 0x0077CD00 (FUN_0077CD00, inner bucket node allocate)
@@ -2136,6 +2209,53 @@ namespace msvc8
              * migration -- see `CCommandDb.cpp`'s history for the
              * hand-rolled `CommandDbMapNodeRuntime` tree this address used
              * to be (incorrectly) associated with.)
+             * Address: 0x00947120 (FUN_00947120, isNil@+0x15 -- the same
+             * 8-byte value_type node shape as 0x006E2990 above, but reached
+             * from a different subsystem (`CScApp`'s vtable neighbourhood,
+             * not `CCommandDb`), so this is a distinct `map`/`set`
+             * instantiation with a matching layout rather than the same
+             * field. Same recurse-right/iterate-left/`free_node` shape
+             * (`call sub_947120` on `[node+8]`, `node=[node]`, delete the
+             * carried-over pointer). Both non-recursive callers
+             * (`FUN_00947290`, `FUN_00947C50`) are unrecovered in this pass,
+             * so the owning `CScApp` member is not yet pinned down -- only
+             * the tree-algorithm shape and node size are confirmed, matching
+             * the precedent set by the unidentified 0x00A5xxxx-0x00A67xxx
+             * rotate instantiation cited under `_Lrotate` below.)
+             */
+            /**
+             * Address: 0x00505EC0 (FUN_00505EC0, whole-subtree destroy for an
+             * unidentified `msvc8::map`/`msvc8::set` instantiation with a
+             * 40-byte value_type -- isNil@+0x35 (0x0D + 0x28 = 0x35).
+             * Recurses on the right child (`sub_505EC0(v2[2])`) then
+             * iterates down the left chain (`v2 = *v2`), matching this
+             * method's recurse-right/iterate-left shape exactly; no inlined
+             * value-destructor work precedes `operator delete`, so the
+             * 40-byte value is trivially destructible (same bare-delete
+             * shape as FUN_007B4D10 above). Reached from `FUN_00505200`
+             * (`EraseSpatialMapRange`, `Mesh.cpp`)'s whole-tree fast path
+             * and from an unclassified code chunk at 0x00505CFC; owning
+             * member not yet pinned down.)
+             */
+            /**
+             * Address: 0x005317D0 (FUN_005317D0, whole-subtree destroy for
+             * another `msvc8::map<msvc8::string, void*>` instantiation --
+             * 32-byte value_type (28-byte string key + 4-byte pointer
+             * value), isNil@+0x2D (0x0D + sizeof(pair<string(28),
+             * void*(4)>) = 0x2D), the identical shape and formula to
+             * FUN_00531490's `RRuleGameRulesImpl` blueprint-map citation
+             * above: per node, frees the key's heap SSO buffer when
+             * `_Myres >= 0x10` (`operator delete((void*)v1[4])`), resets
+             * `_Myres=0xF`/`_Mysize=0`/the first SSO byte, then `operator
+             * delete`s the node. Recurses right (`sub_5317D0(i[2])`) and
+             * iterates left (`i = *i`), matching this method's shape
+             * exactly. Distinct COMDAT from FUN_00531490 (a different
+             * address, not ICF-folded), so this is either a coincidentally
+             * identical sibling `map<string, void*>` member elsewhere or a
+             * second instantiation the linker left unfolded; owning member
+             * not yet pinned down. Reached from FUN_0052E8B0 (`erase_range`,
+             * itself blocked pending this token's recovery) and an
+             * unclassified code chunk at 0x0053091C.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -2363,6 +2483,23 @@ namespace msvc8
              * `EntityDb.h`. Mirror of `rotate_left`'s FUN_006880A0 above,
              * same instantiation. Reached from `insert_at`'s emission
              * FUN_00687280's fixup loop, cited above.)
+             */
+            /**
+             * Address: 0x00A55930 (FUN_00A55930, the right rotate for the same
+             * unidentified `map<int32_t, T>` instantiation cited on
+             * `rotate_left` above (0x00A52800/0x00A529D0) and on `insert_at`'s
+             * link-and-rebalance fixup loop (0x00A63950) -- swapped field
+             * order confirmed (`right@0`/`parent@+4`/`left@+8`, isNil byte at
+             * +0x21): reads `n->left` at `[edx+8]`, `pivot->right` at `[eax]`,
+             * writes `n->left = pivot->right` at `[edx+8]`, the root/
+             * parent-side branch at `[ecx+4]`/`[ecx]`/`[ecx+8]` mirroring
+             * `rotate_left`'s own root/parent-side branch with right and left
+             * swapped, and finishes `pivot->right = n` / `n->parent = pivot`
+             * via field 0 and field+4 exactly as this method's generic body
+             * does. Reached from `insert_at`'s fixup loop (0x00A63950) via the
+             * same caller chain cited there (0x00A656A0 -> 0x00A65D00 ->
+             * 0x00A66270 -> 0x00A666F0 -> ...); owning class still not traced
+             * in this pass, matching the sibling citation.)
              */
             /**
              * Address: 0x006E1FD0 (FUN_006E1FD0, the command-id map's right
