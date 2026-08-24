@@ -360,25 +360,6 @@ namespace moho
     };
     static_assert(sizeof(TimeBarRingHandleRuntime) == 0x08, "TimeBarRingHandleRuntime size must be 0x08");
 
-    struct InlineElement24Storage1000Runtime
-    {
-      STimeBarEventRecord* begin = nullptr;   // +0x00
-      STimeBarEventRecord* current = nullptr; // +0x04
-      STimeBarEventRecord* end = nullptr;     // +0x08
-      STimeBarEventRecord* origin = nullptr;  // +0x0C
-      STimeBarEventRecord storage[1000]{};    // +0x10
-    };
-    static_assert(offsetof(InlineElement24Storage1000Runtime, storage) == 0x10, "storage offset must be 0x10");
-    static_assert(sizeof(InlineElement24Storage1000Runtime) == 0x5DD0, "InlineElement24Storage1000Runtime size must be 0x5DD0");
-
-    struct Element24RangeRuntime
-    {
-      STimeBarEventRecord* begin = nullptr;   // +0x00
-      STimeBarEventRecord* current = nullptr; // +0x04
-      STimeBarEventRecord* end = nullptr;     // +0x08
-      STimeBarEventRecord* origin = nullptr;  // +0x0C
-    };
-    static_assert(sizeof(Element24RangeRuntime) == 0x10, "Element24RangeRuntime size must be 0x10");
 
     /**
      * Address: 0x004E5470 (FUN_004E5470)
@@ -765,24 +746,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x004E8DD0 (FUN_004E8DD0)
-     *
-     * What it does:
-     * Initializes one inline 1000-entry 24-byte range descriptor and points
-     * begin/current/origin to its internal storage lane.
-     */
-    InlineElement24Storage1000Runtime* InitializeInlineElement24BufferRangeWithInternalStorage1000(
-      InlineElement24Storage1000Runtime* const outRange
-    ) noexcept
-    {
-      outRange->begin = outRange->storage;
-      outRange->current = outRange->storage;
-      outRange->end = outRange->storage + 1000;
-      outRange->origin = outRange->storage;
-      return outRange;
-    }
-
-    /**
      * Address: 0x004E8E20 (FUN_004E8E20)
      *
      * What it does:
@@ -826,25 +789,6 @@ namespace moho
     {
       outSlot->value = sourcePair->second;
       return outSlot;
-    }
-
-    /**
-     * Address: 0x004E9030 (FUN_004E9030)
-     *
-     * What it does:
-     * Initializes one 1000-entry 24-byte range descriptor from external
-     * contiguous storage lanes.
-     */
-    Element24RangeRuntime* InitializeElement24BufferRangeFromExternalStorage1000(
-      Element24RangeRuntime* const outRange,
-      STimeBarEventRecord* const storage
-    ) noexcept
-    {
-      outRange->begin = storage;
-      outRange->current = storage;
-      outRange->end = storage + 1000;
-      outRange->origin = storage;
-      return outRange;
     }
 
     /**

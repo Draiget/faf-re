@@ -184,38 +184,4 @@ namespace moho
    */
   void CopyConstructVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& destination,
                                            const msvc8::vector<SNetCommandArg>& source);
-
-  /**
-   * Address: 0x007BB840 (FUN_007BB840, msvc8::vector<Moho::SNetCommandArg>::_Tidy)
-   *
-   * IDA signature:
-   * void __usercall sub_7BB840(int a1@<esi>);
-   *
-   * What it does:
-   * Engine-instantiated `_Tidy()` for `msvc8::vector<Moho::SNetCommandArg>`:
-   * destroys the live element range through the per-`T` range-destroy emission
-   * (FUN_007BD8F0), releases the block with `operator delete`, and clears
-   * `{first_, last_, end_}` without touching the debug-iterator proxy lane.
-   *
-   * Both binary callers reach it from a `catch (...) { _Tidy(); throw; }`
-   * rollback funclet: the copy ctor above (`call sub_7BB840` at 0x007BB083)
-   * and the count/value ctor (0x007BB71D).
-   *
-   * Defined in `moho/net/CGpgNetInterface.cpp` so the body can name the
-   * file-private range-destroy emission, as the binary does.
-   */
-  void TidyVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& storage) noexcept;
-
-  /** Address: 0x007BB7F0 (msvc8::vector<Moho::SNetCommandArg>::_Buy) */
-  [[nodiscard]] bool BuyVectorOfSNetCommandArgStorage(
-    msvc8::vector<SNetCommandArg>& storage,
-    std::size_t count
-  );
-
-  /** Address: 0x007BB6A0 (msvc8::vector<Moho::SNetCommandArg>::vector(count, value)) */
-  void ConstructVectorOfSNetCommandArgFilled(
-    msvc8::vector<SNetCommandArg>& storage,
-    std::size_t count,
-    const SNetCommandArg& prototype
-  );
 } // namespace moho

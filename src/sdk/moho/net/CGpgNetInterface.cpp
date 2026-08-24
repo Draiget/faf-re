@@ -368,157 +368,28 @@ namespace
     return cursor;
   }
 
-
   /**
-   * Address: 0x007BD1B0 (FUN_007BD1B0)
+   * Address: 0x007BAF70 (FUN_007BAF70)
    *
    * What it does:
-   * Assigns one command-argument vector lane from source into destination,
-   * preserving self-assignment and empty-source clear semantics.
+   * Prefills an empty `*args` with `count` default-valued (`NETARG_Num`, 0)
+   * command arguments and returns the storage begin pointer.
+   * `ReadFromSocket`'s real per-command loop calls this once per command
+   * before decoding each argument's real value in place over the default it
+   * left behind, rather than building the vector via `push_back`.
    */
-  [[maybe_unused]] msvc8::vector<SNetCommandArg>* AssignCommandArgVectorStorage(
-    msvc8::vector<SNetCommandArg>* const destination,
-    const int /*destroyContext*/,
-    const msvc8::vector<SNetCommandArg>* const source
+  SNetCommandArg* BuildDefaultFilledCommandArgVector(
+    const std::size_t count,
+    msvc8::vector<SNetCommandArg>* const args
   )
   {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
+    if (count != 0u) {
+      args->insert(args->begin(), count, SNetCommandArg{0});
     }
-
-    if (destination == source) {
-      return destination;
-    }
-
-    if (source->empty()) {
-      destination->clear();
-      return destination;
-    }
-
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x007BD8F0 (FUN_007BD8F0)
-   *
-   * What it does:
-   * Destroys one half-open `SNetCommandArg` range by releasing each string
-   * payload lane in turn.
-   */
-  void DestroyCommandArgRange(
-    SNetCommandArg* first,
-    SNetCommandArg* last
-  ) noexcept
-  {
-    for (; first != last; ++first) {
-      first->ResetPayload();
-    }
-  }
-
-  /**
-   * Address: 0x007BBD40 (FUN_007BBD40)
-   *
-   * What it does:
-   * Adapts one thiscall range-destroy lane into
-   * `DestroyCommandArgRange(begin, end)`.
-   */
-  [[maybe_unused]] void DestroyCommandArgRangeThiscallAdapter(
-    SNetCommandArg* const rangeEnd,
-    SNetCommandArg* const rangeBegin
-  ) noexcept
-  {
-    DestroyCommandArgRange(rangeBegin, rangeEnd);
+    return args->begin();
   }
 
 } // namespace
-
-/**
- * Address: 0x007BB840 (FUN_007BB840, msvc8::vector<Moho::SNetCommandArg>::_Tidy)
- *
- * IDA signature:
- * void __usercall sub_7BB840(int a1@<esi>);
- *
- * What it does:
- * Destroys the live element range through the per-`T` range-destroy emission,
- * releases the storage block, and clears the `{first_, last_, end_}` triplet.
- * The VC8 debug-iterator proxy lane at +0x00 is deliberately left alone, which
- * is what the binary does.
- */
-/**
- * Address: 0x007BB7F0 (FUN_007BB7F0, msvc8::vector<Moho::SNetCommandArg>::_Buy)
- *
- * IDA signature:
- * char callcnv_F3 sub_7BB7F0@<al>(_DWORD *a1@<edi>, unsigned int a2@<esi>);
- *
- * What it does:
- * Allocates raw storage for `count` elements and arms the triplet: `first` and
- * `last` both point at the block start (nothing constructed yet), `end` at the
- * capacity limit. A count of zero leaves the triplet null and reports success.
- *
- * The guard constant 0x71C71C7 is max_size for this element: 0xFFFFFFFF / 36,
- * and sizeof(SNetCommandArg) is 0x24. Exceeding it raises length_error rather
- * than overflowing the byte count.
- */
-bool moho::BuyVectorOfSNetCommandArgStorage(
-  msvc8::vector<moho::SNetCommandArg>& storage,
-  const std::size_t count
-)
-{
-  constexpr std::size_t kMaxElements = 0x71C71C7u;
-  if (count > kMaxElements) {
-    throw std::length_error("vector<T> too long");
-  }
-
-  if (count == 0u) {
-    return true;
-  }
-
-  storage.reserve(count);
-  return storage.capacity() >= count;
-}
-
-/**
- * Address: 0x007BB6A0 (FUN_007BB6A0, msvc8::vector<Moho::SNetCommandArg>::vector(count, value))
- *
- * IDA signature:
- * void __thiscall sub_7BB6A0(unsigned int a1, std::vector_SNetCommandArg *a3, int a4);
- *
- * What it does:
- * Builds a vector holding `count` copies of `prototype`. Storage is bought
- * first, then the elements are copy-constructed into it and `last` is advanced
- * only once the fill has succeeded - so a throw mid-fill leaves `last` at the
- * block start and the rollback funclet has nothing constructed to destroy
- * beyond what the fill lane already unwound.
- */
-void moho::ConstructVectorOfSNetCommandArgFilled(
-  msvc8::vector<moho::SNetCommandArg>& storage,
-  const std::size_t count,
-  const moho::SNetCommandArg& prototype
-)
-{
-  storage.clear();
-  if (count == 0u) {
-    return;
-  }
-
-  try {
-    storage.insert(storage.begin(), count, prototype);
-  } catch (...) {
-    moho::TidyVectorOfSNetCommandArg(storage);
-    throw;
-  }
-}
-
-void moho::TidyVectorOfSNetCommandArg(msvc8::vector<moho::SNetCommandArg>& storage) noexcept
-{
-  if (moho::SNetCommandArg* const first = storage.begin(); first != nullptr) {
-    DestroyCommandArgRange(first, storage.end());
-    ::operator delete(static_cast<void*>(first));
-  }
-
-  storage.reset_range_lanes_preserve_proxy();
-}
 
 /**
  * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)
@@ -2162,12 +2033,9 @@ void CGpgNetInterface::ReadFromSocket()
       reader.ReadExact(argCount);
 
       msvc8::vector<SNetCommandArg> args;
-      if (argCount) {
-        args.reserve(argCount);
-      }
-
+      BuildDefaultFilledCommandArgVector(argCount, &args);
       for (uint32_t i = 0; i < argCount; ++i) {
-        args.push_back(moho::NET_DecodeSocketArg(reader));
+        args[i] = moho::NET_DecodeSocketArg(reader);
       }
 
       EnqueueCommand(commandName.c_str(), args, kNetStateEstablishing);

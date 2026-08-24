@@ -101,6 +101,22 @@ namespace moho
     }
 
     /**
+     * Not an out-of-line binary emission on its own: MSVC8's per-instance
+     * `~SNetCommandArg()` is folded directly into whichever range-destroy
+     * loop calls it (`msvc8::vector<SNetCommandArg>::destroy_range`,
+     * FUN_007BD8F0, see `legacy/containers/Vector.h`). `msvc8::string` has no
+     * destructor of its own by design (see its class comment), so this
+     * explicit destructor is what makes `SNetCommandArg` correctly
+     * non-trivially-destructible -- without it, the generic `destroy_range<T>`
+     * template silently skips element teardown for this type and the payload
+     * leaks, diverging from the binary.
+     */
+    ~SNetCommandArg() noexcept
+    {
+      ResetPayload();
+    }
+
+    /**
      * Address: 0x007BE4B0 (FUN_007BE4B0)
      *
      * What it does:
