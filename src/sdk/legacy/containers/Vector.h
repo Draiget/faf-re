@@ -2477,6 +2477,10 @@ namespace msvc8
          * 0x3FFFFFFF, overflow throw through FUN_00830620, 1.5x growth
          * (`(cap >> 1) + cap`), allocation through FUN_00831B40. Reached from
          * `resize` (FUN_0082D820) when a bucket table is rehashed.)
+         * Address: 0x006F88D0 (FUN_006F88D0, msvc8::vector<CUnitCommand*>::
+         * _Insert_n -- same 4-byte-pointer shape, max_size 0x3FFFFFFF.
+         * Reached from `cfunc_CoordinateAttacksL`'s `commands.push_back(command)`
+         * in CCommandLuaFunctionRegistrations.cpp.)
          * Address: 0x00680BD0 (FUN_00680BD0, the out-of-line `std::fill` emission
          * this method's gap-overwrite compiles to for the 0xD8-byte
          * `Moho::SEntityVariableUpdateEntry` -- `for (p = first; p != last;

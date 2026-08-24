@@ -1242,13 +1242,17 @@ namespace
   }
 
   /**
+   * Address: 0x007AF240 (FUN_007AF240)
+   *
    * Detach every still-attached `CameraUserEntityWeakRef` lane in `[begin, end)`
    * from the tracked owner's intrusive next-back-link chain. For each lane,
    * walks the owner's chain (starting at `*mOwnerLinkSlot`) until finding the
    * slot that points back to this lane and rewires that slot to skip over us
    * by storing this lane's saved `mNextOwnerRef` value. This is the typed
    * mirror of FUN_007AF240 operating over `CameraImpl`'s 8-byte inline
-   * weak-ref pair lanes.
+   * weak-ref pair lanes. Reached from `TeardownCameraFrustumStorageLane`,
+   * itself called from `CameraImpl::~CameraImpl` (0x007A7F00) for all three
+   * frustum lanes.
    */
   void DetachCameraFrustumWeakRefRange(
     moho::CameraUserEntityWeakRef* begin, moho::CameraUserEntityWeakRef* const end

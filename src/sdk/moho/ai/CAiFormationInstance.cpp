@@ -2527,6 +2527,12 @@ namespace
    * What it does:
    * Uses one coord-cache insertion hint to resolve an existing node by key or
    * inserts a new node with `position` when the key is missing.
+   *
+   * Address: 0x00570640 (FUN_00570640, this map's predecessor-lookup /
+   * `_Dec` emission -- isNil@+0x19 matches a 12-byte value_type
+   * (uint32 key(4) + SCoordsVec2 position(8), static_assert-confirmed).
+   * The callgraph shows this function's own binary address calling
+   * FUN_00570640 directly.)
    */
   [[nodiscard]] moho::SFormationCoordCacheNode* ResolveCoordCacheNodeWithHint(
     moho::SFormationCoordCacheMap& cache,
