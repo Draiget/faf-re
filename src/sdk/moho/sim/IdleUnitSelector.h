@@ -76,6 +76,28 @@ namespace moho
     IdleUnitSelector();
 
     /**
+     * Address: 0x00865780 (FUN_00865780, IdleUnitSelector process-global
+     * destructor)
+     *
+     * What it does:
+     * Tears the idle-set tree down completely (full-range erase plus
+     * `operator delete` on the head sentinel, matching
+     * `DestroyWeakEntitySet`) and unlinks this node from whatever
+     * session-listener lane it is still attached to, leaving
+     * `mListenerLink` self-linked.
+     *
+     * The binary calls this through a compiler-generated, argument-less
+     * "destroy this one static object" thunk (`FUN_00C07510`) registered
+     * with `atexit()` by the static-init thunk at `FUN_00BE6160` -
+     * the same magic-static-destructor pattern already established for
+     * `SelectionListener`'s `FUN_00C075D0`/`FUN_00BE62E0` pair. Modeling
+     * `GlobalIdleUnitSelector()`'s `static IdleUnitSelector sSelector;`
+     * as a function-local static reproduces that registration
+     * automatically, so no explicit `atexit` call is written in source.
+     */
+    ~IdleUnitSelector();
+
+    /**
      * Address: 0x008656A0 (FUN_008656A0)
      * Slot: 0 (ISessionListener primary vtable)
      *
