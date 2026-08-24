@@ -1341,6 +1341,23 @@ namespace msvc8
              * node from `erase_range`'s (`FUN_007B3E00`, cited below)
              * walk-one-at-a-time loop.)
              */
+            /**
+             * Address: 0x00860FB0 (FUN_00860FB0, `msvc8::map<std::int32_t,
+             * Moho::ProjectileArcTrack>::erase(const_iterator)` --
+             * `ProjectileArcTrack` is a 0xC30-byte value_type (fixed-size
+             * sample buffer + scalar fields), landing colour/isNil at
+             * `[node+0xC38]`/`[node+0xC39]` (0xC38 = header + 4-byte key +
+             * 0xC30 value, 8-aligned) -- decimal 3144/3145 in the raw
+             * decompile. Same `_Isnil` guard throwing `out_of_range("invalid
+             * map/set<T> iterator")`, same successor-lift-and-rebalance shape
+             * as every other emission of this member; operates on a
+             * function-local `static` tree (`ProjectileArcTable& ArcTable()`
+             * in ProjectileArcRenderer.cpp), which is why the decompile reads
+             * `dword_10C4318`/`dword_10C431C` as fixed globals rather than a
+             * `this`-relative head. Reached from `arcTable.erase(expiredKey)`
+             * in `RenderProjectileArcs` (FUN_008600E0, ProjectileArcRenderer.cpp)
+             * via the erase-by-key overload's inner `erase(find(key))` call.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
