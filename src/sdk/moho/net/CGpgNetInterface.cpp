@@ -1653,6 +1653,25 @@ void moho::AssignWeakNATHandlerFromShared(
 }
 
 /**
+ * Address: 0x007BC5C0 (FUN_007BC5C0,
+ * boost::weak_ptr<INetNATTraversalProvider>(const shared_ptr<CGpgNetInterface>&))
+ *
+ * What it does:
+ * Per-T named helper binding the engine-instantiated aliasing
+ * `boost::weak_ptr<INetNATTraversalProvider>::weak_ptr(const
+ * shared_ptr<CGpgNetInterface>&)` converting-ctor body. Rewrites the inline
+ * `boost::weak_ptr<INetNATTraversalProvider> natProvider(GPGNET_GetPtr());`
+ * construction in `CGpgNetInterface::CreateLobby` through a named call so
+ * the MSVC8 per-T template emission symbol is preserved.
+ */
+void moho::AssignWeakNATProviderFromGpgNetShared(
+  boost::weak_ptr<INetNATTraversalProvider>& destination,
+  const boost::shared_ptr<CGpgNetInterface>& source)
+{
+  destination = source;
+}
+
+/**
  * Address: 0x007B9070 (FUN_007B9070)
  * Address: 0x10381F80 (sub_10381F80)
  *
@@ -2371,7 +2390,8 @@ void CGpgNetInterface::CreateLobby(
   // public binder; the `sGPGNet` shared_ptr is the natural source for the
   // weak_ptr backing the provider).
   LuaPlus::LuaObject natTraversal;
-  boost::weak_ptr<INetNATTraversalProvider> natProvider(GPGNET_GetPtr());
+  boost::weak_ptr<INetNATTraversalProvider> natProvider;
+  AssignWeakNATProviderFromGpgNetShared(natProvider, GPGNET_GetPtr());
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);

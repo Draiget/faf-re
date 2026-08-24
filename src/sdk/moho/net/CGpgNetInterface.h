@@ -458,6 +458,25 @@ namespace moho
     const boost::shared_ptr<INetNATTraversalHandler>& source);
 
   /**
+   * Address: 0x007BC5C0 (FUN_007BC5C0,
+   * boost::weak_ptr<INetNATTraversalProvider>(const shared_ptr<CGpgNetInterface>&))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated aliasing
+   * `boost::weak_ptr<INetNATTraversalProvider>::weak_ptr(const
+   * shared_ptr<CGpgNetInterface>&)` converting-ctor body -- `CGpgNetInterface`
+   * derives from `INetNATTraversalProvider`, so the binary upcasts the raw
+   * pointer sub-object while sharing the same `shared_count`/`weak_count`
+   * control block (`_InterlockedExchangeAdd(&pi->weak_count_, 1)` when the
+   * source is non-empty). Forwards to `destination = source;` so the MSVC8
+   * per-T template emission symbol is preserved even when the modern
+   * compiler would inline the natural weak/shared interconversion.
+   */
+  void AssignWeakNATProviderFromGpgNetShared(
+    boost::weak_ptr<INetNATTraversalProvider>& destination,
+    const boost::shared_ptr<CGpgNetInterface>& source);
+
+  /**
    * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)
    *
    * What it does:
