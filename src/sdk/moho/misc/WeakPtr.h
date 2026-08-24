@@ -1331,6 +1331,12 @@ namespace moho
     return result;
   }
 
+  /**
+   * Address: 0x008B2770 (FUN_008B2770, msvc8::vector<Moho::WeakPtr<UserUnit>>
+   * ::push_back's fast-path append -- the sibling emission of the grow lane
+   * described above (FUN_008B2B70); AddArmyAvatar's InsertWeakPtrVectorObjectAt
+   * call below covers this address's index==size() behavior byte-for-byte.)
+   */
   template <class T>
   void InsertWeakPtrVectorObjectAt(
     msvc8::vector<WeakPtr<T>>& weakVector, T* object, const std::size_t index
