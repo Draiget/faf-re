@@ -787,6 +787,35 @@ namespace msvc8
              * Address: 0x0077B4C0 (FUN_0077B4C0, second sibling emission of the
              * head-sentinel build described above)
              */
+            /**
+             * Address: 0x0052F020 (FUN_0052F020, the copy constructor for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, the same instantiation already pinned
+             * by `buy_head`/`erase_range`/`erase_node`/`destroy_subtree`/
+             * `~rb_tree` above. Buys the head sentinel via `sub_52F370`
+             * (`buy_head`, already cited on that member -- the exact same
+             * instantiation already pinned to this tree), then calls
+             * `sub_530EE0` (`copy_from`'s emission for this instantiation,
+             * cited below) to deep-clone `other`'s tree into the freshly
+             * self-linked empty head. Called from `FUN_0052DBE0`'s
+             * (`msvc8::vector<RRuleGameRulesLuaExportBinding>::insert`,
+             * `legacy/containers/Vector.h`) unconditional top-of-function
+             * `const T localValue(value);` step (VC8 copies `_Val` into a
+             * local before touching storage) -- `FUN_0052DBE0` itself
+             * copies `localValue.mRootState = value.mRootState` inline at
+             * the call site (`mov [ebp+a3],ecx` immediately before `call
+             * sub_52F020`, 0x0052DC11/0x0052DC14) and hands this function
+             * only the non-trivial member's construction, matching
+             * `RRuleGameRulesLuaExportBinding`'s implicit member-wise copy
+             * constructor split across an inlined POD-field copy plus one
+             * real call for the tree member. Was previously mis-marked
+             * `external_dependency` in `recovered_progress.json` on the
+             * grounds that its callees were "external runtime" -- both
+             * `sub_52F370` and `sub_52CF10` (its SEH-unwind cleanup path)
+             * are themselves already `recovered` engine code in this same
+             * file, and `sub_530EE0` is corrected to `recovered` engine
+             * code alongside this entry; corrected here.)
+             */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
             {
@@ -894,6 +923,58 @@ namespace msvc8
              * ~CCommandDb()`'s own hand-written body is only the
              * empty-or-die diagnostic dump; this teardown is reached
              * automatically via member destruction.)
+             */
+            /**
+             * Address: 0x00947E00 (FUN_00947E00)  Address: 0x00947E90
+             * (FUN_00947E90)  Address: 0x00947F20 (FUN_00947F20)
+             *
+             * Three byte-for-byte identical `~rb_tree()` emissions
+             * (`push ecx`/`push esi`, `erase_range(head->left, head)` via
+             * `call sub_947C50`, `operator delete(head)`, zero `head`/`size`
+             * at `[this+4]`/`[this+8]`, `pop esi`/`pop ecx`, `retn`) for the
+             * same isNil@+0x15, 8-byte-value node shape as `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s own
+             * confirmed `erase_range` (0x00947C50, cited above) -- these
+             * three call that exact address, not a sibling emission of it.
+             * Not `StateCache<SamplerState>`'s own destructor bodies (those
+             * are `sub_9480D0`/`sub_9481E0`, already cited on `erase_range`
+             * above, at different addresses with a different prologue); a
+             * distinct class in the same `CScApp`-vtable-neighbourhood
+             * region owns at least three more members of this exact tree
+             * shape. Each of the three differs from its siblings only in
+             * the encoded relative-call displacement to `sub_947C50` (their
+             * own addresses differ, so the `E8` operand differs), which is
+             * exactly why this era's byte-exact `link.exe` `/OPT:ICF` left
+             * them as three separate COMDATs instead of folding them -- the
+             * same effect documented on `erase_range`'s 0x00947B90/
+             * 0x00947C50 pair above. All three have zero incoming
+             * references of any kind anywhere in the binary: `.xrefs.txt`
+             * is empty, `_callgraph_index.sqlite`'s `call_edges`/
+             * `incoming_xrefs`/`reachable` tables have no rows for any of
+             * them, and an exhaustive PE byte-scan (every `E8`/`E9` rel32,
+             * `0F 8x` jcc rel32, `EB`/`7x` rel8 and absolute dword reference
+             * in every section of `bin/external/ForgedAlliance.exe`,
+             * validated against 9 known-called addresses in this same file
+             * before trusting a zero result) found none either. Recovered
+             * here as additional instantiations of this already-well-
+             * evidenced member rather than left as unowned orphans, per the
+             * same "zero incoming xrefs in this sweep" precedent already
+             * used throughout this file (e.g. 0x006E2810 above); owning
+             * class not pinned down.)
+             * Address: 0x00947E30 (FUN_00947E30)  Address: 0x00947EC0
+             * (FUN_00947EC0)  Address: 0x00947F50 (FUN_00947F50)
+             *
+             * The same three-way duplicate pattern as the paragraph above,
+             * one node-shape sibling over: these call `sub_947D10`
+             * (`gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned
+             * int>::tree_`'s confirmed `erase_range`, cited above) instead
+             * of `sub_947C50`. Same zero-incoming-reference status,
+             * confirmed the same way (xrefs file, callgraph index,
+             * exhaustive PE byte-scan). Owning class not pinned down --
+             * plausibly the same class as the three addresses above, given
+             * both trios sit in the identical `CScApp`-neighbourhood address
+             * range and both point at `StateCache`-shaped trees, but nothing
+             * in this pass proves that beyond adjacency.)
              */
             ~rb_tree()
             {
@@ -1629,6 +1710,56 @@ namespace msvc8
              * `rb_min`/`rb_max` patch), so it was deleted rather than kept as
              * an alternate-but-equivalent implementation.)
              */
+            /**
+             * Address: 0x00947630 (FUN_00947630, sub_947630) --
+             * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`
+             * (`StateCache_D3DSAMPLERSTATETYPE.hpp`), isNil@+0x15, 8-byte
+             * value_type (4-byte `_D3DSAMPLERSTATETYPE` key + 4-byte
+             * `unsigned int` mapped value). Matches this member exactly:
+             * `_Isnil` guard throwing `std::out_of_range("invalid map/set<T>
+             * iterator")`, captures the successor via `rb_increment`
+             * (`sub_946880`) before unlinking, patches `head->left`/
+             * `head->right` through this instantiation's own `rb_min`/
+             * `rb_max` only when the erased node was an extremum, and
+             * rebalances through `sub_946D20`/`sub_946620`
+             * (`rotate_left`/`rotate_right`). Single confirmed caller: this
+             * instantiation's `erase_range` at 0x00947C50 (`call sub_947630`
+             * at 0x00947CEF, cited below on `erase_range`) -- confirmed both
+             * via the callgraph index and an exhaustive PE byte-scan (every
+             * `E8`/`E9` rel32, `0F 8x` jcc rel32, `EB`/`7x` rel8 and absolute
+             * dword reference in every section of
+             * `bin/external/ForgedAlliance.exe`; exactly one hit). Corrects a
+             * stale `external_dependency` mark that mis-read the leading
+             * `std::out_of_range("invalid map/set<T> iterator")` throw-path
+             * (Dinkumware's own checked-iterator debug string, reproduced
+             * verbatim by every emission of this member -- see 0x006E1670
+             * above) as "genuine Dinkumware STL internal, not engine logic";
+             * the throw is a two-instruction guard inside an otherwise
+             * complete, engine-instantiated single-node erase-with-rebalance
+             * body, not an imported CRT routine.)
+             * Address: 0x009478E0 (FUN_009478E0, sub_9478E0) --
+             * `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned
+             * int>::tree_` (`StateCache_D3DTEXTURESTAGESTATETYPE.hpp`), the
+             * same isNil@+0x15, 8-byte-value_type shape as 0x00947630
+             * immediately above -- a third sibling `StateCache` specialisation
+             * with its own distinct rotate/min/max helper addresses. Single
+             * confirmed caller: this instantiation's `erase_range` at
+             * 0x00947D10 (`call sub_9478E0` at 0x00947DAF, cited below on
+             * `erase_range`; one PE byte-scan hit). Same stale-
+             * `external_dependency` correction as 0x00947630 above.)
+             * Address: 0x00947380 (FUN_00947380, sub_947380) -- the fourth
+             * sibling: `gpg::gal::StateCache<d3d9::RenderState, unsigned
+             * int>::tree_`'s `erase_node`. Same isNil@+0x15, 8-byte-value
+             * shape and same out_of_range-guard/rb_increment/rotate
+             * structure as 0x00947630/0x009478E0 above, with its own
+             * distinct rotate/min/max helper addresses (`sub_946830`,
+             * `sub_946790`, `sub_946770`, `sub_946CD0`, `sub_946590`).
+             * Single confirmed caller: `erase_range` at 0x00947B90 (`call
+             * sub_947380`, already documented on that citation above as
+             * "matching erase_node exactly"). Corrects the same
+             * `CrtRuntimeHelpers.cpp` DB-integrity misfile as 0x009470E0
+             * above.)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -1756,7 +1887,18 @@ namespace msvc8
              * `sub_52F0A0` (`erase_node`, cited above) erasing the old
              * cursor each turn. Reached from `FUN_0052A390`
              * (`~rb_tree`, cited above) with `[leftmost(), header())` --
-             * always the whole-tree fast path in that caller.)
+             * always the whole-tree fast path in that caller. Also reached
+             * from `FUN_00537420`'s inlined `RRuleGameRulesLuaExportBinding
+             * ::mPendingBlueprintOrdinals` assignment
+             * (`legacy/containers/Vector.h`'s `insert(pos,count,value)`
+             * in-place tail-shift loop, cited there) at 0x00537458 --
+             * erases the DESTINATION slot's own live tree before
+             * `sub_530EE0` (`copy_from`'s emission for this instantiation,
+             * cited below) clones the source slot's tree into it; same
+             * whole-tree-fast-path shape, `[leftmost(), header())` again. A
+             * prior pass on the `Vector.h` citation misread this call as a
+             * "copy-construct helper", which is not what `erase_range`
+             * does anywhere else in this file; corrected there.)
              * Address: 0x007B3E00 (FUN_007B3E00, erase-range for the sibling
              * `msvc8::set<std::uint32_t>` instantiation cited on
              * `destroy_subtree`/`erase_node` above -- `_Isnil` at +0x11. Same
@@ -1835,6 +1977,90 @@ namespace msvc8
              * specialisations, out of scope for this token); flagged for
              * whoever next touches `StateCache`.)
              */
+            /**
+             * Address: 0x00947C50 (FUN_00947C50, sub_947C50) -- the
+             * sampler-state cache's own `erase_range`, following up on the
+             * "flagged for whoever next touches `StateCache`" note directly
+             * above: a distinct address from 0x00947B90, not an ICF twin of
+             * it, because this era's `link.exe` folds identical COMDATs by
+             * raw byte comparison, and a body containing a `call` to another
+             * per-instantiation address bakes that instantiation's own
+             * relative displacement into its bytes -- byte-identical
+             * algorithm shapes across sibling node families still occupy
+             * separate addresses.
+             *
+             * Same two-shape split as 0x00947B90: the whole-tree fast path
+             * (`first == leftmost() && last == header()`) calls `sub_947120`
+             * (`destroy_subtree`, cited below) on the root, relinks
+             * `head->parent`/`head->left`/`head->right` to `head` and zeroes
+             * size, then returns `leftmost()`; otherwise walks
+             * `erase(_First++)` via `sub_947630` (`erase_node`, cited
+             * above), computing the in-order successor inline before each
+             * erase exactly like this member's walk loop.
+             *
+             * Five real callers -- confirmed both via the callgraph index and
+             * an exhaustive PE byte-scan (every `E8`/`E9` rel32, `0F 8x` jcc
+             * rel32, `EB`/`7x` rel8 and absolute dword reference in every
+             * section of `bin/external/ForgedAlliance.exe`; no others exist):
+             *   - 0x009480E9, inside `sub_9480D0` --
+             *     `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned
+             *     int>`'s non-deleting destructor lane
+             *     (`RuntimeDestroySamplerStateCacheTreeOnlyLaneA`,
+             *     `StateCache.cpp`);
+             *   - 0x009481FC, inside `sub_9481E0` -- the same class's real
+             *     destructor (`~StateCache<_D3DSAMPLERSTATETYPE, unsigned
+             *     int>`, `StateCache.cpp`). Both inline this member's whole
+             *     `erase_range(begin(), end())` call directly rather than
+             *     going through a separate `~rb_tree()` symbol -- exactly the
+             *     evidence the 0x00947B90 note above says a future
+             *     `StateCache` pass needs: `tree_`'s real layout is a proper
+             *     header-pointer-owning `msvc8::map<_D3DSAMPLERSTATETYPE,
+             *     unsigned int>` (heap-allocated header, explicit `operator
+             *     delete` on it after the erase), not `msvc8::EmbeddedTree<>`
+             *     -- `StateCache_D3DSAMPLERSTATETYPE.hpp` is retyped to
+             *     `msvc8::map` alongside this citation, and both dtors above
+             *     drop their `tree_.clear()` call in favour of `tree_`'s own
+             *     implicit member destruction, which reproduces this exact
+             *     `erase_range` + `free_raw(head_)` sequence;
+             *   - 0x00947E12/0x00947EA2/0x00947F32, inside `sub_947E00`/
+             *     `sub_947E90`/`sub_947F20` -- three byte-for-byte identical
+             *     `~rb_tree()` emissions (this member's `erase_range(
+             *     leftmost(), header())` then `operator delete` the header
+             *     then zero head/size) for this same isNil@+0x15, 8-byte-
+             *     value node shape, cited on `~rb_tree()` below. All three
+             *     have zero incoming references of any kind anywhere in the
+             *     binary (raw IDA xrefs, callgraph index, and the same
+             *     exhaustive PE byte-scan all agree); their owning member is
+             *     a `CScApp`-vtable-neighbourhood class distinct from
+             *     `StateCache` (reachable via `??_7CScApp@@6B@` like every
+             *     other body in this address range, per the callgraph
+             *     index's `reachable` table), not pinned down further in
+             *     this pass.
+             */
+            /**
+             * Address: 0x00947D10 (FUN_00947D10, sub_947D10) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>`'s own
+             * `erase_range`: a third, distinct emission alongside 0x00947B90
+             * (`RenderState`) and 0x00947C50 (`SamplerState`) above, for the
+             * same byte-exact-ICF reason. Same two-shape split: whole-tree
+             * fast path calls `sub_947160` (`destroy_subtree`, cited below);
+             * walk path calls `sub_9478E0` (`erase_node`, cited above).
+             *
+             * Five real callers (callgraph index + exhaustive PE byte-scan,
+             * same method as 0x00947C50 above):
+             *   - 0x00948169, inside `sub_948150` --
+             *     `RuntimeDestroyTextureStageStateCacheTreeOnlyLaneA`
+             *     (`StateCache.cpp`);
+             *   - 0x0094824C, inside `sub_948230` -- `~StateCache<
+             *     _D3DTEXTURESTAGESTATETYPE, unsigned int>` (`StateCache.
+             *     cpp`), the same inlined-`erase_range`-plus-explicit-
+             *     `delete`-the-header shape as the Sampler and RenderState
+             *     destructors, and retyped to `msvc8::map` in the same pass;
+             *   - 0x00947E42/0x00947ED2/0x00947F62, inside `sub_947E30`/
+             *     `sub_947EC0`/`sub_947F50` -- three more zero-incoming-
+             *     reference `~rb_tree()` emissions for this same node shape,
+             *     cited on `~rb_tree()` below.
+             */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
                 if (first == leftmost() && last == header()) {
@@ -1903,6 +2129,32 @@ namespace msvc8
              * `ClearCommandDbMapAndResetHead` free function in Sim.cpp that
              * hand-rolled this same operation over a `CCommandDbRuntimeView`
              * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x00947290 (FUN_00947290, sub_947290) --
+             * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>`'s
+             * tree shape (isNil@+0x15, 8-byte value_type; shares
+             * `destroy_subtree` at 0x00947120 with the confirmed
+             * `StateCache<SamplerState>` cluster cited on `erase_range`/
+             * `erase_node` above). `destroy_subtree(root())` via
+             * `sub_947120` then self-links `head->parent`/`head->left`/
+             * `head->right` to `head` and zeroes `size_` -- matches this
+             * member exactly. Zero incoming references anywhere in the
+             * binary (raw IDA xrefs, callgraph index, and an exhaustive PE
+             * byte-scan covering every `E8`/`E9` rel32, `0F 8x` jcc rel32,
+             * `EB`/`7x` rel8 and absolute dword reference in every section
+             * of `bin/external/ForgedAlliance.exe` all agree). Not reached
+             * from any of `StateCache<SamplerState>`'s own recovered
+             * methods -- those all go through `erase_range` (0x00947C50,
+             * above) -- so its owner is a distinct member of the same
+             * unidentified `CScApp`-neighbourhood class as the zero-
+             * reference `~rb_tree()` emissions cited on `erase_range`
+             * above.)
+             * Address: 0x009472C0 (FUN_009472C0, sub_9472C0) -- the same
+             * shape for `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+             * unsigned int>`'s tree family (`destroy_subtree` at
+             * 0x00947160, cited on `erase_range` above). Same zero-
+             * incoming-reference status as 0x00947290.)
              */
             void clear() noexcept
             {
@@ -2587,12 +2839,45 @@ namespace msvc8
              * instantiation with a matching layout rather than the same
              * field. Same recurse-right/iterate-left/`free_node` shape
              * (`call sub_947120` on `[node+8]`, `node=[node]`, delete the
-             * carried-over pointer). Both non-recursive callers
-             * (`FUN_00947290`, `FUN_00947C50`) are unrecovered in this pass,
-             * so the owning `CScApp` member is not yet pinned down -- only
-             * the tree-algorithm shape and node size are confirmed, matching
-             * the precedent set by the unidentified 0x00A5xxxx-0x00A67xxx
-             * rotate instantiation cited under `_Lrotate` below.)
+             * carried-over pointer). Owner now pinned down: this member's
+             * two non-recursive callers, `sub_947290` (`clear()`, cited
+             * above) and `sub_947C50` (`erase_range`, cited above), are both
+             * recovered as `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE,
+             * unsigned int>::tree_`'s teardown -- `erase_range` reached from
+             * that class's own `~StateCache`/non-deleting-destructor lane in
+             * `StateCache.cpp` (real, confirmed callers), `clear()` from a
+             * still-unidentified sibling member sharing this same node shape
+             * (zero incoming references anywhere in the binary; see the
+             * `clear()` citation above). The tree-algorithm shape, node
+             * size, and the `StateCache<SamplerState>` half of the ownership
+             * are now confirmed; only the `clear()` caller's owning class
+             * remains open, matching the precedent set by the unidentified
+             * 0x00A5xxxx-0x00A67xxx rotate instantiation cited under
+             * `_Lrotate` below.)
+             * Address: 0x00947160 (FUN_00947160, sub_947160) -- the sibling
+             * emission for `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+             * unsigned int>::tree_`, same isNil@+0x15, 8-byte-value shape.
+             * Three real callers (callgraph index + exhaustive PE byte-scan):
+             * itself (recursive, on the right child), `sub_9472C0`
+             * (`clear()`, cited above, unidentified sibling owner) and
+             * `sub_947D10` (`erase_range`, cited above, the confirmed
+             * `StateCache<TextureStageState>` destructor path).)
+             * Address: 0x009470E0 (FUN_009470E0, sub_9470E0) -- the fourth
+             * sibling in this address range: `gpg::gal::StateCache<
+             * d3d9::RenderState, unsigned int>::tree_`'s `destroy_subtree`.
+             * Same isNil@+0x15, 8-byte-value recurse-right/iterate-left/
+             * `operator delete` shape. Two real callers: itself (recursive)
+             * and `sub_947260` (an unidentified `clear()`-shaped sibling,
+             * mirroring `sub_947290`/`sub_9472C0` above but not itself
+             * re-verified in this pass) at 0x00947260, plus `sub_947B90`
+             * (`erase_range`, the confirmed `StateCache<RenderState>`
+             * destructor path -- see that citation above, which already
+             * documents this exact call). Corrects a stale DB-integrity
+             * revert that had flipped this token to `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path the address never
+             * appeared in; the real source is this member, exactly as the
+             * existing 0x00947B90 citation already described before this
+             * pass gave the token its own address line.)
              */
             /**
              * Address: 0x00505EC0 (FUN_00505EC0, whole-subtree destroy for an
@@ -2644,6 +2929,61 @@ namespace msvc8
              * Walks `other` in ascending key order and re-inserts each value, so
              * the destination ends up with the same ordered contents. Assumes the
              * destination is empty, which both callers guarantee.
+             */
+            /**
+             * Address: 0x00530EE0 (FUN_00530EE0, `copy_from`'s emission for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, the same instantiation already pinned
+             * by `buy_head`/`erase_range`/`erase_node`/`destroy_subtree`/
+             * `~rb_tree`/the copy constructor above. Unlike this template's
+             * own `copy_from` (walk `other` ascending, `insert_unique` each
+             * value -- see the `msvc8::set<msvc8::string>` note above),
+             * this emission is the real MSVC8 `_Tree::_Copy` mechanism:
+             * reads `other`'s head pointer (`other_tree+4`), then that
+             * head's `_Parent` field -- i.e. `other.root()` -- and calls
+             * `sub_531B30` (cited immediately below) to recursively clone
+             * the whole subtree node-for-node, preserving `other`'s exact
+             * tree shape rather than rebuilding it through repeated
+             * inserts. Stores the cloned root at `this->head_->parent`,
+             * copies `_Mysize` across verbatim from `other`, then walks
+             * from the freshly-cloned root down its left-spine to find
+             * `leftmost()` and, separately, down its right-spine to find
+             * `rightmost()`, re-seating `header()->left`/`header()->right`
+             * (self-referential to `header()` in the empty-tree case).
+             * `this` arrives in `eax`; the source tree arrives in `ebx`,
+             * inherited un-set from the caller's own live register rather
+             * than passed as a normal argument -- both `FUN_0052F020`'s
+             * copy-constructor body and `FUN_00537420`'s inlined
+             * `operator=` set up `ebx` before falling into this call (the
+             * same register-heavy internal convention used elsewhere in
+             * this file). Called from `FUN_0052F020` (the copy
+             * constructor, cited above) and from `FUN_00537420`
+             * (`legacy/containers/Vector.h`'s `insert(pos,count,value)`
+             * in-place tail-shift loop, cited there) immediately after
+             * that caller's inlined `erase_range` (`sub_52D9C0`) empties
+             * the destination slot. Was previously mis-marked
+             * `external_dependency` citing a generic "RB-tree-shaped
+             * pointer-chasing helper" description and an (also wrong)
+             * `FUN_0052F020` external classification as justification;
+             * corrected here -- this is genuine, in-binary engine code
+             * with two independently-verified real callers, no
+             * `__imp_*`/CRT symbol anywhere in its body.)
+             * Address: 0x00531B30 (FUN_00531B30, the recursive per-node
+             * subtree clone underneath `FUN_00530EE0` -- MSVC8
+             * `_Tree::_Copy(_Nodeptr _Rootnode, _Nodeptr _Wherenode)`,
+             * `this` in `ecx`. Tests `_Rootnode->_Isnil` (`+0x11`); if nil,
+             * returns `_Wherenode` unchanged. Otherwise calls `sub_52DB50`
+             * (`buy_node`-with-value, already recovered/cited above) to
+             * allocate and copy-construct one new node carrying
+             * `_Rootnode`'s value and color, then recurses on
+             * `_Rootnode->_Left` and `_Rootnode->_Right` in turn (passing
+             * the new node as `_Wherenode`/parent for each), wiring the
+             * results into the new node's `_Left`/`_Right`. On exception
+             * it calls `sub_52CCF0` (`destroy_subtree`, already recovered/
+             * cited above) on the partially-built clone and rethrows --
+             * exactly this file's `destroy_subtree` used as the cleanup
+             * primitive it already is elsewhere. Sole caller is
+             * `FUN_00530EE0` above.)
              */
             void copy_from(const rb_tree& other)
             {
