@@ -917,6 +917,9 @@ namespace
   /**
    * Address: 0x006E9360 (FUN_006E9360)
    * Address: 0x006EC380 (FUN_006EC380, inlined uninitialized-fill-with-rollback lane)
+   * Address: 0x006EA230 (FUN_006EA230, calling-convention trampoline from the
+   *   push_back grow-path helper FUN_006EAB90 into the fill-with-rollback lane
+   *   above; sole callee is FUN_006EC380)
    *
    * What it does:
    * Appends one command descriptor record into sync publication output.
@@ -1572,6 +1575,11 @@ void CUnitCommand::MemberSerialize(CUnitCommand* const command, gpg::WriteArchiv
 
 /**
  * Address: 0x006E8B40 (FUN_006E8B40)
+ * Address: 0x006E96F0 (FUN_006E96F0, msvc8::vector<Moho::WeakPtr<CUnitCommand>>
+ *   ::insert emission for the `queue` insert below, reached via
+ *   InsertWeakPtrVectorObjectAt / EnsureWeakPtrVectorCapacity in WeakPtr.h; the
+ *   T=UserUnit sibling of this same template emission is cited there as
+ *   FUN_008B2B70)
  *
  * What it does:
  * Adds `unit` into this command's unit-set and inserts this command weak-ref
