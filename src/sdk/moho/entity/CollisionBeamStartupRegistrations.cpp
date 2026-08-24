@@ -1,6 +1,7 @@
 #include "moho/entity/CollisionBeamStartupRegistrations.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -9,6 +10,21 @@
 #include "moho/console/CConCommand.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+
+namespace gpg
+{
+  void LoadAndBroadcastManyToOneListenerECollisionBeamEvent(
+    gpg::ReadArchive* archive,
+    moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>* broadcaster,
+    int version,
+    gpg::RRef* ownerRef
+  );
+
+  void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1(
+    gpg::WriteArchive* archive,
+    std::uint32_t* intrusiveListHeadSlot
+  );
+} // namespace gpg
 
 namespace moho
 {
@@ -82,11 +98,30 @@ namespace
       return gManyToOneBroadcasterCollisionBeamEventTypeName.c_str();
     }
 
+    /**
+     * Address: 0x006747E0 (FUN_006747E0, Moho::RManyBroadcasterRType_ECollisionBeamEvent::Init)
+     *
+     * What it does:
+     * Binds serializer load/save callback lanes and version metadata for
+     * `ManyToOneBroadcaster<ECollisionBeamEvent>` reflection: `size_ = 8`,
+     * `version_ = 1`, `serLoadFunc_` at +0x1C installs
+     * `LoadAndBroadcastManyToOneListenerECollisionBeamEvent`
+     * (`FUN_00675140`), `serSaveFunc_` at +0x14 installs
+     * `SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1`
+     * (`FUN_00675170`). Matches the sibling
+     * `RManyToOneBroadcasterProjectileImpactTypeInfo::Init` shape exactly
+     * (same field offsets, same 8-byte broadcaster object).
+     */
     void Init() override
     {
       size_ = sizeof(moho::ManyToOneBroadcaster_ECollisionBeamEvent);
-      gpg::RType::Init();
-      Finish();
+      version_ = 1;
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
+        &gpg::LoadAndBroadcastManyToOneListenerECollisionBeamEvent
+      );
+      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
+        &gpg::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1
+      );
     }
   };
 
@@ -372,6 +407,38 @@ namespace moho
     return std::atexit(&cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo);
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00675140 (FUN_00675140, gpg::LoadAndBroadcastManyToOneListenerECollisionBeamEvent)
+   *
+   * IDA signature:
+   * int __cdecl sub_675140(gpg::ReadArchive *a1, int result, int a3, struct gpg::RRef *a4);
+   *
+   * What it does:
+   * The `serLoadFunc_` lane `RManyToOneBroadcasterCollisionBeamEventTypeInfo::Init`
+   * (FUN_006747E0) binds at +0x1C. Reads the archive's tracked pointer back as a
+   * `ManyToOneListener<ECollisionBeamEvent>` and hands it to the broadcaster,
+   * which re-points its owner-link slot at the restored node. The version word
+   * is not consulted -- the lane has only ever had one layout. Matches the
+   * sibling `gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent`
+   * shape exactly (`ProjectileStartupRegistrations.cpp`).
+   */
+  void LoadAndBroadcastManyToOneListenerECollisionBeamEvent(
+    ReadArchive* const archive,
+    moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>* const broadcaster,
+    const int version,
+    RRef* const ownerRef
+  )
+  {
+    (void)version;
+
+    moho::ManyToOneListener<moho::ECollisionBeamEvent>* listener = nullptr;
+    (void)archive->ReadPointer_ManyToOneListener_ECollisionBeamEvent(&listener, ownerRef);
+    broadcaster->BroadcastEvent(listener);
+  }
+} // namespace gpg
 
 namespace
 {
