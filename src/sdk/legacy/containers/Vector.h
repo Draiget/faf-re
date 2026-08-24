@@ -3562,6 +3562,17 @@ namespace msvc8
          * `(a3, this, this)` on to `sub_760810`, adapting `FUN_0075F810`'s
          * call-site register layout to this member's `[edx,ecx)->eax`
          * convention; same logical operation, no separate behavior.)
+         * Address: 0x0076B6B0 (FUN_0076B6B0, `msvc8::vector<gpg::
+         * AStarOpenHeap<TCell>::Entry>::uninit_copy_n` for the 12-byte
+         * `{float mPriority; node_type* mNode; std::int32_t mHandle;}`
+         * element (`gpg/core/algorithms/AStarSearch.h`) -- `[first@edx,
+         * last@ecx) -> dst@eax`, per-slot 3-dword copy. Reached from the
+         * `_Insert_n`/push_back grow core `FUN_00769F60` (already recovered
+         * above, on `push_back`), `AStarOpenHeap::Push`'s
+         * `mEntries.push_back(entry)` capacity-full path. `FUN_0076AA80` is
+         * the same thin calling-convention bridge shape as `FUN_0075FCF0`
+         * above -- zeroes the low byte of its `this`-shaped third argument
+         * and forwards `(a3, this, this)` on to `sub_76B6B0`.)
          *
          * Uninitialized copy N from src to dst
          */
