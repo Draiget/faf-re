@@ -1754,6 +1754,16 @@ namespace msvc8
          * zeroes all five dwords to build the `ResourceDeposit()` temporary,
          * loads `edi`/`ebx` with the vector and the new count and falls into
          * this body, which pops the by-value `_Val` with `retn 14h`.)
+         * Address: 0x005493B0 (FUN_005493B0, the count-based forward copy
+         * primitive for the 20-byte `Moho::ResourceDeposit` element -- moves
+         * `_Count` elements from `edx` into `eax` (5-dword field copy per
+         * iteration, `add eax,14h` stride, null-guarded so a `dest==nullptr`
+         * call only computes the advance). This is the old-range-into-new-
+         * buffer copy step of the `_Insert_n` grow lane FUN_00547FE0 and is
+         * also reached directly from `push_back`'s capacity-full path
+         * (FUN_00547750, cited on `PushBackVector<ResourceDeposit>` in
+         * moho/misc/EngineVectorHelpers.h) — same family, same caller chain
+         * as the resize entry above.)
          * Address: 0x0082CBA0 (FUN_0082CBA0, `msvc8::vector<void*>::resize`
          * for one of `Moho::UICommandGraph`'s hash-bucket vectors -- `size()`
          * via a plain `(finish - start) >> 2` (4-byte pointer stride),
@@ -1928,6 +1938,15 @@ namespace msvc8
          * the capacity-full path of `mRenderedChildren.push_back(controlCursor)`
          * in RebuildRenderedChildrenLane (UiRuntimeTypes.cpp), reached from
          * Moho::CMauiControl::Render (0x00786FA0))
+         * Address: 0x0057E880 (FUN_0057E880, msvc8::vector<ScalarAndIntVectorLane>::
+         * push_back for the 0x14-byte `{int mScalar; vector<int> mValues}`
+         * element — `(a1[2]-a1[1])/20` and `(a1[3]-a1[1])/20` at 0x0057E895/
+         * 0x0057E8A8 are the size/capacity element counts for this 20-byte
+         * stride; fast path copies the zero-initialized row in place via
+         * `sub_583210`, capacity-full path tail-calls the insert(end(),1,value)
+         * grow lane `sub_57F9F0`. Emitted via `grid.push_back(ScalarAndIntVectorLane{})`
+         * in CAiBrain::ProcessAttackVectors (CAiBrain.cpp), once per heightfield
+         * grid row, building the per-row enemy-occupancy bitset array)
          *
          * Address: 0x00859F70 (FUN_00859F70 — 0x10-byte element, the
          * formation-preview ghost pair held by `gFormationPreviews` in
