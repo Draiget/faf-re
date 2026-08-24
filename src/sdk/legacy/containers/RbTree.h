@@ -511,6 +511,13 @@ namespace msvc8
          * emission FUN_008B5DF0, cited on that member. Re-homed here from
          * the same bespoke `InsertCommandNodeFixup` free function in
          * Sim.cpp cited on `insert_unique`/`insert_at` above.)
+         * Address: 0x008D69D0 (FUN_008D69D0, sub_8D69D0) -- the predecessor
+         * lookup half of `insert_unique` for the local `msvc8::rb_tree<
+         * moho::Resolution>` dedup tree (see the `insert_unique`/
+         * `FUN_008D4F10` and `insert_at`/`FUN_008D5720` citations above),
+         * isNil@+0x1D(29). Standard three-way shape (right-child predecessor
+         * via `rb_max`-equivalent inline walk, ancestor climb, or direct
+         * left-child descent) matching this member exactly.
          */
         /**
          * Address: 0x004E4440 (FUN_004E4440, sub_4E4440)
@@ -1565,6 +1572,28 @@ namespace msvc8
              * its parent's just-obtained child-set, `dedupTree[parentPtr]
              * .insert(bonePtr)` inside `CON_ANI_DumpSkeleton`'s per-bone walk
              * loop (CAniSkel.cpp, not yet recovered).)
+             */
+            /**
+             * Address: 0x008D4F10 (FUN_008D4F10, sub_8D4F10) -- local
+             * `msvc8::rb_tree<moho::Resolution>::insert_unique` (dedup tree
+             * for the raw binary's adapter-mode enumeration -- see the
+             * `insert_at`/`FUN_008D5720` citation above for the full
+             * "not yet wired, current recovered source uses a linear-scan
+             * dedup instead" context). Descend loop compares the 3-int
+             * `(width,height,framesPerSecond)` key at node value-offsets
+             * +16/+20/+24 (skipping +12, the `Resolution::vftable` slot)
+             * against the same fields on the candidate `Resolution` being
+             * inserted, isNil test at +0x1D(29) -- confirmed against
+             * `insert_at`'s own repeated recoloring of +0x1C(28) throughout
+             * its rebalance loop (proof this is color, not isNil, matching
+             * the corrected `buy_head`/`FUN_008D6940` citation above).
+             * `where==leftmost()` fast path tail-calls `insert_at` directly;
+             * otherwise a predecessor check via `sub_8D69D0`
+             * (`rb_decrement`, cited below) gates a second `insert_at` call
+             * or returns the colliding node with `false`. Its two real
+             * callers are `FUN_008D21E0`/`FUN_008D26D0`
+             * (`SetupPrimaryAdapterSettings`/`SetupSecondaryAdapterSettings`'s
+             * RAW, un-recovered binary bodies).
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -2747,13 +2776,27 @@ namespace msvc8
              * above -- a second, distinct `CDecalManager` map/set instantiation)
              */
             /**
-             * Address: 0x008D6940 (FUN_008D6940, fused allocate/self-link/
-             * isNil=1 buy_head for an unidentified map/set instantiation --
-             * writes `left=parent=right=0`, then `isNil@+0x1C=1`, `color@+0x1D=0`.
-             * Reached from `moho::SetupPrimaryAdapterSettings` (0x008D21E0,
-             * recovered in StartupHelpers.cpp), which publishes primary-adapter
-             * option states for the startup options UI; owning member not yet
-             * pinned down.)
+             * Address: 0x008D6940 (FUN_008D6940, sub_8D6940) -- generic
+             * "buy a blank node" half for a local `msvc8::rb_tree<
+             * moho::Resolution>` (value_type IS the key -- ordered by
+             * `(width,height,framesPerSecond)`, used to dedup adapter
+             * display modes; `Resolution` already recovered,
+             * `StartupHelpers.h:131-180`, `sizeof==0x10`). Writes
+             * `left=parent=right=0`, `color@+0x1C(28)=1`, `isNil@+0x1D(29)=0`
+             * -- CORRECTING an earlier mis-read of this same body that had
+             * these two fields backwards (proven by `insert_at`'s own
+             * rebalance loop, which repeatedly recolors `+28` throughout,
+             * and by `insert_unique`'s loop-termination test on `+29`; see
+             * those citations below). This is a generic blank-node buy, not
+             * head-specific: called directly from `SetupPrimaryAdapterSettings`
+             * (0x008D21E0, the RAW un-recovered binary body -- the CURRENT
+             * recovered `StartupHelpers.cpp` body is a simplified rewrite
+             * that dedups via a linear `HasMode` scan instead of this tree,
+             * see the follow-up note on `insert_unique` below), which
+             * overwrites `isNil=1` immediately after to promote this
+             * specific call's result into the tree's head sentinel; other
+             * call sites (via `insert_at`/`FUN_008D5720`'s `sub_8D6280`)
+             * leave `isNil=0` for genuine data nodes.)
              */
             /**
              * Address: 0x007B3F30 (FUN_007B3F30, sub_7B3F30) -- the
@@ -3802,6 +3845,45 @@ namespace msvc8
              * `insert_unique`'s emission (FUN_008B5DF0, cited above). Re-
              * homed here from the same bespoke `InsertCommandNodeFixup` free
              * function in Sim.cpp cited on `insert_unique`/`buy_node` above.)
+             */
+            /**
+             * Address: 0x008D5720 (FUN_008D5720, sub_8D5720) -- local
+             * `msvc8::rb_tree<moho::Resolution>`'s `insert_at` (dedup tree
+             * for `SetupPrimaryAdapterSettings`/`SetupSecondaryAdapterSettings`'s
+             * display-mode enumeration, `StartupHelpers.cpp:6841`/`6891`,
+             * `color@+0x1C`/`isNil@+0x1D` -- see the corrected `buy_head`
+             * citation above, `FUN_008D6940`). `_Mysize >= 0xFFFFFFE`
+             * overflow guard (`0xFFFFFFFF/16 - 1`, matching `Resolution`'s
+             * `sizeof==0x10`), buys the node WITH its value through
+             * `sub_8D6280` (writes `Resolution::vftable` + width/height/fps
+             * at node offsets +12/+16/+20/+24, color=0/isNil=0 for a fresh
+             * data node -- corrects a prior `external_dependency`
+             * mis-classification of `sub_8D6280`; it directly references
+             * the engine `Resolution::vftable`, not third-party runtime),
+             * links under the caller's `where`/`addLeft`, repairs red-red
+             * violations via `sub_8D61D0`/`sub_8D6230`
+             * (`rotate_left`/`rotate_right`-shaped, not yet independently
+             * cited). Reached from `insert_unique`'s emission
+             * (`FUN_008D4F10`, cited below).
+             *
+             * NOT YET WIRED to a source-level caller: the RAW binary's
+             * `SetupPrimaryAdapterSettings` (`FUN_008D21E0`) builds and
+             * queries this tree directly to dedup adapter modes in SORTED
+             * `(width,height,fps)` order, but the CURRENTLY RECOVERED
+             * `StartupHelpers.cpp` body (`CollectAdapterModes`/`HasMode`)
+             * dedups via an O(n) linear scan instead, preserving driver-
+             * enumeration order rather than producing the binary's sorted
+             * order -- same resulting SET of unique modes, different
+             * observable ORDER in the startup options UI. An orphaned,
+             * already-evidenced `*RuntimeView` reimplementation of this
+             * same tree already exists (`AdapterModeSortTreeRuntimeView`
+             * family, `StartupHelpers.cpp:~1234-1330`, several
+             * `[[maybe_unused]]`) -- per RULE ONE this should be migrated
+             * to a real `T=Resolution` instantiation of this template
+             * rather than extended; not done in this pass. `sub_8D69D0`
+             * (`rb_decrement`, cited below) and `sub_8D5020` (lower_bound,
+             * currently cited on the orphaned `ResolveAdapterModeSortInsertionAnchor`)
+             * complete this instantiation's primitive set.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
