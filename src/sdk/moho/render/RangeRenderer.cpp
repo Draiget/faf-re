@@ -316,6 +316,9 @@ namespace
 
   /**
    * Address: 0x007F39E0 (FUN_007F39E0, sub_7F39E0)
+   * Address: 0x007F1470 (FUN_007F1470) - linker-emitted __thiscall
+   *          calling-convention trampoline into this body; no separate
+   *          logic of its own.
    *
    * What it does:
    * Destroys one half-open range of `SRangeRenderProfile` lanes by resetting
