@@ -10,6 +10,8 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "legacy/algorithms/Sort.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/CDecalGroup.h"
 #include "moho/render/CDecalTypes.h"
@@ -420,10 +422,32 @@ namespace
     return upperCandidate;
   }
 
+  /**
+   * Address: 0x0087E850 (FUN_0087E850), 0x0087E5B0 (FUN_0087E5B0),
+   * 0x0087E5F0 (FUN_0087E5F0) -- `msvc8::sort<UserEntity*, Compare>`'s
+   * `adjust_heap`/`make_heap`/`sort_heap` heapsort-fallback instantiation.
+   * Cited in full on `legacy/algorithms/Sort.h`'s canonical templates.
+   *
+   * What it does:
+   * Sorts one collected `UserEntity*` range (entities or props gathered by
+   * `EntitiesInView`/`PropsInView`) into decal-draw order. The binary orders
+   * by each entity's spatial-db registration id
+   * (`UserEntity::mSpatialDbEntry.mEntryId`, an unsigned compare at node
+   * offset `+0x14`) rather than by pointer identity, so this has to be
+   * `msvc8::sort` with an explicit comparator, not a bare `std::sort` on the
+   * pointers themselves.
+   */
   [[nodiscard]] std::int32_t SortUserEntityPointerRange(gpg::fastvector<moho::UserEntity*>& entities)
   {
     if (entities.size() > 1u) {
-      std::sort(entities.begin(), entities.end());
+      msvc8::sort(
+        entities.begin(),
+        entities.end(),
+        [](const moho::UserEntity* const lhs, const moho::UserEntity* const rhs) noexcept {
+          return static_cast<std::uint32_t>(lhs->mSpatialDbEntry.mEntryId)
+               < static_cast<std::uint32_t>(rhs->mSpatialDbEntry.mEntryId);
+        }
+      );
     }
 
     return static_cast<std::int32_t>(entities.size());

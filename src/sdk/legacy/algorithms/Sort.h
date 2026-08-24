@@ -140,6 +140,27 @@ namespace msvc8
          * `lea eax,[esi-1]; cdq; sub eax,edx; sar edi,1` parent-index
          * computation, i.e. `(hole - 1) / 2`.)
          */
+        /**
+         * Address: 0x0087E850 (FUN_0087E850, the `Moho::UserEntity*`
+         * instantiation used by `CDecalManager::EntitiesInView`/`PropsInView`'s
+         * decal-order sort -- `msvc8::sort<UserEntity*, Compare>` falls back to
+         * heapsort here, so this single body fuses both the sift-down and the
+         * settle-upward phase, matching this template's shape exactly rather
+         * than the split `0x0089C170`/`0x0089C350` pair. Compares
+         * `[node+0x14]` unsigned (`jnb`), i.e.
+         * `UserEntity::mSpatialDbEntry.mEntryId`. Called from `make_heap`
+         * (`0x0087E5B0`), `sort_heap` (`0x0087E5F0`), and three inlined
+         * single-pop-step callers (`0x0087E8D0`, `0x0087EA70`, `0x0087EB30`).)
+         * Address: 0x0087EA30 (FUN_0087EA30, VC8's standalone `_Push_heap` for
+         * the same `UserEntity*` instantiation -- structurally identical to
+         * the settle-upward loop below (same `(hole - 1) / 2` parent-index
+         * math, same `[node+0x14]` unsigned compare), emitted as its own
+         * symbol alongside `0x0087E850` but with zero live callers anywhere
+         * in the shipped binary (IDA xrefs and the callgraph index both come
+         * back empty): the `UserEntity*` collections in `CDecalManager` are
+         * always rebuilt with a full `msvc8::sort`, never incrementally
+         * pushed. Same citation-only pattern as `0x0089C350` above.)
+         */
         template <class T, class Compare>
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -173,6 +194,11 @@ namespace msvc8
          * Address: 0x0089BED0 (FUN_0089BED0, the `SBuildTemplateInfo`
          * instantiation; drives the sift-down at 0x0089C170)
          */
+        /**
+         * Address: 0x0087E5B0 (FUN_0087E5B0, the `UserEntity*` instantiation
+         * driving the fused sift at 0x0087E850; called from the `msvc8::sort`
+         * heapsort fallback for `CDecalManager::EntitiesInView`/`PropsInView`.)
+         */
         template <class T, class Compare>
         void make_heap(T* const first, T* const last, Compare comp)
         {
@@ -200,6 +226,19 @@ namespace msvc8
          * hands back to the sift-down at 0x0089C170). Both are out-of-line in
          * the binary and inlined here as the three-line pop step in the loop
          * below.)
+         */
+        /**
+         * Address: 0x0087E5F0 (FUN_0087E5F0, the `UserEntity*` instantiation
+         * driving the fused sift at 0x0087E850, same call chain as
+         * `make_heap`'s `0x0087E5B0`.)
+         * Address: 0x0087E8D0, 0x0087EA70, 0x0087EB30 (FUN_0087E8D0,
+         * FUN_0087EA70, FUN_0087EB30, three more VC8 emissions of a single
+         * pop-and-resift step -- `0x0087EB30` additionally hands the popped
+         * root back through an out-param, the shape VC8 used when a caller
+         * wants the removed max rather than just draining the heap in place.
+         * All three are, like `0x0089C440`/`0x0089C680` above, out-of-line
+         * emissions of the exact three-line pop step in the loop below, with
+         * no separate callers of their own in the shipped binary.)
          */
         template <class T, class Compare>
         void sort_heap(T* const first, T* last, Compare comp)
