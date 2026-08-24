@@ -1559,6 +1559,16 @@ namespace
     return result;
   }
 
+  /**
+   * Address: 0x0071C830 (FUN_0071C830, TNode=InfluenceNodeFlag61Runtime
+   * instantiation -- isNil@+0x3D matches this type's own
+   * offsetof(InfluenceNodeFlag61Runtime, isNil61) static_assert above.
+   * Branch-for-branch match: nil-node right-child fast path, then the
+   * left-child-nil parent-walk predecessor search, then the
+   * leftmost-of-right-subtree descent. Reached from
+   * StepRbIteratorNil61BackwardLaneA/B's `RetreatRuntimeRbIteratorSlot`
+   * call above.)
+   */
   template <typename TNode, typename TIsNil>
   [[nodiscard]] TNode* RetreatRuntimeRbIteratorSlot(TNode** const iteratorSlot, TIsNil&& isNil) noexcept
   {
