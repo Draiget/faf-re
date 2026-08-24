@@ -2802,6 +2802,12 @@ namespace msvc8
          * dword-triple fill loop, reached from QueueCreateEntityParams's
          * `mNewEntities.push_back(params)` in Entity.cpp via its push_back grow
          * lane FUN_0067B6F0)
+         * Address: 0x008EA090 (FUN_008EA090, msvc8::vector<gpg::gal::HeadAdapterMode>::
+         * uninit_fill_n for the 12-byte trivially-copyable element (width/height/
+         * refreshRate dwords) -- the same count-driven dword-triple fill loop,
+         * called with n=1 from push_back's in-place fast path FUN_008EFDD0 (cited
+         * on `AppendHeadAdapterMode`, D3D9Interfaces.cpp) when the vector still has
+         * spare capacity)
          *
          * Uninitialized fill N with value starting at dst
          */
