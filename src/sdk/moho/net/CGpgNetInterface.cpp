@@ -13,6 +13,7 @@
 #include "Common.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "IClient.h"
 #include "CClientManagerImpl.h"
@@ -1635,52 +1636,15 @@ bool CGpgNetInterface::Shutdown()
 }
 
 /**
- * Address: 0x007BB4E0 (FUN_007BB4E0, boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
- *
- * What it does:
- * Per-T named helper binding the engine-instantiated
- * `boost::weak_ptr<INetNATTraversalHandler>::weak_ptr(const shared_ptr&)`
- * conversion-ctor body. Rewrites the inline `mNATHandler = *handler;`
- * assignment in `CGpgNetInterface::SetTraversalHandler` through a named
- * call so the MSVC8 per-T template emission symbol is preserved even when
- * the modern compiler would inline the natural weak/shared interconversion.
- */
-void moho::AssignWeakNATHandlerFromShared(
-  boost::weak_ptr<INetNATTraversalHandler>& destination,
-  const boost::shared_ptr<INetNATTraversalHandler>& source)
-{
-  destination = source;
-}
-
-/**
- * Address: 0x007BC5C0 (FUN_007BC5C0,
- * boost::weak_ptr<INetNATTraversalProvider>(const shared_ptr<CGpgNetInterface>&))
- *
- * What it does:
- * Per-T named helper binding the engine-instantiated aliasing
- * `boost::weak_ptr<INetNATTraversalProvider>::weak_ptr(const
- * shared_ptr<CGpgNetInterface>&)` converting-ctor body. Rewrites the inline
- * `boost::weak_ptr<INetNATTraversalProvider> natProvider(GPGNET_GetPtr());`
- * construction in `CGpgNetInterface::CreateLobby` through a named call so
- * the MSVC8 per-T template emission symbol is preserved.
- */
-void moho::AssignWeakNATProviderFromGpgNetShared(
-  boost::weak_ptr<INetNATTraversalProvider>& destination,
-  const boost::shared_ptr<CGpgNetInterface>& source)
-{
-  destination = source;
-}
-
-/**
  * Address: 0x007B9070 (FUN_007B9070)
  * Address: 0x10381F80 (sub_10381F80)
  *
  * What it does:
  * Updates weak NAT handler pointer used by SendNatPacket command path.
- * The weak/shared interconversion is routed through the per-T named
- * helper `AssignWeakNATHandlerFromShared` (FUN_007BB4E0) so the MSVC8
- * `boost::weak_ptr<INetNATTraversalHandler>` template emission symbol
- * shape is preserved across the assignment.
+ * The weak/shared interconversion is routed through the generic per-T
+ * template `boost::AssignWeakFromShared` (BoostWrappers.h, cited there
+ * for this instantiation as FUN_007BB4E0) so the MSVC8 per-T template
+ * emission symbol shape is preserved across the assignment.
  */
 void CGpgNetInterface::SetTraversalHandler(
   const int port,
@@ -1690,7 +1654,7 @@ void CGpgNetInterface::SetTraversalHandler(
   (void)port;
   boost::mutex::scoped_lock lock(mLock);
   gpg::Logf("GPGNET: setting nat handler to 0x%08x", reinterpret_cast<uintptr_t>(handler->get()));
-  AssignWeakNATHandlerFromShared(mNATHandler, *handler);
+  boost::AssignWeakFromShared(mNATHandler, *handler);
 }
 
 /**
@@ -2391,7 +2355,7 @@ void CGpgNetInterface::CreateLobby(
   // weak_ptr backing the provider).
   LuaPlus::LuaObject natTraversal;
   boost::weak_ptr<INetNATTraversalProvider> natProvider;
-  AssignWeakNATProviderFromGpgNetShared(natProvider, GPGNET_GetPtr());
+  boost::AssignWeakFromShared(natProvider, GPGNET_GetPtr());
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);
