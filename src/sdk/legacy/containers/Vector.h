@@ -2943,6 +2943,16 @@ namespace msvc8
          * `args.push_back(SNetCommandArg(...))` call sites,
          * CGpgNetInterface.cpp).)
          *
+         * Address: 0x008EFA50 (FUN_008EFA50, msvc8::vector<gpg::gal::
+         * HeadAdapterMode>::insert(iterator, const T&) for the 12-byte
+         * `{width; height; refreshRate}` element -- same offset-capture/
+         * tail-call/iterator-rebuild shape as the two entries directly
+         * above, offset computed as `(pos - first_) / 12`, tail-calls the
+         * `_Insert_n` grow core `FUN_008EF010` with `count = 1`. Reached
+         * from `push_back`'s capacity-full path via `AppendHeadAdapterMode`
+         * (D3D9Interfaces.cpp, `adapterModes.push_back(mode); return
+         * &adapterModes.back();`).)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
