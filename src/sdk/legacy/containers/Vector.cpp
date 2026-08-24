@@ -6888,6 +6888,18 @@ void ReleaseSharedControlRef(volatile long* const control) noexcept
   return write;
 }
 
+/**
+ * Address: 0x007420F0 (FUN_007420F0, range-release for the 12-byte
+ * refcounted lane -- walks `[first,last)` in 12-byte strides, and for
+ * each non-null control block at +0x08 decrements its strong count via
+ * `_InterlockedExchangeAdd`, calling the dispose vtable slot (+0x04) on
+ * a strong count reaching zero and the destroy vtable slot (+0x08) on a
+ * subsequent weak-count-reaching-zero -- the shared boost-style
+ * intrusive refcount release pattern. Reached from all six of this
+ * lane's `ReleaseRefcountedLaneRange` call sites: the two overwrite
+ * branches and the trim tail in `CopyAssignRefcountedLaneVector12Storage`
+ * above, plus its siblings in SimDriver.cpp and SimRecoveryRuntime.cpp.)
+ */
 void ReleaseRefcountedLaneRange(
   VectorElement12RefcountedLane* begin,
   VectorElement12RefcountedLane* end
