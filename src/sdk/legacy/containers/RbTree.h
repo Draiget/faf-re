@@ -1965,6 +1965,19 @@ namespace msvc8
              * "matching erase_node exactly"). Corrects the same
              * `CrtRuntimeHelpers.cpp` DB-integrity misfile as 0x009470E0
              * above.)
+             * Address: 0x007B4040 (FUN_007B4040, sub_7B4040) --
+             * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::erase_node`
+             * for the outer per-parent-bone dedup map from the
+             * `CON_ANI_DumpSkeleton` cluster (isNil@+0x1D, the same
+             * instantiation cited on `operator[]` in `Map.h` as
+             * `FUN_007B27D0` and on this file's `erase_range` as
+             * `FUN_007B3820`). Single confirmed caller:
+             * `erase_range`/`FUN_007B3820`'s iterative walk-erase path,
+             * already documented there as needing this citation
+             * ("`sub_7B4AA0`/`sub_7B4040` would need their own citations
+             * too... not yet done" -- landed here). `Moho::
+             * CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
+             * unrecovered.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -3262,6 +3275,20 @@ namespace msvc8
              * not yet pinned down. Reached from FUN_0052E8B0 (`erase_range`,
              * itself blocked pending this token's recovery) and an
              * unclassified code chunk at 0x0053091C.)
+             * Address: 0x007B4AA0 (FUN_007B4AA0, sub_7B4AA0) -- the outer
+             * per-parent-bone dedup map's own `destroy_subtree`
+             * (`CON_ANI_DumpSkeleton` cluster, isNil@+0x1D, same
+             * instantiation as `erase_node`/`FUN_007B4040` and
+             * `erase_range`/`FUN_007B3820` above), reached from
+             * `FUN_007B3820`'s whole-tree fast path. Per node: recurses
+             * right, iterates left, tears down the embedded per-parent
+             * `msvc8::set<uint32_t>` child-set value via `sub_7B3E00`
+             * (already-cited `erase_range` for that nested instantiation)
+             * before freeing the node -- correcting a prior mis-
+             * classification as `external_dependency` (this is genuine
+             * engine-instantiated tree teardown, not CRT/imported code).
+             * `Moho::CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
+             * unrecovered.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
