@@ -1963,25 +1963,66 @@ namespace
 }
 
 /**
+ * Address: 0x00A83A4E (FUN_00A83A4E)
+ *
+ * What it does:
+ * Shared teardown loop reached from `eh vector destructor iterator` at
+ * 0x00A83AAC and from the unwind funclets of `eh vector constructor
+ * iterator` (0x00A83FC5) and `eh vector copy constructor iterator`
+ * (0x00A8402A). Walks one element range in reverse order, invoking the
+ * destructor callback once per element. A destructor callback that itself
+ * throws is fatal (matches `catch (...) { std::terminate(); }`, the C++
+ * rule that an exception escaping a destructor during teardown terminates
+ * the program); the compiled body implements this via an SEH filter that
+ * checks for the C++ exception code (0xE06D7363) before calling
+ * `terminate`.
+ */
+extern "C" void __stdcall RuntimeEhVectorDestructorIterator(
+  char* currentElement,
+  const unsigned int elementSize,
+  int elementCount,
+  const RuntimeEhVectorStepFn destructorFn
+)
+{
+  while (--elementCount >= 0) {
+    currentElement -= elementSize;
+    try {
+      destructorFn(currentElement);
+    } catch (...) {
+      std::terminate();
+    }
+  }
+}
+
+/**
  * Address: 0x00A83FC5 (FUN_00A83FC5, `eh vector constructor iterator`)
  *
  * What it does:
  * Walks one element range in forward order, invoking the constructor callback
- * once per element and returning the number of constructed elements.
+ * once per element and returning the number of constructed elements. If a
+ * constructor throws partway through, the unwind funclet at 0x00A84012
+ * destroys the already-constructed prefix in reverse order via the shared
+ * teardown loop (RuntimeEhVectorDestructorIterator, 0x00A83A4E) before the
+ * original exception continues propagating.
  */
 extern "C" int __stdcall RuntimeEhVectorConstructorIterator(
   char* currentElement,
   const unsigned int elementSize,
   const int elementCount,
-  void(__thiscall* const constructorFn)(void* element),
-  void(__thiscall* const /*destructorFn*/)(void* element)
+  const RuntimeEhVectorStepFn constructorFn,
+  const RuntimeEhVectorStepFn destructorFn
 )
 {
   int constructedCount = 0;
-  while (constructedCount < elementCount) {
-    constructorFn(currentElement);
-    currentElement += elementSize;
-    ++constructedCount;
+  try {
+    while (constructedCount < elementCount) {
+      constructorFn(currentElement);
+      currentElement += elementSize;
+      ++constructedCount;
+    }
+  } catch (...) {
+    RuntimeEhVectorDestructorIterator(currentElement, elementSize, constructedCount, destructorFn);
+    throw;
   }
 
   return constructedCount;
