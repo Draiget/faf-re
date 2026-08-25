@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "Wm3AxisAlignedBox3.h"
+#include "legacy/containers/Vector.h"
 
 namespace moho
 {
@@ -59,37 +60,50 @@ namespace moho
     "ClutterSurfaceElement::meshBlueprint offset must be 0x0C"
   );
 
-  struct ClutterSurfaceEraseLane
-  {
-    std::uint32_t allocatorCookie; // +0x00 (entry +0x08)
-    ClutterSurfaceElement* begin; // +0x04 (entry +0x0C)
-    ClutterSurfaceElement* end; // +0x08 (entry +0x10)
-  };
-  static_assert(sizeof(ClutterSurfaceEraseLane) == 0x0C, "ClutterSurfaceEraseLane size must be 0x0C");
-  static_assert(
-    offsetof(ClutterSurfaceEraseLane, begin) == 0x04,
-    "ClutterSurfaceEraseLane::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ClutterSurfaceEraseLane, end) == 0x08, "ClutterSurfaceEraseLane::end offset must be 0x08"
-  );
-
+  /**
+   * `Moho::Clutter::Surface`. The trailing seed storage (`myProxy_`/
+   * `first_`/`last_`/`end_` inside `mSeeds`, entry offsets +0x08/+0x0C/
+   * +0x10/+0x14) is byte-identical to `msvc8::vector<ClutterSurfaceElement>`
+   * -- confirmed via `Clutter::Clutter`'s real body (`FUN_007D60D0`), which
+   * constructs the 256-entry `mSurfaces` array through the compiler-emitted
+   * `` `eh vector constructor iterator' `` helper calling `Surface::Surface`
+   * (`FUN_007D5CF0`), and `Clutter::~Clutter` (`FUN_007D61E0`), which tears
+   * it down through `` `eh vector destructor iterator' `` calling
+   * `Surface::~Surface` (`FUN_007D5D10`) -- i.e. `Surface` genuinely has a
+   * non-trivial ctor/dtor pair in the original binary, previously modeled
+   * here as free functions (`InitializeSurfaceEntry`/
+   * `DestroySurfaceEntryWrapper`) called from a hand-written loop instead of
+   * real constructor/destructor members.
+   */
   struct ClutterSurfaceEntry
   {
+    /**
+     * Address: 0x007D5CF0 (FUN_007D5CF0, ??0Surface@Clutter@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Resets the vtable to the poison/reset token and zeroes `density`;
+     * `mSeeds` default-constructs itself (empty, no allocation).
+     */
+    ClutterSurfaceEntry();
+
+    /**
+     * Address: 0x007D5D10 (FUN_007D5D10)
+     *
+     * What it does:
+     * Resets the vtable to the poison/reset token; `mSeeds` destroys its
+     * live elements and releases its buffer through its own destructor.
+     */
+    ~ClutterSurfaceEntry();
+
     void* vtable; // +0x00
     std::int32_t density; // +0x04
-    ClutterSurfaceEraseLane eraseLane; // +0x08
-    ClutterSurfaceElement* capacity; // +0x14
+    msvc8::vector<ClutterSurfaceElement> mSeeds; // +0x08 (16 bytes: myProxy_/first_/last_/end_)
   };
   static_assert(sizeof(ClutterSurfaceEntry) == 0x18, "ClutterSurfaceEntry size must be 0x18");
   static_assert(offsetof(ClutterSurfaceEntry, density) == 0x04, "ClutterSurfaceEntry::density offset must be 0x04");
   static_assert(
-    offsetof(ClutterSurfaceEntry, eraseLane) == 0x08,
-    "ClutterSurfaceEntry::eraseLane offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ClutterSurfaceEntry, capacity) == 0x14,
-    "ClutterSurfaceEntry::capacity offset must be 0x14"
+    offsetof(ClutterSurfaceEntry, mSeeds) == 0x08,
+    "ClutterSurfaceEntry::mSeeds offset must be 0x08"
   );
 
   struct ClutterListNode
@@ -407,19 +421,6 @@ namespace moho
   static_assert(sizeof(Clutter) == 0x192C, "Clutter size must be 0x192C");
 
   /**
-   * Address: 0x007D7E00 (FUN_007D7E00)
-   *
-   * What it does:
-   * Compacts one surface entry erase range and destructs trailing elements.
-   */
-  ClutterSurfaceElement** __stdcall ResetSurfaceEntryRange(
-    ClutterSurfaceEraseLane* lane,
-    ClutterSurfaceElement** outBegin,
-    ClutterSurfaceElement* eraseBegin,
-    ClutterSurfaceElement* eraseEnd
-  );
-
-  /**
    * Address: 0x007D9400 (FUN_007D9400)
    *
    * What it does:
@@ -488,17 +489,4 @@ namespace moho
    * Increments list size with the original `list<T> too long` overflow guard.
    */
   std::uint32_t IncrementListSizeChecked(ClutterRegionListState* listState);
-
-  /**
-   * Address: 0x007D94B0 (FUN_007D94B0)
-   *
-   * What it does:
-   * Compacts `[sourceBegin, sourceEnd)` elements into `destination`, copying
-   * non-vtable payload lanes.
-   */
-  ClutterSurfaceElement* CompactSurfaceElements(
-    ClutterSurfaceElement* destination,
-    ClutterSurfaceElement* sourceBegin,
-    ClutterSurfaceElement* sourceEnd
-  );
 } // namespace moho
