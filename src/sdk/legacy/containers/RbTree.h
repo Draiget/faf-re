@@ -3804,6 +3804,33 @@ namespace msvc8
              * (isNil@+29). Reached from both `insert_at`'s fixup loop and
              * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
              * this same instantiation.
+             *
+             * Address: 0x0094FA60 (FUN_0094FA60, sub_94FA60) -- left rotate
+             * for the same "unidentified `msvc8::map<K,V>`/`msvc8::set<T>`
+             * instantiation with a 24-byte value_type" the `buy_node`
+             * catalog above documents at 0x00950430 -- standard
+             * `result=n->right; n->right=result->left; ...` shape, isNil
+             * check at `+37`(0x25). Reached from `insert_at`'s fixup loop
+             * (`FUN_009512B0`, cited on `buy_node` above) via a direct
+             * `call`. Previously reverted to `blocked` in a DB-integrity
+             * sweep after a batch worker mis-cited it against
+             * `CrtRuntimeHelpers.cpp` with a fabricated note; the real,
+             * correct home is this catalog.
+             *
+             * Three left rotates for the `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) family already
+             * documented on `buy_node` above (FUN_005358E0 and siblings) --
+             * isNil check at `+45`(0x2D), matching that family's node size:
+             *   - Address: 0x00531000 (FUN_00531000) -- reached from the
+             *     base blueprint-map `insert_at` bridge FUN_005349E0 (the
+             *     `map.insert(RRuleGameRulesBlueprintMap::value_type(...))`
+             *     call site in Sim.cpp, cited on `insert_unique` above).
+             *   - Address: 0x00531190 (FUN_00531190) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90 (paired with the right
+             *     rotate FUN_00531220 on `rotate_right` below).
+             *   - Address: 0x005316A0 (FUN_005316A0) -- T=REmitterBlueprint's
+             *     map; reached from insert_at FUN_005350A0 (paired with the
+             *     right rotate FUN_00531710 on `rotate_right` below).
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -3941,6 +3968,31 @@ namespace msvc8
              * (isNil@+29). Reached from both `insert_at`'s fixup loop and
              * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
              * this same instantiation.
+             *
+             * Address: 0x0094FAB0 (FUN_0094FAB0, sub_94FAB0) -- right
+             * rotate, mirror of `rotate_left`'s FUN_0094FA60 above, same
+             * "unidentified 24-byte value_type" instantiation
+             * (`result=n->left; n->left=result->right; ...`), isNil check
+             * at `+37`. Reached from the same `insert_at` fixup loop
+             * (`FUN_009512B0`). A prior pass marked this `skip` reasoning
+             * that `FUN_009512B0` "does not actually appear anywhere in
+             * src/sdk" -- stale: `FUN_009512B0` is cited on the `buy_node`
+             * catalog above (added later in the same session). Corrected
+             * to `recovered` here.
+             *
+             * Four right rotates, same `RRuleGameRulesBlueprintMap` family
+             * as the three left rotates cited on `rotate_left` above,
+             * isNil@+45:
+             *   - Address: 0x00531220 (FUN_00531220) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90 (paired with left
+             *     rotate FUN_00531190 above).
+             *   - Address: 0x005313D0 (FUN_005313D0) -- T=RPropBlueprint;
+             *     reached from insert_at FUN_00534D40.
+             *   - Address: 0x00531580 (FUN_00531580) -- T=RMeshBlueprint;
+             *     reached from insert_at FUN_00534EF0.
+             *   - Address: 0x00531710 (FUN_00531710) -- T=REmitterBlueprint's
+             *     map; reached from insert_at FUN_005350A0 (paired with left
+             *     rotate FUN_005316A0 above).
              */
             void rotate_right(node_type* const n) noexcept
             {
