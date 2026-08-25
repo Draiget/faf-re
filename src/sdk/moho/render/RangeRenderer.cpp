@@ -174,8 +174,21 @@ namespace
    *
    * What it does:
    * Rebinds one `fastvector_n<CameraUserEntityWeakRef,40>` snapshot buffer to
-   * inline storage and copies the camera's current frustum weak-ref list into
-   * it, spilling to heap when the source list exceeds inline capacity.
+   * inline storage, then assigns the camera's current frustum weak-ref list
+   * into it via `CameraFrustumUserEntityList::AssignRange` (FUN_007F20E0),
+   * which relinks each copied weak-ref into the new storage's owner chains
+   * and spills to heap when the source list exceeds inline capacity.
+   *
+   * `CameraFrustumWeakRefSnapshotBuffer`'s first four fields are
+   * layout-identical to `CameraFrustumUserEntityList` (same `{begin, end,
+   * capacityEnd, inlineOrigin}` header, just named `mOriginalStart` here),
+   * so `AssignRange` -- and the `InsertRange`/`GrowAndInsertRange` machinery
+   * it calls on the grow path -- apply unchanged. A prior version of this
+   * function used a raw `std::memcpy`, which is wrong for this element type:
+   * each `CameraUserEntityWeakRef` is spliced into its tracked entity's
+   * intrusive weak-link chain, and a byte copy leaves that chain still
+   * pointing at the old (about-to-be-discarded) storage instead of the
+   * fresh snapshot.
    */
   CameraFrustumWeakRefSnapshotBuffer* SnapshotCameraFrustumWeakRefs(
     CameraFrustumWeakRefSnapshotBuffer* const destination,
@@ -193,23 +206,14 @@ namespace
     destination->mCapacity = inlineStart + kInlineCount;
     destination->mOriginalStart = inlineStart;
 
-    const moho::CameraUserEntityWeakRef* const sourceStart = source.mStart;
-    const moho::CameraUserEntityWeakRef* const sourceFinish = source.mFinish;
-    if (sourceStart == nullptr || sourceFinish == nullptr || sourceFinish <= sourceStart) {
-      return destination;
-    }
+    static_assert(
+      sizeof(moho::CameraFrustumUserEntityList) == 0x10,
+      "CameraFrustumWeakRefSnapshotBuffer's header must alias CameraFrustumUserEntityList's four pointer fields"
+    );
+    auto& destinationView = *reinterpret_cast<moho::CameraFrustumUserEntityList*>(destination);
+    auto* const assignedEnd = destinationView.AssignRange(source);
+    (void)assignedEnd;
 
-    const std::size_t sourceCount = static_cast<std::size_t>(sourceFinish - sourceStart);
-    moho::CameraUserEntityWeakRef* writeStart = inlineStart;
-    if (sourceCount > kInlineCount) {
-      writeStart = static_cast<moho::CameraUserEntityWeakRef*>(::operator new[](sourceCount * sizeof(*writeStart)));
-      destination->mStart = writeStart;
-      destination->mFinish = writeStart;
-      destination->mCapacity = writeStart + sourceCount;
-    }
-
-    std::memcpy(writeStart, sourceStart, sourceCount * sizeof(*writeStart));
-    destination->mFinish = writeStart + sourceCount;
     return destination;
   }
 
