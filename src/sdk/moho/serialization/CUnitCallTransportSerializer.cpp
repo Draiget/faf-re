@@ -1,7 +1,6 @@
 #include "moho/serialization/CUnitCallTransportSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -9,41 +8,6 @@
 
 namespace
 {
-  moho::CUnitCallTransportSerializer gCUnitCallTransportSerializer;
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitCallTransportType()
   {
     gpg::RType* type = moho::CUnitCallTransport::sType;
@@ -52,11 +16,6 @@ namespace
       moho::CUnitCallTransport::sType = type;
     }
     return type;
-  }
-
-  void CleanupCUnitCallTransportSerializerAtExit()
-  {
-    (void)moho::cleanup_CUnitCallTransportSerializer();
   }
 } // namespace
 
@@ -111,7 +70,7 @@ namespace moho
    * Binds this serializer helper's load/save callbacks into
    * `CUnitCallTransport` RTTI.
    */
-  void CUnitCallTransportSerializer::RegisterSerializeFunctions()
+  void CUnitCallTransportSerializer::Init()
   {
     gpg::RType* const type = CachedCUnitCallTransportType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -121,69 +80,36 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF9620 (FUN_00BF9620, cleanup_CUnitCallTransportSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallTransportSerializer()
-  {
-    return UnlinkSerializerNode(gCUnitCallTransportSerializer);
-  }
-
-  /**
    * Address: 0x00BCFC60 (FUN_00BCFC60, register_CUnitCallTransportSerializer)
    *
    * What it does:
-   * Initializes `CUnitCallTransport` serializer callback pointers and schedules
-   * process-exit helper unlink cleanup.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. The ctor's atexit target (0x00BF9620) is a
+   * plain unlink thunk with no mangled destructor name in IDA, but its body
+   * is byte-identical to the confirmed real destructors of this class's
+   * three sibling serializers, so it is modeled the same way: the
+   * compiler's implicit static-destructor registration rather than an
+   * explicit call.
    */
-  void register_CUnitCallTransportSerializer()
+  CUnitCallTransportSerializer::CUnitCallTransportSerializer()
+    : mDeserialize(&CUnitCallTransportSerializer::Deserialize)
+    , mSerialize(&CUnitCallTransportSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF9620 (FUN_00BF9620)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently
+   * sits in and restores a self-linked sentinel state.
+   */
+  CUnitCallTransportSerializer::~CUnitCallTransportSerializer()
   {
-    ResetSerializerNode(gCUnitCallTransportSerializer);
-    gCUnitCallTransportSerializer.mDeserialize = &CUnitCallTransportSerializer::Deserialize;
-    gCUnitCallTransportSerializer.mSerialize = &CUnitCallTransportSerializer::Serialize;
-    (void)std::atexit(&CleanupCUnitCallTransportSerializerAtExit);
+    ResetLinks();
   }
 } // namespace moho
 
 namespace
 {
-  struct CUnitCallTransportSerializerBootstrap
-  {
-    CUnitCallTransportSerializerBootstrap()
-    {
-      moho::register_CUnitCallTransportSerializer();
-    }
-  };
-
-  CUnitCallTransportSerializerBootstrap gCUnitCallTransportSerializerBootstrap;
-} // namespace
-
-namespace
-{
-  /**
-   * Address: 0x005FFB50 (FUN_005FFB50)
-   *
-   * What it does:
-   * Unlinks `CUnitCallTransportSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallTransportSerializerNodePrimary()
-  {
-    return UnlinkSerializerNode(gCUnitCallTransportSerializer);
-  }
-
-  /**
-   * Address: 0x005FFB80 (FUN_005FFB80)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCallTransportSerializer` helper storage.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallTransportSerializerNodeSecondary()
-  {
-    return UnlinkSerializerNode(gCUnitCallTransportSerializer);
-  }
+  moho::CUnitCallTransportSerializer gCUnitCallTransportSerializer;
 } // namespace

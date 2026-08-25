@@ -8,9 +8,27 @@ namespace moho
 {
   class CUnitCallTeleport;
 
-  class CUnitCallTeleportSerializer
+  class CUnitCallTeleportSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCFD20 (FUN_00BCFD20, register_CUnitCallTeleportSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitCallTeleportSerializer();
+
+    /**
+     * Address: 0x00BF9740 (FUN_00BF9740, Moho::CUnitCallTeleportSerializer::~CUnitCallTeleportSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CUnitCallTeleportSerializer();
+
     /**
      * Address: 0x006011F0 (FUN_006011F0, Moho::CUnitCallTeleportSerializer::Deserialize)
      *
@@ -34,23 +52,13 @@ namespace moho
      * Binds this serializer helper's load/save callbacks into
      * `CUnitCallTeleport` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext; // +0x04
-    gpg::SerHelperBase* mHelperPrev; // +0x08
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitCallTeleportSerializer, mHelperNext) == 0x04,
-    "CUnitCallTeleportSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitCallTeleportSerializer, mHelperPrev) == 0x08,
-    "CUnitCallTeleportSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitCallTeleportSerializer, mDeserialize) == 0x0C,
     "CUnitCallTeleportSerializer::mDeserialize offset must be 0x0C"
@@ -60,23 +68,4 @@ namespace moho
     "CUnitCallTeleportSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(CUnitCallTeleportSerializer) == 0x14, "CUnitCallTeleportSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BF9740 (FUN_00BF9740, cleanup_CUnitCallTeleportSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallTeleportSerializer();
-
-  /**
-   * Address: 0x00BCFD20 (FUN_00BCFD20, register_CUnitCallTeleportSerializer)
-   *
-   * What it does:
-   * Initializes `CUnitCallTeleport` serializer callback pointers and schedules
-   * process-exit helper unlink cleanup.
-   */
-  void register_CUnitCallTeleportSerializer();
 } // namespace moho
-

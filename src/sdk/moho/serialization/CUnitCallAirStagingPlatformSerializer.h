@@ -8,9 +8,27 @@ namespace moho
 {
   class CUnitCallAirStagingPlatform;
 
-  class CUnitCallAirStagingPlatformSerializer
+  class CUnitCallAirStagingPlatformSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCFD80 (FUN_00BCFD80, register_CUnitCallAirStagingPlatformSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitCallAirStagingPlatformSerializer();
+
+    /**
+     * Address: 0x00BF97D0 (FUN_00BF97D0, Moho::CUnitCallAirStagingPlatformSerializer::~CUnitCallAirStagingPlatformSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CUnitCallAirStagingPlatformSerializer();
+
     /**
      * Address: 0x00601C20 (FUN_00601C20, Moho::CUnitCallAirStagingPlatformSerializer::Deserialize)
      *
@@ -36,23 +54,13 @@ namespace moho
      * Binds this serializer helper's load/save callbacks into
      * `CUnitCallAirStagingPlatform` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext; // +0x04
-    gpg::SerHelperBase* mHelperPrev; // +0x08
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitCallAirStagingPlatformSerializer, mHelperNext) == 0x04,
-    "CUnitCallAirStagingPlatformSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitCallAirStagingPlatformSerializer, mHelperPrev) == 0x08,
-    "CUnitCallAirStagingPlatformSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitCallAirStagingPlatformSerializer, mDeserialize) == 0x0C,
     "CUnitCallAirStagingPlatformSerializer::mDeserialize offset must be 0x0C"
@@ -65,23 +73,4 @@ namespace moho
     sizeof(CUnitCallAirStagingPlatformSerializer) == 0x14,
     "CUnitCallAirStagingPlatformSerializer size must be 0x14"
   );
-
-  /**
-   * Address: 0x00BF97D0 (FUN_00BF97D0, cleanup_CUnitCallAirStagingPlatformSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallAirStagingPlatformSerializer();
-
-  /**
-   * Address: 0x00BCFD80 (FUN_00BCFD80, register_CUnitCallAirStagingPlatformSerializer)
-   *
-   * What it does:
-   * Initializes `CUnitCallAirStagingPlatform` serializer callback pointers and
-   * schedules process-exit helper unlink cleanup.
-   */
-  void register_CUnitCallAirStagingPlatformSerializer();
 } // namespace moho
-
