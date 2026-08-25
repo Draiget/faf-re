@@ -3845,6 +3845,24 @@ namespace msvc8
              * unreachable, verified 2 hops deep" -- a byte-scanner pass
              * that missed these EH-section jumps); corrected to
              * `recovered`.
+             *
+             * Address: 0x008564E0 (FUN_008564E0, sub_8564E0) --
+             * `msvc8::map<CmdId, boost::shared_ptr<MeshInstance>>::
+             * erase_range` for `moho::CUIWorldViewBuildDragRuntimeView::
+             * mPreviewPositions` (`UiRuntimeTypes.h:896`, offset `0x28`).
+             * Fast whole-tree path only (`first==leftmost() && last==
+             * header()`): calls `sub_856F30` (`destroy_subtree`, cited
+             * below), self-links the header, zeroes size -- matches this
+             * member's fast branch exactly. Sole caller is
+             * `~CUIWorldViewBuildDragRuntimeView()` (`FUN_00852B20`,
+             * already recovered, "typed vector/material/tree/decal
+             * teardown") via the compiler-generated implicit member
+             * destructor call for `mPreviewPositions` -- no hand-written
+             * call exists or is needed for that half. Was `skip`
+             * ("covered by typed source construct; no standalone SDK
+             * function emitted", confidence 0.35); corrected to
+             * `recovered` after confirming the destructor does perform a
+             * real, distinct out-of-line call here.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -5374,6 +5392,19 @@ namespace msvc8
              * in `Unit.cpp` that walked a `SArmorMultiplierMapNode*`
              * reach-in and called `.tidy(true, 0u)` on the key by hand
              * instead of relying on this member's own recursive teardown.
+             *
+             * Address: 0x00856F30 (FUN_00856F30, sub_856F30) -- the same
+             * `mPreviewPositions` instantiation's `destroy_subtree`:
+             * recurse-right (`sub_856F30(i[2])`) then walk left with
+             * `operator delete` per node, additionally releasing the
+             * `boost::shared_ptr<MeshInstance>` value's dual strong/weak
+             * refcount (`_InterlockedExchangeAdd` on each, virtual
+             * dispose/destroy through the control-block vtable when a
+             * count reaches zero) before the delete -- exactly what this
+             * member's generic `n->value.~value_type()` (via `free_node`)
+             * compiles to for a `shared_ptr` value. Sole caller is
+             * `erase_range`'s fast whole-tree path for this instantiation
+             * (`FUN_008564E0`, cited above).
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
