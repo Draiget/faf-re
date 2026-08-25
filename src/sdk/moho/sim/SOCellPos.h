@@ -94,11 +94,34 @@ namespace moho
   };
 
   /**
+   * VFTABLE: 0x00E0DD6C
+   *
    * Serializer helper for `SOCellPos` archive lanes.
    */
-  class SOCellPosSerializer
+  class SOCellPosSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7D40 (FUN_00BC7D40, register_SOCellPosSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed from raw disassembly: calls
+     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SOCellPosSerializer@Moho@@6B@` -- no eager `Init()` call exists
+     * here.
+     */
+    SOCellPosSerializer();
+
+    /**
+     * Address: 0x00BF21A0 (FUN_00BF21A0, Moho::SOCellPosSerializer::~SOCellPosSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SOCellPosSerializer();
+
     /**
      * Address: 0x0050BF40 (FUN_0050BF40, Moho::SOCellPosSerializer::Deserialize)
      *
@@ -115,17 +138,17 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, SOCellPos* cellPos);
 
-    virtual ~SOCellPosSerializer() noexcept;
+    /**
+     * What it does:
+     * Binds SOCellPos load/save callbacks into reflected RTTI.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mDeserialize;  // +0x0C
     gpg::RType::save_func_t mSerialize;    // +0x10
   };
 
-  static_assert(offsetof(SOCellPosSerializer, mHelperNext) == 0x04, "SOCellPosSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SOCellPosSerializer, mHelperPrev) == 0x08, "SOCellPosSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SOCellPosSerializer, mDeserialize) == 0x0C, "SOCellPosSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(SOCellPosSerializer, mSerialize) == 0x10, "SOCellPosSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SOCellPosSerializer) == 0x14, "SOCellPosSerializer size must be 0x14");
@@ -151,13 +174,4 @@ namespace moho
    * Installs the static `SOCellPosTypeInfo` instance and its shutdown hook.
    */
   int register_SOCellPosTypeInfo();
-
-  /**
-   * Address: 0x00BC7D40 (FUN_00BC7D40, register_SOCellPosSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `SOCellPos` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_SOCellPosSerializer();
 } // namespace moho

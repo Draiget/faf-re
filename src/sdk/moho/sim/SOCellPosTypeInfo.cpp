@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -14,18 +14,9 @@ namespace
     gSOCellPosTypeInfoStorage[sizeof(moho::SOCellPosTypeInfo)];
   bool gSOCellPosTypeInfoConstructed = false;
 
-  alignas(moho::SOCellPosSerializer) unsigned char
-    gSOCellPosSerializerStorage[sizeof(moho::SOCellPosSerializer)];
-  bool gSOCellPosSerializerConstructed = false;
-
   [[nodiscard]] moho::SOCellPosTypeInfo& SOCellPosTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::SOCellPosTypeInfo*>(gSOCellPosTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::SOCellPosSerializer& SOCellPosSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::SOCellPosSerializer*>(gSOCellPosSerializerStorage);
   }
 
   /**
@@ -42,57 +33,6 @@ namespace
       moho::SOCellPos::sType = type;
     }
     return type;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeHelperNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0050BFD0 (FUN_0050BFD0)
-   *
-   * What it does:
-   * Unlinks the `SOCellPosSerializer` helper node and resets both links to
-   * the serializer self-node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSOCellPosSerializerVariant1() noexcept
-  {
-    return UnlinkHelperNode(SOCellPosSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0050C000 (FUN_0050C000)
-   *
-   * What it does:
-   * Duplicate lane of `SOCellPosSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSOCellPosSerializerVariant2() noexcept
-  {
-    return UnlinkHelperNode(SOCellPosSerializerStorageRef());
   }
 
   /**
@@ -122,17 +62,8 @@ namespace
     gSOCellPosTypeInfoConstructed = false;
   }
 
-  void CleanupSOCellPosSerializerAtExit()
-  {
-    if (!gSOCellPosSerializerConstructed) {
-      return;
-    }
-
-    moho::SOCellPosSerializer& serializer = SOCellPosSerializerStorageRef();
-    (void)CleanupSOCellPosSerializerVariant1();
-    serializer.~SOCellPosSerializer();
-    gSOCellPosSerializerConstructed = false;
-  }
+  // Address: 0x010A3334 -- process-global `SOCellPosSerializer` singleton.
+  moho::SOCellPosSerializer gSOCellPosSerializer;
 } // namespace
 
 namespace moho
@@ -271,38 +202,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050BFA0 (FUN_0050BFA0)
-   *
-   * What it does:
-   * Initializes `SOCellPosSerializer` helper links and callback lanes.
-   */
-  [[nodiscard]] SOCellPosSerializer* initialize_SOCellPosSerializerVariant1()
-  {
-    if (!gSOCellPosSerializerConstructed) {
-      new (gSOCellPosSerializerStorage) SOCellPosSerializer();
-      gSOCellPosSerializerConstructed = true;
-    }
-
-    InitializeHelperNode(SOCellPosSerializerStorageRef());
-    SOCellPosSerializerStorageRef().mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&SOCellPosSerializer::Deserialize);
-    SOCellPosSerializerStorageRef().mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SOCellPosSerializer::Serialize);
-    return &SOCellPosSerializerStorageRef();
-  }
-
-  /**
-   * Address: 0x0050C7A0 (FUN_0050C7A0)
-   *
-   * What it does:
-   * Duplicate lane of `SOCellPosSerializer` callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPosSerializer* initialize_SOCellPosSerializerVariant2()
-  {
-    return initialize_SOCellPosSerializerVariant1();
-  }
-
-  /**
    * Address: 0x0050AEB0 (FUN_0050AEB0, Moho::Invalid<Moho::SOCellPos>)
    *
    * What it does:
@@ -342,31 +241,51 @@ namespace moho
    * Address: 0x00BC7D40 (FUN_00BC7D40, register_SOCellPosSerializer)
    *
    * What it does:
-   * Installs serializer callbacks for `SOCellPos` and registers shutdown
-   * unlink/destruction.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Confirmed real via `__xc_a` incoming xref;
+   * two other dead, zero-xref duplicate ctors exist for this same global
+   * (0x0050BFA0, and 0x0050C7A0 which installs a *different* vtable --
+   * `gpg::SerSaveLoadHelper<Moho::SOCellPos>`'s -- onto the same storage,
+   * the same "linker keeps exactly one TU-local COMDAT copy" shape
+   * documented for `gpg::PrimitiveSerHelper<T,IntType>` this session).
+   * `SOCellPosSerializer` is, in effect, the same recovery-precedent as
+   * `Rect2iSerializer`/`Rect2fSerializer` (`Reflection.h`) -- a concrete,
+   * per-type instantiation of what the binary itself demangles as
+   * `gpg::SerSaveLoadHelper<T>`, kept as its own named class here rather
+   * than folded into a template (only one instantiation exists, unlike
+   * `PrimitiveSerHelper`'s 57).
    */
-  void register_SOCellPosSerializer()
+  SOCellPosSerializer::SOCellPosSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SOCellPosSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SOCellPosSerializer::Serialize))
+  {}
+
+  SOCellPosSerializer::~SOCellPosSerializer()
   {
-    (void)initialize_SOCellPosSerializerVariant1();
-    (void)ResolveSOCellPosType();
-    (void)std::atexit(&CleanupSOCellPosSerializerAtExit);
+    ResetLinks();
   }
 
-  SOCellPosSerializer::~SOCellPosSerializer() noexcept = default;
+  void SOCellPosSerializer::Init()
+  {
+    gpg::RType* const type = ResolveSOCellPosType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
+  }
 } // namespace moho
 
 namespace
 {
-  struct SOCellPosBootstrap
+  struct SOCellPosTypeInfoBootstrap
   {
-    SOCellPosBootstrap()
+    SOCellPosTypeInfoBootstrap()
     {
       (void)moho::register_SOCellPosTypeInfo();
-      moho::register_SOCellPosSerializer();
     }
   };
 
-  [[maybe_unused]] SOCellPosBootstrap gSOCellPosBootstrap;
+  [[maybe_unused]] SOCellPosTypeInfoBootstrap gSOCellPosTypeInfoBootstrap;
 } // namespace
 
 
