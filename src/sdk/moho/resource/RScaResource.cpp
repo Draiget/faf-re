@@ -46,25 +46,18 @@ void SaveConstructArgs_RScaResourceThunk(
   gpg::SerSaveConstructArgsResult* result
 );
 
+// Forward declaration: the real definition sits further down in this TU; the
+// RScaResourceConstruct ctor below only needs the signature to bind the
+// callback pointer.
+void Construct_RScaResource(
+  gpg::ReadArchive* archive,
+  int objectPtr,
+  int version,
+  gpg::SerConstructResult* result
+);
+
 namespace
 {
-  struct SerConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
-    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
-    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
-  );
-
   [[nodiscard]] gpg::RType* ResolveRScaResourceTypeCached() noexcept
   {
     gpg::RType* type = moho::RScaResource::sType;
@@ -76,35 +69,55 @@ namespace
   }
 
   /**
-   * Address: 0x0053AC50 (FUN_0053AC50, gpg::SerConstructHelper<Moho::RScaResource>::Init)
-   *
-   * IDA signature:
-   * void(__cdecl *) __thiscall sub_53AC50(SerConstructHelperView *this);
+   * Demangled: Moho::RScaResourceConstruct
    *
    * What it does:
-   * Virtual-method body installed in the `Moho::RScaResourceConstruct` and
-   * `gpg::SerConstructHelper<Moho::RScaResource>` vtables. Lazily resolves
-   * the `RScaResource` reflection descriptor, asserts the construct callback
-   * slot is empty, and publishes this helper's construct/delete callbacks to
-   * the descriptor.
+   * Binds the construct/delete callbacks used to load `RScaResource` from a
+   * mounted-path string and to tear one down. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  [[maybe_unused]] gpg::RType::construct_func_t InitRScaResourceConstructHelper(
-    const SerConstructHelperView& helper
-  )
+  class RScaResourceConstruct : public gpg::SerHelperBase
   {
-    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kSerializationConstructLine = 231;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+  public:
+    /**
+     * Address: 0x00BC9220 (FUN_00BC9220, dynamic initializer for the global
+     * `RScaResourceConstruct` singleton)
+     */
+    RScaResourceConstruct();
 
-    gpg::RType* const type = ResolveRScaResourceTypeCached();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = helper.mConstructCallback;
-    type->deleteFunc_ = helper.mDeleteCallback;
-    return helper.mConstructCallback;
-  }
+    /**
+     * Address: 0x00BF3D70 (FUN_00BF3D70, Moho::RScaResourceConstruct::~RScaResourceConstruct)
+     */
+    ~RScaResourceConstruct();
+
+    /**
+     * Address: 0x0053AC50 (FUN_0053AC50, Moho::RScaResourceConstruct::Init)
+     *
+     * IDA signature:
+     * void(__cdecl *) __thiscall sub_53AC50(RScaResourceConstruct *this);
+     *
+     * What it does:
+     * Lazily resolves the `RScaResource` reflection descriptor, asserts the
+     * construct callback slot is empty, and publishes this helper's
+     * construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(RScaResourceConstruct, mConstructCallback) == 0x0C,
+    "RScaResourceConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(RScaResourceConstruct, mDeleteCallback) == 0x10,
+    "RScaResourceConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(RScaResourceConstruct) == 0x14, "RScaResourceConstruct size must be 0x14");
 
   /**
    * VFTABLE: unknown - not independently observed for this instantiation.
@@ -170,6 +183,55 @@ namespace
   }
 
   RScaResourceSaveConstruct gRScaResourceSaveConstructHelper;
+
+  /**
+   * Address: 0x0053B0E0 (FUN_0053B0E0)
+   *
+   * What it does:
+   * Destroys and frees one heap-owned `RScaResource`.
+   */
+  void DeleteConstructedRScaResource(void* const objectPtr)
+  {
+    delete static_cast<moho::RScaResource*>(objectPtr);
+  }
+
+  /**
+   * Address: 0x00BC9220 (FUN_00BC9220, dynamic initializer for the global
+   * `RScaResourceConstruct` singleton)
+   */
+  RScaResourceConstruct::RScaResourceConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RScaResource))
+    , mDeleteCallback(&DeleteConstructedRScaResource)
+  {}
+
+  /**
+   * Address: 0x00BF3D70 (FUN_00BF3D70, Moho::RScaResourceConstruct::~RScaResourceConstruct)
+   */
+  RScaResourceConstruct::~RScaResourceConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x0053AC50 (FUN_0053AC50, Moho::RScaResourceConstruct::Init)
+   */
+  void RScaResourceConstruct::Init()
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = ResolveRScaResourceTypeCached();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
+  }
+
+  // Address: 0x010ABCD4 -- process-global `RScaResourceConstruct` singleton.
+  RScaResourceConstruct gRScaResourceConstructHelper;
 
   class RScaResourceTypeInfo final : public gpg::RType
   {
