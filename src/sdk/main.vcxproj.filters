@@ -2544,6 +2544,9 @@
     <ClCompile Include="moho\ai\HPathCellTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\HPathCellSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\path\PathTablesTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5761,6 +5764,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\HPathCellTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\HPathCellSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\path\PathTablesTypeInfo.h">
