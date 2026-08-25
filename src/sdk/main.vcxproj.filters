@@ -576,9 +576,6 @@
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="gpg\core\containers\WriteArchive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3616,9 +3613,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\FastVector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gpg\core\containers\SerSaveLoadHelper_Box3f.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\Rect2.h">
