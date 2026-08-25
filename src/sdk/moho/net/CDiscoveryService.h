@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/time/Timer.h"
+#include "legacy/containers/Vector.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/net/INetDatagramHandler.h"
 #include "moho/net/NetTransportEnums.h"
@@ -111,9 +112,12 @@ namespace moho
      * bottom-up) - the only call site in the binary.
      *
      * What it does:
-     * Appends `newRecord` to the `mGamesBegin..mGamesEnd` storage, growing
-     * the backing allocation (~1.5x, matching the capacity math in
-     * FUN_007C9CD0's realloc path) when `mGamesEnd == mGamesCapacityEnd`.
+     * Appends `newRecord` to `mGames`. The real body is a thin two-branch
+     * dispatcher -- capacity-available fast path copy-constructs in place
+     * and bumps the end pointer; capacity-exhausted path calls the generic
+     * `_Insert_n` growth-and-insert core (FUN_007C9CD0, ~1.5x growth) -- i.e.
+     * exactly `msvc8::vector<T>::push_back`'s own two-branch shape. Recovered
+     * as `mGames.push_back(newRecord)`, not hand-duplicated growth math.
      */
     void AddDiscoveredGame(const DiscoveredGameRecord& newRecord);
 
@@ -121,9 +125,18 @@ namespace moho
     alignas(void*) std::uint8_t mPullTaskStorage[0x18]{}; // +0x38
     std::uint8_t mUnknown50_53[0x04]{};              // +0x50
     alignas(void*) std::uint8_t mPushTaskStorage[0x1C]{}; // +0x54
-    DiscoveredGameRecord* mGamesBegin{nullptr};       // +0x70
-    DiscoveredGameRecord* mGamesEnd{nullptr};         // +0x74
-    DiscoveredGameRecord* mGamesCapacityEnd{nullptr}; // +0x78
+
+    /**
+     * Discovered-game storage. Bare 3-pointer, 12-byte instantiation
+     * (`HasDebugProxy=false`, see `msvc8::vector`'s class doc in Vector.h) --
+     * the ctor (0x007BF650), destructor (0x007BF7F0), and the destructor's
+     * EH-unwind cleanup funclet (0x007C8720) each touch exactly 3
+     * consecutive pointer-sized slots at +0x70/+0x74/+0x78, never a 4th, and
+     * the group sits directly against `mTimer`'s 8-byte-aligned `LONGLONG`
+     * with no room for a reserved debug-iterator lane. `mUnknown7C` is that
+     * unrelated alignment gap, not part of this vector.
+     */
+    msvc8::vector<DiscoveredGameRecord, false> mGames; // +0x70 (0x70 begin, 0x74 end, 0x78 capacityEnd)
     std::uint8_t mUnknown7C[0x04]{};                  // +0x7C
     gpg::time::Timer mTimer;                          // +0x80
     float mNextDiscoveryBroadcastTimeSeconds{0.0f};   // +0x88
@@ -142,12 +155,12 @@ namespace moho
     offsetof(CDiscoveryService, mPushTaskStorage) == 0x54,
     "CDiscoveryService::mPushTaskStorage must be +0x54"
   );
-  static_assert(offsetof(CDiscoveryService, mGamesBegin) == 0x70, "CDiscoveryService::mGamesBegin must be +0x70");
-  static_assert(offsetof(CDiscoveryService, mGamesEnd) == 0x74, "CDiscoveryService::mGamesEnd must be +0x74");
+  static_assert(offsetof(CDiscoveryService, mGames) == 0x70, "CDiscoveryService::mGames must be +0x70");
   static_assert(
-    offsetof(CDiscoveryService, mGamesCapacityEnd) == 0x78,
-    "CDiscoveryService::mGamesCapacityEnd must be +0x78"
+    sizeof(decltype(CDiscoveryService::mGames)) == 0x0C,
+    "CDiscoveryService::mGames (no VC8 debug-iterator lane) must be 0x0C"
   );
+  static_assert(offsetof(CDiscoveryService, mUnknown7C) == 0x7C, "CDiscoveryService::mUnknown7C must be +0x7C");
   static_assert(offsetof(CDiscoveryService, mTimer) == 0x80, "CDiscoveryService::mTimer must be +0x80");
   static_assert(
     offsetof(CDiscoveryService, mNextDiscoveryBroadcastTimeSeconds) == 0x88,

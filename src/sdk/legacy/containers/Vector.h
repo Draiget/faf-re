@@ -1290,8 +1290,20 @@ namespace msvc8
         }
     } // namespace detail
 
+    namespace detail
+    {
+        /**
+         * Empty tag type standing in for `myProxy_` when a `vector<T,
+         * HasDebugProxy>` instantiation carries no VC8 debug-iterator lane at
+         * all -- see `vector`'s `HasDebugProxy` template parameter below.
+         * `[[msvc::no_unique_address]]` lets the compiler fully elide this
+         * tag's storage, dropping the class from 16 to 12 bytes.
+         */
+        struct NoDebugProxyLane {};
+    } // namespace detail
+
     /**
-     * MSVC8-compatible vector with fixed ABI (16 bytes).
+     * MSVC8-compatible vector with fixed ABI (16 bytes by default).
      * Only pointer fields are stored: proxy (opaque), begin, end, capacity-end.
      * Provides a minimal modern API: reserve/resize/push_back/emplace_back/clear,
      * copy/move, and conversions to/from std::vector<T>.
@@ -1303,24 +1315,36 @@ namespace msvc8
      * Why do we have this `Dbg` in Release? This is common default practice of VS2005,
      * they have `_SECURE_SCL=1` defined in Release, so we can see that debug iterator that
      * aren't used by anything really and just sitting alone there.
+     *
+     * `HasDebugProxy` (default `true`): every existing `msvc8::vector<T>` spelling
+     * in this codebase omits this parameter and is byte-for-byte unchanged by its
+     * addition. The `false` arm models a leaner, confirmed-narrower 12-byte shape
+     * for instantiations whose binary evidence shows no reserved proxy slot at
+     * all -- e.g. `Moho::CDiscoveryService::mGames` (`moho/net/CDiscoveryService.h`):
+     * its constructor (0x007BF650), destructor (0x007BF7F0), and the destructor's
+     * EH-unwind cleanup funclet (0x007C8720) each touch exactly 3 consecutive
+     * pointer-sized slots, never a 4th, with the group sitting directly against
+     * `gpg::time::Timer`'s 8-byte-aligned `LONGLONG` member and no room for one.
+     * Per RULE ONE this is one template modeling both observed shapes, not a
+     * forked per-type copy.
      */
-    template <class T>
+    template <class T, bool HasDebugProxy = true>
     class vector
 	{
         using iterator = T*;
         using const_iterator = const T*;
 
-        void* myProxy_; // +0x0  (opaque _Container_proxy*)
-        T* first_;      // +0x4
-        T* last_;       // +0x8
-        T* end_;        // +0xC
+        [[msvc::no_unique_address]] std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxyLane> myProxy_; // +0x0 when present (opaque _Container_proxy*)
+        T* first_;      // +0x4 (+0x0 when HasDebugProxy=false)
+        T* last_;       // +0x8 (+0x4 when HasDebugProxy=false)
+        T* end_;        // +0xC (+0x8 when HasDebugProxy=false)
 
     public:
         /**
          * Default constructor: empty
          */
         vector() noexcept :
-    		myProxy_(nullptr),
+    		myProxy_{},
     		first_(nullptr),
     		last_(nullptr),
     		end_(nullptr)
@@ -1410,7 +1434,9 @@ namespace msvc8
 			last_(other.last_),
 			end_(other.end_)
     	{
-            other.myProxy_ = nullptr;
+            if constexpr (HasDebugProxy) {
+                other.myProxy_ = nullptr;
+            }
             other.first_ = other.last_ = other.end_ = nullptr;
         }
 
@@ -1500,7 +1526,9 @@ namespace msvc8
             first_ = rhs.first_;
             last_ = rhs.last_;
             end_ = rhs.end_;
-            rhs.myProxy_ = nullptr;
+            if constexpr (HasDebugProxy) {
+                rhs.myProxy_ = nullptr;
+            }
             rhs.first_ = rhs.last_ = rhs.end_ = nullptr;
             return *this;
         }
@@ -3805,19 +3833,26 @@ namespace msvc8
          * (0x0085A2D0, 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60) are
          * recovered source yet.)
          *
-         * Address: 0x007CED40 (FUN_007CED40, `uninit_copy_n` for
-         * `Moho::CDiscoveryService::DiscoveredGameRecord` -- a plain
-         * 16-byte POD (protocol/address/port/padding/reply-timestamp, no
-         * pointers), matching `Moho::CDiscoveryService.h`'s own
+         * Address: 0x007CED40 (FUN_007CED40, `msvc8::vector<Moho::
+         * CDiscoveryService::DiscoveredGameRecord, false>::uninit_copy_n`
+         * for the element -- a plain 16-byte POD (protocol/address/port/
+         * padding/reply-timestamp, no pointers), matching
+         * `Moho::CDiscoveryService.h`'s own
          * `static_assert(sizeof(DiscoveredGameRecord) == 0x10)`. Verbatim
-         * 4-dword-per-slot copy, no refcount/special handling. Reached
-         * from `AddDiscoveredGame`'s (0x007C87E0, `CDiscoveryService.cpp`)
-         * growth-reallocation loop via its thin calling-convention
-         * adapter `FUN_007CBF90` (truncates a flag byte before
-         * tail-calling this body). `FUN_007C9CD0`, the sibling
-         * `_Insert`-shaped emission for the same 16-byte element, is
-         * already `skip` (RULE ONE compiler/template emission, its
-         * source-level call site is `AddDiscoveredGame` itself).
+         * 4-dword-per-slot copy, no refcount/special handling. `mGames` is
+         * the `HasDebugProxy=false` instantiation (see `vector`'s class doc
+         * above) -- its ctor/dtor/EH-funclet evidence shows no reserved
+         * proxy slot, a genuine 12-byte narrower shape than this template's
+         * 16-byte default. Reached from `AddDiscoveredGame`'s (0x007C87E0,
+         * `CDiscoveryService.cpp`) growth-reallocation path -- which is
+         * this method's own `insert(last_, value)` slow path, since
+         * `AddDiscoveredGame`'s entire real body is `mGames.push_back(newRecord)`
+         * -- via its thin calling-convention adapter `FUN_007CBF90`
+         * (truncates a flag byte before tail-calling this body).
+         * `FUN_007C9CD0`, the sibling `_Insert`-shaped emission for the
+         * same 16-byte element, is already `skip` (RULE ONE compiler/
+         * template emission, its source-level call site is
+         * `AddDiscoveredGame` itself, i.e. this method's `insert` call).
          *
          * Address: 0x005CDEF0 (FUN_005CDEF0, `uninit_copy_n` for a 0x1C-byte
          * element containing a leading 3-dword header, a 1-byte tag at
@@ -4182,6 +4217,26 @@ namespace msvc8
          * above on `insert`), `mMeshes`'s in-place tail-smaller-than-gap
          * branch (constructs the trailing gap slots that have no live tail
          * element to relocate over them).)
+         *
+         * Address: 0x007CCEB0 (FUN_007CCEB0, `msvc8::vector<Moho::
+         * CDiscoveryService::DiscoveredGameRecord, false>::uninit_fill_n`
+         * for the 16-byte plain-POD element (protocol/address/port/padding/
+         * reply-timestamp, no pointers) -- `(dst@eax, srcValue@edx,
+         * count@ecx)` loop: `*dst = *srcValue` (unrolled 4-dword copy) then
+         * `dst += 4`, `srcValue` never advanced, once per remaining count;
+         * the `if (dst)` null guard wraps only the copy body, matching the
+         * same defensive-null shape already documented on FUN_00549BC0 and
+         * FUN_00832B80 above. Reached with `count = 1` from `AddDiscoveredGame`'s
+         * (0x007C87E0, `CDiscoveryService.cpp`) capacity-available fast path
+         * -- this method's own `if (size() < capacity()) { uninit_fill_n(last_,
+         * 1u, value); ++last_; }` branch -- which is `AddDiscoveredGame`'s
+         * entire real body, `mGames.push_back(newRecord)`. Previously
+         * mis-recovered as a bespoke free function `FillStride4DwordLaneRuntimeA`
+         * in `SimRecoveryRuntime.cpp` (a `*Lane*`-named per-instantiation
+         * reimplementation, the exact RULE ONE anti-pattern this method
+         * exists to replace) with zero source-level callers of its own;
+         * removed in favor of this citation when `CDiscoveryService::mGames`
+         * was migrated onto this template.)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -5152,6 +5207,10 @@ namespace msvc8
         }
     };
     static_assert(sizeof(vector<int>) == 16, "msvc8::set must be 16 bytes on x86");
+    static_assert(
+        sizeof(vector<int, false>) == 3 * sizeof(void*),
+        "vector<T,false> (no VC8 debug-iterator lane) must drop to a bare 3-pointer layout"
+    );
 
     /**
      * Non-owning runtime view for legacy MSVC8 vector layout.

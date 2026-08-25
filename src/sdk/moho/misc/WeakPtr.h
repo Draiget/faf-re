@@ -4,17 +4,13 @@
 #include <cstdint>
 #include <new>
 
+#include "legacy/containers/Vector.h"
+
 // Windows GDI headers define `GetObject` as an ANSI/Unicode macro alias.
 // Undefine it so intrusive weak-pointer accessors keep their intended name.
 #ifdef GetObject
 #undef GetObject
 #endif
-
-namespace msvc8
-{
-  template <class T>
-  class vector;
-}
 
 namespace gpg
 {

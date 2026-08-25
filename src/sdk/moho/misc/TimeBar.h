@@ -3,13 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
-
-namespace msvc8
-{
-  template <class T>
-  class vector;
-}
 
 namespace moho
 {
