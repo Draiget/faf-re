@@ -43,17 +43,6 @@ namespace
   constexpr float kThrustDefaultForceMult = 1.0f;
   constexpr float kThrustDefaultTurnSpeed = 0.30000001f;
 
-  struct CThrustManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(sizeof(CThrustManipulatorSerializerHelperNode) == 0x10, "CThrustManipulatorSerializerHelperNode size must be 0x10");
-
-  CThrustManipulatorSerializerHelperNode gCThrustManipulatorSerializer;
-
   struct CThrustManipulatorTypeLifecycleSlotsRuntimeView
   {
     std::uint8_t mPad00_47[0x48]{}; // +0x00
@@ -82,26 +71,6 @@ namespace
     "CThrustManipulatorTypeLifecycleSlotsRuntimeView::mDestructFunc offset must be 0x5C"
   );
 #endif
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
 
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
@@ -397,112 +366,6 @@ namespace
     archive->Write(CachedQuaternionfType(), &object->mOrientation, owner);
   }
 
-  /**
-   * Address: 0x0064A380 (FUN_0064A380)
-   *
-   * What it does:
-   * atexit cleanup lane that unlinks and self-resets the global
-   * CThrustManipulator serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_CThrustManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCThrustManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0064A3B0 (FUN_0064A3B0)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CThrustManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CThrustManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCThrustManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0064A380 (FUN_0064A380, atexit adapter)
-   *
-   * What it does:
-   * `void()`-shaped atexit adapter that discards the helper-node self pointer
-   * returned by the unlink lane.
-   */
-  void CleanupCThrustManipulatorSerializerAtexit()
-  {
-    (void)cleanup_CThrustManipulatorSerializerStartupThunkA();
-  }
-
-  /**
-   * Address: 0x0064A340 (FUN_0064A340, Moho::CThrustManipulatorSerializer::Serialize)
-   *
-   * IDA signature:
-   * void __cdecl Moho::CThrustManipulatorSerializer::Serialize(BinaryWriteArchive *archive, int objectPtr);
-   *
-   * What it does:
-   * Reflection save-callback facade for `CThrustManipulator`. Forwards the
-   * reflected object pointer to the save body. FUN_0064B4E0/FUN_0064B370 are
-   * phantom `jmp sub_64B890` thunks and are intentionally not reproduced.
-   */
-  void CThrustManipulatorSerializerSerialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    SerializeCThrustManipulatorSerializerState(
-      reinterpret_cast<const CThrustManipulatorSerializerRuntimeView*>(objectPtr),
-      archive
-    );
-  }
-
-  /**
-   * Address: 0x0064A2C0 (FUN_0064A2C0, Moho::CThrustManipulatorSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `CThrustManipulator`. Forwards the
-   * reflected object pointer to the existing load body.
-   */
-  void CThrustManipulatorSerializerDeserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    DeserializeCThrustManipulatorSerializerState(
-      reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectPtr),
-      archive
-    );
-  }
-
-  /**
-   * Address: 0x00BD37A0 (FUN_00BD37A0, register_CThrustManipulatorSerializer)
-   *
-   * What it does:
-   * Startup registration root for the `CThrustManipulator` serializer helper.
-   * Initializes the intrusive helper node and binds both load and save
-   * reflection callbacks, giving both bodies a source-level invocation. In the
-   * binary this also installs an atexit unlink of the helper node.
-   */
-  void register_CThrustManipulatorSerializer()
-  {
-    (void)UnlinkSerializerNode(gCThrustManipulatorSerializer);
-    gCThrustManipulatorSerializer.mSerLoadFunc = &CThrustManipulatorSerializerDeserialize;
-    gCThrustManipulatorSerializer.mSerSaveFunc = &CThrustManipulatorSerializerSerialize;
-    (void)std::atexit(&CleanupCThrustManipulatorSerializerAtexit);
-  }
-
-  struct CThrustManipulatorSerializerStartupBootstrap
-  {
-    CThrustManipulatorSerializerStartupBootstrap()
-    {
-      register_CThrustManipulatorSerializer();
-    }
-  };
-
-  CThrustManipulatorSerializerStartupBootstrap gCThrustManipulatorSerializerStartupBootstrap;
 } // namespace
 
 namespace moho
@@ -524,7 +387,79 @@ namespace moho
    */
   class CThrustManipulator : public IAniManipulator
   {
+  public:
+    /**
+     * Address: 0x0064B6E0 (FUN_0064B6E0, Moho::CThrustManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Reinterprets `this` as the full `CThrustManipulatorSerializerRuntimeView`
+     * layout and forwards to the already-recovered
+     * `DeserializeCThrustManipulatorSerializerState` body.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0064B890 (FUN_0064B890, Moho::CThrustManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Reinterprets `this` as the full `CThrustManipulatorSerializerRuntimeView`
+     * layout and forwards to the already-recovered
+     * `SerializeCThrustManipulatorSerializerState` body.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
+
+  /**
+   * VFTABLE: 0x00E23224
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CThrustManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CThrustManipulatorSerializer`):
+   *    0x00BD37A0 (__xc_a-reachable; exactly one xref on the real
+   *    `??_7CThrustManipulatorSerializer@Moho@@6B@` vtable). Dead zero-xref
+   *    duplicate ctor that installs a distinct byte-identical copy of the
+   *    template's own vtable instead: 0x0064B120 (already `skip`).
+   *  - dtor: 0x00BFB420 (`??1CThrustManipulatorSerializer@Moho@@QAE@@Z`;
+   *    exactly one xref, from the real ctor's atexit push)
+   *  - Init(): 0x0064B150
+   *  - Deserialize(): 0x0064A330 (tail-calls `MemberDeserialize` at
+   *    0x0064B6E0; old source cited a nonexistent 0x0064A2C0 for this slot --
+   *    no such function exists in this namespace's export set, the real
+   *    stored callback address decodes straight out of the ctor's raw asm)
+   *  - Serialize(): 0x0064A340 (tail-calls `MemberSerialize` at 0x0064B890;
+   *    this address was already correctly cited by the old source)
+   *
+   * Prior recovery modeled this as a `CThrustManipulatorSerializerHelperNode`
+   * raw struct (`gpg::SerHelperBase* mNext/mPrev` fields, no real base) plus
+   * a hand-written `register_CThrustManipulatorSerializer()` that wrote the
+   * load/save callbacks onto that orphan struct's own fields instead of onto
+   * `CThrustManipulator::sType`'s `serLoadFunc_`/`serSaveFunc_` slots -- the
+   * reflection callbacks were never actually installed. This template
+   * instantiation fixes both defects.
+   */
+  using CThrustManipulatorSerializer = gpg::SerSaveLoadHelper<CThrustManipulator>;
+
+  /**
+   * Address: 0x0064B6E0 (FUN_0064B6E0, gpg::SerSaveLoadHelper<Moho::CThrustManipulator>::Deserialize thunk target)
+   */
+  void CThrustManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    DeserializeCThrustManipulatorSerializerState(
+      reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(this), archive
+    );
+  }
+
+  /**
+   * Address: 0x0064B890 (FUN_0064B890, gpg::SerSaveLoadHelper<Moho::CThrustManipulator>::Serialize thunk target)
+   */
+  void CThrustManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    SerializeCThrustManipulatorSerializerState(
+      reinterpret_cast<const CThrustManipulatorSerializerRuntimeView*>(this), archive
+    );
+  }
 
   [[nodiscard]] gpg::RType* CachedIAniManipulatorTypeForThrustManipulatorTypeInfo()
   {
@@ -1031,6 +966,18 @@ namespace
   alignas(moho::CThrustManipulatorTypeInfo)
   unsigned char gCThrustManipulatorTypeInfoStorage[sizeof(moho::CThrustManipulatorTypeInfo)] = {};
   bool gCThrustManipulatorTypeInfoConstructed = false;
+
+  // Address: 0x00BD37A0 (dynamic initializer for the global
+  // `CThrustManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CThrustManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CThrustManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFB420) via
+  // `atexit`. See the Doxygen comment on the declaration above (next to the
+  // `CThrustManipulator` class) for the full per-instantiation address list.
+  moho::CThrustManipulatorSerializer gCThrustManipulatorSerializer;
 
   [[nodiscard]] moho::CThrustManipulatorTypeInfo* AcquireCThrustManipulatorTypeInfo()
   {

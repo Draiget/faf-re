@@ -117,6 +117,24 @@ namespace moho
      */
     int AddWatchBone(int boneIndex);
 
+    /**
+     * Address: 0x0063E380 (FUN_0063E380, gpg::SerSaveLoadHelper<Moho::IAniManipulator>::Deserialize thunk target)
+     *
+     * What it does:
+     * Loads `CScriptEvent` base state, the enabled flag, owner actor/sim
+     * pointers, precedence, and the watch-bone fastvector.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0063E450 (FUN_0063E450, gpg::SerSaveLoadHelper<Moho::IAniManipulator>::Serialize thunk target)
+     *
+     * What it does:
+     * Saves `CScriptEvent` base state, the enabled flag, owner actor/sim
+     * pointers, precedence, and the watch-bone fastvector.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   protected:
     void ResetWatchBoneStorage();
 
@@ -201,6 +219,26 @@ namespace moho
      */
     bool ManipulatorUpdate() override;
 
+    /**
+     * Address: 0x0063A460 (FUN_0063A460, Moho::CFootPlantManipulator::MemberDeserialize)
+     * Address: 0x0063A290 (FUN_0063A290, the linker-emitted `jmp` bridge to
+     * FUN_0063A460 -- one instruction, no callers of its own)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base state, goal-unit weak pointer, foot/knee/
+     * hip bones, straight-leg flag, and foot-fall tuning floats.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0063A540 (FUN_0063A540, Moho::CFootPlantManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base state, goal-unit weak pointer, foot/knee/
+     * hip bones, straight-leg flag, and foot-fall tuning floats.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     WeakPtr<Unit> mGoalUnit;         // +0x80
     std::int32_t mFootBoneIndex;     // +0x88
     std::int32_t mKneeBoneIndex;     // +0x8C
@@ -224,6 +262,32 @@ namespace moho
     "CFootPlantManipulator::mMaxFootFall offset must be 0x98"
   );
   static_assert(sizeof(CFootPlantManipulator) == 0xA0, "CFootPlantManipulator size must be 0xA0");
+
+  /**
+   * VFTABLE: 0x00E21B6C
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CFootPlantManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CFootPlantManipulatorSerializer`):
+   *    0x00BD2A20 (__xc_a-reachable, exactly one xref)
+   *  - dtor: 0x00BFAC20 (`??1CFootPlantManipulatorSerializer@Moho@@QAE@@Z`;
+   *    exactly one xref, from the real ctor's atexit push)
+   *  - Init(): 0x00639FA0
+   *  - Deserialize(): 0x00639220 (tail-calls `MemberDeserialize` at 0x0063A460)
+   *  - Serialize(): 0x00639230 (tail-calls `MemberSerialize` at 0x0063A540)
+   *
+   * Prior recovery modeled this as a `CFootPlantManipulatorSerializerHelperNode`
+   * raw struct (`gpg::SerHelperBase* mNext/mPrev` fields, no real base) plus
+   * a hand-written `register_CFootPlantManipulatorSerializer()` that wrote
+   * the load/save callbacks onto that orphan struct's own fields instead of
+   * onto `CFootPlantManipulator::sType`'s `serLoadFunc_`/`serSaveFunc_`
+   * slots -- the reflection callbacks were never actually installed. This
+   * template instantiation fixes both defects; sibling
+   * `CBoneEntityManipulatorSerializer` below already used the correct shape.
+   */
+  using CFootPlantManipulatorSerializer = gpg::SerSaveLoadHelper<CFootPlantManipulator>;
 
   class CBoneEntityManipulator : public IAniManipulator
   {
@@ -580,42 +644,33 @@ namespace moho
    */
   int cfunc_IAniManipulatorDestroyL(LuaPlus::LuaState* state);
 
-  class IAniManipulatorSerializer
-  {
-  public:
-    /**
-     * Address: 0x0063BA10 (FUN_0063BA10, Moho::IAniManipulatorSerializer::Deserialize)
-     *
-     * What it does:
-     * Deserializes IAniManipulator base serialization fields
-     * (`CScriptEvent`, enabled flag, owner pointers, precedence, watch-bones).
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063BA20 (FUN_0063BA20, Moho::IAniManipulatorSerializer::Serialize)
-     *
-     * What it does:
-     * Serializes IAniManipulator base serialization fields
-     * (`CScriptEvent`, enabled flag, owner pointers, precedence, watch-bones).
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063C540 (FUN_0063C540, sub_63C540)
-     * Slot: 0
-     *
-     * What it does:
-     * Installs IAniManipulator load/save callbacks into RTTI serialization hooks.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
+  /**
+   * VFTABLE: 0x00E21F68
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::IAniManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_IAniManipulatorSerializer`):
+   *    0x00BD2C40 (__xc_a-reachable; exactly two vtable writers total, the
+   *    second being a dead zero-xref duplicate ctor: 0x0063BA30)
+   *  - dtor: 0x00BFAE20 (`??1IAniManipulatorSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0063C540
+   *  - Deserialize(): 0x0063BA10 (tail-calls `MemberDeserialize` at 0x0063E380)
+   *  - Serialize(): 0x0063BA20 (tail-calls `MemberSerialize` at 0x0063E450)
+   *
+   * Prior recovery modeled this as a hand-rolled `IAniManipulatorSerializer`
+   * class with untyped `void* mNext`/`void* mPrev` fields (violating both the
+   * project's "no void* for intrusive links" contract and RULE ONE -- no
+   * real `gpg::SerHelperBase` base, just a same-sized mimic) and a
+   * `virtual void RegisterSerializeFunctions()` standing in for the real
+   * `Init()` override, wired through free functions
+   * `register_IAniManipulatorSerializer()`/`cleanup_IAniManipulatorSerializer()`
+   * instead of a real ctor/dtor. This template instantiation fixes both
+   * defects; sibling `CBoneEntityManipulatorSerializer` in this same header
+   * already used the correct shape.
+   */
+  using IAniManipulatorSerializer = gpg::SerSaveLoadHelper<IAniManipulator>;
 
   class IAniManipulatorTypeInfo : public gpg::RType
   {
@@ -681,18 +736,14 @@ namespace moho
   int register_IAniManipulatorTypeInfo_AtExit();
 
   /**
-   * Address: 0x00BFAE20 (FUN_00BFAE20, Moho::IAniManipulatorSerializer::~IAniManipulatorSerializer)
-   *
-   * What it does:
-   * Unlinks IAniManipulator serializer helper node from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_IAniManipulatorSerializer();
-
-  /**
    * Address: 0x00BD2C40 (FUN_00BD2C40, register_IAniManipulatorSerializer)
    *
    * What it does:
-   * Initializes IAniManipulator serializer helper callbacks and installs exit cleanup.
+   * Forces this translation unit's global `IAniManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration above for why this function's body has no
+   * field-setting logic of its own -- the real ctor/dtor/Init() are the
+   * compiler-generated `gpg::SerSaveLoadHelper<IAniManipulator>` members.
    */
   void register_IAniManipulatorSerializer();
 } // namespace moho
