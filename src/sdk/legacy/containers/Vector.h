@@ -3457,6 +3457,51 @@ namespace msvc8
          * the `_Insert_n` grow core `FUN_004451A0` with `count = 1`. Reached
          * from this element's `push_back` (`FUN_00686E80`, cited above)
          * capacity-full path.)
+         * Address: 0x0084F200 (FUN_0084F200, `msvc8::vector<wxWindowBase*>::
+         * insert(iterator, const T&)` for
+         * `SuspendInputWindowEventHandlersAndFlushQueue`'s per-window saved-
+         * handler vector (`UiRuntimeTypes.cpp`) -- like `FUN_0082E950` above,
+         * this is a fused single-element implementation (no separate
+         * count-based `_Insert_n` core call): reads `size()`/`capacity()`
+         * directly, and on the capacity-available path uses
+         * `uninit_move_n` (`FUN_0084F940`, cited above on that member) to
+         * relocate the current last element into the freshly grown slot,
+         * then a raw 4-byte-broadcast loop to shift/write the remainder --
+         * on the capacity-exhausted path, `recommended_capacity`-shaped 1.5x
+         * growth, `allocate_slots_checked` (`FUN_0084FA10`), and two
+         * `memmove_s` head/tail relocates inline (not through
+         * `uninit_move_n`, since this is the *reallocating* branch). Reached
+         * from `moho::PushEventHandler`'s (WxRuntimeTypes.cpp)
+         * `savedHandlers.push_back(handler)` capacity-full path via
+         * `FUN_0084E520`/`FUN_0084EAB7`, and from
+         * `SuspendInputWindowEventHandlersAndFlushQueue`
+         * (`FUN_0084DA80`) directly. RULE ONE compiler/template emission,
+         * not hand-written source -- the programmer-written source line
+         * that emits it already exists at the instantiating call site, so
+         * this token stays `skip`.)
+         *
+         * Address: 0x00627340 (FUN_00627340, sub_627340) --
+         * `msvc8::vector<Moho::SPickUpInfo>::insert(iterator, const T&)`
+         * for the 12-byte intrusive-weak `{WeakPtr<Unit>, float}` element
+         * (`SPickUpInfoVectorReflection.cpp`'s `SPickUpInfoVector`). Offset
+         * captured up front via the divide-by-3 reciprocal idiom
+         * (`0x2AAAAAAB`, matching `(pos-first_)` already measured in
+         * 4-byte/dword units here rather than raw bytes), tail-calls the
+         * `_Insert_n` grow core `FUN_00627800` (cited below on the
+         * count-form `insert`) with `count = 1` (`push 1` immediately
+         * before the call, confirmed against the `.asm`), rebuilds the
+         * returned iterator as `first_ + offset*3` dwords afterwards.
+         * IDA's decompiler mis-infers this body `__noreturn` (it cannot
+         * see past the tail call into `_Insert_n`'s own control flow) --
+         * it unconditionally returns, it does not throw. Reached from this
+         * element's `push_back` (`FUN_00626E10`,
+         * `PushBackSPickUpInfoWithRelink`, `SPickUpInfoVectorReflection.cpp`,
+         * already recovered) capacity-full path, exactly like the sibling
+         * `push_back`/`insert(pos,value)` pairs cited throughout this file.
+         * Previously mis-tracked `skip` as a fabricated "__noreturn
+         * 1-statement tail-call typed throw shim" (confidence 0.35 on that
+         * note); the `.asm` shows ~100 bytes of real offset/count
+         * arithmetic and a normal `retn`, not a throw.
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -3967,6 +4012,25 @@ namespace msvc8
          * separate adapter needed for a 4-byte element. Reached from this
          * element's `push_back` (`FUN_00686E80`, cited above) capacity-full
          * path via `FUN_00687B40`.)
+         * Address: 0x00936FF0 (FUN_00936FF0, `msvc8::vector<gpg::
+         * ThreadCtxEntry*>::insert(iterator, size_type, const T&)` --
+         * `gpg::ThreadState::mEntries`, `Logging.h`. Same 4-byte-pointer
+         * shape again: `max_size` folds to `0x3FFFFFFF`, 1.5x growth
+         * (`v10 = (v7 >> 1) + v7`, confirmed against the `.asm`), throw lane
+         * `FUN_00936DB0`, allocate `FUN_00935B20`, copy/relocate step
+         * `FUN_00936990` (cited above on `uninit_move_n`, called three
+         * times: twice for the in-place tail-shift, once per half for the
+         * reallocation branch), fill step `FUN_00936B00` (cited below on
+         * `uninit_fill_n`). Reached from `gpg::PushThreadContext`'s
+         * `tls->mEntries.push_back(entry)` (`Logging.cpp`) capacity-full
+         * path. Previously mass-mis-attributed to `CrtRuntimeHelpers.cpp`
+         * by the 2026-08-24 DB-integrity bulk pass (address not present in
+         * that file); marked `skip` in `recovered_progress.json` rather
+         * than `recovered` since `push_back(entry)` above is the
+         * programmer-written source line this address's whole family
+         * compiles to, matching every other `push_back`-reached `insert`
+         * instantiation in this member -- but it had no source-side
+         * citation at all before this pass, unlike its siblings.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5403,6 +5467,31 @@ namespace msvc8
          * `CrtRuntimeHelpers.cpp` with no real citation there ("DB-integrity
          * bulk fix 2026-08-24" boilerplate contamination documented for
          * several other tokens this session); corrected to `recovered` here.)
+         *
+         * Address: 0x00936990 (FUN_00936990, `msvc8::vector<gpg::
+         * ThreadCtxEntry*>::uninit_move_n` for the 4-byte pointer element --
+         * `gpg::ThreadState::mEntries`, `Logging.h`. `memmove_s(dst, n*4,
+         * src, n*4)` range form, `[Source,SourceEnd) -> Destination`,
+         * returning `Destination + n` -- confirmed against its own `.c`:
+         * `if ((a2-Source)>>2) memmove_s(Destination, 4*((a2-Source)>>2),
+         * Source, 4*((a2-Source)>>2)); return &Destination[4*((a2-Source)>>2)];`.
+         * Reached from this instantiation's `_Insert_n` (`FUN_00936FF0`,
+         * cited above on `insert`) three times: twice for the in-place
+         * tail-shift (degenerate/zero-length in practice, since this
+         * vector's sole mutator `PushThreadContext`/`mEntries.push_back`
+         * always inserts at `end()` -- same "compiled but not separately
+         * exercised by the one real call site" shape already documented on
+         * this member's other `push_back`-only instantiations), and once
+         * (twice, for the pre-gap/post-gap halves) for the reallocation
+         * branch's relocate-into-new-buffer step, which real `push_back`
+         * growth does exercise. Previously mass-mis-attributed to
+         * `CrtRuntimeHelpers.cpp` by the 2026-08-24 DB-integrity bulk pass
+         * (address not present in that file); `gpg::ThreadState` was also
+         * a hand-rolled `begin`/`end`/`cap` triple with its own doubling
+         * (not MSVC8's real ~1.5x) growth helper at the time, corrected to
+         * `msvc8::vector<ThreadCtxEntry*>` alongside this citation so the
+         * real call site this member documents now actually exists in
+         * source (`Logging.cpp`'s `PushThreadContext`).
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
