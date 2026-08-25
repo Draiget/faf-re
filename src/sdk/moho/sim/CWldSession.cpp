@@ -1615,6 +1615,12 @@ namespace moho
       std::uint32_t mBucketMask;  // +0x20
       std::uint32_t mBucketCount; // +0x24
     };
+    static_assert(sizeof(HashTable<void>) == 0x28, "HashTable<TNode> size must be 0x28");
+    static_assert(offsetof(HashTable<void>, mListHead) == 0x08, "HashTable<TNode>::mListHead offset must be 0x08");
+    static_assert(offsetof(HashTable<void>, mListSize) == 0x0C, "HashTable<TNode>::mListSize offset must be 0x0C");
+    static_assert(offsetof(HashTable<void>, mBuckets) == 0x10, "HashTable<TNode>::mBuckets offset must be 0x10");
+    static_assert(offsetof(HashTable<void>, mBucketMask) == 0x20, "HashTable<TNode>::mBucketMask offset must be 0x20");
+    static_assert(offsetof(HashTable<void>, mBucketCount) == 0x24, "HashTable<TNode>::mBucketCount offset must be 0x24");
 
     struct CommandGraphTreeNode
     {
@@ -2117,9 +2123,19 @@ namespace moho
      * (`mMapC`). Diffed against the scalar scramble above: identical
      * Park-Miller-Schrage tail, different combine step
      * (`3863*lo + 7919*hi + 53849*(lo^hi)` vs `key ^ 0xDEADBEEF`) -
-     * confirmed from 0x0082D960 (the 2C lane's dedicated hash function,
-     * called by both 0x0082C750/`FindHashListNode2C` and
-     * 0x0082C480/`ObtainHashListNode2C`).
+     * confirmed from 0x0082D960 (the 2C lane's dedicated hash function),
+     * genuinely called from 0x0082C750/`FindHashListNode2C`'s rehash loop.
+     * `FUN_0082C480`/`ObtainHashListNode2C` does NOT call 0x0082D960 -
+     * the identical formula is inlined there twice instead (its own final-
+     * insert step and rehash loop both compute it directly); confirmed via
+     * `_callgraph_index.sqlite`, whose complete caller set for 0x0082D960
+     * is `{FUN_0082C750, an unclassified owner=<none> byte-gap chunk at
+     * 0x0082D924}` - `FUN_0082C480` is absent. The recovered C++ is
+     * unaffected either way (`HashKeyToBucketIndex<TNode>`'s pair overload
+     * is correctly called by name from both real call sites, matching
+     * RULE ONE's "recover the shared function even where the compiler
+     * inlined one instantiation" pattern) - only this prose previously
+     * overstated the binary call graph.
      */
     template <typename TNode>
     [[nodiscard]] static std::uint32_t
