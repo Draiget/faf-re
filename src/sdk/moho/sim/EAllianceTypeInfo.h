@@ -64,57 +64,27 @@ namespace moho
 
   static_assert(sizeof(EAllianceTypeInfo) == 0x78, "EAllianceTypeInfo size must be 0x78");
 
-  class EAlliancePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0050A920 (FUN_0050A920, PrimitiveSerHelper<EAlliance>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EAlliance` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A940 (FUN_0050A940, PrimitiveSerHelper<EAlliance>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EAlliance` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A630 (FUN_0050A630, gpg::PrimitiveSerHelper<Moho::EAlliance,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EAlliance`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EAlliancePrimitiveSerializer, mHelperNext) == 0x04,
-    "EAlliancePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EAlliancePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EAlliancePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EAlliancePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EAlliancePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EAlliancePrimitiveSerializer, mSerialize) == 0x10,
-    "EAlliancePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EAlliancePrimitiveSerializer) == 0x14, "EAlliancePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAlliance,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAlliance@Moho@@H@gpg'`):
+   * `FUN_00BC7A30` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at 0x0050A600 (compiler/linker artifact, no source line -- see the
+   * class-level Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h).
+   *
+   * The previous raw-struct recovery of this instantiation also modeled a
+   * "secondary" startup thunk at 0x0050A960 as if it were a duplicate
+   * emission of this same ctor. It is not: per `vtable_writers`, 0x0050A960
+   * is the (itself dead, zero-xref) ctor of the unrelated template
+   * instantiation `gpg::SerSaveLoadHelper<Moho::EAlliance>`
+   * (`class_name='?$SerSaveLoadHelper@W4EAlliance@Moho@@@gpg'`), a distinct
+   * ~50-instantiation template family (see `ArchiveSerialization.cpp` and
+   * friends) that has not been canonicalized and is out of scope here.
+   */
+  using EAlliancePrimitiveSerializer = gpg::PrimitiveSerHelper<EAlliance, int>;
 
   /**
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
@@ -124,13 +94,4 @@ namespace moho
    * cleanup.
    */
   int register_EAllianceTypeInfo();
-
-  /**
-   * Address: 0x00BC7A30 (FUN_00BC7A30, register_EAlliancePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes startup primitive serializer helper links/callbacks for
-   * `EAlliance` and installs process-exit cleanup.
-   */
-  int register_EAlliancePrimitiveSerializer();
 } // namespace moho
