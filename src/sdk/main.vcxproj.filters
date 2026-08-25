@@ -546,9 +546,6 @@
     <ClCompile Include="moho\sim\SPhysConstantsSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\sim\SPhysBodyReflection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\sim\CArmyImplSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2944,9 +2941,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\SPhysBody.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\SPhysBodyReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CArmyImplSerializer.h">

@@ -38,9 +38,15 @@ namespace
 {
   alignas(moho::SPhysBodyTypeInfo) unsigned char gSPhysBodyTypeInfoStorage[sizeof(moho::SPhysBodyTypeInfo)];
   bool gSPhysBodyTypeInfoConstructed = false;
-  moho::SPhysBodySaveConstruct gSPhysBodySaveConstruct{};
-  moho::SPhysBodyConstruct gSPhysBodyConstruct{};
-  moho::SPhysBodySerializer gSPhysBodySerializer{};
+
+  // Address: 0x010B5314 -- process-global `SPhysBodyConstruct` singleton.
+  moho::SPhysBodyConstruct gSPhysBodyConstruct;
+
+  // Address: 0x010B5390 -- process-global `SPhysBodySaveConstruct` singleton.
+  moho::SPhysBodySaveConstruct gSPhysBodySaveConstruct;
+
+  // Address: 0x010B53A0 -- process-global `SPhysBodySerializer` singleton.
+  moho::SPhysBodySerializer gSPhysBodySerializer;
 
   [[nodiscard]] moho::SPhysBodyTypeInfo& SPhysBodyTypeInfoStorageRef() noexcept
   {
@@ -93,57 +99,6 @@ namespace
     return ref;
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x006982F0 (FUN_006982F0)
-   *
-   * What it does:
-   * Splices `SPhysBodySerializer` out of the intrusive helper lane when linked,
-   * then rewires the serializer helper links to its self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSPhysBodySerializerHelperNodeVariantA() noexcept
-  {
-    return UnlinkHelperNode(gSPhysBodySerializer);
-  }
-
-  /**
-   * Address: 0x00698320 (FUN_00698320)
-   *
-   * What it does:
-   * Secondary serializer helper unlink/reset variant sharing the same behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSPhysBodySerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkSPhysBodySerializerHelperNodeVariantA();
-  }
-
   [[nodiscard]] moho::SPhysConstants* ReadSPhysConstantsPointer(gpg::ReadArchive* const archive)
   {
     if (!archive) {
@@ -165,6 +120,9 @@ namespace
 
   /**
    * Address: 0x006980D0 (FUN_006980D0, save-construct args body)
+   *
+   * What it does:
+   * Writes the owning `SPhysConstants*` as an unowned tracked pointer.
    */
   void SaveConstructArgs_SPhysBodyVariant2(
     gpg::WriteArchive* const archive,
@@ -189,37 +147,23 @@ namespace
   }
 
   /**
-   * Address: 0x006980C0 (FUN_006980C0)
+   * Address: 0x00698040 (FUN_00698040)
    *
    * What it does:
-   * Register-shape adapter that forwards one save-construct lane into
-   * `SaveConstructArgs_SPhysBodyVariant2`.
+   * Thin signature-adapting forward into `SaveConstructArgs_SPhysBodyVariant2`.
+   * This is the address the binary actually installs as
+   * `SPhysBodySaveConstruct::mSaveConstructArgsCallback` (confirmed via
+   * `FUN_00BD5EA0`'s raw disassembly), not `SaveConstructArgs_SPhysBodyVariant2`
+   * directly.
    */
-  [[maybe_unused]] int SaveConstructArgs_SPhysBodyRegisterAdapterA(
-    const int objectPtr,
+  void SaveConstructArgs_SPhysBodyVariant1(
     gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int version,
     gpg::SerSaveConstructArgsResult* const result
   )
   {
-    SaveConstructArgs_SPhysBodyVariant2(archive, objectPtr, 0, result);
-    return objectPtr;
-  }
-
-  /**
-   * Address: 0x006987F0 (FUN_006987F0)
-   *
-   * What it does:
-   * Secondary register-shape adapter that forwards one save-construct lane
-   * into `SaveConstructArgs_SPhysBodyVariant2`.
-   */
-  [[maybe_unused]] int SaveConstructArgs_SPhysBodyRegisterAdapterB(
-    const int objectPtr,
-    gpg::WriteArchive* const archive,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    SaveConstructArgs_SPhysBodyVariant2(archive, objectPtr, 0, result);
-    return objectPtr;
+    SaveConstructArgs_SPhysBodyVariant2(archive, objectPtr, version, result);
   }
 
   /**
@@ -267,51 +211,19 @@ namespace
   }
 
   /**
-   * Address: 0x006981A0 (delete callback lane, inferred)
-   */
-  void DeleteConstructedSPhysBodyVariant1(void* const objectPtr)
-  {
-    delete static_cast<moho::SPhysBody*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x00698010 (FUN_00698010, sub_698010)
+   * Address: 0x00698830 (FUN_00698830, `j_j_func_tent_Destroy_15`)
    *
    * What it does:
-   * Initializes the global `SPhysBodySaveConstruct` helper links, binds the
-   * save-construct callback lane, and returns the helper instance.
+   * Deletes one constructed `SPhysBody`. Confirmed from raw disassembly:
+   * this is a direct `jmp` thunk straight to the global scalar
+   * `operator delete(void*)` (`jmp ??3@YAXPAX@Z`), not a typed per-instance
+   * delete -- `SPhysBody` has a trivial destructor so the two compile to
+   * the same thing, but the callback identity itself is what the binary
+   * actually installs into `SPhysBodyConstruct::mDeleteCallback`.
    */
-  [[nodiscard]] moho::SPhysBodySaveConstruct* InitializeSPhysBodySaveConstructGenericHelperLane()
+  void DeleteConstructedSPhysBody(void* const objectPtr)
   {
-    InitializeHelperNode(gSPhysBodySaveConstruct);
-    gSPhysBodySaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_SPhysBodyVariant2);
-    return &gSPhysBodySaveConstruct;
-  }
-
-  /**
-   * Address: 0x006986B0 (FUN_006986B0)
-   *
-   * What it does:
-   * Initializes the generic construct-helper lane for `SPhysBody`.
-   */
-  [[nodiscard]] moho::SPhysBodyConstruct* InitializeSPhysBodyConstructGenericHelperLane()
-  {
-    InitializeHelperNode(gSPhysBodyConstruct);
-    gSPhysBodyConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructSPhysBody);
-    gSPhysBodyConstruct.mDeleteCallback = &DeleteConstructedSPhysBodyVariant1;
-    return &gSPhysBodyConstruct;
-  }
-
-  /**
-   * Address: 0x00698120 (FUN_00698120)
-   *
-   * What it does:
-   * Initializes the custom construct-helper lane for `SPhysBody`.
-   */
-  [[nodiscard]] moho::SPhysBodyConstruct* InitializeSPhysBodyConstructCustomHelperLane()
-  {
-    return InitializeSPhysBodyConstructGenericHelperLane();
+    ::operator delete(objectPtr);
   }
 
   /**
@@ -350,21 +262,6 @@ namespace
     archive->Write(CachedQuaternionfType(), &object->mOrientation, nullOwner);
     archive->Write(CachedVector3fType(), &object->mVelocity, nullOwner);
     archive->Write(CachedVector3fType(), &object->mWorldImpulse, nullOwner);
-  }
-
-  void cleanup_SPhysBodySaveConstruct_atexit()
-  {
-    (void)moho::cleanup_SPhysBodySaveConstruct();
-  }
-
-  void cleanup_SPhysBodyConstruct_atexit()
-  {
-    (void)moho::cleanup_SPhysBodyConstruct();
-  }
-
-  void cleanup_SPhysBodySerializer_atexit()
-  {
-    moho::cleanup_SPhysBodySerializer();
   }
 } // namespace
 
@@ -905,29 +802,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00698040 (FUN_00698040, save-construct registration lane)
-   */
-  void SPhysBodySaveConstruct::RegisterSaveConstructArgsFunction()
-  {
-    gpg::RType* const type = CachedSPhysBodyType();
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSaveConstructArgsCallback);
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
-  /**
-    * Alias of FUN_006981B0 (non-canonical helper lane).
-   */
-  void SPhysBodyConstruct::RegisterConstructFunction()
-  {
-    gpg::RType* const type = CachedSPhysBodyType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
    * Address: 0x006982A0 (FUN_006982A0, Moho::SPhysBodySerializer::Deserialize)
+   *
+   * What it does:
+   * Tail-calls the recovered deserialize body.
    */
   void SPhysBodySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
@@ -936,6 +814,9 @@ namespace moho
 
   /**
    * Address: 0x006982B0 (FUN_006982B0, Moho::SPhysBodySerializer::Serialize)
+   *
+   * What it does:
+   * Tail-calls the recovered serialize body.
    */
   void SPhysBodySerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
@@ -943,15 +824,111 @@ namespace moho
   }
 
   /**
-   * Address: 0x006982C0 (FUN_006982C0, serializer registration lane)
+   * Address: 0x00BD5F10 (FUN_00BD5F10, dynamic initializer for the global
+   * `SPhysBodySerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links into the
+   * pending helper list) and binds the load/save callback fields.
    */
-  void SPhysBodySerializer::RegisterSerializeFunctions()
+  SPhysBodySerializer::SPhysBodySerializer()
+    : mDeserialize(&SPhysBodySerializer::Deserialize)
+    , mSerialize(&SPhysBodySerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BFD390 (FUN_00BFD390, Moho::SPhysBodySerializer::~SPhysBodySerializer)
+   */
+  SPhysBodySerializer::~SPhysBodySerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00698760 (FUN_00698760, Moho::SPhysBodySerializer::Init)
+   *
+   * What it does:
+   * Binds load/save callbacks into `SPhysBody`'s reflected RTTI.
+   */
+  void SPhysBodySerializer::Init()
   {
     gpg::RType* const type = CachedSPhysBodyType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
     type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
     type->serSaveFunc_ = mSerialize;
+  }
+
+  /**
+   * Address: 0x00BD5EA0 (FUN_00BD5EA0, dynamic initializer for the global
+   * `SPhysBodySaveConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links into the
+   * pending helper list) and binds the save-construct-args callback field.
+   */
+  SPhysBodySaveConstruct::SPhysBodySaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_SPhysBodyVariant1)
+      )
+  {}
+
+  /**
+   * Address: 0x00BFD330 (FUN_00BFD330, Moho::SPhysBodySaveConstruct::~SPhysBodySaveConstruct)
+   */
+  SPhysBodySaveConstruct::~SPhysBodySaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00698660 (FUN_00698660, Moho::SPhysBodySaveConstruct::Init)
+   *
+   * What it does:
+   * Binds the save-construct-args callback into `SPhysBody`'s reflected
+   * RTTI.
+   */
+  void SPhysBodySaveConstruct::Init()
+  {
+    gpg::RType* const type = CachedSPhysBodyType();
+    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSaveConstructArgsCallback);
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+  }
+
+  /**
+   * Address: 0x00BD5ED0 (FUN_00BD5ED0, dynamic initializer for the global
+   * `SPhysBodyConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links into the
+   * pending helper list) and binds the construct/delete callback fields.
+   */
+  SPhysBodyConstruct::SPhysBodyConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructSPhysBody))
+    , mDeleteCallback(&DeleteConstructedSPhysBody)
+  {}
+
+  /**
+   * Address: 0x00BFD360 (FUN_00BFD360, Moho::SPhysBodyConstruct::~SPhysBodyConstruct)
+   */
+  SPhysBodyConstruct::~SPhysBodyConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x006986E0 (FUN_006986E0, Moho::SPhysBodyConstruct::Init)
+   *
+   * What it does:
+   * Binds the construct/delete callbacks into `SPhysBody`'s reflected RTTI.
+   */
+  void SPhysBodyConstruct::Init()
+  {
+    gpg::RType* const type = CachedSPhysBodyType();
+    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
+    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 
   /**
@@ -969,30 +946,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD330 (FUN_00BFD330, cleanup_SPhysBodySaveConstruct)
-   */
-  gpg::SerHelperBase* cleanup_SPhysBodySaveConstruct()
-  {
-    return UnlinkHelperNode(gSPhysBodySaveConstruct);
-  }
-
-  /**
-   * Address: 0x00BFD360 (FUN_00BFD360, cleanup_SPhysBodyConstruct)
-   */
-  gpg::SerHelperBase* cleanup_SPhysBodyConstruct()
-  {
-    return UnlinkHelperNode(gSPhysBodyConstruct);
-  }
-
-  /**
-   * Address: 0x00BFD390 (FUN_00BFD390, cleanup_SPhysBodySerializer)
-   */
-  void cleanup_SPhysBodySerializer()
-  {
-    (void)UnlinkSPhysBodySerializerHelperNodeVariantA();
-  }
-
-  /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)
    */
   void register_SPhysBodyTypeInfo()
@@ -1004,50 +957,6 @@ namespace moho
 
     (void)std::atexit(&cleanup_SPhysBodyTypeInfo);
   }
-
-  /**
-   * Address: 0x00BD5EA0 (FUN_00BD5EA0, register_SPhysBodySaveConstruct)
-   */
-  int register_SPhysBodySaveConstruct()
-  {
-    (void)InitializeSPhysBodySaveConstructGenericHelperLane();
-    gSPhysBodySaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&cleanup_SPhysBodySaveConstruct_atexit);
-  }
-
-  /**
-   * Address: 0x00BD5ED0 (FUN_00BD5ED0, register_SPhysBodyConstruct)
-   */
-  int register_SPhysBodyConstruct()
-  {
-    (void)InitializeSPhysBodyConstructCustomHelperLane();
-    gSPhysBodyConstruct.RegisterConstructFunction();
-    return std::atexit(&cleanup_SPhysBodyConstruct_atexit);
-  }
-
-  /**
-   * Address: 0x00698730 (FUN_00698730)
-   *
-   * What it does:
-   * Alternate serializer startup leaf that initializes global helper links,
-   * binds deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_SPhysBodySerializer_SaveLoadStartupLeaf()
-  {
-    InitializeHelperNode(gSPhysBodySerializer);
-    gSPhysBodySerializer.mDeserialize = &SPhysBodySerializer::Deserialize;
-    gSPhysBodySerializer.mSerialize = &SPhysBodySerializer::Serialize;
-    return HelperSelfNode(gSPhysBodySerializer);
-  }
-
-  /**
-   * Address: 0x00BD5F10 (FUN_00BD5F10, register_SPhysBodySerializer)
-   */
-  void register_SPhysBodySerializer()
-  {
-    (void)construct_SPhysBodySerializer_SaveLoadStartupLeaf();
-    (void)std::atexit(&cleanup_SPhysBodySerializer_atexit);
-  }
 } // namespace moho
 
 namespace
@@ -1057,9 +966,6 @@ namespace
     SPhysBodyBootstrap()
     {
       moho::register_SPhysBodyTypeInfo();
-      (void)moho::register_SPhysBodySaveConstruct();
-      (void)moho::register_SPhysBodyConstruct();
-      moho::register_SPhysBodySerializer();
     }
   };
 
