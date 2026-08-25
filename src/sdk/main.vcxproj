@@ -1725,6 +1725,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitter.h" />
+    <ClInclude Include="moho\effects\rendering\CEfxEmitterSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h" />

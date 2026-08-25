@@ -199,6 +199,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CEfxEmitter::sType = nullptr;
+
   /**
    * Address: 0x0065B9B0 (FUN_0065B9B0, Moho::CEfxEmitter::CEfxEmitter)
    *

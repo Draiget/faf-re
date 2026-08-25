@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/SEfxCurve.h"
@@ -60,6 +61,8 @@ namespace moho
   class CEfxEmitter : public CEffectImpl
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0065DD70 (FUN_0065DD70, Moho::CEfxEmitter::dtr)
      *
