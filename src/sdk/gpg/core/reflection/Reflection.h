@@ -4705,6 +4705,64 @@ namespace gpg
    * non-trivial destructor: this template declares a real destructor and
    * relies on the compiler to emit the matching registration at each
    * instantiation site, rather than reproducing an explicit `atexit` call.
+   *
+   * Additional instantiations converted from hand-rolled raw-struct mimics
+   * this session (real ctor address, `__xc_a`-reachable unless noted; dead
+   * zero-xref duplicate ctor in parens where one exists; atexit-target
+   * unlink body -> Deserialize -> Serialize addresses follow):
+   *   - T=Moho::EAiAttackerEvent: ctor 0x00BCE770, atexit 0x00BF8250,
+   *     Deserialize 0x005DC390, Serialize 0x005DC3B0
+   *   - T=Moho::EAiNavigatorEvent: ctor 0x00BCC660, atexit 0x00BF6CD0,
+   *     Deserialize 0x005A7720, Serialize 0x005A7740
+   *   - T=Moho::EAiNavigatorStatus: ctor 0x00BCC600, atexit 0x00BF6C90,
+   *     Deserialize 0x005A76B0, Serialize 0x005A76D0
+   *   - T=Moho::CAiPathNavigator::State (recovered header still names this
+   *     `EAiPathNavigatorState`, a free enum -- known divergence, see
+   *     CAiPathNavigator.h): ctor 0x00BCCFE0, atexit 0x00BF7330,
+   *     Deserialize 0x005B0290, Serialize 0x005B02B0
+   *   - T=Moho::EAiTargetType: ctor 0x00BCEBF0, atexit 0x00BF8880,
+   *     Deserialize 0x005E35B0, Serialize 0x005E35D0
+   *   - T=Moho::EAiTransportEvent: ctor 0x00BCED30 (dead duplicates:
+   *     0x005E8B60, 0x005E9E10 -- two, not the usual one), atexit
+   *     0x00BF8970, Deserialize 0x005E9DD0, Serialize 0x005E9DF0
+   *   - T=Moho::EPathType: ctor 0x00BCD290, atexit 0x00BF7420, Deserialize
+   *     0x005B4E90, Serialize 0x005B4EB0
+   *   - T=Moho::ESearchType: ctor 0x00BCCD10, atexit 0x00BF71B0,
+   *     Deserialize 0x005AB520, Serialize 0x005AB540, Init 0x005AB120
+   *   - T=Moho::ESiloBuildStage: ctor 0x00BCE050, atexit 0x00BF7E10,
+   *     Deserialize 0x005CFFB0, Serialize 0x005CFFD0
+   *   - T=Moho::ESiloType: ctor 0x00BC7B50 (dead duplicate 0x0050A7E0; dead
+   *     sibling-writer `SerSaveLoadHelper<ESiloType>` at 0x0050AAB0, same
+   *     pattern as EAlliance/ELayer/etc. above), atexit 0x00BF1FE0,
+   *     Deserialize 0x0050AA70, Serialize 0x0050AA90
+   *   - T=Moho::ECollisionType: ctor 0x00BCBD70 (dead sibling-writer
+   *     `SerSaveLoadHelper<ECollisionType>` at 0x00598440), atexit
+   *     0x00BF6520 (dead twins 0x005966D0, 0x00596700), Deserialize
+   *     0x00598400, Serialize 0x00598420
+   *   - T=Moho::EPathPointState: ctor 0x00BD20E0 (dead duplicate
+   *     0x0062F840; dead sibling-writer `SerSaveLoadHelper<EPathPointState>`
+   *     at 0x0062F9C0), atexit 0x00BFA7F0, Deserialize 0x0062F980,
+   *     Serialize 0x0062F9A0
+   *   - T=Moho::ERuleBPUnitMovementType: ctor 0x00BC8930, atexit 0x00BF31E0
+   *     (dead twins 0x0051FC20, 0x0051FC50), Deserialize 0x00523AB0,
+   *     Serialize 0x00523AD0
+   *   - T=Moho::ERuleBPUnitCommandCaps: ctor 0x00BC8990, atexit 0x00BF3220
+   *     (dead twins 0x0051FFA0, 0x0051FFD0), Deserialize 0x00523B20,
+   *     Serialize 0x00523B40
+   *   - T=Moho::ERuleBPUnitToggleCaps: ctor 0x00BC89F0, atexit 0x00BF3260
+   *     (dead twins 0x00520190, 0x005201C0), Deserialize 0x00523B90,
+   *     Serialize 0x00523BB0
+   *   - T=Moho::EProjectileImpactEvent: ctor 0x00BD6350, atexit 0x00BFD550,
+   *     Deserialize 0x0069EEC0, Serialize 0x0069EEE0
+   * All of the above previously used a hand-rolled `{ mHelperNext,
+   * mHelperPrev, mDeserialize/mLoadCallback, mSerialize/mSaveCallback }`
+   * raw-struct mimic (sometimes via a per-file or per-cluster generic
+   * template of the same shape, e.g. `EnumPrimitiveSerializer<TEnum>` /
+   * `PrimitiveEnumSerializer<TEnum>`), each paired with a fabricated eager
+   * `Init()`-equivalent call from a bootstrap struct or register_*() free
+   * function -- absent from every real ctor's disassembly checked. "Dead
+   * twins" above are zero-caller/zero-xref sha256-identical ICF copies of
+   * the real atexit-target unlink body, confirmed via the callgraph index.
    */
   template <class T, class IntType = int>
   class PrimitiveSerHelper : public SerHelperBase
