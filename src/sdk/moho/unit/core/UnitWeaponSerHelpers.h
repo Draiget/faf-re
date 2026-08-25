@@ -12,26 +12,39 @@ namespace gpg
 
 namespace moho
 {
-  class UnitWeaponConstruct
+  class UnitWeaponConstruct final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD88F0 (FUN_00BD88F0, register_UnitWeaponConstruct)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    UnitWeaponConstruct();
+
+    /**
+     * Address: 0x00BFE7A0 (FUN_00BFE7A0, sub_BFE7A0)
+     *
+     * What it does:
+     * Unlinks `UnitWeaponConstruct` helper-node links and rewires self-links.
+     */
+    ~UnitWeaponConstruct();
+
     /**
      * Address: 0x006DB960 (FUN_006DB960, sub_6DB960)
      *
      * What it does:
      * Binds UnitWeapon construct/delete callbacks into reflected RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
   };
 
-  static_assert(offsetof(UnitWeaponConstruct, mHelperNext) == 0x04, "UnitWeaponConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(UnitWeaponConstruct, mHelperPrev) == 0x08, "UnitWeaponConstruct::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(UnitWeaponConstruct, mConstructCallback) == 0x0C,
     "UnitWeaponConstruct::mConstructCallback offset must be 0x0C"
@@ -41,9 +54,26 @@ namespace moho
   );
   static_assert(sizeof(UnitWeaponConstruct) == 0x14, "UnitWeaponConstruct size must be 0x14");
 
-  class UnitWeaponSerializer
+  class UnitWeaponSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8930 (FUN_00BD8930, register_UnitWeaponSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    UnitWeaponSerializer();
+
+    /**
+     * Address: 0x00BFE7D0 (FUN_00BFE7D0, Moho::UnitWeaponSerializer::~UnitWeaponSerializer)
+     *
+     * What it does:
+     * Unlinks `UnitWeaponSerializer` helper-node links and rewires self-links.
+     */
+    ~UnitWeaponSerializer();
+
     /**
      * Address: 0x006D7B10 (FUN_006D7B10, Moho::UnitWeaponSerializer::Deserialize)
      *
@@ -66,17 +96,13 @@ namespace moho
      * What it does:
      * Binds UnitWeapon load/save callbacks into reflected RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(UnitWeaponSerializer, mHelperNext) == 0x04, "UnitWeaponSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(UnitWeaponSerializer, mHelperPrev) == 0x08, "UnitWeaponSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(UnitWeaponSerializer, mDeserialize) == 0x0C, "UnitWeaponSerializer::mDeserialize offset must be 0x0C"
   );
@@ -106,68 +132,4 @@ namespace moho
    * Deletes constructed `UnitWeapon` through deleting-dtor path.
    */
   void delete_UnitWeapon_00(void* objectPtr);
-
-  /**
-   * Address: 0x00BFE7A0 (FUN_00BFE7A0, sub_BFE7A0)
-   *
-   * What it does:
-   * Unlinks `UnitWeaponConstruct` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponConstruct();
-
-  /**
-   * Address: 0x006D7A10 (FUN_006D7A10, sub_6D7A10)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `UnitWeaponConstruct` helper links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponConstruct_00Variant1();
-
-  /**
-   * Address: 0x006D7A40 (FUN_006D7A40, sub_6D7A40)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `UnitWeaponConstruct` helper links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponConstruct_00Variant2();
-
-  /**
-   * Address: 0x00BFE7D0 (FUN_00BFE7D0, Moho::UnitWeaponSerializer::~UnitWeaponSerializer)
-   *
-   * What it does:
-   * Unlinks `UnitWeaponSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponSerializer();
-
-  /**
-   * Address: 0x006D7B70 (FUN_006D7B70, sub_6D7B70)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `UnitWeaponSerializer` helper links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponSerializer_00Variant1();
-
-  /**
-   * Address: 0x006D7BA0 (FUN_006D7BA0, sub_6D7BA0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `UnitWeaponSerializer` helper links.
-   */
-  gpg::SerHelperBase* cleanup_UnitWeaponSerializer_00Variant2();
-
-  /**
-   * Address: 0x00BD88F0 (FUN_00BD88F0, sub_BD88F0)
-   *
-   * What it does:
-   * Initializes and registers `UnitWeaponConstruct` helper callbacks.
-   */
-  int register_UnitWeaponConstruct();
-
-  /**
-   * Address: 0x00BD8930 (FUN_00BD8930, register_UnitWeaponSerializer)
-   *
-   * What it does:
-   * Initializes and registers `UnitWeaponSerializer` helper callbacks.
-   */
-  void register_UnitWeaponSerializer();
 } // namespace moho
