@@ -6508,6 +6508,83 @@ namespace
   };
 } // namespace
 
+namespace
+{
+  using RuntimeLockedOutputFn = int(__cdecl*)(
+    std::FILE* stream,
+    const char* format,
+    _locale_t localeInfo,
+    va_list arguments
+  );
+}
+
+/**
+ * Address: 0x00A882CC (FUN_00A882CC, RuntimeDispatchLockedFormattedOutput)
+ *
+ * IDA signature:
+ * FILE *callcnv_F3 sub_A882CC@<eax>(FILE *(__cdecl *a1)(FILE *, const char *, int, va_list), FILE *f, const char *a3, int a4, va_list args);
+ *
+ * What it does:
+ * Shared narrow-output dispatcher behind the `vfprintf`-family entry
+ * points (0x00A88474, 0x00A8841A, 0x00A88438, 0x00A88456, 0x00A88490):
+ * validates `stream`/`format`, locks the stream, rejects a unicode-textmode
+ * stream the same way `fprintf` (0x00A85BC2) does, acquires the write
+ * scratch buffer via `_stbuf`, invokes the caller-supplied formatter
+ * callback (`_output_l`/`_output_s_l`/`outfn`/`woutput_l`), flushes scratch
+ * via `_ftbuf`, then unlocks. Returns the callback's byte count, or `-1`
+ * with `errno = EINVAL` on a validation failure.
+ */
+extern "C" int __cdecl RuntimeDispatchLockedFormattedOutput(
+  const RuntimeLockedOutputFn outputCallback,
+  std::FILE* const stream,
+  const char* const format,
+  const _locale_t localeInfo,
+  va_list arguments)
+{
+  if (stream == nullptr || format == nullptr) {
+    *_errno() = EINVAL;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+    return -1;
+  }
+
+  _lock_file(stream);
+
+  int result = 0;
+  if ((RuntimeGetFileFlags(stream) & 0x40) == 0) {
+    const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
+    if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      result = -1;
+    }
+  }
+
+  if (result == 0) {
+    const int scratchAllocated = _stbuf(stream);
+    result = outputCallback(stream, format, localeInfo, arguments);
+    _ftbuf(scratchAllocated, stream);
+  }
+
+  _unlock_file(stream);
+  return result;
+}
+
+/**
+ * Address: 0x00A88474 (FUN_00A88474, vfprintf)
+ *
+ * IDA signature:
+ * FILE *callcnv_F3 sub_A88474@<eax>(FILE *a1, const char *a2, va_list a3);
+ *
+ * What it does:
+ * CRT narrow-character formatted output to a stream from an existing
+ * `va_list`. Thin forward into `RuntimeDispatchLockedFormattedOutput` with
+ * the `_output_l` callback and the default (null) locale.
+ */
+extern "C" int __cdecl vfprintf(std::FILE* const stream, const char* const format, va_list arguments)
+{
+  return RuntimeDispatchLockedFormattedOutput(_output_l, stream, format, nullptr, arguments);
+}
+
 /**
  * Address: 0x00A85BC2 (FUN_00A85BC2, fprintf)
  *
