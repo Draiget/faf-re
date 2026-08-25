@@ -60,18 +60,6 @@ namespace moho
 
 namespace
 {
-  struct SerSaveConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-  static_assert(
-    offsetof(SerSaveConstructHelperView, mSaveConstructArgsCallback) == 0x0C,
-    "SerSaveConstructHelperView::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-
   [[nodiscard]] gpg::RType* ResolveRPropBlueprintTypeCached() noexcept
   {
     gpg::RType* type = moho::RPropBlueprint::sType;
