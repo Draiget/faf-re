@@ -237,9 +237,24 @@ namespace moho
    * VFTABLE: 0x00E0D7B4
    * COL: 0x00E67010
    */
-  class CIntelGridSaveConstruct
+  class CIntelGridSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7940 (FUN_00BC7940, dynamic initializer for the global
+     * `CIntelGridSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field.
+     */
+    CIntelGridSaveConstruct();
+
+    /**
+     * Address: 0x00BF1DF0 (FUN_00BF1DF0, Moho::CIntelGridSaveConstruct::~CIntelGridSaveConstruct)
+     */
+    ~CIntelGridSaveConstruct();
+
     /**
      * Address: 0x00507240 (FUN_00507240, CIntelGridSaveConstruct::SaveConstruct)
      *
@@ -256,27 +271,46 @@ namespace moho
     );
 
     /**
-     * Address: 0x00507D60 (FUN_00507D60, Moho::CIntelGridSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x00507D60 (FUN_00507D60, Moho::CIntelGridSaveConstruct::Init)
      *
      * What it does:
      * Binds save-construct callback into CIntelGrid RTTI
      * (`serSaveConstructArgsFunc_`).
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
+    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc; // +0x0C
   };
+
+  static_assert(
+    offsetof(CIntelGridSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
+    "CIntelGridSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
+  );
+  static_assert(sizeof(CIntelGridSaveConstruct) == 0x10, "CIntelGridSaveConstruct size must be 0x10");
 
   /**
    * VFTABLE: 0x00E0D7C4
    * COL: 0x00E66F64
    */
-  class CIntelGridConstruct
+  class CIntelGridConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7970 (FUN_00BC7970, dynamic initializer for the global
+     * `CIntelGridConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CIntelGridConstruct();
+
+    /**
+     * Address: 0x00BF1E20 (FUN_00BF1E20, Moho::CIntelGridConstruct::~CIntelGridConstruct)
+     */
+    ~CIntelGridConstruct();
+
     /**
      * Address: 0x005073C0 (FUN_005073C0, Moho::CIntelGridConstruct::Construct)
      *
@@ -295,28 +329,50 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x00507DE0 (FUN_00507DE0, Moho::CIntelGridConstruct::RegisterConstructFunction)
+     * Address: 0x00507DE0 (FUN_00507DE0, Moho::CIntelGridConstruct::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into CIntelGrid RTTI
      * (`serConstructFunc_`, `deleteFunc_`).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
+
+  static_assert(
+    offsetof(CIntelGridConstruct, mSerConstructFunc) == 0x0C,
+    "CIntelGridConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CIntelGridConstruct, mDeleteFunc) == 0x10, "CIntelGridConstruct::mDeleteFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CIntelGridConstruct) == 0x14, "CIntelGridConstruct size must be 0x14");
 
   /**
    * VFTABLE: 0x00E0D7D4
    * COL: 0x00E66EB8
    */
-  class CIntelGridSerializer
+  class CIntelGridSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC79B0 (FUN_00BC79B0, dynamic initializer for the global
+     * `CIntelGridSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CIntelGridSerializer();
+
+    /**
+     * Address: 0x00BF1E50 (FUN_00BF1E50, Moho::CIntelGridSerializer::~CIntelGridSerializer)
+     */
+    ~CIntelGridSerializer();
+
     /**
      * Address: 0x00507490 (FUN_00507490, Moho::CIntelGridSerializer::Deserialize)
      *
@@ -334,20 +390,26 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00507E60 (FUN_00507E60, Moho::CIntelGridSerializer::RegisterSerializeFunctions)
+     * Address: 0x00507E60 (FUN_00507E60, Moho::CIntelGridSerializer::Init)
      *
      * What it does:
      * Binds load/save callbacks into CIntelGrid RTTI
      * (`serLoadFunc_`, `serSaveFunc_`).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(
+    offsetof(CIntelGridSerializer, mSerLoadFunc) == 0x0C, "CIntelGridSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CIntelGridSerializer, mSerSaveFunc) == 0x10, "CIntelGridSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CIntelGridSerializer) == 0x14, "CIntelGridSerializer size must be 0x14");
 
   /**
    * VFTABLE: 0x00E0D784
@@ -392,9 +454,6 @@ namespace moho
   static_assert(offsetof(CIntelGrid, mUpdateList) == 0x10, "CIntelGrid::mUpdateList offset must be 0x10");
   static_assert(offsetof(CIntelGrid, mGridSize) == 0x20, "CIntelGrid::mGridSize offset must be 0x20");
 
-  static_assert(sizeof(CIntelGridSaveConstruct) == 0x10, "CIntelGridSaveConstruct size must be 0x10");
-  static_assert(sizeof(CIntelGridConstruct) == 0x14, "CIntelGridConstruct size must be 0x14");
-  static_assert(sizeof(CIntelGridSerializer) == 0x14, "CIntelGridSerializer size must be 0x14");
   static_assert(sizeof(CIntelGridTypeInfo) == 0x64, "CIntelGridTypeInfo size must be 0x64");
 
   /**
@@ -406,30 +465,6 @@ namespace moho
   void cleanup_CIntelGridTypeInfo();
 
   /**
-   * Address: 0x00BF1DF0 (FUN_00BF1DF0, cleanup_CIntelGridSaveConstruct)
-   *
-   * What it does:
-   * Unlinks startup `CIntelGridSaveConstruct` helper node.
-   */
-  gpg::SerHelperBase* cleanup_CIntelGridSaveConstruct();
-
-  /**
-   * Address: 0x00BF1E20 (FUN_00BF1E20, cleanup_CIntelGridConstruct)
-   *
-   * What it does:
-   * Unlinks startup `CIntelGridConstruct` helper node.
-   */
-  gpg::SerHelperBase* cleanup_CIntelGridConstruct();
-
-  /**
-   * Address: 0x00BF1E50 (FUN_00BF1E50, cleanup_CIntelGridSerializer)
-   *
-   * What it does:
-   * Unlinks startup `CIntelGridSerializer` helper node.
-   */
-  gpg::SerHelperBase* cleanup_CIntelGridSerializer();
-
-  /**
    * Address: 0x00BC7920 (FUN_00BC7920, register_CIntelGridTypeInfo)
    *
    * What it does:
@@ -437,31 +472,4 @@ namespace moho
    * cleanup.
    */
   void register_CIntelGridTypeInfo();
-
-  /**
-   * Address: 0x00BC7940 (FUN_00BC7940, register_CIntelGridSaveConstruct)
-   *
-   * What it does:
-   * Initializes startup `CIntelGridSaveConstruct` callback lanes and installs
-   * `atexit` cleanup.
-   */
-  void register_CIntelGridSaveConstruct();
-
-  /**
-   * Address: 0x00BC7970 (FUN_00BC7970, register_CIntelGridConstruct)
-   *
-   * What it does:
-   * Initializes startup `CIntelGridConstruct` callback lanes and installs
-   * `atexit` cleanup.
-   */
-  void register_CIntelGridConstruct();
-
-  /**
-   * Address: 0x00BC79B0 (FUN_00BC79B0, register_CIntelGridSerializer)
-   *
-   * What it does:
-   * Initializes startup `CIntelGridSerializer` callback lanes and installs
-   * `atexit` cleanup.
-   */
-  void register_CIntelGridSerializer();
 } // namespace moho
