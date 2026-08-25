@@ -18,46 +18,11 @@ namespace gpg
 
 namespace
 {
-  moho::CAniResourceSkelSaveConstruct gCAniResourceSkelSaveConstruct{};
-
-  [[nodiscard]] gpg::SerHelperBase* ResetCAniResourceSkelSaveConstructHelperLinks() noexcept
-  {
-    gCAniResourceSkelSaveConstruct.mHelperNext->mPrev = gCAniResourceSkelSaveConstruct.mHelperPrev;
-    gCAniResourceSkelSaveConstruct.mHelperPrev->mNext = gCAniResourceSkelSaveConstruct.mHelperNext;
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCAniResourceSkelSaveConstruct.mHelperNext);
-    gCAniResourceSkelSaveConstruct.mHelperPrev = self;
-    gCAniResourceSkelSaveConstruct.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00538710 (FUN_00538710)
-   *
-   * What it does:
-   * Unlinks `CAniResourceSkelSaveConstruct` helper node from the intrusive
-   * helper list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelSaveConstructHelperNodePrimary() noexcept
-  {
-    return ResetCAniResourceSkelSaveConstructHelperLinks();
-  }
-
-  /**
-   * Address: 0x00538740 (FUN_00538740)
-   *
-   * What it does:
-   * Secondary entrypoint for `CAniResourceSkelSaveConstruct` helper-node
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelSaveConstructHelperNodeSecondary() noexcept
-  {
-    return ResetCAniResourceSkelSaveConstructHelperLinks();
-  }
-
-  void CleanupCAniResourceSkelSaveConstructAtexit()
-  {
-    (void)CleanupCAniResourceSkelSaveConstructHelperNodePrimary();
-  }
+  // Address: 0x010ABBC8 -- process-global `CAniResourceSkelSaveConstruct`
+  // singleton (constructed by FUN_00BC9080, self-registering via `__xc_a`;
+  // see CAniResourceSkelSaveConstruct.h for the real-ctor/atexit-target/
+  // dead-duplicate evidence).
+  moho::CAniResourceSkelSaveConstruct gCAniResourceSkelSaveConstruct;
 } // namespace
 
 namespace moho
@@ -68,7 +33,7 @@ namespace moho
    * What it does:
    * Resolves `CAniResourceSkel` RTTI and installs save-construct-args callback.
    */
-  void CAniResourceSkelSaveConstruct::RegisterSaveConstructArgsFunction()
+  void CAniResourceSkelSaveConstruct::Init()
   {
     gpg::RType* const typeInfo = resource_reflection::ResolveCAniResourceSkelType();
     resource_reflection::RegisterSaveConstructArgsCallback(typeInfo, mSerSaveConstructArgsFunc);
@@ -119,39 +84,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9080 (FUN_00BC9080, register_CAniResourceSkelSaveConstruct)
+   * Address: 0x00BC9080 (FUN_00BC9080, dynamic initializer for the global
+   * `CAniResourceSkelSaveConstruct` singleton)
    *
    * What it does:
-   * Initializes the global save-construct helper node, installs `&Construct`
-   * as the save-construct-args callback, binds it into `CAniResourceSkel`
-   * RTTI, and schedules helper-node teardown at process exit.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
    */
-  void register_CAniResourceSkelSaveConstruct()
+  CAniResourceSkelSaveConstruct::CAniResourceSkelSaveConstruct()
+    : mSerSaveConstructArgsFunc(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CAniResourceSkelSaveConstruct::Construct)
+      )
+  {}
+
+  CAniResourceSkelSaveConstruct::~CAniResourceSkelSaveConstruct()
   {
-    gpg::SerHelperBase* const self =
-      reinterpret_cast<gpg::SerHelperBase*>(&gCAniResourceSkelSaveConstruct.mHelperNext);
-    gCAniResourceSkelSaveConstruct.mHelperNext = self;
-    gCAniResourceSkelSaveConstruct.mHelperPrev = self;
-    gCAniResourceSkelSaveConstruct.mSerSaveConstructArgsFunc =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CAniResourceSkelSaveConstruct::Construct);
-    // Binds the callback into CAniResourceSkel RTTI. The binary splits this into a
-    // separate helper (SerSaveConstructHelper::Init, 0x00539500) invoked from the
-    // reflection path; invoking it here keeps the callback installed and matches the
-    // sibling SaveConstruct-helper registration idiom (LuaState/Projectile/etc.).
-    gCAniResourceSkelSaveConstruct.RegisterSaveConstructArgsFunction();
-    (void)std::atexit(&CleanupCAniResourceSkelSaveConstructAtexit);
+    ResetLinks();
   }
 } // namespace moho
-
-namespace
-{
-  struct CAniResourceSkelSaveConstructBootstrap
-  {
-    CAniResourceSkelSaveConstructBootstrap()
-    {
-      moho::register_CAniResourceSkelSaveConstruct();
-    }
-  };
-
-  CAniResourceSkelSaveConstructBootstrap gCAniResourceSkelSaveConstructBootstrap;
-} // namespace
