@@ -4989,6 +4989,9 @@
     <ClInclude Include="moho\effects\rendering\CEfxBeamSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\effects\rendering\CEfxEmitterSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>

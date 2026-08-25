@@ -1,151 +1,99 @@
-#include <cstddef>
-#include <cstdlib>
+#include "moho/effects/rendering/CEfxEmitterSerializer.h"
+
+#include <cstdint>
+#include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
 
 namespace
 {
-  struct CEfxEmitterSerializerRuntime
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(CEfxEmitterSerializerRuntime, mHelperNext) == 0x04,
-    "CEfxEmitterSerializerRuntime::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CEfxEmitterSerializerRuntime, mHelperPrev) == 0x08,
-    "CEfxEmitterSerializerRuntime::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CEfxEmitterSerializerRuntime, mLoadCallback) == 0x0C,
-    "CEfxEmitterSerializerRuntime::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEfxEmitterSerializerRuntime, mSaveCallback) == 0x10,
-    "CEfxEmitterSerializerRuntime::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CEfxEmitterSerializerRuntime) == 0x14, "CEfxEmitterSerializerRuntime size must be 0x14");
-
-  CEfxEmitterSerializerRuntime gCEfxEmitterSerializer{};
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
+  // Address: 0x010B3C64 -- process-global `CEfxEmitterSerializer` singleton.
+  // Constructing it runs CEfxEmitterSerializer::CEfxEmitterSerializer()
+  // (0x00BD4310), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::CEfxEmitterSerializer gCEfxEmitterSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x0065E190 (FUN_0065E190)
+   * Address: 0x00BD4310 (FUN_00BD4310, register_CEfxEmitterSerializer)
    *
    * What it does:
-   * Unlinks the global CEfxEmitter serializer helper node and restores
-   * self-links on the serializer node.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  gpg::SerHelperBase* UnlinkCEfxEmitterSerializerNodeVariantA()
-  {
-    return UnlinkHelperNode(gCEfxEmitterSerializer);
-  }
+  CEfxEmitterSerializer::CEfxEmitterSerializer()
+    : mLoadCallback(&CEfxEmitterSerializer::Deserialize)
+    , mSaveCallback(&CEfxEmitterSerializer::Serialize)
+  {}
 
   /**
-   * Address: 0x0065E1C0 (FUN_0065E1C0)
+   * Address: 0x00BFBDB0 (FUN_00BFBDB0, Moho::CEfxEmitterSerializer::~CEfxEmitterSerializer)
    *
    * What it does:
-   * Runs the duplicate CEfxEmitter serializer helper-node unlink/reset lane.
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
    */
-  gpg::SerHelperBase* UnlinkCEfxEmitterSerializerNodeVariantB()
+  CEfxEmitterSerializer::~CEfxEmitterSerializer()
   {
-    return UnlinkHelperNode(gCEfxEmitterSerializer);
+    ResetLinks();
   }
 
   /**
    * Address: 0x0065E140 (FUN_0065E140, Moho::CEfxEmitterSerializer::Deserialize)
    *
    * What it does:
-   * Forwards one CEfxEmitter serializer-load callback lane to
-   * `CEfxEmitter::MemberDeserialize`.
+   * Forwards the reflected object pointer to `CEfxEmitter::MemberDeserialize`.
    */
-  void DeserializeCEfxEmitterSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
+  void CEfxEmitterSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
   )
   {
-    reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    auto* const object = reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr));
+    if (object != nullptr) {
+      object->MemberDeserialize(archive);
+    }
   }
 
   /**
    * Address: 0x0065E150 (FUN_0065E150, Moho::CEfxEmitterSerializer::Serialize)
    *
    * What it does:
-   * Forwards one CEfxEmitter serializer-save callback lane to
-   * `CEfxEmitter::MemberSerialize`.
+   * Forwards the reflected object pointer to `CEfxEmitter::MemberSerialize`.
    */
-  void SerializeCEfxEmitterSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
+  void CEfxEmitterSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
   )
   {
-    reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-  }
-
-  void cleanup_CEfxEmitterSerializer_atexit()
-  {
-    (void)UnlinkCEfxEmitterSerializerNodeVariantA();
+    auto* const object = reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr));
+    if (object != nullptr) {
+      object->MemberSerialize(archive);
+    }
   }
 
   /**
-   * Address: 0x00BD4310 (FUN_00BD4310, register_CEfxEmitterSerializer)
+   * Address: 0x0065F150 (FUN_0065F150, gpg::SerSaveLoadHelper_CEfxEmitter::Init)
    *
    * What it does:
-   * Initializes the global CEfxEmitter serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Lazily resolves `CEfxEmitter` RTTI and installs load/save callbacks from
+   * this helper object into the type descriptor.
    */
-  void register_CEfxEmitterSerializer()
+  void CEfxEmitterSerializer::Init()
   {
-    gpg::SerHelperBase* const self = HelperSelfNode(gCEfxEmitterSerializer);
-    gCEfxEmitterSerializer.mHelperNext = self;
-    gCEfxEmitterSerializer.mHelperPrev = self;
-    gCEfxEmitterSerializer.mLoadCallback = &DeserializeCEfxEmitterSerializerCallback;
-    gCEfxEmitterSerializer.mSaveCallback = &SerializeCEfxEmitterSerializerCallback;
-    (void)std::atexit(&cleanup_CEfxEmitterSerializer_atexit);
+    gpg::RType* type = CEfxEmitter::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(CEfxEmitter));
+      CEfxEmitter::sType = type;
+    }
+
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct CEfxEmitterSerializerStartupBootstrap
-  {
-    CEfxEmitterSerializerStartupBootstrap()
-    {
-      moho::register_CEfxEmitterSerializer();
-    }
-  };
-
-  [[maybe_unused]] CEfxEmitterSerializerStartupBootstrap gCEfxEmitterSerializerStartupBootstrap;
-} // namespace
