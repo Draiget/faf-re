@@ -2366,6 +2366,30 @@ namespace msvc8
          * retired span through FUN_0085A1D0 (`destroy_range`), then rebases
          * `last_`. `CWldSession::RenderMeshPreviews` and `~CWldSession` both
          * reach it as the whole-range `clear`.)
+         * Address: 0x00719E80 (FUN_00719E80, `std::vector_InfluenceGrid::
+         * CleanUpGrid` per IDA's own inferred name — msvc8::vector<Moho::
+         * InfluenceGrid>::erase(iterator,iterator) for the 140-byte element.
+         * `count==0` early return, tail-shift down one slot at a time (the
+         * per-element assign shape shared with `AssignInfluenceGridValue` /
+         * `CopyInfluenceGridRange`, `moho/sim/CInfluenceMap.cpp`, 0x0071ED10 /
+         * 0x0071E7B0), destroys the vacated tail through `InfluenceGrid`'s own
+         * destructor (equivalent to the sibling `DestroyInfluenceGridRange`
+         * free function used elsewhere in that file, 0x0071EA00), rebases
+         * `last_`. Five real callers confirmed directly from each caller's own
+         * disassembly (not just the callgraph index): `Moho::CInfluenceMap`'s
+         * parameterized constructor (0x00716140, defensive pre-clear on the
+         * still-empty `mMapEntries` before `resize`), `~CInfluenceMap`
+         * (0x007163A0, whole-range teardown before the vector's own storage is
+         * freed), `msvc8::vector<InfluenceGrid>::operator=` (0x0071E030,
+         * already cited above), and `ResizeInfluenceGridVectorWithFill`'s
+         * shrink branch (0x0071B860, `moho/sim/CInfluenceMap.cpp` 0x0071B860
+         * citation, `storage.resize(requestedCount)` with no fill value). A
+         * sixth address, 0x007188B0, is a byte-distinct but behaviorally
+         * redundant thiscall-shaped forwarding wrapper around this same
+         * erase(begin(),end()) call with zero callers of its own anywhere in
+         * the shipped binary (verified via `call_edges`, `incoming_xrefs`,
+         * `data_refs`, `vtable_writers`, and the `reachable` closure, all
+         * empty) — classified `skip`, not cited here.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);

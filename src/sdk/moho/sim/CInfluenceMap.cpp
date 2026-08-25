@@ -4310,12 +4310,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071E7B0 (FUN_0071E7B0, Moho::InfluenceGrid::ThreatDeconstruct)
+   * Address: 0x0071E7B0 (FUN_0071E7B0, Moho::InfluenceGrid::PopulateEntries)
    *
    * What it does:
    * Copies one contiguous `InfluenceGrid` range into destination storage for
    * vector relocation/copy lanes, preserving per-grid entry map, threat vector,
-   * aggregate threat, and decay state.
+   * aggregate threat, and decay state. Per-element body is the same assign
+   * shape as `AssignInfluenceGridValue` (0x0071ED10), inlined here for the
+   * range-walk case; also the tail-shift step `msvc8::vector<InfluenceGrid>::
+   * erase(iterator, iterator)` (`legacy/containers/Vector.h`, 0x00719E80)
+   * folds into when relocating the surviving tail down over an erased span.
    */
   static InfluenceGrid*
   CopyInfluenceGridRange(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
