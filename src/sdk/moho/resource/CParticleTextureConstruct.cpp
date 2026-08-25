@@ -18,36 +18,6 @@ namespace gpg
 
 namespace
 {
-  moho::CParticleTextureConstruct gCParticleTextureConstruct;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RRef MakeCParticleTextureRef(moho::CParticleTexture* const object)
   {
     gpg::RRef ref{};
@@ -55,10 +25,10 @@ namespace
     return ref;
   }
 
-  void CleanupCParticleTextureConstructAtexit()
-  {
-    (void)moho::cleanup_CParticleTextureConstruct();
-  }
+  // Address: 0x010A8024 -- process-global `CParticleTextureConstruct`
+  // singleton (constructed by FUN_00BC52A0, self-registering via `__xc_a`;
+  // see CParticleTextureConstruct.h for the real-ctor/atexit-target evidence).
+  moho::CParticleTextureConstruct gCParticleTextureConstruct;
 } // namespace
 
 namespace moho
@@ -104,50 +74,27 @@ namespace moho
    * What it does:
    * Resolves `CParticleTexture` RTTI and installs construct/delete callbacks.
    */
-  void CParticleTextureConstruct::RegisterConstructFunction()
+  void CParticleTextureConstruct::Init()
   {
     gpg::RType* const typeInfo = resource_reflection::ResolveCParticleTextureType();
     resource_reflection::RegisterConstructCallbacks(typeInfo, mConstructCallback, mDeleteCallback);
   }
 
   /**
-   * Address: 0x00BEFE00 (FUN_00BEFE00, Moho::CParticleTextureConstruct::~CParticleTextureConstruct)
+   * Address: 0x00BC52A0 (FUN_00BC52A0, dynamic initializer for the global
+   * `CParticleTextureConstruct` singleton)
    *
    * What it does:
-   * Unlinks the construct helper node from the intrusive helper list.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  gpg::SerHelperBase* cleanup_CParticleTextureConstruct()
-  {
-    return UnlinkHelperNode(gCParticleTextureConstruct);
-  }
+  CParticleTextureConstruct::CParticleTextureConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CParticleTextureConstruct::Construct))
+    , mDeleteCallback(&CParticleTextureConstruct::Deconstruct)
+  {}
 
-  /**
-   * Address: 0x00BC52A0 (FUN_00BC52A0, register_CParticleTextureConstruct)
-   *
-   * What it does:
-   * Initializes callback slots for the global construct helper and schedules
-   * teardown.
-   */
-  void register_CParticleTextureConstruct()
+  CParticleTextureConstruct::~CParticleTextureConstruct()
   {
-    InitializeHelperNode(gCParticleTextureConstruct);
-    gCParticleTextureConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CParticleTextureConstruct::Construct);
-    gCParticleTextureConstruct.mDeleteCallback = &CParticleTextureConstruct::Deconstruct;
-    gCParticleTextureConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupCParticleTextureConstructAtexit);
+    ResetLinks();
   }
 } // namespace moho
-
-namespace
-{
-  struct CParticleTextureConstructBootstrap
-  {
-    CParticleTextureConstructBootstrap()
-    {
-      moho::register_CParticleTextureConstruct();
-    }
-  };
-
-  CParticleTextureConstructBootstrap gCParticleTextureConstructBootstrap;
-} // namespace
