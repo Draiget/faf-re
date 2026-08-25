@@ -188,38 +188,6 @@ namespace
     return self;
   }
 
-  struct SerHelperQueueNodeRuntime
-  {
-    SerHelperQueueNodeRuntime* mNext = nullptr;
-    SerHelperQueueNodeRuntime* mPrev = nullptr;
-  };
-  static_assert(sizeof(SerHelperQueueNodeRuntime) == 0x08, "SerHelperQueueNodeRuntime size must be 0x08");
-
-  [[nodiscard]] SerSaveLoadHelperNodeRuntime* QueueSerSaveLoadHelperNodeForInit(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    auto* const links = reinterpret_cast<SerHelperQueueNodeRuntime*>(&helper.mNext);
-    links->mNext = links;
-    links->mPrev = links;
-
-    auto* root = reinterpret_cast<SerHelperQueueNodeRuntime*>(gpg::SerHelperBase::sNewHelpers);
-    if (root == nullptr) {
-      root = static_cast<SerHelperQueueNodeRuntime*>(::operator new(sizeof(SerHelperQueueNodeRuntime), std::nothrow));
-      if (root != nullptr) {
-        root->mNext = root;
-        root->mPrev = root;
-      }
-      gpg::SerHelperBase::sNewHelpers = reinterpret_cast<gpg::SerHelperBase*>(root);
-    }
-
-    if (root != nullptr) {
-      links->mNext = root->mNext;
-      links->mPrev = root;
-      root->mNext = links;
-      links->mNext->mPrev = links;
-    }
-
-    return &helper;
-  }
 
   struct PathNeighborCellWeightPairRuntime
   {
@@ -268,11 +236,37 @@ namespace
   };
   static_assert(sizeof(SPathNeighborTypeInfo) == 0x64, "SPathNeighborTypeInfo size must be 0x64");
 
-  void RegisterPathNeighborCellWeightSerializerCallbacks(SerSaveLoadHelperNodeRuntime* helper);
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<std::pair<Moho::HPathCell,float>>
+   *
+   * Real `gpg::SerHelperBase`-derived save/load helper for the reflected
+   * `std::pair<Moho::HPathCell,float>` leaf. Previously modeled as a raw
+   * `SerSaveLoadHelperNodeRuntime` POD with a hand-built one-entry fake
+   * vtable pointing at a free function - `Init()` below is the real
+   * override (address 0x0076D6D0), dispatched through the genuine
+   * compiler-generated vtable now that this type actually inherits
+   * `gpg::SerHelperBase`.
+   */
+  class SPathNeighborSerializer : public gpg::SerHelperBase
+  {
+  public:
+    SPathNeighborSerializer();
 
-  void* gSPathNeighborSerializerVtableRuntime[1] = {
-    reinterpret_cast<void*>(&RegisterPathNeighborCellWeightSerializerCallbacks),
+    /**
+     * Address: 0x0076D6D0 (FUN_0076D6D0, gpg::SerSaveLoadHelper_pair_HPathCell_float::Init)
+     *
+     * What it does:
+     * Binds load/save callbacks onto the reflected `std::pair<Moho::HPathCell,float>` type.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
   };
+  static_assert(offsetof(SPathNeighborSerializer, mLoadCallback) == 0x0C, "SPathNeighborSerializer::mLoadCallback offset must be 0x0C");
+  static_assert(offsetof(SPathNeighborSerializer, mSaveCallback) == 0x10, "SPathNeighborSerializer::mSaveCallback offset must be 0x10");
+  static_assert(sizeof(SPathNeighborSerializer) == 0x14, "SPathNeighborSerializer size must be 0x14");
 
   gpg::RType* gPathNeighborCellWeightType = nullptr;
 
@@ -284,7 +278,7 @@ namespace
    * `std::pair<Moho::HPathCell,float>`. Reached from `sub_BDCAD0`
    * (`.CRT$XCL`/`__xc_a` static-init table), the same shape as every other
    * scalar `RType` leaf preregistration this session. Fixes a real gap:
-   * `RegisterPathNeighborCellWeightSerializerCallbacks` below resolves this
+   * `SPathNeighborSerializer::Init` below resolves this
    * type via a lazy `gpg::LookupRType(typeid(std::pair<moho::HPathCell,
    * float>))`, which throws `std::runtime_error` if nothing preregistered
    * the type first - this is what the real binary runs before that consumer
@@ -302,7 +296,7 @@ namespace
   SerSaveLoadHelperNodeRuntime gNavPathSerializerHelper{};
   SerSaveLoadHelperNodeRuntime gPathQueueSerializerHelper{};
   SerSaveLoadHelperNodeRuntime gPathQueueImplSerializerHelper{};
-  SerSaveLoadHelperNodeRuntime gSPathNeighborSerializerHelper{};
+  SPathNeighborSerializer gSPathNeighborSerializerHelper;
 
   /**
    * Address: 0x00762FF0 (FUN_00762FF0)
@@ -406,9 +400,9 @@ namespace
    * Unlinks startup `SPathNeighborSerializer` helper links and rewires the
    * node into one self-linked sentinel lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSPathNeighborSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkSPathNeighborSerializerNodeVariantA() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gSPathNeighborSerializerHelper);
+    gSPathNeighborSerializerHelper.ResetLinks();
   }
 
   /**
@@ -418,9 +412,9 @@ namespace
    * Duplicate unlink/reset lane for startup `SPathNeighborSerializer` helper
    * links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSPathNeighborSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkSPathNeighborSerializerNodeVariantB() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gSPathNeighborSerializerHelper);
+    gSPathNeighborSerializerHelper.ResetLinks();
   }
 
   [[nodiscard]] gpg::RType* ResolveHPathCellSerializerType()
@@ -520,18 +514,27 @@ namespace
   }
 
   /**
+   * Address: 0x0076D4D0 (FUN_0076D4D0, dynamic initializer for the global
+   * `SPathNeighborSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list), then
+   * binds the deserialize/serialize callback pair.
+   */
+  SPathNeighborSerializer::SPathNeighborSerializer()
+    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSPathNeighborSerializerCallback))
+    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeSPathNeighborSerializerCallback))
+  {}
+
+  /**
    * Address: 0x0076D6D0 (FUN_0076D6D0, gpg::SerSaveLoadHelper_pair_HPathCell_float::Init)
    *
    * What it does:
-   * Binds load/save callbacks from one `SerSaveLoadHelper` runtime node onto
-   * the reflected `std::pair<Moho::HPathCell,float>` type.
+   * Binds load/save callbacks onto the reflected `std::pair<Moho::HPathCell,float>` type.
    */
-  void RegisterPathNeighborCellWeightSerializerCallbacks(SerSaveLoadHelperNodeRuntime* const helper)
+  void SPathNeighborSerializer::Init()
   {
-    if (helper == nullptr) {
-      return;
-    }
-
     gpg::RType* type = gPathNeighborCellWeightType;
     if (type == nullptr) {
       type = gpg::LookupRType(typeid(std::pair<moho::HPathCell, float>));
@@ -551,7 +554,7 @@ namespace
     }
 
     const bool saveWasNull = type->serSaveFunc_ == nullptr;
-    type->serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(helper->mPrimaryCallback);
+    type->serLoadFunc_ = mLoadCallback;
 
     if (!saveWasNull) {
       gpg::HandleAssertFailure(
@@ -561,36 +564,8 @@ namespace
       );
     }
 
-    type->serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(helper->mSecondaryCallback);
+    type->serSaveFunc_ = mSaveCallback;
   }
-
-  /**
-   * Address: 0x0076D4D0 (FUN_0076D4D0)
-   *
-   * What it does:
-   * Initializes startup `SPathNeighborSerializer` helper links and binds the
-   * deserialize/serialize callback pair used by its save/load helper lane.
-   */
-  [[nodiscard]] SerSaveLoadHelperNodeRuntime* InitializeSPathNeighborSerializerHelperStorage() noexcept
-  {
-    (void)QueueSerSaveLoadHelperNodeForInit(gSPathNeighborSerializerHelper);
-    gSPathNeighborSerializerHelper.mPrimaryCallback =
-      reinterpret_cast<void*>(&DeserializeSPathNeighborSerializerCallback);
-    gSPathNeighborSerializerHelper.mSecondaryCallback =
-      reinterpret_cast<void*>(&SerializeSPathNeighborSerializerCallback);
-    gSPathNeighborSerializerHelper.mVtable = static_cast<void*>(gSPathNeighborSerializerVtableRuntime);
-    return &gSPathNeighborSerializerHelper;
-  }
-
-  struct SPathNeighborSerializerHelperBootstrap
-  {
-    SPathNeighborSerializerHelperBootstrap()
-    {
-      (void)InitializeSPathNeighborSerializerHelperStorage();
-    }
-  };
-
-  [[maybe_unused]] SPathNeighborSerializerHelperBootstrap gSPathNeighborSerializerHelperBootstrap;
 
   [[nodiscard]] gpg::RType* CachedPathQueueImplType()
   {
