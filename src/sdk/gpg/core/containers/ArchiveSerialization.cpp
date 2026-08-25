@@ -9253,290 +9253,229 @@ namespace
    */
 
   /**
-   * Address: 0x004F0840 (FUN_004F0840)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::VTransform`.
+   * `InstallMohoVTransformSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x004F0840` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/render/camera/VTransform.cpp, moho/render/camera/VTransform.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoVTransformSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::VTransform");
-  }
 
   /**
-   * Address: 0x0050C730 (FUN_0050C730)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SCoordsVec2`.
+   * `InstallMohoSCoordsVec2SerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0050C730` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/containers/SCoordsVec2.h, moho/containers/SCoordsVec2TypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSCoordsVec2SerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SCoordsVec2");
-  }
 
   /**
-   * Address: 0x0050C7D0 (FUN_0050C7D0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SOCellPos`.
+   * `InstallMohoSOCellPosSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0050C7D0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is Moho::SOCellPosSerializer::Init() (or
+   * equivalent) in gpg/core/reflection/Reflection.h, moho/sim/SOCellPos.h,
+   * moho/sim/SOCellPosTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSOCellPosSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SOCellPos");
-  }
 
   /**
-   * Address: 0x0050C910 (FUN_0050C910)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SPointVector`.
+   * `InstallMohoSPointVectorSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0050C910` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is Moho::SPointVectorSerializer::Init() (or
+   * equivalent) in moho/ai/SPointVector.h, moho/ai/SPointVectorTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSPointVectorSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SPointVector");
-  }
 
   /**
-   * Address: 0x0050C9B0 (FUN_0050C9B0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SFootprint`.
+   * `InstallMohoSFootprintSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0050C9B0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/sim/SFootprint.h, moho/sim/SFootprintTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSFootprintSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SFootprint");
-  }
 
   /**
-   * Address: 0x00523110 (FUN_00523110)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ERuleBPUnitMovementType`.
+   * `InstallMohoERuleBPUnitMovementTypeSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x00523110` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * gpg::PrimitiveSerHelper<moho::ERuleBPUnitMovementType,int>::Init(),
+   * instantiated in moho/resource/blueprints/RUnitBlueprintEnumTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoERuleBPUnitMovementTypeSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ERuleBPUnitMovementType");
-  }
 
   /**
-   * Address: 0x005231B0 (FUN_005231B0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ERuleBPUnitCommandCaps`.
+   * `InstallMohoERuleBPUnitCommandCapsSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x005231B0` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * gpg::PrimitiveSerHelper<moho::ERuleBPUnitCommandCaps,int>::Init(),
+   * instantiated in moho/resource/blueprints/RUnitBlueprintEnumTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoERuleBPUnitCommandCapsSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ERuleBPUnitCommandCaps");
-  }
 
   /**
-   * Address: 0x00523250 (FUN_00523250)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ERuleBPUnitToggleCaps`.
+   * `InstallMohoERuleBPUnitToggleCapsSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x00523250` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * gpg::PrimitiveSerHelper<moho::ERuleBPUnitToggleCaps,int>::Init(),
+   * instantiated in moho/resource/blueprints/RUnitBlueprintEnumTypeInfo.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoERuleBPUnitToggleCapsSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ERuleBPUnitToggleCaps");
-  }
 
   /**
-   * Address: 0x0054C610 (FUN_0054C610)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CAniPose`.
+   * `InstallMohoCAniPoseSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0054C610` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * gpg/core/reflection/Reflection.h, moho/animation/CAniPose.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCAniPoseSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CAniPose");
-  }
 
   /**
-   * Address: 0x0054C8F0 (FUN_0054C8F0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CAniPoseBone`.
+   * `InstallMohoCAniPoseBoneSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0054C8F0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/animation/CAniPose.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCAniPoseBoneSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CAniPoseBone");
-  }
 
   /**
-   * Address: 0x00550CF0 (FUN_00550CF0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SSTIArmyConstantData`.
+   * `InstallMohoSSTIArmyConstantDataSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x00550CF0` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/sim/SSTIArmyConstantData.cpp, moho/sim/SSTIArmyConstantData.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSSTIArmyConstantDataSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSTIArmyConstantData");
-  }
 
   /**
-   * Address: 0x005589E0 (FUN_005589E0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EntId`.
+   * `InstallMohoEntIdSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x005589E0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/sim/SSTIArmyConstantData.cpp, moho/sim/SSTIArmyConstantData.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEntIdSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EntId");
-  }
 
   /**
-   * Address: 0x00558A80 (FUN_00558A80)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SSTIEntityConstantData`.
+   * `InstallMohoSSTIEntityConstantDataSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x00558A80` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * Moho::SSTIEntityConstantDataSerializer::Init() (or equivalent) in
+   * moho/entity/SSTIEntityConstantData.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSSTIEntityConstantDataSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSTIEntityConstantData");
-  }
 
   /**
-   * Address: 0x0055B200 (FUN_0055B200)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ESTITargetType`.
+   * `InstallMohoESTITargetTypeSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055B200` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * gpg/core/reflection/Reflection.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoESTITargetTypeSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ESTITargetType");
-  }
 
   /**
-   * Address: 0x0055B2A0 (FUN_0055B2A0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SSTITarget`.
+   * `InstallMohoSSTITargetSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055B2A0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is Moho::SSTITargetSerializer::Init() (or
+   * equivalent) in moho/command/SSTITarget.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSSTITargetSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSTITarget");
-  }
 
   /**
-   * Address: 0x0055C860 (FUN_0055C860)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EJobType`.
+   * `InstallMohoEJobTypeSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055C860` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/unit/core/EJobTypeTypeInfo.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEJobTypeSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EJobType");
-  }
 
   /**
-   * Address: 0x0055C900 (FUN_0055C900)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EFireState`.
+   * `InstallMohoEFireStateSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055C900` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/unit/core/EFireStateTypeInfo.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEFireStateSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EFireState");
-  }
 
   /**
-   * Address: 0x0055C9A0 (FUN_0055C9A0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EUnitState`.
+   * `InstallMohoEUnitStateSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055C9A0` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/unit/core/EUnitStateTypeInfo.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEUnitStateSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EUnitState");
-  }
 
   /**
-   * Address: 0x0055CA40 (FUN_0055CA40)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::UnitWeaponInfo`.
+   * `InstallMohoUnitWeaponInfoSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0055CA40` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/unit/core/Unit.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoUnitWeaponInfoSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::UnitWeaponInfo");
-  }
 
   /**
-   * Address: 0x0055D100 (FUN_0055D100)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SSTIUnitVariableData`.
+   * `InstallMohoSSTIUnitVariableDataSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x0055D100` citation
+   * was disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/unit/core/Unit.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSSTIUnitVariableDataSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSTIUnitVariableData");
-  }
 
   /**
-   * Address: 0x00563F70 (FUN_00563F70)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EEconResource`.
+   * `InstallMohoEEconResourceSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x00563F70` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * gpg/core/reflection/Reflection.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEEconResourceSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EEconResource");
-  }
 
   /**
-   * Address: 0x00564010 (FUN_00564010)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SEconValue`.
+   * `InstallMohoSEconValueSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x00564010` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Address cited elsewhere as the real Init():
+   * moho/sim/CEconomy.cpp, moho/sim/CEconomy.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSEconValueSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SEconValue");
-  }
 
   /**
    * Address: 0x005640B0 (FUN_005640B0)
