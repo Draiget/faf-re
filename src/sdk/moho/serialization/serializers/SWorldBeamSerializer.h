@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/particles/SWorldBeam.h"
 
 namespace gpg
 {
@@ -55,59 +56,17 @@ namespace moho
   static_assert(sizeof(SWorldBeamSerializer) == 0x14, "SWorldBeamSerializer size must be 0x14");
 
   /**
-   * Helper that binds primitive `BlendMode` enum callbacks for `SWorldBeam`.
-   */
-  class SWorldBeamBlendModePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0048FAB0 (gpg::PrimitiveSerHelper<Moho::SWorldBeam::BlendMode, int>::Init)
-     *
-     * What it does:
-     * Binds primitive `BlendMode` load/save callbacks onto the reflected enum type.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(SWorldBeamBlendModePrimitiveSerializer, mHelperNext) == 0x04,
-    "SWorldBeamBlendModePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SWorldBeamBlendModePrimitiveSerializer, mHelperPrev) == 0x08,
-    "SWorldBeamBlendModePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SWorldBeamBlendModePrimitiveSerializer, mDeserialize) == 0x0C,
-    "SWorldBeamBlendModePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SWorldBeamBlendModePrimitiveSerializer, mSerialize) == 0x10,
-    "SWorldBeamBlendModePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(SWorldBeamBlendModePrimitiveSerializer) == 0x14, "SWorldBeamBlendModePrimitiveSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BEFE40 (sub_BEFE40)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldBeam::BlendMode,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
    *
-   * What it does:
-   * Unlinks the `SWorldBeamBlendModePrimitiveSerializer` helper node and rewires self-links.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4BlendMode@SWorldBeam@Moho@@H@gpg'`,
+   * i.e. `BlendMode` nested inside `SWorldBeam`, not the top-level enum
+   * some sibling classes use): `FUN_00BC5300` (real, `__xc_a`-reachable).
+   * No dead low-address duplicate found for this one.
    */
-  gpg::SerHelperBase* cleanup_SWorldBeamBlendModePrimitiveSerializer();
-
-  /**
-   * Address: 0x00BC5300 (sub_BC5300)
-   *
-   * What it does:
-   * Initializes `SWorldBeam::BlendMode` primitive serializer callbacks and schedules exit cleanup.
-   */
-  int register_SWorldBeamBlendModePrimitiveSerializer();
+  using SWorldBeamBlendModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldBeam::BlendMode, int>;
 
   /**
    * Address: 0x00BEFED0 (Moho::SWorldBeamSerializer::~SWorldBeamSerializer)

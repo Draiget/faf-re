@@ -12,10 +12,24 @@
 namespace
 {
   using BeamSerializer = moho::SWorldBeamSerializer;
-  using BeamBlendModePrimitiveSerializer = moho::SWorldBeamBlendModePrimitiveSerializer;
 
-  BeamBlendModePrimitiveSerializer gSWorldBeamBlendModePrimitiveSerializer{};
   BeamSerializer gSWorldBeamSerializer{};
+
+  /**
+   * Address: 0x00BC5300 (FUN_00BC5300, dynamic initializer for the global
+   * `PrimitiveSerHelper<SWorldBeam::BlendMode,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). The previous raw-struct stand-in
+   * for this helper required an explicit
+   * `register_SWorldBeamBlendModePrimitiveSerializer()` call from a
+   * bootstrap struct to run its equivalent logic; the real binary never
+   * does that -- the global's own dynamic initializer is the entire
+   * registration.
+   */
+  moho::SWorldBeamBlendModePrimitiveSerializer gSWorldBeamBlendModePrimitiveSerializer;
 
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
@@ -57,40 +71,6 @@ namespace
   [[nodiscard]] gpg::RType* ResolveSWorldBeamType()
   {
     return ResolveCachedType<moho::SWorldBeam>(moho::SWorldBeam::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldBeamBlendModeType()
-  {
-    return ResolveCachedType<moho::SWorldBeam::BlendMode>(moho::SWorldBeam::sBlendModeType);
-  }
-
-  /**
-   * Address: 0x0048FDA0 (SWorldBeam::BlendMode int read lane)
-   *
-   * What it does:
-   * Reads one `int` from archive and stores it into `SWorldBeam::BlendMode`.
-   */
-  void DeserializeSWorldBeamBlendMode(gpg::ReadArchive* archive, moho::SWorldBeam::BlendMode* value)
-  {
-    int rawValue = 0;
-    archive->ReadInt(&rawValue);
-    *value = static_cast<moho::SWorldBeam::BlendMode>(rawValue);
-  }
-
-  /**
-   * Address: 0x0048FDC0 (SWorldBeam::BlendMode int write lane)
-   *
-   * What it does:
-   * Writes one `SWorldBeam::BlendMode` value to archive as an `int`.
-   */
-  void SerializeSWorldBeamBlendMode(gpg::WriteArchive* archive, const moho::SWorldBeam::BlendMode* value)
-  {
-    archive->WriteInt(static_cast<int>(*value));
-  }
-
-  void cleanup_SWorldBeamBlendModePrimitiveSerializer_atexit()
-  {
-    (void)moho::cleanup_SWorldBeamBlendModePrimitiveSerializer();
   }
 
   void cleanup_SWorldBeamSerializer_atexit()
@@ -136,39 +116,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0048FAB0 (gpg::PrimitiveSerHelper<Moho::SWorldBeam::BlendMode, int>::Init)
-   */
-  void SWorldBeamBlendModePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveSWorldBeamBlendModeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BEFE40 (sub_BEFE40)
-   */
-  gpg::SerHelperBase* cleanup_SWorldBeamBlendModePrimitiveSerializer()
-  {
-    return UnlinkSerializerNode(gSWorldBeamBlendModePrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BC5300 (sub_BC5300)
-   */
-  int register_SWorldBeamBlendModePrimitiveSerializer()
-  {
-    InitializeSerializerNode(gSWorldBeamBlendModePrimitiveSerializer);
-    gSWorldBeamBlendModePrimitiveSerializer.mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSWorldBeamBlendMode);
-    gSWorldBeamBlendModePrimitiveSerializer.mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeSWorldBeamBlendMode);
-    return std::atexit(&cleanup_SWorldBeamBlendModePrimitiveSerializer_atexit);
-  }
-
-  /**
    * Address: 0x00BEFED0 (Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
    */
   gpg::SerHelperBase* cleanup_SWorldBeamSerializer()
@@ -194,7 +141,6 @@ namespace
   {
     SWorldBeamSerializerBootstrap()
     {
-      (void)moho::register_SWorldBeamBlendModePrimitiveSerializer();
       (void)moho::register_SWorldBeamSerializer();
     }
   };
