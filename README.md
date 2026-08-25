@@ -14,8 +14,8 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,207` (79.96%)
-- `skip`: `7,563` (11.37%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `53,202` (79.95%)
+- `skip`: `7,568` (11.37%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,770` (8.67%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,207 functions) — binary caller context
+### Recovered (53,202 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
 | **Recovered caller token exists** (source edge still requires verification) | `17,093` | 32.13% |
-| Vtable-anchored (virtual override of a recovered class) | `5,882` | 11.05% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,573` | 10.47% |
+| Vtable-anchored (virtual override of a recovered class) | `5,882` | 11.06% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,573` | 10.48% |
 | No recovered caller token yet (orphan risk) | `1,697` | 3.19% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,742` | 42.74% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,737` | 42.74% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
