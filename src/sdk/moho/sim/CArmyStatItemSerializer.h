@@ -4,16 +4,34 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CArmyStatItemSerializer
+  /**
+   * VFTABLE: 0x00E311D8
+   */
+  class CArmyStatItemSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDA120 (FUN_00BDA120, dynamic initializer for the global
+     * `CArmyStatItemSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. The ctor's atexit target is a plain
+     * unlink thunk, not a mangled destructor, so it is modeled as the
+     * compiler's implicit static-destructor registration rather than an
+     * explicit call.
+     */
+    CArmyStatItemSerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CArmyStatItemSerializer();
+
     /**
      * Address: 0x0070B770 (FUN_0070B770, sub_70B770)
      *
@@ -36,23 +54,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into CArmyStatItem RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CArmyStatItemSerializer, mHelperNext) == 0x04,
-    "CArmyStatItemSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CArmyStatItemSerializer, mHelperPrev) == 0x08,
-    "CArmyStatItemSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CArmyStatItemSerializer, mLoadCallback) == 0x0C,
     "CArmyStatItemSerializer::mLoadCallback offset must be 0x0C"
