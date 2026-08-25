@@ -2553,6 +2553,22 @@ namespace msvc8
          * `openHeap.mHandleToHeapIndex.push_back(heapIndex)` in
          * `AcquireOrReuseClusterSearchOpenHandle` (FUN_00930440,
          * Cluster.cpp) when the released-handle free list is empty.)
+         * Address: 0x008F1760 (FUN_008F1760, sub_8F1760) --
+         * `msvc8::vector<gpg::gal::HeadSampleOption>::push_back` for
+         * `Head::mStrs` (`Head.hpp`, 0x24/36-byte element -- `{sampleType,
+         * sampleQuality, msvc8::string label}`). The `.c` decompile renders
+         * the fast/slow split as an unconditional fall-through into
+         * `insert(pos,value)` regardless of branch, which would double-
+         * construct -- confirmed against the raw `.asm` instead: the fast
+         * path (`size()<capacity()`) ends in its own `retn 4` right after
+         * updating `last_`, so it never reaches the slow-path call; this is
+         * an ordinary two-way branch, matching this member exactly. Fast
+         * path calls `sub_8EF7E0` (`uninit_fill_n`, cited below) then
+         * `last_ += 1`; slow path tail-calls `insert(last_, value)`
+         * (`FUN_008F1310`, cited below). Emitted via `head.mStrs.push_back(
+         * option);` in `DeviceD3D9::BuildDeviceCapabilities`
+         * (`FUN_008F2080`, `D3D9Interfaces.cpp`, already recovered) while
+         * enumerating multisample options.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -3580,6 +3596,19 @@ namespace msvc8
          * established fused-emission precedent (`FUN_0084F200`), now with
          * concrete caller evidence instead of an unsupported claim.
          *
+         * Address: 0x008F1310 (FUN_008F1310, sub_8F1310) -- `msvc8::
+         * vector<gpg::gal::HeadSampleOption>::insert(pos, value)` for
+         * `Head::mStrs` (same instantiation as `push_back`'s `FUN_008F1760`
+         * above, 0x24/36-byte element). Field-for-field match once the
+         * vector's real 4-field debug-proxy layout is used (`this[1]`=
+         * `first_`, matching this member's own `myProxy_`/`first_`/`last_`/
+         * `end_` layout): `offset = (size()==0) ? 0 : (pos-first_)`,
+         * tail-calls the count overload with `count=1` (`sub_8F05C0`,
+         * cited on `insert(pos,count,value)` below), returns `first_+
+         * offset` -- exactly this member's shape, including the `size()==0`
+         * null-`pos` guard. Reached from `push_back`'s slow (no-spare-
+         * capacity) path with `pos=last_`/`end()`.)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -4215,6 +4244,25 @@ namespace msvc8
          * relocate helper, not a blocker on this citation, and each is a
          * legitimate next target for a dedicated `pair<string,string>`
          * follow-up pass.
+         *
+         * Address: 0x008F05C0 (FUN_008F05C0, sub_8F05C0) -- `msvc8::
+         * vector<gpg::gal::HeadSampleOption>::insert(pos, count, value)`,
+         * the count-based core `FUN_008F1310` (cited above on `insert(pos,
+         * value)`) tail-calls with `count=1`. IDA's own decompile carries a
+         * "positive sp value... may be wrong" disclaimer; verified against
+         * this member's real shape regardless: stages a local copy of
+         * `value` first (raw dword pair for `sampleType`/`sampleQuality`
+         * plus a `std::string::assign` for `label` -- exactly this
+         * member's `const T localValue(value);` self-aliasing guard, see
+         * that line's own comment), the `119304647`(=`0xFFFFFFFF/36`)
+         * `max_size` overflow guard, the `(cap>>1)+cap` 1.5x growth
+         * formula, and a reallocate-or-shift split matching this member's
+         * two branches field for field. Reached only from `FUN_008F1310`
+         * with `count` hardcoded to 1; the general multi-count path is
+         * template-instantiated but not separately exercised through any
+         * currently-traced caller -- same "compiled, not separately
+         * runtime-exercised" shape as this file's other single-caller
+         * count-overload citations.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5297,6 +5345,59 @@ namespace msvc8
          * `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate the address
          * never appeared in.
          *
+         * Address: 0x008EF7E0 (FUN_008EF7E0, sub_8EF7E0) -- `msvc8::
+         * vector<gpg::gal::HeadSampleOption>::uninit_fill_n` for `Head::
+         * mStrs` (same instantiation as `push_back`'s `FUN_008F1760`
+         * above). DB-integrity fix: was mis-tagged `external_dependency`
+         * ("all-external-callees thunk... no engine references") -- its
+         * two callees `FUN_00437900`/`FUN_00437D70` (cited below) are this
+         * project's own `HeadSampleOption` construct/destroy helpers, not
+         * external runtime. IDA's own decompile carries the same "positive
+         * sp value... may be wrong" disclaimer as `FUN_008F05C0` above, and
+         * renders the SEH cleanup funclet as a bogus `while(1)` fallthrough
+         * that never returns -- the raw `.asm` shows the true shape: `test
+         * esi,esi; jbe` straight to a normal `retn` once the fill loop
+         * (`n` iterations of `FUN_00437D70` at `+0x24`/36-byte stride)
+         * completes, matching this member's `for(;i<n;++i) new(dst+i)
+         * T(value)` exactly. The destroy-and-rethrow block (`FUN_00437900`
+         * per element, then `CxxThrowException`) is only reached via SEH
+         * unwind, matching this member's `catch(...){ destroy_n(dst,i);
+         * throw; }`. Reached from `push_back`'s fast (spare-capacity)
+         * path with `n=1`.
+         *
+         * Address: 0x00437D70 (FUN_00437D70, sub_437D70) -- this
+         * instantiation's own out-of-line emission of `HeadSampleOption`'s
+         * copy constructor, as invoked from `uninit_fill_n`'s placement-new
+         * (`::new (dst+i) T(value)`) rather than a direct `T(other)`
+         * expression -- a distinct compiled emission of the SAME logical
+         * ctor already recovered under its "named" mangled symbol
+         * `FUN_004369B0` (`Device.cpp`, `HeadSampleOption::HeadSampleOption
+         * (const HeadSampleOption&)`), confirmed field-for-field identical:
+         * raw dword copy of `sampleType`(+0x00)/`sampleQuality`(+0x04),
+         * `label`(+0x08) reset to empty-SSO state then `std::string::
+         * assign`ed from `other.label`. DB-integrity fix: was mis-tagged
+         * `external_dependency` ("template/helper instantiation artifact")
+         * -- it is this project's own `HeadSampleOption`, not a generic/
+         * external type. No new source needed: this address is the
+         * compiler's own out-of-line copy of the already-recovered ctor
+         * body, reached through this member's placement-new rather than a
+         * separate hand-written call.
+         *
+         * Address: 0x00437900 (FUN_00437900, sub_437900) -- this
+         * instantiation's own destroy helper for `HeadSampleOption::label`
+         * (SSO-aware `msvc8::string` teardown: `if (_Myres>=0x10) operator
+         * delete(_Bx._Ptr);` then reset to empty state), invoked from
+         * `destroy_n`'s per-element loop on this member's SEH cleanup
+         * path. `HeadSampleOption` declares no explicit destructor in
+         * `Head.hpp` -- this is the compiler-emitted implicit destructor's
+         * out-of-line body for the `label` sub-object, not hand-written
+         * source (CLAUDE.md's "member destructors are compiler-emitted, not
+         * hand-written" applies directly). DB-integrity fix: was mis-tagged
+         * `external_dependency` ("STL/wxWidgets string dtor... external
+         * runtime") -- `label` is this project's own `msvc8::string`
+         * member, and this teardown is only reachable during unwind of
+         * this project's own `uninit_fill_n<HeadSampleOption>`.
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
@@ -6252,6 +6353,21 @@ namespace msvc8
          * the `_Insert_n` reallocation branch for this instantiation
          * (`FUN_008A9100`, cited below on `insert`).)
          *
+         * sizeof(T) == 8 (`msvc8::vector<moho::WeakPtr<moho::CMauiControl>>`,
+         * `sInputCapture`'s backing storage, UiRuntimeTypes.cpp):
+         * Address: 0x007A5EF0 (FUN_007A5EF0, reciprocal-division form
+         * `0xFFFFFFFF/count < 8` -- the classic Dinkumware `_Allocate<T>`
+         * shape (dividing by the runtime `count`) rather than the
+         * constant-folded `count > max_size()` form most other
+         * instantiations show; mathematically the same predicate
+         * (`floor(M/K) < n <=> floor(M/n) < K` for positive `M,K,n`), just a
+         * different codegen choice for this call site -- see the
+         * `sizeof(T) == 0x80`/0x14/0x18 entries above for the same
+         * reciprocal-division shape already documented on this member.
+         * Reached from the reallocation branch of
+         * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`,
+         * UiRuntimeTypes.cpp).)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
@@ -6358,6 +6474,13 @@ namespace msvc8
          * mHandleToHeapIndex` instantiation, reached from the `_Insert_n`
          * grow lane `FUN_004451A0`'s `0x3FFFFFFF - size < count` max_size
          * test, already cited above on `insert`.)
+         * Address: 0x007A5D20 (FUN_007A5D20, the 8-byte-stride throw lane for
+         * `msvc8::vector<moho::WeakPtr<moho::CMauiControl>>` (`sInputCapture`,
+         * UiRuntimeTypes.cpp) -- guards `size() == max_size()`
+         * (`0x1FFFFFFF`) before the insert-with-growth core proceeds. DB
+         * previously listed this token `recovered` with no note and no
+         * citation anywhere in `src/sdk` -- corrected here. Reached from
+         * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`).)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
