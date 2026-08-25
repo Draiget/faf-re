@@ -6,6 +6,13 @@
 
 namespace moho::blueprint_ser
 {
+  /**
+   * Lazily resolves and caches the reflection descriptor for `TObject` into
+   * caller-owned storage (`slot`). Shared by the `R*BlueprintConstruct` /
+   * `R*BlueprintSaveConstruct` family in this directory, mirroring the
+   * per-type `Cached*Type()` lazy-lookup helpers used elsewhere in the SDK
+   * (see `CachedSEconStorageType()` in `moho/sim/CEconomy.cpp`).
+   */
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
   {
@@ -13,33 +20,5 @@ namespace moho::blueprint_ser
       slot = gpg::LookupRType(typeid(TObject));
     }
     return slot;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
   }
 } // namespace moho::blueprint_ser
