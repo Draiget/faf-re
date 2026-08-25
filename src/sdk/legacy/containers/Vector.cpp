@@ -2759,26 +2759,48 @@ void DeleteAllocationLane(void* const allocation) noexcept
 }
 
 /**
+ * Address: 0x0076B0E0 (FUN_0076B0E0)
+ *
+ * What it does:
+ * Broadcasts one 12-byte `{dword,dword,dword}` value into `tripleCount`
+ * contiguous lanes and returns one-past the last written lane -- the
+ * generic `uninit_fill_n`-shaped primitive `FillZeroDwordTripleLanesAndReturnEnd`
+ * (below) delegates into with a zero-initialized source value. Also
+ * reached directly (non-zero value) from `FUN_007698C0`/`FUN_00769F60`/
+ * `FUN_0076AA60`.
+ */
+std::uint32_t* FillDwordTripleLanesFromValueAndReturnEnd(
+  std::uint32_t* const destinationBegin,
+  const VectorElement12DwordTripleLane& value,
+  const std::uint32_t tripleCount
+) noexcept
+{
+  auto* const begin = reinterpret_cast<VectorElement12DwordTripleLane*>(destinationBegin);
+  for (std::uint32_t index = 0u; index < tripleCount; ++index) {
+    begin[index] = value;
+  }
+
+  return destinationBegin + (tripleCount * 3u);
+}
+
+/**
  * Address: 0x0075F2B0 (FUN_0075F2B0)
  * Address: 0x00769D70 (FUN_00769D70)
  *
  * What it does:
  * Fills `tripleCount` contiguous 12-byte lanes with zero dwords and returns
- * one-past the last written lane.
+ * one-past the last written lane -- both addresses are thin bridges
+ * (`LOBYTE(a1)=0; sub_76B0E0(a1,a1); return a2+12*a3;`) into
+ * `FillDwordTripleLanesFromValueAndReturnEnd` above with a
+ * zero-initialized source triple, not a hand-inlined zero-fill loop.
  */
 std::uint32_t* FillZeroDwordTripleLanesAndReturnEnd(
   std::uint32_t* const destinationBegin,
   const std::uint32_t tripleCount
 ) noexcept
 {
-  auto* const begin = reinterpret_cast<VectorElement12DwordTripleLane*>(destinationBegin);
-  for (std::uint32_t index = 0u; index < tripleCount; ++index) {
-    begin[index].lane0 = 0u;
-    begin[index].lane1 = 0u;
-    begin[index].lane2 = 0u;
-  }
-
-  return destinationBegin + (tripleCount * 3u);
+  constexpr VectorElement12DwordTripleLane kZero{0u, 0u, 0u};
+  return FillDwordTripleLanesFromValueAndReturnEnd(destinationBegin, kZero, tripleCount);
 }
 
 /**
@@ -6971,6 +6993,15 @@ void ReleaseRefcountedLaneRange(
   }
 }
 
+/**
+ * Address: 0x00755D30 (FUN_00755D30)
+ *
+ * What it does:
+ * Forward range-copy of one 40-byte (10-dword) trivially-copyable element,
+ * `memcpy`-equivalent per slot. Reached from `CopyAssignDwordDecupleVectorStorage`
+ * (0x00752EA0, cited above) both overwrite/append branches and the
+ * reallocation branch.
+ */
 [[nodiscard]] VectorElement40DwordDecupleLane* CopyDwordDecupleLaneRange(
   VectorElement40DwordDecupleLane* destination,
   const VectorElement40DwordDecupleLane* sourceBegin,
@@ -6990,6 +7021,9 @@ void ReleaseRefcountedLaneRange(
  * Address: 0x00755B30 (FUN_00755B30, 28-byte/7-float-stride forward range
  * copy, reached from CopyAssignFloatSeptupleVector28Storage's grow/tail
  * copy branches via FUN_007525C0)
+ * Address: 0x00754710 (FUN_00754710, thin calling-convention bridge --
+ * `LOBYTE(this)=0; return sub_755B30(this,this,this);` -- into this same
+ * function, same adapter idiom as FUN_00754940/FUN_00754970 above.)
  */
 [[nodiscard]] VectorElement28FloatSeptupleLane* CopyFloatSeptupleLaneRange(
   VectorElement28FloatSeptupleLane* destination,
@@ -7039,11 +7073,15 @@ void ReleaseRefcountedLaneRange(
 }
 
 /**
+ * Address: 0x00754940 (FUN_00754940)
  * Address: 0x00754970 (FUN_00754970)
  *
  * What it does:
  * Adapter lane that forwards one trivial 40-byte copy range
  * `[sourceBegin, sourceEnd)` into the decuple-dword range copy helper.
+ * Two distinct calling-convention bridges into `CopyDwordDecupleLaneRange`
+ * (0x00755D30, cited above), each `LOBYTE(this)=0; return
+ * sub_755D30(this,this,this);` at their own call site.
  */
 [[nodiscard]] VectorElement40DwordDecupleLane* CopyDwordDecupleLaneRangeAdapter(
   const VectorElement40DwordDecupleLane* sourceBegin,
