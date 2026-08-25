@@ -28,7 +28,7 @@ namespace
   // singleton. Constructing it runs CSimSoundManagerSaveConstruct::
   // CSimSoundManagerSaveConstruct() (0x00BDC520), which splices this helper
   // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterSaveConstructArgsFunction() on it from within the
+  // later dispatches Init() on it from within the
   // first ReadArchive/WriteArchive construction.
   moho::CSimSoundManagerSaveConstruct gCSimSoundManagerSaveConstruct;
 
@@ -98,7 +98,7 @@ namespace moho
    * Resolves `CSimSoundManager` RTTI and installs the save-construct-args
    * callback.
    */
-  void CSimSoundManagerSaveConstruct::RegisterSaveConstructArgsFunction()
+  void CSimSoundManagerSaveConstruct::Init()
   {
     gpg::RType* const typeInfo = audio_reflection::ResolveCSimSoundManagerType();
     audio_reflection::RegisterSaveConstructArgsCallback(typeInfo, mSerSaveConstructArgsFunc);

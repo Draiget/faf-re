@@ -86,7 +86,7 @@ namespace
   // singleton. Constructing it runs CAniDefaultSkelConstruct::
   // CAniDefaultSkelConstruct() (0x00BC9900), which splices this helper into
   // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterConstructFunction() on it from within the first
+  // later dispatches Init() on it from within the first
   // ReadArchive/WriteArchive construction.
   moho::CAniDefaultSkelConstruct gCAniDefaultSkelConstruct;
 
@@ -129,7 +129,7 @@ namespace moho
    * What it does:
    * Binds construct/delete callbacks into `CAniDefaultSkel` RTTI.
    */
-  void CAniDefaultSkelConstruct::RegisterConstructFunction()
+  void CAniDefaultSkelConstruct::Init()
   {
     gpg::RType* const type = CachedDefaultSkelType();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);

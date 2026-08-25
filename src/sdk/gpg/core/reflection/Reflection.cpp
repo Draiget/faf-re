@@ -3554,13 +3554,9 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
       register_Rect2iTypeInfo();
       register_Rect2fTypeInfo();
 
-      gRect2iSerializer.mHelperNext = nullptr;
-      gRect2iSerializer.mHelperPrev = nullptr;
       gRect2iSerializer.mLoadCallback = &DeserializeRect2i;
       gRect2iSerializer.mSaveCallback = &SerializeRect2i;
 
-      gRect2fSerializer.mHelperNext = nullptr;
-      gRect2fSerializer.mHelperPrev = nullptr;
       gRect2fSerializer.mLoadCallback = &DeserializeRect2f;
       gRect2fSerializer.mSaveCallback = &SerializeRect2f;
     }
@@ -3958,38 +3954,26 @@ RRef RRef_ArchiveToken(ArchiveToken* const token)
  * gpg::SerHelperBase* __thiscall gpg::SerHelperBase::SerHelperBase(gpg::SerHelperBase* this);
  *
  * What it does:
- * Self-links this helper node, lazily creates the process-global pending-helper
- * list root (`sNewHelpers`), then splices this node into that pending intrusive
- * list so a later `InitNewHelpers` pass can drain and dispatch it. The
- * polymorphic helper's own vtable install (`??_7SerHelperBase@gpg@@6B@`) is
- * emitted by the compiler; the modeled `{mNext,mPrev}` node carries only the
- * intrusive links, matching the local-view convention `InitNewHelpers` uses.
+ * Lazily creates the process-global pending-helper list root (`sNewHelpers`),
+ * then appends this freshly self-linked node (via the inherited
+ * `moho::TDatListItem` base) to its tail so a later `InitNewHelpers` pass
+ * drains and dispatches helpers in construction order. The list root is
+ * allocated with raw `operator new` (no constructor call) because it is a
+ * bare `TDatList<SerHelperBase, void>` node, not a payload-bearing
+ * `SerHelperBase`-derived object - no recursion risk.
  */
 gpg::SerHelperBase::SerHelperBase()
-  : mNext(this)
-  , mPrev(this)
 {
-  SerHelperBase* root = sNewHelpers;
-  if (root == nullptr) {
-    // Bare links-only sentinel head; raw operator new (no ctor) avoids recursion.
-    root = static_cast<SerHelperBase*>(::operator new(sizeof(SerHelperBase), std::nothrow));
-    if (root != nullptr) {
-      root->mNext = root;
-      root->mPrev = root;
-    }
-    sNewHelpers = root;
+  if (sNewHelpers == nullptr) {
+    sNewHelpers = new (std::nothrow) moho::TDatList<SerHelperBase, void>();
   }
 
-  if (root != nullptr) {
-    // Splice this node in immediately after the pending-list root.
-    mNext = root->mNext;
-    mPrev = root;
-    root->mNext = this;
-    mNext->mPrev = this;
+  if (sNewHelpers != nullptr) {
+    sNewHelpers->push_back(this);
   }
 }
 
-gpg::SerHelperBase* gpg::SerHelperBase::sNewHelpers = nullptr;
+moho::TDatList<gpg::SerHelperBase, void>* gpg::SerHelperBase::sNewHelpers = nullptr;
 
 /**
  * Address: 0x004027D0 (FUN_004027D0, duplicate helper body)
@@ -3997,71 +3981,31 @@ gpg::SerHelperBase* gpg::SerHelperBase::sNewHelpers = nullptr;
  * What it does:
  * Unlinks this helper node from current intrusive links, then self-links it.
  */
-void gpg::SerHelperBase::ResetLinks()
+void gpg::SerHelperBase::ResetLinks() noexcept
 {
-  mNext->mPrev = mPrev;
-  mPrev->mNext = mNext;
-  mPrev = this;
-  mNext = this;
+  ListUnlinkSelf();
 }
 
 /**
  * Address: 0x00950D50 (FUN_00950D50, gpg::SerHelperBase::InitNewHelpers)
  *
  * What it does:
- * Drains the pending serializer-helper intrusive list by unlinking each helper
- * node, dispatching its first virtual lane, then releases the list root.
+ * Drains the pending serializer-helper intrusive list in FIFO order
+ * (construction order), dispatching `Init()` on each helper, then releases
+ * the list root.
  */
 void gpg::SerHelperBase::InitNewHelpers()
 {
-  struct SerHelperNodeRuntimeView
-  {
-    SerHelperNodeRuntimeView* mNext;
-    SerHelperNodeRuntimeView* mPrev;
-  };
-  static_assert(sizeof(SerHelperNodeRuntimeView) == 0x8, "SerHelperNodeRuntimeView size must be 0x8");
-
-  struct SerHelperRuntimeObjectView
-  {
-    void** vtable;
-    SerHelperNodeRuntimeView links;
-  };
-  static_assert(offsetof(SerHelperRuntimeObjectView, links) == 0x4, "SerHelperRuntimeObjectView::links offset must be 0x4");
-
-  using SerHelperInitFn = void(__thiscall*)(SerHelperRuntimeObjectView*);
-
-  auto* root = reinterpret_cast<SerHelperNodeRuntimeView*>(sNewHelpers);
+  moho::TDatList<SerHelperBase, void>* const root = sNewHelpers;
   if (root == nullptr) {
     return;
   }
 
-  for (auto* node = root->mPrev; node != root; node = root->mPrev) {
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-
-    auto* const helper = reinterpret_cast<SerHelperRuntimeObjectView*>(reinterpret_cast<std::uint8_t*>(node) - 4);
-    auto* const vtable = helper->vtable;
-    if (vtable != nullptr && vtable[0] != nullptr) {
-      reinterpret_cast<SerHelperInitFn>(vtable[0])(helper);
-    }
-
-    root = reinterpret_cast<SerHelperNodeRuntimeView*>(sNewHelpers);
-    if (root == nullptr) {
-      break;
-    }
+  while (auto* const node = root->pop_front()) {
+    static_cast<SerHelperBase*>(node)->Init();
   }
 
-  if (root == nullptr) {
-    return;
-  }
-
-  root->mNext->mPrev = root->mPrev;
-  root->mPrev->mNext = root->mNext;
-  root->mPrev = root;
-  root->mNext = root;
-  ::operator delete(root);
+  delete root;
   sNewHelpers = nullptr;
 }
 
@@ -14039,7 +13983,7 @@ bool RType::IsDerivedFrom(const RType* baseType, int32_t* outOffset) const
  * What it does:
  * Lazily resolves Rect2<int> RTTI and installs serializer callbacks from this helper.
  */
-void gpg::Rect2iSerializer::RegisterSerializeFunctions()
+void gpg::Rect2iSerializer::Init()
 {
   RType* const type = CachedRect2iType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -14055,7 +13999,7 @@ void gpg::Rect2iSerializer::RegisterSerializeFunctions()
  * What it does:
  * Lazily resolves Rect2<float> RTTI and installs serializer callbacks from this helper.
  */
-void gpg::Rect2fSerializer::RegisterSerializeFunctions()
+void gpg::Rect2fSerializer::Init()
 {
   RType* const type = CachedRect2fType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);

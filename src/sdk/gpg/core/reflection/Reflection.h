@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/containers/TDatList.h"
 
 struct lua_State;
 struct TString;
@@ -253,42 +254,72 @@ namespace gpg
   class RField;
   class REnumType;
   class RIndexed;
-  struct SerHelperBase
+  /**
+   * VFTABLE: 0x00D48B90 (`??_7SerHelperBase@gpg@@6B@`)
+   *
+   * Base of every `Ser{Construct,SaveConstruct,SaveLoad}Helper_<T>` reflection
+   * bootstrap singleton (`CIntelPosHandleConstruct`, `Rect2iSerializer`, the
+   * per-file `...ConstructHelper`/`...Serializer` globals throughout
+   * `src/sdk/**`). Each of those helpers self-registers at static-init time,
+   * waits on the process-global pending list below, then gets dispatched once
+   * (via `Init()`) to bind its construct/delete or load/save callback(s) onto
+   * a reflected `RType`.
+   *
+   * The intrusive prev/next pair is the project's shared `moho::TDatListItem`
+   * node (`moho/containers/TDatList.h`), not a hand-rolled pointer pair - see
+   * `FUN_009501D0`'s raw disassembly: the ctor writes `??_7SerHelperBase@gpg@@6B@`
+   * at `this+0`, then self-links the two pointers starting at `this+4`, and
+   * `FUN_00950D50` recovers the owning object from a link-node address via
+   * `node - 4`. That `(vtable@0x00, node@0x04)` shape is exactly a
+   * `TDatListItem`-based derived class, not a bespoke 3-field struct.
+   */
+  struct SerHelperBase : public moho::TDatListItem<SerHelperBase, void>
   {
-    SerHelperBase* mNext;
-    SerHelperBase* mPrev;
-
     /**
      * Address: 0x009501D0 (FUN_009501D0, gpg::SerHelperBase::SerHelperBase)
      *
      * What it does:
-     * Self-links this helper node and splices it into the process-global pending
-     * list root (`sNewHelpers`, lazily created) so `InitNewHelpers` can later
-     * drain and dispatch it.
+     * Lazily creates the process-global pending-helper list (`sNewHelpers`),
+     * then appends this freshly self-linked node to its tail so a later
+     * `InitNewHelpers` pass drains and dispatches helpers in construction
+     * order.
      */
     SerHelperBase();
+
+    /**
+     * Address: 0x00950D50 vtable slot 0 dispatch target.
+     *
+     * What it does:
+     * Binds this helper's callback(s) onto the reflected `RType` it targets.
+     * Every leaf helper type overrides this with its own binding logic;
+     * `InitNewHelpers` calls it once per helper when drained from the pending
+     * list.
+     */
+    virtual void Init() = 0;
 
     /**
      * Address: 0x004027D0 (FUN_004027D0, duplicate self-link helper)
      *
      * What it does:
-     * Performs the same unlink-and-self-link sequence as the constructor.
+     * Unlinks this helper node from its current intrusive list and restores
+     * singleton self-links.
      */
-    void ResetLinks();
+    void ResetLinks() noexcept;
 
     /**
+     * Address: 0x00950D50 (FUN_00950D50, gpg::SerHelperBase::InitNewHelpers)
      * Address: 0x00953BE0 caller lane (`gpg::WriteArchive::WriteArchive`)
      *
      * What it does:
-     * Ensures serializer helper bootstrap lanes are initialized before
-     * write-archive save paths run.
+     * Drains the pending serializer-helper intrusive list in FIFO order,
+     * dispatching `Init()` on each helper, then releases the list root.
      */
     static void InitNewHelpers();
 
     // Address: 0x00F8ECB8 - process-global pending helper intrusive-list root.
-    static SerHelperBase* sNewHelpers;
+    static moho::TDatList<SerHelperBase, void>* sNewHelpers;
   };
-  static_assert(sizeof(SerHelperBase) == 0x8, "SerHelperBase size must be 0x8");
+  static_assert(sizeof(SerHelperBase) == 0xC, "SerHelperBase size must be 0xC");
 
   /**
    * C-string comparator for map keys.
@@ -4452,8 +4483,10 @@ namespace gpg
   /**
    * VFTABLE: 0x00D44B44
    * COL:  0x00E51514
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<int>>
    */
-  class Rect2iSerializer
+  class Rect2iSerializer : public SerHelperBase
   {
   public:
     /**
@@ -4463,16 +4496,12 @@ namespace gpg
      * What it does:
      * Binds Rect2<int> load/save callbacks onto the reflected type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    SerHelperBase* mHelperNext;
-    SerHelperBase* mHelperPrev;
     RType::load_func_t mLoadCallback;
     RType::save_func_t mSaveCallback;
   };
-  static_assert(offsetof(Rect2iSerializer, mHelperNext) == 0x04, "Rect2iSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Rect2iSerializer, mHelperPrev) == 0x08, "Rect2iSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(Rect2iSerializer, mLoadCallback) == 0x0C, "Rect2iSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -4484,8 +4513,10 @@ namespace gpg
   /**
    * VFTABLE: 0x00D44B3C
    * COL:  0x00E514BC
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<float>>
    */
-  class Rect2fSerializer
+  class Rect2fSerializer : public SerHelperBase
   {
   public:
     /**
@@ -4495,16 +4526,12 @@ namespace gpg
      * What it does:
      * Binds Rect2<float> load/save callbacks onto the reflected type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    SerHelperBase* mHelperNext;
-    SerHelperBase* mHelperPrev;
     RType::load_func_t mLoadCallback;
     RType::save_func_t mSaveCallback;
   };
-  static_assert(offsetof(Rect2fSerializer, mHelperNext) == 0x04, "Rect2fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Rect2fSerializer, mHelperPrev) == 0x08, "Rect2fSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(Rect2fSerializer, mLoadCallback) == 0x0C, "Rect2fSerializer::mLoadCallback offset must be 0x0C"
   );

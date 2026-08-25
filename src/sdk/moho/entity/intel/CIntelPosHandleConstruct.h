@@ -60,19 +60,13 @@ namespace moho
      * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
      * from the pending list (vtable slot 0).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
 
-  static_assert(
-    offsetof(CIntelPosHandleConstruct, mNext) == 0x04, "CIntelPosHandleConstruct::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CIntelPosHandleConstruct, mPrev) == 0x08, "CIntelPosHandleConstruct::mPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CIntelPosHandleConstruct, mConstructCallback) == 0x0C,
     "CIntelPosHandleConstruct::mConstructCallback offset must be 0x0C"

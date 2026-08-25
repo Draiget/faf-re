@@ -29,18 +29,12 @@ namespace moho
      * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
      * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
     gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
   };
 
-  static_assert(
-    offsetof(CAniDefaultSkelSaveConstruct, mNext) == 0x04, "CAniDefaultSkelSaveConstruct::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAniDefaultSkelSaveConstruct, mPrev) == 0x08, "CAniDefaultSkelSaveConstruct::mPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CAniDefaultSkelSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
     "CAniDefaultSkelSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
