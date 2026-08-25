@@ -1585,6 +1585,46 @@ namespace
     return grid == nullptr || grid->IsVisible(rect, false);
   }
 
+  /**
+   * Address: 0x008B1E80 (FUN_008B1E80, sub_8B1E80)
+   * Address: 0x008B19A0 (FUN_008B19A0, sub_8B19A0)
+   *
+   * What it does:
+   * The real binary splits this into two functions. `FUN_008B1E80(rect,
+   * focusArmy)` early-outs true when `focusArmy`'s vision-recon grid is
+   * missing or fog-of-war rendering is disabled, then converts `rect`
+   * into TWO grid-space rects (one divided by the vision grid's cell
+   * size, one by the water grid's) and calls `FUN_008B19A0` with both
+   * rects and two enable flags (checkVision=1, checkWater=1) always set.
+   * `FUN_008B19A0` first checks the focus army's OWN grids directly by
+   * offset -- `mExploredReconGrid`(+0x40) against the vision-space rect,
+   * `mFogReconGrid`(+0x48) against the water-space rect (NOT
+   * `mWaterReconGrid`(+0x50) -- confirmed from the raw offsets, `a1[16]`/
+   * `a1[18]`) -- matching this function's own unchanged fast path below
+   * (`exploredGrid`/`fogGrid`). It then iterates every ally (bitset
+   * membership test against `focusArmy`'s ally mask) checking each
+   * ally's vision grid (for the vision-space rect) and, on an ally
+   * match, that ally's WATER grid (for the water-space rect) via
+   * `Moho::UserArmy::GetVisionReconGrid`/`GetWaterReconGrid` --
+   * `GetVisionReconGrid` is the accessor name for `mExploredReconGrid`.
+   * The ally loop's `mFogReconGrid` -> `mWaterReconGrid` fix already
+   * landed in this function (see the ally-loop check below) matches this
+   * evidence exactly; the focus army's own fast path genuinely uses Fog,
+   * not Water, and was correctly left unchanged.
+   *
+   * The recovered `TerrainRectVisibleForFocusArmy`/
+   * `IntelRectVisibleOrGridMissing` below is a faithful-BEHAVIOR
+   * simplification, not a byte-exact re-expression: it checks a single
+   * rect against both grids directly rather than converting to two
+   * separate grid-space rects first (the two source grids are assumed
+   * to share cell size in practice at every real call site), and always
+   * checks both grids rather than taking independent enable flags (this
+   * call site's only caller, `SyncTerrain` below, always wants both). It
+   * also adds a `focusArmy == nullptr` guard the binary does not have --
+   * kept as a defensive simplification since `FUN_008B1E80` dereferences
+   * `focusArmy` unconditionally and no evidence was found either way on
+   * whether `SyncTerrain`'s `GetFocusArmy()` can return null in practice.
+   */
   [[nodiscard]] bool TerrainRectVisibleForFocusArmy(const gpg::Rect2i& rect, const moho::UserArmy* const focusArmy)
   {
     if (focusArmy == nullptr) {
