@@ -160,13 +160,22 @@ namespace msvc8
             return const_iterator(tree_.upper_bound_node(k));
         }
 
+        /**
+         * `rb_tree::equal_range` (RbTree.h) carries this method's real
+         * addresses (0x00A59E20/0x00A59E80, a `msvc8::set<std::uint32_t>`
+         * instantiation -- the same shared `_Tree::equal_range` member `map`
+         * and `set` both compile down to) -- see that citation for the full
+         * evidence trail.
+         */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k)
         {
-            return {lower_bound(k), upper_bound(k)};
+            const std::pair<node_type*, node_type*> range = tree_.equal_range(k);
+            return {iterator(range.first), iterator(range.second)};
         }
         [[nodiscard]] std::pair<const_iterator, const_iterator> equal_range(const key_type& k) const
         {
-            return {lower_bound(k), upper_bound(k)};
+            const std::pair<node_type*, node_type*> range = tree_.equal_range(k);
+            return {const_iterator(range.first), const_iterator(range.second)};
         }
 
         /** Reference to the mapped value; asserts when the key is missing. */
@@ -317,34 +326,32 @@ namespace msvc8
          * here despite already noting `isNil@+0x15` -- that offset belongs
          * to `UiKeyRepeatMap`, not `UiKeyActionMap` (which is isNil@+0x2D;
          * see `FUN_0083A640` cited on `erase(const_iterator)` above). This
-         * is `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::erase(const
-         * key_type&)` (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:
-         * 1395`). `find_node`-then-conditionally-`erase_node` shape
-         * matching this member exactly (`RemoveUiKeyMapEntries`'s
-         * `gUiKeyRepeatMap.erase(keyMask)`, `UiRuntimeTypes.cpp:1466` --
-         * not `:1465`, which is the sibling `gUiKeyActionMap.erase(keyMask)`
-         * call the mislabeled version pointed at instead -- already
-         * recovered). The compiled body is FUN_0083AA70's own `erase_node`
-         * shape with the `find_node` descent inlined directly into
-         * `RemoveUiKeyMapEntries` (`FUN_00839270`) rather than compiled as
-         * a separate `erase(key)` symbol for this instantiation; the real
-         * canonical home and full evidence trail is `erase_node`'s
-         * citation for this same address in `RbTree.h`. The `out_of_range`
-         * guard this compiles in (via `erase_node`'s own `_SECURE_SCL`
-         * checked-iterator machinery, see this file's `~rb_tree()` note in
-         * `RbTree.h`) is unreachable here since `n` is always either nil
-         * (short-circuited before the call) or a genuinely-found, valid
-         * node.)
+         * is NOT actually `UiKeyRepeatMap::erase(const key_type&)`'s own
+         * symbol: the compiled body is `erase_node`'s emission for this
+         * instantiation (cited under that member in `RbTree.h`) with the
+         * `find_node` descent inlined directly into `RemoveUiKeyMapEntries`
+         * (`FUN_00839270`, `gUiKeyRepeatMap.erase(keyMask)`,
+         * `UiRuntimeTypes.cpp:1466`) instead of compiled as a separate
+         * `erase(key)` symbol -- this instantiation simply never got one.
+         * Kept here only as a record of that fact; it is not evidence for
+         * this method's own code shape. The `out_of_range` guard `erase_node`
+         * carries is unreachable at that inlined call site since `n` is
+         * always either nil (short-circuited before the call) or a
+         * genuinely-found, valid node.
+         *
+         * The general shape below -- `find`+conditional-`erase_node` is
+         * itself a reasonable-looking but non-canonical shortcut valid only
+         * because a `map`'s keys are unique. Real MSVC8 `_Tree::erase(const
+         * key_type&)` is shared machinery between `map`/`set`/`multimap`/
+         * `multiset` and can't assume uniqueness, so it is always the
+         * general `equal_range`+count+`erase_range` shape -- confirmed
+         * directly against the decompiled body of a `msvc8::set<
+         * std::uint32_t>` instantiation (0x00A65B60/0x00A65C10, cited on
+         * `rb_tree::erase(const key_type&)` in `RbTree.h`). `map`/`set`
+         * both delegate to that one shared member now instead of each
+         * hand-rolling their own shortcut.
          */
-        size_type erase(const key_type& k)
-        {
-            node_type* const n = tree_.find_node(k);
-            if (detail::rb_is_nil(n)) {
-                return 0;
-            }
-            (void)tree_.erase_node(n);
-            return 1;
-        }
+        size_type erase(const key_type& k) { return tree_.erase(k); }
 
         /**
          * Erases `[first, last)` and returns a cursor on the first survivor.
