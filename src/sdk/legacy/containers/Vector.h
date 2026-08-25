@@ -2133,6 +2133,15 @@ namespace msvc8
          * `LinkCommandGraphEdge` (0x00826960, CWldSession.cpp:14703,
          * already recovered), which pushes the new edge into the owning
          * `CommandGraphTreeBucket::mEdges` vector.)
+         * Address: 0x006868C0 (FUN_006868C0, msvc8::vector<Moho::
+         * CEntityDbBoundedPropQueueNode>::push_back for the 20-byte
+         * `{priority, boundedTick, WeakPtr<Prop> ownerLink, handleId}`
+         * element -- checked-capacity fast append (constructs in place at
+         * `last_`), else tail-calls the grow-and-insert path FUN_00687720.
+         * Emitted via `heap.push_back(...)` in
+         * `CEntityDbBoundedPropQueueRuntime::Insert` (EntityDb.h/.cpp),
+         * the `gpg::PriorityQueue<SPropPriorityInfo, WeakPtr<Prop>>::Insert`
+         * member reached from `Moho::EntityDB::AddBoundedProp`.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -3689,6 +3698,20 @@ namespace msvc8
          * caller not yet identified -- none of the five candidate callers
          * (0x0085A2D0, 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60) are
          * recovered source yet.)
+         *
+         * Address: 0x007CED40 (FUN_007CED40, `uninit_copy_n` for
+         * `Moho::CDiscoveryService::DiscoveredGameRecord` -- a plain
+         * 16-byte POD (protocol/address/port/padding/reply-timestamp, no
+         * pointers), matching `Moho::CDiscoveryService.h`'s own
+         * `static_assert(sizeof(DiscoveredGameRecord) == 0x10)`. Verbatim
+         * 4-dword-per-slot copy, no refcount/special handling. Reached
+         * from `AddDiscoveredGame`'s (0x007C87E0, `CDiscoveryService.cpp`)
+         * growth-reallocation loop via its thin calling-convention
+         * adapter `FUN_007CBF90` (truncates a flag byte before
+         * tail-calling this body). `FUN_007C9CD0`, the sibling
+         * `_Insert`-shaped emission for the same 16-byte element, is
+         * already `skip` (RULE ONE compiler/template emission, its
+         * source-level call site is `AddDiscoveredGame` itself).
          *
          * Address: 0x005CDEF0 (FUN_005CDEF0, `uninit_copy_n` for a 0x1C-byte
          * element containing a leading 3-dword header, a 1-byte tag at
