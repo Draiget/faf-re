@@ -1121,6 +1121,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\audio\ISoundManagerSerializer.cpp" />
     <ClCompile Include="moho\audio\SAudioRequestFastVectorReflection.cpp" />
     <ClCompile Include="moho\ai\HPathCellTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\HPathCellSerializer.cpp" />
     <ClCompile Include="moho\path\NavPathTypeInfo.cpp" />
     <ClCompile Include="moho\path\RDebugNavPathTypeInfo.cpp" />
     <ClCompile Include="moho\ai\HPathCellVectorReflection.cpp" />
@@ -2037,6 +2038,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\SPickUpInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\CSquadTypeInfo.h" />
     <ClInclude Include="moho\ai\HPathCellTypeInfo.h" />
+    <ClInclude Include="moho\ai\HPathCellSerializer.h" />
     <ClInclude Include="moho\path\PathTablesTypeInfo.h" />
     <ClInclude Include="moho\entity\SScrollerTypeInfo.h" />
     <ClInclude Include="moho\render\SDecalInfoTypeInfo.h" />

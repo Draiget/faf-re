@@ -31,7 +31,7 @@
 #include "moho/sim/STIMap.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include <windows.h>
 #include "gpg/core/reflection/StaticInitPhase.h"
 #endif
 
@@ -49,35 +49,6 @@ namespace
 {
   constexpr const char* kSerializationHeaderPath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
-  struct SerSaveLoadHelperInitRuntimeView
-  {
-    void* mVTable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoadCallback = nullptr; // +0x0C
-    gpg::RType::save_func_t mSaveCallback = nullptr; // +0x10
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperInitRuntimeView::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperInitRuntimeView::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mLoadCallback) == 0x0C,
-    "SerSaveLoadHelperInitRuntimeView::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mSaveCallback) == 0x10,
-    "SerSaveLoadHelperInitRuntimeView::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(SerSaveLoadHelperInitRuntimeView) == 0x14,
-    "SerSaveLoadHelperInitRuntimeView size must be 0x14"
-  );
 
   /**
    * The traveler ring node. `moho::TDatListItem` is `{mPrev, mNext}` in that order,
@@ -856,70 +827,114 @@ namespace moho
     }
 
     /**
-     * Serializer helper for `PathQueue`. Same `gpg::SerHelperBase` shape as
-     * `EntitySerializer` and `CFormationInstanceSerializer`: an intrusive node
-     * plus the two callbacks installed into the reflected type.
+     * VFTABLE: 0x00E35FC0 (`??_7PathQueueSerializer@Moho@@6B@`)
+     * Also installed as: 0x00E35FC8 (`??_7?$SerSaveLoadHelper@VPathQueue@Moho@@@gpg@@6B@`)
+     *
+     * Demangled: gpg::SerSaveLoadHelper<class Moho::PathQueue>
+     *
+     * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+     * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+     * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+     * sibling `SerHelperBase`-derived serializer in this codebase
+     * (`CUnitCarrierRetrieveSerializerHelper`, `SPathNeighborSerializer`, ...).
+     *
+     * Investigation note (2026-08-25): this class replaces a prior hand-rolled
+     * `PathQueueSerializerHelper` POD whose `register_PathQueueSerializer`
+     * manually self-linked an intrusive node instead of deriving
+     * `gpg::SerHelperBase` (so it never spliced into the real
+     * `sNewHelpers` pending list), and which bound `serLoadFunc_`/
+     * `serSaveFunc_` at *construction* time. The raw disassembly proves
+     * 0x00BDC920 (construction) and 0x00767080 (the vtable-slot-0 `Init()`
+     * body, dispatched later by `gpg::SerHelperBase::InitNewHelpers`) are two
+     * distinct functions -- see
+     * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
      */
-    struct PathQueueSerializerHelper
+    class PathQueueSerializerHelper : public gpg::SerHelperBase
     {
-      gpg::SerHelperBase* mHelperNext = nullptr;
-      gpg::SerHelperBase* mHelperPrev = nullptr;
-      gpg::RType::load_func_t mLoadCallback = nullptr;
-      gpg::RType::save_func_t mSaveCallback = nullptr;
+    public:
+      /**
+       * Address: 0x00BDC920 (FUN_00BDC920, register_PathQueueSerializer,
+       * dynamic initializer for the global `PathQueueSerializer` singleton)
+       *
+       * What it does:
+       * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+       * and splices it into the process-global `sNewHelpers` pending list),
+       * then binds the deserialize/serialize callback fields and installs
+       * process-exit cleanup.
+       */
+      PathQueueSerializerHelper();
+
+      /**
+       * Address: 0x00767080 (FUN_00767080, gpg::SerSaveLoadHelper<Moho::PathQueue>::Init)
+       *
+       * What it does:
+       * Resolves `PathQueue` RTTI and installs this helper's load/save
+       * callbacks into the reflected type descriptor.
+       */
+      void Init() override;
+
+    public:
+      gpg::RType::load_func_t mLoadCallback;
+      gpg::RType::save_func_t mSaveCallback;
     };
+    static_assert(
+      offsetof(PathQueueSerializerHelper, mLoadCallback) == 0x0C,
+      "PathQueueSerializerHelper::mLoadCallback offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(PathQueueSerializerHelper, mSaveCallback) == 0x10,
+      "PathQueueSerializerHelper::mSaveCallback offset must be 0x10"
+    );
+    static_assert(sizeof(PathQueueSerializerHelper) == 0x14, "PathQueueSerializerHelper size must be 0x14");
 
-    PathQueueSerializerHelper gPathQueueSerializerHelper{};
-
-    void cleanup_PathQueueSerializer()
-    {
-      auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gPathQueueSerializerHelper.mHelperNext);
-      if (gPathQueueSerializerHelper.mHelperNext != nullptr && gPathQueueSerializerHelper.mHelperPrev != nullptr) {
-        gPathQueueSerializerHelper.mHelperNext->mPrev = gPathQueueSerializerHelper.mHelperPrev;
-        gPathQueueSerializerHelper.mHelperPrev->mNext = gPathQueueSerializerHelper.mHelperNext;
-      }
-      gPathQueueSerializerHelper.mHelperPrev = self;
-      gPathQueueSerializerHelper.mHelperNext = self;
-    }
+    PathQueueSerializerHelper gPathQueueSerializerHelper;
 
     /**
-     * Address: 0x00BDC920 (FUN_00BDC920, register_PathQueueSerializer)
+     * Address: 0x00C01AB0 (FUN_00C01AB0, atexit-registered cleanup target)
+     * ICF twins: 0x007669F0 (FUN_007669F0), 0x00766A20 (FUN_00766A20) --
+     * identical unlink/self-link bodies hardcoded to the same global; only
+     * 0x00C01AB0 is the one `register_PathQueueSerializer` (0x00BDC920)
+     * actually registers via `atexit`.
      *
      * What it does:
-     * Initializes the `PathQueue` serializer helper, binds its load/save
-     * callbacks, and installs them into the reflected `PathQueue` type.
-     *
-     * The emission binds the callbacks and leaves the descriptor install to
-     * the helper chain; this does both here, because nothing in the recovered
-     * tree walks that chain yet.
+     * Unlinks this helper node from the intrusive serializer-helper list and
+     * restores a self-linked sentinel state.
      */
-    void register_PathQueueSerializer()
+    void cleanup_PathQueueSerializer()
     {
-      auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gPathQueueSerializerHelper.mHelperNext);
-      gPathQueueSerializerHelper.mHelperNext = self;
-      gPathQueueSerializerHelper.mHelperPrev = self;
-      gPathQueueSerializerHelper.mLoadCallback = &PathQueueSerializerDeserialize;
-      gPathQueueSerializerHelper.mSaveCallback = &PathQueueSerializerSerialize;
+      gPathQueueSerializerHelper.ResetLinks();
+    }
 
-      if (moho::PathQueue::sType == nullptr) {
-        moho::PathQueue::sType = gpg::LookupRType(typeid(moho::PathQueue));
-      }
-      if (moho::PathQueue::sType != nullptr) {
-        moho::PathQueue::sType->serLoadFunc_ = gPathQueueSerializerHelper.mLoadCallback;
-        moho::PathQueue::sType->serSaveFunc_ = gPathQueueSerializerHelper.mSaveCallback;
-      }
-
+    PathQueueSerializerHelper::PathQueueSerializerHelper()
+      : mLoadCallback(&PathQueueSerializerDeserialize)
+      , mSaveCallback(&PathQueueSerializerSerialize)
+    {
       (void)std::atexit(&cleanup_PathQueueSerializer);
     }
 
-    struct PathQueueSerializerBootstrap
+    /**
+     * Address: 0x00767080 (FUN_00767080, gpg::SerSaveLoadHelper<Moho::PathQueue>::Init)
+     *
+     * What it does:
+     * Resolves `PathQueue` RTTI (via the cached `PathQueue::sType`, falling
+     * back to `gpg::LookupRType(typeid(PathQueue))` on a cache miss) and
+     * binds this helper's load/save callbacks into the reflected type
+     * descriptor. Dispatched by `gpg::SerHelperBase::InitNewHelpers` when
+     * this helper is drained from the pending list (vtable slot 0).
+     */
+    void PathQueueSerializerHelper::Init()
     {
-      PathQueueSerializerBootstrap()
-      {
-        register_PathQueueSerializer();
+      gpg::RType* type = moho::PathQueue::sType;
+      if (type == nullptr) {
+        type = gpg::LookupRType(typeid(moho::PathQueue));
+        moho::PathQueue::sType = type;
       }
-    };
 
-    [[maybe_unused]] PathQueueSerializerBootstrap gPathQueueSerializerBootstrap;
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mLoadCallback;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSaveCallback;
+    }
 
     /**
      * Address: 0x00767900 (FUN_00767900, Moho::PathQueueTypeInfo::Delete)
@@ -1104,38 +1119,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00767140 (FUN_00767140, gpg::SerSaveLoadHelper_PathQueue_Impl::Init)
-     *
-     * What it does:
-     * Resolves reflected type metadata for `PathQueue::Impl`, installs
-     * serializer callbacks from helper storage, and returns the load callback.
-     */
-    [[nodiscard]] gpg::RType::load_func_t InstallPathQueueImplSerializerCallbacks(
-      SerSaveLoadHelperInitRuntimeView* const helper
-    )
-    {
-      static gpg::RType* type = nullptr;
-      if (type == nullptr) {
-        type = gpg::LookupRType(typeid(PathQueue::Impl));
-      }
-
-      if (type->serLoadFunc_ != nullptr) {
-        gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
-      }
-
-      const bool saveWasNull = type->serSaveFunc_ == nullptr;
-      const gpg::RType::load_func_t loadCallback = helper->mLoadCallback;
-      type->serLoadFunc_ = loadCallback;
-
-      if (!saveWasNull) {
-        gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
-      }
-
-      type->serSaveFunc_ = helper->mSaveCallback;
-      return loadCallback;
-    }
-
-    /**
      * Address: 0x00768AD0 (FUN_00768AD0, Moho::PathQueueImplSerializer::Serialize body)
      * Mangled: (reached via the cdecl->usercall thunk 0x00766BC0,
      *   Moho::PathQueueImplSerializer::Serialize)
@@ -1248,51 +1231,133 @@ namespace moho
     }
 
     /**
-     * Source-level wiring for the `PathQueue::Impl` reflected serializer pair.
+     * VFTABLE: 0x00E36000 (`??_7PathQueueImplSerializer@Moho@@6B@`)
+     *
+     * Demangled: gpg::SerSaveLoadHelper<struct Moho::PathQueue::Impl>
+     * (IDA symbol: `gpg::SerSaveLoadHelper_PathQueue_Impl::Init`)
+     *
+     * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+     * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+     * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+     * sibling `SerHelperBase`-derived serializer in this codebase.
      *
      * The binary stores the address of the save callback (via the 0x00766BC0
-     * calling-convention thunk over 0x00768AD0) and the load callback (via the
-     * 0x00766BB0 trampoline over 0x00768A10) into the
-     * `SerSaveLoadHelper_PathQueue_Impl` helper node's save/load lanes, which
-     * `InstallPathQueueImplSerializerCallbacks` (0x00767140) then copies into
-     * the reflected `Moho::PathQueue::Impl` type's `serSaveFunc_` /
-     * `serLoadFunc_` slots. Taking the address of both callbacks here is the
-     * source-level invocation (evidence class 2, function-pointer table) that
-     * keeps them linked into the engine binary.
+     * calling-convention thunk over 0x00768AD0) and the load callback (via
+     * the 0x00766BB0 trampoline over 0x00768A10) into this helper's
+     * save/load lanes; `Init()` (0x00767140) then copies them into the
+     * reflected `Moho::PathQueue::Impl` type's `serSaveFunc_` /
+     * `serLoadFunc_` slots. Taking the address of both callbacks in the
+     * constructor below is the source-level invocation (evidence class 2,
+     * function-pointer table) that keeps them linked into the engine binary.
+     *
+     * Investigation note (2026-08-25): this class replaces a prior
+     * `InstallPathQueueImplSerializerCallbacks` free function operating on a
+     * raw `SerSaveLoadHelperInitRuntimeView` POD (never a real
+     * `gpg::SerHelperBase`, so never spliced into `sNewHelpers`, so never
+     * actually dispatched -- the free function that would have invoked it
+     * directly, `InstallPathQueueImplSerializerLifecycleCallbacks`, was
+     * itself `[[maybe_unused]]` and uncalled). The `Init()` body below is
+     * unchanged from that free function's logic, which already matched the
+     * raw disassembly at 0x00767140 (typeid-cached `gpg::LookupRType`
+     * lookup, not `REF_FindTypeNamed`) -- only the wiring mechanism was
+     * wrong. See
+     * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
      */
-    SerSaveLoadHelperInitRuntimeView gPathQueueImplSaveHelper{};
+    class PathQueueImplSerializerHelper : public gpg::SerHelperBase
+    {
+    public:
+      /**
+       * Address: 0x00BDC980 (FUN_00BDC980, register_PathQueueImplSerializer,
+       * dynamic initializer for the global `PathQueueImplSerializer` singleton)
+       *
+       * What it does:
+       * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+       * and splices it into the process-global `sNewHelpers` pending list),
+       * then binds the deserialize/serialize callback fields and installs
+       * process-exit cleanup.
+       */
+      PathQueueImplSerializerHelper();
+
+      /**
+       * Address: 0x00767140 (FUN_00767140, gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::Init)
+       *
+       * What it does:
+       * Resolves `PathQueue::Impl` RTTI and installs this helper's load/save
+       * callbacks into the reflected type descriptor.
+       */
+      void Init() override;
+
+    public:
+      gpg::RType::load_func_t mLoadCallback;
+      gpg::RType::save_func_t mSaveCallback;
+    };
+    static_assert(
+      offsetof(PathQueueImplSerializerHelper, mLoadCallback) == 0x0C,
+      "PathQueueImplSerializerHelper::mLoadCallback offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(PathQueueImplSerializerHelper, mSaveCallback) == 0x10,
+      "PathQueueImplSerializerHelper::mSaveCallback offset must be 0x10"
+    );
+    static_assert(
+      sizeof(PathQueueImplSerializerHelper) == 0x14, "PathQueueImplSerializerHelper size must be 0x14"
+    );
+
+    PathQueueImplSerializerHelper gPathQueueImplSerializerHelper;
 
     /**
-     * Populates the `PathQueue::Impl` serializer helper node's save and load
-     * lanes with the recovered callback addresses, mirroring the binary's
-     * startup helper-node population. Installing the lanes onto the live
-     * reflected type is deferred to `InstallPathQueueImplSerializerCallbacks`,
-     * which the engine runs once the `Moho::PathQueue::Impl` type descriptor is
-     * registered.
+     * Address: 0x00C01B40 (FUN_00C01B40, atexit-registered cleanup target)
+     * ICF twins: 0x00766C00 (FUN_00766C00), 0x00766C30 (FUN_00766C30) --
+     * identical unlink/self-link bodies hardcoded to the same global; only
+     * 0x00C01B40 is the one `register_PathQueueImplSerializer` (0x00BDC980)
+     * actually registers via `atexit`.
+     *
+     * What it does:
+     * Unlinks this helper node from the intrusive serializer-helper list and
+     * restores a self-linked sentinel state.
      */
-    SerSaveLoadHelperInitRuntimeView* PopulatePathQueueImplSerializerCallbackStorage() noexcept
+    void cleanup_PathQueueImplSerializer()
     {
-      gPathQueueImplSaveHelper.mLoadCallback =
-        reinterpret_cast<gpg::RType::load_func_t>(&DeserializePathQueueImplRefCallback);
-      gPathQueueImplSaveHelper.mSaveCallback =
-        reinterpret_cast<gpg::RType::save_func_t>(&SavePathQueueImplRefCallback);
-      return &gPathQueueImplSaveHelper;
+      gPathQueueImplSerializerHelper.ResetLinks();
     }
 
-    [[maybe_unused]] gpg::RType::load_func_t InstallPathQueueImplSerializerLifecycleCallbacks()
+    PathQueueImplSerializerHelper::PathQueueImplSerializerHelper()
+      : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializePathQueueImplRefCallback))
+      , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SavePathQueueImplRefCallback))
     {
-      return InstallPathQueueImplSerializerCallbacks(PopulatePathQueueImplSerializerCallbackStorage());
+      (void)std::atexit(&cleanup_PathQueueImplSerializer);
     }
 
-    struct PathQueueImplSerializerCallbackBootstrap
+    /**
+     * Address: 0x00767140 (FUN_00767140, gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::Init)
+     *
+     * What it does:
+     * Resolves reflected type metadata for `PathQueue::Impl` (via a cached
+     * `sType` singleton, lazy `gpg::LookupRType(typeid(PathQueue::Impl))`)
+     * and installs this helper's load/save callbacks into it. Dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` when this helper is drained from
+     * the pending list (vtable slot 0).
+     */
+    void PathQueueImplSerializerHelper::Init()
     {
-      PathQueueImplSerializerCallbackBootstrap() noexcept
-      {
-        (void)PopulatePathQueueImplSerializerCallbackStorage();
+      static gpg::RType* type = nullptr;
+      if (type == nullptr) {
+        type = gpg::LookupRType(typeid(PathQueue::Impl));
       }
-    };
 
-    [[maybe_unused]] PathQueueImplSerializerCallbackBootstrap gPathQueueImplSerializerCallbackBootstrap;
+      if (type->serLoadFunc_ != nullptr) {
+        gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
+      }
+
+      const bool saveWasNull = type->serSaveFunc_ == nullptr;
+      type->serLoadFunc_ = mLoadCallback;
+
+      if (!saveWasNull) {
+        gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
+      }
+
+      type->serSaveFunc_ = mSaveCallback;
+    }
 
     class PathQueueTypeInfo final : public gpg::RType
     {

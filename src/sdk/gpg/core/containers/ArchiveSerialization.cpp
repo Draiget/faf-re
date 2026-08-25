@@ -292,35 +292,29 @@ namespace
     return &typeInfo;
   }
 
-  SerSaveLoadHelperNodeRuntime gHPathCellSerializerHelper{};
+  /**
+   * `HPathCellSerializer`/`PathQueueSerializer`/`PathQueueImplSerializer`
+   * moved out of this file (2026-08-25 investigation): each is now a real
+   * `gpg::SerHelperBase`-derived class with a genuine `Init()` override,
+   * asm-confirmed against 0x007632D0 / 0x00767080 / 0x00767140 respectively.
+   * See `moho::HPathCellSerializer` (moho/ai/HPathCellSerializer.h/.cpp) and
+   * `PathQueueSerializerHelper` / `PathQueueImplSerializerHelper`
+   * (moho/path/PathTables.cpp).
+   *
+   * `gNavPathSerializerHelper` below is deliberately left as-is (still dead,
+   * still unwired): its real `Init()` is confirmed by the same raw-asm
+   * method (0x00763370, typeid-cached lookup, not `REF_FindTypeNamed`), but
+   * wiring it correctly requires first resolving what concrete C++ type
+   * `Moho::NavPath` (RTTI name, no "S" prefix) actually is -- it is NOT the
+   * same type as the already-declared `moho::SNavPath` (0x10-byte struct in
+   * IAiNavigator.h). See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md
+   * for the full writeup, including a pre-existing `typeid(SNavPath)` vs.
+   * `typeid(NavPath)` mismatch this investigation found (but did not fix) in
+   * `moho/path/NavPathTypeInfo.cpp`.
+   */
   SerSaveLoadHelperNodeRuntime gNavPathSerializerHelper{};
-  SerSaveLoadHelperNodeRuntime gPathQueueSerializerHelper{};
-  SerSaveLoadHelperNodeRuntime gPathQueueImplSerializerHelper{};
   SPathNeighborSerializer gSPathNeighborSerializerHelper;
-
-  /**
-   * Address: 0x00762FF0 (FUN_00762FF0)
-   *
-   * What it does:
-   * Unlinks startup `HPathCellSerializer` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkHPathCellSerializerNodeVariantA() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gHPathCellSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00763020 (FUN_00763020)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `HPathCellSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkHPathCellSerializerNodeVariantB() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gHPathCellSerializerHelper);
-  }
 
   /**
    * Address: 0x00763240 (FUN_00763240)
@@ -343,54 +337,6 @@ namespace
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkNavPathSerializerNodeVariantB() noexcept
   {
     return UnlinkSerSaveLoadHelperNode(gNavPathSerializerHelper);
-  }
-
-  /**
-   * Address: 0x007669F0 (FUN_007669F0)
-   *
-   * What it does:
-   * Unlinks startup `PathQueueSerializer` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkPathQueueSerializerNodeVariantA() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gPathQueueSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00766A20 (FUN_00766A20)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `PathQueueSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkPathQueueSerializerNodeVariantB() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gPathQueueSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00766C00 (FUN_00766C00)
-   *
-   * What it does:
-   * Unlinks startup `PathQueueImplSerializer` helper links and rewires the
-   * node into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkPathQueueImplSerializerNodeVariantA() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gPathQueueImplSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00766C30 (FUN_00766C30)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `PathQueueImplSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkPathQueueImplSerializerNodeVariantB() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gPathQueueImplSerializerHelper);
   }
 
   /**
@@ -973,6 +919,58 @@ namespace gpg
     SaveContiguousArchiveVectorPayload(
       archive, view, CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
     );
+  }
+
+  /**
+   * Address: 0x005C5700 (FUN_005C5700)
+   *
+   * What it does:
+   * Reads one contiguous `vector<SPerArmyReconInfo>` payload: element count,
+   * then that many reflected `moho::SPerArmyReconInfo` values read into a
+   * fresh temporary vector, which replaces the destination vector's storage
+   * (releasing the old buffer). Bound as `RType::serLoadFunc_`; `version`/
+   * `ownerRef` are unused by this body, mirroring `gpg::
+   * DeserializeSimArmyPtrVector` (Reflection.cpp). Unlike its `Save*`
+   * sibling above, the binary body has no `archive`/`objectPtr` null guard
+   * -- every real call site (`ReadArchive::Read` dispatch through this
+   * type's `serLoadFunc_`) always supplies both, so none is added here.
+   * The element type is resolved through `moho::SPerArmyReconInfo::sType`
+   * directly (lazily populated via `gpg::LookupRType` on first use) rather
+   * than through this file's generic `CachedCompatRType<T>()` helper --
+   * a real, deliberate difference from the `Save` side confirmed against
+   * the `.c`/`.asm` (`Moho::SPerArmyReconInfo::sType` is read and, if null,
+   * assigned from `gpg::LookupRType`, matching the class's own public
+   * `static gpg::RType* sType` member already used by `gpg::
+   * RRef_SPerArmyReconInfo`).
+   */
+  void LoadVectorSPerArmyReconInfo(
+    gpg::ReadArchive* const archive,
+    int objectPtr,
+    int /*version*/,
+    gpg::RRef* /*ownerRef*/
+  )
+  {
+    auto* const outVector =
+      reinterpret_cast<msvc8::vector<moho::SPerArmyReconInfo>*>(static_cast<std::uintptr_t>(objectPtr));
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    msvc8::vector<moho::SPerArmyReconInfo> loaded;
+    loaded.reserve(count);
+
+    if (!moho::SPerArmyReconInfo::sType) {
+      moho::SPerArmyReconInfo::sType = gpg::LookupRType(typeid(moho::SPerArmyReconInfo));
+    }
+
+    const gpg::RRef emptyOwner{};
+    for (unsigned int i = 0; i < count; ++i) {
+      moho::SPerArmyReconInfo element{};
+      archive->Read(moho::SPerArmyReconInfo::sType, &element, emptyOwner);
+      loaded.push_back(element);
+    }
+
+    *outVector = std::move(loaded);
   }
 
   /**
@@ -9140,6 +9138,31 @@ namespace
 
   using SerializerWord = std::uint32_t;
 
+  /**
+   * INVESTIGATION FLAG (2026-08-25): this function has no `Address:` citation
+   * of its own -- every caller below supplies one, but none of the ones this
+   * pass checked hold up. Raw `.asm` reads at 9 of the ~127 cited addresses
+   * (`Wm3::AxisAlignedBox3f` 0x004ED140, `Moho::Vector4f` 0x004ED460,
+   * `Moho::VTransform` 0x004F0840, `Moho::HPathCell` 0x007632D0,
+   * `Moho::NavPath` 0x00763370, `Moho::PathQueue` 0x00767080,
+   * `Moho::CUnitCarrierRetrieve` 0x00607730, `Moho::CUnitCarrierLaunch`
+   * 0x006078B0, plus this function's own would-be address which turned out to
+   * be a duplicate citation of the unrelated, already-correctly-recovered
+   * `WriteSharedRawPointerFromLaunchInfoBaseSlotLane2` at 0x00884E70) show
+   * every one is actually a per-type `Init()` override on a distinct
+   * `gpg::SerHelperBase`-derived class (IDA's own demangled name:
+   * `gpg::SerSaveLoadHelper<T>::Init`), using a cached-static +
+   * `gpg::LookupRType(typeid(T))` lookup -- never `gpg::REF_FindTypeNamed`
+   * by string, which is what this shared helper does. 9/9 sampled addresses
+   * were wrong. Four are fixed (HPathCell/PathQueue in
+   * `moho/ai/HPathCellSerializer.*` and `moho/path/PathTables.cpp`; the two
+   * CUnitCarrier* citations were plain duplicates of already-correct
+   * recoveries and were deleted outright). The remaining ~120 callers below
+   * are UNVERIFIED, not confirmed-correct -- treat every one as a lead to
+   * re-check against its own raw `.asm`, not as settled. See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md
+   * for the full methodology and findings.
+   */
   [[nodiscard]] gpg::RType::load_func_t InstallSerSaveLoadHelperCallbacksByTypeName(
     SerSaveLoadHelperInitView* const helper,
     const char* const reflectedTypeName
@@ -9935,17 +9958,18 @@ namespace
   }
 
   /**
-   * Address: 0x00607730 (FUN_00607730)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitCarrierRetrieve`.
+   * `InstallMohoCUnitCarrierRetrieveSerializerCallbacks` removed here
+   * (2026-08-25 investigation): its `Address: 0x00607730` citation collided
+   * with the already-correctly-recovered
+   * `moho::CUnitCarrierRetrieveSerializerHelper::Init()` in
+   * `moho/unit/tasks/CUnitCarrierRetrieve.cpp`, which matches the raw asm at
+   * that address exactly (typeid-cached `gpg::LookupRType` lookup, not
+   * `REF_FindTypeNamed`). This
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitCarrierRetrieve")`
+   * body was a duplicate, disproven claim on an address another TU already
+   * owns for real; it had zero callers in this file. See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitCarrierRetrieveSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitCarrierRetrieve");
-  }
 
   /**
    * Address: 0x006077F0 (FUN_006077F0)
@@ -9961,17 +9985,16 @@ namespace
   }
 
   /**
-   * Address: 0x006078B0 (FUN_006078B0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitCarrierLaunch`.
+   * `InstallMohoCUnitCarrierLaunchSerializerCallbacks` removed here
+   * (2026-08-25 investigation): its `Address: 0x006078B0` citation collided
+   * with the already-correctly-recovered
+   * `moho::CUnitCarrierLaunchSerializerHelperNode::Init()` in
+   * `moho/unit/tasks/CUnitCarrierLaunch.cpp`, which matches the raw asm at
+   * that address exactly (typeid-cached `gpg::LookupRType` lookup, not
+   * `REF_FindTypeNamed`). Same disproven-duplicate shape as the
+   * `CUnitCarrierRetrieve` removal above. See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitCarrierLaunchSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitCarrierLaunch");
-  }
 
   /**
    * Address: 0x0060B980 (FUN_0060B980)
@@ -10602,43 +10625,27 @@ namespace
   }
 
   /**
-   * Address: 0x007632D0 (FUN_007632D0)
+   * `InstallMohoHPathCellSerializerCallbacks` (0x007632D0) and
+   * `InstallMohoPathQueueSerializerCallbacks` (0x00767080) removed here
+   * (2026-08-25 investigation): raw disassembly at both addresses is a
+   * typeid-cached `gpg::LookupRType` lookup, never `REF_FindTypeNamed`.
+   * Replaced by real `gpg::SerHelperBase`-derived classes with genuine
+   * `Init()` overrides: `moho::HPathCellSerializer`
+   * (moho/ai/HPathCellSerializer.h/.cpp) and `PathQueueSerializerHelper`
+   * (moho/path/PathTables.cpp).
    *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::HPathCell`.
+   * `InstallMohoNavPathSerializerCallbacks` (0x00763370) removed too, same
+   * disproof, but NOT yet replaced: `Moho::NavPath` (RTTI name, no "S"
+   * prefix) is not `moho::SNavPath` (the already-declared 0x10-byte struct
+   * in IAiNavigator.h) and its real C++ shape (raw disassembly shows its
+   * `Deserialize`/`Serialize` forward the object pointer, unmodified, into
+   * `msvc8::vector<moho::HPathCell>`'s own reflected Read/Write -- i.e.
+   * `NavPath` wraps or derives from that vector with no other reflected
+   * state) needs a dedicated pass before it can be safely declared.
+   * `gNavPathSerializerHelper` (still dead/unwired) is left in this file
+   * pending that pass. See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoHPathCellSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::HPathCell");
-  }
-
-  /**
-   * Address: 0x00763370 (FUN_00763370)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::NavPath`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoNavPathSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::NavPath");
-  }
-
-  /**
-   * Address: 0x00767080 (FUN_00767080)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::PathQueue`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoPathQueueSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::PathQueue");
-  }
 
   /**
    * Address: 0x00773D00 (FUN_00773D00)
