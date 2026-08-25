@@ -511,46 +511,35 @@ namespace
   static_assert(sizeof(FastVectorCPathPointTypeInfo) == 0x68, "FastVectorCPathPointTypeInfo size must be 0x68");
 
   /**
-   * Address: 0x00BCBD70 (FUN_00BCBD70, dynamic initializer for the global
-   * `ECollisionTypePrimitiveSerializer` singleton)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ECollisionType,int>
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list), then
-   * binds the load/save callback fields. Confirmed from raw disassembly:
-   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
-   * `??_7?$PrimitiveSerHelper@W4ECollisionType@Moho@@H@gpg@@6B@` (the
-   * `gpg::PrimitiveSerHelper<Moho::ECollisionType,int>` template's vtable)
-   * -- no eager `Init()` call exists here, and this class has no
-   * user-declared destructor (the real binary explicitly registers
-   * `atexit(&sub_BF6520)` instead).
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ECollisionType@Moho@@H@gpg'`):
+   * `FUN_00BCBD70` (real, `__xc_a`-reachable, sole ctor-shaped writer for
+   * this global's storage). A separate `gpg::SerSaveLoadHelper<
+   * Moho::ECollisionType>` writer, `FUN_00598440`, shares no storage with
+   * this global and is itself zero-xref/unreachable -- same "dead
+   * sibling-writer" pattern documented for other enums on the
+   * `PrimitiveSerHelper` template (see `Reflection.h`); already correctly
+   * classified `skip` in the progress DB.
+   *
+   * Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_00598400`/`FUN_00598420`, installs the
+   * `PrimitiveSerHelper<ECollisionType,int>` vtable, and explicitly
+   * registers `atexit(&sub_BF6520)` -- confirmed bare unlink-then-self-link
+   * shape matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed. Two
+   * zero-xref duplicate emissions of that same unlink logic
+   * (`FUN_005966D0`, `FUN_00596700`) are already correctly marked `skip`.
+   *
+   * Previously modeled as its own hand-rolled `SerHelperBase`-derived class
+   * (correctly identifying the real ctor/vtable, but not actually reusing
+   * the shared template, so its compiled vtable identity would diverge from
+   * the binary's real `?$PrimitiveSerHelper@W4ECollisionType@Moho@@H@gpg`
+   * symbol). Collapsed into the canonical template alias.
    */
-  class ECollisionTypePrimitiveSerializer : public gpg::SerHelperBase
-  {
-  public:
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    ECollisionTypePrimitiveSerializer();
-
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(ECollisionTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "ECollisionTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ECollisionTypePrimitiveSerializer, mSerialize) == 0x10,
-    "ECollisionTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(ECollisionTypePrimitiveSerializer) == 0x14, "ECollisionTypePrimitiveSerializer size must be 0x14"
-  );
+  using ECollisionTypePrimitiveSerializer = gpg::PrimitiveSerHelper<ECollisionType, int>;
 } // namespace
 
 namespace
@@ -573,12 +562,10 @@ namespace
     unsigned char gFastVectorCPathPointTypeStorage[sizeof(FastVectorCPathPointTypeInfo)] = {};
   bool gFastVectorCPathPointTypeConstructed = false;
 
-  // Address: 0x010AE1EC -- process-global `ECollisionTypePrimitiveSerializer`
-  // singleton. Constructing it runs ECollisionTypePrimitiveSerializer::
-  // ECollisionTypePrimitiveSerializer() (0x00BCBD70), which splices this
-  // helper into gpg::SerHelperBase::sNewHelpers and explicitly registers
-  // this translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // Address: 0x010AE1EC -- process-global `PrimitiveSerHelper<ECollisionType,int>`
+  // singleton (constructed by FUN_00BCBD70, self-registering via `__xc_a`;
+  // see the class Doxygen above for the real-ctor/atexit-target/dead-writer
+  // evidence).
   ECollisionTypePrimitiveSerializer gECollisionTypePrimitiveSerializer;
 
   // Address: 0x010AE29C -- process-global `SCollisionInfoSerializer`
@@ -591,12 +578,10 @@ namespace
   // binary's atexit registration.
   moho::SCollisionInfoSerializer gSCollisionInfoSerializer;
 
-  // Address: 0x010B2038 -- process-global `EPathPointStatePrimitiveSerializer`
-  // singleton. Constructing it runs EPathPointStatePrimitiveSerializer::
-  // EPathPointStatePrimitiveSerializer() (0x00BD20E0), which splices this
-  // helper into gpg::SerHelperBase::sNewHelpers and explicitly registers
-  // this translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // Address: 0x010B2038 -- process-global `PrimitiveSerHelper<EPathPointState,int>`
+  // singleton (constructed by FUN_00BD20E0, self-registering via `__xc_a`;
+  // see CAiPathSpline.h for the real-ctor/atexit-target/dead-writer
+  // evidence).
   moho::EPathPointStatePrimitiveSerializer gEPathPointStatePrimitiveSerializer;
 
   // Address: 0x010B204C -- process-global `CPathPointSerializer` singleton.
@@ -896,20 +881,6 @@ namespace
   }
 
   /**
-   * Address: 0x00BFA7F0 (FUN_00BFA7F0, cleanup_EPathPointStatePrimitiveSerializer)
-   *
-   * What it does:
-   * Unlinks the global `EPathPointStatePrimitiveSerializer` helper node from
-   * the intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BD20E0) as the global's
-   * `atexit` teardown.
-   */
-  void cleanup_EPathPointStatePrimitiveSerializer()
-  {
-    gEPathPointStatePrimitiveSerializer.ResetLinks();
-  }
-
-  /**
    * Address: 0x0062F650 (FUN_0062F650, construct_CPathPointTypeInfo)
    *
    * What it does:
@@ -959,23 +930,6 @@ namespace
     AcquireECollisionTypeTypeInfo()->~ECollisionTypeTypeInfo();
     gECollisionTypeTypeInfoConstructed = false;
     gECollisionTypeType = nullptr;
-  }
-
-  /**
-   * Address: 0x00BF6520 (FUN_00BF6520, cleanup_PrimitiveSerHelper_ECollisionType_int)
-   *
-   * What it does:
-   * Unlinks the global `ECollisionTypePrimitiveSerializer` helper node from
-   * the intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCBD70) as the global's
-   * `atexit` teardown. Two duplicate zero-xref emissions of this same
-   * unlink/self-link sequence exist nearby (0x005966D0, 0x00596700,
-   * formerly `cleanup_PrimitiveSerHelper_ECollisionTypeStartupThunkA/B`);
-   * they are superseded by this citation.
-   */
-  void cleanup_PrimitiveSerHelper_ECollisionType_int()
-  {
-    gECollisionTypePrimitiveSerializer.ResetLinks();
   }
 
   /**
@@ -1039,40 +993,6 @@ namespace
 
     delete gRecoveredAiPathSplineStartupStatsSlot;
     gRecoveredAiPathSplineStartupStatsSlot = nullptr;
-  }
-
-  /**
-   * Address: 0x0062F980 (FUN_0062F980, Deserialize_EPathPointState)
-   *
-   * What it does:
-   * Reads one enum lane as `int` and stores it into `EPathPointState`.
-   */
-  void Deserialize_EPathPointState(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<moho::EPathPointState*>(static_cast<std::uintptr_t>(objectPtr)) =
-      static_cast<moho::EPathPointState>(value);
-  }
-
-  /**
-   * Address: 0x0062F9A0 (FUN_0062F9A0, Serialize_EPathPointState)
-   *
-   * What it does:
-   * Writes one `EPathPointState` enum lane as `int`.
-   */
-  void Serialize_EPathPointState(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto* const value = reinterpret_cast<const moho::EPathPointState*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(*value));
   }
 
 } // namespace
@@ -1821,95 +1741,6 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
   fill.mDirection = Wm3::Vector3f{};
   fill.mState = PPS_7;
   vec.Resize(static_cast<std::size_t>(count), fill);
-}
-
-/**
- * Address: 0x00BD20E0 (FUN_00BD20E0, dynamic initializer for the global
- * `EPathPointStatePrimitiveSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
- */
-EPathPointStatePrimitiveSerializer::EPathPointStatePrimitiveSerializer()
-  : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Deserialize_EPathPointState))
-  , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Serialize_EPathPointState))
-{
-  (void)std::atexit(&cleanup_EPathPointStatePrimitiveSerializer);
-}
-
-void EPathPointStatePrimitiveSerializer::Init()
-{
-  gpg::RType* const type = ResolveEPathPointStateType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-  type->serLoadFunc_ = mDeserialize;
-  type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x00598400 (FUN_00598400, gpg::PrimitiveSerHelper_ECollisionType_int::Deserialize)
- */
-void ECollisionTypePrimitiveSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (archive == nullptr || objectPtr == 0) {
-    return;
-  }
-
-  int value = 0;
-  archive->ReadInt(&value);
-  *reinterpret_cast<ECollisionType*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<ECollisionType>(value);
-}
-
-/**
- * Address: 0x00598420 (FUN_00598420, gpg::PrimitiveSerHelper_ECollisionType_int::Serialize)
- */
-void ECollisionTypePrimitiveSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (archive == nullptr || objectPtr == 0) {
-    return;
-  }
-
-  const auto* const value = reinterpret_cast<const ECollisionType*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteInt(static_cast<int>(*value));
-}
-
-/**
- * Address: 0x00BCBD70 (FUN_00BCBD70, dynamic initializer for the global
- * `ECollisionTypePrimitiveSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
- */
-ECollisionTypePrimitiveSerializer::ECollisionTypePrimitiveSerializer()
-  : mDeserialize(&ECollisionTypePrimitiveSerializer::Deserialize)
-  , mSerialize(&ECollisionTypePrimitiveSerializer::Serialize)
-{
-  (void)std::atexit(&cleanup_PrimitiveSerHelper_ECollisionType_int);
-}
-
-void ECollisionTypePrimitiveSerializer::Init()
-{
-  gpg::RType* const type = ResolveECollisionTypeType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-  type->serLoadFunc_ = mDeserialize;
-  type->serSaveFunc_ = mSerialize;
 }
 
 /**

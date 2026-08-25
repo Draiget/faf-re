@@ -497,56 +497,34 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BD20E0 (FUN_00BD20E0, dynamic initializer for the global
-   * `EPathPointStatePrimitiveSerializer` singleton)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPathPointState,int>
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list), then
-   * binds the load/save callback fields. Confirmed from raw disassembly:
-   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
-   * `??_7?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg@@6B@` (the
-   * `gpg::PrimitiveSerHelper<Moho::EPathPointState,int>` template's vtable;
-   * this class's own recovered shape mirrors the sibling per-enum
-   * `*PrimitiveSerializer` classes already established elsewhere, e.g.
-   * `ESiloTypePrimitiveSerializer`) -- no eager `Init()` call exists here,
-   * and this class has no user-declared destructor (the real binary
-   * explicitly registers `atexit(&sub_BFA7F0)` instead). Two duplicate
-   * zero-xref "construct+set-fields" emissions of this same ctor logic
-   * exist nearby (0x0062F840, 0x0062F9C0, formerly
-   * `InitializeEPathPointStatePrimitiveSerializerPrimitiveLane/SaveLoadLane`);
-   * they are superseded by this citation.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg'`):
+   * `FUN_00BD20E0` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_0062F840`. A third writer for the same global's storage address,
+   * `FUN_0062F9C0` (demangled `gpg::SerSaveLoadHelper<Moho::EPathPointState>`),
+   * is itself zero-xref/unreachable too -- same "dead sibling-writer"
+   * pattern documented for `EAlliance`/`ELayer`/`EVisibilityMode`/
+   * `ESquadClass`/`EThreatType`/`ESiloType` on the `PrimitiveSerHelper`
+   * template itself (see `Reflection.h`); all three already correctly
+   * classified in the progress DB by an earlier pass this session.
+   *
+   * Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_0062F980`/`FUN_0062F9A0`, installs the
+   * `PrimitiveSerHelper<EPathPointState,int>` vtable, and explicitly
+   * registers `atexit(&sub_BFA7F0)` -- confirmed bare unlink-then-self-link
+   * shape matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * Previously modeled as its own hand-rolled `SerHelperBase`-derived class
+   * (correctly identifying the real ctor/vtable, but not actually reusing
+   * the shared template, so its compiled vtable identity would diverge from
+   * the binary's real `?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg`
+   * symbol). Collapsed into the canonical template alias.
    */
-  class EPathPointStatePrimitiveSerializer : public gpg::SerHelperBase
-  {
-  public:
-    EPathPointStatePrimitiveSerializer();
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected
-     * `EPathPointState`. Dispatched by `gpg::SerHelperBase::InitNewHelpers`
-     * when this helper is drained from the pending list (vtable slot 0).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EPathPointStatePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EPathPointStatePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EPathPointStatePrimitiveSerializer, mSerialize) == 0x10,
-    "EPathPointStatePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EPathPointStatePrimitiveSerializer) == 0x14,
-    "EPathPointStatePrimitiveSerializer size must be 0x14"
-  );
+  using EPathPointStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EPathPointState, int>;
 
   class SCollisionInfoSerializer : public gpg::SerHelperBase
   {
