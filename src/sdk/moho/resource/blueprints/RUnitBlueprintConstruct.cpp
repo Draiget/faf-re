@@ -22,32 +22,43 @@ namespace gpg
 
 namespace
 {
+  // RUnitBlueprint (unlike RBeamBlueprint/REmitterBlueprint/RMeshBlueprint/
+  // RProjectileBlueprint/RTrailBlueprint) has no plain `sType` static member
+  // of its own -- the binary's own cache for this Init() is a distinct
+  // global (`Moho__RUnitBlueprint__sType2`, IDA's own disambiguation suffix
+  // implying more than one similarly-named RUnitBlueprint-related RType
+  // cache exists). Rather than add a new static data member to
+  // RUnitBlueprint's layout for this, this TU keeps its own lazily-resolved
+  // cache, matching the established fallback pattern used elsewhere in this
+  // codebase when the owning type exposes no such member (see
+  // `CachedCEconStorageType()` in CEconomy.cpp).
   gpg::RType* gRuleGameRulesType = nullptr;
   gpg::RType* gUnitBlueprintType = nullptr;
-  moho::RUnitBlueprintConstruct gUnitBlueprintConstruct;
+
+  // Address: 0x010AAFE4 -- process-global `RUnitBlueprintConstruct` singleton.
+  // Constructing it runs RUnitBlueprintConstruct::RUnitBlueprintConstruct()
+  // (0x00BC8C60), which splices this helper into gpg::SerHelperBase::
+  // sNewHelpers; gpg::SerHelperBase::InitNewHelpers() later dispatches
+  // Init() on it from within the first ReadArchive/WriteArchive construction.
+  moho::RUnitBlueprintConstruct gRUnitBlueprintConstructHelper;
 
   /**
-   * Address: 0x00522C60 (FUN_00522C60)
+   * Address: 0x00BF3780 (FUN_00BF3780)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintConstruct` helper node from the global
-   * serializer-helper intrusive list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintConstruct);
-  }
-
-  /**
-   * Address: 0x00522C90 (FUN_00522C90)
+   * Unlinks the `RUnitBlueprintConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8C60) as the
+   * global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RUnitBlueprintConstruct` helper-node
-   * cleanup; behavior matches the primary lane.
+   * ICF twins: 0x00522C60 (FUN_00522C60) and 0x00522C90 (FUN_00522C90) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintConstructHelperNodeSecondary() noexcept
+  void CleanupRUnitBlueprintConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintConstruct);
+    gRUnitBlueprintConstructHelper.ResetLinks();
   }
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
@@ -65,11 +76,6 @@ namespace
       moho::blueprint_ser::ResolveCachedType<moho::RRuleGameRules>(gRuleGameRulesType)
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
-  }
-
-  void CleanupUnitBlueprintConstructAtexit()
-  {
-    (void)CleanupUnitBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -121,56 +127,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x00523740 (FUN_00523740, sub_523740)
+   * Address: 0x00BC8C60 (FUN_00BC8C60, dynamic initializer for the global
+   * `RUnitBlueprintConstruct` singleton)
    *
    * What it does:
-   * Binds `RUnitBlueprint` construct/delete callbacks into reflected RTTI
-   * (`serConstructFunc_`, `deleteFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
-  void RUnitBlueprintConstruct::RegisterConstructFunction()
+  RUnitBlueprintConstruct::RUnitBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RUnitBlueprint))
+    , mDeleteCallback(&Delete_RUnitBlueprint)
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RUnitBlueprint>(gUnitBlueprintType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
+    (void)std::atexit(&CleanupRUnitBlueprintConstruct);
   }
 
   /**
-   * Address: 0x00BF3780 (FUN_00BF3780, sub_BF3780)
+   * Address: 0x00523740 (FUN_00523740, gpg::SerConstructHelper<Moho::RUnitBlueprint>::Init)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintConstruct` helper links and rewires self-links.
+   * Lazily resolves `RUnitBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RUnitBlueprintConstruct()
+  void RUnitBlueprintConstruct::Init()
   {
-    return CleanupUnitBlueprintConstructHelperNodePrimary();
-  }
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00BC8C60 (FUN_00BC8C60, sub_BC8C60)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for `RUnitBlueprint`.
-   */
-  int register_RUnitBlueprintConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gUnitBlueprintConstruct);
-    gUnitBlueprintConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RUnitBlueprint);
-    gUnitBlueprintConstruct.mDeleteCallback = &Delete_RUnitBlueprint;
-    gUnitBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupUnitBlueprintConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RUnitBlueprint>(gUnitBlueprintType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RUnitBlueprintConstructBootstrap
-  {
-    RUnitBlueprintConstructBootstrap()
-    {
-      (void)moho::register_RUnitBlueprintConstruct();
-    }
-  };
-
-  RUnitBlueprintConstructBootstrap gRUnitBlueprintConstructBootstrap;
-} // namespace
