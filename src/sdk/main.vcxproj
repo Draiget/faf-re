@@ -1017,7 +1017,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\SPhysBody.cpp" />
     <ClCompile Include="moho\sim\SPhysConstantsTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SPhysConstantsSerializer.cpp" />
-    <ClCompile Include="moho\sim\SPhysBodyReflection.cpp" />
     <ClCompile Include="moho\sim\SimGravityCommandRegistrations.cpp" />
     <ClCompile Include="moho\projectile\ProjectileTypeInfo.cpp" />
     <ClCompile Include="moho\projectile\ProjectileSerHelpers.cpp" />
@@ -2265,7 +2264,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SPhysConstantsTypeInfo.h" />
     <ClInclude Include="moho\sim\SPhysConstantsSerializer.h" />
     <ClInclude Include="moho\sim\SPhysBody.h" />
-    <ClInclude Include="moho\sim\SPhysBodyReflection.h" />
     <ClInclude Include="moho\sim\CArmyImplSerializer.h" />
     <ClInclude Include="moho\sim\CArmyImplTypeInfo.h" />
     <ClInclude Include="moho\sim\CArmyStatItemSerializer.h" />
