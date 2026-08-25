@@ -78,64 +78,32 @@ namespace moho
   /**
    * VFTABLE: 0x00E0D774
    * COL: 0x00E67028
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::SDelayedSubVizInfo>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_SDelayedSubVizInfoSerializer`):
+   *    0x00BC78E0 (dead zero-xref COMDAT duplicate: 0x00507C90)
+   *  - dtor: 0x00BF1D60 (`??1SDelayedSubVizInfoSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x00507CC0
+   *  - Deserialize(): 0x00507010
+   *  - Serialize(): 0x00507020
    */
-  class SDelayedSubVizInfoSerializer
-  {
-  public:
-    /**
-     * Address: 0x00507CC0 (FUN_00507CC0, gpg::SerSaveLoadHelper<Moho::SDelayedSubVizInfo>::Init)
-     *
-     * What it does:
-     * Binds serializer load/save callbacks into `SDelayedSubVizInfo` RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-    /**
-     * Address: 0x00507010 (FUN_00507010, Moho::SDelayedSubVizInfoSerializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00507020 (FUN_00507020, Moho::SDelayedSubVizInfoSerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
-
-  public:
-    gpg::SerHelperBase* mHelperNext;     // +0x04
-    gpg::SerHelperBase* mHelperPrev;     // +0x08
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(offsetof(SDelayedSubVizInfoSerializer, mHelperNext) == 0x04, "SDelayedSubVizInfoSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SDelayedSubVizInfoSerializer, mHelperPrev) == 0x08, "SDelayedSubVizInfoSerializer::mHelperPrev offset must be 0x08");
-  static_assert(offsetof(SDelayedSubVizInfoSerializer, mDeserialize) == 0x0C, "SDelayedSubVizInfoSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(SDelayedSubVizInfoSerializer, mSerialize) == 0x10, "SDelayedSubVizInfoSerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(SDelayedSubVizInfoSerializer) == 0x14, "SDelayedSubVizInfoSerializer size must be 0x14");
+  using SDelayedSubVizInfoSerializer = gpg::SerSaveLoadHelper<SDelayedSubVizInfo>;
 
   /**
-   * Address: 0x00507040 (FUN_00507040, init_SDelayedSubVizInfoSerializer)
+   * Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
    *
    * What it does:
-   * Initializes global delayed-sub-viz serializer helper lanes.
+   * Forces this translation unit's global `SDelayedSubVizInfoSerializer`
+   * instance to link into the reflection bootstrap sequence. The ctor/
+   * vtable-install/atexit-dtor-registration sequence this address decompiles
+   * to is MSVC's own compiler-generated dynamic initializer for that global,
+   * not hand-written source -- see `gpg::SerSaveLoadHelper<T>` in
+   * Reflection.h.
    */
-  SDelayedSubVizInfoSerializer* initialize_SDelayedSubVizInfoSerializer();
-
-  /**
-   * Address: 0x00507070 (FUN_00507070, cleanup_SDelayedSubVizInfoSerializer)
-   *
-   * What it does:
-   * Unlinks serializer helper node from intrusive list and self-links it.
-   */
-  gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant1();
-
-  /**
-   * Address: 0x005070A0 (FUN_005070A0, cleanup_SDelayedSubVizInfoSerializer duplicate lane)
-   *
-   * What it does:
-   * Duplicate cleanup lane with same list-unlink semantics as `FUN_00507070`.
-   */
-  gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant2();
+  void register_SDelayedSubVizInfoSerializer();
 
   /**
    * Address: 0x00506ED0 (FUN_00506ED0, preregister_SDelayedSubVizInfoTypeInfo)
