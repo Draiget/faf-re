@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -13,22 +14,28 @@
 namespace
 {
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
-  moho::CSimSoundManagerSerializer gCSimSoundManagerSerializer{};
 
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::CSimSoundManagerSerializer& serializer) noexcept
+  // Address: 0x010BAF04 -- process-global `CSimSoundManagerSerializer`
+  // singleton. Constructing it runs CSimSoundManagerSerializer::
+  // CSimSoundManagerSerializer() (0x00BDC590, IDA's own inferred name for
+  // this address is register_CSimSoundManagerSerializer), which splices
+  // this helper into gpg::SerHelperBase::sNewHelpers;
+  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init() on it from
+  // within the first ReadArchive/WriteArchive construction.
+  moho::CSimSoundManagerSerializer gCSimSoundManagerSerializer;
+
+  /**
+   * Address: 0x00C015C0 (FUN_00C015C0, sub_C015C0)
+   *
+   * What it does:
+   * Unlinks the `CSimSoundManagerSerializer` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked
+   * sentinel state. Registered by the real dynamic initializer
+   * (0x00BDC590) as the global's `atexit` teardown.
+   */
+  void CleanupCSimSoundManagerSerializer()
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(moho::CSimSoundManagerSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
+    gCSimSoundManagerSerializer.ResetLinks();
   }
 
   /**
@@ -38,9 +45,9 @@ namespace
    * Unlinks startup `CSimSoundManagerSerializer` helper links and rewires the
    * node into one self-linked sentinel lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCSimSoundManagerSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkCSimSoundManagerSerializerNodeVariantA() noexcept
   {
-    return UnlinkSerializerNode(gCSimSoundManagerSerializer);
+    gCSimSoundManagerSerializer.ResetLinks();
   }
 
   /**
@@ -50,9 +57,9 @@ namespace
    * Duplicate unlink/reset lane for the startup `CSimSoundManagerSerializer`
    * helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCSimSoundManagerSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkCSimSoundManagerSerializerNodeVariantB() noexcept
   {
-    return UnlinkSerializerNode(gCSimSoundManagerSerializer);
+    gCSimSoundManagerSerializer.ResetLinks();
   }
 
   void SerializeAudioRequestFastVectorRuntime(
@@ -291,12 +298,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BDC590 (FUN_00BDC590, dynamic initializer for the global
+   * `CSimSoundManagerSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and
+   * splices into `sNewHelpers`), binds the load/save callback fields, and
+   * registers process-exit cleanup.
+   */
+  CSimSoundManagerSerializer::CSimSoundManagerSerializer()
+    : mLoadCallback(&CSimSoundManagerSerializer::Deserialize)
+    , mSaveCallback(&CSimSoundManagerSerializer::Serialize)
+  {
+    (void)std::atexit(&CleanupCSimSoundManagerSerializer);
+  }
+
+  /**
    * Address: 0x00761E90 (FUN_00761E90, gpg::SerSaveLoadHelper_CSimSoundManager::Init)
    *
    * What it does:
    * Resolves `CSimSoundManager` RTTI and installs load/save callbacks.
    */
-  void CSimSoundManagerSerializer::RegisterSerializeFunctions()
+  void CSimSoundManagerSerializer::Init()
   {
     gpg::RType* const typeInfo = audio_reflection::ResolveCSimSoundManagerType();
     audio_reflection::RegisterSerializeCallbacks(typeInfo, mLoadCallback, mSaveCallback);

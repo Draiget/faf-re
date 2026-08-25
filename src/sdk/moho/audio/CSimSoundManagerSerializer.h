@@ -7,7 +7,6 @@
 namespace gpg
 {
   class ReadArchive;
-  struct SerHelperBase;
   class WriteArchive;
 } // namespace gpg
 
@@ -17,9 +16,28 @@ namespace moho
    * VFTABLE: 0x00E35ABC
    * COL: 0x00E8EF78
    */
-  class CSimSoundManagerSerializer
+  class CSimSoundManagerSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDC590 (FUN_00BDC590, dynamic initializer for the global
+     * `CSimSoundManagerSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields. Confirmed from raw
+     * disassembly (IDA's own inferred name for this address is literally
+     * `register_CSimSoundManagerSerializer`): calls
+     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CSimSoundManagerSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here. Previously this global was declared with plain `{}`
+     * aggregate init and this constructor was never invoked anywhere in
+     * the recovered source, so the helper was never spliced into
+     * `sNewHelpers` and its `Init()` never ran.
+     */
+    CSimSoundManagerSerializer();
+
     /**
      * Address: 0x00762440 (FUN_00762440)
      *
@@ -41,24 +59,16 @@ namespace moho
      *
      * What it does:
      * Binds load/save serializer callbacks into `CSimSoundManager` RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(
-    offsetof(CSimSoundManagerSerializer, mHelperNext) == 0x04,
-    "CSimSoundManagerSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CSimSoundManagerSerializer, mHelperPrev) == 0x08,
-    "CSimSoundManagerSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CSimSoundManagerSerializer, mLoadCallback) == 0x0C,
     "CSimSoundManagerSerializer::mLoadCallback offset must be 0x0C"
