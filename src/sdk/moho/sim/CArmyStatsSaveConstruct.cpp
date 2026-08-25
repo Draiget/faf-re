@@ -27,7 +27,6 @@ namespace
   }
 
   gpg::RType* gCAiBrainType = nullptr;
-  moho::CArmyStatsSaveConstruct gCArmyStatsSaveConstruct;
 
   /**
    * Address: 0x0070DF60 (FUN_0070DF60, sub_70DF60)
@@ -57,19 +56,22 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BDA1A0 (FUN_00BDA1A0, sub_BDA1A0)
+   * Address: 0x00BDA1A0 (FUN_00BDA1A0, dynamic initializer for the global
+   * `CArmyStatsSaveConstruct` singleton)
    *
    * What it does:
-   * Initializes CArmyStats save-construct helper callback slots and registers
-   * them into reflected RTTI.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
    */
-  void register_CArmyStatsSaveConstruct()
+  CArmyStatsSaveConstruct::CArmyStatsSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_CArmyStats)
+      )
+  {}
+
+  CArmyStatsSaveConstruct::~CArmyStatsSaveConstruct()
   {
-    gCArmyStatsSaveConstruct.mHelperNext = nullptr;
-    gCArmyStatsSaveConstruct.mHelperPrev = nullptr;
-    gCArmyStatsSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_CArmyStats);
-    gCArmyStatsSaveConstruct.RegisterSaveConstructArgsFunction();
+    ResetLinks();
   }
 
   /**
@@ -78,7 +80,7 @@ namespace moho
    * IDA signature:
    * gpg::RType *__thiscall sub_70F4E0(void (__cdecl **this)(...));
    */
-  void CArmyStatsSaveConstruct::RegisterSaveConstructArgsFunction()
+  void CArmyStatsSaveConstruct::Init()
   {
     gpg::RType* const type = CArmyStats::StaticGetClass();
     GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
@@ -88,13 +90,6 @@ namespace moho
 
 namespace
 {
-  struct CArmyStatsSaveConstructBootstrap
-  {
-    CArmyStatsSaveConstructBootstrap()
-    {
-      moho::register_CArmyStatsSaveConstruct();
-    }
-  };
-
-  CArmyStatsSaveConstructBootstrap gCArmyStatsSaveConstructBootstrap;
+  // Address: 0x010B902C -- process-global `CArmyStatsSaveConstruct` singleton.
+  moho::CArmyStatsSaveConstruct gCArmyStatsSaveConstruct;
 } // namespace

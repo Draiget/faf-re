@@ -1,45 +1,11 @@
 #include "moho/sim/CArmyStatsSerializer.h"
 
-#include <cstdlib>
-
 #include "moho/sim/CArmyStats.h"
 
 namespace
 {
+  // Address: 0x010B8FB4 -- process-global `CArmyStatsSerializer` singleton.
   moho::CArmyStatsSerializer gCArmyStatsSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  void CleanupCArmyStatsSerializerAtexit()
-  {
-    (void)UnlinkHelperNode(gCArmyStatsSerializer);
-  }
 } // namespace
 
 namespace moho
@@ -88,38 +54,20 @@ namespace moho
    * Address: 0x00BDA210 (FUN_00BDA210, register_CArmyStatsSerializer)
    *
    * What it does:
-   * Initializes `CArmyStats` serializer helper callback slots and registers
-   * them into reflected RTTI.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_CArmyStatsSerializer()
-  {
-    InitializeHelperNode(gCArmyStatsSerializer);
-    gCArmyStatsSerializer.mLoadCallback = &CArmyStatsSerializer::Deserialize;
-    gCArmyStatsSerializer.mSaveCallback = &CArmyStatsSerializer::Serialize;
-    (void)std::atexit(&CleanupCArmyStatsSerializerAtexit);
-  }
+  CArmyStatsSerializer::CArmyStatsSerializer()
+    : mLoadCallback(&CArmyStatsSerializer::Deserialize)
+    , mSaveCallback(&CArmyStatsSerializer::Serialize)
+  {}
 
   /**
-   * Address: 0x0070E240 (FUN_0070E240)
-   *
-   * What it does:
-   * Duplicated teardown lane for `CArmyStatsSerializer` helper links.
+   * Address: 0x00BFF850 (FUN_00BFF850, Moho::CArmyStatsSerializer::~CArmyStatsSerializer)
    */
-  gpg::SerHelperBase* cleanup_CArmyStatsSerializer_variant_primary()
+  CArmyStatsSerializer::~CArmyStatsSerializer()
   {
-    return UnlinkHelperNode(gCArmyStatsSerializer);
-  }
-
-  /**
-   * Address: 0x0070E270 (FUN_0070E270)
-   *
-   * What it does:
-   * Secondary duplicated teardown lane for `CArmyStatsSerializer` helper
-   * links.
-   */
-  gpg::SerHelperBase* cleanup_CArmyStatsSerializer_variant_secondary()
-  {
-    return UnlinkHelperNode(gCArmyStatsSerializer);
+    ResetLinks();
   }
 
   /**
@@ -128,7 +76,7 @@ namespace moho
    * IDA signature:
    * void (__cdecl *__thiscall sub_70F5E0(void (__cdecl **this)(...)))(...);
    */
-  void CArmyStatsSerializer::RegisterSerializeFunctions()
+  void CArmyStatsSerializer::Init()
   {
     gpg::RType* const type = CArmyStats::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -137,16 +85,3 @@ namespace moho
     type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct CArmyStatsSerializerBootstrap
-  {
-    CArmyStatsSerializerBootstrap()
-    {
-      moho::register_CArmyStatsSerializer();
-    }
-  };
-
-  CArmyStatsSerializerBootstrap gCArmyStatsSerializerBootstrap;
-} // namespace

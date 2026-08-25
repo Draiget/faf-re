@@ -4,37 +4,52 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CArmyStatsConstruct
+  /**
+   * VFTABLE: 0x00E31288
+   */
+  class CArmyStatsConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDA1D0 (FUN_00BDA1D0, dynamic initializer for the global
+     * `CArmyStatsConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the construct/delete callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
+     * then installs `??_7CArmyStatsConstruct@Moho@@6B@` -- no eager
+     * `Init()` call exists here. The ctor's atexit target is a plain,
+     * unmangled unlink thunk (not a mangled destructor symbol), so it is
+     * modeled as the compiler's own implicit static-destructor
+     * registration: this class declares a real destructor and relies on
+     * the compiler to emit the matching registration.
+     */
+    CArmyStatsConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CArmyStatsConstruct();
+
     /**
      * Address: 0x0070F560 (FUN_0070F560, gpg::SerConstructHelper_CArmyStats::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into CArmyStats RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
   };
 
-  static_assert(
-    offsetof(CArmyStatsConstruct, mHelperNext) == 0x04, "CArmyStatsConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CArmyStatsConstruct, mHelperPrev) == 0x08, "CArmyStatsConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CArmyStatsConstruct, mConstructCallback) == 0x0C,
     "CArmyStatsConstruct::mConstructCallback offset must be 0x0C"
