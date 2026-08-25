@@ -644,6 +644,11 @@ namespace moho
    * Address: 0x006EB810 (FUN_006EB810)
    * Address: 0x007A5EB0 (FUN_007A5EB0)
    * Address: 0x007A6030 (FUN_007A6030)
+   * Address: 0x007F3B90 (FUN_007F3B90, ICF twin of FUN_005725A0/FUN_00573140/
+   *          FUN_006B2400 above -- identical `function_sha256`. Direct
+   *          callers are `FUN_007F20E0` (`AssignCameraFrustumWeakRefRange`,
+   *          RangeRenderer.cpp) and `FUN_007F35E0` (a genuinely-unreferenced
+   *          ICF-twin fragment, `skip`, zero callers of its own).)
    *
    * What it does:
    * Copy-assigns one contiguous weak-link pair range in forward order and
@@ -711,6 +716,19 @@ namespace moho
    * Address: 0x007A6120 (FUN_007A6120)
    * Address: 0x007A5EC0 (FUN_007A5EC0) - __cdecl calling-convention
    *          trampoline into 0x007A6120; no separate logic of its own.
+   * Address: 0x007B1740 (FUN_007B1740, ICF twin of FUN_004FB240 -- identical
+   *          `function_sha256` in the namespace callgraph index. Direct
+   *          callers are `FUN_007AF0B0` (`InsertUserEntityRangeIntoCameraFrustumLane`,
+   *          CameraImpl.cpp) and `FUN_007B1070` (a genuinely-orphaned
+   *          default-arg forwarder, zero callers of its own -- `skip`).
+   *          Reached from the camera frustum lane insert's in-place
+   *          tail-shift step, both branches.)
+   * Address: 0x007B17B0 (FUN_007B17B0, ICF twin of FUN_004FB240 -- identical
+   *          `function_sha256`. Direct callers are `FUN_007AF0B0` (same
+   *          insert dispatcher as above) and `FUN_007B10A0` (sibling
+   *          register-shape adapter). Reached from the same in-place
+   *          tail-shift step as FUN_007B1740, a different call site within
+   *          `FUN_007AF0B0`.)
    *
    * What it does:
    * Copy-assigns one contiguous weak-link pair range in backward order and
@@ -925,6 +943,13 @@ namespace moho
    * Address: 0x008B7DA0 (FUN_008B7DA0, sibling emission for the
    * `UserCommandQueueEntry` instantiation -- reached from
    * `CopyQueueLinkRangeWithOwnerRelink` in UserUnit.cpp)
+   * Address: 0x007A61F0 (FUN_007A61F0, separate non-ICF-folded emission of
+   * the same body -- direct callers are `FUN_007A5A70` (still `blocked`,
+   * two call sites) and `FUN_007A5E90`. `FUN_007A6010`/`FUN_007A6100`/
+   * `FUN_007A61E1` also call it, all still `skip`/unclassified fragments in
+   * the same address neighborhood.)
+   * Address: 0x007A5E90 (FUN_007A5E90) - same-register-shape trampoline into
+   *          0x007A61F0 immediately above; no separate logic of its own.
    *
    * What it does:
    * Copies one contiguous weak-link range `[sourceBegin, sourceEnd)` into
