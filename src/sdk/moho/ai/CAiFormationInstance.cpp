@@ -900,11 +900,61 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x0056E110 (FUN_0056E110, gpg::RMapType_EntId_SCoordsVec2::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `std::map<EntId,SCoordsVec2>` payload: clears the
+     * destination map, reads an element count, then reads that many
+     * reflected EntId/SCoordsVec2 pairs, inserting each by key. Mirror of
+     * `SerSave` above -- `SerSave` was already recovered and wired, this
+     * counterpart was not.
+     */
+    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      auto* const mapObject = reinterpret_cast<FormationCoordMap*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      );
+      if (!archive) {
+        return;
+      }
+
+      unsigned int count = 0u;
+      archive->ReadUInt(&count);
+
+      if (mapObject) {
+        mapObject->clear();
+      }
+      if (!mapObject || count == 0u) {
+        return;
+      }
+
+      gpg::RType* const keyType = CachedEntIdType();
+      gpg::RType* const valueType = CachedSCoordsVec2Type();
+      GPG_ASSERT(keyType != nullptr);
+      GPG_ASSERT(valueType != nullptr);
+      if (!keyType || !valueType) {
+        return;
+      }
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (unsigned int i = 0; i < count; ++i) {
+        moho::EntId key{};
+        archive->Read(keyType, &key, owner);
+
+        moho::SCoordsVec2 value{};
+        archive->Read(valueType, &value, owner);
+
+        (*mapObject)[key] = value;
+      }
+    }
+
     void Init() override
     {
       size_ = 0x0C;
       version_ = 1;
       serSaveFunc_ = &RMapType_EntId_SCoordsVec2::SerSave;
+      serLoadFunc_ = &RMapType_EntId_SCoordsVec2::SerLoad;
       gpg::RType::Init();
       Finish();
     }
