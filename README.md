@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,164` (80.11%)
+- `recovered`: `53,175` (80.12%)
 - `skip`: `7,382` (11.12%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,820` (8.77%) — proven third-party/import-boundary code
+- `external_dependency`: `5,809` (8.75%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `7` (0.01%)
 - `in_progress`: `9` (0.01%)
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,164 functions) — binary caller context
+### Recovered (53,175 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,885` | 31.76% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,898` | 31.78% |
 | Vtable-anchored (virtual override of a recovered class) | `5,885` | 11.07% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,565` | 10.47% |
-| No recovered caller token yet (orphan risk) | `1,733` | 3.26% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,876` | 43.03% |
+| No recovered caller token yet (orphan risk) | `1,731` | 3.26% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,876` | 43.02% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
