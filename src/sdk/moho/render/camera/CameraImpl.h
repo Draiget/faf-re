@@ -52,6 +52,83 @@ namespace moho
     CameraUserEntityWeakRef* mFinish;       // +0x04
     CameraUserEntityWeakRef* mCapacity;     // +0x08
     CameraUserEntityWeakRef* mInlineOrigin; // +0x0C
+
+    /**
+     * Address: 0x007AFBB0 (FUN_007AFBB0)
+     *
+     * IDA signature:
+     * void** __thiscall sub_7AFBB0(CameraFrustumUserEntityList *this,
+     *   unsigned requiredCapacity, CameraUserEntityWeakRef *insertionPos,
+     *   CameraUserEntityWeakRef *first, CameraUserEntityWeakRef *last);
+     *
+     * What it does:
+     * Reallocates this lane's storage to `requiredCapacity` slots, splicing
+     * `[first, last)` in at `insertionPos` while relocating the existing
+     * `[mStart, insertionPos)` head and `[insertionPos, mFinish)` tail into
+     * the new buffer (each element's owner-chain link is relinked to the new
+     * address by the copy step). Detaches every element at the OLD storage
+     * addresses from the owner chains they were just relinked away from,
+     * then either releases the old heap buffer or, when the old buffer was
+     * the inline block, stashes its capacity bound at the inline origin so a
+     * later `Teardown` can restore it. Returns the new `mCapacity` (matching
+     * the binary's own return value, which no observed caller actually
+     * uses). Called only from `InsertRange`'s grow branch below.
+     */
+    CameraUserEntityWeakRef* GrowAndInsertRange(
+      std::size_t requiredCapacity,
+      CameraUserEntityWeakRef* insertionPos,
+      CameraUserEntityWeakRef* first,
+      CameraUserEntityWeakRef* last
+    );
+
+    /**
+     * Address: 0x007AF0B0 (FUN_007AF0B0)
+     *
+     * IDA signature:
+     * void __thiscall sub_7AF0B0(CameraFrustumUserEntityList *this,
+     *   CameraUserEntityWeakRef *insertionPos, CameraUserEntityWeakRef *first,
+     *   CameraUserEntityWeakRef *last);
+     *
+     * What it does:
+     * The VC8 `_Insert_n` dispatcher for this lane's element range: when
+     * spare capacity cannot hold `size() + (last-first)`, reallocates via
+     * `GrowAndInsertRange` above; otherwise shifts the existing tail
+     * in-place (constructing into freshly-exposed raw slots past `mFinish`,
+     * assigning over slots that stay live) and places `[first, last)` into
+     * the gap at `insertionPos`. Direct callers: the inlined sound-entities
+     * lane push in `CacheCameraFrustumUnits` (FUN_007A75A0), and `AssignRange`
+     * below (FUN_007F20E0's grow-then-append path).
+     */
+    CameraUserEntityWeakRef* InsertRange(
+      CameraUserEntityWeakRef* insertionPos,
+      CameraUserEntityWeakRef* first,
+      CameraUserEntityWeakRef* last
+    );
+
+    /**
+     * Address: 0x007F20E0 (FUN_007F20E0)
+     *
+     * IDA signature:
+     * CameraFrustumUserEntityList* __thiscall sub_7F20E0(
+     *   CameraFrustumUserEntityList *this, CameraFrustumUserEntityList *other);
+     *
+     * What it does:
+     * The VC8 vector `assign(first, last)` / `operator=` shape for this lane,
+     * taking another lane-shaped object as the source view (matching the
+     * binary's own `CameraFrustumUserEntityList*` second parameter, even
+     * though only its `mStart`/`mFinish` are ever read): self-assignment
+     * no-op guard; when this lane's current size already covers `other`,
+     * assigns the retained prefix forward and detaches/drops the excess
+     * tail; otherwise ensures capacity for `other`'s element count (via
+     * `InsertRange`'s own grow machinery, invoked here with a degenerate
+     * empty range purely for its capacity-ensure side effect), assigns
+     * forward over the currently-live prefix, then places the remaining
+     * source elements past `mFinish` via `InsertRange`. Sole real caller:
+     * `SnapshotCameraFrustumWeakRefs` (FUN_007F03D0, RangeRenderer.cpp),
+     * always with an empty `this` -- the truncate branch is therefore only
+     * exercised when `other` is also empty in every observed call site.
+     */
+    CameraUserEntityWeakRef* AssignRange(const CameraFrustumUserEntityList& other);
   };
 
   static_assert(sizeof(CameraFrustumUserEntityList) == 0x10, "CameraFrustumUserEntityList size must be 0x10");
