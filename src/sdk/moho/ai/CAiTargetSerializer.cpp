@@ -10,58 +10,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiTargetSerializer) unsigned char gCAiTargetSerializerStorage[sizeof(CAiTargetSerializer)];
-  bool gCAiTargetSerializerConstructed = false;
-
-  [[nodiscard]] CAiTargetSerializer* AcquireCAiTargetSerializer()
-  {
-    if (!gCAiTargetSerializerConstructed) {
-      new (gCAiTargetSerializerStorage) CAiTargetSerializer();
-      gCAiTargetSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiTargetSerializer*>(gCAiTargetSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x005E2E60 (FUN_005E2E60)
-   *
-   * What it does:
-   * Unlinks the global `CAiTargetSerializer` helper node from the intrusive
-   * serializer chain and restores it to a self-linked node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiTargetSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(*AcquireCAiTargetSerializer());
-  }
+  // Address: 0x010B05B4 -- process-global `CAiTargetSerializer` singleton.
+  // Constructing it runs CAiTargetSerializer::CAiTargetSerializer()
+  // (0x00BCEC50), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiTargetSerializer,
+  // 0x005E2E60) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiTargetSerializer gCAiTargetSerializer;
 
   /**
    * Address: 0x005E2E90 (FUN_005E2E90)
@@ -70,21 +27,9 @@ namespace
    * Secondary unlink/reset thunk for the global `CAiTargetSerializer` helper
    * node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiTargetSerializerStartupThunkB()
+  [[maybe_unused]] void cleanup_CAiTargetSerializerStartupThunkB()
   {
-    return UnlinkSerializerNode(*AcquireCAiTargetSerializer());
-  }
-
-  void cleanup_CAiTargetSerializer()
-  {
-    if (!gCAiTargetSerializerConstructed) {
-      return;
-    }
-
-    CAiTargetSerializer* const serializer = AcquireCAiTargetSerializer();
-    (void)cleanup_CAiTargetSerializerStartupThunkA();
-    serializer->~CAiTargetSerializer();
-    gCAiTargetSerializerConstructed = false;
+    gCAiTargetSerializer.ResetLinks();
   }
 
   [[nodiscard]] gpg::RType* CachedCAiTargetType()
@@ -99,13 +44,31 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005E3540 (FUN_005E3540)
+ * Address: 0x00BCEC50 (FUN_00BCEC50, dynamic initializer for the global
+ * `CAiTargetSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiTargetSerializer::CAiTargetSerializer()
+  : mLoadCallback(&CAiTarget::DeserializeFromArchive)
+  , mSaveCallback(&CAiTarget::SerializeToArchive)
+{}
+
+CAiTargetSerializer::~CAiTargetSerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x005E3540 (FUN_005E3540, gpg::SerSaveLoadHelper_CAiTarget::Init)
  *
  * What it does:
  * Lazily resolves CAiTarget RTTI and installs load/save callbacks from this
  * helper object into the type descriptor.
  */
-void CAiTargetSerializer::RegisterSerializeFunctions()
+void CAiTargetSerializer::Init()
 {
   gpg::RType* const type = CachedCAiTargetType();
   const gpg::RType::load_func_t loadCallback = mLoadCallback ? mLoadCallback : &CAiTarget::DeserializeFromArchive;
@@ -114,20 +77,4 @@ void CAiTargetSerializer::RegisterSerializeFunctions()
   type->serLoadFunc_ = loadCallback;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = saveCallback;
-}
-
-/**
- * Address: 0x00BCEC50 (FUN_00BCEC50, register_CAiTargetSerializer)
- *
- * What it does:
- * Registers `CAiTarget` serializer callbacks and installs process-exit
- * cleanup.
- */
-int moho::register_CAiTargetSerializer()
-{
-  CAiTargetSerializer* const serializer = AcquireCAiTargetSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiTarget::DeserializeFromArchive;
-  serializer->mSaveCallback = &CAiTarget::SerializeToArchive;
-  return std::atexit(&cleanup_CAiTargetSerializer);
 }
