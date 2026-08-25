@@ -4530,10 +4530,15 @@ extern "C" int __cdecl __initmbctable()
 
 /**
  * Address: 0x00A84313 (FUN_00A84313, __time64_t_from_ft)
+ * Address: 0x00A8462D (FUN_00A8462D, __time64_t_from_ft)
  *
  * What it does:
  * Converts one non-zero `FILETIME` to local broken-down time and then to
- * `__time64_t`; returns `-1` when conversion fails.
+ * `__time64_t`; returns `-1` when conversion fails. The compiler emitted this
+ * body twice (not folded by ICF because each copy calls a different
+ * not-yet-merged `__loctotime64_t` instantiation -- 0x00A84313 calls
+ * FUN_00A9AD55, 0x00A8462D calls FUN_00A9AFBE, both already recovered as
+ * `__loctotime64_t` above).
  */
 extern "C" __time64_t __cdecl __time64_t_from_ft(FILETIME* const fileTime)
 {
@@ -11614,11 +11619,16 @@ namespace moho::runtime
 
   /**
    * Address: 0x00A8E302 (FUN_00A8E302)
+   * Address: 0x00AAA0C1 (FUN_00AAA0C1)
    *
    * What it does:
    * Classifies the legacy `_pow_0` exponent lane into non-integer, odd integer,
    * or even integer categories using the same round-to-nearest integral checks
-   * the x87 path applied.
+   * the x87 path applied. The compiler emitted this body a second time
+   * (0x00AAA0C1) as the private copy used by the Pentium4/SSE2 `pow()` lane
+   * (`__pow_pentium4`, already `external_dependency`); confirmed instruction
+   * for instruction against the x87 body, including the `fmul dbl_F3F3D2`
+   * multiply by the same 0.5 constant as `gRuntimeHalfScaleDouble` below.
    */
   extern "C" std::uint8_t __cdecl RuntimeClassifyPowExponentParity(const double exponent)
   {
