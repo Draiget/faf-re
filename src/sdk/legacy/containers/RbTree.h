@@ -183,6 +183,23 @@ namespace msvc8
          * `FUN_00946790` above -- sibling `StateCache` specialisation with
          * its own distinct helper address (`FUN_009478E0`'s `erase_node`
          * citation above).
+         *
+         * Address: 0x0052D960 (FUN_0052D960, the category-lookup map's
+         * leftmost descent -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). `while (!n->left->isNil) n
+         * = n->left;`, matching this member exactly (confirmed against the
+         * raw decompile: `while (!(*a2)->_Isnil) *a2 = ...`, walking
+         * `_Left`). Sole caller per this pass's xref sweep is `erase_node`'s
+         * emission for this instantiation (FUN_00536010, cited below) via
+         * `rb_min(fix)` when the erased node was the map's leftmost -- the
+         * same "constructor-inlined instantiation, only the erase-rebalance
+         * path keeps a standalone symbol" shape documented throughout this
+         * file. Re-homed here from a hand-rolled
+         * `LeftmostCategoryLookupDescendant` free function in
+         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * reach-in instead of calling it.)
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -283,6 +300,20 @@ namespace msvc8
          * instantiation cited on `erase_node`/`buy_node`/`buy_head`
          * elsewhere in this file). Reached from `rb_decrement`'s
          * `rb_max(n->left)` call for this same instantiation.
+         *
+         * Address: 0x00536AA0 (FUN_00536AA0, the category-lookup map's
+         * rightmost descent -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). `while (!n->right->isNil) n
+         * = n->right;`, matching this member exactly. Sole caller per this
+         * pass's xref sweep is `erase_node`'s emission for this
+         * instantiation (FUN_00536010, cited below) via `rb_max(fix)` when
+         * the erased node was the map's rightmost -- sibling of `rb_min`'s
+         * 0x0052D960 citation above, same map. Re-homed here from a
+         * hand-rolled `RightmostCategoryLookupDescendant` free function in
+         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * reach-in instead of calling it.)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -464,6 +495,24 @@ namespace msvc8
          * emission (including this increment step) into a direct
          * find-then-insert path -- see the "Absorbs binary helper"
          * comment on `FUN_005A08B0`'s citation there.
+         *
+         * Address: 0x0052CC30 (FUN_0052CC30, the category-lookup map's
+         * successor walk -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). Matches this member field
+         * for field, confirmed against the raw decompile: real-right-child
+         * case descends to `right->left` while `!isNil`; nil-right-child
+         * case climbs `parent` while `*cursor == parent->right`, landing on
+         * the first ancestor reached from its left subtree. Reached from
+         * `erase_node`'s emission for this instantiation (FUN_00536010,
+         * cited below) as the successor-capture step every `erase_node`
+         * emission performs before unlinking. Re-homed here from a
+         * hand-rolled `AdvanceCategoryLookupNodeSuccessor` free function in
+         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * reach-in instead of calling it -- also reached from that file's
+         * `PublishCategoriesTable` before the migration, now folded into
+         * `mCategoryMap`'s own range-for iteration.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1198,6 +1247,39 @@ namespace msvc8
              * `0x0052FB40` (`0x0052E330`), `0x0052FEE0` (`0x0052E510`),
              * `0x00530280` (`0x0052E6E0`), `0x00530630` (`0x0052E8B0`),
              * `0x005309E0` (`0x0052EA80`).
+             *
+             * Address: 0x00533E20 (FUN_00533E20, mangles as
+             * `Moho::EntityCategory::~EntityCategory` -- see the
+             * mangled-name note on `EntityCategoryLookupTableRuntimeView`'s
+             * constructor, RRuleGameRules.cpp) -- the category-lookup map's
+             * `~rb_tree()`, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+             * mCategoryMap`. Matches this member's body field for field:
+             * `erase_range(leftmost(), header())` (`sub_535750`, cited
+             * above) then `operator delete` the head then null head/size.
+             * The raw decompile shows an additional leading block releasing
+             * `mCat.mSet.mUsed`'s heap array (`operator delete[]` when it
+             * differs from the SBO's `originalvec`) ahead of this tail --
+             * that is `CategoryWordRangeView::~CategoryWordRangeView()`'s
+             * own body (the `EntityCategoryLookupTableRuntimeView::
+             * mCategoryFallback` member immediately preceding `mCategoryMap`
+             * in declaration order... reversed at destruction, so it runs
+             * first), inlined by the compiler into this same out-of-line
+             * symbol because both members' destructors are called from one
+             * enclosing (implicit) `~EntityCategoryLookupTableRuntimeView`.
+             * Not this member's own work -- `mCategoryMap`'s own share of
+             * FUN_00533E20 is exactly this member's four-statement body, no
+             * more. Reached from `RRuleGameRulesImpl::~RRuleGameRulesImpl`
+             * (FUN_00529700) as `delete mEntityCategoryLookup;`. Re-homed
+             * here from a hand-written
+             * `EntityCategoryLookupTableRuntimeView::
+             * ~EntityCategoryLookupTableRuntimeView()` body in
+             * RRuleGameRules.cpp that reproduced this exact shape by hand
+             * over a `CategoryLookupNodeRuntimeView*` reach-in; deleted in
+             * favor of the implicit destructor now that `mCategoryMap` is a
+             * real typed member (RULE ONE: member destructors are
+             * compiler-emitted, not hand-written source).
              */
             ~rb_tree()
             {
@@ -2115,6 +2197,43 @@ namespace msvc8
              * checked-iterator guard shape as every other `erase_node`
              * emission in this file. Reached from that `erase_range`'s
              * walk path.
+             *
+             * Address: 0x00536010 (FUN_00536010, MSVC8 `_Tree::
+             * erase(const_iterator)`) -- the category-lookup map's
+             * erase-with-rebalance, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Confirmed field-for-field
+             * against the raw decompile: `isNil` guard at `[a2+89]` (decimal
+             * 89 = 0x59), transplant-then-rebalance shape identical to this
+             * member's body, colour/isNil read/written at `[node+88]`/
+             * `[node+89]` (0x58/0x59) throughout the rebalance loop -- pins
+             * this instantiation's node to the 8-byte-aligned
+             * `pair<const msvc8::string, CategoryLookupValue>` shape
+             * documented on `CategoryLookupValue` (RRuleGameRules.h). Captures
+             * the successor via `rb_increment` (`FUN_0052CC30`, cited above),
+             * re-seats `head->left`/`head->right` through this instantiation's
+             * own `rb_min`/`rb_max` (`FUN_0052D960`/`FUN_00536AA0`, both
+             * cited above) only when the erased node was an extremum, and
+             * rebalances through `rotate_left`/`rotate_right`
+             * (`FUN_00536A50`/`FUN_00536AE0`, both cited above) -- the same
+             * shipped `erase_rebalance` shape this template inlines directly
+             * into this member's body, not a separate symbol. Reached from
+             * this instantiation's `erase_range` (`FUN_00535750`, cited
+             * below) walk-one-at-a-time path; `erase_range` itself is reached
+             * only from `~EntityCategoryLookupTableRuntimeView`'s implicit
+             * destructor with the whole-tree range, so this member's walk
+             * branch is compiled (and reachable -- `insert_at`'s rebalance
+             * loop for this instantiation also calls `rotate_left`/
+             * `rotate_right` directly, so the rotates are exercised at
+             * runtime even where this specific per-node walk branch may not
+             * be) but this member's own single-node path is not separately
+             * exercised by any currently-known call site. Re-homed here from
+             * a hand-rolled `EraseCategoryLookupNode` free function in
+             * RRuleGameRules.cpp that performed this identical
+             * transplant-and-rebalance over a
+             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
+             * reach-in instead of calling it.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -2534,6 +2653,34 @@ namespace msvc8
              * mis-labeled "insert with rebalance" note to its real role,
              * `erase_node` (see that citation, above the `insert_at`
              * cluster it was previously filed under).
+             *
+             * Address: 0x00535750 (FUN_00535750, MSVC8 `_Tree::
+             * erase(first, last)`) -- the category-lookup map's
+             * `erase_range`, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Confirmed against the
+             * raw decompile: whole-range fast path
+             * (`first==head->left && last==head`) calls `sub_5369D0`
+             * (`destroy_subtree`, cited above) on the root, resets the head
+             * self-links and zeroes size, returning the (now-self-linked)
+             * `head->left`; the walk path advances the cursor via the
+             * successor step inlined ahead of each iteration and calls
+             * `sub_536010` (`erase_node`, cited above) on the old cursor --
+             * matching this member's two-shape split exactly. Sole caller:
+             * `~EntityCategoryLookupTableRuntimeView`'s implicit destructor
+             * (via `mCategoryMap`'s own destructor, `~rb_tree()` below),
+             * always with `[leftmost(), header())` -- i.e. always this
+             * member's whole-tree fast path in this instantiation's actual
+             * runtime usage; the walk-path branch that calls `erase_node`
+             * node-by-node is compiled (this member handles both shapes in
+             * one function body) but not separately exercised by any
+             * currently-known call site of this specific map. Re-homed here
+             * from a hand-rolled `EraseCategoryLookupNodeRange` free
+             * function in RRuleGameRules.cpp that performed this identical
+             * two-shape dispatch over a
+             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
+             * reach-in instead of calling it.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -2648,6 +2795,24 @@ namespace msvc8
              * below, whose only confirmed callers are the three explicit
              * destroy-and-reconstruct helpers in `moho/sim/
              * SimRecoveryRuntime.cpp` cited on `destroy_subtree` above.)
+             *
+             * Address: 0x005551F0 (FUN_005551F0, `Moho::EntityCategorySet::
+             * EntityCategorySet`'s tail, 0x0055525A-0x00555276) -- the
+             * category-lookup map's constructor calls this member's exact
+             * body on the tree it just default-constructed a few
+             * instructions earlier: `destroy_subtree(root())` (a no-op on
+             * the fresh, still-empty tree -- cited above) then the same
+             * three-self-link-plus-zero-size reset. Confirmed against the
+             * raw decompile: this is a second, redundant destroy-and-reset
+             * pass over an already-empty tree, distinct from (and following)
+             * the buy_head-equivalent allocate-and-self-link sequence cited
+             * on `buy_head` below. `EntityCategoryLookupTableRuntimeView`'s
+             * constructor (RRuleGameRules.h/.cpp) keeps this as an explicit
+             * `mCategoryMap.clear();` call for exact instruction-sequence
+             * fidelity with FUN_005551F0, rather than silently dropping it
+             * as dead code -- it is behaviorally inert (the tree is already
+             * empty) but genuinely present in the binary's instruction
+             * stream.
              */
             void clear() noexcept
             {
@@ -2987,6 +3152,34 @@ namespace msvc8
              * and a boilerplate "batch 0x007B**** pass" note that cited
              * nothing; a full `src/sdk` sweep found zero real citations
              * anywhere. Owning field not yet pinned to a specific class.)
+             *
+             * Address: 0x00556DE0 (FUN_00556DE0, sub_556DE0) -- the
+             * category-lookup map's sentinel-head buy, `msvc8::map<
+             * msvc8::string, moho::CategoryLookupValue>`,
+             * `RRuleGameRulesImpl::mEntityCategoryLookup`'s
+             * `EntityCategoryLookupTableRuntimeView::mCategoryMap`
+             * (RRuleGameRules.h/.cpp). A third split shape, distinct from
+             * both patterns above: this function allocates the raw node
+             * (`alloc_raw()`) *and* sets `color=1(black)`/`isNil=0`, but
+             * does NOT self-link `left`/`parent`/`right` -- its sole caller,
+             * the map's constructor (`FUN_005551F0`,
+             * `Moho::EntityCategorySet::EntityCategorySet`, cited on
+             * `clear()` above), does the self-link and overwrites `isNil=1`
+             * itself immediately after the call (confirmed against the raw
+             * decompile: `v2 = sub_556DE0(); this->mMap._Myhead = v2;
+             * v2->_Isnil = 1; ...->_Parent = ...->_Myhead; ...->_Left = ...;
+             * ...->_Right = ...;`). This member fuses all three steps
+             * (allocate, flag-init, self-link) into one call, matching every
+             * other instantiation's citation convention in this file even
+             * though the binary happens to split this one three ways rather
+             * than two. Re-homed here from a hand-rolled
+             * `AllocateCategoryLookupHeadNodeRuntime` free function in
+             * RRuleGameRules.cpp that already fused the same three steps by
+             * hand over a `CategoryLookupNodeRuntimeView*` reach-in instead
+             * of calling this member -- that helper's own citation already
+             * carried this exact evidence and disclosure; it is preserved
+             * here verbatim now that the real container performs the fusion
+             * instead.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -3587,6 +3780,38 @@ namespace msvc8
              * described in prose as "recursive delete-all with no
              * rebalancing" without its own Address block. Reached from
              * that same `erase_range`'s whole-tree fast path.
+             *
+             * Address: 0x005369D0 (FUN_005369D0, sub_5369D0) -- the
+             * category-lookup map's `destroy_subtree`, `msvc8::map<
+             * msvc8::string, moho::CategoryLookupValue>`,
+             * `RRuleGameRulesImpl::mEntityCategoryLookup`'s
+             * `EntityCategoryLookupTableRuntimeView::mCategoryMap`
+             * (RRuleGameRules.h/.cpp). Recurse-right-then-iterate-left shape
+             * matching this member exactly; per node, tears down the value's
+             * inline-SBO bit-vector (`_Myval.helper.second.mSet.mUsed`,
+             * `CategoryWordRangeView`'s own heap-release when it grew past
+             * the SBO) and the key's capacity (`_Myval.helper.first`,
+             * `msvc8::string`'s own release) before `operator delete`ing the
+             * node -- both inlined directly by the compiler rather than
+             * calling separate `~CategoryWordRangeView`/`~string` symbols,
+             * confirmed against the raw decompile (IDA's own `helper`
+             * struct naming is this instantiation's `pair<const
+             * msvc8::string, CategoryWordRangeView>` value_type, `.first`
+             * the key / `.second` the value). This member's generic
+             * `n->value.~value_type()` in `free_node` (called by
+             * `erase_node` above, not by this member directly -- see that
+             * member's own body) reproduces the identical net effect through
+             * the type system rather than by hand. Called with a sentinel
+             * (`isNil` head) node this is a no-op, which is what this
+             * instantiation's default-constructed `mCategoryMap` (and this
+             * type's constructor, which calls `clear()` on the
+             * freshly-built empty tree -- cited on `clear()` below) relies
+             * on. Reached from this instantiation's `erase_range`
+             * (`FUN_00535750`, cited below) whole-tree fast path. Re-homed
+             * here from a hand-rolled `DestroyCategoryLookupSubtree` free
+             * function in RRuleGameRules.cpp that recursed over a
+             * `CategoryLookupNodeRuntimeView*` reach-in instead of calling
+             * it.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -3852,6 +4077,26 @@ namespace msvc8
              *   - Address: 0x005316A0 (FUN_005316A0) -- T=REmitterBlueprint's
              *     map; reached from insert_at FUN_005350A0 (paired with the
              *     right rotate FUN_00531710 on `rotate_right` below).
+             *
+             * Address: 0x00536A50 (FUN_00536A50, the category-lookup map's
+             * left rotate -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Matches this member
+             * exactly: `pivot=n->right; n->right=pivot->left; ...;
+             * pivot->left=n; n->parent=pivot;`, IDA's own naming tags it
+             * `_Tree::_Lrotate`. Reached from two independent fixup loops for
+             * this same instantiation -- `insert_at`'s emission (FUN_005565D0,
+             * cited above on that member) on the uncle-red rebalance path,
+             * and `erase_node`'s emission (FUN_00536010, cited below) on its
+             * post-erase black-height repair -- confirming this instantiation
+             * exercises both the insert-side and erase-side rebalance
+             * machinery at runtime, not just the compiled-but-dead erase
+             * path. Re-homed here from a hand-rolled
+             * `RotateCategoryLookupNodeLeft` free function in
+             * RRuleGameRules.cpp that rotated over a
+             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
+             * reach-in instead of calling it.)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -4014,6 +4259,19 @@ namespace msvc8
              *   - Address: 0x00531710 (FUN_00531710) -- T=REmitterBlueprint's
              *     map; reached from insert_at FUN_005350A0 (paired with left
              *     rotate FUN_005316A0 above).
+             *
+             * Address: 0x00536AE0 (FUN_00536AE0, the category-lookup map's
+             * right rotate -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTableRuntimeView::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Mirror of `rotate_left`'s
+             * 0x00536A50 above, same instantiation -- reached from the same
+             * two fixup loops (`insert_at`'s FUN_005565D0 and `erase_node`'s
+             * FUN_00536010, both cited above/below). Re-homed here from a
+             * hand-rolled `RotateCategoryLookupNodeRight` free function in
+             * RRuleGameRules.cpp that rotated over a
+             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
+             * reach-in instead of calling it.)
              */
             void rotate_right(node_type* const n) noexcept
             {

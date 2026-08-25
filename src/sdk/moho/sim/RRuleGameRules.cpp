@@ -286,107 +286,28 @@ namespace moho
 
   } // namespace
 
-  // EntityCategoryLookupTableRuntimeView (and the node/map views it owns) is
-  // deliberately NOT in the anonymous namespace above: RRuleGameRules.h
-  // forward-declares it by name so `RRuleGameRulesImpl::mEntityCategoryLookup`
-  // can be a real typed pointer instead of `void*`. An anonymous-namespace definition
-  // here would be a distinct per-TU type that could never complete that
-  // forward declaration.
-  namespace
-  {
-    struct CategoryLookupNodeRuntimeView : msvc8::Tree<CategoryLookupNodeRuntimeView>
-    {
-      std::uint8_t color;         // +0x0C
-      std::uint8_t reserved0D;    // +0x0D
-      std::uint8_t reserved0E;    // +0x0E
-      std::uint8_t reserved0F;    // +0x0F
-      msvc8::string key;          // +0x10
-      std::uint8_t pad_2C_2F[4];  // +0x2C
-      CategoryWordRangeView value; // +0x30
-      std::uint8_t nodeState;     // +0x58
-      std::uint8_t isNil;         // +0x59
-      std::uint8_t pad_5A_5B[2];  // +0x5A
-    };
-    static_assert(offsetof(CategoryLookupNodeRuntimeView, key) == 0x10, "CategoryLookupNodeRuntimeView::key offset");
-    static_assert(
-      offsetof(CategoryLookupNodeRuntimeView, value) == 0x30, "CategoryLookupNodeRuntimeView::value offset"
-    );
-    static_assert(
-      offsetof(CategoryLookupNodeRuntimeView, isNil) == 0x59, "CategoryLookupNodeRuntimeView::isNil offset"
-    );
-    static_assert(sizeof(CategoryLookupNodeRuntimeView) == 0x5C, "CategoryLookupNodeRuntimeView size must be 0x5C");
-
-    struct CategoryLookupMapRuntimeView
-    {
-      std::uint32_t unknown00;               // +0x00
-      CategoryLookupNodeRuntimeView* head;   // +0x04
-      std::uint32_t size;                    // +0x08
-      std::uint32_t unknown0C;               // +0x0C
-    };
-    static_assert(sizeof(CategoryLookupMapRuntimeView) == 0x10, "CategoryLookupMapRuntimeView size must be 0x10");
-  } // namespace
-
-  struct EntityCategoryLookupTableRuntimeView
-  {
-    CategoryLookupMapRuntimeView categoryMap; // +0x00
-    CategoryWordRangeView categoryFallback;   // +0x10
-    std::uint32_t wordUniverseHandle;         // +0x38
-    std::uint8_t pad_003C_003F[0x04];         // +0x3C (binary leaves this unwritten; not initialized here either)
-
-    /**
-     * Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
-     *
-     * What it does:
-     * In-place constructs the (empty, sentinel-headed) category-name map and
-     * the fallback `CategoryWordRangeView`, seeding both the fallback's
-     * universe lane and the trailing `wordUniverseHandle` with `owner`
-     * reinterpreted as a 4-byte handle - the same raw pointer value the
-     * binary writes to +0x10 and +0x38.
-     */
-    explicit EntityCategoryLookupTableRuntimeView(const RRuleGameRulesImpl* owner) noexcept;
-
-    /**
-     * Address: 0x00533E20 (FUN_00533E20, Moho::EntityCategory::~EntityCategory)
-     *
-     * What it does:
-     * Frees every category-name map node and the sentinel head itself.
-     * Leaves `categoryFallback` / `wordUniverseHandle` untouched, exactly as
-     * the binary does - those lanes own no heap storage of their own.
-     *
-     * Mangled-name note: the binary's constructor mangles as
-     * `Moho::EntityCategorySet::EntityCategorySet` but this destructor
-     * mangles as `Moho::EntityCategory::~EntityCategory` - a different class
-     * name over the identical `this` layout (most likely an
-     * EntityCategorySet-derives-from-EntityCategory relationship where the
-     * derived class adds no members and never gets its own destructor
-     * symbol). Both of those binary names are already taken in this codebase
-     * by unrelated types (`Moho::EntityCategorySet` = the 0x28-byte
-     * `BVSet<const RBlueprint*, EntityCategoryHelper>` alias in
-     * EntityCategoryReflection.h; `Moho::EntityCategory` = the static-method
-     * utility class in the same header), so this object keeps its
-     * pre-existing source-level name here instead of colliding with either.
-     */
-    ~EntityCategoryLookupTableRuntimeView();
-
-    EntityCategoryLookupTableRuntimeView(const EntityCategoryLookupTableRuntimeView&) = delete;
-    EntityCategoryLookupTableRuntimeView& operator=(const EntityCategoryLookupTableRuntimeView&) = delete;
-  };
-  static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, categoryMap) == 0x00,
-    "EntityCategoryLookupTableRuntimeView::categoryMap offset"
-  );
-  static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, categoryFallback) == 0x10,
-    "EntityCategoryLookupTableRuntimeView::categoryFallback offset"
-  );
-  static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, wordUniverseHandle) == 0x38,
-    "EntityCategoryLookupTableRuntimeView::wordUniverseHandle offset"
-  );
-  static_assert(
-    sizeof(EntityCategoryLookupTableRuntimeView) == 0x40,
-    "EntityCategoryLookupTableRuntimeView size must be 0x40"
-  );
+  // EntityCategoryLookupTableRuntimeView used to own a hand-rolled RB-tree
+  // reimplementation here (CategoryLookupNodeRuntimeView/
+  // CategoryLookupMapRuntimeView, a per-TU duplicate of the exact same
+  // hand-rolled-tree anti-pattern Sim.cpp's CategoryLookupMapView/
+  // CategoryLookupNodeView had -- see commit 5bf090ef for that sibling fix).
+  // Migrated to a real `msvc8::map<msvc8::string, CategoryLookupValue>`; the
+  // full type (shared with Sim.cpp, which reaches into the same live object
+  // through `RRuleGameRulesImpl::mEntityCategoryLookup`) now lives in
+  // RRuleGameRules.h instead of being forward-declared there and redefined
+  // here, per the CLAUDE.md duplicate-layout contract. The tree-walk helper
+  // functions that used to follow this comment (AllocateCategoryLookupHeadNodeRuntime,
+  // LeftmostCategoryLookupDescendant, RightmostCategoryLookupDescendant,
+  // RotateCategoryLookupNodeLeft/Right, AdvanceCategoryLookupNodeSuccessor,
+  // EraseCategoryLookupNode, DestroyCategoryLookupSubtree,
+  // EraseCategoryLookupNodeRange) are gone too -- their binary addresses
+  // (FUN_00556DE0, FUN_0052D960, FUN_00536AA0, FUN_00536A50/FUN_00536AE0,
+  // FUN_0052CC30, FUN_00536010, FUN_005369D0, FUN_00535750) are now cited on
+  // RbTree.h's `buy_head`/`rb_min`/`rb_max`/`rotate_left`/`rotate_right`/
+  // `rb_increment`/`erase_node`/`destroy_subtree`/`erase_range` members,
+  // which already implement this exact instantiation's shape with zero
+  // template changes (independently re-verified against the raw decompiles
+  // for this migration, not just re-cited from the Sim.cpp precedent).
 
   namespace
   {
@@ -430,327 +351,6 @@ namespace moho
       sentinel->next = sentinel;
       sentinel->prev = sentinel;
       return sentinel;
-    }
-
-    /**
-     * Address: 0x00556DE0 (FUN_00556DE0, sub_556DE0)
-     *
-     * What it does:
-     * The binary's allocator (`sub_556DE0`) only allocates the node and sets
-     * `_Color=1`/`_Isnil=0` (left/parent/right left null); its sole caller,
-     * `EntityCategorySet::EntityCategorySet` (0x0055520B-0x00555233),
-     * immediately overwrites `_Isnil=1` and self-links left/parent/right to
-     * the head itself. This helper fuses both steps, since nothing else in
-     * this tree calls the allocator without that follow-up.
-     *
-     * Previously mis-cited on an orphaned `AllocateCategoryMapNodeRuntime` in
-     * SimRecoveryRuntime.cpp (zero real callers there, and its field values
-     * -- isNil=0, no self-link -- matched only the allocator's raw output,
-     * not the net state after construction); removed from there.
-     */
-    [[nodiscard]] CategoryLookupNodeRuntimeView* AllocateCategoryLookupHeadNodeRuntime() noexcept
-    {
-      auto* const head = new (std::nothrow) CategoryLookupNodeRuntimeView{};
-      if (head == nullptr) {
-        return nullptr;
-      }
-
-      head->left = head;
-      head->parent = head;
-      head->right = head;
-      head->color = 1u;
-      head->nodeState = 0u;
-      head->isNil = 1u;
-      return head;
-    }
-
-    // Red-black colour encoding shared by the category-name map's rotate /
-    // erase helpers below, matching the binary's `_Color` byte (0 = red,
-    // 1 = black) - the same encoding `AllocateCategoryLookupHeadNodeRuntime`
-    // above already uses for the sentinel head (`head->color = 1u`).
-    constexpr std::uint8_t kCategoryLookupNodeRed = 0u;
-    constexpr std::uint8_t kCategoryLookupNodeBlack = 1u;
-
-    /**
-     * Address: 0x0052D960 (FUN_0052D960)
-     *
-     * What it does:
-     * Walks left from `node` to the leftmost (minimum-key) real descendant.
-     */
-    [[nodiscard]] CategoryLookupNodeRuntimeView* LeftmostCategoryLookupDescendant(
-      CategoryLookupNodeRuntimeView* node
-    ) noexcept
-    {
-      while (node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    /**
-     * Address: 0x00536AA0 (FUN_00536AA0)
-     *
-     * What it does:
-     * Walks right from `node` to the rightmost (maximum-key) real descendant.
-     */
-    [[nodiscard]] CategoryLookupNodeRuntimeView* RightmostCategoryLookupDescendant(
-      CategoryLookupNodeRuntimeView* node
-    ) noexcept
-    {
-      while (node->right->isNil == 0u) {
-        node = node->right;
-      }
-      return node;
-    }
-
-    /**
-     * Address: 0x00536A50 (FUN_00536A50, MSVC8 `_Tree::_Lrotate`)
-     *
-     * What it does:
-     * Rotates `node`'s right child up into `node`'s slot, re-parenting the
-     * moved subtree and patching the table's root link when `node` was root.
-     */
-    void RotateCategoryLookupNodeLeft(
-      EntityCategoryLookupTableRuntimeView& table, CategoryLookupNodeRuntimeView* const node
-    ) noexcept
-    {
-      CategoryLookupNodeRuntimeView* const pivot = node->right;
-      node->right = pivot->left;
-      if (pivot->left->isNil == 0u) {
-        pivot->left->parent = node;
-      }
-      pivot->parent = node->parent;
-
-      CategoryLookupNodeRuntimeView* const head = table.categoryMap.head;
-      if (node == head->parent) {
-        head->parent = pivot;
-      } else if (node == node->parent->left) {
-        node->parent->left = pivot;
-      } else {
-        node->parent->right = pivot;
-      }
-
-      pivot->left = node;
-      node->parent = pivot;
-    }
-
-    /**
-     * Address: 0x00536AE0 (FUN_00536AE0, MSVC8 `_Tree::_Rrotate`)
-     *
-     * What it does:
-     * Mirror of `RotateCategoryLookupNodeLeft`: lifts `node`'s left child
-     * into `node`'s slot.
-     */
-    void RotateCategoryLookupNodeRight(
-      EntityCategoryLookupTableRuntimeView& table, CategoryLookupNodeRuntimeView* const node
-    ) noexcept
-    {
-      CategoryLookupNodeRuntimeView* const pivot = node->left;
-      node->left = pivot->right;
-      if (pivot->right->isNil == 0u) {
-        pivot->right->parent = node;
-      }
-      pivot->parent = node->parent;
-
-      CategoryLookupNodeRuntimeView* const head = table.categoryMap.head;
-      if (node == head->parent) {
-        head->parent = pivot;
-      } else if (node == node->parent->right) {
-        node->parent->right = pivot;
-      } else {
-        node->parent->left = pivot;
-      }
-
-      pivot->right = node;
-      node->parent = pivot;
-    }
-
-    void AdvanceCategoryLookupNodeSuccessor(CategoryLookupNodeRuntimeView** const cursor) noexcept
-    {
-      CategoryLookupNodeRuntimeView* node = *cursor;
-      if (node->isNil != 0u) {
-        return;
-      }
-
-      CategoryLookupNodeRuntimeView* right = node->right;
-      if (right->isNil != 0u) {
-        CategoryLookupNodeRuntimeView* parent = node->parent;
-        while (parent->isNil == 0u) {
-          if (*cursor != parent->right) {
-            break;
-          }
-          *cursor = parent;
-          parent = parent->parent;
-        }
-        *cursor = parent;
-        return;
-      }
-
-      CategoryLookupNodeRuntimeView* left = right->left;
-      while (left->isNil == 0u) {
-        right = left;
-        left = left->left;
-      }
-      *cursor = right;
-    }
-
-    /**
-     * Address: 0x00536010 (FUN_00536010, MSVC8 `_Tree::erase(const_iterator)`)
-     *
-     * What it does:
-     * Unlinks and destroys `erased` from the category-name map: transplants
-     * its in-order successor into its slot when both children are real,
-     * relinks the fix-up child in `erased`'s place otherwise, then repairs
-     * the black-height deficit from the stitched-up child upward (matching
-     * `RotateCategoryLookupNodeLeft`/`Right`'s sibling-recolour/rotate
-     * cases 1:1). Finally destroys `erased` - its `msvc8::string` key and
-     * `CategoryWordRangeView` value release their own heap storage through
-     * their real destructors, so no manual byte-level cleanup is needed
-     * here - and decrements the map size (binary guards the decrement
-     * against an already-zero count). Returns the in-order successor,
-     * matching `std::map::erase`'s return convention.
-     */
-    CategoryLookupNodeRuntimeView* EraseCategoryLookupNode(
-      EntityCategoryLookupTableRuntimeView& table, CategoryLookupNodeRuntimeView* const erased
-    ) noexcept
-    {
-      CategoryLookupNodeRuntimeView* const head = table.categoryMap.head;
-
-      CategoryLookupNodeRuntimeView* next = erased;
-      AdvanceCategoryLookupNodeSuccessor(&next);
-
-      CategoryLookupNodeRuntimeView* lifted = erased;
-      CategoryLookupNodeRuntimeView* fix;
-      CategoryLookupNodeRuntimeView* fixParent;
-
-      if (erased->left->isNil != 0u) {
-        fix = erased->right;
-      } else if (erased->right->isNil != 0u) {
-        fix = erased->left;
-      } else {
-        lifted = next; // in-order successor of a two-real-child node
-        fix = lifted->right;
-      }
-
-      if (lifted == erased) {
-        // At most one real subtree: relink it in place.
-        fixParent = erased->parent;
-        if (fix->isNil == 0u) {
-          fix->parent = fixParent;
-        }
-
-        if (head->parent == erased) {
-          head->parent = fix;
-        } else if (fixParent->left == erased) {
-          fixParent->left = fix;
-        } else {
-          fixParent->right = fix;
-        }
-
-        if (head->left == erased) {
-          head->left = (fix->isNil != 0u) ? fixParent : LeftmostCategoryLookupDescendant(fix);
-        }
-        if (head->right == erased) {
-          head->right = (fix->isNil != 0u) ? fixParent : RightmostCategoryLookupDescendant(fix);
-        }
-      } else {
-        // Two real subtrees: `lifted` (the successor) takes the erased slot.
-        erased->left->parent = lifted;
-        lifted->left = erased->left;
-
-        if (lifted == erased->right) {
-          fixParent = lifted;
-        } else {
-          fixParent = lifted->parent;
-          if (fix->isNil == 0u) {
-            fix->parent = fixParent;
-          }
-          fixParent->left = fix;
-          lifted->right = erased->right;
-          erased->right->parent = lifted;
-        }
-
-        if (head->parent == erased) {
-          head->parent = lifted;
-        } else if (erased->parent->left == erased) {
-          erased->parent->left = lifted;
-        } else {
-          erased->parent->right = lifted;
-        }
-
-        lifted->parent = erased->parent;
-        std::swap(lifted->nodeState, erased->nodeState);
-      }
-
-      if (erased->nodeState == kCategoryLookupNodeBlack) {
-        // MSVC8's post-erase black-height repair.
-        for (; fix != head->parent && fix->nodeState == kCategoryLookupNodeBlack; fixParent = fix->parent) {
-          if (fix == fixParent->left) {
-            CategoryLookupNodeRuntimeView* sibling = fixParent->right;
-            if (sibling->nodeState == kCategoryLookupNodeRed) {
-              sibling->nodeState = kCategoryLookupNodeBlack;
-              fixParent->nodeState = kCategoryLookupNodeRed;
-              RotateCategoryLookupNodeLeft(table, fixParent);
-              sibling = fixParent->right;
-            }
-
-            if (sibling->isNil != 0u) {
-              fix = fixParent;
-            } else if (sibling->left->nodeState == kCategoryLookupNodeBlack
-                       && sibling->right->nodeState == kCategoryLookupNodeBlack) {
-              sibling->nodeState = kCategoryLookupNodeRed;
-              fix = fixParent;
-            } else {
-              if (sibling->right->nodeState == kCategoryLookupNodeBlack) {
-                sibling->left->nodeState = kCategoryLookupNodeBlack;
-                sibling->nodeState = kCategoryLookupNodeRed;
-                RotateCategoryLookupNodeRight(table, sibling);
-                sibling = fixParent->right;
-              }
-              sibling->nodeState = fixParent->nodeState;
-              fixParent->nodeState = kCategoryLookupNodeBlack;
-              sibling->right->nodeState = kCategoryLookupNodeBlack;
-              RotateCategoryLookupNodeLeft(table, fixParent);
-              break; // black heights match again; root is still black
-            }
-          } else {
-            CategoryLookupNodeRuntimeView* sibling = fixParent->left;
-            if (sibling->nodeState == kCategoryLookupNodeRed) {
-              sibling->nodeState = kCategoryLookupNodeBlack;
-              fixParent->nodeState = kCategoryLookupNodeRed;
-              RotateCategoryLookupNodeRight(table, fixParent);
-              sibling = fixParent->left;
-            }
-
-            if (sibling->isNil != 0u) {
-              fix = fixParent;
-            } else if (sibling->right->nodeState == kCategoryLookupNodeBlack
-                       && sibling->left->nodeState == kCategoryLookupNodeBlack) {
-              sibling->nodeState = kCategoryLookupNodeRed;
-              fix = fixParent;
-            } else {
-              if (sibling->left->nodeState == kCategoryLookupNodeBlack) {
-                sibling->right->nodeState = kCategoryLookupNodeBlack;
-                sibling->nodeState = kCategoryLookupNodeRed;
-                RotateCategoryLookupNodeLeft(table, sibling);
-                sibling = fixParent->left;
-              }
-              sibling->nodeState = fixParent->nodeState;
-              fixParent->nodeState = kCategoryLookupNodeBlack;
-              sibling->left->nodeState = kCategoryLookupNodeBlack;
-              RotateCategoryLookupNodeRight(table, fixParent);
-              break;
-            }
-          }
-        }
-        fix->nodeState = kCategoryLookupNodeBlack;
-      }
-
-      delete erased;
-      if (table.categoryMap.size != 0u) {
-        table.categoryMap.size -= 1u;
-      }
-      return next;
     }
 
     template <typename TValue>
@@ -1030,18 +630,18 @@ namespace moho
       globals.SetObject("categories", categoriesTable);
 
       const EntityCategoryLookupTableRuntimeView* const categoryLookup = rules.mEntityCategoryLookup;
-      if (categoryLookup == nullptr || categoryLookup->categoryMap.head == nullptr) {
+      if (categoryLookup == nullptr) {
         return;
       }
 
-      CategoryLookupNodeRuntimeView* node = categoryLookup->categoryMap.head->left;
-      while (node != categoryLookup->categoryMap.head) {
-        CategoryWordRangeView categoryValue = node->value;
+      // `categoryMap.begin()`/`end()` is `rb_tree::leftmost()`/`header()` --
+      // the same `head->left` / `head` walk this loop used to do by hand,
+      // now through the real container's own iterator (RbTree.h `rb_iterator`).
+      for (const auto& [categoryName, categoryValue] : categoryLookup->mCategoryMap) {
+        CategoryWordRangeView categoryValueCopy = categoryValue;
         LuaPlus::LuaObject categoryLuaObject{};
-        (void)func_NewEntityCategory(targetState, &categoryLuaObject, &categoryValue);
-        categoriesTable.SetObject(node->key.c_str(), categoryLuaObject);
-
-        AdvanceCategoryLookupNodeSuccessor(&node);
+        (void)func_NewEntityCategory(targetState, &categoryLuaObject, &categoryValueCopy);
+        categoriesTable.SetObject(categoryName.c_str(), categoryLuaObject);
       }
     }
 
@@ -1598,73 +1198,6 @@ namespace moho
       footprints.mSize = 0u;
     }
 
-    /**
-     * Address: 0x005369D0 (FUN_005369D0)
-     *
-     * What it does:
-     * Recursively destroys every real node in the subtree rooted at `node`
-     * (right subtree first, then iterates down the left spine - the
-     * compiler's tail-recursive form of "destroy left; destroy right;
-     * destroy self"). Each node's `msvc8::string` key and
-     * `CategoryWordRangeView` value release their own heap storage through
-     * their real destructors when the node is deleted, matching the
-     * binary's inline SBO-vector-release + string-capacity-release
-     * sequence exactly - no manual byte-level cleanup is needed here.
-     *
-     * Called with a sentinel (`isNil` head) node this is a no-op, which is
-     * exactly what `EntityCategoryLookupTableRuntimeView`'s own constructor
-     * below relies on.
-     */
-    void DestroyCategoryLookupSubtree(CategoryLookupNodeRuntimeView* node) noexcept
-    {
-      while (node->isNil == 0u) {
-        DestroyCategoryLookupSubtree(node->right);
-        CategoryLookupNodeRuntimeView* const left = node->left;
-        delete node;
-        node = left;
-      }
-    }
-
-    /**
-     * Address: 0x00535750 (FUN_00535750, MSVC8 `_Tree::erase(first, last)`)
-     *
-     * What it does:
-     * Erases the half-open node range `[first, last)`. Erasing the whole
-     * tree (`first == head->left && last == head`) takes the fast path -
-     * one recursive `DestroyCategoryLookupSubtree` pass over the root
-     * instead of N individual rebalancing erases; any other range is
-     * erased one node at a time via in-order successor walk, matching the
-     * binary's two-branch dispatch exactly. Returns the node the erased
-     * range's `last` cursor lands on (the whole-tree fast path always
-     * lands on `head`).
-     */
-    CategoryLookupNodeRuntimeView* EraseCategoryLookupNodeRange(
-      EntityCategoryLookupTableRuntimeView& table,
-      CategoryLookupNodeRuntimeView* const first,
-      CategoryLookupNodeRuntimeView* const last
-    ) noexcept
-    {
-      CategoryLookupNodeRuntimeView* const head = table.categoryMap.head;
-
-      if (first == head->left && last == head) {
-        DestroyCategoryLookupSubtree(head->parent);
-        head->parent = head;
-        table.categoryMap.size = 0u;
-        head->left = head;
-        head->right = head;
-        return head->left;
-      }
-
-      CategoryLookupNodeRuntimeView* cursor = first;
-      if (first != last) {
-        do {
-          CategoryLookupNodeRuntimeView* const erased = cursor;
-          AdvanceCategoryLookupNodeSuccessor(&cursor); // compute successor before erasing
-          (void)EraseCategoryLookupNode(table, erased);
-        } while (cursor != last);
-      }
-      return cursor;
-    }
   } // namespace
 
   /**
@@ -1712,62 +1245,75 @@ namespace moho
     return object;
   }
 
-  // The `owner` handle written below (categoryFallback's universe lane and
-  // wordUniverseHandle) is the table's only back-reference to the rules
+  // The `owner` handle written below (mCategoryFallback's universe lane and
+  // mWordUniverseHandle) is the table's only back-reference to the rules
   // that own it: `ParseEntityCategory` seeds every clause accumulator from
   // it (0x00555323 reads [esi+38h]), each map entry it creates inherits the
   // same handle, and `EntityCategory::Add` calls `GetBlueprintFromOrdinal`
   // through it to remap the clause's bits. A null owner here means the very
   // first economy restriction parsed during category setup would dispatch
   // through a null rules pointer.
+  //
+  // Mangled-name note: the binary's constructor mangles as
+  // `Moho::EntityCategorySet::EntityCategorySet` but the destructor this
+  // class no longer declares explicitly (see below) mangled as
+  // `Moho::EntityCategory::~EntityCategory` - a different class name over
+  // the identical `this` layout (most likely an
+  // EntityCategorySet-derives-from-EntityCategory relationship where the
+  // derived class adds no members and never got its own destructor symbol).
+  // Both of those binary names are already taken in this codebase by
+  // unrelated types (`Moho::EntityCategorySet` = the 0x28-byte
+  // `BVSet<const RBlueprint*, EntityCategoryHelper>` alias in
+  // EntityCategoryReflection.h; `Moho::EntityCategory` = the static-method
+  // utility class in the same header), so this object keeps its
+  // pre-existing source-level name instead of colliding with either.
+  //
+  // EH note: `FUN_005551F0`'s unwind funclet at 0x00BA0453 (FUN_00533FD0)
+  // runs only if construction throws after the category map is live but
+  // before the word-range fallback is - it re-derives the same
+  // `erase(first,last)`-then-`operator delete`-the-head tail
+  // `~EntityCategoryLookupTableRuntimeView`'s implicit destructor performs
+  // via `mCategoryMap`'s own real destructor (`RbTree.h`'s `erase_range`/
+  // `~rb_tree` members). Per RULE ONE an unwind funclet target maps to no
+  // source line of its own, so it is cited here rather than written as a
+  // separate function.
   EntityCategoryLookupTableRuntimeView::EntityCategoryLookupTableRuntimeView(
     const RRuleGameRulesImpl* const owner
   ) noexcept
   {
-    CategoryLookupNodeRuntimeView* const head = AllocateCategoryLookupHeadNodeRuntime();
-    categoryMap.head = head;
-    categoryMap.size = 0u;
+    // `mCategoryMap`'s sentinel head is already live at this point (member
+    // default-initialization runs before this body, real `msvc8::map`
+    // default ctor -> `RbTree.h` `buy_head()`, cited FUN_00556DE0). The
+    // binary re-runs the whole-subtree destroyer on the fresh (already
+    // empty) head before re-asserting the empty-tree links one more time -
+    // an inert second pass, preserved here as an explicit `clear()` call
+    // (RbTree.h `clear()` member, also cited FUN_005551F0) for exact
+    // instruction-sequence fidelity with FUN_005551F0 at
+    // 0x0055525A-0x00555276 rather than silently dropped as dead code.
+    mCategoryMap.clear();
 
     const auto ownerHandle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owner));
-    categoryFallback.ResetToEmpty(ownerHandle);
-    wordUniverseHandle = ownerHandle;
-
-    // Binary re-runs the whole-subtree destroyer on the fresh head (a no-op:
-    // head->isNil is already 1, per AllocateCategoryLookupHeadNodeRuntime)
-    // before re-asserting the empty-tree links one more time. Preserved
-    // verbatim for exact instruction-sequence fidelity with FUN_005551F0 at
-    // 0x0055525A-0x00555276.
-    DestroyCategoryLookupSubtree(head->parent);
-    head->parent = head;
-    categoryMap.size = 0u;
-    head->left = head;
-    head->right = head;
+    mCategoryFallback.ResetToEmpty(ownerHandle);
+    mWordUniverseHandle = ownerHandle;
   }
 
-  /**
-   * Address: 0x00533FD0 (FUN_00533FD0, the partial-cleanup emission MSVC
-   * generates from this destructor for the constructor's EH unwind path)
-   *
-   * FUN_005551F0's unwind funclet at 0x00BA0453 calls it when construction
-   * throws after the category map is live but before the word-range fastvector
-   * is, so it runs only this destructor's second half: erase the whole node
-   * range through the shared `_Tree::erase(first, last)` lane (FUN_00535750),
-   * `operator delete` the sentinel head, then null the head/size lanes. The
-   * full destructor at 0x00533E20 is the same tail preceded by the fastvector
-   * tidy (free +0x20 when it differs from the inline base at +0x2C, then reseat
-   * the SBO lanes), which is why that one is 32 instructions and this one 20.
-   *
-   * Per RULE ONE an unwind funclet target maps to no source line of its own -
-   * it is cited here rather than written as a separate function.
-   */
-  EntityCategoryLookupTableRuntimeView::~EntityCategoryLookupTableRuntimeView()
-  {
-    CategoryLookupNodeRuntimeView* const head = categoryMap.head;
-    (void)EraseCategoryLookupNodeRange(*this, head->left, head);
-    delete head;
-    categoryMap.head = nullptr;
-    categoryMap.size = 0u;
-  }
+  // No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
+  // CategoryLookupValue>`) and `mCategoryFallback` (`CategoryWordRangeView`)
+  // are both real typed members, so implicit member destruction already runs
+  // their own real destructors in reverse declaration order - exactly
+  // matching FUN_00533E20's (`Moho::EntityCategory::~EntityCategory`) two
+  // real pieces of work: `mCategoryMap`'s teardown is `RbTree.h`'s
+  // `~rb_tree()` emission for this instantiation (cited there, erase_range +
+  // free the head), and the leading `mSet.mUsed` inline-vector release the
+  // raw decompile shows ahead of it is `CategoryWordRangeView`'s own
+  // destructor body, inlined into FUN_00533E20 by the compiler - not
+  // hand-written source of this class at all (RULE ONE: "member
+  // destructors... the source body says nothing; MSVC emits it"). A prior
+  // recovery pass wrote this class's destructor by hand as an explicit
+  // function precisely reproducing `~rb_tree()`'s shape over the old
+  // hand-rolled tree view; removing it in favor of the implicit destructor
+  // does not change behavior, it removes a hand-transcription of
+  // compiler-emitted glue.
 
   /**
    * Address: 0x00529120 (FUN_00529120, Moho::RRuleGameRulesImpl::RRuleGameRulesImpl)

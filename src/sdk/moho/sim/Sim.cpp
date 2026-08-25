@@ -13593,102 +13593,25 @@ namespace
   // (`AddCategoryMemberBit`, `AppendBlueprintOrdinal` and
   // `RegisterBlueprintInCategoryMaps` below already cite their own
   // `FUN_005555C0`/`FUN_005347A0`/`FUN_00529B30` addresses).
-  /**
-   * `CategoryWordRangeView` given 8-byte alignment for exactly one purpose:
-   * matching the binary's node layout for the category-lookup map's tree
-   * (`std::map<msvc8::string, Moho::EntityCategory>` per IDA's own type
-   * naming at the read-side lookups, FUN_005561C0/FUN_00556220/FUN_00556970).
-   * Direct evidence this node is 8-byte-aligned, not the usual 4-byte
-   * `msvc8::detail::rb_node<V>` shape:
-   *
-   *   - `buy_node` (FUN_005569C0) places the value at `node+0x10`, not the
-   *     usual `node+0x0C` (`lea eax,[esi+10h]` ahead of the value ctor call).
-   *   - The value's own two halves are split by a further 4-byte gap: the
-   *     key ends at value+0x1C but the `CategoryWordRangeView` payload
-   *     starts at value+0x20 (`FUN_00556320` and `FUN_00557310` both write
-   *     the BVSet-shaped fields at their destination's +0x20/+0x28/+0x30,
-   *     matching `CategoryWordRangeView::mUniverse`/`mBits` placed at that
-   *     +0x20 base).
-   *   - `color`/`isNil` sit at `node+0x58`/`node+0x59` (`FUN_005565D0`'s
-   *     rebalance loop writes `[node+0x58]`; `FUN_005560B0`'s descent tests
-   *     `[node+0x59]`), not the `node+0x54`/`+0x55` a 4-byte-aligned
-   *     `pair<msvc8::string, CategoryWordRangeView>` would produce.
-   *   - The node allocator (`sub_5579D0`, called from `buy_node`) computes
-   *     `operator new(0x60 * count)` -- 0x60, not the 0x5C a 4-byte-aligned
-   *     node would need; 0x5A (0x0C + 0x4C value + 2 colour/nil bytes)
-   *     rounded up to an 8-byte boundary is exactly 0x60.
-   *
-   * All four facts are exactly what `pair<const msvc8::string,
-   * CategoryWordRangeView>` produces once the second member is given
-   * `alignas(8)`: the pair pads the key up to a multiple of 8 before the
-   * second member, and `rb_node<V>` (RbTree.h) pads its own `V value`
-   * member up to a multiple of 8 after the three link pointers. Verified
-   * against this exact shape by compiling the layout in isolation with this
-   * project's MSVC toolchain: an explicit `alignas` on a member overrides
-   * `legacy/containers/RbTree.h`'s `#pragma pack(push, 4)` for that member --
-   * `#pragma pack` only *lowers* a member's alignment below its natural
-   * value, never below an explicit `alignas` on that member's own type.
-   *
-   * This wrapper carries no data of its own; it only raises
-   * `CategoryWordRangeView`'s alignment for this one map's node
-   * instantiation, without touching the type's natural 4-byte alignment
-   * everywhere else `moho::EntityCategorySet` is used as a plain value.
-   */
-  struct alignas(8) CategoryLookupValue : CategoryWordRangeView
-  {
-  };
-  static_assert(sizeof(CategoryLookupValue) == 0x28, "CategoryLookupValue size must be 0x28");
-  static_assert(alignof(CategoryLookupValue) == 8, "CategoryLookupValue alignment must be 8");
-
-  /**
-   * The category-name -> category-word-range map embedded in
-   * `RRuleGameRulesImpl::mEntityCategoryLookup` (+0xC4, see
-   * `EntityCategoryLookupResolver::GetEntityCategory`). Address evidence for
-   * the tree operations this instantiation reaches is cited on
-   * `msvc8::detail::rb_tree`'s `insert_unique`/`insert_at`/`buy_node`/
-   * `rb_decrement`/`find_node` members (RbTree.h).
-   *
-   * `EntityCategoryLookupResolver.cpp` independently models the read-only
-   * half of this exact tree as a lighter `CategoryNameMapView`/`Tree.h` view
-   * (no owning insert/erase, since that file only ever looks values up);
-   * both recoveries agree on the node layout (key@+0x10, value@+0x30,
-   * isNil@+0x59), which is corroborating evidence from two independently
-   * recovered call sites for the same binary object.
-   */
-  using CategoryLookupMap = msvc8::map<msvc8::string, CategoryLookupValue>;
-  static_assert(sizeof(CategoryLookupMap) == 0x0C, "CategoryLookupMap size must be 0x0C");
-
-  struct EntityCategoryLookupTableView
-  {
-    CategoryLookupMap mCategoryMap;       // +0x00 (0x0C: {proxy, head, size})
-    /// Never read or written by any call site traced in this pass (the map
-    /// header itself is only ever touched at +0x00/+0x04/+0x08). Kept as an
-    /// explicit gap because both this map's predecessor recovery here
-    /// (`CategoryLookupMapView::mUnknown0C`) and the independent read-only
-    /// recovery in `EntityCategoryLookupResolver.cpp`
-    /// (`CategoryNameMapView::unknown0C`) needed it to land
-    /// `mCategoryFallback` at the confirmed +0x10 -- unlike the tree node's
-    /// alignment gap above, nothing pins this one to an alignment
-    /// requirement of `CategoryWordRangeView` itself (that type is 4-byte
-    /// aligned everywhere else it is used as a plain value), so it is left
-    /// as an honest unresolved field rather than folded into an assumed
-    /// alignment.
-    std::uint32_t mCategoryMapReserved0C; // +0x0C
-    CategoryWordRangeView mCategoryFallback; // +0x10
-    std::uint32_t mWordUniverseHandle;       // +0x38
-  };
-  static_assert(
-    offsetof(EntityCategoryLookupTableView, mCategoryMap) == 0x00,
-    "EntityCategoryLookupTableView::mCategoryMap offset must be 0x00"
-  );
-  static_assert(
-    offsetof(EntityCategoryLookupTableView, mCategoryFallback) == 0x10,
-    "EntityCategoryLookupTableView::mCategoryFallback offset must be 0x10"
-  );
-  static_assert(
-    offsetof(EntityCategoryLookupTableView, mWordUniverseHandle) == 0x38,
-    "EntityCategoryLookupTableView::mWordUniverseHandle offset must be 0x38"
-  );
+  // CategoryLookupValue/CategoryLookupMap/EntityCategoryLookupTableView used
+  // to be defined here as a second, per-TU-only copy of the exact same
+  // binary object RRuleGameRules.cpp's `EntityCategoryLookupTableRuntimeView`
+  // models (`RRuleGameRulesImpl::mEntityCategoryLookup`, +0xC4) -- this
+  // anonymous namespace's version reached it read the same live object
+  // through `ResolveEntityCategoryLookupTable`'s `reinterpret_cast` below.
+  // Per the CLAUDE.md duplicate-layout contract ("pick a single owning
+  // reconstructed definition"), that duplication is gone: the real type
+  // (identical layout, identical evidence -- 8-byte-aligned node, value at
+  // node+0x10, colour/isNil at node+0x58/0x59, all independently
+  // re-verified against the raw decompiles during the RRuleGameRules.cpp
+  // migration this promotion is part of) now lives once, in
+  // `moho::CategoryLookupValue`/`moho::CategoryLookupMap`/
+  // `moho::EntityCategoryLookupTableRuntimeView` (RRuleGameRules.h), and
+  // this file uses that shared definition directly instead of a
+  // `reinterpret_cast`-punned twin. `RbTree.h`'s `insert_unique`/`insert_at`/
+  // `buy_node`/`rb_decrement`/`find_node` citations for this instantiation
+  // (below, on `AddCategoryMemberBit`) are unaffected -- same type, same
+  // addresses, just one definition instead of two.
 
   struct BlueprintNodeIdPayloadView
   {
@@ -13771,9 +13694,12 @@ namespace
     }
   }
 
-  [[nodiscard]] EntityCategoryLookupTableView* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept
+  [[nodiscard]] EntityCategoryLookupTableRuntimeView* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept
   {
-    return reinterpret_cast<EntityCategoryLookupTableView*>(rules.mEntityCategoryLookup);
+    // `mEntityCategoryLookup` is already `EntityCategoryLookupTableRuntimeView*`
+    // (RRuleGameRules.h) -- no cast needed now that this file shares that
+    // type instead of reinterpret_casting its own separate duplicate.
+    return rules.mEntityCategoryLookup;
   }
 
   /**
@@ -13824,7 +13750,7 @@ namespace
    * is left for a pass that can verify it at runtime.
    */
   void AddCategoryMemberBit(
-    EntityCategoryLookupTableView& lookup,
+    EntityCategoryLookupTableRuntimeView& lookup,
     const msvc8::string& categoryName,
     const unsigned int categoryBitIndex
   )
@@ -13919,7 +13845,7 @@ namespace
       return;
     }
 
-    EntityCategoryLookupTableView* const lookup = ResolveEntityCategoryLookupTable(*rules);
+    EntityCategoryLookupTableRuntimeView* const lookup = ResolveEntityCategoryLookupTable(*rules);
     if (!lookup) {
       return;
     }
