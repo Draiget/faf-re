@@ -5320,9 +5320,16 @@ namespace Wm3
    *
    * What it does:
    * Computes point-to-sphere signed distance-squared (`distance^2 - radius^2`)
-   * and returns whether the point is inside/on the sphere.
+   * and returns whether the point is inside/on the sphere. This is
+   * Wm3::MinSphere3<double>::Contains -- every one of its callers traces
+   * back exclusively to FUN_00A4E390 (MinSphere3<double>'s own constructor),
+   * which is provably unreachable (exhaustively byte-verified zero
+   * references anywhere in the shipped binary; see the sibling
+   * MinSphere3<float> resolution for the same finding on that
+   * instantiation). Kept as [[maybe_unused]] rather than deleted: a correct,
+   * faithful recovery of real compiled bytes for a dead code path.
    */
-  bool RuntimePointInsideSphereBySignedDistanceSquared(
+  [[maybe_unused]] bool RuntimePointInsideSphereBySignedDistanceSquared(
     const double* const point3,
     const double* const sphereCenterRadius4,
     double* const outSignedDistanceSquared
