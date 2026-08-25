@@ -10,12 +10,17 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/resource/EResourceTypeTypeInfo.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   constexpr float kTerrainHeightWordScale = 1.0f / 128.0f;
+
+  constexpr const char* kSerializationSourcePath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+  constexpr int kSerializationLoadLine = 84;
+  constexpr int kSerializationSaveLine = 87;
 
   [[nodiscard]] int ClampTerrainSampleIndex(const int value, const int maxInclusive) noexcept
   {
@@ -71,40 +76,108 @@ namespace
     gResourceDepositTypeInfoStorage[sizeof(moho::ResourceDepositTypeInfo)]{};
   bool gResourceDepositTypeInfoConstructed = false;
 
-  struct ResourceDepositSerializerHelper
+  /**
+   * Demangled: Moho::ResourceDepositSerializer
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='ResourceDepositSerializer@Moho'`): `FUN_00BC9670` (real,
+   * `__xc_a`-reachable) vs. a dead zero-xref duplicate at `FUN_00545D30`
+   * (same field writes, no `atexit` call, confirmed via raw asm never
+   * live). Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
+   * `FUN_00545D10`/`FUN_00545D20` (thin forwarders into
+   * `ResourceDeposit::MemberDeserialize`/`MemberSerialize`), installs the
+   * `ResourceDepositSerializer` vtable, and pushes the real mangled
+   * destructor `??1ResourceDepositSerializer@Moho@@QAE@@Z` (`FUN_00BF4230`,
+   * confirmed unlink-then-self-link shape matching `SerHelperBase::
+   * ResetLinks()`) as its `atexit` target -- no eager `RegisterSerializeFunctions`/
+   * `Init()` call exists in the real ctor. Two zero-xref duplicate
+   * emissions of that unlink logic (`FUN_00545D60`, `FUN_00545D90`,
+   * formerly `CleanupResourceDepositSerializerHelperNodePrimary/Secondary`)
+   * are dead ICF twins, sha256-identical to the real destructor.
+   *
+   * Not a `gpg::SerSaveLoadHelper<ResourceDeposit>` instantiation: this
+   * class's own leaf Deserialize/Serialize bodies forward to
+   * `ResourceDeposit::MemberDeserialize`/`MemberSerialize`, which are
+   * themselves `static` free-style methods taking an explicit object
+   * pointer (not the `void MemberDeserialize(archive)` instance-method
+   * shape the generic template expects) -- kept as its own concrete class,
+   * same precedent as `Box3fSerializer`/`CSimResourcesSerializer`.
+   */
+  class ResourceDepositSerializer : public gpg::SerHelperBase
   {
-    void* mVTable;
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+  public:
+    /**
+     * Address: 0x00BC9670 (FUN_00BC9670, dynamic initializer for the global
+     * `ResourceDepositSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    ResourceDepositSerializer();
+
+    /**
+     * Address: 0x00BF4230 (FUN_00BF4230, Moho::ResourceDepositSerializer::~ResourceDepositSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ResourceDepositSerializer();
+
+    /**
+     * Address: 0x00545D10 (FUN_00545D10, Moho::ResourceDepositSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive load requests into `ResourceDeposit::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00545D20 (FUN_00545D20, Moho::ResourceDepositSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive save requests into `ResourceDeposit::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00547450 (FUN_00547450, gpg::SerSaveLoadHelper_ResourceDeposit::Init)
+     *
+     * What it does:
+     * Lazily resolves and caches `ResourceDeposit` RTTI on
+     * `ResourceDeposit::sType`, then binds load/save serializer callbacks
+     * into it. Confirmed via raw asm: this address reads/writes
+     * `Moho__ResourceDeposit__sType` directly (a genuine static member,
+     * previously missing from the recovered `ResourceDeposit` struct) --
+     * matches the `SerSaveLoadHelper<T>::Init()` generic caching shape
+     * exactly, including the same `"!type->mSerLoadFunc"`/
+     * `"!type->mSerSaveFunc"` assert strings at
+     * `gpgcore/reflection/serialization.h` lines 84/87 used by every other
+     * confirmed instantiation. `ArchiveSerialization.cpp` currently cites
+     * this SAME address for a different, incompatible generic dispatcher
+     * (`InstallMohoResourceDepositSerializerCallbacks`); removed there.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
   static_assert(
-    offsetof(ResourceDepositSerializerHelper, mHelperNext) == 0x04,
-    "ResourceDepositSerializerHelper::mHelperNext offset must be 0x04"
+    offsetof(ResourceDepositSerializer, mLoadCallback) == 0x0C,
+    "ResourceDepositSerializer::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(ResourceDepositSerializerHelper, mHelperPrev) == 0x08,
-    "ResourceDepositSerializerHelper::mHelperPrev offset must be 0x08"
+    offsetof(ResourceDepositSerializer, mSaveCallback) == 0x10,
+    "ResourceDepositSerializer::mSaveCallback offset must be 0x10"
   );
-  static_assert(sizeof(ResourceDepositSerializerHelper) == 0x14, "ResourceDepositSerializerHelper size must be 0x14");
+  static_assert(sizeof(ResourceDepositSerializer) == 0x14, "ResourceDepositSerializer size must be 0x14");
 
-  ResourceDepositSerializerHelper gResourceDepositSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* ResourceDepositSerializerSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gResourceDepositSerializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetResourceDepositSerializerHelperLinks() noexcept
-  {
-    gResourceDepositSerializer.mHelperNext->mPrev = gResourceDepositSerializer.mHelperPrev;
-    gResourceDepositSerializer.mHelperPrev->mNext = gResourceDepositSerializer.mHelperNext;
-    gpg::SerHelperBase* const self = ResourceDepositSerializerSelfNode();
-    gResourceDepositSerializer.mHelperPrev = self;
-    gResourceDepositSerializer.mHelperNext = self;
-    return self;
-  }
+  // Address: 0x010ABEEC -- process-global `ResourceDepositSerializer`
+  // singleton (constructed by FUN_00BC9670, self-registering via `__xc_a`).
+  ResourceDepositSerializer gResourceDepositSerializer;
 
   /**
    * Address: 0x00545CC0 (FUN_00545CC0)
@@ -121,69 +194,6 @@ namespace
 
     typeInfo->fields_ = msvc8::vector<gpg::RField>{};
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void DeserializeResourceDepositSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
-    moho::ResourceDeposit::MemberDeserialize(object, archive);
-  }
-
-  void SerializeResourceDepositSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
-    moho::ResourceDeposit::MemberSerialize(object, archive);
-  }
-
-  /**
-   * Address: 0x00545D30 (FUN_00545D30)
-   *
-   * What it does:
-   * Initializes callback lanes for global `ResourceDepositSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[nodiscard]] ResourceDepositSerializerHelper* InitializeResourceDepositSerializerStartupThunk() noexcept
-  {
-    gpg::SerHelperBase* const self = ResourceDepositSerializerSelfNode();
-    gResourceDepositSerializer.mHelperPrev = self;
-    gResourceDepositSerializer.mHelperNext = self;
-    gResourceDepositSerializer.mLoadCallback = &DeserializeResourceDepositSerializerCallback;
-    gResourceDepositSerializer.mSaveCallback = &SerializeResourceDepositSerializerCallback;
-    return &gResourceDepositSerializer;
-  }
-
-  /**
-   * Address: 0x00545D60 (FUN_00545D60)
-   *
-   * What it does:
-   * Unlinks `ResourceDepositSerializer` helper node from the intrusive helper
-   * list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodePrimary() noexcept
-  {
-    return ResetResourceDepositSerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00545D90 (FUN_00545D90)
-   *
-   * What it does:
-   * Secondary entrypoint for `ResourceDepositSerializer` helper-node
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetResourceDepositSerializerHelperLinks();
   }
 
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
@@ -206,22 +216,60 @@ namespace
     gResourceDepositTypeInfoConstructed = false;
   }
 
-  void cleanup_ResourceDepositSerializer_atexit()
+  /**
+   * Address: 0x00545D10 (FUN_00545D10, Moho::ResourceDepositSerializer::Deserialize)
+   */
+  void ResourceDepositSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
   {
-    (void)CleanupResourceDepositSerializerHelperNodePrimary();
+    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
+    moho::ResourceDeposit::MemberDeserialize(object, archive);
   }
 
   /**
-   * Address: 0x00BC9670 (FUN_00BC9670, register_ResourceDepositSerializer)
-   *
-   * What it does:
-   * Initializes the global ResourceDeposit serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Address: 0x00545D20 (FUN_00545D20, Moho::ResourceDepositSerializer::Serialize)
    */
-  void register_ResourceDepositSerializer()
+  void ResourceDepositSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
   {
-    (void)InitializeResourceDepositSerializerStartupThunk();
-    (void)std::atexit(&cleanup_ResourceDepositSerializer_atexit);
+    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
+    moho::ResourceDeposit::MemberSerialize(object, archive);
+  }
+
+  /**
+   * Address: 0x00547450 (FUN_00547450, gpg::SerSaveLoadHelper_ResourceDeposit::Init)
+   */
+  void ResourceDepositSerializer::Init()
+  {
+    if (moho::ResourceDeposit::sType == nullptr) {
+      moho::ResourceDeposit::sType = gpg::LookupRType(typeid(moho::ResourceDeposit));
+    }
+
+    gpg::RType* const type = moho::ResourceDeposit::sType;
+    if (type->serLoadFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerLoadFunc", kSerializationLoadLine, kSerializationSourcePath);
+    }
+    if (type->serSaveFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerSaveFunc", kSerializationSaveLine, kSerializationSourcePath);
+    }
+    type->serLoadFunc_ = mLoadCallback;
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  /**
+   * Address: 0x00BC9670 (FUN_00BC9670, dynamic initializer for the global
+   * `ResourceDepositSerializer` singleton)
+   */
+  ResourceDepositSerializer::ResourceDepositSerializer()
+    : mLoadCallback(&ResourceDepositSerializer::Deserialize)
+    , mSaveCallback(&ResourceDepositSerializer::Serialize)
+  {}
+
+  ResourceDepositSerializer::~ResourceDepositSerializer()
+  {
+    ResetLinks();
   }
 
   struct ResourceDepositTypeInfoStartup
@@ -229,12 +277,13 @@ namespace
     ResourceDepositTypeInfoStartup()
     {
       moho::register_ResourceDepositTypeInfo();
-      register_ResourceDepositSerializer();
     }
   };
 
   [[maybe_unused]] ResourceDepositTypeInfoStartup gResourceDepositTypeInfoStartup;
 } // namespace
+
+gpg::RType* moho::ResourceDeposit::sType = nullptr;
 
 namespace moho
 {

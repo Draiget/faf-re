@@ -19,6 +19,15 @@ namespace moho
 
   struct ResourceDeposit
   {
+    // Address: 0x010C6EA0 -- process-lifetime cached RTTI pointer for
+    // `ResourceDeposit`, lazily resolved and written by
+    // `ResourceDepositSerializer::Init()` (0x00547450, ResourceDeposit.cpp).
+    // Confirmed via raw asm: that Init() body reads/writes this static
+    // directly (`Moho__ResourceDeposit__sType`), matching the same
+    // `T::sType` caching shape used by `SPointVector::sType`/`CAniPose::
+    // sType`/`BVIntSet::sType`.
+    static gpg::RType* sType;
+
     gpg::Rect2i footprintRect; // +0x00
 
     EDepositType depositType; // +0x10
