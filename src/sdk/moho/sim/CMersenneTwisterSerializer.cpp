@@ -68,14 +68,7 @@ namespace
     SaveMemberThunk<moho::CMersenneTwister>(archive, objectPtr, 0, nullptr);
   }
 
-  template <typename TObject>
-  void MaterializeReflectionSingleton(TObject& singleton)
-  {
-    (void)singleton;
-  }
-
   moho::CMersenneTwisterTypeInfo gCMersenneTwisterTypeInfo;
-  moho::CMersenneTwisterSerializer gCMersenneTwisterSerializer;
 
   /**
    * Address: 0x00BC3300 (FUN_00BC3300, register_CMersenneTwisterTypeInfo)
@@ -83,47 +76,43 @@ namespace
    * What it does:
    * Materializes the global reflection descriptor for `CMersenneTwister`.
    */
-  void RegisterCMersenneTwisterTypeInfoBootstrap()
+  struct CMersenneTwisterTypeInfoRegistration
   {
-    MaterializeReflectionSingleton(gCMersenneTwisterTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC3320 (FUN_00BC3320, register_CMersenneTwisterSerializer)
-   *
-   * What it does:
-   * Initializes the global CMersenneTwister serializer helper and binds
-   * load/save callbacks into reflected type metadata.
-   */
-  void RegisterCMersenneTwisterSerializerBootstrap()
-  {
-    gCMersenneTwisterSerializer.mHelperNext = nullptr;
-    gCMersenneTwisterSerializer.mHelperPrev = nullptr;
-    gCMersenneTwisterSerializer.mLoadCallback = &LoadCMersenneTwister;
-    gCMersenneTwisterSerializer.mSaveCallback = &SaveCMersenneTwister;
-  }
-
-  struct CMersenneTwisterReflectionRegistration
-  {
-    CMersenneTwisterReflectionRegistration()
+    CMersenneTwisterTypeInfoRegistration()
     {
-      RegisterCMersenneTwisterTypeInfoBootstrap();
-      RegisterCMersenneTwisterSerializerBootstrap();
+      (void)gCMersenneTwisterTypeInfo;
     }
   };
 
-  CMersenneTwisterReflectionRegistration gCMersenneTwisterReflectionRegistration;
+  CMersenneTwisterTypeInfoRegistration gCMersenneTwisterTypeInfoRegistration;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC3320 (FUN_00BC3320, register_CMersenneTwisterSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  CMersenneTwisterSerializer::CMersenneTwisterSerializer()
+    : mLoadCallback(&LoadCMersenneTwister)
+    , mSaveCallback(&SaveCMersenneTwister)
+  {}
+
+  CMersenneTwisterSerializer::~CMersenneTwisterSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x0040F2C0 (FUN_0040F2C0, gpg::SerSaveLoadHelper<class Moho::CMersenneTwister>::Init)
    *
    * What it does:
    * Resolves CMersenneTwister RTTI and installs load/save callbacks from this helper.
    */
-  void CMersenneTwisterSerializer::RegisterSerializeFunctions()
+  void CMersenneTwisterSerializer::Init()
   {
     gpg::RType* const type = CachedCMersenneTwisterType();
     GPG_ASSERT(type != nullptr);
@@ -133,3 +122,9 @@ namespace moho
     type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010A699C -- process-global `CMersenneTwisterSerializer` singleton.
+  moho::CMersenneTwisterSerializer gCMersenneTwisterSerializer;
+} // namespace
