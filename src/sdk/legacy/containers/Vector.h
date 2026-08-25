@@ -2175,15 +2175,32 @@ namespace msvc8
          * temporary on exit; taking it by const-ref here is equivalent because
          * `insert` copies into its own local before any reallocation.
          *
-         * Address: 0x0082DB00 (FUN_0082DB00, `msvc8::vector<UICommandGraph::
-         * HashListNode2C*>::resize` for the 4-byte pointer element -- shrinks
-         * via the destroy-range helper FUN_0082F750 (recovered,
-         * LegacyContainerRuntime.cpp) or grows via the `_Insert_n` emission
-         * FUN_0082F7A0 (already cited on this template, stride 4). Reached
-         * from `UICommandGraph::ObtainHashListNodePair<TNode,TValue>`'s
-         * rehash-growth branch, `table.mBuckets.resize(newMask + 2u,
-         * table.mListHead)` -- the fill value is the table's sentinel head
-         * pointer, not a raw byte, matching this member's `const T&` shape.)
+         * Address: 0x0082DB00 (FUN_0082DB00, `msvc8::vector<void*>::resize`
+         * for the 4-byte pointer element -- shrinks via the destroy-range
+         * helper FUN_0082F750 (recovered, LegacyContainerRuntime.cpp) or
+         * grows via the `_Insert_n` emission FUN_0082F7A0 (already cited on
+         * this template, stride 4). Reached from `UICommandGraph::
+         * ObtainHashListNodePair<TNode,TValue>`'s rehash-growth branch,
+         * `table.mBuckets.resize(newMask + 2u, table.mListHead)` -- the fill
+         * value is the table's sentinel head pointer, not a raw byte,
+         * matching this member's `const T&` shape. Element type correction:
+         * `HashTable<TNode>::mBuckets` (`CWldSession.cpp`) is declared
+         * `HashBucketVector = msvc8::vector<void*>` UNPARAMETERIZED by
+         * `TNode` -- there is no `vector<HashListNode2C*>` type anywhere in
+         * `src/sdk` (grep-confirmed zero hits); this citation previously
+         * claimed one. The binary genuinely emits 3 separate, non-ICF-folded
+         * `resize` bodies for the 3 hash tables (`FUN_0082D820`/mMapAB0,
+         * `FUN_0082CBA0`/mMapD, this one/mMapC -- confirmed via
+         * `_callgraph_index.sqlite`, each with exactly one disjoint real
+         * caller) despite all three being the textually-identical
+         * `vector<void*>` instantiation; this is presumably a build-
+         * configuration/TU-boundary artifact of the original 2007 compile
+         * (each `HashTable<TNode>` specialization living in its own
+         * translation unit prevented the linker from folding them), not
+         * evidence of a real per-TNode type. Recovering this source as one
+         * shared `vector<void*>` instantiation is the correct 1:1-behavior
+         * fidelity target regardless of how the original build happened to
+         * split the symbols.)
          * Address: 0x0074DDD0 (FUN_0074DDD0, IDA infers `std::
          * vector_CSimConVarInstanceBase::reserve` but the real behavior is
          * `msvc8::vector<Moho::CSimConVarInstanceBase*>::resize(newSize,
@@ -4031,6 +4048,45 @@ namespace msvc8
          * compiles to, matching every other `push_back`-reached `insert`
          * instantiation in this member -- but it had no source-side
          * citation at all before this pass, unlike its siblings.)
+         *
+         * Address: 0x00627800 (FUN_00627800, sub_627800) --
+         * `msvc8::vector<Moho::SPickUpInfo>::insert(iterator, size_type,
+         * const T&)` (`_Insert_n`) for the 12-byte intrusive-weak
+         * `{WeakPtr<Unit>, float}` element (`SPickUpInfoVectorReflection.cpp`'s
+         * `SPickUpInfoVector`). `max_size` folds to 357913941
+         * (`0xFFFFFFFF / 12`, throw lane `FUN_00627B20`). In-place branch
+         * (`capacity() >= size()+count`): the `tail >= count` sub-branch
+         * (not exercised by this instantiation's only confirmed caller,
+         * since `push_back` always inserts at `end()` where `tail == 0`)
+         * shifts via `FUN_00628200`/`FUN_00628230`; the `tail < count`
+         * sub-branch -- the one `push_back`'s `count=1`-at-`end()` call
+         * always takes -- moves the (empty) tail via `FUN_00628200` then
+         * fills the new element through the `_Ufill` adapter `FUN_006274B0`
+         * (cited below on `uninit_fill_n`), matching this member's
+         * `uninit_move_n(insertAt, tail, insertAt+count); uninit_fill_n(
+         * insertAt+tail, count-tail, localValue);` pair for `tail == 0`.
+         * Reallocation branch: 1.5x growth (`v10 = (v5>>1)+v5`, folding to
+         * `count + FUN_00627310` -- this instantiation's own
+         * `recommended_capacity`-shaped grow query -- when 1.5x undershoots
+         * `size()+count`), allocates via `FUN_00628260`, fills the new
+         * element(s) through `FUN_00629F40`/`FUN_00628AE0`, relocates the
+         * live range and frees the old block via `FUN_00628AB0` +
+         * `operator delete`. Every element move/copy/destroy step in both
+         * branches drives `SPickUpInfo`'s non-trivial copy-ctor/dtor to
+         * relink the intrusive `WeakPtr<Unit>` owner chain -- none of this
+         * instantiation's sub-helpers are the STL's trivial-scalar
+         * fast-copy path. Reached from this element's `insert(pos, value)`
+         * single-value overload (`FUN_00627340`, cited above) with
+         * `count = 1`, itself reached from `push_back`
+         * (`FUN_00626E10`/`PushBackSPickUpInfoWithRelink`,
+         * `SPickUpInfoVectorReflection.cpp`, already recovered)
+         * capacity-full path. Previously `blocked`
+         * ("needs_recovered_caller" -- its only feasible source-level
+         * callers were `[[maybe_unused]]` orphans); both
+         * `PushBackSPickUpInfoWithRelink` and `gpg::RVectorType_SPickUpInfo::
+         * SetCount`/`SerLoad` are non-orphan recovered source as of this
+         * pass, resolving that blocker per its own documented unblock
+         * criteria (`decomp/recovery/reports/FUN_00627800.md`).
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5095,6 +5151,23 @@ namespace msvc8
          * returning the advanced pointer directly with no separate adapter
          * needed. Reached from the `_Insert_n` grow core `FUN_004451A0`,
          * cited above on `insert`.)
+         * Address: 0x006274B0 (FUN_006274B0, sub_6274B0) -- the `_Ufill`
+         * advance-returning adapter for `msvc8::vector<Moho::SPickUpInfo>`'s
+         * fill loop, for the 12-byte intrusive-weak `{WeakPtr<Unit>, float}`
+         * element (`SPickUpInfoVectorReflection.cpp`'s `SPickUpInfoVector`)
+         * -- `sub_628AE0(a1,a2,a3); return a1 + 12*a2;`, the same
+         * "wrap the core fill loop, return `dst + n*sizeof(T)`" shape as
+         * `FUN_0092E920`/`FUN_0092EB70` above, confirmed against the `.asm`
+         * (3 instructions of setup, one `call`, one `lea`, `retn`). The
+         * wrapped core loop (`FUN_00628200`/`FUN_00628230`, this
+         * instantiation's own `WeakPtr<Unit>`-relinking element constructor,
+         * not yet individually recovered) is passed through unchanged.
+         * Reached from the `_Insert_n` grow core `FUN_00627800`'s (cited
+         * above on `insert`) `tail < count` sub-branch -- the one
+         * `push_back`'s `count=1`-at-`end()` insert always takes, since
+         * `tail == last_ - insertAt == 0` there. Previously mis-tracked
+         * `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate the address
+         * never appeared in.
          *
          * Uninitialized fill N with value starting at dst
          */
