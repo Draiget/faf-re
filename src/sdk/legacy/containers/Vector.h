@@ -2070,6 +2070,29 @@ namespace msvc8
          * (moho/ui/SelectionDragger.cpp), the exact source line
          * `Moho::SelectionDragger::DragRelease` (0x00863870) reaches this from at
          * 0x00863C4F in the shipped binary.)
+         *
+         * Address: 0x00537B40 (FUN_00537B40, sub_537B40) --
+         * `msvc8::vector<const char*>::resize(size_type)` for the 4-byte
+         * pointer element (`CAniSkel.cpp`'s `FillSScmBoneNamePointers`
+         * scratch vector, `outNamePointers.resize(boneCount)`). Unlike the
+         * two instantiations cited above, this emission does not tail-call
+         * a separate two-argument `resize(n, value)` body: since `T()` for
+         * `const char*` is the trivial literal `nullptr`, the compiler
+         * fused the size comparison directly into this function and
+         * dispatches straight to this instantiation's `erase(first_+
+         * newSize, last_)` (`FUN_00537C10`, not yet individually recovered)
+         * on shrink, or straight to its `_Insert_n` grow core
+         * (`FUN_00537C60`, cited above on `insert`) on growth, passing
+         * `newSize - size()` as the count and the address of a
+         * stack-local `nullptr` as the value -- behaviourally identical to
+         * `resize(newSize, T())`, just without a separate out-of-line
+         * `resize(n,value)` symbol to tail-call. Reached from
+         * `FillSScmBoneNamePointers` (`FUN_005379D0`,
+         * `CAniSkel.cpp`, already recovered), itself reached from
+         * `CAniSkel::CAniSkel` (`FUN_0054A0A0`, already recovered).
+         * Previously mis-tracked `skip` as a generic RULE ONE boilerplate
+         * note with no caller evidence; this pass supplies the concrete
+         * caller chain.
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -4087,6 +4110,30 @@ namespace msvc8
          * SetCount`/`SerLoad` are non-orphan recovered source as of this
          * pass, resolving that blocker per its own documented unblock
          * criteria (`decomp/recovery/reports/FUN_00627800.md`).
+         *
+         * Address: 0x00537C60 (FUN_00537C60, sub_537C60) --
+         * `msvc8::vector<const char*>::insert(iterator, size_type, const T&)`
+         * (`_Insert_n`) for the 4-byte pointer element (`CAniSkel.cpp`'s
+         * `FillSScmBoneNamePointers` scratch vector). `max_size` folds to
+         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw lane `FUN_00537EF0`). This is
+         * the STL trivial-scalar fast-copy shape (like `FUN_004451A0`
+         * above): the in-place branch's tail-shift step is the range-form
+         * `uninit_move_n` adapter `FUN_00538040` (cited above), the fill
+         * step is a direct `memset32(dst, value, count)` broadcast (no
+         * per-element loop, no separate `uninit_fill_n` callee -- `value`
+         * is a single 4-byte word here), and the reallocation branch grows
+         * 1.5x, allocates via `FUN_005380D0`, and relocates head/tail
+         * through two more `memmove_s` calls inline rather than through
+         * this member's own helpers. `sub_538080` (called once, in the
+         * in-place branch's `tail >= count` sub-branch) is not yet
+         * individually recovered. Reached from `resize`'s emission for
+         * this instantiation (`FUN_00537B40`, cited below) with `pos =
+         * last_`, `count = newSize - size()` -- the only call pattern this
+         * instantiation is exercised with, which is why its `tail >= count`
+         * sub-branch (only reachable for a mid-range insert) is dead in
+         * practice. Previously `blocked` ("requires deeper evidence/
+         * caller-context before recovery"); this pass supplies the full
+         * instantiation and caller evidence.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5595,6 +5642,25 @@ namespace msvc8
          * silently take over this loop and diverge from the binary, which is
          * exactly what happened at FUN_00885070 above. Always copy-construct
          * instead, matching every emission seen for this member so far.
+         *
+         * Address: 0x00538040 (FUN_00538040, sub_538040) -- range-form,
+         * advance-returning calling-convention variant of this member for
+         * `msvc8::vector<const char*>` (4-byte trivially-copyable pointer
+         * element; `CAniSkel.cpp`'s `FillSScmBoneNamePointers` scratch
+         * vector). Takes `(dst, first, last)` instead of `(src, n, dst)`
+         * and returns `dst + (last-first)` instead of `void` -- confirmed
+         * against the `.asm`: `n = (last-first)>>2; if (n) memmove_s(dst,
+         * 4n, first, 4n); return dst+4n;`, the same trivially-copyable
+         * `memmove` fast path this member's `if constexpr
+         * (is_trivially_copyable_v<T>)` branch takes, just addressed by a
+         * range instead of a count. Reached from `_Insert_n`'s emission for
+         * this instantiation (`FUN_00537C60`, cited below on `insert`) as
+         * its tail-shift step -- a structural no-op for this instantiation's
+         * only live caller (`resize`, which always inserts at `end()`, so
+         * `tail == 0`), present because the emission is the general
+         * insert-at-any-position shape. Previously mis-tracked `blocked`
+         * citing `CrtRuntimeHelpers.cpp` boilerplate the address never
+         * appeared in.
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
