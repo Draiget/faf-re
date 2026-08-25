@@ -8,6 +8,11 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 
+namespace gpg
+{
+  class SerConstructResult;
+}
+
 namespace moho
 {
   class CScrLuaInitForm;
@@ -77,43 +82,116 @@ namespace moho
     bool* mExecuteDestroyedFlag;  // 0x24
   };
 
-  class CLuaTaskConstruct
+  class CLuaTaskConstruct : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC6180 (FUN_00BC6180, dynamic initializer for the global
+     * `CLuaTaskConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CLuaTaskConstruct();
+
+    /**
+     * Address: 0x00BF0AC0 (FUN_00BF0AC0, Moho::CLuaTaskConstruct::~CLuaTaskConstruct)
+     */
+    ~CLuaTaskConstruct();
+
+    /**
+     * Address: 0x004C9BA0 (FUN_004C9BA0, Moho::CLuaTaskConstruct::Construct)
+     *
+     * What it does:
+     * Thin reflection-dispatcher thunk: ignores the archive/objectStorage/
+     * version parameters and forwards only `result` to the allocate +
+     * placement-construct + `SetUnowned` body (FUN_004C9BB0). The callback
+     * allocates its own `CLuaTask` storage rather than using caller-provided
+     * storage.
+     */
+    static void Construct(void* archive, void* objectStorage, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x004CB6E0 (FUN_004CB6E0, CLuaTask construct delete callback)
+     *
+     * What it does:
+     * Deletes one construct-path CLuaTask object through its virtual
+     * deleting destructor.
+     */
+    static void Deconstruct(void* object);
+
+    /**
      * Address: 0x004CAF60 (FUN_004CAF60, sub_4CAF60)
-     * Slot: 0
      *
      * What it does:
      * Binds construct/delete callbacks into CLuaTask RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
-  class CLuaTaskSerializer
+  static_assert(
+    offsetof(CLuaTaskConstruct, mSerConstructFunc) == 0x0C, "CLuaTaskConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(offsetof(CLuaTaskConstruct, mDeleteFunc) == 0x10, "CLuaTaskConstruct::mDeleteFunc offset must be 0x10");
+  static_assert(sizeof(CLuaTaskConstruct) == 0x14, "CLuaTaskConstruct size must be 0x14");
+
+  class CLuaTaskSerializer : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC61C0 (FUN_00BC61C0, dynamic initializer for the global
+     * `CLuaTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CLuaTaskSerializer();
+
+    /**
+     * Address: 0x00BF0AF0 (FUN_00BF0AF0, Moho::CLuaTaskSerializer::~CLuaTaskSerializer)
+     */
+    ~CLuaTaskSerializer();
+
+    /**
+     * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
+     * Chain:   0x004CC2B0 (FUN_004CC2B0)
+     *
+     * What it does:
+     * Forwards archive-load flow into `CLuaTask::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
+     * Chain:   0x004CC320 (FUN_004CC320)
+     *
+     * What it does:
+     * Forwards archive-save flow into `CLuaTask::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x004CAFE0 (FUN_004CAFE0, sub_4CAFE0)
-     * Slot: 0
      *
      * What it does:
      * Binds load/save serializer callbacks into CLuaTask RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(offsetof(CLuaTaskSerializer, mSerLoadFunc) == 0x0C, "CLuaTaskSerializer::mSerLoadFunc offset must be 0x0C");
+  static_assert(offsetof(CLuaTaskSerializer, mSerSaveFunc) == 0x10, "CLuaTaskSerializer::mSerSaveFunc offset must be 0x10");
+  static_assert(sizeof(CLuaTaskSerializer) == 0x14, "CLuaTaskSerializer size must be 0x14");
 
   class CLuaTaskTypeInfo : public gpg::RType
   {
@@ -153,8 +231,6 @@ namespace moho
   static_assert(
     offsetof(CLuaTask, mExecuteDestroyedFlag) == 0x24, "CLuaTask::mExecuteDestroyedFlag offset must be 0x24"
   );
-  static_assert(sizeof(CLuaTaskConstruct) == 0x14, "CLuaTaskConstruct size must be 0x14");
-  static_assert(sizeof(CLuaTaskSerializer) == 0x14, "CLuaTaskSerializer size must be 0x14");
   static_assert(sizeof(CLuaTaskTypeInfo) == 0x64, "CLuaTaskTypeInfo size must be 0x64");
 
   /**
@@ -362,32 +438,4 @@ namespace moho
    * cleanup at process exit.
    */
   void register_CLuaTaskTypeInfo();
-
-  /**
-   * Address: 0x00BC6180 (FUN_00BC6180, CLuaTask startup construct registration)
-   *
-   * What it does:
-   * Initializes construct/delete callback helper lanes for `CLuaTask` and
-   * schedules intrusive helper cleanup at process exit.
-   */
-  void register_CLuaTaskConstruct();
-
-  /**
-   * Address: 0x00BC61C0 (FUN_00BC61C0, register_CLuaTaskSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer callback lanes for `CLuaTask` and schedules
-   * intrusive helper cleanup at process exit.
-   */
-  void register_CLuaTaskSerializer();
-
-  /**
-     * Address: 0x004C9CA0 (FUN_004C9CA0)
-     * Address: 0x004C9CD0 (FUN_004C9CD0)
-   *
-   * What it does:
-   * Unlinks static serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CLuaTaskSerializer();
 } // namespace moho

@@ -21,6 +21,15 @@ extern "C" {
 int lua_traceback(lua_State* L, const char* message, int level);
 }
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 using namespace moho;
 
 namespace
@@ -45,18 +54,12 @@ namespace
   constexpr const char* kResumeThreadForkOnlyError = "Can't resume a thread that wasn't created with ForkThread.";
   alignas(moho::CLuaTaskTypeInfo) std::byte gCLuaTaskTypeInfoStorage[sizeof(moho::CLuaTaskTypeInfo)]{};
   bool gCLuaTaskTypeInfoConstructed = false;
-  alignas(moho::CLuaTaskConstruct) std::byte gCLuaTaskConstructStorage[sizeof(moho::CLuaTaskConstruct)]{};
-  bool gCLuaTaskConstructInitialized = false;
+  moho::CLuaTaskConstruct gCLuaTaskConstruct{};
   moho::CLuaTaskSerializer gCLuaTaskSerializer{};
 
   [[nodiscard]] moho::CLuaTaskTypeInfo& CLuaTaskTypeInfoSlot()
   {
     return *reinterpret_cast<moho::CLuaTaskTypeInfo*>(gCLuaTaskTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CLuaTaskConstruct& CLuaTaskConstructSlot()
-  {
-    return *reinterpret_cast<moho::CLuaTaskConstruct*>(gCLuaTaskConstructStorage);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
@@ -76,41 +79,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    auto* const next = static_cast<gpg::SerHelperBase*>(serializer.mNext);
-    auto* const prev = static_cast<gpg::SerHelperBase*>(serializer.mPrev);
-    if (next != nullptr && prev != nullptr) {
-      next->mPrev = prev;
-      prev->mNext = next;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mPrev = self;
-    serializer.mNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mNext == nullptr || serializer.mPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mPrev = self;
-      serializer.mNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
   }
 
   [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
@@ -193,93 +161,26 @@ namespace
   }
 
   /**
-   * Address: 0x004C9BB0 (FUN_004C9BB0, CLuaTask construct callback body)
+   * Address: 0x004C9BB0 (FUN_004C9BB0, allocate + construct + SetUnowned body)
    *
    * What it does:
-   * Placement-constructs one CLuaTask object in caller-provided storage for
-   * reflection construct-function registration.
+   * Allocates raw `CLuaTask` storage, placement-constructs it via
+   * `InitializeRawCLuaTaskConstructStorage`, builds an unowned reflected
+   * reference for the new object, and reports it through the serializer
+   * construct result. This is the real callback body -- it allocates its
+   * own storage rather than using any caller-provided `objectStorage`.
    */
-  void ConstructCLuaTaskInPlace(void* const objectStorage)
+  void ConstructCLuaTaskForSerializer(gpg::SerConstructResult* const result)
   {
-    (void)InitializeRawCLuaTaskConstructStorage(objectStorage);
-  }
-
-  /**
-   * Address: 0x004CB6E0 (FUN_004CB6E0, CLuaTask construct delete callback)
-   *
-   * What it does:
-   * Deletes one construct-path CLuaTask object through its virtual deleting
-   * destructor.
-   */
-  void DeleteConstructedCLuaTask(void* const objectStorage)
-  {
-    auto* const task = static_cast<CLuaTask*>(objectStorage);
-    if (!task) {
-      return;
-    }
-    delete task;
-  }
-
-  /**
-   * Address: 0x00BF0AC0 (FUN_00BF0AC0, CLuaTask construct cleanup primary)
-   *
-   * What it does:
-   * Unlinks startup CLuaTask construct helper node from the intrusive helper
-   * chain and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantPrimary()
-  {
-    return UnlinkSerializerNode(CLuaTaskConstructSlot());
-  }
-
-  /**
-   * Address: 0x004C9B40 (FUN_004C9B40, CLuaTask construct cleanup alias A)
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantAliasA()
-  {
-    return CleanupCLuaTaskConstructVariantPrimary();
-  }
-
-  /**
-   * Address: 0x004C9B70 (FUN_004C9B70, CLuaTask construct cleanup alias B)
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantAliasB()
-  {
-    return CleanupCLuaTaskConstructVariantPrimary();
-  }
-
-  /**
-    * Alias of FUN_004C9CA0 (non-canonical helper lane).
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasA()
-  {
-    return UnlinkSerializerNode(gCLuaTaskSerializer);
-  }
-
-  /**
-    * Alias of FUN_004C9CD0 (non-canonical helper lane).
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasB()
-  {
-    return UnlinkSerializerNode(gCLuaTaskSerializer);
-  }
-
-  void InitializeCLuaTaskConstructHelper()
-  {
-    if (!gCLuaTaskConstructInitialized) {
-      ::new (static_cast<void*>(&CLuaTaskConstructSlot())) moho::CLuaTaskConstruct();
-      gCLuaTaskConstructInitialized = true;
+    void* const storage = ::operator new(sizeof(moho::CLuaTask), std::nothrow);
+    moho::CLuaTask* task = nullptr;
+    if (storage) {
+      task = InitializeRawCLuaTaskConstructStorage(storage);
     }
 
-    auto& constructHelper = CLuaTaskConstructSlot();
-    ResetSerializerNode(constructHelper);
-    constructHelper.mSerConstructFunc = &ConstructCLuaTaskInPlace;
-    constructHelper.mDeleteFunc = &DeleteConstructedCLuaTask;
-  }
-
-  void CleanupCLuaTaskConstructAtExit()
-  {
-    (void)CleanupCLuaTaskConstructVariantPrimary();
+    gpg::RRef taskRef{};
+    (void)gpg::RRef_CLuaTask(&taskRef, task);
+    result->SetUnowned(taskRef, 0u);
   }
 
   gpg::RType* CachedCLuaTaskType()
@@ -392,37 +293,6 @@ namespace
     ++task->mResumeArgCount;
   }
 
-  /**
-   * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
-   * Chain:   0x004CC2B0 (FUN_004CC2B0)
-   */
-  void DeserializeCLuaTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-    DeserializeCLuaTaskThunk(archive, task);
-  }
-
-  /**
-   * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
-   * Chain:   0x004CC320 (FUN_004CC320)
-   */
-  void SerializeCLuaTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-    SerializeCLuaTaskThunk(archive, task);
-  }
-
-  void InitializeCLuaTaskSerializer()
-  {
-    ResetSerializerNode(gCLuaTaskSerializer);
-    gCLuaTaskSerializer.mSerLoadFunc = &DeserializeCLuaTask;
-    gCLuaTaskSerializer.mSerSaveFunc = &SerializeCLuaTask;
-  }
-
-  void CleanupCLuaTaskSerializerAtExit()
-  {
-    (void)moho::cleanup_CLuaTaskSerializer();
-  }
 } // namespace
 
 /**
@@ -1106,9 +976,67 @@ void CLuaTask::MemberSerialize(gpg::WriteArchive* const archive)
 }
 
 /**
+ * Address: 0x00BC6180 (FUN_00BC6180, dynamic initializer for the global
+ * `CLuaTaskConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * construct/delete callback fields.
+ */
+CLuaTaskConstruct::CLuaTaskConstruct()
+  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CLuaTaskConstruct::Construct))
+  , mDeleteFunc(&CLuaTaskConstruct::Deconstruct)
+{}
+
+/**
+ * Address: 0x00BF0AC0 (FUN_00BF0AC0, Moho::CLuaTaskConstruct::~CLuaTaskConstruct)
+ *
+ * What it does:
+ * Plain (unmangled) implicit-dtor-style unlink body -- functionally
+ * identical to `ResetLinks()`. Two zero-incoming-xref duplicate emissions
+ * of this same unlink shape also exist (0x004C9B40, 0x004C9B70); neither is
+ * reachable from anywhere in the binary.
+ */
+CLuaTaskConstruct::~CLuaTaskConstruct()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x004C9BA0 (FUN_004C9BA0, Moho::CLuaTaskConstruct::Construct)
+ *
+ * What it does:
+ * Thin reflection-dispatcher thunk: ignores the archive/objectStorage/
+ * version parameters and forwards only `result` to the allocate +
+ * placement-construct + `SetUnowned` body.
+ */
+void CLuaTaskConstruct::Construct(
+  void* /*archive*/, void* /*objectStorage*/, int /*version*/, gpg::SerConstructResult* const result
+)
+{
+  ConstructCLuaTaskForSerializer(result);
+}
+
+/**
+ * Address: 0x004CB6E0 (FUN_004CB6E0, CLuaTask construct delete callback)
+ *
+ * What it does:
+ * Deletes one construct-path CLuaTask object through its virtual deleting
+ * destructor.
+ */
+void CLuaTaskConstruct::Deconstruct(void* const object)
+{
+  auto* const task = static_cast<CLuaTask*>(object);
+  if (!task) {
+    return;
+  }
+  delete task;
+}
+
+/**
  * Address: 0x004CAF60 (FUN_004CAF60, sub_4CAF60)
  */
-void CLuaTaskConstruct::RegisterConstructFunction()
+void CLuaTaskConstruct::Init()
 {
   gpg::RType* const type = CachedCLuaTaskType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -1117,15 +1045,66 @@ void CLuaTaskConstruct::RegisterConstructFunction()
 }
 
 /**
+ * Address: 0x00BC61C0 (FUN_00BC61C0, dynamic initializer for the global
+ * `CLuaTaskSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
+ * callback fields.
+ */
+CLuaTaskSerializer::CLuaTaskSerializer()
+  : mSerLoadFunc(&CLuaTaskSerializer::Deserialize)
+  , mSerSaveFunc(&CLuaTaskSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF0AF0 (FUN_00BF0AF0, Moho::CLuaTaskSerializer::~CLuaTaskSerializer)
+ *
+ * What it does:
+ * Mangled `??1CLuaTaskSerializer@Moho@@QAE@@Z` dtor calling the shared
+ * unlink body. Two zero-incoming-xref duplicate emissions of this same
+ * unlink shape also exist (0x004C9CA0, 0x004C9CD0); neither is reachable
+ * from anywhere in the binary.
+ */
+CLuaTaskSerializer::~CLuaTaskSerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
+ * Chain:   0x004CC2B0 (FUN_004CC2B0)
+ */
+void CLuaTaskSerializer::Deserialize(
+  gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
+)
+{
+  auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
+  DeserializeCLuaTaskThunk(archive, task);
+}
+
+/**
+ * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
+ * Chain:   0x004CC320 (FUN_004CC320)
+ */
+void CLuaTaskSerializer::Serialize(
+  gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
+)
+{
+  auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
+  SerializeCLuaTaskThunk(archive, task);
+}
+
+/**
  * Address: 0x004CAFE0 (FUN_004CAFE0, sub_4CAFE0)
  */
-void CLuaTaskSerializer::RegisterSerializeFunctions()
+void CLuaTaskSerializer::Init()
 {
   gpg::RType* const type = CachedCLuaTaskType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = &DeserializeCLuaTask;
+  type->serLoadFunc_ = mSerLoadFunc;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = &SerializeCLuaTask;
+  type->serSaveFunc_ = mSerSaveFunc;
 }
 
 /**
@@ -1143,50 +1122,6 @@ void moho::register_CLuaTaskTypeInfo()
     return true;
   }();
   (void)kRegistered;
-}
-
-/**
- * Address: 0x00BC6180 (FUN_00BC6180, CLuaTask startup construct registration)
- *
- * What it does:
- * Initializes construct helper callbacks for CLuaTask reflected serializer
- * construction and schedules intrusive helper cleanup at process exit.
- */
-void moho::register_CLuaTaskConstruct()
-{
-  static const bool kRegistered = []() {
-    InitializeCLuaTaskConstructHelper();
-    CLuaTaskConstructSlot().RegisterConstructFunction();
-    (void)std::atexit(&CleanupCLuaTaskConstructAtExit);
-    return true;
-  }();
-  (void)kRegistered;
-}
-
-/**
- * Address: 0x004C9CA0 (FUN_004C9CA0, serializer cleanup alias A)
- * Address: 0x004C9CD0 (FUN_004C9CD0, serializer cleanup alias B)
- *
- * What it does:
- * Unlinks static CLuaTask serializer helper node from the intrusive helper
- * list and restores self-links.
- */
-gpg::SerHelperBase* moho::cleanup_CLuaTaskSerializer()
-{
-  return CleanupCLuaTaskSerializerVariantAliasA();
-}
-
-/**
- * Address: 0x00BC61C0 (FUN_00BC61C0, register_CLuaTaskSerializer)
- *
- * What it does:
- * Initializes startup serializer callback lanes for `CLuaTask` and schedules
- * intrusive helper cleanup at process exit.
- */
-void moho::register_CLuaTaskSerializer()
-{
-  InitializeCLuaTaskSerializer();
-  (void)std::atexit(&CleanupCLuaTaskSerializerAtExit);
 }
 
 /**
