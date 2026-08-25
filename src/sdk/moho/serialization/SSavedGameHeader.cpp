@@ -6,7 +6,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/serialization/SSavedGameArmyInfoVectorReflection.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/LaunchInfoBase.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -22,6 +22,10 @@ namespace
    *
    * What it does:
    * Loads SSavedGameHeader payload fields and shared LaunchInfoBase pointer.
+   * Single caller (the 0x00880260 thunk); the compiler passes `archive`
+   * through `esi` and `objectPtr` through `edi` at the machine-code level
+   * instead of the normal 4-arg cdecl stack shape, which is why this body
+   * is a free function rather than the field-bound callback itself.
    */
   void LoadSavedGameHeader(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef*)
   {
@@ -49,6 +53,8 @@ namespace
    *
    * What it does:
    * Saves SSavedGameHeader payload fields and LaunchInfoBase shared pointer lane.
+   * Single caller (the 0x00880280 thunk); same register-passing shape as
+   * LoadSavedGameHeader/0x008831C0.
    */
   void SaveSavedGameHeader(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef*)
   {
@@ -75,56 +81,9 @@ namespace
   }
 
   moho::SSavedGameHeaderTypeInfo gSavedGameHeaderTypeInfo;
+
+  // Address: 0x010C4D74 -- process-global `SSavedGameHeaderSerializer` singleton.
   moho::SSavedGameHeaderSerializer gSavedGameHeaderSerializer;
-
-  [[nodiscard]] gpg::SerHelperBase* SavedGameHeaderSerializerSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gSavedGameHeaderSerializer.mNext);
-  }
-
-  void InitializeSavedGameHeaderSerializerLinks() noexcept
-  {
-    gpg::SerHelperBase* const self = SavedGameHeaderSerializerSelfNode();
-    gSavedGameHeaderSerializer.mNext = self;
-    gSavedGameHeaderSerializer.mPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperNode() noexcept
-  {
-    auto* const next = static_cast<gpg::SerHelperBase*>(gSavedGameHeaderSerializer.mNext);
-    auto* const prev = static_cast<gpg::SerHelperBase*>(gSavedGameHeaderSerializer.mPrev);
-    next->mPrev = prev;
-    prev->mNext = next;
-
-    gpg::SerHelperBase* const self = SavedGameHeaderSerializerSelfNode();
-    gSavedGameHeaderSerializer.mPrev = self;
-    gSavedGameHeaderSerializer.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x008802D0 (FUN_008802D0)
-   *
-   * What it does:
-   * Unlinks global `SSavedGameHeaderSerializer` helper node from the intrusive
-   * helper list, rewires self-links, and returns the helper self node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperPrimary() noexcept
-  {
-    return UnlinkSavedGameHeaderSerializerHelperNode();
-  }
-
-  /**
-   * Address: 0x00880300 (FUN_00880300)
-   *
-   * What it does:
-   * Secondary entrypoint for `SSavedGameHeaderSerializer` helper-node
-   * intrusive unlink + self-link reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperSecondary() noexcept
-  {
-    return UnlinkSavedGameHeaderSerializerHelperNode();
-  }
 
   /**
    * Address: 0x00880110 (FUN_00880110, preregister_SSavedGameHeaderTypeInfo)
@@ -137,20 +96,6 @@ namespace
     gpg::PreRegisterRType(typeid(moho::SSavedGameHeader), &gSavedGameHeaderTypeInfo);
     return &gSavedGameHeaderTypeInfo;
   }
-
-  void EnsureSavedGameHeaderRegistered()
-  {
-    static const bool kRegistered = []() {
-      (void)preregister_SSavedGameHeaderTypeInfo();
-      InitializeSavedGameHeaderSerializerLinks();
-      gSavedGameHeaderSerializer.mSerLoadFunc = &LoadSavedGameHeader;
-      gSavedGameHeaderSerializer.mSerSaveFunc = &SaveSavedGameHeader;
-      gSavedGameHeaderSerializer.RegisterSerializeFunctions();
-      return true;
-    }();
-
-    (void)kRegistered;
-  }
 } // namespace
 
 namespace moho
@@ -159,7 +104,6 @@ namespace moho
 
   gpg::RType* SSavedGameHeader::StaticGetClass()
   {
-    EnsureSavedGameHeaderRegistered();
     if (!sType) {
       sType = gpg::LookupRType(typeid(SSavedGameHeader));
     }
@@ -239,12 +183,50 @@ namespace moho
   }
 
   /**
-   * Address: 0x00882330 (FUN_00882330)
+   * Address: 0x00880260 (FUN_00880260, Moho::SSavedGameHeaderSerializer::Deserialize)
+   */
+  void SSavedGameHeaderSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  )
+  {
+    LoadSavedGameHeader(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00880280 (FUN_00880280, Moho::SSavedGameHeaderSerializer::Serialize)
+   */
+  void SSavedGameHeaderSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  )
+  {
+    SaveSavedGameHeader(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00BE7040 (FUN_00BE7040, register_SSavedGameHeaderSerializer,
+   * dynamic initializer for the global `SSavedGameHeaderSerializer`
+   * singleton)
+   */
+  SSavedGameHeaderSerializer::SSavedGameHeaderSerializer()
+    : mSerLoadFunc(&SSavedGameHeaderSerializer::Deserialize)
+    , mSerSaveFunc(&SSavedGameHeaderSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00C07D50 (FUN_00C07D50, ??1SSavedGameHeaderSerializer@Moho@@QAE@@Z)
+   */
+  SSavedGameHeaderSerializer::~SSavedGameHeaderSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00882330 (FUN_00882330, Moho::SSavedGameHeaderSerializer::Init)
    *
    * What it does:
    * Registers save/load callbacks for SSavedGameHeader.
    */
-  void SSavedGameHeaderSerializer::RegisterSerializeFunctions()
+  void SSavedGameHeaderSerializer::Init()
   {
     gpg::RType* const type = SSavedGameHeader::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -253,7 +235,6 @@ namespace moho
     type->serSaveFunc_ = mSerSaveFunc;
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
