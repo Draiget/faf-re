@@ -156,80 +156,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00622460 (FUN_00622460, CUnitRefuel::MemberDeserialize thunk)
-   *
-   * What it does:
-   * Forwards one serializer load callback lane to `CUnitRefuel::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitRefuelDeserializeThunkPrimary(
-    moho::CUnitRefuel* const task,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x006224B0 (FUN_006224B0, CUnitRefuel::MemberDeserialize thunk)
-   *
-   * What it does:
-   * Secondary load-callback forwarder to `CUnitRefuel::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitRefuelDeserializeThunkSecondary(
-    moho::CUnitRefuel* const task,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberDeserialize(archive);
-    }
-  }
-
-  struct CUnitRefuelSerializerStartupNode
-  {
-    void* mVtable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
-    gpg::RType::save_func_t mSave = nullptr;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CUnitRefuelSerializerStartupNode, mHelperNext) == 0x04,
-    "CUnitRefuelSerializerStartupNode::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitRefuelSerializerStartupNode, mHelperPrev) == 0x08,
-    "CUnitRefuelSerializerStartupNode::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    sizeof(CUnitRefuelSerializerStartupNode) == 0x14,
-    "CUnitRefuelSerializerStartupNode size must be 0x14"
-  );
-
-  CUnitRefuelSerializerStartupNode gCUnitRefuelSerializerStartupNode{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CUnitRefuelSerializerStartupNode& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CUnitRefuelSerializerStartupNode& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
   {
@@ -304,30 +230,6 @@ namespace moho
     if (mUnit != nullptr && mUnit->AiNavigator != nullptr) {
       mUnit->AiNavigator->IgnoreFormation(true);
     }
-  }
-
-  /**
-   * Address: 0x00621430 (FUN_00621430, cleanup_CUnitRefuelSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the `CUnitRefuel` serializer helper
-   * node and restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCUnitRefuelSerializerStartupNode);
-  }
-
-  /**
-   * Address: 0x00621460 (FUN_00621460, cleanup_CUnitRefuelSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the `CUnitRefuel` serializer
-   * helper node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCUnitRefuelSerializerStartupNode);
   }
 
   /**
@@ -413,65 +315,107 @@ namespace moho
   }
 } // namespace moho
 
-namespace
-{
-  void DeserializeCUnitRefuelSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<moho::CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
-  }
-
-  void SerializeCUnitRefuelSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<const moho::CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-  }
-
-  void cleanup_CUnitRefuelSerializer_atexit()
-  {
-    (void)moho::cleanup_CUnitRefuelSerializerStartupThunkA();
-  }
-} // namespace
-
 namespace moho
 {
   /**
-   * Address: 0x00BD18B0 (FUN_00BD18B0, register_CUnitRefuelSerializer)
-   *
-   * What it does:
-   * Initializes the global CUnitRefuel serializer helper callbacks and
-   * installs process-exit cleanup.
+   * RTTI Class Hierarchy Descriptor shows this class's base chain running
+   * through `.?AU?$SerSaveLoadHelper@VCUnitRefuel@Moho@@@gpg@@` before
+   * `gpg::SerHelperBase`. `CUnitRefuel::MemberDeserialize`/`MemberSerialize`
+   * are non-static instance methods, so this class needs its own static
+   * forwarding methods to bind into the `__cdecl`-shaped callback fields
+   * (same situation as `CUnitPodAssistSerializer`/`CUnitReclaimTaskSerializer`
+   * fixed earlier this session). Kept as a concrete `SerHelperBase`-derived
+   * class rather than a naked `gpg::SerSaveLoadHelper<CUnitRefuel>` alias,
+   * matching the `Rect2iSerializer`-style precedent.
    */
-  void register_CUnitRefuelSerializer()
+  class CUnitRefuelSerializer final : public gpg::SerHelperBase
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitRefuelSerializerStartupNode);
-    gCUnitRefuelSerializerStartupNode.mHelperNext = self;
-    gCUnitRefuelSerializerStartupNode.mHelperPrev = self;
-    gCUnitRefuelSerializerStartupNode.mLoad = &DeserializeCUnitRefuelSerializerCallback;
-    gCUnitRefuelSerializerStartupNode.mSave = &SerializeCUnitRefuelSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitRefuelSerializer_atexit);
-  }
+  public:
+    /**
+     * Address: 0x00BD18B0 (FUN_00BD18B0, register_CUnitRefuelSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitRefuelSerializer()
+      : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitRefuelSerializer::Deserialize))
+      , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitRefuelSerializer::Serialize))
+    {}
+
+    /**
+     * Address: 0x00BFA3C0 (FUN_00BFA3C0, Moho::CUnitRefuelSerializer::~CUnitRefuelSerializer)
+     *
+     * What it does:
+     * Unlinks the serializer helper from the intrusive helper list.
+     */
+    ~CUnitRefuelSerializer()
+    {
+      ResetLinks();
+    }
+
+    /**
+     * What it does:
+     * Forwards one archive load callback into
+     * `CUnitRefuel::MemberDeserialize` on the supplied object pointer.
+     */
+    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    }
+
+    /**
+     * What it does:
+     * Forwards one archive save callback into `CUnitRefuel::MemberSerialize`
+     * on the supplied object pointer.
+     */
+    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<const CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    }
+
+    /**
+     * Address: 0x00622210 (FUN_00622210, gpg::SerSaveLoadHelper<Moho::CUnitRefuel>::Init)
+     *
+     * What it does:
+     * Lazily resolves `CUnitRefuel` RTTI and installs load/save callbacks
+     * from this helper object into the type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = CachedCUnitRefuelType();
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mDeserialize;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerialize;
+    }
+
+  public:
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
+  };
+
+  static_assert(
+    offsetof(CUnitRefuelSerializer, mDeserialize) == 0x0C, "CUnitRefuelSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitRefuelSerializer, mSerialize) == 0x10, "CUnitRefuelSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(CUnitRefuelSerializer) == 0x14, "CUnitRefuelSerializer size must be 0x14");
 } // namespace moho
 
 namespace
 {
-  struct CUnitRefuelSerializerStartupBootstrap
-  {
-    CUnitRefuelSerializerStartupBootstrap()
-    {
-      moho::register_CUnitRefuelSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitRefuelSerializerStartupBootstrap gCUnitRefuelSerializerStartupBootstrap;
+  /**
+   * Address: 0x00BD18B0 (FUN_00BD18B0, dynamic initializer for the global
+   * `CUnitRefuelSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`).
+   */
+  moho::CUnitRefuelSerializer gCUnitRefuelSerializer;
 } // namespace
 
 namespace moho
