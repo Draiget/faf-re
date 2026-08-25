@@ -3543,6 +3543,43 @@ namespace msvc8
          * note); the `.asm` shows ~100 bytes of real offset/count
          * arithmetic and a normal `retn`, not a throw.
          *
+         * Address: 0x007336C0 (FUN_007336C0, sub_7336C0) --
+         * `msvc8::vector<PlatoonUnitSearchEntry>::insert(iterator, const T&)`
+         * for the 8-byte `{Unit*, float}` element (`CPlatoon.cpp`'s
+         * `AppendPlatoonUnitSearchEntry`/`cfunc_CPlatoonFormPlatoonL`
+         * nearest-first candidate scratch vector). `max_size` folds to
+         * 0x1FFFFFFF (`0xFFFFFFFF / 8`, throw lane `FUN_00733910`). Unlike
+         * this member's usual "capture offset, tail-call the count-form
+         * with `count=1`" shape, this emission is fully fused in place --
+         * like `FUN_0084F200` above -- with no separate `_Insert_n(pos, 1,
+         * value)` call: the in-place branch's `tail > 0` sub-case moves
+         * the current last element into the freshly grown slot through
+         * the calling-convention bridge `FUN_00733A80` (cited below on
+         * `uninit_move_n`) then shifts the remainder via `FUN_00733AD0`
+         * (not yet individually recovered -- its existing citation in
+         * `CPlatoon.cpp` as `CopyPlatoonPriorityEntryRangeBackward` names
+         * the wrong element type, a `PlatoonPriorityEntry`/
+         * `PlatoonUnitSearchEntry` shape collision this pass did not
+         * resolve); the `tail == 0` (append) sub-case calls the same
+         * bridge with a zero-length range (a structural no-op) and
+         * constructs the new value in place via `FUN_00733C40` (not yet
+         * recovered). The reallocation branch grows 1.5x, allocates via
+         * `FUN_00733AF0`, and relocates the head/tail spans through two
+         * more calls into `FUN_00734440` (the same core `FUN_00733A80`
+         * bridges into). Reached from this element's `push_back`
+         * (`FUN_00733480`/`AppendPlatoonUnitSearchEntry`, `CPlatoon.cpp`,
+         * already recovered) capacity-full path, itself reached from
+         * `cfunc_CPlatoonFormPlatoonL`'s (`FUN_0072D8F0`, already
+         * recovered) nearest-first candidate filter -- previously that
+         * filter used a locally-duplicated `CandidateDistance` struct and
+         * a real `std::vector` instead of `PlatoonUnitSearchEntry`/
+         * `msvc8::vector`, which meant `AppendPlatoonUnitSearchEntry` was
+         * an orphan `[[maybe_unused]]` helper with the wrong container
+         * type entirely; both fixed in the same pass as this citation.
+         * Previously `blocked` on `needs_ida`; stays `skip` per the
+         * established fused-emission precedent (`FUN_0084F200`), now with
+         * concrete caller evidence instead of an unsupported claim.
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -5661,6 +5698,26 @@ namespace msvc8
          * insert-at-any-position shape. Previously mis-tracked `blocked`
          * citing `CrtRuntimeHelpers.cpp` boilerplate the address never
          * appeared in.
+         *
+         * Address: 0x00733A80 (FUN_00733A80, sub_733A80) -- calling-
+         * convention bridge into `FUN_00734440` (this instantiation's real
+         * move core, not yet individually recovered) for `msvc8::vector<
+         * PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}` element;
+         * `CPlatoon.cpp`'s `AppendPlatoonUnitSearchEntry`/
+         * `cfunc_CPlatoonFormPlatoonL` nearest-first candidate scratch
+         * vector). A pure register/stack reshuffle with no logic of its
+         * own -- 15 bytes of setup, one `call FUN_00734440`, `retn 8` --
+         * confirmed against the `.asm`. Called twice from `insert(pos,
+         * value)`'s emission for this instantiation (`FUN_007336C0`, cited
+         * above): once in the in-place branch's `tail > 0` sub-case as
+         * `sub_733A80(oldLast-8, oldLast)`, moving the current last
+         * element into the freshly grown slot (this member's
+         * `uninit_move_n(oldLast-1, 1, oldLast)` shape for `count=1`), and
+         * once in the `tail == 0` (append) sub-case as `sub_733A80(pos,
+         * pos+8)`, a zero-length structural no-op present only because the
+         * emission is the general insert-at-any-position shape. Previously
+         * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
+         * the address never appeared in.
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
