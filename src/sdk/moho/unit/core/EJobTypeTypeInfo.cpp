@@ -9,6 +9,19 @@
 namespace
 {
   gpg::StaticTypeInfoStorage<moho::EJobTypeTypeInfo> gEJobTypeTypeInfoStorage{};
+
+  /**
+   * Address: 0x00BCA460 (FUN_00BCA460, dynamic initializer for the global
+   * `PrimitiveSerHelper<EJobType,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `EJobTypeTypeInfo`'s own initializer
+   * above.
+   */
+  moho::EJobTypePrimitiveSerializer gEJobTypePrimitiveSerializer;
 } // namespace
 
 namespace moho
@@ -75,43 +88,6 @@ namespace moho
     AddEnum(StripPrefix("JOB_Reclaim"), static_cast<std::int32_t>(JOB_Reclaim));
   }
 
-  /**
-   * Address: 0x0055D370 (FUN_0055D370, PrimitiveSerHelper<EJobType>::Deserialize)
-   */
-  void EJobTypePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EJobType*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EJobType>(value);
-  }
-
-  /**
-   * Address: 0x0055D390 (FUN_0055D390, PrimitiveSerHelper<EJobType>::Serialize)
-   */
-  void EJobTypePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto value = *reinterpret_cast<const EJobType*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  void EJobTypePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = gpg::LookupRType(typeid(EJobType));
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho
 
 // Phase-1 pre-registration: RegisterSerializeFunctions above is a consumer

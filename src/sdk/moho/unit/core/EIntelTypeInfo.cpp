@@ -1,147 +1,59 @@
 #include "moho/unit/core/EIntelTypeInfo.h"
 
 #include <cstdlib>
-#include <cstdint>
-#include <new>
 #include <typeinfo>
+
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  alignas(moho::EIntelTypeInfo) unsigned char gEIntelTypeInfoStorage[sizeof(moho::EIntelTypeInfo)]{};
-  bool gEIntelTypeInfoConstructed = false;
-  bool gEIntelTypeInfoPreregistered = false;
-
-  alignas(moho::EIntelPrimitiveSerializer)
-    unsigned char gEIntelPrimitiveSerializerStorage[sizeof(moho::EIntelPrimitiveSerializer)]{};
-  bool gEIntelPrimitiveSerializerConstructed = false;
-
-  /**
-   * Address: 0x0050A3A0 (FUN_0050A3A0, startup preregister lane)
-   *
-   * What it does:
-   * Constructs one static `EIntelTypeInfo` instance and preregisters RTTI
-   * ownership for `EIntel`.
-   */
-  [[nodiscard]] gpg::REnumType* preregister_EIntelTypeInfo()
-  {
-    if (!gEIntelTypeInfoConstructed) {
-      new (gEIntelTypeInfoStorage) moho::EIntelTypeInfo();
-      gEIntelTypeInfoConstructed = true;
-    }
-
-    auto* const typeInfo = reinterpret_cast<moho::EIntelTypeInfo*>(gEIntelTypeInfoStorage);
-    if (!gEIntelTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(moho::EIntel), typeInfo);
-      gEIntelTypeInfoPreregistered = true;
-    }
-
-    return typeInfo;
-  }
-
-  [[nodiscard]] moho::EIntelTypeInfo* AcquireEIntelTypeInfoStorage() noexcept
-  {
-    return reinterpret_cast<moho::EIntelTypeInfo*>(gEIntelTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::EIntelPrimitiveSerializer* AcquireEIntelPrimitiveSerializer()
-  {
-    if (!gEIntelPrimitiveSerializerConstructed) {
-      new (gEIntelPrimitiveSerializerStorage) moho::EIntelPrimitiveSerializer();
-      gEIntelPrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EIntelPrimitiveSerializer*>(gEIntelPrimitiveSerializerStorage);
-  }
-
-  /**
-   * Address: 0x0050ABD0 (FUN_0050ABD0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `EIntel`.
-   */
-  [[nodiscard]] gpg::RType* ResolveEIntelType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::EIntel));
-    }
-    return cached;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  /**
-   * Address: 0x0050A880 (FUN_0050A880)
-   *
-   * What it does:
-   * Initializes callback lanes for startup-owned `EIntel` primitive serializer
-   * helper storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EIntelPrimitiveSerializer*
-  InitializeEIntelPrimitiveSerializerStartupThunkPrimary()
-  {
-    auto* const serializer = AcquireEIntelPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EIntelPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EIntelPrimitiveSerializer::Serialize;
-    return serializer;
-  }
+  gpg::StaticTypeInfoStorage<moho::EIntelTypeInfo> gEIntelTypeInfoStorage{};
 
   /**
    * Address: 0x00BF2010 (FUN_00BF2010, cleanup_EIntelTypeInfo)
+   *
+   * What it does:
+   * Process-exit teardown for the `EIntelTypeInfo` descriptor. The real
+   * ctor's atexit push at 0x00BC7B90 targets a plain destructor call, not a
+   * mangled symbol.
    */
   void cleanup_EIntelTypeInfo()
   {
-    if (!gEIntelTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEIntelTypeInfoStorage()->~EIntelTypeInfo();
-    gEIntelTypeInfoConstructed = false;
-    gEIntelTypeInfoPreregistered = false;
+    gEIntelTypeInfoStorage.Destroy();
   }
 
   /**
-   * Address: 0x00BF2020 (FUN_00BF2020, cleanup_EIntelPrimitiveSerializer)
+   * Address: 0x00BC7BB0 (FUN_00BC7BB0, dynamic initializer for the global
+   * `PrimitiveSerHelper<EIntel,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `EIntelTypeInfo`'s own initializer
+   * below -- the prior recovery wrongly coupled both into one shared
+   * bootstrap struct that also triple-registered the type info (bootstrap
+   * ctor + two separate GPG_PREREGISTER_INIT entries for the same
+   * descriptor).
    */
-  void cleanup_EIntelPrimitiveSerializer()
-  {
-    if (!gEIntelPrimitiveSerializerConstructed) {
-      return;
-    }
-
-    UnlinkSerializerNode(*AcquireEIntelPrimitiveSerializer());
-  }
+  moho::EIntelPrimitiveSerializer gEIntelPrimitiveSerializer;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x0050A3A0 (FUN_0050A3A0, Moho::EIntelTypeInfo::EIntelTypeInfo)
+   *
+   * What it does:
+   * Preregisters the enum type descriptor for `EIntel` with the reflection registry.
+   */
+  EIntelTypeInfo::EIntelTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EIntel), this);
+  }
+
   /**
    * Address: 0x0050A430 (FUN_0050A430, Moho::EIntelTypeInfo::dtr)
    */
@@ -189,90 +101,19 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050AAE0 (FUN_0050AAE0, PrimitiveSerHelper<EIntel>::Deserialize)
-   */
-  void EIntelPrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EIntel*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EIntel>(value);
-  }
-
-  /**
-   * Address: 0x0050AB00 (FUN_0050AB00, PrimitiveSerHelper<EIntel>::Serialize)
-   */
-  void EIntelPrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const EIntel*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  /**
-   * Address: 0x0050A8B0 (FUN_0050A8B0, gpg::PrimitiveSerHelper<Moho::EIntel,int>::Init)
-   */
-  void EIntelPrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveEIntelType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)
+   *
+   * What it does:
+   * Constructs the static `EIntelTypeInfo` descriptor in place and installs
+   * its atexit teardown.
    */
   int register_EIntelTypeInfo()
   {
-    (void)preregister_EIntelTypeInfo();
+    (void)gEIntelTypeInfoStorage.Ensure();
     return std::atexit(&cleanup_EIntelTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC7BB0 (FUN_00BC7BB0, register_EIntelPrimitiveSerializer)
-   */
-  int register_EIntelPrimitiveSerializer()
-  {
-    (void)InitializeEIntelPrimitiveSerializerStartupThunkPrimary();
-    return std::atexit(&cleanup_EIntelPrimitiveSerializer);
   }
 } // namespace moho
 
-namespace
-{
-  struct EIntelTypeInfoBootstrap
-  {
-    EIntelTypeInfoBootstrap()
-    {
-      (void)moho::register_EIntelTypeInfo();
-      (void)moho::register_EIntelPrimitiveSerializer();
-    }
-  };
-
-  [[maybe_unused]] EIntelTypeInfoBootstrap gEIntelTypeInfoBootstrap;
-} // namespace
-
-
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_EIntelTypeInfo_4aa76a, moho::register_EIntelTypeInfo)
-
-GPG_PREREGISTER_INIT(preregister_EIntelTypeInfo_4aa76a, preregister_EIntelTypeInfo)

@@ -31,6 +31,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0050A3A0 (FUN_0050A3A0, Moho::EIntelTypeInfo::EIntelTypeInfo)
+     *
+     * What it does:
+     * Preregisters the enum type descriptor for `EIntel` with the reflection registry.
+     */
+    EIntelTypeInfo();
+
+    /**
      * Address: 0x0050A430 (FUN_0050A430, Moho::EIntelTypeInfo::dtr)
      */
     ~EIntelTypeInfo() override;
@@ -54,57 +62,18 @@ namespace moho
 
   static_assert(sizeof(EIntelTypeInfo) == 0x78, "EIntelTypeInfo size must be 0x78");
 
-  class EIntelPrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0050AAE0 (FUN_0050AAE0, PrimitiveSerHelper<EIntel>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EIntel` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050AB00 (FUN_0050AB00, PrimitiveSerHelper<EIntel>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EIntel` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A8B0 (FUN_0050A8B0, gpg::PrimitiveSerHelper<Moho::EIntel,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EIntel`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EIntelPrimitiveSerializer, mHelperNext) == 0x04,
-    "EIntelPrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EIntelPrimitiveSerializer, mHelperPrev) == 0x08,
-    "EIntelPrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EIntelPrimitiveSerializer, mDeserialize) == 0x0C,
-    "EIntelPrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EIntelPrimitiveSerializer, mSerialize) == 0x10,
-    "EIntelPrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EIntelPrimitiveSerializer) == 0x14, "EIntelPrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EIntel,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EIntel@Moho@@H@gpg'`): `FUN_00BC7BB0`
+   * (real, `__xc_a`-reachable) vs. a dead, zero-xref duplicate ctor at
+   * `FUN_0050A880` (same low-address/high-address shape already established
+   * for every other `PrimitiveSerHelper<T,int>` instantiation). `Init()`
+   * confirmed at `FUN_0050A8B0` via the RTTI vftable dump (`vftable@0xE0DB94`
+   * slot 0) -- matches this template's `Init()` exactly.
+   */
+  using EIntelPrimitiveSerializer = gpg::PrimitiveSerHelper<EIntel, int>;
 
   /**
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)
@@ -113,13 +82,4 @@ namespace moho
    * Runs `EIntel` typeinfo preregistration and installs process-exit cleanup.
    */
   int register_EIntelTypeInfo();
-
-  /**
-   * Address: 0x00BC7BB0 (FUN_00BC7BB0, register_EIntelPrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes startup primitive serializer helper links/callbacks for
-   * `EIntel` and installs process-exit cleanup.
-   */
-  int register_EIntelPrimitiveSerializer();
 } // namespace moho

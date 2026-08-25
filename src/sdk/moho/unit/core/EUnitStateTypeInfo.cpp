@@ -1,51 +1,54 @@
 #include "moho/unit/core/EUnitStateTypeInfo.h"
 
 #include <cstdint>
-#include <new>
-#include <typeinfo>
+#include <typeinfo>
+
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  alignas(moho::EUnitStateTypeInfo) unsigned char gEUnitStateTypeInfoStorage[sizeof(moho::EUnitStateTypeInfo)]{};
-  bool gEUnitStateTypeInfoConstructed = false;
-  bool gEUnitStateTypeInfoPreregistered = false;
+  gpg::StaticTypeInfoStorage<moho::EUnitStateTypeInfo> gEUnitStateTypeInfoStorage{};
 
-  [[nodiscard]] moho::EUnitStateTypeInfo* AcquireEUnitStateTypeInfo()
-  {
-    if (!gEUnitStateTypeInfoConstructed) {
-      new (gEUnitStateTypeInfoStorage) moho::EUnitStateTypeInfo();
-      gEUnitStateTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EUnitStateTypeInfo*>(gEUnitStateTypeInfoStorage);
-  }
-
-  struct EUnitStateTypeInfoBootstrap
-  {
-    EUnitStateTypeInfoBootstrap()
-    {
-      (void)moho::preregister_EUnitStateTypeInfo();
-    }
-  };
-
-  [[maybe_unused]] EUnitStateTypeInfoBootstrap gEUnitStateTypeInfoBootstrap;
+  /**
+   * Address: 0x00BCA520 (FUN_00BCA520, dynamic initializer for the global
+   * `PrimitiveSerHelper<EUnitState,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `EUnitStateTypeInfo`'s own
+   * initializer below.
+   */
+  moho::EUnitStatePrimitiveSerializer gEUnitStatePrimitiveSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x0055BB10 (FUN_0055BB10, preregister_EUnitStateTypeInfo)
+   * Address: 0x0055BB10 (FUN_0055BB10, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
    */
   gpg::REnumType* preregister_EUnitStateTypeInfo()
   {
-    auto* const typeInfo = AcquireEUnitStateTypeInfo();
-    if (!gEUnitStateTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(EUnitState), typeInfo);
-      gEUnitStateTypeInfoPreregistered = true;
-    }
+    return &gEUnitStateTypeInfoStorage.Ensure();
+  }
 
-    return typeInfo;
+  /**
+   * Address: 0x0055BB10 (FUN_0055BB10, Moho::EUnitStateTypeInfo::EUnitStateTypeInfo)
+   *
+   * What it does:
+   * Preregisters the enum type descriptor for `EUnitState` with the reflection registry.
+   */
+  EUnitStateTypeInfo::EUnitStateTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EUnitState), this);
   }
 
   /**
@@ -123,44 +126,6 @@ namespace moho
     AddEnum(StripPrefix("UNITSTATE_MakingAttackRun"), UNITSTATE_MakingAttackRun);
     AddEnum(StripPrefix("UNITSTATE_HoldingPattern"), UNITSTATE_HoldingPattern);
     AddEnum(StripPrefix("UNITSTATE_SiloBuildingAmmo"), UNITSTATE_SiloBuildingAmmo);
-  }
-
-  /**
-   * Address: 0x0055D450 (FUN_0055D450, PrimitiveSerHelper<EUnitState>::Deserialize)
-   */
-  void EUnitStatePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EUnitState*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EUnitState>(value);
-  }
-
-  /**
-   * Address: 0x0055D470 (FUN_0055D470, PrimitiveSerHelper<EUnitState>::Serialize)
-   */
-  void EUnitStatePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto value = *reinterpret_cast<const EUnitState*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  void EUnitStatePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = gpg::LookupRType(typeid(EUnitState));
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
   }
 } // namespace moho
 
