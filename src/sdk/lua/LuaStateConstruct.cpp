@@ -113,7 +113,7 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091E3C0 (FUN_0091E3C0, TStringConstruct::Deserialize)
+   * Address: 0x0091E3C0 (FUN_0091E3C0, TStringConstruct::Deconstruct)
    *
    * What it does:
    * Releases one constructed Lua string lane through global delete.
@@ -121,6 +121,23 @@ namespace LuaPlus
   void TStringConstruct::Deconstruct(void* const objectPtr)
   {
     operator delete(objectPtr);
+  }
+
+  /**
+   * Address: 0x00BEA230 (FUN_00BEA230, dynamic initializer for the global
+   * `TStringConstruct` singleton)
+   */
+  TStringConstruct::TStringConstruct()
+    : mConstruct(&TStringConstruct::Construct)
+    , mDeconstruct(&TStringConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09A30 (FUN_00C09A30, TStringConstruct::~TStringConstruct)
+   */
+  TStringConstruct::~TStringConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -201,6 +218,23 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA340 (FUN_00BEA340, dynamic initializer for the global
+   * `TableConstruct` singleton)
+   */
+  TableConstruct::TableConstruct()
+    : mConstruct(&TableConstruct::Construct)
+    , mDeconstruct(&TableConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09AC0 (FUN_00C09AC0, TableConstruct::~TableConstruct)
+   */
+  TableConstruct::~TableConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00920A80 (FUN_00920A80, LClosureConstruct::Construct)
    *
    * What it does:
@@ -238,6 +272,23 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA450 (FUN_00BEA450, dynamic initializer for the global
+   * `LClosureConstruct` singleton)
+   */
+  LClosureConstruct::LClosureConstruct()
+    : mConstruct(&LClosureConstruct::Construct)
+    , mDeconstruct(&LClosureConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09B50 (FUN_00C09B50, LClosureConstruct::~LClosureConstruct)
+   */
+  LClosureConstruct::~LClosureConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00920B10 (FUN_00920B10, UpValConstruct::Construct)
    *
    * What it does:
@@ -268,6 +319,23 @@ namespace LuaPlus
   void UpValConstruct::Deconstruct(void* const objectPtr)
   {
     operator delete(objectPtr);
+  }
+
+  /**
+   * Address: 0x00BEA560 (FUN_00BEA560, dynamic initializer for the global
+   * `UpValConstruct` singleton)
+   */
+  UpValConstruct::UpValConstruct()
+    : mConstruct(&UpValConstruct::Construct)
+    , mDeconstruct(&UpValConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09BE0 (FUN_00C09BE0, UpValConstruct::~UpValConstruct)
+   */
+  UpValConstruct::~UpValConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -351,6 +419,23 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA5A0 (FUN_00BEA5A0, dynamic initializer for the global
+   * `UpValSerializer` singleton)
+   */
+  UpValSerializer::UpValSerializer()
+    : mDeserialize(&UpValSerializer::Deserialize)
+    , mSerialize(&UpValSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00C09C10 (FUN_00C09C10, UpValSerializer::~UpValSerializer)
+   */
+  UpValSerializer::~UpValSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00920C20 (FUN_00920C20, ProtoConstruct::Construct)
    *
    * What it does:
@@ -381,6 +466,23 @@ namespace LuaPlus
   void ProtoConstruct::Deconstruct(void* const objectPtr)
   {
     operator delete(objectPtr);
+  }
+
+  /**
+   * Address: 0x00BEA670 (FUN_00BEA670, dynamic initializer for the global
+   * `ProtoConstruct` singleton)
+   */
+  ProtoConstruct::ProtoConstruct()
+    : mConstruct(&ProtoConstruct::Construct)
+    , mDeconstruct(&ProtoConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09C70 (FUN_00C09C70, ProtoConstruct::~ProtoConstruct)
+   */
+  ProtoConstruct::~ProtoConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -418,6 +520,23 @@ namespace LuaPlus
     auto* const state = static_cast<LuaState*>(objectPtr);
     state->~LuaState();
     ::operator delete(state);
+  }
+
+  /**
+   * Address: 0x00BE9FC0 (FUN_00BE9FC0, dynamic initializer for the global
+   * `LuaStateConstruct` singleton)
+   */
+  LuaStateConstruct::LuaStateConstruct()
+    : mConstruct(&LuaStateConstruct::Construct)
+    , mDeconstruct(&LuaStateConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09850 (FUN_00C09850, LuaPlus::LuaStateConstruct::~LuaStateConstruct)
+   */
+  LuaStateConstruct::~LuaStateConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -465,6 +584,23 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA780 (FUN_00BEA780, dynamic initializer for the global
+   * `lua_StateConstruct` singleton)
+   */
+  lua_StateConstruct::lua_StateConstruct()
+    : mConstruct(&lua_StateConstruct::Construct)
+    , mDeconstruct(&lua_StateConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09D00 (FUN_00C09D00, lua_StateConstruct::~lua_StateConstruct)
+   */
+  lua_StateConstruct::~lua_StateConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00920D30 (FUN_00920D30, UdataConstruct::Construct)
    *
    * What it does:
@@ -499,13 +635,30 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0090B670 (FUN_0090B670, LuaPlus::LuaStateConstruct::RegisterConstructFunction)
+   * Address: 0x00BEA890 (FUN_00BEA890, dynamic initializer for the global
+   * `UdataConstruct` singleton)
+   */
+  UdataConstruct::UdataConstruct()
+    : mConstruct(&UdataConstruct::Construct)
+    , mDeconstruct(&UdataConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00C09D90 (FUN_00C09D90, UdataConstruct::~UdataConstruct)
+   */
+  UdataConstruct::~UdataConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x0090B670 (FUN_0090B670, LuaPlus::LuaStateConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for
    * `LuaPlus::LuaState`.
    */
-  void LuaStateConstruct::RegisterConstructFunction()
+  void LuaStateConstruct::Init()
   {
     static gpg::RType* sLuaStateType = nullptr;
     if (sLuaStateType == nullptr) {
@@ -518,12 +671,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x00920180 (FUN_00920180, lua_StateConstruct::RegisterConstructFunction)
+   * Address: 0x00920180 (FUN_00920180, lua_StateConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `lua_State`.
    */
-  void lua_StateConstruct::RegisterConstructFunction()
+  void lua_StateConstruct::Init()
   {
     static gpg::RType* sLuaThreadType = nullptr;
     if (sLuaThreadType == nullptr) {
@@ -536,12 +689,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091F9B0 (FUN_0091F9B0, TStringConstruct::RegisterConstructFunction)
+   * Address: 0x0091F9B0 (FUN_0091F9B0, TStringConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `TString`.
    */
-  void TStringConstruct::RegisterConstructFunction()
+  void TStringConstruct::Init()
   {
     static gpg::RType* sTStringType = nullptr;
     if (sTStringType == nullptr) {
@@ -554,12 +707,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FB40 (FUN_0091FB40, TableConstruct::RegisterConstructFunction)
+   * Address: 0x0091FB40 (FUN_0091FB40, TableConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `Table`.
    */
-  void TableConstruct::RegisterConstructFunction()
+  void TableConstruct::Init()
   {
     static gpg::RType* sTableType = nullptr;
     if (sTableType == nullptr) {
@@ -572,12 +725,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FCD0 (FUN_0091FCD0, LClosureConstruct::RegisterConstructFunction)
+   * Address: 0x0091FCD0 (FUN_0091FCD0, LClosureConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `LClosure`.
    */
-  void LClosureConstruct::RegisterConstructFunction()
+  void LClosureConstruct::Init()
   {
     static gpg::RType* sLClosureType = nullptr;
     if (sLClosureType == nullptr) {
@@ -590,12 +743,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FE60 (FUN_0091FE60, UpValConstruct::RegisterConstructFunction)
+   * Address: 0x0091FE60 (FUN_0091FE60, UpValConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `UpVal`.
    */
-  void UpValConstruct::RegisterConstructFunction()
+  void UpValConstruct::Init()
   {
     static gpg::RType* sUpValType = nullptr;
     if (sUpValType == nullptr) {
@@ -608,12 +761,31 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FFF0 (FUN_0091FFF0, ProtoConstruct::RegisterConstructFunction)
+   * Address: 0x0091FEE0 (FUN_0091FEE0, UpValSerializer::Init)
+   *
+   * What it does:
+   * Binds load/save callbacks into reflected RTTI for `UpVal`.
+   */
+  void UpValSerializer::Init()
+  {
+    static gpg::RType* sUpValType = nullptr;
+    if (sUpValType == nullptr) {
+      sUpValType = gpg::LookupRType(typeid(UpVal));
+    }
+
+    GPG_ASSERT(sUpValType->serLoadFunc_ == nullptr);
+    sUpValType->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(sUpValType->serSaveFunc_ == nullptr);
+    sUpValType->serSaveFunc_ = mSerialize;
+  }
+
+  /**
+   * Address: 0x0091FFF0 (FUN_0091FFF0, ProtoConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `Proto`.
    */
-  void ProtoConstruct::RegisterConstructFunction()
+  void ProtoConstruct::Init()
   {
     static gpg::RType* sProtoType = nullptr;
     if (sProtoType == nullptr) {
@@ -626,12 +798,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x00920310 (FUN_00920310, UdataConstruct::RegisterConstructFunction)
+   * Address: 0x00920310 (FUN_00920310, UdataConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `Udata`.
    */
-  void UdataConstruct::RegisterConstructFunction()
+  void UdataConstruct::Init()
   {
     static gpg::RType* sUdataType = nullptr;
     if (sUdataType == nullptr) {
@@ -646,109 +818,30 @@ namespace LuaPlus
 
 namespace
 {
-  LuaPlus::LuaStateConstruct gLuaStateConstructHelper{};
+  // Address: 0x00F8E5E4 -- process-global `LuaStateConstruct` singleton.
+  LuaPlus::LuaStateConstruct gLuaStateConstruct;
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
+  // Address: 0x00F8E754 -- process-global `lua_StateConstruct` singleton.
+  LuaPlus::lua_StateConstruct gLuaThreadStateConstruct;
 
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
+  // Address: 0x00F8E704 -- process-global `TStringConstruct` singleton.
+  LuaPlus::TStringConstruct gTStringConstruct;
 
-  template <typename THelper>
-  void UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
+  // Address: 0x00F8E9AC -- process-global `TableConstruct` singleton.
+  LuaPlus::TableConstruct gTableConstruct;
 
-    InitializeHelperNode(helper);
-  }
+  // Address: 0x00F8EB24 -- process-global `LClosureConstruct` singleton.
+  LuaPlus::LClosureConstruct gLClosureConstruct;
 
-  /**
-   * Address: 0x00C09850 (FUN_00C09850, LuaPlus::LuaStateConstruct::~LuaStateConstruct)
-   *
-   * What it does:
-   * Unlinks the global LuaState construct helper from intrusive helper links.
-   */
-  void cleanup_LuaStateConstruct()
-  {
-    UnlinkHelperNode(gLuaStateConstructHelper);
-  }
+  // Address: 0x00F8E7F4 -- process-global `UpValConstruct` singleton.
+  LuaPlus::UpValConstruct gUpValConstruct;
 
-  /**
-   * Address: 0x00BE9FC0 (FUN_00BE9FC0, register_LuaStateConstruct)
-   *
-   * What it does:
-   * Initializes LuaState construct helper callbacks and schedules teardown.
-   */
-  void register_LuaStateConstruct()
-  {
-    InitializeHelperNode(gLuaStateConstructHelper);
-    gLuaStateConstructHelper.mConstruct = &LuaPlus::LuaStateConstruct::Construct;
-    gLuaStateConstructHelper.mDeconstruct = &LuaPlus::LuaStateConstruct::Deconstruct;
-    gLuaStateConstructHelper.RegisterConstructFunction();
-    (void)std::atexit(&cleanup_LuaStateConstruct);
-  }
+  // Address: 0x00F8EA34 -- process-global `UpValSerializer` singleton.
+  LuaPlus::UpValSerializer gUpValSerializer;
 
-  struct LuaStateConstructBootstrap
-  {
-    LuaStateConstructBootstrap()
-    {
-      register_LuaStateConstruct();
-    }
-  };
+  // Address: 0x00F8E740 -- process-global `ProtoConstruct` singleton.
+  LuaPlus::ProtoConstruct gProtoConstruct;
 
-  [[maybe_unused]] LuaStateConstructBootstrap gLuaStateConstructBootstrap{};
-
-  LuaPlus::TableConstruct gTableConstructHelper{};
-
-  /**
-   * Address: 0x00C09AC0 (FUN_00C09AC0, TableConstruct::~TableConstruct)
-   *
-   * What it does:
-   * Unlinks the global Table construct helper from intrusive helper links
-   * at process teardown via `atexit` chain.
-   */
-  void cleanup_TableConstruct()
-  {
-    UnlinkHelperNode(gTableConstructHelper);
-  }
-
-  /**
-   * Address: 0x00BEA340 (FUN_00BEA340, register_TableConstruct)
-   *
-   * What it does:
-   * Initializes the global Table construct helper, binds the
-   * `TableConstruct::Construct` and `TableConstruct::Deconstruct` callbacks
-   * into the reflected `Table` RTType, and schedules teardown via `atexit`.
-   * This is the source-level address-take of `&TableConstruct::Construct`
-   * that anchors the recovered body for linker dead-strip preservation.
-   */
-  void register_TableConstruct()
-  {
-    InitializeHelperNode(gTableConstructHelper);
-    gTableConstructHelper.mConstruct = &LuaPlus::TableConstruct::Construct;
-    gTableConstructHelper.mDeconstruct = &LuaPlus::TableConstruct::Deconstruct;
-    gTableConstructHelper.RegisterConstructFunction();
-    (void)std::atexit(&cleanup_TableConstruct);
-  }
-
-  struct TableConstructBootstrap
-  {
-    TableConstructBootstrap()
-    {
-      register_TableConstruct();
-    }
-  };
-
-  [[maybe_unused]] TableConstructBootstrap gTableConstructBootstrap{};
+  // Address: 0x00F8E718 -- process-global `UdataConstruct` singleton.
+  LuaPlus::UdataConstruct gUdataConstruct;
 } // namespace
