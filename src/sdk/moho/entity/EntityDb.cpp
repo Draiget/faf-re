@@ -1362,18 +1362,6 @@ namespace
     return sEntitySetBaseType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveEntityDbType()
-  {
-    static gpg::RType* sEntityDbType = nullptr;
-    if (!sEntityDbType) {
-      sEntityDbType = ResolveTypeByAnyName({"EntityDB", "CEntityDB", "Moho::EntityDB"});
-      if (!sEntityDbType) {
-        sEntityDbType = gpg::LookupRType(typeid(moho::CEntityDb));
-      }
-    }
-    return sEntityDbType;
-  }
-
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
@@ -1503,91 +1491,6 @@ namespace
     node->prev = &head;
     head.next->prev = node;
     head.next = node;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext && helper.mHelperPrev) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00684930 (FUN_00684930)
-   *
-   * What it does:
-   * Initializes callback lanes for global `EntityDBSerializer` helper storage
-   * and returns that helper object.
-   */
-  [[nodiscard]] moho::EntityDBSerializer* InitializeEntityDBSerializerStartupThunk() noexcept
-  {
-    InitializeHelperNode(gEntityDBSerializer);
-    gEntityDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&moho::EntityDBSerializer::Deserialize);
-    gEntityDBSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&moho::EntityDBSerializer::Serialize);
-    return &gEntityDBSerializer;
-  }
-
-  /**
-   * Address: 0x00685FE0 (FUN_00685FE0)
-   *
-   * What it does:
-   * Initializes callback lanes for global `EntityDBSerializer` helper storage
-   * and returns the serializer helper pointer.
-   */
-  [[nodiscard]] gpg::SerHelperBase* InitializeEntityDBSerializerStartupLeaf() noexcept
-  {
-    (void)InitializeEntityDBSerializerStartupThunk();
-    return HelperSelfNode(gEntityDBSerializer);
-  }
-
-  /**
-   * Address: 0x00684960 (FUN_00684960)
-   *
-   * What it does:
-   * Unlinks global `EntityDBSerializer` helper links and resets the node to
-   * the canonical self-linked state.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkEntityDBSerializerHelperNodePrimary() noexcept
-  {
-    return UnlinkHelperNode(gEntityDBSerializer);
-  }
-
-  /**
-   * Address: 0x00684990 (FUN_00684990)
-   *
-   * What it does:
-   * Secondary unlink/reset entry for the global `EntityDBSerializer` helper
-   * node.
-   */
-  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkEntityDBSerializerHelperNodeSecondary() noexcept
-  {
-    return UnlinkHelperNode(gEntityDBSerializer);
-  }
-
-  void cleanup_EntityDBSerializer_atexit()
-  {
-    (void)moho::cleanup_EntityDBSerializer();
   }
 
   [[nodiscard]] moho::CEntityDbAllUnitsNode*
@@ -4171,37 +4074,54 @@ namespace moho
   /**
    * Address: 0x00686010 (FUN_00686010, gpg::SerSaveLoadHelper_EntityDB::Init)
    */
-  void EntityDBSerializer::RegisterSerializeFunctions()
+  void EntityDBSerializer::Init()
   {
-    gpg::RType* const entityDbType = ResolveEntityDbType();
-    GPG_ASSERT(entityDbType != nullptr);
-    if (!entityDbType) {
-      return;
+    gpg::RType* type = CEntityDb::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CEntityDb));
+      CEntityDb::sType = type;
     }
 
-    GPG_ASSERT(entityDbType->serLoadFunc_ == nullptr);
-    GPG_ASSERT(entityDbType->serSaveFunc_ == nullptr);
-    entityDbType->serLoadFunc_ = mDeserialize;
-    entityDbType->serSaveFunc_ = mSerialize;
+    GPG_ASSERT(type != nullptr);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
-   * Address: 0x00BFCAD0 (FUN_00BFCAD0, Moho::EntityDBSerializer::~EntityDBSerializer)
+   * Address: 0x00BD51A0 (FUN_00BD51A0, dynamic initializer for the global
+   * `EntityDBSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Confirmed real via `vtable_writers`
+   * (`EntityDBSerializer@Moho`): `__xc_a`-reachable with one incoming xref,
+   * versus three zero-xref dead duplicates that model the same shape --
+   * `FUN_00684930` (identical ctor body, own vtable), `FUN_00685FE0`
+   * (same ctor body but writes the OTHER emitted vtable head, `gpg::
+   * SerSaveLoadHelper<Moho::EntityDB>`'s -- a base-subobject ctor variant
+   * the linker never wired to any call site), and both `FUN_00684960`/
+   * `FUN_00684990` (byte-identical unlink-then-self-link bodies matching
+   * `SerHelperBase::ResetLinks()`, superseded by that shared
+   * implementation). All four marked `skip`.
    */
-  gpg::SerHelperBase* cleanup_EntityDBSerializer()
+  EntityDBSerializer::EntityDBSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&EntityDBSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntityDBSerializer::Serialize))
+  {}
+
+  EntityDBSerializer::~EntityDBSerializer()
   {
-    return UnlinkEntityDBSerializerHelperNodePrimary();
+    ResetLinks();
   }
 
   /**
    * Address: 0x00BD51A0 (FUN_00BD51A0, register_EntityDBSerializer)
    */
-  int register_EntityDBSerializer()
+  void register_EntityDBSerializer()
   {
-    InitializeHelperNode(gEntityDBSerializer);
-    gEntityDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&EntityDBSerializer::Deserialize);
-    gEntityDBSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&EntityDBSerializer::Serialize);
-    return std::atexit(&cleanup_EntityDBSerializer_atexit);
+    (void)gEntityDBSerializer;
   }
 
   /**
