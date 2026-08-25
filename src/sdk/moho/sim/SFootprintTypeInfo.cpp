@@ -8,7 +8,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/SFootprint.h"
+#include "moho/sim/SFootprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -16,102 +16,9 @@ namespace
   alignas(moho::SFootprintTypeInfo) unsigned char gSFootprintTypeInfoStorage[sizeof(moho::SFootprintTypeInfo)];
   bool gSFootprintTypeInfoConstructed = false;
 
-  alignas(moho::SFootprintSerializer) unsigned char
-    gSFootprintSerializerStorage[sizeof(moho::SFootprintSerializer)];
-  bool gSFootprintSerializerConstructed = false;
-
   [[nodiscard]] moho::SFootprintTypeInfo& SFootprintTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::SFootprintTypeInfo*>(gSFootprintTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::SFootprintSerializer& SFootprintSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::SFootprintSerializer*>(gSFootprintSerializerStorage);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0050CB30 (FUN_0050CB30)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `SFootprint`.
-   */
-  [[nodiscard]] gpg::RType* ResolveSFootprintType()
-  {
-    gpg::RType* type = moho::SFootprint::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SFootprint));
-      moho::SFootprint::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0050C600 (FUN_0050C600)
-   *
-   * What it does:
-   * Unlinks the `SFootprintSerializer` helper node and resets both links to
-   * the serializer self-node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSFootprintSerializerVariant1() noexcept
-  {
-    return UnlinkHelperNode(SFootprintSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0050C630 (FUN_0050C630)
-   *
-   * What it does:
-   * Duplicate lane of `SFootprintSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSFootprintSerializerVariant2() noexcept
-  {
-    return UnlinkHelperNode(SFootprintSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0050C500 (FUN_0050C500)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `SFootprintTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_SFootprintTypeInfoRTypeBase(moho::SFootprintTypeInfo* const typeInfo) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
   void CleanupSFootprintTypeInfoAtExit()
@@ -122,17 +29,6 @@ namespace
 
     SFootprintTypeInfoStorageRef().~SFootprintTypeInfo();
     gSFootprintTypeInfoConstructed = false;
-  }
-
-  void CleanupSFootprintSerializerAtExit()
-  {
-    if (!gSFootprintSerializerConstructed) {
-      return;
-    }
-
-    (void)CleanupSFootprintSerializerVariant1();
-    SFootprintSerializerStorageRef().~SFootprintSerializer();
-    gSFootprintSerializerConstructed = false;
   }
 } // namespace
 
@@ -258,8 +154,11 @@ namespace moho
    * What it does:
    * Forwards archive loading to `SFootprint::MemberDeserialize`.
    */
-  void SFootprintSerializer::Deserialize(gpg::ReadArchive* const archive, SFootprint* const footprint)
+  void SFootprintSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
   {
+    auto* const footprint = reinterpret_cast<SFootprint*>(objectPtr);
     GPG_ASSERT(footprint != nullptr);
     GPG_ASSERT(archive != nullptr);
     footprint->MemberDeserialize(archive);
@@ -271,43 +170,31 @@ namespace moho
    * What it does:
    * Forwards archive saving to `SFootprint::MemberSerialize`.
    */
-  void SFootprintSerializer::Serialize(gpg::WriteArchive* const archive, SFootprint* const footprint)
+  void SFootprintSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
   {
+    auto* const footprint = reinterpret_cast<SFootprint*>(objectPtr);
     GPG_ASSERT(footprint != nullptr);
     GPG_ASSERT(archive != nullptr);
     footprint->MemberSerialize(archive);
   }
 
   /**
-   * Address: 0x0050C5D0 (FUN_0050C5D0)
-   *
-   * What it does:
-   * Initializes `SFootprintSerializer` helper links and callback lanes.
+   * Address: 0x0050C9B0 (FUN_0050C9B0, shared Init() body -- also serves the
+   * dead SerSaveLoadHelper<SFootprint> duplicate's vtable slot 0)
    */
-  [[nodiscard]] SFootprintSerializer* initialize_SFootprintSerializerVariant1()
+  void SFootprintSerializer::Init()
   {
-    if (!gSFootprintSerializerConstructed) {
-      new (gSFootprintSerializerStorage) SFootprintSerializer();
-      gSFootprintSerializerConstructed = true;
+    if (SFootprint::sType == nullptr) {
+      SFootprint::sType = gpg::LookupRType(typeid(SFootprint));
     }
 
-    InitializeHelperNode(SFootprintSerializerStorageRef());
-    SFootprintSerializerStorageRef().mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&SFootprintSerializer::Deserialize);
-    SFootprintSerializerStorageRef().mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SFootprintSerializer::Serialize);
-    return &SFootprintSerializerStorageRef();
-  }
-
-  /**
-   * Address: 0x0050C980 (FUN_0050C980)
-   *
-   * What it does:
-   * Duplicate lane of `SFootprintSerializer` callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] SFootprintSerializer* initialize_SFootprintSerializerVariant2()
-  {
-    return initialize_SFootprintSerializerVariant1();
+    gpg::RType* const type = SFootprint::sType;
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -327,33 +214,30 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC7E60 (FUN_00BC7E60, register_SFootprintSerializer)
+   * Address: 0x00BC7E60 (FUN_00BC7E60, dynamic initializer for the global
+   * `SFootprintSerializer` singleton)
    *
    * What it does:
-   * Installs the serializer helper node and binds the member archive lanes.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_SFootprintSerializer()
-  {
-    (void)initialize_SFootprintSerializerVariant1();
-    (void)ResolveSFootprintType();
-    (void)std::atexit(&CleanupSFootprintSerializerAtExit);
-  }
+  SFootprintSerializer::SFootprintSerializer()
+    : mDeserialize(&SFootprintSerializer::Deserialize)
+    , mSerialize(&SFootprintSerializer::Serialize)
+  {}
 
-  SFootprintSerializer::~SFootprintSerializer() noexcept = default;
+  SFootprintSerializer::~SFootprintSerializer() noexcept
+  {
+    ResetLinks();
+  }
 } // namespace moho
 
 namespace
 {
-  struct SFootprintBootstrap
-  {
-    SFootprintBootstrap()
-    {
-      moho::register_SFootprintTypeInfo();
-      moho::register_SFootprintSerializer();
-    }
-  };
-
-  [[maybe_unused]] SFootprintBootstrap gSFootprintBootstrap;
+  // Address: 0x010AA42C -- process-global `SFootprintSerializer` singleton.
+  // (SFootprintTypeInfo's own registration is independently __xc_a-reachable
+  // through GPG_PREREGISTER_INIT below; the two are unrelated hierarchies.)
+  moho::SFootprintSerializer gSFootprintSerializer;
 } // namespace
 
 

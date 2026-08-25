@@ -80,16 +80,38 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
-  class SFootprintSerializer
+  /**
+   * VFTABLE: 0x00E0DE2C
+   */
+  class SFootprintSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7E60 (FUN_00BC7E60, dynamic initializer for the global
+     * `SFootprintSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SFootprintSerializer();
+
+    /**
+     * Address: 0x00BF2350 (FUN_00BF2350, ??1SFootprintSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SFootprintSerializer() noexcept;
+
     /**
      * Address: 0x0050C5A0 (FUN_0050C5A0, Moho::SFootprintSerializer::Deserialize)
      *
      * What it does:
      * Forwards archive loading to `SFootprint::MemberDeserialize`.
      */
-    static void Deserialize(gpg::ReadArchive* archive, SFootprint* footprint);
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0050C5B0 (FUN_0050C5B0, Moho::SFootprintSerializer::Serialize)
@@ -97,19 +119,24 @@ namespace moho
      * What it does:
      * Forwards archive saving to `SFootprint::MemberSerialize`.
      */
-    static void Serialize(gpg::WriteArchive* archive, SFootprint* footprint);
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-    virtual ~SFootprintSerializer() noexcept;
+    /**
+     * Address: 0x0050C9B0 (FUN_0050C9B0, gpg::SerSaveLoadHelper_SFootprint::Init
+     * shared body -- also serves the dead SerSaveLoadHelper<SFootprint>
+     * duplicate's vtable slot 0, see SFootprintTypeInfo.cpp)
+     *
+     * What it does:
+     * Resolves `SFootprint` RTTI and installs serializer load/save callback
+     * lanes.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(SFootprintSerializer, mHelperNext) == 0x04, "SFootprintSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SFootprintSerializer, mHelperPrev) == 0x08, "SFootprintSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SFootprintSerializer, mDeserialize) == 0x0C, "SFootprintSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(SFootprintSerializer, mSerialize) == 0x10, "SFootprintSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SFootprintSerializer) == 0x14, "SFootprintSerializer size must be 0x14");

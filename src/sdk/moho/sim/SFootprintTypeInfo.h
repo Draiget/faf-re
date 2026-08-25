@@ -62,14 +62,5 @@ namespace moho
    */
   void register_SFootprintTypeInfo();
 
-  /**
-   * Address: 0x00BC7E60 (FUN_00BC7E60, register_SFootprintSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `SFootprint` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_SFootprintSerializer();
-
   static_assert(sizeof(SFootprintTypeInfo) == 0x64, "SFootprintTypeInfo size must be 0x64");
 } // namespace moho
