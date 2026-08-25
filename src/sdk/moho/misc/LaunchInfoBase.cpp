@@ -12,7 +12,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -98,19 +98,19 @@ namespace
   moho::ArmyLaunchInfoTypeInfo gArmyLaunchInfoTypeInfo;
   ArmyLaunchInfoVectorTypeInfo gArmyLaunchInfoVectorTypeInfo;
   moho::LaunchInfoBaseTypeInfo gLaunchInfoBaseTypeInfo;
+
+  // Address: 0x010ABED0 -- process-global `LaunchInfoBaseSerializer` singleton.
   moho::LaunchInfoBaseSerializer gLaunchInfoBaseSerializer;
+
+  // Address: 0x010ABD74 -- process-global `ArmyLaunchInfoSerializer` singleton.
+  moho::ArmyLaunchInfoSerializer gArmyLaunchInfoSerializer;
+
+  // Address: 0x010ABE54 -- process-global `LaunchInfoNewSerializer` singleton.
+  moho::LaunchInfoNewSerializer gLaunchInfoNewSerializer;
 
   alignas(moho::LaunchInfoNewTypeInfo) unsigned char
     gLaunchInfoNewTypeInfoStorage[sizeof(moho::LaunchInfoNewTypeInfo)]{};
   bool gLaunchInfoNewTypeInfoConstructed = false;
-
-  alignas(moho::ArmyLaunchInfoSerializer) unsigned char
-    gArmyLaunchInfoSerializerStorage[sizeof(moho::ArmyLaunchInfoSerializer)]{};
-  bool gArmyLaunchInfoSerializerConstructed = false;
-
-  alignas(moho::LaunchInfoNewSerializer) unsigned char
-    gLaunchInfoNewSerializerStorage[sizeof(moho::LaunchInfoNewSerializer)]{};
-  bool gLaunchInfoNewSerializerConstructed = false;
 
   bool gArmyLaunchInfoTypeRegistered = false;
   bool gArmyLaunchInfoVectorTypeRegistered = false;
@@ -122,16 +122,6 @@ namespace
   [[nodiscard]] moho::LaunchInfoNewTypeInfo& LaunchInfoNewTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::LaunchInfoNewTypeInfo*>(gLaunchInfoNewTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::ArmyLaunchInfoSerializer& ArmyLaunchInfoSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::ArmyLaunchInfoSerializer*>(gArmyLaunchInfoSerializerStorage);
-  }
-
-  [[nodiscard]] moho::LaunchInfoNewSerializer& LaunchInfoNewSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::LaunchInfoNewSerializer*>(gLaunchInfoNewSerializerStorage);
   }
 
   /**
@@ -744,12 +734,6 @@ namespace
 
   bool gLaunchInfoBaseTypeRegistered = false;
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
   template <typename TShared>
   void ReleaseSharedOwnerControlBlockOnly(boost::SharedPtrRaw<TShared>& shared) noexcept
   {
@@ -1328,28 +1312,6 @@ namespace
     storage = msvc8::vector<moho::SSTICommandSource>{};
   }
 
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
   void EnsureLaunchInfoNewTypeInfoConstructed()
   {
     if (gLaunchInfoNewTypeInfoConstructed) {
@@ -1370,84 +1332,6 @@ namespace
     gLaunchInfoNewTypeInfoConstructed = false;
   }
 
-  moho::ArmyLaunchInfoSerializer* InitializeArmyLaunchInfoSerializerCallbacks()
-  {
-    if (!gArmyLaunchInfoSerializerConstructed) {
-      new (gArmyLaunchInfoSerializerStorage) moho::ArmyLaunchInfoSerializer();
-      gArmyLaunchInfoSerializerConstructed = true;
-    }
-
-    moho::ArmyLaunchInfoSerializer& serializer = ArmyLaunchInfoSerializerStorageRef();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = &moho::ArmyLaunchInfoSerializer::Deserialize;
-    serializer.mSerialize = &moho::ArmyLaunchInfoSerializer::Serialize;
-    return &serializer;
-  }
-
-  /**
-   * Address: 0x00542210 (FUN_00542210)
-   */
-  gpg::SerHelperBase* ResetArmyLaunchInfoSerializerLinksPrimary()
-  {
-    if (!gArmyLaunchInfoSerializerConstructed) {
-      return nullptr;
-    }
-    return UnlinkHelperNode(ArmyLaunchInfoSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x00542240 (FUN_00542240)
-   */
-  gpg::SerHelperBase* ResetArmyLaunchInfoSerializerLinksSecondary()
-  {
-    if (!gArmyLaunchInfoSerializerConstructed) {
-      return nullptr;
-    }
-    return UnlinkHelperNode(ArmyLaunchInfoSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x00542A50 (FUN_00542A50)
-   */
-  moho::LaunchInfoNewSerializer* InitializeLaunchInfoNewSerializerCallbacks()
-  {
-    if (!gLaunchInfoNewSerializerConstructed) {
-      new (gLaunchInfoNewSerializerStorage) moho::LaunchInfoNewSerializer();
-      gLaunchInfoNewSerializerConstructed = true;
-    }
-
-    moho::LaunchInfoNewSerializer& serializer = LaunchInfoNewSerializerStorageRef();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = &moho::LaunchInfoNewSerializer::Deserialize;
-    serializer.mSerialize = &moho::LaunchInfoNewSerializer::Serialize;
-    return &serializer;
-  }
-
-  /**
-   * Address: 0x00542A80 (FUN_00542A80)
-   */
-  gpg::SerHelperBase* ResetLaunchInfoNewSerializerLinksPrimary()
-  {
-    if (!gLaunchInfoNewSerializerConstructed) {
-      return nullptr;
-    }
-    return UnlinkHelperNode(LaunchInfoNewSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x00542AB0 (FUN_00542AB0)
-   */
-  gpg::SerHelperBase* ResetLaunchInfoNewSerializerLinksSecondary()
-  {
-    if (!gLaunchInfoNewSerializerConstructed) {
-      return nullptr;
-    }
-    return UnlinkHelperNode(LaunchInfoNewSerializerStorageRef());
-  }
-
-  gpg::SerHelperBase* ResetLaunchInfoBaseSerializerLinksPrimary();
-  gpg::SerHelperBase* ResetLaunchInfoBaseSerializerLinksSecondary();
-
   /**
    * Address: 0x00542270 (FUN_00542270)
    *
@@ -1466,38 +1350,6 @@ namespace
     return &gLaunchInfoBaseTypeInfo;
   }
 
-  void CleanupLaunchInfoBaseSerializerAtexit()
-  {
-    (void)ResetLaunchInfoBaseSerializerLinksSecondary();
-  }
-
-  void CleanupArmyLaunchInfoSerializerAtexit()
-  {
-    if (!gArmyLaunchInfoSerializerConstructed) {
-      return;
-    }
-
-    (void)ResetArmyLaunchInfoSerializerLinksSecondary();
-    ArmyLaunchInfoSerializerStorageRef().~ArmyLaunchInfoSerializer();
-    gArmyLaunchInfoSerializerConstructed = false;
-  }
-
-  /**
-   * Address: 0x005425B0 (FUN_005425B0)
-   */
-  gpg::SerHelperBase* ResetLaunchInfoBaseSerializerLinksPrimary()
-  {
-    return UnlinkHelperNode(gLaunchInfoBaseSerializer);
-  }
-
-  /**
-   * Address: 0x005425E0 (FUN_005425E0)
-   */
-  gpg::SerHelperBase* ResetLaunchInfoBaseSerializerLinksSecondary()
-  {
-    return UnlinkHelperNode(gLaunchInfoBaseSerializer);
-  }
-
   /**
    * Address: 0x005421B0 (FUN_005421B0)
    */
@@ -1512,35 +1364,22 @@ namespace
   {
   }
 
-  void CleanupLaunchInfoNewSerializerAtexit()
+  struct LaunchInfoNewTypeInfoBootstrap
   {
-    if (!gLaunchInfoNewSerializerConstructed) {
-      return;
-    }
-
-    (void)ResetLaunchInfoNewSerializerLinksSecondary();
-    LaunchInfoNewSerializerStorageRef().~LaunchInfoNewSerializer();
-    gLaunchInfoNewSerializerConstructed = false;
-  }
-
-  struct LaunchInfoBaseSerializerBootstrap
-  {
-    LaunchInfoBaseSerializerBootstrap()
+    LaunchInfoNewTypeInfoBootstrap()
     {
-      moho::register_ArmyLaunchInfoSerializer();
       moho::register_LaunchInfoNewTypeInfo();
-      moho::register_LaunchInfoNewSerializer();
-      moho::register_LaunchInfoBaseSerializer();
     }
   };
 
-  [[maybe_unused]] LaunchInfoBaseSerializerBootstrap gLaunchInfoBaseSerializerBootstrap;
+  [[maybe_unused]] LaunchInfoNewTypeInfoBootstrap gLaunchInfoNewTypeInfoBootstrap;
 } // namespace
 
 namespace moho
 {
   gpg::RType* ArmyLaunchInfo::sType = nullptr;
   gpg::RType* LaunchInfoBase::sType = nullptr;
+  gpg::RType* LaunchInfoNew::sType = nullptr;
 
   /**
    * Address: 0x00544800 (FUN_00544800, preregister_ArmyLaunchInfoVectorTypeStartup)
@@ -1595,11 +1434,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC9460 (FUN_00BC9460, dynamic initializer for the global
+   * `ArmyLaunchInfoSerializer` singleton)
+   */
+  ArmyLaunchInfoSerializer::ArmyLaunchInfoSerializer()
+    : mDeserialize(&ArmyLaunchInfoSerializer::Deserialize)
+    , mSerialize(&ArmyLaunchInfoSerializer::Serialize)
+  {}
+
+  /**
    * Address: 0x00BF3F90 (FUN_00BF3F90, Moho::ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer)
    */
   ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer()
   {
-    (void)UnlinkHelperNode(*this);
+    ResetLinks();
   }
 
   /**
@@ -1617,9 +1465,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00542EF0 (FUN_00542EF0)
+   * Address: 0x00542EF0 (FUN_00542EF0, Moho::ArmyLaunchInfoSerializer::Init)
    */
-  void ArmyLaunchInfoSerializer::RegisterSerializeFunctions()
+  void ArmyLaunchInfoSerializer::Init()
   {
     gpg::RType* type = ArmyLaunchInfo::sType;
     if (!type) {
@@ -1636,54 +1484,6 @@ namespace moho
     type->serLoadFunc_ = mDeserialize;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BF40B0 (FUN_00BF40B0, Moho::LaunchInfoNewSerializer::~LaunchInfoNewSerializer)
-   */
-  LaunchInfoNewSerializer::~LaunchInfoNewSerializer()
-  {
-    (void)UnlinkHelperNode(*this);
-  }
-
-  /**
-   * Address: 0x00542A20 (FUN_00542A20, Moho::LaunchInfoNewSerializer::Deserialize)
-   */
-  void LaunchInfoNewSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const info = reinterpret_cast<LaunchInfoNew*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    info->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00542A30 (FUN_00542A30, Moho::LaunchInfoNewSerializer::Serialize)
-   */
-  void LaunchInfoNewSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const info = reinterpret_cast<LaunchInfoNew*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    info->MemberSerialize(archive);
   }
 
   /**
@@ -1949,7 +1749,7 @@ namespace moho
   /**
    * Address: 0x005443F0 (FUN_005443F0, Moho::LaunchInfoNew::MemberSerialize)
    */
-  void LaunchInfoNew::MemberSerialize(gpg::WriteArchive* const archive)
+  void LaunchInfoNew::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -2054,7 +1854,7 @@ namespace moho
    * What it does:
    * Registers load/save callbacks into LaunchInfoBase RTTI.
    */
-  void LaunchInfoBaseSerializer::RegisterSerializeFunctions()
+  void LaunchInfoBaseSerializer::Init()
   {
     gpg::RType* const type = LaunchInfoBase::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -2064,12 +1864,20 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9460 (FUN_00BC9460, register_ArmyLaunchInfoSerializer)
+   * Address: 0x00BC94C0 (FUN_00BC94C0, dynamic initializer for the global
+   * `LaunchInfoBaseSerializer` singleton)
    */
-  void register_ArmyLaunchInfoSerializer()
+  LaunchInfoBaseSerializer::LaunchInfoBaseSerializer()
+    : mSerLoadFunc(&LaunchInfoBaseSerializer::Deserialize)
+    , mSerSaveFunc(&LaunchInfoBaseSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF4020 (FUN_00BF4020, Moho::LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer)
+   */
+  LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer()
   {
-    (void)InitializeArmyLaunchInfoSerializerCallbacks();
-    (void)std::atexit(&CleanupArmyLaunchInfoSerializerAtexit);
+    ResetLinks();
   }
 
   /**
@@ -2079,31 +1887,6 @@ namespace moho
   {
     EnsureLaunchInfoNewTypeInfoConstructed();
     (void)std::atexit(&CleanupLaunchInfoNewTypeInfoAtexit);
-  }
-
-  /**
-   * Address: 0x00BC9520 (FUN_00BC9520, register_LaunchInfoNewSerializer)
-   */
-  void register_LaunchInfoNewSerializer()
-  {
-    (void)InitializeLaunchInfoNewSerializerCallbacks();
-    (void)std::atexit(&CleanupLaunchInfoNewSerializerAtexit);
-  }
-
-  /**
-   * Address: 0x00BC94C0 (FUN_00BC94C0, register_LaunchInfoBaseSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper links/callbacks for `LaunchInfoBase`
-   * and schedules process-exit cleanup.
-   */
-  void register_LaunchInfoBaseSerializer()
-  {
-    (void)EnsureLaunchInfoBaseTypeRegistered();
-    InitializeHelperNode(gLaunchInfoBaseSerializer);
-    gLaunchInfoBaseSerializer.mSerLoadFunc = &LaunchInfoBaseSerializer::Deserialize;
-    gLaunchInfoBaseSerializer.mSerSaveFunc = &LaunchInfoBaseSerializer::Serialize;
-    (void)std::atexit(&CleanupLaunchInfoBaseSerializerAtexit);
   }
 
   /**

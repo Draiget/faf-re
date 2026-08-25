@@ -131,6 +131,8 @@ namespace moho
   class LaunchInfoNew final : public LaunchInfoBase
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00542790 (FUN_00542790)
      */
@@ -168,7 +170,7 @@ namespace moho
      * Saves `LaunchInfoNew` lanes by serializing `LaunchInfoBase`, then
      * string-vector payload and initialization seed.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     // Borrowed from CWldMap; the session hands the loaded map's prop list
@@ -311,13 +313,23 @@ namespace moho
 
   static_assert(sizeof(LaunchInfoNewTypeInfo) == 0x64, "LaunchInfoNewTypeInfo size must be 0x64");
 
-  class ArmyLaunchInfoSerializer
+  class ArmyLaunchInfoSerializer : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC9460 (FUN_00BC9460, dynamic initializer for the global
+     * `ArmyLaunchInfoSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    ArmyLaunchInfoSerializer();
+
+    /**
      * Address: 0x00BF3F90 (FUN_00BF3F90, Moho::ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer)
      */
-    virtual ~ArmyLaunchInfoSerializer();
+    ~ArmyLaunchInfoSerializer();
 
     /**
      * Address: 0x005421C0 (FUN_005421C0, Moho::ArmyLaunchInfoSerializer::Deserialize)
@@ -336,28 +348,18 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00542EF0 (FUN_00542EF0)
+     * Address: 0x00542EF0 (FUN_00542EF0, Moho::ArmyLaunchInfoSerializer::Init)
      *
      * What it does:
      * Binds ArmyLaunchInfo load/save serializer callbacks into its reflected
      * runtime type with one-time assertions.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext = nullptr;
-    gpg::SerHelperBase* mHelperPrev = nullptr;
-    gpg::RType::load_func_t mDeserialize = nullptr;
-    gpg::RType::save_func_t mSerialize = nullptr;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
-  static_assert(
-    offsetof(ArmyLaunchInfoSerializer, mHelperNext) == 0x04,
-    "ArmyLaunchInfoSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ArmyLaunchInfoSerializer, mHelperPrev) == 0x08,
-    "ArmyLaunchInfoSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(ArmyLaunchInfoSerializer, mDeserialize) == 0x0C,
     "ArmyLaunchInfoSerializer::mDeserialize offset must be 0x0C"
@@ -368,47 +370,24 @@ namespace moho
   );
   static_assert(sizeof(ArmyLaunchInfoSerializer) == 0x14, "ArmyLaunchInfoSerializer size must be 0x14");
 
-  class LaunchInfoNewSerializer
-  {
-  public:
-    /**
-     * Address: 0x00BF40B0 (FUN_00BF40B0, Moho::LaunchInfoNewSerializer::~LaunchInfoNewSerializer)
-     */
-    virtual ~LaunchInfoNewSerializer();
-
-    /**
-     * Address: 0x00542A20 (FUN_00542A20, Moho::LaunchInfoNewSerializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00542A30 (FUN_00542A30, Moho::LaunchInfoNewSerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-  public:
-    gpg::SerHelperBase* mHelperNext = nullptr;
-    gpg::SerHelperBase* mHelperPrev = nullptr;
-    gpg::RType::load_func_t mDeserialize = nullptr;
-    gpg::RType::save_func_t mSerialize = nullptr;
-  };
-  static_assert(
-    offsetof(LaunchInfoNewSerializer, mHelperNext) == 0x04,
-    "LaunchInfoNewSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LaunchInfoNewSerializer, mHelperPrev) == 0x08,
-    "LaunchInfoNewSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LaunchInfoNewSerializer, mDeserialize) == 0x0C,
-    "LaunchInfoNewSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(LaunchInfoNewSerializer, mSerialize) == 0x10,
-    "LaunchInfoNewSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(LaunchInfoNewSerializer) == 0x14, "LaunchInfoNewSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::LaunchInfoNew>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='LaunchInfoNewSerializer@Moho'`): `FUN_00BC9520` (real,
+   * `__xc_a`-reachable) vs. a dead zero-xref duplicate at `FUN_00542A50`
+   * (the prior source's fabricated `InitializeLaunchInfoNewSerializerCallbacks`
+   * lazy-construction helper -- confirmed zero incoming xrefs, never called by
+   * anything in this binary). `FUN_00543260` (this template's `Init()` body)
+   * is written into BOTH `LaunchInfoNewSerializer`'s vtable AND
+   * `gpg::SerSaveLoadHelper<Moho::LaunchInfoNew>`'s vtable at the same slot --
+   * ICF folding confirms this class genuinely is that template instantiation,
+   * not a hand-rolled lookalike. `Deserialize`/`Serialize`
+   * (0x00542A20/0x00542A30) already forward into
+   * `LaunchInfoNew::MemberDeserialize`/`MemberSerialize`, matching the
+   * template exactly.
+   */
+  using LaunchInfoNewSerializer = gpg::SerSaveLoadHelper<LaunchInfoNew>;
 
   /**
    * Address: 0x00544800 (FUN_00544800, preregister_ArmyLaunchInfoVectorTypeStartup)
@@ -419,19 +398,9 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_ArmyLaunchInfoVectorTypeStartup();
 
   /**
-   * Address: 0x00BC9460 (FUN_00BC9460, register_ArmyLaunchInfoSerializer)
-   */
-  void register_ArmyLaunchInfoSerializer();
-
-  /**
    * Address: 0x00BC9500 (FUN_00BC9500, register_LaunchInfoNewTypeInfo)
    */
   void register_LaunchInfoNewTypeInfo();
-
-  /**
-   * Address: 0x00BC9520 (FUN_00BC9520, register_LaunchInfoNewSerializer)
-   */
-  void register_LaunchInfoNewSerializer();
 
   class LaunchInfoBaseTypeInfo final : public gpg::RType
   {
@@ -454,9 +423,24 @@ namespace moho
 
   static_assert(sizeof(LaunchInfoBaseTypeInfo) == 0x64, "LaunchInfoBaseTypeInfo size must be 0x64");
 
-  class LaunchInfoBaseSerializer
+  class LaunchInfoBaseSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC94C0 (FUN_00BC94C0, dynamic initializer for the global
+     * `LaunchInfoBaseSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    LaunchInfoBaseSerializer();
+
+    /**
+     * Address: 0x00BF4020 (FUN_00BF4020, Moho::LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer)
+     */
+    ~LaunchInfoBaseSerializer();
+
     /**
      * Address: 0x00542550 (FUN_00542550, Moho::LaunchInfoBaseSerializer::Deserialize)
      *
@@ -474,37 +458,18 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00543190 (FUN_00543190, sub_543190)
+     * Address: 0x00543190 (FUN_00543190, Moho::LaunchInfoBaseSerializer::Init)
      *
      * What it does:
      * Registers load/save callbacks into LaunchInfoBase RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
 
-  /**
-   * Address: 0x00BC94C0 (FUN_00BC94C0, register_LaunchInfoBaseSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper links/callbacks for `LaunchInfoBase`
-   * and schedules process-exit cleanup.
-   */
-  void register_LaunchInfoBaseSerializer();
-
-  static_assert(
-    offsetof(LaunchInfoBaseSerializer, mHelperNext) == 0x04,
-    "LaunchInfoBaseSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LaunchInfoBaseSerializer, mHelperPrev) == 0x08,
-    "LaunchInfoBaseSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(LaunchInfoBaseSerializer, mSerLoadFunc) == 0x0C,
     "LaunchInfoBaseSerializer::mSerLoadFunc offset must be 0x0C"
