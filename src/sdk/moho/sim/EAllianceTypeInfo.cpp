@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -12,9 +12,20 @@ namespace
   bool gEAllianceTypeInfoConstructed = false;
   bool gEAllianceTypeInfoPreregistered = false;
 
-  alignas(moho::EAlliancePrimitiveSerializer)
-    unsigned char gEAlliancePrimitiveSerializerStorage[sizeof(moho::EAlliancePrimitiveSerializer)]{};
-  bool gEAlliancePrimitiveSerializerConstructed = false;
+  /**
+   * Address: 0x00BC7A30 (FUN_00BC7A30, dynamic initializer for the global
+   * `PrimitiveSerHelper<EAlliance,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). The previous raw-struct stand-in
+   * for this helper required an explicit
+   * `register_EAlliancePrimitiveSerializer()` call from a bootstrap struct
+   * to run its equivalent logic; the real binary never does that -- the
+   * global's own dynamic initializer is the entire registration.
+   */
+  moho::EAlliancePrimitiveSerializer gEAlliancePrimitiveSerializer;
 
   /**
    * Address: 0x00509D60 (FUN_00509D60, EAllianceTypeInfo construct/register lane)
@@ -39,92 +50,6 @@ namespace
   }
 
   /**
-   * Address: 0x0050AB50 (FUN_0050AB50)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `EAlliance`.
-   */
-  [[nodiscard]] gpg::RType* ResolveEAllianceType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::EAlliance));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] moho::EAlliancePrimitiveSerializer* AcquireEAlliancePrimitiveSerializer()
-  {
-    if (!gEAlliancePrimitiveSerializerConstructed) {
-      new (gEAlliancePrimitiveSerializerStorage) moho::EAlliancePrimitiveSerializer();
-      gEAlliancePrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EAlliancePrimitiveSerializer*>(gEAlliancePrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  /**
-   * Address: 0x0050A600 (FUN_0050A600)
-   *
-   * What it does:
-   * Initializes callback lanes for startup-owned `EAlliance` primitive
-   * serializer helper storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EAlliancePrimitiveSerializer*
-  InitializeEAlliancePrimitiveSerializerStartupThunkPrimary()
-  {
-    auto* const serializer = AcquireEAlliancePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EAlliancePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EAlliancePrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050A960 (FUN_0050A960)
-   *
-   * What it does:
-   * Secondary startup-init entry for the `EAlliance` primitive serializer
-   * helper storage that mirrors the primary callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EAlliancePrimitiveSerializer*
-  InitializeEAlliancePrimitiveSerializerStartupThunkSecondary()
-  {
-    auto* const serializer = AcquireEAlliancePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EAlliancePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EAlliancePrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
    * Address: 0x00BF1F10 (FUN_00BF1F10, cleanup_EAllianceTypeInfo)
    */
   void cleanup_EAllianceTypeInfo()
@@ -136,18 +61,6 @@ namespace
     reinterpret_cast<moho::EAllianceTypeInfo*>(gEAllianceTypeInfoStorage)->~EAllianceTypeInfo();
     gEAllianceTypeInfoConstructed = false;
     gEAllianceTypeInfoPreregistered = false;
-  }
-
-  /**
-   * Address: 0x00BF1F20 (FUN_00BF1F20, cleanup_EAlliancePrimitiveSerializer)
-   */
-  void cleanup_EAlliancePrimitiveSerializer()
-  {
-    if (!gEAlliancePrimitiveSerializerConstructed) {
-      return;
-    }
-
-    UnlinkSerializerNode(*AcquireEAlliancePrimitiveSerializer());
   }
 
   /**
@@ -199,70 +112,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050A920 (FUN_0050A920, PrimitiveSerHelper<EAlliance>::Deserialize)
-   */
-  void EAlliancePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EAlliance*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EAlliance>(value);
-  }
-
-  /**
-   * Address: 0x0050A940 (FUN_0050A940, PrimitiveSerHelper<EAlliance>::Serialize)
-   */
-  void EAlliancePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const EAlliance*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  /**
-   * Address: 0x0050A630 (FUN_0050A630, gpg::PrimitiveSerHelper<Moho::EAlliance,int>::Init)
-   */
-  void EAlliancePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveEAllianceType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
    */
   int register_EAllianceTypeInfo()
   {
     (void)ConstructEAllianceTypeInfoInternal();
     return std::atexit(&cleanup_EAllianceTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC7A30 (FUN_00BC7A30, register_EAlliancePrimitiveSerializer)
-   */
-  int register_EAlliancePrimitiveSerializer()
-  {
-    (void)InitializeEAlliancePrimitiveSerializerStartupThunkPrimary();
-    return std::atexit(&cleanup_EAlliancePrimitiveSerializer);
   }
 } // namespace moho
 
@@ -273,7 +128,6 @@ namespace
     EAllianceTypeInfoBootstrap()
     {
       (void)moho::register_EAllianceTypeInfo();
-      (void)moho::register_EAlliancePrimitiveSerializer();
     }
   };
 
