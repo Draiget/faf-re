@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/render/EmitterType.h"
 
 namespace moho
 {
@@ -35,44 +36,22 @@ namespace moho
   static_assert(sizeof(EmitterTypeTypeInfo) == 0x78, "EmitterTypeTypeInfo size must be 0x78");
 
   /**
+   * Demangled: gpg::PrimitiveSerHelper<enum moho::EmitterType,int>
    * VFTABLE: 0x00E2416C
    * COL: 0x00E7E4A8
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EmitterType@Moho@@H@gpg'`):
+   * `FUN_00BD42B0` (real, `__xc_a`-reachable; no dead low-address duplicate
+   * found for this instantiation). Previously modeled in this file as a
+   * hand-rolled `{ void* mVtable; SerHelperBase* mHelperNext, mHelperPrev;
+   * ... }` POD plus manual `InitializeHelperNode`/`UnlinkHelperNode`
+   * splicing and an eager `register_EmitterTypePrimitiveSerializer()`
+   * bootstrap call -- none of which the real binary does; `SerHelperBase`'s
+   * own ctor performs the real self-registration onto the pending-helper
+   * list.
    */
-  class EmitterTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0065EE50 (FUN_0065EE50, gpg::PrimitiveSerHelper<moho::EmitterType,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EmitterType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EmitterTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EmitterTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EmitterTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EmitterTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EmitterTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EmitterTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EmitterTypePrimitiveSerializer, mSerialize) == 0x10,
-    "EmitterTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EmitterTypePrimitiveSerializer) == 0x14, "EmitterTypePrimitiveSerializer size must be 0x14");
+  using EmitterTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EmitterType, int>;
 
   /**
    * Address: 0x0065DEB0 (FUN_0065DEB0, register_EmitterTypeTypeInfo_00)
@@ -97,21 +76,4 @@ namespace moho
    * Registers `EmitterType` RTTI bootstrap and installs process-exit cleanup.
    */
   int register_EmitterTypeTypeInfo_AtExit();
-
-  /**
-   * Address: 0x00BFBD20 (FUN_00BFBD20, cleanup_EmitterTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Unlinks startup `EmitterType` primitive serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_EmitterTypePrimitiveSerializer();
-
-  /**
-   * Address: 0x00BD42B0 (FUN_00BD42B0, register_EmitterTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `EmitterType` and installs
-   * process-exit cleanup.
-   */
-  int register_EmitterTypePrimitiveSerializer();
 } // namespace moho
