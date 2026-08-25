@@ -1346,6 +1346,20 @@ namespace gpg::core
      * Address: 0x005774B0 (FUN_005774B0, the same body emitted a second time --
      * 36 instructions and 92 bytes each, identical mnemonics and the same call
      * target. This build did not fold identical COMDATs, so both survive.)
+     * Address: 0x008AFB90 (FUN_008AFB90, gpg::fastvector_n<moho::SoundHandleRecord,
+     * 256>'s per-element forward copy, called three times from `GrowInsert`'s
+     * FUN_008AF760 instantiation (see the citation there) for the
+     * `[start,pos)+[insStart,insEnd)+[pos,end)` slices. Per element the binary
+     * calls `FUN_008AECF0` (`if (dest) sub_8AECF0(source++, dest); ++dest;`) --
+     * a splice-into-owner-chain-head-and-reset-tracked-entity-tree copy, not a
+     * plain field copy. `RebuildSoundHandleOwnerChains` and
+     * `RefreshTrackedEntitySetAfterRelocation` (CUserSoundManager.cpp) already
+     * reproduce those two per-element effects as aggregate caller-side passes
+     * run once after the whole `.Resize()` completes, which is what makes this
+     * method's plain `*dest = *cur` shape the correct substrate here: it
+     * carries every other field (owner handle, cue, params, angle/loop index,
+     * playing-seconds) verbatim, exactly as the binary's per-element copy also
+     * does for those same fields.)
      */
     static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
@@ -1603,6 +1617,35 @@ namespace gpg::core
      * modern `GrowInsert` consolidates every per-type growth helper (see the
      * other addresses on this block) into one template, same as the other
      * lanes)
+     * Address: 0x008AF760 (FUN_008AF760, gpg::fastvector_n<moho::SoundHandleRecord,
+     * 256>::GrowInsert -- the 40-byte (0x28) `SoundHandleRecord` element lane
+     * reached from `FastVectorN::Resize`'s "Binary char lane grows through
+     * GrowInsert(start, size, start, start)" call, itself reached from
+     * `moho::EnsureSoundHandleStorage`'s `mSoundHandles.Resize(...)`
+     * (CUserSoundManager.cpp). Asm-verified against FUN_008AF760.asm: `operator
+     * new(40 * newCapacity)`, three `sub_8AFB90` (CopyRangeForward) calls for
+     * the `[start,pos)+[insStart,insEnd)+[pos,end)` slices -- always the
+     * degenerate zero-length-insert form at this call site, since `pos ==
+     * insStart == insEnd == start` -- then the inline-vs-heap old-buffer
+     * release (`+0x0C` origin compare, matching `originalVec_`/
+     * `SaveInlineCapacity_`) and the `start_`/`end_`/`capacity_` field swap.
+     * One divergence this template does not itself model: right after the
+     * copy, for every element carried over from the OLD range specifically
+     * (not the empty insert range), FUN_008AF760 also calls `FUN_008AB160`
+     * per relocated element (0x008AF7E2 loop, stride 0x28) before releasing
+     * the old buffer -- releasing the tracked-entity RB-tree each relocated
+     * `SoundHandleRecord` still shares (by raw pointer value) with its
+     * about-to-be-freed old-storage origin, and FUN_008AECF0/FUN_008AEE40
+     * (reached the same way for brand-new slots) install a fresh empty
+     * sentinel rather than carry the old tree forward. That is
+     * `SoundHandleRecord`-specific business logic, not generic vector
+     * mechanics, so it is NOT folded into this shared template (see RULE ONE,
+     * CLAUDE.md) -- it is modeled as the caller-side
+     * `RefreshTrackedEntitySetAfterRelocation` step `EnsureSoundHandleStorage`
+     * runs over `[0, currentCount)` whenever this grow lane actually fires
+     * (CUserSoundManager.cpp), the same "manager-level step wrapping the
+     * generic Resize() call" idiom that file already uses for
+     * `InitializeSoundHandleRecordRuntime` and `RebuildSoundHandleOwnerChains`.)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes
