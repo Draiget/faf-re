@@ -1086,6 +1086,8 @@ extern "C" int __cdecl outfn(
   va_list arguments
 );
 extern "C" int __cdecl _ismbblead_l(unsigned int value, _locale_t localeInfo);
+extern "C" std::size_t __cdecl wstrlen(const wchar_t* str);
+extern "C" errno_t wstrcpy(wchar_t* destination, int length, const wchar_t* source);
 extern "C" int __cdecl _mbsnbicoll_l(
   const unsigned char* lhsText,
   const unsigned char* rhsText,
@@ -13873,12 +13875,302 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return 0;
   }
 
+  namespace
+  {
+    // Cached result of probing GetEnvironmentStringsW() support: 0 = not yet
+    // probed, 1 = natively supported, 2 = unsupported (this CRT's classic
+    // ERROR_CALL_NOT_IMPLEMENTED fallback trigger, pre-NT/Win9x heritage).
+    int gCrtEnvironmentStringsWSupport = 0;
+  }
+
+  // Staging pointer for the raw wide (UTF-16) environment block returned by
+  // RuntimeBuildWideEnvironmentBlock, consumed and freed by
+  // RuntimePublishWideEnvironFromBlock. Real symbol at 0x00FB8970 (`ptr` in
+  // IDA's decompile); also written by the not-yet-recovered `_wputenv`
+  // internal (FUN_00ABDD6F).
+  extern "C" wchar_t* gCrtRawWideEnvironmentBlock = nullptr;
+
+  // The parsed `wchar_t*` array view of the environment (one pointer per
+  // "NAME=value" entry, nullptr-terminated) that `_wgetenv`-family lookups
+  // scan. Real symbol at 0x00FB7D78 (`dword_FB7D78` in IDA's decompile) --
+  // a VC8-internal staging array, distinct from the published `_wenviron`
+  // (0x00FB7D70) the two are compared against each other at 0x00A90805,
+  // proving they are separate storage. Also read/written by the
+  // not-yet-recovered `_wputenv` internal (FUN_00ABDD6F).
+  extern "C" wchar_t** gCrtWideEnvironPointerArray = nullptr;
+
+  /**
+   * Address: 0x00AAEB7C (FUN_00AAEB7C, sub_AAEB7C)
+   *
+   * IDA signature:
+   * char *sub_AAEB7C(void);
+   *
+   * What it does:
+   * Builds one heap-owned copy of the process's wide (UTF-16) environment
+   * block -- a run of null-terminated `NAME=value` strings ending in an
+   * extra null wide character. Prefers the native `GetEnvironmentStringsW`
+   * API, caching whether it is supported in `gCrtEnvironmentStringsWSupport`
+   * so later calls skip the probe. When the native API fails with
+   * `ERROR_CALL_NOT_IMPLEMENTED`, falls back to the ANSI
+   * `GetEnvironmentStrings` plus a per-entry `MultiByteToWideChar`
+   * conversion into a freshly allocated wide buffer sized exactly to the
+   * summed per-entry conversion lengths. Returns `nullptr` on any
+   * allocation or conversion failure.
+   *
+   * Binary quirk preserved: if the very first `MultiByteToWideChar` length
+   * probe in the ANSI fallback fails, the function returns `nullptr`
+   * without releasing the `GetEnvironmentStrings()` block (every other
+   * failure path in this function does release it). This matches the
+   * shipped binary exactly, not a mistake introduced here.
+   */
+  extern "C" wchar_t* __cdecl RuntimeBuildWideEnvironmentBlock()
+  {
+    LPWCH nativeBlock = nullptr;
+    int support = gCrtEnvironmentStringsWSupport;
+
+    if (support == 0) {
+      nativeBlock = ::GetEnvironmentStringsW();
+      if (nativeBlock != nullptr) {
+        support = 1;
+      } else if (::GetLastError() == ERROR_CALL_NOT_IMPLEMENTED) {
+        support = 2;
+      }
+      gCrtEnvironmentStringsWSupport = support;
+    }
+
+    if (support == 1) {
+      if (nativeBlock == nullptr) {
+        nativeBlock = ::GetEnvironmentStringsW();
+        if (nativeBlock == nullptr) {
+          return nullptr;
+        }
+      }
+
+      const wchar_t* scan = nativeBlock;
+      if (*scan != L'\0') {
+        do {
+          while (*scan != L'\0') {
+            ++scan;
+          }
+          ++scan;
+        } while (*scan != L'\0');
+      }
+
+      const std::size_t byteCount = static_cast<std::size_t>(
+        reinterpret_cast<const std::uint8_t*>(scan) - reinterpret_cast<const std::uint8_t*>(nativeBlock)
+      ) + sizeof(wchar_t);
+      wchar_t* const copy = static_cast<wchar_t*>(std::malloc(byteCount));
+      if (copy != nullptr) {
+        std::memcpy(copy, nativeBlock, byteCount);
+      }
+      ::FreeEnvironmentStringsW(nativeBlock);
+      return copy;
+    }
+
+    if (support != 2) {
+      return nullptr;
+    }
+
+    LPCH const ansiBlock = ::GetEnvironmentStrings();
+    if (ansiBlock == nullptr) {
+      return nullptr;
+    }
+
+    int requiredWideChars = 0;
+    for (const char* entry = ansiBlock; *entry != '\0'; entry += std::strlen(entry) + 1) {
+      const int wideLength = ::MultiByteToWideChar(0, MB_PRECOMPOSED, entry, -1, nullptr, 0);
+      if (wideLength == 0) {
+        // Binary quirk, preserved -- see the Doxygen note above.
+        return nullptr;
+      }
+      requiredWideChars += wideLength;
+    }
+
+    wchar_t* const wideBlock = static_cast<wchar_t*>(
+      _calloc_crt(static_cast<std::size_t>(requiredWideChars) + 1u, sizeof(wchar_t))
+    );
+    if (wideBlock == nullptr) {
+      ::FreeEnvironmentStringsA(ansiBlock);
+      return nullptr;
+    }
+
+    const char* ansiCursor = ansiBlock;
+    wchar_t* wideCursor = wideBlock;
+    if (*ansiCursor != '\0') {
+      for (;;) {
+        const int remainingWideChars = (requiredWideChars + 1) - static_cast<int>(wideCursor - wideBlock);
+        if (::MultiByteToWideChar(0, MB_PRECOMPOSED, ansiCursor, -1, wideCursor, remainingWideChars) == 0) {
+          _free_crt(wideBlock);
+          ::FreeEnvironmentStringsA(ansiBlock);
+          return nullptr;
+        }
+
+        ansiCursor += std::strlen(ansiCursor) + 1;
+        wideCursor += wstrlen(wideCursor) + 1;
+        if (*ansiCursor == '\0') {
+          break;
+        }
+      }
+    }
+
+    *wideCursor = L'\0';
+    ::FreeEnvironmentStringsA(ansiBlock);
+    return wideBlock;
+  }
+
+  /**
+   * Address: 0x00AAEAA2 (FUN_00AAEAA2, sub_AAEAA2)
+   *
+   * IDA signature:
+   * int sub_AAEAA2(void);
+   *
+   * What it does:
+   * Parses `gCrtRawWideEnvironmentBlock` (built by
+   * `RuntimeBuildWideEnvironmentBlock`) into `gCrtWideEnvironPointerArray`,
+   * one heap-owned copy per entry, skipping entries that start with `=`
+   * (Windows' hidden per-drive current-directory pseudo-variables). Frees
+   * the raw block and marks `__env_initialized` on success. Returns `-1`
+   * if the raw block is null or any allocation fails, `0` on success.
+   */
+  extern "C" int __cdecl RuntimePublishWideEnvironFromBlock()
+  {
+    if (gCrtRawWideEnvironmentBlock == nullptr) {
+      return -1;
+    }
+
+    int visibleEntryCount = 0;
+    for (const wchar_t* entry = gCrtRawWideEnvironmentBlock; *entry != L'\0'; entry += wstrlen(entry) + 1) {
+      if (*entry != L'=') {
+        ++visibleEntryCount;
+      }
+    }
+
+    wchar_t** const pointerArray = static_cast<wchar_t**>(
+      _calloc_crt(static_cast<std::size_t>(visibleEntryCount) + 1u, sizeof(wchar_t*))
+    );
+    gCrtWideEnvironPointerArray = pointerArray;
+    if (pointerArray == nullptr) {
+      return -1;
+    }
+
+    wchar_t** writeSlot = pointerArray;
+    for (const wchar_t* entry = gCrtRawWideEnvironmentBlock;;) {
+      if (*entry == L'\0') {
+        _free_crt(gCrtRawWideEnvironmentBlock);
+        gCrtRawWideEnvironmentBlock = nullptr;
+        *writeSlot = nullptr;
+        __env_initialized = 1;
+        return 0;
+      }
+
+      const std::size_t entryLength = wstrlen(entry);
+      const std::size_t entryStride = entryLength + 1u;
+      if (*entry != L'=') {
+        wchar_t* const entryCopy = static_cast<wchar_t*>(_calloc_crt(entryLength + 1u, sizeof(wchar_t)));
+        *writeSlot = entryCopy;
+        if (entryCopy == nullptr) {
+          _free_crt(gCrtWideEnvironPointerArray);
+          gCrtWideEnvironPointerArray = nullptr;
+          return -1;
+        }
+
+        if (wstrcpy(entryCopy, static_cast<int>(entryStride), entry) != 0) {
+          _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+        }
+        ++writeSlot;
+      }
+
+      entry += entryStride;
+    }
+  }
+
+  /**
+   * Address: 0x00AAEA1D (FUN_00AAEA1D, sub_AAEA1D)
+   *
+   * Not recovered this pass. ANSI-to-wide environment sync fallback, only
+   * reached from `RuntimeGetWideEnvironmentValue` when
+   * `RuntimePublishWideEnvironFromBlock` fails on the pre-NT
+   * `GetEnvironmentStringsW`-unsupported path (dead in practice on every
+   * Windows version this game targets). IDA's decompile shows it reading
+   * `_wenviron` (confirmed via raw asm: `mov esi, _wenviron` at 0x00AAEA24)
+   * but immediately treating each entry as a narrow `CHAR*` for
+   * `MultiByteToWideChar` -- a real type-confusion in the VC8 source this
+   * needs a dedicated pass to resolve, not a guess -- before publishing
+   * each converted entry through the also-unrecovered `_wputenv` internal
+   * (FUN_00ABDD6F, its own ~90-instruction function with further
+   * dependencies). Declared here, matching this file's existing pattern
+   * for not-yet-individually-recovered CRT internals (`_output_l`,
+   * `outfn`, `woutput_l` above are the same shape).
+   */
+  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback();
+
+  /**
+   * Address: 0x00A907EB (FUN_00A907EB, sub_A907EB)
+   *
+   * IDA signature:
+   * int __cdecl sub_A907EB(const wchar_t *a1);
+   *
+   * What it does:
+   * The real VC8 `_wgetenv` implementation. Bails if `__env_initialized`
+   * is false. If `gCrtWideEnvironPointerArray` is not yet built, and
+   * `_wenviron` is set, lazily builds it -- `RuntimeBuildWideEnvironmentBlock`
+   * then `RuntimePublishWideEnvironFromBlock`, falling back to
+   * `RuntimeSyncWideEnvironFromAnsiFallback` only if that fails. Once the
+   * array is available, linear-scans it for a `NAME=value` entry whose
+   * name matches `variableName` case-insensitively (`_wcsnicoll`), and
+   * returns a pointer just past the `=`.
+   *
+   * Real caller: `_wdupenv_s` (0x00A90B12, `sub_A90B12` calls
+   * `sub_A907EB(a3)` directly -- confirmed reading its raw decompile, not
+   * just its already-recovered source) -- rewired below to call this
+   * function by name instead of the modern CRT's own `_wgetenv`, which
+   * does not touch this VC8-shaped `gCrtWideEnvironPointerArray` state at
+   * all and was a placeholder pending this recovery.
+   */
+  extern "C" const wchar_t* __cdecl RuntimeGetWideEnvironmentValue(const wchar_t* const variableName)
+  {
+    const wchar_t* const* environArray = gCrtWideEnvironPointerArray;
+
+    if (__env_initialized == 0) {
+      return nullptr;
+    }
+
+    const bool ready = (gCrtWideEnvironPointerArray != nullptr) || (
+      _wenviron != nullptr &&
+      ((gCrtRawWideEnvironmentBlock = RuntimeBuildWideEnvironmentBlock(), RuntimePublishWideEnvironFromBlock() >= 0) ||
+       !RuntimeSyncWideEnvironFromAnsiFallback()) &&
+      (environArray = gCrtWideEnvironPointerArray) != nullptr
+    );
+
+    if (ready && variableName != nullptr) {
+      const std::size_t nameLength = wstrlen(variableName);
+      for (; *environArray != nullptr; ++environArray) {
+        if (wstrlen(*environArray) > nameLength &&
+            (*environArray)[nameLength] == L'=' &&
+            _wcsnicoll(*environArray, variableName, static_cast<unsigned int>(nameLength)) == 0)
+        {
+          return &(*environArray)[nameLength + 1];
+        }
+      }
+    }
+
+    return nullptr;
+  }
+
   /**
    * Address: 0x00A90B12 (FUN_00A90B12, _wdupenv_s)
    *
    * What it does:
    * Duplicates one wide environment variable value into caller-owned heap
    * storage and reports the required UTF-16 element count.
+   *
+   * Real callsite evidence for `RuntimeGetWideEnvironmentValue`: this
+   * function's raw decompile (`FUN_00A90B12.c`) shows
+   * `v3 = sub_A907EB(a3);` -- a direct call to the VC8 `_wgetenv` internal,
+   * not to some generic CRT entry point. Previously called the modern
+   * toolchain's own `_wgetenv`, which does not participate in this file's
+   * recovered `gCrtWideEnvironPointerArray` state at all; rewired here to
+   * match the binary.
    */
   extern "C" errno_t __cdecl _wdupenv_s(
     wchar_t** const duplicatedValueOut,
@@ -13901,7 +14193,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       *requiredCountOut = 0u;
     }
 
-    const wchar_t* const source = _wgetenv(variableName);
+    const wchar_t* const source = RuntimeGetWideEnvironmentValue(variableName);
     if (source == nullptr) {
       return 0;
     }
