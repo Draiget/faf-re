@@ -9,6 +9,11 @@ namespace
 {
   moho::CInfluenceMapTypeInfo gCInfluenceMapTypeInfo;
   moho::EThreatTypeTypeInfo gEThreatTypeTypeInfo;
+
+  // Address: 0x010B9448 -- process-global `PrimitiveSerHelper<EThreatType,int>`
+  // singleton (constructed by FUN_00BDA3A0; see CInfluenceMapTypeInfo.h for
+  // the dead-duplicate-ctor and dead-sibling-writer evidence).
+  moho::EThreatTypePrimitiveSerializer gEThreatTypeSerializer;
 }
 
 namespace moho

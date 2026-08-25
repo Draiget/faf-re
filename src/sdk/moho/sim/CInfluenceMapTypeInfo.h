@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/sim/CInfluenceMap.h"
 
 namespace moho
 {
@@ -100,4 +101,36 @@ namespace moho
    * Forces EThreatType type-info startup materialization.
    */
   void register_EThreatTypeTypeInfo();
+
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EThreatType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EThreatType@Moho@@H@gpg'`):
+   * `FUN_00BDA3A0` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_007188D0`. A third writer for the same global's storage address,
+   * `FUN_00719FF0` (demangled `gpg::SerSaveLoadHelper<Moho::EThreatType>`),
+   * is itself zero-xref/unreachable -- same sibling-writer pattern already
+   * documented for `EAlliance`/`ELayer`/`EVisibilityMode`/`ESquadClass` on
+   * the template itself (see `Reflection.h`). There is no real
+   * `SerSaveLoadHelper<EThreatType>` instance in this binary; only the
+   * `PrimitiveSerHelper` instantiation is ever constructed.
+   *
+   * The real ctor's tail pushes plain, unmangled `FUN_00BFFCA0` as its
+   * `atexit` target (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) -- modeled by the template's own real
+   * destructor, no explicit `atexit` call needed.
+   *
+   * Previously a hand-rolled `{ void* mVtable; SerHelperBase*, SerHelperBase*;
+   * ...}` mimic named `EThreatTypeSerializerHelperStorage` lived in
+   * SThreatSerializer.cpp, entirely disconnected from this real global
+   * (`dword_10B9448`/`Moho__PrimitiveSerHelper<EThreatType,int>`): its own
+   * storage was a separate anonymous-namespace static, its two
+   * "initializer" functions had no real caller beyond a local bootstrap in
+   * that file, and its one real address citation (0x007188D0) actually
+   * pointed at the dead duplicate ctor, not this real one. Removed as
+   * fabricated/orphaned; this alias is the correct, evidence-backed
+   * recovery.
+   */
+  using EThreatTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EThreatType, int>;
 } // namespace moho

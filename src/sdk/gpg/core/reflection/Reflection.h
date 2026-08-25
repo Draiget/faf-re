@@ -4742,6 +4742,13 @@ namespace gpg
      *     `SerSaveLoadHelper<Moho::ESquadClass>` -- shares this global's
      *     storage address but is itself zero-xref/unreachable too, same
      *     sibling-writer situation as ELayer/EVisibilityMode above)
+     *   - T=Moho::EThreatType: 0x00BDA3A0 (dead duplicate: 0x007188D0; a
+     *     second, unrelated writer -- FUN_00719FF0, demangled
+     *     `SerSaveLoadHelper<Moho::EThreatType>` -- shares this global's
+     *     storage address but is itself zero-xref/unreachable too, same
+     *     sibling-writer situation as ESquadClass above. A prior fabricated
+     *     mimic in moho/sim/SThreatSerializer.cpp cited the dead duplicate
+     *     address as if it were this real ctor; removed.)
      */
     PrimitiveSerHelper()
       : mLoadCallback(&PrimitiveSerHelper::Deserialize)
@@ -4770,6 +4777,7 @@ namespace gpg
      *   - T=Moho::EResourceType: 0x005478E0 (FUN_005478E0)
      *   - T=Moho::EUnitCommandType: 0x00553540 (FUN_00553540)
      *   - T=Moho::ESquadClass: 0x0072A9B0 (FUN_0072A9B0)
+     *   - T=Moho::EThreatType: 0x00719FB0 (FUN_00719FB0)
      *
      * What it does:
      * Reads one `IntType` lane from the archive and stores it into the
@@ -4803,6 +4811,7 @@ namespace gpg
      *   - T=Moho::EResourceType: 0x00547900 (FUN_00547900)
      *   - T=Moho::EUnitCommandType: 0x00553560 (FUN_00553560)
      *   - T=Moho::ESquadClass: 0x0072A9D0 (FUN_0072A9D0)
+     *   - T=Moho::EThreatType: 0x00719FD0 (FUN_00719FD0)
      *
      * What it does:
      * Writes the reflected object's `T` value as one `IntType` lane.
@@ -4852,6 +4861,10 @@ namespace gpg
      *     `??_7?$SerSaveLoadHelper@W4ESquadClass@Moho@@@gpg@@6B@` (slot 0) --
      *     one shared compiled body serves both vtables, same pattern as
      *     every other instantiation's `Init()`.
+     *   - T=Moho::EThreatType: 0x00719370 -- same shared-body pattern,
+     *     confirmed via `incoming_xrefs` from both the real
+     *     `PrimitiveSerHelper<EThreatType,int>` vtable and the dead
+     *     `SerSaveLoadHelper<EThreatType>` sibling vtable.
      *
      * What it does:
      * Lazily resolves `T`'s RTTI and installs load/save callbacks from this
