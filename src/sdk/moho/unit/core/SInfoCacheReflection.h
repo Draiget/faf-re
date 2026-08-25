@@ -57,10 +57,38 @@ namespace moho
   /**
    * VFTABLE: 0x00E2D7F8
    * COL: 0x00E870E8
+   *
+   * RTTI Class Hierarchy Descriptor shows this class's base chain running
+   * through `.?AU?$SerSaveLoadHelper@USInfoCache@Moho@@@gpg@@` before
+   * `gpg::SerHelperBase` (same pattern observed on every
+   * `PrimitiveSerHelper<T,int>` instantiation this session). `SInfoCache`
+   * has no `MemberDeserialize`/`MemberSerialize` methods of its own (its
+   * load/save bodies do bespoke tracked-pointer + scalar/vector IO, not a
+   * template-forwardable member call), so -- same as `Rect2iSerializer`/
+   * `Rect2fSerializer` above -- this stays a concrete `SerHelperBase`-
+   * derived class rather than inheriting the generic template directly;
+   * valid prior art either way per those classes' own comment.
    */
-  class SInfoCacheSerializer final
+  class SInfoCacheSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD6A90 (FUN_00BD6A90, register_SInfoCacheSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SInfoCacheSerializer();
+
+    /**
+     * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
+     *
+     * What it does:
+     * Unlinks the serializer helper from the intrusive helper list.
+     */
+    ~SInfoCacheSerializer();
+
     /**
       * Alias of FUN_006B04B0 (non-canonical helper lane).
      *
@@ -78,22 +106,23 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-       * Address: 0x00BD6A90 (FUN_00BD6A90)
+     * Address: 0x006AE810 (FUN_006AE810, gpg::SerSaveLoadHelper<Moho::SInfoCache>::Init)
      *
      * What it does:
-     * Binds `SInfoCache` load/save callbacks into its RTTI descriptor.
+     * Binds `SInfoCache` load/save callbacks into its RTTI descriptor; caches
+     * the resolved type on `SInfoCache::sType`. Previously mis-cited on
+     * 0x00BD6A90, which is actually this class's ctor (same mis-citation
+     * family already caught for ESTITargetType/EResourceType/
+     * EUnitCommandType/CAniPose/CAniPoseBone/EFireState/EJobType/EUnitState/
+     * ECommandEvent).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(SInfoCacheSerializer, mHelperNext) == 0x04, "SInfoCacheSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SInfoCacheSerializer, mHelperPrev) == 0x08, "SInfoCacheSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SInfoCacheSerializer, mDeserialize) == 0x0C, "SInfoCacheSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(SInfoCacheSerializer, mSerialize) == 0x10, "SInfoCacheSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SInfoCacheSerializer) == 0x14, "SInfoCacheSerializer size must be 0x14");

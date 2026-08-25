@@ -17,6 +17,11 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
+namespace moho
+{
+  gpg::RType* SInfoCache::sType = nullptr;
+} // namespace moho
+
 namespace
 {
   using TypeInfo = moho::SInfoCacheTypeInfo;
@@ -26,6 +31,17 @@ namespace
   alignas(TypeInfo) unsigned char gSInfoCacheTypeInfoStorage[sizeof(TypeInfo)];
   bool gSInfoCacheTypeInfoConstructed = false;
 
+  /**
+   * Address: 0x00BD6A90 (FUN_00BD6A90, dynamic initializer for the global
+   * `SInfoCacheSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `SInfoCacheTypeInfo`'s own
+   * initializer below.
+   */
   Serializer gSInfoCacheSerializer{};
 
   [[nodiscard]] TypeInfo& AcquireSInfoCacheTypeInfo()
@@ -157,36 +173,6 @@ namespace
     return reinterpret_cast<const SInfoCacheView*>(objectPtr);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSInfoCacheType()
-  {
-    return gpg::LookupRType(typeid(SInfoCacheView));
-  }
-
   /**
    * Address: 0x006B04B0 (FUN_006B04B0, Moho::SInfoCacheSerializer::Deserialize)
    *
@@ -248,45 +234,6 @@ namespace
   }
 
   /**
-   * Address: 0x006A4FF0 (FUN_006A4FF0)
-   *
-   * What it does:
-   * Splices the `SInfoCacheSerializer` helper node out of the intrusive lane
-   * when linked, then rewires helper links to its self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSInfoCacheSerializerHelperNodeVariantA() noexcept
-  {
-    return UnlinkSerializerNode(gSInfoCacheSerializer);
-  }
-
-  /**
-   * Address: 0x006A5020 (FUN_006A5020)
-   *
-   * What it does:
-   * Secondary serializer helper unlink/reset variant sharing the same behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSInfoCacheSerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkSInfoCacheSerializerHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
-   *
-   * What it does:
-   * Unlinks the serializer helper-node and rewires it as a self-linked singleton.
-   */
-  gpg::SerHelperBase* cleanup_SInfoCacheSerializer_00BFD940_Impl()
-  {
-    return UnlinkSInfoCacheSerializerHelperNodeVariantA();
-  }
-
-  void cleanup_SInfoCacheSerializer_00BFD940_AtExit()
-  {
-    (void)cleanup_SInfoCacheSerializer_00BFD940_Impl();
-  }
-
-  /**
    * Address: 0x00BFD8E0 (FUN_00BFD8E0, sub_BFD8E0)
    *
    * What it does:
@@ -319,26 +266,11 @@ namespace
     return std::atexit(&cleanup_SInfoCacheTypeInfo_00BFD8E0_AtExit);
   }
 
-  /**
-    * Alias of FUN_00BD6A90 (non-canonical helper lane).
-   *
-   * What it does:
-   * Initializes `SInfoCacheSerializer` callbacks and schedules exit cleanup.
-   */
-  void register_SInfoCacheSerializer_Impl()
-  {
-    InitializeSerializerNode(gSInfoCacheSerializer);
-    gSInfoCacheSerializer.mDeserialize = &moho::SInfoCacheSerializer::Deserialize;
-    gSInfoCacheSerializer.mSerialize = &moho::SInfoCacheSerializer::Serialize;
-    (void)std::atexit(&cleanup_SInfoCacheSerializer_00BFD940_AtExit);
-  }
-
   struct SInfoCacheReflectionBootstrap
   {
     SInfoCacheReflectionBootstrap()
     {
       (void)register_SInfoCacheTypeInfo_Impl();
-      register_SInfoCacheSerializer_Impl();
     }
   };
 
@@ -411,11 +343,38 @@ namespace moho
 
   /**
    * Address: 0x00BD6A90 (FUN_00BD6A90, register_SInfoCacheSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void SInfoCacheSerializer::RegisterSerializeFunctions()
+  SInfoCacheSerializer::SInfoCacheSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SInfoCacheSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SInfoCacheSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
+   */
+  SInfoCacheSerializer::~SInfoCacheSerializer()
   {
-    gpg::RType* const type = ResolveSInfoCacheType();
-    GPG_ASSERT(type != nullptr);
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x006AE810 (FUN_006AE810, gpg::SerSaveLoadHelper<Moho::SInfoCache>::Init)
+   *
+   * What it does:
+   * Binds `SInfoCache` load/save callbacks into its RTTI descriptor; caches
+   * the resolved type on `SInfoCache::sType`.
+   */
+  void SInfoCacheSerializer::Init()
+  {
+    if (SInfoCache::sType == nullptr) {
+      SInfoCache::sType = gpg::LookupRType(typeid(SInfoCache));
+    }
+
+    gpg::RType* const type = SInfoCache::sType;
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
