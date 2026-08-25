@@ -2659,7 +2659,7 @@ namespace msvc8
              * through to `insert_at` (`FUN_00687280`, cited above) with the
              * decided `addLeft`, and a fallback to `insert_unique`
              * (`FUN_006870D0`, cited above) taking its `.first`. Reached
-             * from `CEntityDb::MemberDeserialize`'s
+             * from `CEntityDb::MemberSerialize`'s
              * `mIdPoolTree[familySourceBits]` (binary: `Moho::EntityDB::
              * DoReserveId`/`ReleaseId`'s `std::map_uint_IdPool::find2`,
              * `FUN_00685750`, cited on `msvc8::map::operator[]` in Map.h --

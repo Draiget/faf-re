@@ -296,7 +296,7 @@ namespace msvc8
          * insert shape this member performs. Reached from `Moho::EntityDB::
          * DoReserveId`/`ReleaseId` (`FUN_00684480`/`FUN_00684690`) in the
          * binary; the current recovery reaches the same instantiation from
-         * `CEntityDb::MemberDeserialize`'s `mIdPoolTree[familySourceBits]`
+         * `CEntityDb::MemberSerialize`'s `mIdPoolTree[familySourceBits]`
          * -- `DoReserveId`/`ReleaseId` themselves still route id allocation
          * through a separate `gRuntimePools` runtime cache rather than this
          * member directly, a known follow-up documented in the EntityDb.cpp
