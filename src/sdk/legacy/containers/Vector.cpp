@@ -631,6 +631,24 @@ inline void ReportVectorInvalidParameter() noexcept
 
 /**
  * Address: 0x0064FFB0 (FUN_0064FFB0)
+ * Address: 0x0064F760 (FUN_0064F760, sub_64F760) -- a second, byte-distinct
+ * calling-convention adapter into this function (different register/stack
+ * shape and a different logical argument order than `FUN_0064FAC0` below --
+ * `.asm`-confirmed: `push 0; push arg_8; push arg_8; push arg_C; push
+ * arg_0; call sub_64FFB0`, `0x2A` bytes span, vs. `FUN_0064FAC0`'s `push 0;
+ * push var_4; push arg_C; push arg_8; push arg_0`, `0x29` bytes -- not an
+ * ICF twin of it). Called from `_Insert_n`'s (`FUN_0064E490`,
+ * `legacy/containers/Vector.h`, cited there on `insert(pos,count,value)`)
+ * mid-vector tail-shift sub-branch (compiled as part of that shared
+ * emission but never reached by any caller in this binary, since
+ * `CDebugCanvas::screenText` is only ever appended through `push_back` --
+ * same "compiled but unreached" precedent as this file's other
+ * general-position `_Insert_n` emissions). DB-integrity fix: was
+ * mis-tagged `skip` ("was marked recovered citing Vector.cpp as a
+ * linker-emitted calling-convention trampoline... but this address does
+ * not appear anywhere in Vector.cpp") -- that DB-integrity revert was
+ * correct that the citation was missing, but the trampoline claim itself
+ * was accurate; this is that citation, added for real.
  *
  * What it does:
  * Copy-assigns one contiguous `SDebugScreenText` range in reverse order from
