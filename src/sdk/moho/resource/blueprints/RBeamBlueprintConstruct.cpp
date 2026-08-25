@@ -24,31 +24,31 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gBeamBlueprintType = nullptr;
-  moho::RBeamBlueprintConstruct gBeamBlueprintConstruct;
+
+  // Address: 0x010AA73C -- process-global `RBeamBlueprintConstruct` singleton.
+  // Constructing it runs RBeamBlueprintConstruct::RBeamBlueprintConstruct()
+  // (0x00BC81E0), which splices this helper into gpg::SerHelperBase::
+  // sNewHelpers; gpg::SerHelperBase::InitNewHelpers() later dispatches
+  // Init() on it from within the first ReadArchive/WriteArchive construction.
+  moho::RBeamBlueprintConstruct gRBeamBlueprintConstructHelper;
 
   /**
-   * Address: 0x005102E0 (FUN_005102E0)
+   * Address: 0x00BF26B0 (FUN_00BF26B0)
    *
    * What it does:
-   * Unlinks the global `RBeamBlueprintConstruct` helper node from the
-   * intrusive serializer-helper list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintConstruct);
-  }
-
-  /**
-   * Address: 0x00510310 (FUN_00510310)
+   * Unlinks the `RBeamBlueprintConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC81E0) as the
+   * global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RBeamBlueprintConstruct` helper-node
-   * cleanup; behavior matches the primary lane.
+   * ICF twins: 0x005102E0 (FUN_005102E0) and 0x00510310 (FUN_00510310) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintConstructHelperNodeSecondary() noexcept
+  void CleanupRBeamBlueprintConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintConstruct);
+    gRBeamBlueprintConstructHelper.ResetLinks();
   }
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
@@ -67,30 +67,10 @@ namespace
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
   }
-
-  void CleanupBeamBlueprintConstructAtexit()
-  {
-    (void)CleanupBeamBlueprintConstructHelperNodePrimary();
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00510800 (FUN_00510800, sub_510800)
-   *
-   * What it does:
-   * Binds construct/delete callbacks into RBeamBlueprint RTTI
-   * (`serConstructFunc_`, `deleteFunc_`).
-   */
-  void RBeamBlueprintConstruct::RegisterConstructFunction()
-  {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RBeamBlueprint>(gBeamBlueprintType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
-  }
-
   /**
    * Address: 0x00510340 (FUN_00510340, sub_510340)
    *
@@ -117,7 +97,7 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     blueprintRef.mObj = blueprint;
-    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RBeamBlueprint>(gBeamBlueprintType) : nullptr;
+    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RBeamBlueprint>(RBeamBlueprint::sType) : nullptr;
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -133,30 +113,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC81E0 (FUN_00BC81E0, sub_BC81E0)
+   * Address: 0x00BC81E0 (FUN_00BC81E0, dynamic initializer for the global
+   * `RBeamBlueprintConstruct` singleton)
    *
    * What it does:
-   * Initializes and registers global construct helper for `RBeamBlueprint`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
-  int register_RBeamBlueprintConstruct()
+  RBeamBlueprintConstruct::RBeamBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RBeamBlueprint))
+    , mDeleteCallback(&Delete_RBeamBlueprint)
   {
-    blueprint_ser::InitializeHelperNode(gBeamBlueprintConstruct);
-    gBeamBlueprintConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RBeamBlueprint);
-    gBeamBlueprintConstruct.mDeleteCallback = &Delete_RBeamBlueprint;
-    gBeamBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupBeamBlueprintConstructAtexit);
+    (void)std::atexit(&CleanupRBeamBlueprintConstruct);
+  }
+
+  /**
+   * Address: 0x00510800 (FUN_00510800, gpg::SerConstructHelper<Moho::RBeamBlueprint>::Init)
+   *
+   * What it does:
+   * Lazily resolves `RBeamBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
+   */
+  void RBeamBlueprintConstruct::Init()
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RBeamBlueprint>(RBeamBlueprint::sType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RBeamBlueprintConstructBootstrap
-  {
-    RBeamBlueprintConstructBootstrap()
-    {
-      (void)moho::register_RBeamBlueprintConstruct();
-    }
-  };
-
-  RBeamBlueprintConstructBootstrap gRBeamBlueprintConstructBootstrap;
-} // namespace

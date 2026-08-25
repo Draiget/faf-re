@@ -13,32 +13,48 @@ namespace gpg
 
 namespace moho
 {
-  class RBeamBlueprintConstruct
+  /**
+   * Demangled: gpg::SerConstructHelper<class Moho::RBeamBlueprint>
+   *
+   * What it does:
+   * Binds the construct/delete callbacks used to materialize `RBeamBlueprint`
+   * references during load. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
+   */
+  class RBeamBlueprintConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00510800 (FUN_00510800, sub_510800)
-     * Slot: 0
+     * Address: 0x00BC81E0 (FUN_00BC81E0, dynamic initializer for the global
+     * `RBeamBlueprintConstruct` singleton)
      *
      * What it does:
-     * Binds construct/delete callbacks into RBeamBlueprint RTTI
-     * (`serConstructFunc_`, `deleteFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the construct/delete callback fields, and registers process-exit
+     * cleanup.
      */
-    virtual void RegisterConstructFunction();
+    RBeamBlueprintConstruct();
+
+    /**
+     * Address: 0x00510800 (FUN_00510800, gpg::SerConstructHelper<Moho::RBeamBlueprint>::Init)
+     *
+     * IDA signature:
+     * void __thiscall sub_510800(RBeamBlueprintConstruct *this);
+     *
+     * What it does:
+     * Lazily resolves the `RBeamBlueprint` reflection descriptor, asserts the
+     * construct callback slot is empty, and publishes this helper's
+     * construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
-
-  static_assert(
-    offsetof(RBeamBlueprintConstruct, mHelperNext) == 0x04, "RBeamBlueprintConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RBeamBlueprintConstruct, mHelperPrev) == 0x08, "RBeamBlueprintConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RBeamBlueprintConstruct, mConstructCallback) == 0x0C,
     "RBeamBlueprintConstruct::mConstructCallback offset must be 0x0C"
@@ -70,12 +86,4 @@ namespace moho
    * Deletes one constructed `RBeamBlueprint`.
    */
   void Delete_RBeamBlueprint(void* objectPtr);
-
-  /**
-   * Address: 0x00BC81E0 (FUN_00BC81E0, sub_BC81E0)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for `RBeamBlueprint`.
-   */
-  int register_RBeamBlueprintConstruct();
 } // namespace moho
