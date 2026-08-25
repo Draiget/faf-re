@@ -10495,32 +10495,6 @@ namespace
   }
 
   /**
-   * Address: 0x0072A5F0 (FUN_0072A5F0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CSquad`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCSquadSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CSquad");
-  }
-
-  /**
-   * Address: 0x0072A710 (FUN_0072A710)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CPlatoon`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCPlatoonSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CPlatoon");
-  }
-
-  /**
    * `InstallMohoHPathCellSerializerCallbacks` (0x007632D0) and
    * `InstallMohoPathQueueSerializerCallbacks` (0x00767080) removed here
    * (2026-08-25 investigation): raw disassembly at both addresses is a
@@ -10541,6 +10515,23 @@ namespace
    * `gNavPathSerializerHelper` (still dead/unwired) is left in this file
    * pending that pass. See
    * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
+   *
+   * `InstallMohoCSquadSerializerCallbacks` (0x0072A5F0) and
+   * `InstallMohoCPlatoonSerializerCallbacks` (0x0072A710) removed here too
+   * (same-day follow-up while fixing `CPlatoon.cpp`'s void*-vtable-mimic
+   * cluster): same disproof again -- both addresses' raw disassembly is the
+   * typeid-cached `T::sType` + `gpg::LookupRType` shape, ICF-shared between
+   * `Moho::CSquadSerializer`/`Moho::CPlatoonSerializer`'s own vtable slot 0
+   * and `gpg::SerSaveLoadHelper<CSquad>`/`<CPlatoon>`'s (two vftable-slot
+   * data xrefs land on each address), never `REF_FindTypeNamed`. Both were
+   * zero-caller orphans here (confirmed before deletion). Real bodies now
+   * live as `Init()` overrides on real concrete `gpg::SerHelperBase`-derived
+   * classes: `moho::CSquadSerializer` (moho/sim/CSquad.h, body in
+   * moho/sim/CPlatoon.cpp) and `moho::CPlatoonSerializer`
+   * (moho/sim/CPlatoon.h/.cpp) -- these replace a prior, also-wrong
+   * `using CSquadSerializer = gpg::SerSaveLoadHelper<CSquad>` (and CPlatoon
+   * equivalent) type-alias modeling that matched the callback bodies but
+   * never checked which vtable the confirmed-live ctor actually installs.
    */
 
   /**
