@@ -1645,14 +1645,6 @@ namespace
     std::byte thumbnailStorage[1];
   };
 
-  struct Stride136VectorRuntime
-  {
-    std::uint32_t lane00;
-    std::byte* begin;
-    std::byte* end;
-    std::byte* capacity;
-  };
-
   class CameraSnapshotViewRuntime
   {
   public:
@@ -1842,8 +1834,6 @@ namespace
   using MeshThumbnailDtorFn = void (*)(void* thumbnail);
   using BuildSelectionRangeFn = void (*)(void* outRange, void* owner, void* begin, void* end);
   using SubmitSelectionQuadFn = int (*)(const float* quadVertices, void* owner);
-  using ConstructStride136Fn = void (*)(std::byte* destination, std::uint32_t count, std::uint32_t lane4, std::uint32_t lane5);
-  using GrowStride136Fn = void (*)(Stride136VectorRuntime* owner, void* scratch, std::byte* tail, void* source);
   using CloneTreeStorageFn = void* (*)(std::uint8_t lane0, std::uint8_t lane1, std::uint8_t lane2, void* sourceRoot);
   using CloneTreePayloadFn = void (*)(void* destinationRoot, void* sourceRoot);
   using SimpleDtorFn = void (*)(void* object);
@@ -1952,17 +1942,6 @@ namespace
         }
       }
     }
-  }
-
-  [[nodiscard]] std::ptrdiff_t CountStride136Elements(
-    const std::byte* const begin,
-    const std::byte* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end < begin) {
-      return 0;
-    }
-    return (end - begin) / 136;
   }
 
 #if INTPTR_MAX == INT32_MAX
@@ -10668,41 +10647,6 @@ int UpdateSelectedEntryBoundsRuntime(
   quad[2] = 0.0f;
   quad[3] = entryView.minZ();
   return submitQuadFn != nullptr ? submitQuadFn(quad, owner) : result;
-}
-
-/**
- * Address: 0x007EFFA0 (FUN_007EFFA0)
- *
- * What it does:
- * Appends one 136-byte lane in-place when capacity remains, otherwise routes
- * through vector growth/reallocation path.
- */
-void AppendOrGrowStride136VectorRuntime(
-  Stride136VectorRuntime* const vector,
-  void* const source,
-  const ConstructStride136Fn constructFn,
-  const GrowStride136Fn growFn
-)
-{
-  if (vector == nullptr) {
-    return;
-  }
-
-  const std::ptrdiff_t size = CountStride136Elements(vector->begin, vector->end);
-  const std::ptrdiff_t capacity = CountStride136Elements(vector->begin, vector->capacity);
-  if (vector->begin != nullptr && size < capacity) {
-    std::byte* const tail = vector->end;
-    if (constructFn != nullptr) {
-      constructFn(tail, 1u, 0u, 0u);
-    }
-    vector->end = tail + 136u;
-    return;
-  }
-
-  std::uint32_t scratch = 0u;
-  if (growFn != nullptr) {
-    growFn(vector, &scratch, vector->end, source);
-  }
 }
 
 /**
