@@ -2363,6 +2363,28 @@ namespace msvc8
              * not yet recovered). `sub_7B4AA0`/`sub_7B4040` would need their
              * own citations as `destroy_subtree`/`erase_node` for this same
              * node shape, not yet done.)
+             *
+             * Address: 0x00580600 (FUN_00580600, sub_580600) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s own `erase_range`
+             * (isNil@+0x25, same node instantiation cited on this file's
+             * `erase(const_iterator)` entry, `FUN_0057DA50`, in Map.h).
+             * Same two-shape split as the other instantiations here:
+             * whole-range fast path (`first==leftmost() && last==header()`)
+             * calls the already-cited `destroy_subtree` realization
+             * `sub_5812C0` and resets head/size; walk path does an
+             * iterative successor-walk erase via the already-cited
+             * `erase_node` realization `sub_57DA50`. Reached from
+             * `CAiBrain::~CAiBrain` (`FUN_0057A1E0`, CAiBrain.cpp) via
+             * `DestroyBuildStructureMap` -- confirmed directly from the
+             * destructor's own raw decompile, which calls this address as
+             * its fourth cleanup step (right after the three `CTaskStage`
+             * teardowns `DestroyTaskStageAndDelete` already recovers) with
+             * a 3-pointer-argument shape matching `(outIter, first, last)`,
+             * not the argument-less `tree_::clear()` the source previously
+             * called; IDA mis-typed the `this`/argument registers here as
+             * `Moho::CScriptObject`/`LuaPlus::LuaObject` fields from an
+             * unrelated class, which is why the raw `.c` export reads as
+             * script-object teardown at this call site.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {

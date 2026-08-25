@@ -1429,15 +1429,16 @@ namespace
    * What it does:
    * Empties one build-structure reservation map. The binary walks the tree and
    * frees node by node with `sub_5812C0`, which unlinks both weak lanes before
-   * releasing the storage; `msvc8::map::clear` owns the node walk, so only the
-   * unlink half is written out here.
+   * releasing the storage; `erase(begin(), end())` (FUN_00580600, cited in
+   * RbTree.h) owns the node walk itself, so only the unlink half is written
+   * out here. Reached from `CAiBrain::~CAiBrain` (FUN_0057A1E0) below.
    */
   void DestroyBuildStructureMap(SBuildStructurePositionMap& map) noexcept
   {
     for (auto& entry : map) {
       (void)UnlinkBuildResourceInfoLinksNoReset(reinterpret_cast<SBuildResourceInfo&>(entry.second));
     }
-    map.clear();
+    map.erase(map.begin(), map.end());
   }
 
   [[nodiscard]] CTaskStage* AllocateTaskStage()
