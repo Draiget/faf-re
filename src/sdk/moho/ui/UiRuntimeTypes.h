@@ -1259,6 +1259,49 @@ namespace moho
      */
     ~CUIKeyHandlerRuntime() override;
 
+    /**
+     * Models the compiled `CUIKeyHandler` event table's dispatch role
+     * directly (two rows: `wxEVT_KEY_UP` -> `OnKeyUp`, `wxEVT_KEY_DOWN` ->
+     * `OnKeyDown`, binary table at `0x00F5B150`), the same approach
+     * `CMauiWxEventMapperRuntime::ProcessWxEvent` uses for its own
+     * keyboard rows.
+     */
+    bool ProcessWxEvent(void* event) override;
+
+    /**
+     * Address: 0x00838D10 (FUN_00838D10, Moho::CUIKeyHandler::OnKeyDown)
+     *
+     * IDA signature:
+     * void __stdcall sub_838D10(int a1);
+     *
+     * What it does:
+     * `wxEventTableEntry` key-press sink for the `CUIKeyHandler` event table
+     * (binary `0x00F5B150`, row 2 of 2 -- row 1 at `0x00F5B158` is
+     * `OnKeyUp`; both rows recovered by a raw dword byte-scan of the shipped
+     * `.exe`, since IDA's own xref pass missed this table entirely -
+     * `incoming_xrefs`/`callers` are empty for both sinks). Bails out when a
+     * `CMauiControl` currently owns keyboard focus. Otherwise packs the wx
+     * shift/ctrl/alt flags and raw key code into one `UiKeyMask` and looks it
+     * up in `gUiKeyActionMap`: a hit runs the bound command string through
+     * `Moho::CON_Execute`. A miss falls back to the two hardcoded shortcuts
+     * (Enter opens game chat, `~` toggles the console) via
+     * `Moho::UI_ActivateChat` / `Moho::MAUI_ToggleConsole`. Also consults
+     * `gUiKeyRepeatMap` to suppress processing when the Win32 "previously
+     * down" auto-repeat flag (`WM_KEYDOWN` lParam bit 30) is set for a key
+     * this handler is not currently tracking as held.
+     */
+    void OnKeyDown(wxEventRuntime& keyEvent);
+
+    /**
+     * Address: 0x00838E30 (FUN_00838E30, sub_838E30)
+     *
+     * What it does:
+     * `wxEventTableEntry` key-release sink for the `CUIKeyHandler` event
+     * table (binary `0x00F5B150`, row 1 of 2). Unconditionally marks the wx
+     * event skipped; `CUIKeyHandler` takes no other action on key-up.
+     */
+    void OnKeyUp(wxEventRuntime& keyEvent);
+
     std::uint8_t mUnknown04To27[0x24]{};
   };
 
