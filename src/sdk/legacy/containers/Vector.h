@@ -1458,14 +1458,72 @@ namespace msvc8
          * no further `src/sdk` change is needed at that link -- the compiler
          * default already produces this call chain (the `AdapterModeD3D10`-
          * level copy constructor/`operator=` pair itself, `FUN_008F7020`/
-         * `FUN_008F7110`, is a separate `msvc8::vector<AdapterModeD3D10>`
-         * instantiation gap, not yet cited). DB previously listed
+         * `FUN_008F7110`, remains a separate `msvc8::vector<AdapterModeD3D10>`
+         * instantiation gap -- see below, still uncited). DB previously listed
          * `FUN_008F6D20` and `FUN_008F69A0` `external_dependency`
          * ("all-external-callees thunk" / body "references only third-party
          * runtime... no Moho/gpg engine references") -- wrong: both are
          * `DXGI_MODE_DESC`/`AdapterModeD3D10` engine-instantiated vector
          * internals reached from committed `gpg::gal::AdapterD3D10` source;
          * corrected to `recovered` here.)
+         * Address: 0x008FF220 (FUN_008FF220, `msvc8::vector<AdapterModeD3D10>::
+         * vector(const vector&)` for the 0x74-byte (116, `AdapterModeD3D10` --
+         * format_/output_/outputDesc_/modes_) non-trivial element -- the
+         * one-level-up sibling of `FUN_008F6D20` above, fully inlined into a
+         * single body rather than split into a `FUN_008F69A0`-style fused
+         * helper: zeroes `first_`/`last_`/`end_` unconditionally, computes
+         * `n = (other.last_-other.first_)/116` null-guarded exactly like the
+         * inner instantiation, checks `n > 0x234F72C` (`max_size()` for this
+         * element, `0xFFFFFFFF/116`) throwing through `FUN_008F6900` (cited
+         * below on `insert`), allocates via the checked allocator
+         * `FUN_008F6040` (`allocate_struct116_slots_checked`, already
+         * recovered), arms the triple, then uninitialized-copies the whole
+         * source range via `FUN_008FE940` (cited below on `uninit_copy_n`).
+         * Source-level trigger: `AdapterD3D10::AdapterD3D10(const
+         * AdapterD3D10& other) : ..., modes_(other.modes_) {}`
+         * (D3D10Interfaces.cpp, already committed) -- `modes_` here is
+         * `AdapterD3D10::modes_` itself (`+0x12C`, the *outer*
+         * `msvc8::vector<AdapterModeD3D10>`), one level above the
+         * `AdapterModeD3D10::modes_` (`+0x64`) the `FUN_008F6D20` citation
+         * above describes. Confirmed via `_callgraph_index.sqlite`
+         * `call_edges`: this token's sole caller is `FUN_008FF450`
+         * (`AdapterD3D10`'s recovered copy constructor). DB previously
+         * listed this token `external_dependency` ("all-external-callees
+         * thunk") -- wrong for the same reason `FUN_008F6D20`/`FUN_008F69A0`
+         * were: its only real callee besides the throw/allocate helpers is
+         * `FUN_008FE940`, an engine-instantiated `AdapterModeD3D10` vector
+         * internal, not third-party runtime; corrected to `recovered` here.
+         *
+         * `FUN_008F7020`/`FUN_008F7110` (the single-`AdapterModeD3D10`-level
+         * copy constructor and a second, structurally near-identical
+         * single-element construct helper) remain uncited despite an
+         * exhaustive search: neither is called by any traced
+         * `msvc8::vector<AdapterModeD3D10>` internal (`FUN_008F7390`,
+         * `FUN_008FE940`, `FUN_008F74A0`, `FUN_008F72D0`, `FUN_008F70A0`,
+         * `FUN_008F7770`, `FUN_008FF220`, or `AppendAdapterModeEntry`/
+         * `ProbeOutputsAndModes` in D3D10Interfaces.cpp -- all of them inline
+         * their own field-by-field copy rather than delegating to either
+         * token). `FUN_008F7020` (plain `__thiscall`, no null guard, `retn
+         * 4`, `.asm`-confirmed) has zero incoming code or data xrefs anywhere
+         * in `_callgraph_index.sqlite` (`call_edges`, `data_refs`,
+         * `incoming_xrefs` all empty) and is absent from the `reachable`
+         * table even at the conservative seeded-root BFS. `FUN_008F7110`
+         * (mixed-convention entry -- `ecx`-passed dest pushed to a local,
+         * plain `retn`, its own dedicated `SEH_8F7110`/`stru_EA3368`
+         * `__CxxFrameHandler3` scope table, null-guarded copy body -- the
+         * same "defensive-null" shape already documented elsewhere on this
+         * member for `FUN_00549BC0`/`FUN_007CCEB0`) has exactly one caller,
+         * `FUN_008F734A` -- confirmed, independently of a prior
+         * investigation that reached the same wall, via a direct `functions`
+         * table query against `_callgraph_index.sqlite`: no row for that
+         * address, and no tracked function's `[start_ea,end_ea)` contains it
+         * either -- it falls in a genuine 0x25-byte unclassified gap between
+         * `FUN_008F7320` (ends `0x008F733B`) and `FUN_008F7360` (starts
+         * `0x008F7360`). No further evidence found; left un-recovered rather
+         * than force a citation. A future pass with IDA available could try
+         * re-analyzing that gap directly (manual function creation over
+         * `[0x8F733B,0x8F7360)`) to recover `FUN_008F734A`'s own body and
+         * settle which of `FUN_008F7020`/`FUN_008F7110` it is.)
          *
          * Copy constructor (deep copy)
          */
@@ -1538,6 +1596,23 @@ namespace msvc8
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
          * Address: 0x005ED190 (FUN_005ED190, msvc8::vector<int>::operator=(const vector&))
+         * Address: 0x0084FF80 (FUN_0084FF80, msvc8::vector<wxWindowBase*>::
+         * operator=(const vector&) -- the full VC8 assign shape (self-check,
+         * empty-source clear, fits-in-capacity assign-over-then-append,
+         * grows-beyond-capacity free-and-rebuy, shrinks-in-place memmove)
+         * for the 4-byte trivially-copyable pointer element (`wxWindowBase*`
+         * is this codebase's type-erased stand-in for the real wx
+         * `wxEvtHandler*` -- see `PopEventHandler`/`PushEventHandler` in
+         * WxRuntimeTypes.h). This is the per-window saved-handler inner
+         * vector `moho::SuspendInputWindowEventHandlersAndFlushQueue`
+         * (UiRuntimeTypes.cpp) builds as `msvc8::vector<msvc8::vector<
+         * wxWindowBase*>>`; reached through the outer vector's grow-relocate
+         * step (`FUN_0084F820`, `copy_or_move_assign` for the 16-byte
+         * `vector<wxWindowBase*>` element, cited below on
+         * `copy_or_move_assign`), which the source
+         * call `suspended.resize(g_UIManager->mInputWindows.size())`
+         * instantiates regardless of how many old elements that particular
+         * call site happens to relocate at runtime.)
          * Address: 0x0071E030 (FUN_0071E030,
          * msvc8::vector<Moho::InfluenceGrid>::operator=(const vector&) --
          * the same VC8 assign shape with rollback-safe copy-construction on
@@ -1586,12 +1661,22 @@ namespace msvc8
          * Source-level trigger: same chain as `vector(const vector&)` above,
          * but through `AdapterD3D10::operator=(const AdapterD3D10&)`'s
          * `modes_ = other.modes_;` (D3D10Interfaces.cpp) instead of the copy
-         * constructor -- `msvc8::vector<AdapterModeD3D10>::operator=`'s own
-         * assign-over step invokes `AdapterModeD3D10`'s compiler-synthesized
-         * memberwise `operator=`, which assigns `AdapterModeD3D10::modes_`
-         * through this token. DB previously listed this token `blocked`
-         * ("stale in_progress claim after reboot, no Address evidence") with
-         * zero citations anywhere in `src/sdk`; corrected to `recovered` here.)
+         * constructor -- the *outer* `msvc8::vector<AdapterModeD3D10>::
+         * operator=` (not yet individually recovered) has its own
+         * assign-over step which, like every other `AdapterModeD3D10`-level
+         * copy/assign operation traced in this cluster, inlines the
+         * field-by-field copy directly rather than calling out to a
+         * standalone `AdapterModeD3D10::operator=` symbol -- no such symbol
+         * exists anywhere in the traced call graph (see the exhaustive
+         * `FUN_008F7020`/`FUN_008F7110` search on `vector(const vector&)`
+         * above). That inlined assign-over loop is `FUN_008F72D0` (cited
+         * below on `insert`, `msvc8::vector<AdapterModeD3D10>`'s
+         * `std::fill`-shaped gap-overwrite step), which calls this token
+         * directly for the `AdapterModeD3D10::modes_` sub-object of each
+         * already-constructed destination element. DB previously listed
+         * this token `blocked` ("stale in_progress claim after reboot, no
+         * Address evidence") with zero citations anywhere in `src/sdk`;
+         * corrected to `recovered` here.)
          *
          * Copy assignment (strong exception safety)
          */
@@ -3564,6 +3649,87 @@ namespace msvc8
          * together. `sub_751D30`/`sub_751D70`/`sub_751DA0` (the in-place
          * shift / destroy-tail / allocate sub-helpers this instantiation
          * calls) are not individually cited yet -- follow-up.)
+         * Address: 0x008F7770 (FUN_008F7770, `msvc8::vector<AdapterModeD3D10>::
+         * insert(pos, count, value)` / `_Insert_n` core for the 0x74-byte
+         * (116) non-trivial `AdapterModeD3D10` element -- `AdapterD3D10::
+         * modes_` (`+0x12C`). Full three-branch VC8 shape matching this
+         * method body statement-for-statement: copies `value` into a local
+         * stack temporary first (`sub_8F6D20` on `&localValue.modes_`,
+         * guarding against `value` aliasing into `this` across a
+         * reallocation/shift, exactly this method's `const T
+         * localValue(value);`), computes `cur = size()`, checks `max_size()
+         * - cur < count` throwing through `FUN_008F6900` (`this method's
+         * `throw_too_long()` guard); growth branch (`cur+count >
+         * capacity()`): `recommended_capacity` via `FUN_008F5D90` (already
+         * recovered), allocate via `FUN_008F6040`
+         * (`allocate_struct116_slots_checked`, already recovered),
+         * `uninit_move_n`/`uninit_copy_n` the pre-insertion-point elements
+         * via `FUN_008F7390` (cited below on `uninit_copy_n`), `uninit_fill_n`
+         * `count` copies of `localValue` at the gap via `FUN_008F74A0`
+         * (through the thiscall bridge `FUN_008F7630`, cited there), then
+         * `uninit_move_n`/`uninit_copy_n` the post-insertion-point tail via a
+         * second `FUN_008F7390` call (through the thiscall bridge
+         * `FUN_008F7700`, cited on `uninit_copy_n`), destroys and frees the
+         * old buffer via `FUN_008F7550`/`FUN_008F7670` (already recovered);
+         * in-place branches (capacity available, no reallocation): the
+         * tail-large-enough-to-shift-whole case uses the `copy_backward`-
+         * shaped tail-shift-by-assignment loop `FUN_008F70A0` (through the
+         * `__cdecl` bridge `FUN_008F7470`, already correctly `skip`-tagged
+         * as a thin tail-call thunk) to relocate already-constructed
+         * elements via `operator=` (`FUN_008F6DD0`, cited above on
+         * `operator=`) for each element's `modes_` sub-object, then
+         * overwrites the vacated gap with `localValue` via the
+         * `std::fill`-shaped assign loop `FUN_008F72D0` (also `operator=`
+         * via `FUN_008F6DD0` per slot); the tail-smaller-than-gap case
+         * `uninit_move_n`s the tail into fresh slots past `last_` (again
+         * `FUN_008F7390`/`FUN_008F7700`), `uninit_fill_n`s the newly-exposed
+         * trailing gap slots (`FUN_008F74A0`/`FUN_008F7630`), and assign-fills
+         * the head-of-gap slots that overlap already-constructed storage via
+         * `FUN_008F72D0` again. Reached via the `__stdcall` calling-
+         * convention bridge `FUN_008F7B80` (`sub_8F7770(a2, 1, a3);`, no
+         * logic of its own) from `AppendAdapterModeEntry`'s
+         * `modes.push_back(entry)` (D3D10Interfaces.cpp, already committed)
+         * -- `push_back`'s capacity-exceeded path is `insert(end(), 1,
+         * value)`, matching this token's `count=1` invocation shape
+         * (`FUN_008F7C50`'s own fast path calls `FUN_008F74A0` directly when
+         * capacity allows; this token is the slow/grow path taken when it
+         * does not). DB previously listed this token `blocked` ("released
+         * after triage - either too large for single-session recovery,
+         * callers themselves blocked, or recovery would conflict with
+         * existing high-level abstractions") -- stale: `FUN_008F7C50` is
+         * `recovered`, and none of this token's real callees conflict with
+         * this template; corrected to `recovered` here.
+         * Address: 0x008F72D0 (FUN_008F72D0, this instantiation's
+         * `std::fill`-shaped gap-overwrite sub-step -- loops `[a1,a2)`
+         * writing the single repeated `*a3` value into each already-
+         * constructed slot via `operator=` (`FUN_008F6DD0` on the `modes_`
+         * sub-object at each element's `+0x64`). Reached from `FUN_008F7770`
+         * above (both in-place branches) and from the orphan bridge
+         * `FUN_008F7460` (`// attributes: thunk`, zero traced callers of its
+         * own -- likely reached from the still-unrecovered outer
+         * `msvc8::vector<AdapterModeD3D10>::operator=`'s own assign-over
+         * step, matching the correction on `operator=` above, but not
+         * proven). DB previously listed this token `blocked` ("mixed
+         * POD+subobject copy lane requires dependent type recovery (callee
+         * FUN_008F6DD0)") -- stale: `FUN_008F6DD0` is `recovered`; corrected
+         * to `recovered` here.
+         * Address: 0x008F70A0 (FUN_008F70A0, this instantiation's
+         * `copy_backward`-shaped tail-shift-by-assignment sub-step -- walks
+         * `[a1,a2)` backward writing into a descending `a3` cursor,
+         * `operator=` (`FUN_008F6DD0`) per element's `modes_` sub-object,
+         * safe for the overlapping-range shift `_Insert_n`'s in-place branch
+         * needs. Reached through the `__cdecl` calling-convention bridge
+         * `FUN_008F7470` (`return sub_8F70A0(a1,a2,a3);`, already correctly
+         * `skip`-tagged, no logic of its own) from `FUN_008F7770` above.
+         * `FUN_008F7320` (`jmp sub_8F70A0`, already `skip`-tagged as a
+         * tail-call thunk) is a second, still-uncalled-from-anywhere-traced
+         * bridge to this same token -- likely reached from the same
+         * still-unrecovered outer `operator=`/`erase`/`resize` family as
+         * `FUN_008F7460` above, not proven. DB previously listed this token
+         * `blocked` ("unresolved owner layout and callee FUN_008F6DD0") --
+         * stale: layout is `AdapterModeD3D10` (`AdapterD3D10.hpp`, already
+         * recovered) and `FUN_008F6DD0` is `recovered`; corrected to
+         * `recovered` here.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -4090,6 +4256,70 @@ namespace msvc8
          * on `vector(const vector&)`), `AdapterD3D10::AdapterD3D10(const
          * AdapterD3D10&)`'s `modes_(other.modes_)` member-init
          * (D3D10Interfaces.cpp) deep-copying `AdapterModeD3D10::modes_`.)
+         * Address: 0x008F7390 (FUN_008F7390, `msvc8::vector<AdapterModeD3D10>::
+         * uninit_copy_n` for the 0x74-byte (116) non-trivial
+         * `AdapterModeD3D10` element -- matches this member's non-trivial
+         * branch shape exactly: loop constructing one `AdapterModeD3D10` per
+         * slot (`qmemcpy` of the POD `format_`/`output_`/`outputDesc_`
+         * prefix plus a nested `sub_8F6D20` copy-construct of the
+         * `modes_` sub-object at `+0x64`), with an SEH catch funclet that
+         * destroys the already-constructed `[dst,dst+i)` prefix via
+         * `FUN_008F7360` (already `skip`-tagged: "MSVC-emitted member-vector
+         * storage release", the same `begin->modes_ =
+         * decltype(begin->modes_){}` operation `DestroyAdapterModeRuntimeRange`
+         * -- cited on `FUN_008F7550` -- performs per element, just compiled
+         * as a standalone per-call address here) and rethrows via
+         * `_CxxThrowException`; Hex-Rays renders the try-body loop and the
+         * disjoint catch funclet as one linear `__noreturn` listing since
+         * the SEH catch handler is laid out immediately after its guarded
+         * try region with no explicit branch between them -- the loop's
+         * normal-completion path (all elements copied, no throw) falls
+         * through to an ordinary return that the misapplied `__noreturn` tag
+         * suppresses from the decompile, not an unconditional
+         * destroy-then-rethrow. Reached directly from `FUN_008F7770` above
+         * (both the growth branch's pre-insertion-point relocate and, via
+         * the thiscall calling-convention bridge `FUN_008F7700` -- `sub_8F7390(a2,
+         * a3, a4, this);`, no logic of its own -- the post-insertion-point
+         * tail relocate and the in-place tail-smaller-than-gap branch); also
+         * reached through four further thin calling-convention bridges with
+         * no logic of their own -- `FUN_008F7590` (`__cdecl`), `FUN_008F7610`
+         * (`__cdecl`), `FUN_008F7690` (`__cdecl`), and `FUN_008FF020`
+         * (`__thiscall`) -- from sibling `msvc8::vector<AdapterModeD3D10>`
+         * methods (`reserve`/`resize`/`assign`-family grow paths) not yet
+         * individually recovered; none of the five bridges need a separate
+         * citation. DB previously listed this token `skip` ("Compiler-
+         * generated VC8 uninitialized range-copy/EH cleanup helper... no
+         * standalone SDK body") -- directionally correct (this is exactly
+         * the shape this template member already generalizes) but the wrong
+         * terminal status: the sibling instantiation `FUN_0071A1F0`
+         * (`msvc8::vector<SPositionThreat>::uninit_copy_n`, cited elsewhere
+         * in this member) sets the precedent of `recovered` with its own
+         * `Address:` line for this exact class of token; corrected to
+         * `recovered` here for consistency.
+         * Address: 0x008FE940 (FUN_008FE940, a second, separately-compiled
+         * COMDAT instantiation of the same `msvc8::vector<AdapterModeD3D10>::
+         * uninit_copy_n` body as `FUN_008F7390` above -- byte-for-byte the
+         * same algorithm (construct-with-rollback loop, `sub_8F6D20` for the
+         * `modes_` sub-object) but not an ICF twin
+         * (`function_sha256` differs: its rollback destroy call is
+         * `FUN_008F6970` at a `+116`-byte-stride cursor instead of
+         * `FUN_008F7360` at a `+29`-dword-stride one -- same operation,
+         * different codegen). Reached directly from `FUN_008FF220` above
+         * (`vector(const vector&)`'s whole-range uninitialized copy into the
+         * freshly-allocated buffer -- unambiguous copy-construct semantics,
+         * `other` is left untouched) and through two thin calling-convention
+         * bridges with no logic of their own -- `FUN_008FEFD0` (`__cdecl`)
+         * and `FUN_008FF050` (`__stdcall`) -- from sibling
+         * `msvc8::vector<AdapterModeD3D10>` methods not yet individually
+         * recovered; neither bridge needs a separate citation. `FUN_008F6970`
+         * (its rollback destroy callee) DB previously listed
+         * `external_dependency` ("all-external-callees thunk... no Moho/gpg
+         * engine references") -- wrong for the same reason `FUN_008F6D20`
+         * was: it is the `AdapterModeD3D10`-element-typed sibling of
+         * `FUN_008F7360` (already correctly `skip`-tagged), not third-party
+         * runtime; corrected to `skip` here with a matching note. DB
+         * previously listed `FUN_008FE940` itself `external_dependency` for
+         * the same wrong reason; corrected to `recovered` here.
          *
          * Uninitialized copy N from src to dst
          */
@@ -4210,10 +4440,26 @@ namespace msvc8
          * these as one unconditional tail call; the two `jz`/`jnb` branches to
          * `loc_7AEB8E` prove they are mutually exclusive). The other three xrefs
          * (FUN_007AF4C0, FUN_007B0010, FUN_007B1100) are call sites inside the
-         * still-`blocked` `_Insert_n` growth core for this element and are not
-         * needed to satisfy this instantiation's caller evidence. Source-level
-         * invocation: `cameras.push_back(camera)` in
-         * `AppendGeomCameraViewAndReturnEnd`)
+         * `_Insert_n` growth core for this element -- not needed to satisfy
+         * THIS instantiation's caller evidence, but see the next entry, which
+         * cites FUN_007B0010 itself. Source-level invocation:
+         * `cameras.push_back(camera)` in `AppendGeomCameraViewAndReturnEnd`)
+         *
+         * Address: 0x007B0010 (FUN_007B0010, msvc8::vector<moho::GeomCamera3>::
+         * insert(pos, value)'s `_Insert_n` growth core for the same 0x2C8
+         * (712)-byte element -- max_size guard (`0xFFFFFFFF/712`, throw lane
+         * FUN_007AF4C0, already cited as a typed throw shim above), 1.5x
+         * growth (`(cap>>1)+cap`) floored to `size()+1` via `size()` itself
+         * (`std::vector_GeomCamera3::size`, inlined), allocation through the
+         * checked 712-byte lane `sub_7419E0`, construct-the-inserted-value
+         * via `sub_7425B0`, tail relocation/destroy-old-buffer via
+         * `sub_7B1290`/`sub_7B12E0`/`sub_7B12C0`. Reached from the
+         * `insert(pos,val)` wrapper `FUN_007AF450` (already `skip`'d as a
+         * RULE ONE compiler/template emission -- its own note already
+         * identifies this address as the canonical template home). Its
+         * sibling throw-shim `FUN_007B1100` (already `skip`'d) pairs with
+         * this instantiation's own `_Buy` allocation lane the same way
+         * `FUN_007AF4C0` does above.)
          *
          * Address: 0x0064F9A0 (FUN_0064F9A0, msvc8::vector<moho::SDebugDecal>::
          * uninit_fill_n for the 52-byte element -- broadcast-copies the same
@@ -4388,6 +4634,33 @@ namespace msvc8
          * exists to replace) with zero source-level callers of its own;
          * removed in favor of this citation when `CDiscoveryService::mGames`
          * was migrated onto this template.)
+         * Address: 0x008F74A0 (FUN_008F74A0, `msvc8::vector<AdapterModeD3D10>::
+         * uninit_fill_n` for the 0x74-byte (116) non-trivial
+         * `AdapterModeD3D10` element -- matches this member's shape exactly:
+         * `while (a2 [count]) { construct one AdapterModeD3D10 copy of *a3
+         * at a1; --a2; a1 += 116; }`, per-element construct is the same
+         * `qmemcpy` POD-prefix-plus-`sub_8F6D20`-for-`modes_` shape as the
+         * `uninit_copy_n` instantiations above, with the same disjoint-SEH-
+         * catch-funclet-rendered-as-linear-`__noreturn` decompile artifact
+         * documented there (destroys `[a1_start,a1)` via `FUN_008F7360` on
+         * exception, then rethrows -- not an unconditional
+         * destroy-then-rethrow on the normal-completion path). Reached
+         * directly from `FUN_008F7C50` (`AppendAdapterModeEntry`'s
+         * `msvc8::vector<AdapterModeD3D10>::push_back` capacity-available
+         * fast path -- `size() < capacity()` -> construct the one new
+         * element directly at `last_`, this method's own `if (size() <
+         * capacity()) { uninit_fill_n(last_, 1u, value); ++last_; }` branch
+         * -- `FUN_008F7C50` is already `recovered`, D3D10Interfaces.cpp) and
+         * through the thiscall calling-convention bridge `FUN_008F7630`
+         * (`sub_8F74A0(a2, a3, a4, this);`, no logic of its own) from
+         * `FUN_008F7770` above (both the growth branch's fill-the-gap step
+         * and the in-place tail-smaller-than-gap branch's trailing-gap
+         * fill). DB previously listed this token `external_dependency`
+         * ("all-external-callees thunk... no Moho/gpg engine references")
+         * -- wrong for the same reason `FUN_008F6D20`/`FUN_008F69A0` were:
+         * its only real callee besides the destroy/throw helpers is
+         * `sub_8F6D20`, an engine-instantiated `DXGI_MODE_DESC` vector
+         * internal, not third-party runtime; corrected to `recovered` here.)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -4861,6 +5134,22 @@ namespace msvc8
          * element's `is_trivially_copy_assignable_v<T>` branch takes.
          * Reached from the `_Insert_n` grow lane FUN_005C68E0, already
          * cited above.)
+         * Address: 0x0084F820 (FUN_0084F820 — 16-byte `msvc8::vector<
+         * wxWindowBase*>` element (a nested vector, not a POD struct;
+         * `wxWindowBase*` is this codebase's stand-in for the real wx
+         * `wxEvtHandler*`, see the note on `operator=` above): pointer-walk
+         * loop form (`for (; src != srcEnd; dst += 16) dst[0..3] = *src++`,
+         * IDA shows the two cursors threaded through registers rather than
+         * an index) calling this element type's own `operator=`
+         * (`FUN_0084FF80`, cited above on `operator=`) per slot -- the
+         * non-trivial branch here because a `vector<T>` element owns a heap
+         * buffer and is not `is_trivially_copy_assignable_v`. Reached from
+         * the outer `msvc8::vector<msvc8::vector<wxWindowBase*>>`'s
+         * grow-relocate path (`FUN_0084EE20`, not yet independently
+         * address-annotated) when `moho::
+         * SuspendInputWindowEventHandlersAndFlushQueue`'s
+         * `suspended.resize(g_UIManager->mInputWindows.size())` call
+         * instantiates it (UiRuntimeTypes.cpp).)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
