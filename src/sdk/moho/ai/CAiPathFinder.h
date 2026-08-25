@@ -56,8 +56,6 @@ namespace moho
     AIPATHSEARCH_Leader = 3,
   };
 
-  using ESearchType = EAiPathSearchType;
-
   /**
    * VFTABLE: 0x00E1C338
    * COL:  0x00E72290

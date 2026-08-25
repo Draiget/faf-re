@@ -24,7 +24,7 @@
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -437,7 +437,7 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedSearchType()
   {
-    return CachedType<ESearchType>(gSearchType);
+    return CachedType<EAiPathSearchType>(gSearchType);
   }
 
   [[nodiscard]] gpg::RType* CachedRect2iListType()
@@ -1274,7 +1274,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
   }
 
   if (gpg::RType* const searchType = CachedSearchType()) {
-    ESearchType search = AIPATHSEARCH_None;
+    EAiPathSearchType search = AIPATHSEARCH_None;
     archive->Read(searchType, &search, owner);
     (void)SetPathFinderSearchModeRaw(this, static_cast<std::int32_t>(search));
   }
@@ -1341,7 +1341,7 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
   }
 
   if (gpg::RType* const searchType = CachedSearchType()) {
-    ESearchType search = mSearchType;
+    EAiPathSearchType search = mSearchType;
     archive->Write(searchType, &search, owner);
   }
 
