@@ -4576,6 +4576,11 @@ namespace gpg
      * real-high-address pattern each one follows):
      *   - T=Moho::EAlliance: 0x00BC7A30 (dead duplicate: 0x0050A600)
      *   - T=Moho::EEconResource: 0x00BCA810
+     *   - T=Moho::EImpactType: 0x00BC7A90 (dead duplicate: 0x0050A6A0)
+     *   - T=Moho::ESTITargetType: 0x00BCA2B0 (no dead duplicate found)
+     *   - T=Moho::SWorldBeam::BlendMode: 0x00BC5300 (no dead duplicate found)
+     *   - T=Moho::SWorldParticle::BlendMode: 0x00BC53C0 (no dead duplicate found)
+     *   - T=Moho::SWorldParticle::ZMode: 0x00BC5420 (no dead duplicate found)
      */
     PrimitiveSerHelper()
       : mLoadCallback(&PrimitiveSerHelper::Deserialize)
@@ -4589,7 +4594,13 @@ namespace gpg
 
     /**
      * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EAlliance: 0x0050A920 (FUN_0050A920)
      *   - T=Moho::EEconResource: 0x00564120 (FUN_00564120)
+     *   - T=Moho::EImpactType: 0x0050A990 (FUN_0050A990)
+     *   - T=Moho::ESTITargetType: 0x0055B310 (FUN_0055B310)
+     *   - T=Moho::SWorldBeam::BlendMode: 0x0048FDA0 (FUN_0048FDA0)
+     *   - T=Moho::SWorldParticle::BlendMode: 0x0048FE10 (FUN_0048FE10)
+     *   - T=Moho::SWorldParticle::ZMode: 0x0048FE80 (FUN_0048FE80)
      *
      * What it does:
      * Reads one `IntType` lane from the archive and stores it into the
@@ -4604,11 +4615,17 @@ namespace gpg
 
     /**
      * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EAlliance: 0x0050A940 (FUN_0050A940)
      *   - T=Moho::EEconResource: 0x00564140 (FUN_00564140) -- this specific
      *     address was previously mis-tagged `external_dependency` as a
      *     supposed "CRT iostream/locale-facet dispatch trampoline"; it is
      *     `archive->WriteInt(*a2)`, a virtual call on our own
      *     `gpg::WriteArchive`, not CRT.
+     *   - T=Moho::EImpactType: 0x0050A9B0 (FUN_0050A9B0)
+     *   - T=Moho::ESTITargetType: 0x0055B330 (FUN_0055B330)
+     *   - T=Moho::SWorldBeam::BlendMode: 0x0048FDC0 (FUN_0048FDC0)
+     *   - T=Moho::SWorldParticle::BlendMode: 0x0048FE30 (FUN_0048FE30)
+     *   - T=Moho::SWorldParticle::ZMode: 0x0048FEA0 (FUN_0048FEA0)
      *
      * What it does:
      * Writes the reflected object's `T` value as one `IntType` lane.
@@ -4621,7 +4638,19 @@ namespace gpg
 
     /**
      * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EAlliance: 0x0050A630 (FUN_0050A630)
      *   - T=Moho::EEconResource: 0x00563F70 (FUN_00563F70)
+     *   - T=Moho::EImpactType: 0x0050A6D0 (FUN_0050A6D0)
+     *   - T=Moho::ESTITargetType: 0x0055B200 (FUN_0055B200) -- previously
+     *     mis-modeled in ArchiveSerialization.cpp as a generic
+     *     `InstallSerSaveLoadHelperCallbacksByTypeName(helper,
+     *     "Moho::ESTITargetType")` dispatch; the real body installs two
+     *     hardcoded callback pointers directly (confirmed against asm),
+     *     matching this template's `Init()` exactly, not the generic
+     *     by-type-name lookup.
+     *   - T=Moho::SWorldBeam::BlendMode: 0x0048FAB0 (FUN_0048FAB0)
+     *   - T=Moho::SWorldParticle::BlendMode: 0x0048FBF0 (FUN_0048FBF0)
+     *   - T=Moho::SWorldParticle::ZMode: 0x0048FC90 (FUN_0048FC90)
      *
      * What it does:
      * Lazily resolves `T`'s RTTI and installs load/save callbacks from this
