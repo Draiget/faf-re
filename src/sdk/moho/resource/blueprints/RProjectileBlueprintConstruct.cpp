@@ -23,30 +23,32 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  moho::RProjectileBlueprintConstruct gProjectileBlueprintConstruct;
+
+  // Address: 0x010AAC64 -- process-global `RProjectileBlueprintConstruct`
+  // singleton. Constructing it runs RProjectileBlueprintConstruct::
+  // RProjectileBlueprintConstruct() (0x00BC8700), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RProjectileBlueprintConstruct gRProjectileBlueprintConstructHelper;
 
   /**
-   * Address: 0x0051CAC0 (FUN_0051CAC0)
+   * Address: 0x00BF2F80 (FUN_00BF2F80)
    *
    * What it does:
-   * Unlinks `RProjectileBlueprintConstruct` helper node from the global
-   * serializer-helper intrusive list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
-  }
-
-  /**
-   * Address: 0x0051CAF0 (FUN_0051CAF0)
+   * Unlinks the `RProjectileBlueprintConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8700) as the
+   * global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RProjectileBlueprintConstruct`
-   * helper-node cleanup; behavior matches the primary lane.
+   * ICF twins: 0x0051CAC0 (FUN_0051CAC0) and 0x0051CAF0 (FUN_0051CAF0) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodeSecondary() noexcept
+  void CleanupRProjectileBlueprintConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
+    gRProjectileBlueprintConstructHelper.ResetLinks();
   }
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
@@ -64,11 +66,6 @@ namespace
       moho::blueprint_ser::ResolveCachedType<moho::RRuleGameRules>(gRuleGameRulesType)
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
-  }
-
-  void CleanupProjectileBlueprintConstructAtexit()
-  {
-    (void)CleanupProjectileBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -100,7 +97,9 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     blueprintRef.mObj = blueprint;
-    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType) : nullptr;
+    blueprintRef.mType = blueprint
+      ? blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType)
+      : nullptr;
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -120,59 +119,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051CD10 (FUN_0051CD10, sub_51CD10)
+   * Address: 0x00BC8700 (FUN_00BC8700, dynamic initializer for the global
+   * `RProjectileBlueprintConstruct` singleton)
    *
    * What it does:
-   * Binds `RProjectileBlueprint` construct/delete callbacks into reflected
-   * RTTI (`serConstructFunc_`, `deleteFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
-  void RProjectileBlueprintConstruct::RegisterConstructFunction()
+  RProjectileBlueprintConstruct::RProjectileBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RProjectileBlueprint))
+    , mDeleteCallback(&Delete_RProjectileBlueprint)
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
+    (void)std::atexit(&CleanupRProjectileBlueprintConstruct);
   }
 
   /**
-   * Address: 0x00BF2F80 (FUN_00BF2F80, sub_BF2F80)
+   * Address: 0x0051CD10 (FUN_0051CD10, gpg::SerConstructHelper<Moho::RProjectileBlueprint>::Init)
    *
    * What it does:
-   * Unlinks `RProjectileBlueprintConstruct` helper links and rewires
-   * self-links.
+   * Lazily resolves `RProjectileBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RProjectileBlueprintConstruct()
+  void RProjectileBlueprintConstruct::Init()
   {
-    return CleanupProjectileBlueprintConstructHelperNodePrimary();
-  }
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00BC8700 (FUN_00BC8700, sub_BC8700)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for
-   * `RProjectileBlueprint`.
-   */
-  int register_RProjectileBlueprintConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gProjectileBlueprintConstruct);
-    gProjectileBlueprintConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RProjectileBlueprint);
-    gProjectileBlueprintConstruct.mDeleteCallback = &Delete_RProjectileBlueprint;
-    gProjectileBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupProjectileBlueprintConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RProjectileBlueprintConstructBootstrap
-  {
-    RProjectileBlueprintConstructBootstrap()
-    {
-      (void)moho::register_RProjectileBlueprintConstruct();
-    }
-  };
-
-  RProjectileBlueprintConstructBootstrap gRProjectileBlueprintConstructBootstrap;
-} // namespace

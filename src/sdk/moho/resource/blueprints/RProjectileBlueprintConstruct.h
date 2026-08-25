@@ -16,35 +16,45 @@ namespace moho
   /**
    * VFTABLE: 0x00E10DDC
    * COL: 0x00E68DC4
+   *
+   * Demangled: gpg::SerConstructHelper<class Moho::RProjectileBlueprint>
+   *
+   * What it does:
+   * Binds the construct/delete callbacks used to materialize
+   * `RProjectileBlueprint` references during load. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  class RProjectileBlueprintConstruct
+  class RProjectileBlueprintConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x0051CD10 (FUN_0051CD10, sub_51CD10)
-     * Slot: 0
+     * Address: 0x00BC8700 (FUN_00BC8700, dynamic initializer for the global
+     * `RProjectileBlueprintConstruct` singleton)
      *
      * What it does:
-     * Binds `RProjectileBlueprint` construct/delete callbacks into reflected
-     * RTTI (`serConstructFunc_`, `deleteFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the construct/delete callback fields, and registers process-exit
+     * cleanup.
      */
-    virtual void RegisterConstructFunction();
+    RProjectileBlueprintConstruct();
+
+    /**
+     * Address: 0x0051CD10 (FUN_0051CD10, gpg::SerConstructHelper<Moho::RProjectileBlueprint>::Init)
+     *
+     * What it does:
+     * Lazily resolves the `RProjectileBlueprint` reflection descriptor,
+     * asserts the construct callback slot is empty, and publishes this
+     * helper's construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
-
-  static_assert(
-    offsetof(RProjectileBlueprintConstruct, mHelperNext) == 0x04,
-    "RProjectileBlueprintConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RProjectileBlueprintConstruct, mHelperPrev) == 0x08,
-    "RProjectileBlueprintConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RProjectileBlueprintConstruct, mConstructCallback) == 0x0C,
     "RProjectileBlueprintConstruct::mConstructCallback offset must be 0x0C"
@@ -76,22 +86,4 @@ namespace moho
    * Deletes one constructed `RProjectileBlueprint`.
    */
   void Delete_RProjectileBlueprint(void* objectPtr);
-
-  /**
-   * Address: 0x00BF2F80 (FUN_00BF2F80, sub_BF2F80)
-   *
-   * What it does:
-   * Unlinks `RProjectileBlueprintConstruct` helper links and rewires
-   * self-links.
-   */
-  gpg::SerHelperBase* cleanup_RProjectileBlueprintConstruct();
-
-  /**
-   * Address: 0x00BC8700 (FUN_00BC8700, sub_BC8700)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for
-   * `RProjectileBlueprint`.
-   */
-  int register_RProjectileBlueprintConstruct();
 } // namespace moho

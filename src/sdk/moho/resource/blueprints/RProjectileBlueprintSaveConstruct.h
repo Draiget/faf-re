@@ -16,34 +16,43 @@ namespace moho
   /**
    * VFTABLE: 0x00E10DCC
    * COL: 0x00E68E70
+   *
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RProjectileBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `RProjectileBlueprint` reference on load. This
+   * is the save-side counterpart of `RProjectileBlueprintConstruct` (that
+   * class's `Init()` writes `serConstructFunc_`/`deleteFunc_`; this one
+   * writes `serSaveConstructArgsFunc_`).
    */
-  class RProjectileBlueprintSaveConstruct
+  class RProjectileBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x0051CC90 (FUN_0051CC90, sub_51CC90)
-     * Slot: 0
+     * Address: 0x00BC86D0 (FUN_00BC86D0, dynamic initializer for the global
+     * `RProjectileBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds `RProjectileBlueprint` save-construct-args callback into reflected
-     * RTTI (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    RProjectileBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x0051CC90 (FUN_0051CC90, gpg::SerSaveConstructHelper<Moho::RProjectileBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `RProjectileBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(
-    offsetof(RProjectileBlueprintSaveConstruct, mHelperNext) == 0x04,
-    "RProjectileBlueprintSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RProjectileBlueprintSaveConstruct, mHelperPrev) == 0x08,
-    "RProjectileBlueprintSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RProjectileBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "RProjectileBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -79,22 +88,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00BF2F50 (FUN_00BF2F50, sub_BF2F50)
-   *
-   * What it does:
-   * Unlinks `RProjectileBlueprintSaveConstruct` helper links and rewires
-   * self-links.
-   */
-  gpg::SerHelperBase* cleanup_RProjectileBlueprintSaveConstruct();
-
-  /**
-   * Address: 0x00BC86D0 (FUN_00BC86D0, sub_BC86D0)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RProjectileBlueprint`.
-   */
-  int register_RProjectileBlueprintSaveConstruct();
 } // namespace moho

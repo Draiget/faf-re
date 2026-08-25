@@ -4,7 +4,6 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/blueprints/BlueprintConstructSerializationHelpers.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
@@ -22,35 +21,32 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  moho::RProjectileBlueprintSaveConstruct gProjectileBlueprintSaveConstruct;
+
+  // Address: 0x010AAC54 -- process-global `RProjectileBlueprintSaveConstruct`
+  // singleton. Constructing it runs RProjectileBlueprintSaveConstruct::
+  // RProjectileBlueprintSaveConstruct() (0x00BC86D0), which splices this
+  // helper into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
+  // InitNewHelpers() later dispatches Init() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::RProjectileBlueprintSaveConstruct gRProjectileBlueprintSaveConstructHelper;
 
   /**
-   * Address: 0x0051C9E0 (FUN_0051C9E0)
+   * Address: 0x00BF2F50 (FUN_00BF2F50)
    *
    * What it does:
-   * Unlinks `RProjectileBlueprintSaveConstruct` helper node from the global
-   * serializer-helper intrusive list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
-  }
-
-  /**
-   * Address: 0x0051CA10 (FUN_0051CA10)
+   * Unlinks the `RProjectileBlueprintSaveConstruct` helper node from
+   * whatever intrusive list it currently sits in and restores a self-linked
+   * sentinel state. Registered by the real dynamic initializer (0x00BC86D0)
+   * as the global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RProjectileBlueprintSaveConstruct`
-   * helper-node cleanup; behavior matches the primary lane.
+   * ICF twins: 0x0051C9E0 (FUN_0051C9E0) and 0x0051CA10 (FUN_0051CA10) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodeSecondary() noexcept
+  void CleanupRProjectileBlueprintSaveConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
-  }
-
-  void CleanupProjectileBlueprintSaveConstructAtexit()
-  {
-    (void)CleanupProjectileBlueprintSaveConstructHelperNodePrimary();
+    gRProjectileBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
@@ -103,70 +99,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051CC60 (FUN_0051CC60, sub_51CC60)
+   * Address: 0x00BC86D0 (FUN_00BC86D0, dynamic initializer for the global
+   * `RProjectileBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Initializes the global `RProjectileBlueprintSaveConstruct` helper links,
-   * binds its save-construct callback lane, and returns the helper instance.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  RProjectileBlueprintSaveConstruct* InitializeRProjectileBlueprintSaveConstructHelperLane()
+  RProjectileBlueprintSaveConstruct::RProjectileBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RProjectileBlueprintThunk)
+      )
   {
-    blueprint_ser::InitializeHelperNode(gProjectileBlueprintSaveConstruct);
-    gProjectileBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RProjectileBlueprintThunk);
-    return &gProjectileBlueprintSaveConstruct;
+    (void)std::atexit(&CleanupRProjectileBlueprintSaveConstruct);
   }
 
   /**
-   * Address: 0x0051CC90 (FUN_0051CC90, sub_51CC90)
+   * Address: 0x0051CC90 (FUN_0051CC90, gpg::SerSaveConstructHelper<Moho::RProjectileBlueprint>::Init)
    *
    * What it does:
-   * Binds `RProjectileBlueprint` save-construct-args callback into reflected
-   * RTTI (`serSaveConstructArgsFunc_`).
+   * Resolves `RProjectileBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
    */
-  void RProjectileBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
+  void RProjectileBlueprintSaveConstruct::Init()
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00BF2F50 (FUN_00BF2F50, sub_BF2F50)
-   *
-   * What it does:
-   * Unlinks `RProjectileBlueprintSaveConstruct` helper links and rewires
-   * self-links.
-   */
-  gpg::SerHelperBase* cleanup_RProjectileBlueprintSaveConstruct()
-  {
-    return CleanupProjectileBlueprintSaveConstructHelperNodePrimary();
-  }
-
-  /**
-   * Address: 0x00BC86D0 (FUN_00BC86D0, sub_BC86D0)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RProjectileBlueprint`.
-   */
-  int register_RProjectileBlueprintSaveConstruct()
-  {
-    (void)InitializeRProjectileBlueprintSaveConstructHelperLane();
-    gProjectileBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupProjectileBlueprintSaveConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RProjectileBlueprint>(RProjectileBlueprint::sType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RProjectileBlueprintSaveConstructBootstrap
-  {
-    RProjectileBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_RProjectileBlueprintSaveConstruct();
-    }
-  };
-
-  RProjectileBlueprintSaveConstructBootstrap gRProjectileBlueprintSaveConstructBootstrap;
-} // namespace
