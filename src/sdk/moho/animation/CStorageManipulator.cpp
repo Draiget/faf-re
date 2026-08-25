@@ -103,16 +103,6 @@ namespace
     return runtime;
   }
 
-  struct CStorageManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(sizeof(CStorageManipulatorSerializerHelperNode) == 0x10, "CStorageManipulatorSerializerHelperNode size must be 0x10");
-
-  CStorageManipulatorSerializerHelperNode gCStorageManipulatorSerializer;
   gpg::RType* gCStorageManipulatorCachedType = nullptr;
 
   using ScalarDeletingDtorFn = int(__thiscall*)(void* self, int deleteFlag);
@@ -166,49 +156,6 @@ namespace
     watchedBone->SetLocalTransform(updatedLocal);
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00648F60 (FUN_00648F60)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CStorageManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CStorageManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCStorageManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x00648F90 (FUN_00648F90)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CStorageManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CStorageManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCStorageManipulatorSerializer);
-  }
 } // namespace
 
 namespace moho
@@ -230,7 +177,56 @@ namespace moho
    */
   class CStorageManipulator : public IAniManipulator
   {
+  public:
+    /**
+     * Address: 0x00649DB0 (FUN_00649DB0, Moho::CStorageManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Forwards to the already-recovered `DeserializeCStorageManipulatorRuntime`
+     * free helper (this class models only the `IAniManipulator` base
+     * directly; the full field layout past `+0x80` lives on
+     * `CStorageManipulatorRuntimeView`, see the class comment above).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00649EF0 (FUN_00649EF0, Moho::CStorageManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Forwards to the already-recovered `SerializeCStorageManipulatorRuntime`
+     * free helper.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
+
+  /**
+   * VFTABLE: 0x00E230B4
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CStorageManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CStorageManipulatorSerializer`):
+   *    0x00BD3660 (__xc_a-reachable; exactly one xref on the real
+   *    `??_7CStorageManipulatorSerializer@Moho@@6B@` vtable). Dead zero-xref
+   *    duplicate ctor that installs a distinct byte-identical copy of the
+   *    template's own vtable instead: 0x00649900 (already `skip`).
+   *  - dtor: 0x00BFB370 (`??1CStorageManipulatorSerializer@Moho@@QAE@@Z`;
+   *    exactly one xref, from the real ctor's atexit push)
+   *  - Init(): 0x00649930
+   *  - Deserialize(): 0x00648F10 (tail-calls `MemberDeserialize` at 0x00649DB0)
+   *  - Serialize(): 0x00648F20 (tail-calls `MemberSerialize` at 0x00649EF0)
+   *
+   * Prior recovery modeled this as a `CStorageManipulatorSerializerHelperNode`
+   * raw struct (`gpg::SerHelperBase* mNext/mPrev` fields, no real base) wired
+   * through `InstallCStorageManipulatorSerializerCallbackStorage`, a
+   * fabricated bootstrap function with no address citation of its own that
+   * only stored the load/save callbacks on that orphan struct's own fields
+   * -- `CStorageManipulator::sType`'s `serLoadFunc_`/`serSaveFunc_` slots
+   * were never actually written. This template instantiation fixes both
+   * defects.
+   */
+  using CStorageManipulatorSerializer = gpg::SerSaveLoadHelper<CStorageManipulator>;
 
   LuaPlus::LuaObject* func_CreateLuaCStorageManipulator(
     LuaPlus::LuaObject* object,
@@ -854,6 +850,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x00649DB0 (FUN_00649DB0, gpg::SerSaveLoadHelper<Moho::CStorageManipulator>::Deserialize thunk target)
+   *
+   * What it does:
+   * Reinterprets `this` as the full `CStorageManipulatorRuntimeView` layout
+   * and forwards to the already-recovered `DeserializeCStorageManipulatorRuntime`
+   * body.
+   */
+  void CStorageManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    DeserializeCStorageManipulatorRuntime(reinterpret_cast<CStorageManipulatorRuntimeView*>(this), archive);
+  }
+
+  /**
+   * Address: 0x00649EF0 (FUN_00649EF0, gpg::SerSaveLoadHelper<Moho::CStorageManipulator>::Serialize thunk target)
+   *
+   * What it does:
+   * Reinterprets `this` as the full `CStorageManipulatorRuntimeView` layout
+   * and forwards to the already-recovered `SerializeCStorageManipulatorRuntime`
+   * body.
+   */
+  void CStorageManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    SerializeCStorageManipulatorRuntime(
+      reinterpret_cast<CStorageManipulatorRuntimeView*>(const_cast<CStorageManipulator*>(this)), archive
+    );
+  }
+
+  /**
    * Address: 0x00649B60 (FUN_00649B60, func_CreateLuaCStorageManipulator)
    *
    * What it does:
@@ -885,41 +909,34 @@ namespace moho
 
 namespace
 {
-  /**
-   * Source-level wiring for the `CStorageManipulator` reflected serializer.
-   *
-   * The binary stores the address of the load callback (0x00649DB0,
-   * `DeserializeCStorageManipulatorRuntime`) and the save callback
-   * (0x00649EF0, `SerializeCStorageManipulatorRuntime`) into the global
-   * `SerSaveLoadHelper_Moho_CStorageManipulator` helper node's callback
-   * lanes, exactly as the archive-serialization helper nodes bind their
-   * load/save pairs (see `InitializeSPathNeighborSerializerHelperStorage`).
-   * `InstallMohoCStorageManipulatorSerializerCallbacks` (0x00649930) later
-   * copies these lanes into the reflected `Moho::CStorageManipulator` type's
-   * `serLoadFunc_` / `serSaveFunc_` slots. Taking the address of each callback
-   * here is the source-level invocation (evidence class 2, function-pointer
-   * table) that keeps both callbacks linked into the engine binary.
-   */
-  CStorageManipulatorSerializerHelperNode* InstallCStorageManipulatorSerializerCallbackStorage() noexcept
-  {
-    (void)UnlinkSerializerNode(gCStorageManipulatorSerializer);
-    gCStorageManipulatorSerializer.mSerLoadFunc =
-      reinterpret_cast<gpg::RType::load_func_t>(&moho::DeserializeCStorageManipulatorRuntime);
-    gCStorageManipulatorSerializer.mSerSaveFunc =
-      reinterpret_cast<gpg::RType::save_func_t>(&moho::SerializeCStorageManipulatorRuntime);
-    return &gCStorageManipulatorSerializer;
-  }
+  // Address: 0x00BD3660 (dynamic initializer for the global
+  // `CStorageManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CStorageManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CStorageManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFB370) via
+  // `atexit`. See the Doxygen comment on the declaration above (next to the
+  // `CStorageManipulator` class) for the full per-instantiation address
+  // list. Prior recovery modeled this global's wiring via
+  // `InstallCStorageManipulatorSerializerCallbackStorage`, a fabricated
+  // function with no address citation of its own that only ever stored the
+  // load/save callbacks on an orphan `CStorageManipulatorSerializerHelperNode`
+  // struct's own fields -- `CStorageManipulator::sType`'s `serLoadFunc_`/
+  // `serSaveFunc_` slots were never actually written. This global's own
+  // static initialization fixes that.
+  moho::CStorageManipulatorSerializer gCStorageManipulatorSerializer;
 
-  struct CStorageManipulatorSerializerBootstrap
+  struct CStorageManipulatorTypeInfoStartupBootstrap
   {
-    CStorageManipulatorSerializerBootstrap()
+    CStorageManipulatorTypeInfoStartupBootstrap()
     {
-      (void)InstallCStorageManipulatorSerializerCallbackStorage();
       moho::register_CStorageManipulatorTypeInfo();
     }
   };
 
-  [[maybe_unused]] CStorageManipulatorSerializerBootstrap gCStorageManipulatorSerializerBootstrap;
+  [[maybe_unused]] CStorageManipulatorTypeInfoStartupBootstrap gCStorageManipulatorTypeInfoStartupBootstrap;
 } // namespace
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

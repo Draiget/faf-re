@@ -59,6 +59,24 @@ namespace moho
      */
     bool ManipulatorUpdate() override;
 
+    /**
+     * Address: 0x00646C40 (FUN_00646C40, gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::Deserialize thunk target)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base state, then this type's source-bone index,
+     * current rotation quaternion, and max-rate fields.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00646CE0 (FUN_00646CE0, gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::Serialize thunk target)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base state, then this type's source-bone index,
+     * current rotation quaternion, and max-rate fields.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     static gpg::RType* sType;
 
     std::int32_t mSourceBoneIndex = -1;  // +0x80
@@ -76,6 +94,45 @@ namespace moho
   );
   static_assert(offsetof(CSlaveManipulator, mMaxRate) == 0x94, "CSlaveManipulator::mMaxRate offset must be 0x94");
   static_assert(sizeof(CSlaveManipulator) == 0x98, "CSlaveManipulator size must be 0x98");
+
+  /**
+   * VFTABLE: 0x00E22D48
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CSlaveManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CSlaveManipulatorSerializer`):
+   *    0x00BD31F0 (__xc_a-reachable, confirmed via raw asm: calls
+   *    `gpg::SerHelperBase::SerHelperBase`, pushes the mangled dtor as the
+   *    atexit target, stores `mDeserialize`/`mSerialize`, then installs the
+   *    real `??_7CSlaveManipulatorSerializer@Moho@@6B@` vtable pointer). The
+   *    same three field-writes additionally appear inlined a second time at
+   *    ~0x00645EFA/~0x00646694 with no independent function identity (not
+   *    owned by any exported `FUN_*` token, so nothing to mark `skip`).
+   *  - dtor: 0x00BFB210 (`??1CSlaveManipulatorSerializer@Moho@@QAE@@Z`; exactly
+   *    one xref, from the real ctor's atexit push). Dead zero-xref duplicate
+   *    unlink-only bodies: 0x00645F20, 0x00645F50.
+   *  - Init(): 0x006466B0 (confirmed via data xrefs from both
+   *    `??_7CSlaveManipulatorSerializer@Moho@@6B@` and the template's own
+   *    `??_7?$SerSaveLoadHelper@VCSlaveManipulator@Moho@@@gpg@@6B@`, same
+   *    never-folded-sibling-vtable-copy shape documented for other
+   *    `SerSaveLoadHelper<T>` instantiations)
+   *  - Deserialize(): 0x00645EC0 (tail-calls `MemberDeserialize` body at
+   *    0x00646C40; 3 xrefs, one of them the real ctor)
+   *  - Serialize(): 0x00645ED0 (tail-calls `MemberSerialize` body at
+   *    0x00646CE0; 3 xrefs, one of them the real ctor)
+   *
+   * Prior recovery modeled this as a `CSlaveManipulatorSerializerHelperNode`
+   * raw struct (`gpg::SerHelperBase* mNext/mPrev` fields, no real base --
+   * missing even the vtable pointer a real `SerHelperBase`-derived class
+   * carries) plus a hand-written `register_CSlaveManipulatorSerializer()`
+   * that wrote the load/save callbacks onto that orphan struct's own fields
+   * instead of onto `CSlaveManipulator::sType`'s `serLoadFunc_`/
+   * `serSaveFunc_` slots -- i.e. the reflection callbacks were never
+   * actually installed. This template instantiation fixes both defects.
+   */
+  using CSlaveManipulatorSerializer = gpg::SerSaveLoadHelper<CSlaveManipulator>;
 
   class CSlaveManipulatorTypeInfo : public gpg::RType
   {

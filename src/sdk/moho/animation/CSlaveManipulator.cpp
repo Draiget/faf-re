@@ -113,200 +113,21 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00646C40 (FUN_00646C40)
-   *
-   * What it does:
-   * Deserializes one `CSlaveManipulator` lane by loading IAniManipulator base
-   * state then source-bone, current quaternion, and max-rate fields.
-   */
-  void DeserializeCSlaveManipulatorSerializerBody(
-    moho::CSlaveManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
-    archive->ReadInt(&manipulator->mSourceBoneIndex);
-    archive->Read(CachedQuaternionfType(), &manipulator->mCurrentRotation, owner);
-    archive->ReadFloat(&manipulator->mMaxRate);
-  }
-
-  /**
-   * Address: 0x00646CE0 (FUN_00646CE0)
-   *
-   * What it does:
-   * Serializes one `CSlaveManipulator` lane by saving IAniManipulator base
-   * state then source-bone, current quaternion, and max-rate fields.
-   */
-  void SerializeCSlaveManipulatorSerializerBody(
-    const moho::CSlaveManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Write(CachedIAniManipulatorType(), manipulator, owner);
-    archive->WriteInt(manipulator->mSourceBoneIndex);
-    archive->Write(CachedQuaternionfType(), &manipulator->mCurrentRotation, owner);
-    archive->WriteFloat(manipulator->mMaxRate);
-  }
-
-  /**
-   * Address: 0x006468C0 (FUN_006468C0)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards slave manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerThunkAliasA(
-    moho::CSlaveManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCSlaveManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x006468D0 (FUN_006468D0)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards slave manipulator serialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerThunkAliasA(
-    const moho::CSlaveManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCSlaveManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00646A30 (FUN_00646A30)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards slave manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerThunkAliasB(
-    moho::CSlaveManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCSlaveManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00646A40 (FUN_00646A40)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards slave manipulator serialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerThunkAliasB(
-    const moho::CSlaveManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCSlaveManipulatorSerializerBody(manipulator, archive);
-  }
-
-  struct CSlaveManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(sizeof(CSlaveManipulatorSerializerHelperNode) == 0x10, "CSlaveManipulatorSerializerHelperNode size must be 0x10");
-
-  CSlaveManipulatorSerializerHelperNode gCSlaveManipulatorSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00645F20 (FUN_00645F20)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CSlaveManipulator serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x00645F50 (FUN_00645F50)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CSlaveManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
-  }
-
-  void cleanup_CSlaveManipulatorSerializer_atexit()
-  {
-    (void)cleanup_CSlaveManipulatorSerializerStartupThunkA();
-  }
-
-  /**
-   * Address: 0x00BD31F0 (FUN_00BD31F0, register_CSlaveManipulatorSerializer)
-   *
-   * What it does:
-   * Initializes the global `CSlaveManipulator` serializer helper callbacks
-   * and installs process-exit cleanup.
-   */
-  void register_CSlaveManipulatorSerializer()
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCSlaveManipulatorSerializer);
-    gCSlaveManipulatorSerializer.mNext = self;
-    gCSlaveManipulatorSerializer.mPrev = self;
-    gCSlaveManipulatorSerializer.mSerLoadFunc =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCSlaveManipulatorSerializerBody);
-    gCSlaveManipulatorSerializer.mSerSaveFunc =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeCSlaveManipulatorSerializerBody);
-    (void)std::atexit(&cleanup_CSlaveManipulatorSerializer_atexit);
-  }
-
-  struct CSlaveManipulatorSerializerStartupBootstrap
-  {
-    CSlaveManipulatorSerializerStartupBootstrap()
-    {
-      register_CSlaveManipulatorSerializer();
-    }
-  };
-
-  [[maybe_unused]] CSlaveManipulatorSerializerStartupBootstrap gCSlaveManipulatorSerializerStartupBootstrap;
+  // Address: 0x00BD31F0 (dynamic initializer for the global
+  // `CSlaveManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CSlaveManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CSlaveManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFB210) via `atexit`.
+  // Dead zero-xref duplicate unlink-only bodies: 0x00645F20, 0x00645F50.
+  // See the Doxygen comment on the declaration (CSlaveManipulator.h) for the
+  // full per-instantiation address list. Prior recovery modeled this as a
+  // `CSlaveManipulatorSerializerHelperNode` raw struct that never actually
+  // installed the callbacks on `CSlaveManipulator::sType`; this global's own
+  // static initialization fixes that.
+  moho::CSlaveManipulatorSerializer gCSlaveManipulatorSerializer;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
@@ -532,6 +353,46 @@ moho::CSlaveManipulator::CSlaveManipulator(
   CreateLuaObject(scriptFactory, arg1, arg2, arg3);
 
   AddWatchBone(watchedBoneIndex);
+}
+
+/**
+ * Address: 0x00646C40 (FUN_00646C40, gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::Deserialize thunk target)
+ *
+ * What it does:
+ * Loads `IAniManipulator` base state, then source-bone index, current
+ * rotation quaternion, and max-rate fields.
+ */
+void moho::CSlaveManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(this), owner);
+  archive->ReadInt(&mSourceBoneIndex);
+  archive->Read(CachedQuaternionfType(), &mCurrentRotation, owner);
+  archive->ReadFloat(&mMaxRate);
+}
+
+/**
+ * Address: 0x00646CE0 (FUN_00646CE0, gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::Serialize thunk target)
+ *
+ * What it does:
+ * Saves `IAniManipulator` base state, then source-bone index, current
+ * rotation quaternion, and max-rate fields.
+ */
+void moho::CSlaveManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Write(CachedIAniManipulatorType(), static_cast<const IAniManipulator*>(this), owner);
+  archive->WriteInt(mSourceBoneIndex);
+  archive->Write(CachedQuaternionfType(), &mCurrentRotation, owner);
+  archive->WriteFloat(mMaxRate);
 }
 
 /**

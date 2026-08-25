@@ -975,7 +975,18 @@ namespace
   gpg::RType* gFastVectorSAniManipBindingType = nullptr;
   gpg::RType* gWeakPtrUnitType = nullptr;
 
-  moho::IAniManipulatorSerializer gIAniManipulatorSerializer{};
+  // Address: 0x00BD2C40 (dynamic initializer for the global
+  // `IAniManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<IAniManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1IAniManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFAE20) via `atexit`.
+  // Dead zero-xref duplicate ctor: 0x0063BA30. See the Doxygen comment on
+  // the declaration (IAniManipulator.h) for the full per-instantiation
+  // address list.
+  moho::IAniManipulatorSerializer gIAniManipulatorSerializer;
 
   // Address: 0x00BD2460 (dynamic initializer for the global
   // `CBoneEntityManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
@@ -991,6 +1002,22 @@ namespace
   // nothing in src/sdk/** ever called -- the reflection callbacks were never
   // actually installed. This global's own static initialization fixes that.
   moho::CBoneEntityManipulatorSerializer gCBoneEntityManipulatorSerializer;
+
+  // Address: 0x00BD2A20 (dynamic initializer for the global
+  // `CFootPlantManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CFootPlantManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CFootPlantManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFAC20) via
+  // `atexit`. See the Doxygen comment on the declaration (IAniManipulator.h)
+  // for the full per-instantiation address list. Prior recovery modeled this
+  // global's wiring via a `CFootPlantManipulatorSerializerHelperNode` raw
+  // struct that never actually installed the callbacks on
+  // `CFootPlantManipulator::sType`; this global's own static initialization
+  // fixes that.
+  moho::CFootPlantManipulatorSerializer gCFootPlantManipulatorSerializer;
 
   [[nodiscard]] gpg::RType* CachedCAniActorType()
   {
@@ -1086,34 +1113,6 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      static_cast<gpg::SerHelperBase*>(helper.mNext)->mPrev = static_cast<gpg::SerHelperBase*>(helper.mPrev);
-      static_cast<gpg::SerHelperBase*>(helper.mPrev)->mNext = static_cast<gpg::SerHelperBase*>(helper.mNext);
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
   void cleanup_IAniManipulatorTypeInfo_00BFADC0_Impl()
   {
     if (!gIAniManipulatorTypeInfoConstructed) {
@@ -1124,58 +1123,9 @@ namespace
     gIAniManipulatorTypeInfoConstructed = false;
   }
 
-  [[nodiscard]] gpg::SerHelperBase* cleanup_IAniManipulatorSerializer_00BFAE20_Impl()
-  {
-    return UnlinkHelperNode(gIAniManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0063BA30 (FUN_0063BA30)
-   *
-   * What it does:
-   * Initializes callback lanes for global `IAniManipulatorSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::IAniManipulatorSerializer* InitializeIAniManipulatorSerializerStartupThunk()
-  {
-    InitializeHelperNode(gIAniManipulatorSerializer);
-    gIAniManipulatorSerializer.mSerLoadFunc = &moho::IAniManipulatorSerializer::Deserialize;
-    gIAniManipulatorSerializer.mSerSaveFunc = &moho::IAniManipulatorSerializer::Serialize;
-    return &gIAniManipulatorSerializer;
-  }
-
-  /**
-   * Address: 0x0063BA60 (FUN_0063BA60)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * IAniManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAniManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkHelperNode(gIAniManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0063BA90 (FUN_0063BA90)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * IAniManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAniManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkHelperNode(gIAniManipulatorSerializer);
-  }
-
   void CleanupIAniManipulatorTypeInfoAtexit()
   {
     cleanup_IAniManipulatorTypeInfo_00BFADC0_Impl();
-  }
-
-  void CleanupIAniManipulatorSerializerAtexit()
-  {
-    (void)cleanup_IAniManipulatorSerializer_00BFAE20_Impl();
   }
 
   /**
@@ -1311,77 +1261,6 @@ namespace
     SerializeCFootPlantManipulatorState(object, archive);
   }
 
-  struct CFootPlantManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(
-    sizeof(CFootPlantManipulatorSerializerHelperNode) == 0x10,
-    "CFootPlantManipulatorSerializerHelperNode size must be 0x10"
-  );
-
-  CFootPlantManipulatorSerializerHelperNode gCFootPlantManipulatorSerializer{};
-
-  void DeserializeCFootPlantManipulatorSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    DeserializeCFootPlantManipulatorState(
-      reinterpret_cast<moho::CFootPlantManipulator*>(static_cast<std::uintptr_t>(objectPtr)), archive
-    );
-  }
-
-  void SerializeCFootPlantManipulatorSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    SerializeCFootPlantManipulatorState(
-      reinterpret_cast<const moho::CFootPlantManipulator*>(static_cast<std::uintptr_t>(objectPtr)), archive
-    );
-  }
-
-  /**
-   * Address: 0x00639280 (FUN_00639280, cleanup_CFootPlantManipulatorSerializerStartupThunkA)
-   * Address: 0x006392B0 (FUN_006392B0, cleanup_CFootPlantManipulatorSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the global CFootPlantManipulator serializer helper node from the
-   * intrusive helper list and rebinds it to a self-linked sentinel. The
-   * binary emits this mechanic as two near-identical 10-instruction bodies
-   * with no incoming code xrefs of their own (compare the
-   * IAniManipulatorSerializer sibling pair
-   * `cleanup_IAniManipulatorSerializerStartupThunkA`/`ThunkB` above); both
-   * addresses fold into this single shared helper, called once from
-   * `cleanup_CFootPlantManipulatorSerializer_atexit()` below and once from
-   * `register_CFootPlantManipulatorSerializer()`.
-   */
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCFootPlantManipulatorSerializerNode() noexcept
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCFootPlantManipulatorSerializer.mNext);
-    if (gCFootPlantManipulatorSerializer.mNext != nullptr && gCFootPlantManipulatorSerializer.mPrev != nullptr) {
-      gCFootPlantManipulatorSerializer.mNext->mPrev = gCFootPlantManipulatorSerializer.mPrev;
-      gCFootPlantManipulatorSerializer.mPrev->mNext = gCFootPlantManipulatorSerializer.mNext;
-    }
-    gCFootPlantManipulatorSerializer.mPrev = self;
-    gCFootPlantManipulatorSerializer.mNext = self;
-    return self;
-  }
-
-  void cleanup_CFootPlantManipulatorSerializer_atexit()
-  {
-    (void)UnlinkCFootPlantManipulatorSerializerNode();
-  }
-
   /**
    * Address: 0x0063CDD0 (FUN_0063CDD0)
    *
@@ -1510,6 +1389,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063E380 (FUN_0063E380, gpg::SerSaveLoadHelper<Moho::IAniManipulator>::Deserialize thunk target)
+   */
+  void IAniManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    DeserializeIAniManipulatorState(this, archive);
+  }
+
+  /**
+   * Address: 0x0063E450 (FUN_0063E450, gpg::SerSaveLoadHelper<Moho::IAniManipulator>::Serialize thunk target)
+   */
+  void IAniManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    SerializeIAniManipulatorState(this, archive);
+  }
+
+  /**
    * Address: 0x006392E0 (FUN_006392E0, ??0CFootPlantManipulator@Moho@@QAE@XZ)
    */
   CFootPlantManipulator::CFootPlantManipulator()
@@ -1606,6 +1501,22 @@ namespace moho
         mHalfLegSpan = std::fabs(footY - hipY) * 0.5f;
       }
     }
+  }
+
+  /**
+   * Address: 0x0063A460 (FUN_0063A460, gpg::SerSaveLoadHelper<Moho::CFootPlantManipulator>::Deserialize thunk target)
+   */
+  void CFootPlantManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    DeserializeCFootPlantManipulatorState(this, archive);
+  }
+
+  /**
+   * Address: 0x0063A540 (FUN_0063A540, gpg::SerSaveLoadHelper<Moho::CFootPlantManipulator>::Serialize thunk target)
+   */
+  void CFootPlantManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    SerializeCFootPlantManipulatorState(this, archive);
   }
 
   // File-local forward declaration of the quaternion-rotate-vector helper shared
@@ -2729,38 +2640,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063C540 (FUN_0063C540, sub_63C540)
-   */
-  void IAniManipulatorSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedIAniManipulatorType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
-   * Address: 0x0063BA10 (FUN_0063BA10, Moho::IAniManipulatorSerializer::Deserialize)
-   */
-  void IAniManipulatorSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    DeserializeIAniManipulatorState(reinterpret_cast<IAniManipulator*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x0063BA20 (FUN_0063BA20, Moho::IAniManipulatorSerializer::Serialize)
-   */
-  void IAniManipulatorSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    SerializeIAniManipulatorState(reinterpret_cast<const IAniManipulator*>(objectPtr), archive);
-  }
-
-  /**
    * Address: 0x0063B520 (FUN_0063B520, scalar deleting destructor thunk)
    */
   IAniManipulatorTypeInfo::~IAniManipulatorTypeInfo() = default;
@@ -2819,43 +2698,33 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAE20 (FUN_00BFAE20, Moho::IAniManipulatorSerializer::~IAniManipulatorSerializer)
-   *
-   * What it does:
-   * Unlinks IAniManipulator serializer helper node from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_IAniManipulatorSerializer()
-  {
-    return cleanup_IAniManipulatorSerializer_00BFAE20_Impl();
-  }
-
-  /**
    * Address: 0x00BD2C40 (FUN_00BD2C40, register_IAniManipulatorSerializer)
    *
    * What it does:
-   * Initializes IAniManipulator serializer helper callbacks and installs exit cleanup.
+   * Forces this translation unit's global `IAniManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (IAniManipulator.h) and on
+   * `gIAniManipulatorSerializer` above for why this function's body has no
+   * field-setting logic of its own.
    */
   void register_IAniManipulatorSerializer()
   {
-    InitializeHelperNode(gIAniManipulatorSerializer);
-    gIAniManipulatorSerializer.mSerLoadFunc = &IAniManipulatorSerializer::Deserialize;
-    gIAniManipulatorSerializer.mSerSaveFunc = &IAniManipulatorSerializer::Serialize;
-    (void)std::atexit(&CleanupIAniManipulatorSerializerAtexit);
+    (void)gIAniManipulatorSerializer;
   }
 
   /**
    * Address: 0x00BD2A20 (FUN_00BD2A20, register_CFootPlantManipulatorSerializer)
    *
    * What it does:
-   * Initializes CFootPlantManipulator serializer helper callbacks and
-   * installs exit cleanup.
+   * Forces this translation unit's global `CFootPlantManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (IAniManipulator.h) and on
+   * `gCFootPlantManipulatorSerializer` above for why this function's body
+   * has no field-setting logic of its own.
    */
   void register_CFootPlantManipulatorSerializer()
   {
-    (void)UnlinkCFootPlantManipulatorSerializerNode();
-    gCFootPlantManipulatorSerializer.mSerLoadFunc = &DeserializeCFootPlantManipulatorSerializerCallback;
-    gCFootPlantManipulatorSerializer.mSerSaveFunc = &SerializeCFootPlantManipulatorSerializerCallback;
-    (void)std::atexit(&cleanup_CFootPlantManipulatorSerializer_atexit);
+    (void)gCFootPlantManipulatorSerializer;
   }
 
   gpg::RType* CBoneEntityManipulator::sType = nullptr;
