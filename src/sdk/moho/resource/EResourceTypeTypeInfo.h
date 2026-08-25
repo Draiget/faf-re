@@ -51,57 +51,32 @@ namespace moho
     void AddEnums();
   };
 
-  class EResourceTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005478E0 (FUN_005478E0, PrimitiveSerHelper<EResourceType>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EResourceType` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00547900 (FUN_00547900, PrimitiveSerHelper<EResourceType>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EResourceType` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EResourceType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EResourceTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EResourceTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EResourceTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EResourceTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EResourceTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EResourceTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EResourceTypePrimitiveSerializer, mSerialize) == 0x10,
-    "EResourceTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EResourceTypePrimitiveSerializer) == 0x14, "EResourceTypePrimitiveSerializer size must be 0x14");
-
   static_assert(sizeof(EResourceTypeTypeInfo) == 0x78, "EResourceTypeTypeInfo size must be 0x78");
+
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EResourceType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EResourceType@Moho@@H@gpg'`):
+   * `FUN_00BC9610` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_00547380` in the same instantiation family. `FUN_00BC9610` was
+   * wrongly tagged `external_dependency` in progress tracking before this
+   * recovery -- it is the same SerHelperBase-ctor/field-set/vtable-install/
+   * atexit shape as every other confirmed instantiation, not an OS/CRT/
+   * library import.
+   *
+   * Previously modeled in this file as a hand-rolled `{ void* mVtable;
+   * SerHelperBase* mHelperNext, mHelperPrev; ... }` POD. Worse than the
+   * sibling conversions in this same pass: its only wiring function,
+   * `InitializeEResourceTypePrimitiveSerializerStartupThunk` (citing the
+   * dead `FUN_00547380` address, not the real one), was `[[maybe_unused]]`
+   * and genuinely never called from anywhere -- not even from an eager
+   * bootstrap struct like the others had -- so `EResourceType`'s
+   * serialize/deserialize callbacks were never installed under any code
+   * path at all. `SerHelperBase`'s own ctor now performs the real
+   * self-registration onto the pending-helper list.
+   */
+  using EResourceTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EResourceType, int>;
 
   /**
    * Address: 0x00BC95F0 (FUN_00BC95F0, register_EResourceTypeTypeInfo)
