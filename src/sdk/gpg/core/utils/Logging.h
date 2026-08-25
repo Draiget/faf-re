@@ -346,26 +346,33 @@ namespace gpg
     /**
      * Thread-local state, stored in TSS.
      *
-     * `field_0x00` is confirmed present (sizeof == 0x14 per the
-     * `operator new(0x14u)` allocation in FUN_00937370) but its role is not
-     * yet identified; no examined code path reads or writes it.
+     * The context-label array is `msvc8::vector<ThreadCtxEntry*>` --
+     * previously modeled as a hand-rolled `begin`/`end`/`cap` triple with a
+     * separate `EnsureThreadContextCapacity` growth helper that doubled
+     * capacity, which diverges from MSVC8's real ~1.5x vector growth (the
+     * exact "duplicated growth math silently diverged from the container's"
+     * failure mode named in this repo's `CLAUDE.md`). Reverted to the real
+     * container: the previously-unidentified leading `field_0x00`
+     * (confirmed present via the `operator new(0x14u)` allocation in
+     * `EnsureThreadState`, but whose role was not identified) is exactly
+     * `msvc8::vector<T>`'s debug-proxy slot (`HasDebugProxy=true` is this
+     * template's default, matching the rest of this codebase's `_SECURE_SCL`
+     * modeling) -- `mEntries` alone reproduces all four original fields
+     * (proxy/begin/end/cap) at their original offsets.
      */
     struct ThreadState
     {
-        void* field_0x00{};
-        ThreadCtxEntry** begin{};
-        ThreadCtxEntry** end{};
-        ThreadCtxEntry** cap{};
+        msvc8::vector<ThreadCtxEntry*> mEntries;
         std::uint32_t depthCache{};
 
         /**
          * Address: 0x009358F0 (FUN_009358F0)
          *
          * What it does:
-         * Returns true when the context-label array has never been
-         * allocated or currently holds no entries (begin == end).
+         * Returns true when the context-label array currently holds no
+         * entries.
          */
-        [[nodiscard]] bool Empty() const noexcept { return begin == nullptr || begin == end; }
+        [[nodiscard]] bool Empty() const noexcept { return mEntries.empty(); }
 
         /**
          * Address: 0x00936CC0 (FUN_00936CC0, boost::thread_specific_ptr_ContextStack
@@ -374,19 +381,16 @@ namespace gpg
          * What it does:
          * Repeatedly detaches and destroys the last pushed context entry
          * (matching the binary's backward-pop loop) via
-         * ThreadCtxEntry::DetachFromOwnerAndState, then frees the backing
-         * array and clears the range/depth lanes.
+         * ThreadCtxEntry::DetachFromOwnerAndState (which itself erases the
+         * entry from `mEntries` via `RemoveThreadContext`), then clears the
+         * depth lane. `mEntries`'s own destructor frees the backing array.
          */
         ~ThreadState() {
             while (!Empty()) {
-                ThreadCtxEntry* const entry = end[-1];
+                ThreadCtxEntry* const entry = mEntries.back();
                 entry->DetachFromOwnerAndState();
                 delete entry;
             }
-            if (begin) {
-                delete[] begin;
-            }
-            begin = end = cap = nullptr;
             depthCache = 0;
         }
     };

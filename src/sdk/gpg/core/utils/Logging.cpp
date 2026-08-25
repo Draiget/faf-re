@@ -20,7 +20,6 @@ using namespace gpg;
 
 namespace
 {
-constexpr std::size_t kInitialContextCapacity = 4;
 constexpr std::size_t kPipeChunkSize = 0x1000;
 constexpr std::size_t kDebugOutputPayloadSize = 0x100;
 
@@ -343,38 +342,6 @@ void DestroyLogContextSingleton()
     delete previous;
 }
 
-void EnsureThreadContextCapacity(gpg::ThreadState* const tls, const std::size_t wantedCount)
-{
-    if (!tls) {
-        return;
-    }
-
-    const std::size_t currentCount = (tls->begin && tls->end)
-                                         ? static_cast<std::size_t>(tls->end - tls->begin)
-                                         : 0;
-    const std::size_t currentCapacity = (tls->begin && tls->cap)
-                                            ? static_cast<std::size_t>(tls->cap - tls->begin)
-                                            : 0;
-    if (currentCapacity >= wantedCount) {
-        return;
-    }
-
-    std::size_t newCapacity = currentCapacity ? currentCapacity : kInitialContextCapacity;
-    while (newCapacity < wantedCount) {
-        newCapacity *= 2;
-    }
-
-    auto** const newBuffer = new gpg::ThreadCtxEntry*[newCapacity]{};
-    if (tls->begin && currentCount > 0) {
-        std::copy(tls->begin, tls->begin + currentCount, newBuffer);
-        delete[] tls->begin;
-    }
-
-    tls->begin = newBuffer;
-    tls->end = newBuffer + currentCount;
-    tls->cap = newBuffer + newCapacity;
-}
-
 gpg::ThreadState* EnsureThreadState()
 {
     std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
@@ -390,36 +357,47 @@ gpg::ThreadState* EnsureThreadState()
     return tls;
 }
 
+/**
+ * Address: 0x00936FF0 (FUN_00936FF0, msvc8::vector<gpg::ThreadCtxEntry*>::
+ * _Insert_n for the 4-byte pointer element)
+ * Address: 0x00936990 (FUN_00936990, the same instantiation's `uninit_move_n`
+ * -- `memmove_s`-based, serving both the reallocation head/tail relocate and
+ * the in-place tail-shift call shapes for this trivially-relocatable
+ * element, same "one compiled memmove_s wrapper backs both call shapes"
+ * pattern documented on Vector.h's `uninit_move_n` member)
+ *
+ * `tls->mEntries.push_back(entry)` below is the real, programmer-written
+ * source line these two addresses compile to. Previously this call site was
+ * a hand-rolled `begin`/`end`/`cap` triple with its own
+ * `EnsureThreadContextCapacity` growth helper that doubled capacity -- which
+ * diverged from the binary's real ~1.5x `_Insert_n` growth (confirmed
+ * against 0x00936FF0's own decompile: `v10 = (v7 >> 1) + v7`). Reverted to
+ * `msvc8::vector<ThreadCtxEntry*>` so growth, relocation, and this instance's
+ * `_Insert_n`/`uninit_move_n` pair are modeled once, in `Vector.h`, instead
+ * of a second time here with different (wrong) arithmetic.
+ */
 void PushThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
 {
     if (!tls || !entry) {
         return;
     }
 
-    const std::size_t count = (tls->begin && tls->end)
-                                  ? static_cast<std::size_t>(tls->end - tls->begin)
-                                  : 0;
-    EnsureThreadContextCapacity(tls, count + 1);
-    tls->begin[count] = entry;
-    tls->end = tls->begin + count + 1;
+    tls->mEntries.push_back(entry);
 }
 
 void RemoveThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
 {
-    if (!tls || !entry || !tls->begin || tls->end == tls->begin) {
+    if (!tls || !entry || tls->mEntries.empty()) {
         return;
     }
 
-    gpg::ThreadCtxEntry** const found = std::find(tls->begin, tls->end, entry);
-    if (found == tls->end) {
+    const auto found = std::find(tls->mEntries.begin(), tls->mEntries.end(), entry);
+    if (found == tls->mEntries.end()) {
         return;
     }
 
-    const std::uint32_t removedIndex = static_cast<std::uint32_t>(found - tls->begin);
-
-    std::move(found + 1, tls->end, found);
-    --tls->end;
-    *tls->end = nullptr;
+    const std::uint32_t removedIndex = static_cast<std::uint32_t>(found - tls->mEntries.begin());
+    tls->mEntries.erase(found);
 
     if (removedIndex < tls->depthCache) {
         tls->depthCache = removedIndex;
@@ -1266,12 +1244,11 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
     int prevDepth = 0;
 
     if (tls) {
-        const std::size_t count =
-            (tls->begin && tls->end) ? static_cast<std::size_t>(tls->end - tls->begin) : 0;
+        const std::size_t count = tls->mEntries.size();
 
         snapshot.reserve(count);
-        for (std::size_t i = 0; i < count; ++i) {
-            snapshot.push_back(tls->begin[i]->text);
+        for (const ThreadCtxEntry* const entry : tls->mEntries) {
+            snapshot.push_back(entry->text);
         }
 
         prevDepth = static_cast<int>(tls->depthCache);
