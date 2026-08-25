@@ -39,12 +39,193 @@ namespace moho
   struct RTrailBlueprint;
   struct REffectBlueprint;
 
+  // Forward declaration needed here (rather than only at its full definition
+  // further below) because `EntityCategoryLookupTableRuntimeView`'s
+  // constructor takes a `const RRuleGameRulesImpl*` parameter -- a pointer
+  // to an incomplete type is a legal declaration.
+  class RRuleGameRulesImpl;
+
   /**
-   * Real binary object constructed at `RRuleGameRulesImpl::mEntityCategoryLookup`.
-   * Full layout + ctor/dtor live in RRuleGameRules.cpp (internal to this TU);
-   * only a pointer to it escapes into the class layout below.
+   * `CategoryWordRangeView` given 8-byte alignment for exactly one purpose:
+   * matching the binary's node layout for the category-lookup map's tree
+   * embedded in `RRuleGameRulesImpl::mEntityCategoryLookup`
+   * (`EntityCategoryLookupTableRuntimeView::mCategoryMap` below). Direct
+   * evidence this node is 8-byte-aligned, not the usual 4-byte
+   * `msvc8::detail::rb_node<V>` shape -- independently re-verified against
+   * the raw IDA decompiles for every address cited below, not merely
+   * re-stated from the sibling `Sim.cpp` recovery this type was promoted
+   * from:
+   *
+   *   - `buy_node`'s emission for this instantiation (`FUN_005569C0`, cited
+   *     on `RbTree.h`'s `buy_node` member) places the value at `node+0x10`,
+   *     not the usual `node+0x0C`.
+   *   - `erase_node`'s emission (`FUN_00536010`, cited on `RbTree.h`'s
+   *     `erase_node` member) reads/writes colour at `[node+0x58]` (decimal
+   *     88, `*((_BYTE*)v3+88)`) and `isNil` at `[node+0x59]` (decimal 89,
+   *     `*(_BYTE*)(a2+89)`) throughout its transplant-and-rebalance body,
+   *     confirmed directly against the raw decompile.
+   *   - `destroy_subtree`'s emission (`FUN_005369D0`) tears each node down
+   *     as `_Myval.helper.first` (the `msvc8::string` key, at the usual
+   *     string-capacity-release shape) and `_Myval.helper.second.mSet.mUsed`
+   *     (the `CategoryWordRangeView` value's inline-SBO bit-vector release) --
+   *     IDA's own `helper` struct naming is this instantiation's
+   *     `pair<const msvc8::string, CategoryWordRangeView>` value_type, with
+   *     `.first`/`.second` exactly matching the key/value split.
+   *
+   * All of this reproduces automatically, with the existing
+   * `rb_node<V>`/`rb_tree<Traits>` templates completely unmodified, once the
+   * value type is given `alignas(8)` (verified by compiling the layout in
+   * isolation with this project's MSVC toolchain -- see the commit that
+   * first introduced this type in `Sim.cpp` for the compiler-verification
+   * detail: `alignas` on a member overrides `RbTree.h`'s
+   * `#pragma pack(push, 4)` for that member). `CategoryLookupValue` is that
+   * `alignas(8)` wrapper.
+   *
+   * Promoted here from `Sim.cpp`'s anonymous namespace, where it was
+   * previously a second, per-TU-only definition of this exact same binary
+   * object (internal linkage, so it could never actually be the same type
+   * as anything declared in this header). `RRuleGameRulesImpl::
+   * mEntityCategoryLookup` is a `new`'d/`delete`d owning pointer whose real
+   * owner is `RRuleGameRules.cpp`; `Sim.cpp` only reaches into the same live
+   * object (via this pointer) to register blueprint category membership.
+   * Giving both translation units one shared definition here, instead of
+   * two independently maintained layout copies reached by
+   * `reinterpret_cast`, is the CLAUDE.md duplicate-layout contract: "pick a
+   * single owning reconstructed definition."
    */
-  struct EntityCategoryLookupTableRuntimeView;
+  struct alignas(8) CategoryLookupValue : CategoryWordRangeView
+  {
+  };
+  static_assert(sizeof(CategoryLookupValue) == 0x28, "CategoryLookupValue size must be 0x28");
+  static_assert(alignof(CategoryLookupValue) == 8, "CategoryLookupValue alignment must be 8");
+
+  /**
+   * The category-name -> category-word-range map embedded in
+   * `RRuleGameRulesImpl::mEntityCategoryLookup` (+0xC4, see
+   * `EntityCategoryLookupResolver::GetEntityCategory`). Address evidence for
+   * the tree operations this instantiation reaches is cited on
+   * `msvc8::detail::rb_tree`'s `insert_unique`/`insert_at`/`buy_node`/
+   * `rb_decrement`/`find_node` members (insert/lookup side, reached from
+   * `Sim.cpp`'s `AddCategoryMemberBit`) and its `buy_head`/`rb_min`/
+   * `rb_max`/`rb_increment`/`rotate_left`/`rotate_right`/`erase_node`/
+   * `destroy_subtree`/`erase_range`/`~rb_tree`/`clear` members
+   * (construction/destruction side, reached from `RRuleGameRules.cpp`'s
+   * `EntityCategoryLookupTableRuntimeView` constructor and implicit
+   * destructor) in `RbTree.h`.
+   *
+   * `EntityCategoryLookupResolver.cpp` independently models the read-only
+   * half of this exact tree as a lighter `CategoryNameMapView`/`Tree.h` view
+   * (no owning insert/erase, since that file only ever looks values up);
+   * all three recoveries agree on the node layout (key@+0x10, value@+0x30,
+   * colour@+0x58, isNil@+0x59) -- corroborating evidence from three
+   * independently recovered call sites for the same binary object.
+   */
+  using CategoryLookupMap = msvc8::map<msvc8::string, CategoryLookupValue>;
+  static_assert(sizeof(CategoryLookupMap) == 0x0C, "CategoryLookupMap size must be 0x0C");
+
+  /**
+   * Real binary object constructed at `RRuleGameRulesImpl::mEntityCategoryLookup`
+   * (+0xC4). Ctor lives in RRuleGameRules.cpp; the layout is complete here
+   * (rather than forward-declared) so `Sim.cpp`'s
+   * `RegisterBlueprintCategoryMembership`/`AddCategoryMemberBit` can operate
+   * on the same real object through this typed pointer instead of a second,
+   * `reinterpret_cast`-punned struct duplicating this layout (the previous
+   * shape of that duplication -- `Sim.cpp`'s now-removed
+   * `EntityCategoryLookupTableView` -- is why this type carries a `Runtime`
+   * in its name here but that one didn't; both named the identical binary
+   * object).
+   */
+  struct EntityCategoryLookupTableRuntimeView
+  {
+    CategoryLookupMap mCategoryMap; // +0x00 (0x0C: {proxy, head, size})
+    /// Never read or written by any call site traced across either recovery
+    /// pass that has touched this type (the map header itself is only ever
+    /// touched at +0x00/+0x04/+0x08). Kept as an explicit gap rather than
+    /// folded into an assumed alignment: unlike the tree node's alignment
+    /// gap above, nothing pins this one to an alignment requirement of
+    /// `CategoryWordRangeView` itself (that type is 4-byte aligned
+    /// everywhere else it is used as a plain value).
+    std::uint32_t mCategoryMapReserved0C;    // +0x0C
+    CategoryWordRangeView mCategoryFallback; // +0x10
+    std::uint32_t mWordUniverseHandle;       // +0x38
+    std::uint8_t pad_003C_003F[0x04];        // +0x3C (binary leaves this unwritten; not initialized here either)
+
+    /**
+     * Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
+     *
+     * IDA signature:
+     * Moho::EntityCategorySet *__userpurge Moho::EntityCategorySet::EntityCategorySet@<eax>(
+     *   Moho::RRuleGameRulesImpl *rules@<edi>, Moho::EntityCategorySet *this);
+     *
+     * What it does:
+     * In-place constructs the (empty, sentinel-headed) category-name map and
+     * the fallback `CategoryWordRangeView`, seeding both the fallback's
+     * universe lane and the trailing `mWordUniverseHandle` with `owner`
+     * reinterpreted as a 4-byte handle - the same raw pointer value the
+     * binary writes to +0x10 and +0x38 (IDA types both writes as the plain
+     * `RRuleGameRulesImpl*` pointer rather than a bit-cast integer, but the
+     * two are bit-identical on this 32-bit ABI, so the pre-existing
+     * `uint32_t` field typing is kept here - only the field names changed
+     * in this pass, not their type or behavior).
+     *
+     * `mCategoryMap`'s sentinel head is default-constructed implicitly
+     * (member init, before this body runs) - the binary's own
+     * `buy_head()`-equivalent allocate-then-self-link sequence, cited on
+     * `RbTree.h`'s `buy_head` member (`FUN_00556DE0`). The redundant
+     * `mCategoryMap.clear()` call below preserves an otherwise-inert second
+     * destroy-and-reset pass the binary performs on the (already empty)
+     * fresh tree - cited on `RbTree.h`'s `clear()` member - kept verbatim
+     * for exact instruction-sequence fidelity with FUN_005551F0 at
+     * 0x0055525A-0x00555276 rather than silently dropped as dead code.
+     *
+     * EH note: `FUN_005551F0`'s unwind funclet at 0x00BA0453 runs only if
+     * construction throws after the category map is live but before the
+     * word-range fallback is - it re-derives the same
+     * `erase(first,last)`-then-`operator delete`-the-head tail this type's
+     * (now implicit) destructor performs, cited on `RbTree.h`'s
+     * `erase_range`/`~rb_tree` members. Per RULE ONE an unwind funclet
+     * target maps to no source line of its own, so it is cited here rather
+     * than written as a separate function.
+     */
+    explicit EntityCategoryLookupTableRuntimeView(const RRuleGameRulesImpl* owner) noexcept;
+
+    /**
+     * No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
+     * CategoryLookupValue>`) and `mCategoryFallback` (`CategoryWordRangeView`)
+     * are both real typed members now, so implicit member destruction runs
+     * their own real destructors automatically - exactly matching
+     * `FUN_00533E20`'s (`Moho::EntityCategory::~EntityCategory`) two real
+     * pieces of work: `mCategoryMap`'s teardown is `RbTree.h`'s `~rb_tree()`
+     * emission for this instantiation (cited there), and the leading
+     * `mSet.mUsed` inline-vector release the raw decompile shows ahead of it
+     * is `CategoryWordRangeView::~CategoryWordRangeView()`'s own body,
+     * inlined into this destructor by the compiler - not hand-written
+     * source of this class at all (RULE ONE: "member destructors... the
+     * source body says nothing; MSVC emits it"). A prior recovery pass
+     * wrote this class's destructor by hand as an explicit function
+     * precisely reproducing `~rb_tree()`'s shape; removing it in favor of
+     * the implicit one does not change behavior, it removes a
+     * hand-transcription of compiler-emitted glue.
+     */
+    EntityCategoryLookupTableRuntimeView(const EntityCategoryLookupTableRuntimeView&) = delete;
+    EntityCategoryLookupTableRuntimeView& operator=(const EntityCategoryLookupTableRuntimeView&) = delete;
+  };
+  static_assert(
+    offsetof(EntityCategoryLookupTableRuntimeView, mCategoryMap) == 0x00,
+    "EntityCategoryLookupTableRuntimeView::mCategoryMap offset"
+  );
+  static_assert(
+    offsetof(EntityCategoryLookupTableRuntimeView, mCategoryFallback) == 0x10,
+    "EntityCategoryLookupTableRuntimeView::mCategoryFallback offset"
+  );
+  static_assert(
+    offsetof(EntityCategoryLookupTableRuntimeView, mWordUniverseHandle) == 0x38,
+    "EntityCategoryLookupTableRuntimeView::mWordUniverseHandle offset"
+  );
+  static_assert(
+    sizeof(EntityCategoryLookupTableRuntimeView) == 0x40,
+    "EntityCategoryLookupTableRuntimeView size must be 0x40"
+  );
 
   struct RRuleGameRulesBlueprintNode : msvc8::Tree<RRuleGameRulesBlueprintNode>
   {
