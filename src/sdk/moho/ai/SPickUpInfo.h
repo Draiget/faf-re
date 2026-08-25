@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/misc/WeakPtr.h"
 
 namespace gpg
@@ -80,6 +81,70 @@ namespace moho
   static_assert(sizeof(SPickUpInfo) == 0x0C, "SPickUpInfo size must be 0x0C");
   static_assert(offsetof(SPickUpInfo, mUnit) == 0x00, "SPickUpInfo::mUnit offset must be 0x00");
   static_assert(offsetof(SPickUpInfo, mDistanceSq) == 0x08, "SPickUpInfo::mDistanceSq offset must be 0x08");
+
+  /**
+   * Serializer helper for `SPickUpInfo`.
+   *
+   * Address: 0x00BD1C50 (FUN_00BD1C50, dynamic initializer for the global
+   * `SPickUpInfoSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list), then
+   * binds the load/save callback fields. Confirmed from raw disassembly:
+   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+   * `??_7SPickUpInfoSerializer@Moho@@6B@` -- no eager `Init()` call exists
+   * here. The previous recovery modeled this helper as an anonymous,
+   * non-virtual `SPickUpInfoSerializerStartupNode` struct that never wrote
+   * a vtable slot at all and never touched the real `gpg::SerHelperBase`
+   * base, so it was never actually spliced into `sNewHelpers`.
+   */
+  class SPickUpInfoSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00624810 (FUN_00624810, Moho::SPickUpInfoSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `SPickUpInfo::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00624820 (FUN_00624820, Moho::SPickUpInfoSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `SPickUpInfo::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    SPickUpInfoSerializer();
+
+    /**
+     * Address: 0x00BFA520 (FUN_00BFA520, ??1SPickUpInfoSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SPickUpInfoSerializer();
+
+    /**
+     * What it does:
+     * Binds the `SPickUpInfo` serializer callbacks into reflected RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper
+     * is drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoad; // +0x0C
+    gpg::RType::save_func_t mSave; // +0x10
+  };
+
+  static_assert(offsetof(SPickUpInfoSerializer, mLoad) == 0x0C, "SPickUpInfoSerializer::mLoad offset must be 0x0C");
+  static_assert(offsetof(SPickUpInfoSerializer, mSave) == 0x10, "SPickUpInfoSerializer::mSave offset must be 0x10");
+  static_assert(sizeof(SPickUpInfoSerializer) == 0x14, "SPickUpInfoSerializer size must be 0x14");
 } // namespace moho
 
 namespace gpg
