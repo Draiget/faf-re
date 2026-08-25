@@ -1,63 +1,28 @@
 #include "moho/unit/tasks/CUnitMobileBuildTaskSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
 #include "moho/unit/tasks/CUnitMobileBuildTask.h"
 
+namespace moho
+{
+  gpg::RType* CUnitMobileBuildTask::sType = nullptr;
+} // namespace moho
+
 namespace
 {
+  /**
+   * Address: 0x00BCF890 (FUN_00BCF890, dynamic initializer for the global
+   * `CUnitMobileBuildTaskSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`).
+   */
   moho::CUnitMobileBuildTaskSerializer gCUnitMobileBuildTaskSerializer;
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(
-    moho::CUnitMobileBuildTaskSerializer& serializer
-  ) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(
-    moho::CUnitMobileBuildTaskSerializer& serializer
-  ) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  void ResetSerializerNode(moho::CUnitMobileBuildTaskSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitMobileBuildTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitMobileBuildTask));
-    }
-    return cached;
-  }
-
-  void CleanupCUnitMobileBuildTaskSerializerAtExit()
-  {
-    (void)moho::cleanup_CUnitMobileBuildTaskSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -121,48 +86,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BCF890 (FUN_00BCF890, register_CUnitMobileBuildTaskSerializer)
+   *
    * What it does:
-   * Lazily resolves the `CUnitMobileBuildTask` reflected type and installs this
-   * helper's load/save callbacks into its type descriptor.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void CUnitMobileBuildTaskSerializer::RegisterSerializeFunctions()
+  CUnitMobileBuildTaskSerializer::CUnitMobileBuildTaskSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitMobileBuildTaskSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitMobileBuildTaskSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BF9330 (FUN_00BF9330, Moho::CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer)
+   */
+  CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer()
   {
-    gpg::RType* const type = CachedCUnitMobileBuildTaskType();
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x005FBBA0 (FUN_005FBBA0, gpg::SerSaveLoadHelper<Moho::CUnitMobileBuildTask>::Init)
+   */
+  void CUnitMobileBuildTaskSerializer::Init()
+  {
+    if (CUnitMobileBuildTask::sType == nullptr) {
+      CUnitMobileBuildTask::sType = gpg::LookupRType(typeid(CUnitMobileBuildTask));
+    }
+
+    gpg::RType* const type = CUnitMobileBuildTask::sType;
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BF9330 (FUN_00BF9330, cleanup_CUnitMobileBuildTaskSerializer)
-   */
-  gpg::SerHelperBase* cleanup_CUnitMobileBuildTaskSerializer()
-  {
-    return UnlinkSerializerNode(gCUnitMobileBuildTaskSerializer);
-  }
-
-  /**
-   * Address: 0x00BCF890 (FUN_00BCF890, register_CUnitMobileBuildTaskSerializer)
-   */
-  void register_CUnitMobileBuildTaskSerializer()
-  {
-    ResetSerializerNode(gCUnitMobileBuildTaskSerializer);
-    gCUnitMobileBuildTaskSerializer.mDeserialize = &CUnitMobileBuildTaskSerializer::Deserialize;
-    gCUnitMobileBuildTaskSerializer.mSerialize = &CUnitMobileBuildTaskSerializer::Serialize;
-    (void)std::atexit(&CleanupCUnitMobileBuildTaskSerializerAtExit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct CUnitMobileBuildTaskSerializerBootstrap
-  {
-    CUnitMobileBuildTaskSerializerBootstrap()
-    {
-      moho::register_CUnitMobileBuildTaskSerializer();
-    }
-  };
-
-  CUnitMobileBuildTaskSerializerBootstrap gCUnitMobileBuildTaskSerializerBootstrap;
-} // namespace

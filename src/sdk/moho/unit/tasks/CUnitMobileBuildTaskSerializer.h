@@ -15,9 +15,27 @@ namespace moho
    * Helper owner that wires the `CUnitMobileBuildTask` archive load/save lanes
    * into its reflected `gpg::RType`.
    */
-  class CUnitMobileBuildTaskSerializer
+  class CUnitMobileBuildTaskSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCF890 (FUN_00BCF890, register_CUnitMobileBuildTaskSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitMobileBuildTaskSerializer();
+
+    /**
+     * Address: 0x00BF9330 (FUN_00BF9330, Moho::CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer)
+     *
+     * What it does:
+     * Unlinks the `CUnitMobileBuildTaskSerializer` helper node from the intrusive
+     * serializer-helper list and restores one self-linked node lane.
+     */
+    ~CUnitMobileBuildTaskSerializer();
+
     /**
      * Address: 0x005F6A10 (FUN_005F6A10, Moho::CUnitMobileBuildTaskSerializer::Deserialize)
      *
@@ -37,27 +55,23 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x005FBBA0 (FUN_005FBBA0, gpg::SerSaveLoadHelper<Moho::CUnitMobileBuildTask>::Init)
+     *
      * What it does:
      * Binds the serializer load/save callbacks into the reflected
-     * `CUnitMobileBuildTask` type descriptor.
+     * `CUnitMobileBuildTask` type descriptor. Previously mis-cited in
+     * `ArchiveSerialization.cpp` as a generic
+     * `InstallSerSaveLoadHelperCallbacksByTypeName` dispatch (same
+     * mis-citation family already caught this session for several other
+     * classes); real body caches on `CUnitMobileBuildTask::sType` directly.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitMobileBuildTaskSerializer, mHelperNext) == 0x04,
-    "CUnitMobileBuildTaskSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitMobileBuildTaskSerializer, mHelperPrev) == 0x08,
-    "CUnitMobileBuildTaskSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitMobileBuildTaskSerializer, mDeserialize) == 0x0C,
     "CUnitMobileBuildTaskSerializer::mDeserialize offset must be 0x0C"
@@ -67,24 +81,4 @@ namespace moho
     "CUnitMobileBuildTaskSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(CUnitMobileBuildTaskSerializer) == 0x14, "CUnitMobileBuildTaskSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BF9330 (FUN_00BF9330, Moho::CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer)
-   *
-   * What it does:
-   * Unlinks the `CUnitMobileBuildTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane. Scheduled at
-   * process exit via `atexit` by the registrar.
-   */
-  gpg::SerHelperBase* cleanup_CUnitMobileBuildTaskSerializer();
-
-  /**
-   * Address: 0x00BCF890 (FUN_00BCF890, register_CUnitMobileBuildTaskSerializer)
-   *
-   * What it does:
-   * Constructs the global `CUnitMobileBuildTaskSerializer` helper, installs the
-   * archive load/save callbacks, and schedules helper-node teardown at process
-   * exit.
-   */
-  void register_CUnitMobileBuildTaskSerializer();
 } // namespace moho
