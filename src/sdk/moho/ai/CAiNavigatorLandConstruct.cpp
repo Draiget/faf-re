@@ -19,24 +19,6 @@ namespace gpg
 
 namespace
 {
-  alignas(CAiNavigatorLandConstruct) unsigned char gCAiNavigatorLandConstructStorage[sizeof(CAiNavigatorLandConstruct)] = {};
-  bool gCAiNavigatorLandConstructConstructed = false;
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNode(CAiNavigatorLandConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  [[nodiscard]] CAiNavigatorLandConstruct* AcquireCAiNavigatorLandConstruct()
-  {
-    if (!gCAiNavigatorLandConstructConstructed) {
-      new (gCAiNavigatorLandConstructStorage) CAiNavigatorLandConstruct();
-      gCAiNavigatorLandConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorLandConstruct*>(gCAiNavigatorLandConstructStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiNavigatorLandType()
   {
     gpg::RType* type = CAiNavigatorLand::sType;
@@ -86,34 +68,26 @@ namespace
     result->SetUnowned(MakeCAiNavigatorLandRef(object), 0u);
   }
 
+  // Address: 0x010AE85C -- process-global `CAiNavigatorLandConstruct` singleton.
+  // Constructing it runs CAiNavigatorLandConstruct::CAiNavigatorLandConstruct()
+  // (0x00BCC7A0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  CAiNavigatorLandConstruct gCAiNavigatorLandConstruct;
+
   /**
    * Address: 0x00BF6E80 (FUN_00BF6E80, cleanup_CAiNavigatorLandConstruct)
    *
    * What it does:
-   * Unlinks recovered CAiNavigatorLand construct helper node from intrusive
-   * serializer chain.
+   * Unlinks the `CAiNavigatorLandConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BCC7A0) as the
+   * global's `atexit` teardown.
    */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorLandConstruct()
+  void CleanupCAiNavigatorLandConstructStartup()
   {
-    if (!gCAiNavigatorLandConstructConstructed) {
-      return nullptr;
-    }
-
-    CAiNavigatorLandConstruct* const construct = AcquireCAiNavigatorLandConstruct();
-    gpg::SerHelperBase* const self = HelperNode(*construct);
-    if (construct->mHelperNext != nullptr && construct->mHelperPrev != nullptr) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
-    construct->mHelperNext = self;
-    construct->mHelperPrev = self;
-    return self;
-  }
-
-  void cleanup_CAiNavigatorLandConstruct_atexit()
-  {
-    (void)cleanup_CAiNavigatorLandConstruct();
+    gCAiNavigatorLandConstruct.ResetLinks();
   }
 } // namespace
 
@@ -146,48 +120,32 @@ void CAiNavigatorLandConstruct::Deconstruct(void* const object)
 }
 
 /**
- * Address: 0x005A73B0 (FUN_005A73B0)
+ * Address: 0x00BCC7A0 (FUN_00BCC7A0, dynamic initializer for the global
+ * `CAiNavigatorLandConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * registers process-exit cleanup.
+ */
+CAiNavigatorLandConstruct::CAiNavigatorLandConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorLandConstruct::Construct))
+  , mDeleteCallback(&CAiNavigatorLandConstruct::Deconstruct)
+{
+  (void)std::atexit(&CleanupCAiNavigatorLandConstructStartup);
+}
+
+/**
+ * Address: 0x005A73B0 (FUN_005A73B0, gpg::SerConstructHelper_CAiNavigatorLand::Init)
  *
  * What it does:
  * Lazily resolves CAiNavigatorLand RTTI and installs construct/delete callbacks
  * from this helper object into the type descriptor.
  */
-void CAiNavigatorLandConstruct::RegisterConstructFunction()
+void CAiNavigatorLandConstruct::Init()
 {
   gpg::RType* const type = CachedCAiNavigatorLandType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
 }
-
-/**
- * Address: 0x00BCC7A0 (FUN_00BCC7A0, register_CAiNavigatorLandConstruct)
- *
- * What it does:
- * Initializes the global CAiNavigatorLand construct helper callbacks and
- * installs process-exit cleanup.
- */
-int moho::register_CAiNavigatorLandConstruct()
-{
-  CAiNavigatorLandConstruct* const construct = AcquireCAiNavigatorLandConstruct();
-  gpg::SerHelperBase* const self = HelperNode(*construct);
-  construct->mHelperNext = self;
-  construct->mHelperPrev = self;
-  construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorLandConstruct::Construct);
-  construct->mDeleteCallback = &CAiNavigatorLandConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiNavigatorLandConstruct_atexit);
-}
-
-namespace
-{
-  struct CAiNavigatorLandConstructBootstrap
-  {
-    CAiNavigatorLandConstructBootstrap()
-    {
-      (void)moho::register_CAiNavigatorLandConstruct();
-    }
-  };
-
-  [[maybe_unused]] CAiNavigatorLandConstructBootstrap gCAiNavigatorLandConstructBootstrap;
-} // namespace
