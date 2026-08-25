@@ -38,6 +38,8 @@ namespace moho
   class CUnitRepairTask : public CCommandTask, public CUnitRepairTaskListenerPad, public Listener<ECommandEvent>
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x005FED70 (FUN_005FED70, Moho::CUnitRepairTask::MemberDeserialize)
      *

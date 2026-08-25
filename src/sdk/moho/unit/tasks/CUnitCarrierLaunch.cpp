@@ -9,7 +9,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/Entity.h"
@@ -31,6 +31,16 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CCommandTask));
       moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCUnitCarrierLaunchType()
+  {
+    gpg::RType* type = moho::CUnitCarrierLaunch::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitCarrierLaunch));
+      moho::CUnitCarrierLaunch::sType = type;
     }
     return type;
   }
@@ -57,6 +67,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CUnitCarrierLaunch::sType = nullptr;
+
   /**
    * Address: 0x00606E10 (FUN_00606E10, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
    *
@@ -402,15 +414,44 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them.
-  struct CUnitCarrierLaunchSerializerHelperNode
+  /**
+   * VFTABLE: 0x00E20118 (`??_7CUnitCarrierLaunchSerializer@Moho@@6B@`)
+   * Also installed as: 0x00E20120 (`??_7?$SerSaveLoadHelper@VCUnitCarrierLaunch@Moho@@@gpg@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CUnitCarrierLaunch>
+   *
+   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+   * other `SerHelperBase`-derived serializer in this codebase.
+   */
+  class CUnitCarrierLaunchSerializerHelperNode : public gpg::SerHelperBase
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  public:
+    /**
+     * Address: 0x00BD02E0 (FUN_00BD02E0, dynamic initializer for the global
+     * `CUnitCarrierLaunchSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields and installs process-exit
+     * cleanup via `atexit`.
+     */
+    CUnitCarrierLaunchSerializerHelperNode();
+
+    /**
+     * Address: 0x006078B0 (FUN_006078B0, gpg::SerSaveLoadHelper<Moho::CUnitCarrierLaunch>::Init)
+     *
+     * What it does:
+     * Resolves `CUnitCarrierLaunch` RTTI and installs this helper's
+     * load/save callbacks into the reflected type descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(CUnitCarrierLaunchSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -425,7 +466,7 @@ namespace
     "CUnitCarrierLaunchSerializerHelperNode size must be 0x14"
   );
 
-  CUnitCarrierLaunchSerializerHelperNode gCUnitCarrierLaunchSerializer{};
+  CUnitCarrierLaunchSerializerHelperNode gCUnitCarrierLaunchSerializer;
 
   /**
    * Address: 0x00607620 (FUN_00607620)
@@ -434,9 +475,9 @@ namespace
    * Unlinks `CUnitCarrierLaunchSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodePrimary()
+  void UnlinkCUnitCarrierLaunchSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer.mListLinks);
+    gCUnitCarrierLaunchSerializer.ResetLinks();
   }
 
   /**
@@ -446,9 +487,9 @@ namespace
    * Performs the same intrusive-list unlink/self-link sequence for
    * `CUnitCarrierLaunchSerializer` helper storage.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodeSecondary()
+  [[maybe_unused]] void UnlinkCUnitCarrierLaunchSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer.mListLinks);
+    gCUnitCarrierLaunchSerializer.ResetLinks();
   }
 
   /**
@@ -507,32 +548,22 @@ namespace
    */
   void cleanup_CUnitCarrierLaunchSerializer_atexit()
   {
-    (void)UnlinkCUnitCarrierLaunchSerializerNodePrimary();
+    UnlinkCUnitCarrierLaunchSerializerNodePrimary();
   }
 
-  /**
-   * Address: 0x00BD02E0 (FUN_00BD02E0, register_CUnitCarrierLaunchSerializer)
-   *
-   * What it does:
-   * Initializes the global `CUnitCarrierLaunch` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`.
-   */
-  void register_CUnitCarrierLaunchSerializer()
+  CUnitCarrierLaunchSerializerHelperNode::CUnitCarrierLaunchSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeCUnitCarrierLaunchSerializerCallback)
+    , mSerSaveFunc(&SerializeCUnitCarrierLaunchSerializerCallback)
   {
-    (void)UnlinkCUnitCarrierLaunchSerializerNodePrimary();
-    gCUnitCarrierLaunchSerializer.mSerLoadFunc = &DeserializeCUnitCarrierLaunchSerializerCallback;
-    gCUnitCarrierLaunchSerializer.mSerSaveFunc = &SerializeCUnitCarrierLaunchSerializerCallback;
     (void)std::atexit(&cleanup_CUnitCarrierLaunchSerializer_atexit);
   }
 
-  struct CUnitCarrierLaunchSerializerStartupBootstrap
+  void CUnitCarrierLaunchSerializerHelperNode::Init()
   {
-    CUnitCarrierLaunchSerializerStartupBootstrap()
-    {
-      register_CUnitCarrierLaunchSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitCarrierLaunchSerializerStartupBootstrap gCUnitCarrierLaunchSerializerStartupBootstrap;
+    gpg::RType* const type = CachedCUnitCarrierLaunchType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
 } // namespace

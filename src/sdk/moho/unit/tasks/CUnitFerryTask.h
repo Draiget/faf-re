@@ -167,8 +167,9 @@ namespace moho
      * confirmed field-for-field against this class's own offsets
      * (0x30/0x34/0x38/0x3C/0x48/0x50/0x58). Invoked through
      * `CUnitFerryTaskSerializer::Deserialize` (0x0060DC60), the
-     * `gpg::RType::load_func_t`-shaped trampoline that
-     * `register_CUnitFerryTaskSerializer` (0x00BD0900) installs as
+     * `gpg::RType::load_func_t`-shaped trampoline that the
+     * `CUnitFerryTaskSerializerHelper` constructor (0x00BD0900) binds, then
+     * `CUnitFerryTaskSerializerHelper::Init` (0x00610000) installs as
      * `Moho::CUnitFerryTask::sType->serLoadFunc_`.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
@@ -182,9 +183,10 @@ namespace moho
      * `gpg::RRef_CCommandTask`/`WriteRawPointer`), `mCommandIndex`,
      * `mFollowsExistingRoute`, `mPos`, then `mRouteUnit`/`mFerryUnit`/
      * `mBeacon`, in the same field order as the load side. Invoked through
-     * `CUnitFerryTaskSerializer::Serialize` (0x0060DC70), installed as
-     * `Moho::CUnitFerryTask::sType->serSaveFunc_` by the same
-     * `register_CUnitFerryTaskSerializer`.
+     * `CUnitFerryTaskSerializer::Serialize` (0x0060DC70), bound by the same
+     * `CUnitFerryTaskSerializerHelper` constructor and installed as
+     * `Moho::CUnitFerryTask::sType->serSaveFunc_` by
+     * `CUnitFerryTaskSerializerHelper::Init` (0x00610000).
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 

@@ -23,6 +23,8 @@ namespace moho
   class CUnitCarrierLaunch : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00606E10 (FUN_00606E10, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
      *

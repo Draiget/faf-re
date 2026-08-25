@@ -36,7 +36,6 @@
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 
 namespace moho
 {
@@ -1665,13 +1664,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x006177B0 (FUN_006177B0)
+   * Address: 0x006177B0 (FUN_006177B0, gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::Init)
    *
    * What it does:
    * Resolves melee-task RTTI and binds this helper's load/save callbacks into
    * the reflected type descriptor.
    */
-  void CUnitMeleeAttackTargetTaskSerializer::RegisterSerializeFunctions()
+  void CUnitMeleeAttackTargetTaskSerializer::Init()
   {
     gpg::RType* type = CUnitMeleeAttackTargetTask::sType;
     if (type == nullptr) {
@@ -1730,13 +1729,7 @@ namespace gpg
 
 namespace
 {
-  moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime&
-  AsSerSaveLoadHelperListRuntime(moho::CUnitMeleeAttackTargetTaskSerializer& serializer) noexcept
-  {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&serializer);
-  }
+  moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer;
 
   /**
    * Address: 0x00615450 (FUN_00615450)
@@ -1745,11 +1738,9 @@ namespace
    * Unlinks `CUnitMeleeAttackTargetTaskSerializer` helper node from the
    * intrusive serializer-helper list and restores self-links.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary()
+  void UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(
-      AsSerSaveLoadHelperListRuntime(gCUnitMeleeAttackTargetTaskSerializer)
-    );
+    gCUnitMeleeAttackTargetTaskSerializer.ResetLinks();
   }
 
   /**
@@ -1759,11 +1750,9 @@ namespace
    * Performs the same intrusive-list unlink/self-link lane rewrite for
    * `CUnitMeleeAttackTargetTaskSerializer` helper storage.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMeleeAttackTargetTaskSerializerNodeSecondary()
+  [[maybe_unused]] void UnlinkCUnitMeleeAttackTargetTaskSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(
-      AsSerSaveLoadHelperListRuntime(gCUnitMeleeAttackTargetTaskSerializer)
-    );
+    gCUnitMeleeAttackTargetTaskSerializer.ResetLinks();
   }
 
   /**
@@ -1776,37 +1765,16 @@ namespace
    */
   void cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit()
   {
-    (void)UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary();
+    UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary();
   }
+} // namespace
 
-  /**
-   * Address: 0x00BD0E00 (FUN_00BD0E00, register_CUnitMeleeAttackTargetTaskSerializer)
-   *
-   * What it does:
-   * Initializes the global `CUnitMeleeAttackTargetTaskSerializer` helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`. Supersedes the previous
-   * orphaned startup thunk, which self-linked and set the callback lanes but
-   * never installed the `atexit` cleanup the real binary registers here.
-   */
-  void register_CUnitMeleeAttackTargetTaskSerializer()
+namespace moho
+{
+  CUnitMeleeAttackTargetTaskSerializer::CUnitMeleeAttackTargetTaskSerializer()
+    : mDeserialize(&CUnitMeleeAttackTargetTaskSerializer::Deserialize)
+    , mSerialize(&CUnitMeleeAttackTargetTaskSerializer::Serialize)
   {
-    gpg::SerHelperBase* const self =
-      reinterpret_cast<gpg::SerHelperBase*>(&gCUnitMeleeAttackTargetTaskSerializer.mHelperNext);
-    gCUnitMeleeAttackTargetTaskSerializer.mHelperNext = self;
-    gCUnitMeleeAttackTargetTaskSerializer.mHelperPrev = self;
-    gCUnitMeleeAttackTargetTaskSerializer.mDeserialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize;
-    gCUnitMeleeAttackTargetTaskSerializer.mSerialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Serialize;
     (void)std::atexit(&cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit);
   }
-
-  struct CUnitMeleeAttackTargetTaskSerializerStartupBootstrap
-  {
-    CUnitMeleeAttackTargetTaskSerializerStartupBootstrap()
-    {
-      register_CUnitMeleeAttackTargetTaskSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitMeleeAttackTargetTaskSerializerStartupBootstrap gCUnitMeleeAttackTargetTaskSerializerStartupBootstrap;
-} // namespace
+} // namespace moho

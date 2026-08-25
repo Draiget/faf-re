@@ -20,6 +20,8 @@ namespace moho
   class CUnitCarrierRetrieve : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00605D10 (FUN_00605D10, Moho::CUnitCarrierRetrieve::CUnitCarrierRetrieve)
      *
