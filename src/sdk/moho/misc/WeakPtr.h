@@ -1187,6 +1187,60 @@ namespace moho
   }
 
   /**
+   * Address: 0x00689D70 (FUN_00689D70)
+   *
+   * IDA signature:
+   * void *__usercall sub_689D70@<eax>(void *result@<eax>, const void *sourceBegin@<ecx>, const void *sourceEnd@<edi>);
+   *
+   * What it does:
+   * Forward counterpart of `CopyPrefixedWeakPtrDwordPayloadRangeBackwardCore`
+   * above: walks `[sourceBegin, sourceEnd)` in ascending order, copying each
+   * lane into the matching destination slot via
+   * `CopyPrefixedWeakPtrDwordPayloadLane` and preserving intrusive
+   * weak-owner chain semantics per element exactly like that member.
+   * `.asm`-confirmed field-for-field: prefix0/prefix1 direct copy, the
+   * owner-chain splice (relink into the owner's weak-observer chain when
+   * non-null, else clear), then the trailing payload dword -- the same
+   * per-element shape `CopyPrefixedWeakPtrDwordPayloadLane` already
+   * expresses, just looped. The binary carries a `destination != nullptr`
+   * guard around the whole per-element body (absent from the
+   * already-recovered backward core above -- different call site,
+   * different codegen, not a contradiction); preserved here for binary
+   * fidelity.
+   *
+   * Real instantiation: this exact 20-byte shape (4-byte prefix0/prefix1,
+   * an embedded `WeakPtr<T>`, 4-byte trailing payload) is, field-for-field,
+   * `moho::CEntityDbBoundedPropQueueNode` in `moho/entity/EntityDb.cpp`
+   * (`mPriority`/`mBoundedTick`/`mOwnerLink`(`WeakPtr<Prop>`)/`mHandleId` at
+   * the same four offsets as `prefix0`/`prefix1`/`weak`/`payload`) -- see
+   * `Vector.h`'s `insert(const_iterator, const T&)` citation for
+   * `FUN_006882E0` (`msvc8::vector<CEntityDbBoundedPropQueueNode>::insert`,
+   * this function's real caller) for the full evidence chain. This file's
+   * generic, less-specifically-typed `PrefixedWeakPtrDwordPayloadLane` and
+   * `EntityDb.cpp`'s properly-typed `CEntityDbBoundedPropQueueNode` are two
+   * independently-recovered names for the same binary object -- a
+   * `Duplicate layout contract` violation predating this citation, flagged
+   * here rather than silently carried forward; a dedicated pass should
+   * either retype this whole `PrefixedWeakPtrDwordPayloadLane` family onto
+   * `CEntityDbBoundedPropQueueNode` directly or confirm a second, distinct
+   * owner actually needs the generic name kept.
+   */
+  [[nodiscard]] inline PrefixedWeakPtrDwordPayloadLane* CopyPrefixedWeakPtrDwordPayloadRangeForwardCore(
+    PrefixedWeakPtrDwordPayloadLane* destinationBegin,
+    const PrefixedWeakPtrDwordPayloadLane* sourceBegin,
+    const PrefixedWeakPtrDwordPayloadLane* sourceEnd
+  ) noexcept
+  {
+    auto* destination = destinationBegin;
+    for (const PrefixedWeakPtrDwordPayloadLane* source = sourceBegin; source != sourceEnd; ++source, ++destination) {
+      if (destination != nullptr) {
+        (void)CopyPrefixedWeakPtrDwordPayloadLane(destination, source);
+      }
+    }
+    return destination;
+  }
+
+  /**
    * Address: 0x00689570 (FUN_00689570)
    *
    * What it does:
