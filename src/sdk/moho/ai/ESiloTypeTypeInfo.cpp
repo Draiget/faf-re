@@ -96,23 +96,6 @@ namespace
   }
 
   /**
-   * Address: 0x0050AAB0 (FUN_0050AAB0)
-   *
-   * What it does:
-   * Secondary startup-init entry for the `ESiloType` primitive serializer
-   * helper storage that mirrors the primary callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ESiloTypePrimitiveSerializer*
-  InitializeESiloTypePrimitiveSerializerStartupThunkSecondary()
-  {
-    auto* const serializer = AcquireESiloTypePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::ESiloTypePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::ESiloTypePrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
    * Address: 0x00BF1FD0 (FUN_00BF1FD0, cleanup_ESiloTypeTypeInfo)
    */
   void cleanup_ESiloTypeTypeInfo()
