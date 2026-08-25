@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -105,23 +105,6 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] moho::EIntelPrimitiveSerializer*
   InitializeEIntelPrimitiveSerializerStartupThunkPrimary()
-  {
-    auto* const serializer = AcquireEIntelPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EIntelPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EIntelPrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050AB20 (FUN_0050AB20)
-   *
-   * What it does:
-   * Secondary startup-init entry for the `EIntel` primitive serializer helper
-   * storage that mirrors the primary callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EIntelPrimitiveSerializer*
-  InitializeEIntelPrimitiveSerializerStartupThunkSecondary()
   {
     auto* const serializer = AcquireEIntelPrimitiveSerializer();
     InitializeSerializerNode(*serializer);

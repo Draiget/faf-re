@@ -132,10 +132,18 @@ namespace
   }
 
   /**
-   * Address: 0x00719FF0 (FUN_00719FF0)
-   *
    * What it does:
    * Initializes startup `EThreatType` save/load-helper links and callbacks.
+   *
+   * NOTE: this was previously (wrongly) cited as `Address: 0x00719FF0`. That
+   * address's real body installs `gpg::SerSaveLoadHelper<enum
+   * Moho::EThreatType>`'s vtable, not `PrimitiveSerHelper`'s -- it is a
+   * zero-xref dead COMDAT duplicate writing the same storage
+   * (`dword_10B9448`) as the real `PrimitiveSerHelper<EThreatType,int>` ctor
+   * elsewhere (same dead/real vtable-pair shape documented for
+   * EAlliance/ELayer/EVisibilityMode in gpg::PrimitiveSerHelper<T,IntType>'s
+   * class comment in Reflection.h). This function has no single correct
+   * address of its own in the current source shape.
    */
   [[maybe_unused]] [[nodiscard]] EThreatTypeSerializerHelperStorage* InitializeEThreatTypeSaveLoadHelperStorage() noexcept
   {

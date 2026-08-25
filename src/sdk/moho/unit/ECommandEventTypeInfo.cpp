@@ -142,10 +142,20 @@ namespace
   }
 
   /**
-   * Address: 0x006EA770 (FUN_006EA770)
-   *
    * What it does:
    * Initializes the generic save/load helper lane for `ECommandEvent`.
+   *
+   * NOTE: this was previously (wrongly) cited as `Address: 0x006EA770`.
+   * That address's real body installs `gpg::SerSaveLoadHelper<enum
+   * Moho::ECommandEvent>`'s vtable, not `PrimitiveSerHelper`'s -- it is a
+   * zero-xref dead COMDAT duplicate that happens to write the same storage
+   * (`dword_10B7FBC`) as the real, distinct `PrimitiveSerHelper<ECommandEvent,
+   * int>` ctor at 0x006E9730 (confirmed against raw asm; same "two mutually
+   * exclusive vtables share one dead/real address pair" shape already
+   * documented for EAlliance/ELayer/EVisibilityMode in
+   * gpg::PrimitiveSerHelper<T,IntType>'s class comment in Reflection.h).
+   * This function's own logic approximates the real 0x006E9730 body but has
+   * no single correct address of its own in the current source shape.
    */
   [[nodiscard]] moho::ECommandEventPrimitiveSerializer* InitializeECommandEventGenericHelperLane()
   {
