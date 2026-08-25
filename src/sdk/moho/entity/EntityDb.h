@@ -218,6 +218,11 @@ namespace moho
   class CEntityDb
   {
   public:
+    // Reflection RTTI cache slot -- confirmed against the real
+    // `EntityDBSerializer::Init()` body (0x00686010), which reads/writes
+    // `Moho::EntityDB::sType` directly (not a local/file-static cache).
+    inline static gpg::RType* sType = nullptr;
+
     /**
      * Address: 0x00684230 (FUN_00684230, Moho::EntityDB::EntityDB)
      *
@@ -447,10 +452,50 @@ namespace moho
   /**
    * VFTABLE: 0x00E27980
    * COL: 0x00E8D0F0
+   *
+   * `vtable_writers` for `EntityDBSerializer@Moho` shows two writers:
+   * `FUN_00BD51A0` (real, `__xc_a`-reachable via one incoming xref) and
+   * `FUN_00684930` (zero incoming xrefs, unreachable -- dead COMDAT twin,
+   * marked `skip`). `FUN_00686010.xrefs.txt` shows this class's own
+   * `??_7EntityDBSerializer@Moho@@6B@` vtable slot 0 AND the separately
+   * emitted (never directly named in source) `gpg::SerSaveLoadHelper<Moho::
+   * EntityDB>` intermediate vtable's slot 0 both point at the exact same
+   * address (0x00686010) -- so this class does not override `Init()` with
+   * any class-specific logic, it is the plain generic
+   * `gpg::SerSaveLoadHelper<T>::Init()` body. Deserialize/Serialize
+   * (0x00684910/0x00684920) likewise just forward to
+   * `CEntityDb::MemberDeserialize`/`MemberSerialize`, matching the generic
+   * template's `T::MemberDeserialize`/`MemberSerialize` calls exactly. Kept
+   * as its own concrete `SerHelperBase` derivative rather than the
+   * `gpg::SerSaveLoadHelper<CEntityDb>` alias (the `BVIntSetSerializer`
+   * shape) because `CEntityDb::MemberSerialize` is not `const`-qualified
+   * (it folds `gRuntimePools` back into `mIdPoolTree` before writing) and
+   * the generic template's `Serialize()` requires a `const T*` call --
+   * forcing that would mean changing already-recovered `MemberSerialize`
+   * behavior, which is out of scope here.
    */
-  class EntityDBSerializer
+  class EntityDBSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD51A0 (FUN_00BD51A0, dynamic initializer for the global
+     * `EntityDBSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntityDBSerializer();
+
+    /**
+     * Address: 0x00BFCAD0 (FUN_00BFCAD0, Moho::EntityDBSerializer::~EntityDBSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~EntityDBSerializer();
+
     /**
      * Address: 0x00684910 (FUN_00684910, Moho::EntityDBSerializer::Deserialize)
      *
@@ -471,22 +516,15 @@ namespace moho
      * Address: 0x00686010 (FUN_00686010, gpg::SerSaveLoadHelper_EntityDB::Init)
      *
      * What it does:
-     * Binds `EntityDB` RTTI serializer callbacks.
+     * Resolves `EntityDB` RTTI (caching on `CEntityDb::sType`) and installs
+     * this helper's load/save callbacks onto that type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
-  static_assert(
-    offsetof(EntityDBSerializer, mHelperNext) == 0x04, "EntityDBSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EntityDBSerializer, mHelperPrev) == 0x08, "EntityDBSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(EntityDBSerializer, mDeserialize) == 0x0C, "EntityDBSerializer::mDeserialize offset must be 0x0C"
   );
@@ -496,20 +534,16 @@ namespace moho
   static_assert(sizeof(EntityDBSerializer) == 0x14, "EntityDBSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BFCAD0 (FUN_00BFCAD0, Moho::EntityDBSerializer::~EntityDBSerializer)
-   *
-   * What it does:
-   * Unlinks `EntityDBSerializer` from the intrusive helper list and rewires
-   * self-links.
-   */
-  gpg::SerHelperBase* cleanup_EntityDBSerializer();
-
-  /**
    * Address: 0x00BD51A0 (FUN_00BD51A0, register_EntityDBSerializer)
    *
    * What it does:
-   * Initializes the `EntityDBSerializer` helper callback lanes and installs
-   * process-exit cleanup.
+   * Forces this translation unit's global `EntityDBSerializer` instance to
+   * link into the reflection bootstrap sequence. The ctor/vtable-install/
+   * atexit-dtor-registration sequence this address decompiles to is MSVC's
+   * own compiler-generated dynamic initializer for that global, not
+   * hand-written source -- see `gpg::SerSaveLoadHelper<T>` in Reflection.h,
+   * which documents the same shape for other real instantiations
+   * (`BVIntSetSerializer`, etc).
    */
-  int register_EntityDBSerializer();
+  void register_EntityDBSerializer();
 } // namespace moho
