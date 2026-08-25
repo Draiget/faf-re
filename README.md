@@ -14,8 +14,8 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,366` (80.21%)
-- `skip`: `7,387` (11.10%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `53,367` (80.21%)
+- `skip`: `7,386` (11.10%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,779` (8.69%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
@@ -30,7 +30,7 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,366 functions) — binary caller context
+### Recovered (53,367 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
@@ -38,7 +38,7 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Vtable-anchored (virtual override of a recovered class) | `5,885` | 11.03% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,568` | 10.43% |
 | No recovered caller token yet (orphan risk) | `1,697` | 3.18% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,917` | 42.94% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,918` | 42.94% |
 | Unclassified data xref (manual review) | `216` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
