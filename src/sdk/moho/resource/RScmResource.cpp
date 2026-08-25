@@ -3,12 +3,14 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/CAniResourceSkel.h"
@@ -34,36 +36,10 @@ namespace gpg
 
 namespace
 {
-  struct SerSaveLoadHelperNodeRuntime
-  {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-  };
-
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mNext) == 0x04,
-    "SerSaveLoadHelperNodeRuntime::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mPrev) == 0x08,
-    "SerSaveLoadHelperNodeRuntime::mPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeRuntime) == 0x0C, "SerSaveLoadHelperNodeRuntime size must be 0x0C");
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  SerSaveLoadHelperNodeRuntime gRScmResourceSaveConstructHelper{};
-  SerSaveLoadHelperNodeRuntime gRScmResourceConstructHelper{};
+  // Leading 0x0C-byte intrusive-list header (vtable + mNext/mPrev), shared by
+  // every SerHelperBase-derived serializer/construct-helper global in this
+  // codebase; see gpg/core/reflection/SerSaveLoadHelperListRuntime.h.
+  gpg::SerSaveLoadHelperListRuntime gRScmResourceSaveConstructHelper{};
 
   [[nodiscard]] gpg::RType* ResolveRScmResourceTypeCached() noexcept
   {
@@ -77,11 +53,11 @@ namespace
 
   struct SerConstructHelperView
   {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    void* mVftable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::construct_func_t mConstructCallback = nullptr;
+    gpg::RType::delete_func_t mDeleteCallback = nullptr;
   };
   static_assert(
     offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
@@ -91,6 +67,19 @@ namespace
     offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
     "SerConstructHelperView::mDeleteCallback offset must be 0x10"
   );
+  static_assert(sizeof(SerConstructHelperView) == 0x14, "SerConstructHelperView size must be 0x14");
+
+  // The binary global is the full 0x14-byte SerConstructHelperView (vtable +
+  // mNext/mPrev + construct/delete callback lanes), populated by
+  // register_RScmResourceConstructHelper (0x00BC9140, see below).
+  SerConstructHelperView gRScmResourceConstructHelper{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    SerConstructHelperView& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
 
   struct SerSaveConstructHelperView
   {
@@ -219,7 +208,7 @@ namespace moho
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScmResourceSaveConstructHelperPrimary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRScmResourceSaveConstructHelper);
+    return gpg::UnlinkSerSaveLoadHelperNode(gRScmResourceSaveConstructHelper);
   }
 
   /**
@@ -231,7 +220,7 @@ namespace moho
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScmResourceSaveConstructHelperSecondary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRScmResourceSaveConstructHelper);
+    return gpg::UnlinkSerSaveLoadHelperNode(gRScmResourceSaveConstructHelper);
   }
 
   /**
@@ -239,11 +228,14 @@ namespace moho
    *
    * What it does:
    * Unlinks `RScmResource` construct-helper links and restores the node to
-   * self-linked sentinel state.
+   * self-linked sentinel state. Reused as the body of the process-exit
+   * cleanup registered by `register_RScmResourceConstructHelper`
+   * (0x00BC9140, atexit target 0x00BF3C70): the real 0x00BF3C70 thunk
+   * performs the identical unlink sequence on the same global inline.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScmResourceConstructHelperPrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupRScmResourceConstructHelperPrimary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRScmResourceConstructHelper);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gRScmResourceConstructHelper));
   }
 
   /**
@@ -255,7 +247,7 @@ namespace moho
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScmResourceConstructHelperSecondary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRScmResourceConstructHelper);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gRScmResourceConstructHelper));
   }
 
   /**
@@ -320,6 +312,29 @@ namespace moho
   {
     delete mSkeleton;
     mSkeleton = nullptr;
+  }
+
+  /**
+   * Address: 0x00539D40 (FUN_00539D40, gpg::RType::delete_func_t callback for
+   * Moho::RScmResourceConstruct)
+   *
+   * IDA signature:
+   * void __cdecl sub_539D40(void *a1);
+   *
+   * What it does:
+   * `gpg::RType::delete_func_t`-shaped callback installed alongside
+   * `Construct_RScmResource` by `register_RScmResourceConstructHelper`
+   * (0x00BC9140). Destroys one heap-allocated `RScmResource` in place
+   * (destructor, then `operator delete`) when non-null -- the same shape as
+   * `RType::deleteFunc_` uses to release constructed objects everywhere else
+   * in the reflection system.
+   */
+  void DeleteRScmResource(void* const self)
+  {
+    if (self != nullptr) {
+      static_cast<RScmResource*>(self)->~RScmResource();
+      operator delete(self);
+    }
   }
 
   /**
@@ -473,3 +488,57 @@ namespace moho
     RES_RegisterPrefetchType("models", resourceType);
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Address: 0x00BF3C70 (FUN_00BF3C70, cleanup_RScmResourceConstructHelper)
+   *
+   * What it does:
+   * Process-exit cleanup registered by `register_RScmResourceConstructHelper`
+   * via `atexit`. Unlinks the global `RScmResourceConstruct` helper node,
+   * reusing the same unlink logic as `CleanupRScmResourceConstructHelperPrimary`
+   * (0x00539060) -- the real binary duplicates this unlink sequence inline at
+   * 0x00BF3C70 rather than calling 0x00539060 directly, but the effect is
+   * identical.
+   */
+  void CleanupRScmResourceConstructHelperAtExit()
+  {
+    (void)moho::CleanupRScmResourceConstructHelperPrimary();
+  }
+
+  /**
+   * Address: 0x00BC9140 (FUN_00BC9140, register_RScmResourceConstructHelper)
+   *
+   * What it does:
+   * Static-init constructor for the global `Moho::RScmResourceConstruct`
+   * helper: self-links its intrusive-list node, binds
+   * `Construct_RScmResource` / `DeleteRScmResource` as its construct/delete
+   * callbacks (type-erased through `gpg::RType::construct_func_t` /
+   * `delete_func_t`, matching the established `LuaStateConstruct`-style
+   * registration pattern), and installs process-exit cleanup. The published
+   * callbacks are later copied onto `RScmResource`'s reflected `RType` by
+   * `InitRScmResourceConstructHelper` (0x005396A0) when the pending helper
+   * list is drained.
+   */
+  void register_RScmResourceConstructHelper()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gRScmResourceConstructHelper.mNext);
+    gRScmResourceConstructHelper.mNext = self;
+    gRScmResourceConstructHelper.mPrev = self;
+    gRScmResourceConstructHelper.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RScmResource);
+    gRScmResourceConstructHelper.mDeleteCallback = &moho::DeleteRScmResource;
+    (void)std::atexit(&CleanupRScmResourceConstructHelperAtExit);
+  }
+
+  struct RScmResourceConstructHelperStartupBootstrap
+  {
+    RScmResourceConstructHelperStartupBootstrap()
+    {
+      register_RScmResourceConstructHelper();
+    }
+  };
+
+  [[maybe_unused]] RScmResourceConstructHelperStartupBootstrap gRScmResourceConstructHelperStartupBootstrap;
+} // namespace
