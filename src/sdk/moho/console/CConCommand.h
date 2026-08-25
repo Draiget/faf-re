@@ -478,6 +478,20 @@ namespace moho
   void register_CConFunc_IN_BindKey();
 
   /**
+   * Address: 0x00BDF8D0 (FUN_00BDF8D0, register_CConFunc_ANI_DumpSkeleton)
+   *
+   * What it does:
+   * Registers the startup console command that dumps the current selection's
+   * animation skeleton bone hierarchy. `Moho::ANI_DumpSkeleton` takes no
+   * arguments; the binary force-casts it to `CConFunc::Callback` at the
+   * store (`Moho__CConFunc_ANI_DumpSkeleton.mFunc = offset
+   * Moho__ANI_DumpSkeleton`, 0x00BDF8F0), matching the same
+   * `reinterpret_cast<CConFunc::Callback>` shape already used for the other
+   * zero-argument command in this file, `CON_ExecuteLastCommand`.
+   */
+  void register_CConFunc_ANI_DumpSkeleton();
+
+  /**
    * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
    *
    * What it does:
@@ -932,6 +946,20 @@ namespace moho
    * shown through a scoped managed-window handle.
    */
   void EFX_CreateEmitterWindow(void* commandArgs);
+
+  /**
+   * Address: 0x007B22B0 (FUN_007B22B0, Moho::ANI_DumpSkeleton)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ANI_DumpSkeleton();
+   *
+   * What it does:
+   * `ANI_DumpSkeleton` console command. Prints the current selection's first
+   * live unit's animation skeleton bone hierarchy (indented, parent-then-
+   * children) to both the console and the log. Defined in CAniSkel.cpp,
+   * next to the skeleton bone types it walks.
+   */
+  void ANI_DumpSkeleton();
 
   /**
    * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)

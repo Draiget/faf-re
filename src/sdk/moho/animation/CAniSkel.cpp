@@ -7,10 +7,17 @@
 #include <boost/detail/sp_counted_impl.hpp>
 
 #include "CAniDefaultSkel.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Map.h"
+#include "legacy/containers/Set.h"
+#include "moho/animation/CAniPose.h"
+#include "moho/console/CConCommand.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/resource/SScmFile.h"
+#include "moho/sim/CWldSession.h"
 #include "Wm3Vector3.h"
 
 namespace
@@ -778,136 +785,162 @@ namespace
   }
 
   /**
-   * Layout of the rb-tree node the release binary's ANI-dump-skeleton
-   * lane (see `Moho::ANI_DumpSkeleton`, FUN_007B22B0) allocates via
-   * `std::set<std::uint32_t>::_Buynode`. Only the four leading lanes
-   * (`left/parent/right/value`) are written by the node initializer;
-   * the color/isnil byte pair immediately following the value is
-   * maintained by the surrounding `std::_Tree<>::_Insert` lane.
+   * `Moho::ANI_DumpSkeleton`'s per-parent-bone dedup map is a real
+   * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>` (see the
+   * `operator[]`/`insert_unique`/`erase_range` citations in
+   * `legacy/containers/Map.h` and `RbTree.h`, and `WeakEntitySetUserEntity::
+   * BuyNode`/`alloc_raw` in `WeakEntitySet.h`/`RbTree.h`) - a hand-rolled
+   * `AniSkeletonVisitedBoneNodeLanes` node struct used to stand in for that
+   * template before those instantiations were identified and cited; it and
+   * its `InitializeAniSkeletonVisitedBoneNode`/`StageAniSkeletonVisitedBoneNode`
+   * helpers (reached only from a static bootstrap object invented purely to
+   * keep them reachable-by-name, never from real engine code) are removed
+   * below in favor of `Moho::ANI_DumpSkeleton` building and tearing down its
+   * dedup tree and selection set through those typed containers directly.
    */
-  struct AniSkeletonVisitedBoneNodeLanes
+
+  /**
+   * Address: 0x007B2372-0x007B2385 (inlined in `Moho::ANI_DumpSkeleton`,
+   * FUN_007B22B0)
+   *
+   * What it does:
+   * Resolves the `UserEntity*` a selection weak-ref slot points at, or null
+   * for an empty/tombstoned slot (`nullptr` or the sentinel `(void*)8`).
+   * Same `WeakObject` sub-object `-offsetof(UserEntity, mIUnitChainHead)`
+   * adjust as `DecodeUserEntityFromSelectionSlot` (CConCommand.cpp) and
+   * `DecodeSelectionEntity` (CFormation.cpp); re-homed here as this file's
+   * own copy of the pattern rather than reaching into another TU's
+   * anonymous namespace.
+   */
+  [[nodiscard]] moho::UserEntity* DecodeAniSkeletonSelectionEntity(
+    const moho::SSelectionWeakRefUserEntity& weakRef
+  ) noexcept
   {
-    AniSkeletonVisitedBoneNodeLanes* left;   // +0x00
-    AniSkeletonVisitedBoneNodeLanes* parent; // +0x04
-    AniSkeletonVisitedBoneNodeLanes* right;  // +0x08
-    std::uint32_t value;                     // +0x0C
-    std::uint8_t color;                      // +0x10 (0=red,1=black)
-    std::uint8_t isSentinel;                 // +0x11
-    std::uint8_t pad12[2]{};                 // +0x12
+    void* const ownerLinkSlot = weakRef.mOwnerLinkSlot;
+    if (ownerLinkSlot == nullptr || ownerLinkSlot == reinterpret_cast<void*>(static_cast<std::uintptr_t>(8u))) {
+      return nullptr;
+    }
+
+    constexpr std::uintptr_t kWeakOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
+    if (raw < kWeakOwnerOffset) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::UserEntity*>(raw - kWeakOwnerOffset);
+  }
+
+  /**
+   * The record `PrintAniSkeletonBoneHierarchy` (FUN_007B2050) reads through
+   * each bone pointer stored in a per-parent dedup set. Proven from raw
+   * `.asm` (movss reads at `[pointer+0x08]`/`+0x0C`/`+0x10`/`+0x14`/`+0x18`/
+   * `+0x1C`/`+0x20`, name read at `[pointer+0x00]`): this does NOT match
+   * either `SAniSkelBone` (name@0x00 matches, but its `mBoneTransform` sits
+   * at +0x24, with `mLocalOffsetX/Y/Z`/`mLocalScale`/`mChildStartIndex`/
+   * `mChildCount`/`mFlags` in between that this dump never reads) or
+   * `CAniPoseBone` (`mCompositeTransform` at +0x00, no name field at all).
+   *
+   * The pointer stored in the dedup set is independently proven (from
+   * `Moho::ANI_DumpSkeleton`'s per-bone loop, 0x007B2421-0x007B2432) to be a
+   * genuine `&skel->mBones[i]`, i.e. a real `SAniSkelBone*` - so the shipped
+   * binary's `ANI_DumpSkeleton` debug command reads its name/quaternion/
+   * position fields at byte offsets that do not correspond to
+   * `SAniSkelBone`'s current fields beyond the shared name prefix.
+   * Reproduced 1:1 as a raw offset view rather than "corrected" to
+   * `SAniSkelBone`'s named fields, matching the binary's actual (evidently
+   * stale relative to the current on-disk bone format) reads exactly - per
+   * this project's typed-placeholder-struct allowance for fields not yet
+   * fully owned. Whether this reflects a console command that was never
+   * updated after `SAniSkelBone`'s on-disk layout changed, or some other
+   * historical mismatch, is not resolved by this pass.
+   */
+  struct AniSkeletonBoneDumpFieldsView
+  {
+    const char* mName;        // +0x00
+    std::uint32_t field_0x04; // +0x04 (never read by the dump)
+    float mQuatW;             // +0x08
+    float mQuatX;              // +0x0C
+    float mQuatY;               // +0x10
+    float mQuatZ;                // +0x14
+    float mPosX;                  // +0x18
+    float mPosY;                   // +0x1C
+    float mPosZ;                    // +0x20
   };
   static_assert(
-    offsetof(AniSkeletonVisitedBoneNodeLanes, value) == 0x0C,
-    "AniSkeletonVisitedBoneNodeLanes::value offset must be 0x0C"
+    offsetof(AniSkeletonBoneDumpFieldsView, mQuatW) == 0x08,
+    "AniSkeletonBoneDumpFieldsView::mQuatW offset must be 0x08"
   );
   static_assert(
-    offsetof(AniSkeletonVisitedBoneNodeLanes, color) == 0x10,
-    "AniSkeletonVisitedBoneNodeLanes::color offset must be 0x10"
+    offsetof(AniSkeletonBoneDumpFieldsView, mPosX) == 0x18,
+    "AniSkeletonBoneDumpFieldsView::mPosX offset must be 0x18"
   );
   static_assert(
-    sizeof(AniSkeletonVisitedBoneNodeLanes) == 0x14,
-    "AniSkeletonVisitedBoneNodeLanes size must be 0x14"
+    sizeof(AniSkeletonBoneDumpFieldsView) == 0x24, "AniSkeletonBoneDumpFieldsView size must be 0x24"
   );
 
   /**
-   * Address: 0x007B3660 (FUN_007B3660)
+   * Address: 0x007B2050 (FUN_007B2050, sub_7B2050)
    *
    * IDA signature:
-   * int __stdcall sub_7B3660(int a1, int a2, int a3, _DWORD *a4, char a5);
+   * _DWORD *__cdecl sub_7B2050(int arg0, unsigned int a2, int a3);
    *
    * What it does:
-   * Allocates one `std::set<std::uint32_t>::_Node` via the MSVC8 tree
-   * allocator (FUN_007B4E50, `operator new`-backed with overflow guard)
-   * and initializes the four leading link/value lanes plus the
-   * `color/isnil` byte pair used by the enclosing tree's red-black
-   * invariants: `{left=a1, parent=a2, right=a3, value=*a4, color=a5,
-   * isnil=0}`. Used exclusively by the ANI-dump-skeleton console
-   * command path (see `Moho::ANI_DumpSkeleton`, FUN_007B22B0) to track
-   * already-visited bone indices as the command walks the skeleton's
-   * parent-child hierarchy.
-   */
-  AniSkeletonVisitedBoneNodeLanes* InitializeAniSkeletonVisitedBoneNode(
-    AniSkeletonVisitedBoneNodeLanes* const node,
-    AniSkeletonVisitedBoneNodeLanes* const left,
-    AniSkeletonVisitedBoneNodeLanes* const parent,
-    AniSkeletonVisitedBoneNodeLanes* const right,
-    const std::uint32_t* const valueSource,
-    const std::uint8_t color
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->value = (valueSource != nullptr) ? *valueSource : 0u;
-    node->color = color;
-    node->isSentinel = 0u;
-    node->pad12[0] = 0;
-    node->pad12[1] = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x007B22B0 (partial, FUN_007B22B0 / Moho::ANI_DumpSkeleton)
+   * Recursive, indented bone-hierarchy printer for `ANI_DumpSkeleton`. Walks
+   * `children` in order; for each stored bone pointer, formats
+   * "<indent><name><pad>p=<x,y,z> q=<x,y,z,w>" (name right-padded so the
+   * `p=` column lands at ~50 characters, clamped to at least 2 spaces) via
+   * `gpg::STR_Printf`, emits it through both `Moho::CON_Printf` and
+   * `gpg::Logf`, then recurses into that bone's own children
+   * (`dedupTree[boneKey]`) with `indent + 2`.
    *
-   * What it does:
-   * Extracts the "mark this bone index as visited" lane from the ANI
-   * dump-skeleton console command: ensures the supplied `visitedSet`'s
-   * sentinel head is structurally sound and stages one freshly-init'd
-   * rb-tree node for `boneIndex` via the recovered node initializer.
-   * The remaining tree-rotation and insertion logic (`FUN_007B2B30`,
-   * `FUN_007B3590`, `FUN_007B3610`) is owned by the broader
-   * `ANI_DumpSkeleton` recovery and will link this node once that
-   * function lands.
+   * `dedupTree` is threaded through explicitly - it is the binary's third
+   * parameter, proven via raw `.asm` at 0x007B2233-0x007B224E to be the
+   * outer map pointer loaded into `ecx` as `this` for the recursive
+   * `operator[]` call, not an inert/unused context value (the top-level
+   * decompiler pseudocode's `(int)&v18._Myend` naming for this argument at
+   * the initial call site does not survive a register-level check either;
+   * the pushed value is `&a2._Myval`, the same outer-map local the per-bone
+   * loop already builds).
    */
-  AniSkeletonVisitedBoneNodeLanes* StageAniSkeletonVisitedBoneNode(
-    AniSkeletonVisitedBoneNodeLanes* const visitedSetHead,
-    const std::uint32_t boneIndex
-  ) noexcept
+  void PrintAniSkeletonBoneHierarchy(
+    const msvc8::set<std::uint32_t>& children,
+    const std::uint32_t indent,
+    msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>& dedupTree
+  )
   {
-    if (visitedSetHead == nullptr) {
-      return nullptr;
-    }
+    for (const std::uint32_t boneKey : children) {
+      const auto* const fields =
+        reinterpret_cast<const AniSkeletonBoneDumpFieldsView*>(static_cast<std::uintptr_t>(boneKey));
 
-    // The release binary allocates a fresh 20-byte node via the tree
-    // allocator. We model that allocation with a plain `new` so the
-    // staged node mirrors the binary's ownership contract and stays
-    // observably linked to the initializer helper.
-    auto* const node = new AniSkeletonVisitedBoneNodeLanes{};
-    return InitializeAniSkeletonVisitedBoneNode(
-      node, visitedSetHead, visitedSetHead, visitedSetHead, &boneIndex, 0u
-    );
+      const std::size_t nameLength = std::strlen(fields->mName);
+      const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);
+      const std::size_t namePadWidth = static_cast<std::size_t>(rawPadWidth > 2 ? rawPadWidth : 2);
+
+      msvc8::string indentPad;
+      (void)indentPad.assign(static_cast<std::size_t>(indent), ' ');
+      msvc8::string namePad;
+      (void)namePad.assign(namePadWidth, ' ');
+
+      const msvc8::string line = gpg::STR_Printf(
+        "%s%s%sp=<%5.2f,%5.2f,%5.2f> q=<%5.2f,%5.2f,%5.2f,%5.2f>",
+        indentPad.c_str(),
+        fields->mName,
+        namePad.c_str(),
+        fields->mPosX,
+        fields->mPosY,
+        fields->mPosZ,
+        fields->mQuatX,
+        fields->mQuatY,
+        fields->mQuatZ,
+        fields->mQuatW
+      );
+
+      moho::CON_Printf("%s", line.c_str());
+      gpg::Logf("%s", line.c_str());
+
+      PrintAniSkeletonBoneHierarchy(dedupTree[boneKey], indent + 2u, dedupTree);
+    }
   }
-
-  /**
-   * Static bootstrap that exercises the ANI visited-bone-set node
-   * initializer lane once at translation-unit load. Keeps the recovered
-   * `InitializeAniSkeletonVisitedBoneNode` helper reachable-by-name from
-   * a real runtime entry, so the invocation chain
-   * `bootstrap -> StageAniSkeletonVisitedBoneNode ->
-   * InitializeAniSkeletonVisitedBoneNode` matches the decompiler's
-   * `FUN_007B22B0 -> FUN_007B2B30 -> FUN_007B3660` call shape until the
-   * owning `Moho::ANI_DumpSkeleton` console command lands.
-   */
-  struct AniSkeletonVisitedBoneBootstrap
-  {
-    AniSkeletonVisitedBoneBootstrap() noexcept
-    {
-      AniSkeletonVisitedBoneNodeLanes sentinelHead{};
-      sentinelHead.left = &sentinelHead;
-      sentinelHead.parent = &sentinelHead;
-      sentinelHead.right = &sentinelHead;
-      sentinelHead.isSentinel = 1u;
-
-      AniSkeletonVisitedBoneNodeLanes* const staged =
-        StageAniSkeletonVisitedBoneNode(&sentinelHead, 0u);
-      delete staged;
-    }
-  };
-
-  const AniSkeletonVisitedBoneBootstrap gAniSkeletonVisitedBoneBootstrap{};
 } // namespace
 
 namespace moho
@@ -1167,5 +1200,79 @@ namespace moho
         bone.mBoundsMaxZ = mappedZ;
       }
     }
+  }
+
+  /**
+   * The active world session (`Moho::sWldSession`, 0x010A6470). The global
+   * has no owning header in this tree yet, so it is declared here where it
+   * is used, matching the established pattern (Cartographic.cpp,
+   * WxRuntimeTypes.cpp).
+   */
+  extern CWldSession* sWldSession;
+
+  /**
+   * Address: 0x007B22B0 (FUN_007B22B0, Moho::ANI_DumpSkeleton)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ANI_DumpSkeleton();
+   *
+   * What it does:
+   * The `ANI_DumpSkeleton` console command. Resolves the current selection's
+   * first live unit, prints its animation skeleton's bone hierarchy
+   * (indented, parent-then-children) through both the console and the log,
+   * then releases the transient selection snapshot and per-parent dedup
+   * tree it built to reconstruct that hierarchy from the skeleton's flat,
+   * parent-index-only bone array. Prints "There is no selected unit." when
+   * the selection is empty or has no live entries. The binary reads
+   * `mPoseSecondary` (+0x24) unconditionally once a live entity is found,
+   * with no null check on the resulting `CAniPose*` before calling
+   * `GetSkeleton()` - reproduced as-is.
+   *
+   * The dedup map (`dedupTree`) and its nested per-parent sets, and the
+   * transient selection snapshot (`selectionGuard`), are released by their
+   * own destructors at scope exit - the same cleanup the binary performs
+   * explicitly (`erase_range` + `operator delete` on both, cited in
+   * `legacy/containers/RbTree.h` / `moho/sim/WeakEntitySet.h`).
+   */
+  void ANI_DumpSkeleton()
+  {
+    ScopedLocalUnitSet selectionGuard;
+    WeakUnitSetUserUnit& selection = selectionGuard.get();
+    sWldSession->GetSelectionUnits(selection);
+
+    UserEntity* selectedEntity = nullptr;
+    if (!selection.IsEmptyAfterPrune()) {
+      SSelectionNodeUserEntity* liveNode = nullptr;
+      (void)PruneTombstonesAndFindLive(selection, &liveNode, selection.mHead->mLeft);
+      selectedEntity = DecodeAniSkeletonSelectionEntity(liveNode->mEnt);
+    }
+
+    if (selectedEntity == nullptr) {
+      CON_Printf("There is no selected unit.");
+      return;
+    }
+
+    CAniPose* const pose = selectedEntity->mPoseSecondary.get();
+
+    // The binary extracts the raw skeleton pointer and releases the
+    // temporary `shared_ptr<const CAniSkel>` handle immediately
+    // (`Moho::WeakPtr_CAniSkel_D::release`, 0x00538320) rather than holding
+    // it for the whole function - matched here with a tight scope instead of
+    // keeping the shared_ptr alive across the walk below.
+    const CAniSkel* skel;
+    {
+      const boost::shared_ptr<const CAniSkel> skelHandle = pose->GetSkeleton();
+      skel = skelHandle.get();
+    }
+
+    msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>> dedupTree;
+    for (const SAniSkelBone& bone : skel->mBones) {
+      const SAniSkelBone* const parentBone = skel->GetBone(static_cast<std::uint32_t>(bone.mParentBoneIndex));
+      const std::uint32_t parentKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(parentBone));
+      const std::uint32_t boneKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&bone));
+      (void)dedupTree[parentKey].insert(boneKey);
+    }
+
+    PrintAniSkeletonBoneHierarchy(dedupTree[0u], 0u, dedupTree);
   }
 } // namespace moho

@@ -1707,8 +1707,8 @@ namespace msvc8
              * into the found/created entry's embedded-set control block),
              * `a2`=ebx is the key read once via `mov edx,[ebx]`. Descend loop
              * tests isNil at `[node+0x11]` (17 decimal, matching the flat
-             * `msvc8::set<std::uint32_t>` shape already documented in this
-             * file's `AniSkeletonVisitedBoneNodeLanes` family) and updates
+             * `msvc8::set<std::uint32_t>` shape already documented throughout
+             * this file's other `msvc8::set<std::uint32_t>` instantiations) and updates
              * the candidate every iteration with an explicit `addLeft` flag
              * -- this member's shape, not `lower_bound_node`'s. `where ==
              * leftmost()` fast path tail-calls `insert_at` (`sub_7B2B30`,
