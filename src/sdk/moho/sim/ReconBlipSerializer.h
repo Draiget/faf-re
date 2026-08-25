@@ -4,20 +4,33 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1D99C
    * COL:  0x00E74204
    */
-  class SPerArmyReconInfoSerializer
+  class SPerArmyReconInfoSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCDBD0 (FUN_00BCDBD0, register_SPerArmyReconInfoSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SPerArmyReconInfoSerializer();
+
+    /**
+     * Address: 0x00BF7840 (FUN_00BF7840, Moho::SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SPerArmyReconInfoSerializer();
+
     /**
      * Address: 0x005BE4C0 (FUN_005BE4C0, Moho::SPerArmyReconInfoSerializer::Deserialize)
      *
@@ -40,23 +53,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into `SPerArmyReconInfo` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(SPerArmyReconInfoSerializer, mHelperNext) == 0x04,
-    "SPerArmyReconInfoSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SPerArmyReconInfoSerializer, mHelperPrev) == 0x08,
-    "SPerArmyReconInfoSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SPerArmyReconInfoSerializer, mLoadCallback) == 0x0C,
     "SPerArmyReconInfoSerializer::mLoadCallback offset must be 0x0C"
@@ -68,21 +71,23 @@ namespace moho
   static_assert(sizeof(SPerArmyReconInfoSerializer) == 0x14, "SPerArmyReconInfoSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BCDBD0 (FUN_00BCDBD0, register_SPerArmyReconInfoSerializer)
-   *
-   * What it does:
-   * Registers serializer callbacks for `SPerArmyReconInfo` and installs
-   * process-exit cleanup.
-   */
-  void register_SPerArmyReconInfoSerializer();
-
-  /**
    * VFTABLE: 0x00E1DA64
    * COL:  0x00E73E98
    */
-  class ReconBlipSerializer
+  class ReconBlipSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCDCE0 (FUN_00BCDCE0, register_ReconBlipSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields, then registers `cleanup_ReconBlipSerializer`
+     * (0x00BF7930, a plain free function -- not a mangled destructor) as
+     * the explicit atexit teardown.
+     */
+    ReconBlipSerializer();
+
     /**
      * Address: 0x005BFC90 (FUN_005BFC90, Moho::ReconBlipSerializer::Deserialize)
      *
@@ -105,21 +110,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into ReconBlip RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(ReconBlipSerializer, mHelperNext) == 0x04, "ReconBlipSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ReconBlipSerializer, mHelperPrev) == 0x08, "ReconBlipSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(ReconBlipSerializer, mLoadCallback) == 0x0C, "ReconBlipSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -127,13 +124,4 @@ namespace moho
     offsetof(ReconBlipSerializer, mSaveCallback) == 0x10, "ReconBlipSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(ReconBlipSerializer) == 0x14, "ReconBlipSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BCDCE0 (FUN_00BCDCE0, register_ReconBlipSerializer)
-   *
-   * What it does:
-   * Registers serializer callbacks for `ReconBlip` and installs process-exit
-   * cleanup.
-   */
-  void register_ReconBlipSerializer();
 } // namespace moho
