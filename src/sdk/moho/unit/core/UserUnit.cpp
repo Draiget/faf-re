@@ -665,51 +665,6 @@ namespace
   // moho/command/UserCommandQueue.h so the layout is stated once instead of
   // living as a reinterpret view over an opaque forward declaration.
 
-  struct SessionCommandIssueMapNodeView
-  {
-    SessionCommandIssueMapNodeView* left;   // +0x00
-    SessionCommandIssueMapNodeView* parent; // +0x04
-    SessionCommandIssueMapNodeView* right;  // +0x08
-    std::uint32_t key;                      // +0x0C
-    UserCommandIssueHelperRuntimeView* value; // +0x10
-    std::uint8_t color;                     // +0x14
-    std::uint8_t isNil;                     // +0x15
-    std::uint8_t pad_16_18[2];              // +0x16
-  };
-  static_assert(sizeof(SessionCommandIssueMapNodeView) == 0x18, "SessionCommandIssueMapNodeView size must be 0x18");
-  static_assert(
-    offsetof(SessionCommandIssueMapNodeView, key) == 0x0C,
-    "SessionCommandIssueMapNodeView::key offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SessionCommandIssueMapNodeView, value) == 0x10,
-    "SessionCommandIssueMapNodeView::value offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SessionCommandIssueMapNodeView, isNil) == 0x15,
-    "SessionCommandIssueMapNodeView::isNil offset must be 0x15"
-  );
-
-  struct SessionCommandIssueMapView
-  {
-    void* allocatorProxy;                   // +0x00
-    SessionCommandIssueMapNodeView* head;   // +0x04
-    std::uint32_t size;                     // +0x08
-  };
-  static_assert(sizeof(SessionCommandIssueMapView) == 0x0C, "SessionCommandIssueMapView size must be 0x0C");
-  static_assert(
-    offsetof(SessionCommandIssueMapView, head) == 0x04,
-    "SessionCommandIssueMapView::head offset must be 0x04"
-  );
-
-  /// `moho::CommandManager` owns the layout; this file only needs the
-  /// command map as raw tree nodes, which it walks itself.
-  [[nodiscard]] inline SessionCommandIssueMapView& CommandIssueMapOf(moho::CommandManager& manager) noexcept
-  {
-    return *reinterpret_cast<SessionCommandIssueMapView*>(&manager.mCommands);
-  }
-  static_assert(sizeof(moho::CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
-
   struct UserUnitVisionRuntimeView
   {
     std::uint8_t pad_0000_0018[0x18];
@@ -2278,33 +2233,30 @@ namespace
     );
   }
 
-  [[nodiscard]] SessionCommandIssueMapNodeView*
-  FindSessionCommandIssueNode(SessionCommandIssueMapView& map, const CmdId commandId) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t key = static_cast<std::uint32_t>(commandId);
-    SessionCommandIssueMapNodeView* result = head;
-    SessionCommandIssueMapNodeView* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= key) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || key < result->key) {
-      return head;
-    }
-
-    return result;
-  }
-
+  /**
+   * No standalone address: this call site invokes real
+   * `msvc8::map<CmdId, UserCommandIssueHelper*>::find` on
+   * `CommandManager::mCommands`, whose compiled internals
+   * (`find_node`/`lower_bound_node`, e.g. FUN_008B6160 and siblings) are
+   * already cited on `RbTree.h`'s shared `rb_tree<Traits>` template from
+   * the `Sim.cpp` instantiation of this same map -- the same template
+   * member is reused across every call site for one map instantiation, so
+   * no separate citation is needed per caller.
+   *
+   * DB-integrity fix: this function, and the ~340-line hand-rolled rb-tree
+   * it used to call through (`FindSessionCommandIssueNode`/
+   * `NextSessionCommandIssueNode`/`IsSessionCommandIssueNil`/
+   * `SessionCommandIssueNodeColor`/`SessionCommandIssueMin`/`Max`/
+   * `RefreshSessionCommandIssueMapBounds`/`RotateSessionCommandIssueLeft`/
+   * `Right`/`ReplaceSessionCommandIssueSubtree`/
+   * `FixupSessionCommandIssueErase`/`EraseSessionCommandIssueNode`, all
+   * deleted), reached `CommandManager::mCommands` via a
+   * `reinterpret_cast<SessionCommandIssueMapView*>(&manager.mCommands)`
+   * reach-in instead of the real typed member -- the exact RULE ONE
+   * anti-pattern already fixed for this same map in `Sim.cpp` (see the
+   * `project_commanddbmapnoderuntime_handrolled_tree` memory note). This
+   * file now calls `mCommands` directly, same as `Sim.cpp` does.
+   */
   [[nodiscard]] UserCommandIssueHelperRuntimeView*
   FindSessionCommandIssueHelperById(CWldSession* const session, const CmdId commandId) noexcept
   {
@@ -2312,333 +2264,37 @@ namespace
       return nullptr;
     }
 
-    auto* const commandManager =
-      session->mCommandManager;
-    SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
-    SessionCommandIssueMapNodeView* const node = FindSessionCommandIssueNode(issueMap, commandId);
-    if (node == nullptr || node == issueMap.head) {
+    auto& mCommands = session->mCommandManager->mCommands;
+    const auto it = mCommands.find(commandId);
+    if (it == mCommands.end()) {
       return nullptr;
     }
 
-    return node->value;
+    return reinterpret_cast<UserCommandIssueHelperRuntimeView*>(it->second);
   }
 
-  [[nodiscard]] SessionCommandIssueMapNodeView* NextSessionCommandIssueNode(
-    SessionCommandIssueMapNodeView* node,
-    SessionCommandIssueMapNodeView* const head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr || node == head) {
-      return head;
-    }
-
-    if (node->right != nullptr && node->right != head && node->right->isNil == 0u) {
-      node = node->right;
-      while (node->left != nullptr && node->left != head && node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    SessionCommandIssueMapNodeView* parent = node->parent;
-    while (parent != nullptr && parent != head && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-
-    return (parent != nullptr) ? parent : head;
-  }
-
-  [[nodiscard]] bool IsSessionCommandIssueNil(const SessionCommandIssueMapNodeView* const node) noexcept
-  {
-    return node == nullptr || node->isNil != 0u;
-  }
-
-  [[nodiscard]] std::uint8_t SessionCommandIssueNodeColor(
-    const SessionCommandIssueMapNodeView* const node,
-    const SessionCommandIssueMapNodeView* const head
-  ) noexcept
-  {
-    return (node == nullptr || node == head || node->isNil != 0u) ? 1u : node->color;
-  }
-
-  [[nodiscard]] SessionCommandIssueMapNodeView*
-  SessionCommandIssueMin(SessionCommandIssueMapNodeView* node, SessionCommandIssueMapNodeView* const head) noexcept
-  {
-    while (!IsSessionCommandIssueNil(node->left) && node->left != head) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  [[nodiscard]] SessionCommandIssueMapNodeView*
-  SessionCommandIssueMax(SessionCommandIssueMapNodeView* node, SessionCommandIssueMapNodeView* const head) noexcept
-  {
-    while (!IsSessionCommandIssueNil(node->right) && node->right != head) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  void RefreshSessionCommandIssueMapBounds(SessionCommandIssueMapView& map) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    SessionCommandIssueMapNodeView* const root = head->parent;
-    if (root == nullptr || root == head || root->isNil != 0u) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = SessionCommandIssueMin(root, head);
-    head->right = SessionCommandIssueMax(root, head);
-  }
-
-  void RotateSessionCommandIssueLeft(SessionCommandIssueMapView& map, SessionCommandIssueMapNodeView* const node) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    SessionCommandIssueMapNodeView* const pivot = node->right;
-    node->right = pivot->left;
-    if (pivot->left != head && !IsSessionCommandIssueNil(pivot->left)) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void RotateSessionCommandIssueRight(SessionCommandIssueMapView& map, SessionCommandIssueMapNodeView* const node) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    SessionCommandIssueMapNodeView* const pivot = node->left;
-    node->left = pivot->right;
-    if (pivot->right != head && !IsSessionCommandIssueNil(pivot->right)) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void ReplaceSessionCommandIssueSubtree(
-    SessionCommandIssueMapView& map,
-    SessionCommandIssueMapNodeView* const oldNode,
-    SessionCommandIssueMapNodeView* const newNode
-  ) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (newNode != head && !IsSessionCommandIssueNil(newNode)) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  void FixupSessionCommandIssueErase(
-    SessionCommandIssueMapView& map,
-    SessionCommandIssueMapNodeView* node,
-    SessionCommandIssueMapNodeView* nodeParent
-  ) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    SessionCommandIssueMapNodeView* parent =
-      (node != head && !IsSessionCommandIssueNil(node)) ? node->parent : nodeParent;
-
-    while (node != head->parent && SessionCommandIssueNodeColor(node, head) == 1u) {
-      if (parent == nullptr || parent == head) {
-        break;
-      }
-
-      if (node == parent->left) {
-        SessionCommandIssueMapNodeView* sibling = parent->right;
-        if (sibling == head || IsSessionCommandIssueNil(sibling)) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (SessionCommandIssueNodeColor(sibling, head) == 0u) {
-          sibling->color = 1u;
-          parent->color = 0u;
-          RotateSessionCommandIssueLeft(map, parent);
-          sibling = parent->right;
-        }
-
-        if (
-          SessionCommandIssueNodeColor(sibling->left, head) == 1u
-          && SessionCommandIssueNodeColor(sibling->right, head) == 1u
-        ) {
-          sibling->color = 0u;
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (SessionCommandIssueNodeColor(sibling->right, head) == 1u) {
-          if (sibling->left != head && !IsSessionCommandIssueNil(sibling->left)) {
-            sibling->left->color = 1u;
-          }
-          sibling->color = 0u;
-          RotateSessionCommandIssueRight(map, sibling);
-          sibling = parent->right;
-        }
-
-        sibling->color = parent->color;
-        parent->color = 1u;
-        if (sibling->right != head && !IsSessionCommandIssueNil(sibling->right)) {
-          sibling->right->color = 1u;
-        }
-        RotateSessionCommandIssueLeft(map, parent);
-        node = head->parent;
-      } else {
-        SessionCommandIssueMapNodeView* sibling = parent->left;
-        if (sibling == head || IsSessionCommandIssueNil(sibling)) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (SessionCommandIssueNodeColor(sibling, head) == 0u) {
-          sibling->color = 1u;
-          parent->color = 0u;
-          RotateSessionCommandIssueRight(map, parent);
-          sibling = parent->left;
-        }
-
-        if (
-          SessionCommandIssueNodeColor(sibling->right, head) == 1u
-          && SessionCommandIssueNodeColor(sibling->left, head) == 1u
-        ) {
-          sibling->color = 0u;
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (SessionCommandIssueNodeColor(sibling->left, head) == 1u) {
-          if (sibling->right != head && !IsSessionCommandIssueNil(sibling->right)) {
-            sibling->right->color = 1u;
-          }
-          sibling->color = 0u;
-          RotateSessionCommandIssueLeft(map, sibling);
-          sibling = parent->left;
-        }
-
-        sibling->color = parent->color;
-        parent->color = 1u;
-        if (sibling->left != head && !IsSessionCommandIssueNil(sibling->left)) {
-          sibling->left->color = 1u;
-        }
-        RotateSessionCommandIssueRight(map, parent);
-        node = head->parent;
-      }
-    }
-
-    if (node != head && !IsSessionCommandIssueNil(node)) {
-      node->color = 1u;
-    }
-  }
-
-  void EraseSessionCommandIssueNode(SessionCommandIssueMapView& map, SessionCommandIssueMapNodeView* const node) noexcept
-  {
-    SessionCommandIssueMapNodeView* const head = map.head;
-    if (head == nullptr || node == nullptr || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    SessionCommandIssueMapNodeView* spliceTarget = node;
-    SessionCommandIssueMapNodeView* fixNode = head;
-    SessionCommandIssueMapNodeView* fixParent = head;
-    std::uint8_t removedColor = spliceTarget->color;
-
-    if (node->left == head || IsSessionCommandIssueNil(node->left)) {
-      fixNode = node->right;
-      fixParent = node->parent;
-      ReplaceSessionCommandIssueSubtree(map, node, node->right);
-    } else if (node->right == head || IsSessionCommandIssueNil(node->right)) {
-      fixNode = node->left;
-      fixParent = node->parent;
-      ReplaceSessionCommandIssueSubtree(map, node, node->left);
-    } else {
-      spliceTarget = SessionCommandIssueMin(node->right, head);
-      removedColor = spliceTarget->color;
-      fixNode = spliceTarget->right;
-      if (spliceTarget->parent == node) {
-        fixParent = spliceTarget;
-        if (fixNode != head && !IsSessionCommandIssueNil(fixNode)) {
-          fixNode->parent = spliceTarget;
-        }
-      } else {
-        fixParent = spliceTarget->parent;
-        ReplaceSessionCommandIssueSubtree(map, spliceTarget, spliceTarget->right);
-        spliceTarget->right = node->right;
-        spliceTarget->right->parent = spliceTarget;
-      }
-
-      ReplaceSessionCommandIssueSubtree(map, node, spliceTarget);
-      spliceTarget->left = node->left;
-      spliceTarget->left->parent = spliceTarget;
-      spliceTarget->color = node->color;
-    }
-
-    if (removedColor == 1u) {
-      FixupSessionCommandIssueErase(map, fixNode, fixParent);
-    }
-
-    ::operator delete(node);
-    if (map.size != 0u) {
-      --map.size;
-    }
-    RefreshSessionCommandIssueMapBounds(map);
-  }
-
-  void RemoveCommandIssueHelperFromActiveSessionMap(const UserCommandIssueHelper& helper) noexcept
+  /**
+   * Address: 0x008B5EB0 (FUN_008B5EB0)
+   *
+   * What it does:
+   * Removes this command's issue-helper entry from the active session's
+   * command-issue map, if present.
+   *
+   * Real `msvc8::map<CmdId, UserCommandIssueHelper*>::erase(const
+   * key_type&)` call on `CommandManager::mCommands` -- "covered by typed
+   * source construct... no standalone SDK address owner emitted" per this
+   * token's own progress-DB note, matching the `Sim.cpp` precedent (see
+   * `FindSessionCommandIssueHelperById`'s citation above for the shared
+   * rb-tree cleanup this migration is part of).
+   */
+  void DiscardActiveSessionCommandIssueHelper(const UserCommandIssueHelper& helper) noexcept
   {
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr || session->mCommandManager == nullptr) {
       return;
     }
 
-    auto* const commandManager = session->mCommandManager;
-    SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
-    SessionCommandIssueMapNodeView* const node =
-      FindSessionCommandIssueNode(issueMap, static_cast<CmdId>(helper.mConstantData.cmd));
-    if (node == nullptr || node == issueMap.head) {
-      return;
-    }
-
-    // Source-level coverage for FUN_008B5EB0: this is the original
-    // `std::map<CmdId, CommandIssueHelper*>::erase(iterator)` construct.
-    EraseSessionCommandIssueNode(issueMap, node);
+    session->mCommandManager->mCommands.erase(static_cast<CmdId>(helper.mConstantData.cmd));
   }
 
   void AppendQueueLinkStagedEntry(
@@ -4160,7 +3816,7 @@ namespace moho
    */
   UserCommandIssueHelper::~UserCommandIssueHelper() noexcept
   {
-    RemoveCommandIssueHelperFromActiveSessionMap(*this);
+    DiscardActiveSessionCommandIssueHelper(*this);
     DestroyCommandIssueWeakSet(mCursorEntitySet);
     DestroyCommandIssueLocalQueue(mLocalQueue);
   }
@@ -5805,16 +5461,12 @@ bool moho::USERUNIT_CanBeBuiltAt(
   }
 
   auto* const commandManager = session.mCommandManager;
-  if (commandManager == nullptr || CommandIssueMapOf(*commandManager).head == nullptr) {
+  if (commandManager == nullptr) {
     return true;
   }
 
-  SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
-  SessionCommandIssueMapNodeView* const mapHead = issueMap.head;
-  for (SessionCommandIssueMapNodeView* node = mapHead->left;
-       node != nullptr && node != mapHead;
-       node = NextSessionCommandIssueNode(node, mapHead)) {
-    UserCommandIssueHelperRuntimeView* const helper = node->value;
+  for (const auto& [issueCommandId, issueHelper] : commandManager->mCommands) {
+    auto* const helper = reinterpret_cast<UserCommandIssueHelperRuntimeView*>(issueHelper);
     if (helper == nullptr || ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
       continue;
     }
