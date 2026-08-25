@@ -49,18 +49,12 @@ namespace moho
      * callback. Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this
      * helper is drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
     gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
   };
 
-  static_assert(
-    offsetof(CSimSoundManagerSaveConstruct, mNext) == 0x04, "CSimSoundManagerSaveConstruct::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CSimSoundManagerSaveConstruct, mPrev) == 0x08, "CSimSoundManagerSaveConstruct::mPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CSimSoundManagerSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
     "CSimSoundManagerSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"

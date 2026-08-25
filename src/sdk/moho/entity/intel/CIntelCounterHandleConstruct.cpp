@@ -20,7 +20,7 @@ namespace
   // singleton. Constructing it runs CIntelCounterHandleConstruct::
   // CIntelCounterHandleConstruct() (0x00BDCD50), which splices this helper
   // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterConstructFunction() on it from within the first
+  // later dispatches Init() on it from within the first
   // ReadArchive/WriteArchive construction.
   moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
 
@@ -127,7 +127,7 @@ namespace moho
    * Lazily resolves CIntelCounterHandle RTTI and installs construct/delete
    * callbacks from this helper into the type descriptor.
    */
-  void CIntelCounterHandleConstruct::RegisterConstructFunction()
+  void CIntelCounterHandleConstruct::Init()
   {
     gpg::RType* const type = CIntelCounterHandle::StaticGetClass();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);

@@ -22,7 +22,7 @@ namespace
   // Address: 0x010BAF40 -- process-global `CSimSoundManagerConstruct` singleton.
   // Constructing it runs CSimSoundManagerConstruct::CSimSoundManagerConstruct()
   // (0x00BDC550), which splices this helper into gpg::SerHelperBase::sNewHelpers;
-  // gpg::SerHelperBase::InitNewHelpers() later dispatches RegisterConstructFunction()
+  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init()
   // on it from within the first ReadArchive/WriteArchive construction.
   moho::CSimSoundManagerConstruct gCSimSoundManagerConstruct;
 
@@ -102,7 +102,7 @@ namespace moho
    * What it does:
    * Resolves `CSimSoundManager` RTTI and installs construct/delete callbacks.
    */
-  void CSimSoundManagerConstruct::RegisterConstructFunction()
+  void CSimSoundManagerConstruct::Init()
   {
     gpg::RType* const typeInfo = audio_reflection::ResolveCSimSoundManagerType();
     audio_reflection::RegisterConstructCallbacks(typeInfo, mConstructCallback, mDeleteCallback);

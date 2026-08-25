@@ -127,7 +127,7 @@ namespace moho
    * Lazily resolves CIntelPosHandle RTTI and installs construct/delete callbacks
    * from this helper into the type descriptor.
    */
-  void CIntelPosHandleConstruct::RegisterConstructFunction()
+  void CIntelPosHandleConstruct::Init()
   {
     gpg::RType* const type = CIntelPosHandle::StaticGetClass();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);

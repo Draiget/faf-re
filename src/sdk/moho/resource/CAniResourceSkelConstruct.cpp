@@ -136,7 +136,7 @@ namespace moho
    * What it does:
    * Resolves `CAniResourceSkel` RTTI and installs construct/delete callbacks.
    */
-  void CAniResourceSkelConstruct::RegisterConstructFunction()
+  void CAniResourceSkelConstruct::Init()
   {
     gpg::RType* const typeInfo = resource_reflection::ResolveCAniResourceSkelType();
     resource_reflection::RegisterConstructCallbacks(typeInfo, mConstructCallback, mDeleteCallback);
@@ -149,7 +149,7 @@ namespace
   // singleton. Constructing it runs CAniResourceSkelConstruct::
   // CAniResourceSkelConstruct() (0x00BC90B0), which splices this helper into
   // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterConstructFunction() on it from within the first
+  // later dispatches Init() on it from within the first
   // ReadArchive/WriteArchive construction. Its destructor
   // (~CAniResourceSkelConstruct, 0x00BF3BB0) runs at normal static-duration
   // teardown, matching the real binary's atexit registration.
