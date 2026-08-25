@@ -19,8 +19,6 @@ namespace gpg
 
 namespace
 {
-  CAiBrainConstruct gCAiBrainConstructStartupHelper{};
-
   [[nodiscard]] gpg::RType* CachedCAiBrainType()
   {
     gpg::RType* type = CAiBrain::sType;
@@ -31,36 +29,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(CAiBrainConstruct& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
   [[nodiscard]] gpg::RRef MakeCAiBrainRef(CAiBrain* const object)
   {
     gpg::RRef ref{};
     gpg::RRef_CAiBrain(&ref, object);
     return ref;
-  }
-
-  void InitializeHelperNode(CAiBrainConstruct& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(CAiBrainConstruct& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
   }
 
   /**
@@ -108,55 +81,55 @@ namespace
     delete object;
   }
 
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiBrainConstructStartup()
+  // Address: 0x010AD510 -- process-global `CAiBrainConstruct` singleton.
+  // Constructing it runs CAiBrainConstruct::CAiBrainConstruct() (0x00BCB3F0),
+  // which splices this helper into gpg::SerHelperBase::sNewHelpers;
+  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init() on it from
+  // within the first ReadArchive/WriteArchive construction.
+  CAiBrainConstruct gCAiBrainConstructStartupHelper;
+
+  /**
+   * Address: 0x00BF62C0 (FUN_00BF62C0)
+   *
+   * What it does:
+   * Unlinks the `CAiBrainConstruct` helper node from whatever intrusive list
+   * it currently sits in and restores a self-linked sentinel state.
+   * Registered by the real dynamic initializer (0x00BCB3F0) as the global's
+   * `atexit` teardown.
+   */
+  void CleanupCAiBrainConstructStartup()
   {
-    return UnlinkHelperNode(gCAiBrainConstructStartupHelper);
+    gCAiBrainConstructStartupHelper.ResetLinks();
   }
-
-  void cleanup_CAiBrainConstructStartupAtExit()
-  {
-    (void)cleanup_CAiBrainConstructStartup();
-  }
-
-  struct CAiBrainConstructStartupBootstrap
-  {
-    CAiBrainConstructStartupBootstrap()
-    {
-      (void)moho::register_CAiBrainConstructStartup();
-    }
-  };
-
-  CAiBrainConstructStartupBootstrap gCAiBrainConstructStartupBootstrap;
 } // namespace
 
 /**
- * Address: 0x0057E3E0 (FUN_0057E3E0)
+ * Address: 0x00BCB3F0 (FUN_00BCB3F0, dynamic initializer for the global
+ * `CAiBrainConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * registers process-exit cleanup.
+ */
+CAiBrainConstruct::CAiBrainConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCAiBrainForResultThunk))
+  , mDeleteCallback(&DeleteConstructedCAiBrain)
+{
+  (void)std::atexit(&CleanupCAiBrainConstructStartup);
+}
+
+/**
+ * Address: 0x0057E3E0 (FUN_0057E3E0, gpg::SerConstructHelper_CAiBrain::Init)
  *
  * What it does:
  * Lazily resolves CAiBrain RTTI and installs construct/delete callbacks from
  * this helper object into the type descriptor.
  */
-void CAiBrainConstruct::RegisterConstructFunction()
+void CAiBrainConstruct::Init()
 {
   gpg::RType* type = CachedCAiBrainType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
-}
-
-/**
- * Address: 0x00BCB3F0 (FUN_00BCB3F0, sub_BCB3F0)
- *
- * What it does:
- * Initializes the startup `CAiBrainConstruct` serializer-helper node,
- * installs construct/delete callbacks, and schedules cleanup at exit.
- */
-int moho::register_CAiBrainConstructStartup()
-{
-  InitializeHelperNode(gCAiBrainConstructStartupHelper);
-  gCAiBrainConstructStartupHelper.mConstructCallback =
-    reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCAiBrainForResultThunk);
-  gCAiBrainConstructStartupHelper.mDeleteCallback = &DeleteConstructedCAiBrain;
-  gCAiBrainConstructStartupHelper.RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiBrainConstructStartupAtExit);
 }
