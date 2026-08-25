@@ -150,10 +150,47 @@ namespace moho
   /**
    * VFTABLE: 0x00E2D4EC
    * COL: 0x00E86568
+   *
+   * `vtable_writers` for `EntitySetBaseSerializer@Moho` shows two writers:
+   * `FUN_00BD5790` (real, `__xc_a`-reachable) and `FUN_006936D0` (zero
+   * incoming xrefs, dead COMDAT twin -- marked `skip`, along with
+   * `FUN_00693DB0`, a base-subobject ctor variant that writes the OTHER
+   * emitted vtable head, `gpg::SerSaveLoadHelper<Moho::EntitySetBase>`'s,
+   * and `FUN_00693700`/`FUN_00693730`, two byte-identical dead
+   * unlink-then-self-link bodies superseded by `SerHelperBase::
+   * ResetLinks()`).
+   *
+   * `Init()`'s real body is `FUN_00693DE0` (found via a vtable slot-0 data
+   * xref search: both this class's own vtable AND the `SerSaveLoadHelper<
+   * EntitySetBase>` intermediate vtable point at the same address, so this
+   * class does not override `Init()` -- it is the plain generic body). A
+   * prior recovery pass mis-cited this class's `Init()`/
+   * `RegisterSerializeFunctions` as `FUN_006936A0` ("nullsub_1804"), a
+   * genuinely unrelated 1-byte, zero-xref padding stub nowhere near this
+   * class's vtable -- that citation is corrected here.
    */
-  class EntitySetBaseSerializer
+  class EntitySetBaseSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD5790 (FUN_00BD5790, dynamic initializer for the global
+     * `EntitySetBaseSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntitySetBaseSerializer();
+
+    /**
+     * Address: 0x00BFCD20 (FUN_00BFCD20, Moho::EntitySetBaseSerializer::~EntitySetBaseSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~EntitySetBaseSerializer();
+
     /**
      * Address: 0x006936B0 (FUN_006936B0, Moho::EntitySetBaseSerializer::Deserialize)
      *
@@ -173,26 +210,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x006936A0 (FUN_006936A0, nullsub_1804)
+     * Address: 0x00693DE0 (FUN_00693DE0, gpg::SerSaveLoadHelper<Moho::EntitySetBase>::Init lane)
      *
      * What it does:
-     * No-op vtable lane for this serializer helper family.
+     * Resolves `EntitySetBase` RTTI and installs this helper's load/save
+     * callbacks onto that type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(EntitySetBaseSerializer, mHelperNext) == 0x04, "EntitySetBaseSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EntitySetBaseSerializer, mHelperPrev) == 0x08, "EntitySetBaseSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(EntitySetBaseSerializer, mDeserialize) == 0x0C,
     "EntitySetBaseSerializer::mDeserialize offset must be 0x0C"
@@ -205,10 +235,52 @@ namespace moho
   /**
    * VFTABLE: 0x00E2D4F4
    * COL: 0x00E86510
+   *
+   * `vtable_writers` for `EntitySetSerializer@Moho` shows two writers:
+   * `FUN_00BD57F0` (real, `__xc_a`-reachable) and `FUN_00693920` (zero
+   * incoming xrefs, dead COMDAT twin -- marked `skip`, along with
+   * `FUN_00693E50`, a base-subobject ctor variant that writes the OTHER
+   * emitted vtable head, `gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<
+   * Moho::Entity>>`'s, and `FUN_00693950`/`FUN_00693980`, two
+   * byte-identical dead unlink-then-self-link bodies superseded by
+   * `SerHelperBase::ResetLinks()`).
+   *
+   * `Deserialize`/`Serialize` (0x006938A0/0x006938E0) do NOT call
+   * `EntitySetTemplate<Entity>::MemberDeserialize`/`MemberSerialize` on
+   * their own type -- confirmed from raw decompiler output, both resolve
+   * `EntitySetBase::sType` (the BASE class's RTTI) and forward through
+   * `gpg::ReadArchive::Read`/`WriteArchive::Write`'s generic type-driven
+   * dispatch instead. `Init()`'s real body is `FUN_00693E80` (found via a
+   * vtable slot-0 data xref search, same shape as `EntitySetBaseSerializer`
+   * above: both this class's own vtable and the `SerSaveLoadHelper<
+   * EntitySetTemplate<Entity>>` intermediate vtable point at the same
+   * address) and resolves this class's OWN type (`EntitySetTemplate<
+   * Entity>::sType`, not `EntitySetBase`) -- the cross-type delegation is
+   * confined to the Deserialize/Serialize callback bodies, `Init()` itself
+   * is the plain generic pattern.
    */
-  class EntitySetSerializer
+  class EntitySetSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD57F0 (FUN_00BD57F0, dynamic initializer for the global
+     * `EntitySetSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntitySetSerializer();
+
+    /**
+     * Address: 0x00BFCDB0 (FUN_00BFCDB0, Moho::EntitySetSerializer::~EntitySetSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~EntitySetSerializer();
+
     /**
      * Address: 0x006938A0 (FUN_006938A0, Moho::EntitySetSerializer::Deserialize)
      *
@@ -226,20 +298,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00693E80 (FUN_00693E80, gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Entity>>::Init lane)
+     *
      * What it does:
-     * Binds `EntitySetTemplate<Entity>` RTTI serializer callbacks.
+     * Resolves `EntitySetTemplate<Entity>` RTTI and installs this helper's
+     * load/save callbacks onto that type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(EntitySetSerializer, mHelperNext) == 0x04, "EntitySetSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(EntitySetSerializer, mHelperPrev) == 0x08, "EntitySetSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(EntitySetSerializer, mDeserialize) == 0x0C, "EntitySetSerializer::mDeserialize offset must be 0x0C"
   );
@@ -249,10 +320,59 @@ namespace moho
   /**
    * VFTABLE: 0x00E2D4FC
    * COL: 0x00E864B8
+   *
+   * `vtable_writers` for `WeakEntitySetSerializer@Moho` shows two writers:
+   * `FUN_00BD5850` (real, `__xc_a`-reachable) and `FUN_00693B70` (zero
+   * incoming xrefs, dead COMDAT twin -- marked `skip`, along with
+   * `FUN_00693EF0`, a base-subobject ctor variant that writes the OTHER
+   * emitted vtable head, `gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<
+   * Moho::Entity>>`'s, and `FUN_00693BA0`/`FUN_00693BD0`, two
+   * byte-identical dead unlink-then-self-link bodies superseded by
+   * `SerHelperBase::ResetLinks()`).
+   *
+   * Unlike the other three classes in this file, the real ctor's `atexit`
+   * target (`FUN_00BFCE40`) demangles to no meaningful/mangled symbol at
+   * all (`sub_BFCE40`, zero-meaningful-name) -- decompiles to the exact
+   * same unlink-then-self-link body as the other three classes' mangled
+   * `~XSerializer` destructors, and is directly confirmed as this class's
+   * real atexit target via `FUN_00BD5850`'s own disassembly (`push offset
+   * sub_BFCE40; call _atexit`). Modeled as a real destructor calling
+   * `ResetLinks()`, same as the mangled cases; only the binary's own
+   * naming differs.
+   *
+   * `Deserialize`/`Serialize` (0x00693AF0/0x00693B30) resolve
+   * `EntitySetTemplate<Entity>::sType` (this class's OWN base, i.e. one
+   * level up the chain from `EntitySetBaseSerializer`'s target) and forward
+   * through `gpg::ReadArchive::Read`/`WriteArchive::Write`'s generic
+   * type-driven dispatch, confirmed from raw decompiler output. `Init()`'s
+   * real body is `FUN_00693F20` (found via a vtable slot-0 data xref
+   * search, same two-vtables-same-address shape as the other two classes)
+   * and resolves this class's OWN type (`WeakEntitySetTemplate<
+   * Entity>::sType`) -- again, the cross-type delegation is confined to
+   * the Deserialize/Serialize callback bodies.
    */
-  class WeakEntitySetSerializer
+  class WeakEntitySetSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD5850 (FUN_00BD5850, dynamic initializer for the global
+     * `WeakEntitySetSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    WeakEntitySetSerializer();
+
+    /**
+     * Address: 0x00BFCE40 (FUN_00BFCE40)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~WeakEntitySetSerializer();
+
     /**
      * Address: 0x00693AF0 (FUN_00693AF0, Moho::WeakEntitySetSerializer::Deserialize)
      *
@@ -270,24 +390,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00693F20 (FUN_00693F20, gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Entity>>::Init lane)
+     *
      * What it does:
-     * Binds `WeakEntitySetTemplate<Entity>` RTTI serializer callbacks.
+     * Resolves `WeakEntitySetTemplate<Entity>` RTTI and installs this
+     * helper's load/save callbacks onto that type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(WeakEntitySetSerializer, mHelperNext) == 0x04, "WeakEntitySetSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(WeakEntitySetSerializer, mHelperPrev) == 0x08, "WeakEntitySetSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(WeakEntitySetSerializer, mDeserialize) == 0x0C,
     "WeakEntitySetSerializer::mDeserialize offset must be 0x0C"

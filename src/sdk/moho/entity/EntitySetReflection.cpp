@@ -9,15 +9,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityFastVectorReflection.h"
+#include "moho/entity/EntityFastVectorReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-
-namespace moho
-{
-  gpg::SerHelperBase* cleanup_EntitySetBaseSerializer();
-  gpg::SerHelperBase* cleanup_EntitySetSerializer();
-  gpg::SerHelperBase* cleanup_WeakEntitySetSerializer();
-} // namespace moho
 
 namespace
 {
@@ -33,9 +26,9 @@ namespace
   alignas(moho::WeakEntitySetTypeInfo) unsigned char gWeakEntitySetTypeInfoStorage[sizeof(moho::WeakEntitySetTypeInfo)];
   bool gWeakEntitySetTypeInfoConstructed = false;
 
-  moho::EntitySetBaseSerializer gEntitySetBaseSerializer{};
-  moho::EntitySetSerializer gEntitySetSerializer{};
-  moho::WeakEntitySetSerializer gWeakEntitySetSerializer{};
+  moho::EntitySetBaseSerializer gEntitySetBaseSerializer;
+  moho::EntitySetSerializer gEntitySetSerializer;
+  moho::WeakEntitySetSerializer gWeakEntitySetSerializer;
 
   [[nodiscard]] moho::EntitySetBaseTypeInfo& AcquireEntitySetBaseTypeInfo()
   {
@@ -62,37 +55,6 @@ namespace
       gWeakEntitySetTypeInfoConstructed = true;
     }
     return *reinterpret_cast<moho::WeakEntitySetTypeInfo*>(gWeakEntitySetTypeInfoStorage);
-  }
-
-  template <typename Serializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename Serializer>
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename Serializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    if (!serializer.mHelperNext || !serializer.mHelperPrev) {
-      serializer.mHelperNext = self;
-      serializer.mHelperPrev = self;
-      return self;
-    }
-
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
   }
 
   /**
@@ -501,20 +463,6 @@ namespace
     typeInfo->bases_ = {};
   }
 
-  void cleanup_EntitySetBaseSerializer_00BFCD20_atexit()
-  {
-    (void)moho::cleanup_EntitySetBaseSerializer();
-  }
-
-  void cleanup_EntitySetSerializer_00BFCDB0_atexit()
-  {
-    (void)moho::cleanup_EntitySetSerializer();
-  }
-
-  void cleanup_WeakEntitySetSerializer_00BFCE40_atexit()
-  {
-    (void)moho::cleanup_WeakEntitySetSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -693,13 +641,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006936A0 (FUN_006936A0, nullsub_1804)
-   */
-  void EntitySetBaseSerializer::RegisterSerializeFunctions()
-  {
-  }
-
-  /**
    * Address: 0x006936B0 (FUN_006936B0, Moho::EntitySetBaseSerializer::Deserialize)
    */
   void EntitySetBaseSerializer::Deserialize(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
@@ -728,10 +669,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00693DE0 (FUN_00693DE0, gpg::SerSaveLoadHelper<Moho::EntitySetBase>::Init lane)
+   */
+  void EntitySetBaseSerializer::Init()
+  {
+    gpg::RType* const type = ResolveEntitySetBaseType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
+  }
+
+  /**
+   * Address: 0x00693E80 (FUN_00693E80, gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Entity>>::Init lane)
+   *
    * What it does:
    * Binds `EntitySetTemplate<Entity>` RTTI serializer callbacks.
    */
-  void EntitySetSerializer::RegisterSerializeFunctions()
+  void EntitySetSerializer::Init()
   {
     gpg::RType* const type = ResolveEntitySetType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -771,10 +726,12 @@ namespace moho
   }
 
   /**
+   * Address: 0x00693F20 (FUN_00693F20, gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Entity>>::Init lane)
+   *
    * What it does:
    * Binds `WeakEntitySetTemplate<Entity>` RTTI serializer callbacks.
    */
-  void WeakEntitySetSerializer::RegisterSerializeFunctions()
+  void WeakEntitySetSerializer::Init()
   {
     gpg::RType* const type = ResolveWeakEntitySetType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -839,71 +796,36 @@ namespace moho
   }
 
   /**
-   * Address: 0x006936D0 (FUN_006936D0, sub_6936D0)
+   * Address: 0x00BD5790 (FUN_00BD5790, dynamic initializer for the global
+   * `EntitySetBaseSerializer` singleton)
    *
    * What it does:
-   * Initializes global `EntitySetBaseSerializer` links and callback pointers.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Confirmed real via `vtable_writers`
+   * (`EntitySetBaseSerializer@Moho`): `__xc_a`-reachable with one incoming
+   * xref, versus four zero-xref dead duplicates -- `FUN_006936D0`
+   * (identical ctor body, own vtable), `FUN_00693DB0` (same ctor body but
+   * writes the OTHER emitted vtable head, `gpg::SerSaveLoadHelper<Moho::
+   * EntitySetBase>`'s), and `FUN_00693700`/`FUN_00693730` (byte-identical
+   * unlink-then-self-link bodies matching `SerHelperBase::ResetLinks()`).
+   * All four marked `skip`.
    */
-  gpg::SerHelperBase* construct_EntitySetBaseSerializer()
+  EntitySetBaseSerializer::EntitySetBaseSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&EntitySetBaseSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntitySetBaseSerializer::Serialize))
+  {}
+
+  EntitySetBaseSerializer::~EntitySetBaseSerializer()
   {
-    InitializeSerializerNode(gEntitySetBaseSerializer);
-    gEntitySetBaseSerializer.mDeserialize = &EntitySetBaseSerializer::Deserialize;
-    gEntitySetBaseSerializer.mSerialize = &EntitySetBaseSerializer::Serialize;
-    return SerializerSelfNode(gEntitySetBaseSerializer);
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00693DB0 (FUN_00693DB0)
-   *
-   * What it does:
-   * Startup leaf that initializes global `EntitySetBaseSerializer` callback
-   * lanes and returns its serializer helper pointer.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_EntitySetBaseSerializer_StartupLeaf()
-  {
-    return construct_EntitySetBaseSerializer();
-  }
-
-  /**
-   * Address: 0x00693700 (FUN_00693700, sub_693700)
-   *
-   * What it does:
-   * Unlinks and rewires `EntitySetBaseSerializer` helper links to self.
-   */
-  gpg::SerHelperBase* reset_EntitySetBaseSerializerLinksVariant1()
-  {
-    return UnlinkSerializerNode(gEntitySetBaseSerializer);
-  }
-
-  /**
-   * Address: 0x00693730 (FUN_00693730, sub_693730)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `EntitySetBaseSerializer` helper links.
-   */
-  gpg::SerHelperBase* reset_EntitySetBaseSerializerLinksVariant2()
-  {
-    return UnlinkSerializerNode(gEntitySetBaseSerializer);
-  }
-
-  /**
-   * Address: 0x00BFCD20 (FUN_00BFCD20, Moho::EntitySetBaseSerializer::~EntitySetBaseSerializer)
-   *
-   * What it does:
-   * Unlinks `EntitySetBaseSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_EntitySetBaseSerializer()
-  {
-    return reset_EntitySetBaseSerializerLinksVariant2();
-  }
-
-  /**
-   * Address: 0x00BD5790 (FUN_00BD5790, sub_BD5790)
+   * Address: 0x00BD5790 (FUN_00BD5790, register_EntitySetBaseSerializer)
    */
   void register_EntitySetBaseSerializer()
   {
-    (void)construct_EntitySetBaseSerializer();
-    (void)std::atexit(&cleanup_EntitySetBaseSerializer_00BFCD20_atexit);
+    (void)gEntitySetBaseSerializer;
   }
 
   /**
@@ -932,62 +854,28 @@ namespace moho
   }
 
   /**
-   * Address: 0x00693920 (FUN_00693920, sub_693920)
+   * Address: 0x00BD57F0 (FUN_00BD57F0, dynamic initializer for the global
+   * `EntitySetSerializer` singleton)
    *
    * What it does:
-   * Initializes global `EntitySetSerializer` links and callback pointers.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Confirmed real via `vtable_writers`
+   * (`EntitySetSerializer@Moho`): `__xc_a`-reachable with one incoming
+   * xref, versus four zero-xref dead duplicates -- `FUN_00693920`
+   * (identical ctor body, own vtable), `FUN_00693E50` (same ctor body but
+   * writes the OTHER emitted vtable head, `gpg::SerSaveLoadHelper<Moho::
+   * EntitySetTemplate<Moho::Entity>>`'s), and `FUN_00693950`/`FUN_00693980`
+   * (byte-identical unlink-then-self-link bodies matching `SerHelperBase::
+   * ResetLinks()`). All four marked `skip`.
    */
-  gpg::SerHelperBase* construct_EntitySetSerializer()
-  {
-    InitializeSerializerNode(gEntitySetSerializer);
-    gEntitySetSerializer.mDeserialize = &EntitySetSerializer::Deserialize;
-    gEntitySetSerializer.mSerialize = &EntitySetSerializer::Serialize;
-    return SerializerSelfNode(gEntitySetSerializer);
-  }
+  EntitySetSerializer::EntitySetSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&EntitySetSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntitySetSerializer::Serialize))
+  {}
 
-  /**
-   * Address: 0x00693E50 (FUN_00693E50)
-   *
-   * What it does:
-   * Startup leaf that initializes global `EntitySetSerializer` callback lanes
-   * and returns its serializer helper pointer.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_EntitySetSerializer_StartupLeaf()
+  EntitySetSerializer::~EntitySetSerializer()
   {
-    return construct_EntitySetSerializer();
-  }
-
-  /**
-   * Address: 0x00693950 (FUN_00693950, sub_693950)
-   *
-   * What it does:
-   * Unlinks and rewires `EntitySetSerializer` helper links to self.
-   */
-  gpg::SerHelperBase* reset_EntitySetSerializerLinksVariant1()
-  {
-    return UnlinkSerializerNode(gEntitySetSerializer);
-  }
-
-  /**
-   * Address: 0x00693980 (FUN_00693980, sub_693980)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `EntitySetSerializer` helper links.
-   */
-  gpg::SerHelperBase* reset_EntitySetSerializerLinksVariant2()
-  {
-    return UnlinkSerializerNode(gEntitySetSerializer);
-  }
-
-  /**
-   * Address: 0x00BFCDB0 (FUN_00BFCDB0, Moho::EntitySetSerializer::~EntitySetSerializer)
-   *
-   * What it does:
-   * Unlinks `EntitySetSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_EntitySetSerializer()
-  {
-    return reset_EntitySetSerializerLinksVariant2();
+    ResetLinks();
   }
 
   /**
@@ -995,8 +883,7 @@ namespace moho
    */
   void register_EntitySetSerializer()
   {
-    (void)construct_EntitySetSerializer();
-    (void)std::atexit(&cleanup_EntitySetSerializer_00BFCDB0_atexit);
+    (void)gEntitySetSerializer;
   }
 
   /**
@@ -1025,62 +912,28 @@ namespace moho
   }
 
   /**
-   * Address: 0x00693B70 (FUN_00693B70, sub_693B70)
+   * Address: 0x00BD5850 (FUN_00BD5850, dynamic initializer for the global
+   * `WeakEntitySetSerializer` singleton)
    *
    * What it does:
-   * Initializes global `WeakEntitySetSerializer` links and callback pointers.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Confirmed real via `vtable_writers`
+   * (`WeakEntitySetSerializer@Moho`): `__xc_a`-reachable with one incoming
+   * xref, versus four zero-xref dead duplicates -- `FUN_00693B70`
+   * (identical ctor body, own vtable), `FUN_00693EF0` (same ctor body but
+   * writes the OTHER emitted vtable head, `gpg::SerSaveLoadHelper<Moho::
+   * WeakEntitySetTemplate<Moho::Entity>>`'s), and `FUN_00693BA0`/
+   * `FUN_00693BD0` (byte-identical unlink-then-self-link bodies matching
+   * `SerHelperBase::ResetLinks()`). All four marked `skip`.
    */
-  gpg::SerHelperBase* construct_WeakEntitySetSerializer()
-  {
-    InitializeSerializerNode(gWeakEntitySetSerializer);
-    gWeakEntitySetSerializer.mDeserialize = &WeakEntitySetSerializer::Deserialize;
-    gWeakEntitySetSerializer.mSerialize = &WeakEntitySetSerializer::Serialize;
-    return SerializerSelfNode(gWeakEntitySetSerializer);
-  }
+  WeakEntitySetSerializer::WeakEntitySetSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&WeakEntitySetSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&WeakEntitySetSerializer::Serialize))
+  {}
 
-  /**
-   * Address: 0x00693EF0 (FUN_00693EF0)
-   *
-   * What it does:
-   * Startup leaf that initializes global `WeakEntitySetSerializer` callback
-   * lanes and returns its serializer helper pointer.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_WeakEntitySetSerializer_StartupLeaf()
+  WeakEntitySetSerializer::~WeakEntitySetSerializer()
   {
-    return construct_WeakEntitySetSerializer();
-  }
-
-  /**
-   * Address: 0x00693BA0 (FUN_00693BA0, sub_693BA0)
-   *
-   * What it does:
-   * Unlinks and rewires `WeakEntitySetSerializer` helper links to self.
-   */
-  gpg::SerHelperBase* reset_WeakEntitySetSerializerLinksVariant1()
-  {
-    return UnlinkSerializerNode(gWeakEntitySetSerializer);
-  }
-
-  /**
-   * Address: 0x00693BD0 (FUN_00693BD0, sub_693BD0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `WeakEntitySetSerializer` helper links.
-   */
-  gpg::SerHelperBase* reset_WeakEntitySetSerializerLinksVariant2()
-  {
-    return UnlinkSerializerNode(gWeakEntitySetSerializer);
-  }
-
-  /**
-   * Address: 0x00BFCE40 (FUN_00BFCE40, sub_BFCE40)
-   *
-   * What it does:
-   * Unlinks `WeakEntitySetSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_WeakEntitySetSerializer()
-  {
-    return reset_WeakEntitySetSerializerLinksVariant2();
+    ResetLinks();
   }
 
   /**
@@ -1088,8 +941,7 @@ namespace moho
    */
   void register_WeakEntitySetSerializer()
   {
-    (void)construct_WeakEntitySetSerializer();
-    (void)std::atexit(&cleanup_WeakEntitySetSerializer_00BFCE40_atexit);
+    (void)gWeakEntitySetSerializer;
   }
 } // namespace moho
 
