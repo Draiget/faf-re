@@ -20,37 +20,38 @@ namespace gpg
 
 namespace
 {
+  // See the matching comment in RUnitBlueprintConstruct.cpp: RUnitBlueprint
+  // has no plain `sType` static member, so this TU keeps its own lazily
+  // resolved cache rather than adding a new data member to RUnitBlueprint's
+  // binary layout.
   gpg::RType* gRuleGameRulesType = nullptr;
   gpg::RType* gUnitBlueprintType = nullptr;
-  moho::RUnitBlueprintSaveConstruct gUnitBlueprintSaveConstruct;
+
+  // Address: 0x010AB3A8 -- process-global `RUnitBlueprintSaveConstruct`
+  // singleton. Constructing it runs RUnitBlueprintSaveConstruct::
+  // RUnitBlueprintSaveConstruct() (0x00BC8C30), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RUnitBlueprintSaveConstruct gRUnitBlueprintSaveConstructHelper;
 
   /**
-   * Address: 0x00522B80 (FUN_00522B80)
+   * Address: 0x00BF3750 (FUN_00BF3750)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintSaveConstruct` helper node from the global
-   * serializer-helper intrusive list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintSaveConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintSaveConstruct);
-  }
-
-  /**
-   * Address: 0x00522BB0 (FUN_00522BB0)
+   * Unlinks the `RUnitBlueprintSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8C30) as the
+   * global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RUnitBlueprintSaveConstruct`
-   * helper-node cleanup; behavior matches the primary lane.
+   * ICF twins: 0x00522B80 (FUN_00522B80) and 0x00522BB0 (FUN_00522BB0) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintSaveConstructHelperNodeSecondary() noexcept
+  void CleanupRUnitBlueprintSaveConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintSaveConstruct);
-  }
-
-  void CleanupUnitBlueprintSaveConstructAtexit()
-  {
-    (void)CleanupUnitBlueprintSaveConstructHelperNodePrimary();
+    gRUnitBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
@@ -103,56 +104,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x005236C0 (FUN_005236C0, sub_5236C0)
+   * Address: 0x00BC8C30 (FUN_00BC8C30, dynamic initializer for the global
+   * `RUnitBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Binds `RUnitBlueprint` save-construct-args callback into reflected RTTI
-   * (`serSaveConstructArgsFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  void RUnitBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
+  RUnitBlueprintSaveConstruct::RUnitBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintThunk)
+      )
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RUnitBlueprint>(gUnitBlueprintType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+    (void)std::atexit(&CleanupRUnitBlueprintSaveConstruct);
   }
 
   /**
-   * Address: 0x00BF3750 (FUN_00BF3750, sub_BF3750)
+   * Address: 0x005236C0 (FUN_005236C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::Init)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintSaveConstruct` helper links and rewires self-links.
+   * Resolves `RUnitBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RUnitBlueprintSaveConstruct()
+  void RUnitBlueprintSaveConstruct::Init()
   {
-    return CleanupUnitBlueprintSaveConstructHelperNodePrimary();
-  }
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00BC8C30 (FUN_00BC8C30, sub_BC8C30)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RUnitBlueprint`.
-   */
-  int register_RUnitBlueprintSaveConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gUnitBlueprintSaveConstruct);
-    gUnitBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintThunk);
-    gUnitBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupUnitBlueprintSaveConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RUnitBlueprint>(gUnitBlueprintType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RUnitBlueprintSaveConstructBootstrap
-  {
-    RUnitBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_RUnitBlueprintSaveConstruct();
-    }
-  };
-
-  RUnitBlueprintSaveConstructBootstrap gRUnitBlueprintSaveConstructBootstrap;
-} // namespace

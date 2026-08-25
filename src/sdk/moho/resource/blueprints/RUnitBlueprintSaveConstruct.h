@@ -16,32 +16,44 @@ namespace moho
   /**
    * VFTABLE: 0x00E15A9C
    * COL: 0x00E695A8
+   *
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RUnitBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `RUnitBlueprint` reference on load. This is the
+   * save-side counterpart of `RUnitBlueprintConstruct` (that class's
+   * `Init()` writes `serConstructFunc_`/`deleteFunc_`; this one writes
+   * `serSaveConstructArgsFunc_`).
    */
-  class RUnitBlueprintSaveConstruct
+  class RUnitBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x005236C0 (FUN_005236C0, sub_5236C0)
-     * Slot: 0
+     * Address: 0x00BC8C30 (FUN_00BC8C30, dynamic initializer for the global
+     * `RUnitBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds `RUnitBlueprint` save-construct-args callback into reflected RTTI
-     * (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    RUnitBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x005236C0 (FUN_005236C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `RUnitBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(offsetof(RUnitBlueprintSaveConstruct, mHelperNext) == 0x04, "RUnitBlueprintSaveConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(RUnitBlueprintSaveConstruct, mHelperPrev) == 0x08, "RUnitBlueprintSaveConstruct::mHelperPrev offset must be 0x08");
-  static_assert(
-    offsetof(RUnitBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
-    "RUnitBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
-  );
+  static_assert(offsetof(RUnitBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C, "RUnitBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C");
   static_assert(sizeof(RUnitBlueprintSaveConstruct) == 0x10, "RUnitBlueprintSaveConstruct size must be 0x10");
 
   /**
@@ -73,21 +85,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00BF3750 (FUN_00BF3750, sub_BF3750)
-   *
-   * What it does:
-   * Unlinks `RUnitBlueprintSaveConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_RUnitBlueprintSaveConstruct();
-
-  /**
-   * Address: 0x00BC8C30 (FUN_00BC8C30, sub_BC8C30)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RUnitBlueprint`.
-   */
-  int register_RUnitBlueprintSaveConstruct();
 } // namespace moho
