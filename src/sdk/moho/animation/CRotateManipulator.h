@@ -90,6 +90,24 @@ namespace moho
      */
     void SetFollowBoneTarget(int followBoneIndex) noexcept;
 
+    /**
+     * Address: 0x006458A0 (FUN_006458A0, Moho::CRotateManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base payload, then rotate-state flags, axis,
+     * angular lanes, and follow-bone index.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006459A0 (FUN_006459A0, Moho::CRotateManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base payload, then rotate-state flags, axis,
+     * angular lanes, and follow-bone index.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     static gpg::RType* sType;
 
     std::uint8_t mHasGoal = 0;      // +0x80
@@ -120,6 +138,26 @@ namespace moho
     offsetof(CRotateManipulator, mFollowBone) == 0xA4, "CRotateManipulator::mFollowBone offset must be 0xA4"
   );
   static_assert(sizeof(CRotateManipulator) == 0xA8, "CRotateManipulator size must be 0xA8");
+
+  /**
+   * VFTABLE: 0x00E22B30
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CRotateManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer
+   *    (`register_CRotateManipulatorSerializer`): 0x00BD3010
+   *    (__xc_a-reachable; dead zero-xref COMDAT duplicates: 0x006435A0,
+   *    0x006452E0)
+   *  - dtor: 0x00BFB160 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x00645310
+   *  - Deserialize(): 0x00643570
+   *  - Serialize(): 0x00643580
+   */
+  using CRotateManipulatorSerializer = gpg::SerSaveLoadHelper<CRotateManipulator>;
 
   class CRotateManipulatorTypeInfo : public gpg::RType
   {
