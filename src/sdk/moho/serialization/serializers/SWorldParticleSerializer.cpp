@@ -12,12 +12,36 @@
 namespace
 {
   using ParticleSerializer = moho::SWorldParticleSerializer;
-  using ParticleBlendModePrimitiveSerializer = moho::SWorldParticleBlendModePrimitiveSerializer;
-  using ParticleZModePrimitiveSerializer = moho::SWorldParticleZModePrimitiveSerializer;
 
-  ParticleBlendModePrimitiveSerializer gSWorldParticleBlendModePrimitiveSerializer{};
-  ParticleZModePrimitiveSerializer gSWorldParticleZModePrimitiveSerializer{};
   ParticleSerializer gSWorldParticleSerializer{};
+
+  /**
+   * Address: 0x00BC53C0 (FUN_00BC53C0, dynamic initializer for the global
+   * `PrimitiveSerHelper<SWorldParticle::BlendMode,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). The previous raw-struct stand-in
+   * for this helper required an explicit
+   * `register_SWorldParticleBlendModePrimitiveSerializer()` call from a
+   * bootstrap struct to run its equivalent logic; the real binary never
+   * does that -- the global's own dynamic initializer is the entire
+   * registration.
+   */
+  moho::SWorldParticleBlendModePrimitiveSerializer gSWorldParticleBlendModePrimitiveSerializer;
+
+  /**
+   * Address: 0x00BC5420 (FUN_00BC5420, dynamic initializer for the global
+   * `PrimitiveSerHelper<SWorldParticle::ZMode,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). Same "never actually registered
+   * before this recovery" story as `SWorldParticle::BlendMode` above.
+   */
+  moho::SWorldParticleZModePrimitiveSerializer gSWorldParticleZModePrimitiveSerializer;
 
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
@@ -59,80 +83,6 @@ namespace
   [[nodiscard]] gpg::RType* ResolveSWorldParticleType()
   {
     return ResolveCachedType<moho::SWorldParticle>(moho::SWorldParticle::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldParticleBlendModeType()
-  {
-    return ResolveCachedType<moho::SWorldParticle::BlendMode>(moho::SWorldParticle::sBlendModeType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldParticleZModeType()
-  {
-    return ResolveCachedType<moho::SWorldParticle::ZMode>(moho::SWorldParticle::sZModeType);
-  }
-
-  /**
-   * Address: 0x0048FE10 (SWorldParticle::BlendMode int read lane)
-   *
-   * What it does:
-   * Reads one `int` from archive and stores it into `SWorldParticle::BlendMode`.
-   */
-  void DeserializeSWorldParticleBlendMode(
-    gpg::ReadArchive* archive,
-    moho::SWorldParticle::BlendMode* value
-  )
-  {
-    int rawValue = 0;
-    archive->ReadInt(&rawValue);
-    *value = static_cast<moho::SWorldParticle::BlendMode>(rawValue);
-  }
-
-  /**
-   * Address: 0x0048FE30 (SWorldParticle::BlendMode int write lane)
-   *
-   * What it does:
-   * Writes one `SWorldParticle::BlendMode` value to archive as an `int`.
-   */
-  void SerializeSWorldParticleBlendMode(
-    gpg::WriteArchive* archive,
-    const moho::SWorldParticle::BlendMode* value
-  )
-  {
-    archive->WriteInt(static_cast<int>(*value));
-  }
-
-  /**
-   * Address: 0x0048FE80 (SWorldParticle::ZMode int read lane)
-   *
-   * What it does:
-   * Reads one `int` from archive and stores it into `SWorldParticle::ZMode`.
-   */
-  void DeserializeSWorldParticleZMode(gpg::ReadArchive* archive, moho::SWorldParticle::ZMode* value)
-  {
-    int rawValue = 0;
-    archive->ReadInt(&rawValue);
-    *value = static_cast<moho::SWorldParticle::ZMode>(rawValue);
-  }
-
-  /**
-   * Address: 0x0048FEA0 (SWorldParticle::ZMode int write lane)
-   *
-   * What it does:
-   * Writes one `SWorldParticle::ZMode` value to archive as an `int`.
-   */
-  void SerializeSWorldParticleZMode(gpg::WriteArchive* archive, const moho::SWorldParticle::ZMode* value)
-  {
-    archive->WriteInt(static_cast<int>(*value));
-  }
-
-  void cleanup_SWorldParticleBlendModePrimitiveSerializer_atexit()
-  {
-    (void)moho::cleanup_SWorldParticleBlendModePrimitiveSerializer();
-  }
-
-  void cleanup_SWorldParticleZModePrimitiveSerializer_atexit()
-  {
-    (void)moho::cleanup_SWorldParticleZModePrimitiveSerializer();
   }
 
   void cleanup_SWorldParticleSerializer_atexit()
@@ -202,72 +152,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0048FBF0 (gpg::PrimitiveSerHelper<Moho::SWorldParticle::BlendMode, int>::Init)
-   */
-  void SWorldParticleBlendModePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveSWorldParticleBlendModeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BEFF10 (sub_BEFF10)
-   */
-  gpg::SerHelperBase* cleanup_SWorldParticleBlendModePrimitiveSerializer()
-  {
-    return UnlinkSerializerNode(gSWorldParticleBlendModePrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BC53C0 (sub_BC53C0)
-   */
-  int register_SWorldParticleBlendModePrimitiveSerializer()
-  {
-    InitializeSerializerNode(gSWorldParticleBlendModePrimitiveSerializer);
-    gSWorldParticleBlendModePrimitiveSerializer.mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSWorldParticleBlendMode);
-    gSWorldParticleBlendModePrimitiveSerializer.mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeSWorldParticleBlendMode);
-    return std::atexit(&cleanup_SWorldParticleBlendModePrimitiveSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x0048FC90 (gpg::PrimitiveSerHelper<Moho::SWorldParticle::ZMode, int>::Init)
-   */
-  void SWorldParticleZModePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveSWorldParticleZModeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BEFF50 (sub_BEFF50)
-   */
-  gpg::SerHelperBase* cleanup_SWorldParticleZModePrimitiveSerializer()
-  {
-    return UnlinkSerializerNode(gSWorldParticleZModePrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BC5420 (sub_BC5420)
-   */
-  int register_SWorldParticleZModePrimitiveSerializer()
-  {
-    InitializeSerializerNode(gSWorldParticleZModePrimitiveSerializer);
-    gSWorldParticleZModePrimitiveSerializer.mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSWorldParticleZMode);
-    gSWorldParticleZModePrimitiveSerializer.mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeSWorldParticleZMode);
-    return std::atexit(&cleanup_SWorldParticleZModePrimitiveSerializer_atexit);
-  }
-
-  /**
    * Address: 0x00BEFFE0 (Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
    */
   gpg::SerHelperBase* cleanup_SWorldParticleSerializer()
@@ -293,8 +177,6 @@ namespace
   {
     SWorldParticleSerializerBootstrap()
     {
-      (void)moho::register_SWorldParticleBlendModePrimitiveSerializer();
-      (void)moho::register_SWorldParticleZModePrimitiveSerializer();
       (void)moho::register_SWorldParticleSerializer();
     }
   };
