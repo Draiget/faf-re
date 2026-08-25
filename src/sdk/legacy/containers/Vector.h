@@ -1413,6 +1413,59 @@ namespace msvc8
          * `CPlatoon::FindPrioritizedUnit`'s `const msvc8::vector<
          * EntityCategorySet> priorityList = squad->mCats;` (CPlatoon.cpp)
          * via the thin calling-convention bridge `FUN_00723A80`.)
+         * Address: 0x008F6D20 (FUN_008F6D20, `msvc8::vector<DXGI_MODE_DESC>::
+         * vector(const vector&)` for the 0x1C-byte (28, `DXGI_MODE_DESC` --
+         * Width/Height/RefreshRate{Num,Denom}/Format/ScanlineOrdering/Scaling)
+         * POD element -- `n = other.size()` (the `(other.last_-other.first_)/28`
+         * divide, null-guarded so an empty `other` never subtracts through a
+         * null `first_`), then `if (Buy(n)) { last_ = uninit_copy(other.first_,
+         * other.last_, first_); }`, exactly this constructor's `if (n) {
+         * reserve(n); uninit_copy_n(...); last_ = first_+n; }` body with the
+         * default-construct-then-reserve steps fused by the compiler into one
+         * helper. That fused zero-the-triple-then-conditionally-buy(n) helper is
+         * `FUN_008F69A0` (`char __thiscall(this, count)`): zeroes `first_`/
+         * `last_`/`end_` unconditionally, returns `false` on `count==0` (so the
+         * caller's `if(...)` guard skips the copy for an empty source), else
+         * checks `count > 0x9249249` (`max_size()` for this element,
+         * `0xFFFFFFFF/28`) and throws through `FUN_008F6890`
+         * (`std::length_error("vector<T> too long")`, cited below on
+         * `throw_too_long`) exactly like `reserve()`'s own guard above, then
+         * calls the checked allocator `FUN_008F5FD0` (cited below on
+         * `allocate_slots_checked`) and arms `first_ = last_ = <new block>`,
+         * `end_ = first_ + 28*count` -- `allocate_slots_checked`'s own
+         * `0xFFFFFFFF/count < 0x1C` guard is the same defense-in-depth
+         * `bad_alloc` backstop `reserve()`'s doc above describes, not a
+         * duplicate check. The same `FUN_008F69A0` body is reused verbatim by
+         * this specialization's `operator=` (`FUN_008F6DD0`, cited below on
+         * `operator=`) for its post-free rebuy step -- both call sites need the
+         * identical "start from an all-null/just-freed triple, buy blank
+         * storage for `count` elements" operation, so one compiled body serves
+         * both. The 0x1C-byte uninitialized-copy step is `FUN_008F6470` (cited
+         * below on `uninit_copy_n`); its two calling-convention bridges --
+         * `FUN_008F65F0` (`__cdecl`, `return sub_8F6470(a1,a2,a3);`) and
+         * `FUN_008F6690` (`__stdcall`, same tail call) -- carry no logic of
+         * their own and need no separate citation. Source-level trigger:
+         * `AdapterD3D10::AdapterD3D10(const AdapterD3D10& other) : ...,
+         * modes_(other.modes_) {}` (D3D10Interfaces.cpp) deep-copies
+         * `AdapterD3D10::modes_` (`msvc8::vector<AdapterModeD3D10>`,
+         * `AdapterD3D10.hpp`), whose own copy constructor placement-constructs
+         * each 116-byte `AdapterModeD3D10` element via
+         * `uninit_copy_n<AdapterModeD3D10>`, which invokes `AdapterModeD3D10`'s
+         * compiler-synthesized memberwise copy constructor -- that in turn
+         * copy-constructs `AdapterModeD3D10::modes_` (`+0x64`, this exact
+         * `msvc8::vector<DXGI_MODE_DESC>`) through this token.
+         * `AdapterModeD3D10` has no user-declared special member functions, so
+         * no further `src/sdk` change is needed at that link -- the compiler
+         * default already produces this call chain (the `AdapterModeD3D10`-
+         * level copy constructor/`operator=` pair itself, `FUN_008F7020`/
+         * `FUN_008F7110`, is a separate `msvc8::vector<AdapterModeD3D10>`
+         * instantiation gap, not yet cited). DB previously listed
+         * `FUN_008F6D20` and `FUN_008F69A0` `external_dependency`
+         * ("all-external-callees thunk" / body "references only third-party
+         * runtime... no Moho/gpg engine references") -- wrong: both are
+         * `DXGI_MODE_DESC`/`AdapterModeD3D10` engine-instantiated vector
+         * internals reached from committed `gpg::gal::AdapterD3D10` source;
+         * corrected to `recovered` here.)
          *
          * Copy constructor (deep copy)
          */
@@ -1506,6 +1559,39 @@ namespace msvc8
          * shape, calling the `std::copy` lane FUN_00548C00 three times, once
          * per branch. Reached from `RVectorType_ResourceDeposit::SerLoad`'s
          * closing `*storage = loaded;`.)
+         * Address: 0x008F6DD0 (FUN_008F6DD0, `msvc8::vector<DXGI_MODE_DESC>::
+         * operator=(const vector&)` for the 0x1C-byte (28, `DXGI_MODE_DESC`)
+         * POD element -- the full VC8 `assign` shape: self-check guard first
+         * (`this == &rhs` early return); empty source -> `erase(begin(),
+         * end())` on `this` (`FUN_008F6790`, cited below on `erase`) to clear
+         * it, the returned iterator discarded; source longer but fits in
+         * capacity -> assign-over the retained prefix (`FUN_008F64A0`,
+         * `copy_or_move_assign` shape, already recovered as
+         * `CopyForward28ByteLaneSourceFirst` in
+         * `gpg/core/containers/FastVectorInsertLanes.cpp`) then
+         * uninitialized-copy the excess tail (`FUN_008F66E0` -> `FUN_008F64D0`,
+         * `uninit_copy_n` shape, already recovered in the same file --
+         * `FUN_008F64D0` is additionally a byte-identical `function_sha256` ICF
+         * twin of `FUN_008F6470`, cited below on `uninit_copy_n`); source
+         * longer and does not fit -> `operator delete` the old block, rebuy
+         * blank storage for `other.size()` through `FUN_008F69A0` (the same
+         * fused zero-then-buy helper cited above on `vector(const vector&)`),
+         * then uninitialized-copy everything via the same `FUN_008F66E0`/
+         * `FUN_008F64D0` pair; source shorter or equal -> assign-over the
+         * prefix (`FUN_008F64A0` again) and rebase `last_` directly, with no
+         * explicit destroy call for the truncated tail because the element is
+         * trivially destructible. `FUN_008F5E00` (`this->first_ ?
+         * (this->last_-this->first_)/28 : 0`, i.e. `size()`, cited below)
+         * computes both sides of every length comparison in this body.
+         * Source-level trigger: same chain as `vector(const vector&)` above,
+         * but through `AdapterD3D10::operator=(const AdapterD3D10&)`'s
+         * `modes_ = other.modes_;` (D3D10Interfaces.cpp) instead of the copy
+         * constructor -- `msvc8::vector<AdapterModeD3D10>::operator=`'s own
+         * assign-over step invokes `AdapterModeD3D10`'s compiler-synthesized
+         * memberwise `operator=`, which assigns `AdapterModeD3D10::modes_`
+         * through this token. DB previously listed this token `blocked`
+         * ("stale in_progress claim after reboot, no Address evidence") with
+         * zero citations anywhere in `src/sdk`; corrected to `recovered` here.)
          *
          * Copy assignment (strong exception safety)
          */
@@ -1568,6 +1654,19 @@ namespace msvc8
          * Address: 0x004433F0 (FUN_004433F0)
          * Address: 0x005DB5E0 (FUN_005DB5E0, msvc8::vector<EntityCategorySet>::size,
          *   `weapon->mTargetPriorities.size()` in CAiAttackerImpl.cpp)
+         * Address: 0x008F5E00 (FUN_008F5E00, msvc8::vector<DXGI_MODE_DESC>::size
+         *   for the 0x1C-byte element -- `this->first_ ? (this->last_-
+         *   this->first_)/28 : 0`. Reached from the `_Insert_n` grow lane
+         *   `FUN_008F6A50` (cited below on `insert`) and from `operator=`
+         *   (`FUN_008F6DD0`, cited above). `StartupHelpers.cpp` previously
+         *   mis-attributed this token to `AllowedProtocolsCountUnsafe`
+         *   (`gAllowedProtocols.size()`, an unrelated `std::wstring` vector)
+         *   grouped alongside two genuinely-unrelated addresses -- wrong: both
+         *   of this token's real callers, confirmed from
+         *   `_callgraph_index.sqlite` `call_edges`, are this `DXGI_MODE_DESC`
+         *   vector's own internals, not the allowed-protocols list. Citation
+         *   moved here; the stray `Address:` line removed from
+         *   `StartupHelpers.cpp`.)
          *
          * What it does:
          * Address: 0x0054C1B0 (FUN_0054C1B0,
@@ -2470,6 +2569,18 @@ namespace msvc8
          * the shipped binary (verified via `call_edges`, `incoming_xrefs`,
          * `data_refs`, `vtable_writers`, and the `reachable` closure, all
          * empty) — classified `skip`, not cited here.)
+         * Address: 0x008F6790 (FUN_008F6790, `msvc8::vector<DXGI_MODE_DESC>::
+         * erase(iterator,iterator)` for the 0x1C-byte element -- tail-shift-
+         * down loop (`qmemcpy` per 28-byte slot, shifting `[last,
+         * this->last_)` down to start at `first`), rebases `last_`, returns
+         * the post-erase iterator through a hidden out-param (2007 MSVC's ABI
+         * for this `thiscall`, not something the modern `T*` return needs to
+         * replicate). Reached from this specialization's own `operator=`
+         * (`FUN_008F6DD0`, cited above on `operator=`) calling `erase(begin(),
+         * end())` on `this` to clear it when the assignment source is empty --
+         * the returned iterator is discarded, the same self-clear-via-
+         * `erase(begin(),end())` idiom as the `InfluenceGrid` instantiation
+         * above.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -3955,6 +4066,30 @@ namespace msvc8
          * from this instantiation's copy constructor (`FUN_006DE100`,
          * cited above on `vector(const vector&)`), `CPlatoon::
          * FindPrioritizedUnit`'s `priorityList = squad->mCats`.)
+         * Address: 0x008F6470 (FUN_008F6470, `msvc8::vector<DXGI_MODE_DESC>::
+         * uninit_copy_n` for the 0x1C-byte (28, `DXGI_MODE_DESC`) POD element
+         * -- `[first@a1,last@a2) -> dst@a3`, per-slot `qmemcpy(dst, first,
+         * 0x1C)`, returns the advanced `dst` cursor. No placement-new/destroy
+         * pass since the element is trivially copyable -- this is exactly the
+         * shape the `is_trivially_copyable_v<T>` branch above collapses to a
+         * single `memcpy` call for; the original binary loops per-element
+         * instead (period-accurate VC8 STL: `_Uninit_copy` had no bulk-memmove
+         * fast path for scalar/POD ranges), same divergence already accepted
+         * for e.g. `FUN_00720220` above. Two calling-convention bridges
+         * forward here with no logic of their own: `FUN_008F65F0` (`__cdecl`,
+         * `return sub_8F6470(a1,a2,a3);`) and `FUN_008F6690` (`__stdcall`,
+         * same tail call) -- neither needs its own citation. Byte-identical
+         * (`function_sha256`) to `FUN_008F64D0`, the ICF-twin instantiation
+         * reached from this specialization's own `operator=`
+         * (`FUN_008F6DD0`, cited above on `operator=`) for its two
+         * grow-branch uninitialized-copy steps (the capacity-fits
+         * excess-tail fill, and the reallocate-and-copy-everything path);
+         * that twin is already recovered as `CopyForward28ByteLaneSourceFirst`
+         * in `gpg/core/containers/FastVectorInsertLanes.cpp`. Reached from
+         * this instantiation's copy constructor (`FUN_008F6D20`, cited above
+         * on `vector(const vector&)`), `AdapterD3D10::AdapterD3D10(const
+         * AdapterD3D10&)`'s `modes_(other.modes_)` member-init
+         * (D3D10Interfaces.cpp) deep-copying `AdapterModeD3D10::modes_`.)
          *
          * Uninitialized copy N from src to dst
          */
@@ -5146,6 +5281,12 @@ namespace msvc8
          * `0x1FFFFFFF - cur < count` max_size test, already cited above on
          * `insert`. DB previously listed this token `recovered` with no
          * note and no citation anywhere in `src/sdk` -- corrected here.)
+         * Address: 0x008F6890 (FUN_008F6890, the 28-byte-stride throw lane for
+         * `msvc8::vector<DXGI_MODE_DESC>`, reached from the ctor/assign fused
+         * zero-then-buy helper `FUN_008F69A0` (cited above on `vector(const
+         * vector&)`) and from the `_Insert_n` grow lane `FUN_008F6A50` (cited
+         * above on `insert`), both guarding the same `count > 0x9249249`
+         * (`0xFFFFFFFF/28`) `max_size()` test.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

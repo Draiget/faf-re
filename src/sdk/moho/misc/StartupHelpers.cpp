@@ -958,7 +958,6 @@ namespace
   /**
    * Address: 0x0045C2D0 (FUN_0045C2D0, sub_45C2D0)
    * Address: 0x00881FD0 (FUN_00881FD0)
-   * Address: 0x008F5E00 (FUN_008F5E00)
    *
    * What it does:
    * Returns the count of configured allowed URL protocols.
