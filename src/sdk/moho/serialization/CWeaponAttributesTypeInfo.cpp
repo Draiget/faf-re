@@ -4,7 +4,6 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/serialization/CWeaponAttributesSerializer.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -47,21 +46,11 @@ namespace
     return std::atexit(&cleanup_CWeaponAttributesTypeInfo_00BFE590_Impl);
   }
 
-  /**
-   * Ordinary `.CRT$XCU` initializer carrying only the serializer registration.
-   * That call is a `gpg::LookupRType` consumer, so it has to stay in phase 2;
-   * the descriptor it resolves is published from phase 1 by
-   * `moho::preregister_CWeaponAttributesTypeInfo` below.
-   */
-  struct CWeaponAttributesSerializerBootstrap
-  {
-    CWeaponAttributesSerializerBootstrap()
-    {
-      (void)moho::register_CWeaponAttributesSerializer();
-    }
-  };
-
-  CWeaponAttributesSerializerBootstrap gCWeaponAttributesSerializerBootstrap;
+  // The `CWeaponAttributesSerializer` consumer (a `gpg::LookupRType` caller,
+  // so it must run in phase 2) now registers itself through its own plain
+  // global's dynamic initializer in CWeaponAttributesSerializer.cpp; the
+  // descriptor it resolves is still published from phase 1 by
+  // `moho::preregister_CWeaponAttributesTypeInfo` below.
 } // namespace
 
 namespace moho
@@ -138,6 +127,7 @@ namespace moho
 
 // Phase-1 pre-registration: this descriptor was previously built by an
 // ordinary namespace-scope bootstrap object, which the CRT runs in .CRT$XCU
-// alongside register_CWeaponAttributesSerializer - the gpg::LookupRType
-// consumer that depends on it. See StaticInitPhase.h.
+// alongside moho::CWeaponAttributesSerializer's own dynamic initializer (see
+// CWeaponAttributesSerializer.cpp) - the gpg::LookupRType consumer that
+// depends on it. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_CWeaponAttributesTypeInfo_bd87b0, moho::preregister_CWeaponAttributesTypeInfo)
