@@ -307,7 +307,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\containers\Array2D.cpp" />
     <ClCompile Include="gpg\core\containers\BitArray2D.cpp" />
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp" />
-    <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp" />
     <ClCompile Include="gpg\core\containers\Set.cpp">
       <ObjectFileName>$(IntDir)gpg_core_containers_Set.obj</ObjectFileName>
     </ClCompile>
@@ -1449,7 +1448,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\containers\IntrusiveRbTree.h" />
     <ClInclude Include="gpg\core\containers\ReadArchive.h" />
     <ClInclude Include="gpg\core\containers\Rect2.h" />
-    <ClInclude Include="gpg\core\containers\SerSaveLoadHelper_Box3f.h" />
     <ClInclude Include="gpg\core\containers\Set.h" />
     <ClInclude Include="gpg\core\containers\String.h" />
     <ClInclude Include="gpg\core\random\Random.h" />
