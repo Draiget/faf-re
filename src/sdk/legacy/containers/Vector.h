@@ -1614,6 +1614,22 @@ namespace msvc8
 
         /**
          * Front element (no check)
+         *
+         * A trivial 2-instruction return-by-value form of this member
+         * (`*out = *first_`, `out` a hidden return-value pointer, `first_`
+         * read from `this+4`) is byte-identical across 133 confirmed
+         * instantiations for different 4-byte element types (`function_sha256`
+         * match in `_callgraph_index.sqlite`) -- e.g. `FUN_0041F360`,
+         * `FUN_00431AE0`, `FUN_005142F0`, `FUN_004E2C60`. All 133 have zero
+         * callers/incoming_xrefs/data_refs anywhere in the shipped binary
+         * (independently re-verified for the whole group, not sampled) --
+         * fully inlined at every real call site, these out-of-line copies are
+         * never referenced. Most are already `skip`/`recovered` from prior
+         * passes with their own justification; not individually re-cited
+         * here to avoid duplicating 133 near-identical Address lines for a
+         * body this trivial. Do not add new bespoke per-type `front()`
+         * free functions if more of these twins surface -- they are this
+         * member, dead-COMDAT-classified, nothing further to write.
          */
         T& front() const noexcept { return *first_; }
 
