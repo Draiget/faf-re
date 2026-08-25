@@ -11,7 +11,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -198,27 +197,45 @@ namespace
     return type;
   }
 
-  struct CUnitAttackTargetTaskSerializerStartupNode
+  /**
+   * VFTABLE: 0x00E1F6A8 (`??_7CUnitAttackTargetTaskSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitAttackTargetTask>
+   * (IDA infers `Moho::CUnitAttackTargetTaskSerializer`). The binary global
+   * is 0x14 bytes (vtable + inherited link pair + load/save callback
+   * lanes), matching every other `SerHelperBase`-derived serializer in this
+   * codebase.
+   */
+  struct CUnitAttackTargetTaskSerializer : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
+    /**
+     * Address: 0x005F44F0 (FUN_005F44F0, Moho::CUnitAttackTargetTaskSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `CUnitAttackTargetTask` RTTI and installs this
+     * helper's load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mLoad = nullptr;
     gpg::RType::save_func_t mSave = nullptr;
   };
   static_assert(
-    sizeof(CUnitAttackTargetTaskSerializerStartupNode) == 0x14,
-    "CUnitAttackTargetTaskSerializerStartupNode size must be 0x14"
+    sizeof(CUnitAttackTargetTaskSerializer) == 0x14,
+    "CUnitAttackTargetTaskSerializer size must be 0x14"
   );
 
-  CUnitAttackTargetTaskSerializerStartupNode gCUnitAttackTargetTaskSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    CUnitAttackTargetTaskSerializerStartupNode& helper
-  ) noexcept
+  void CUnitAttackTargetTaskSerializer::Init()
   {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+    gpg::RType* const type = CachedCUnitAttackTargetTaskType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoad;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSave;
   }
+
+  CUnitAttackTargetTaskSerializer gCUnitAttackTargetTaskSerializer{};
 
   void DeserializeCUnitAttackTargetTaskSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -252,24 +269,25 @@ namespace
    */
   void cleanup_CUnitAttackTargetTaskSerializer_atexit()
   {
-    (void)gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitAttackTargetTaskSerializer));
+    gCUnitAttackTargetTaskSerializer.ResetLinks();
   }
 
   /**
-   * Address: 0x00BCF4C0 (FUN_00BCF4C0, register_CUnitAttackTargetTaskSerializer)
+   * Address: 0x00BCF4C0 (FUN_00BCF4C0, register_CUnitAttackTargetTaskSerializer,
+   * dynamic initializer for the global `CUnitAttackTargetTaskSerializer`
+   * singleton)
    *
    * What it does:
-   * Initializes the global `CUnitAttackTargetTaskSerializer` helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`. Supersedes the previous
-   * orphaned startup thunk (mis-cited to FUN_005F44C0, a distinct real
-   * binary function with no recovered caller of its own).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`.
+   * Supersedes the previous orphaned startup thunk (mis-cited to
+   * FUN_005F44C0, a distinct real binary function with no recovered caller
+   * of its own).
    */
   void register_CUnitAttackTargetTaskSerializer()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitAttackTargetTaskSerializer.mNext);
-    gCUnitAttackTargetTaskSerializer.mPrev = self;
-    gCUnitAttackTargetTaskSerializer.mNext = self;
     gCUnitAttackTargetTaskSerializer.mLoad = &DeserializeCUnitAttackTargetTaskSerializerCallback;
     gCUnitAttackTargetTaskSerializer.mSave = &SerializeCUnitAttackTargetTaskSerializerCallback;
     (void)std::atexit(&cleanup_CUnitAttackTargetTaskSerializer_atexit);
