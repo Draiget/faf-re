@@ -91,57 +91,27 @@ namespace moho
 
   static_assert(sizeof(EImpactTypeTypeInfo) == 0x78, "EImpactTypeTypeInfo size must be 0x78");
 
-  class EImpactTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0050A990 (FUN_0050A990, PrimitiveSerHelper<EImpactType>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EImpactType` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A9B0 (FUN_0050A9B0, PrimitiveSerHelper<EImpactType>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EImpactType` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A6D0 (FUN_0050A6D0, gpg::PrimitiveSerHelper<Moho::EImpactType,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EImpactType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EImpactTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EImpactTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EImpactTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EImpactTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EImpactTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EImpactTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EImpactTypePrimitiveSerializer, mSerialize) == 0x10,
-    "EImpactTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EImpactTypePrimitiveSerializer) == 0x14, "EImpactTypePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EImpactType,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EImpactType@Moho@@H@gpg'`):
+   * `FUN_00BC7A90` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at 0x0050A6A0 (compiler/linker artifact, no source line -- see the
+   * class-level Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h).
+   *
+   * The previous raw-struct recovery of this instantiation also modeled a
+   * "secondary" startup thunk at 0x0050A9D0 as if it were a duplicate
+   * emission of this same ctor. It is not: per `vtable_writers`, 0x0050A9D0
+   * is the (itself dead, zero-xref) ctor of the unrelated template
+   * instantiation `gpg::SerSaveLoadHelper<Moho::EImpactType>`
+   * (`class_name='?$SerSaveLoadHelper@W4EImpactType@Moho@@@gpg'`), the same
+   * distinct ~50-instantiation template family flagged on `EAlliance`'s
+   * conversion, out of scope here.
+   */
+  using EImpactTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EImpactType, int>;
 
   /**
    * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
@@ -151,13 +121,4 @@ namespace moho
    * cleanup.
    */
   int register_EImpactTypeTypeInfo();
-
-  /**
-   * Address: 0x00BC7A90 (FUN_00BC7A90, register_EImpactTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes startup primitive serializer helper links/callbacks for
-   * `EImpactType` and installs process-exit cleanup.
-   */
-  int register_EImpactTypePrimitiveSerializer();
 } // namespace moho
