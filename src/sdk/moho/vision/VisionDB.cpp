@@ -1,6 +1,7 @@
 #include "moho/vision/VisionDB.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "Wm3IntrBox2Circle2.h"
@@ -324,9 +325,19 @@ VisionDB::Pool::NewEntry(const EntryCircle& previousCircle, const EntryCircle& c
     ++mEntriesSize;
 
     for (std::uint32_t index = 0; index < kEntryBlockCount; ++index) {
+      // Address: 0x0081BA00 (FUN_0081BA00) -- std::list<Entry*>::_Buynode
+      // for this pool's free list (IDA's own type inference: `_List_nod_
+      // VisionDB_Entry::_Node`), matching FreeNodeEntry's real 12-byte
+      // {_Next,_Prev,_Myval=Entry*} layout exactly.
       auto* const freeEntry = new FreeNodeEntry();
       freeEntry->node = &entryBlock[index];
       freeEntry->ListLinkBefore(mEntryPoolHead);
+      // Address: 0x0081BA40 (FUN_0081BA40) -- the sibling `_Incsize`,
+      // checked against the Dinkumware 0x3FFFFFFF cap and throwing
+      // std::length_error("list<T> too long") on overflow.
+      if (mEntryPoolSize == 0x3FFFFFFFu) {
+        throw std::length_error("list<T> too long");
+      }
       ++mEntryPoolSize;
     }
   }
