@@ -4,16 +4,33 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class SimArmySerializer
+  /**
+   * VFTABLE: 0x00E2FAC4
+   */
+  class SimArmySerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD9BC0 (FUN_00BD9BC0, dynamic initializer for the global
+     * `SimArmySerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SimArmySerializer();
+
+    /**
+     * Address: 0x00BFF380 (FUN_00BFF380, ??1SimArmySerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SimArmySerializer();
+
     /**
      * Address: 0x006FDB60 (FUN_006FDB60, Moho::SimArmySerializer::Deserialize)
      *
@@ -36,17 +53,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into SimArmy RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(SimArmySerializer, mHelperNext) == 0x04, "SimArmySerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SimArmySerializer, mHelperPrev) == 0x08, "SimArmySerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SimArmySerializer, mLoadCallback) == 0x0C, "SimArmySerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(SimArmySerializer, mSaveCallback) == 0x10, "SimArmySerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(SimArmySerializer) == 0x14, "SimArmySerializer size must be 0x14");

@@ -1,16 +1,14 @@
 #include "moho/sim/IArmySerializer.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <limits>
-#include <new>
 #include <typeinfo>
 
 #include "moho/sim/IArmy.h"
 #include "moho/sim/IArmyTypeInfo.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SSTIArmyConstantData.h"
-#include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/sim/SSTIArmyVariableData.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -45,83 +43,8 @@ namespace
   );
   static_assert(sizeof(IArmySerializedView) == 0x1E0, "IArmySerializedView size must be 0x1E0");
 
-  alignas(moho::IArmySerializer) unsigned char gIArmySerializerStorage[sizeof(moho::IArmySerializer)];
-  bool gIArmySerializerConstructed = false;
-
   gpg::RType* gSSTIArmyConstantDataType = nullptr;
   gpg::RType* gSSTIArmyVariableDataType = nullptr;
-
-  [[nodiscard]] moho::IArmySerializer* AcquireIArmySerializer()
-  {
-    if (!gIArmySerializerConstructed) {
-      new (gIArmySerializerStorage) moho::IArmySerializer();
-      gIArmySerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::IArmySerializer*>(gIArmySerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetIArmySerializerHelperLinks() noexcept
-  {
-    moho::IArmySerializer* const serializer = AcquireIArmySerializer();
-    serializer->mHelperNext->mPrev = serializer->mHelperPrev;
-    serializer->mHelperPrev->mNext = serializer->mHelperNext;
-    gpg::SerHelperBase* const self = SerializerSelfNode(*serializer);
-    serializer->mHelperPrev = self;
-    serializer->mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00550C50 (FUN_00550C50)
-   *
-   * What it does:
-   * Unlinks `IArmySerializer` helper node from the intrusive helper list and
-   * restores self-linked sentinel links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupIArmySerializerHelperNodePrimary() noexcept
-  {
-    return ResetIArmySerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00550C80 (FUN_00550C80)
-   *
-   * What it does:
-   * Secondary entrypoint for `IArmySerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupIArmySerializerHelperNodeSecondary() noexcept
-  {
-    return ResetIArmySerializerHelperLinks();
-  }
 
   [[nodiscard]] gpg::RType* ResolveIArmyType()
   {
@@ -150,18 +73,6 @@ namespace
       gSSTIArmyVariableDataType = gpg::LookupRType(typeid(moho::SSTIArmyVariableData));
     }
     return gSSTIArmyVariableDataType;
-  }
-
-  /**
-   * Address: 0x00BF4900 (FUN_00BF4900, cleanup_IArmySerializer)
-   */
-  void cleanup_IArmySerializer()
-  {
-    if (!gIArmySerializerConstructed) {
-      return;
-    }
-
-    (void)CleanupIArmySerializerHelperNodePrimary();
   }
 } // namespace
 
@@ -200,34 +111,6 @@ namespace moho
 
     gpg::RRef variableOwnerRef{};
     archive->Read(variableType, &view->mVariableData, variableOwnerRef);
-  }
-
-  /**
-   * Address: 0x00550F40 (FUN_00550F40)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one army-load lane into
-   * `IArmy::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeIArmyMemberThunkA(IArmy* const army, gpg::ReadArchive* const archive)
-  {
-    if (army != nullptr) {
-      army->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00550FA0 (FUN_00550FA0)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards one army-load lane into
-   * `IArmy::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeIArmyMemberThunkB(IArmy* const army, gpg::ReadArchive* const archive)
-  {
-    if (army != nullptr) {
-      army->MemberDeserialize(archive);
-    }
   }
 
   /**
@@ -369,6 +252,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC9B70 (FUN_00BC9B70, dynamic initializer for the global
+   * `IArmySerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  IArmySerializer::IArmySerializer()
+    : mLoadCallback(&IArmySerializer::Deserialize)
+    , mSaveCallback(&IArmySerializer::Serialize)
+  {}
+
+  IArmySerializer::~IArmySerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00550C00 (FUN_00550C00, Moho::IArmySerializer::Deserialize)
    */
   void IArmySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
@@ -397,7 +298,7 @@ namespace moho
   /**
    * Address: 0x00550E30 (FUN_00550E30, gpg::SerSaveLoadHelper_IArmy::Init)
    */
-  void IArmySerializer::RegisterSerializeFunctions()
+  void IArmySerializer::Init()
   {
     gpg::RType* const type = ResolveIArmyType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
@@ -405,36 +306,12 @@ namespace moho
     type->serLoadFunc_ = mLoadCallback;
     type->serSaveFunc_ = mSaveCallback;
   }
-
-  /**
-   * Address: 0x00BC9B70 (FUN_00BC9B70, register_IArmySerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper links/callbacks for `IArmy` and
-   * installs process-exit cleanup.
-   */
-  void register_IArmySerializer()
-  {
-    (void)preregister_SSTIArmyConstantDataTypeInfo();
-    auto* const serializer = AcquireIArmySerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mLoadCallback = &IArmySerializer::Deserialize;
-    serializer->mSaveCallback = &IArmySerializer::Serialize;
-    (void)std::atexit(&cleanup_IArmySerializer);
-  }
 } // namespace moho
 
 namespace
 {
-  struct IArmySerializerBootstrap
-  {
-    IArmySerializerBootstrap()
-    {
-      moho::register_IArmySerializer();
-    }
-  };
-
-  [[maybe_unused]] IArmySerializerBootstrap gIArmySerializerBootstrap;
+  // Address: 0x010AC364 -- process-global `IArmySerializer` singleton.
+  moho::IArmySerializer gIArmySerializer;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
