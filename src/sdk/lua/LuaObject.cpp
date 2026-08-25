@@ -118,17 +118,26 @@ extern "C" std::FILE* __cdecl __iob_func(void)
 // engine's `realloc_0` / `free_crt`. It was unreferenced, but it is exactly
 // the pairing Global.cpp warns about, so it is gone rather than dormant.
 
-class TableSerializer
+gpg::RType* Table::sType = nullptr;
+gpg::RType* Proto::sType = nullptr;
+
+class TableSerializer : public gpg::SerHelperBase
 {
 public:
 	/**
-	 * Address: 0x009233B0 (FUN_009233B0, init_TableSerializer)
+	 * Address: 0x00BEA380 (FUN_00BEA380, dynamic initializer for the global
+	 * `TableSerializer` singleton)
 	 *
 	 * What it does:
-	 * Initializes one table serializer helper runtime object by wiring intrusive
-	 * helper links and binding table deserialize/serialize callback lanes.
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
 	 */
-	static TableSerializer* Initialize(TableSerializer* serializer);
+	TableSerializer();
+
+	/**
+	 * Address: 0x00C09AF0 (FUN_00C09AF0, TableSerializer::~TableSerializer)
+	 */
+	~TableSerializer();
 
 	/**
 	 * Address: 0x009233A0 (FUN_009233A0, TableSerializer::Deserialize)
@@ -147,43 +156,62 @@ public:
 	 */
 	static void Serialize(gpg::WriteArchive* archive, Table* object, int version, gpg::RRef* ownerRef);
 
-	virtual void RegisterSerializeFunctions();
+	/**
+	 * Address: 0x0091FBC0 (FUN_0091FBC0, TableSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into `Table` RTTI.
+	 */
+	void Init() override;
 
-	gpg::SerHelperBase* mHelperNext;
-	gpg::SerHelperBase* mHelperPrev;
-	gpg::RType::load_func_t mDeserialize;
-	gpg::RType::save_func_t mSerialize;
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
 
-static_assert(offsetof(TableSerializer, mHelperNext) == 0x04, "TableSerializer::mHelperNext offset must be 0x04");
-static_assert(offsetof(TableSerializer, mHelperPrev) == 0x08, "TableSerializer::mHelperPrev offset must be 0x08");
 static_assert(offsetof(TableSerializer, mDeserialize) == 0x0C, "TableSerializer::mDeserialize offset must be 0x0C");
 static_assert(offsetof(TableSerializer, mSerialize) == 0x10, "TableSerializer::mSerialize offset must be 0x10");
 static_assert(sizeof(TableSerializer) == 0x14, "TableSerializer size must be 0x14");
 
 /**
- * Address: 0x009233B0 (FUN_009233B0, init_TableSerializer)
+ * Address: 0x00BEA380 (FUN_00BEA380, dynamic initializer for the global
+ * `TableSerializer` singleton)
  *
  * What it does:
- * Initializes one table serializer helper runtime object by wiring intrusive
- * helper links and binding table deserialize/serialize callback lanes.
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
  */
-TableSerializer* TableSerializer::Initialize(TableSerializer* serializer)
-{
-	if (serializer == nullptr) {
-		return nullptr;
-	}
-	serializer = new (serializer) TableSerializer();
+TableSerializer::TableSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&TableSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&TableSerializer::Serialize))
+{}
 
-	auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&serializer->mHelperNext);
-	serializer->mHelperNext = self;
-	serializer->mHelperPrev = self;
-	serializer->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&TableSerializer::Deserialize);
-	serializer->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&TableSerializer::Serialize);
-	return serializer;
+/**
+ * Address: 0x00C09AF0 (FUN_00C09AF0, TableSerializer::~TableSerializer)
+ */
+TableSerializer::~TableSerializer()
+{
+	ResetLinks();
 }
 
-void TableSerializer::RegisterSerializeFunctions() {}
+/**
+ * Address: 0x0091FBC0 (FUN_0091FBC0, TableSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into `Table` RTTI.
+ */
+void TableSerializer::Init()
+{
+	gpg::RType* type = Table::sType;
+	if (!type) {
+		type = gpg::LookupRType(typeid(Table));
+		Table::sType = type;
+	}
+
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
+}
 
 /**
  * Address: 0x009233A0 (FUN_009233A0, TableSerializer::Deserialize)
@@ -239,17 +267,23 @@ public:
 	static void Deserialize(gpg::ReadArchive* archive, LClosure* object, int version, gpg::RRef* ownerRef);
 };
 
-class ProtoSerializer
+class ProtoSerializer : public gpg::SerHelperBase
 {
 public:
 	/**
-	 * Address: 0x00923530 (FUN_00923530, ProtoSerializer::ProtoSerializer)
+	 * Address: 0x00BEA6B0 (FUN_00BEA6B0, dynamic initializer for the global
+	 * `ProtoSerializer` singleton)
 	 *
 	 * What it does:
-	 * Initializes one proto serializer helper node by self-linking intrusive
-	 * helper lanes and wiring deserialize/serialize callback slots.
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
 	 */
 	ProtoSerializer();
+
+	/**
+	 * Address: 0x00C09CA0 (FUN_00C09CA0, ProtoSerializer::~ProtoSerializer)
+	 */
+	~ProtoSerializer();
 
 	/**
 	 * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
@@ -267,16 +301,18 @@ public:
 	 */
 	static void Serialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
 
-	virtual void RegisterSerializeFunctions();
+	/**
+	 * Address: 0x00920070 (FUN_00920070, ProtoSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into `Proto` RTTI.
+	 */
+	void Init() override;
 
-	gpg::SerHelperBase* mHelperNext;
-	gpg::SerHelperBase* mHelperPrev;
-	gpg::RType::load_func_t mDeserialize;
-	gpg::RType::save_func_t mSerialize;
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
 
-static_assert(offsetof(ProtoSerializer, mHelperNext) == 0x04, "ProtoSerializer::mHelperNext offset must be 0x04");
-static_assert(offsetof(ProtoSerializer, mHelperPrev) == 0x08, "ProtoSerializer::mHelperPrev offset must be 0x08");
 static_assert(offsetof(ProtoSerializer, mDeserialize) == 0x0C, "ProtoSerializer::mDeserialize offset must be 0x0C");
 static_assert(offsetof(ProtoSerializer, mSerialize) == 0x10, "ProtoSerializer::mSerialize offset must be 0x10");
 static_assert(sizeof(ProtoSerializer) == 0x14, "ProtoSerializer size must be 0x14");
@@ -510,48 +546,52 @@ void LClosureSerializer::Deserialize(
 }
 
 /**
- * Address: 0x00923530 (FUN_00923530, ProtoSerializer::ProtoSerializer)
+ * Address: 0x00BEA6B0 (FUN_00BEA6B0, dynamic initializer for the global
+ * `ProtoSerializer` singleton)
  *
  * What it does:
- * Initializes one proto serializer helper node by self-linking intrusive
- * helper lanes and wiring deserialize/serialize callback slots.
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
  */
 ProtoSerializer::ProtoSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&ProtoSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&ProtoSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00C09CA0 (FUN_00C09CA0, ProtoSerializer::~ProtoSerializer)
+ */
+ProtoSerializer::~ProtoSerializer()
 {
-	auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&mHelperNext);
-	mHelperNext = self;
-	mHelperPrev = self;
-	mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&ProtoSerializer::Deserialize);
-	mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&ProtoSerializer::Serialize);
+	ResetLinks();
 }
 
-void ProtoSerializer::RegisterSerializeFunctions() {}
+/**
+ * Address: 0x00920070 (FUN_00920070, ProtoSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into `Proto` RTTI.
+ */
+void ProtoSerializer::Init()
+{
+	gpg::RType* type = Proto::sType;
+	if (!type) {
+		type = gpg::LookupRType(typeid(Proto));
+		Proto::sType = type;
+	}
+
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
+}
 
 namespace
 {
-	/**
-	 * Address: 0x00BEA380 (register_TableSerializer)
-	 * Address: 0x00BEA6B0 (register_ProtoSerializer)
-	 *
-	 * What it does:
-	 * Brings both serializer helpers into existence. Each self-links into its own
-	 * intrusive helper ring and binds its load/save callbacks - TableSerializer
-	 * through its Initialize lane, ProtoSerializer through its constructor - so
-	 * neither takes effect until something creates one. The binary drives both
-	 * from its CRT initializer table.
-	 */
-	alignas(TableSerializer) unsigned char gTableSerializerStorage[sizeof(TableSerializer)];
+	// Address: 0x00F8E72C -- process-global `TableSerializer` singleton.
+	TableSerializer gTableSerializer;
 
-	struct LuaValueSerializerBootstrap
-	{
-		LuaValueSerializerBootstrap()
-		{
-			(void)TableSerializer::Initialize(
-				reinterpret_cast<TableSerializer*>(gTableSerializerStorage));
-		}
-	};
-
-	LuaValueSerializerBootstrap gLuaValueSerializerBootstrap;
+	// Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
 	ProtoSerializer gProtoSerializer;
 }
 

@@ -98,6 +98,8 @@ struct Table
 	 * lanes, and hashed key/value lanes under owner GC traversal lock.
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, Table* object, int version, const gpg::RRef& ownerRef);
+
+	static gpg::RType* sType;
 };
 
 // Layout confirmed from the binary, not inferred: luaH_new (FUN_00927320)
@@ -225,6 +227,8 @@ struct Proto
 	 * and debug name/source pointer lanes, then validates bytecode consistency.
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+
+	static gpg::RType* sType;
 };
 
 struct UpVal
