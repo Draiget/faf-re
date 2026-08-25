@@ -9909,8 +9909,21 @@ namespace moho
    * What it does:
    * Decodes one serialized Lua payload from network chat bytes and invokes
    * `/lua/ui/game/gamemain.lua:ReceiveChat(senderName, payloadObject)`.
+   *
+   * Signature correction: the manager RTTI installed by the ReceiveChat
+   * `boost::bind` chain (0x0088FC70, `get_functor_type_tag`) publishes this
+   * function's pointer type as `void (__cdecl *)(gpg::StrArg, gpg::MemBuffer
+   * <char const> const &)` -- `void` return (the binary body at 0x0083EBC0
+   * never writes `eax` on its fall-through path) and `data` taken by const
+   * reference. The RTTI's `gpg::StrArg` is the *class*-typed original (see
+   * `gpg/core/utils/Logging.h`'s `LogScopeEntry` note and
+   * `CGpgNetInterface.cpp`'s `MakeConnectThreadLaunchCallback`): this SDK's
+   * `gpg::StrArg` is currently the simplified `= const char*` alias with no
+   * implicit conversion from `msvc8::string`, so this parameter is kept as
+   * `const msvc8::string&` -- matching that same already-documented,
+   * evidenced gap rather than reintroducing the class here.
    */
-  int func_ReceiveChat(const char* senderName, gpg::MemBuffer<const char> data);
+  void func_ReceiveChat(const msvc8::string& senderName, const gpg::MemBuffer<const char>& data);
 
   /**
    * Address: 0x0083EDF0 (FUN_0083EDF0, ?UI_StopCursorText@Moho@@YAXXZ)
