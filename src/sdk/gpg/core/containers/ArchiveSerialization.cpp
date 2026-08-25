@@ -9357,19 +9357,6 @@ namespace
   }
 
   /**
-   * Address: 0x00547450 (FUN_00547450)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ResourceDeposit`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoResourceDepositSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ResourceDeposit");
-  }
-
-  /**
    * Address: 0x0054C610 (FUN_0054C610)
    *
    * What it does:
