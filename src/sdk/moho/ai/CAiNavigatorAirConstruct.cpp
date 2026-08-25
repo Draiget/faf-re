@@ -19,24 +19,6 @@ namespace gpg
 
 namespace
 {
-  alignas(CAiNavigatorAirConstruct) unsigned char gCAiNavigatorAirConstructStorage[sizeof(CAiNavigatorAirConstruct)] = {};
-  bool gCAiNavigatorAirConstructConstructed = false;
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNode(CAiNavigatorAirConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  [[nodiscard]] CAiNavigatorAirConstruct* AcquireCAiNavigatorAirConstruct()
-  {
-    if (!gCAiNavigatorAirConstructConstructed) {
-      new (gCAiNavigatorAirConstructStorage) CAiNavigatorAirConstruct();
-      gCAiNavigatorAirConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorAirConstruct*>(gCAiNavigatorAirConstructStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiNavigatorAirType()
   {
     gpg::RType* type = CAiNavigatorAir::sType;
@@ -85,51 +67,33 @@ namespace
     result->SetUnowned(MakeCAiNavigatorAirRef(object), 0u);
   }
 
+  // Address: 0x010AE848 -- process-global `CAiNavigatorAirConstruct` singleton.
+  // Constructing it runs CAiNavigatorAirConstruct::CAiNavigatorAirConstruct()
+  // (0x00BCC840), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  CAiNavigatorAirConstruct gCAiNavigatorAirConstruct;
+
   /**
    * Address: 0x00BF6F40 (FUN_00BF6F40, cleanup_CAiNavigatorAirConstruct)
    *
    * What it does:
-   * Unlinks recovered CAiNavigatorAir construct helper node from intrusive
-   * serializer chain.
+   * Unlinks the `CAiNavigatorAirConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BCC840) as the
+   * global's `atexit` teardown. `FUN_005A5600` is a duplicate-emission twin
+   * of this exact unlink/reset lane (same `ResetLinks()` shape, folded to a
+   * separate address); it has no distinct source-level body of its own.
    */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorAirConstruct()
+  void CleanupCAiNavigatorAirConstructStartup()
   {
-    if (!gCAiNavigatorAirConstructConstructed) {
-      return nullptr;
-    }
-
-    CAiNavigatorAirConstruct* const construct = AcquireCAiNavigatorAirConstruct();
-    gpg::SerHelperBase* const self = HelperNode(*construct);
-    if (construct->mHelperNext != nullptr && construct->mHelperPrev != nullptr) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
-    construct->mHelperNext = self;
-    construct->mHelperPrev = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x005A5600 (FUN_005A5600)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the global
-   * `CAiNavigatorAirConstruct` helper node and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorAirConstructStartupThunk()
-  {
-    return cleanup_CAiNavigatorAirConstruct();
-  }
-
-  void cleanup_CAiNavigatorAirConstruct_atexit()
-  {
-    (void)cleanup_CAiNavigatorAirConstruct();
+    gCAiNavigatorAirConstruct.ResetLinks();
   }
 } // namespace
 
 /**
-  * Alias of FUN_005A5630 (non-canonical helper lane).
+ * Alias of FUN_005A5630 (non-canonical helper lane).
  */
 void CAiNavigatorAirConstruct::Construct(
   gpg::ReadArchive* const,
@@ -153,49 +117,32 @@ void CAiNavigatorAirConstruct::Deconstruct(void* const object)
 }
 
 /**
- * Address: 0x005A74D0 (FUN_005A74D0)
+ * Address: 0x00BCC840 (FUN_00BCC840, dynamic initializer for the global
+ * `CAiNavigatorAirConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * registers process-exit cleanup.
+ */
+CAiNavigatorAirConstruct::CAiNavigatorAirConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorAirConstruct::Construct))
+  , mDeleteCallback(&CAiNavigatorAirConstruct::Deconstruct)
+{
+  (void)std::atexit(&CleanupCAiNavigatorAirConstructStartup);
+}
+
+/**
+ * Address: 0x005A74D0 (FUN_005A74D0, gpg::SerConstructHelper_CAiNavigatorAir::Init)
  *
  * What it does:
  * Lazily resolves CAiNavigatorAir RTTI and installs construct/delete callbacks
  * from this helper object into the type descriptor.
  */
-void CAiNavigatorAirConstruct::RegisterConstructFunction()
+void CAiNavigatorAirConstruct::Init()
 {
   gpg::RType* const type = CachedCAiNavigatorAirType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
 }
-
-/**
- * Address: 0x00BCC840 (FUN_00BCC840, register_CAiNavigatorAirConstruct)
- *
- * What it does:
- * Initializes the global CAiNavigatorAir construct helper callbacks and
- * installs process-exit cleanup.
- */
-int moho::register_CAiNavigatorAirConstruct()
-{
-  CAiNavigatorAirConstruct* const construct = AcquireCAiNavigatorAirConstruct();
-  gpg::SerHelperBase* const self = HelperNode(*construct);
-  construct->mHelperNext = self;
-  construct->mHelperPrev = self;
-  construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorAirConstruct::Construct);
-  construct->mDeleteCallback = &CAiNavigatorAirConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiNavigatorAirConstruct_atexit);
-}
-
-namespace
-{
-  struct CAiNavigatorAirConstructBootstrap
-  {
-    CAiNavigatorAirConstructBootstrap()
-    {
-      (void)moho::register_CAiNavigatorAirConstruct();
-    }
-  };
-
-  [[maybe_unused]] CAiNavigatorAirConstructBootstrap gCAiNavigatorAirConstructBootstrap;
-} // namespace
-
