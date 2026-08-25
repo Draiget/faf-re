@@ -42,6 +42,41 @@ static_assert(offsetof(PngStructWeightedFilterView, inv_filter_costs)    == 0x14
 struct png_struct_def;
 using png_structp = png_struct_def*;
 
+// Opaque png_info forward declaration. The full layout (png_info_struct) is
+// defined in PngSetRuntime.h; declarations here only need the pointer type.
+struct png_info_struct;
+using png_infop  = png_info_struct*;
+using png_infopp = png_info_struct**;
+
+// Opaque png_sPLT_t forward declaration (full layout in PngSetRuntime.h).
+struct png_sPLT_t;
+
+// libpng png_color_16 (10-byte record): palette index + 16-bit RGB + gray.
+// Used verbatim (no byte-swap) as the in-memory representation of
+// png_info::trans_values (tRNS) and png_info::background (bKGD); only the
+// PNG chunk bytes written to the stream are big-endian (via png_save_uint_16).
+//
+// Binary evidence: png_write_tRNS (0x00A25649) and png_write_bKGD
+// (0x00A25753) both index a supplied png_color_16* as
+// ((uint16_t*)p)[1..3] for red/green/blue and ((uint16_t*)p)[4] for gray,
+// matching {index; pad; red; green; blue; gray;} with red at +0x02.
+struct png_color_16
+{
+  std::uint8_t  index;    // +0x00  palette index (PNG_COLOR_TYPE_PALETTE)
+  std::uint8_t  pad_01;   // +0x01  alignment
+  std::uint16_t red;      // +0x02
+  std::uint16_t green;    // +0x04
+  std::uint16_t blue;     // +0x06
+  std::uint16_t gray;     // +0x08
+};
+static_assert(sizeof(png_color_16) == 0x0A, "png_color_16 size must be 0x0A");
+static_assert(offsetof(png_color_16, index) == 0x00, "png_color_16::index at +0x00");
+static_assert(offsetof(png_color_16, red)   == 0x02, "png_color_16::red at +0x02");
+static_assert(offsetof(png_color_16, green) == 0x04, "png_color_16::green at +0x04");
+static_assert(offsetof(png_color_16, blue)  == 0x06, "png_color_16::blue at +0x06");
+static_assert(offsetof(png_color_16, gray)  == 0x08, "png_color_16::gray at +0x08");
+using png_color_16p = const png_color_16*;
+
 // Libpng helper: issue a warning message via the struct's error handler.
 extern "C" void png_warning(png_structp png_ptr, const char* message);
 extern "C" void png_error(png_structp png_ptr, const char* message);
@@ -295,3 +330,364 @@ extern "C" void png_write_iCCP(
   char* profile,
   int profileDataLength
 );
+
+// ============================================================================
+// png_write_IHDR chain: IHDR chunk, ancillary chunk writers, png_write_info*
+// ============================================================================
+
+/**
+ * Address: 0x00A23DD1 (FUN_00A23DD1)
+ * Mangled: png_save_uint_16
+ *
+ * IDA signature:
+ * png_bytep __cdecl png_save_uint_16(png_bytep buf, unsigned int i);
+ *
+ * What it does:
+ * Stores a 16-bit value into a 2-byte buffer in big-endian (network) byte
+ * order. The binary returns buf, which every caller discards (matching
+ * png_save_uint_32's convention in this file).
+ */
+extern "C" void png_save_uint_16(std::uint8_t* buf, std::uint16_t value);
+
+/**
+ * Address: 0x00A23DAE (FUN_00A23DAE)
+ * Mangled: png_save_int_32
+ *
+ * IDA signature:
+ * png_bytep __cdecl png_save_int_32(png_bytep buf, png_int_32 i);
+ *
+ * What it does:
+ * Stores a signed 32-bit value into a 4-byte buffer in big-endian order
+ * (identical bit pattern to png_save_uint_32; libpng keeps it as a distinct
+ * entry point for the signed ancillary chunks oFFs/pCAL). Return value
+ * (buf) is discarded by every caller.
+ */
+extern "C" void png_save_int_32(std::uint8_t* buf, std::int32_t value);
+
+/**
+ * Address: 0x00A24B90 (FUN_00A24B90)
+ * Mangled: png_write_IHDR
+ *
+ * IDA signature:
+ * int __cdecl png_write_IHDR(png_structp png_ptr, png_uint_32 width,
+ *   png_uint_32 height, int bit_depth, int color_type, int compression_type,
+ *   int filter_type, int interlace_type);
+ *
+ * What it does:
+ * Validates bit_depth against color_type (raises png_error on an invalid
+ * combination) and derives png_ptr->channels. Normalises out-of-range
+ * compression_type / filter_type / interlace_type to their defaults
+ * (warning each). Stores bit_depth/color_type/interlaced/compression_type/
+ * width/height/pixel_depth/rowbytes/usr_width/usr_bit_depth/usr_channels on
+ * png_ptr, writes the 13-byte IHDR chunk, then seeds png_ptr->do_filter and
+ * the zlib level/method/window_bits/mem_level/strategy defaults (only the
+ * lanes not already overridden via png_set_compression_*) before calling
+ * deflateInit2_ and pointing zstream.next_out/avail_out at zbuf. Sets
+ * png_ptr->mode = PNG_HAVE_IHDR.
+ *
+ * Sole caller: png_write_info_before_PLTE (0x009E78EB).
+ */
+extern "C" void png_write_IHDR(
+  png_structp   png_ptr,
+  std::uint32_t width,
+  std::uint32_t height,
+  int           bit_depth,
+  int           color_type,
+  int           compression_type,
+  int           filter_type,
+  int           interlace_type
+);
+
+/**
+ * Address: 0x00A23E76 (FUN_00A23E76)
+ * Mangled: png_write_sig
+ *
+ * IDA signature:
+ * void __cdecl png_write_sig(png_structp png_ptr);
+ *
+ * What it does:
+ * Writes the remaining PNG signature bytes based on `sig_bytes` (bytes
+ * already written, e.g. via png_set_sig_bytes) and marks
+ * PNG_HAVE_PNG_SIGNATURE on png_ptr->mode when fewer than three bytes were
+ * already present.
+ *
+ * Sole caller: png_write_info_before_PLTE (0x009E78EB).
+ */
+extern "C" void png_write_sig(png_structp png_ptr);
+
+/**
+ * Address: 0x00A241CB (FUN_00A241CB)
+ * Mangled: png_write_PLTE
+ *
+ * IDA signature:
+ * void __cdecl png_write_PLTE(png_structp png_ptr, png_colorp palette, png_uint_32 num_pal);
+ *
+ * What it does:
+ * Validates the palette entry count (0 or >256 is an error for paletted
+ * images, a warning-and-skip otherwise; MNG's empty-PLTE exception via
+ * mng_features_permitted is honoured) and that the image is a colour type
+ * (warns and skips for grayscale). Stores num_pal into png_ptr->num_palette,
+ * writes one PLTE chunk (3 bytes per entry: red, green, blue — packed
+ * png_color, no byte-swap), and sets PNG_HAVE_PLTE on png_ptr->mode.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_PLTE(png_structp png_ptr, const std::uint8_t* palette, std::uint32_t num_pal);
+
+/**
+ * Address: 0x00A24274 (FUN_00A24274)
+ * Mangled: png_write_hIST
+ *
+ * IDA signature:
+ * void __cdecl png_write_hIST(png_structp png_ptr, png_uint_16p hist, int num_hist);
+ *
+ * What it does:
+ * Warns and skips when num_hist exceeds png_ptr->num_palette; otherwise
+ * writes one hIST chunk (one big-endian uint16 frequency value per palette
+ * entry).
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_hIST(png_structp png_ptr, const std::uint16_t* hist, int num_hist);
+
+/**
+ * Address: 0x00A2446B (FUN_00A2446B)
+ * Mangled: png_write_tEXt
+ *
+ * IDA signature:
+ * void __cdecl png_write_tEXt(png_structp png_ptr, png_charp key, png_charp text, png_size_t text_len);
+ *
+ * What it does:
+ * Normalises `key` via png_check_keyword (warns and returns on an empty
+ * keyword); measures text_len itself via strlen (the binary's text_len
+ * parameter is never read — MSVC dropped it from this compiled entry
+ * point's real 3-argument call sites). Writes one tEXt chunk
+ * (key + NUL + optional text bytes) and frees the checked keyword buffer.
+ *
+ * Caller: png_write_info (0x009E7A92), and png_write_zTXt's uncompressed
+ * fallback (0x00A244FB).
+ */
+extern "C" void png_write_tEXt(png_structp png_ptr, char* key, char* text);
+
+/**
+ * Address: 0x00A244FB (FUN_00A244FB)
+ * Mangled: png_write_zTXt
+ *
+ * IDA signature:
+ * void __cdecl png_write_zTXt(png_structp png_ptr, png_charp key, png_charp text,
+ *   png_size_t text_len, int compression);
+ *
+ * What it does:
+ * Normalises `key` via png_check_keyword. When text is empty or compression
+ * is PNG_TEXT_COMPRESSION_NONE(-1), falls back to png_write_tEXt with the
+ * *checked* keyword and frees it. Otherwise measures text_len via strlen,
+ * frees the checked keyword immediately (binary quirk: the chunk itself is
+ * later written from the *original*, unchecked `key` pointer, using only
+ * the checked length), deflates the text through png_text_compress, writes
+ * one zTXt chunk (key + NUL + compression byte + compressed payload), and
+ * closes it. The binary's text_len parameter is never read (its call sites
+ * pass a literal 0) so this recovery drops it, matching png_write_tEXt.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_zTXt(png_structp png_ptr, std::uint8_t* key, char* text, int compression);
+
+/**
+ * Address: 0x00A245CB (FUN_00A245CB)
+ * Mangled: png_write_pCAL
+ *
+ * IDA signature:
+ * void __cdecl png_write_pCAL(png_structp png_ptr, png_charp purpose, png_int_32 X0,
+ *   png_int_32 X1, int type, int nparams, png_charp units, png_charpp params);
+ *
+ * What it does:
+ * Warns on an unrecognised equation type. Normalises `purpose` via
+ * png_check_keyword, measures `units` and each of the `nparams` parameter
+ * strings via strlen (each NUL-separated except the very last), sums the
+ * total chunk length, writes the pCAL chunk (purpose, X0, X1, type,
+ * nparams, units, then each parameter string in turn), and frees the
+ * checked purpose buffer plus the temporary parameter-length array.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_pCAL(
+  png_structp png_ptr, char* purpose, std::int32_t X0, std::int32_t X1,
+  int type, int nparams, char* units, char** params
+);
+
+/**
+ * Address: 0x00A24733 (FUN_00A24733)
+ * Mangled: png_write_sCAL
+ *
+ * IDA signature:
+ * void __cdecl png_write_sCAL(png_structp png_ptr, int unit, double width, double height);
+ *
+ * What it does:
+ * Formats width and height as "%12.12e" C strings and writes one sCAL
+ * chunk (unit byte, width string + NUL, height string).
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_sCAL(png_structp png_ptr, int unit, double width, double height);
+
+/**
+ * Address: 0x00A25023 (FUN_00A25023)
+ * Mangled: png_write_sPLT
+ *
+ * IDA signature:
+ * void __cdecl png_write_sPLT(png_structp png_ptr, png_sPLT_tp spalette);
+ *
+ * What it does:
+ * Normalises spalette->name via png_check_keyword (warns and returns on an
+ * empty keyword). Computes entry_size (6 bytes for depth 8, 10 bytes for
+ * depth 16) and writes one sPLT chunk: checked name + NUL, depth byte, then
+ * each of spalette->nentries palette entries packed to entry_size bytes
+ * (depth 8 truncates each 16-bit red/green/blue/alpha to its low byte but
+ * keeps frequency as a full big-endian uint16; depth 16 writes all five
+ * fields as big-endian uint16). Frees the checked name buffer.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_sPLT(png_structp png_ptr, const png_sPLT_t* spalette);
+
+/**
+ * Address: 0x00A25649 (FUN_00A25649)
+ * Mangled: png_write_tRNS
+ *
+ * IDA signature:
+ * void __cdecl png_write_tRNS(png_structp png_ptr, png_bytep trans, png_color_16p tran,
+ *   int num_trans, int color_type);
+ *
+ * What it does:
+ * For PNG_COLOR_TYPE_PALETTE, validates num_trans against
+ * png_ptr->num_palette and writes the raw per-palette-entry alpha bytes
+ * verbatim. For PNG_COLOR_TYPE_GRAY, writes tran->gray as one big-endian
+ * uint16 (after an out-of-range-for-bit_depth check). For
+ * PNG_COLOR_TYPE_RGB, writes tran->red/green/blue as three big-endian
+ * uint16 values (warns and skips if bit_depth is 8 but any high byte is
+ * non-zero). Any other color_type (an alpha channel already present) warns
+ * and writes nothing.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_tRNS(
+  png_structp png_ptr, const std::uint8_t* trans, const png_color_16* trans_values,
+  int num_trans, int color_type
+);
+
+/**
+ * Address: 0x00A25753 (FUN_00A25753)
+ * Mangled: png_write_bKGD
+ *
+ * IDA signature:
+ * void __cdecl png_write_bKGD(png_structp png_ptr, png_color_16p back, int color_type);
+ *
+ * What it does:
+ * For PNG_COLOR_TYPE_PALETTE, writes back->index as one byte (validated
+ * against png_ptr->num_palette, with the MNG empty-PLTE exception). For
+ * colour types, writes back->red/green/blue as three big-endian uint16
+ * values (warns and skips if bit_depth is 8 but any high byte is non-zero).
+ * Otherwise writes back->gray as one big-endian uint16 (after an
+ * out-of-range-for-bit_depth check).
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_bKGD(png_structp png_ptr, const png_color_16* back, int color_type);
+
+/**
+ * Address: 0x00A25857 (FUN_00A25857)
+ * Mangled: png_write_oFFs
+ *
+ * IDA signature:
+ * void __cdecl png_write_oFFs(png_structp png_ptr, png_int_32 x_offset,
+ *   png_int_32 y_offset, int unit_type);
+ *
+ * What it does:
+ * Warns on an unrecognised unit_type (>= PNG_OFFSET_LAST) and writes one
+ * 9-byte oFFs chunk (signed x_offset, signed y_offset, unit_type byte).
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_oFFs(png_structp png_ptr, std::int32_t x_offset, std::int32_t y_offset, int unit_type);
+
+/**
+ * Address: 0x00A258BE (FUN_00A258BE)
+ * Mangled: png_write_pHYs
+ *
+ * IDA signature:
+ * void __cdecl png_write_pHYs(png_structp png_ptr, png_uint_32 x_pixels_per_unit,
+ *   png_uint_32 y_pixels_per_unit, int unit_type);
+ *
+ * What it does:
+ * Warns on an unrecognised unit_type (>= PNG_RESOLUTION_LAST) and writes
+ * one 9-byte pHYs chunk (x/y pixels-per-unit, unit_type byte).
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_pHYs(png_structp png_ptr, std::uint32_t x_pixels_per_unit, std::uint32_t y_pixels_per_unit, int unit_type);
+
+/**
+ * Address: 0x00A25925 (FUN_00A25925)
+ * Mangled: png_write_tIME
+ *
+ * IDA signature:
+ * void __cdecl png_write_tIME(png_structp png_ptr, png_timep mod_time);
+ *
+ * What it does:
+ * Validates month/day/hour/second ranges (warns and returns on any
+ * violation; minute is unchecked, matching upstream libpng) and writes one
+ * 7-byte tIME chunk (big-endian uint16 year, then month/day/hour/minute/
+ * second bytes). Takes a raw 8-byte png_time image (year u16 + m/d/h/m/s),
+ * matching png_set_tIME's established convention in this codebase.
+ *
+ * Caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_tIME(png_structp png_ptr, const std::uint8_t* mod_time);
+
+/**
+ * Address: 0x009E78EB (FUN_009E78EB)
+ * Mangled: png_write_info_before_PLTE
+ *
+ * IDA signature:
+ * void __cdecl png_write_info_before_PLTE(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * One-shot guard on PNG_WROTE_INFO_BEFORE_PLTE (png_ptr->mode & 0x400):
+ * writes the PNG signature (png_write_sig), clears mng_features_permitted
+ * with a warning if MNG features were permitted but the signature was
+ * already written, writes the IHDR chunk (png_write_IHDR) from
+ * info_ptr->width/height/bit_depth/color_type/compression_type/
+ * filter_type/interlace_type, then conditionally writes gAMA / sRGB / iCCP
+ * / sBIT / cHRM per info_ptr->valid, then walks info_ptr->unknown_chunks
+ * looking for entries not yet located after PLTE that are safe (or forced)
+ * to copy, writing each via png_write_chunk. Finally sets
+ * PNG_WROTE_INFO_BEFORE_PLTE on png_ptr->mode.
+ *
+ * Sole caller: png_write_info (0x009E7A92).
+ */
+extern "C" void png_write_info_before_PLTE(png_structp png_ptr, png_infop info_ptr);
+
+/**
+ * Address: 0x009E7A92 (FUN_009E7A92)
+ * Mangled: png_write_info
+ *
+ * IDA signature:
+ * void __cdecl png_write_info(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * Calls png_write_info_before_PLTE, then writes PLTE (or raises png_error
+ * for a paletted image with no palette supplied), tRNS, bKGD, hIST, oFFs,
+ * pCAL, sCAL, pHYs, tIME, and each sPLT record, each gated on the
+ * corresponding info_ptr->valid bit. Walks info_ptr->text, writing each
+ * record as tEXt/zTXt (international/iTXt-compression records are
+ * unsupported here and only warned) and marking each record's compression
+ * field with its "already written" sentinel so a second call is a no-op.
+ * Finally walks info_ptr->unknown_chunks for entries located after PLTE but
+ * before IDAT that are safe (or forced) to copy, writing each via
+ * png_write_chunk.
+ *
+ * Callers: wxPNGHandler::SaveFile (0x00975370), png_write_png (0x009E8AB8).
+ * Both remain unrecovered (separate wx image-handler / top-level-API
+ * subsystems) — see the recovery report for this token.
+ */
+extern "C" void png_write_info(png_structp png_ptr, png_infop info_ptr);
