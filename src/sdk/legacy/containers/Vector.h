@@ -4570,6 +4570,23 @@ namespace msvc8
          * previously listed `FUN_008FE940` itself `external_dependency` for
          * the same wrong reason; corrected to `recovered` here.
          *
+         * Address: 0x00832BE0 (FUN_00832BE0, `msvc8::vector<UICommandGraph::
+         * HashListNode2C*>::uninit_copy_n` for the 4-byte pointer element --
+         * `for (; a3 != a2; ++result) { if (result) *result = *a3; ++a3; }`,
+         * a per-element pointer-assignment loop that is byte-for-byte
+         * equivalent to this member's `memcpy(dst, src, n*4)` trivially-
+         * copyable path (same `HashListNode2C*` instantiation `resize`
+         * above already cites via its `_Insert_n` lane FUN_0082F7A0, `skip`'d
+         * as a RULE ONE compiler/template emission). Reached from
+         * `_Insert_n`'s reallocation copy-the-old-range step for this
+         * instantiation (`FUN_0082F7A0`) and, via a thin calling-convention
+         * bridge with no logic of its own, from sibling `HashListNode2C*`
+         * emissions not yet individually recovered.
+         * Address: 0x00831910 (FUN_00831910, the calling-convention bridge
+         * described immediately above -- `int __thiscall sub_831910(this,
+         * a2, a3) { LOBYTE(this) = 0; return sub_832BE0(a3, this, this); }`,
+         * pure register-shuffle into FUN_00832BE0 with no logic of its own.)
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -4798,6 +4815,16 @@ namespace msvc8
          * `push_back`'s (`FUN_0057D820`, already recovered above)
          * capacity-full path, whose `insert(end(), 1, value)` fallback calls
          * this with `n=1`.)
+         * Address: 0x0057EEF0 (FUN_0057EEF0, the advance-returning `_Ufill`
+         * adapter around FUN_00583180 for this same `SAiAttackVectorDebug`
+         * specialization -- `int __userpurge sub_57EEF0(dest@ecx, gapPtr@edi,
+         * count@esi, value) { uninit_fill_n(value, count, gapPtr); return
+         * gapPtr + 24*count; }`, matching the `_Ufill` adapter shape already
+         * documented on FUN_00868580 above. Reached from the `_Insert_n`
+         * emission for this same 24-byte element (FUN_00580150, `skip`'d as
+         * a RULE ONE compiler/template emission already modeled generically
+         * by `insert`/`_Insert_n` below) to fill the vacated gap and advance
+         * past it.)
          * Address: 0x007E9700 (FUN_007E9700, `msvc8::vector<
          * Moho::MeshRenderer's palette entry type>::uninit_fill_n` for the
          * 0x10-byte (4-float) element -- broadcasts the caller's zeroed
