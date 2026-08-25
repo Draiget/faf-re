@@ -2324,6 +2324,28 @@ namespace msvc8
          * not external. Reached from `Sim.cpp:8498`'s
          * `outSyncData->mNewGrids.resize(armyCount)` call by name, already
          * recovered.)
+         *
+         * Address: 0x0092FC60 (FUN_0092FC60, sub_92FC60, IDA-named
+         * `std::vector_MapNode::resize`) -- `msvc8::vector<iterator>::
+         * resize(n, val)` for `ClusterInternalCache<gpg::HaStar::
+         * OccupationData>::mVec` (`OccupationCacheRuntimeMap`,
+         * `gpg/core/algorithms/Cluster.cpp`) -- same 4-byte `list<pair<const
+         * OccupationCacheKey, Cluster::Data*>>::iterator` element as
+         * `insert`'s `FUN_0092F9E0` above. Grows via that
+         * `insert(last_, newSize-cur, val)` call; shrinks via the erase
+         * lane `FUN_0092EA10` (not part of this pass). Reached from
+         * `hash_map<OccupationCacheKey,...>::insert(value)`'s inlined
+         * `_Grow()` (`FUN_00930890`, IDA-named
+         * `std::hash_map_unk_unk::insert`, sole caller per
+         * `_callgraph_index.sqlite`) -- `mVec.resize(2 * windowCount - 1,
+         * mList.end())` in `legacy/containers/HashMap.h`'s `_Grow()`,
+         * instantiated for this `hash_map`. DB-integrity fix: was
+         * `external_dependency` ("STL template instantiation / codec
+         * helper - external") -- this is this project's own `msvc8::
+         * vector<iterator>` internals for an engine-owned hash_map
+         * instantiation, not external code. This is the `OccupationData`
+         * counterpart of the `SubclusterData` emission `FUN_00934130`
+         * referenced (but not independently cited) on `insert` above.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -2798,6 +2820,30 @@ namespace msvc8
          * Address: 0x0082FB80 (FUN_0082FB80, the MapD emission of the same)
          * Address: 0x0082DBA0 (FUN_0082DBA0, the HashListNode88 draw-node table's
          * `mBuckets.assign(9, mListHead)` emission, UICommandGraph::PrepareForRebuild)
+         * Address: 0x009303F0 (FUN_009303F0, sub_9303F0) -- `msvc8::
+         * vector<iterator>::assign(count, value)` for `ClusterInternalCache<
+         * gpg::HaStar::OccupationData>::mVec` (`OccupationCacheRuntimeMap`,
+         * `gpg/core/algorithms/Cluster.cpp`) -- same 4-byte `iterator`
+         * element as `insert`'s `FUN_0092F9E0` above. Builds `localValue`
+         * from the by-ref value param exactly like this member's own
+         * `const T localValue(value)`, then unconditionally calls
+         * `insert(first_, count, localValue)` (`FUN_0092F9E0`) -- the
+         * binary's `if (first_ != last_) last_ = first_` is the compiled
+         * `clear()` (`destroy_all(); last_ = first_;`, a no-op destroy pass
+         * for this trivially-destructible element) with a redundant-store
+         * guard the compiler added around the unconditional pointer write,
+         * not a divergence from this member's unconditional `clear()` call.
+         * Reached from `hash_map<OccupationCacheKey,...>`'s default
+         * constructor (`FUN_00930810`, a 1-statement thiscall thunk into
+         * this token, cited as `skip`) and from `clear()` (`FUN_00930B40`,
+         * IDA-named `std::hash_map_unk_unk::clear`) -- both call sites are
+         * `_Init()`'s `mVec.assign(Traits::min_buckets + 1, mList.end())`
+         * (`legacy/containers/HashMap.h`), matching the already-proven
+         * `assign(9, sentinel)` bucket-vector-init idiom documented above
+         * for the UICommandGraph/HashListNode88 tables. `_Init()` previously
+         * read `mVec.clear(); mVec.resize(...)` as two separate calls --
+         * behaviourally identical, but updated to a single `assign` call to
+         * match this fused compiled shape and the proven idiom.)
          *
          * What it does:
          * The VC8 `vector<T>::assign(_Count, _Val)` lane: copies `_Val` into a
@@ -4528,6 +4574,56 @@ namespace msvc8
          * own decompile carries a spurious `__noreturn` tag; the function
          * returns normally. Sole caller is `resize`'s `FUN_0074D190`
          * above.
+         *
+         * Address: 0x0092F9E0 (FUN_0092F9E0, sub_92F9E0) -- `msvc8::
+         * vector<iterator>::insert(pos, count, value)` for `msvc8::hash_map<
+         * OccupationCacheKey, gpg::HaStar::Cluster::Data*, hash_compare<
+         * OccupationCacheKey, OccupationKeyOrder>>::mVec`
+         * (`OccupationCacheRuntimeMap`, `ClusterInternalCache<gpg::HaStar::
+         * OccupationData>::mVec`, `gpg/core/algorithms/Cluster.cpp`) -- the
+         * bucket-index vector whose element is `msvc8::list<std::pair<const
+         * OccupationCacheKey, Cluster::Data*>>::iterator`, a single 4-byte
+         * `_Nodeptr` wrapper (this file's own `list<T>::iterator`), matching
+         * the `0x3FFFFFFF` (`0xFFFFFFFF/4`) `max_size` fold this body
+         * carries. Carries this method's full two-branch shape: `sub_92F0D0`
+         * is `throw_too_long` (cited below), `sub_92C1E0` is
+         * `allocate_slots_checked` (cited below, `sizeof(T)==4` group), the
+         * in-place branches' `sub_92ED90` and the reallocation branch's
+         * `sub_92D810` are this instantiation's `uninit_move_n` (cited
+         * below -- `sub_92D810` is already `skip`, an ICF twin of
+         * `FUN_008D8190`; `sub_92ED90` is the calling-convention entry the
+         * in-place branches call, itself tail-calling that same primitive),
+         * and `sub_92EA50`/`sub_92DF90` are this instantiation's
+         * `uninit_fill_n` (cited below as the advance-returning `_Ufill`
+         * adapter -- `sub_92DF90` is already `skip`, an ICF twin of
+         * `FUN_008EA0D0`). The in-place branch's backward tail-shift
+         * (`sub_92DCB0`) and gap-fill-assign (`sub_92D130`) loops match this
+         * method's own `std::memmove` (trivially-copyable branch) and
+         * `insertAt[i] = localValue` lines directly -- no separate template
+         * member, the same treatment as the `SSTIArmyVariableData` entry's
+         * "own uninit-copy/shift helpers" above.
+         *
+         * Reached from `resize(n, val)`'s grow branch (`FUN_0092FC60`,
+         * IDA-named `std::vector_MapNode::resize`, cited below on
+         * `resize`), itself called from `hash_map<OccupationCacheKey,...>::
+         * insert(value)` (`FUN_00930890`, IDA-named
+         * `std::hash_map_unk_unk::insert`, `_Grow()` inlined) when the load
+         * factor is exceeded -- the source-level trigger is
+         * `ClusterInternalCache<OccupationData>::Fetch`'s
+         * `mVec.insert(OccupationCacheRuntimeMap::value_type(key,
+         * built.mData))`, `Cluster.cpp:3687`, already recovered. Also
+         * reached from `assign(count, value)`'s `insert(first_, count,
+         * localValue)` call (`FUN_009303F0`, cited below on `assign`),
+         * itself reached from `_Init()`'s `mVec.assign(Traits::min_buckets +
+         * 1, mList.end())` (`legacy/containers/HashMap.h`) via both the
+         * default constructor (`FUN_00930810`, thunk) and `clear()`
+         * (`FUN_00930B40`, IDA-named `std::hash_map_unk_unk::clear`).
+         * `FUN_00933950`/`0x00934130` cited above are this template's
+         * sibling emission for `SubclusterCacheRuntimeMap`
+         * (`ClusterInternalCache<SubclusterData>::mVec`) -- a distinct C++
+         * `iterator` type (different `Key` in `list<pair<const Key,T>>`)
+         * with the identical 4-byte-trivial shape, not ICF-folded across
+         * because the two are separate instantiations.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5261,6 +5357,44 @@ namespace msvc8
          * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
          * the address never appeared in.
          *
+         * Address: 0x007574E0 (FUN_007574E0, sub_7574E0) --
+         * `msvc8::vector<Moho::SimArmy*>::uninit_copy_n` for the 4-byte
+         * pointer element -- `for (; a2 != a3; ++result) { if (result)
+         * *result = *a2; ++a2; }`, the same per-element pointer-assignment
+         * loop family as `FUN_005CE060`/`FUN_00832BE0` above, has 24 ICF
+         * twins. Reached from `reserve(n)`'s emission for this
+         * instantiation (`FUN_0074F720`, corrected below from a wrong
+         * `external_dependency` tag -- reachability root is
+         * `??_7?$RVectorType@PAVSimArmy@Moho@@@gpg@@6B@`): `if (a2 >
+         * 0x3FFFFFFF) throw; ...grow via sub_704530/operator new...;
+         * sub_7574E0(v8,v7)` to copy the old range into the new buffer,
+         * matching this member's reallocation-copy role exactly.
+         * `FUN_0074F720`'s own caller, `FUN_0074E240`, is already
+         * `recovered` in `gpg/core/reflection/Reflection.cpp` as the
+         * `RVectorType<Moho::SimArmy*>` foundation exemplar. Four trivial
+         * calling-convention forwarders into this token (`FUN_00751C90`,
+         * `FUN_00753EA0`, `FUN_00755A30`, `FUN_00756710`) exist but have no
+         * discoverable callers of their own in the indexed binary; recorded
+         * as such rather than guessed.
+         * Address: 0x0074F720 (FUN_0074F720, sub_74F720) --
+         * `msvc8::vector<Moho::SimArmy*>::reserve(std::size_t)` for the
+         * same instantiation, described immediately above.
+         *
+         * Address: 0x008528E0 (FUN_008528E0, sub_8528E0) --
+         * `msvc8::vector<Wm3::Vector3f>::uninit_copy_n` for the 12-byte
+         * (3-float) element -- `for (; a3 != a2; result += 3) { if
+         * (result) { copy 3 floats } a3 += 3; }`, the 12-byte-stride
+         * sibling of this member's generic copy loop. Reached from
+         * `_Insert_n`'s emission for this instantiation (`FUN_008523C0`,
+         * already `skip`-tagged as a RULE ONE compiler/template emission,
+         * resting on the already-recovered `allocate_triple_dword_slots_
+         * checked`, `FUN_007E5650`). Four sibling thunks passing a
+         * degenerate empty range (`FUN_008526D0`/`FUN_00852780`/
+         * `FUN_00852830`/`FUN_00852880`) are already `skip`-tagged with
+         * matching reasoning, except `FUN_00852830` which was still
+         * sitting in stale fabricated-`blocked` state; corrected to `skip`
+         * here alongside its three siblings for consistency.
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -5805,6 +5939,22 @@ namespace msvc8
          * this project's own `uninit_fill_n` core for this same
          * engine-owned `moho::SDesyncInfo` element, not third-party
          * runtime.)
+         *
+         * Address: 0x0092EA50 (FUN_0092EA50, sub_92EA50) -- the
+         * advance-returning `_Ufill` adapter for this instantiation's
+         * `uninit_fill_n` (`ClusterInternalCache<gpg::HaStar::
+         * OccupationData>::mVec`, `OccupationCacheRuntimeMap`, 4-byte
+         * `iterator` element -- same instantiation as `insert`'s
+         * `FUN_0092F9E0` above): `int __stdcall sub_92EA50(dest, count,
+         * srcValue) { sub_92DF90(dest, count, srcValue); return dest +
+         * 4*count; }`, matching the `_Ufill` adapter shape already
+         * documented on `FUN_00868580`/`FUN_0074DAC0` above. Its callee
+         * `FUN_0092DF90` is already `skip`, an ICF twin of `FUN_008EA0D0`
+         * (the D3D9 dword-fill dispatch helper this 4-byte-trivial fill
+         * loop folds onto). Called once from `FUN_0092F9E0`'s tail<count
+         * branch to construct the trailing gap (`uninit_fill_n(oldLast,
+         * count-tail, localValue)`) and once from its reallocation branch
+         * to construct the inserted run in the fresh buffer.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -6269,6 +6419,22 @@ namespace msvc8
          * emission is the general insert-at-any-position shape. Previously
          * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
          * the address never appeared in.
+         *
+         * Address: 0x0092ED90 (FUN_0092ED90, sub_92ED90) -- the `__stdcall`
+         * calling-convention entry `insert`'s in-place branches call for
+         * this instantiation's `uninit_move_n` (`ClusterInternalCache<
+         * gpg::HaStar::OccupationData>::mVec`, `OccupationCacheRuntimeMap`,
+         * 4-byte `iterator` element -- same instantiation as `insert`'s
+         * `FUN_0092F9E0` above). Forwards straight into the shared 4-byte-
+         * stride forward-copy primitive `FUN_0092D810` (already `skip`, an
+         * ICF twin of `FUN_008D8190`) -- a real tail-call reusing that
+         * primitive's body, not an ICF fold (the differing `__stdcall`/
+         * `__cdecl` prologues keep the two byte-distinct). Called from
+         * `FUN_0092F9E0`'s tail>=count branch (`uninit_move_n(oldLast-count,
+         * count, oldLast)`) and tail<count branch (`uninit_move_n(insertAt,
+         * tail, insertAt+count)`); that same instantiation's reallocation
+         * branch calls `FUN_0092D810` directly instead of through this
+         * trampoline.)
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -6907,6 +7073,18 @@ namespace msvc8
          * previously listed this token `recovered` with no note and no
          * citation anywhere in `src/sdk` -- corrected here. Reached from
          * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`).)
+         * Address: 0x0092F0D0 (FUN_0092F0D0, sub_92F0D0) -- the
+         * `throw_too_long` emission for `ClusterInternalCache<gpg::HaStar::
+         * OccupationData>::mVec` (`OccupationCacheRuntimeMap`, 4-byte
+         * `iterator` element -- same instantiation as `insert`'s
+         * `FUN_0092F9E0` above). Builds `std::length_error("vector<T> too
+         * long")` the same way as this member's other emissions (a
+         * `std::string`, then `std::logic_error::logic_error`, then the
+         * vtable overwrite to `std::length_error::`vftable'`) and routes
+         * through `_CxxThrowException`. Reached from `FUN_0092F9E0`'s
+         * `0x3FFFFFFF - size() < count` guard. DB previously listed this
+         * token `recovered` with a blank note and no citation anywhere in
+         * `src/sdk` -- corrected here.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

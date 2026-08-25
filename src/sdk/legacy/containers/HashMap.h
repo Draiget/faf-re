@@ -389,10 +389,31 @@ namespace msvc8
         }
 
     private:
+        /**
+         * Address: 0x009303F0 (FUN_009303F0), reached from the constructor
+         * (`FUN_00930810`) and `clear()` (`FUN_00930B40`) for the
+         * `OccupationCacheRuntimeMap` instantiation
+         * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
+         * `gpg/core/algorithms/Cluster.cpp`) -- see
+         * `msvc8::vector<T>::assign(count, value)`'s `Address:` block
+         * (`legacy/containers/Vector.h`) for the full evidence trail.
+         *
+         * What it does:
+         * Seeds the bucket-index vector with `min_buckets + 1` copies of the
+         * `end()` sentinel. A single `assign` call, not a separate
+         * `clear()`+`resize()` pair: the compiled bodies for this
+         * instantiation fuse both into one unconditional
+         * `insert(first_, count, value)` (`vector<T>::assign`'s own shape),
+         * which only holds when the vector starts empty on every call --
+         * true here since `_Init()` only ever runs from a fresh constructor
+         * or right after `clear()` has already emptied `mList`/reset
+         * `mMask`/`mMaxidx`. `assign` reproduces that fused shape exactly;
+         * the previous `clear(); resize(...);` pair was behaviourally
+         * equivalent but did not match the binary's one-call emission.
+         */
         void _Init()
         {
-            mVec.clear();
-            mVec.resize(Traits::min_buckets + 1, mList.end());
+            mVec.assign(Traits::min_buckets + 1, mList.end());
         }
 
         /**
