@@ -172,24 +172,34 @@ namespace moho
    */
   using MotorSinkAwaySerializer = gpg::SerSaveLoadHelper<MotorSinkAway>;
 
-  class MotorSinkAwayConstruct
+  class MotorSinkAwayConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::RegisterConstructFunction)
+     * Address: 0x00BD5D70 (FUN_00BD5D70, dynamic initializer for the global
+     * `MotorSinkAwayConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
      */
-    virtual void RegisterConstructFunction();
+    MotorSinkAwayConstruct();
+
+    /**
+     * Address: 0x00BFD270 (FUN_00BFD270, Moho::MotorSinkAwayConstruct::~MotorSinkAwayConstruct)
+     */
+    ~MotorSinkAwayConstruct();
+
+    /**
+     * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::Init)
+     */
+    void Init() override;
 
   public:
-    moho::TDatListItem<gpg::SerHelperBase, void> mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
   };
 
-  static_assert(
-    offsetof(MotorSinkAwayConstruct, mHelperLinks) == 0x04,
-    "MotorSinkAwayConstruct::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(MotorSinkAwayConstruct, mConstructCallback) == 0x0C,
     "MotorSinkAwayConstruct::mConstructCallback offset must be 0x0C"
@@ -206,19 +216,9 @@ namespace moho
   void cleanup_MotorSinkAwayTypeInfo();
 
   /**
-   * Address: 0x00BFD270 (FUN_00BFD270, cleanup_MotorSinkAwayConstruct)
-   */
-  moho::TDatListItem<gpg::SerHelperBase, void>* cleanup_MotorSinkAwayConstruct();
-
-  /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
    */
   void register_MotorSinkAwayTypeInfo();
-
-  /**
-   * Address: 0x00BD5D70 (FUN_00BD5D70, register_MotorSinkAwayConstruct)
-   */
-  int register_MotorSinkAwayConstruct();
 
   /**
    * Address: 0x00BD5DB0 (FUN_00BD5DB0, register_MotorSinkAwaySerializer)
