@@ -61,54 +61,33 @@ namespace moho
 
   static_assert(sizeof(EAiNavigatorStatusTypeInfo) == 0x78, "EAiNavigatorStatusTypeInfo size must be 0x78");
 
-  class EAiNavigatorStatusPrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005A76B0 (FUN_005A76B0, gpg::PrimitiveSerHelper_EAiNavigatorStatus::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EAiNavigatorStatus` enum lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005A76D0 (FUN_005A76D0, gpg::PrimitiveSerHelper_EAiNavigatorStatus::Serialize)
-     *
-     * What it does:
-     * Serializes one `EAiNavigatorStatus` enum lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(EAiNavigatorStatusPrimitiveSerializer, mHelperNext) == 0x04,
-    "EAiNavigatorStatusPrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EAiNavigatorStatusPrimitiveSerializer, mHelperPrev) == 0x08,
-    "EAiNavigatorStatusPrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EAiNavigatorStatusPrimitiveSerializer, mLoadCallback) == 0x0C,
-    "EAiNavigatorStatusPrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EAiNavigatorStatusPrimitiveSerializer, mSaveCallback) == 0x10,
-    "EAiNavigatorStatusPrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EAiNavigatorStatusPrimitiveSerializer) == 0x14,
-    "EAiNavigatorStatusPrimitiveSerializer size must be 0x14"
-  );
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiNavigatorStatus,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiNavigatorStatus@Moho@@H@gpg'`):
+   * `FUN_00BCC600` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found for this instantiation). This address's IDA export
+   * already carried synthetic struct names (`gpg::PrimitiveSerHelper_
+   * EAiNavigatorStatus`), confirming via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_005A76B0`/`FUN_005A76D0`, installs the
+   * `PrimitiveSerHelper<EAiNavigatorStatus,int>` vtable, and pushes
+   * `FUN_00BF6C90` (IDA-labeled `??1PrimitiveSerHelper_EAiNavigatorStatus@
+   * gpg@@QAE@@Z` -- a synthetic/heuristic name, not real MSVC mangling for
+   * this template) as its `atexit` target; confirmed to be the same bare
+   * unlink-then-self-link shape as every other instantiation's atexit
+   * target, matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiNavigatorStatusPrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `EAiNavigatorStatusTypeInfoBootstrap` constructor -- absent from the
+   * real ctor's disassembly (`FUN_00BCC600` already self-registers via
+   * `__xc_a`); removed.
+   */
+  using EAiNavigatorStatusPrimitiveSerializer = gpg::PrimitiveSerHelper<EAiNavigatorStatus, int>;
 
   /**
    * Address: 0x00BCC5E0 (FUN_00BCC5E0, register_EAiNavigatorStatusTypeInfo)
@@ -118,13 +97,4 @@ namespace moho
    * descriptor and installs exit-time teardown.
    */
   void register_EAiNavigatorStatusTypeInfo();
-
-  /**
-   * Address: 0x00BCC600 (FUN_00BCC600, register_PrimitiveSerHelper_EAiNavigatorStatus)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `EAiNavigatorStatus` and
-   * installs process-exit helper unlink cleanup.
-   */
-  int register_EAiNavigatorStatusPrimitiveSerializer();
 } // namespace moho

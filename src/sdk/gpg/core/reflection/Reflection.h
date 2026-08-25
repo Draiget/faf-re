@@ -100,7 +100,13 @@ namespace moho
   enum EUnitCommandQueueStatus : std::int32_t;
   enum EAiAttackerEvent : std::int32_t;
   enum EAiNavigatorEvent : std::int32_t;
+  enum EAiNavigatorStatus : std::int32_t;
+  enum EAiPathNavigatorState : std::int32_t;
   enum EAiTransportEvent : std::int32_t;
+  enum EPathType : std::int32_t;
+  enum ESearchType : std::int32_t;
+  enum ESiloBuildStage : std::int32_t;
+  enum ESiloType : std::int32_t;
   enum EProjectileImpactEvent : int;
   enum class EAiTargetType : std::int32_t;
   enum class ESTITargetType : std::int32_t;
