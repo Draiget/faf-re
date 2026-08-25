@@ -4541,6 +4541,113 @@ namespace gpg
   static_assert(sizeof(Rect2fSerializer) == 0x14, "Rect2fSerializer size must be 0x14");
 
   /**
+   * Demangled: gpg::PrimitiveSerHelper<T,IntType>
+   *
+   * Canonical template for a `gpg::SerHelperBase`-derived serializer that
+   * reads/writes one enum (or other integral-representable) value as a
+   * single `IntType` lane. Confirmed instantiated 50+ times across the
+   * binary -- one per reflected enum type (`Moho::EAlliance`,
+   * `Moho::EEconResource`, `Moho::ELayer`, `Moho::EUnitState`, ...) -- always
+   * with `IntType=int`. Every instantiation's vtable-writer pair follows the
+   * same two-address shape: a dead, zero-incoming-xref duplicate at a low
+   * address (compiler/linker artifact, never reachable from `__xc_a`) and
+   * the real, `__xc_a`-reachable dynamic initializer at a high address in
+   * the 0x00BCxxxx-0x00BDxxxx cluster -- e.g. for `EAlliance`,
+   * `FUN_0050A600` (dead) vs. `FUN_00BC7A30` (real, confirmed via
+   * `incoming_xrefs` data xref from `__xc_a`).
+   *
+   * Each per-T real ctor's tail pushes a plain, unmangled `sub_XXXXXX`
+   * cleanup thunk (not a mangled `~PrimitiveSerHelper<T,int>` destructor
+   * symbol IDA could associate back to this class) as its `atexit` target;
+   * every one checked decompiles to the same unlink-then-self-link shape as
+   * `SerHelperBase::ResetLinks()`. Modeled here as the compiler's own
+   * implicit static-destructor registration for a global with a
+   * non-trivial destructor: this template declares a real destructor and
+   * relies on the compiler to emit the matching registration at each
+   * instantiation site, rather than reproducing an explicit `atexit` call.
+   */
+  template <class T, class IntType = int>
+  class PrimitiveSerHelper : public SerHelperBase
+  {
+  public:
+    /**
+     * Per-instantiation dynamic-initializer addresses (one compiler-emitted
+     * ctor per `T`; see the class-level comment above for the dead-low-vs-
+     * real-high-address pattern each one follows):
+     *   - T=Moho::EAlliance: 0x00BC7A30 (dead duplicate: 0x0050A600)
+     *   - T=Moho::EEconResource: 0x00BCA810
+     */
+    PrimitiveSerHelper()
+      : mLoadCallback(&PrimitiveSerHelper::Deserialize)
+      , mSaveCallback(&PrimitiveSerHelper::Serialize)
+    {}
+
+    ~PrimitiveSerHelper()
+    {
+      ResetLinks();
+    }
+
+    /**
+     * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EEconResource: 0x00564120 (FUN_00564120)
+     *
+     * What it does:
+     * Reads one `IntType` lane from the archive and stores it into the
+     * reflected object as a `T` value.
+     */
+    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int, RRef* const)
+    {
+      IntType value{};
+      archive->ReadInt(&value);
+      *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<T>(value);
+    }
+
+    /**
+     * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EEconResource: 0x00564140 (FUN_00564140) -- this specific
+     *     address was previously mis-tagged `external_dependency` as a
+     *     supposed "CRT iostream/locale-facet dispatch trampoline"; it is
+     *     `archive->WriteInt(*a2)`, a virtual call on our own
+     *     `gpg::WriteArchive`, not CRT.
+     *
+     * What it does:
+     * Writes the reflected object's `T` value as one `IntType` lane.
+     */
+    static void Serialize(WriteArchive* const archive, const int objectPtr, const int, RRef* const)
+    {
+      const auto value = *reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr));
+      archive->WriteInt(static_cast<int>(value));
+    }
+
+    /**
+     * Per-instantiation addresses (one compiler-emitted body per `T`):
+     *   - T=Moho::EEconResource: 0x00563F70 (FUN_00563F70)
+     *
+     * What it does:
+     * Lazily resolves `T`'s RTTI and installs load/save callbacks from this
+     * helper object into the type descriptor (vtable slot 0, dispatched by
+     * `SerHelperBase::InitNewHelpers`).
+     */
+    void Init() override
+    {
+      if (sCachedType == nullptr) {
+        sCachedType = LookupRType(typeid(T));
+      }
+      GPG_ASSERT(sCachedType->serLoadFunc_ == nullptr);
+      sCachedType->serLoadFunc_ = mLoadCallback;
+      GPG_ASSERT(sCachedType->serSaveFunc_ == nullptr);
+      sCachedType->serSaveFunc_ = mSaveCallback;
+    }
+
+  public:
+    RType::load_func_t mLoadCallback; // +0x0C
+    RType::save_func_t mSaveCallback; // +0x10
+
+  private:
+    static inline RType* sCachedType = nullptr;
+  };
+
+  /**
    * VFTABLE: 0x00D48CA0
    * COL:  0x00E5DC40
    * Source hints:

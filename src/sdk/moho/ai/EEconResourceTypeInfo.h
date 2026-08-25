@@ -48,56 +48,17 @@ namespace moho
     void AddEnums();
   };
 
-  class EEconResourcePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x00564120 (FUN_00564120, PrimitiveSerHelper<EEconResource>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EEconResource` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Serializes one `EEconResource` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EEconResource`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EEconResourcePrimitiveSerializer, mHelperNext) == 0x04,
-    "EEconResourcePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EEconResourcePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EEconResourcePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EEconResourcePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EEconResourcePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EEconResourcePrimitiveSerializer, mSerialize) == 0x10,
-    "EEconResourcePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EEconResourcePrimitiveSerializer) == 0x14,
-    "EEconResourcePrimitiveSerializer size must be 0x14"
-  );
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EEconResource,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EEconResource@Moho@@H@gpg'`):
+   * `FUN_00BCA810` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at a lower address in the same instantiation family.
+   */
+  using EEconResourcePrimitiveSerializer = gpg::PrimitiveSerHelper<EEconResource, int>;
 
   static_assert(sizeof(EEconResourceTypeInfo) == 0x78, "EEconResourceTypeInfo size must be 0x78");
 

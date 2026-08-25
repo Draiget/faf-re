@@ -9,6 +9,19 @@
 namespace
 {
   gpg::StaticTypeInfoStorage<moho::EEconResourceTypeInfo> gEEconResourceTypeInfoStorage{};
+
+  /**
+   * Address: 0x00BCA810 (FUN_00BCA810, dynamic initializer for the global
+   * `PrimitiveSerHelper<EEconResource,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). Prior to this recovery, nothing
+   * in `src/sdk` ever constructed this helper at all, so `EEconResource`'s
+   * serialize/deserialize callbacks were never installed.
+   */
+  moho::EEconResourcePrimitiveSerializer gEEconResourcePrimitiveSerializer;
 } // namespace
 
 namespace moho
@@ -72,44 +85,9 @@ namespace moho
     AddEnum(StripPrefix("ECON_ENERGY"), static_cast<std::int32_t>(ECON_ENERGY));
     AddEnum(StripPrefix("ECON_MASS"), static_cast<std::int32_t>(ECON_MASS));
   }
-
-  /**
-   * Address: 0x00564120 (FUN_00564120, PrimitiveSerHelper<EEconResource>::Deserialize)
-   */
-  void EEconResourcePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EEconResource*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EEconResource>(value);
-  }
-
-  void EEconResourcePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto value = *reinterpret_cast<const EEconResource*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  void EEconResourcePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = gpg::LookupRType(typeid(EEconResource));
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho
 
-// Phase-1 pre-registration: RegisterSerializeFunctions above is a consumer
-// that calls gpg::LookupRType, so the descriptor must exist first. See
-// StaticInitPhase.h.
+// Phase-1 pre-registration: gEEconResourcePrimitiveSerializer's Init() (run
+// later, from InitNewHelpers) calls gpg::LookupRType(typeid(EEconResource)),
+// so the descriptor must exist first. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_EEconResourceTypeInfo_563980, moho::preregister_EEconResourceTypeInfo)
