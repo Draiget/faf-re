@@ -163,6 +163,26 @@ namespace msvc8
          * address `TreeMinNode` but had it walk the `right` field -- this
          * member's real behaviour, confirmed against the disassembly, is
          * the leftmost (not rightmost) descent.)
+         *
+         * Address: 0x007B4B20 (FUN_007B4B20, sub_7B4B20) -- the ANI_DumpSkeleton
+         * outer per-parent-bone dedup map's leftmost descent, `msvc8::map<
+         * std::uint32_t, msvc8::set<uint32_t>>` (isNil@+0x1D, same tree
+         * cited on `erase_range`/`insert_unique` elsewhere in this file).
+         * Walks `_Left` (offset 0) while `!_Isnil` (offset+0x1D), matching
+         * this member exactly. Reached from `rb_increment`'s `rb_min(n->
+         * right)` call for this same instantiation.
+         *
+         * Address: 0x00946790 (FUN_00946790, sub_946790) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s leftmost
+         * descent, isNil@+0x15. One of this instantiation's "own distinct
+         * rotate/min/max helper addresses" already named on `erase_node`
+         * (`FUN_00947380` above).
+         * Address: 0x00946810 (FUN_00946810, sub_946810) -- `gpg::gal::
+         * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+         * leftmost descent, isNil@+0x15, byte-identical shape to
+         * `FUN_00946790` above -- sibling `StateCache` specialisation with
+         * its own distinct helper address (`FUN_009478E0`'s `erase_node`
+         * citation above).
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -236,6 +256,26 @@ namespace msvc8
          * address `TreeMaxNode` but had it walk the `left` field -- this
          * member's real behaviour, confirmed against the disassembly, is
          * the rightmost (not leftmost) descent.)
+         *
+         * Address: 0x007B4B00 (FUN_007B4B00, sub_7B4B00) -- the ANI_DumpSkeleton
+         * outer per-parent-bone dedup map's rightmost descent, same
+         * `msvc8::map<std::uint32_t, msvc8::set<uint32_t>>` instantiation
+         * as `rb_min`'s sibling citation `FUN_007B4B20` above (isNil@+0x1D).
+         * Walks `_Right` (offset+8) while `!_Isnil`, matching this member
+         * exactly. Reached from `rb_decrement`'s `rb_max(n->left)` call for
+         * this same instantiation.
+         *
+         * Address: 0x00946770 (FUN_00946770, sub_946770) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s rightmost
+         * descent, isNil@+0x15. One of this instantiation's "own distinct
+         * rotate/min/max helper addresses" already named on `erase_node`
+         * (`FUN_00947380` above).
+         * Address: 0x009467F0 (FUN_009467F0, sub_9467F0) -- `gpg::gal::
+         * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+         * rightmost descent, isNil@+0x15, byte-identical shape to
+         * `FUN_00946770` above -- sibling `StateCache` specialisation with
+         * its own distinct helper address (`FUN_009478E0`'s `erase_node`
+         * citation above).
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -3585,6 +3625,20 @@ namespace msvc8
              * bespoke `RotateLeft` free function in Sim.cpp that hand-rolled
              * this same rotation over a `CommandDbMapStorageView`/
              * `CommandDbMapNodeView` reach-in instead of calling it.)
+             *
+             * Address: 0x00946D20 (FUN_00946D20, sub_946D20) -- `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s left
+             * rotate, isNil@+0x15. This is the `sub_946D20` this
+             * instantiation's `erase_node` citation (`FUN_00947630` above)
+             * already names as one of its "own" rebalance helpers. Reached
+             * from `insert_at`'s fixup loop for this instantiation.
+             * Address: 0x00946D70 (FUN_00946D70, sub_946D70) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * left rotate, isNil@+0x15, byte-identical shape to
+             * `FUN_00946D20` immediately above -- a sibling `StateCache`
+             * specialisation with its own distinct rotate helper address.
+             * Reached from `insert_at`'s fixup loop for this instantiation
+             * (`FUN_009478E0`'s `erase_node` citation above).
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -3702,6 +3756,20 @@ namespace msvc8
              * Sim.cpp that hand-rolled this same rotation over a
              * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
              * instead of calling it.)
+             *
+             * Address: 0x00946590 (FUN_00946590, sub_946590) -- `gpg::gal::
+             * StateCache<d3d9::RenderState, unsigned int>::tree_`'s right
+             * rotate, isNil@+0x15. One of the "own distinct rotate/min/max
+             * helper addresses" this instantiation's `erase_node` citation
+             * (`FUN_00947380` above) already names. Reached from `insert_at`'s
+             * fixup loop for this same instantiation.
+             * Address: 0x009466B0 (FUN_009466B0, sub_9466B0) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * right rotate, isNil@+0x15, byte-identical shape to
+             * `FUN_00946590` immediately above -- a sibling `StateCache`
+             * specialisation with its own distinct rotate helper address.
+             * Reached from `insert_at`'s fixup loop for this instantiation
+             * (`FUN_009478E0`'s `erase_node` citation above).
              */
             void rotate_right(node_type* const n) noexcept
             {
