@@ -40,6 +40,7 @@
 #include "moho/lua/SCR_String.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/net/CClientManagerImpl.h"
 #include "moho/misc/IConOutputHandler.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
@@ -142,6 +143,11 @@ namespace
   constexpr const char* kPathDebuggerLoadErrorText = "failed to load \"/lua/debug/pathdebugger.lua\" module";
   constexpr const char* kPathDebuggerCreateUiMethodName = "CreateUI";
   constexpr const char* kPathDebuggerDestroyUiMethodName = "DestroyUI";
+  constexpr const char* kConsoleStartupSkipUIChecksDescription = "Don't perform any command validation in UI";
+  constexpr const char* kConsoleStartupWLDRestartBeatDescription = "Restart rendering the current beat.";
+  constexpr const char* kConsoleStartupWLDAdvanceBeatDescription = "Advance the sim one beat.";
+  constexpr const char* kConsoleStartupWLDSingleStepDescription = "Single-step the sim one tick.";
+  constexpr const char* kConsoleStartupWLDGameSpeedDescription = "Set a new game speed";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
@@ -3111,6 +3117,156 @@ void moho::CON_TeleportSelectedUnits(void* const commandArgs)
 }
 
 /**
+ * Address: 0x00897580 (FUN_00897580, sub_897580)
+ *
+ * void*
+ *
+ * What it does:
+ * Toggles the world session's invalid-build-placement-preview flag, which
+ * this command uses as a "skip UI command validation" switch. Prints
+ * localized "no session" feedback when no session is active.
+ *
+ * The registrar (FUN_00BE77D0, `__xc_a` static-initializer lane) stores this
+ * callback's address into the `CConFunc` at `stru_F5B7A4`/`dword_F5B7B0`; the
+ * command's own name/description ("SkipUIChecks" / "Don't perform any
+ * command validation in UI") are the struct's `.data` initializers, read
+ * directly from the shipped PE.
+ */
+void moho::SkipUIChecks(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  session->mShowInvalidBuildPlacementPreview = !session->mShowInvalidBuildPlacementPreview;
+}
+
+/**
+ * Address: 0x00897630 (FUN_00897630, sub_897630)
+ *
+ * void*
+ *
+ * What it does:
+ * Restarts rendering of the current beat by zeroing the session's
+ * time-since-last-tick accumulator. Prints localized "no session" feedback
+ * when no session is active.
+ *
+ * Registrar: FUN_00BE7810 (`__xc_a` lane), name/description ("WLD_RestartBeat"
+ * / "Restart rendering the current beat.") read from the PE `.data`
+ * initializers of `stru_F5B7B4`/`dword_F5B7C0`.
+ */
+void moho::WLD_RestartBeat(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  session->mTimeSinceLastTick = 0.0f;
+}
+
+/**
+ * Address: 0x008976D0 (FUN_008976D0, sub_8976D0)
+ *
+ * What it does:
+ * Advances the sim one beat by forcing the session's time-since-last-tick
+ * accumulator to a full beat interval. Prints localized "no session"
+ * feedback when no session is active.
+ *
+ * Registrar: FUN_00BE7850 (`__xc_a` lane), name/description ("WLD_AdvanceBeat"
+ * / "Advance the sim one beat.") read from the PE `.data` initializers of
+ * `stru_F5B7C4`/`dword_F5B7D0`.
+ */
+void moho::WLD_AdvanceBeat(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  session->mTimeSinceLastTick = 1.0f;
+}
+
+/**
+ * Address: 0x0088E0B0 (FUN_0088E0B0, sub_88E0B0)
+ *
+ * What it does:
+ * Single-steps the active sim driver one tick. Prints localized "no
+ * session" feedback when no sim driver is active.
+ *
+ * The binary's raw `ISTIDriver::SingleStep` slot writes its command-cookie
+ * result through an out-pointer to a scratch stack local this call site
+ * never reads back; `CSimDriver::SingleStep()`'s already-recovered signature
+ * (SimDriver.cpp) folds that into an ordinary return value instead, so this
+ * call discards the result the same way the binary's caller effectively
+ * does. Registrar: FUN_00BE7430 (`__xc_a` lane), name/description
+ * ("WLD_SingleStep" / "Single-step the sim one tick.") read from the PE
+ * `.data` initializers of `stru_F5B734`/`dword_F5B740`.
+ */
+void moho::WLD_SingleStep(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  if (simDriver == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  (void)simDriver->SingleStep();
+}
+
+/**
+ * Address: 0x0088E150 (FUN_0088E150, sub_88E150)
+ *
+ * What it does:
+ * Parses one numeric argument and sets the active sim driver's requested
+ * sim rate, clamped to [-10, 50]. Prints usage text for any other argument
+ * count; silently no-ops when no sim driver is active. This is a wider,
+ * console-only debug range than `WLD_SetGameSpeed`'s UI-facing [-10, 10]
+ * clamp (CWldSession.cpp) - the two are distinct binary functions with
+ * distinct bounds, not the same command recovered twice.
+ *
+ * Registrar: FUN_00BE7470 (`__xc_a` lane), name/description ("WLD_GameSpeed"
+ * / "Set a new game speed") read from the PE `.data` initializers of
+ * `stru_F5B744`/`dword_F5B750`.
+ */
+void moho::WLD_GameSpeed(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() != 2u) {
+    CON_Printf("WLD_GameSpeed <int> - set current game speed");
+    return;
+  }
+
+  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  if (simDriver == nullptr) {
+    return;
+  }
+
+  const msvc8::string* const rateToken = args.At(1u);
+  int requestedSpeed = static_cast<int>(std::atof(TokenDataOrEmpty(rateToken)));
+  if (requestedSpeed > 50) {
+    requestedSpeed = 50;
+  }
+  if (requestedSpeed < -10) {
+    requestedSpeed = -10;
+  }
+
+  simDriver->GetClientManager()->SetSimRate(requestedSpeed);
+}
+
+/**
  * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
  *
  * What it does:
@@ -3823,6 +3979,11 @@ namespace
   CConFunc gCConFunc_ProcessInfoPair{};
   CConFunc gCConFunc_UI_TrackUnit{};
   CConFunc gCConFunc_RenameUnit{};
+  CConFunc gCConFunc_SkipUIChecks{};
+  CConFunc gCConFunc_WLD_RestartBeat{};
+  CConFunc gCConFunc_WLD_AdvanceBeat{};
+  CConFunc gCConFunc_WLD_SingleStep{};
+  CConFunc gCConFunc_WLD_GameSpeed{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_EFX_CreateEmitterWindow{};
@@ -4064,6 +4225,161 @@ namespace moho
       "p4_IsOpenedForEdit",
       &moho::CON_p4_IsOpenedForEdit,
       &cleanup_CConFunc_p4_IsOpenedForEdit
+    );
+  }
+
+  /**
+   * Address: 0x00C08250 (FUN_00C08250, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SkipUIChecks`.
+   */
+  void cleanup_CConFunc_SkipUIChecks()
+  {
+    CleanupStartupConCommand(gCConFunc_SkipUIChecks);
+  }
+
+  /**
+   * Address: 0x00BE77D0 (FUN_00BE77D0, register_CConFunc_SkipUIChecks)
+   *
+   * What it does:
+   * Registers startup console callback for `SkipUIChecks`. The store
+   * `dword_F5B7B0 = offset sub_897580` at 0x00BE77DC is the only reference to
+   * `Moho::SkipUIChecks` anywhere in the image.
+   */
+  void register_CConFunc_SkipUIChecks()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_SkipUIChecks,
+      kConsoleStartupSkipUIChecksDescription,
+      "SkipUIChecks",
+      &moho::SkipUIChecks,
+      &cleanup_CConFunc_SkipUIChecks
+    );
+  }
+
+  /**
+   * Address: 0x00C08280 (FUN_00C08280, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_RestartBeat`.
+   */
+  void cleanup_CConFunc_WLD_RestartBeat()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_RestartBeat);
+  }
+
+  /**
+   * Address: 0x00BE7810 (FUN_00BE7810, register_CConFunc_WLD_RestartBeat)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_RestartBeat`. The store
+   * `dword_F5B7C0 = offset sub_897630` at 0x00BE781C is the only reference to
+   * `Moho::WLD_RestartBeat` anywhere in the image.
+   */
+  void register_CConFunc_WLD_RestartBeat()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_RestartBeat,
+      kConsoleStartupWLDRestartBeatDescription,
+      "WLD_RestartBeat",
+      &moho::WLD_RestartBeat,
+      &cleanup_CConFunc_WLD_RestartBeat
+    );
+  }
+
+  /**
+   * Address: 0x00C082B0 (FUN_00C082B0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_AdvanceBeat`.
+   */
+  void cleanup_CConFunc_WLD_AdvanceBeat()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_AdvanceBeat);
+  }
+
+  /**
+   * Address: 0x00BE7850 (FUN_00BE7850, register_CConFunc_WLD_AdvanceBeat)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_AdvanceBeat`. The store
+   * `dword_F5B7D0 = offset sub_8976D0` at 0x00BE785C is the only reference to
+   * `Moho::WLD_AdvanceBeat` anywhere in the image.
+   */
+  void register_CConFunc_WLD_AdvanceBeat()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_AdvanceBeat,
+      kConsoleStartupWLDAdvanceBeatDescription,
+      "WLD_AdvanceBeat",
+      &moho::WLD_AdvanceBeat,
+      &cleanup_CConFunc_WLD_AdvanceBeat
+    );
+  }
+
+  /**
+   * Address: 0x00C07FF0 (FUN_00C07FF0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_SingleStep`.
+   */
+  void cleanup_CConFunc_WLD_SingleStep()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_SingleStep);
+  }
+
+  /**
+   * Address: 0x00BE7430 (FUN_00BE7430, register_CConFunc_WLD_SingleStep)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_SingleStep`. The store
+   * `dword_F5B740 = offset sub_88E0B0` at 0x00BE743C is the only reference to
+   * `Moho::WLD_SingleStep` anywhere in the image.
+   */
+  void register_CConFunc_WLD_SingleStep()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_SingleStep,
+      kConsoleStartupWLDSingleStepDescription,
+      "WLD_SingleStep",
+      &moho::WLD_SingleStep,
+      &cleanup_CConFunc_WLD_SingleStep
+    );
+  }
+
+  /**
+   * Address: 0x00C08020 (FUN_00C08020, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_GameSpeed`.
+   */
+  void cleanup_CConFunc_WLD_GameSpeed()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_GameSpeed);
+  }
+
+  /**
+   * Address: 0x00BE7470 (FUN_00BE7470, register_CConFunc_WLD_GameSpeed)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_GameSpeed`. The store
+   * `dword_F5B750 = offset sub_88E150` at 0x00BE747C is the only reference to
+   * `Moho::WLD_GameSpeed` anywhere in the image.
+   */
+  void register_CConFunc_WLD_GameSpeed()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_GameSpeed,
+      kConsoleStartupWLDGameSpeedDescription,
+      "WLD_GameSpeed",
+      &moho::WLD_GameSpeed,
+      &cleanup_CConFunc_WLD_GameSpeed
     );
   }
 
@@ -5727,6 +6043,11 @@ namespace
       moho::register_CConFunc_UI_TrackUnit();
       moho::register_CConFunc_RenameUnit();
       moho::register_CConFunc_IssueCommand();
+      moho::register_CConFunc_SkipUIChecks();
+      moho::register_CConFunc_WLD_RestartBeat();
+      moho::register_CConFunc_WLD_AdvanceBeat();
+      moho::register_CConFunc_WLD_SingleStep();
+      moho::register_CConFunc_WLD_GameSpeed();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();

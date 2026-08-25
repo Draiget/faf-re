@@ -664,6 +664,55 @@ namespace moho
   void CON_TeleportSelectedUnits(void* commandArgs);
 
   /**
+   * Address: 0x00897580 (FUN_00897580, Moho::SkipUIChecks)
+   *
+   * What it does:
+   * Toggles the world session's invalid-build-placement-preview flag, which
+   * this command uses as a "skip UI command validation" switch. Prints
+   * localized "no session" feedback when no session is active.
+   */
+  void SkipUIChecks(void* commandArgs);
+
+  /**
+   * Address: 0x00897630 (FUN_00897630, Moho::WLD_RestartBeat)
+   *
+   * What it does:
+   * Restarts rendering of the current beat by zeroing the session's
+   * time-since-last-tick accumulator. Prints localized "no session"
+   * feedback when no session is active.
+   */
+  void WLD_RestartBeat(void* commandArgs);
+
+  /**
+   * Address: 0x008976D0 (FUN_008976D0, Moho::WLD_AdvanceBeat)
+   *
+   * What it does:
+   * Advances the sim one beat by forcing the session's time-since-last-tick
+   * accumulator to a full beat interval. Prints localized "no session"
+   * feedback when no session is active.
+   */
+  void WLD_AdvanceBeat(void* commandArgs);
+
+  /**
+   * Address: 0x0088E0B0 (FUN_0088E0B0, Moho::WLD_SingleStep)
+   *
+   * What it does:
+   * Single-steps the active sim driver one tick. Prints localized "no
+   * session" feedback when no sim driver is active.
+   */
+  void WLD_SingleStep(void* commandArgs);
+
+  /**
+   * Address: 0x0088E150 (FUN_0088E150, Moho::WLD_GameSpeed)
+   *
+   * What it does:
+   * Parses one numeric argument and sets the active sim driver's requested
+   * sim rate, clamped to [-10, 50]. Prints usage text for any other
+   * argument count; silently no-ops when no sim driver is active.
+   */
+  void WLD_GameSpeed(void* commandArgs);
+
+  /**
    * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
    *
    * What it does:
