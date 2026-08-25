@@ -12,6 +12,7 @@ namespace gpg
   class RRef;
   class RType;
   class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -164,17 +165,28 @@ namespace moho
      * `mFollowsExistingRoute` (bool), `mPos` (Vector3f), then `mRouteUnit`/
      * `mFerryUnit`/`mBeacon` (three `WeakPtr<Unit>` reads in that order) --
      * confirmed field-for-field against this class's own offsets
-     * (0x30/0x34/0x38/0x3C/0x48/0x50/0x58). `[[maybe_unused]]`: this class
-     * has no `CUnitFerryTaskSerializer`/`RegisterSerializeFunctions`
-     * wiring yet (unlike the sibling `CCommandTaskSerializer` pattern in
-     * `CCommandTask.h`) -- real destiny is `&CUnitFerryTaskSerializer::
-     * Deserialize`'s address being stored into `gpg::RType::serLoadFunc_`,
-     * an address-taken registration this session did not locate a
-     * confirmed call site for. See
-     * project_fun_006109b0_reflection_lead.md for the write-direction
-     * (`MemberSerialize`) and registration-wiring follow-up.
+     * (0x30/0x34/0x38/0x3C/0x48/0x50/0x58). Invoked through
+     * `CUnitFerryTaskSerializer::Deserialize` (0x0060DC60), the
+     * `gpg::RType::load_func_t`-shaped trampoline that
+     * `register_CUnitFerryTaskSerializer` (0x00BD0900) installs as
+     * `Moho::CUnitFerryTask::sType->serLoadFunc_`.
      */
-    [[maybe_unused]] void MemberDeserialize(gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00610B00 (FUN_00610B00, sub_610B00)
+     *
+     * What it does:
+     * Mirrors `MemberDeserialize`: writes the base `CCommandTask` state,
+     * `mDispatch` (as an unowned `CCommandTask*` tracked pointer via
+     * `gpg::RRef_CCommandTask`/`WriteRawPointer`), `mCommandIndex`,
+     * `mFollowsExistingRoute`, `mPos`, then `mRouteUnit`/`mFerryUnit`/
+     * `mBeacon`, in the same field order as the load side. Invoked through
+     * `CUnitFerryTaskSerializer::Serialize` (0x0060DC70), installed as
+     * `Moho::CUnitFerryTask::sType->serSaveFunc_` by the same
+     * `register_CUnitFerryTaskSerializer`.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   private:
     /**

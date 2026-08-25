@@ -6,7 +6,9 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiBuilder.h"
@@ -1075,7 +1077,7 @@ namespace moho
    * mDispatch, mCommandIndex, mFollowsExistingRoute, mPos, then mRouteUnit/
    * mFerryUnit/mBeacon in that order.
    */
-  [[maybe_unused]] void CUnitFerryTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitFerryTask::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef owner{};
 
@@ -1093,7 +1095,176 @@ namespace moho
     archive->Read(CachedFerryTaskWeakPtrUnitType(), &mFerryUnit, owner);
     archive->Read(CachedFerryTaskWeakPtrUnitType(), &mBeacon, owner);
   }
+
+  /**
+   * Address: 0x00610B00 (FUN_00610B00, sub_610B00)
+   *
+   * What it does:
+   * Mirrors MemberDeserialize: writes the base CCommandTask state, mDispatch
+   * (as an unowned CCommandTask* tracked pointer), mCommandIndex,
+   * mFollowsExistingRoute, mPos, then mRouteUnit/mFerryUnit/mBeacon, in the
+   * same field order as the load side.
+   */
+  void CUnitFerryTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef owner{};
+
+    archive->Write(CachedFerryTaskCCommandTaskType(), static_cast<const CCommandTask*>(this), owner);
+
+    gpg::RRef dispatchRef{};
+    (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
+    gpg::WriteRawPointer(archive, dispatchRef, gpg::TrackedPointerState::Unowned, owner);
+
+    archive->WriteInt(mCommandIndex);
+    archive->WriteBool(mFollowsExistingRoute);
+
+    archive->Write(CachedFerryTaskVector3fType(), &mPos, owner);
+    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mRouteUnit, owner);
+    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mFerryUnit, owner);
+    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mBeacon, owner);
+  }
+
+  /**
+   * Address: 0x0060DC60 (FUN_0060DC60, Moho::CUnitFerryTaskSerializer::Deserialize)
+   *
+   * IDA signature:
+   * void __cdecl sub_60DC60(gpg::ReadArchive *archive, CUnitFerryTask *obj);
+   *
+   * What it does:
+   * `gpg::RType::load_func_t`-shaped trampoline: reads `archive`/`objectPtr`
+   * from the leading two stack args (the trailing `version`/`ownerRef` args
+   * load_func_t reserves are unused here) and tail-calls
+   * `CUnitFerryTask::MemberDeserialize`. This is the exact address
+   * `register_CUnitFerryTaskSerializer` (0x00BD0900) stores into
+   * `gCUnitFerryTaskSerializer.mLoadCallback`.
+   */
+  void DeserializeCUnitFerryTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int /*version*/,
+    gpg::RRef* const /*ownerRef*/
+  )
+  {
+    reinterpret_cast<CUnitFerryTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0060DC70 (FUN_0060DC70, Moho::CUnitFerryTaskSerializer::Serialize)
+   *
+   * IDA signature:
+   * void __cdecl sub_60DC70(gpg::WriteArchive *archive, CUnitFerryTask *obj);
+   *
+   * What it does:
+   * `gpg::RType::save_func_t`-shaped trampoline, the save-side mirror of
+   * `DeserializeCUnitFerryTaskSerializerCallback`: calls
+   * `CUnitFerryTask::MemberSerialize`. The address
+   * `register_CUnitFerryTaskSerializer` stores into
+   * `gCUnitFerryTaskSerializer.mSaveCallback`.
+   */
+  void SerializeCUnitFerryTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int /*version*/,
+    gpg::RRef* const /*ownerRef*/
+  )
+  {
+    reinterpret_cast<const CUnitFerryTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
 } // namespace moho
+
+namespace
+{
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes) -- same shape as the sibling CUnitCarrierRetrieve /
+  // CUnitWaitForFerryTask serializer globals (`SerSaveLoadHelperListRuntime`
+  // only models the leading 0x0C-byte intrusive-list header shared by every
+  // SerHelperBase-derived serializer).
+  struct CUnitFerryTaskSerializerHelper
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitFerryTaskSerializerHelper, mNext) == 0x04,
+    "CUnitFerryTaskSerializerHelper::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitFerryTaskSerializerHelper, mPrev) == 0x08,
+    "CUnitFerryTaskSerializerHelper::mPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CUnitFerryTaskSerializerHelper) == 0x14, "CUnitFerryTaskSerializerHelper size must be 0x14"
+  );
+
+  CUnitFerryTaskSerializerHelper gCUnitFerryTaskSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitFerryTaskSerializerHelper& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
+
+  /**
+   * Address: 0x00BF9DA0 (FUN_00BF9DA0)
+   *
+   * What it does:
+   * Unlinks `CUnitFerryTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   * Registered by `register_CUnitFerryTaskSerializer` (0x00BD0900) as this
+   * global's `atexit` teardown. `FUN_0060DCB0` and `FUN_0060DCE0` are
+   * byte-identical ICF twins of this same body (marked `skip`).
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupUnlinkCUnitFerryTaskSerializerNode()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitFerryTaskSerializer));
+  }
+
+  void cleanup_CUnitFerryTaskSerializer_atexit()
+  {
+    (void)CleanupUnlinkCUnitFerryTaskSerializerNode();
+  }
+
+  /**
+   * Address: 0x00BD0900 (FUN_00BD0900, register_CUnitFerryTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitFerryTask serializer helper callbacks and
+   * installs process-exit cleanup, matching the sibling
+   * CUnitCarrierRetrieve/CUnitWaitForFerryTask registration shape. The real
+   * asm calls `gpg::SerHelperBase::SerHelperBase()` (0x009501D0) directly on
+   * this global rather than hand-rolling the self-link, then separately
+   * stamps the vtable lane with `Moho::CUnitFerryTaskSerializer::`vftable''
+   * -- modeled here with the same self-link-and-assign form the sibling
+   * serializers use, since the base ctor's self-loop and this hand-rolled
+   * form produce the same singleton-node result and the exact
+   * base-subobject placement the real ctor call targets is not modeled by
+   * `gpg::SerHelperBase` as a plain `{mNext,mPrev}` pair (see
+   * project_serhelperbase_dispatch_gap_open.md).
+   */
+  void register_CUnitFerryTaskSerializer()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitFerryTaskSerializer.mNext);
+    gCUnitFerryTaskSerializer.mNext = self;
+    gCUnitFerryTaskSerializer.mPrev = self;
+    gCUnitFerryTaskSerializer.mLoadCallback = &moho::DeserializeCUnitFerryTaskSerializerCallback;
+    gCUnitFerryTaskSerializer.mSaveCallback = &moho::SerializeCUnitFerryTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitFerryTaskSerializer_atexit);
+  }
+
+  struct CUnitFerryTaskSerializerStartupBootstrap
+  {
+    CUnitFerryTaskSerializerStartupBootstrap()
+    {
+      register_CUnitFerryTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitFerryTaskSerializerStartupBootstrap gCUnitFerryTaskSerializerStartupBootstrap;
+} // namespace
 
 namespace gpg
 {
