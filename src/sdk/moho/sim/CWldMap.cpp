@@ -1614,7 +1614,7 @@ namespace
 
       if (
         IntelRectVisibleOrGridMissing(alliedArmy->mExploredReconGrid.get(), rect)
-        || IntelRectVisibleOrGridMissing(alliedArmy->mFogReconGrid.get(), rect)
+        || IntelRectVisibleOrGridMissing(alliedArmy->mWaterReconGrid.get(), rect)
       ) {
         return true;
       }
