@@ -58,6 +58,35 @@ constexpr int          kPngStructInfoType   = 2;
 constexpr std::uint32_t kPngSizeofPngStruct  = 0x260;
 constexpr std::uint32_t kPngSizeofInfoStruct = 0x120;
 
+[[nodiscard]] PngMallocFn PngStructMallocFn(png_structp png_ptr) noexcept
+{
+  return *reinterpret_cast<PngMallocFn*>(
+    reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructMallocFnOffset);
+}
+
+/**
+ * Address: 0x00A21022 (FUN_00A21022)
+ * Mangled: png_malloc_default
+ *
+ * IDA signature:
+ * png_voidp __cdecl png_malloc_default(png_structp png_ptr, png_uint_32 size);
+ *
+ * libpng's default allocator body, reached from png_malloc when no user
+ * malloc_fn is installed. This build carries no DOS/OS2 16-bit far-heap
+ * segment workaround (PNG_MAX_MALLOC_64K is unset for the Win32 target), so
+ * it reduces to the CRT allocator plus the standard out-of-memory diagnostic,
+ * suppressed when PNG_FLAG_MALLOC_NULL_MEM_OK is set (e.g. png_zalloc
+ * temporarily tolerating a NULL return while zlib probes an allocation size).
+ */
+void* png_malloc_default(png_structp png_ptr, std::uint32_t size)
+{
+  void* const block = std::malloc(size);
+  if (block == nullptr && (PngStructFlags(png_ptr) & kPngFlagMallocNullMemOk) == 0) {
+    png_error(png_ptr, "Out of Memory");
+  }
+  return block;
+}
+
 /**
  * Address: 0x00A21051 (FUN_00A21051)
  * Mangled: png_free_default
@@ -99,6 +128,34 @@ extern "C" void png_free(png_structp png_ptr, void* ptr)
   } else {
     png_free_default(png_ptr, ptr);
   }
+}
+
+/**
+ * Address: 0x00A210E4 (FUN_00A210E4)
+ * Mangled: png_malloc
+ *
+ * IDA signature:
+ * png_voidp __cdecl png_malloc(png_structp png_ptr, png_uint_32 size);
+ *
+ * libpng malloc entry point. No-op (returns null) on a null png_ptr or a
+ * zero size. Dispatches to the user malloc callback (png_ptr->malloc_fn,
+ * +0x248) when one is installed -- raising the standard out-of-memory error
+ * unless PNG_FLAG_MALLOC_NULL_MEM_OK is set -- otherwise falls back to
+ * png_malloc_default (the CRT malloc path).
+ */
+extern "C" void* png_malloc(png_structp png_ptr, std::uint32_t size)
+{
+  if (png_ptr == nullptr || size == 0) {
+    return nullptr;
+  }
+  if (const PngMallocFn malloc_fn = PngStructMallocFn(png_ptr)) {
+    void* const block = malloc_fn(png_ptr, size);
+    if (block == nullptr && (PngStructFlags(png_ptr) & kPngFlagMallocNullMemOk) == 0) {
+      png_error(png_ptr, "Out of Memory!");
+    }
+    return block;
+  }
+  return png_malloc_default(png_ptr, size);
 }
 
 /**

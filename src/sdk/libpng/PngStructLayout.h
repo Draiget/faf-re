@@ -87,6 +87,13 @@ constexpr std::size_t kOffIwidth            = 0xE0;   // png_uint_32 iwidth     
 constexpr std::size_t kOffRowNumber         = 0xE4;   // png_uint_32 row_number  (current row within the pass)
 constexpr std::size_t kOffPrevRow           = 0xE8;   // png_bytep   prev_row
 constexpr std::size_t kOffRowBuf            = 0xEC;   // png_bytep   row_buf (points 32 bytes into big_row_buf)
+// Per-filter-type scratch row buffers, allocated by png_write_start_row
+// (0x00A247E4) when the corresponding PNG_FILTER_* bit is set in do_filter.
+// Verified from FUN_00A247E4.asm: `mov [esi+0F0h/0F4h/0F8h/0FCh], eax`.
+constexpr std::size_t kOffSubRow            = 0xF0;   // png_bytep   sub_row
+constexpr std::size_t kOffUpRow             = 0xF4;   // png_bytep   up_row
+constexpr std::size_t kOffAvgRow            = 0xF8;   // png_bytep   avg_row
+constexpr std::size_t kOffPaethRow          = 0xFC;   // png_bytep   paeth_row
 constexpr std::size_t kOffIdatSize          = 0x10C;  // png_uint_32 idat_size   (bytes left in current IDAT chunk)
 constexpr std::size_t kOffUserTransformDepth    = 0x64;   // png_byte user_transform_depth
 constexpr std::size_t kOffUserTransformChannels = 0x65;   // png_byte user_transform_channels
@@ -109,7 +116,23 @@ constexpr std::size_t kOffShift             = 0x181;  // png_color_8 shift   (of
 // read-transform dispatcher fields (png_do_read_transformations, FUN_009E711B);
 // offsets confirmed from the leaf-call push order in FUN_009E711B.asm.
 constexpr std::size_t kOffReadUserTransformFn = 0x58;  // png_user_transform_ptr read_user_transform_fn
+// Verified from FUN_00A26C8E.asm (png_do_write_transformations): `mov eax, [esi+5Ch]`.
+constexpr std::size_t kOffWriteUserTransformFn = 0x5C;  // png_user_transform_ptr write_user_transform_fn
 constexpr std::size_t kOffWriteDataFn       = 0x4C;   // png_rw_ptr write_data_fn (output callback)
+// Write-status progress callback, set by png_set_write_status_fn (0x009E8727).
+// Verified from FUN_009E7EC5.asm (png_write_row): `mov eax, [esi+19Ch]`.
+constexpr std::size_t kOffWriteRowFn        = 0x19C;  // png_write_status_ptr write_row_fn
+// User memory allocator, set by png_create_write_struct_2's mem_ptr/malloc_fn
+// arguments (PNG_USER_MEM_SUPPORTED lane). Verified from FUN_00A210E4.asm
+// (png_malloc): `mov eax, [esi+248h]`.
+constexpr std::size_t kOffMallocFn          = 0x248;  // png_malloc_ptr malloc_fn
+// Flush-distance bookkeeping used by png_write_flush (0x009E80D0) and
+// png_write_filtered_row (0x00A25B38): flush every `flush_dist` rows.
+// Verified from FUN_00A25B38.asm: `mov ecx, [esi+150h]` (flush_dist),
+// `lea eax, [esi+154h]; inc dword ptr [eax]` (++flush_rows); and
+// FUN_009E80D0.asm: `and dword ptr [esi+154h], 0` (flush_rows = 0).
+constexpr std::size_t kOffFlushDist         = 0x150;  // png_uint_32 flush_dist
+constexpr std::size_t kOffFlushRows         = 0x154;  // png_uint_32 flush_rows
 constexpr std::size_t kOffRowInfoRowbytes   = 0x104;  // row_info.rowbytes mirror (dither ==0 check)
 constexpr std::size_t kOffRowInfoColorType  = 0x108;  // row_info.color_type mirror (expand check)
 constexpr std::size_t kOffTrans             = 0x188;  // png_bytep    trans (tRNS alpha array; 4th arg @0x9E717C)
@@ -189,6 +212,19 @@ template <typename T>
 [[nodiscard]] inline std::uint32_t& UsrWidth(png_structp p) noexcept    { return Field<std::uint32_t>(p, kOffUsrWidth); }
 [[nodiscard]] inline std::uint16_t& NumPalette(png_structp p) noexcept  { return Field<std::uint16_t>(p, kOffNumPalette); }
 [[nodiscard]] inline std::uint32_t& MngFeaturesPermitted(png_structp p) noexcept { return Field<std::uint32_t>(p, kOffMngFeaturesPermitted); }
+[[nodiscard]] inline std::uint8_t&  FilterType(png_structp p) noexcept  { return *(RawBase(p) + kOffFilterType); }
+[[nodiscard]] inline std::uint32_t& RowNumber(png_structp p) noexcept   { return Field<std::uint32_t>(p, kOffRowNumber); }
+[[nodiscard]] inline std::uint32_t& Height(png_structp p) noexcept      { return Field<std::uint32_t>(p, kOffHeight); }
+[[nodiscard]] inline std::uint32_t& Width(png_structp p) noexcept       { return Field<std::uint32_t>(p, kOffWidth); }
+[[nodiscard]] inline std::uint32_t& Rowbytes(png_structp p) noexcept    { return Field<std::uint32_t>(p, kOffRowbytes); }
+[[nodiscard]] inline std::uint8_t*& RowBuf(png_structp p) noexcept      { return Field<std::uint8_t*>(p, kOffRowBuf); }
+[[nodiscard]] inline std::uint8_t*& PrevRow(png_structp p) noexcept     { return Field<std::uint8_t*>(p, kOffPrevRow); }
+[[nodiscard]] inline std::uint8_t*& SubRow(png_structp p) noexcept      { return Field<std::uint8_t*>(p, kOffSubRow); }
+[[nodiscard]] inline std::uint8_t*& UpRow(png_structp p) noexcept       { return Field<std::uint8_t*>(p, kOffUpRow); }
+[[nodiscard]] inline std::uint8_t*& AvgRow(png_structp p) noexcept      { return Field<std::uint8_t*>(p, kOffAvgRow); }
+[[nodiscard]] inline std::uint8_t*& PaethRow(png_structp p) noexcept    { return Field<std::uint8_t*>(p, kOffPaethRow); }
+[[nodiscard]] inline std::uint32_t& FlushDist(png_structp p) noexcept   { return Field<std::uint32_t>(p, kOffFlushDist); }
+[[nodiscard]] inline std::uint32_t& FlushRows(png_structp p) noexcept   { return Field<std::uint32_t>(p, kOffFlushRows); }
 
 // ----------------------------------------------------------------------------
 // libpng transformation flag constants used by recovered helpers
@@ -228,7 +264,29 @@ constexpr std::uint32_t kPngHavePngSignature     = 0x1000;
 // png_ptr->do_filter bitmask (libpng 1.2.x png.h): PNG_FILTER_NONE plus the
 // four real filter types, and PNG_ALL_FILTERS = SUB|UP|AVG|PAETH.
 constexpr std::uint8_t kPngFilterNone = 0x08;
+constexpr std::uint8_t kPngFilterSub  = 0x10;
+constexpr std::uint8_t kPngFilterUp   = 0x20;
+constexpr std::uint8_t kPngFilterAvg  = 0x40;
+constexpr std::uint8_t kPngFilterPaeth = 0x80;
 constexpr std::uint8_t kPngAllFilters = 0xF8;
+
+// The filter-type byte written as row[0] on the wire (libpng 1.2.x png.h
+// PNG_FILTER_VALUE_*). Distinct value space from the do_filter bitmask above.
+constexpr std::uint8_t kPngFilterValueNone  = 0;
+constexpr std::uint8_t kPngFilterValueSub   = 1;
+constexpr std::uint8_t kPngFilterValueUp    = 2;
+constexpr std::uint8_t kPngFilterValueAvg   = 3;
+constexpr std::uint8_t kPngFilterValuePaeth = 4;
+
+// Adam7 interlace pass geometry (png_uint_32[7]), verified byte-for-byte from
+// the shipped PE .rdata: png_pass_start @0x00D62B88, png_pass_inc @0x00D62BA4,
+// png_pass_ystart @0x00D62BC0, png_pass_yinc @0x00D62BDC. Shared by the read
+// (png_read_row / png_do_read_interlace) and write (png_write_start_row /
+// png_write_finish_row / png_do_write_interlace) row-pass machinery.
+constexpr std::uint32_t kPngPassStart[7]  = {0, 4, 0, 2, 0, 1, 0};
+constexpr std::uint32_t kPngPassInc[7]    = {8, 8, 4, 4, 2, 2, 1};
+constexpr std::uint32_t kPngPassYStart[7] = {0, 0, 4, 0, 2, 0, 1};
+constexpr std::uint32_t kPngPassYInc[7]   = {8, 8, 8, 4, 4, 2, 2};
 
 // png_ptr->mng_features_permitted bits (libpng 1.2.x png.h). Distinct bit
 // space from both png_info::valid and png_ptr->flags.

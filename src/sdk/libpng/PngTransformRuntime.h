@@ -139,6 +139,89 @@ extern "C" void png_do_strip_filler(png_row_infop row_info, std::uint8_t* row, s
 extern "C" void png_do_bgr(png_row_infop row_info, std::uint8_t* row);
 
 /**
+ * Address: 0x00A2666E (FUN_00A2666E)
+ * Mangled: png_do_pack
+ *
+ * IDA signature:
+ * void __cdecl png_do_pack(png_row_infop row_info, png_bytep row, png_uint_32 bit_depth);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_unpack: repacks a one-byte-per-pixel
+ * grayscale/palette row into `bit_depth` bits per pixel (1/2/4) in place.
+ * No-op for any other target depth or when the row isn't already 8bpp/1-channel.
+ */
+extern "C" void png_do_pack(png_row_infop row_info, std::uint8_t* row, std::uint32_t bit_depth);
+
+/**
+ * Address: 0x00A2679E (FUN_00A2679E)
+ * Mangled: png_do_shift
+ *
+ * IDA signature:
+ * void __cdecl png_do_shift(png_row_infop row_info, png_bytep row, png_color_8p bit_depth);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_unshift: expands each channel from its
+ * true significant-bit count (a 5-byte png_color_8: red/green/blue/gray/alpha)
+ * back up to the row's full bit_depth. No-op for palette rows.
+ */
+extern "C" void png_do_shift(png_row_infop row_info, std::uint8_t* row, const std::uint8_t* bit_depth);
+
+/**
+ * Address: 0x00A269EF (FUN_00A269EF)
+ * Mangled: png_do_write_swap_alpha
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_swap_alpha(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_read_swap_alpha: converts ARGB/AG rows
+ * back to PNG's wire order RGBA/GA in place. 8-bit and 16-bit RGBA and
+ * gray+alpha rows; no-op for any other color type.
+ */
+extern "C" void png_do_write_swap_alpha(png_row_infop row_info, std::uint8_t* row);
+
+/**
+ * Address: 0x00A26AE1 (FUN_00A26AE1)
+ * Mangled: png_do_write_invert_alpha
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_invert_alpha(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_read_invert_alpha: inverts the alpha
+ * channel back to PNG's opacity convention in place for RGBA / gray+alpha rows.
+ */
+extern "C" void png_do_write_invert_alpha(png_row_infop row_info, std::uint8_t* row);
+
+/**
+ * Address: 0x00A2493D (FUN_00A2493D)
+ * Mangled: png_do_write_interlace
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_interlace(png_row_infop row_info, png_bytep row, int pass);
+ *
+ * What it does:
+ * Compacts a full-width row down to just the pixels belonging to Adam7 pass
+ * `pass`, in place. No-op for pass 6. Called from png_write_row for each row
+ * of an interlaced image whose caller did not pre-expand PNG_INTERLACE.
+ */
+extern "C" void png_do_write_interlace(png_row_infop row_info, std::uint8_t* row, int pass);
+
+/**
+ * Address: 0x00A26BCC (FUN_00A26BCC)
+ * Mangled: png_do_write_intrapixel
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_intrapixel(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * MNG "intrapixel differencing" write-side filter: replaces R and B with
+ * (R-G) and (B-G) in place for 8/16-bit RGB/RGBA rows. Called from
+ * png_write_row only when the MNG intrapixel filter type is active.
+ */
+extern "C" void png_do_write_intrapixel(png_row_infop row_info, std::uint8_t* row);
+
+/**
  * Address: 0x009E3A7E (FUN_009E3A7E)
  *
  * IDA signature:
@@ -349,3 +432,18 @@ extern "C" std::uint32_t png_do_expand(png_row_infop row_info, std::uint8_t* row
 extern "C" std::uint32_t png_do_dither(png_row_infop row_info, std::uint8_t* row,
                                        const std::uint8_t* palette_lookup,
                                        const std::uint8_t* dither_lookup);
+
+/**
+ * Address: 0x00A26C8E (FUN_00A26C8E)
+ * Mangled: png_do_write_transformations
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_transformations(png_structp png_ptr);
+ *
+ * What it does:
+ * Write-path transform dispatcher, called once per row from png_write_row.
+ * Applies each enabled png_ptr->transformations bit to the current scanline
+ * in libpng's fixed pngwtran.c order (user transform, strip filler, packswap,
+ * pack, swap bytes, shift, invert alpha, swap alpha, bgr, invert mono).
+ */
+extern "C" void png_do_write_transformations(png_structp png_ptr);

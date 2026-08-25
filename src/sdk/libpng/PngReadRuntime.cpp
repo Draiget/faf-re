@@ -653,15 +653,9 @@ extern "C" void png_do_read_intrapixel(int* row_info_raw, std::uint32_t row_addr
   }
 }
 
-namespace {
-// Adam7 interlace pass geometry (png_uint_32[7]), verified byte-for-byte from
-// the shipped PE .rdata: png_pass_start @0x00D62B88, png_pass_inc @0x00D62BA4,
-// png_pass_ystart @0x00D62BC0, png_pass_yinc @0x00D62BDC.
-constexpr std::uint32_t kPngPassStart[7]  = {0, 4, 0, 2, 0, 1, 0};
-constexpr std::uint32_t kPngPassInc[7]    = {8, 8, 4, 4, 2, 2, 1};
-constexpr std::uint32_t kPngPassYStart[7] = {0, 0, 4, 0, 2, 0, 1};
-constexpr std::uint32_t kPngPassYInc[7]   = {8, 8, 8, 4, 4, 2, 2};
-} // namespace
+// Adam7 interlace pass geometry (kPngPassStart/Inc/YStart/YInc) moved to the
+// shared libpng_layout namespace in PngStructLayout.h -- png_write_start_row /
+// png_write_finish_row / png_do_write_interlace need the same four tables.
 
 /**
  * Address: 0x00A2107F (FUN_00A2107F)
