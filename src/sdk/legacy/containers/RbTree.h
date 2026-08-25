@@ -3316,6 +3316,40 @@ namespace msvc8
              * above) and, independently, to the same WildMagic EH-cleanup
              * tail-jumps documented there -- correcting a prior
              * "transitively unreachable" verdict that missed those jumps.
+             *
+             * Address: 0x00856950 (FUN_00856950, sub_856950) -- `msvc8::
+             * map<CmdId, boost::shared_ptr<MeshInstance>>::erase_node` for
+             * `moho::CUIWorldViewBuildDragRuntimeView::mPreviewPositions`
+             * (`UiRuntimeTypes.h:896`, offset `0x28`), the same instantiation
+             * as `erase_range`'s emission cited on that member above
+             * (`FUN_008564E0`). Opens with the identical `_Isnil` check +
+             * `out_of_range("invalid map/set<T> iterator")` throw, transplant/
+             * two-child-successor logic, and `erase_rebalance` call this
+             * member's body has, then tears down the erased node's value
+             * before `operator delete`: reads the node's `boost::shared_ptr`
+             * counted-base pointer, and when present, does the classic
+             * two-phase `sp_counted_base::release()` (atomic-decrement the
+             * use count, dispose via vtable slot 1 if it hits zero;
+             * atomic-decrement the weak count, destroy via vtable slot 2 if
+             * that hits zero) -- matching this project's own established
+             * `release()`-not-`weak_release()` identification of that exact
+             * two-phase shape. That is precisely `~shared_ptr<MeshInstance>()`
+             * running as part of `~pair<const CmdId, shared_ptr<MeshInstance>>()`
+             * inside this member's implicit value teardown -- no bespoke
+             * shared_ptr-release code needed, `free_node` below already
+             * models it generically via the value's own destructor.
+             *
+             * Reached from this instantiation's `erase_range` (`FUN_008564E0`,
+             * cited above) via its general (non-whole-tree) loop branch. That
+             * caller's own citation already records that its one real
+             * invocation (`~CUIWorldViewBuildDragRuntimeView()`, `FUN_00852B20`)
+             * always takes the fast whole-tree-clear path -- so, per this
+             * file's established "template-instantiated but the per-node
+             * erase-rebalance path is compiled, not separately runtime-
+             * exercised through the currently-traced caller" shape (the
+             * `FUN_007CAC80`/`FUN_00A3E450` precedents immediately above),
+             * this member is kept `recovered` as a genuine compiled emission
+             * of real template code.
              */
             node_type* erase_node(node_type* const erased)
             {
