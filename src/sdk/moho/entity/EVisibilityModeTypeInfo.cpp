@@ -12,10 +12,6 @@ namespace
   bool gEVisibilityModeTypeInfoConstructed = false;
   bool gEVisibilityModeTypeInfoPreregistered = false;
 
-  alignas(moho::EVisibilityModePrimitiveSerializer)
-    unsigned char gEVisibilityModePrimitiveSerializerStorage[sizeof(moho::EVisibilityModePrimitiveSerializer)]{};
-  bool gEVisibilityModePrimitiveSerializerConstructed = false;
-
   const gpg::REnumType* gEVisibilityModeCachedType = nullptr;
 
   [[nodiscard]] moho::EVisibilityModeTypeInfo* AcquireEVisibilityModeTypeInfo()
@@ -28,92 +24,20 @@ namespace
     return reinterpret_cast<moho::EVisibilityModeTypeInfo*>(gEVisibilityModeTypeInfoStorage);
   }
 
-  [[nodiscard]] moho::EVisibilityModePrimitiveSerializer* AcquireEVisibilityModePrimitiveSerializer()
-  {
-    if (!gEVisibilityModePrimitiveSerializerConstructed) {
-      new (gEVisibilityModePrimitiveSerializerStorage) moho::EVisibilityModePrimitiveSerializer();
-      gEVisibilityModePrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EVisibilityModePrimitiveSerializer*>(gEVisibilityModePrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
   /**
-   * Address: 0x0050A740 (FUN_0050A740)
+   * Address: 0x00BC7AF0 (FUN_00BC7AF0, dynamic initializer for the global
+   * `PrimitiveSerHelper<EVisibilityMode,int>` singleton)
    *
    * What it does:
-   * Initializes callback lanes for startup-owned `EVisibilityMode` primitive
-   * serializer helper storage and returns that helper object.
+   * Default-constructs the `gpg::SerHelperBase` base (which self-links this
+   * helper onto the process-global pending-helper list) and binds the
+   * load/save callback fields; `Init()` is dispatched later, from
+   * `gpg::SerHelperBase::InitNewHelpers`. Prior to this recovery, this
+   * global was a hand-rolled POD that never actually inherited
+   * `SerHelperBase`, so `EVisibilityMode`'s serialize/deserialize callbacks
+   * were never installed under any code path.
    */
-  [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
-  InitializeEVisibilityModePrimitiveSerializerStartupThunkPrimary()
-  {
-    auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EVisibilityModePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EVisibilityModePrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050AA40 (FUN_0050AA40)
-   *
-   * What it does:
-   * Secondary startup-init entry for the `EVisibilityMode` primitive
-   * serializer helper storage that mirrors the primary callback
-   * initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
-  InitializeEVisibilityModePrimitiveSerializerStartupThunkSecondary()
-  {
-    auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::EVisibilityModePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::EVisibilityModePrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050AB90 (FUN_0050AB90)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `EVisibilityMode`.
-   */
-  [[nodiscard]] gpg::RType* ResolveEVisibilityModeType()
-  {
-    if (!gEVisibilityModeCachedType) {
-      gpg::RType* const type = gpg::LookupRType(typeid(moho::EVisibilityMode));
-      gEVisibilityModeCachedType = (type != nullptr) ? type->IsEnumType() : nullptr;
-    }
-    return const_cast<gpg::REnumType*>(gEVisibilityModeCachedType);
-  }
+  moho::EVisibilityModePrimitiveSerializer gEVisibilityModePrimitiveSerializer;
 
   /**
    * Address: 0x00BF1F90 (FUN_00BF1F90, cleanup_EVisibilityModeTypeInfo)
@@ -129,19 +53,6 @@ namespace
     gEVisibilityModeTypeInfoPreregistered = false;
     gEVisibilityModeCachedType = nullptr;
   }
-
-  /**
-   * Address: 0x00BF1FA0 (FUN_00BF1FA0, cleanup_EVisibilityModePrimitiveSerializer)
-   */
-  void cleanup_EVisibilityModePrimitiveSerializer()
-  {
-    if (!gEVisibilityModePrimitiveSerializerConstructed) {
-      return;
-    }
-
-    UnlinkSerializerNode(*AcquireEVisibilityModePrimitiveSerializer());
-  }
-
 } // namespace
 
 namespace moho
@@ -186,55 +97,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050AA00 (FUN_0050AA00, PrimitiveSerHelper<EVisibilityMode>::Deserialize)
-   */
-  void EVisibilityModePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EVisibilityMode*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EVisibilityMode>(value);
-  }
-
-  /**
-   * Address: 0x0050AA20 (FUN_0050AA20, PrimitiveSerHelper<EVisibilityMode>::Serialize)
-   */
-  void EVisibilityModePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const EVisibilityMode*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  /**
-   * Address: 0x0050A770 (FUN_0050A770, gpg::PrimitiveSerHelper<Moho::EVisibilityMode,int>::Init)
-   */
-  void EVisibilityModePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveEVisibilityModeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x0050A100 (FUN_0050A100, preregister_EVisibilityModeTypeInfo)
    */
   gpg::REnumType* preregister_EVisibilityModeTypeInfo()
@@ -257,15 +119,6 @@ namespace moho
     (void)preregister_EVisibilityModeTypeInfo();
     return std::atexit(&cleanup_EVisibilityModeTypeInfo);
   }
-
-  /**
-   * Address: 0x00BC7AF0 (FUN_00BC7AF0, register_EVisibilityModePrimitiveSerializer)
-   */
-  int register_EVisibilityModePrimitiveSerializer()
-  {
-    (void)InitializeEVisibilityModePrimitiveSerializerStartupThunkPrimary();
-    return std::atexit(&cleanup_EVisibilityModePrimitiveSerializer);
-  }
 } // namespace moho
 
 namespace
@@ -275,7 +128,6 @@ namespace
     EVisibilityModeTypeInfoBootstrap()
     {
       (void)moho::register_EVisibilityModeTypeInfo();
-      (void)moho::register_EVisibilityModePrimitiveSerializer();
     }
   };
 
