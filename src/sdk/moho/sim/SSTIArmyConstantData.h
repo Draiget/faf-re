@@ -5,6 +5,7 @@
 
 #include "../../boost/shared_ptr.h"
 #include "../../legacy/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
 {
@@ -28,6 +29,8 @@ namespace moho
    */
   struct SSTIArmyConstantData
   {
+    static gpg::RType* sType;
+
     /**
      * Address: 0x006FD330 (FUN_006FD330, Moho::SSTIArmyConstantData::SSTIArmyConstantData)
      *
@@ -118,4 +121,142 @@ namespace moho
     offsetof(SSTIArmyConstantData, mSciReconGrid) == 0x78, "SSTIArmyConstantData::mSciReconGrid offset must be 0x78"
   );
   static_assert(sizeof(SSTIArmyConstantData) == 0x80, "SSTIArmyConstantData size must be 0x80");
+
+  /**
+   * VFTABLE: 0x00E17534
+   */
+  class SSTIArmyConstantDataSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BC9AB0 (FUN_00BC9AB0, dynamic initializer for the global
+     * `SSTIArmyConstantDataSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SSTIArmyConstantDataSerializer();
+
+    /**
+     * Address: 0x00BF47E0 (FUN_00BF47E0, ??1SSTIArmyConstantDataSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SSTIArmyConstantDataSerializer();
+
+    /**
+     * Address: 0x005507F0 (FUN_005507F0, Moho::SSTIArmyConstantDataSerializer::Deserialize)
+     *
+     * What it does:
+     * Reflection load-callback facade forwarding to
+     * `SSTIArmyConstantData::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00550810 (FUN_00550810, Moho::SSTIArmyConstantDataSerializer::Serialize)
+     *
+     * What it does:
+     * Reflection save-callback facade forwarding to
+     * `SSTIArmyConstantData::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00550CF0 (FUN_00550CF0, shared Init() body -- also serves
+     * the dead SerSaveLoadHelper<SSTIArmyConstantData> duplicate's vtable
+     * slot 0, confirmed via incoming_xrefs from both vtables)
+     *
+     * What it does:
+     * Binds load/save serializer callbacks into `SSTIArmyConstantData` RTTI.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  static_assert(
+    offsetof(SSTIArmyConstantDataSerializer, mLoadCallback) == 0x0C,
+    "SSTIArmyConstantDataSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSTIArmyConstantDataSerializer, mSaveCallback) == 0x10,
+    "SSTIArmyConstantDataSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(SSTIArmyConstantDataSerializer) == 0x14, "SSTIArmyConstantDataSerializer size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00E17E5C
+   *
+   * Reflection serializer for `EntId` (`std::int32_t`). Adjacent to
+   * `SSTIArmyConstantDataSerializer` in the binary's registration cluster
+   * (0x00BC9AB0/0x00BC9F80 sit in the same address range), suggesting the
+   * original 2007 translation unit housed both together.
+   */
+  class EntIdSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BC9F80 (FUN_00BC9F80, dynamic initializer for the global
+     * `EntIdSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntIdSerializer();
+
+    /**
+     * Address: 0x00BF4DB0 (FUN_00BF4DB0, ??1EntIdSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~EntIdSerializer();
+
+    /**
+     * Address: 0x00557EF0 (FUN_00557EF0, Moho::EntIdSerializer::Deserialize)
+     *
+     * What it does:
+     * Reads the raw `EntId` value directly through the archive.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00557F10 (FUN_00557F10, Moho::EntIdSerializer::Serialize)
+     *
+     * What it does:
+     * Writes the raw `EntId` value directly through the archive.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005589E0 (FUN_005589E0, shared Init() body -- also serves
+     * the dead SerSaveLoadHelper<EntId> duplicate's vtable slot 0, confirmed
+     * via incoming_xrefs from both vtables)
+     *
+     * What it does:
+     * Binds load/save serializer callbacks into `EntId` RTTI. `EntId` is a
+     * `std::int32_t` alias (not a class), so unlike `SSTIArmyConstantData`
+     * it cannot host its own `static RType* sType` member; the cached type
+     * pointer lives as a translation-unit-local static instead (matches the
+     * real ctor's `Moho__EntId__sType` target, a plain data symbol rather
+     * than a class static member).
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  static_assert(offsetof(EntIdSerializer, mLoadCallback) == 0x0C, "EntIdSerializer::mLoadCallback offset must be 0x0C");
+  static_assert(offsetof(EntIdSerializer, mSaveCallback) == 0x10, "EntIdSerializer::mSaveCallback offset must be 0x10");
+  static_assert(sizeof(EntIdSerializer) == 0x14, "EntIdSerializer size must be 0x14");
 } // namespace moho

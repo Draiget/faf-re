@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
@@ -11,241 +12,25 @@
 
 namespace
 {
-  struct SerSaveLoadHelperNodeView
+  // The real ctor's cache slot (Moho__EntId__sType) resolves via
+  // typeid(??_R0?AVEntId@Moho@@@8) -- a *class*-mangled ('V' prefix) RTTI
+  // descriptor, meaning the 2007 source declared `EntId` as its own
+  // distinct class, not a bare integer alias. The current codebase-wide
+  // recovery models EntId as `using EntId = std::int32_t;` in five separate
+  // headers (Entity.h, Sim.h, IUnit.h, CWldSession.h,
+  // SSTICommandVariableData.h), under which typeid(EntId) resolves to
+  // typeid(std::int32_t) by alias transparency. Reconciling that whole-
+  // codebase typedef-vs-class divergence is out of scope for this pass;
+  // this cache intentionally matches the current alias definition so
+  // behavior is consistent with every other EntId call site today.
+  [[nodiscard]] gpg::RType* CachedEntIdType()
   {
-    void* mVTable;
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperNodeView::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperNodeView::mHelperPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeView) == 0x14, "SerSaveLoadHelperNodeView size must be 0x14");
-
-  SerSaveLoadHelperNodeView gSSTIArmyConstantDataSerializer{};
-  SerSaveLoadHelperNodeView gEntIdSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNodeSelf(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetHelperNodeLinks(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-    gpg::SerHelperBase* const self = HelperNodeSelf(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00550860 (FUN_00550860)
-   *
-   * What it does:
-   * Unlinks `SSTIArmyConstantDataSerializer` helper node from the intrusive
-   * helper list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyConstantDataSerializerHelperNodePrimary() noexcept
-  {
-    return ResetHelperNodeLinks(gSSTIArmyConstantDataSerializer);
-  }
-
-  /**
-   * Address: 0x00550890 (FUN_00550890)
-   *
-   * What it does:
-   * Secondary entrypoint for `SSTIArmyConstantDataSerializer` helper-node
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyConstantDataSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetHelperNodeLinks(gSSTIArmyConstantDataSerializer);
-  }
-
-  /**
-   * Address: 0x00557F60 (FUN_00557F60)
-   *
-   * What it does:
-   * Unlinks `EntIdSerializer` helper node from the intrusive helper list and
-   * restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupEntIdSerializerHelperNodePrimary() noexcept
-  {
-    return ResetHelperNodeLinks(gEntIdSerializer);
-  }
-
-  /**
-   * Address: 0x00557F90 (FUN_00557F90)
-   *
-   * What it does:
-   * Secondary entrypoint for `EntIdSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEntIdSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetHelperNodeLinks(gEntIdSerializer);
-  }
-
-  /**
-   * Address: 0x00557EF0 (FUN_00557EF0, Moho::EntIdSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `EntId`. Reads the raw id value
-   * directly through the archive (matches the binary's `ReadUInt` call on
-   * the raw 4-byte id storage).
-   */
-  void DeserializeEntIdSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
-    archive->ReadInt(object);
-  }
-
-  /**
-   * Address: 0x00557F10 (FUN_00557F10, Moho::EntIdSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `EntId`. Writes the raw id value
-   * directly through the archive (matches the binary's `WriteUInt` call on
-   * the raw 4-byte id storage).
-   */
-  void SerializeEntIdSerializerCallback(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const object = reinterpret_cast<const std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
-    archive->WriteInt(*object);
-  }
-
-  /**
-   * Address: 0x00BF4DB0 (FUN_00BF4DB0, Moho::EntIdSerializer::~EntIdSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `EntIdSerializer` helper node,
-   * matching the sibling unlink lanes used across other serializer
-   * registrars.
-   */
-  void cleanup_EntIdSerializer_atexit()
-  {
-    (void)CleanupEntIdSerializerHelperNodePrimary();
-  }
-
-  /**
-   * Address: 0x00BC9F80 (FUN_00BC9F80, register_EntIdSerializer)
-   *
-   * What it does:
-   * Initializes the global `EntId` serializer helper's load/save callback
-   * lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`. Supersedes the previous orphaned
-   * startup thunk, which self-linked and set the callback lanes but never
-   * installed the `atexit` cleanup the real binary registers here.
-   */
-  void register_EntIdSerializer()
-  {
-    gpg::SerHelperBase* const self = HelperNodeSelf(gEntIdSerializer);
-    gEntIdSerializer.mHelperPrev = self;
-    gEntIdSerializer.mHelperNext = self;
-    gEntIdSerializer.mLoadCallback = &DeserializeEntIdSerializerCallback;
-    gEntIdSerializer.mSaveCallback = &SerializeEntIdSerializerCallback;
-    (void)std::atexit(&cleanup_EntIdSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x005507F0 (FUN_005507F0, Moho::SSTIArmyConstantDataSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `SSTIArmyConstantData`. Forwards
-   * the reflected object pointer to
-   * `SSTIArmyConstantData::MemberDeserialize` (FUN_00550FC0 body); `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary
-   * tail call).
-   */
-  void DeserializeSSTIArmyConstantDataSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const data = reinterpret_cast<moho::SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
-    if (data == nullptr) {
-      return;
+    static gpg::RType* sCachedType = nullptr;
+    if (!sCachedType) {
+      sCachedType = gpg::LookupRType(typeid(std::int32_t));
     }
-    data->MemberDeserialize(archive);
+    return sCachedType;
   }
-
-  /**
-   * Address: 0x00550810 (FUN_00550810, Moho::SSTIArmyConstantDataSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `SSTIArmyConstantData`. Forwards
-   * the reflected object pointer to
-   * `SSTIArmyConstantData::MemberSerialize` (FUN_005510C0 body); `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary
-   * tail call).
-   */
-  void SerializeSSTIArmyConstantDataSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto* const data =
-      reinterpret_cast<const moho::SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
-    if (data == nullptr) {
-      return;
-    }
-    data->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00BF47E0 (FUN_00BF47E0, Moho::SSTIArmyConstantDataSerializer::~SSTIArmyConstantDataSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `SSTIArmyConstantDataSerializer`
-   * helper node, matching the sibling unlink lanes used across other
-   * serializer registrars.
-   */
-  void cleanup_SSTIArmyConstantDataSerializer_atexit()
-  {
-    (void)CleanupSSTIArmyConstantDataSerializerHelperNodePrimary();
-  }
-
-  /**
-   * Address: 0x00BC9AB0 (FUN_00BC9AB0, register_SSTIArmyConstantDataSerializer)
-   *
-   * What it does:
-   * Initializes the global `SSTIArmyConstantData` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`.
-   */
-  void register_SSTIArmyConstantDataSerializer()
-  {
-    gpg::SerHelperBase* const self = HelperNodeSelf(gSSTIArmyConstantDataSerializer);
-    gSSTIArmyConstantDataSerializer.mHelperPrev = self;
-    gSSTIArmyConstantDataSerializer.mHelperNext = self;
-    gSSTIArmyConstantDataSerializer.mLoadCallback = &DeserializeSSTIArmyConstantDataSerializerCallback;
-    gSSTIArmyConstantDataSerializer.mSaveCallback = &SerializeSSTIArmyConstantDataSerializerCallback;
-    (void)std::atexit(&cleanup_SSTIArmyConstantDataSerializer_atexit);
-  }
-
-  struct EntIdAndSSTIArmyConstantDataSerializerStartupBootstrap
-  {
-    EntIdAndSSTIArmyConstantDataSerializerStartupBootstrap()
-    {
-      register_EntIdSerializer();
-      register_SSTIArmyConstantDataSerializer();
-    }
-  };
-
-  [[maybe_unused]] EntIdAndSSTIArmyConstantDataSerializerStartupBootstrap
-    gEntIdAndSSTIArmyConstantDataSerializerStartupBootstrap;
 
   /**
    * Address: 0x007518A0 (FUN_007518A0)
@@ -527,6 +312,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* SSTIArmyConstantData::sType = nullptr;
+
   /**
    * Address: 0x006FD330 (FUN_006FD330, Moho::SSTIArmyConstantData::SSTIArmyConstantData)
    *
@@ -675,4 +462,147 @@ namespace moho
     *destination = source;
     return destination;
   }
+
+  /**
+   * Address: 0x00BC9AB0 (FUN_00BC9AB0, dynamic initializer for the global
+   * `SSTIArmyConstantDataSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SSTIArmyConstantDataSerializer::SSTIArmyConstantDataSerializer()
+    : mLoadCallback(&SSTIArmyConstantDataSerializer::Deserialize)
+    , mSaveCallback(&SSTIArmyConstantDataSerializer::Serialize)
+  {}
+
+  SSTIArmyConstantDataSerializer::~SSTIArmyConstantDataSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x005507F0 (FUN_005507F0, Moho::SSTIArmyConstantDataSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `SSTIArmyConstantData`. Forwards
+   * the reflected object pointer to
+   * `SSTIArmyConstantData::MemberDeserialize` (FUN_00550FC0 body); `version`
+   * and the owner-ref lane are unused by the member (mirrors the binary
+   * tail call).
+   */
+  void SSTIArmyConstantDataSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
+  {
+    auto* const data = reinterpret_cast<SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
+    if (data == nullptr) {
+      return;
+    }
+    data->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00550810 (FUN_00550810, Moho::SSTIArmyConstantDataSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `SSTIArmyConstantData`. Forwards
+   * the reflected object pointer to
+   * `SSTIArmyConstantData::MemberSerialize` (FUN_005510C0 body); `version`
+   * and the owner-ref lane are unused by the member (mirrors the binary
+   * tail call).
+   */
+  void SSTIArmyConstantDataSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
+  {
+    const auto* const data = reinterpret_cast<const SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
+    if (data == nullptr) {
+      return;
+    }
+    data->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00550CF0 (FUN_00550CF0, shared Init() body)
+   */
+  void SSTIArmyConstantDataSerializer::Init()
+  {
+    if (SSTIArmyConstantData::sType == nullptr) {
+      SSTIArmyConstantData::sType = gpg::LookupRType(typeid(SSTIArmyConstantData));
+    }
+
+    gpg::RType* const type = SSTIArmyConstantData::sType;
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  /**
+   * Address: 0x00BC9F80 (FUN_00BC9F80, dynamic initializer for the global
+   * `EntIdSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  EntIdSerializer::EntIdSerializer()
+    : mLoadCallback(&EntIdSerializer::Deserialize)
+    , mSaveCallback(&EntIdSerializer::Serialize)
+  {}
+
+  EntIdSerializer::~EntIdSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00557EF0 (FUN_00557EF0, Moho::EntIdSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `EntId`. Reads the raw id value
+   * directly through the archive (matches the binary's `ReadUInt` call on
+   * the raw 4-byte id storage).
+   */
+  void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const object = reinterpret_cast<std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
+    archive->ReadInt(object);
+  }
+
+  /**
+   * Address: 0x00557F10 (FUN_00557F10, Moho::EntIdSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `EntId`. Writes the raw id value
+   * directly through the archive (matches the binary's `WriteUInt` call on
+   * the raw 4-byte id storage).
+   */
+  void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    const auto* const object = reinterpret_cast<const std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
+    archive->WriteInt(*object);
+  }
+
+  /**
+   * Address: 0x005589E0 (FUN_005589E0, shared Init() body)
+   */
+  void EntIdSerializer::Init()
+  {
+    gpg::RType* const type = CachedEntIdType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010AC3DC -- process-global `SSTIArmyConstantDataSerializer` singleton.
+  moho::SSTIArmyConstantDataSerializer gSSTIArmyConstantDataSerializer;
+
+  // Address: 0x010AC890 -- process-global `EntIdSerializer` singleton.
+  moho::EntIdSerializer gEntIdSerializer;
+} // namespace
