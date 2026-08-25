@@ -1,30 +1,13 @@
 #include "moho/entity/CollisionBeamEntityConstruct.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
-#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/CollisionBeamEntity.h"
-#include "moho/sim/Sim.h"
-
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int flags);
-  };
-} // namespace gpg
 
 namespace
 {
-  gpg::RType* gSimType = nullptr;
-  gpg::RType* gCollisionBeamEntityType = nullptr;
-  moho::CollisionBeamEntitySaveConstruct gCollisionBeamEntitySaveConstruct{};
-  moho::CollisionBeamEntityConstruct gCollisionBeamEntityConstruct{};
-
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
   {
@@ -33,111 +16,10 @@ namespace
     }
     return slot;
   }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return &helper.mHelperLinks;
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mNext = self;
-    helper.mHelperLinks.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    helper.mHelperLinks.mNext->mPrev = helper.mHelperLinks.mPrev;
-    helper.mHelperLinks.mPrev->mNext = helper.mHelperLinks.mNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mPrev = self;
-    helper.mHelperLinks.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x006739D0 (FUN_006739D0)
-   *
-   * What it does:
-   * Unlinks the global `CollisionBeamEntityConstruct` helper node from
-   * the intrusive serializer-helper list, then resets the node to self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCollisionBeamEntityConstructHelperNode() noexcept
-  {
-    gCollisionBeamEntityConstruct.mHelperLinks.mNext->mPrev = gCollisionBeamEntityConstruct.mHelperLinks.mPrev;
-    gCollisionBeamEntityConstruct.mHelperLinks.mPrev->mNext = gCollisionBeamEntityConstruct.mHelperLinks.mNext;
-
-    gpg::SerHelperBase* const self = &gCollisionBeamEntityConstruct.mHelperLinks;
-    gCollisionBeamEntityConstruct.mHelperLinks.mPrev = self;
-    gCollisionBeamEntityConstruct.mHelperLinks.mNext = self;
-    return self;
-  }
-
-  void CleanupCollisionBeamEntityConstructAtexit()
-  {
-    (void)moho::cleanup_CollisionBeamEntityConstruct();
-  }
-
-  void CleanupCollisionBeamEntitySaveConstructAtexit()
-  {
-    (void)moho::cleanup_CollisionBeamEntitySaveConstruct();
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x006738A0 (FUN_006738A0, CollisionBeamEntity save-construct args callback)
-   */
-  void CollisionBeamEntitySaveConstruct::SaveConstructArgs(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const object = reinterpret_cast<CollisionBeamEntity*>(static_cast<std::uintptr_t>(objectPtr));
-    if (!archive || !object) {
-      return;
-    }
-
-    gpg::RRef ownerRef{};
-    ownerRef.mObj = object->SimulationRef;
-    ownerRef.mType = object->SimulationRef ? ResolveCachedType<Sim>(gSimType) : nullptr;
-    gpg::WriteRawPointer(archive, ownerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-
-    if (result != nullptr) {
-      result->SetUnowned(0u);
-    }
-  }
-
-  /**
-   * Address: 0x00674EB0 (FUN_00674EB0, initialize_CollisionBeamEntitySaveConstruct)
-   */
-  gpg::SerHelperBase* initialize_CollisionBeamEntitySaveConstruct()
-  {
-    InitializeHelperNode(gCollisionBeamEntitySaveConstruct);
-    gCollisionBeamEntitySaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CollisionBeamEntitySaveConstruct::SaveConstructArgs);
-    return &gCollisionBeamEntitySaveConstruct.mHelperLinks;
-  }
-
-  /**
-   * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)
-   */
-  void CollisionBeamEntitySaveConstruct::RegisterSaveConstructArgsFunction()
-  {
-    gpg::RType* const type = ResolveCachedType<CollisionBeamEntity>(gCollisionBeamEntityType);
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
   /**
    * Address: 0x00675590 (FUN_00675590, construct callback adapter)
    *
@@ -182,71 +64,44 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BD4C90 (FUN_00BD4C90, dynamic initializer for the global
+   * `CollisionBeamEntityConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
+   */
+  CollisionBeamEntityConstruct::CollisionBeamEntityConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CollisionBeamEntityConstruct::Construct))
+    , mDeleteCallback(&CollisionBeamEntityConstruct::Deconstruct)
+  {}
+
+  CollisionBeamEntityConstruct::~CollisionBeamEntityConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00674F60 (FUN_00674F60, gpg::SerConstructHelper_CollisionBeamEntity::Init)
    *
    * What it does:
-   * Resolves `CollisionBeamEntity` RTTI and installs construct/delete callback
-   * lanes into reflected type metadata.
+   * Resolves `CollisionBeamEntity` RTTI (caching into its own `sType`
+   * static, matching the binary) and installs construct/delete callback
+   * lanes. Raw asm at 0x00674F60 asserts only `serConstructFunc_ ==
+   * nullptr` before overwriting both fields unconditionally -- it does not
+   * also assert on `deleteFunc_` the way the sibling Serializer::Init
+   * (0x00674FE0) asserts both of its callback lanes.
    */
-  void CollisionBeamEntityConstruct::RegisterConstructFunction()
+  void CollisionBeamEntityConstruct::Init()
   {
-    gpg::RType* const type = ResolveCachedType<CollisionBeamEntity>(gCollisionBeamEntityType);
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
+    gpg::RType* const type = ResolveCachedType<CollisionBeamEntity>(CollisionBeamEntity::sType);
+    GPG_ASSERT(type->serConstructFunc_ == nullptr);
     type->serConstructFunc_ = mConstructCallback;
     type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
-   * Address: 0x00673A00 (FUN_00673A00, cleanup_CollisionBeamEntityConstruct)
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntityConstruct()
-  {
-    return UnlinkCollisionBeamEntityConstructHelperNode();
-  }
-
-  /**
-   * Address: 0x00BFC340 (FUN_00BFC340, cleanup_CollisionBeamEntitySaveConstruct)
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntitySaveConstruct()
-  {
-    return UnlinkHelperNode(gCollisionBeamEntitySaveConstruct);
-  }
-
-  /**
-   * Address: 0x00BD4C60 (FUN_00BD4C60, register_CollisionBeamEntitySaveConstruct)
-   */
-  int register_CollisionBeamEntitySaveConstruct()
-  {
-    (void)initialize_CollisionBeamEntitySaveConstruct();
-    return std::atexit(&CleanupCollisionBeamEntitySaveConstructAtexit);
-  }
-
-  /**
-   * Address: 0x00BD4C90 (FUN_00BD4C90, register_CollisionBeamEntityConstruct)
-   */
-  void register_CollisionBeamEntityConstruct()
-  {
-    InitializeHelperNode(gCollisionBeamEntityConstruct);
-    gCollisionBeamEntityConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CollisionBeamEntityConstruct::Construct);
-    gCollisionBeamEntityConstruct.mDeleteCallback = &CollisionBeamEntityConstruct::Deconstruct;
-    gCollisionBeamEntityConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupCollisionBeamEntityConstructAtexit);
   }
 } // namespace moho
 
 namespace
 {
-  struct CollisionBeamEntityConstructBootstrap
-  {
-    CollisionBeamEntityConstructBootstrap()
-    {
-      (void)moho::register_CollisionBeamEntitySaveConstruct();
-      moho::register_CollisionBeamEntityConstruct();
-    }
-  };
-
-  [[maybe_unused]] CollisionBeamEntityConstructBootstrap gCollisionBeamEntityConstructBootstrap;
+  moho::CollisionBeamEntityConstruct gCollisionBeamEntityConstruct{};
 } // namespace

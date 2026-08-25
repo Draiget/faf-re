@@ -12,9 +12,29 @@ namespace moho
    * VFTABLE: 0x00E26F94
    * COL: 0x00E99494
    */
-  class CollisionBeamEntitySerializer
+  class CollisionBeamEntitySerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD4CD0 (FUN_00BD4CD0, dynamic initializer for the global
+     * `CollisionBeamEntitySerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields.
+     */
+    CollisionBeamEntitySerializer();
+
+    /**
+     * Address: 0x00BFC3A0 (FUN_00BFC3A0, Moho::CollisionBeamEntitySerializer::~CollisionBeamEntitySerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CollisionBeamEntitySerializer();
+
     /**
      * Address: 0x00673B00 (FUN_00673B00, Moho::CollisionBeamEntitySerializer::Deserialize)
      *
@@ -35,20 +55,17 @@ namespace moho
      * Address: 0x00674FE0 (FUN_00674FE0, gpg::SerSaveLoadHelper_CollisionBeamEntity::Init)
      *
      * What it does:
-     * Binds `CollisionBeamEntity` RTTI load/save callback lanes.
+     * Binds `CollisionBeamEntity` RTTI load/save callback lanes. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CollisionBeamEntitySerializer, mHelperLinks) == 0x04,
-    "CollisionBeamEntitySerializer::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(CollisionBeamEntitySerializer, mDeserialize) == 0x0C,
     "CollisionBeamEntitySerializer::mDeserialize offset must be 0x0C"
@@ -58,21 +75,4 @@ namespace moho
     "CollisionBeamEntitySerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(CollisionBeamEntitySerializer) == 0x14, "CollisionBeamEntitySerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFC3A0 (FUN_00BFC3A0, Moho::CollisionBeamEntitySerializer::~CollisionBeamEntitySerializer)
-   *
-   * What it does:
-   * Unlinks the startup serializer helper-node lane and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntitySerializer();
-
-  /**
-   * Address: 0x00BD4CD0 (FUN_00BD4CD0, register_CollisionBeamEntitySerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper and callback lanes for
-   * `CollisionBeamEntity`.
-   */
-  void register_CollisionBeamEntitySerializer();
 } // namespace moho
