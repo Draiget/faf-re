@@ -8,7 +8,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/sim/SOCellPos.h"
+#include "moho/sim/SOCellPos.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -16,69 +16,22 @@ namespace
   alignas(moho::SNavGoalTypeInfo) unsigned char gSNavGoalTypeInfoStorage[sizeof(moho::SNavGoalTypeInfo)];
   bool gSNavGoalTypeInfoConstructed = false;
 
-  alignas(moho::SNavGoalSerializer) unsigned char gSNavGoalSerializerStorage[sizeof(moho::SNavGoalSerializer)];
-  bool gSNavGoalSerializerConstructed = false;
-
   [[nodiscard]] moho::SNavGoalTypeInfo& SNavGoalTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::SNavGoalTypeInfo*>(gSNavGoalTypeInfoStorage);
   }
 
-  [[nodiscard]] moho::SNavGoalSerializer& SNavGoalSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::SNavGoalSerializer*>(gSNavGoalSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeHelperNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0050C1C0 (FUN_0050C1C0)
-   *
-   * What it does:
-   * Unlinks the `SNavGoalSerializer` helper node and resets both links to the
-   * serializer self-node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSNavGoalSerializerVariant1() noexcept
-  {
-    return UnlinkHelperNode(SNavGoalSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0050C1F0 (FUN_0050C1F0)
-   *
-   * What it does:
-   * Duplicate lane of `SNavGoalSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSNavGoalSerializerVariant2() noexcept
-  {
-    return UnlinkHelperNode(SNavGoalSerializerStorageRef());
-  }
+  // Address: 0x00BC7DA0 (FUN_00BC7DA0, register_SNavGoalSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<SNavGoal>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real mangled
+  // destructor (`??1SNavGoalSerializer@Moho@@QAE@@Z`, 0x00BF2230) via
+  // `atexit`. There is no hand-written "register" function for this in the
+  // original source -- matches `gpg::PrimitiveSerHelper<T,IntType>`'s and
+  // every other `gpg::SerSaveLoadHelper<T>` instantiation's already-
+  // established modeling.
+  moho::SNavGoalSerializer gSNavGoalSerializer;
 
   /**
    * Address: 0x0050C120 (FUN_0050C120)
@@ -116,22 +69,6 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x0050CAF0 (FUN_0050CAF0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `SNavGoal`.
-   */
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* cached = moho::SNavGoal::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = cached;
-    }
-    return cached;
-  }
-
   void CleanupSNavGoalTypeInfoAtExit()
   {
     if (!gSNavGoalTypeInfoConstructed) {
@@ -140,18 +77,6 @@ namespace
 
     SNavGoalTypeInfoStorageRef().~SNavGoalTypeInfo();
     gSNavGoalTypeInfoConstructed = false;
-  }
-
-  void CleanupSNavGoalSerializerAtExit()
-  {
-    if (!gSNavGoalSerializerConstructed) {
-      return;
-    }
-
-    moho::SNavGoalSerializer& serializer = SNavGoalSerializerStorageRef();
-    (void)CleanupSNavGoalSerializerVariant1();
-    serializer.~SNavGoalSerializer();
-    gSNavGoalSerializerConstructed = false;
   }
 } // namespace
 
@@ -187,13 +112,13 @@ namespace moho
    * Loads the first rectangle, secondary rectangle, and layer payload in
    * exact binary archive order.
    */
-  void SNavGoal::MemberDeserialize(SNavGoal* const object, gpg::ReadArchive* const archive)
+  void SNavGoal::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedRect2iType(), &object->mPos1, ownerRef);
-    archive->Read(CachedRect2iType(), &object->mPos2, ownerRef);
-    archive->Read(CachedELayerType(), &object->mLayer, ownerRef);
+    archive->Read(CachedRect2iType(), &mPos1, ownerRef);
+    archive->Read(CachedRect2iType(), &mPos2, ownerRef);
+    archive->Read(CachedELayerType(), &mLayer, ownerRef);
   }
 
   /**
@@ -203,13 +128,13 @@ namespace moho
    * Stores the first rectangle, secondary rectangle, and layer payload in
    * exact binary archive order.
    */
-  void SNavGoal::MemberSerialize(const SNavGoal* const object, gpg::WriteArchive* const archive)
+  void SNavGoal::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedRect2iType(), &object->mPos1, ownerRef);
-    archive->Write(CachedRect2iType(), &object->mPos2, ownerRef);
-    archive->Write(CachedELayerType(), &object->mLayer, ownerRef);
+    archive->Write(CachedRect2iType(), &mPos1, ownerRef);
+    archive->Write(CachedRect2iType(), &mPos2, ownerRef);
+    archive->Write(CachedELayerType(), &mLayer, ownerRef);
   }
 
   /**
@@ -257,76 +182,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050C170 (FUN_0050C170, Moho::SNavGoalSerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards archive loading to `SNavGoal::MemberDeserialize`.
-   */
-  void SNavGoalSerializer::Deserialize(gpg::ReadArchive* const archive, SNavGoal* const goal)
-  {
-    SNavGoal::MemberDeserialize(goal, archive);
-  }
-
-  /**
-   * Address: 0x0050C180 (FUN_0050C180, Moho::SNavGoalSerializer::Serialize)
-   *
-   * What it does:
-   * Forwards archive saving to `SNavGoal::MemberSerialize`.
-   */
-  void SNavGoalSerializer::Serialize(gpg::WriteArchive* const archive, SNavGoal* const goal)
-  {
-    SNavGoal::MemberSerialize(goal, archive);
-  }
-
-  /**
-   * Address: 0x0050C190 (FUN_0050C190)
-   *
-   * What it does:
-   * Initializes `SNavGoalSerializer` helper links and callback lanes.
-   */
-  [[nodiscard]] SNavGoalSerializer* initialize_SNavGoalSerializerVariant1()
-  {
-    if (!gSNavGoalSerializerConstructed) {
-      new (gSNavGoalSerializerStorage) SNavGoalSerializer();
-      gSNavGoalSerializerConstructed = true;
-    }
-
-    InitializeHelperNode(SNavGoalSerializerStorageRef());
-    SNavGoalSerializerStorageRef().mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&SNavGoalSerializer::Deserialize);
-    SNavGoalSerializerStorageRef().mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SNavGoalSerializer::Serialize);
-    return &SNavGoalSerializerStorageRef();
-  }
-
-  /**
-   * Address: 0x0050C840 (FUN_0050C840)
-   *
-   * What it does:
-   * Duplicate lane of `SNavGoalSerializer` callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] SNavGoalSerializer* initialize_SNavGoalSerializerVariant2()
-  {
-    return initialize_SNavGoalSerializerVariant1();
-  }
-
-  /**
-   * Address: 0x0050C870 (FUN_0050C870, Moho::SNavGoalSerializer::RegisterSerializeFunctions)
-   *
-   * What it does:
-   * Binds the serializer callbacks into `SNavGoal` RTTI.
-   */
-  void SNavGoalSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedSNavGoalType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00BC7D80 (FUN_00BC7D80, register_SNavGoalTypeInfo)
    *
    * What it does:
@@ -346,16 +201,15 @@ namespace moho
    * Address: 0x00BC7DA0 (FUN_00BC7DA0, register_SNavGoalSerializer)
    *
    * What it does:
-   * Installs serializer callbacks for `SNavGoal` and registers shutdown
-   * unlink/destruction.
+   * Forces this translation unit's global `SNavGoalSerializer` instance to
+   * link into the reflection bootstrap sequence. See the Doxygen comment on
+   * the declaration (SNavGoal.h) and on `gSNavGoalSerializer` above for why
+   * this function's body has no field-setting logic of its own.
    */
   void register_SNavGoalSerializer()
   {
-    (void)initialize_SNavGoalSerializerVariant1();
-    (void)std::atexit(&CleanupSNavGoalSerializerAtExit);
+    (void)gSNavGoalSerializer;
   }
-
-  SNavGoalSerializer::~SNavGoalSerializer() noexcept = default;
 } // namespace moho
 
 namespace
