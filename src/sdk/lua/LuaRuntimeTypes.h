@@ -146,6 +146,8 @@ struct Udata
 	 * owning Lua thread traversal lock context.
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, Udata* object, int version, const gpg::RRef& ownerRef);
+
+	static gpg::RType* sType;
 };
 static_assert(offsetof(Udata, metatable) == 0x08, "Udata::metatable offset must be 0x08");
 static_assert(offsetof(Udata, len) == 0x0C, "Udata::len offset must be 0x0C");
@@ -275,6 +277,8 @@ struct LClosure
 	 * Lua closure object.
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, LClosure* object, int version, const gpg::RRef& ownerRef);
+
+	static gpg::RType* sType;
 };
 
 union Closure
@@ -416,6 +420,8 @@ struct __declspec(align(8)) lua_State
 	// leaves exactly 0x1A8 - 0x160 = 0x48 for this struct. It used to carry
 	// 0x20 bytes of unproven trailing slots (errorJmp/errfunc/allocName and
 	// filler), so any write through them landed past the real allocation.
+
+	static gpg::RType* sType;
 };
 
 union GCObject

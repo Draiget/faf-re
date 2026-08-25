@@ -3663,6 +3663,7 @@ gpg::RType* preregister_SimArmyVectorTypeStartup()
 }
 
 RType* RType::sType = nullptr;
+RType* RType::TObject = nullptr;
 
 RField::RField()
   : mName(nullptr)
