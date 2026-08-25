@@ -23,15 +23,26 @@ namespace LuaPlus
 {
   class LuaState;
 
-  /**
-   * VFTABLE: 0x00D44F4C
-   * COL: 0x00E5189C
-   */
-  class LuaStateSaveConstruct
+  class LuaStateSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, LuaState*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x00BE9F90 (FUN_00BE9F90, dynamic initializer for the global
+     * `LuaStateSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field.
+     */
+    LuaStateSaveConstruct();
+
+    /**
+     * Address: 0x00C09820 (FUN_00C09820, LuaPlus::LuaStateSaveConstruct::~LuaStateSaveConstruct)
+     */
+    ~LuaStateSaveConstruct();
 
     /**
      * Address: 0x0090BC50 (FUN_0090BC50, LuaPlus::LuaStateSaveConstruct::Construct)
@@ -49,35 +60,41 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for
      * `LuaPlus::LuaState`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(LuaStateSaveConstruct, vftable_) == 0x00, "LuaStateSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(LuaStateSaveConstruct, mNext) == 0x04, "LuaStateSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(LuaStateSaveConstruct, mPrev) == 0x08, "LuaStateSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(LuaStateSaveConstruct, mConstruct) == 0x0C, "LuaStateSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(LuaStateSaveConstruct) == 0x10, "LuaStateSaveConstruct size must be 0x10");
 
-  /**
-   * VFTABLE: 0x00D46A68
-   */
-  class LClosureSaveConstruct
+  class LClosureSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, LClosure*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x00BEA420 (FUN_00BEA420, dynamic initializer for the global
+     * `LClosureSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field.
+     */
+    LClosureSaveConstruct();
+
+    /**
+     * Address: 0x00C09B20 (FUN_00C09B20, LClosureSaveConstruct::~LClosureSaveConstruct)
+     */
+    ~LClosureSaveConstruct();
 
     /**
      * Address: 0x0091F490 (FUN_0091F490, LClosureSaveConstruct::Construct)
@@ -95,35 +112,41 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0091FC50 (FUN_0091FC50, LClosureSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0091FC50 (FUN_0091FC50, LClosureSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for
      * `LClosure`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(LClosureSaveConstruct, vftable_) == 0x00, "LClosureSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(LClosureSaveConstruct, mNext) == 0x04, "LClosureSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(LClosureSaveConstruct, mPrev) == 0x08, "LClosureSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(LClosureSaveConstruct, mConstruct) == 0x0C, "LClosureSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(LClosureSaveConstruct) == 0x10, "LClosureSaveConstruct size must be 0x10");
 
-  /**
-   * VFTABLE: 0x00D46A70
-   */
-  class UpValSaveConstruct
+  class UpValSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, UpVal*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x00BEA530 (FUN_00BEA530, dynamic initializer for the global
+     * `UpValSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field.
+     */
+    UpValSaveConstruct();
+
+    /**
+     * Address: 0x00C09BB0 (FUN_00C09BB0, UpValSaveConstruct::~UpValSaveConstruct)
+     */
+    ~UpValSaveConstruct();
 
     /**
      * Address: 0x0091E510 (FUN_0091E510, UpValSaveConstruct::Construct)
@@ -140,34 +163,40 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0091FDE0 (FUN_0091FDE0, UpValSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0091FDE0 (FUN_0091FDE0, UpValSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for `UpVal`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(UpValSaveConstruct, vftable_) == 0x00, "UpValSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(UpValSaveConstruct, mNext) == 0x04, "UpValSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(UpValSaveConstruct, mPrev) == 0x08, "UpValSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(UpValSaveConstruct, mConstruct) == 0x0C, "UpValSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(UpValSaveConstruct) == 0x10, "UpValSaveConstruct size must be 0x10");
 
-  /**
-   * VFTABLE: 0x00D46A80
-   */
-  class ProtoSaveConstruct
+  class ProtoSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, Proto*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x00BEA640 (FUN_00BEA640, dynamic initializer for the global
+     * `ProtoSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field.
+     */
+    ProtoSaveConstruct();
+
+    /**
+     * Address: 0x00C09C40 (FUN_00C09C40, ProtoSaveConstruct::~ProtoSaveConstruct)
+     */
+    ~ProtoSaveConstruct();
 
     /**
      * Address: 0x0091E520 (FUN_0091E520, ProtoSaveConstruct::Construct)
@@ -184,40 +213,42 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0091FF70 (FUN_0091FF70, ProtoSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0091FF70 (FUN_0091FF70, ProtoSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for `Proto`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(ProtoSaveConstruct, vftable_) == 0x00, "ProtoSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(ProtoSaveConstruct, mNext) == 0x04, "ProtoSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(ProtoSaveConstruct, mPrev) == 0x08, "ProtoSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(ProtoSaveConstruct, mConstruct) == 0x0C, "ProtoSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(ProtoSaveConstruct) == 0x10, "ProtoSaveConstruct size must be 0x10");
 
-  class TStringSaveConstruct
+  class TStringSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, TString*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
 
     /**
-     * Address: 0x009232E0 (FUN_009232E0)
+     * Address: 0x00BEA200 (FUN_00BEA200, dynamic initializer for the global
+     * `TStringSaveConstruct` singleton)
      *
      * What it does:
-     * Initializes TString save-construct helper links and binds the construct
-     * callback lane.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field. A dead, zero-xref COMDAT duplicate of this
+     * dynamic initializer sits at 0x009232E0 (not `__xc_a`-reachable); this
+     * is the real one.
      */
     TStringSaveConstruct();
+
+    /**
+     * Address: 0x00C09A00 (FUN_00C09A00, TStringSaveConstruct::~TStringSaveConstruct)
+     */
+    ~TStringSaveConstruct();
 
     /**
      * Address: 0x009220A0 (FUN_009220A0, TStringSaveConstruct::Construct)
@@ -234,41 +265,43 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0091F930 (FUN_0091F930, TStringSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0091F930 (FUN_0091F930, TStringSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for
      * `TString`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(TStringSaveConstruct, vftable_) == 0x00, "TStringSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(TStringSaveConstruct, mNext) == 0x04, "TStringSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(TStringSaveConstruct, mPrev) == 0x08, "TStringSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(TStringSaveConstruct, mConstruct) == 0x0C, "TStringSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(TStringSaveConstruct) == 0x10, "TStringSaveConstruct size must be 0x10");
 
-  class TableSaveConstruct
+  class TableSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, Table*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
 
     /**
-     * Address: 0x00923360 (FUN_00923360)
+     * Address: 0x00BEA310 (FUN_00BEA310, dynamic initializer for the global
+     * `TableSaveConstruct` singleton)
      *
      * What it does:
-     * Initializes table save-construct helper links and binds the construct
-     * callback lane.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field. A dead, zero-xref COMDAT duplicate of this
+     * dynamic initializer sits at 0x00923360 (not `__xc_a`-reachable); this
+     * is the real one.
      */
     TableSaveConstruct();
+
+    /**
+     * Address: 0x00C09A90 (FUN_00C09A90, TableSaveConstruct::~TableSaveConstruct)
+     */
+    ~TableSaveConstruct();
 
     /**
      * Address: 0x00922180 (FUN_00922180, TableSaveConstruct::Construct)
@@ -285,31 +318,40 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x0091FAC0 (FUN_0091FAC0, TableSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x0091FAC0 (FUN_0091FAC0, TableSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for `Table`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(TableSaveConstruct, vftable_) == 0x00, "TableSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(TableSaveConstruct, mNext) == 0x04, "TableSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(TableSaveConstruct, mPrev) == 0x08, "TableSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(TableSaveConstruct, mConstruct) == 0x0C, "TableSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(TableSaveConstruct) == 0x10, "TableSaveConstruct size must be 0x10");
 
-  class UdataSaveConstruct
+  class UdataSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, Udata*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x00BEA860 (FUN_00BEA860, dynamic initializer for the global
+     * `UdataSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field.
+     */
+    UdataSaveConstruct();
+
+    /**
+     * Address: 0x00C09D60 (FUN_00C09D60, UdataSaveConstruct::~UdataSaveConstruct)
+     */
+    ~UdataSaveConstruct();
 
     /**
      * Address: 0x0091E530 (FUN_0091E530, UdataSaveConstruct::Construct)
@@ -327,41 +369,43 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x00920290 (FUN_00920290, UdataSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x00920290 (FUN_00920290, UdataSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for
      * `Udata`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(UdataSaveConstruct, vftable_) == 0x00, "UdataSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(UdataSaveConstruct, mNext) == 0x04, "UdataSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(UdataSaveConstruct, mPrev) == 0x08, "UdataSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(UdataSaveConstruct, mConstruct) == 0x0C, "UdataSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(UdataSaveConstruct) == 0x10, "UdataSaveConstruct size must be 0x10");
 
-  class lua_StateSaveConstruct
+  class lua_StateSaveConstruct : public gpg::SerHelperBase
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, lua_State*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
 
     /**
-     * Address: 0x009235B0 (FUN_009235B0)
+     * Address: 0x00BEA750 (FUN_00BEA750, dynamic initializer for the global
+     * `lua_StateSaveConstruct` singleton)
      *
      * What it does:
-     * Initializes lua-thread save-construct helper links and binds the
-     * construct callback lane.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct callback field. A dead, zero-xref COMDAT duplicate of this
+     * dynamic initializer sits at 0x009235B0 (not `__xc_a`-reachable); this
+     * is the real one.
      */
     lua_StateSaveConstruct();
+
+    /**
+     * Address: 0x00C09CD0 (FUN_00C09CD0, lua_StateSaveConstruct::~lua_StateSaveConstruct)
+     */
+    ~lua_StateSaveConstruct();
 
     /**
      * Address: 0x00922610 (FUN_00922610, lua_StateSaveConstruct::Construct)
@@ -378,24 +422,18 @@ namespace LuaPlus
     );
 
     /**
-     * Address: 0x00920100 (FUN_00920100, lua_StateSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x00920100 (FUN_00920100, lua_StateSaveConstruct::Init)
      *
      * What it does:
      * Binds the save-construct-args callback into reflected RTTI for
      * `lua_State`.
      */
-    void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    void* vftable_;                  // +0x00
-    gpg::SerHelperBase* mNext;       // +0x04
-    gpg::SerHelperBase* mPrev;       // +0x08
-    construct_fn_t mConstruct;       // +0x0C
+    construct_fn_t mConstruct; // +0x0C
   };
 
-  static_assert(offsetof(lua_StateSaveConstruct, vftable_) == 0x00, "lua_StateSaveConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(lua_StateSaveConstruct, mNext) == 0x04, "lua_StateSaveConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(lua_StateSaveConstruct, mPrev) == 0x08, "lua_StateSaveConstruct::mPrev offset must be 0x08");
   static_assert(offsetof(lua_StateSaveConstruct, mConstruct) == 0x0C, "lua_StateSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(lua_StateSaveConstruct) == 0x10, "lua_StateSaveConstruct size must be 0x10");
 } // namespace LuaPlus
