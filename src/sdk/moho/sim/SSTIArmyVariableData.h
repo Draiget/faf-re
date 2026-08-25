@@ -72,6 +72,8 @@ namespace moho
    */
   struct SSTIArmyVariableData
   {
+    static gpg::RType* sType;
+
     SEconTotals mEconomyTotals;             // 0x000
     std::uint8_t mIsResourceSharingEnabled; // 0x038
     std::uint8_t mPad_0039_0040[0x07]{};
@@ -202,9 +204,28 @@ namespace moho
    * VFTABLE: 0x00E17574
    * COL:  0x00E6C0A0
    */
-  class SSTIArmyVariableDataSerializer
+  class SSTIArmyVariableDataSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC9B10 (FUN_00BC9B10, dynamic initializer for the global
+     * `SSTIArmyVariableDataSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SSTIArmyVariableDataSerializer();
+
+    /**
+     * Address: 0x00BF4870 (FUN_00BF4870, ??1SSTIArmyVariableDataSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SSTIArmyVariableDataSerializer();
+
     /**
      * Address: 0x00550A00 (FUN_00550A00, Moho::SSTIArmyVariableDataSerializer::Deserialize callback)
      *
@@ -222,29 +243,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00550D90 (FUN_00550D90, sub_550D90)
-     * Slot: 0
+     * Address: 0x00550D90 (FUN_00550D90, shared Init() body -- also serves
+     * the dead SerSaveLoadHelper<SSTIArmyVariableData> duplicate's vtable
+     * slot 0)
      *
      * What it does:
      * Binds load/save serializer callbacks into SSTIArmyVariableData RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
-
-  /**
-   * Address: 0x00BC9B10 (FUN_00BC9B10, register_SSTIArmyVariableDataSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper links/callbacks for
-   * `SSTIArmyVariableData` and schedules process-exit cleanup.
-   */
-  void register_SSTIArmyVariableDataSerializer();
 
   /**
    * VFTABLE: 0x00E17544
@@ -303,14 +314,6 @@ namespace moho
    */
   void register_SSTIArmyVariableDataTypeInfo();
 
-  static_assert(
-    offsetof(SSTIArmyVariableDataSerializer, mHelperNext) == 0x04,
-    "SSTIArmyVariableDataSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SSTIArmyVariableDataSerializer, mHelperPrev) == 0x08,
-    "SSTIArmyVariableDataSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SSTIArmyVariableDataSerializer, mSerLoadFunc) == 0x0C,
     "SSTIArmyVariableDataSerializer::mSerLoadFunc offset must be 0x0C"

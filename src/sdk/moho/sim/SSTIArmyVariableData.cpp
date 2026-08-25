@@ -9,7 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/EngineVectorHelpers.h"
+#include "moho/misc/EngineVectorHelpers.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -93,75 +93,6 @@ namespace
 
     AcquireSSTIArmyVariableDataTypeInfo().~SSTIArmyVariableDataTypeInfo();
     gSSTIArmyVariableDataTypeInfoConstructed = false;
-  }
-
-  moho::SSTIArmyVariableDataSerializer gSSTIArmyVariableDataSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetSSTIArmyVariableDataSerializerHelperLinks() noexcept
-  {
-    gSSTIArmyVariableDataSerializer.mHelperNext->mPrev = gSSTIArmyVariableDataSerializer.mHelperPrev;
-    gSSTIArmyVariableDataSerializer.mHelperPrev->mNext = gSSTIArmyVariableDataSerializer.mHelperNext;
-    gpg::SerHelperBase* const self = HelperSelfNode(gSSTIArmyVariableDataSerializer);
-    gSSTIArmyVariableDataSerializer.mHelperPrev = self;
-    gSSTIArmyVariableDataSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00550A60 (FUN_00550A60)
-   *
-   * What it does:
-   * Unlinks `SSTIArmyVariableDataSerializer` helper node from the intrusive
-   * helper list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyVariableDataSerializerHelperNodePrimary() noexcept
-  {
-    return ResetSSTIArmyVariableDataSerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00550A90 (FUN_00550A90)
-   *
-   * What it does:
-   * Secondary entrypoint for `SSTIArmyVariableDataSerializer` helper-node
-   * unlink/reset.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyVariableDataSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetSSTIArmyVariableDataSerializerHelperLinks();
-  }
-
-  void CleanupSSTIArmyVariableDataSerializerAtexit()
-  {
-    (void)CleanupSSTIArmyVariableDataSerializerHelperNodePrimary();
   }
 
   /**
@@ -714,6 +645,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* SSTIArmyVariableData::sType = nullptr;
+
   /**
    * Address: 0x006FD390 (FUN_006FD390, Moho::SSTIArmyVariableData::SSTIArmyVariableData)
    *
@@ -983,37 +916,37 @@ namespace moho
   }
 
   /**
-   * Address: 0x00550D90 (FUN_00550D90, sub_550D90)
+   * Address: 0x00BC9B10 (FUN_00BC9B10, dynamic initializer for the global
+   * `SSTIArmyVariableDataSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void SSTIArmyVariableDataSerializer::RegisterSerializeFunctions()
+  SSTIArmyVariableDataSerializer::SSTIArmyVariableDataSerializer()
+    : mSerLoadFunc(&SSTIArmyVariableDataSerializer::Deserialize)
+    , mSerSaveFunc(&SSTIArmyVariableDataSerializer::Serialize)
+  {}
+
+  SSTIArmyVariableDataSerializer::~SSTIArmyVariableDataSerializer()
   {
-    if (mSerLoadFunc == nullptr) {
-      mSerLoadFunc = &SSTIArmyVariableDataSerializer::Deserialize;
-    }
-    if (mSerSaveFunc == nullptr) {
-      mSerSaveFunc = &SSTIArmyVariableDataSerializer::Serialize;
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00550D90 (FUN_00550D90, shared Init() body)
+   */
+  void SSTIArmyVariableDataSerializer::Init()
+  {
+    if (SSTIArmyVariableData::sType == nullptr) {
+      SSTIArmyVariableData::sType = gpg::LookupRType(typeid(SSTIArmyVariableData));
     }
 
-    gpg::RType* const type = gpg::LookupRType(typeid(SSTIArmyVariableData));
+    gpg::RType* const type = SSTIArmyVariableData::sType;
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mSerLoadFunc;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
-   * Address: 0x00BC9B10 (FUN_00BC9B10, register_SSTIArmyVariableDataSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper links/callbacks for
-   * `SSTIArmyVariableData` and schedules process-exit cleanup.
-   */
-  void register_SSTIArmyVariableDataSerializer()
-  {
-    InitializeHelperNode(gSSTIArmyVariableDataSerializer);
-    gSSTIArmyVariableDataSerializer.mSerLoadFunc = &SSTIArmyVariableDataSerializer::Deserialize;
-    gSSTIArmyVariableDataSerializer.mSerSaveFunc = &SSTIArmyVariableDataSerializer::Serialize;
-    (void)std::atexit(&CleanupSSTIArmyVariableDataSerializerAtexit);
   }
 
   /**
@@ -1089,25 +1022,11 @@ namespace moho
 
 namespace
 {
-  struct SSTIArmyVariableDataTypeInfoBootstrap
-  {
-    SSTIArmyVariableDataTypeInfoBootstrap()
-    {
-      moho::register_SSTIArmyVariableDataTypeInfo();
-    }
-  };
-
-  SSTIArmyVariableDataTypeInfoBootstrap gSSTIArmyVariableDataTypeInfoBootstrap;
-
-  struct SSTIArmyVariableDataSerializerBootstrap
-  {
-    SSTIArmyVariableDataSerializerBootstrap()
-    {
-      moho::register_SSTIArmyVariableDataSerializer();
-    }
-  };
-
-  SSTIArmyVariableDataSerializerBootstrap gSSTIArmyVariableDataSerializerBootstrap;
+  // Address: 0x010AC350 -- process-global `SSTIArmyVariableDataSerializer`
+  // singleton. SSTIArmyVariableDataTypeInfo's own registration is
+  // independently __xc_a-reachable through GPG_PREREGISTER_INIT below; the
+  // two are unrelated hierarchies (gpg::RType vs gpg::SerHelperBase).
+  moho::SSTIArmyVariableDataSerializer gSSTIArmyVariableDataSerializer;
 } // namespace
 
 
