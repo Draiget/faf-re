@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <utility>
 
 #include "boost/mutex.h"
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
@@ -209,6 +210,80 @@ namespace
     }
 
     return best;
+  }
+
+  /**
+   * Address: 0x004E2060 (FUN_004E2060)
+   *
+   * IDA signature:
+   * void __usercall sub_4E2060(SoundTreeHeadNode **outResult@<eax>, const std::uint32_t *keyPtr);
+   *
+   * What it does:
+   * `upper_bound`-style walk of the `sSndParamsCache` RB-tree: returns the
+   * first node whose key is strictly greater than `*keyPtr`, or the header
+   * itself (`end()`) when none qualifies or the tree is empty. Byte-for-byte
+   * the same walk as `LowerBoundSoundParamsCacheByHash` above with one
+   * operand order flipped (`cmp esi,[ecx+0Ch]` here vs `cmp [ecx+0Ch],esi`
+   * there), which turns the `>=` branch into `>` -- the textbook
+   * lower_bound/upper_bound distinction.
+   *
+   * Not yet wired to a source-level caller of its own -- its real caller
+   * (0x004E1710, `EqualRangeSoundParamsCacheByHash` below) is itself not
+   * reached from any currently-recovered source, matching
+   * `LowerBoundSoundParamsCacheByHash`'s own pending-caller note above and
+   * this file's "not read by the modern runtime path" mirror status. Kept
+   * `[[maybe_unused]]` pending that chain's recovery.
+   */
+  [[maybe_unused]] SoundTreeHeadNode* UpperBoundSoundParamsCacheByHash(const std::uint32_t* const keyPtr)
+  {
+    SoundTreeHeadNode* const head = gSSndParamsCacheMirror.head;
+    auto* node = reinterpret_cast<SoundTreeHeadNode*>(head->left);
+    SoundTreeHeadNode* best = head;
+
+    if (node->isNil == 0) {
+      const std::uint32_t key = *keyPtr;
+      while (node->isNil == 0) {
+        const std::uint32_t nodeKey = *reinterpret_cast<const std::uint32_t*>(node->reservedValue);
+        if (nodeKey > key) {
+          best = node;
+          node = reinterpret_cast<SoundTreeHeadNode*>(node->parent);
+        } else {
+          node = reinterpret_cast<SoundTreeHeadNode*>(node->right);
+        }
+      }
+    }
+
+    return best;
+  }
+
+  /**
+   * Address: 0x004E1710 (FUN_004E1710)
+   *
+   * IDA signature:
+   * SoundTreeHeadNode **__usercall sub_4E1710@<eax>(const std::uint32_t *keyPtr@<edi>, std::pair<SoundTreeHeadNode*,SoundTreeHeadNode*> *outResult@<esi>);
+   *
+   * What it does:
+   * `equal_range`-style query of the `sSndParamsCache` RB-tree: calls
+   * `UpperBoundSoundParamsCacheByHash` and `LowerBoundSoundParamsCacheByHash`
+   * against the same key and returns the pair `{lowerBound, upperBound}` --
+   * `.asm`-confirmed field order (`[esi]` = the lower-bound result, `[esi+4]`
+   * = the upper-bound result), matching `std::equal_range`'s `{first,
+   * second}` convention exactly.
+   *
+   * This is the token whose recovery unblocks both bound-walk helpers
+   * above; DB-integrity fix: this token was marked `recovered` citing
+   * `src/sdk/moho/misc/CrtRuntimeHelpers.cpp` (address not present in that
+   * file, confirmed by a full-file grep) and reverted to `blocked`. Neither
+   * this function nor its two callees is itself called from any
+   * currently-recovered source -- the tree's real consumers
+   * (`GetCSndParams`/insert, `CSndParams.cpp`) inline their own private
+   * walk instead of calling out to any of these three, matching this
+   * file's "not read by the modern runtime path" mirror status. Kept
+   * `[[maybe_unused]]` pending a caller.
+   */
+  [[maybe_unused]] std::pair<SoundTreeHeadNode*, SoundTreeHeadNode*> EqualRangeSoundParamsCacheByHash(const std::uint32_t* const keyPtr)
+  {
+    return {LowerBoundSoundParamsCacheByHash(keyPtr), UpperBoundSoundParamsCacheByHash(keyPtr)};
   }
 } // namespace
 
