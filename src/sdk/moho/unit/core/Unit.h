@@ -283,6 +283,11 @@ namespace moho
    */
   struct SInfoCache
   {
+    // Address: cached RTTI lane read/written by
+    // `SInfoCacheSerializer::Init` (0x006AE810); see
+    // `moho/unit/core/SInfoCacheReflection.cpp`.
+    static gpg::RType* sType;
+
     CFormationInstance* mFormationLayer;   // +0x00
     SWeakRefSlot mFormationLeadRef;        // +0x04
     std::int32_t mFormationPriorityOrder;  // +0x0C
