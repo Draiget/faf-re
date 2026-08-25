@@ -12,6 +12,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/entity/CTextureScroller.h"
 
 namespace gpg
 {
@@ -190,70 +191,125 @@ namespace
     gSDecalInfoListTypeNameInitGuard = 0u;
   }
 
-  struct SerSaveLoadHelperNodeView
+  // Forward declarations: SDecalInfoSerializer's constructor below binds
+  // these as its load/save callback pointers; their bodies are defined
+  // further down in this same anonymous namespace.
+  void DeserializeSDecalInfoSerializerLane(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void SerializeSDecalInfoSerializerLane(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+
+  /**
+   * Demangled (by analogy to the established `gpg::Rect2iSerializer` /
+   * `gpg::Rect2fSerializer` sibling shape in Reflection.h):
+   * `gpg::SerSaveLoadHelper<class Moho::CTextureScroller>`.
+   *
+   * NOTE: no citation in this TU identifies a constructor that binds
+   * `mLoadCallback`/`mSaveCallback` for this specific helper, nor an `Init()`
+   * dispatch body -- both load/save fields stay null here, matching this
+   * file's pre-existing (already-uncalled) state. This also appears to
+   * duplicate `moho::CTextureScroller`'s own, fully-evidenced serializer
+   * helper recovered in `CTextureScroller.cpp`
+   * (`register_CTextureScrollerSerializer` /
+   * `InstallTextureScrollerSerializerCallbacks`, FUN_00BDD750/FUN_00777F80) --
+   * flagged here for a follow-up reconciliation pass, not merged.
+   */
+  class CTextureScrollerSerializer : public gpg::SerHelperBase
   {
-    void* mVTable;                          // +0x00
-    gpg::SerHelperBase* mHelperNext;        // +0x04
-    gpg::SerHelperBase* mHelperPrev;        // +0x08
-    gpg::RType::load_func_t mLoadCallback;  // +0x0C
-    gpg::RType::save_func_t mSaveCallback;  // +0x10
+  public:
+    /**
+     * Address: 0x00777D90 (FUN_00777D90, SerSaveLoadHelper<CTextureScroller>::unlink lane A)
+     * Address: 0x00777DC0 (FUN_00777DC0, SerSaveLoadHelper<CTextureScroller>::unlink lane B)
+     *
+     * What it does:
+     * Resolves `CTextureScroller` reflected type metadata and publishes this
+     * helper's (currently null) load/save callback lanes to it.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
   };
   static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperNodeView::mHelperNext offset must be 0x04"
+    offsetof(CTextureScrollerSerializer, mLoadCallback) == 0x0C,
+    "CTextureScrollerSerializer::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperNodeView::mHelperPrev offset must be 0x08"
+    offsetof(CTextureScrollerSerializer, mSaveCallback) == 0x10,
+    "CTextureScrollerSerializer::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mLoadCallback) == 0x0C,
-    "SerSaveLoadHelperNodeView::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mSaveCallback) == 0x10,
-    "SerSaveLoadHelperNodeView::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeView) == 0x14, "SerSaveLoadHelperNodeView size must be 0x14");
+  static_assert(sizeof(CTextureScrollerSerializer) == 0x14, "CTextureScrollerSerializer size must be 0x14");
 
-  SerSaveLoadHelperNodeView gTextureScrollerSerializer{};
-  SerSaveLoadHelperNodeView gSDecalInfoSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNodeSelf(SerSaveLoadHelperNodeView& helper) noexcept
+  void CTextureScrollerSerializer::Init()
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  void InitializeSerSaveLoadHelperNode(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperNodeSelf(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-    helper.mLoadCallback = nullptr;
-    helper.mSaveCallback = nullptr;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperNodeSelf(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  struct DecalSerializerHelperBootstrap
-  {
-    DecalSerializerHelperBootstrap()
-    {
-      InitializeSerSaveLoadHelperNode(gTextureScrollerSerializer);
-      InitializeSerSaveLoadHelperNode(gSDecalInfoSerializer);
+    gpg::RType* type = moho::CTextureScroller::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CTextureScroller));
+      moho::CTextureScroller::sType = type;
     }
-  };
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
 
-  DecalSerializerHelperBootstrap gDecalSerializerHelperBootstrap;
+  CTextureScrollerSerializer gTextureScrollerSerializer;
+
+  /**
+   * Demangled (by analogy to `gpg::Rect2iSerializer` / `gpg::Rect2fSerializer`):
+   * `gpg::SerSaveLoadHelper<class Moho::SDecalInfo>`.
+   */
+  class SDecalInfoSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x0077A6A0 (FUN_0077A6A0)
+     *
+     * What it does:
+     * Binds this helper's load/save callback lanes to the decal-info member
+     * (de)serialize thunks. Base-class construction
+     * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices
+     * it into the pending `sNewHelpers` list.
+     */
+    SDecalInfoSerializer();
+
+    /**
+     * Address: 0x0077A6D0 (FUN_0077A6D0, InstallMohoSDecalInfoSerializerCallbacks
+     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
+     * template in gpg/core/containers/ArchiveSerialization.cpp)
+     *
+     * What it does:
+     * Resolves `SDecalInfo` reflected type metadata and publishes this
+     * helper's load/save callback lanes to it.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+  static_assert(
+    offsetof(SDecalInfoSerializer, mLoadCallback) == 0x0C, "SDecalInfoSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SDecalInfoSerializer, mSaveCallback) == 0x10, "SDecalInfoSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(SDecalInfoSerializer) == 0x14, "SDecalInfoSerializer size must be 0x14");
+
+  SDecalInfoSerializer::SDecalInfoSerializer()
+    : mLoadCallback(&DeserializeSDecalInfoSerializerLane)
+    , mSaveCallback(&SerializeSDecalInfoSerializerLane)
+  {}
+
+  void SDecalInfoSerializer::Init()
+  {
+    gpg::RType* const type = CachedSDecalInfoType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  SDecalInfoSerializer gSDecalInfoSerializer;
 
   void DeserializeSDecalInfoSerializerLane(
     gpg::ReadArchive* const archive,
@@ -286,30 +342,15 @@ namespace
   }
 
   /**
-   * Address: 0x0077A6A0 (FUN_0077A6A0)
-   *
-   * What it does:
-   * Initializes `SDecalInfo` serializer helper links and binds archive
-   * load/save callback lanes for one decal-info payload.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* InitializeSDecalInfoSerializerHelper() noexcept
-  {
-    InitializeSerSaveLoadHelperNode(gSDecalInfoSerializer);
-    gSDecalInfoSerializer.mLoadCallback = &DeserializeSDecalInfoSerializerLane;
-    gSDecalInfoSerializer.mSaveCallback = &SerializeSDecalInfoSerializerLane;
-    return HelperNodeSelf(gSDecalInfoSerializer);
-  }
-
-  /**
    * Address: 0x00777D90 (FUN_00777D90)
    *
    * What it does:
    * Unlinks `CTextureScrollerSerializer` helper node from the intrusive helper
-   * list, rewires self-links, and returns the helper self node.
+   * list and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkTextureScrollerSerializerHelperPrimary() noexcept
+  [[maybe_unused]] void UnlinkTextureScrollerSerializerHelperPrimary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gTextureScrollerSerializer);
+    gTextureScrollerSerializer.ResetLinks();
   }
 
   /**
@@ -319,21 +360,21 @@ namespace
    * Secondary entrypoint for `CTextureScrollerSerializer` helper-node
    * intrusive unlink + self-link reset.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkTextureScrollerSerializerHelperSecondary() noexcept
+  [[maybe_unused]] void UnlinkTextureScrollerSerializerHelperSecondary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gTextureScrollerSerializer);
+    gTextureScrollerSerializer.ResetLinks();
   }
 
   /**
    * Address: 0x00778E70 (FUN_00778E70)
    *
    * What it does:
-   * Unlinks `SDecalInfoSerializer` helper node from the intrusive helper list,
-   * rewires self-links, and returns the helper self node.
+   * Unlinks `SDecalInfoSerializer` helper node from the intrusive helper list
+   * and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSDecalInfoSerializerHelperPrimary() noexcept
+  [[maybe_unused]] void UnlinkSDecalInfoSerializerHelperPrimary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gSDecalInfoSerializer);
+    gSDecalInfoSerializer.ResetLinks();
   }
 
   /**
@@ -343,9 +384,9 @@ namespace
    * Secondary entrypoint for `SDecalInfoSerializer` helper-node intrusive
    * unlink + self-link reset.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSDecalInfoSerializerHelperSecondary() noexcept
+  [[maybe_unused]] void UnlinkSDecalInfoSerializerHelperSecondary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gSDecalInfoSerializer);
+    gSDecalInfoSerializer.ResetLinks();
   }
 
   struct SDecalInfoListRuntimeView

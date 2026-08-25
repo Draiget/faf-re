@@ -22,55 +22,16 @@ namespace gpg
   };
 } // namespace gpg
 
+namespace moho
+{
+  // Forward declaration: the real definition sits further down in this TU;
+  // RPropBlueprintConstruct's ctor below only needs the signature to bind
+  // the callback pointer.
+  void Construct_RPropBlueprint(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+} // namespace moho
+
 namespace
 {
-  struct SerSaveLoadHelperNodeRuntime
-  {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-  };
-
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mNext) == 0x04,
-    "SerSaveLoadHelperNodeRuntime::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mPrev) == 0x08,
-    "SerSaveLoadHelperNodeRuntime::mPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeRuntime) == 0x0C, "SerSaveLoadHelperNodeRuntime size must be 0x0C");
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  SerSaveLoadHelperNodeRuntime gRPropBlueprintConstructHelper{};
-
-  struct SerConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
-    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
-    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
-  );
-
   struct SerSaveConstructHelperView
   {
     void* mVftable;
@@ -94,22 +55,61 @@ namespace
   }
 
   /**
-   * Address: 0x0051DE50 (FUN_0051DE50, gpg::SerConstructHelper<Moho::RPropBlueprint>::Init)
+   * VFTABLE: unknown - not independently observed for this instantiation.
    *
-   * IDA signature:
-   * void(__cdecl *) __thiscall sub_51DE50(SerConstructHelperView *this);
+   * Demangled: gpg::SerConstructHelper<class Moho::RPropBlueprint>
    *
    * What it does:
-   * Virtual-method body installed in the
-   * `Moho::RPropBlueprintConstruct` and
-   * `gpg::SerConstructHelper<Moho::RPropBlueprint>` vtables. Lazily resolves
-   * the `RPropBlueprint` reflection descriptor, asserts the construct callback
-   * slot is empty, and publishes this helper's construct/delete callbacks to
-   * the descriptor.
+   * Binds the construct/delete callbacks used to materialize
+   * `RPropBlueprint` references during load. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  [[maybe_unused]] gpg::RType::construct_func_t InitRPropBlueprintConstructHelper(
-    const SerConstructHelperView& helper
-  )
+  class RPropBlueprintConstruct : public gpg::SerHelperBase
+  {
+  public:
+    RPropBlueprintConstruct();
+
+    /**
+     * Address: 0x0051DE50 (FUN_0051DE50, gpg::SerConstructHelper<Moho::RPropBlueprint>::Init)
+     *
+     * IDA signature:
+     * void(__cdecl *) __thiscall sub_51DE50(SerConstructHelperView *this);
+     *
+     * What it does:
+     * Lazily resolves the `RPropBlueprint` reflection descriptor, asserts the
+     * construct callback slot is empty, and publishes this helper's
+     * construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(RPropBlueprintConstruct, mConstructCallback) == 0x0C,
+    "RPropBlueprintConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(RPropBlueprintConstruct, mDeleteCallback) == 0x10,
+    "RPropBlueprintConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(RPropBlueprintConstruct) == 0x14, "RPropBlueprintConstruct size must be 0x14");
+
+  // NOTE: no binary evidence in this TU identifies a delete callback for
+  // RPropBlueprint - Construct_RPropBlueprint below resolves an *existing*
+  // blueprint out of RRuleGameRules's blueprint table (SetOwned on a lookup
+  // result, not a fresh heap allocation), so a null delete callback is
+  // plausible (the table, not the reflection system, owns blueprint
+  // lifetime) but is not independently confirmed.
+  RPropBlueprintConstruct::RPropBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RPropBlueprint))
+    , mDeleteCallback(nullptr)
+  {}
+
+  void RPropBlueprintConstruct::Init()
   {
     constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
     constexpr int kSerializationConstructLine = 231;
@@ -120,10 +120,11 @@ namespace
     if (type->serConstructFunc_ != nullptr) {
       gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
     }
-    type->serConstructFunc_ = helper.mConstructCallback;
-    type->deleteFunc_ = helper.mDeleteCallback;
-    return helper.mConstructCallback;
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
+
+  RPropBlueprintConstruct gRPropBlueprintConstructHelper;
 
   /**
    * Address: 0x0051DDD0 (FUN_0051DDD0, gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::Init)
@@ -172,9 +173,9 @@ namespace moho
    * Unlinks `RPropBlueprint` construct-helper links and restores the node to
    * self-linked sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRPropBlueprintConstructHelperPrimary() noexcept
+  [[maybe_unused]] void CleanupRPropBlueprintConstructHelperPrimary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRPropBlueprintConstructHelper);
+    gRPropBlueprintConstructHelper.ResetLinks();
   }
 
   /**
@@ -184,9 +185,9 @@ namespace moho
    * Secondary entrypoint for unlink/reset of the same
    * `RPropBlueprint` construct-helper lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRPropBlueprintConstructHelperSecondary() noexcept
+  [[maybe_unused]] void CleanupRPropBlueprintConstructHelperSecondary() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gRPropBlueprintConstructHelper);
+    gRPropBlueprintConstructHelper.ResetLinks();
   }
 
   /**

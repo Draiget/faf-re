@@ -8,8 +8,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -46,30 +45,77 @@ namespace
     }
   };
 
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them.
-  struct SSTITargetSerializerHelperNode
+  // Forward declarations: SSTITargetSerializer's constructor below binds
+  // these as its load/save callback pointers; their bodies are defined
+  // further down in this same anonymous namespace.
+  void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void cleanup_SSTITargetSerializer_atexit();
+
+  [[nodiscard]] gpg::RType* CachedSSTITargetType()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::SSTITarget));
+    }
+    return cached;
+  }
+
+  /**
+   * Demangled (by analogy to the established `gpg::Rect2iSerializer` /
+   * `gpg::Rect2fSerializer` sibling shape in Reflection.h):
+   * `gpg::SerSaveLoadHelper<class Moho::SSTITarget>`.
+   */
+  class SSTITargetSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BCA310 (FUN_00BCA310, register_SSTITargetSerializer)
+     *
+     * What it does:
+     * Binds this helper's load/save callback lanes and registers process-exit
+     * cleanup. Base-class construction (`gpg::SerHelperBase::SerHelperBase`)
+     * self-links this node and splices it into the pending `sNewHelpers`
+     * list.
+     */
+    SSTITargetSerializer();
+
+    /**
+     * What it does:
+     * Resolves `SSTITarget` reflected type metadata and publishes this
+     * helper's load/save callback lanes to it.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
-    offsetof(SSTITargetSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "SSTITargetSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+    offsetof(SSTITargetSerializer, mSerLoadFunc) == 0x0C, "SSTITargetSerializer::mSerLoadFunc offset must be 0x0C"
   );
   static_assert(
-    offsetof(SSTITargetSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "SSTITargetSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+    offsetof(SSTITargetSerializer, mSerSaveFunc) == 0x10, "SSTITargetSerializer::mSerSaveFunc offset must be 0x10"
   );
-  static_assert(
-    sizeof(SSTITargetSerializerHelperNode) == 0x14,
-    "SSTITargetSerializerHelperNode size must be 0x14"
-  );
+  static_assert(sizeof(SSTITargetSerializer) == 0x14, "SSTITargetSerializer size must be 0x14");
 
-  SSTITargetSerializerHelperNode gSSTITargetSerializer{};
+  SSTITargetSerializer::SSTITargetSerializer()
+    : mSerLoadFunc(&DeserializeSSTITargetSerializerCallback)
+    , mSerSaveFunc(&SerializeSSTITargetSerializerCallback)
+  {
+    (void)std::atexit(&cleanup_SSTITargetSerializer_atexit);
+  }
+
+  void SSTITargetSerializer::Init()
+  {
+    gpg::RType* const type = CachedSSTITargetType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  SSTITargetSerializer gSSTITargetSerializer;
 
   /**
    * Address: 0x0055B170 (FUN_0055B170, SerSaveLoadHelper<SSTITarget>::unlink lane A)
@@ -78,9 +124,9 @@ namespace
    * Unlinks `SSTITarget` serializer helper links and restores self-links for
    * intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTITargetSerializerLaneA() noexcept
+  [[maybe_unused]] void UnlinkSSTITargetSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer.mListLinks);
+    gSSTITargetSerializer.ResetLinks();
   }
 
   /**
@@ -90,9 +136,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the `SSTITarget` serializer
    * helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTITargetSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkSSTITargetSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer.mListLinks);
+    gSSTITargetSerializer.ResetLinks();
   }
 
   /**
@@ -151,34 +197,8 @@ namespace
    */
   void cleanup_SSTITargetSerializer_atexit()
   {
-    (void)UnlinkSSTITargetSerializerLaneA();
+    gSSTITargetSerializer.ResetLinks();
   }
-
-  /**
-   * Address: 0x00BCA310 (FUN_00BCA310, register_SSTITargetSerializer)
-   *
-   * What it does:
-   * Initializes the global `SSTITarget` serializer helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`.
-   */
-  void register_SSTITargetSerializer()
-  {
-    (void)UnlinkSSTITargetSerializerLaneA();
-    gSSTITargetSerializer.mSerLoadFunc = &DeserializeSSTITargetSerializerCallback;
-    gSSTITargetSerializer.mSerSaveFunc = &SerializeSSTITargetSerializerCallback;
-    (void)std::atexit(&cleanup_SSTITargetSerializer_atexit);
-  }
-
-  struct SSTITargetSerializerStartupBootstrap
-  {
-    SSTITargetSerializerStartupBootstrap()
-    {
-      register_SSTITargetSerializer();
-    }
-  };
-
-  [[maybe_unused]] SSTITargetSerializerStartupBootstrap gSSTITargetSerializerStartupBootstrap;
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {

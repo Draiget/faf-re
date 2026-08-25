@@ -34,38 +34,20 @@ namespace moho
 
 gpg::RType* RScaResource::sType = nullptr;
 
+// Forward declaration: the real definition sits further down in this TU
+// (needs Construct_RScaResource's own dependencies resolved first); the
+// RScaResourceSaveConstruct ctor below only needs the signature to bind the
+// callback pointer.
+void SaveConstructArgs_RScaResourceThunk(
+  gpg::WriteArchive* archive,
+  int objectPtr,
+  int version,
+  gpg::RRef* ownerRef,
+  gpg::SerSaveConstructArgsResult* result
+);
+
 namespace
 {
-  struct SerSaveLoadHelperNodeRuntime
-  {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-  };
-
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mNext) == 0x04,
-    "SerSaveLoadHelperNodeRuntime::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mPrev) == 0x08,
-    "SerSaveLoadHelperNodeRuntime::mPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeRuntime) == 0x0C, "SerSaveLoadHelperNodeRuntime size must be 0x0C");
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  SerSaveLoadHelperNodeRuntime gRScaResourceSaveConstructHelper{};
-
   struct SerConstructHelperView
   {
     void* mVftable;
@@ -81,18 +63,6 @@ namespace
   static_assert(
     offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
     "SerConstructHelperView::mDeleteCallback offset must be 0x10"
-  );
-
-  struct SerSaveConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-  static_assert(
-    offsetof(SerSaveConstructHelperView, mSaveConstructArgsCallback) == 0x0C,
-    "SerSaveConstructHelperView::mSaveConstructArgsCallback offset must be 0x0C"
   );
 
   [[nodiscard]] gpg::RType* ResolveRScaResourceTypeCached() noexcept
@@ -137,22 +107,51 @@ namespace
   }
 
   /**
-   * Address: 0x0053ABD0 (FUN_0053ABD0, gpg::SerSaveConstructHelper<Moho::RScaResource>::Init)
+   * VFTABLE: unknown - not independently observed for this instantiation.
    *
-   * IDA signature:
-   * gpg::RType *__thiscall sub_53ABD0(SerSaveConstructHelperView *this);
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RScaResource>
    *
    * What it does:
-   * Virtual-method body installed in the
-   * `Moho::RScaResourceSaveConstruct` and
-   * `gpg::SerSaveConstructHelper<Moho::RScaResource>` vtables. Lazily
-   * resolves the `RScaResource` reflection descriptor, asserts the
-   * save-construct-args callback slot is empty, and publishes this helper's
-   * save-construct-args callback to the descriptor.
+   * Binds the save-construct-args callback used to serialize `RScaResource`
+   * pointer lanes by mounted-path string. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  [[maybe_unused]] gpg::RType* InitRScaResourceSaveConstructHelper(
-    const SerSaveConstructHelperView& helper
-  )
+  class RScaResourceSaveConstruct : public gpg::SerHelperBase
+  {
+  public:
+    RScaResourceSaveConstruct();
+
+    /**
+     * Address: 0x0053ABD0 (FUN_0053ABD0, gpg::SerSaveConstructHelper<Moho::RScaResource>::Init)
+     *
+     * IDA signature:
+     * gpg::RType *__thiscall sub_53ABD0(SerSaveConstructHelperView *this);
+     *
+     * What it does:
+     * Lazily resolves the `RScaResource` reflection descriptor, asserts the
+     * save-construct-args callback slot is empty, and publishes this helper's
+     * save-construct-args callback to the descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+  };
+  static_assert(
+    offsetof(RScaResourceSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
+    "RScaResourceSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
+  );
+  static_assert(sizeof(RScaResourceSaveConstruct) == 0x10, "RScaResourceSaveConstruct size must be 0x10");
+
+  RScaResourceSaveConstruct::RScaResourceSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::SaveConstructArgs_RScaResourceThunk)
+      )
+  {}
+
+  void RScaResourceSaveConstruct::Init()
   {
     constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
     constexpr int kSerializationSaveConstructLine = 189;
@@ -167,9 +166,10 @@ namespace
         kSerializationSourcePath
       );
     }
-    type->serSaveConstructArgsFunc_ = helper.mSaveConstructArgsCallback;
-    return type;
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
+
+  RScaResourceSaveConstruct gRScaResourceSaveConstructHelper;
 
   class RScaResourceTypeInfo final : public gpg::RType
   {
@@ -201,9 +201,9 @@ namespace
  * Unlinks `RScaResource` save-construct helper links and restores the node
  * to self-linked sentinel state.
  */
-[[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScaResourceSaveConstructHelperPrimary() noexcept
+[[maybe_unused]] void CleanupRScaResourceSaveConstructHelperPrimary() noexcept
 {
-  return UnlinkSerSaveLoadHelperNode(gRScaResourceSaveConstructHelper);
+  gRScaResourceSaveConstructHelper.ResetLinks();
 }
 
 /**

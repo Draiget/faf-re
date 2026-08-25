@@ -9,7 +9,6 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -47,119 +46,130 @@ namespace
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
   constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
   constexpr int kSerializationConstructLine = 231;
-  gpg::SerSaveLoadHelperListRuntime gCEconomyEventSerializerHelper{};
 
-  struct SerConstructHelperRuntime
+  // Forward declarations: real definitions sit further down in this
+  // anonymous namespace; CEconRequestConstruct/CEconRequestSerializer's
+  // ctors and Init() bodies below only need the signatures.
+  [[nodiscard]] gpg::RType* CachedCEconRequestType();
+  void ConstructCEconRequestSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+  void DeconstructCEconRequestSerializerCallback(moho::CEconRequest* request);
+  void DeserializeCEconRequestSerializerCallback(gpg::ReadArchive* archive, moho::CEconRequest* request);
+  void SerializeCEconRequestSerializerCallback(gpg::WriteArchive* archive, moho::CEconRequest* request);
+
+  /**
+   * Demangled: gpg::SerConstructHelper<class Moho::CEconRequest>
+   */
+  class CEconRequestConstruct : public gpg::SerHelperBase
   {
-    void* mVtable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
+  public:
+    /**
+     * Address: 0x007738F0 (FUN_007738F0)
+     *
+     * What it does:
+     * Binds construct/deconstruct callback lanes for `CEconRequest`. Base-class
+     * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
+     * and splices it into the pending `sNewHelpers` list.
+     */
+    CEconRequestConstruct();
+
+    /**
+     * Address: 0x00773EC0 (FUN_00773EC0, Moho::CEconRequestConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Resolves `CEconRequest` RTTI and installs this helper's construct/delete
+     * callbacks.
+     */
+    void Init() override;
+
+  public:
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
-  static_assert(offsetof(SerConstructHelperRuntime, mNext) == 0x04, "SerConstructHelperRuntime::mNext offset must be 0x04");
-  static_assert(offsetof(SerConstructHelperRuntime, mPrev) == 0x08, "SerConstructHelperRuntime::mPrev offset must be 0x08");
   static_assert(
-    offsetof(SerConstructHelperRuntime, mConstructCallback) == 0x0C,
-    "SerConstructHelperRuntime::mConstructCallback offset must be 0x0C"
+    offsetof(CEconRequestConstruct, mConstructCallback) == 0x0C,
+    "CEconRequestConstruct::mConstructCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(SerConstructHelperRuntime, mDeleteCallback) == 0x10,
-    "SerConstructHelperRuntime::mDeleteCallback offset must be 0x10"
+    offsetof(CEconRequestConstruct, mDeleteCallback) == 0x10,
+    "CEconRequestConstruct::mDeleteCallback offset must be 0x10"
   );
-  static_assert(sizeof(SerConstructHelperRuntime) == 0x14, "SerConstructHelperRuntime size must be 0x14");
+  static_assert(sizeof(CEconRequestConstruct) == 0x14, "CEconRequestConstruct size must be 0x14");
 
-  struct SerSaveLoadHelperRuntime
+  CEconRequestConstruct::CEconRequestConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconRequestSerializerCallback))
+    , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconRequestSerializerCallback))
+  {}
+
+  void CEconRequestConstruct::Init()
   {
-    void* mVtable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
+    gpg::RType* const type = CachedCEconRequestType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
+  }
+
+  CEconRequestConstruct gCEconRequestConstructHelper;
+
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CEconRequest> (Init() body
+   * confirmed at FUN_00773F40, see below; matches the shared
+   * `InstallSerSaveLoadHelperCallbacksByTypeName` template's expansion for
+   * "Moho::CEconRequest" in gpg/core/containers/ArchiveSerialization.cpp).
+   */
+  class CEconRequestSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00773A20 (FUN_00773A20)
+     *
+     * What it does:
+     * Binds deserialize/serialize callback lanes for `CEconRequest`. Base-class
+     * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
+     * and splices it into the pending `sNewHelpers` list.
+     */
+    CEconRequestSerializer();
+
+    /**
+     * Address: 0x00773F40 (FUN_00773F40, InstallMohoCEconRequestSerializerCallbacks
+     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
+     * template in gpg/core/containers/ArchiveSerialization.cpp)
+     *
+     * What it does:
+     * Resolves `CEconRequest` RTTI and installs this helper's load/save
+     * callbacks.
+     */
+    void Init() override;
+
+  public:
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
-  static_assert(offsetof(SerSaveLoadHelperRuntime, mNext) == 0x04, "SerSaveLoadHelperRuntime::mNext offset must be 0x04");
-  static_assert(offsetof(SerSaveLoadHelperRuntime, mPrev) == 0x08, "SerSaveLoadHelperRuntime::mPrev offset must be 0x08");
   static_assert(
-    offsetof(SerSaveLoadHelperRuntime, mLoadCallback) == 0x0C,
-    "SerSaveLoadHelperRuntime::mLoadCallback offset must be 0x0C"
+    offsetof(CEconRequestSerializer, mLoadCallback) == 0x0C, "CEconRequestSerializer::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(SerSaveLoadHelperRuntime, mSaveCallback) == 0x10,
-    "SerSaveLoadHelperRuntime::mSaveCallback offset must be 0x10"
+    offsetof(CEconRequestSerializer, mSaveCallback) == 0x10, "CEconRequestSerializer::mSaveCallback offset must be 0x10"
   );
-  static_assert(sizeof(SerSaveLoadHelperRuntime) == 0x14, "SerSaveLoadHelperRuntime size must be 0x14");
+  static_assert(sizeof(CEconRequestSerializer) == 0x14, "CEconRequestSerializer size must be 0x14");
 
-  SerConstructHelperRuntime gCEconRequestConstructHelper{};
-  SerSaveLoadHelperRuntime gCEconRequestSerializerHelper{};
+  CEconRequestSerializer::CEconRequestSerializer()
+    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCEconRequestSerializerCallback))
+    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeCEconRequestSerializerCallback))
+  {}
 
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(SerConstructHelperRuntime& helper) noexcept
+  void CEconRequestSerializer::Init()
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+    gpg::RType* const type = CachedCEconRequestType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
   }
 
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(SerSaveLoadHelperRuntime& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  void InitializeHelperNode(SerConstructHelperRuntime& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  void InitializeHelperNode(SerSaveLoadHelperRuntime& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(SerConstructHelperRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(SerSaveLoadHelperRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x007755D0 (FUN_007755D0, SerSaveLoadHelper<CEconomyEvent>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `CEconomyEventSerializer` helper node from the intrusive helper
-   * list and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconomyEventSerializerNodeVariantA() noexcept
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCEconomyEventSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00775600 (FUN_00775600, SerSaveLoadHelper<CEconomyEvent>::unlink lane B)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for the `CEconomyEventSerializer` helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconomyEventSerializerNodeVariantB() noexcept
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCEconomyEventSerializerHelper);
-  }
+  CEconRequestSerializer gCEconRequestSerializerHelper;
 
   /**
    * Address: 0x00773920 (FUN_00773920)
@@ -168,9 +178,9 @@ namespace
    * Unlinks startup `CEconRequestConstruct` helper links and rewires the node
    * into one self-linked sentinel lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconRequestConstructNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkCEconRequestConstructNodeVariantA() noexcept
   {
-    return UnlinkHelperNode(gCEconRequestConstructHelper);
+    gCEconRequestConstructHelper.ResetLinks();
   }
 
   /**
@@ -180,9 +190,9 @@ namespace
    * Duplicate unlink/reset lane for startup `CEconRequestConstruct` helper
    * links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconRequestConstructNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkCEconRequestConstructNodeVariantB() noexcept
   {
-    return UnlinkHelperNode(gCEconRequestConstructHelper);
+    gCEconRequestConstructHelper.ResetLinks();
   }
 
   /**
@@ -192,9 +202,9 @@ namespace
    * Unlinks startup `CEconRequestSerializer` helper links and rewires the node
    * into one self-linked sentinel lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconRequestSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkCEconRequestSerializerNodeVariantA() noexcept
   {
-    return UnlinkHelperNode(gCEconRequestSerializerHelper);
+    gCEconRequestSerializerHelper.ResetLinks();
   }
 
   /**
@@ -204,9 +214,9 @@ namespace
    * Duplicate unlink/reset lane for startup `CEconRequestSerializer` helper
    * links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconRequestSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkCEconRequestSerializerNodeVariantB() noexcept
   {
-    return UnlinkHelperNode(gCEconRequestSerializerHelper);
+    gCEconRequestSerializerHelper.ResetLinks();
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -293,27 +303,6 @@ namespace
   }
 
   /**
-   * Address: 0x00773EC0 (FUN_00773EC0, Moho::CEconRequestConstruct::RegisterConstructFunction)
-   *
-   * What it does:
-   * Resolves `CEconRequest` RTTI and installs startup construct/delete
-   * callbacks from one construct-helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType::construct_func_t RegisterCEconRequestConstructCallbacks(
-    SerConstructHelperRuntime* const helper
-  )
-  {
-    gpg::RType* const type = CachedCEconRequestType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-
-    type->serConstructFunc_ = helper->mConstructCallback;
-    type->deleteFunc_ = helper->mDeleteCallback;
-    return helper->mConstructCallback;
-  }
-
-  /**
    * Address: 0x00773980 (FUN_00773980, Moho::CEconRequestConstruct::Construct)
    *
    * What it does:
@@ -384,40 +373,6 @@ namespace
     if (request != nullptr) {
       request->MemberSerialize(archive);
     }
-  }
-
-  /**
-   * Address: 0x007738F0 (FUN_007738F0)
-   *
-   * What it does:
-   * Initializes startup `CEconRequestConstruct` helper links and binds
-   * construct/deconstruct callback lanes.
-   */
-  [[nodiscard]] SerConstructHelperRuntime* InitializeCEconRequestConstructHelperStorage() noexcept
-  {
-    InitializeHelperNode(gCEconRequestConstructHelper);
-    gCEconRequestConstructHelper.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconRequestSerializerCallback);
-    gCEconRequestConstructHelper.mDeleteCallback =
-      reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconRequestSerializerCallback);
-    return &gCEconRequestConstructHelper;
-  }
-
-  /**
-   * Address: 0x00773A20 (FUN_00773A20)
-   *
-   * What it does:
-   * Initializes startup `CEconRequestSerializer` helper links and binds
-   * deserialize/serialize callback lanes.
-   */
-  [[nodiscard]] SerSaveLoadHelperRuntime* InitializeCEconRequestSerializerHelperStorage() noexcept
-  {
-    InitializeHelperNode(gCEconRequestSerializerHelper);
-    gCEconRequestSerializerHelper.mLoadCallback =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCEconRequestSerializerCallback);
-    gCEconRequestSerializerHelper.mSaveCallback =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeCEconRequestSerializerCallback);
-    return &gCEconRequestSerializerHelper;
   }
 
   [[nodiscard]] gpg::RType* CachedLuaObjectType()
@@ -1372,7 +1327,7 @@ LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Create(Lu
 /**
  * Address: 0x00775C40 (FUN_00775C40, sub_775C40)
  */
-void moho::CEconomyEventConstruct::RegisterConstructFunction()
+void moho::CEconomyEventConstruct::Init()
 {
   gpg::RType* const type = CachedCEconomyEventType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -1383,7 +1338,7 @@ void moho::CEconomyEventConstruct::RegisterConstructFunction()
 /**
  * Address: 0x00775CC0 (FUN_00775CC0, sub_775CC0)
  */
-void moho::CEconomyEventSerializer::RegisterSerializeFunctions()
+void moho::CEconomyEventSerializer::Init()
 {
   gpg::RType* const type = CachedCEconomyEventType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -1566,20 +1521,6 @@ moho::CEconomyEvent* moho::func_GetCEconomyEvent(const LuaPlus::LuaObject& objec
 {
   return ResolveTypedGameObject<CEconomyEvent>(object, state, CachedCEconomyEventType());
 }
-
-namespace
-{
-  struct CEconRequestHelperBootstrap
-  {
-    CEconRequestHelperBootstrap()
-    {
-      (void)InitializeCEconRequestConstructHelperStorage();
-      (void)InitializeCEconRequestSerializerHelperStorage();
-    }
-  };
-
-  [[maybe_unused]] CEconRequestHelperBootstrap gCEconRequestHelperBootstrap;
-} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
