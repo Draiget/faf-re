@@ -569,23 +569,146 @@ namespace moho
   static_assert(sizeof(CPlatoon) == 0x110, "CPlatoon size must be 0x110");
 
   /**
-   * VFTABLE: 0x00E31B98
+   * VFTABLE: 0x00E31B98 (`??_7CPlatoonSerializer@Moho@@6B@`)
    *
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CPlatoon>
-   *
-   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
-   * template's class-level comment in Reflection.h for the general shape):
-   *  - ctor / compiler dynamic-initializer (`register_CPlatoonSerializer`):
-   *    0x00BDACC0 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
-   *    0x0072A6E0)
-   *  - dtor: 0x00C005C0 (no recovered mangled name; body confirmed via raw
-   *    asm to just call `ResetLinks()`, same as every other instantiation's
-   *    real destructor)
-   *  - Init(): 0x0072A710
-   *  - Deserialize(): 0x0072A160
-   *  - Serialize(): 0x0072A170
+   * `Init()`/`Deserialize()`/`Serialize()` are each ICF-shared with
+   * `gpg::SerSaveLoadHelper<Moho::CPlatoon>`'s own bodies (two
+   * vftable-slot data xrefs land on each address, and IDA independently
+   * resolves Deserialize/Serialize's qualified name as
+   * `Moho::CPlatoonSerializer::`, not the template's). But the confirmed
+   * `__xc_a`-reachable ctor (0x00BDACC0) installs `CPlatoonSerializer`'s
+   * OWN vtable (`??_7CPlatoonSerializer@Moho@@6B@`), not the template's --
+   * and a distinct `CPlatoonSerializer@Moho` vtable/RTTI symbol could not
+   * exist at all if this were a pure `using X = SerSaveLoadHelper<T>`
+   * alias (aliases never introduce a new type, let alone a new vtable).
+   * `CPlatoonSerializer` is therefore a real concrete class, same
+   * precedent as `Rect2iSerializer`/`Box3fSerializer`/
+   * `Moho::SPhysBodySerializer` -- not a template instantiation in
+   * disguise. (The previous `using` modeling only checked that the
+   * callback bodies matched the template; it never checked which vtable
+   * the live ctor actually installs, which is what this class-level
+   * comment previously got backwards.) Two dead zero-xref COMDAT
+   * duplicate ctors: 0x0072A180 (installs this class's own vtable, never
+   * called) and 0x0072A6E0 (installs the template's vtable onto this same
+   * global, never called either).
    */
-  using CPlatoonSerializer = gpg::SerSaveLoadHelper<CPlatoon>;
+  class CPlatoonSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BDACC0 (FUN_00BDACC0, dynamic initializer for the
+     * global `CPlatoonSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CPlatoonSerializer();
+
+    /**
+     * Address: 0x00C005C0 (FUN_00C005C0, Moho::CPlatoonSerializer::~CPlatoonSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. No recovered
+     * mangled name; body confirmed via raw asm to just call `ResetLinks()`,
+     * same as every other instantiation's real destructor.
+     */
+    ~CPlatoonSerializer();
+
+    /**
+     * Address: 0x0072A160 (FUN_0072A160, Moho::CPlatoonSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive load flow into `CPlatoon::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0072A170 (FUN_0072A170, Moho::CPlatoonSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive save flow into `CPlatoon::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0072A710 (FUN_0072A710, Moho::CPlatoonSerializer::Init)
+     *
+     * What it does:
+     * Binds load/save callbacks into `CPlatoon`'s reflected RTTI.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  static_assert(
+    offsetof(CPlatoonSerializer, mLoadCallback) == 0x0C, "CPlatoonSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CPlatoonSerializer, mSaveCallback) == 0x10, "CPlatoonSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CPlatoonSerializer) == 0x14, "CPlatoonSerializer size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00E31B88 (`??_7CPlatoonConstruct@Moho@@6B@`)
+   *
+   * Same ICF-shared-`Init()`-with-a-dead-template-twin shape as
+   * `CPlatoonSerializer` above: `Init()` (FUN_0072A690) is shared with
+   * `gpg::SerConstructHelper<Moho::CPlatoon>::Init()` (confirmed via two
+   * vftable-slot data xrefs into that one address). That template's own
+   * separately-emitted ctor (FUN_0072A660) plus a second dead out-of-line
+   * copy of this class's own ctor (FUN_0072A030) both have zero incoming
+   * xrefs and are `skip`; the confirmed `__xc_a`-reachable ctor is
+   * 0x00BDAC80, which installs this class's own vtable.
+   */
+  class CPlatoonConstruct : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BDAC80 (FUN_00BDAC80, dynamic initializer for the
+     * global `CPlatoonConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CPlatoonConstruct();
+
+    /**
+     * Address: 0x00C00590 (FUN_00C00590, Moho::CPlatoonConstruct::~CPlatoonConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CPlatoonConstruct();
+
+    /**
+     * Address: 0x0072A690 (FUN_0072A690, Moho::CPlatoonConstruct::Init)
+     *
+     * What it does:
+     * Binds the construct/delete callbacks into `CPlatoon`'s reflected
+     * RTTI. Mirrors the binary's single `!type->mSerConstructFunc` assert
+     * (no separate delete-slot assert), confirmed from raw disassembly.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
+  };
+
+  static_assert(
+    offsetof(CPlatoonConstruct, mConstructCallback) == 0x0C, "CPlatoonConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CPlatoonConstruct, mDeleteCallback) == 0x10, "CPlatoonConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CPlatoonConstruct) == 0x14, "CPlatoonConstruct size must be 0x14");
 
   /**
    * Address: 0x00BDAE70 (FUN_00BDAE70, register_CPlatoonCanConsiderFormingPlatoon_LuaFuncDef)

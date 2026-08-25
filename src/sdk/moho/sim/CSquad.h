@@ -215,19 +215,138 @@ namespace moho
   static_assert(sizeof(CSquad) == 0x60, "CSquad size must be 0x60");
 
   /**
-   * VFTABLE: 0x00E31B78
+   * VFTABLE: 0x00E31B78 (`??_7CSquadSerializer@Moho@@6B@`)
    *
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CSquad>
-   *
-   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
-   * template's class-level comment in Reflection.h for the general shape):
-   *  - ctor / compiler dynamic-initializer (`register_CSquadSerializer`):
-   *    0x00BDAC20 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
-   *    0x0072A5C0)
-   *  - dtor: 0x00C00500 (`??1CSquadSerializer@Moho@@QAE@@Z`)
-   *  - Init(): 0x0072A5F0
-   *  - Deserialize(): 0x007249B0
-   *  - Serialize(): 0x007249C0
+   * `Init()`/`Deserialize()`/`Serialize()` are each ICF-shared with
+   * `gpg::SerSaveLoadHelper<Moho::CSquad>`'s own bodies (two vftable-slot
+   * data xrefs land on each address, and IDA independently resolves
+   * Deserialize/Serialize's qualified name as `Moho::CSquadSerializer::`,
+   * not the template's). But the confirmed `__xc_a`-reachable ctor
+   * (0x00BDAC20) installs `CSquadSerializer`'s OWN vtable
+   * (`??_7CSquadSerializer@Moho@@6B@`), not the template's -- and a
+   * distinct `CSquadSerializer@Moho` vtable/RTTI symbol could not exist at
+   * all if this were a pure `using X = SerSaveLoadHelper<T>` alias
+   * (aliases never introduce a new type, let alone a new vtable).
+   * `CSquadSerializer` is therefore a real concrete class, same precedent
+   * as `Rect2iSerializer`/`Box3fSerializer`/`Moho::SPhysBodySerializer` --
+   * not a template instantiation in disguise. (The previous `using`
+   * modeling only checked that the callback bodies matched the template;
+   * it never checked which vtable the live ctor actually installs, which
+   * is what this class-level comment previously got backwards.) Two dead
+   * zero-xref COMDAT duplicate ctors: 0x007249D0 (installs this class's
+   * own vtable, never called) and 0x0072A5C0 (installs the template's
+   * vtable onto this same global, never called either).
    */
-  using CSquadSerializer = gpg::SerSaveLoadHelper<CSquad>;
+  class CSquadSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BDAC20 (FUN_00BDAC20, dynamic initializer for the global
+     * `CSquadSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CSquadSerializer();
+
+    /**
+     * Address: 0x00C00500 (`??1CSquadSerializer@Moho@@QAE@@Z`,
+     * Moho::CSquadSerializer::~CSquadSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CSquadSerializer();
+
+    /**
+     * Address: 0x007249B0 (FUN_007249B0, Moho::CSquadSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive load flow into `CSquad::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x007249C0 (FUN_007249C0, Moho::CSquadSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive save flow into `CSquad::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0072A5F0 (FUN_0072A5F0, Moho::CSquadSerializer::Init)
+     *
+     * What it does:
+     * Binds load/save callbacks into `CSquad`'s reflected RTTI.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  static_assert(offsetof(CSquadSerializer, mLoadCallback) == 0x0C, "CSquadSerializer::mLoadCallback offset must be 0x0C");
+  static_assert(offsetof(CSquadSerializer, mSaveCallback) == 0x10, "CSquadSerializer::mSaveCallback offset must be 0x10");
+  static_assert(sizeof(CSquadSerializer) == 0x14, "CSquadSerializer size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00E31B68 (`??_7CSquadConstruct@Moho@@6B@`)
+   *
+   * Same ICF-shared-`Init()`-with-a-dead-template-twin shape as
+   * `CSquadSerializer` above: `Init()` (FUN_0072A570) is shared with
+   * `gpg::SerConstructHelper<Moho::CSquad>::Init()` (confirmed via two
+   * vftable-slot data xrefs into that one address). That template's own
+   * separately-emitted ctor (FUN_0072A540) plus a second dead out-of-line
+   * copy of this class's own ctor (FUN_00724880) both have zero incoming
+   * xrefs and are `skip`; the confirmed `__xc_a`-reachable ctor is
+   * 0x00BDABE0, which installs this class's own vtable.
+   */
+  class CSquadConstruct : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BDABE0 (FUN_00BDABE0, dynamic initializer for the global
+     * `CSquadConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CSquadConstruct();
+
+    /**
+     * Address: 0x00C004D0 (FUN_00C004D0, Moho::CSquadConstruct::~CSquadConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CSquadConstruct();
+
+    /**
+     * Address: 0x0072A570 (FUN_0072A570, Moho::CSquadConstruct::Init)
+     *
+     * What it does:
+     * Binds the construct/delete callbacks into `CSquad`'s reflected RTTI.
+     * Mirrors the binary's single `!type->mSerConstructFunc` assert (no
+     * separate delete-slot assert), confirmed from raw disassembly.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
+  };
+
+  static_assert(
+    offsetof(CSquadConstruct, mConstructCallback) == 0x0C, "CSquadConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CSquadConstruct, mDeleteCallback) == 0x10, "CSquadConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CSquadConstruct) == 0x14, "CSquadConstruct size must be 0x14");
 } // namespace moho
