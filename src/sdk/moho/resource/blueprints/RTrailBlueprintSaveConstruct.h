@@ -16,34 +16,43 @@ namespace moho
   /**
    * VFTABLE: 0x00E0EC3C
    * COL: 0x00E68190
+   *
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RTrailBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `RTrailBlueprint` reference on load. This is
+   * the save-side counterpart of `RTrailBlueprintConstruct` (that class's
+   * `Init()` writes `serConstructFunc_`/`deleteFunc_`; this one writes
+   * `serSaveConstructArgsFunc_`).
    */
-  class RTrailBlueprintSaveConstruct
+  class RTrailBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00510680 (FUN_00510680, sub_510680)
-     * Slot: 0
+     * Address: 0x00BC8140 (FUN_00BC8140, dynamic initializer for the global
+     * `RTrailBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds save-construct-args callback into RTrailBlueprint RTTI
-     * (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    RTrailBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x00510680 (FUN_00510680, gpg::SerSaveConstructHelper<Moho::RTrailBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `RTrailBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(
-    offsetof(RTrailBlueprintSaveConstruct, mHelperNext) == 0x04,
-    "RTrailBlueprintSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RTrailBlueprintSaveConstruct, mHelperPrev) == 0x08,
-    "RTrailBlueprintSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RTrailBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "RTrailBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -79,13 +88,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00BC8140 (FUN_00BC8140, sub_BC8140)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RTrailBlueprint`.
-   */
-  int register_RTrailBlueprintSaveConstruct();
 } // namespace moho

@@ -21,12 +21,27 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gTrailBlueprintType = nullptr;
-  moho::RTrailBlueprintSaveConstruct gTrailBlueprintSaveConstruct;
 
-  void CleanupTrailBlueprintSaveConstructAtexit()
+  // Address: 0x010AA63C -- process-global `RTrailBlueprintSaveConstruct`
+  // singleton. Constructing it runs RTrailBlueprintSaveConstruct::
+  // RTrailBlueprintSaveConstruct() (0x00BC8140), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RTrailBlueprintSaveConstruct gRTrailBlueprintSaveConstructHelper;
+
+  /**
+   * Address: 0x00BF2620 (FUN_00BF2620)
+   *
+   * What it does:
+   * Unlinks the `RTrailBlueprintSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8140) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupRTrailBlueprintSaveConstruct()
   {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gTrailBlueprintSaveConstruct);
+    gRTrailBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
@@ -79,45 +94,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x00510680 (FUN_00510680, sub_510680)
+   * Address: 0x00BC8140 (FUN_00BC8140, dynamic initializer for the global
+   * `RTrailBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Binds save-construct-args callback into RTrailBlueprint RTTI
-   * (`serSaveConstructArgsFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  void RTrailBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
+  RTrailBlueprintSaveConstruct::RTrailBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RTrailBlueprintThunk)
+      )
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RTrailBlueprint>(gTrailBlueprintType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+    (void)std::atexit(&CleanupRTrailBlueprintSaveConstruct);
   }
 
   /**
-   * Address: 0x00BC8140 (FUN_00BC8140, sub_BC8140)
+   * Address: 0x00510680 (FUN_00510680, gpg::SerSaveConstructHelper<Moho::RTrailBlueprint>::Init)
    *
    * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RTrailBlueprint`.
+   * Resolves `RTrailBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
    */
-  int register_RTrailBlueprintSaveConstruct()
+  void RTrailBlueprintSaveConstruct::Init()
   {
-    blueprint_ser::InitializeHelperNode(gTrailBlueprintSaveConstruct);
-    gTrailBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RTrailBlueprintThunk);
-    gTrailBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupTrailBlueprintSaveConstructAtexit);
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RTrailBlueprint>(RTrailBlueprint::sType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RTrailBlueprintSaveConstructBootstrap
-  {
-    RTrailBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_RTrailBlueprintSaveConstruct();
-    }
-  };
-
-  RTrailBlueprintSaveConstructBootstrap gRTrailBlueprintSaveConstructBootstrap;
-} // namespace

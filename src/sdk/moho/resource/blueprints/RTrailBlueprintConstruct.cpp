@@ -24,8 +24,28 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gTrailBlueprintType = nullptr;
-  moho::RTrailBlueprintConstruct gTrailBlueprintConstruct;
+
+  // Address: 0x010AA64C -- process-global `RTrailBlueprintConstruct`
+  // singleton. Constructing it runs RTrailBlueprintConstruct::
+  // RTrailBlueprintConstruct() (0x00BC8170), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RTrailBlueprintConstruct gRTrailBlueprintConstructHelper;
+
+  /**
+   * Address: 0x00BF2650 (FUN_00BF2650)
+   *
+   * What it does:
+   * Unlinks the `RTrailBlueprintConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8170) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupRTrailBlueprintConstruct()
+  {
+    gRTrailBlueprintConstructHelper.ResetLinks();
+  }
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
@@ -42,11 +62,6 @@ namespace
       moho::blueprint_ser::ResolveCachedType<moho::RRuleGameRules>(gRuleGameRulesType)
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
-  }
-
-  void CleanupTrailBlueprintConstructAtexit()
-  {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gTrailBlueprintConstruct);
   }
 } // namespace
 
@@ -78,7 +93,7 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     blueprintRef.mObj = blueprint;
-    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RTrailBlueprint>(gTrailBlueprintType) : nullptr;
+    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RTrailBlueprint>(RTrailBlueprint::sType) : nullptr;
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -94,45 +109,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x00510700 (FUN_00510700, sub_510700)
+   * Address: 0x00BC8170 (FUN_00BC8170, dynamic initializer for the global
+   * `RTrailBlueprintConstruct` singleton)
    *
    * What it does:
-   * Binds construct/delete callbacks into RTrailBlueprint RTTI
-   * (`serConstructFunc_`, `deleteFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
-  void RTrailBlueprintConstruct::RegisterConstructFunction()
+  RTrailBlueprintConstruct::RTrailBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RTrailBlueprint))
+    , mDeleteCallback(&Delete_RTrailBlueprint)
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RTrailBlueprint>(gTrailBlueprintType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
+    (void)std::atexit(&CleanupRTrailBlueprintConstruct);
   }
 
   /**
-   * Address: 0x00BC8170 (FUN_00BC8170, sub_BC8170)
+   * Address: 0x00510700 (FUN_00510700, gpg::SerConstructHelper<Moho::RTrailBlueprint>::Init)
    *
    * What it does:
-   * Initializes and registers global construct helper for `RTrailBlueprint`.
+   * Lazily resolves `RTrailBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
    */
-  int register_RTrailBlueprintConstruct()
+  void RTrailBlueprintConstruct::Init()
   {
-    blueprint_ser::InitializeHelperNode(gTrailBlueprintConstruct);
-    gTrailBlueprintConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RTrailBlueprint);
-    gTrailBlueprintConstruct.mDeleteCallback = &Delete_RTrailBlueprint;
-    gTrailBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupTrailBlueprintConstructAtexit);
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RTrailBlueprint>(RTrailBlueprint::sType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RTrailBlueprintConstructBootstrap
-  {
-    RTrailBlueprintConstructBootstrap()
-    {
-      (void)moho::register_RTrailBlueprintConstruct();
-    }
-  };
-
-  RTrailBlueprintConstructBootstrap gRTrailBlueprintConstructBootstrap;
-} // namespace
