@@ -1,6 +1,5 @@
 #include "moho/entity/PropConstruct.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -22,7 +21,6 @@ namespace
 {
   gpg::RType* gSimType = nullptr;
   gpg::RType* gPropType = nullptr;
-  moho::PropConstruct gPropConstruct;
 
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
@@ -31,34 +29,6 @@ namespace
       slot = gpg::LookupRType(typeid(TObject));
     }
     return slot;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return &helper.mHelperLinks;
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mNext = self;
-    helper.mHelperLinks.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperLinks.mNext != nullptr && helper.mHelperLinks.mPrev != nullptr) {
-      helper.mHelperLinks.mNext->mPrev = helper.mHelperLinks.mPrev;
-      helper.mHelperLinks.mPrev->mNext = helper.mHelperLinks.mNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mPrev = self;
-    helper.mHelperLinks.mNext = self;
-    return self;
   }
 
   [[nodiscard]] moho::Sim* DecodePropConstructOwnerSim(gpg::ReadArchive* const archive)
@@ -130,19 +100,34 @@ namespace
     object->~Prop();
     ::operator delete(object);
   }
-
-  void CleanupPropConstructAtexit()
-  {
-    (void)moho::cleanup_PropConstruct();
-  }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x006FA9E0 (FUN_006FA9E0, sub_6FA9E0)
+   * Address: 0x00BD98D0 (FUN_00BD98D0, dynamic initializer for the global
+   * `PropConstruct` singleton)
    */
-  void PropConstruct::RegisterConstructFunction()
+  PropConstruct::PropConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructPropCallback))
+    , mDeleteCallback(&DeleteConstructedProp)
+  {}
+
+  PropConstruct::~PropConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x006FA9E0 (FUN_006FA9E0, gpg::SerConstructHelper_Prop::Init)
+   *
+   * What it does:
+   * Resolves `Prop` RTTI (caching into its own `sType` static, matching the
+   * binary) and installs construct/delete callback lanes. Raw asm at
+   * 0x006FA9E0 asserts only `serConstructFunc_ == nullptr` before
+   * overwriting both fields unconditionally.
+   */
+  void PropConstruct::Init()
   {
     gpg::RType* type = Prop::sType;
     if (!type) {
@@ -154,37 +139,9 @@ namespace moho
     type->serConstructFunc_ = mConstructCallback;
     type->deleteFunc_ = mDeleteCallback;
   }
-
-  /**
-   * Address: 0x00BFF200 (FUN_00BFF200, sub_BFF200)
-   */
-  gpg::SerHelperBase* cleanup_PropConstruct()
-  {
-    return UnlinkHelperNode(gPropConstruct);
-  }
-
-  /**
-   * Address: 0x00BD98D0 (FUN_00BD98D0, sub_BD98D0)
-   */
-  void register_PropConstruct()
-  {
-    InitializeHelperNode(gPropConstruct);
-    gPropConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructPropCallback);
-    gPropConstruct.mDeleteCallback = &DeleteConstructedProp;
-    gPropConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupPropConstructAtexit);
-  }
 } // namespace moho
 
 namespace
 {
-  struct PropConstructBootstrap
-  {
-    PropConstructBootstrap()
-    {
-      moho::register_PropConstruct();
-    }
-  };
-
-  PropConstructBootstrap gPropConstructBootstrap;
+  moho::PropConstruct gPropConstruct;
 } // namespace
