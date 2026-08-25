@@ -3984,6 +3984,25 @@ namespace msvc8
          * template" -- the address did not appear anywhere in `src/sdk`;
          * this is the real recovery.)
          *
+         * Address: 0x005C60A0 (FUN_005C60A0, msvc8::vector<Moho::
+         * CAiReconDBImpl::SNewBlip>::insert(pos,value) for the 12-byte
+         * element) -- same "capture offset up front, tail-call the count=1
+         * core, rebuild the iterator from the offset afterwards" shape:
+         * computes `offset = (a3-v4)/12` before the call (the `size()==0`
+         * guard is implicit -- `v4` being null makes the division moot),
+         * tail-calls the count-based core `FUN_005C7B10` (cited below), then
+         * rebuilds `*outIterator = _Myfirst + 12*offset` from the
+         * post-reallocation `_Myfirst`. Direct caller (`.asm`-confirmed):
+         * `AppendPendingNewBlip` (`FUN_005C4CA0`, `CAiReconDBImpl.cpp`,
+         * cited above on `uninit_fill_n`)'s `pending.push_back(SNewBlip{...})`
+         * on its capacity-exhausted path (`push_back`'s own `else { insert(
+         * last_, value); }` branch). DB-integrity fix: was wrongly `skip`
+         * ("drift-audit-demoted... behavior absorbed into owning subsystem
+         * sources" -- no such absorption exists; zero real citation
+         * anywhere in `src/sdk` before this pass, and this shape is a
+         * distinct, real, uncollapsed emission, not something any other
+         * recovered function already models).
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -4877,6 +4896,42 @@ namespace msvc8
          * `CLobby.cpp` lead from earlier research that does not match this
          * function's real body at all -- this and `FUN_007D8620` are
          * `Moho::Clutter::Surface`'s seed vector, not lobby/networking code.
+         *
+         * Address: 0x005C7B10 (FUN_005C7B10, msvc8::vector<Moho::
+         * CAiReconDBImpl::SNewBlip>::insert for the 12-byte element with
+         * `count` folded to 1) -- `CAiReconDBImpl.cpp`'s `pending` staging
+         * vector. Max_size guard against 357913941 (`0xFFFFFFFF/12`, throw
+         * lane `FUN_005C7DA0`); fast path: tail-shift branch moves the
+         * current last element via the count=1 `uninit_move_n` adapter
+         * `FUN_005CA0A0` (cited below), shifts the remaining tail right one
+         * slot via the backward per-element loop `FUN_005CA0F0`, then
+         * assigns the gap via `FUN_005CA0D0`; at-end branch (no tail)
+         * constructs directly through the already-cited `FUN_005C6190`/
+         * `FUN_005CBC70` `uninit_fill_n` adapter pair. Reallocation path:
+         * checked-allocate via `FUN_005CA120` (`allocate_slots_checked`),
+         * head-copy and tail-copy through the general range form
+         * `FUN_005CE090` (`uninit_move_n`, called twice -- head then tail --
+         * also the target `FUN_005CA0A0`'s adapter forwards into for its
+         * count=1 case), gap-fill via the already-cited `FUN_005CBC70`.
+         * Reached from `insert(pos,value)`'s (`FUN_005C60A0`, cited above)
+         * capacity-exhausted forward, which is itself reached from
+         * `AppendPendingNewBlip`'s (`FUN_005C4CA0`, already recovered,
+         * `CAiReconDBImpl.cpp`) `pending.push_back(SNewBlip{...})` on its
+         * own capacity-exhausted branch. DB-integrity fix: was left `wip`
+         * pending this element-type identification (its own note already
+         * confirmed the 12-byte/max_size shape); real caller and sibling
+         * `uninit_fill_n` emissions were independently recovered by another
+         * pass on `AppendPendingNewBlip` -- this closes the loop.
+         *
+         * Address: 0x005CA0A0 (FUN_005CA0A0, single-element uninit_move_n
+         * adapter) -- register-shuffling thunk that forwards into this
+         * instantiation's general range form `FUN_005CE090` as
+         * `uninit_move_n(dest, src, src+1)` (count=1, expressed as a
+         * one-element range rather than a count parameter). Reached from
+         * `insert`'s (`FUN_005C7B10`) fast-path tail-shift branch to move
+         * the current last element into the newly-opened slot beyond the
+         * old end. DB-integrity fix: was blocked citing a stale `CLobby.cpp`
+         * lead -- real home is `CAiReconDBImpl.cpp`'s `SNewBlip` vector.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
