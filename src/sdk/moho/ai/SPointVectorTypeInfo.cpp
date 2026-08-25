@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -20,8 +20,15 @@ namespace
   alignas(SPointVectorTypeInfo) unsigned char gSPointVectorTypeInfoStorage[sizeof(SPointVectorTypeInfo)] = {};
   bool gSPointVectorTypeInfoConstructed = false;
 
-  alignas(SPointVectorSerializer) unsigned char gSPointVectorSerializerStorage[sizeof(SPointVectorSerializer)] = {};
-  bool gSPointVectorSerializerConstructed = false;
+  // Address: 0x010AA230 -- process-global `SPointVectorSerializer` singleton.
+  // Constructing it runs SPointVectorSerializer::SPointVectorSerializer()
+  // (0x00BC7E00), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~SPointVectorSerializer,
+  // 0x00BF22C0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  SPointVectorSerializer gSPointVectorSerializer;
 
   alignas(SPointVectorVectorType) unsigned char gSPointVectorVectorTypeStorage[sizeof(SPointVectorVectorType)] = {};
   bool gSPointVectorVectorTypeConstructed = false;
@@ -37,21 +44,6 @@ namespace
     }
 
     return *reinterpret_cast<SPointVectorTypeInfo*>(gSPointVectorTypeInfoStorage);
-  }
-
-  [[nodiscard]] SPointVectorSerializer& AcquireSPointVectorSerializer()
-  {
-    if (!gSPointVectorSerializerConstructed) {
-      new (gSPointVectorSerializerStorage) SPointVectorSerializer();
-      gSPointVectorSerializerConstructed = true;
-    }
-
-    return *reinterpret_cast<SPointVectorSerializer*>(gSPointVectorSerializerStorage);
-  }
-
-  [[nodiscard]] SPointVectorSerializer& SPointVectorSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<SPointVectorSerializer*>(gSPointVectorSerializerStorage);
   }
 
   [[nodiscard]] SPointVectorVectorType& AcquireSPointVectorVectorType()
@@ -234,29 +226,6 @@ namespace
   }
 
   /**
-   * Address: 0x0050C3B0 (FUN_0050C3B0)
-   *
-   * What it does:
-   * Unlinks the `SPointVectorSerializer` helper node and resets both links to
-   * the serializer self-node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupSPointVectorSerializerVariant1() noexcept
-  {
-    return UnlinkSerializerNode(SPointVectorSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0050C3E0 (FUN_0050C3E0)
-   *
-   * What it does:
-   * Duplicate lane of `SPointVectorSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSPointVectorSerializerVariant2() noexcept
-  {
-    return UnlinkSerializerNode(SPointVectorSerializerStorageRef());
-  }
-
-  /**
    * Address: 0x0050C310 (FUN_0050C310)
    *
    * What it does:
@@ -281,18 +250,6 @@ namespace
 
     AcquireSPointVectorTypeInfo().~SPointVectorTypeInfo();
     gSPointVectorTypeInfoConstructed = false;
-  }
-
-  void cleanup_SPointVectorSerializer()
-  {
-    if (!gSPointVectorSerializerConstructed) {
-      return;
-    }
-
-    (void)CleanupSPointVectorSerializerVariant1();
-    SPointVectorSerializer& serializer = SPointVectorSerializerStorageRef();
-    serializer.~SPointVectorSerializer();
-    gSPointVectorSerializerConstructed = false;
   }
 
   /**
@@ -409,7 +366,32 @@ void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
  * What it does:
  * Binds the `SPointVector` serializer callbacks into reflected RTTI.
  */
-void SPointVectorSerializer::RegisterSerializeFunctions()
+/**
+ * Address: 0x00BC7E00 (FUN_00BC7E00, dynamic initializer for the global
+ * `SPointVectorSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+SPointVectorSerializer::SPointVectorSerializer()
+  : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&SPointVectorSerializer::Deserialize))
+  , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SPointVectorSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00BF22C0 (FUN_00BF22C0, ??1SPointVectorSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+SPointVectorSerializer::~SPointVectorSerializer()
+{
+  ResetLinks();
+}
+
+void SPointVectorSerializer::Init()
 {
   gpg::RType* const type = CachedSPointVectorType();
   GPG_ASSERT(type != nullptr);
@@ -439,32 +421,6 @@ void SPointVectorSerializer::Deserialize(gpg::ReadArchive* const archive, SPoint
 void SPointVectorSerializer::Serialize(gpg::WriteArchive* const archive, SPointVector* const value)
 {
   value->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x0050C380 (FUN_0050C380)
- *
- * What it does:
- * Initializes `SPointVectorSerializer` helper links and callback lanes.
- */
-[[nodiscard]] moho::SPointVectorSerializer* InitializeSPointVectorSerializerVariant1()
-{
-  moho::SPointVectorSerializer& serializer = AcquireSPointVectorSerializer();
-  InitializeSerializerNode(serializer);
-  serializer.mLoadCallback = reinterpret_cast<gpg::RType::load_func_t>(&moho::SPointVectorSerializer::Deserialize);
-  serializer.mSaveCallback = reinterpret_cast<gpg::RType::save_func_t>(&moho::SPointVectorSerializer::Serialize);
-  return &serializer;
-}
-
-/**
- * Address: 0x0050C8E0 (FUN_0050C8E0)
- *
- * What it does:
- * Duplicate lane of `SPointVectorSerializer` callback initialization.
- */
-[[maybe_unused]] [[nodiscard]] moho::SPointVectorSerializer* InitializeSPointVectorSerializerVariant2()
-{
-  return InitializeSPointVectorSerializerVariant1();
 }
 
 /**
@@ -662,19 +618,6 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
 }
 
 /**
- * Address: 0x00BC7E00 (FUN_00BC7E00, register_SPointVectorSerializer)
- *
- * What it does:
- * Registers serializer callbacks for `SPointVector` and installs process-exit
- * cleanup.
- */
-void moho::register_SPointVectorSerializer()
-{
-  (void)InitializeSPointVectorSerializerVariant1();
-  (void)std::atexit(&cleanup_SPointVectorSerializer);
-}
-
-/**
  * Address: 0x00BC7DE0 (FUN_00BC7DE0, register_SPointVectorTypeInfo)
  *
  * What it does:
@@ -714,14 +657,9 @@ int moho::register_SPointVectorVectorType_AtExit()
 
 namespace
 {
-  struct SPointVectorSerializerBootstrap
-  {
-    SPointVectorSerializerBootstrap()
-    {
-      (void)moho::register_SPointVectorSerializer();
-    }
-  };
-
+  // `SPointVectorSerializer` is now a genuine namespace-scope global
+  // (declared above), so its constructor already runs unconditionally at
+  // static-init time; this bootstrap no longer needs to force it.
   struct SPointVectorTypeInfoBootstrap
   {
     SPointVectorTypeInfoBootstrap()
@@ -738,7 +676,6 @@ namespace
     }
   };
 
-  [[maybe_unused]] SPointVectorSerializerBootstrap gSPointVectorSerializerBootstrap;
   [[maybe_unused]] SPointVectorTypeInfoBootstrap gSPointVectorTypeInfoBootstrap;
   [[maybe_unused]] SPointVectorVectorTypeBootstrap gSPointVectorVectorTypeBootstrap;
 } // namespace

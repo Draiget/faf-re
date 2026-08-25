@@ -90,8 +90,23 @@ namespace moho
 
   /**
    * Serializer helper lane for `SPointVector`.
+   *
+   * Address: 0x00BC7E00 (FUN_00BC7E00, dynamic initializer for the global
+   * `SPointVectorSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list), then
+   * binds the load/save callback fields. Confirmed from raw disassembly:
+   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+   * `??_7SPointVectorSerializer@Moho@@6B@` -- no eager `Init()` call exists
+   * here. Two duplicate zero-xref "construct+set-fields" emissions of this
+   * same ctor logic exist nearby (0x0050C380, 0x0050C8E0); two more
+   * duplicate zero-xref unlink/self-link emissions of the destructor's
+   * logic also exist nearby (0x0050C3B0, 0x0050C3E0). All four are
+   * superseded by the citations below.
    */
-  class SPointVectorSerializer
+  class SPointVectorSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -110,33 +125,33 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, SPointVector* value);
 
+    SPointVectorSerializer();
+
+    /**
+     * Address: 0x00BF22C0 (FUN_00BF22C0, ??1SPointVectorSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SPointVectorSerializer();
+
     /**
      * What it does:
      * Binds the `SPointVector` serializer callbacks into reflected RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper
+     * is drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(offsetof(SPointVectorSerializer, mHelperNext) == 0x04, "SPointVectorSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SPointVectorSerializer, mHelperPrev) == 0x08, "SPointVectorSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SPointVectorSerializer, mLoadCallback) == 0x0C, "SPointVectorSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(SPointVectorSerializer, mSaveCallback) == 0x10, "SPointVectorSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(SPointVectorSerializer) == 0x14, "SPointVectorSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BC7E00 (FUN_00BC7E00, register_SPointVectorSerializer)
-   *
-   * What it does:
-   * Registers serializer callbacks for `SPointVector` and installs process-exit
-   * cleanup.
-   */
-  void register_SPointVectorSerializer();
 
   /**
    * Address: 0x00BC7DE0 (FUN_00BC7DE0, register_SPointVectorTypeInfo)
