@@ -13,14 +13,40 @@ namespace gpg
 namespace moho
 {
   /**
-   * Serializer helper for `Entity`. Same `SerHelperBase` shape as
-   * `CAiBrainSerializer` and `CFormationInstanceSerializer`: an intrusive node
-   * in the global serializer chain plus the load/save callbacks that
-   * `RegisterSerializeFunctions` installs into the reflected type.
+   * Serializer helper for `Entity`.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='EntitySerializer@Moho'`): `FUN_00BD5050`
+   * (`__xc_a`-reachable, plain unlink atexit target `FUN_00BFC870`,
+   * modeled as the compiler's implicit static-destructor registration).
+   * The real `Init()` body (`FUN_0067C600`, found via the class's own
+   * vtable slot-0 data xref) demangles as `gpg::SerSaveLoadHelper_Entity::
+   * Init` and is ICF-shared with `gpg::SerSaveLoadHelper<Moho::Entity>`'s
+   * own vtable slot -- it was previously duplicated (uncalled, orphaned)
+   * in `Entity.cpp` as `InstallEntitySerializerCallbacks`, reached through
+   * a generic `SerSaveLoadHelperInitRuntimeView*` reach-in parameter
+   * instead of `this`.
    */
-  class EntitySerializer
+  class EntitySerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD5050 (FUN_00BD5050, dynamic initializer for the global
+     * `EntitySerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntitySerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~EntitySerializer();
+
     /**
      * Address: 0x0067B630 (FUN_0067B630, Moho::EntitySerializer::Deserialize)
      *
@@ -41,23 +67,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x0067C600 (FUN_0067C600, gpg::SerSaveLoadHelper_Entity::Init)
+     *
      * What it does:
      * Binds this helper's load/save callbacks into the `Entity` type
      * descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    // Intrusive list links from gpg::DListItem<gpg::SerHelperBase>.
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    // Serializer callbacks consumed by the reflection registration flow.
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(EntitySerializer, mHelperNext) == 0x04, "EntitySerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(EntitySerializer, mHelperPrev) == 0x08, "EntitySerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(EntitySerializer, mLoadCallback) == 0x0C, "EntitySerializer::mLoadCallback offset must be 0x0C"
   );
@@ -65,13 +87,4 @@ namespace moho
     offsetof(EntitySerializer, mSaveCallback) == 0x10, "EntitySerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(EntitySerializer) == 0x14, "EntitySerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BD5050 (FUN_00BD5050, register_EntitySerializer)
-   *
-   * What it does:
-   * Initializes the global `Entity` serializer helper, binds its load/save
-   * callbacks, and installs process-exit cleanup.
-   */
-  void register_EntitySerializer();
 } // namespace moho
