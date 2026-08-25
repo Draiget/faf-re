@@ -301,6 +301,17 @@ namespace moho
    * crosses the binary's serialized surface uses the current toolchain's
    * own `std::map`, so its `operator[]` machinery is standard-library
    * code, not engine code to hand-write.
+   *
+   * Address: 0x00735C20 (FUN_00735C20) -- another compiled internal of
+   * this same `operator[]` chain: a case-insensitive lower-bound walk
+   * (same `isnil@+45`/`stricmp` shape as FUN_00735170) that either
+   * returns the existing node (exact match found) or inserts a new one
+   * via the same buy-node primitive (`sub_7360A0` = FUN_007360A0,
+   * already recovered) on the not-found path. Its own callees
+   * (FUN_007360A0, recovered; FUN_00736700, an ICF twin of the canonical
+   * body cited on `RbTree.h`) are both already terminal-status. Reached
+   * from FUN_007355F0 per the callgraph -- same "no separate source
+   * line" rationale as the entries above.
    */
   CSimConCommand::CSimConCommand(const bool requiresCheat, const char* const name)
     : mName(name)
