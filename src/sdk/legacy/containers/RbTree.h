@@ -276,6 +276,13 @@ namespace msvc8
          * `FUN_00946770` above -- sibling `StateCache` specialisation with
          * its own distinct helper address (`FUN_009478E0`'s `erase_node`
          * citation above).
+         *
+         * Address: 0x0057F1B0 (FUN_0057F1B0, sub_57F1B0) -- `Moho::
+         * CAiBrain::mBuildStructureMap`'s rightmost descent (isNil@+0x25,
+         * the same `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`
+         * instantiation cited on `erase_node`/`buy_node`/`buy_head`
+         * elsewhere in this file). Reached from `rb_decrement`'s
+         * `rb_max(n->left)` call for this same instantiation.
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -438,6 +445,14 @@ namespace msvc8
          * sibling emission of it. Three real callers (`FUN_0052D730`,
          * `FUN_0052F0A0`, `FUN_00530DC4`); owning field/class not yet
          * pinned down.
+         *
+         * Address: 0x0083C2E0 (FUN_0083C2E0, sub_83C2E0) -- `UiKeyActionMap`/
+         * `msvc8::map<UiKeyMask, msvc8::string>`'s in-order successor walk
+         * (isNil@+0x15, the same instantiation cited on `erase(const
+         * key_type&)` as `FUN_0083AA70` in Map.h). Reached from this
+         * instantiation's `erase_node` (via the successor-capture step
+         * every `erase_node` emission in this file performs before
+         * unlinking).
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
