@@ -22,6 +22,14 @@ namespace moho
   class VTransform
   {
   public:
+    // Address: 0x010C6B64 -- process-lifetime cached RTTI pointer for
+    // `VTransform`, lazily resolved and written by
+    // `VTransformSerializer::Init()` (0x004F0840, VTransform.cpp). Confirmed
+    // via raw asm: that Init() body reads/writes this static directly
+    // (`Moho__VTransform__sType`), matching the same `T::sType` caching
+    // shape used by `SPointVector::sType`/`ResourceDeposit::sType`.
+    static gpg::RType* sType;
+
     Wm3::Quatf orient_; // 0x00 (w,x,y,z)
     Wm3::Vec3f pos_;    // 0x10
 
@@ -200,10 +208,52 @@ namespace moho
   /**
    * VFTABLE: 0x00E0BF9C
    * COL: 0x00E66A94
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='VTransformSerializer@Moho'`): `FUN_00BC7170` (real, sole
+   * writer, `__xc_a`-reachable). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_004F0740`/`FUN_004F0760`, installs the `VTransformSerializer`
+   * vtable, and pushes the real mangled destructor
+   * `??1VTransformSerializer@Moho@@QAE@@Z` (`FUN_00BF17D0`, confirmed
+   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
+   * call exists in the real ctor. Two zero-xref duplicate emissions of
+   * that unlink logic (`FUN_004F07B0`, `FUN_004F07E0`, formerly
+   * `cleanup_VTransformSerializerVariant1/2`) are dead ICF twins,
+   * sha256-identical to the real destructor.
+   *
+   * The previous recovery's `RegisterSerializeFunctions()` was itself dead
+   * code (declared and defined, but never called from anywhere -- not even
+   * eagerly). Its real body, confirmed at `FUN_004F0840`, reads/writes
+   * `Moho__VTransform__sType` directly -- a genuine `static gpg::RType*
+   * sType;` member on `VTransform` (added above), matching
+   * `SerSaveLoadHelper<T>::Init()`'s generic caching shape exactly,
+   * including the same `"!type->mSerLoadFunc"`/`"!type->mSerSaveFunc"`
+   * assert strings used by every other confirmed instantiation.
    */
-  class VTransformSerializer
+  class VTransformSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7170 (FUN_00BC7170, dynamic initializer for the global
+     * `VTransformSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    VTransformSerializer();
+
+    /**
+     * Address: 0x00BF17D0 (FUN_00BF17D0, Moho::VTransformSerializer::~VTransformSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~VTransformSerializer();
+
     /**
      * Address: 0x004F0740 (FUN_004F0740, Moho::VTransformSerializer::Deserialize)
      *
@@ -220,18 +270,21 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-    virtual void RegisterSerializeFunctions();
+    /**
+     * Address: 0x004F0840 (FUN_004F0840, gpg::SerSaveLoadHelper_VTransform::Init)
+     *
+     * What it does:
+     * Lazily resolves and caches `VTransform` RTTI on `VTransform::sType`,
+     * then binds load/save serializer callbacks into it.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   static_assert(sizeof(VTransformTypeInfo) == 0x64, "VTransformTypeInfo size must be 0x64");
-  static_assert(offsetof(VTransformSerializer, mHelperNext) == 0x04, "VTransformSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(VTransformSerializer, mHelperPrev) == 0x08, "VTransformSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(VTransformSerializer, mDeserialize) == 0x0C, "VTransformSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VTransformSerializer, mSerialize) == 0x10, "VTransformSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VTransformSerializer) == 0x14, "VTransformSerializer size must be 0x14");
@@ -251,15 +304,6 @@ namespace moho
    * Runs `VTransform` type preregistration and installs process-exit cleanup.
    */
   int register_VTransformTypeInfo();
-
-  /**
-   * Address: 0x00BC7170 (FUN_00BC7170, register_VTransformSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper callbacks for `VTransform` and
-   * installs process-exit unlink cleanup.
-   */
-  void register_VTransformSerializer();
 
   /**
    * Applies rigid transform `(R,p)` to plane `N*X = C`:

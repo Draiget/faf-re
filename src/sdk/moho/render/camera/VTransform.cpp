@@ -12,17 +12,19 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/math/VMatrix4.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
+  constexpr const char* kSerializationSourcePath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+  constexpr int kSerializationLoadLine = 84;
+  constexpr int kSerializationSaveLine = 87;
+
   alignas(moho::VTransformTypeInfo) unsigned char gVTransformTypeInfoStorage[sizeof(moho::VTransformTypeInfo)];
   bool gVTransformTypeInfoConstructed = false;
   bool gVTransformTypeInfoPreregistered = false;
-
-  alignas(moho::VTransformSerializer) unsigned char gVTransformSerializerStorage[sizeof(moho::VTransformSerializer)];
-  bool gVTransformSerializerConstructed = false;
 
   gpg::RType* gCachedVector3fType = nullptr;
   gpg::RType* gCachedQuaternionfType = nullptr;
@@ -30,11 +32,6 @@ namespace
   [[nodiscard]] moho::VTransformTypeInfo& VTransformTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::VTransformTypeInfo*>(gVTransformTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::VTransformSerializer& VTransformSerializerStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::VTransformSerializer*>(gVTransformSerializerStorage);
   }
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
@@ -76,43 +73,6 @@ namespace
     type.fields_.push_back(field);
   }
 
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeHelperNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkHelperNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeHelperNode(serializer);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkAndResetVTransformSerializerStartupHelperNode() noexcept
-  {
-    moho::VTransformSerializer& serializer = VTransformSerializerStorageRef();
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] bool CompareQuaternionComponents(
     const Wm3::Quatf& lhs,
     const Wm3::Quatf& rhs,
@@ -136,17 +96,10 @@ namespace
     gCachedQuaternionfType = nullptr;
   }
 
-  void CleanupVTransformSerializerAtExit()
-  {
-    if (!gVTransformSerializerConstructed) {
-      return;
-    }
-
-    moho::VTransformSerializer& serializer = VTransformSerializerStorageRef();
-    UnlinkHelperNode(serializer);
-    serializer.~VTransformSerializer();
-    gVTransformSerializerConstructed = false;
-  }
+  // Address: 0x010A9B40 -- process-global `VTransformSerializer` singleton
+  // (constructed by FUN_00BC7170, self-registering via `__xc_a`; see
+  // VTransform.h for the real-ctor/atexit-target/dead-duplicate evidence).
+  moho::VTransformSerializer gVTransformSerializer;
 } // namespace
 
 namespace moho
@@ -476,40 +429,37 @@ namespace moho
   }
 
   /**
-   * Address: 0x004F07B0 (FUN_004F07B0)
-   *
-   * What it does:
-   * Unlinks the `VTransformSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * Address: 0x004F0840 (FUN_004F0840, gpg::SerSaveLoadHelper_VTransform::Init)
    */
-  gpg::SerHelperBase* cleanup_VTransformSerializerVariant1()
+  void VTransformSerializer::Init()
   {
-    return UnlinkAndResetVTransformSerializerStartupHelperNode();
+    if (VTransform::sType == nullptr) {
+      VTransform::sType = gpg::LookupRType(typeid(VTransform));
+    }
+
+    gpg::RType* const type = VTransform::sType;
+    if (type->serLoadFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerLoadFunc", kSerializationLoadLine, kSerializationSourcePath);
+    }
+    if (type->serSaveFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerSaveFunc", kSerializationSaveLine, kSerializationSourcePath);
+    }
+    type->serLoadFunc_ = mDeserialize;
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
-   * Address: 0x004F07E0 (FUN_004F07E0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `VTransformSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BC7170 (FUN_00BC7170, dynamic initializer for the global
+   * `VTransformSerializer` singleton)
    */
-  gpg::SerHelperBase* cleanup_VTransformSerializerVariant2()
-  {
-    return UnlinkAndResetVTransformSerializerStartupHelperNode();
-  }
+  VTransformSerializer::VTransformSerializer()
+    : mDeserialize(&VTransformSerializer::Deserialize)
+    , mSerialize(&VTransformSerializer::Serialize)
+  {}
 
-  void VTransformSerializer::RegisterSerializeFunctions()
+  VTransformSerializer::~VTransformSerializer()
   {
-    gpg::RType* const type = preregister_VTransformTypeInfo();
-    if (type == nullptr) {
-      return;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
+    ResetLinks();
   }
 
   /**
@@ -538,24 +488,9 @@ namespace moho
     (void)preregister_VTransformTypeInfo();
     return std::atexit(&CleanupVTransformTypeInfoAtExit);
   }
-
-  /**
-   * Address: 0x00BC7170 (FUN_00BC7170, register_VTransformSerializer)
-   */
-  void register_VTransformSerializer()
-  {
-    if (!gVTransformSerializerConstructed) {
-      new (gVTransformSerializerStorage) VTransformSerializer();
-      gVTransformSerializerConstructed = true;
-    }
-
-    VTransformSerializer& serializer = VTransformSerializerStorageRef();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = &VTransformSerializer::Deserialize;
-    serializer.mSerialize = &VTransformSerializer::Serialize;
-    (void)std::atexit(&CleanupVTransformSerializerAtExit);
-  }
 } // namespace moho
+
+gpg::RType* moho::VTransform::sType = nullptr;
 
 namespace
 {
@@ -564,7 +499,6 @@ namespace
     VTransformBootstrap()
     {
       (void)moho::register_VTransformTypeInfo();
-      moho::register_VTransformSerializer();
     }
   };
 
