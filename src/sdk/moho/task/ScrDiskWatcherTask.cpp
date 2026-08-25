@@ -35,8 +35,6 @@ namespace gpg
 namespace
 {
   moho::ScrDiskWatcherTaskTypeInfo gScrDiskWatcherTaskTypeInfo;
-  moho::ScrDiskWatcherTaskSaveConstruct gScrDiskWatcherTaskSaveConstruct;
-  moho::ScrDiskWatcherTaskConstruct gScrDiskWatcherTaskConstruct;
 
   gpg::RType* CachedScrDiskWatcherTaskType()
   {
@@ -144,92 +142,10 @@ namespace
     return outRef;
   }
 
-  template <class THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <class THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <class THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x004C0980 (FUN_004C0980)
-   *
-   * What it does:
-   * Unlinks the ScrDiskWatcherTask save-construct helper node.
-   */
-  gpg::SerHelperBase* CleanupScrDiskWatcherTaskSaveConstructVariant1()
-  {
-    return UnlinkHelperNode(gScrDiskWatcherTaskSaveConstruct);
-  }
-
-  /**
-   * Address: 0x004C09B0 (FUN_004C09B0)
-   *
-   * What it does:
-   * Duplicate lane of save-construct helper unlink/reset.
-   */
-  gpg::SerHelperBase* CleanupScrDiskWatcherTaskSaveConstructVariant2()
-  {
-    return UnlinkHelperNode(gScrDiskWatcherTaskSaveConstruct);
-  }
-
-  /**
-   * Address: 0x004C0A50 (FUN_004C0A50)
-   *
-   * What it does:
-   * Unlinks the ScrDiskWatcherTask construct helper node.
-   */
-  gpg::SerHelperBase* CleanupScrDiskWatcherTaskConstructVariant1()
-  {
-    return UnlinkHelperNode(gScrDiskWatcherTaskConstruct);
-  }
-
-  /**
-   * Address: 0x004C0A80 (FUN_004C0A80)
-   *
-   * What it does:
-   * Duplicate lane of construct helper unlink/reset.
-   */
-  gpg::SerHelperBase* CleanupScrDiskWatcherTaskConstructVariant2()
-  {
-    return UnlinkHelperNode(gScrDiskWatcherTaskConstruct);
-  }
-
   void CleanupScrDiskWatcherTaskTypeInfo() noexcept
   {
     gScrDiskWatcherTaskTypeInfo.fields_ = msvc8::vector<gpg::RField>{};
     gScrDiskWatcherTaskTypeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void CleanupScrDiskWatcherTaskSaveConstructAtexit()
-  {
-    (void)CleanupScrDiskWatcherTaskSaveConstructVariant1();
-  }
-
-  void CleanupScrDiskWatcherTaskConstructAtexit()
-  {
-    (void)CleanupScrDiskWatcherTaskConstructVariant1();
   }
 
   /**
@@ -242,25 +158,6 @@ namespace
   {
     gpg::PreRegisterRType(typeid(ScrDiskWatcherTask), &gScrDiskWatcherTaskTypeInfo);
     return &gScrDiskWatcherTaskTypeInfo;
-  }
-
-  void RegisterScrDiskWatcherTaskSaveConstruct()
-  {
-    InitializeHelperNode(gScrDiskWatcherTaskSaveConstruct);
-    gScrDiskWatcherTaskSaveConstruct.mSerSaveConstructArgsFunc =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::ScrDiskWatcherTask::SaveConstructArgs);
-    gScrDiskWatcherTaskSaveConstruct.RegisterSaveConstructArgsFunction();
-    (void)std::atexit(&CleanupScrDiskWatcherTaskSaveConstructAtexit);
-  }
-
-  void RegisterScrDiskWatcherTaskConstruct()
-  {
-    InitializeHelperNode(gScrDiskWatcherTaskConstruct);
-    gScrDiskWatcherTaskConstruct.mSerConstructFunc =
-      reinterpret_cast<gpg::RType::construct_func_t>(&moho::ScrDiskWatcherTask::Construct);
-    gScrDiskWatcherTaskConstruct.mDeleteFunc = &moho::ScrDiskWatcherTask::Delete;
-    gScrDiskWatcherTaskConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupScrDiskWatcherTaskConstructAtexit);
   }
 
   void ResolvePathForLua(const SDiskWatchEvent& event, msvc8::string& normalizedPath)
@@ -291,12 +188,16 @@ namespace
     ScrDiskWatcherTaskReflectionBootstrap()
     {
       moho::register_ScrDiskWatcherTaskTypeInfo();
-      moho::register_ScrDiskWatcherTaskSaveConstruct();
-      moho::register_ScrDiskWatcherTaskConstruct();
     }
   };
 
   ScrDiskWatcherTaskReflectionBootstrap gScrDiskWatcherTaskReflectionBootstrap{};
+
+  // Address: 0x010A8A9C -- process-global `ScrDiskWatcherTaskSaveConstruct` singleton.
+  moho::ScrDiskWatcherTaskSaveConstruct gScrDiskWatcherTaskSaveConstruct;
+
+  // Address: 0x010A8A88 -- process-global `ScrDiskWatcherTaskConstruct` singleton.
+  moho::ScrDiskWatcherTaskConstruct gScrDiskWatcherTaskConstruct;
 } // namespace
 
 /**
@@ -311,36 +212,6 @@ void moho::register_ScrDiskWatcherTaskTypeInfo()
   static const bool kRegistered = []() {
     (void)RegisterScrDiskWatcherTaskTypeInfo();
     (void)std::atexit(&CleanupScrDiskWatcherTaskTypeInfo);
-    return true;
-  }();
-  (void)kRegistered;
-}
-
-/**
- * Address: 0x00BC5F80 (FUN_00BC5F80, ScrDiskWatcherTask startup save-construct registration)
- *
- * What it does:
- * Registers save-construct callback helper for `ScrDiskWatcherTask`.
- */
-void moho::register_ScrDiskWatcherTaskSaveConstruct()
-{
-  static const bool kRegistered = []() {
-    RegisterScrDiskWatcherTaskSaveConstruct();
-    return true;
-  }();
-  (void)kRegistered;
-}
-
-/**
- * Address: 0x00BC5FB0 (FUN_00BC5FB0, ScrDiskWatcherTask startup construct registration)
- *
- * What it does:
- * Registers construct/delete callback helper for `ScrDiskWatcherTask`.
- */
-void moho::register_ScrDiskWatcherTaskConstruct()
-{
-  static const bool kRegistered = []() {
-    RegisterScrDiskWatcherTaskConstruct();
     return true;
   }();
   (void)kRegistered;
@@ -501,9 +372,24 @@ void ScrDiskWatcherTask::Delete(void* const objectPtr)
 }
 
 /**
+ * Address: 0x00BC5F80 (FUN_00BC5F80, dynamic initializer for the global
+ * `ScrDiskWatcherTaskSaveConstruct` singleton)
+ */
+ScrDiskWatcherTaskSaveConstruct::ScrDiskWatcherTaskSaveConstruct()
+  : mSerSaveConstructArgsFunc(
+      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&ScrDiskWatcherTask::SaveConstructArgs)
+    )
+{}
+
+ScrDiskWatcherTaskSaveConstruct::~ScrDiskWatcherTaskSaveConstruct()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x004C0F90 (FUN_004C0F90, sub_4C0F90)
  */
-void ScrDiskWatcherTaskSaveConstruct::RegisterSaveConstructArgsFunction()
+void ScrDiskWatcherTaskSaveConstruct::Init()
 {
   gpg::RType* const type = CachedScrDiskWatcherTaskType();
   GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSerSaveConstructArgsFunc);
@@ -511,9 +397,23 @@ void ScrDiskWatcherTaskSaveConstruct::RegisterSaveConstructArgsFunction()
 }
 
 /**
+ * Address: 0x00BC5FB0 (FUN_00BC5FB0, dynamic initializer for the global
+ * `ScrDiskWatcherTaskConstruct` singleton)
+ */
+ScrDiskWatcherTaskConstruct::ScrDiskWatcherTaskConstruct()
+  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ScrDiskWatcherTask::Construct))
+  , mDeleteFunc(&ScrDiskWatcherTask::Delete)
+{}
+
+ScrDiskWatcherTaskConstruct::~ScrDiskWatcherTaskConstruct()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x004C1010 (FUN_004C1010, sub_4C1010)
  */
-void ScrDiskWatcherTaskConstruct::RegisterConstructFunction()
+void ScrDiskWatcherTaskConstruct::Init()
 {
   gpg::RType* const type = CachedScrDiskWatcherTaskType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mSerConstructFunc);

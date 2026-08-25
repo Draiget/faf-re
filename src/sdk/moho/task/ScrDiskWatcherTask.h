@@ -29,22 +29,6 @@ namespace moho
    */
   void register_ScrDiskWatcherTaskTypeInfo();
 
-  /**
-   * Address: 0x00BC5F80 (FUN_00BC5F80, ScrDiskWatcherTask startup save-construct registration)
-   *
-   * What it does:
-   * Registers save-construct callback helper for `ScrDiskWatcherTask`.
-   */
-  void register_ScrDiskWatcherTaskSaveConstruct();
-
-  /**
-   * Address: 0x00BC5FB0 (FUN_00BC5FB0, ScrDiskWatcherTask startup construct registration)
-   *
-   * What it does:
-   * Registers construct/delete callback helper for `ScrDiskWatcherTask`.
-   */
-  void register_ScrDiskWatcherTaskConstruct();
-
   class ScrDiskWatcherTask : public CTask
   {
   public:
@@ -112,9 +96,29 @@ namespace moho
     CDiskWatchListener mListener; // +0x20
   };
 
-  class ScrDiskWatcherTaskSaveConstruct
+  class ScrDiskWatcherTaskSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC5F80 (FUN_00BC5F80, dynamic initializer for the global
+     * `ScrDiskWatcherTaskSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field. The ctor's atexit target is a
+     * plain unlink thunk, not a mangled destructor, so it is modeled as
+     * the compiler's implicit static-destructor registration rather than
+     * an explicit call.
+     */
+    ScrDiskWatcherTaskSaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ScrDiskWatcherTaskSaveConstruct();
+
     /**
      * Address: 0x004C0F90 (FUN_004C0F90, sub_4C0F90)
      * Slot: 0
@@ -122,17 +126,33 @@ namespace moho
      * What it does:
      * Binds save-construct-args callback into ScrDiskWatcherTask RTTI.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
+    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc; // +0x0C
   };
 
-  class ScrDiskWatcherTaskConstruct
+  class ScrDiskWatcherTaskConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC5FB0 (FUN_00BC5FB0, dynamic initializer for the global
+     * `ScrDiskWatcherTaskConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields. Same implicit-registration atexit
+     * shape as `ScrDiskWatcherTaskSaveConstruct`.
+     */
+    ScrDiskWatcherTaskConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ScrDiskWatcherTaskConstruct();
+
     /**
      * Address: 0x004C1010 (FUN_004C1010, sub_4C1010)
      * Slot: 0
@@ -140,13 +160,11 @@ namespace moho
      * What it does:
      * Binds construct/delete callbacks into ScrDiskWatcherTask RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
   class ScrDiskWatcherTaskTypeInfo : public gpg::RType
@@ -188,24 +206,8 @@ namespace moho
   static_assert(offsetof(ScrDiskWatcherTask, mLuaState) == 0x1C, "ScrDiskWatcherTask::mLuaState offset must be 0x1C");
   static_assert(offsetof(ScrDiskWatcherTask, mListener) == 0x20, "ScrDiskWatcherTask::mListener offset must be 0x20");
   static_assert(
-    offsetof(ScrDiskWatcherTaskSaveConstruct, mHelperNext) == 0x04,
-    "ScrDiskWatcherTaskSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ScrDiskWatcherTaskSaveConstruct, mHelperPrev) == 0x08,
-    "ScrDiskWatcherTaskSaveConstruct::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
     offsetof(ScrDiskWatcherTaskSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
     "ScrDiskWatcherTaskSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ScrDiskWatcherTaskConstruct, mHelperNext) == 0x04,
-    "ScrDiskWatcherTaskConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ScrDiskWatcherTaskConstruct, mHelperPrev) == 0x08,
-    "ScrDiskWatcherTaskConstruct::mHelperPrev offset must be 0x08"
   );
   static_assert(
     offsetof(ScrDiskWatcherTaskConstruct, mSerConstructFunc) == 0x0C,
