@@ -3,47 +3,31 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
+#include "moho/render/CDecalHandle.h"
 
 namespace moho
 {
   /**
    * VFTABLE: 0x00E373E8
    * COL: 0x00E913E4
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CDecalHandle>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CDecalHandleSerializer`):
+   *    0x00BDD8E0 (__xc_a-reachable; dead zero-xref COMDAT duplicates:
+   *    0x0077AB90, 0x00779FD0)
+   *  - dtor: 0x00C02940 (`??1CDecalHandleSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0077ABC0
+   *  - Deserialize(): 0x00779FA0
+   *  - Serialize(): 0x00779FB0
+   *
+   * NOTE: prior recovery had never identified the real ctor -- the
+   * `CDecalHandleSerializerBootstrap` static-init struct in the old .cpp
+   * only self-linked the helper node and left `mLoadCallback`/`mSaveCallback`
+   * explicitly null, so the reflection callbacks were never actually
+   * installed under that shape.
    */
-  class CDecalHandleSerializer
-  {
-  public:
-    /**
-     * Address: 0x0077ABC0 (FUN_0077ABC0, gpg::SerSaveLoadHelper_CDecalHandle::Init)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into CDecalHandle RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(CDecalHandleSerializer, mHelperNext) == 0x04, "CDecalHandleSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CDecalHandleSerializer, mHelperPrev) == 0x08, "CDecalHandleSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CDecalHandleSerializer, mLoadCallback) == 0x0C, "CDecalHandleSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CDecalHandleSerializer, mSaveCallback) == 0x10, "CDecalHandleSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CDecalHandleSerializer) == 0x14, "CDecalHandleSerializer size must be 0x14");
+  using CDecalHandleSerializer = gpg::SerSaveLoadHelper<CDecalHandle>;
 } // namespace moho
