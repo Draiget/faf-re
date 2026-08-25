@@ -4352,16 +4352,21 @@ namespace Wm3
       std::uint8_t isNil;           // +kIsNilOffset
     };
 
+    // NOTE: this node-view shape is byte-identical to `msvc8::detail::rb_node<V>`
+    // (legacy/containers/RbTree.h): left/parent/right/value at the same offsets,
+    // with `isNil` landing at `0x0D + sizeof(V)`. Nil17 (V=uint32_t, `isNil`@0x11)
+    // and Nil21 (8-byte V, `isNil`@0x15) still back the `OwnerKeyCursor` family
+    // below, whose real identity is not yet resolved (see that block's note) --
+    // kept local rather than retargeted at `rb_node<V>` until that's settled.
+    // The Nil33 (20-byte V, `isNil`@0x21) tree-descent/find surface has been
+    // migrated to `rb_tree::rb_min`/`rb_max`/`find_node` in RbTree.h.
     using QueryTreeNodeKeyNil17 = QueryTreeNodeKeyView<0x11>;
     using QueryTreeNodeKeyNil21 = QueryTreeNodeKeyView<0x15>;
-    using QueryTreeNodeKeyNil33 = QueryTreeNodeKeyView<0x21>;
 
     static_assert(offsetof(QueryTreeNodeKeyNil17, key) == 0x0C, "QueryTreeNodeKeyNil17::key offset must be 0x0C");
     static_assert(offsetof(QueryTreeNodeKeyNil17, isNil) == 0x11, "QueryTreeNodeKeyNil17::isNil offset must be 0x11");
     static_assert(offsetof(QueryTreeNodeKeyNil21, key) == 0x0C, "QueryTreeNodeKeyNil21::key offset must be 0x0C");
     static_assert(offsetof(QueryTreeNodeKeyNil21, isNil) == 0x15, "QueryTreeNodeKeyNil21::isNil offset must be 0x15");
-    static_assert(offsetof(QueryTreeNodeKeyNil33, key) == 0x0C, "QueryTreeNodeKeyNil33::key offset must be 0x0C");
-    static_assert(offsetof(QueryTreeNodeKeyNil33, isNil) == 0x21, "QueryTreeNodeKeyNil33::isNil offset must be 0x21");
 
     template <class TNode>
     struct QueryTreeOwnerView
@@ -4375,29 +4380,11 @@ namespace Wm3
       "QueryTreeOwnerView::head offset must be 0x04"
     );
 
-    template <class TNode>
-    struct QueryTreeEqualRangeResultView
-    {
-      QueryTreeOwnerView<TNode>* owner0; // +0x00
-      TNode* lowerBound;                 // +0x04
-      QueryTreeOwnerView<TNode>* owner2; // +0x08
-      TNode* upperBound;                 // +0x0C
-    };
-    static_assert(
-      sizeof(QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>) == 0x10,
-      "QueryTreeEqualRangeResultView size must be 0x10"
-    );
-
-    template <class TNode>
-    struct QueryTreeNodeLookupResultView
-    {
-      QueryTreeOwnerView<TNode>* owner; // +0x00
-      TNode* node;                      // +0x04
-    };
-    static_assert(
-      sizeof(QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>) == 0x08,
-      "QueryTreeNodeLookupResultView size must be 0x08"
-    );
+    // `QueryTreeEqualRangeResultView`/`QueryTreeNodeLookupResultView` (both
+    // {owner,node}-pair-of-pairs reach-in views over `equal_range`/`find`
+    // results) were deleted here: the real behavior is `rb_tree::equal_range`/
+    // `rb_tree::find_node` in RbTree.h now (Address: 0x00A59E20 and
+    // 0x00A5D810 respectively, cited there).
 
     void SignalInvalidParameterRecoveredInvariant() noexcept
     {
@@ -4534,45 +4521,10 @@ namespace Wm3
       return owner->wordChunkBases[chunkIndex] + chunkLane;
     }
 
-    template <class TNode>
-    [[nodiscard]] TNode* FindSubtreeLeftmostFromLeftChild(TNode* node) noexcept
-    {
-      if (node == nullptr) {
-        return nullptr;
-      }
-
-      TNode* cursor = node->left;
-      if (cursor == nullptr || cursor->isNil != 0u) {
-        return node;
-      }
-
-      do {
-        node = cursor;
-        cursor = cursor->left;
-      } while (cursor != nullptr && cursor->isNil == 0u);
-
-      return node;
-    }
-
-    template <class TNode>
-    [[nodiscard]] TNode* FindSubtreeRightmostFromRightChild(TNode* node) noexcept
-    {
-      if (node == nullptr) {
-        return nullptr;
-      }
-
-      TNode* cursor = node->right;
-      if (cursor == nullptr || cursor->isNil != 0u) {
-        return node;
-      }
-
-      do {
-        node = cursor;
-        cursor = cursor->right;
-      } while (cursor != nullptr && cursor->isNil == 0u);
-
-      return node;
-    }
+    // `FindSubtreeLeftmostFromLeftChild`/`FindSubtreeRightmostFromRightChild`
+    // (generic subtree leftmost/rightmost descent over the reach-in node view)
+    // were deleted here: byte-identical to `rb_tree::rb_min`/`rb_max` already
+    // in RbTree.h, which now carries this file's addresses as citations.
   } // namespace
 
   struct Distance3fRuntimeView
@@ -5162,29 +5114,9 @@ namespace Wm3
     return InitializeQueryTreeOwnerKeyCursor(cursor, keyLane, owner);
   }
 
-  /**
-   * Address: 0x00A3A170 (FUN_00A3A170)
-   *
-   * What it does:
-   * Returns the left-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x15`.
-   */
-  QueryTreeNodeKeyNil21* QueryTreeLeftmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
-  {
-    return FindSubtreeLeftmostFromLeftChild(node);
-  }
-
-  /**
-   * Address: 0x00A3A240 (FUN_00A3A240)
-   *
-   * What it does:
-   * Returns the right-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x15`.
-   */
-  QueryTreeNodeKeyNil21* QueryTreeRightmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
-  {
-    return FindSubtreeRightmostFromRightChild(node);
-  }
+  // `QueryTreeLeftmostNil21LaneC` (0x00A3A170) / `QueryTreeRightmostNil21LaneC`
+  // (0x00A3A240) deleted here: byte-identical to `rb_tree::rb_min`/`rb_max`,
+  // which now carries both addresses as citations (RbTree.h).
 
   /**
    * Address: 0x00A3A340 (FUN_00A3A340)
@@ -5626,551 +5558,51 @@ namespace Wm3
     return InitializeQueryWordCursor(cursor, wordIndex, owner);
   }
 
-  /**
-   * Address: 0x00A52630 (FUN_00A52630)
-   *
-   * What it does:
-   * Returns the right-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x11`.
-   */
-  QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
-  {
-    return FindSubtreeRightmostFromRightChild(node);
-  }
+  // `QueryTreeRightmostNil17LaneC`/`LaneD` (0x00A52630, 0x00A52680) and
+  // `QueryTreeLeftmostNil17LaneC`/`LaneD` (0x00A52650, 0x00A526A0) deleted
+  // here: byte-identical to `rb_tree::rb_max`/`rb_min`, which now carries
+  // all four addresses as citations (RbTree.h).
 
-  /**
-   * Address: 0x00A52650 (FUN_00A52650)
-   *
-   * What it does:
-   * Returns the left-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x11`.
-   */
-  QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
-  {
-    return FindSubtreeLeftmostFromLeftChild(node);
-  }
+  // `QueryTreeRightmostNil33LaneA`/`LaneB` (0x00A52BD0, 0x00A52D20) and
+  // `QueryTreeLeftmostNil33LaneA`/`LaneB` (0x00A52BF0, 0x00A52D40) deleted
+  // here: byte-identical to `rb_tree::rb_max`/`rb_min`, cited there now.
+  //
+  // `BuildQueryTreeEqualRangeNil17LaneA`/`LaneB` (0x00A59E20, 0x00A59E80)
+  // deleted here: this fused dual-descent body IS `rb_tree::equal_range`'s
+  // own out-of-line emission for the `msvc8::set<uint32_t>`-shaped Nil17
+  // tree (`this`=ecx=tree, matching a real `__thiscall` member, not a free
+  // function taking a tree pointer) -- moved to RbTree.h with both
+  // addresses cited (0x00A59E80 is an ICF twin of 0x00A59E20, marked skip).
+  //
+  // The anonymous-namespace RB-tree rotate/erase-rebalance machinery that
+  // used to live here (`QueryTreeRotateLeft/Right`, `QueryTreeRefreshBoundaryNodes`,
+  // `QueryTreeDeleteSubtreeNodes`, `QueryTreeEraseSingleNode`,
+  // `QueryTreeCountNodesInRange`, `QueryTreeEraseRange`) carried no `Address:`
+  // citations at all -- it was hand-written scaffolding standing in for what
+  // the binary actually calls. The real callees are `rb_tree::erase_range`
+  // (0x00A65320, already cited in RbTree.h for several other instantiations)
+  // and `rb_tree::erase_node` (0x00A633D0, ditto, including its
+  // `std::out_of_range` guard-throw path -- confirmed: this address's
+  // `vtable_writes` hit for `out_of_range@std`'s vtable is real, not a false
+  // positive, matching `erase_node`'s documented guard). Both are reached
+  // from `Wm3::ConvexHull3<float>::~ConvexHull3()` (0x00A66440) erasing a
+  // 12-byte `rb_tree` member at `this+0x68` -- see RbTree.h's `erase_range`
+  // citation for the full chain. The node-shape-specific counting step
+  // (`sub_A598A0`, a checked "how many nodes in [first,last)" walk) and the
+  // increment stepper it uses (`sub_A52760`) are themselves real, separate
+  // addresses currently misfiled as a blocked token in
+  // `moho/misc/CrtRuntimeHelpers.cpp` -- out of this pass's scope (that file
+  // has its own in-progress blocked-cluster drain); `rb_tree::erase(const
+  // key_type&)` below reconstructs the same observable behavior with
+  // `rb_increment` (already canonical in RbTree.h) instead of re-citing an
+  // unrecovered helper.
 
-  /**
-   * Address: 0x00A52680 (FUN_00A52680)
-   *
-   * What it does:
-   * Alias lane of `QueryTreeRightmostNil17LaneC`.
-   */
-  QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
-  {
-    return QueryTreeRightmostNil17LaneC(node);
-  }
-
-  /**
-   * Address: 0x00A526A0 (FUN_00A526A0)
-   *
-   * What it does:
-   * Alias lane of `QueryTreeLeftmostNil17LaneC`.
-   */
-  QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
-  {
-    return QueryTreeLeftmostNil17LaneC(node);
-  }
-
-  /**
-   * Address: 0x00A52BD0 (FUN_00A52BD0)
-   *
-   * What it does:
-   * Returns the right-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x21`.
-   */
-  QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
-  {
-    return FindSubtreeRightmostFromRightChild(node);
-  }
-
-  /**
-   * Address: 0x00A52BF0 (FUN_00A52BF0)
-   *
-   * What it does:
-   * Returns the left-most node in one query tree subtree that uses nil marker
-   * byte offset `+0x21`.
-   */
-  QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
-  {
-    return FindSubtreeLeftmostFromLeftChild(node);
-  }
-
-  /**
-   * Address: 0x00A52D20 (FUN_00A52D20)
-   *
-   * What it does:
-   * Alias lane of `QueryTreeRightmostNil33LaneA`.
-   */
-  QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
-  {
-    return QueryTreeRightmostNil33LaneA(node);
-  }
-
-  /**
-   * Address: 0x00A52D40 (FUN_00A52D40)
-   *
-   * What it does:
-   * Alias lane of `QueryTreeLeftmostNil33LaneA`.
-   */
-  QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
-  {
-    return QueryTreeLeftmostNil33LaneA(node);
-  }
-
-  /**
-   * Address: 0x00A59E20 (FUN_00A59E20)
-   *
-   * What it does:
-   * Builds one equal-range iterator tuple `(owner, lower, owner, upper)` for a
-   * dword-key query tree with nil marker byte offset `+0x11`.
-   */
-  QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneA(
-    QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const tree,
-    QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* const outRange,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    QueryTreeNodeKeyNil17* upperBound = tree->head;
-    QueryTreeNodeKeyNil17* cursor = upperBound->parent;
-    while (cursor->isNil == 0u) {
-      if (*key >= cursor->key) {
-        cursor = cursor->right;
-      } else {
-        upperBound = cursor;
-        cursor = cursor->left;
-      }
-    }
-
-    QueryTreeNodeKeyNil17* lowerBound = tree->head;
-    cursor = lowerBound->parent;
-    while (cursor->isNil == 0u) {
-      if (cursor->key >= *key) {
-        lowerBound = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-
-    outRange->lowerBound = lowerBound;
-    outRange->owner0 = tree;
-    outRange->owner2 = tree;
-    outRange->upperBound = upperBound;
-    return outRange;
-  }
-
-  /**
-   * Address: 0x00A59E80 (FUN_00A59E80)
-   *
-   * What it does:
-   * Alias lane of `BuildQueryTreeEqualRangeNil17LaneA`.
-   */
-  QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneB(
-    QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const tree,
-    QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* const outRange,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return BuildQueryTreeEqualRangeNil17LaneA(tree, outRange, key);
-  }
-
-  namespace
-  {
-    constexpr std::uint8_t kQueryTreeColorRed = 0u;
-    constexpr std::uint8_t kQueryTreeColorBlack = 1u;
-
-    template <class TNode>
-    struct QueryTreeContainerWithSizeView
-    {
-      std::uint32_t lane00; // +0x00
-      TNode* head;          // +0x04
-      std::uint32_t size;   // +0x08
-    };
-
-    static_assert(
-      sizeof(QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>) == 0x0C,
-      "QueryTreeContainerWithSizeView size must be 0x0C"
-    );
-    static_assert(
-      offsetof(QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>, head) == 0x04,
-      "QueryTreeContainerWithSizeView::head offset must be 0x04"
-    );
-    static_assert(
-      offsetof(QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>, size) == 0x08,
-      "QueryTreeContainerWithSizeView::size offset must be 0x08"
-    );
-
-    template <class TNode>
-    [[nodiscard]] std::uint8_t& QueryTreeNodeColor(TNode* const node) noexcept
-    {
-      return reinterpret_cast<std::uint8_t*>(node)[0x10];
-    }
-
-    template <class TNode>
-    [[nodiscard]] TNode* QueryTreeSubtreeMinimum(TNode* node) noexcept
-    {
-      while (node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    template <class TNode>
-    [[nodiscard]] TNode* QueryTreeSubtreeMaximum(TNode* node) noexcept
-    {
-      while (node->right->isNil == 0u) {
-        node = node->right;
-      }
-      return node;
-    }
-
-    template <class TNode>
-    [[nodiscard]] TNode* QueryTreeSuccessor(TNode* node, TNode* const head) noexcept
-    {
-      if (node->right->isNil == 0u) {
-        return QueryTreeSubtreeMinimum(node->right);
-      }
-
-      TNode* parent = node->parent;
-      while (parent->isNil == 0u && node == parent->right) {
-        node = parent;
-        parent = parent->parent;
-      }
-      return parent;
-    }
-
-    template <class TNode>
-    void QueryTreeRotateLeft(QueryTreeContainerWithSizeView<TNode>* const tree, TNode* const pivot) noexcept
-    {
-      TNode* const head = tree->head;
-      TNode* const replacement = pivot->right;
-
-      pivot->right = replacement->left;
-      if (replacement->left->isNil == 0u) {
-        replacement->left->parent = pivot;
-      }
-
-      replacement->parent = pivot->parent;
-      if (head->parent == pivot) {
-        head->parent = replacement;
-      } else if (pivot->parent->left == pivot) {
-        pivot->parent->left = replacement;
-      } else {
-        pivot->parent->right = replacement;
-      }
-
-      replacement->left = pivot;
-      pivot->parent = replacement;
-    }
-
-    template <class TNode>
-    void QueryTreeRotateRight(QueryTreeContainerWithSizeView<TNode>* const tree, TNode* const pivot) noexcept
-    {
-      TNode* const head = tree->head;
-      TNode* const replacement = pivot->left;
-
-      pivot->left = replacement->right;
-      if (replacement->right->isNil == 0u) {
-        replacement->right->parent = pivot;
-      }
-
-      replacement->parent = pivot->parent;
-      if (head->parent == pivot) {
-        head->parent = replacement;
-      } else if (pivot->parent->right == pivot) {
-        pivot->parent->right = replacement;
-      } else {
-        pivot->parent->left = replacement;
-      }
-
-      replacement->right = pivot;
-      pivot->parent = replacement;
-    }
-
-    template <class TNode>
-    void QueryTreeRefreshBoundaryNodes(QueryTreeContainerWithSizeView<TNode>* const tree) noexcept
-    {
-      TNode* const head = tree->head;
-      TNode* const root = head->parent;
-      if (root->isNil != 0u) {
-        head->left = head;
-        head->right = head;
-        return;
-      }
-
-      root->parent = head;
-      head->left = QueryTreeSubtreeMinimum(root);
-      head->right = QueryTreeSubtreeMaximum(root);
-    }
-
-    template <class TNode>
-    void QueryTreeDeleteSubtreeNodes(TNode* const node) noexcept
-    {
-      if (node == nullptr || node->isNil != 0u) {
-        return;
-      }
-
-      QueryTreeDeleteSubtreeNodes(node->right);
-      QueryTreeDeleteSubtreeNodes(node->left);
-      ::operator delete(node);
-    }
-
-    template <class TNode>
-    void QueryTreeEraseSingleNode(
-      QueryTreeContainerWithSizeView<TNode>* const tree,
-      TNode* const erasedNode
-    ) noexcept
-    {
-      TNode* const head = tree->head;
-      TNode* nodeToDelete = erasedNode;
-      TNode* fixNode = head;
-      TNode* fixParent = head;
-
-      if (erasedNode->left->isNil != 0u) {
-        fixNode = erasedNode->right;
-        fixParent = erasedNode->parent;
-        if (fixNode->isNil == 0u) {
-          fixNode->parent = fixParent;
-        }
-
-        if (head->parent == erasedNode) {
-          head->parent = fixNode;
-        } else if (fixParent->left == erasedNode) {
-          fixParent->left = fixNode;
-        } else {
-          fixParent->right = fixNode;
-        }
-      } else if (erasedNode->right->isNil != 0u) {
-        fixNode = erasedNode->left;
-        fixParent = erasedNode->parent;
-        if (fixNode->isNil == 0u) {
-          fixNode->parent = fixParent;
-        }
-
-        if (head->parent == erasedNode) {
-          head->parent = fixNode;
-        } else if (fixParent->left == erasedNode) {
-          fixParent->left = fixNode;
-        } else {
-          fixParent->right = fixNode;
-        }
-      } else {
-        TNode* const successor = QueryTreeSubtreeMinimum(erasedNode->right);
-        nodeToDelete = successor;
-        fixNode = successor->right;
-
-        if (successor == erasedNode->right) {
-          fixParent = successor;
-        } else {
-          fixParent = successor->parent;
-          if (fixNode->isNil == 0u) {
-            fixNode->parent = fixParent;
-          }
-
-          fixParent->left = fixNode;
-          successor->right = erasedNode->right;
-          erasedNode->right->parent = successor;
-        }
-
-        if (head->parent == erasedNode) {
-          head->parent = successor;
-        } else if (erasedNode->parent->left == erasedNode) {
-          erasedNode->parent->left = successor;
-        } else {
-          erasedNode->parent->right = successor;
-        }
-
-        successor->parent = erasedNode->parent;
-        successor->left = erasedNode->left;
-        erasedNode->left->parent = successor;
-
-        const std::uint8_t successorColor = QueryTreeNodeColor(successor);
-        QueryTreeNodeColor(successor) = QueryTreeNodeColor(erasedNode);
-        QueryTreeNodeColor(erasedNode) = successorColor;
-      }
-
-      if (QueryTreeNodeColor(nodeToDelete) == kQueryTreeColorBlack) {
-        while (fixNode != head->parent && QueryTreeNodeColor(fixNode) == kQueryTreeColorBlack) {
-          if (fixNode == fixParent->left) {
-            TNode* sibling = fixParent->right;
-            if (QueryTreeNodeColor(sibling) == kQueryTreeColorRed) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorBlack;
-              QueryTreeNodeColor(fixParent) = kQueryTreeColorRed;
-              QueryTreeRotateLeft(tree, fixParent);
-              sibling = fixParent->right;
-            }
-
-            if (sibling->isNil != 0u) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-              fixNode = fixParent;
-              fixParent = fixParent->parent;
-              continue;
-            }
-
-            if (QueryTreeNodeColor(sibling->left) == kQueryTreeColorBlack &&
-                QueryTreeNodeColor(sibling->right) == kQueryTreeColorBlack) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-              fixNode = fixParent;
-              fixParent = fixParent->parent;
-            } else {
-              if (QueryTreeNodeColor(sibling->right) == kQueryTreeColorBlack) {
-                QueryTreeNodeColor(sibling->left) = kQueryTreeColorBlack;
-                QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-                QueryTreeRotateRight(tree, sibling);
-                sibling = fixParent->right;
-              }
-
-              QueryTreeNodeColor(sibling) = QueryTreeNodeColor(fixParent);
-              QueryTreeNodeColor(fixParent) = kQueryTreeColorBlack;
-              QueryTreeNodeColor(sibling->right) = kQueryTreeColorBlack;
-              QueryTreeRotateLeft(tree, fixParent);
-              break;
-            }
-          } else {
-            TNode* sibling = fixParent->left;
-            if (QueryTreeNodeColor(sibling) == kQueryTreeColorRed) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorBlack;
-              QueryTreeNodeColor(fixParent) = kQueryTreeColorRed;
-              QueryTreeRotateRight(tree, fixParent);
-              sibling = fixParent->left;
-            }
-
-            if (sibling->isNil != 0u) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-              fixNode = fixParent;
-              fixParent = fixParent->parent;
-              continue;
-            }
-
-            if (QueryTreeNodeColor(sibling->right) == kQueryTreeColorBlack &&
-                QueryTreeNodeColor(sibling->left) == kQueryTreeColorBlack) {
-              QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-              fixNode = fixParent;
-              fixParent = fixParent->parent;
-            } else {
-              if (QueryTreeNodeColor(sibling->left) == kQueryTreeColorBlack) {
-                QueryTreeNodeColor(sibling->right) = kQueryTreeColorBlack;
-                QueryTreeNodeColor(sibling) = kQueryTreeColorRed;
-                QueryTreeRotateLeft(tree, sibling);
-                sibling = fixParent->left;
-              }
-
-              QueryTreeNodeColor(sibling) = QueryTreeNodeColor(fixParent);
-              QueryTreeNodeColor(fixParent) = kQueryTreeColorBlack;
-              QueryTreeNodeColor(sibling->left) = kQueryTreeColorBlack;
-              QueryTreeRotateRight(tree, fixParent);
-              break;
-            }
-          }
-        }
-
-        QueryTreeNodeColor(fixNode) = kQueryTreeColorBlack;
-      }
-
-      ::operator delete(nodeToDelete);
-      if (tree->size != 0u) {
-        --tree->size;
-      }
-
-      QueryTreeRefreshBoundaryNodes(tree);
-    }
-
-    template <class TNode>
-    [[nodiscard]] int QueryTreeCountNodesInRange(
-      TNode* first,
-      const TNode* const last,
-      TNode* const head
-    ) noexcept
-    {
-      int count = 0;
-      while (first != last) {
-        ++count;
-        first = QueryTreeSuccessor(first, head);
-      }
-      return count;
-    }
-
-    template <class TNode>
-    void QueryTreeEraseRange(
-      QueryTreeContainerWithSizeView<TNode>* const tree,
-      TNode* first,
-      const TNode* const last
-    ) noexcept
-    {
-      if (first == tree->head->left && last == tree->head) {
-        QueryTreeDeleteSubtreeNodes(tree->head->parent);
-        tree->head->parent = tree->head;
-        tree->head->left = tree->head;
-        tree->head->right = tree->head;
-        tree->size = 0u;
-        QueryTreeNodeColor(tree->head) = kQueryTreeColorBlack;
-        return;
-      }
-
-      while (first != last) {
-        TNode* const nodeToDelete = first;
-        first = QueryTreeSuccessor(first, tree->head);
-        QueryTreeEraseSingleNode(tree, nodeToDelete);
-      }
-    }
-  } // namespace
-
-  /**
-   * Address: 0x00A65B60 (FUN_00A65B60)
-   *
-   * What it does:
-   * Erases all nodes matching `*key` from one nil-`+0x11` query tree lane and
-   * returns the number of erased nodes.
-   */
-  int EraseQueryTreeKeyRangeNil17LaneA(
-    QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>* const tree,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    if (tree == nullptr || key == nullptr) {
-      return 0;
-    }
-
-    QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17> range{};
-    BuildQueryTreeEqualRangeNil17LaneA(
-      reinterpret_cast<QueryTreeOwnerView<QueryTreeNodeKeyNil17>*>(tree),
-      &range,
-      key
-    );
-
-    const int erasedCount = QueryTreeCountNodesInRange(range.lowerBound, range.upperBound, tree->head);
-    QueryTreeEraseRange(tree, range.lowerBound, range.upperBound);
-    return erasedCount;
-  }
-
-  /**
-   * Address: 0x00A65C10 (FUN_00A65C10)
-   *
-   * What it does:
-   * Alternate lane of nil-`+0x11` query-tree erase-by-key; erases all nodes
-   * matching `*key` and returns the number of erased nodes.
-   */
-  int EraseQueryTreeKeyRangeNil17LaneB(
-    QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>* const tree,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    if (tree == nullptr || key == nullptr) {
-      return 0;
-    }
-
-    QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17> range{};
-    BuildQueryTreeEqualRangeNil17LaneB(
-      reinterpret_cast<QueryTreeOwnerView<QueryTreeNodeKeyNil17>*>(tree),
-      &range,
-      key
-    );
-
-    const int erasedCount = QueryTreeCountNodesInRange(range.lowerBound, range.upperBound, tree->head);
-    QueryTreeEraseRange(tree, range.lowerBound, range.upperBound);
-    return erasedCount;
-  }
+  // `EraseQueryTreeKeyRangeNil17LaneA`/`LaneB` (0x00A65B60, 0x00A65C10)
+  // deleted here: both are `rb_tree<rb_set_traits<uint32_t>>::erase(const
+  // key_type&)`'s own out-of-line emissions (`this`=ecx=tree, one stack arg
+  // = pointer-to-key, `retn 4` -- a real `__thiscall` member, matching
+  // `equal_range`'s calling convention above, not a free function). Moved to
+  // RbTree.h's `rb_tree::erase(const key_type&)` with both addresses cited.
 
   /**
    * Address: 0x00A5D060 (FUN_00A5D060)
@@ -6235,53 +5667,10 @@ namespace Wm3
     return value;
   }
 
-  /**
-   * Address: 0x00A5D810 (FUN_00A5D810)
-   *
-   * What it does:
-   * Finds one exact dword-key node in a query tree with nil marker byte offset
-   * `+0x21`; when not found, returns the tree head sentinel lane.
-   */
-  QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneA(
-    QueryTreeOwnerView<QueryTreeNodeKeyNil33>* const tree,
-    QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* const outResult,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    QueryTreeNodeKeyNil33* candidate = tree->head;
-    QueryTreeNodeKeyNil33* cursor = candidate->parent;
-    while (cursor->isNil == 0u) {
-      if (cursor->key >= *key) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-
-    outResult->owner = tree;
-    if (candidate == tree->head || *key < candidate->key) {
-      outResult->node = tree->head;
-    } else {
-      outResult->node = candidate;
-    }
-    return outResult;
-  }
-
-  /**
-   * Address: 0x00A5D8A0 (FUN_00A5D8A0)
-   *
-   * What it does:
-   * Alias lane of `FindExactQueryTreeNodeNil33LaneA`.
-   */
-  QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneB(
-    QueryTreeOwnerView<QueryTreeNodeKeyNil33>* const tree,
-    QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* const outResult,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return FindExactQueryTreeNodeNil33LaneA(tree, outResult, key);
-  }
+  // `FindExactQueryTreeNodeNil33LaneA`/`LaneB` (0x00A5D810, 0x00A5D8A0, ICF
+  // twins) deleted here: lower-bound-then-verify shape byte-identical to
+  // `rb_tree::find_node`, for the 20-byte-value ("Nil33") tree instantiation
+  // -- moved to RbTree.h with both addresses cited on `find_node`.
 
   struct HeapEntryFloatKey
   {
