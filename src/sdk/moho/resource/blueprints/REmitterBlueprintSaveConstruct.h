@@ -13,33 +13,43 @@ namespace gpg
 
 namespace moho
 {
-  class REmitterBlueprintSaveConstruct
+  /**
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::REmitterBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `REmitterBlueprint` reference on load. This is
+   * the save-side counterpart of `REmitterBlueprintConstruct` (that class's
+   * `Init()` writes `serConstructFunc_`/`deleteFunc_`; this one writes
+   * `serSaveConstructArgsFunc_`).
+   */
+  class REmitterBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00510580 (FUN_00510580, sub_510580)
-     * Slot: 0
+     * Address: 0x00BC80D0 (FUN_00BC80D0, dynamic initializer for the global
+     * `REmitterBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds save-construct-args callback into REmitterBlueprint RTTI
-     * (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    REmitterBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x00510580 (FUN_00510580, gpg::SerSaveConstructHelper<Moho::REmitterBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `REmitterBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(
-    offsetof(REmitterBlueprintSaveConstruct, mHelperNext) == 0x04,
-    "REmitterBlueprintSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(REmitterBlueprintSaveConstruct, mHelperPrev) == 0x08,
-    "REmitterBlueprintSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(REmitterBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "REmitterBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -75,13 +85,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00BC80D0 (FUN_00BC80D0, sub_BC80D0)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `REmitterBlueprint`.
-   */
-  int register_REmitterBlueprintSaveConstruct();
 } // namespace moho
