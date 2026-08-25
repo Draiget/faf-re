@@ -27303,6 +27303,27 @@ void moho::UI_NoteDisconnect(const IClient* const client)
  *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr, memBuffer)`
  *          against the bound string and MemBuffer (cdecl, 2 args, `add
  *          esp,8` confirms the arity)
+ * Address: 0x0088FEC0 (FUN_0088FEC0) - the heap-allocated-functor overload
+ *          `boost::detail::function::functor_manager<Functor,
+ *          Allocator>::manager(in_buffer, out_buffer, op, mpl::false_)`
+ *          this bind_t<>'s size rules out the small-object buffer for
+ *          (`dependencies/boost_1_34_1/boost/function/function_base.hpp`,
+ *          the `mpl::false_` overload at ~line 300): `manage` (FUN_0088FC70,
+ *          cited above) tail-calls it for every operation except
+ *          `get_functor_type_tag`. Body matches line for line -
+ *          `clone_functor_tag` (`a1==0`) allocator-constructs a copy
+ *          (`sub_890080`/`sub_8900D0`), `destroy_functor_tag` (`a1==1`)
+ *          destroys/deallocates it (`sub_88BAB0` + `operator delete`), and
+ *          `check_functor_type_tag` (the `else`) compares `*a3`'s
+ *          `std::type_info` against the same `bind_t<>` RTTI descriptor
+ *          `manage` returns for `get_functor_type_tag`, handing back the
+ *          object pointer on a match or null otherwise. `FUN_0088FDE0`
+ *          (already `skip`, an ICF-shaped register-order twin) reaches the
+ *          same body for a sibling `boost::function` instance built the same
+ *          way. No separate C++ body is written for this one either - real
+ *          vendored `<boost/function.hpp>`/`<boost/bind.hpp>` (both
+ *          `#include`d at the top of this file) already emits it from the
+ *          same `boost::bind(&func_ReceiveChat, nickname, data)` call.
  *
  * What it does:
  * IClientMgrUIInterface::ReceiveChat override: captures the sender's nickname
