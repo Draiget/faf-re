@@ -683,6 +683,133 @@ namespace
   }
 
   /**
+   * Address: 0x00866020 (FUN_00866020, sub_866020)
+   *
+   * Moho::CWldSession *, int
+   *
+   * What it does:
+   * Core of `UI_ExpandCurrentSelection`. Collects every unit in the
+   * session's spatial DB, and for each one that is alive, selectable, and
+   * not in the "WALL" category, checks whether the *current* selection
+   * already contains a unit sharing the same blueprint; if so (and the
+   * candidate is not mid-upgrade - `IUnit::IsUnitState(UNITSTATE_
+   * BeingUpgraded)`, vtable-confirmed via `UserUnit::UserUnit`'s ctor write
+   * of `??_7UserUnit@Moho@@6BIUnit@Moho@@@` at 0x008BF53D), adds it to a
+   * working copy of the selection that starts seeded with the current
+   * selection's own members (both `originalSelection` and
+   * `expandedSelection` below are independent copies of `session->mSelection`
+   * - the binary constructs two, not one, matching `sub_822210`'s citation
+   * as the `WeakEntitySetUserEntity` copy constructor's underlying clone
+   * step). Commits the expanded selection via `CWldSession::SetSelection`.
+   *
+   * The `camera` parameter is only ever null-checked, never dereferenced -
+   * preserved as a real parameter rather than reduced to a bool, since the
+   * binary's caller (`UI_ExpandCurrentSelection` below) always resolves and
+   * passes a real `CameraImpl*` for this exact null-check gate.
+   */
+  void ExpandCurrentSelection(moho::CWldSession* const session, const moho::CameraImpl* const camera)
+  {
+    if (camera == nullptr) {
+      return;
+    }
+
+    gpg::fastvector<moho::UserEntity*> collected{};
+    auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+    (void)spatialDb->Collect(collected, moho::ENTITYTYPE_Unit);
+
+    moho::SSelectionSetUserEntity originalSelection(session->mSelection);
+    moho::SSelectionSetUserEntity expandedSelection(session->mSelection);
+
+    const msvc8::string wallCategory("WALL");
+
+    for (moho::UserEntity* const candidateEntity : collected) {
+      moho::UserUnit* const candidate = candidateEntity->IsUserUnit();
+      if (candidate == nullptr || candidate->IsDead() || !session->CanSelectUnit(candidate)) {
+        continue;
+      }
+      if (candidate->IsInCategory(wallCategory)) {
+        continue;
+      }
+
+      bool sharesBlueprintWithSelection = false;
+      for (moho::SSelectionNodeUserEntity* node = moho::SSelectionSetUserEntity::find(
+             &originalSelection, originalSelection.mHead->mLeft, &node
+           );
+           node != originalSelection.mHead;
+           moho::SSelectionSetUserEntity::Iterator_inc(&node),
+             node = moho::SSelectionSetUserEntity::find(&originalSelection, node, &node)) {
+        const moho::UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt);
+        if (selectedEntity != nullptr && selectedEntity->mParams.mBlueprint == candidate->mParams.mBlueprint) {
+          sharesBlueprintWithSelection = true;
+          break;
+        }
+      }
+
+      if (sharesBlueprintWithSelection && !candidate->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
+        moho::SSelectionSetUserEntity::AddResult addResult{};
+        (void)moho::SSelectionSetUserEntity::Add(&addResult, &expandedSelection, candidate);
+      }
+    }
+
+    session->SetSelection(expandedSelection);
+  }
+
+  /**
+   * Address: 0x00866970 (FUN_00866970, sub_866970)
+   *
+   * char*
+   *
+   * What it does:
+   * `UI_ExpandCurrentSelection` console command. Resolves the world camera
+   * and dispatches `ExpandCurrentSelection` above. Prints localized "no
+   * session" feedback when no session is active.
+   *
+   * Registrar: FUN_00BE61C0 (`__xc_a` lane), data-xref
+   * `dword_F5B524 = offset sub_866970` is the callsite evidence. Name is
+   * read from the PE `.data` initializer of `stru_F5B518`
+   * ("UI_ExpandCurrentSelection").
+   */
+  void UI_ExpandCurrentSelection(void* const commandArgs)
+  {
+    (void)commandArgs;
+
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr) {
+      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
+      moho::CON_Printf(noSessionText.c_str());
+      return;
+    }
+
+    moho::RCamManager* const cameraManager = moho::CAM_GetManager();
+    moho::CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
+
+    ExpandCurrentSelection(session, camera);
+  }
+
+  constexpr const char* kConsoleStartupUIExpandCurrentSelectionDescription =
+    "Expand selection to all units in view that is found in our current selection group";
+  moho::CConFunc gCConFunc_UI_ExpandCurrentSelection{};
+
+  void cleanup_CConFunc_UI_ExpandCurrentSelection()
+  {
+    moho::CleanupStartupConCommand(gCConFunc_UI_ExpandCurrentSelection);
+  }
+
+  /**
+   * Address: 0x00BE61C0 (FUN_00BE61C0, register_CConFunc_UI_ExpandCurrentSelection)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_ExpandCurrentSelection`.
+   */
+  void register_CConFunc_UI_ExpandCurrentSelection()
+  {
+    gCConFunc_UI_ExpandCurrentSelection.InitializeRecovered(
+      kConsoleStartupUIExpandCurrentSelectionDescription, "UI_ExpandCurrentSelection", &UI_ExpandCurrentSelection
+    );
+    (void)std::atexit(&cleanup_CConFunc_UI_ExpandCurrentSelection);
+  }
+
+  /**
    * Address: 0x00866A30 (FUN_00866A30, sub_866A30)
    *
    * std::vector_string*
@@ -817,7 +944,11 @@ namespace
   // moho/app/ResolutionCommands.cpp.
   struct CCommandLuaFunctionConsoleRegistrations
   {
-    CCommandLuaFunctionConsoleRegistrations() { register_CConFunc_UI_SelectByCategory(); }
+    CCommandLuaFunctionConsoleRegistrations()
+    {
+      register_CConFunc_UI_SelectByCategory();
+      register_CConFunc_UI_ExpandCurrentSelection();
+    }
   };
 
   [[maybe_unused]] CCommandLuaFunctionConsoleRegistrations gCCommandLuaFunctionConsoleRegistrations;
