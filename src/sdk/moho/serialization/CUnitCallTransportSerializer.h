@@ -8,9 +8,32 @@ namespace moho
 {
   class CUnitCallTransport;
 
-  class CUnitCallTransportSerializer
+  class CUnitCallTransportSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCFC60 (FUN_00BCFC60, register_CUnitCallTransportSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. The ctor's atexit target (0x00BF9620) is a
+     * plain unlink thunk with no mangled destructor name in IDA, but its body
+     * is byte-identical to the confirmed real destructors of this class's
+     * three sibling serializers, so it is modeled the same way: the
+     * compiler's implicit static-destructor registration rather than an
+     * explicit call.
+     */
+    CUnitCallTransportSerializer();
+
+    /**
+     * Address: 0x00BF9620 (FUN_00BF9620)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CUnitCallTransportSerializer();
+
     /**
      * Address: 0x005FFAF0 (FUN_005FFAF0, Moho::CUnitCallTransportSerializer::Deserialize)
      *
@@ -34,23 +57,13 @@ namespace moho
      * Binds this serializer helper's load/save callbacks into
      * `CUnitCallTransport` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext; // +0x04
-    gpg::SerHelperBase* mHelperPrev; // +0x08
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitCallTransportSerializer, mHelperNext) == 0x04,
-    "CUnitCallTransportSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitCallTransportSerializer, mHelperPrev) == 0x08,
-    "CUnitCallTransportSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitCallTransportSerializer, mDeserialize) == 0x0C,
     "CUnitCallTransportSerializer::mDeserialize offset must be 0x0C"
@@ -60,23 +73,4 @@ namespace moho
     "CUnitCallTransportSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(CUnitCallTransportSerializer) == 0x14, "CUnitCallTransportSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BF9620 (FUN_00BF9620, cleanup_CUnitCallTransportSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallTransportSerializer();
-
-  /**
-   * Address: 0x00BCFC60 (FUN_00BCFC60, register_CUnitCallTransportSerializer)
-   *
-   * What it does:
-   * Initializes `CUnitCallTransport` serializer callback pointers and schedules
-   * process-exit helper unlink cleanup.
-   */
-  void register_CUnitCallTransportSerializer();
 } // namespace moho
-

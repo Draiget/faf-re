@@ -1,7 +1,6 @@
 #include "moho/serialization/CUnitCallLandTransportSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -9,41 +8,6 @@
 
 namespace
 {
-  moho::CUnitCallLandTransportSerializer gCUnitCallLandTransportSerializer;
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitCallLandTransportType()
   {
     gpg::RType* type = moho::CUnitCallLandTransport::sType;
@@ -52,11 +16,6 @@ namespace
       moho::CUnitCallLandTransport::sType = type;
     }
     return type;
-  }
-
-  void CleanupCUnitCallLandTransportSerializerAtExit()
-  {
-    (void)moho::cleanup_CUnitCallLandTransportSerializer();
   }
 } // namespace
 
@@ -111,7 +70,7 @@ namespace moho
    * Binds this serializer helper's load/save callbacks into
    * `CUnitCallLandTransport` RTTI.
    */
-  void CUnitCallLandTransportSerializer::RegisterSerializeFunctions()
+  void CUnitCallLandTransportSerializer::Init()
   {
     gpg::RType* const type = CachedCUnitCallLandTransportType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -121,69 +80,31 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF96B0 (FUN_00BF96B0, cleanup_CUnitCallLandTransportSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallLandTransportSerializer()
-  {
-    return UnlinkSerializerNode(gCUnitCallLandTransportSerializer);
-  }
-
-  /**
    * Address: 0x00BCFCC0 (FUN_00BCFCC0, register_CUnitCallLandTransportSerializer)
    *
    * What it does:
-   * Initializes `CUnitCallLandTransport` serializer callback pointers and
-   * schedules process-exit helper unlink cleanup.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_CUnitCallLandTransportSerializer()
+  CUnitCallLandTransportSerializer::CUnitCallLandTransportSerializer()
+    : mDeserialize(&CUnitCallLandTransportSerializer::Deserialize)
+    , mSerialize(&CUnitCallLandTransportSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF96B0 (FUN_00BF96B0, Moho::CUnitCallLandTransportSerializer::~CUnitCallLandTransportSerializer)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently
+   * sits in and restores a self-linked sentinel state.
+   */
+  CUnitCallLandTransportSerializer::~CUnitCallLandTransportSerializer()
   {
-    ResetSerializerNode(gCUnitCallLandTransportSerializer);
-    gCUnitCallLandTransportSerializer.mDeserialize = &CUnitCallLandTransportSerializer::Deserialize;
-    gCUnitCallLandTransportSerializer.mSerialize = &CUnitCallLandTransportSerializer::Serialize;
-    (void)std::atexit(&CleanupCUnitCallLandTransportSerializerAtExit);
+    ResetLinks();
   }
 } // namespace moho
 
 namespace
 {
-  struct CUnitCallLandTransportSerializerBootstrap
-  {
-    CUnitCallLandTransportSerializerBootstrap()
-    {
-      moho::register_CUnitCallLandTransportSerializer();
-    }
-  };
-
-  CUnitCallLandTransportSerializerBootstrap gCUnitCallLandTransportSerializerBootstrap;
-} // namespace
-
-namespace
-{
-  /**
-   * Address: 0x00600760 (FUN_00600760)
-   *
-   * What it does:
-   * Unlinks `CUnitCallLandTransportSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallLandTransportSerializerNodePrimary()
-  {
-    return UnlinkSerializerNode(gCUnitCallLandTransportSerializer);
-  }
-
-  /**
-   * Address: 0x00600790 (FUN_00600790)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCallLandTransportSerializer` helper storage.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallLandTransportSerializerNodeSecondary()
-  {
-    return UnlinkSerializerNode(gCUnitCallLandTransportSerializer);
-  }
+  moho::CUnitCallLandTransportSerializer gCUnitCallLandTransportSerializer;
 } // namespace

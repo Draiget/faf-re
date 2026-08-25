@@ -1,7 +1,6 @@
 #include "moho/serialization/CUnitCallAirStagingPlatformSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -9,41 +8,6 @@
 
 namespace
 {
-  moho::CUnitCallAirStagingPlatformSerializer gCUnitCallAirStagingPlatformSerializer;
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitCallAirStagingPlatformType()
   {
     gpg::RType* type = moho::CUnitCallAirStagingPlatform::sType;
@@ -52,11 +16,6 @@ namespace
       moho::CUnitCallAirStagingPlatform::sType = type;
     }
     return type;
-  }
-
-  void CleanupCUnitCallAirStagingPlatformSerializerAtExit()
-  {
-    (void)moho::cleanup_CUnitCallAirStagingPlatformSerializer();
   }
 } // namespace
 
@@ -113,7 +72,7 @@ namespace moho
    * Binds this serializer helper's load/save callbacks into
    * `CUnitCallAirStagingPlatform` RTTI.
    */
-  void CUnitCallAirStagingPlatformSerializer::RegisterSerializeFunctions()
+  void CUnitCallAirStagingPlatformSerializer::Init()
   {
     gpg::RType* const type = CachedCUnitCallAirStagingPlatformType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -123,69 +82,31 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF97D0 (FUN_00BF97D0, cleanup_CUnitCallAirStagingPlatformSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCallAirStagingPlatformSerializer()
-  {
-    return UnlinkSerializerNode(gCUnitCallAirStagingPlatformSerializer);
-  }
-
-  /**
    * Address: 0x00BCFD80 (FUN_00BCFD80, register_CUnitCallAirStagingPlatformSerializer)
    *
    * What it does:
-   * Initializes `CUnitCallAirStagingPlatform` serializer callback pointers and
-   * schedules process-exit helper unlink cleanup.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_CUnitCallAirStagingPlatformSerializer()
+  CUnitCallAirStagingPlatformSerializer::CUnitCallAirStagingPlatformSerializer()
+    : mDeserialize(&CUnitCallAirStagingPlatformSerializer::Deserialize)
+    , mSerialize(&CUnitCallAirStagingPlatformSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF97D0 (FUN_00BF97D0, Moho::CUnitCallAirStagingPlatformSerializer::~CUnitCallAirStagingPlatformSerializer)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently
+   * sits in and restores a self-linked sentinel state.
+   */
+  CUnitCallAirStagingPlatformSerializer::~CUnitCallAirStagingPlatformSerializer()
   {
-    ResetSerializerNode(gCUnitCallAirStagingPlatformSerializer);
-    gCUnitCallAirStagingPlatformSerializer.mDeserialize = &CUnitCallAirStagingPlatformSerializer::Deserialize;
-    gCUnitCallAirStagingPlatformSerializer.mSerialize = &CUnitCallAirStagingPlatformSerializer::Serialize;
-    (void)std::atexit(&CleanupCUnitCallAirStagingPlatformSerializerAtExit);
+    ResetLinks();
   }
 } // namespace moho
 
 namespace
 {
-  struct CUnitCallAirStagingPlatformSerializerBootstrap
-  {
-    CUnitCallAirStagingPlatformSerializerBootstrap()
-    {
-      moho::register_CUnitCallAirStagingPlatformSerializer();
-    }
-  };
-
-  CUnitCallAirStagingPlatformSerializerBootstrap gCUnitCallAirStagingPlatformSerializerBootstrap;
-} // namespace
-
-namespace
-{
-  /**
-   * Address: 0x00601C80 (FUN_00601C80)
-   *
-   * What it does:
-   * Unlinks `CUnitCallAirStagingPlatformSerializer` helper node from the
-   * intrusive serializer-helper list and restores one self-linked node lane.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallAirStagingPlatformSerializerNodePrimary()
-  {
-    return UnlinkSerializerNode(gCUnitCallAirStagingPlatformSerializer);
-  }
-
-  /**
-   * Address: 0x00601CB0 (FUN_00601CB0)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCallAirStagingPlatformSerializer` helper storage.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallAirStagingPlatformSerializerNodeSecondary()
-  {
-    return UnlinkSerializerNode(gCUnitCallAirStagingPlatformSerializer);
-  }
+  moho::CUnitCallAirStagingPlatformSerializer gCUnitCallAirStagingPlatformSerializer;
 } // namespace
