@@ -2056,6 +2056,25 @@ namespace msvc8
          * `ReadUInt`. Previously mis-tracked `external_dependency`
          * ("all-external-callees thunk"); every real callee is this
          * template's own engine code, not third-party runtime.
+         *
+         * Address: 0x0074D2B0 (FUN_0074D2B0, IDA's own demangled name:
+         * `std::vector_SSTIArmyVariableData::reserve`) -- `msvc8::
+         * vector<Moho::SSTIArmyVariableData>::reserve` for the 352-byte
+         * (`0x160`) element, `SSyncData::mArmyUpdates` (`SimDriver.h`).
+         * `if (size() < newCap) { grow via insert(end(), newCap-size(),
+         * localCopy); }` -- logically the same guard as this member's
+         * `newCap <= capacity()` early return, checked from the opposite
+         * side. Growth path tail-calls `FUN_0074EB00` (this instantiation's
+         * `insert(pos, count, value)`, cited below), which the reserve
+         * call constructs a throwaway default-initialized element for and
+         * passes as the fill value (matches `SSTIArmyVariableData`'s own
+         * default ctor semantics). Reached from `Sim::Sync`'s (already
+         * recovered, `Sim.cpp`) `syncData.mArmyUpdates.reserve(
+         * sizes.mArmyData)` call by name. DB-integrity fix: was mis-tagged
+         * `external_dependency` ("STL template instantiation / codec
+         * helper - external") -- `SSTIArmyVariableData` is this project's
+         * own engine type (`moho/sim/SSTIArmyVariableData.h`), not generic/
+         * external.
          */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
@@ -4380,6 +4399,26 @@ namespace msvc8
          * addresses from the `uninit_copy_n` citation are still
          * unidentified; this citation resolves one of five, not the whole
          * cluster.
+         *
+         * Address: 0x0074EB00 (FUN_0074EB00, sub_74EB00) -- `msvc8::
+         * vector<Moho::SSTIArmyVariableData>::insert(pos, count, value)`
+         * for the 352-byte element, `SSyncData::mArmyUpdates` (same
+         * instantiation as `reserve`'s `FUN_0074D2B0` above). Stages a
+         * local copy of `value` via this element's copy ctor
+         * (`Moho::SSTIArmyVariableData::SSTIArmyVariableData`, already
+         * recovered), the max_size overflow guard (the divisor constant
+         * folds onto a decompiler-mislabeled `LuaObject::j_Dtr_9` symbol --
+         * a coincidental address overlap, not a real reference to
+         * `LuaObject`, matching `0xFFFFFFFF/352`), the `(cap>>1)+cap` 1.5x
+         * growth formula via `FUN_560E90`, allocation via `FUN_562700`,
+         * and calls this instantiation's own uninit-copy/shift helpers
+         * (`FUN_757430`/`FUN_7519D0`) on the reallocation and in-place
+         * paths respectively. IDA's own decompile carries a spurious
+         * `__noreturn` tag -- the function returns normally in every
+         * observed path; matches this member's shape once the mislabeled
+         * symbol and `__noreturn` tag are set aside. Sole caller is
+         * `reserve`'s `FUN_0074D2B0` above. DB-integrity fix: was
+         * `blocked` with no specific note.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
