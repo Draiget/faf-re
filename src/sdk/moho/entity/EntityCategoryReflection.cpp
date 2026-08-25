@@ -202,6 +202,7 @@ namespace
     unsigned char gEntityCategoryHelperTypeInfoStorage[sizeof(moho::EntityCategoryHelperTypeInfo)];
   bool gEntityCategoryHelperTypeInfoConstructed = false;
 
+  // Address: 0x010ABA0C -- process-global `EntityCategoryHelperSerializer` singleton.
   moho::EntityCategoryHelperSerializer gEntityCategoryHelperSerializer;
 
   [[nodiscard]] moho::EntityCategoryHelperTypeInfo& AcquireEntityCategoryHelperTypeInfo()
@@ -224,82 +225,12 @@ namespace
     gEntityCategoryHelperTypeInfoConstructed = false;
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    auto* const next = helper.mNext;
-    auto* const prev = helper.mPrev;
-    if (next != nullptr && prev != nullptr) {
-      next->mPrev = prev;
-      prev->mNext = next;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetEntityCategoryHelperSerializerLinks() noexcept
-  {
-    gEntityCategoryHelperSerializer.mNext->mPrev = gEntityCategoryHelperSerializer.mPrev;
-    gEntityCategoryHelperSerializer.mPrev->mNext = gEntityCategoryHelperSerializer.mNext;
-    gpg::SerHelperBase* const self = HelperSelfNode(gEntityCategoryHelperSerializer);
-    gEntityCategoryHelperSerializer.mPrev = self;
-    gEntityCategoryHelperSerializer.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0052B900 (FUN_0052B900)
-   *
-   * What it does:
-   * Unlinks `EntityCategoryHelperSerializer` from the global helper intrusive
-   * list and restores self-sentinel links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEntityCategoryHelperSerializerPrimary() noexcept
-  {
-    return ResetEntityCategoryHelperSerializerLinks();
-  }
-
-  /**
-   * Address: 0x0052B930 (FUN_0052B930)
-   *
-   * What it does:
-   * Secondary entrypoint for `EntityCategoryHelperSerializer` helper-list
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEntityCategoryHelperSerializerSecondary() noexcept
-  {
-    return ResetEntityCategoryHelperSerializerLinks();
-  }
-
-  void cleanup_EntityCategoryHelperSerializerAtexit()
-  {
-    gEntityCategoryHelperSerializer.~EntityCategoryHelperSerializer();
-  }
-
   struct EntityCategoryHelperRegistration
   {
     EntityCategoryHelperRegistration()
     {
       (void)register_EntityCategoryLuaMetatableFactoryIndexStartup();
       (void)moho::register_EntityCategoryHelperTypeInfoStartup();
-      moho::register_EntityCategoryHelperSerializer();
     }
   };
 
@@ -923,25 +854,17 @@ namespace
   }
 
   /**
-   * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::dtr)
+   * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer)
    */
   EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer()
   {
-    (void)::CleanupEntityCategoryHelperSerializerPrimary();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x0052C8D8 (FUN_0052C8D8)
+   * Address: 0x0052C8E0 (FUN_0052C8E0, Moho::EntityCategoryHelperSerializer::Init)
    */
-  EntityCategoryHelperSerializer* GetEntityCategoryHelperSerializer() noexcept
-  {
-    return &gEntityCategoryHelperSerializer;
-  }
-
-  /**
-   * Address: 0x0052C8E0 (FUN_0052C8E0, gpg::SerSaveLoadHelper_EntityCategoryHelper::Init)
-   */
-  void EntityCategoryHelperSerializer::RegisterSerializeFunctions()
+  void EntityCategoryHelperSerializer::Init()
   {
     gpg::RType* const type = EntityCategoryHelper::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -960,15 +883,13 @@ namespace
   }
 
   /**
-   * Address: 0x00BC8F30 (FUN_00BC8F30, register_EntityCategoryHelperSerializer)
+   * Address: 0x00BC8F30 (FUN_00BC8F30, dynamic initializer for the global
+   * `EntityCategoryHelperSerializer` singleton)
    */
-  void register_EntityCategoryHelperSerializer()
-  {
-    InitializeHelperNode(gEntityCategoryHelperSerializer);
-    gEntityCategoryHelperSerializer.mSerLoadFunc = &EntityCategory::SerLoad;
-    gEntityCategoryHelperSerializer.mSerSaveFunc = &EntityCategory::SerSave;
-    (void)std::atexit(&cleanup_EntityCategoryHelperSerializerAtexit);
-  }
+  EntityCategoryHelperSerializer::EntityCategoryHelperSerializer()
+    : mSerLoadFunc(&EntityCategory::SerLoad)
+    , mSerSaveFunc(&EntityCategory::SerSave)
+  {}
 } // namespace moho
 
 

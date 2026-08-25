@@ -174,42 +174,53 @@ namespace moho
   /**
    * VFTABLE: 0x00E162C4
    * COL: 0x00E69FD8
+   *
+   * `EntityCategory::SerLoad`/`SerSave` operate on the combined
+   * `{EntityCategoryHelper dword, BVIntSet payload}` layout, not on
+   * `EntityCategoryHelper::MemberDeserialize`/`MemberSerialize` (no such
+   * methods exist), so this stays a direct `SerHelperBase` derivative
+   * rather than a `gpg::SerSaveLoadHelper<EntityCategoryHelper>` alias.
    */
-  class EntityCategoryHelperSerializer
+  class EntityCategoryHelperSerializer : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::dtr)
+     * Address: 0x00BC8F30 (FUN_00BC8F30, dynamic initializer for the global
+     * `EntityCategoryHelperSerializer` singleton)
      *
      * What it does:
-     * Unlinks the serializer helper node from the intrusive helper list.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    EntityCategoryHelperSerializer();
+
+    /**
+     * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer)
      */
     ~EntityCategoryHelperSerializer();
 
     /**
-     * Address: 0x0052C8E0 (FUN_0052C8E0, gpg::SerSaveLoadHelper_EntityCategoryHelper::Init)
+     * Address: 0x0052C8E0 (FUN_0052C8E0, Moho::EntityCategoryHelperSerializer::Init)
      *
      * What it does:
      * Registers helper load/save callbacks on `EntityCategoryHelper` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
-  static_assert(sizeof(EntityCategoryHelperSerializer) == 0x14, "EntityCategoryHelperSerializer size must be 0x14");
 
-  /**
-   * Address: 0x0052C8D8 (FUN_0052C8D8)
-   *
-   * What it does:
-   * Returns the startup singleton serializer helper for
-   * `EntityCategoryHelper`.
-   */
-  [[nodiscard]] EntityCategoryHelperSerializer* GetEntityCategoryHelperSerializer() noexcept;
+  static_assert(
+    offsetof(EntityCategoryHelperSerializer, mSerLoadFunc) == 0x0C,
+    "EntityCategoryHelperSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EntityCategoryHelperSerializer, mSerSaveFunc) == 0x10,
+    "EntityCategoryHelperSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(EntityCategoryHelperSerializer) == 0x14, "EntityCategoryHelperSerializer size must be 0x14");
 
   /**
    * Address: 0x00BC8F10 (FUN_00BC8F10, register_EntityCategoryHelperTypeInfoStartup)
@@ -218,14 +229,6 @@ namespace moho
    * Materializes and startup-registers `EntityCategoryHelperTypeInfo`.
    */
   int register_EntityCategoryHelperTypeInfoStartup();
-
-  /**
-   * Address: 0x00BC8F30 (FUN_00BC8F30, register_EntityCategoryHelperSerializer)
-   *
-   * What it does:
-   * Initializes serializer helper links/callbacks and registers teardown.
-   */
-  void register_EntityCategoryHelperSerializer();
 
   /**
    * Address: 0x005575E0 (FUN_005575E0, func_GetCObj_EntityCategory)
