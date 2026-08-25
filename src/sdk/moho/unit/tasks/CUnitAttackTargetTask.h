@@ -160,7 +160,7 @@ namespace moho
      * Serializes base command-task state, attack-task pointer lanes, target
      * payload, and boolean state flags.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   private:
     /**
