@@ -3932,19 +3932,48 @@ namespace msvc8
          * 12-byte-element `uninit_copy_n` (3-dword-stride copy loop, no
          * `_InterlockedExchangeAdd`/refcount bump, unlike the
          * `SPendingPoseCopy` specialization below -- a trivially-copyable
-         * POD element, not a `shared_ptr`-holding one). Owning `T` not yet
-         * identified. Reached via `FUN_0084B8B0` (`sub_84B8B0`, a thin
-         * 2-arg calling-convention adapter that zeroes a truncated flag
-         * byte before tail-calling this body) from `sub_849250`, a
-         * `vector<T>::insert`-growth emission whose allocator
-         * (`FUN_0084A560`) is `gpg::core::legacy::AllocateChecked12ByteLane`
-         * (`CheckedArrayAllocationLanes.h`). `FUN_0084B8B0` was previously
-         * mis-cited in `CWorldParticles.cpp` as a `TrailRuntimeView`
-         * (80+-byte, ref-counted-texture-pointer) range-copy bridge --
-         * disproven by this body's real shape (plain 3-dword copy, no
-         * texture/refcount handling at all) and corrected there;
-         * `CWorldParticles.cpp`'s real `TrailRuntimeView` copy bridge is
-         * `FUN_004A0310` alone, cited on the same member.)
+         * POD element, not a `shared_ptr`-holding one). Owning `T` identified
+         * 2026-08-25: `CCommandLuaFunctionRegistrations.cpp`'s local
+         * `DockCandidate` struct (`{UserUnit* platform; float distSq;
+         * std::int32_t freeCapacity;}`, exactly 12 bytes, declared inside
+         * `cfunc_IssueDockCommandL`'s anonymous namespace) -- this is the
+         * SAME `std::vector<DockCandidate>` whose `std::sort`/`std::rotate`
+         * internals were cited on `front()` and elsewhere this session
+         * (`FUN_0084A890`/`FUN_0084B3F0`/`FUN_0084B0F0`/`FUN_0084C330`, all
+         * `external_dependency`, MSVC8 STL-internal). Reached via
+         * `FUN_0084B8B0` (`sub_84B8B0`, a thin 2-arg calling-convention
+         * adapter that zeroes a truncated flag byte before tail-calling this
+         * body) from `sub_849250`, a `vector<T>::insert`-growth emission
+         * whose allocator (`FUN_0084A560`) is `gpg::core::legacy::
+         * AllocateChecked12ByteLane` (`CheckedArrayAllocationLanes.h`).
+         * `FUN_0084B8B0` was previously mis-cited in `CWorldParticles.cpp`
+         * as a `TrailRuntimeView` (80+-byte, ref-counted-texture-pointer)
+         * range-copy bridge -- disproven by this body's real shape (plain
+         * 3-dword copy, no texture/refcount handling at all) and corrected
+         * there; `CWorldParticles.cpp`'s real `TrailRuntimeView` copy bridge
+         * is `FUN_004A0310` alone, cited on the same member.
+         *
+         * `FUN_00849250` (`push_back`'s capacity-exceeded growth path,
+         * 1.5x geometric growth floored to `size()+1`, max_size guard
+         * `0xFFFFFFFF/12`, allocate via `FUN_0084A560`, uninit-copy the head
+         * via two direct calls to this member, in-place-construct the new
+         * value via `FUN_0084AF60`) is itself reached from the
+         * position-preserving wrapper `FUN_00848CB0` (converts insert
+         * position to an index before the call, since reallocation moves
+         * the buffer), reached in turn from the `push_back` capacity
+         * dispatcher `FUN_00848820` (in-place fast path calling
+         * `FUN_0084AF60` directly vs. `_Insert_n`-growth slow path), reached
+         * from `cfunc_IssueDockCommandL` (`FUN_00840A70`, already recovered,
+         * `CCommandLuaFunctionRegistrations.cpp`) as
+         * `candidates.push_back(DockCandidate{platform, distSq,
+         * freeCapacity})` and `nearbyPlatforms.push_back(candidate)` -- the
+         * same two `std::vector<DockCandidate>` locals the sort/rotate
+         * citations above already trace back to this exact function.
+         * `FUN_0084A4E0` is the in-place (capacity-available) fast path's
+         * own thin `uninit_fill_n`-shaped single-value construct call
+         * (`sub_84A4E0(dst, dst+12)` bracketing one already-placed value),
+         * distinct from `FUN_0084B8B0`'s role in the growth path above but
+         * calling this same `uninit_copy_n` body.)
          *
          * Address: 0x0075FEA0 (FUN_0075FEA0, msvc8::vector<Moho::SPendingPoseCopy>::uninit_copy_n
          * for the 12-byte `{EntId, boost::shared_ptr<CAniPose>}` element — per-slot
