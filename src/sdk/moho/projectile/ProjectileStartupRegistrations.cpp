@@ -52,34 +52,6 @@ namespace moho
 
 namespace
 {
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] moho::TConVar<bool>& GetDbgProjectileConVar()
   {
     static moho::TConVar<bool> conVar(
@@ -593,39 +565,26 @@ namespace
    */
   RManyToOneListenerProjectileImpactTypeInfo::~RManyToOneListenerProjectileImpactTypeInfo() = default;
 
-  template <typename TEnum>
-  class PrimitiveEnumSerializer
-  {
-  public:
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(PrimitiveEnumSerializer<moho::EProjectileImpactEvent>, mHelperNext) == 0x04,
-    "PrimitiveEnumSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(PrimitiveEnumSerializer<moho::EProjectileImpactEvent>, mHelperPrev) == 0x08,
-    "PrimitiveEnumSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(PrimitiveEnumSerializer<moho::EProjectileImpactEvent>, mDeserialize) == 0x0C,
-    "PrimitiveEnumSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(PrimitiveEnumSerializer<moho::EProjectileImpactEvent>, mSerialize) == 0x10,
-    "PrimitiveEnumSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(PrimitiveEnumSerializer<moho::EProjectileImpactEvent>) == 0x14,
-    "PrimitiveEnumSerializer size must be 0x14"
-  );
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EProjectileImpactEvent,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EProjectileImpactEvent@Moho@@H@gpg'`):
+   * `FUN_00BD6350` (real, sole writer, `__xc_a`-reachable). Confirmed via raw
+   * asm: default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_0069EEC0`/`FUN_0069EEE0`, installs the
+   * `PrimitiveSerHelper<EProjectileImpactEvent,int>` vtable, and pushes
+   * plain unmangled `FUN_00BFD550` (bare unlink-then-self-link shape,
+   * matching `SerHelperBase::ResetLinks()`) as its `atexit` target -- no
+   * eager `Init()` call exists in the real ctor.
+   *
+   * Previously modeled via a hand-rolled generic `PrimitiveEnumSerializer
+   * <TEnum>` template mimicking `SerHelperBase` with a raw
+   * `{ mHelperNext, mHelperPrev, mDeserialize, mSerialize }` layout, backed
+   * by a fabricated eager double-registration from this file's own
+   * `ProjectileStartupBootstrap` constructor.
+   */
+  using EProjectileImpactEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EProjectileImpactEvent, int>;
 
   alignas(moho::EProjectileImpactEventTypeInfo)
     unsigned char gEProjectileImpactEventTypeInfoStorage[sizeof(moho::EProjectileImpactEventTypeInfo)];
@@ -635,10 +594,6 @@ namespace
     unsigned char gCProjectileAttributesTypeInfoStorage[sizeof(moho::CProjectileAttributesTypeInfo)];
   bool gCProjectileAttributesTypeInfoConstructed = false;
 
-  alignas(moho::CProjectileAttributesSerializer)
-    unsigned char gCProjectileAttributesSerializerStorage[sizeof(moho::CProjectileAttributesSerializer)];
-  bool gCProjectileAttributesSerializerConstructed = false;
-
   alignas(RManyToOneBroadcasterProjectileImpactTypeInfo)
     unsigned char gManyToOneBroadcasterProjectileImpactTypeInfoStorage[sizeof(RManyToOneBroadcasterProjectileImpactTypeInfo)];
   bool gManyToOneBroadcasterProjectileImpactTypeInfoConstructed = false;
@@ -647,7 +602,15 @@ namespace
     unsigned char gManyToOneListenerProjectileImpactTypeInfoStorage[sizeof(RManyToOneListenerProjectileImpactTypeInfo)];
   bool gManyToOneListenerProjectileImpactTypeInfoConstructed = false;
 
-  PrimitiveEnumSerializer<moho::EProjectileImpactEvent> gEProjectileImpactEventPrimitiveSerializer{};
+  // Address: 0x010B55E4 -- process-global `PrimitiveSerHelper<
+  // EProjectileImpactEvent,int>` singleton (constructed by FUN_00BD6350,
+  // self-registering via `__xc_a`).
+  EProjectileImpactEventPrimitiveSerializer gEProjectileImpactEventPrimitiveSerializer;
+
+  // Address: 0x010B55AC -- process-global `CProjectileAttributesSerializer`
+  // singleton (constructed by FUN_00BD63B0, self-registering via `__xc_a`;
+  // see CProjectileAttributes.h for the real-ctor/atexit-target evidence).
+  moho::CProjectileAttributesSerializer gCProjectileAttributesSerializer;
 
   [[nodiscard]] moho::EProjectileImpactEventTypeInfo& EProjectileImpactEventTypeInfoStorageRef()
   {
@@ -657,11 +620,6 @@ namespace
   [[nodiscard]] moho::CProjectileAttributesTypeInfo& CProjectileAttributesTypeInfoStorageRef()
   {
     return *reinterpret_cast<moho::CProjectileAttributesTypeInfo*>(gCProjectileAttributesTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CProjectileAttributesSerializer& CProjectileAttributesSerializerStorageRef()
-  {
-    return *reinterpret_cast<moho::CProjectileAttributesSerializer*>(gCProjectileAttributesSerializerStorage);
   }
 
   [[nodiscard]] RManyToOneBroadcasterProjectileImpactTypeInfo& ManyToOneBroadcasterTypeInfoStorageRef()
@@ -761,45 +719,6 @@ void moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>::BroadcastEvent(
 
 namespace
 {
-
-  /**
-   * Address: 0x0069EEC0 (FUN_0069EEC0)
-   */
-  void Deserialize_EProjectileImpactEvent_Primitive(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<moho::EProjectileImpactEvent*>(static_cast<std::uintptr_t>(objectPtr)) =
-      static_cast<moho::EProjectileImpactEvent>(value);
-  }
-
-  /**
-   * Address: 0x0069EEE0 (FUN_0069EEE0)
-   */
-  void Serialize_EProjectileImpactEvent_Primitive(
-    gpg::WriteArchive* archive,
-    int objectPtr,
-    int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const moho::EProjectileImpactEvent*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
   /**
    * Address: 0x0069F470 (FUN_0069F470)
    */
@@ -833,40 +752,6 @@ namespace
     archive->WriteFloat(attributes.mDetonateBelowHeight);
   }
 
-  void cleanup_EProjectileImpactEventPrimitiveSerializer_atexit()
-  {
-    (void)moho::cleanup_EProjectileImpactEventPrimitiveSerializer();
-  }
-
-  void cleanup_CProjectileAttributesSerializer_atexit()
-  {
-    (void)moho::cleanup_CProjectileAttributesSerializer();
-  }
-
-  /**
-   * Address: 0x0069A9F0 (FUN_0069A9F0)
-   *
-   * What it does:
-   * Unlinks global `CProjectileAttributesSerializer` helper links and resets
-   * the node to the canonical self-linked state.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCProjectileAttributesSerializerHelperNodePrimary() noexcept
-  {
-    return UnlinkSerializerNode(CProjectileAttributesSerializerStorageRef());
-  }
-
-  /**
-   * Address: 0x0069AA20 (FUN_0069AA20)
-   *
-   * What it does:
-   * Secondary unlink/reset entry for the global
-   * `CProjectileAttributesSerializer` helper node.
-   */
-  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkCProjectileAttributesSerializerHelperNodeSecondary() noexcept
-  {
-    return UnlinkSerializerNode(CProjectileAttributesSerializerStorageRef());
-  }
-
   struct ProjectileStartupBootstrap
   {
     ProjectileStartupBootstrap()
@@ -874,25 +759,13 @@ namespace
       (void)moho::register_CScrLuaMetatableFactory_Projectile_Index();
       moho::register_TConVar_dbg_Projectile();
       (void)moho::register_EProjectileImpactEventTypeInfo();
-      (void)moho::register_EProjectileImpactEventPrimitiveSerializer();
       (void)moho::register_CProjectileAttributesTypeInfo();
-      (void)moho::register_CProjectileAttributesSerializer();
       (void)moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo();
       (void)moho::register_ManyToOneListener_EProjectileImpactEvent_TypeInfo();
     }
   };
 
   [[maybe_unused]] ProjectileStartupBootstrap gProjectileStartupBootstrap;
-
-  template <typename TEnum>
-  void PrimitiveEnumSerializer<TEnum>::RegisterSerializeFunctions()
-  {
-    gpg::RType* const typeInfo = gpg::LookupRType(typeid(TEnum));
-    GPG_ASSERT(typeInfo->serLoadFunc_ == nullptr || typeInfo->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(typeInfo->serSaveFunc_ == nullptr || typeInfo->serSaveFunc_ == mSerialize);
-    typeInfo->serLoadFunc_ = mDeserialize;
-    typeInfo->serSaveFunc_ = mSerialize;
-  }
 } // namespace
 
 namespace moho
@@ -3166,13 +3039,27 @@ namespace moho
   /**
    * Address: 0x0069E900 (FUN_0069E900, serializer registration lane)
    */
-  void CProjectileAttributesSerializer::RegisterSerializeFunctions()
+  void CProjectileAttributesSerializer::Init()
   {
     gpg::RType* const typeInfo = CachedCProjectileAttributesType();
     GPG_ASSERT(typeInfo->serLoadFunc_ == nullptr || typeInfo->serLoadFunc_ == mDeserialize);
     GPG_ASSERT(typeInfo->serSaveFunc_ == nullptr || typeInfo->serSaveFunc_ == mSerialize);
     typeInfo->serLoadFunc_ = mDeserialize;
     typeInfo->serSaveFunc_ = mSerialize;
+  }
+
+  /**
+   * Address: 0x00BD63B0 (FUN_00BD63B0, dynamic initializer for the global
+   * `CProjectileAttributesSerializer` singleton)
+   */
+  CProjectileAttributesSerializer::CProjectileAttributesSerializer()
+    : mDeserialize(&CProjectileAttributesSerializer::Deserialize)
+    , mSerialize(&CProjectileAttributesSerializer::Serialize)
+  {}
+
+  CProjectileAttributesSerializer::~CProjectileAttributesSerializer()
+  {
+    ResetLinks();
   }
 
   /**
@@ -3215,26 +3102,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD550 (FUN_00BFD550, cleanup_EProjectileImpactEventPrimitiveSerializer)
-   */
-  gpg::SerHelperBase* cleanup_EProjectileImpactEventPrimitiveSerializer()
-  {
-    return UnlinkSerializerNode(gEProjectileImpactEventPrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BD6350 (FUN_00BD6350, register_EProjectileImpactEventPrimitiveSerializer)
-   */
-  int register_EProjectileImpactEventPrimitiveSerializer()
-  {
-    new (&gEProjectileImpactEventPrimitiveSerializer) PrimitiveEnumSerializer<EProjectileImpactEvent>();
-    InitializeSerializerNode(gEProjectileImpactEventPrimitiveSerializer);
-    gEProjectileImpactEventPrimitiveSerializer.mDeserialize = &Deserialize_EProjectileImpactEvent_Primitive;
-    gEProjectileImpactEventPrimitiveSerializer.mSerialize = &Serialize_EProjectileImpactEvent_Primitive;
-    return std::atexit(&cleanup_EProjectileImpactEventPrimitiveSerializer_atexit);
-  }
-
-  /**
    * Address: 0x00BFD580 (FUN_00BFD580, cleanup_CProjectileAttributesTypeInfo)
    */
   void cleanup_CProjectileAttributesTypeInfo()
@@ -3255,31 +3122,6 @@ namespace moho
   {
     (void)ConstructCProjectileAttributesTypeInfo();
     return std::atexit(&cleanup_CProjectileAttributesTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFD5E0 (FUN_00BFD5E0, cleanup_CProjectileAttributesSerializer)
-   */
-  gpg::SerHelperBase* cleanup_CProjectileAttributesSerializer()
-  {
-    return UnlinkCProjectileAttributesSerializerHelperNodePrimary();
-  }
-
-  /**
-   * Address: 0x00BD63B0 (FUN_00BD63B0, register_CProjectileAttributesSerializer)
-   */
-  int register_CProjectileAttributesSerializer()
-  {
-    if (!gCProjectileAttributesSerializerConstructed) {
-      new (gCProjectileAttributesSerializerStorage) CProjectileAttributesSerializer();
-      gCProjectileAttributesSerializerConstructed = true;
-    }
-
-    CProjectileAttributesSerializer& serializer = CProjectileAttributesSerializerStorageRef();
-    InitializeSerializerNode(serializer);
-    serializer.mDeserialize = &CProjectileAttributesSerializer::Deserialize;
-    serializer.mSerialize = &CProjectileAttributesSerializer::Serialize;
-    return std::atexit(&cleanup_CProjectileAttributesSerializer_atexit);
   }
 
   /**
