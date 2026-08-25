@@ -57,31 +57,65 @@ namespace moho
   /**
    * VFTABLE: 0x00E373D8
    * COL: 0x00E91490
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='CDecalBufferSerializer@Moho'`): `FUN_00BDD880` (real,
+   * `__xc_a`-reachable) vs. a dead zero-xref duplicate at `FUN_00779C50`
+   * (same field writes, no `atexit` call -- confirmed via raw asm never
+   * live, despite IDA's own demangler coincidentally labeling it
+   * `??0CDecalBufferSerializer@Moho@@QAE@@Z`, a plausible-looking ctor
+   * mangling that does NOT make it the live one). Confirmed via raw asm:
+   * the real ctor default-constructs `gpg::SerHelperBase`, binds
+   * `mLoadCallback`/`mSaveCallback` to `FUN_00779C30`/`FUN_00779C40`,
+   * installs the `CDecalBufferSerializer` vtable, and pushes plain
+   * unmangled `FUN_00C028B0` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by
+   * the template's own real destructor, no explicit `atexit` call needed.
+   * Two zero-xref duplicate emissions of that unlink logic
+   * (`FUN_00779C80`, `FUN_00779CB0`, formerly
+   * `UnlinkCDecalBufferSerializerHelperPrimary/Secondary`) are dead ICF
+   * twins, sha256-identical to the real atexit target.
+   *
+   * The previous recovery modeled the whole ctor as an untraced
+   * `CDecalBufferSerializerBootstrap` struct constructor -- not tied to
+   * either the real or dead ctor address -- with no `atexit` registration
+   * at all.
    */
-  class CDecalBufferSerializer
+  class CDecalBufferSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDD880 (FUN_00BDD880, dynamic initializer for the global
+     * `CDecalBufferSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CDecalBufferSerializer();
+
+    /**
+     * Address: 0x00C028B0 (FUN_00C028B0, Moho::CDecalBufferSerializer::~CDecalBufferSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CDecalBufferSerializer();
+
     /**
      * Address: 0x0077AB00 (FUN_0077AB00, gpg::SerSaveLoadHelper_CDecalBuffer::Init)
      *
      * What it does:
      * Binds load/save serializer callbacks into `CDecalBuffer` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CDecalBufferSerializer, mHelperNext) == 0x04, "CDecalBufferSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CDecalBufferSerializer, mHelperPrev) == 0x08, "CDecalBufferSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CDecalBufferSerializer, mLoadCallback) == 0x0C, "CDecalBufferSerializer::mLoadCallback offset must be 0x0C"
   );
