@@ -1392,6 +1392,22 @@ namespace
   static_assert(sizeof(UiKeyRepeatMap) == 0x0C, "UI key repeat map size must be 0x0C");
 
   UiKeyActionMap gUiKeyActionMap{};
+
+  /**
+   * Address: 0x00BE4810 (FUN_00BE4810)
+   *
+   * What it does:
+   * Compiler-emitted CRT static-initializer stub for this global: calls
+   * `UiKeyRepeatMap`'s default constructor (inlined in the binary rather
+   * than emitted as a separate symbol -- `sub_83C220`/`buy_head`'s "third
+   * split shape", already cited in `RbTree.h`, followed by the self-link +
+   * `isNil=1` + `size=0` this member-initializer's constructor performs),
+   * then `atexit`-registers the matching teardown (`sub_C06720`). No
+   * hand-written call exists for this stub because none is needed: it is
+   * purely a consequence of this global declaration existing, the same
+   * "compiler-emitted, no source line" category as base-ctor chaining.
+   * Registered in the binary's CRT static-init array (`__xc_a` lane).
+   */
   UiKeyRepeatMap gUiKeyRepeatMap{};
 
   void AppendLegacyStringOrThrow(msvc8::string& destination, const char* const text, const std::size_t length)

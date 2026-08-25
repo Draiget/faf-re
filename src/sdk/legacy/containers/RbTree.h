@@ -769,6 +769,21 @@ namespace msvc8
          * below, `FUN_009470C0` `operator++(int)` cited below,
          * `FUN_009499C0` insert-with-hint not independently exported in
          * this pass). Same DB-integrity correction as 0x00946830 above.
+         *
+         * Address: 0x00A3A8D0 (FUN_00A3A8D0, sub_A3A8D0) -- another
+         * `isNil@+0x15`, 8-byte-value instantiation's `_Inc`. `.asm`-confirmed:
+         * nil-check, `if (!right->isNil) return rb_min(right);` else climb
+         * `parent` while `n==parent->right` -- matches this member field for
+         * field. Largest fan-in of this file's `rb_increment` siblings (12
+         * incoming code xrefs): called from this instantiation's
+         * `erase_node` successor-capture step (`sub_A3E450`, cited on
+         * `erase_node` below) and `erase_range`'s per-element loop
+         * (`sub_A3E800`, cited on `erase_range` below). Reached, per those
+         * members' own citations, from two independently PE-byte-verified
+         * EH-cleanup tail-jumps inside WildMagic-shaped functions
+         * (`sub_A3E9C0`/`sub_A40060`) that each carry a local instance of
+         * this same tree as scratch storage -- owning engine class not yet
+         * pinned down beyond that.
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1778,6 +1793,48 @@ namespace msvc8
              * body, addressed twice because the compiler placed this
              * instantiation's unwind path in its own cold section rather
              * than sharing `FUN_007CC2B0`'s.
+             *
+             * Address: 0x00A3E8D0 (FUN_00A3E8D0, sub_A3E8D0) -- another
+             * instantiation's `~rb_tree()`: `erase_range(leftmost(),
+             * header())` (`sub_A3E800`, cited below) then `operator
+             * delete(head_)`, zero head/size -- matches this member
+             * exactly.
+             * Address: 0x00A3E910 (FUN_00A3E910, sub_A3E910) --
+             * byte-identical sibling emission of the same destructor.
+             * Address: 0x00A3E950 (FUN_00A3E950, sub_A3E950) --
+             * byte-identical sibling emission of the same destructor;
+             * reached from two independently PE-byte-verified EH-cleanup
+             * tail-jumps (`0x00B75B81`: `E9 CA 8D EC FF`, `0x00B75BC1`:
+             * `E9 8A 8D EC FF`, both confirmed by direct PE byte read to
+             * land exactly here) inside WildMagic-shaped functions
+             * `sub_A3E9C0`/`sub_A40060`, each carrying a local instance of
+             * this tree as scratch storage. All three of 0x00A3E8D0/
+             * 0x00A3E910/0x00A3E950 were previously `skip`
+             * ("transitively unreachable" / "exhaustively byte-verified
+             * ZERO references" -- both claims from a byte-scan pass that
+             * did not cover the EH-cleanup PE section these jumps live
+             * in); corrected to `recovered` after independently
+             * re-verifying the jump targets by direct PE byte read.
+             *
+             * Address: 0x006A5380 (FUN_006A5380, sub_6A5380) -- `msvc8::
+             * map<msvc8::string, float>::~rb_tree()` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`. `IDA signature:
+             * int __usercall sub_6A5380@<eax>(std::map_string_float
+             * *a1@<eax>);`. Matches this member field for field: the
+             * recursive teardown call (`std::map_string_float::~map_string_
+             * float(a1, &scratch, a1->_Myhead->_Left, a1->_Myhead)` --
+             * `destroy_subtree`'s emission for this instantiation,
+             * `FUN_006AEF60`, cited below) reached via `head_->parent`
+             * (root, matching `erase_range(leftmost(),header())`'s whole-
+             * tree fast path for this instantiation, which resolves to the
+             * same subtree walk), then `operator delete(head_)`, then zero
+             * `head_`/`size_`. Reached automatically via `Unit`'s implicit
+             * member destruction (`Unit::~Unit`, `Unit.cpp`) -- no explicit
+             * call needed once `ArmorMultipliers` is a real typed member.
+             * Re-homed here from a hand-rolled `DestroyArmorMultiplierMap
+             * Storage` free function in `Unit.cpp` that walked a
+             * `SArmorMultiplierMap&`/`SArmorMultiplierMapNode*` reach-in
+             * instead of relying on the member's own destruction.
              */
             ~rb_tree()
             {
@@ -1959,6 +2016,32 @@ namespace msvc8
              * instantiation, cited on `Map.h`'s `find()`), itself called from
              * `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10,
              * `moho/ui/UiRuntimeTypes.h`/`.cpp`).
+             */
+            /**
+             * Address: 0x006AFBF0 (FUN_006AFBF0, sub_6AFBF0) --
+             * `msvc8::map<msvc8::string, float>::lower_bound_node` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (48-byte node: 12-byte link triplet + 28-byte
+             * `msvc8::string` key + 4-byte `float` value + color/isNil).
+             * Plain descent loop comparing the candidate's key lane against
+             * the sought key via `std::operator<<char>`, updating the
+             * candidate on left turns -- matches this member's shape
+             * exactly, no store-into-hidden-pointer adapter (returns the
+             * node directly in eax). Four confirmed callers: `find_node`'s
+             * fused emission for this instantiation (`FUN_006ADD30`, cited
+             * on `Map.h`'s `find()`), `operator[]`'s emission
+             * (`FUN_006ADBF0`, cited on `Map.h`'s `operator[]()`), and two
+             * further calls (0x006AEF40/0x006AEF50) inlined inside
+             * `insert_hint`'s own emission (`FUN_006AEDD0`, cited below) --
+             * hint-validation re-deriving the lower bound on its straddle-
+             * check branches. Re-homed here from a hand-rolled
+             * `LowerBoundStringFloatMapRuntime` free function in
+             * `moho/sim/SimRecoveryRuntime.cpp` that walked a duplicate
+             * `StringFloatMapRuntime`/`StringFloatMapNodeRuntime` struct
+             * pair over the same node shape instead of calling this member
+             * (deleted: zero callers anywhere in `src/sdk`, confirmed by a
+             * full-tree grep -- an orphan duplicate, not a second real
+             * instantiation).
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -2450,6 +2533,32 @@ namespace msvc8
              * template's own engine code, not third-party runtime
              * (DB-integrity fix).
              */
+            /**
+             * Address: 0x006AF840 (FUN_006AF840, sub_6AF840) --
+             * `msvc8::map<msvc8::string, float>::insert_unique` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (same 48-byte node cited on `lower_bound_node` above).
+             * Full descent recording the last branch, leftmost fast path via
+             * `rb_decrement` (`sub_6B03D0`, ICF twin of the canonical
+             * `FUN_005363B0` `rb_decrement` emission already `skip`'d in
+             * `recovered_progress.json`), final uniqueness compare, then
+             * tail-calls `insert_at` (`FUN_006AFA40`, cited below) either
+             * way -- matches this member field for field. Two real callers:
+             * `insert_hint`'s emission for this instantiation
+             * (`FUN_006AEDD0`, cited below) as its final fallback
+             * (`return insert_unique(v).first`), and `gpg::RMapType_string_
+             * float::SerLoad` (`FUN_006AF250`, already recovered in
+             * `RMapStringFloatTypeInfo.cpp`) directly -- `operator[]` is
+             * fully inlined at that call site (`(*destination)[key] =
+             * value` inside `SerLoad`'s per-entry loop), leaving only this
+             * member as a real out-of-line call in that emission, the same
+             * "operator[]/insert_hint fully inlined, only insert_unique
+             * out-of-line" shape `FUN_00580510` above documents for a
+             * sibling instantiation. Previously `recovered` with no
+             * citation/source/report (`depends_on: [FUN_006AFA40,
+             * FUN_006B03D0]`, both since resolved -- DB-integrity gap, not a
+             * false attribution); this is the real source.
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -2613,6 +2722,34 @@ namespace msvc8
              * instead of calling it out-of-line). Previously `blocked`
              * ("owner_layout", additional evidence needed); this pass
              * supplies the full instantiation, calling-convention, and
+             * caller evidence.
+             */
+            /**
+             * Address: 0x006AEDD0 (FUN_006AEDD0, sub_6AEDD0) --
+             * `msvc8::map<msvc8::string, float>::insert_hint` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (same instantiation cited on `lower_bound_node`/
+             * `insert_unique` above). Matches this member's branch
+             * structure: empty-tree fast path straight to `insert_at`
+             * (`sub_6AFA40`, cited below); `hint == leftmost()` check;
+             * `hint == head_` (`rb_is_nil`) check; predecessor/successor
+             * straddle checks calling `lower_bound_node`'s emission
+             * (`FUN_006AFBF0`, cited above, at the two owner=<none> call
+             * sites 0x006AEF40/0x006AEF50 inside this same function's own
+             * body -- hint re-validation, not a separate function) and
+             * `rb_decrement` (`sub_6B03D0`, ICF twin of canonical
+             * `FUN_005363B0`); final fallback to `insert_unique`
+             * (`FUN_006AF840`, cited above) taking its `.first`. Sole real
+             * caller is `operator[]`'s emission for this instantiation
+             * (`FUN_006ADBF0`, cited on `Map.h`'s `operator[]()`) passing
+             * its own `lower_bound` result as the hint -- the same "fill
+             * the gap we just located" usage this member's doc comment
+             * above describes, confirmed via `Unit::InitializeArmor`'s
+             * `ArmorMultipliers[damageTypeName] = armorMultiplier` and
+             * `cfunc_UnitAlterArmorL`'s `unit->ArmorMultipliers[armorType
+             * Name] = armorMultiplier` (both `Unit.cpp`). Previously
+             * `blocked` ("owner_layout", additional evidence needed); this
+             * pass supplies the full instantiation, calling-convention, and
              * caller evidence.
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
@@ -3150,6 +3287,21 @@ namespace msvc8
              * precedents above), this member and its two rotate/two
              * extremum helpers are genuine compiled emissions of real
              * template code, kept `recovered` rather than `skip`.
+             *
+             * Address: 0x00A3E450 (FUN_00A3E450, sub_A3E450) -- the
+             * `isNil@+0x15` instantiation cited on `rb_increment`/
+             * `rotate_left`/`buy_head`/`destroy_subtree` above's
+             * `erase_node`, opening with the identical `_Isnil` check +
+             * `out_of_range("invalid map/set<T> iterator")` throw and
+             * successor-capture-before-unlink shape (calls this
+             * instantiation's `rb_increment`, `sub_A3A8D0`, cited above).
+             * Sole caller is this instantiation's `erase_range`
+             * (`sub_A3E800`, cited below) via its per-element loop. Real
+             * reachability traces through `sub_A3E800`'s own citation to
+             * `~rb_tree()` (`sub_A3E8D0`/`sub_A3E910`/`sub_A3E950`, cited
+             * above) and, independently, to the same WildMagic EH-cleanup
+             * tail-jumps documented there -- correcting a prior
+             * "transitively unreachable" verdict that missed those jumps.
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -3661,6 +3813,24 @@ namespace msvc8
              * this token was marked `skip` citing a `CrtRuntimeHelpers.cpp`
              * source path the address never appeared in; this is the real
              * source.
+             *
+             * Address: 0x00A3E800 (FUN_00A3E800, sub_A3E800) -- the same
+             * `isNil@+0x15` instantiation's `erase_range`. Fast path
+             * (`first==leftmost() && last==header()`) calls `sub_A3CF30`
+             * (`destroy_subtree`, cited above); general path loops
+             * `sub_A3A8D0` (`rb_increment`, cited above) + `sub_A3E450`
+             * (`erase_node`, cited above) per element -- field-for-field
+             * match to this member's body. Reached from three
+             * byte-identical `~rb_tree()` emissions (`sub_A3E8D0`/
+             * `sub_A3E910`/`sub_A3E950`, cited above) plus, independently,
+             * from EH-cleanup tail-jumps inside two WildMagic-shaped
+             * functions (`sub_A3E9C0`, already `external_dependency`;
+             * `sub_A40060`) -- both verified by direct PE byte read
+             * (`0x00B75B81`/`0x00B75BC1`, both `E9` rel32 landing on
+             * `sub_A3E950`). Was previously `skip` ("transitively
+             * unreachable, verified 2 hops deep" -- a byte-scanner pass
+             * that missed these EH-section jumps); corrected to
+             * `recovered`.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -4270,6 +4440,54 @@ namespace msvc8
              * carried this exact evidence and disclosure; it is preserved
              * here verbatim now that the real container performs the fusion
              * instead.)
+             *
+             * Address: 0x00A3CEE0 (FUN_00A3CEE0, sub_A3CEE0) -- the same
+             * `isNil@+0x15` instantiation cited on `rb_increment`/
+             * `rotate_left` above's own header-node allocator: `operator
+             * new(0x18)`, `left=parent=right=0`, `color=1`(black), `isnil=0`
+             * -- NOT self-linked, distinct from this member's plain shape
+             * (see `FUN_0083C220` below for the same "does not self-link"
+             * split variant this file already documents on `FUN_00556DE0`
+             * above). Called from `erase_range`'s fast whole-tree-clear path
+             * (`sub_A3E800`, cited below) for this instantiation.
+             *
+             * Address: 0x0083C220 (FUN_0083C220, sub_83C220) -- `msvc8::map<
+             * UiKeyMask, ...>`-family `gUiKeyRepeatMap`'s (`moho/ui/
+             * UiRuntimeTypes.cpp`) header-node buy: allocates the raw node
+             * (`sub_83C6E0(1)`, the scaled/checked node allocator -- see
+             * `buy_node` below for this same shape used as a node-count
+             * allocator) then zeroes `left`/`parent`/`right` (NOT
+             * self-linked) and sets `color=1`(black)/`isNil=0` at
+             * `node+20`/`node+21` -- the same "third split shape" as
+             * `FUN_00556DE0` above: allocate + flag-init only, no
+             * self-link. Its caller, `gUiKeyRepeatMap`'s real static
+             * constructor `FUN_00BE4810` (writes `dword_10C374C`/
+             * `dword_10C3750` -- the exact globals this file already names
+             * for this tree -- then `atexit(sub_C06720)`), does the
+             * self-link and `isNil=1` overwrite itself immediately after
+             * the call, matching `FUN_00556DE0`'s documented caller pattern
+             * exactly. Three more callers (0x83A990/0x83B2E0/0x83BDB0, all
+             * unowned call sites) sit immediately adjacent to this tree's
+             * already-cited `operator[]`/`insert_hint`/`insert_at` members.
+             *
+             * Address: 0x006B01C0 (FUN_006B01C0, sub_6B01C0) -- `msvc8::
+             * map<msvc8::string, float>::buy_head`'s `alloc_raw()` half --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`. Allocates
+             * one 48-byte node via `sub_6B1420` (the already-recovered
+             * checked 48-byte allocation lane, `CheckedArrayAllocationLanes.
+             * cpp`), then seeds `color=black`/`isNil=0` -- the raw
+             * `alloc_raw()`-plus-flags half of this member; the two
+             * callers (`Unit::Unit(const SUnitConstructionParams&)` and
+             * `Unit::Unit(Sim*, ...)`, both `Unit.cpp`) used to finish the
+             * self-link and `isNil=1` overwrite by hand (matching the
+             * split-instantiation pattern documented throughout this file),
+             * before `ArmorMultipliers` became a real typed member whose
+             * own default construction (this member) now performs the
+             * self-link and `isNil=1` flip in one call. Re-homed here from
+             * a hand-rolled `AllocateArmorMultiplierMapNodeRaw` free
+             * function in `Unit.cpp` that only replicated the raw-alloc
+             * half and left the self-link/isNil flip open-coded at each of
+             * the two call sites.
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -4598,6 +4816,75 @@ namespace msvc8
              * documents for this tree's erase/clear family. Re-homed here
              * from the false `CrtRuntimeHelpers.cpp` DB-integrity
              * contamination; this catalog is the real home.)
+             *
+             * Address: 0x0089A130 (FUN_0089A130, sub_89A130) -- a
+             * `std::map<Moho::EntId, Moho::UserEntity*>::_Buynode`
+             * (IDA-typed real field names `_Myhead`/`_Parent`/`_Isnil`/
+             * `_Myval.id`/`_Left`/`_Right` on the confirmed real caller
+             * chain below), 24-byte node, 8-byte value. Allocates via
+             * `FUN_0089B1A0(1u)` -- the scaled/checked
+             * `allocator<node_type>::allocate(size_t)` shape (`if
+             * (0xFFFFFFFF/n < sizeof(node_type)) throw bad_alloc; return
+             * operator new(sizeof(node_type)*n);`, here always called with
+             * n=1) rather than this member's plain `alloc_raw()` call --
+             * this `std::map` instantiation routes through its own
+             * `_Alnode` allocator instead of a direct `operator new`, an
+             * instantiation-specific compile choice, not a different
+             * operation. Then sets Left/Parent/Right/value/Color(red)/
+             * Isnil(false) exactly as this member does. Chain to solid
+             * ground: `FUN_00898A50` (`std::map<EntId,UserEntity*>::
+             * insert`, IDA-typed) calls `FUN_00899490` (`[[maybe_unused]]`,
+             * `insert_at`-shaped) which calls this token. Owning field not
+             * yet pinned down -- best address-locality lead is
+             * `Moho::CWldSession` (this cluster's addresses, 0x88F000-
+             * 0x89C000, sit inside `CWldSession.cpp`'s own address range,
+             * e.g. `LookupEntityId`@0x894280/`AddEntity`@0x894140), but
+             * `mSaveSourceTreeHead` is already a different, independently
+             * recovered 28-byte `SessionEntityMapNode` tree -- this must be
+             * a second, not-yet-named `EntId->UserEntity*` field.
+             *
+             * Address: 0x00948CC0 (FUN_00948CC0, sub_948CC0) -- a second,
+             * unrelated `<int32, pointer>`-keyed instantiation's
+             * `_Buynode`, 24-byte node, allocated via a direct inline
+             * `operator new(0x18)` (no scaled allocator this time) then
+             * Left/Parent/Right/value/Color/Isnil set the same way. Chain:
+             * `FUN_00948ED0` (`[[maybe_unused]]`, `insert_at`-shaped, length
+             * check + buy + link + red-black rebalance using the byte-at-
+             * +20 Color) calls this token; reached from `FUN_009494A0`
+             * (insert descent) and a 7-call-site cluster inside
+             * `FUN_009496E0`, a much higher call volume than the EntId map
+             * above, suggesting a hot per-entity or per-frame map. Not
+             * `CEntityDb::mIdPoolTree` (that instantiation's insert
+             * machinery is already separately cited on `erase_node`/
+             * `buy_node` elsewhere in this file, `EntityDb.h:428-437`).
+             * Owning class not yet pinned down.
+             *
+             * Address: 0x006B0200 (FUN_006B0200, sub_6B0200) -- `msvc8::
+             * map<msvc8::string, float>::buy_node` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * Allocates one 48-byte node via `sub_6B1420` (the already-
+             * recovered checked 48-byte allocation lane), links `left`/
+             * `parent`/`right` directly to the caller-supplied `head`/
+             * `where` values (the binary fuses this member's placeholder
+             * `head_` links with `link_and_rebalance`'s subsequent
+             * `fresh->parent = where` write, the same optimisation
+             * `FUN_0083C260`'s citation above documents -- same final
+             * observable state, no behavioural difference), placement-
+             * constructs the `pair<const msvc8::string, float>` value via
+             * `std::string::assign` for the key and a value slot at
+             * node+0x28 sourced from the caller's `const value_type&`
+             * (IDA mistypes the parameter `std::string*`, reading the
+             * trailing `float` via a same-object offset -- the value_type
+             * pair is one contiguous object, key first), then sets
+             * `color=red(0)`/`isNil=0` at +0x2C/+0x2D. Matches this member
+             * exactly. Sole caller is `insert_at`'s emission for this
+             * instantiation (`FUN_006AFA40`, cited above). Previously
+             * mis-tracked `external_dependency` ("all-external-callees
+             * thunk... no engine references"); this is a real engine-
+             * instantiated `msvc8::map` node buy for `Unit`'s own armor
+             * data, not third-party/generic runtime (DB-integrity fix, the
+             * same correction already applied to `FUN_0083BC50`/
+             * `FUN_00580510` above).
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -4994,6 +5281,54 @@ namespace msvc8
              * fast path. DB-integrity fix: this token was marked `blocked`
              * citing a `CrtRuntimeHelpers.cpp` source path the address
              * never appeared in; this is the real source.
+             *
+             * Address: 0x00A3CF30 (FUN_00A3CF30, sub_A3CF30) -- the same
+             * `isNil@+0x15` instantiation cited on `rb_increment`/
+             * `rotate_left`/`buy_head` above's recursive subtree-free: `if
+             * (!isNil) { do { destroy_subtree(right); tmp=left; delete
+             * this; this=tmp; } while (!isNil); }` -- matches this member
+             * exactly, including the genuine self-recursive call at
+             * 0x00A3CF47. Called from `erase_range`'s fast whole-tree-clear
+             * path (`sub_A3E800`, cited below) for this instantiation.
+             *
+             * Address: 0x004E4530 (FUN_004E4530, sub_4E4530) --
+             * `sSndParamsCache`'s (`moho/audio/SoundSubsystemBootstrap.cpp`)
+             * own `destroy_subtree` -- the third of this file's three
+             * sSndParamsCache-family addresses (see 0x004E45E0/0x004E4690
+             * above for the other two sibling caches); confirmed by its
+             * caller `FUN_004E3A30`, which names `sSndParamsCache.
+             * _Myfirstiter`/`._Myhead` directly and calls this token on
+             * `sSndParamsCache._Myfirstiter->_Mynextiter` -- unambiguously
+             * this specific tree's teardown, not one of the other two.
+             * Recurse-right/iterate-left shape matches this member exactly.
+             * Reached the same way as its siblings: elided at
+             * `TeardownSoundStructs` (0x004DF0E0, already recovered) since
+             * every real call site finds this mirror tree empty (real
+             * inserts/erases go through the modern `unordered_map` path
+             * instead) -- cited here so it is not mistaken for an orphan.
+             *
+             * Address: 0x006AEF60 (FUN_006AEF60, sub_6AEF60) -- `msvc8::
+             * map<msvc8::string, float>::destroy_subtree` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * Recurse-right-then-iterate-left shape matching this member
+             * exactly: `for (i = node; !isNil; i = left) { destroy_subtree
+             * (right); if (key.capacity >= 0x10) operator delete(key.ptr);
+             * operator delete(i); }` -- the leading capacity check/free is
+             * `msvc8::string`'s own non-SSO buffer release for the 28-byte
+             * key at node+0x0C, inlined directly by the compiler rather
+             * than calling a separate `~string()` symbol (the same "value's
+             * own teardown inlined into destroy_subtree" pattern the
+             * category-lookup map's citation above documents for its
+             * `msvc8::string` key half). This member's generic `n->value.
+             * ~value_type()` in `free_node` (called by `erase_node`, not by
+             * this member directly) reproduces the identical net effect
+             * through the type system. Sole caller is `~rb_tree()`'s
+             * emission for this instantiation (`FUN_006A5380`, cited
+             * above) via `head_->parent` (root). Re-homed here from a
+             * hand-rolled `DestroyArmorMultiplierMapSubtree` free function
+             * in `Unit.cpp` that walked a `SArmorMultiplierMapNode*`
+             * reach-in and called `.tidy(true, 0u)` on the key by hand
+             * instead of relying on this member's own recursive teardown.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -5348,6 +5683,16 @@ namespace msvc8
              * exactly the three `LEFT-ROTATE` call sites CLRS's algorithm
              * makes, confirmed independently against this member's own
              * unambiguous body, not just the caller's shape.
+             *
+             * Address: 0x00A3A950 (FUN_00A3A950, sub_A3A950) -- the
+             * `isNil@+0x15` instantiation cited on `rb_increment` above's own
+             * `_Lrotate`. `.asm`-confirmed classic Dinkumware left-rotate:
+             * `x->right=y->left; if(!y->left->isNil) y->left->parent=x;
+             * y->parent=x->parent; if(x==root) root=y; else if(x==parent->
+             * left) parent->left=y; else parent->right=y; y->left=x;
+             * x->parent=y;` -- matches this member exactly. Called from that
+             * instantiation's `erase_node` rebalance loop (`sub_A3E450`,
+             * cited on `erase_node` below).
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -5825,6 +6170,28 @@ namespace msvc8
              * already lists this token for exactly that reason. Re-homed
              * here from the false `CrtRuntimeHelpers.cpp` DB-integrity
              * contamination; this catalog is the real home.)
+             *
+             * Address: 0x006AFA40 (FUN_006AFA40, sub_6AFA40) --
+             * `msvc8::map<msvc8::string, float>::insert_at` (fused with
+             * `link_and_rebalance`, the same one-function fusion documented
+             * on `FUN_0083BDE0`/`FUN_004E22B0` above) -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * `(unsigned)size_ >= 0x7FFFFFEu` guard matches this member's
+             * `max_size() - 1u <= size_` for a 4-byte key / 4-byte value
+             * pair whose *node* max is bounded by the 48-byte node
+             * (`0xFFFFFFFF/48`), throwing `std::length_error("map/set<T>
+             * too long")` via the standard `logic_error`-then-vftable-patch
+             * shape documented throughout this file. Buys the node through
+             * `sub_6B0200` (`buy_node`, cited below), links it under the
+             * caller's `where`/`addLeft`, then repairs red-red violations
+             * calling `sub_6B0120`/`sub_6B0170` (ICF twins of the canonical
+             * `rotate_left`/`rotate_right` emissions, already `skip`'d in
+             * `recovered_progress.json`). Two real callers: `insert_unique`'s
+             * emission (`FUN_006AF840`, cited above) on both its accepted
+             * branches, and `insert_hint`'s emission (`FUN_006AEDD0`, cited
+             * above) on its fast-path branches -- the same
+             * `insert_at(addLeft, where, v)` calls this member's own C++
+             * source performs.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
