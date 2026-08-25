@@ -353,13 +353,13 @@ namespace moho
     /**
      * Address: 0x005C0A70 (FUN_005C0A70, Moho::CAiReconDBImpl::GenerateNewBlips)
      *
-     * std::vector<SNewBlip> const &
+     * msvc8::vector<SNewBlip> const &
      *
      * What it does:
      * Materializes pending blip requests, updates per-army state, and inserts
      * resulting blips into the typed blip map.
      */
-    void GenerateNewBlips(const std::vector<SNewBlip>& pending);
+    void GenerateNewBlips(const msvc8::vector<SNewBlip>& pending);
 
     /**
      * Address: 0x005C1810 (FUN_005C1810, Moho::CAiReconDBImpl::IntelConfirmDead)
@@ -410,13 +410,13 @@ namespace moho
     /**
      * Address: 0x005C1F80 (FUN_005C1F80)
      *
-     * Unit *, EReconFlags, std::vector<SNewBlip> &
+     * Unit *, EReconFlags, msvc8::vector<SNewBlip> &
      *
      * What it does:
      * Updates all map-owned blips for one source unit, prunes excess fake
      * jammer blips, and appends pending fake-blip creation requests when needed.
      */
-    void UpdateBlips(Unit* sourceUnit, EReconFlags detectedFlags, std::vector<SNewBlip>& pending);
+    void UpdateBlips(Unit* sourceUnit, EReconFlags detectedFlags, msvc8::vector<SNewBlip>& pending);
 
     /**
      * Address: 0x005C21F0 (FUN_005C21F0)

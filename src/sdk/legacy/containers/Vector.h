@@ -4746,6 +4746,24 @@ namespace msvc8
          * `sub_8F6D20`, an engine-instantiated `DXGI_MODE_DESC` vector
          * internal, not third-party runtime; corrected to `recovered` here.)
          *
+         * Address: 0x005CBC70 (FUN_005CBC70, `msvc8::vector<Moho::
+         * CAiReconDBImpl::SNewBlip>::uninit_fill_n` for the 12-byte
+         * trivially-copyable element (`Unit* sourceUnit; uint8_t fake; enum
+         * detectedFlags;`) -- `(dst@eax, srcValue@edx, count@ecx)` loop:
+         * `*dst = *srcValue` (3-dword copy) then `dst += 3`, `srcValue`
+         * never advanced, once per remaining count; the `if (dst)` null
+         * guard wraps only the copy body, the same defensive-null shape as
+         * the 16-byte `CDiscoveredGameRecord` instantiation above. Reached
+         * with `count = 1` from `AppendPendingNewBlip`'s (0x005C4CA0,
+         * `CAiReconDBImpl.cpp`) capacity-available fast path -- this
+         * method's own `if (size() < capacity()) { uninit_fill_n(last_, 1u,
+         * value); ++last_; }` branch -- which is `AppendPendingNewBlip`'s
+         * entire real body, `pending.push_back(SNewBlip{...})`.
+         * DB-integrity fix: `pending`'s declared type (`AppendPendingNewBlip`/
+         * `GenerateNewBlips`/`UpdateBlips`, `CAiReconDBImpl.h`/`.cpp`) had
+         * drifted to real `std::vector<SNewBlip>`, which would not emit this
+         * symbol on rebuild; retyped to `msvc8::vector<SNewBlip>` to match.)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {

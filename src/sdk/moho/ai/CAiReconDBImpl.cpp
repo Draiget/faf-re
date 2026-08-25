@@ -1071,9 +1071,20 @@ namespace
    *
    * What it does:
    * Appends one pending-new-blip request into the temporary generation vector.
+   *
+   * DB-integrity fix: `pending` was previously typed `std::vector<SNewBlip>`,
+   * which does not match this binary -- `SNewBlip` is a 12-byte trivially-
+   * copyable POD (`Unit* sourceUnit; uint8_t fake; EReconFlags
+   * detectedFlags;`) and `push_back`'s growth-fill emission at this call
+   * site (`FUN_005CBC70`, a 3-dword-stride uninit_fill_n loop) matches
+   * `msvc8::vector<T>::push_back`'s shape exactly, not the real STL's.
+   * Retyped to `msvc8::vector<SNewBlip>` across this helper, `GenerateNewBlips`,
+   * and `UpdateBlips` (see their own citations) to match the binary; this
+   * caller now correctly reaches `legacy/containers/Vector.h`'s shared
+   * `push_back` template member.
    */
   void AppendPendingNewBlip(
-    std::vector<CAiReconDBImpl::SNewBlip>& pending,
+    msvc8::vector<CAiReconDBImpl::SNewBlip>& pending,
     Unit* const sourceUnit,
     const std::uint8_t fake,
     const EReconFlags detectedFlags
@@ -1330,7 +1341,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-  std::vector<SNewBlip> pendingNewBlips{};
+  msvc8::vector<SNewBlip> pendingNewBlips{};
   if (mSim->mEntityDB) {
     for (Entity* const entity : mSim->mEntityDB->Entities()) {
       Unit* const unit = entity ? entity->IsUnit() : nullptr;
@@ -1481,13 +1492,13 @@ void CAiReconDBImpl::CheckIntelEvents(ReconBlip* const blip, const int oldFlags,
 /**
  * Address: 0x005C0A70 (FUN_005C0A70, Moho::CAiReconDBImpl::GenerateNewBlips)
  *
- * std::vector<SNewBlip> const &
+ * msvc8::vector<SNewBlip> const &
  *
  * What it does:
  * Materializes pending blips, updates per-army blip state, and inserts them
  * into the recon blip map.
  */
-void CAiReconDBImpl::GenerateNewBlips(const std::vector<SNewBlip>& pending)
+void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
 {
   for (const SNewBlip& candidate : pending) {
     ReconBlip* const blip = FindOrCreateBlip(candidate);
@@ -1666,7 +1677,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
 /**
  * Address: 0x005C1F80 (FUN_005C1F80, Moho::CAiReconDBImpl::UpdateBlips)
  *
- * Unit *, EReconFlags, std::vector<SNewBlip> &
+ * Unit *, EReconFlags, msvc8::vector<SNewBlip> &
  *
  * IDA signature:
  * void __thiscall Moho::CAiReconDBImpl::UpdateBlips(
@@ -1679,9 +1690,14 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
  * What it does:
  * Updates all map-owned blips for one source unit, prunes excess fake jammer
  * blips, and enqueues pending fake blips when jammer count increased.
+ *
+ * DB-integrity fix: `pending` was previously typed `std::vector<SNewBlip>`
+ * (matching IDA's own generic type guess above); the real binary shape is
+ * `msvc8::vector<SNewBlip>` -- see `AppendPendingNewBlip`'s citation for the
+ * evidence (`FUN_005CBC70`'s push_back growth-fill emission).
  */
 void CAiReconDBImpl::UpdateBlips(
-  Unit* const sourceUnit, const EReconFlags detectedFlags, std::vector<CAiReconDBImpl::SNewBlip>& pending
+  Unit* const sourceUnit, const EReconFlags detectedFlags, msvc8::vector<CAiReconDBImpl::SNewBlip>& pending
 )
 {
   if (!sourceUnit) {
