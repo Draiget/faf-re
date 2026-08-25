@@ -14416,6 +14416,26 @@ extern "C"
 		}
 
 		const int first = std::getc(lf.f);
+		/**
+		 * Address: 0x00A868BB (FUN_00A868BB, `ungetc` -- IDA FLIRT-identified
+		 * by its real CRT symbol name, not `FUN_`/`sub_` prefixed)
+		 * Address: 0x00A8679D (FUN_00A8679D, `_ungetc_nolock`-equivalent
+		 * internal body `ungetc` calls into)
+		 *
+		 * `std::ungetc(first, lf.f)` below compiles to these two out-of-line
+		 * MSVC8 CRT stdio bodies. Confirmed against 0x00A8679D's own `.c`:
+		 * text-mode `ioinfo`/`_badioinfo` validation via `_fileno`, then
+		 * direct `FILE::_flag`/`_base`/`_ptr`/`_cnt` manipulation and
+		 * `getbuf`/`_invalid_parameter` calls -- textbook MSVC CRT
+		 * `ungetc`/`_ungetc_nolock`, not engine code. Reached from this call
+		 * site (the classic `luaL_loadfile` shebang-line peek: read one
+		 * byte, push it back, then decide text- vs binary-mode reopen) and
+		 * from the `io.read(0)`-style peek at `LuaObject.cpp` ~line 6112.
+		 * Both `FUN_00A868BB`/`FUN_00A8679D` were mass-mis-attributed to
+		 * `CrtRuntimeHelpers.cpp` by the 2026-08-24 DB-integrity bulk pass
+		 * (address not present in that file); classified
+		 * `external_dependency` here with a real citation instead.
+		 */
 		std::ungetc(first, lf.f);
 		if (std::isspace(first) == 0 && std::isprint(first) == 0 && lf.f != stdin) {
 			std::fclose(lf.f);
