@@ -4,6 +4,7 @@
 #include "lua/LuaObject.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/ArmyUnitSet.h"
@@ -38,6 +39,7 @@
 #include <string>
 #include <typeinfo>
 #include <type_traits>
+#include <utility>
 #include <xmmintrin.h>
 
 int wxGetOsVersion(int* majorVsn, int* minorVsn);
@@ -12822,6 +12824,7 @@ struct StringRankLaneRuntime
   const char* text;
   std::int32_t rank;
 };
+static_assert(sizeof(StringRankLaneRuntime) == 0x08, "StringRankLaneRuntime size must be 0x08");
 
 struct ByteFlushStateRuntime
 {
@@ -13316,6 +13319,218 @@ void SelectStringRankNintherPivotForIntrosortRuntime(
   (void)SortThreeStringRankLanesRuntime(mid - partitionElements, mid, mid + partitionElements);
   (void)SortThreeStringRankLanesRuntime(end - (partitionElements * 2), end - partitionElements, end);
   (void)SortThreeStringRankLanesRuntime(lowQuartile, mid, end - partitionElements);
+}
+
+/**
+ * Address: 0x0054EE30 (FUN_0054EE30, sub_54EE30, `_Unguarded_partition`)
+ *
+ * IDA signature:
+ * unsigned int *__cdecl sub_54EE30(unsigned int *a1, unsigned int a2, int *a3, int a4);
+ *
+ * What it does:
+ * MSVC8 STL `_Unguarded_partition` for the introsort partition step over a
+ * range of `StringRankLaneRuntime` (`{string,rank}` 8-byte) elements
+ * `[first, last)`. Picks `mid = first + (last-first)/2`, calls the
+ * ninther pivot selector (`SelectStringRankNintherPivotForIntrosortRuntime`,
+ * FUN_0054F8A0) to place a good pivot at `mid`, widens the pivot-equal run
+ * outward from `mid` in both directions (skipping elements the comparator
+ * treats as equivalent to the pivot before the main scan even starts), then
+ * runs the classic 3-way (Dutch-flag-style) partition scan: `greaterFirst`
+ * walks forward absorbing pivot-equal elements into the growing
+ * `[pivotFirst,pivotLast)` run and stopping on the first strictly-less
+ * element it finds (or the end of the range); `greaterLast` walks backward
+ * doing the mirror image. The four possible outcomes of that pair of scans
+ * (both exhausted / only the forward scan found a live candidate / only the
+ * backward scan did / neither exhausted) each get their own swap shape to
+ * keep the pivot-equal run contiguous while feeding the two scan cursors
+ * one more candidate, then the scan pair repeats. Returns
+ * `[pivotFirst, pivotLast)`, the sub-range already known equal to the
+ * pivot, so the introsort driver can skip re-sorting it.
+ *
+ * Every element-vs-element comparison here is byte-verified against the raw
+ * disassembly (0x0054EE30-0x0054F242) instruction by instruction, including
+ * the two boundary swaps (`if (pivotLast != greaterFirst) ...` /
+ * `if (greaterLast != pivotFirst) ...`) which DO carry a self-swap guard in
+ * the binary, and the two scan-loop swaps (absorbing a pivot-equal element
+ * found mid-scan) which do NOT -- the binary performs those unconditionally.
+ * Both shapes are semantically a no-op when the guarded addresses coincide,
+ * so this only affects which swaps are guarded, never the final ordering.
+ *
+ * The predicate argument (`a4`) is a dead pass-through in the binary: the
+ * only two live call sites (0x0054A32C in `Moho::CAniSkel::CAniSkel`, and
+ * the `std::sort` entry thunk FUN_0054DDD0) push a literal `0` for it, since
+ * `IsStringRankLessRuntime` is stateless and its logic is inlined directly
+ * at every comparison. Dropped here, matching the sibling recoveries
+ * (FUN_0054F8A0/FUN_0054FC70) that also drop the dead predicate parameter.
+ */
+[[nodiscard]] std::pair<StringRankLaneRuntime*, StringRankLaneRuntime*> PartitionStringRankLaneRuntimeRange(
+  StringRankLaneRuntime* const first,
+  StringRankLaneRuntime* const last
+)
+{
+  StringRankLaneRuntime* const mid = first + (last - first) / 2;
+  SelectStringRankNintherPivotForIntrosortRuntime(first, mid, last - 1);
+
+  const StringRankLaneRuntime pivot = *mid;
+  StringRankLaneRuntime* pivotFirst = mid;
+  StringRankLaneRuntime* pivotLast = pivotFirst + 1;
+
+  // Widen the pivot-equal run outward before the main scan starts. `pivot`
+  // stands in for `*pivotFirst`/`*pivotLast` throughout this function: the
+  // binary re-reads through those cursors directly rather than hoisting a
+  // saved copy, which is equivalent here only because both cursors are a
+  // loop invariant always pointing at a pivot-equivalent element -- provable
+  // by induction from the strict-weak-order transitivity of `IsStringRankLessRuntime`.
+  while (
+    first < pivotFirst &&
+    !IsStringRankLessRuntime(*(pivotFirst - 1), pivot) &&
+    !IsStringRankLessRuntime(pivot, *(pivotFirst - 1))
+  ) {
+    --pivotFirst;
+  }
+  while (
+    pivotLast < last &&
+    !IsStringRankLessRuntime(*pivotLast, pivot) &&
+    !IsStringRankLessRuntime(pivot, *pivotLast)
+  ) {
+    ++pivotLast;
+  }
+
+  StringRankLaneRuntime* greaterFirst = pivotLast;
+  StringRankLaneRuntime* greaterLast = pivotFirst;
+
+  for (;;) {
+    // Forward scan: absorb pivot-equal elements into the run, stop on the
+    // first strictly-less element (or run off the end).
+    for (; greaterFirst < last; ++greaterFirst) {
+      if (IsStringRankLessRuntime(pivot, *greaterFirst)) {
+        continue;
+      }
+      if (IsStringRankLessRuntime(*greaterFirst, pivot)) {
+        break;
+      }
+      SwapByValueRuntime(*pivotLast, *greaterFirst);
+      ++pivotLast;
+    }
+
+    // Backward scan: mirror image, absorbing from the top down.
+    for (; first < greaterLast; --greaterLast) {
+      if (IsStringRankLessRuntime(*(greaterLast - 1), pivot)) {
+        continue;
+      }
+      if (IsStringRankLessRuntime(pivot, *(greaterLast - 1))) {
+        break;
+      }
+      --pivotFirst;
+      SwapByValueRuntime(*pivotFirst, *(greaterLast - 1));
+    }
+
+    if (greaterLast == first && greaterFirst == last) {
+      return {pivotFirst, pivotLast};
+    }
+
+    if (greaterLast == first) {
+      // Only the forward scan found a live candidate: fold it into the
+      // pivot-equal run and hand the vacated slot to the less-than side.
+      if (pivotLast != greaterFirst) {
+        SwapByValueRuntime(*pivotFirst, *pivotLast);
+      }
+      ++pivotLast;
+      SwapByValueRuntime(*pivotFirst, *greaterFirst);
+      ++pivotFirst;
+      ++greaterFirst;
+    } else if (greaterFirst == last) {
+      // Mirror image: only the backward scan found a live candidate.
+      --greaterLast;
+      --pivotFirst;
+      if (greaterLast != pivotFirst) {
+        SwapByValueRuntime(*greaterLast, *pivotFirst);
+      }
+      --pivotLast;
+      SwapByValueRuntime(*pivotFirst, *pivotLast);
+    } else {
+      // Both scans found a live candidate: trade them directly.
+      --greaterLast;
+      SwapByValueRuntime(*greaterFirst, *greaterLast);
+      ++greaterFirst;
+    }
+  }
+}
+
+/**
+ * Address: 0x0054E4B0 (FUN_0054E4B0, sub_54E4B0, `std::_Sort`)
+ *
+ * IDA signature:
+ * int __cdecl sub_54E4B0(int a1, int a2, int a3, int a4);
+ *
+ * What it does:
+ * MSVC8 STL `_Sort`, the introsort driver for `StringRankLaneRuntime`
+ * (`{string,rank}` 8-byte) ranges. While the range holds more than 32
+ * elements and the recursion budget (`ideal`) has not run out: partitions
+ * via `PartitionStringRankLaneRuntimeRange` (FUN_0054EE30), shrinks `ideal`
+ * by the standard introsort factor (`ideal/2 + ideal/4`, using truncating
+ * division at each step to match the literal `cdq`/`sub`/`sar` instruction
+ * pairs at 0x0054E4EC-0x0054E4FA), recurses into the smaller of the two
+ * partition halves, and loops (tail-iterates) on the larger half -- the
+ * classic introsort trick that bounds stack depth logarithmically. Once the
+ * range is small enough or the budget is exhausted, falls back to heapsort
+ * (`MakeHeapOverStringIntHeapLaneRange` + `SortHeapStringIntHeapLaneRange`,
+ * FUN_0054F990/FUN_0054F9E0) for ranges over 32 elements, or to
+ * `InsertionSortStringIntHeapLaneRangeAscending` (FUN_0054F290) otherwise.
+ *
+ * Those three fallbacks were previously recovered as `StringIntHeapLane`-
+ * typed (`{key,value}`) free functions in Vector.cpp for this exact 8-byte
+ * shape. `StringIntHeapLane` and `StringRankLaneRuntime` are layout-
+ * compatible standard-layout structs (`const char*` then `std::int32_t` in
+ * both), so the two families share a common initial sequence and the
+ * boundary between them is bridged with a `reinterpret_cast` rather than a
+ * duplicate container/algorithm implementation.
+ *
+ * The predicate argument (`a4`) is a dead pass-through in the binary (see
+ * `PartitionStringRankLaneRuntimeRange`); dropped here as in the sibling
+ * recoveries. The `ideal` recursion budget is seeded by the caller with the
+ * initial element count (`last - first`), matching `std::sort`'s
+ * `_Sort(first, last, last-first, pred)` entry contract -- both live
+ * callers agree: `Moho::CAniSkel::CAniSkel` (0x0054A32C) computes
+ * `(last-first)>>3` inline before the call, and the separate `std::sort`
+ * entry thunk FUN_0054DDD0 (already `skip`'d as a one-statement,
+ * compiler-emitted tail-call shim: `return sub_54E4B0(a1, a2, (a2-a1)>>3, a3);`)
+ * does the exact same computation before forwarding here. FUN_0054DDD0 is
+ * the "second caller" noted against the ICF-shared siblings below it in
+ * this family -- it is `std::sort()`'s own compiled body for this
+ * instantiation, not a distinct logical owner, so it does not change the
+ * fact that `Moho::CAniSkel::CAniSkel` is this range's one real source-level
+ * call site.
+ */
+void SortStringRankLaneRuntimeRange(
+  StringRankLaneRuntime* first,
+  StringRankLaneRuntime* last,
+  std::ptrdiff_t ideal
+)
+{
+  std::ptrdiff_t count = last - first;
+  while (count > 32 && ideal > 0) {
+    const auto [pivotFirst, pivotLast] = PartitionStringRankLaneRuntimeRange(first, last);
+    ideal = (ideal / 2) + (ideal / 2 / 2);
+
+    if ((pivotFirst - first) >= (last - pivotLast)) {
+      SortStringRankLaneRuntimeRange(pivotLast, last, ideal);
+      last = pivotFirst;
+    } else {
+      SortStringRankLaneRuntimeRange(first, pivotFirst, ideal);
+      first = pivotLast;
+    }
+    count = last - first;
+  }
+
+  auto* const heapFirst = reinterpret_cast<msvc8::detail::StringIntHeapLane*>(first);
+  auto* const heapLast = reinterpret_cast<msvc8::detail::StringIntHeapLane*>(last);
+  if (count > 32) {
+    (void)msvc8::detail::MakeHeapOverStringIntHeapLaneRange(heapFirst, heapLast, 0);
+    (void)msvc8::detail::SortHeapStringIntHeapLaneRange(heapFirst, heapLast, 0);
+  } else if (count > 1) {
+    (void)msvc8::detail::InsertionSortStringIntHeapLaneRangeAscending(heapFirst, heapLast);
+  }
 }
 
 /**

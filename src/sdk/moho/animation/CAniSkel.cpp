@@ -1,6 +1,5 @@
 #include "CAniSkel.h"
 
-#include <algorithm>
 #include <cstring>
 #include <new>
 
@@ -19,6 +18,15 @@
 #include "moho/resource/SScmFile.h"
 #include "moho/sim/CWldSession.h"
 #include "Wm3Vector3.h"
+
+// Forward-declared (no shared header) rather than `#include`d: the recovered
+// MSVC8 std::_Sort introsort family lives in SimRecoveryRuntime.cpp, which
+// has no header of its own -- this matches that file's own ad-hoc extern
+// convention (see e.g. its `wxGetOsVersion` forward declaration). Only the
+// entry point (FUN_0054E4B0) is declared here; its partition helper
+// (FUN_0054EE30) is called internally and stays local to that file.
+struct StringRankLaneRuntime;
+void SortStringRankLaneRuntimeRange(StringRankLaneRuntime* first, StringRankLaneRuntime* last, std::ptrdiff_t ideal);
 
 namespace
 {
@@ -115,29 +123,6 @@ namespace
       cursor += std::strlen(cursor) + 1;
     }
   }
-
-  /**
-   * Byte-verified from the introsort comparator emitted at FUN_0054EE30
-   * (`sub_54EE30`, `_Unguarded_partition`) and its guarded-insertion sibling.
-   * The MSVC8 `std::_Sort` internals (`sub_54E4B0` / `sub_54EE30`) are collapsed
-   * into a single native `std::sort` per the STL-native contract; this functor
-   * reproduces the exact strict-weak ordering: primary key is `strcmp` on the
-   * bone name, tie-broken by ascending signed `mBoneIndex`.
-   */
-  struct AniSkelBoneNameIndexLess
-  {
-    [[nodiscard]] bool operator()(
-      const moho::SAniSkelBoneNameIndex& lhs,
-      const moho::SAniSkelBoneNameIndex& rhs
-    ) const noexcept
-    {
-      const int nameOrder = std::strcmp(lhs.mBoneName, rhs.mBoneName);
-      if (nameOrder != 0) {
-        return nameOrder < 0;
-      }
-      return lhs.mBoneIndex < rhs.mBoneIndex;
-    }
-  };
 
   /**
    * Address: 0x0054AC80 (FUN_0054AC80, nullsub_2)
@@ -1023,9 +1008,26 @@ namespace moho
       bone.mBoneTransform.pos_.z = record.mRestPositionZ;
     }
 
-    // Collapsed MSVC8 std::_Sort internals (sub_54E4B0 / sub_54EE30) into one
-    // native std::sort with the byte-verified strcmp-then-index comparator.
-    std::sort(mBoneNameToIndex.begin(), mBoneNameToIndex.end(), AniSkelBoneNameIndexLess{});
+    // Address: 0x0054A32C -- calls the recovered MSVC8 std::_Sort introsort
+    // family directly: SortStringRankLaneRuntimeRange (FUN_0054E4B0), which
+    // partitions via PartitionStringRankLaneRuntimeRange (FUN_0054EE30),
+    // both in SimRecoveryRuntime.cpp. `StringRankLaneRuntime` is the layout
+    // twin of `SAniSkelBoneNameIndex` (`const char*` then `std::int32_t` in
+    // both, so the two standard-layout types share a common initial
+    // sequence). The binary pushes a dead-null predicate argument at this
+    // call site (`IsStringRankLessRuntime` is stateless and its strcmp-then-
+    // index ordering -- byte-verified equal to this file's former
+    // `AniSkelBoneNameIndexLess` comparator -- is inlined at every
+    // comparison instead), and seeds the recursion budget with the initial
+    // element count, matching `std::sort`'s `_Sort(first,last,last-first,pred)`
+    // entry contract.
+    SAniSkelBoneNameIndex* const nameIndexFirst = mBoneNameToIndex.begin();
+    SAniSkelBoneNameIndex* const nameIndexLast = mBoneNameToIndex.end();
+    SortStringRankLaneRuntimeRange(
+      reinterpret_cast<StringRankLaneRuntime*>(nameIndexFirst),
+      reinterpret_cast<StringRankLaneRuntime*>(nameIndexLast),
+      nameIndexLast - nameIndexFirst
+    );
 
     UpdateBoneBounds();
   }
