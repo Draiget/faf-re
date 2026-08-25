@@ -277,6 +277,415 @@ extern "C" void png_do_bgr(png_row_infop row_info, std::uint8_t* row)
 }
 
 // ---------------------------------------------------------------------------
+// png_do_pack (0x00A2666E) — pack one-byte-per-pixel samples down to 1/2/4 bpp.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A2666E (FUN_00A2666E)
+ * Mangled: png_do_pack
+ *
+ * IDA signature:
+ * void __cdecl png_do_pack(png_row_infop row_info, png_bytep row, png_uint_32 bit_depth);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_unpack: repacks a one-byte-per-pixel
+ * grayscale/palette row into `bit_depth` bits per pixel (1/2/4) in place.
+ * No-op for any other target depth or when the row isn't already 8bpp/1-channel.
+ * The trailing bit_depth/pixel_depth/rowbytes refresh always runs when the
+ * guard passes, even for a target depth the switch doesn't recognise --
+ * matching the binary's unconditional `goto` to the shared exit.
+ */
+extern "C" void png_do_pack(png_row_infop row_info, std::uint8_t* row, std::uint32_t bit_depth)
+{
+  auto info = View(row_info);
+  if (info.bit_depth != 8 || info.channels != 1) {
+    return;
+  }
+
+  const std::uint32_t width = info.width;
+  switch (bit_depth) {
+    case 1: {
+      std::uint8_t* sp = row;
+      std::uint8_t* dp = row;
+      int mask = 0x80;
+      int v = 0;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        if (*sp != 0) {
+          v |= mask;
+        }
+        ++sp;
+        if (mask > 1) {
+          mask >>= 1;
+        } else {
+          mask = 0x80;
+          *dp++ = static_cast<std::uint8_t>(v);
+          v = 0;
+        }
+      }
+      if (mask != 0x80) {
+        *dp = static_cast<std::uint8_t>(v);
+      }
+      break;
+    }
+    case 2: {
+      std::uint8_t* sp = row;
+      std::uint8_t* dp = row;
+      int shift = 6;
+      int v = 0;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t value = static_cast<std::uint8_t>(*sp & 0x03);
+        v |= (value << shift);
+        if (shift == 0) {
+          shift = 6;
+          *dp++ = static_cast<std::uint8_t>(v);
+          v = 0;
+        } else {
+          shift -= 2;
+        }
+        ++sp;
+      }
+      if (shift != 6) {
+        *dp = static_cast<std::uint8_t>(v);
+      }
+      break;
+    }
+    case 4: {
+      std::uint8_t* sp = row;
+      std::uint8_t* dp = row;
+      int shift = 4;
+      int v = 0;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t value = static_cast<std::uint8_t>(*sp & 0x0f);
+        v |= (value << shift);
+        if (shift == 0) {
+          shift = 4;
+          *dp++ = static_cast<std::uint8_t>(v);
+          v = 0;
+        } else {
+          shift -= 4;
+        }
+        ++sp;
+      }
+      if (shift != 4) {
+        *dp = static_cast<std::uint8_t>(v);
+      }
+      break;
+    }
+    default:
+      break;  // unrecognised target depth: no repacking, layout still refreshes below
+  }
+
+  info.bit_depth   = static_cast<std::uint8_t>(bit_depth);
+  info.pixel_depth = static_cast<std::uint8_t>(info.channels * bit_depth);
+  info.rowbytes    = (info.width * info.pixel_depth + 7) >> 3;
+}
+
+// ---------------------------------------------------------------------------
+// png_do_shift (0x00A2679E) — rescale sample values from sig_bits to bit_depth.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A2679E (FUN_00A2679E)
+ * Mangled: png_do_shift
+ *
+ * IDA signature:
+ * void __cdecl png_do_shift(png_row_infop row_info, png_bytep row, png_color_8p bit_depth);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_unshift: expands each channel from its
+ * true significant-bit count (the sBIT chunk's red/green/blue/gray/alpha
+ * values, packed as a 5-byte png_color_8) back up to the row's full
+ * bit_depth by left/right-shifting the sample into every replicated
+ * sub-range. No-op for palette rows. Dispatches by bit_depth (<8 / ==8 / 16).
+ */
+extern "C" void png_do_shift(png_row_infop row_info, std::uint8_t* row, const std::uint8_t* bit_depth)
+{
+  auto info = View(row_info);
+  if (info.color_type == libpng_detail::kPngColorTypePalette) {
+    return;
+  }
+
+  // bit_depth[] is a packed png_color_8: {red, green, blue, gray, alpha}.
+  int shiftStart[4];
+  int shiftDec[4];
+  int channels = 0;
+
+  if ((info.color_type & libpng_detail::kPngColorMaskColor) != 0) {
+    shiftStart[channels] = info.bit_depth - bit_depth[0];  // red
+    shiftDec[channels]   = bit_depth[0];
+    ++channels;
+    shiftStart[channels] = info.bit_depth - bit_depth[1];  // green
+    shiftDec[channels]   = bit_depth[1];
+    ++channels;
+    shiftStart[channels] = info.bit_depth - bit_depth[2];  // blue
+    shiftDec[channels]   = bit_depth[2];
+    ++channels;
+  } else {
+    shiftStart[channels] = info.bit_depth - bit_depth[3];  // gray
+    shiftDec[channels]   = bit_depth[3];
+    ++channels;
+  }
+  if ((info.color_type & libpng_detail::kPngColorMaskAlpha) != 0) {
+    shiftStart[channels] = info.bit_depth - bit_depth[4];  // alpha
+    shiftDec[channels]   = bit_depth[4];
+    ++channels;
+  }
+
+  if (info.bit_depth < 8) {
+    // Low row depths are always single-channel grayscale.
+    std::uint8_t mask;
+    if (bit_depth[3] == 1 && info.bit_depth == 2) {
+      mask = 0x55;
+    } else if (info.bit_depth == 4 && bit_depth[3] == 3) {
+      mask = 0x11;
+    } else {
+      mask = 0xff;
+    }
+
+    std::uint8_t* bp = row;
+    for (std::uint32_t i = 0; i < info.rowbytes; ++i, ++bp) {
+      const int v = *bp;
+      *bp = 0;
+      for (int j = shiftStart[0]; j > -shiftDec[0]; j -= shiftDec[0]) {
+        if (j > 0) {
+          *bp = static_cast<std::uint8_t>(*bp | ((v << j) & 0xff));
+        } else {
+          *bp = static_cast<std::uint8_t>(*bp | ((v >> (-j)) & mask));
+        }
+      }
+    }
+  } else if (info.bit_depth == 8) {
+    std::uint8_t* bp = row;
+    const std::uint32_t istop = static_cast<std::uint32_t>(channels) * info.width;
+    for (std::uint32_t i = 0; i < istop; ++i, ++bp) {
+      const int v = *bp;
+      *bp = 0;
+      const int c = static_cast<int>(i % static_cast<std::uint32_t>(channels));
+      for (int j = shiftStart[c]; j > -shiftDec[c]; j -= shiftDec[c]) {
+        if (j > 0) {
+          *bp = static_cast<std::uint8_t>(*bp | ((v << j) & 0xff));
+        } else {
+          *bp = static_cast<std::uint8_t>(*bp | ((v >> (-j)) & 0xff));
+        }
+      }
+    }
+  } else {
+    std::uint8_t* bp = row;
+    const std::uint32_t istop = static_cast<std::uint32_t>(channels) * info.width;
+    for (std::uint32_t i = 0; i < istop; ++i) {
+      const int c = static_cast<int>(i % static_cast<std::uint32_t>(channels));
+      const int v = (static_cast<int>(bp[0]) << 8) + bp[1];
+      int value = 0;
+      for (int j = shiftStart[c]; j > -shiftDec[c]; j -= shiftDec[c]) {
+        if (j > 0) {
+          value |= (v << j) & 0xffff;
+        } else {
+          value |= (v >> (-j)) & 0xffff;
+        }
+      }
+      bp[0] = static_cast<std::uint8_t>(value >> 8);
+      bp[1] = static_cast<std::uint8_t>(value & 0xff);
+      bp += 2;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// png_do_write_swap_alpha (0x00A269EF) — reorder alpha from leading to trailing.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A269EF (FUN_00A269EF)
+ * Mangled: png_do_write_swap_alpha
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_swap_alpha(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_read_swap_alpha: converts ARGB/AG rows
+ * (as produced by an application via PNG_TRANSFORM_SWAP_ALPHA) back to PNG's
+ * wire order RGBA/GA in place. Handles 8-bit and 16-bit RGBA and
+ * gray+alpha rows; no-op for any other color type.
+ */
+extern "C" void png_do_write_swap_alpha(png_row_infop row_info, std::uint8_t* row)
+{
+  auto info = View(row_info);
+  const std::uint32_t width = info.width;
+
+  if (info.color_type == libpng_detail::kPngColorTypeRgbAlpha) {
+    std::uint8_t* sp = row;
+    std::uint8_t* dp = row;
+    if (info.bit_depth == 8) {
+      // ARGB -> RGBA
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t save = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = save;
+      }
+    } else {
+      // AARRGGBB -> RRGGBBAA
+      for (std::uint32_t i = 0; i < width; ++i) {
+        std::uint8_t save[2];
+        save[0] = *(sp++);
+        save[1] = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = save[0];
+        *(dp++) = save[1];
+      }
+    }
+  } else if (info.color_type == libpng_detail::kPngColorTypeGrayAlpha) {
+    std::uint8_t* sp = row;
+    std::uint8_t* dp = row;
+    if (info.bit_depth == 8) {
+      // AG -> GA
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t save = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = save;
+      }
+    } else {
+      // AAGG -> GGAA
+      for (std::uint32_t i = 0; i < width; ++i) {
+        std::uint8_t save[2];
+        save[0] = *(sp++);
+        save[1] = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = save[0];
+        *(dp++) = save[1];
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// png_do_write_invert_alpha (0x00A26AE1) — undo application-side alpha invert.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A26AE1 (FUN_00A26AE1)
+ * Mangled: png_do_write_invert_alpha
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_invert_alpha(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * Write-side counterpart to png_do_read_invert_alpha: inverts the alpha
+ * channel back to PNG's opacity convention (a' = 255 - a, or two-byte
+ * equivalent for 16-bit) for RGBA and gray+alpha rows, in place.
+ */
+extern "C" void png_do_write_invert_alpha(png_row_infop row_info, std::uint8_t* row)
+{
+  auto info = View(row_info);
+  const std::uint32_t width = info.width;
+
+  if (info.color_type == libpng_detail::kPngColorTypeRgbAlpha) {
+    std::uint8_t* sp = row;
+    std::uint8_t* dp = row;
+    if (info.bit_depth == 8) {
+      for (std::uint32_t i = 0; i < width; ++i) {
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+      }
+    } else {
+      for (std::uint32_t i = 0; i < width; ++i) {
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+      }
+    }
+  } else if (info.color_type == libpng_detail::kPngColorTypeGrayAlpha) {
+    std::uint8_t* sp = row;
+    std::uint8_t* dp = row;
+    if (info.bit_depth == 8) {
+      for (std::uint32_t i = 0; i < width; ++i) {
+        *(dp++) = *(sp++);
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+      }
+    } else {
+      for (std::uint32_t i = 0; i < width; ++i) {
+        *(dp++) = *(sp++);
+        *(dp++) = *(sp++);
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+        *(dp++) = static_cast<std::uint8_t>(255 - *(sp++));
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// png_do_write_intrapixel (0x00A26BCC) — MNG intrapixel (RGB) differencing.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A26BCC (FUN_00A26BCC)
+ * Mangled: png_do_write_intrapixel
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_intrapixel(png_row_infop row_info, png_bytep row);
+ *
+ * What it does:
+ * MNG "intrapixel differencing" write-side filter (Sub-RGB): replaces R and B
+ * with (R-G) and (B-G) in place for 8-bit and 16-bit RGB/RGBA rows. No-op for
+ * non-color rows. Called from png_write_row only when mng_features_permitted
+ * has PNG_FLAG_MNG_FILTER_64 set and filter_type == 64 (MNG_FILTER_INTRAPIXEL).
+ */
+extern "C" void png_do_write_intrapixel(png_row_infop row_info, std::uint8_t* row)
+{
+  auto info = View(row_info);
+  if ((info.color_type & libpng_detail::kPngColorMaskColor) == 0) {
+    return;
+  }
+
+  const std::uint32_t width = info.width;
+  if (info.bit_depth == 8) {
+    int bytesPerPixel;
+    if (info.color_type == libpng_detail::kPngColorTypeRgb) {
+      bytesPerPixel = 3;
+    } else if (info.color_type == libpng_detail::kPngColorTypeRgbAlpha) {
+      bytesPerPixel = 4;
+    } else {
+      return;
+    }
+    std::uint8_t* rp = row;
+    for (std::uint32_t i = 0; i < width; ++i, rp += bytesPerPixel) {
+      rp[0] = static_cast<std::uint8_t>((rp[0] - rp[1]) & 0xff);
+      rp[2] = static_cast<std::uint8_t>((rp[2] - rp[1]) & 0xff);
+    }
+  } else if (info.bit_depth == 16) {
+    int bytesPerPixel;
+    if (info.color_type == libpng_detail::kPngColorTypeRgb) {
+      bytesPerPixel = 6;
+    } else if (info.color_type == libpng_detail::kPngColorTypeRgbAlpha) {
+      bytesPerPixel = 8;
+    } else {
+      return;
+    }
+    std::uint8_t* rp = row;
+    for (std::uint32_t i = 0; i < width; ++i, rp += bytesPerPixel) {
+      const std::uint32_t s0 = (static_cast<std::uint32_t>(rp[0]) << 8) | rp[1];
+      const std::uint32_t s1 = (static_cast<std::uint32_t>(rp[2]) << 8) | rp[3];
+      const std::uint32_t s2 = (static_cast<std::uint32_t>(rp[4]) << 8) | rp[5];
+      const std::uint32_t red  = (s0 - s1) & 0xffffu;
+      const std::uint32_t blue = (s2 - s1) & 0xffffu;
+      rp[0] = static_cast<std::uint8_t>((red >> 8) & 0xff);
+      rp[1] = static_cast<std::uint8_t>(red & 0xff);
+      rp[4] = static_cast<std::uint8_t>((blue >> 8) & 0xff);
+      rp[5] = static_cast<std::uint8_t>(blue & 0xff);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // png_do_unpack (0x009E3A7E) — expand 1/2/4 bpp packed pixels to 8 bpp.
 // ---------------------------------------------------------------------------
 /**
@@ -2027,6 +2436,118 @@ extern "C" void png_do_background(png_row_infop row_info, std::uint8_t* row,
 extern "C" void png_error(png_structp png_ptr, const char* message);
 extern "C" void png_warning(png_structp png_ptr, const char* message);
 
+// ---------------------------------------------------------------------------
+// png_do_write_interlace (0x00A2493D) — compact a row down to one Adam7 pass.
+// ---------------------------------------------------------------------------
+/**
+ * Address: 0x00A2493D (FUN_00A2493D)
+ * Mangled: png_do_write_interlace
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_interlace(png_row_infop row_info, png_bytep row, int pass);
+ *
+ * What it does:
+ * Compacts a full-width row down to just the pixels belonging to Adam7 pass
+ * `pass`, in place (the source cursor is always >= the destination cursor,
+ * so the compaction never overwrites unread source data). Dispatches by
+ * pixel_depth: 1/2/4 bpp are bit-packed by hand, everything else (8/16/24/
+ * 32/48/64 bpp) is a per-pixel byte copy. No-op for pass 6, which already
+ * covers every pixel. Called from png_write_row for each row of an
+ * interlaced image whose caller did not pre-expand PNG_INTERLACE.
+ */
+extern "C" void png_do_write_interlace(png_row_infop row_info, std::uint8_t* row, int pass)
+{
+  using libpng_layout::kPngPassInc;
+  using libpng_layout::kPngPassStart;
+
+  if (pass >= 6) {
+    return;
+  }
+
+  const std::uint32_t rowWidth = row_info->width;
+
+  switch (row_info->pixel_depth) {
+    case 1: {
+      std::uint8_t* dp = row;
+      int shift = 7;
+      int d = 0;
+      for (std::uint32_t i = kPngPassStart[pass]; i < rowWidth; i += kPngPassInc[pass]) {
+        const std::uint8_t* sp = row + (i >> 3);
+        const int value = (*sp >> (7 - static_cast<int>(i & 7))) & 0x01;
+        d |= (value << shift);
+        if (shift == 0) {
+          shift = 7;
+          *dp++ = static_cast<std::uint8_t>(d);
+          d = 0;
+        } else {
+          --shift;
+        }
+      }
+      if (shift != 7) {
+        *dp = static_cast<std::uint8_t>(d);
+      }
+      break;
+    }
+    case 2: {
+      std::uint8_t* dp = row;
+      int shift = 6;
+      int d = 0;
+      for (std::uint32_t i = kPngPassStart[pass]; i < rowWidth; i += kPngPassInc[pass]) {
+        const std::uint8_t* sp = row + (i >> 2);
+        const int value = (*sp >> ((3 - static_cast<int>(i & 3)) << 1)) & 0x03;
+        d |= (value << shift);
+        if (shift == 0) {
+          shift = 6;
+          *dp++ = static_cast<std::uint8_t>(d);
+          d = 0;
+        } else {
+          shift -= 2;
+        }
+      }
+      if (shift != 6) {
+        *dp = static_cast<std::uint8_t>(d);
+      }
+      break;
+    }
+    case 4: {
+      std::uint8_t* dp = row;
+      int shift = 4;
+      int d = 0;
+      for (std::uint32_t i = kPngPassStart[pass]; i < rowWidth; i += kPngPassInc[pass]) {
+        const std::uint8_t* sp = row + (i >> 1);
+        const int value = (*sp >> ((1 - static_cast<int>(i & 1)) << 2)) & 0x0f;
+        d |= (value << shift);
+        if (shift == 0) {
+          shift = 4;
+          *dp++ = static_cast<std::uint8_t>(d);
+          d = 0;
+        } else {
+          shift -= 4;
+        }
+      }
+      if (shift != 4) {
+        *dp = static_cast<std::uint8_t>(d);
+      }
+      break;
+    }
+    default: {
+      std::uint8_t* dp = row;
+      const std::size_t pixelBytes = row_info->pixel_depth >> 3;
+      for (std::uint32_t i = kPngPassStart[pass]; i < rowWidth; i += kPngPassInc[pass]) {
+        const std::uint8_t* sp = row + static_cast<std::size_t>(i) * pixelBytes;
+        if (dp != sp) {
+          std::memcpy(dp, sp, pixelBytes);
+        }
+        dp += pixelBytes;
+      }
+      break;
+    }
+  }
+
+  row_info->width = (row_info->width + kPngPassInc[pass] - 1 - kPngPassStart[pass]) / kPngPassInc[pass];
+  row_info->rowbytes = ((row_info->width * row_info->pixel_depth + 7) >> 3);
+}
+
 /**
  * Address: 0x009E711B (FUN_009E711B)
  * Mangled: png_do_read_transformations
@@ -2194,5 +2715,78 @@ extern "C" void png_do_read_transformations(png_structp png_ptr)
     const std::uint8_t pd = static_cast<std::uint8_t>(row_info->bit_depth * row_info->channels);
     row_info->pixel_depth = pd;
     row_info->rowbytes = (row_info->width * pd + 7) >> 3;
+  }
+}
+
+/**
+ * Address: 0x00A26C8E (FUN_00A26C8E)
+ * Mangled: png_do_write_transformations
+ *
+ * IDA signature:
+ * void __cdecl png_do_write_transformations(png_structp png_ptr);
+ *
+ * What it does:
+ * Write-path transform dispatcher: walks png_ptr->transformations and applies
+ * each enabled transform to the current scanline (row_buf + 1) in sequence,
+ * updating the row_info sub-object at png_struct+0x100 that png_write_row
+ * primed. Mirrors libpng pngwtran.c order exactly: optional user transform,
+ * strip filler, packswap, pack, swap bytes, shift, invert alpha, swap alpha,
+ * bgr, invert mono. A null png_ptr is a no-op (matches the binary's explicit
+ * guard, unlike the read-side dispatcher which assumes a valid pointer).
+ */
+extern "C" void png_do_write_transformations(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  if (png_ptr == nullptr) {
+    return;
+  }
+
+  auto* const row_info = reinterpret_cast<png_row_infop>(RawBase(png_ptr) + 0x100);
+  std::uint8_t* const row = Field<std::uint8_t*>(png_ptr, kOffRowBuf) + 1;
+  const std::uint32_t transformations = Transformations(png_ptr);
+
+  if ((transformations & 0x100000u) != 0) {  // PNG_USER_TRANSFORM
+    using png_user_transform_ptr = void (*)(png_structp, png_row_infop, std::uint8_t*);
+    const auto fn = Field<png_user_transform_ptr>(png_ptr, kOffWriteUserTransformFn);
+    if (fn != nullptr) {
+      fn(png_ptr, row_info, row);
+    }
+  }
+
+  if ((transformations & kPngFiller) != 0) {
+    png_do_strip_filler(row_info, row, Flags(png_ptr));
+  }
+
+  if ((transformations & kPngPackSwap) != 0) {
+    png_do_packswap(row_info, row);
+  }
+
+  if ((transformations & kPngPack) != 0) {
+    png_do_pack(row_info, row, static_cast<std::uint32_t>(BitDepth(png_ptr)));
+  }
+
+  if ((transformations & kPngSwapBytes) != 0) {
+    png_do_swap(row_info, row);
+  }
+
+  if ((transformations & kPngShift) != 0) {
+    png_do_shift(row_info, row, RawBase(png_ptr) + kOffShift);
+  }
+
+  if ((transformations & kPngInvertAlpha) != 0) {
+    png_do_write_invert_alpha(row_info, row);
+  }
+
+  if ((transformations & kPngSwapAlpha) != 0) {
+    png_do_write_swap_alpha(row_info, row);
+  }
+
+  if ((transformations & kPngBgr) != 0) {
+    png_do_bgr(row_info, row);
+  }
+
+  if ((transformations & kPngInvertMono) != 0) {
+    png_do_invert(row_info, row);
   }
 }
