@@ -64,53 +64,18 @@ namespace
     return sType;
   }
 
-  struct SerSaveLoadHelperNodeView
-  {
-    void* mVTable;
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperNodeView::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperNodeView::mHelperPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeView) == 0x14, "SerSaveLoadHelperNodeView size must be 0x14");
-
-  SerSaveLoadHelperNodeView gCAniPoseSerializer{};
-  SerSaveLoadHelperNodeView gCAniPoseBoneSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNodeSelf(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetHelperNodeLinks(SerSaveLoadHelperNodeView& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-    gpg::SerHelperBase* const self = HelperNodeSelf(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  void DeserializeCAniPoseSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<moho::CAniPose*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive);
-  }
-
-  void SerializeCAniPoseSerializerCallback(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<moho::CAniPose*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive);
-  }
+  // Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CAniPose>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, which forward to `CAniPose::MemberDeserialize`/
+  // `MemberSerialize`, installs the vtable) and registers the real mangled
+  // destructor (`??1CAniPoseSerializer@Moho@@QAE@@Z`, 0x00BF4610) via
+  // `atexit`. There is no hand-written "register" function for this in the
+  // original source -- matches `gpg::PrimitiveSerHelper<T,IntType>`'s
+  // already-established modeling. See `gpg::SerSaveLoadHelper<T>`'s
+  // class-level comment in Reflection.h.
+  moho::CAniPoseSerializer gCAniPoseSerializer;
 
   /**
    * Address: 0x0054DEB0 (FUN_0054DEB0)
@@ -192,142 +157,37 @@ namespace
     return archive;
   }
 
-  void DeserializeCAniPoseBoneSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::CAniPoseBone*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive);
-  }
-
-  void SerializeCAniPoseBoneSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::CAniPoseBone*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0054C5E0 (FUN_0054C5E0)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAniPoseSerializer` helper storage
-   * and returns that helper object.
-   */
-  [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseSerializerStartupThunk() noexcept
-  {
-    gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseSerializer);
-    gCAniPoseSerializer.mHelperPrev = self;
-    gCAniPoseSerializer.mHelperNext = self;
-    gCAniPoseSerializer.mLoadCallback = &DeserializeCAniPoseSerializerCallback;
-    gCAniPoseSerializer.mSaveCallback = &SerializeCAniPoseSerializerCallback;
-    return &gCAniPoseSerializer;
-  }
-
-  /**
-   * Address: 0x0054C8C0 (FUN_0054C8C0)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAniPoseBoneSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseBoneSerializerStartupThunk() noexcept
-  {
-    gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseBoneSerializer);
-    gCAniPoseBoneSerializer.mHelperPrev = self;
-    gCAniPoseBoneSerializer.mHelperNext = self;
-    gCAniPoseBoneSerializer.mLoadCallback = &DeserializeCAniPoseBoneSerializerCallback;
-    gCAniPoseBoneSerializer.mSaveCallback = &SerializeCAniPoseBoneSerializerCallback;
-    return &gCAniPoseBoneSerializer;
-  }
-
-  /**
-   * Address: 0x0054BA60 (FUN_0054BA60)
-   *
-   * What it does:
-   * Unlinks `CAniPoseSerializer` helper node from the intrusive helper list
-   * and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodePrimary() noexcept
-  {
-    return ResetHelperNodeLinks(gCAniPoseSerializer);
-  }
-
-  /**
-   * Address: 0x0054BA90 (FUN_0054BA90)
-   *
-   * What it does:
-   * Secondary entrypoint for `CAniPoseSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetHelperNodeLinks(gCAniPoseSerializer);
-  }
-
-  /**
-   * Address: 0x0054BFD0 (FUN_0054BFD0)
-   *
-   * What it does:
-   * Unlinks `CAniPoseBoneSerializer` helper node from the intrusive helper
-   * list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodePrimary() noexcept
-  {
-    return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
-  }
-
-  /**
-   * Address: 0x0054C000 (FUN_0054C000)
-   *
-   * What it does:
-   * Secondary entrypoint for `CAniPoseBoneSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
-  }
-
-  void cleanup_CAniPoseSerializer_atexit()
-  {
-    (void)CleanupCAniPoseSerializerHelperNodePrimary();
-  }
+  // Address: 0x00BC99C0 (FUN_00BC99C0, register_CAniPoseBoneSerializer) --
+  // same shape as gCAniPoseSerializer above, for
+  // `gpg::SerSaveLoadHelper<CAniPoseBone>`; real mangled destructor
+  // `??1CAniPoseBoneSerializer@Moho@@QAE@@Z` at 0x00BF46A0.
+  moho::CAniPoseBoneSerializer gCAniPoseBoneSerializer;
 
   /**
    * Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer)
    *
    * What it does:
-   * Initializes the global CAniPose serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Forces this translation unit's global `CAniPoseSerializer` instance to
+   * link into the reflection bootstrap sequence. The ctor/vtable-install/
+   * atexit-dtor-registration sequence this address decompiles to is MSVC's
+   * own compiler-generated dynamic initializer for `gCAniPoseSerializer` (see
+   * the Doxygen comment on that global above), not hand-written source.
    */
   void register_CAniPoseSerializer()
   {
-    (void)InitializeCAniPoseSerializerStartupThunk();
-    (void)std::atexit(&cleanup_CAniPoseSerializer_atexit);
-  }
-
-  void cleanup_CAniPoseBoneSerializer_atexit()
-  {
-    (void)CleanupCAniPoseBoneSerializerHelperNodePrimary();
+    (void)gCAniPoseSerializer;
   }
 
   /**
    * Address: 0x00BC99C0 (FUN_00BC99C0, register_CAniPoseBoneSerializer)
    *
    * What it does:
-   * Initializes the global CAniPoseBone serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Same forcing role as `register_CAniPoseSerializer`, for
+   * `gCAniPoseBoneSerializer`.
    */
   void register_CAniPoseBoneSerializer()
   {
-    (void)InitializeCAniPoseBoneSerializerStartupThunk();
-    (void)std::atexit(&cleanup_CAniPoseBoneSerializer_atexit);
+    (void)gCAniPoseBoneSerializer;
   }
 
   struct CAniPoseSerializerStartupBootstrap
