@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -21,9 +20,16 @@ namespace
   template <>
   EngineStats* StartupEngineStatsSlot<0x10AE4DCu>::value = nullptr;
 
-  alignas(IAiCommandDispatchImplSerializer)
-  unsigned char gIAiCommandDispatchImplSerializerStorage[sizeof(IAiCommandDispatchImplSerializer)] = {};
-  bool gIAiCommandDispatchImplSerializerConstructed = false;
+  // Address: 0x010AE324 -- process-global `IAiCommandDispatchImplSerializer`
+  // singleton. Constructing it runs IAiCommandDispatchImplSerializer::
+  // IAiCommandDispatchImplSerializer() (0x00BCBF00), which splices this
+  // helper into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
+  // InitNewHelpers() later dispatches Init() on it from within the first
+  // ReadArchive/WriteArchive construction. Its destructor
+  // (~IAiCommandDispatchImplSerializer, 0x00BF66F0) runs at normal
+  // static-duration teardown, matching the real binary's atexit
+  // registration.
+  IAiCommandDispatchImplSerializer gIAiCommandDispatchImplSerializer;
 
   /**
    * Address: 0x00599A40 (FUN_00599A40, j_Moho::IAiCommandDispatchImpl::MemberSerialize)
@@ -60,44 +66,6 @@ namespace
     moho::IAiCommandDispatchImpl::MemberSerialize(object, archive);
   }
 
-  [[nodiscard]] IAiCommandDispatchImplSerializer* AcquireIAiCommandDispatchImplSerializer()
-  {
-    if (!gIAiCommandDispatchImplSerializerConstructed) {
-      new (gIAiCommandDispatchImplSerializerStorage) IAiCommandDispatchImplSerializer();
-      gIAiCommandDispatchImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<IAiCommandDispatchImplSerializer*>(gIAiCommandDispatchImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiCommandDispatchImplType()
   {
     gpg::RType* type = IAiCommandDispatchImpl::sType;
@@ -106,50 +74,6 @@ namespace
       IAiCommandDispatchImpl::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BF66F0 (FUN_00BF66F0, cleanup_IAiCommandDispatchImplSerializer)
-   *
-   * What it does:
-   * Unlinks recovered serializer helper node from intrusive serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplSerializer()
-  {
-    if (!gIAiCommandDispatchImplSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireIAiCommandDispatchImplSerializer());
-  }
-
-  /**
-   * Address: 0x00599410 (FUN_00599410)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * IAiCommandDispatchImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplSerializerStartupThunkA()
-  {
-    return cleanup_IAiCommandDispatchImplSerializer();
-  }
-
-  /**
-   * Address: 0x00599440 (FUN_00599440)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * IAiCommandDispatchImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplSerializerStartupThunkB()
-  {
-    return cleanup_IAiCommandDispatchImplSerializer();
-  }
-
-  void cleanup_IAiCommandDispatchImplSerializer_atexit()
-  {
-    (void)cleanup_IAiCommandDispatchImplSerializer();
   }
 
   /**
@@ -206,35 +130,44 @@ void IAiCommandDispatchImplSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCBF00 (FUN_00BCBF00, dynamic initializer for the global
+ * `IAiCommandDispatchImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+IAiCommandDispatchImplSerializer::IAiCommandDispatchImplSerializer()
+  : mLoadCallback(&IAiCommandDispatchImplSerializer::Deserialize)
+  , mSaveCallback(&IAiCommandDispatchImplSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF66F0 (FUN_00BF66F0, ??1IAiCommandDispatchImplSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+IAiCommandDispatchImplSerializer::~IAiCommandDispatchImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005996D0 (FUN_005996D0)
  *
  * What it does:
  * Lazily resolves IAiCommandDispatchImpl RTTI and installs load/save callbacks
  * from this helper object into the type descriptor.
  */
-void IAiCommandDispatchImplSerializer::RegisterSerializeFunctions()
+void IAiCommandDispatchImplSerializer::Init()
 {
   gpg::RType* const type = CachedIAiCommandDispatchImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mLoadCallback;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x00BCBF00 (FUN_00BCBF00, register_IAiCommandDispatchImplSerializer)
- *
- * What it does:
- * Initializes recovered serializer helper storage/callback lanes and installs
- * process-exit unlink cleanup.
- */
-void moho::register_IAiCommandDispatchImplSerializer()
-{
-  IAiCommandDispatchImplSerializer* const serializer = AcquireIAiCommandDispatchImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &IAiCommandDispatchImplSerializer::Deserialize;
-  serializer->mSaveCallback = &IAiCommandDispatchImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_IAiCommandDispatchImplSerializer_atexit);
 }
 
 /**
@@ -250,14 +183,19 @@ int moho::register_IAiCommandDispatchImplStartupStatsCleanup()
 
 namespace
 {
-  struct IAiCommandDispatchImplSerializerBootstrap
+  // The binary runs `register_IAiCommandDispatchImplStartupStatsCleanup`
+  // from the CRT static-initializer array as its own independent entry
+  // (FUN_00BCBF40 takes no `this` and never touches
+  // `IAiCommandDispatchImplSerializer`); a file-scope bootstrap object
+  // reproduces that entry now that the serializer above no longer needs one
+  // of its own.
+  struct IAiCommandDispatchImplStartupStatsCleanupBootstrap
   {
-    IAiCommandDispatchImplSerializerBootstrap()
+    IAiCommandDispatchImplStartupStatsCleanupBootstrap()
     {
-      moho::register_IAiCommandDispatchImplSerializer();
       (void)moho::register_IAiCommandDispatchImplStartupStatsCleanup();
     }
   };
 
-  [[maybe_unused]] IAiCommandDispatchImplSerializerBootstrap gIAiCommandDispatchImplSerializerBootstrap;
+  [[maybe_unused]] IAiCommandDispatchImplStartupStatsCleanupBootstrap gIAiCommandDispatchImplStartupStatsCleanupBootstrap;
 } // namespace

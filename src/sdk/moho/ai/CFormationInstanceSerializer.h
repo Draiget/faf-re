@@ -5,11 +5,6 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
@@ -17,10 +12,9 @@ namespace moho
    *
    * Serializer helper for `CFormationInstance`. Same shape as
    * `CAiBrainSerializer`: an intrusive node in the global serializer chain plus
-   * the load/save callbacks that `RegisterSerializeFunctions` installs into the
-   * reflected type.
+   * the load/save callbacks that `Init` installs into the reflected type.
    */
-  class CFormationInstanceSerializer
+  class CFormationInstanceSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -40,29 +34,42 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00BCAC40 (FUN_00BCAC40, dynamic initializer for the global
+     * `CFormationInstanceSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CFormationInstanceSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here.
+     */
+    CFormationInstanceSerializer();
+
+    /**
+     * Address: 0x00BF5AA0 (FUN_00BF5AA0, ??1CFormationInstanceSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks the helper node from the intrusive serializer chain and
+     * re-points both links at itself, leaving a valid one-element ring.
+     */
+    ~CFormationInstanceSerializer();
+
+    /**
      * What it does:
      * Binds this helper's load/save callbacks into the `CFormationInstance`
-     * type descriptor.
+     * type descriptor. Dispatched by `gpg::SerHelperBase::InitNewHelpers`
+     * when this helper is drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    // Intrusive list links from gpg::DListItem<gpg::SerHelperBase>.
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     // Serializer callbacks consumed by the reflection registration flow.
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(
-    offsetof(CFormationInstanceSerializer, mHelperNext) == 0x04,
-    "CFormationInstanceSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CFormationInstanceSerializer, mHelperPrev) == 0x08,
-    "CFormationInstanceSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CFormationInstanceSerializer, mLoadCallback) == 0x0C,
     "CFormationInstanceSerializer::mLoadCallback offset must be 0x0C"
@@ -74,13 +81,4 @@ namespace moho
   static_assert(
     sizeof(CFormationInstanceSerializer) == 0x14, "CFormationInstanceSerializer size must be 0x14"
   );
-
-  /**
-   * Address: 0x00BCAC40 (FUN_00BCAC40, register_CFormationInstanceSerializer)
-   *
-   * What it does:
-   * Initializes the global `CFormationInstance` serializer helper, binds its
-   * load/save callbacks, and installs process-exit cleanup.
-   */
-  void register_CFormationInstanceSerializer();
 } // namespace moho

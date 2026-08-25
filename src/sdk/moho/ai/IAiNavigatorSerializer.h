@@ -4,18 +4,13 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1C068
    * COL:  0x00E71870
    */
-  class IAiNavigatorSerializer
+  class IAiNavigatorSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -35,28 +30,43 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00BCC6C0 (FUN_00BCC6C0, dynamic initializer for the global
+     * `IAiNavigatorSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7IAiNavigatorSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here.
+     */
+    IAiNavigatorSerializer();
+
+    /**
+     * Address: 0x00BF6D60 (FUN_00BF6D60, ??1IAiNavigatorSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~IAiNavigatorSerializer();
+
+    /**
      * Address: 0x005A71A0 (FUN_005A71A0)
      *
      * What it does:
-     * Binds load/save serializer callbacks into IAiNavigator RTTI.
+     * Binds load/save serializer callbacks into IAiNavigator RTTI. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(
-    offsetof(IAiNavigatorSerializer, mHelperNext) == 0x04,
-    "IAiNavigatorSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(IAiNavigatorSerializer, mHelperPrev) == 0x08,
-    "IAiNavigatorSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(IAiNavigatorSerializer, mLoadCallback) == 0x0C,
     "IAiNavigatorSerializer::mLoadCallback offset must be 0x0C"
@@ -66,14 +76,4 @@ namespace moho
     "IAiNavigatorSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(IAiNavigatorSerializer) == 0x14, "IAiNavigatorSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BCC6C0 (FUN_00BCC6C0, register_IAiNavigatorSerializer)
-   *
-   * What it does:
-   * Initializes the global IAiNavigator serializer helper callbacks and
-   * installs process-exit cleanup.
-   */
-  void register_IAiNavigatorSerializer();
 } // namespace moho
-
