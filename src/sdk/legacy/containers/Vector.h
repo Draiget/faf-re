@@ -2767,6 +2767,34 @@ namespace msvc8
          * above. This `push_back` instantiation's own evidence (a real,
          * direct, `.asm`-confirmed call from `FUN_0064CC70`) stands
          * regardless of that upstream gap.)
+         * Address: 0x005C6E70 (FUN_005C6E70, msvc8::vector<Moho::
+         * SPerArmyReconInfo>::push_back for the 52-byte element) -- same
+         * two-way split as this member's other instantiations: the
+         * `size()<capacity()` fast path constructs the pushed value at
+         * `_Mylast` through the `uninit_fill_n` core `FUN_005CC2D0` (`n=1`,
+         * cited on `uninit_fill_n` below) then advances `_Mylast` by 52 in
+         * place; the capacity-exhausted path tail-calls the single-append
+         * adapter `FUN_005C86B0` (its own `Address:` line immediately
+         * below), matching this member's `insert(last_, value)` else-branch.
+         * Reached from `LoadVectorSPerArmyReconInfo` (`FUN_005C5700`,
+         * `ArchiveSerialization.cpp`) as `loaded.push_back(element)` inside
+         * the per-element read loop -- confirmed against the `.c`:
+         * `sub_5C6E70((int)&obj, &v9)` follows each `ReadArchive::Read` call.
+         * The decompiled render drops the third (`ebx`) argument to the
+         * nested `uninit_fill_n`/`_Insert_n` calls in both this function and
+         * its adapter (a known IDA pseudo-c quirk for custom-convention
+         * calls, already documented elsewhere in this file, e.g. the
+         * `HeadSampleOption` `push_back` entry above) -- read against the
+         * raw `.asm`, both branches match this member exactly. DB-integrity
+         * fix: was fake-recovered (batch r14/codex-needs-evidence, zero real
+         * src/sdk citation for this token or its caller `FUN_005C3EF0`).
+         * Address: 0x005C86B0 (FUN_005C86B0, single-append adapter) --
+         * register-shuffling thunk that forwards into this instantiation's
+         * `_Insert_n` (`FUN_005C6F90`, cited above) as `_Insert_n(value,
+         * vec, pos, count=1u)`; the same adapter `_Insert_n`'s own citation
+         * already names as "the single-append adapter FUN_005C86B0" reached
+         * "from resize (FUN_005C5460)" -- this is its other reach, from
+         * `push_back`'s capacity-exhausted branch.
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
