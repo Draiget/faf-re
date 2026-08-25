@@ -154,41 +154,6 @@ namespace
     }
   }
 
-  struct SerSaveLoadHelperNodeRuntime
-  {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    void* mPrimaryCallback = nullptr;
-    void* mSecondaryCallback = nullptr;
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mNext) == 0x04,
-    "SerSaveLoadHelperNodeRuntime::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperNodeRuntime, mPrev) == 0x08,
-    "SerSaveLoadHelperNodeRuntime::mPrev offset must be 0x08"
-  );
-  static_assert(sizeof(SerSaveLoadHelperNodeRuntime) == 0x14, "SerSaveLoadHelperNodeRuntime size must be 0x14");
-
-  [[nodiscard]] gpg::SerHelperBase* SerSaveLoadHelperSelfNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = SerSaveLoadHelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-
   struct PathNeighborCellWeightPairRuntime
   {
     moho::HPathCell mCell;
@@ -312,8 +277,36 @@ namespace
    * for the full writeup, including a pre-existing `typeid(SNavPath)` vs.
    * `typeid(NavPath)` mismatch this investigation found (but did not fix) in
    * `moho/path/NavPathTypeInfo.cpp`.
+   *
+   * This placeholder is intentionally self-contained (its own local struct
+   * + inline unlink bodies below) rather than sharing the generic
+   * `SerSaveLoadHelperNodeRuntime`/`UnlinkSerSaveLoadHelperNode` apparatus
+   * every other consumer in this file used to lean on -- that apparatus had
+   * zero remaining consumers once HPathCell/PathQueue/PathQueueImpl moved
+   * to real classes and has been deleted, per "0 vtable pointers as void*
+   * in the whole project."
    */
-  SerSaveLoadHelperNodeRuntime gNavPathSerializerHelper{};
+  struct NavPathSerializerDeadNodeRuntime
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    void* mLoadCallback = nullptr;
+    void* mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(NavPathSerializerDeadNodeRuntime, mNext) == 0x04,
+    "NavPathSerializerDeadNodeRuntime::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(NavPathSerializerDeadNodeRuntime, mPrev) == 0x08,
+    "NavPathSerializerDeadNodeRuntime::mPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(NavPathSerializerDeadNodeRuntime) == 0x14, "NavPathSerializerDeadNodeRuntime size must be 0x14"
+  );
+
+  NavPathSerializerDeadNodeRuntime gNavPathSerializerHelper{};
   SPathNeighborSerializer gSPathNeighborSerializerHelper;
 
   /**
@@ -323,9 +316,13 @@ namespace
    * Unlinks startup `NavPathSerializer` helper links and rewires the node into
    * one self-linked sentinel lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkNavPathSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkNavPathSerializerNodeVariantA() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gNavPathSerializerHelper);
+    gNavPathSerializerHelper.mNext->mPrev = gNavPathSerializerHelper.mPrev;
+    gNavPathSerializerHelper.mPrev->mNext = gNavPathSerializerHelper.mNext;
+    auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gNavPathSerializerHelper.mNext);
+    gNavPathSerializerHelper.mPrev = self;
+    gNavPathSerializerHelper.mNext = self;
   }
 
   /**
@@ -334,9 +331,9 @@ namespace
    * What it does:
    * Duplicate unlink/reset lane for startup `NavPathSerializer` helper links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkNavPathSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkNavPathSerializerNodeVariantB() noexcept
   {
-    return UnlinkSerSaveLoadHelperNode(gNavPathSerializerHelper);
+    UnlinkNavPathSerializerNodeVariantA();
   }
 
   /**
@@ -872,28 +869,16 @@ namespace gpg
     );
   }
 
-  /**
-   * Address: 0x005B4FF0 (FUN_005B4FF0)
-   *
-   * What it does:
-   * Writes one contiguous `CPathPoint` payload by saving the element count and
-   * each reflected lane in order.
-   */
-  void SaveFastVectorCPathPoint(
-    gpg::WriteArchive* const archive,
-    int objectPtr,
-    int /*version*/,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto& view =
-      gpg::AsFastVectorRuntimeView<moho::CPathPoint>(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)));
-    SaveContiguousArchiveVectorPayload(archive, view, CachedCompatRType<moho::CPathPoint>(), ownerRef ? *ownerRef : gpg::RRef{});
-  }
+  // DB-integrity fix: this file previously carried a second, unwired
+  // `SaveFastVectorCPathPoint` here, wrongly claiming Address: 0x005B4FF0.
+  // The real 0x005B4FF0 body (confirmed against the .c/.asm: a direct
+  // `(end-begin)/28` count with a plain per-element `WriteArchive::Write`
+  // loop, no `AsFastVectorRuntimeView`/`SaveContiguousArchiveVectorPayload`
+  // calls anywhere) is `moho`-anonymous-namespace `SaveFastVectorCPathPoint`
+  // in CAiPathSpline.cpp, which is also the one actually wired into
+  // `FastVectorCPathPointTypeInfo::Init()`'s `serSaveFunc_`. This orphan
+  // copy had zero header declaration and zero callers anywhere in
+  // src/sdk -- removed rather than left as dead, address-misattributed code.
 
   /**
    * Address: 0x005C5860 (FUN_005C5860)
@@ -7133,80 +7118,28 @@ namespace
     return writeResult;
   }
 
-  void SaveUnownedRawPointerAndNameFromRRuleGameRulesOwnerFieldLane1(
-    int ownerToken,
-    gpg::WriteArchive* archive,
-    gpg::SerSaveConstructArgsResult* constructResult
-  );
-
-  SerSaveLoadHelperNodeRuntime gRRuleGameRulesOwnerFieldSaveConstructHelper{};
-
   /**
-   * Address: 0x0051DB30 (FUN_0051DB30)
-   *
-   * What it does:
-   * Register-shape thunk that forwards save-construct serialization for one
-   * owner-field lane (`RRuleGameRules*` + name) to the canonical helper.
+   * `gRRuleGameRulesOwnerFieldSaveConstructHelper` and its thunk/unlink/body
+   * quartet (0x0051DB30/0x0051DB50/0x0051DB80/0x0051DBB0) removed here
+   * (2026-08-25 investigation, continued): the name described the FIELD
+   * TYPE this helper saves (`RRuleGameRules*`), not the TYPE it is actually
+   * registered for. Raw asm at the real construction site (0x00BC8830,
+   * `mov ecx, offset dword_10AAFCC; call SerHelperBase::SerHelperBase()`)
+   * installs vtable `??_7RPropBlueprintSaveConstruct@Moho@@6B@`, and the
+   * real `Init()` (0x0051DDD0) does `typeid(RPropBlueprint)` -- this is
+   * `gpg::SerSaveConstructHelper<Moho::RPropBlueprint>`, not an
+   * `RRuleGameRules`-owned helper at all; `RRuleGameRules*` is merely the
+   * owner-pointer field this helper writes as part of `RPropBlueprint`'s
+   * save-construct args. Real address family (0x00BC8830 ctor /
+   * 0x0051DDD0 Init / 0x00BF3150 real atexit target, ICF twins
+   * 0x0051DB50+0x0051DB80 / 0x0051DB30+0x0051DBB0 thunk+body) is now
+   * `moho::RPropBlueprintSaveConstruct` in
+   * `moho/resource/blueprints/RPropBlueprint.cpp`, alongside the
+   * already-correct load-side `RPropBlueprintConstruct` in the same file.
+   * The moved-in-place `SerSaveLoadHelperNodeRuntime`/
+   * `UnlinkSerSaveLoadHelperNode` POD apparatus this used is also gone --
+   * see the "0 vtable pointers as void*" cleanup note below.
    */
-  void SaveUnownedRawPointerAndNameFromRRuleGameRulesOwnerFieldLane1Thunk(
-    gpg::WriteArchive* const archive,
-    const int ownerToken,
-    const int,
-    gpg::RRef* const,
-    gpg::SerSaveConstructArgsResult* const constructResult
-  )
-  {
-    SaveUnownedRawPointerAndNameFromRRuleGameRulesOwnerFieldLane1(ownerToken, archive, constructResult);
-  }
-
-  /**
-   * Address: 0x0051DB50 (FUN_0051DB50)
-   *
-   * What it does:
-   * Unlinks save-construct helper links for the
-   * `{RRuleGameRules*,name}` owner-field lane and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  CleanupRRuleGameRulesOwnerFieldSaveConstructHelperPrimary() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gRRuleGameRulesOwnerFieldSaveConstructHelper);
-  }
-
-  /**
-   * Address: 0x0051DB80 (FUN_0051DB80)
-   *
-   * What it does:
-   * Secondary entrypoint for unlink/reset of the same save-construct helper
-   * lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  CleanupRRuleGameRulesOwnerFieldSaveConstructHelperSecondary() noexcept
-  {
-    return UnlinkSerSaveLoadHelperNode(gRRuleGameRulesOwnerFieldSaveConstructHelper);
-  }
-
-  /**
-   * Address: 0x0051DBB0 (FUN_0051DBB0)
-   *
-   * What it does:
-   * Writes one tracked pointer lane, serializes one companion name string, and updates save-construct ownership metadata.
-   */
-  void SaveUnownedRawPointerAndNameFromRRuleGameRulesOwnerFieldLane1(int ownerToken, gpg::WriteArchive* archive, gpg::SerSaveConstructArgsResult* constructResult)
-  {
-    struct OwnerFieldView
-    {
-      std::uint8_t reserved00[0x4]{};
-      moho::RRuleGameRules* ownerField;
-      msvc8::string ownerName;
-    };
-    static_assert(offsetof(OwnerFieldView, ownerField) == 0x4, "OwnerFieldView::ownerField offset must match evidence");
-    static_assert(offsetof(OwnerFieldView, ownerName) == 0x8, "OwnerFieldView::ownerName offset must match evidence");
-
-    auto* const ownerView = reinterpret_cast<OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
-    archive->WriteString(&ownerView->ownerName);
-    constructResult->SetOwned(1);
-  }
 
   /**
    * Address: 0x0054FAC0 (FUN_0054FAC0)
