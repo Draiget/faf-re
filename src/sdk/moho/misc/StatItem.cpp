@@ -249,30 +249,6 @@ namespace
   }
 
   /**
-   * Address: 0x00418FE0 (FUN_00418FE0, Moho::StatItemSerializer::Deserialize)
-   */
-  void DeserializeStatItem(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
-  {
-    auto* const item = reinterpret_cast<moho::StatItem*>(objectPtr);
-    GPG_ASSERT(item != nullptr);
-    if (item) {
-      item->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00418FF0 (FUN_00418FF0, Moho::StatItemSerializer::Serialize)
-   */
-  void SerializeStatItem(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
-  {
-    auto* const item = reinterpret_cast<moho::StatItem*>(objectPtr);
-    GPG_ASSERT(item != nullptr);
-    if (item) {
-      item->MemberSerialize(archive);
-    }
-  }
-
-  /**
    * Address: 0x00419DE0 (FUN_00419DE0, func_ReadArchive_Stats_StatItem)
    */
   void DeserializeStatsStatItem(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
@@ -2031,7 +2007,7 @@ namespace moho
   /**
    * Address: 0x00419090 (FUN_00419090, Moho::StatItem::SerializeList)
    */
-  void StatItem::SerializeList(gpg::WriteArchive* const archive)
+  void StatItem::SerializeList(gpg::WriteArchive* const archive) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -2039,7 +2015,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(const_cast<StatItem*>(this))->next; node != nullptr; node = node->next) {
       StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -2132,7 +2108,7 @@ namespace moho
   /**
    * Address: 0x0041AEE0 (FUN_0041AEE0, Moho::StatItem::MemberSerialize)
    */
-  void StatItem::MemberSerialize(gpg::WriteArchive* const archive)
+  void StatItem::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -2150,7 +2126,7 @@ namespace moho
       sEPulseMode = gpg::LookupRType(typeid(EPulseMode));
     }
 
-    archive->Write(sEStatType, &mType, gpg::RRef{});
+    archive->Write(sEStatType, const_cast<EStatType*>(&mType), gpg::RRef{});
     switch (mType) {
     case EStatType::kNone:
       break;
@@ -2163,15 +2139,15 @@ namespace moho
       archive->WriteInt(mRealtimeValueBits);
       break;
     case EStatType::kString:
-      archive->WriteString(&mValue);
-      archive->WriteString(&mScratchValue);
+      archive->WriteString(const_cast<msvc8::string*>(&mValue));
+      archive->WriteString(const_cast<msvc8::string*>(&mScratchValue));
       break;
     default:
       gpg::HandleAssertFailure("Reached the supposably unreachable.", 360, "c:\\work\\rts\\main\\code\\src\\core\\Stats.cpp");
       break;
     }
 
-    archive->WriteString(&mName);
+    archive->WriteString(const_cast<msvc8::string*>(&mName));
     archive->Write(sEPulseMode, const_cast<std::int32_t*>(&mUseRealtimeSlot), gpg::RRef{});
     SerializeList(archive);
   }
@@ -2347,20 +2323,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004194E0 (FUN_004194E0, sub_4194E0)
-   */
-  void StatItemSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedStatItemType();
-    const gpg::RType::load_func_t loadFunc = mSerLoadFunc ? mSerLoadFunc : &DeserializeStatItem;
-    const gpg::RType::save_func_t saveFunc = mSerSaveFunc ? mSerSaveFunc : &SerializeStatItem;
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = loadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = saveFunc;
-  }
-
-  /**
    * Address: 0x004184B0 (FUN_004184B0, Moho::StatItemTypeInfo::StatItemTypeInfo)
    */
   StatItemTypeInfo::StatItemTypeInfo()
@@ -2521,14 +2483,6 @@ namespace moho
     deleteFunc_ = &DeleteStatsStatItem;
   }
 
-  void register_StatItemSerializer()
-  {
-    gStatItemSerializer.mNext = nullptr;
-    gStatItemSerializer.mPrev = nullptr;
-    gStatItemSerializer.mSerLoadFunc = &DeserializeStatItem;
-    gStatItemSerializer.mSerSaveFunc = &SerializeStatItem;
-  }
-
   /**
    * Address: 0x00BC35E0 (FUN_00BC35E0, register_EStatTypeTypeInfo)
    *
@@ -2566,12 +2520,16 @@ namespace moho
    * Address: 0x00BC36C0 (FUN_00BC36C0, register_StatItemSerializer)
    *
    * What it does:
-   * Initializes the global StatItem serializer helper and binds load/save
-   * callbacks into reflected type metadata.
+   * Forces this translation unit's global `StatItemSerializer` instance
+   * (`gStatItemSerializer`) to link into the reflection bootstrap sequence.
+   * See the Doxygen comment on the declaration (StatItem.h) for why this
+   * function's body has no field-setting logic of its own -- the real
+   * ctor/dtor/Init() are the compiler-generated
+   * `gpg::SerSaveLoadHelper<StatItem>` members.
    */
   void RegisterStatItemSerializerBootstrap()
   {
-    register_StatItemSerializer();
+    (void)gStatItemSerializer;
   }
 
   /**
