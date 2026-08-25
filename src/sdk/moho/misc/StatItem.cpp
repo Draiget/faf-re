@@ -973,6 +973,23 @@ namespace moho
   {
     const __time64_t* const selectedTime =
       useFineTime ? reinterpret_cast<const __time64_t*>(&ftime) : reinterpret_cast<const __time64_t*>(&time);
+    /**
+     * Address: 0x00A86D49 (FUN_00A86D49, `_localtime64`, already
+     * external_dependency)
+     * Address: 0x00A9D752 (FUN_00A9D752, the CRT's lazy per-thread
+     * `_tiddata::_gmtimebuf` allocator `_localtime64`/`gmtime64`/`_gmtime64`
+     * share)
+     *
+     * `_localtime64(selectedTime)` below compiles to these two out-of-line
+     * MSVC8 CRT bodies. Confirmed against 0x00A9D752's own `.c`:
+     * `getptd_noexit()` fetches the per-thread data block, and if its
+     * `_gmtimebuf` field is unset, lazily `malloc(0x24)`s the `struct tm`
+     * scratch buffer the `*time64` family fills and returns a pointer into
+     * -- textbook CRT internals (`_tiddata`, `_gmtimebuf`, `_errno`), not
+     * engine code. Both were mass-mis-attributed to `CrtRuntimeHelpers.cpp`
+     * by the 2026-08-24 DB-integrity bulk pass (address not present in that
+     * file); classified `external_dependency` here with a real citation.
+     */
     const std::tm* const localTime = _localtime64(selectedTime);
     if (localTime == nullptr) {
       return false;
