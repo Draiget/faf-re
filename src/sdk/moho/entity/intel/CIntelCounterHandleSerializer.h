@@ -4,20 +4,35 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E3636C
    * COL:  0x00E8FDA4
    */
-  class CIntelCounterHandleSerializer
+  class CIntelCounterHandleSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDCD90 (FUN_00BDCD90, dynamic initializer for the global
+     * `CIntelCounterHandleSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields.
+     */
+    CIntelCounterHandleSerializer();
+
+    /**
+     * Address: 0x00C01F90 (FUN_00C01F90, Moho::CIntelCounterHandleSerializer::~CIntelCounterHandleSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CIntelCounterHandleSerializer();
+
     /**
      * Address: 0x0076F990 (FUN_0076F990, Moho::CIntelCounterHandleSerializer::Deserialize)
      *
@@ -39,19 +54,16 @@ namespace moho
      *
      * What it does:
      * Binds load/save serializer callbacks into CIntelCounterHandle RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CIntelCounterHandleSerializer, mHelperLinks) == 0x04,
-    "CIntelCounterHandleSerializer::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(CIntelCounterHandleSerializer, mLoadCallback) == 0x0C,
     "CIntelCounterHandleSerializer::mLoadCallback offset must be 0x0C"
@@ -61,23 +73,4 @@ namespace moho
     "CIntelCounterHandleSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CIntelCounterHandleSerializer) == 0x14, "CIntelCounterHandleSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00C01F90 (FUN_00C01F90, cleanup_CIntelCounterHandleSerializer)
-   *
-   * What it does:
-   * Unlinks startup `CIntelCounterHandleSerializer` helper links and rewires
-   * a self-linked sentinel lane.
-   */
-  gpg::SerHelperBase* cleanup_CIntelCounterHandleSerializer();
-
-  /**
-   * Address: 0x00BDCD90 (FUN_00BDCD90, register_CIntelCounterHandleSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper lanes for `CIntelCounterHandle` and
-   * installs process-exit cleanup.
-   */
-  void register_CIntelCounterHandleSerializer();
 } // namespace moho
-
