@@ -19457,6 +19457,122 @@ namespace moho
 
       return textOrigin;
     }
+
+    /**
+     * Address: 0x0085E3A0 (FUN_0085E3A0, sub_85E3A0)
+     *
+     * IDA signature:
+     * Wm3::Vector2f *__cdecl sub_85E3A0(Wm3::Vector2f *result, UnitIconData *icon,
+     *   struct_IconAux *aux, Wm3::Vector2f *labelCursor, char isMiniMap);
+     *
+     * What it does:
+     * Draws the space-joined list of every named selection set this unit
+     * belongs to (`UserUnit::mSelectionSets`), stacked directly under the
+     * custom name label, and returns where the text was placed so a
+     * still-deferred label could stack under this one in turn. Returns
+     * `InvalidScreenPoint()` when nothing was drawn - labels are off, this
+     * is the minimap (inlined guard at 0x0085E796, byte-identical to
+     * `DrawUnitCustomNameLabel`'s first early-out), or the unit belongs to
+     * no selection set (`mSelectionSets.empty()`, 0x0085E3EF calls the
+     * shared sentinel body directly) - which is the caller's signal to
+     * leave its cursor untouched.
+     *
+     * Positioning mirrors `DrawUnitCustomNameLabel` exactly: centred on
+     * `labelCursor` when the bar/name pass gave it one, otherwise projected
+     * from the unit itself through `aux.mCamera->Project` plus the
+     * blueprint and console lifebar offsets (0x0085E415..0x0085E48A is the
+     * same `viewProjection`-matrix `Project` math, confirmed against
+     * `GeomCamera3::viewProjection`'s `+0x9C` offset). Snapped to whole
+     * pixels and drawn twice, an opaque black shadow copy one pixel
+     * down-right first, same as the custom name label.
+     *
+     * The joined string is built by walking `unit->mSelectionSets` in its
+     * own key order (`msvc8::set<msvc8::string>`'s `begin()`/`end()`/
+     * `operator++`, i.e. the already-recovered `rb_increment` at
+     * FUN_004DDD30 - also reached from `UserUnit::AddToSelectionSet` and
+     * `cfunc_UserUnitGetSelectionSetsL`, confirming this is the same
+     * `mSelectionSets` instantiation) and appending each name followed by a
+     * literal space, including after the last one (0x0085E4A8..0x0085E4C5)
+     * - the binary does not trim the trailing separator, so this preserves
+     * that exactly rather than "fixing" it.
+     */
+    [[nodiscard]] Wm3::Vector2f DrawUnitSelectionSetNameLabel(
+      const UnitIconData& icon,
+      const StrategicIconAuxView& aux,
+      const Wm3::Vector2f& labelCursor,
+      const bool isMiniMap
+    )
+    {
+      if (!ui_RenderSelectionSetNames || isMiniMap) {
+        return InvalidScreenPoint();
+      }
+
+      // Slot 3 (`[vftable+0x0C]`), same dispatch as `DrawUnitLifebars`/
+      // `DrawUnitCustomNameLabel` - relies on the lifebar loop above having
+      // already proven `icon.mUnit` is a real `UserUnit` this frame, so this
+      // is not re-null-checked here either (matches the binary).
+      UserUnit* const unit = icon.mUnit->IsUserUnit();
+      if (unit->mSelectionSets.empty()) {
+        return InvalidScreenPoint();
+      }
+
+      CD3DFont* const font = CustomNameFont();
+
+      msvc8::string joinedNames{};
+      for (const msvc8::string& name : unit->mSelectionSets) {
+        joinedNames.append(name.view());
+        joinedNames.append(" ", 1);
+      }
+
+      // The second `GetAdvance` argument is not materialised at this call
+      // site either (0x0085E491), same neutral-flag convention as
+      // `DrawUnitCustomNameLabel`.
+      const float textWidth = font->GetAdvance(joinedNames.c_str(), 0);
+      const float lineHeight = font->mHeight;
+
+      float textLeft = 0.0f;
+      float textBaseline = 0.0f;
+      if (IsValidScreenPoint(labelCursor)) {
+        textLeft = labelCursor.X() - (textWidth * 0.5f);
+        textBaseline = labelCursor.Y();
+      } else {
+        const Wm3::Vector2f projected = aux.mCamera->Project(
+          Wm3::Vector3f(icon.mWorldX, icon.mWorldY, icon.mWorldZ),
+          0.0f,
+          aux.mViewportWidth,
+          aux.mViewportHeight,
+          0.0f
+        );
+        textLeft = projected.X() - (textWidth * 0.5f);
+        textBaseline = (icon.mBlueprint->mLifeBarOffset + projected.Y()) + ui_LifebarOffset;
+      }
+      textBaseline += lineHeight;
+
+      const float snappedLeft = std::floor(textLeft);
+      const float snappedBaseline = std::floor(textBaseline);
+
+      const Wm3::Vector2f shadowOrigin{snappedLeft + kLabelShadowOffset, snappedBaseline + kLabelShadowOffset};
+      const Wm3::Vector2f textOrigin{snappedLeft, snappedBaseline};
+
+      font->Render2D(
+        joinedNames.c_str(),
+        aux.mBatcher,
+        shadowOrigin,
+        kLabelShadowColor,
+        1.0f,
+        std::numeric_limits<float>::quiet_NaN()
+      );
+      font->Render2D(
+        joinedNames.c_str(),
+        aux.mBatcher,
+        textOrigin,
+        ui_SelectionSetNamesColor,
+        1.0f,
+        std::numeric_limits<float>::quiet_NaN()
+      );
+
+      return textOrigin;
+    }
   } // namespace
 
   /**
@@ -19491,6 +19607,9 @@ namespace moho
    *    recovered (0x0085D880 / 0x0085CBD0), which required retyping
    *    `REntityBlueprint`'s four cached icon fields from `boost::weak_ptr`
    *    to `boost::shared_ptr` (see the evidence note on those fields).
+   *  - The selection-set name label (`DrawUnitSelectionSetNameLabel`,
+   *    0x0085E3A0), which stacks under the custom name using the same
+   *    cursor protocol, is now wired into phase 4 below.
    *
    * Deferred to a follow-up pass - not drawn by this function yet:
    *  - The actual draw calls (`RenderUnitIcon`, 0x0085D9A0): the icon-quad
@@ -19502,8 +19621,6 @@ namespace moho
    *    them yet).
    *  - The "toggled off a scripted ability" half of the paused-overlay flag
    *    below, which currently reflects only `mUnitVarDat.mIsPaused`.
-   *  - The selection-set name label (0x0085E3A0), which stacks under the
-   *    custom name using the same cursor protocol.
    *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
    *    `IFormationInstance::Contains`, not modelled yet - a separate,
    *    already-tracked blocker (see the `CFormationInstance` split notes).
@@ -19758,8 +19875,13 @@ namespace moho
         labelCursor = afterCustomName;
       }
 
-      // The selection-set name label (0x0085E3A0) stacks under this one and
-      // is still deferred - see the function comment above.
+      // The selection-set name label stacks under the custom name label,
+      // same cursor protocol (0x0085C990..0x0085C9DB).
+      const Wm3::Vector2f afterSelectionSetNames =
+        DrawUnitSelectionSetNameLabel(lifebarIcon, aux, labelCursor, isMiniMap);
+      if (IsValidScreenPoint(afterSelectionSetNames)) {
+        labelCursor = afterSelectionSetNames;
+      }
     }
 
     primBatcher->Flush();
