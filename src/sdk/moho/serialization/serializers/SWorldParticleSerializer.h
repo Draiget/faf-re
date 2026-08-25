@@ -6,19 +6,41 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/particles/SWorldParticle.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * SWorldParticle serializer helper used by the recovered startup registration.
    */
-  class SWorldParticleSerializer
+  class SWorldParticleSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC5480 (FUN_00BC5480, register_SWorldParticleSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed from raw disassembly: calls
+     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SWorldParticleSerializer@Moho@@6B@` -- no eager
+     * `RegisterSerializeFunctions`-style call exists here. The
+     * `push offset ~SWorldParticleSerializer; call _atexit` sequence
+     * visible in the real ctor's tail is the compiler's own implicit
+     * static-destructor registration for a global with a non-trivial
+     * destructor (it is not a call the 2007 source wrote), so it is not
+     * reproduced explicitly here -- declaring a real destructor below is
+     * sufficient for the compiler to emit the same registration.
+     */
+    SWorldParticleSerializer();
+
+    /**
+     * Address: 0x00BEFFE0 (FUN_00BEFFE0, Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SWorldParticleSerializer();
+
     /**
      * Address: 0x0048F8D0 (Moho::SWorldParticleSerializer::Deserialize)
      *
@@ -41,21 +63,13 @@ namespace moho
      * What it does:
      * Binds `SWorldParticle` RTTI load/save callbacks.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(SWorldParticleSerializer, mHelperNext) == 0x04, "SWorldParticleSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SWorldParticleSerializer, mHelperPrev) == 0x08, "SWorldParticleSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SWorldParticleSerializer, mDeserialize) == 0x0C, "SWorldParticleSerializer::mDeserialize offset must be 0x0C"
   );
@@ -89,20 +103,4 @@ namespace moho
    * duplicate found for this one.
    */
   using SWorldParticleZModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldParticle::ZMode, int>;
-
-  /**
-   * Address: 0x00BEFFE0 (Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
-   *
-   * What it does:
-   * Unlinks the `SWorldParticleSerializer` helper node and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_SWorldParticleSerializer();
-
-  /**
-   * Address: 0x00BC5480 (register_SWorldParticleSerializer)
-   *
-   * What it does:
-   * Initializes `SWorldParticle` serializer callbacks and schedules exit cleanup.
-   */
-  int register_SWorldParticleSerializer();
 } // namespace moho

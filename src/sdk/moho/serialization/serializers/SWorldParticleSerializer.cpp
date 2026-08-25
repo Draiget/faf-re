@@ -1,6 +1,5 @@
 #include "moho/serialization/serializers/SWorldParticleSerializer.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <typeinfo>
 
@@ -11,9 +10,7 @@
 
 namespace
 {
-  using ParticleSerializer = moho::SWorldParticleSerializer;
-
-  ParticleSerializer gSWorldParticleSerializer{};
+  moho::SWorldParticleSerializer gSWorldParticleSerializer;
 
   /**
    * Address: 0x00BC53C0 (FUN_00BC53C0, dynamic initializer for the global
@@ -43,32 +40,6 @@ namespace
    */
   moho::SWorldParticleZModePrimitiveSerializer gSWorldParticleZModePrimitiveSerializer;
 
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   template <typename TType>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
   {
@@ -84,39 +55,34 @@ namespace
   {
     return ResolveCachedType<moho::SWorldParticle>(moho::SWorldParticle::sType);
   }
-
-  void cleanup_SWorldParticleSerializer_atexit()
-  {
-    (void)moho::cleanup_SWorldParticleSerializer();
-  }
-
-  /**
-   * Address: 0x0048F920 (FUN_0048F920)
-   *
-   * What it does:
-   * Unlinks `SWorldParticleSerializer` from the intrusive helper list and
-   * rewires it to a self-linked sentinel.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSWorldParticleSerializerNodeA()
-  {
-    return UnlinkSerializerNode(gSWorldParticleSerializer);
-  }
-
-  /**
-   * Address: 0x0048F950 (FUN_0048F950)
-   *
-   * What it does:
-   * Duplicate unlink lane for `SWorldParticleSerializer` with identical
-   * self-link reset behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSWorldParticleSerializerNodeB()
-  {
-    return UnlinkSerializerNode(gSWorldParticleSerializer);
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC5480 (FUN_00BC5480, register_SWorldParticleSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SWorldParticleSerializer::SWorldParticleSerializer()
+    : mDeserialize(&SWorldParticleSerializer::Deserialize)
+    , mSerialize(&SWorldParticleSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BEFFE0 (FUN_00BEFFE0, Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
+   *
+   * What it does:
+   * Unlinks the `SWorldParticleSerializer` helper node and rewires
+   * self-links.
+   */
+  SWorldParticleSerializer::~SWorldParticleSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x0048F8D0 (Moho::SWorldParticleSerializer::Deserialize)
    */
@@ -142,7 +108,7 @@ namespace moho
   /**
    * Address: 0x0048FD30 (Moho::SWorldParticleSerializer::Init)
    */
-  void SWorldParticleSerializer::RegisterSerializeFunctions()
+  void SWorldParticleSerializer::Init()
   {
     gpg::RType* const type = ResolveSWorldParticleType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -150,36 +116,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BEFFE0 (Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
-   */
-  gpg::SerHelperBase* cleanup_SWorldParticleSerializer()
-  {
-    return UnlinkSWorldParticleSerializerNodeA();
-  }
-
-  /**
-   * Address: 0x00BC5480 (register_SWorldParticleSerializer)
-   */
-  int register_SWorldParticleSerializer()
-  {
-    InitializeSerializerNode(gSWorldParticleSerializer);
-    gSWorldParticleSerializer.mDeserialize = &SWorldParticleSerializer::Deserialize;
-    gSWorldParticleSerializer.mSerialize = &SWorldParticleSerializer::Serialize;
-    return std::atexit(&cleanup_SWorldParticleSerializer_atexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct SWorldParticleSerializerBootstrap
-  {
-    SWorldParticleSerializerBootstrap()
-    {
-      (void)moho::register_SWorldParticleSerializer();
-    }
-  };
-
-  [[maybe_unused]] SWorldParticleSerializerBootstrap gSWorldParticleSerializerBootstrap;
-} // namespace
