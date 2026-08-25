@@ -4,16 +4,25 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class IAiAttackerSerializer
+  class IAiAttackerSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCE7D0 (FUN_00BCE7D0, dynamic initializer for the global
+     * `IAiAttackerSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7IAiAttackerSerializer@Moho@@6B@` -- no eager `Init()` call exists
+     * here.
+     */
+    IAiAttackerSerializer();
+
     /**
      * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
      *
@@ -34,23 +43,17 @@ namespace moho
      * Address: 0x005DBC90 (FUN_005DBC90)
      *
      * What it does:
-     * Binds load/save serializer callbacks into IAiAttacker RTTI.
+     * Binds load/save serializer callbacks into IAiAttacker RTTI. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mLoadCallback; // +0x0C
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(IAiAttackerSerializer, mHelperNext) == 0x04, "IAiAttackerSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(IAiAttackerSerializer, mHelperPrev) == 0x08, "IAiAttackerSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(IAiAttackerSerializer, mLoadCallback) == 0x0C, "IAiAttackerSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -60,11 +63,9 @@ namespace moho
   static_assert(sizeof(IAiAttackerSerializer) == 0x14, "IAiAttackerSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BCE7D0 (FUN_00BCE7D0, sub_BCE7D0)
-   *
-   * What it does:
-   * Registers serializer callbacks for `IAiAttacker` and installs process-exit
-   * cleanup.
+   * Compatibility no-op: `IAiAttacker.cpp`'s reflection bootstrap sequence
+   * still calls this by name. See the definition in IAiAttackerSerializer.cpp
+   * for why it no longer needs to do anything.
    */
   int register_IAiAttackerSerializer();
 } // namespace moho

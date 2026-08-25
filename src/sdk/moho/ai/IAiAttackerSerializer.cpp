@@ -11,44 +11,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiAttackerSerializer) unsigned char gIAiAttackerSerializerStorage[sizeof(IAiAttackerSerializer)];
-  bool gIAiAttackerSerializerConstructed = false;
-
-  [[nodiscard]] IAiAttackerSerializer* AcquireIAiAttackerSerializer()
-  {
-    if (!gIAiAttackerSerializerConstructed) {
-      new (gIAiAttackerSerializerStorage) IAiAttackerSerializer();
-      gIAiAttackerSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<IAiAttackerSerializer*>(gIAiAttackerSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiAttackerType()
   {
     gpg::RType* type = IAiAttacker::sType;
@@ -103,44 +65,38 @@ namespace
     IAiAttackerSerializer::Serialize(archive, objectPtr, version, ownerRef);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* UnlinkIAiAttackerSerializerHelperNode()
-  {
-    if (!gIAiAttackerSerializerConstructed) {
-      return nullptr;
-    }
-
-    IAiAttackerSerializer* const serializer = AcquireIAiAttackerSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
+  // Address: 0x010B0344 -- process-global `IAiAttackerSerializer` singleton.
+  // Constructing it runs IAiAttackerSerializer::IAiAttackerSerializer()
+  // (0x00BCE7D0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::IAiAttackerSerializer gIAiAttackerSerializer;
 
   /**
    * Address: 0x00BF82E0 (FUN_00BF82E0, sub_BF82E0)
    *
    * What it does:
-   * Unlinks recovered `IAiAttackerSerializer` helper node from intrusive
-   * serializer list and restores self-links.
+   * Unlinks the `IAiAttackerSerializer` helper node from whatever intrusive
+   * list it currently sits in and restores a self-linked sentinel state.
+   * Registered by the real dynamic initializer (0x00BCE7D0) as the global's
+   * `atexit` teardown.
    */
   void cleanup_IAiAttackerSerializer()
   {
-    if (!gIAiAttackerSerializerConstructed) {
-      return;
-    }
-
-    (void)UnlinkIAiAttackerSerializerHelperNode();
-    gIAiAttackerSerializerConstructed = false;
+    gIAiAttackerSerializer.ResetLinks();
   }
 
   /**
    * Address: 0x005D5CA0 (FUN_005D5CA0)
    *
    * What it does:
-   * Alias startup-lane thunk that unlinks recovered `IAiAttackerSerializer`
-   * helper links and restores self-links.
+   * Alias startup-lane thunk that unlinks the `IAiAttackerSerializer` helper
+   * links and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiAttackerSerializerStartupThunkA()
+  [[maybe_unused]] void cleanup_IAiAttackerSerializerStartupThunkA()
   {
-    return UnlinkIAiAttackerSerializerHelperNode();
+    gIAiAttackerSerializer.ResetLinks();
   }
 
   /**
@@ -150,9 +106,9 @@ namespace
    * Secondary alias startup-lane thunk for the same `IAiAttackerSerializer`
    * helper unlink/reset path.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiAttackerSerializerStartupThunkB()
+  [[maybe_unused]] void cleanup_IAiAttackerSerializerStartupThunkB()
   {
-    return UnlinkIAiAttackerSerializerHelperNode();
+    gIAiAttackerSerializer.ResetLinks();
   }
 } // namespace
 
@@ -191,13 +147,29 @@ void IAiAttackerSerializer::Serialize(gpg::WriteArchive* const archive, const in
 }
 
 /**
- * Address: 0x005DBC90 (FUN_005DBC90)
+ * Address: 0x00BCE7D0 (FUN_00BCE7D0, dynamic initializer for the global
+ * `IAiAttackerSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and registers
+ * process-exit cleanup.
+ */
+IAiAttackerSerializer::IAiAttackerSerializer()
+  : mLoadCallback(&IAiAttackerDeserializeThunk)
+  , mSaveCallback(&IAiAttackerSerializeThunk)
+{
+  (void)std::atexit(&cleanup_IAiAttackerSerializer);
+}
+
+/**
+ * Address: 0x005DBC90 (FUN_005DBC90, gpg::SerSaveLoadHelper_IAiAttacker::Init)
  *
  * What it does:
  * Lazily resolves IAiAttacker RTTI and installs load/save callbacks from this
  * helper object into the type descriptor.
  */
-void IAiAttackerSerializer::RegisterSerializeFunctions()
+void IAiAttackerSerializer::Init()
 {
   gpg::RType* const type = CachedIAiAttackerType();
 
@@ -208,17 +180,18 @@ void IAiAttackerSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCE7D0 (FUN_00BCE7D0, sub_BCE7D0)
+ * Address: 0x010B0344 caller lane (`IAiAttacker.cpp`'s reflection bootstrap
+ * sequence)
  *
  * What it does:
- * Registers serializer callbacks for `IAiAttacker` and installs process-exit
- * cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `IAiAttackerSerializer` singleton from an explicit registration sequence.
+ * `gIAiAttackerSerializer` is now a genuine namespace-scope global, so its
+ * constructor already runs unconditionally at static-init time; this call is
+ * kept only so `IAiAttacker.cpp`'s existing bootstrap sequence does not need
+ * editing.
  */
 int moho::register_IAiAttackerSerializer()
 {
-  IAiAttackerSerializer* const serializer = AcquireIAiAttackerSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &IAiAttackerDeserializeThunk;
-  serializer->mSaveCallback = &IAiAttackerSerializeThunk;
-  return std::atexit(&cleanup_IAiAttackerSerializer);
+  return 0;
 }
