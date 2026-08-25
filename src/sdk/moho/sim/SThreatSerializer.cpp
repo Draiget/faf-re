@@ -8,79 +8,51 @@
 namespace moho
 {
   /**
-   * Address: 0x00BDA780 (FUN_00BDA780, dynamic initializer for the global
-   * `SThreatSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SThreatSerializer::SThreatSerializer()
-    : mLoadCallback(&SThreatSerializer::Deserialize)
-    , mSaveCallback(&SThreatSerializer::Serialize)
-  {}
-
-  SThreatSerializer::~SThreatSerializer()
-  {
-    ResetLinks();
-  }
-
-  /**
-   * Address: 0x00717AF0 (FUN_00717AF0, Moho::SThreatSerializer::Deserialize)
+   * Address: 0x00717AF0 (FUN_00717AF0, Moho::SThreat::MemberDeserialize)
    *
    * What it does:
    * Reads one 14-float `SThreat` record from archive.
    */
-  void SThreatSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void SThreat::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    auto* const threat = reinterpret_cast<SThreat*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr || threat == nullptr) {
+    if (archive == nullptr) {
       return;
     }
 
-    float* const lanes = reinterpret_cast<float*>(threat);
+    float* const lanes = reinterpret_cast<float*>(this);
     for (std::size_t i = 0; i < 14u; ++i) {
       archive->ReadFloat(&lanes[i]);
     }
   }
 
   /**
-   * Address: 0x00717B00 (FUN_00717B00, Moho::SThreatSerializer::Serialize)
+   * Address: 0x00717B00 (FUN_00717B00, Moho::SThreat::MemberSerialize)
    *
    * What it does:
    * Writes one 14-float `SThreat` record to archive.
    */
-  void SThreatSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void SThreat::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    const auto* const threat = reinterpret_cast<const SThreat*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr || threat == nullptr) {
+    if (archive == nullptr) {
       return;
     }
 
-    const float* const lanes = reinterpret_cast<const float*>(threat);
+    const float* const lanes = reinterpret_cast<const float*>(this);
     for (std::size_t i = 0; i < 14u; ++i) {
       archive->WriteFloat(lanes[i]);
     }
-  }
-
-  /**
-   * Address: 0x00719370 (FUN_00719370, gpg::SerSaveLoadHelper_SThreat::Init)
-   *
-   * IDA signature:
-   * void (__cdecl *__thiscall sub_719370(void (__cdecl **this)(...)))(...);
-   */
-  void SThreatSerializer::Init()
-  {
-    gpg::RType* const type = SThreat::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
 
 namespace
 {
-  // Address: 0x010B945C -- process-global `SThreatSerializer` singleton.
+  // Address: 0x00BDA780 (FUN_00BDA780, register_SThreatSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<SThreat>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real destructor
+  // (0x00C00060, no recovered mangled name; body confirmed via raw asm to
+  // just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT duplicate
+  // ctor: 0x00719340.
   moho::SThreatSerializer gSThreatSerializer;
 } // namespace

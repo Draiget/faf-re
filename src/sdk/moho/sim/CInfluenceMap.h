@@ -84,6 +84,22 @@ namespace moho
     void RecomputeOverall() noexcept;
     void DecayBy(const SThreat& decayRate) noexcept;
     [[nodiscard]] float ValueByType(EThreatType threatType) const noexcept;
+
+    /**
+     * Address: 0x00717AF0 (FUN_00717AF0, Moho::SThreatSerializer::Deserialize)
+     *
+     * What it does:
+     * Reads one 14-float `SThreat` record from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00717B00 (FUN_00717B00, Moho::SThreatSerializer::Serialize)
+     *
+     * What it does:
+     * Writes one 14-float `SThreat` record to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   /**
