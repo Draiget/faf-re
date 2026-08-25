@@ -111,9 +111,24 @@ namespace moho
     static WeakPtr<STaskEventLinkage>* SetObject(WeakPtr<STaskEventLinkage>* slot, STaskEventLinkage* linkage) noexcept;
   };
 
-  class STaskEventLinkageSerializer
+  class STaskEventLinkageSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC2EF0 (FUN_00BC2EF0, dynamic initializer for the global
+     * `STaskEventLinkageSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    STaskEventLinkageSerializer();
+
+    /**
+     * Address: 0x00BEE140 (FUN_00BEE140, Moho::STaskEventLinkageSerializer::~STaskEventLinkageSerializer)
+     */
+    ~STaskEventLinkageSerializer();
+
     /**
      * Address: 0x004069A0 (FUN_004069A0, Moho::STaskEventLinkageSerializer::Deserialize)
      * Alias:   0x00407900 (FUN_00407900, duplicate callback body)
@@ -136,19 +151,26 @@ namespace moho
 
     /**
      * Address: 0x00407240 (FUN_00407240, Moho::STaskEventLinkageSerializer::Init)
-     * Slot: 0
      *
      * What it does:
      * Binds linkage serializer callbacks into RTTI for `STaskEventLinkage`.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(
+    offsetof(STaskEventLinkageSerializer, mSerLoadFunc) == 0x0C,
+    "STaskEventLinkageSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(STaskEventLinkageSerializer, mSerSaveFunc) == 0x10,
+    "STaskEventLinkageSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(STaskEventLinkageSerializer) == 0x14, "STaskEventLinkageSerializer size must be 0x14");
 
   class STaskEventLinkageTypeInfo : public gpg::RType
   {
@@ -345,6 +367,8 @@ namespace moho
     void SerializeWaitLinks(gpg::WriteArchive* archive) const;
 
   public:
+    static gpg::RType* sType;
+
     bool mTriggered{false}; // 0x04
     // 0x05..0x07: layout alignment bytes (no direct task-path field accesses recovered).
     std::uint8_t mAlignmentPad05[3]{};
@@ -355,24 +379,44 @@ namespace moho
   static_assert(offsetof(CTaskEvent, mTriggered) == 0x04, "CTaskEvent::mTriggered offset must be 0x04");
   static_assert(offsetof(CTaskEvent, mWaitLinks) == 0x08, "CTaskEvent::mWaitLinks offset must be 0x08");
 
-  class CTaskEventSerializer
+  class CTaskEventSerializer : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC2F50 (FUN_00BC2F50, dynamic initializer for the global
+     * `CTaskEventSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CTaskEventSerializer();
+
+    /**
+     * Address: 0x00BEE1D0 (FUN_00BEE1D0, Moho::CTaskEventSerializer::~CTaskEventSerializer)
+     */
+    ~CTaskEventSerializer();
+
+    /**
      * Address: 0x00407620 (FUN_00407620, ?Init@CTaskEventSerializer@Moho@@UAEXXZ)
-     * Slot: 0
      *
      * What it does:
      * Binds CTaskEvent load/save serializer callbacks into RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(
+    offsetof(CTaskEventSerializer, mSerLoadFunc) == 0x0C, "CTaskEventSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CTaskEventSerializer, mSerSaveFunc) == 0x10, "CTaskEventSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CTaskEventSerializer) == 0x14, "CTaskEventSerializer size must be 0x14");
 
   class CTaskEventTypeInfo : public gpg::RType
   {
@@ -405,10 +449,8 @@ namespace moho
     void Init() override;
   };
 
-  static_assert(sizeof(STaskEventLinkageSerializer) == 0x14, "STaskEventLinkageSerializer size must be 0x14");
   static_assert(sizeof(STaskEventLinkageTypeInfo) == 0x64, "STaskEventLinkageTypeInfo size must be 0x64");
   static_assert(sizeof(RWeakPtrType<STaskEventLinkage>) == 0x68, "RWeakPtrType<STaskEventLinkage> size must be 0x68");
-  static_assert(sizeof(CTaskEventSerializer) == 0x14, "CTaskEventSerializer size must be 0x14");
   static_assert(sizeof(CTaskEventTypeInfo) == 0x64, "CTaskEventTypeInfo size must be 0x64");
 
   /**
@@ -419,15 +461,6 @@ namespace moho
    * registers process-exit teardown.
    */
   void register_STaskEventLinkageTypeInfo();
-
-  /**
-   * Address: 0x00BC2EF0 (FUN_00BC2EF0, register_STaskEventLinkageSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer callbacks for `STaskEventLinkage` and
-   * registers process-exit intrusive-link cleanup.
-   */
-  void register_STaskEventLinkageSerializer();
 
   /**
    * Address: 0x00BC2F30 (FUN_00BC2F30, register_CTaskEventTypeInfo)
