@@ -6,7 +6,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/task/CCommandTask.h"
+#include "moho/task/CCommandTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -15,35 +15,6 @@ namespace
 
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
-
-  struct CUnitAssistMoveTaskTypeInfoStartupHelperLinks
-  {
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-  };
-
-  CUnitAssistMoveTaskTypeInfoStartupHelperLinks gCUnitAssistMoveTaskTypeInfoStartupHelperLinks{};
-
-  [[nodiscard]] gpg::SerHelperBase* CUnitAssistMoveTaskTypeInfoStartupSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitAssistMoveTaskTypeInfoStartupHelperNode() noexcept
-  {
-    if (
-      gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mNext != nullptr
-      && gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mPrev != nullptr
-    ) {
-      gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mNext->mPrev = gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mPrev;
-      gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mPrev->mNext = gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mNext;
-    }
-
-    gpg::SerHelperBase* const self = CUnitAssistMoveTaskTypeInfoStartupSelfNode();
-    gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mPrev = self;
-    gCUnitAssistMoveTaskTypeInfoStartupHelperLinks.mNext = self;
-    return self;
-  }
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -63,30 +34,6 @@ namespace
 
     AcquireTypeInfo().~CUnitAssistMoveTaskTypeInfo();
     gTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x005F0B60 (FUN_005F0B60)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks one static helper-link node used by
-   * `CUnitAssistMoveTaskTypeInfo` bootstrap storage and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CUnitAssistMoveTaskTypeInfoStartupThunkA() noexcept
-  {
-    return UnlinkCUnitAssistMoveTaskTypeInfoStartupHelperNode();
-  }
-
-  /**
-   * Address: 0x005F0B90 (FUN_005F0B90)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `CUnitAssistMoveTaskTypeInfo` helper-link unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CUnitAssistMoveTaskTypeInfoStartupThunkB() noexcept
-  {
-    return UnlinkCUnitAssistMoveTaskTypeInfoStartupHelperNode();
   }
 
   struct CUnitAssistMoveTaskRuntimeView final : moho::CCommandTask
