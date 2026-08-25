@@ -11,54 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiTransportSerializer) unsigned char gIAiTransportSerializerStorage[sizeof(IAiTransportSerializer)];
-  bool gIAiTransportSerializerConstructed = false;
-
-  [[nodiscard]] IAiTransportSerializer* AcquireIAiTransportSerializer()
-  {
-    if (!gIAiTransportSerializerConstructed) {
-      new (gIAiTransportSerializerStorage) IAiTransportSerializer();
-      gIAiTransportSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<IAiTransportSerializer*>(gIAiTransportSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkIAiTransportSerializerHelperNode()
-  {
-    if (!gIAiTransportSerializerConstructed) {
-      return nullptr;
-    }
-
-    IAiTransportSerializer* const serializer = AcquireIAiTransportSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
+  // Address: 0x010B06D4 -- process-global `IAiTransportSerializer`
+  // singleton. Constructing it runs
+  // IAiTransportSerializer::IAiTransportSerializer() (0x00BCEEB0), which
+  // splices this helper into gpg::SerHelperBase::sNewHelpers;
+  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init() on it from
+  // within the first ReadArchive/WriteArchive construction.
+  moho::IAiTransportSerializer gIAiTransportSerializer;
 
   [[nodiscard]] gpg::RType* CachedIAiTransportType()
   {
@@ -117,28 +76,30 @@ namespace
     archive->Write(broadcasterType, broadcasterLane, ownerRef);
   }
 
+  /**
+   * Address: 0x00BF8BB0 (FUN_00BF8BB0, sub_BF8BB0)
+   *
+   * What it does:
+   * Unlinks the `IAiTransportSerializer` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BCEEB0) as the
+   * global's `atexit` teardown.
+   */
   void cleanup_IAiTransportSerializer()
   {
-    if (!gIAiTransportSerializerConstructed) {
-      return;
-    }
-
-    IAiTransportSerializer* const serializer = AcquireIAiTransportSerializer();
-    (void)UnlinkIAiTransportSerializerHelperNode();
-    serializer->~IAiTransportSerializer();
-    gIAiTransportSerializerConstructed = false;
+    gIAiTransportSerializer.ResetLinks();
   }
 
   /**
    * Address: 0x005E48D0 (FUN_005E48D0)
    *
    * What it does:
-   * Alias startup-lane thunk that unlinks recovered `IAiTransportSerializer`
+   * Alias startup-lane thunk that unlinks the `IAiTransportSerializer`
    * helper links and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiTransportSerializerStartupThunkA()
+  [[maybe_unused]] void cleanup_IAiTransportSerializerStartupThunkA()
   {
-    return UnlinkIAiTransportSerializerHelperNode();
+    gIAiTransportSerializer.ResetLinks();
   }
 
   /**
@@ -148,9 +109,9 @@ namespace
    * Secondary alias startup-lane thunk for the same
    * `IAiTransportSerializer` helper unlink/reset path.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiTransportSerializerStartupThunkB()
+  [[maybe_unused]] void cleanup_IAiTransportSerializerStartupThunkB()
   {
-    return UnlinkIAiTransportSerializerHelperNode();
+    gIAiTransportSerializer.ResetLinks();
   }
 } // namespace
 
@@ -183,13 +144,29 @@ void IAiTransportSerializer::Serialize(gpg::WriteArchive* const archive, const i
 }
 
 /**
- * Address: 0x005E9530 (FUN_005E9530)
+ * Address: 0x00BCEEB0 (FUN_00BCEEB0, dynamic initializer for the global
+ * `IAiTransportSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and registers
+ * process-exit cleanup.
+ */
+IAiTransportSerializer::IAiTransportSerializer()
+  : mLoadCallback(&IAiTransportSerializer::Deserialize)
+  , mSaveCallback(&IAiTransportSerializer::Serialize)
+{
+  (void)std::atexit(&cleanup_IAiTransportSerializer);
+}
+
+/**
+ * Address: 0x005E9530 (FUN_005E9530, gpg::SerSaveLoadHelper_IAiTransport::Init)
  *
  * What it does:
  * Lazily resolves IAiTransport RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void IAiTransportSerializer::RegisterSerializeFunctions()
+void IAiTransportSerializer::Init()
 {
   gpg::RType* const type = CachedIAiTransportType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
@@ -199,17 +176,18 @@ void IAiTransportSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCEEB0 (FUN_00BCEEB0, register_IAiTransportSerializer)
+ * Address: 0x010B06D4 caller lane (`IAiTransport.cpp`'s reflection
+ * bootstrap sequence)
  *
  * What it does:
- * Registers serializer callbacks for `IAiTransport` and installs process-exit
- * cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `IAiTransportSerializer` singleton from an explicit registration
+ * sequence. `gIAiTransportSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
+ * sequence does not need editing.
  */
 int moho::register_IAiTransportSerializer()
 {
-  IAiTransportSerializer* const serializer = AcquireIAiTransportSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &IAiTransportSerializer::Deserialize;
-  serializer->mSaveCallback = &IAiTransportSerializer::Serialize;
-  return std::atexit(&cleanup_IAiTransportSerializer);
+  return 0;
 }
