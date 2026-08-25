@@ -1564,6 +1564,28 @@ namespace moho
     // `{left, parent, right = the three link args, value = *area, color =
     // 0}`). Both are plain MSVC8 `std::set<float>` template emissions with no
     // CDecalManager-specific behavior of their own.
+    //
+    // Address: 0x00879810 (FUN_00879810, std::set<float>::insert(area)'s
+    // _Insert dispatcher) -- BST-descends comparing the candidate area
+    // against each node's value (+0x0C, isNil at +0x11), tracks the
+    // last-visited node and descent direction, and on reaching a leaf either
+    // returns the existing equal node with second=false (duplicate area,
+    // matching this loop's "if (seenAreas.insert(area).second)" guard) or
+    // calls buy_node+link (FUN_0087A470, insert_at, below) and returns the
+    // fresh node with second=true. Was wrongly classified
+    // external_dependency ("all-external-callees thunk... no engine
+    // references") -- the body is pure std::set<float> RB-tree descent with
+    // no third-party calls at all, just FUN_0087A470/FUN_87CA10 (both
+    // engine std::set<float> internals). Reached directly from
+    // seenAreas.insert(area) below.
+    // Address: 0x0087A470 (FUN_0087A470, std::set<float>::insert_at) -- the
+    // link+rebalance step FUN_00879810 calls on a miss: (unsigned)size_ >=
+    // 0x1FFFFFFEu guard is max_size() - 1u <= size_ for the 4-byte float
+    // value_type, throwing std::length_error("map/set<T> too long") via the
+    // same logic_error-then-vftable-patch shape used throughout this
+    // codebase's other RB-tree instantiations. Calls buy_node (FUN_0087C060,
+    // cited above) then repairs red-red violations. Reached from
+    // FUN_00879810 immediately above.
     std::set<float> seenAreas;
     std::vector<float> distinctAreas;
 
