@@ -18,33 +18,6 @@ namespace
   gpg::RType* gFastVectorFloatType = nullptr;
   gpg::RType* gFastVectorCountedParticleTextureType = nullptr;
   gpg::RType* gFastVectorStringType = nullptr;
-  moho::CEffectImplSerializer gCEffectImplSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
 
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
@@ -98,34 +71,6 @@ namespace
   }
 
   /**
-   * Address: 0x0065A7B0 (FUN_0065A7B0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CEffectImpl deserialize thunk alias into the shared
-   * deserialize core body.
-   */
-  void DeserializeCEffectImplCoreThunkVariantA(
-    moho::CEffectImpl* const object, gpg::ReadArchive* const archive, const gpg::RRef&
-  )
-  {
-    DeserializeCEffectImplCore(object, archive);
-  }
-
-  /**
-   * Address: 0x0065ADA0 (FUN_0065ADA0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second CEffectImpl deserialize thunk alias into the shared
-   * deserialize core body.
-   */
-  void DeserializeCEffectImplCoreThunkVariantB(
-    moho::CEffectImpl* const object, gpg::ReadArchive* const archive, const gpg::RRef&
-  )
-  {
-    DeserializeCEffectImplCore(object, archive);
-  }
-
-  /**
    * Address: 0x0065B110 (FUN_0065B110, CEffectImplSerializer::SerializeCore)
    *
    * What it does:
@@ -148,63 +93,43 @@ namespace
     archive->Write(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &object->mMatrix, gpg::RRef{});
   }
 
-  /**
-   * Address: 0x0065A7C0 (FUN_0065A7C0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CEffectImpl serialize thunk alias into the shared
-   * serialize core body.
-   */
-  void SerializeCEffectImplCoreThunkVariantA(
-    const moho::CEffectImpl* const object, gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCEffectImplCore(object, archive);
-  }
+  // Address: 0x010B3ADC -- process-global `CEffectImplSerializer` singleton.
+  // Constructing it runs CEffectImplSerializer::CEffectImplSerializer()
+  // (0x00BD40E0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::CEffectImplSerializer gCEffectImplSerializer;
 
   /**
-   * Address: 0x0065ADB0 (FUN_0065ADB0, serializer save thunk alias)
+   * Address: 0x00BFBA20 (FUN_00BFBA20, cleanup_CEffectImplSerializer)
    *
    * What it does:
-   * Tail-forwards a second CEffectImpl serialize thunk alias into the shared
-   * serialize core body.
+   * Process-exit cleanup that unlinks the `CEffectImplSerializer` helper
+   * node. The real ctor pushes this plain free function (not a mangled
+   * destructor) as its atexit target.
    */
-  void SerializeCEffectImplCoreThunkVariantB(
-    const moho::CEffectImpl* const object, gpg::WriteArchive* const archive
-  )
+  void cleanup_CEffectImplSerializer()
   {
-    SerializeCEffectImplCore(object, archive);
-  }
-
-  void cleanup_CEffectImplSerializer_atexit()
-  {
-    (void)moho::cleanup_CEffectImplSerializer();
+    gCEffectImplSerializer.ResetLinks();
   }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x006598F0 (FUN_006598F0)
+   * Address: 0x00BD40E0 (FUN_00BD40E0, register_CEffectImplSerializer)
    *
    * What it does:
-   * Unlinks the global CEffectImpl serializer helper node and restores
-   * self-links on the serializer node.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields, then registers
+   * `cleanup_CEffectImplSerializer` as the explicit atexit teardown.
    */
-  gpg::SerHelperBase* UnlinkCEffectImplSerializerNodeVariantA()
+  CEffectImplSerializer::CEffectImplSerializer()
+    : mLoadCallback(&CEffectImplSerializer::Deserialize)
+    , mSaveCallback(&CEffectImplSerializer::Serialize)
   {
-    return UnlinkHelperNode(gCEffectImplSerializer);
-  }
-
-  /**
-   * Address: 0x00659920 (FUN_00659920)
-   *
-   * What it does:
-   * Runs the duplicate CEffectImpl serializer helper-node unlink/reset lane.
-   */
-  gpg::SerHelperBase* UnlinkCEffectImplSerializerNodeVariantB()
-  {
-    return UnlinkHelperNode(gCEffectImplSerializer);
+    (void)std::atexit(&cleanup_CEffectImplSerializer);
   }
 
   /**
@@ -228,7 +153,7 @@ namespace moho
   /**
    * Address: 0x0065A2C0 (FUN_0065A2C0, gpg::SerSaveLoadHelper_CEffectImpl::Init)
    */
-  void CEffectImplSerializer::RegisterSerializeFunctions()
+  void CEffectImplSerializer::Init()
   {
     gpg::RType* const type = CEffectImpl::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -236,43 +161,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSaveCallback;
   }
-
-  /**
-   * Address: 0x00BFBA20 (FUN_00BFBA20, cleanup_CEffectImplSerializer)
-   *
-   * What it does:
-   * Unlinks startup CEffectImpl serializer helper node and restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CEffectImplSerializer()
-  {
-    return UnlinkHelperNode(gCEffectImplSerializer);
-  }
-
-  /**
-   * Address: 0x00BD40E0 (FUN_00BD40E0, register_CEffectImplSerializer)
-   *
-   * What it does:
-   * Initializes startup CEffectImpl serializer helper callbacks and installs
-   * process-exit cleanup.
-   */
-  int register_CEffectImplSerializer()
-  {
-    InitializeHelperNode(gCEffectImplSerializer);
-    gCEffectImplSerializer.mLoadCallback = &CEffectImplSerializer::Deserialize;
-    gCEffectImplSerializer.mSaveCallback = &CEffectImplSerializer::Serialize;
-    return std::atexit(&cleanup_CEffectImplSerializer_atexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct CEffectImplSerializerBootstrap
-  {
-    CEffectImplSerializerBootstrap()
-    {
-      (void)moho::register_CEffectImplSerializer();
-    }
-  };
-
-  [[maybe_unused]] CEffectImplSerializerBootstrap gCEffectImplSerializerBootstrap;
-} // namespace
