@@ -121,24 +121,58 @@ namespace moho
    */
   void WriteCTaskBase(gpg::WriteArchive* archive, const void* object, const gpg::RRef& ownerRef);
 
-  class CTaskSerializer
+  class CTaskSerializer : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC2FE0 (FUN_00BC2FE0, dynamic initializer for the global
+     * `CTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CTaskSerializer();
+
+    /**
+     * Address: 0x00BEE310 (FUN_00BEE310, Moho::CTaskSerializer::~CTaskSerializer)
+     */
+    ~CTaskSerializer();
+
+    /**
+     * Address: 0x00408E00 (FUN_00408E00, Moho::CTaskSerializer::Deserialize)
+     *
+     * What it does:
+     * Reads one weak task pointer from archive payload and intentionally
+     * discards it (binary callback keeps stack-link restoration in
+     * thread-level helpers).
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00408E40 (FUN_00408E40, Moho::CTaskSerializer::Serialize)
+     *
+     * What it does:
+     * Saves the task-chain link (`mSubtask`) as an unowned tracked pointer.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0040A290 (FUN_0040A290, sub_40A290)
-     * Slot: 0
      *
      * What it does:
      * Binds load/save serializer callbacks into CTask RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(offsetof(CTaskSerializer, mSerLoadFunc) == 0x0C, "CTaskSerializer::mSerLoadFunc offset must be 0x0C");
+  static_assert(offsetof(CTaskSerializer, mSerSaveFunc) == 0x10, "CTaskSerializer::mSerSaveFunc offset must be 0x10");
+  static_assert(sizeof(CTaskSerializer) == 0x14, "CTaskSerializer size must be 0x14");
 
   class CTaskTypeInfo : public gpg::RType
   {
@@ -163,7 +197,6 @@ namespace moho
     void Init() override;
   };
 
-  static_assert(sizeof(CTaskSerializer) == 0x14, "CTaskSerializer size must be 0x14");
   static_assert(sizeof(CTaskTypeInfo) == 0x64, "CTaskTypeInfo size must be 0x64");
 
   template <class T>
