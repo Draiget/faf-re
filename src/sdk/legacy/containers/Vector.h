@@ -1887,6 +1887,23 @@ namespace msvc8
          * rehash-growth branch, `table.mBuckets.resize(newMask + 2u,
          * table.mListHead)` -- the fill value is the table's sentinel head
          * pointer, not a raw byte, matching this member's `const T&` shape.)
+         * Address: 0x0074DDD0 (FUN_0074DDD0, IDA infers `std::
+         * vector_CSimConVarInstanceBase::reserve` but the real behavior is
+         * `msvc8::vector<Moho::CSimConVarInstanceBase*>::resize(newSize,
+         * nullptr)` for the 4-byte pointer element -- compares `newSize`
+         * against `size()` (not `capacity()`, ruling out a real `reserve`),
+         * no-ops when equal, tail-calls the shrink erase lane `sub_74F880`
+         * when `newSize < size()`, tail-calls the grow `_Insert_n` lane
+         * FUN_0074F8E0 (cited on `insert(pos,count,value)` below) with
+         * `count = newSize - size()` otherwise. Was wrongly classified
+         * `external_dependency` ("STL template instantiation / codec helper")
+         * -- `Moho::CSimConVarInstanceBase` is an engine type
+         * (`moho/sim/CSimConVarInstanceBase.h`), not external. Reached from
+         * two real call sites, both already recovered: `Sim.cpp:8161`
+         * (`mSimVars.resize(GetSimConVarIndexCounter(), nullptr)`, the
+         * `CSimConVarBase::mIndex`-driven grow-to-index path) and
+         * `Sim.cpp:8297` (`mSimVars.resize(index + 1u, nullptr)`, the
+         * same grow-by-index pattern in a sibling registration function).)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3327,6 +3344,22 @@ namespace msvc8
          * already covers the request -- the in-place branch this
          * instantiation's `uninit_move_n` citation below did not yet
          * cover (that one documents the reallocation branch only).
+         * Address: 0x0074F8E0 (FUN_0074F8E0, IDA types the vector correctly
+         * as `std::vector_CSimConVarInstanceBase` -- `msvc8::vector<Moho::
+         * CSimConVarInstanceBase*>::insert(pos, count, value)` for the
+         * 4-byte pointer element, trivially copyable: the in-place branch
+         * uses `sub_751D30`/`memset32` for the tail-shift and gap-fill
+         * (matching this method's `memmove`+broadcast-`localValue` shape
+         * for `is_trivially_copyable_v<T>`), the reallocation branch
+         * allocates via `sub_751DA0` (matching `allocate_slots_checked`)
+         * and copies via `memmove_s` (matching `uninit_move_n` for a
+         * trivial element). Was `blocked` ("needs deeper owner/xref
+         * closure") -- its only caller, `FUN_0074DDD0` (now cited on
+         * `resize` above as the `mSimVars.resize(n, nullptr)` grow path),
+         * was independently wrongly `external_dependency`; both corrected
+         * together. `sub_751D30`/`sub_751D70`/`sub_751DA0` (the in-place
+         * shift / destroy-tail / allocate sub-helpers this instantiation
+         * calls) are not individually cited yet -- follow-up.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
