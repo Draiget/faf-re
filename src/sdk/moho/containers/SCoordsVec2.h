@@ -55,10 +55,40 @@ namespace moho
 
   /**
    * Serializer helper for `SCoordsVec2` archive lanes.
+   *
+   * RTTI (`dumps/rtti_dump_all.hpp`) shows the real inheritance chain as
+   * `SerHelperBase -> SerSaveLoadHelper<SCoordsVec2> -> SCoordsVec2Serializer`
+   * (every base at `mdisp=0`, single inheritance) -- but `SCoordsVec2` has
+   * no `MemberDeserialize`/`MemberSerialize` of its own, so this class fully
+   * overrides `Init()`/`Deserialize`/`Serialize` rather than using the
+   * generic template bodies. Modeled as directly inheriting `SerHelperBase`
+   * (same prior-art judgment call as `Rect2iSerializer`/`Rect2fSerializer`
+   * in Reflection.h): the intermediate template level adds zero data or
+   * behavior this class doesn't already fully override.
    */
-  class SCoordsVec2Serializer
+  class SCoordsVec2Serializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC7CE0 (FUN_00BC7CE0, dynamic initializer for the global
+     * `SCoordsVec2Serializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SCoordsVec2Serializer();
+
+    /**
+     * Address: 0x00BF2110 (FUN_00BF2110, Moho::SCoordsVec2Serializer::~SCoordsVec2Serializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. The real ctor
+     * pushes this mangled destructor symbol as its atexit target.
+     */
+    ~SCoordsVec2Serializer();
+
     /**
      * Address: 0x0050BD10 (FUN_0050BD10, Moho::SCoordsVec2Serializer::Deserialize)
      *
@@ -75,17 +105,23 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, SCoordsVec2* coords);
 
-    virtual ~SCoordsVec2Serializer() noexcept;
+    /**
+     * Address: 0x0050C730 (FUN_0050C730) -- shared vtable slot 0 target for
+     * both `??_7SCoordsVec2Serializer@Moho@@6B@` and the
+     * `SerSaveLoadHelper<SCoordsVec2>` intermediate vtable (confirmed via
+     * `data_refs` on both vtable heads).
+     *
+     * What it does:
+     * Lazily resolves `SCoordsVec2`'s RTTI onto `SCoordsVec2::sType`, then
+     * installs this helper's load/save callbacks onto that type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mDeserialize;  // +0x0C
     gpg::RType::save_func_t mSerialize;    // +0x10
   };
 
-  static_assert(offsetof(SCoordsVec2Serializer, mHelperNext) == 0x04, "SCoordsVec2Serializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SCoordsVec2Serializer, mHelperPrev) == 0x08, "SCoordsVec2Serializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SCoordsVec2Serializer, mDeserialize) == 0x0C, "SCoordsVec2Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(SCoordsVec2Serializer, mSerialize) == 0x10, "SCoordsVec2Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SCoordsVec2Serializer) == 0x14, "SCoordsVec2Serializer size must be 0x14");
@@ -101,13 +137,4 @@ namespace moho
    * Installs the static `SCoordsVec2TypeInfo` instance and its shutdown hook.
    */
   void register_SCoordsVec2TypeInfo();
-
-  /**
-   * Address: 0x00BC7CE0 (FUN_00BC7CE0, register_SCoordsVec2Serializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `SCoordsVec2` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_SCoordsVec2Serializer();
 } // namespace moho
