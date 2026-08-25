@@ -24,23 +24,38 @@ namespace moho
     void Init() override;
   };
 
-  class SAniManipBindingSerializer
+  class SAniManipBindingSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD2BC0 (FUN_00BD2BC0, dynamic initializer for the global
+     * `SAniManipBindingSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SAniManipBindingSerializer();
+
+    /**
+     * Address: 0x00BFAD90 (FUN_00BFAD90, Moho::SAniManipBindingSerializer::~SAniManipBindingSerializer)
+     */
+    ~SAniManipBindingSerializer();
+
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    virtual void RegisterSerializeFunctions();
+
+    /**
+     * Address: 0x0063C2B0 (FUN_0063C2B0, Moho::SAniManipBindingSerializer::Init)
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mLoadCallback; // +0x0C
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
   static_assert(sizeof(SAniManipBindingTypeInfo) == 0x64, "SAniManipBindingTypeInfo size must be 0x64");
-  static_assert(offsetof(SAniManipBindingSerializer, mHelperNext) == 0x04, "SAniManipBindingSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SAniManipBindingSerializer, mHelperPrev) == 0x08, "SAniManipBindingSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(SAniManipBindingSerializer, mLoadCallback) == 0x0C,
     "SAniManipBindingSerializer::mLoadCallback offset must be 0x0C"
@@ -74,22 +89,6 @@ namespace moho
    * Preregisters `SAniManipBinding` RTTI and installs process-exit cleanup.
    */
   int register_SAniManipBindingTypeInfoAtexit();
-
-  /**
-   * Address: 0x00BFAD90 (FUN_00BFAD90, cleanup_SAniManipBindingSerializer)
-   *
-   * What it does:
-   * Unlinks and tears down startup serializer helper ownership.
-   */
-  void cleanup_SAniManipBindingSerializer();
-
-  /**
-   * Address: 0x00BD2BC0 (FUN_00BD2BC0, register_SAniManipBindingSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `SAniManipBinding` and schedules teardown.
-   */
-  void register_SAniManipBindingSerializer();
 
   /**
    * Address: 0x0063D0E0 (FUN_0063D0E0, preregister_FastVectorSAniManipBindingType)
@@ -154,8 +153,8 @@ namespace
   alignas(SAniManipBindingTypeInfo) unsigned char gSAniManipBindingTypeInfoStorage[sizeof(SAniManipBindingTypeInfo)]{};
   bool gSAniManipBindingTypeInfoConstructed = false;
 
-  alignas(SAniManipBindingSerializer) unsigned char gSAniManipBindingSerializerStorage[sizeof(SAniManipBindingSerializer)]{};
-  bool gSAniManipBindingSerializerConstructed = false;
+  // Address: 0x010B28C8 -- process-global `SAniManipBindingSerializer` singleton.
+  SAniManipBindingSerializer gSAniManipBindingSerializer;
 
   alignas(FastVectorSAniManipBindingType)
     unsigned char gFastVectorSAniManipBindingTypeStorage[sizeof(FastVectorSAniManipBindingType)]{};
@@ -174,16 +173,6 @@ namespace
     return reinterpret_cast<SAniManipBindingTypeInfo*>(gSAniManipBindingTypeInfoStorage);
   }
 
-  [[nodiscard]] SAniManipBindingSerializer* AcquireSAniManipBindingSerializer()
-  {
-    if (!gSAniManipBindingSerializerConstructed) {
-      new (gSAniManipBindingSerializerStorage) SAniManipBindingSerializer();
-      gSAniManipBindingSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SAniManipBindingSerializer*>(gSAniManipBindingSerializerStorage);
-  }
-
   [[nodiscard]] FastVectorSAniManipBindingType* AcquireFastVectorSAniManipBindingType()
   {
     if (!gFastVectorSAniManipBindingTypeConstructed) {
@@ -200,20 +189,6 @@ namespace
       moho::SAniManipBinding::sType = gpg::LookupRType(typeid(moho::SAniManipBinding));
     }
     return moho::SAniManipBinding::sType;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
   }
 
   struct SAniManipBindingRuntimeInlineView
@@ -246,17 +221,6 @@ namespace
     outView->capacityEnd = inlineStorageBase + 2;
     outView->inlineStorage = inlineStorageBase;
     return outView;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
   }
 
   /**
@@ -445,9 +409,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063C2B0 (FUN_0063C2B0, Moho::SAniManipBindingSerializer::RegisterSerializeFunctions)
+   * Address: 0x0063C2B0 (FUN_0063C2B0, Moho::SAniManipBindingSerializer::Init)
    */
-  void SAniManipBindingSerializer::RegisterSerializeFunctions()
+  void SAniManipBindingSerializer::Init()
   {
     gpg::RType* const type = CachedSAniManipBindingType();
     GPG_ASSERT(type != nullptr);
@@ -492,59 +456,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063B420 (FUN_0063B420, cleanup_SAniManipBindingSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the recovered
-   * `SAniManipBindingSerializer` node and restores self-links.
+   * Address: 0x00BFAD90 (FUN_00BFAD90, Moho::SAniManipBindingSerializer::~SAniManipBindingSerializer)
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SAniManipBindingSerializerStartupThunkA()
+  SAniManipBindingSerializer::~SAniManipBindingSerializer()
   {
-    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
+    ResetLinks();
   }
 
   /**
-   * Address: 0x0063B450 (FUN_0063B450, cleanup_SAniManipBindingSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the recovered
-   * `SAniManipBindingSerializer` node and restores self-links.
+   * Address: 0x00BD2BC0 (FUN_00BD2BC0, dynamic initializer for the global
+   * `SAniManipBindingSerializer` singleton)
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SAniManipBindingSerializerStartupThunkB()
-  {
-    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
-
-  /**
-   * Address: 0x00BFAD90 (FUN_00BFAD90, cleanup_SAniManipBindingSerializer)
-   */
-  void cleanup_SAniManipBindingSerializer()
-  {
-    if (!gSAniManipBindingSerializerConstructed) {
-      return;
-    }
-
-    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
-    UnlinkSerializerNode(*serializer);
-    serializer->~SAniManipBindingSerializer();
-    gSAniManipBindingSerializerConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BD2BC0 (FUN_00BD2BC0, register_SAniManipBindingSerializer)
-   */
-  void register_SAniManipBindingSerializer()
-  {
-    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mLoadCallback = &SAniManipBindingSerializer::Deserialize;
-    serializer->mSaveCallback = &SAniManipBindingSerializer::Serialize;
-    (void)std::atexit(&cleanup_SAniManipBindingSerializer);
-  }
+  SAniManipBindingSerializer::SAniManipBindingSerializer()
+    : mLoadCallback(&SAniManipBindingSerializer::Deserialize)
+    , mSaveCallback(&SAniManipBindingSerializer::Serialize)
+  {}
 } // namespace moho
 
 namespace gpg
@@ -684,7 +610,6 @@ namespace
     SAniManipBindingReflectionBootstrap()
     {
       (void)moho::register_SAniManipBindingTypeInfoAtexit();
-      moho::register_SAniManipBindingSerializer();
       (void)moho::register_FastVectorSAniManipBindingTypeAtexit();
     }
   };
