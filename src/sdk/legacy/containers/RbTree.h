@@ -1260,6 +1260,33 @@ namespace msvc8
              * are themselves already `recovered` engine code in this same
              * file, and `sub_530EE0` is corrected to `recovered` engine
              * code alongside this entry; corrected here.)
+             *
+             * Address: 0x007CC2F0 (FUN_007CC2F0, sub_7CC2F0) -- `msvc8::
+             * set<char>`'s copy constructor for `CLobby.cpp`'s ignore-names
+             * separator set (node 0x10, colour@0x0D/isNil@0x0E -- see
+             * `alloc_raw`/`copy_from` below). Real SEH-protected body:
+             * `buy_head()` inlined at the call site (`call sub_7CC520`
+             * (`alloc_raw`, cited there) then self-link `left=parent=
+             * right=self`/`isNil=1`/`size_=0` inline, matching the split-
+             * instantiation pattern already documented on `buy_head()`
+             * itself) followed by `call sub_7CC3B0` (`copy_from`'s top-
+             * level clone for this instantiation, cited below). Reached
+             * from `func_GetIgnoreNames`/`BuildLobbyIgnoreNameList`
+             * (0x007CBC80, `CLobby.cpp`), which explicitly copy-constructs
+             * a local from its by-value `std::set<char>` parameter before
+             * consuming it -- the real binary's `sub_7CC2F0(&v4.mSet,
+             * &a2)` -- mirrored in the recovered source as an explicit
+             * `const msvc8::set<char> localSeparators(separatorsParam);`
+             * so the copy constructor is actually invoked rather than
+             * elided by return-value/parameter-passing optimisation. Was
+             * mis-marked `external_dependency` in `recovered_progress.json`
+             * ("std::set<char> copy-constructor STL internal") on the
+             * grounds that the recovered `BuildLobbyIgnoreNameList` elided
+             * the whole separator-set mechanism in favour of a hardcoded
+             * comma check; the elision was behaviourally exact for output
+             * but dropped the real call chain the binary performs --
+             * corrected here now that `BuildLobbyIgnoreNameList` genuinely
+             * carries the separator set through.
              */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
@@ -1563,6 +1590,28 @@ namespace msvc8
              * favor of the implicit destructor now that `mCategoryMap` is a
              * real typed member (RULE ONE: member destructors are
              * compiler-emitted, not hand-written source).
+             *
+             * Address: 0x007CC2B0 (FUN_007CC2B0, sub_7CC2B0) -- `msvc8::
+             * set<char>`'s destructor for `CLobby.cpp`'s ignore-names
+             * separator set (node 0x10, colour@0x0D/isNil@0x0E -- the same
+             * instantiation cited on `alloc_raw`/`copy_from` above and
+             * `erase_range`/`destroy_subtree` below). `this` arrives in
+             * `eax`. Matches this member's body field for field:
+             * `erase_range(leftmost(), header())` (`sub_7CA730`, cited
+             * below) then `operator delete(head_)` then `head_=nullptr`/
+             * `size_=0`. All 11 recorded incoming xrefs are `jmp`s from
+             * cold/EH-funclet chunks of unrelated-looking `sub_7CCxxx`/
+             * `sub_7CFxxx` addresses -- those are the local-unwind cleanup
+             * paths of the (still unrecovered) `boost::algorithm::split`
+             * tokenizer pipeline `func_GetIgnoreNames` drives for the
+             * actual character-by-character split (see the `FUN_007CD3A0`
+             * open item in `decomp/recovery/reports/FUN_007CD3A0.md`), not
+             * eleven separate hand-written callers of this member. Reached
+             * in the recovered tree via `BuildLobbyIgnoreNameList`'s
+             * `localSeparators` local (`CLobby.cpp`) going out of scope --
+             * an ordinary implicit local destructor call, the same
+             * evidentiary pattern as every other implicit `~rb_tree()`
+             * citation in this file.
              */
             ~rb_tree()
             {
@@ -3363,6 +3412,25 @@ namespace msvc8
              * `CEntityDb` (`EntityDb.h`) -- `~CEntityDb()`'s implicit member
              * destruction (`EntityDb.cpp`) is what triggers `~rb_tree()`,
              * which is what calls this member.
+             *
+             * Address: 0x007CA730 (FUN_007CA730, sub_7CA730) -- `msvc8::
+             * set<char>`'s `erase_range`, the same `CLobby.cpp` ignore-
+             * names separator-set instantiation cited on `alloc_raw`/
+             * `copy_from`/`~rb_tree` above (node 0x10, colour@0x0D/isNil@
+             * 0x0E). `this` in `edi`, matching this member's fast-path
+             * field for field: tests `first == head_->left` (`leftmost()`)
+             * `&& last == head_` (`header()`), and on the fast path calls
+             * `sub_7CB080` (`destroy_subtree`, cited below) on `head_->
+             * parent` (`root()`) then self-links the header and zeroes
+             * size -- exactly `clear()`'s body, which this member's own
+             * fast path delegates to. The non-fast-path walk matches this
+             * member's `erase(_First++)` loop, calling `sub_7CAC80`
+             * (`erase_node`) per element. Sole caller is `FUN_007CC2B0`
+             * (`~rb_tree`, cited above), which always takes the fast path
+             * (`erase_range(leftmost(), header())`). DB-integrity fix:
+             * this token was marked `skip` citing a `CrtRuntimeHelpers.cpp`
+             * source path the address never appeared in; this is the real
+             * source.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -3696,6 +3764,25 @@ namespace msvc8
              * field/class not yet pinned down (isNil@+0x15, 8-byte-value
              * shape recurs across many Sim-subsystem containers per that
              * same paragraph).
+             *
+             * Address: 0x007CC520 (FUN_007CC520, sub_7CC520) -- `msvc8::
+             * set<char>` instantiation behind `CLobby.cpp`'s ignore-names
+             * separator set (`Moho::CLobby::ConnectToPeer` ->
+             * `GetIgnoreNamesSeparators`/`BuildLobbyIgnoreNameList`), node
+             * 0x10 (12-byte link triple + 1-byte `char` value, colour/nil
+             * rounded up), colour@0x0D/isNil@0x0E. `operator new(0x10)` via
+             * `sub_7CD150` (the shared checked-16-byte lane,
+             * `AllocateChecked16ByteLane` in
+             * `CheckedArrayAllocationLanes.cpp`), then zeroes the three
+             * link dwords (same pointer-wrap "null tests after each
+             * derived pointer are compiler artifacts" guards seen
+             * elsewhere in this file) and sets `color=1`/`isNil=0` --
+             * matches this member exactly. Called by this instantiation's
+             * inlined `buy_head()` half at the copy constructor
+             * (`FUN_007CC2F0`, cited above) and by the from-range
+             * constructor (`FUN_007CD990`, which performs the self-link/
+             * `isNil=1` fixup itself, the same split-instantiation pattern
+             * already documented above).
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -4632,6 +4719,19 @@ namespace msvc8
              * ICF twin) for a second one of the three sound-cache trees.
              * Reached from `FUN_004E3020`, part of the same elided
              * `TeardownSoundStructs` cluster.)
+             *
+             * Address: 0x007CB080 (FUN_007CB080, sub_7CB080) -- `msvc8::
+             * set<char>`'s `destroy_subtree`, the same `CLobby.cpp`
+             * ignore-names separator-set instantiation cited on
+             * `alloc_raw`/`copy_from`/`~rb_tree`/`erase_range` above (node
+             * 0x10, isNil@0x0E for this 1-byte `char` value_type). Recurses
+             * right (`sub_7CB080(node->right)`) then walks left with
+             * `operator delete` per node, matching this member's recurse-
+             * right/iterate-left shape exactly. Sole caller is
+             * `FUN_007CA730` (`erase_range`, cited above)'s whole-tree
+             * fast path. DB-integrity fix: this token was marked `blocked`
+             * citing a `CrtRuntimeHelpers.cpp` source path the address
+             * never appeared in; this is the real source.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -4704,6 +4804,32 @@ namespace msvc8
              * exactly this file's `destroy_subtree` used as the cleanup
              * primitive it already is elsewhere. Sole caller is
              * `FUN_00530EE0` above.)
+             *
+             * Address: 0x007CC3B0 (FUN_007CC3B0, sub_7CC3B0) -- the same
+             * recursive-clone `_Tree::_Copy` mechanism as `FUN_00530EE0`/
+             * `FUN_00531B30` above, for `msvc8::set<char>` (`CLobby.cpp`'s
+             * ignore-names separator set, node 0x10, colour@0x0D/isNil@
+             * 0x0E). `this` arrives in `eax`, the source tree in `ebx` --
+             * the same register-heavy convention already documented above.
+             * Clones `other`'s root via `sub_7CC470` (cited immediately
+             * below), stores it at `head_->parent`, copies `_Mysize`, then
+             * walks the cloned root's left-spine for `leftmost()` and
+             * right-spine for `rightmost()` (self-referential in the
+             * empty-tree case) -- field-for-field identical to this
+             * member's other cited recursive-clone instantiations. Sole
+             * caller is `FUN_007CC2F0` (the copy constructor, cited on
+             * `rb_tree(const rb_tree&)` above).
+             * Address: 0x007CC470 (FUN_007CC470, sub_7CC470) -- the
+             * recursive per-node subtree clone underneath `FUN_007CC3B0`,
+             * matching `FUN_00531B30`'s shape exactly: `this` in `ecx`,
+             * tests `_Rootnode->_Isnil` (`+0x0E` for this 1-byte-value
+             * instantiation), returns `_Wherenode` unchanged when nil,
+             * otherwise calls `sub_7CC580` (`buy_node`-with-value, already
+             * `recovered`) to allocate and copy-construct one new node
+             * carrying `_Rootnode`'s `char` value and colour, then recurses
+             * on `_Rootnode->_Left`/`_Rootnode->_Right` in turn, wiring the
+             * results into the new node's `_Left`/`_Right`. Sole caller is
+             * `FUN_007CC3B0` above (plus its own two self-recursive calls).
              */
             void copy_from(const rb_tree& other)
             {

@@ -23,6 +23,7 @@
 #include "INetConnection.h"
 #include "INetDatagramSocket.h"
 #include "INetNATTraversalProviderWeakPtrReflection.h"
+#include "legacy/containers/Set.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
@@ -368,23 +369,47 @@ namespace
   }
 
   /**
+   * Address: 0x007CBC40 (FUN_007CBC40, func_GetIgnoreNamesSeparators)
+   *
+   * What it does:
+   * Builds the delimiter set used to split `lob_IgnoreNames` -- the shipped
+   * body constructs it from the single-character literal "," via
+   * `std::set<char>(begin,end)`-style range insertion (`sub_7CD990`); this
+   * is that same comma-only content, expressed directly.
+   */
+  [[nodiscard]] msvc8::set<char> GetIgnoreNamesSeparators()
+  {
+    msvc8::set<char> separators;
+    separators.insert(',');
+    return separators;
+  }
+
+  /**
    * Address: 0x007CBC80 (FUN_007CBC80, func_GetIgnoreNames)
    *
-   * std::vector<std::string> &,std::set<char> const &
+   * IDA signature:
+   * int __cdecl func_GetIgnoreNames(std::vector_string *outNames, std::set_char separators);
    *
    * What it does:
    * Splits global `lob_IgnoreNames` CSV text into trimmed ignore-name tokens
-   * used by `CLobby::ConnectToPeer`.
+   * used by `CLobby::ConnectToPeer`. The real binary takes the separator set
+   * by value and immediately copy-constructs a local from it
+   * (`sub_7CC2F0(&local.mSet, &separators)`) before consuming it in the
+   * tokenizer pipeline; mirrored here as an explicit local copy so the
+   * `msvc8::set<char>` copy constructor is genuinely invoked rather than
+   * elided.
    */
-  [[nodiscard]] msvc8::vector<msvc8::string> BuildLobbyIgnoreNameList()
+  [[nodiscard]] msvc8::vector<msvc8::string> BuildLobbyIgnoreNameList(const msvc8::set<char>& separatorsParam)
   {
     msvc8::vector<msvc8::string> ignoreNames{};
     if (moho::lob_IgnoreNames.empty()) {
       return ignoreNames;
     }
 
+    const msvc8::set<char> localSeparators(separatorsParam);
+
     ignoreNames.reserve(8);
-    SplitByComma(moho::lob_IgnoreNames, ignoreNames);
+    SplitBySeparatorSet(moho::lob_IgnoreNames, localSeparators, ignoreNames);
     return ignoreNames;
   }
 
@@ -2854,7 +2879,7 @@ void CLobby::ConnectToPeer(
     throw std::runtime_error(msg.c_str());
   }
 
-  const msvc8::vector<msvc8::string> ignoreNames = BuildLobbyIgnoreNameList();
+  const msvc8::vector<msvc8::string> ignoreNames = BuildLobbyIgnoreNameList(GetIgnoreNamesSeparators());
   if (!ignoreNames.empty() && IsPeerNameInIgnoreList(ignoreNames, name)) {
     return;
   }
