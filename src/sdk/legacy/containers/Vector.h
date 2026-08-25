@@ -3846,6 +3846,40 @@ namespace msvc8
          * instantiations elsewhere in the engine -- cited here by address
          * for completeness, not re-derived or renamed.)
          *
+         * Address: 0x006882E0 (FUN_006882E0, `msvc8::vector<moho::
+         * CEntityDbBoundedPropQueueNode>::insert(iterator, const T&)` for
+         * the 20-byte element -- `moho/entity/EntityDb.cpp`'s bounded-prop
+         * priority-queue backing store). Max_size check
+         * `0xFFFFFFFF/20==214748364` throwing through `FUN_006885F0`
+         * (`_Xlength_error`, `VTABLE_CONFIRMED` via `vtable_writers` ->
+         * `length_error@std`), 1.5x growth, allocates through
+         * `FUN_00688E80` (already recovered, checked 20-byte allocator),
+         * relocates the pre-/post-insertion spans through `FUN_00689D70`
+         * (cited on `WeakPtr.h`'s `CopyPrefixedWeakPtrDwordPayloadRange
+         * ForwardCore` -- `CEntityDbBoundedPropQueueNode`'s binary layout
+         * is field-for-field the same 20-byte prefix+`WeakPtr`+payload
+         * shape that generic helper already models: `mPriority`/
+         * `mBoundedTick`/`mOwnerLink`(`WeakPtr<Prop>`)/`mHandleId` at the
+         * same four offsets as `prefix0`/`prefix1`/`weak`/`payload`; see
+         * the `Duplicate layout contract` note on that citation), called
+         * twice in the reallocation branch (copy-before-insertion-point,
+         * copy-after) matching `_Insert_n`'s `uninit_copy` pair shape. A
+         * local stack temp of the inserted value self-registers into an
+         * SEH cleanup list before the copy (`*a1[2] = &v19`-style
+         * intrusive-list splice, matching an EH-unwind funclet at
+         * 0x00686120 doing the identical unlink walk -- compiler-emitted
+         * glue, not an independently callable function). Reached from
+         * `FUN_006868C0` (already recovered, `msvc8::vector<
+         * CEntityDbBoundedPropQueueNode>::push_back`, `EntityDb.cpp`) via
+         * `FUN_00687720` (already `skip`-tagged, a 1-line typed-throw
+         * shim), itself reached from `FUN_006859F0` (already recovered).
+         * Address: 0x00688DF0 (FUN_00688DF0, the single-element-range
+         * calling-convention wrapper this method's shift-insert and
+         * append-at-end paths both call into `FUN_00689D70` through --
+         * `.asm`-confirmed call sites at 0x688529 (shift-insert,
+         * `sub_688DF0(v16-20, v16)`) and 0x68859B (append-at-end,
+         * `sub_688DF0(arg4, arg4+20)`).)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
