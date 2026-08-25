@@ -7,82 +7,36 @@
 namespace gpg
 {
   class ReadArchive;
-  class WriteArchive;
   class SerConstructResult;
-  class SerSaveConstructArgsResult;
-}
+} // namespace gpg
 
 namespace moho
 {
   /**
-   * VFTABLE: 0x00E26F74
-   * COL: 0x00E994DC
-   */
-  class CollisionBeamEntitySaveConstruct
-  {
-  public:
-    /**
-     * Address: 0x006738A0 (FUN_006738A0, CollisionBeamEntity save-construct args callback)
-     *
-     * What it does:
-     * Serializes owning `Sim` pointer as unowned save-construct argument.
-     */
-    static void SaveConstructArgs(
-      gpg::WriteArchive* archive,
-      int objectPtr,
-      int version,
-      gpg::SerSaveConstructArgsResult* result
-    );
-
-    /**
-     * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)
-     *
-     * What it does:
-     * Binds save-construct-args callback lane into `CollisionBeamEntity` RTTI.
-     */
-    virtual void RegisterSaveConstructArgsFunction();
-
-  public:
-    gpg::SerHelperBase mHelperLinks; // +0x04
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-
-  static_assert(
-    offsetof(CollisionBeamEntitySaveConstruct, mHelperLinks) == 0x04,
-    "CollisionBeamEntitySaveConstruct::mHelperLinks offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CollisionBeamEntitySaveConstruct, mSaveConstructArgsCallback) == 0x0C,
-    "CollisionBeamEntitySaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(CollisionBeamEntitySaveConstruct) == 0x10,
-    "CollisionBeamEntitySaveConstruct size must be 0x10"
-  );
-
-  /**
-   * Address: 0x00BFC340 (FUN_00BFC340, cleanup_CollisionBeamEntitySaveConstruct)
-   *
-   * What it does:
-   * Unlinks `CollisionBeamEntitySaveConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntitySaveConstruct();
-
-  /**
-   * Address: 0x00BD4C60 (FUN_00BD4C60, register_CollisionBeamEntitySaveConstruct)
-   *
-   * What it does:
-   * Initializes startup save-construct helper and schedules exit cleanup.
-   */
-  int register_CollisionBeamEntitySaveConstruct();
-
-  /**
    * VFTABLE: 0x00E26F84
    * COL: 0x00E994B8
    */
-  class CollisionBeamEntityConstruct
+  class CollisionBeamEntityConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD4C90 (FUN_00BD4C90, dynamic initializer for the global
+     * `CollisionBeamEntityConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the construct/delete callback fields.
+     */
+    CollisionBeamEntityConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CollisionBeamEntityConstruct();
+
     /**
      * Address: 0x00673A30 (FUN_00673A30, Moho::CollisionBeamEntityConstruct::Construct)
      *
@@ -103,20 +57,19 @@ namespace moho
      * Address: 0x00674F60 (FUN_00674F60, gpg::SerConstructHelper_CollisionBeamEntity::Init)
      *
      * What it does:
-     * Binds construct/delete callback lanes into `CollisionBeamEntity` RTTI.
+     * Asserts `CollisionBeamEntity`'s reflected construct callback is not
+     * already bound, then installs the construct/delete callback lanes into
+     * `CollisionBeamEntity` RTTI. Dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` when this helper is drained from
+     * the pending list (vtable slot 0).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
   };
 
-  static_assert(
-    offsetof(CollisionBeamEntityConstruct, mHelperLinks) == 0x04,
-    "CollisionBeamEntityConstruct::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(CollisionBeamEntityConstruct, mConstructCallback) == 0x0C,
     "CollisionBeamEntityConstruct::mConstructCallback offset must be 0x0C"
@@ -126,21 +79,4 @@ namespace moho
     "CollisionBeamEntityConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(CollisionBeamEntityConstruct) == 0x14, "CollisionBeamEntityConstruct size must be 0x14");
-
-  /**
-   * Address: 0x00673A00 (FUN_00673A00, cleanup_CollisionBeamEntityConstruct)
-   *
-   * What it does:
-   * Unlinks `CollisionBeamEntityConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntityConstruct();
-
-  /**
-   * Address: 0x00BD4C90 (FUN_00BD4C90, register_CollisionBeamEntityConstruct)
-   *
-   * What it does:
-   * Initializes startup construct helper and callback lanes for
-   * `CollisionBeamEntity`.
-   */
-  void register_CollisionBeamEntityConstruct();
 } // namespace moho

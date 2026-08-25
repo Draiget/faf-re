@@ -6,56 +6,70 @@
 
 namespace gpg
 {
-  struct SerHelperBase;
+  class WriteArchive;
+  class SerSaveConstructArgsResult;
 } // namespace gpg
 
 namespace moho
 {
   /**
    * VFTABLE: 0x00E26F74
-   * COL: 0x00E994E0
+   * COL: 0x00E994DC
    */
-  class CollisionBeamEntitySaveConstruct
+  class CollisionBeamEntitySaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-      * Alias of FUN_00674EE0 (non-canonical helper lane).
+     * Address: 0x00BD4C60 (FUN_00BD4C60, dynamic initializer for the global
+     * `CollisionBeamEntitySaveConstruct` singleton)
      *
      * What it does:
-     * Resolves `CollisionBeamEntity` RTTI and binds one save-construct-args
-     * callback lane (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the save-construct-args callback field.
      */
-    virtual gpg::RType* Init();
+    CollisionBeamEntitySaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CollisionBeamEntitySaveConstruct();
+
+    /**
+     * Address: 0x006738A0 (FUN_006738A0, CollisionBeamEntity save-construct args callback)
+     *
+     * What it does:
+     * Serializes owning `Sim` pointer as unowned save-construct argument.
+     */
+    static void SaveConstructArgs(
+      gpg::WriteArchive* archive,
+      int objectPtr,
+      int version,
+      gpg::SerSaveConstructArgsResult* result
+    );
+
+    /**
+     * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)
+     *
+     * What it does:
+     * Binds save-construct-args callback lane into `CollisionBeamEntity` RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
   };
 
-  static_assert(
-    offsetof(CollisionBeamEntitySaveConstruct, mHelperLinks) == 0x04,
-    "CollisionBeamEntitySaveConstruct::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(CollisionBeamEntitySaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "CollisionBeamEntitySaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
   );
-  static_assert(sizeof(CollisionBeamEntitySaveConstruct) == 0x10, "CollisionBeamEntitySaveConstruct size must be 0x10");
-
-  /**
-   * Address: 0x00BD4C60 (FUN_00BD4C60, register_CollisionBeamEntitySaveConstruct)
-   *
-   * What it does:
-   * Initializes startup helper links/callback lanes for
-   * `CollisionBeamEntity` save-construct registration.
-   */
-  int register_CollisionBeamEntitySaveConstruct();
-
-  /**
-   * Address: 0x00BFC340 (FUN_00BFC340, cleanup_CollisionBeamEntitySaveConstruct)
-   *
-   * What it does:
-   * Unlinks save-construct helper node and rewires it to self-linked state.
-   */
-  gpg::SerHelperBase* cleanup_CollisionBeamEntitySaveConstruct();
+  static_assert(
+    sizeof(CollisionBeamEntitySaveConstruct) == 0x10,
+    "CollisionBeamEntitySaveConstruct size must be 0x10"
+  );
 } // namespace moho
