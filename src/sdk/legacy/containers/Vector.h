@@ -1383,6 +1383,13 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x006DE100 (FUN_006DE100, msvc8::vector<Moho::
+         * EntityCategorySet>::vector(const vector&) for the 40-byte
+         * element -- `Moho::CSquad::mCats` (`CPlatoon.h`). Reached from
+         * `CPlatoon::FindPrioritizedUnit`'s `const msvc8::vector<
+         * EntityCategorySet> priorityList = squad->mCats;` (CPlatoon.cpp)
+         * via the thin calling-convention bridge `FUN_00723A80`.)
+         *
          * Copy constructor (deep copy)
          */
         vector(const vector& other) : vector() {
