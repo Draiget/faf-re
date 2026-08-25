@@ -248,256 +248,29 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x006458A0 (FUN_006458A0)
-   *
-   * What it does:
-   * Deserializes one `CRotateManipulator` lane from IAniManipulator base data
-   * plus rotate-state flags, axis, angular lanes, and follow-bone index.
-   */
-  void DeserializeCRotateManipulatorSerializerBody(
-    moho::CRotateManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
-
-    bool hasGoal = manipulator->mHasGoal != 0;
-    archive->ReadBool(&hasGoal);
-    manipulator->mHasGoal = static_cast<std::uint8_t>(hasGoal ? 1 : 0);
-
-    bool spinDown = manipulator->mSpinDown != 0;
-    archive->ReadBool(&spinDown);
-    manipulator->mSpinDown = static_cast<std::uint8_t>(spinDown ? 1 : 0);
-
-    archive->Read(CachedVector3fType(), &manipulator->mAxis, owner);
-    archive->ReadFloat(&manipulator->mCurrentAngle);
-    archive->ReadFloat(&manipulator->mGoalAngle);
-    archive->ReadFloat(&manipulator->mSpeed);
-    archive->ReadFloat(&manipulator->mTargetSpeed);
-    archive->ReadFloat(&manipulator->mAccel);
-    archive->ReadInt(&manipulator->mFollowBone);
-  }
-
-  /**
-   * Address: 0x006459A0 (FUN_006459A0)
-   *
-   * What it does:
-   * Serializes one `CRotateManipulator` lane to IAniManipulator base data plus
-   * rotate-state flags, axis, angular lanes, and follow-bone index.
-   */
-  void SerializeCRotateManipulatorSerializerBody(
-    const moho::CRotateManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Write(CachedIAniManipulatorType(), manipulator, owner);
-    archive->WriteBool(manipulator->mHasGoal != 0);
-    archive->WriteBool(manipulator->mSpinDown != 0);
-    archive->Write(CachedVector3fType(), &manipulator->mAxis, owner);
-    archive->WriteFloat(manipulator->mCurrentAngle);
-    archive->WriteFloat(manipulator->mGoalAngle);
-    archive->WriteFloat(manipulator->mSpeed);
-    archive->WriteFloat(manipulator->mTargetSpeed);
-    archive->WriteFloat(manipulator->mAccel);
-    archive->WriteInt(manipulator->mFollowBone);
-  }
-
-  /**
-   * Address: 0x00645520 (FUN_00645520)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards rotate manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerThunkAliasA(
-    moho::CRotateManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00645530 (FUN_00645530)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards rotate manipulator serialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCRotateManipulatorSerializerThunkAliasA(
-    const moho::CRotateManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00645690 (FUN_00645690)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards rotate manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerThunkAliasB(
-    moho::CRotateManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x006456A0 (FUN_006456A0)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards rotate manipulator serialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCRotateManipulatorSerializerThunkAliasB(
-    const moho::CRotateManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  struct CRotateManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(sizeof(CRotateManipulatorSerializerHelperNode) == 0x10, "CRotateManipulatorSerializerHelperNode size must be 0x10");
-
-  CRotateManipulatorSerializerHelperNode gCRotateManipulatorSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  void DeserializeCRotateManipulatorSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const manipulator = reinterpret_cast<moho::CRotateManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  void SerializeCRotateManipulatorSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto* const manipulator =
-      reinterpret_cast<const moho::CRotateManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x006435A0 (FUN_006435A0)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CRotateManipulator` serializer
-   * helper storage and returns that helper object.
-   */
-  [[nodiscard]] CRotateManipulatorSerializerHelperNode*
-  InitializeCRotateManipulatorSerializerStartupThunkPrimary()
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCRotateManipulatorSerializer);
-    gCRotateManipulatorSerializer.mPrev = self;
-    gCRotateManipulatorSerializer.mNext = self;
-    gCRotateManipulatorSerializer.mSerLoadFunc = &DeserializeCRotateManipulatorSerializerCallback;
-    gCRotateManipulatorSerializer.mSerSaveFunc = &SerializeCRotateManipulatorSerializerCallback;
-    return &gCRotateManipulatorSerializer;
-  }
-
-  /**
-   * Address: 0x006452E0 (FUN_006452E0)
-   *
-   * What it does:
-   * Secondary startup-init entry for global `CRotateManipulator` serializer
-   * helper storage that mirrors the primary callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] CRotateManipulatorSerializerHelperNode*
-  InitializeCRotateManipulatorSerializerStartupThunkSecondary()
-  {
-    return InitializeCRotateManipulatorSerializerStartupThunkPrimary();
-  }
-
-  /**
-   * Address: 0x006435D0 (FUN_006435D0)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CRotateManipulator serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCRotateManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x00643600 (FUN_00643600)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CRotateManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCRotateManipulatorSerializer);
-  }
-
-  void cleanup_CRotateManipulatorSerializer_atexit()
-  {
-    (void)cleanup_CRotateManipulatorSerializerStartupThunkA();
-  }
+  // Address: 0x00BD3010 (FUN_00BD3010, register_CRotateManipulatorSerializer)
+  // -- MSVC's own compiler-generated dynamic initializer for this global runs
+  // the real `gpg::SerSaveLoadHelper<CRotateManipulator>` ctor (self-links
+  // into `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback` to the
+  // template's `Deserialize`/`Serialize`, installs the vtable) and registers
+  // the real destructor (0x00BFB160, no recovered mangled name; body
+  // confirmed via raw asm to just call `ResetLinks()`) via `atexit`. Dead
+  // zero-xref COMDAT duplicate ctors: 0x006435A0, 0x006452E0.
+  moho::CRotateManipulatorSerializer gCRotateManipulatorSerializer;
 
   /**
    * Address: 0x00BD3010 (FUN_00BD3010, register_CRotateManipulatorSerializer)
    *
    * What it does:
-   * Initializes the global `CRotateManipulator` serializer helper callbacks
-   * and installs process-exit cleanup.
+   * Forces this translation unit's global `CRotateManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (CRotateManipulator.h) and on
+   * `gCRotateManipulatorSerializer` above for why this function's body has
+   * no field-setting logic of its own.
    */
   void register_CRotateManipulatorSerializer()
   {
-    (void)InitializeCRotateManipulatorSerializerStartupThunkPrimary();
-    (void)std::atexit(&cleanup_CRotateManipulatorSerializer_atexit);
+    (void)gCRotateManipulatorSerializer;
   }
 
   struct CRotateManipulatorSerializerStartupBootstrap
@@ -587,6 +360,65 @@ namespace moho
 {
   gpg::RType* CRotateManipulator::sType = nullptr;
 } // namespace moho
+
+/**
+ * Address: 0x006458A0 (FUN_006458A0, Moho::CRotateManipulator::MemberDeserialize)
+ *
+ * What it does:
+ * Loads `IAniManipulator` base payload, then rotate-state flags, axis,
+ * angular lanes, and follow-bone index.
+ */
+void moho::CRotateManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+
+  bool hasGoal = mHasGoal != 0;
+  archive->ReadBool(&hasGoal);
+  mHasGoal = static_cast<std::uint8_t>(hasGoal ? 1 : 0);
+
+  bool spinDown = mSpinDown != 0;
+  archive->ReadBool(&spinDown);
+  mSpinDown = static_cast<std::uint8_t>(spinDown ? 1 : 0);
+
+  archive->Read(CachedVector3fType(), &mAxis, owner);
+  archive->ReadFloat(&mCurrentAngle);
+  archive->ReadFloat(&mGoalAngle);
+  archive->ReadFloat(&mSpeed);
+  archive->ReadFloat(&mTargetSpeed);
+  archive->ReadFloat(&mAccel);
+  archive->ReadInt(&mFollowBone);
+}
+
+/**
+ * Address: 0x006459A0 (FUN_006459A0, Moho::CRotateManipulator::MemberSerialize)
+ *
+ * What it does:
+ * Saves `IAniManipulator` base payload, then rotate-state flags, axis,
+ * angular lanes, and follow-bone index.
+ */
+void moho::CRotateManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Write(CachedIAniManipulatorType(), this, owner);
+  archive->WriteBool(mHasGoal != 0);
+  archive->WriteBool(mSpinDown != 0);
+  archive->Write(CachedVector3fType(), &mAxis, owner);
+  archive->WriteFloat(mCurrentAngle);
+  archive->WriteFloat(mGoalAngle);
+  archive->WriteFloat(mSpeed);
+  archive->WriteFloat(mTargetSpeed);
+  archive->WriteFloat(mAccel);
+  archive->WriteInt(mFollowBone);
+}
 
 /**
  * Address: 0x00643630 (FUN_00643630)
