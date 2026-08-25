@@ -10,7 +10,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/IAiSiloBuild.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/CEconomyEvent.h"
@@ -51,6 +50,15 @@ namespace
     static gpg::RType* cachedType = nullptr;
     if (!cachedType) {
       cachedType = gpg::LookupRType(typeid(moho::Sim));
+    }
+    return cachedType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCBuildTaskHelperType()
+  {
+    static gpg::RType* cachedType = nullptr;
+    if (!cachedType) {
+      cachedType = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
     }
     return cachedType;
   }
@@ -504,12 +512,36 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase).
-  struct CBuildTaskHelperSerializerHelperNode
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CBuildTaskHelper>
+   *
+   * The binary global is 0x14 bytes (vtable + `moho::TDatListItem` link pair
+   * + load/save callback lanes, matching every other SerHelperBase-derived
+   * serializer in this codebase).
+   */
+  struct CBuildTaskHelperSerializerHelperNode : public gpg::SerHelperBase
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    /**
+     * Address: 0x00BCF830 vtable slot 0 dispatch target (dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
+     * the pending list).
+     *
+     * What it does:
+     * Binds this helper's already-cited load/save callbacks
+     * (`DeserializeCBuildTaskHelperSerializerCallback` /
+     * `SerializeCBuildTaskHelperSerializerCallback`) onto
+     * `CBuildTaskHelper`'s reflected type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = ResolveCBuildTaskHelperType();
+      GPG_ASSERT(type != nullptr);
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mSerLoadFunc;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerSaveFunc;
+    }
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
@@ -532,9 +564,9 @@ namespace
    * Unlinks `CBuildTaskHelperSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCBuildTaskHelperSerializerNodePrimary()
+  void UnlinkCBuildTaskHelperSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCBuildTaskHelperSerializer.mListLinks);
+    gCBuildTaskHelperSerializer.ResetLinks();
   }
 
   /**
@@ -593,20 +625,22 @@ namespace
    */
   void cleanup_CBuildTaskHelperSerializer_atexit()
   {
-    (void)UnlinkCBuildTaskHelperSerializerNodePrimary();
+    UnlinkCBuildTaskHelperSerializerNodePrimary();
   }
 
   /**
    * Address: 0x00BCF830 (FUN_00BCF830, register_CBuildTaskHelperSerializer)
    *
    * What it does:
-   * Initializes the global `CBuildTaskHelper` serializer helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`.
+   * Binds the global `CBuildTaskHelper` serializer helper's load/save
+   * callback lanes and installs process-exit cleanup via `atexit`. The
+   * helper node self-links and splices into `gpg::SerHelperBase::sNewHelpers`
+   * automatically as part of its own construction, which runs before this
+   * function does, so this no longer needs to unlink/self-link the node
+   * itself first.
    */
   void register_CBuildTaskHelperSerializer()
   {
-    (void)UnlinkCBuildTaskHelperSerializerNodePrimary();
     gCBuildTaskHelperSerializer.mSerLoadFunc = &DeserializeCBuildTaskHelperSerializerCallback;
     gCBuildTaskHelperSerializer.mSerSaveFunc = &SerializeCBuildTaskHelperSerializerCallback;
     (void)std::atexit(&cleanup_CBuildTaskHelperSerializer_atexit);
