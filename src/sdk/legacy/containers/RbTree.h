@@ -264,10 +264,9 @@ namespace msvc8
          * classification.
          */
         /**
-         * Address: 0x0094EE60 (FUN_0094EE60, sub_94EE60) -- `gpg::
-         * WriteArchive::mObjRefs`'s (`std::map<const void*,
-         * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
-         * leftmost descent, sibling of `rb_max`'s 0x0094F010 citation below.
+         * Address: 0x0094EE60 (FUN_0094EE60, sub_94EE60) -- leftmost
+         * descent for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs`), sibling of `rb_max`'s 0x0094F010 citation below.
          * Walks `_Left` (node+0x00) while `!_Isnil` (node+0x25), matching
          * this member exactly (confirmed against the `.asm`: `mov ecx,[eax]`
          * / `cmp byte ptr [ecx+25h],0` loop, no other fields touched). Sole
@@ -281,6 +280,31 @@ namespace msvc8
          * precedent above: the sole caller's single-node path is compiled
          * but not separately exercised, yet this member itself is exactly
          * what the compiler emits at this address.
+         *
+         * NOTE (found this pass, not yet corrected): `WriteArchive.h`
+         * currently declares `mObjRefs` as `std::map<const void*,
+         * TrackedPointerRecord>` (0x0C/12-byte value_type), which is
+         * inconsistent both with this member's own isNil@+0x25 (implies a
+         * 0x18/24-byte value_type: 0x0C header + 0x18) and with the real
+         * binary: `WriteArchive::PreCreatedPtr` (0x009523F0) and the free
+         * `gpg::WriteRawPointer` (0x00953320, `ArchiveSerialization.cpp`)
+         * both call `std::map_RRef_TrackedPointer::find`/`::insert` on this
+         * same `this+0x10` field, ordering by the *whole* `RRef` (`mType`
+         * then `mObj`), not a bare pointer -- confirmed against both
+         * functions' own `.c` and `.asm`. `PreCreatedPtr`'s insert-argument
+         * `.asm` lays out `{mType, mObj, mType(dup), mObj(dup), index,
+         * ownership}`, i.e. an 8-byte `RRef` key followed by a 16-byte
+         * mapped value that itself re-stores the `RRef`. The currently
+         * recovered `PreCreatedPtr`/`WriteRawPointer` and a third
+         * `mObjRefs.find(objectRef.mObj)` reach-in in
+         * `ArchiveSerialization.cpp` (~line 2016) all use the wrong
+         * (void*-keyed) type and compile, but don't match the binary at
+         * those addresses. Left uncorrected here -- out of scope for this
+         * pass (RbTree.h `rb_min`/`rb_max`/`rb_decrement` citations only);
+         * needs a dedicated fix spanning `WriteArchive.h`/`WriteArchive.cpp`/
+         * `ArchiveSerialization.cpp`. This member's own `_Left`/isNil
+         * offsets are independently confirmed against the `.asm` and are
+         * unaffected by the key-type question.
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -437,11 +461,10 @@ namespace msvc8
          * classification.
          */
         /**
-         * Address: 0x0094F010 (FUN_0094F010, sub_94F010) -- `gpg::
-         * WriteArchive::mObjRefs`'s (`std::map<const void*,
-         * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
-         * rightmost descent, sibling of `rb_min`'s 0x0094EE60 citation
-         * above. Walks `_Right` (node+0x08) while `!_Isnil` (node+0x25),
+         * Address: 0x0094F010 (FUN_0094F010, sub_94F010) -- rightmost
+         * descent for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs`), sibling of `rb_min`'s 0x0094EE60 citation above.
+         * Walks `_Right` (node+0x08) while `!_Isnil` (node+0x25),
          * matching this member exactly (confirmed against the `.asm`: `mov
          * ecx,[eax+8]` / `cmp byte ptr [ecx+25h],0` loop). Sole caller is
          * this instantiation's `erase_node` (`FUN_00951A40`, cited above on
@@ -451,6 +474,13 @@ namespace msvc8
          * always erases the full range and never reaches the per-node walk
          * that would call this). Kept `recovered` rather than `skip`, same
          * precedent as `rb_min`'s 0x0094EE60 citation above.
+         *
+         * NOTE: same `mObjRefs` key-type discrepancy documented in full on
+         * `rb_min`'s 0x0094EE60 citation above -- `WriteArchive.h` declares
+         * this tree void*-keyed, the real binary (`PreCreatedPtr`
+         * 0x009523F0, `WriteRawPointer` 0x00953320) is `RRef`-keyed. Not
+         * corrected here; this member's `_Right`/isNil offsets are
+         * independently confirmed and unaffected.
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -838,6 +868,51 @@ namespace msvc8
          * -- the two real `operator[]` use sites for this map. Previously
          * mis-tracked `blocked`, citing `CrtRuntimeHelpers.cpp` boilerplate
          * the address never actually appeared in (DB-integrity fix).
+         */
+        /**
+         * Address: 0x0094FD20 (FUN_0094FD20, sub_94FD20) -- predecessor
+         * lookup for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs` -- same isNil@+0x25 instantiation cited on `rb_min`/
+         * `rb_max`/`erase_node` above at 0x0094EE60/0x0094F010/0x00951A40).
+         * Byte-for-byte match of this member against the `.asm`: nil-case
+         * returns `n->right` (0x0094FD22-2D), has-left-subtree case inlines
+         * the `rb_max(n->left)` walk directly (0x0094FD2E-4D), no-left-
+         * subtree case climbs `parent` (offset+4) while `n == ancestor->
+         * left` and keeps the walked-to node when the climb falls off the
+         * front (0x0094FD4E-72) -- instruction-for-instruction match.
+         *
+         * Sole *confirmed* caller is this instantiation's `insert_unique`
+         * emission, `std::map_RRef_TrackedPointer::insert` (`FUN_00951D30`,
+         * IDA FLIRT-named), via its `--_Insnode`/`probe = rb_decrement(
+         * where)` predecessor check -- confirmed against that function's
+         * own `.c`: `sub_94FD20(&a3)` is called immediately after the tree
+         * descent, before the final key comparison that decides insert-vs-
+         * already-present, matching this member's `insert_unique` usage
+         * exactly. `FUN_00951D30` is itself called from `WriteArchive::
+         * PreCreatedPtr` (0x009523F0, already recovered and cited in
+         * `WriteArchive.cpp`, real call site `mObjRefs.insert(...)` at
+         * `WriteArchive.cpp:915`) and from `gpg::WriteRawPointer`
+         * (0x00953320, `ArchiveSerialization.cpp`) -- confirmed via both
+         * callers' own `.asm` (`call std__map_RRef_TrackedPointer__insert`).
+         * The callgraph index also lists 0x009504B3 and 0x00950AF3 as
+         * callers; both are unclassified gap bytes between real functions
+         * (no `.c`/`.asm`/`.meta.json` export; neither address's containing
+         * range appears in the `functions` table -- 0x009504B3 sits in the
+         * 0x950487-0x9504C0 gap after `FUN_00950430`, 0x00950AF3 in the
+         * 0x950AD8-0x950B30 gap after `FUN_00950A80`) -- indexer noise from
+         * scanning raw opcode bytes in inter-function padding, not genuine
+         * call sites.
+         *
+         * Previously mass-mis-attributed to `CrtRuntimeHelpers.cpp` by the
+         * 2026-08-24 DB-integrity bulk pass (address not present in that
+         * file).
+         *
+         * Same `mObjRefs` key-type discrepancy documented in full on
+         * `rb_min`'s 0x0094EE60 citation above applies to the owner
+         * description here too (real tree is `RRef`-keyed, `WriteArchive.h`
+         * currently declares it void*-keyed) -- not corrected in this pass.
+         * This member's own offsets are independently confirmed against the
+         * `.asm` and are unaffected.
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
