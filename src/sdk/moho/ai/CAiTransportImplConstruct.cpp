@@ -10,73 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiTransportImplConstruct) unsigned char gCAiTransportImplConstructStorage[sizeof(CAiTransportImplConstruct)];
-  bool gCAiTransportImplConstructConstructed = false;
-
-  [[nodiscard]] CAiTransportImplConstruct* AcquireCAiTransportImplConstruct()
-  {
-    if (!gCAiTransportImplConstructConstructed) {
-      new (gCAiTransportImplConstructStorage) CAiTransportImplConstruct();
-      gCAiTransportImplConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiTransportImplConstruct*>(gCAiTransportImplConstructStorage);
-  }
-
-  template <typename TConstruct>
-  [[nodiscard]] gpg::SerHelperBase* ConstructSelfNode(TConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  template <typename TConstruct>
-  void InitializeConstructNode(TConstruct& construct) noexcept
-  {
-    gpg::SerHelperBase* const self = ConstructSelfNode(construct);
-    construct.mHelperNext = self;
-    construct.mHelperPrev = self;
-  }
-
-  template <typename TConstruct>
-  void UnlinkConstructNode(TConstruct& construct) noexcept
-  {
-    if (construct.mHelperNext != nullptr && construct.mHelperPrev != nullptr) {
-      construct.mHelperNext->mPrev = construct.mHelperPrev;
-      construct.mHelperPrev->mNext = construct.mHelperNext;
-    }
-
-    InitializeConstructNode(construct);
-  }
-
-  /**
-   * Address: 0x005E8490 (FUN_005E8490)
-   *
-   * What it does:
-   * Splices this construct helper node out of its intrusive lane when linked,
-   * then resets helper links to self and returns the self node pointer.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplConstructHelperNodeVariantA(
-    CAiTransportImplConstruct& construct
-  ) noexcept
-  {
-    UnlinkConstructNode(construct);
-    return ConstructSelfNode(construct);
-  }
-
-  /**
-   * Address: 0x005E84C0 (FUN_005E84C0)
-   *
-   * What it does:
-   * Secondary helper-node unlink/reset variant that preserves the same
-   * intrusive unlink semantics and returns the helper self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplConstructHelperNodeVariantB(
-    CAiTransportImplConstruct& construct
-  ) noexcept
-  {
-    return UnlinkCAiTransportImplConstructHelperNodeVariantA(construct);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiTransportImplType()
   {
     gpg::RType* type = CAiTransportImpl::sType;
@@ -87,33 +20,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x005E9B80 (FUN_005E9B80)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAiTransportImplConstruct` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] CAiTransportImplConstruct* InitializeCAiTransportImplConstructStartupThunk()
-  {
-    CAiTransportImplConstruct* const construct = AcquireCAiTransportImplConstruct();
-    InitializeConstructNode(*construct);
-    construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiTransportImplConstruct::Construct);
-    construct->mDeleteCallback = &CAiTransportImplConstruct::Deconstruct;
-    return construct;
-  }
-
-  void cleanup_CAiTransportImplConstruct()
-  {
-    if (!gCAiTransportImplConstructConstructed) {
-      return;
-    }
-
-    CAiTransportImplConstruct* const construct = AcquireCAiTransportImplConstruct();
-    (void)UnlinkCAiTransportImplConstructHelperNodeVariantA(*construct);
-    construct->~CAiTransportImplConstruct();
-    gCAiTransportImplConstructConstructed = false;
-  }
+  // Address: 0x010B087C -- process-global `CAiTransportImplConstruct`
+  // singleton. Constructing it runs CAiTransportImplConstruct::
+  // CAiTransportImplConstruct() (0x00BCEF10), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiTransportImplConstruct,
+  // 0x00BF8C40) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiTransportImplConstruct gCAiTransportImplConstruct;
 } // namespace
 
 /**
@@ -143,33 +58,56 @@ void CAiTransportImplConstruct::Deconstruct(void* const objectPtr)
 }
 
 /**
- * Address: 0x00BCEF10 (FUN_00BCEF10, register_CAiTransportImplConstruct)
+ * Address: 0x00BCEF10 (FUN_00BCEF10, dynamic initializer for the global
+ * `CAiTransportImplConstruct` singleton)
  *
  * What it does:
- * Registers construct/delete callbacks for `CAiTransportImpl` and installs
- * process-exit cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the construct/delete callback fields.
  */
-void moho::register_CAiTransportImplConstruct()
+CAiTransportImplConstruct::CAiTransportImplConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiTransportImplConstruct::Construct))
+  , mDeleteCallback(&CAiTransportImplConstruct::Deconstruct)
+{}
+
+/**
+ * Address: 0x00BF8C40 (FUN_00BF8C40, Moho::CAiTransportImplConstruct::~CAiTransportImplConstruct)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+CAiTransportImplConstruct::~CAiTransportImplConstruct()
 {
-  CAiTransportImplConstruct* const construct = AcquireCAiTransportImplConstruct();
-  InitializeConstructNode(*construct);
-  construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiTransportImplConstruct::Construct);
-  construct->mDeleteCallback = &CAiTransportImplConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  (void)std::atexit(&cleanup_CAiTransportImplConstruct);
+  ResetLinks();
 }
 
 /**
- * Address: 0x005E9BB0 (FUN_005E9BB0)
+ * Address: 0x005E9BB0 (FUN_005E9BB0, gpg::SerConstructHelper_CAiTransportImpl::Init)
  *
  * What it does:
  * Lazily resolves CAiTransportImpl RTTI and installs construct/delete callbacks
  * from this helper object into the type descriptor.
  */
-void CAiTransportImplConstruct::RegisterConstructFunction()
+void CAiTransportImplConstruct::Init()
 {
   gpg::RType* const type = CachedCAiTransportImplType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
 }
+
+/**
+ * Address: 0x010B087C caller lane (`IAiTransport.cpp`'s
+ * `IAiTransportReflectionBootstrap` reflection bootstrap sequence)
+ *
+ * What it does:
+ * Historically forced construction of the (then lazily-constructed)
+ * `CAiTransportImplConstruct` singleton from an explicit registration
+ * sequence. `gCAiTransportImplConstruct` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
+ * sequence does not need editing.
+ */
+void moho::register_CAiTransportImplConstruct()
+{}
