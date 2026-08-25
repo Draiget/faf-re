@@ -5561,48 +5561,55 @@ namespace Wm3
   // `QueryTreeRightmostNil17LaneC`/`LaneD` (0x00A52630, 0x00A52680) and
   // `QueryTreeLeftmostNil17LaneC`/`LaneD` (0x00A52650, 0x00A526A0) deleted
   // here: byte-identical to `rb_tree::rb_max`/`rb_min`, which now carries
-  // all four addresses as citations (RbTree.h).
+  // all four addresses as cross-reference citations (RbTree.h) -- real
+  // identity is `std::set<HullTriangle3<float>*>` (vendored WildMagic,
+  // `Wm3::ConvexHull3<float>::m_kHull`), CLAUDE.md's named terminal
+  // `external_dependency` category, not this project's own container.
 
   // `QueryTreeRightmostNil33LaneA`/`LaneB` (0x00A52BD0, 0x00A52D20) and
   // `QueryTreeLeftmostNil33LaneA`/`LaneB` (0x00A52BF0, 0x00A52D40) deleted
-  // here: byte-identical to `rb_tree::rb_max`/`rb_min`, cited there now.
+  // here: byte-identical to `rb_tree::rb_max`/`rb_min`, cited there now --
+  // real identity is `kTerminator`, a `std::map<int, TerminatorData>` local
+  // to `Wm3::ConvexHull3<Real>::Update`, also WildMagic/external_dependency.
   //
   // `BuildQueryTreeEqualRangeNil17LaneA`/`LaneB` (0x00A59E20, 0x00A59E80)
   // deleted here: this fused dual-descent body IS `rb_tree::equal_range`'s
-  // own out-of-line emission for the `msvc8::set<uint32_t>`-shaped Nil17
-  // tree (`this`=ecx=tree, matching a real `__thiscall` member, not a free
-  // function taking a tree pointer) -- moved to RbTree.h with both
-  // addresses cited (0x00A59E80 is an ICF twin of 0x00A59E20, marked skip).
+  // own out-of-line emission for `std::set<HullTriangle3<float>*>`
+  // (`Wm3::ConvexHull3<float>::m_kHull`) -- `this`=ecx=tree, matching a real
+  // `__thiscall` member, not a free function taking a tree pointer. Moved to
+  // RbTree.h with both addresses cited as WildMagic/external_dependency
+  // cross-reference evidence (0x00A59E80 is an ICF twin of 0x00A59E20).
   //
   // The anonymous-namespace RB-tree rotate/erase-rebalance machinery that
   // used to live here (`QueryTreeRotateLeft/Right`, `QueryTreeRefreshBoundaryNodes`,
   // `QueryTreeDeleteSubtreeNodes`, `QueryTreeEraseSingleNode`,
   // `QueryTreeCountNodesInRange`, `QueryTreeEraseRange`) carried no `Address:`
   // citations at all -- it was hand-written scaffolding standing in for what
-  // the binary actually calls. The real callees are `rb_tree::erase_range`
-  // (0x00A65320, already cited in RbTree.h for several other instantiations)
-  // and `rb_tree::erase_node` (0x00A633D0, ditto, including its
-  // `std::out_of_range` guard-throw path -- confirmed: this address's
-  // `vtable_writes` hit for `out_of_range@std`'s vtable is real, not a false
-  // positive, matching `erase_node`'s documented guard). Both are reached
-  // from `Wm3::ConvexHull3<float>::~ConvexHull3()` (0x00A66440) erasing a
-  // 12-byte `rb_tree` member at `this+0x68` -- see RbTree.h's `erase_range`
-  // citation for the full chain. The node-shape-specific counting step
-  // (`sub_A598A0`, a checked "how many nodes in [first,last)" walk) and the
-  // increment stepper it uses (`sub_A52760`) are themselves real, separate
-  // addresses currently misfiled as a blocked token in
-  // `moho/misc/CrtRuntimeHelpers.cpp` -- out of this pass's scope (that file
-  // has its own in-progress blocked-cluster drain); `rb_tree::erase(const
-  // key_type&)` below reconstructs the same observable behavior with
-  // `rb_increment` (already canonical in RbTree.h) instead of re-citing an
-  // unrecovered helper.
+  // the binary actually calls. The real callees are `sub_A65320`
+  // (`m_kHull.erase(first,last)`) and `sub_A633D0` (`m_kHull.erase_node`,
+  // including its `std::out_of_range` guard-throw path), both WildMagic/
+  // `external_dependency`, reached from `Wm3::ConvexHull3<float>::
+  // ~ConvexHull3()` (0x00A66440, also external_dependency) tearing down
+  // `m_kHull` -- see RbTree.h's `equal_range`/`erase_node` citations for the
+  // full, already-traced chain (commit `ea2e46c3` and follow-ups). The
+  // node-shape-specific counting step (`sub_A598A0`) and the increment
+  // stepper it uses (`sub_A52760`) are the same external instantiation's
+  // checked-iterator machinery, also correctly `external_dependency`;
+  // `rb_tree::erase(const key_type&)` below reconstructs the same observable
+  // behavior with `rb_increment` (already canonical in RbTree.h, used by
+  // this project's own `msvc8::set`/`msvc8::map`) instead of re-citing the
+  // external helper.
 
   // `EraseQueryTreeKeyRangeNil17LaneA`/`LaneB` (0x00A65B60, 0x00A65C10)
-  // deleted here: both are `rb_tree<rb_set_traits<uint32_t>>::erase(const
+  // deleted here: both are `std::set<HullTriangle3<float>*>::erase(const
   // key_type&)`'s own out-of-line emissions (`this`=ecx=tree, one stack arg
   // = pointer-to-key, `retn 4` -- a real `__thiscall` member, matching
-  // `equal_range`'s calling convention above, not a free function). Moved to
-  // RbTree.h's `rb_tree::erase(const key_type&)` with both addresses cited.
+  // `equal_range`'s calling convention above, not a free function). Source
+  // line is `m_kHull.erase(pkTri)` in `ConvexHull3<Real>::Update`
+  // (`dependencies/WildMagic3p8/Foundation/Containment/Wm3ConvexHull3.cpp:324`).
+  // Moved to RbTree.h's `rb_tree::erase(const key_type&)` with both
+  // addresses cited as WildMagic/external_dependency cross-reference
+  // evidence for that method's shape, not as engine recovery work.
 
   /**
    * Address: 0x00A5D060 (FUN_00A5D060)
