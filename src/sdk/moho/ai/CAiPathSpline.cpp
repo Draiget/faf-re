@@ -769,6 +769,20 @@ namespace
     return gPathSplineContinuationType;
   }
 
+  /**
+   * Address: 0x005B4F20 (FUN_005B4F20)
+   *
+   * What it does:
+   * Reads one contiguous `fastvector<CPathPoint>` payload: element count,
+   * resizes to that count via `fastvector::Resize` (`FUN_005B4D30`, the
+   * canonical `gpg::fastvector<T>::Resize` for this 28-byte element -- cited
+   * on `FastVector.h`), then reads that many reflected `moho::CPathPoint`
+   * values in place. `fill`'s `mState` is set to `PPS_7` (not left
+   * zero-initialized): confirmed against the `.c` -- the local fill value
+   * this function builds before calling `Resize` has its state lane set to
+   * the literal `7`, not `0`. Bound as `RType::serLoadFunc_` via
+   * `FastVectorCPathPointTypeInfo::Init` below.
+   */
   void LoadFastVectorCPathPoint(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
@@ -779,7 +793,8 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    const moho::CPathPoint fill{};
+    moho::CPathPoint fill{};
+    fill.mState = moho::EPathPointState::PPS_7;
     vec.Resize(count, fill);
 
     gpg::RType* const elementType = ResolveCPathPointType();
@@ -789,6 +804,25 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x005B4FF0 (FUN_005B4FF0)
+   *
+   * What it does:
+   * Writes one contiguous `fastvector<CPathPoint>` payload: element count
+   * via `(end-begin)/28` (direct pointer arithmetic, not a `.size()` call --
+   * confirmed against the `.asm`), then each reflected lane in order. The
+   * element type is resolved through `moho::CPathPoint::sType2` directly
+   * (lazily populated via `gpg::LookupRType` on first use, matching the
+   * class's own public static member) rather than through this file's
+   * generic `ResolveCPathPointType()` helper -- a real, deliberate
+   * difference from the `Load` side confirmed against the `.c`/`.asm`.
+   * Bound as `RType::serSaveFunc_` via `FastVectorCPathPointTypeInfo::Init`
+   * below. DB-integrity fix: a second, unwired copy of this function
+   * previously lived in `gpg/core/containers/ArchiveSerialization.cpp`
+   * wrongly claiming this same address through a generic container-view
+   * helper pair whose calls do not appear anywhere in this address's real
+   * disassembly -- removed there; this is the real, already-wired body.
+   */
   void SaveFastVectorCPathPoint(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
@@ -1734,6 +1768,18 @@ const gpg::RIndexed* FastVectorCPathPointTypeInfo::IsIndexed() const
   return this;
 }
 
+/**
+ * Address: 0x005B49F0 (FUN_005B49F0, gpg::RFastVectorType_CPathPoint::Init)
+ *
+ * What it does:
+ * Records the element byte-size (16 = `sizeof(gpg::fastvector<
+ * moho::CPathPoint>)`), version 1, and installs the element (de)serialize
+ * callbacks (`serLoadFunc_ = &LoadFastVectorCPathPoint`, `serSaveFunc_ =
+ * &SaveFastVectorCPathPoint`). DB-integrity fix: was fake-recovered (note
+ * cited `gpg/core/reflection/Reflection.cpp`, but this class -- and both
+ * callbacks it wires -- has always lived here in CAiPathSpline.cpp; the
+ * address was simply never annotated).
+ */
 void FastVectorCPathPointTypeInfo::Init()
 {
   size_ = 0x10;
