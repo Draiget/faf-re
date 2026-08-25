@@ -63,8 +63,12 @@ namespace gpg::gal
      * `std::map<...>::operator[]` pair: `FUN_00949B30`/`FUN_00949BA0` are
      * their RB-tree-descend halves (isNil@+0x15, same shape as
      * `FUN_00949C10` above -- lower_bound loop, hit returns the existing
-     * slot, miss falls through to an insert-hint core via `sub_9496E0`),
-     * absorbed into `std::unordered_map::operator[]` the same way.
+     * slot, miss falls through to an insert-hint core), absorbed into
+     * `std::unordered_map::operator[]` the same way. The two insert-hint
+     * cores are separate compiled bodies, one per specialization, despite
+     * the identical shape: `FUN_009496E0` (render-state, `sub_9496E0`,
+     * reached from `FUN_00949B30`) and `FUN_00949850` (sampler-state,
+     * `sub_949850`, reached from `FUN_00949BA0`).
      */
     template <typename MapT, typename KeyT, typename ValueT>
     bool CacheValue(MapT& map, const KeyT key, const ValueT value)
