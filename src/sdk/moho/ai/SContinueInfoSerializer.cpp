@@ -1,8 +1,6 @@
 #include "moho/ai/SContinueInfoSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiPathSpline.h"
@@ -11,46 +9,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(SContinueInfoSerializer) unsigned char gSContinueInfoSerializerStorage[sizeof(SContinueInfoSerializer)] = {};
-  bool gSContinueInfoSerializerConstructed = false;
-
-  [[nodiscard]] SContinueInfoSerializer* AcquireSContinueInfoSerializer()
-  {
-    if (!gSContinueInfoSerializerConstructed) {
-      new (gSContinueInfoSerializerStorage) SContinueInfoSerializer();
-      gSContinueInfoSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SContinueInfoSerializer*>(gSContinueInfoSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
+  // Address: 0x010AEF74 -- process-global `SContinueInfoSerializer`
+  // singleton. Constructing it runs SContinueInfoSerializer::
+  // SContinueInfoSerializer() (0x00BCD2F0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~SContinueInfoSerializer,
+  // 0x00BF74B0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  SContinueInfoSerializer gSContinueInfoSerializer;
 
   [[nodiscard]] gpg::RType* CachedSContinueInfoType()
   {
@@ -60,58 +27,6 @@ namespace
       SContinueInfo::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BF7460 (FUN_00BF7460, cleanup_SContinueInfoSerializer)
-   *
-   * What it does:
-   * Unlinks the startup serializer helper node from the intrusive helper list.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_SContinueInfoSerializer()
-  {
-    if (!gSContinueInfoSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
-  }
-
-  /**
-   * Address: 0x005B22E0 (FUN_005B22E0)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * SContinueInfo serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SContinueInfoSerializerStartupThunkA()
-  {
-    if (!gSContinueInfoSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
-  }
-
-  /**
-   * Address: 0x005B2310 (FUN_005B2310)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * SContinueInfo serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SContinueInfoSerializerStartupThunkB()
-  {
-    if (!gSContinueInfoSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
-  }
-
-  void cleanup_SContinueInfoSerializer_atexit()
-  {
-    (void)cleanup_SContinueInfoSerializer();
   }
 } // namespace
 
@@ -142,9 +57,34 @@ void SContinueInfoSerializer::Serialize(gpg::WriteArchive* const archive, const 
 }
 
 /**
+ * Address: 0x00BCD2F0 (FUN_00BCD2F0, dynamic initializer for the global
+ * `SContinueInfoSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+SContinueInfoSerializer::SContinueInfoSerializer()
+  : mLoadCallback(&SContinueInfoSerializer::Deserialize)
+  , mSaveCallback(&SContinueInfoSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF74B0 (FUN_00BF74B0, ??1SContinueInfoSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+SContinueInfoSerializer::~SContinueInfoSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005B4820 (FUN_005B4820)
  */
-void SContinueInfoSerializer::RegisterSerializeFunctions()
+void SContinueInfoSerializer::Init()
 {
   gpg::RType* const type = CachedSContinueInfoType();
   GPG_ASSERT(type != nullptr);
@@ -153,32 +93,3 @@ void SContinueInfoSerializer::RegisterSerializeFunctions()
   type->serLoadFunc_ = mLoadCallback;
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCD2F0 (FUN_00BCD2F0, register_SContinueInfoSerializer)
- *
- * What it does:
- * Initializes startup serializer callbacks for `SContinueInfo` and installs
- * process-exit helper unlink cleanup.
- */
-int moho::register_SContinueInfoSerializer()
-{
-  SContinueInfoSerializer* const serializer = AcquireSContinueInfoSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &SContinueInfoSerializer::Deserialize;
-  serializer->mSaveCallback = &SContinueInfoSerializer::Serialize;
-  return std::atexit(&cleanup_SContinueInfoSerializer_atexit);
-}
-
-namespace
-{
-  struct SContinueInfoSerializerBootstrap
-  {
-    SContinueInfoSerializerBootstrap()
-    {
-      (void)moho::register_SContinueInfoSerializer();
-    }
-  };
-
-  [[maybe_unused]] SContinueInfoSerializerBootstrap gSContinueInfoSerializerBootstrap;
-} // namespace

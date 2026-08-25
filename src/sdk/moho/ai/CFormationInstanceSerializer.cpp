@@ -1,8 +1,6 @@
 #include "moho/ai/CFormationInstanceSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiFormationInstance.h"
@@ -11,31 +9,16 @@ using namespace moho;
 
 namespace
 {
-  alignas(CFormationInstanceSerializer) unsigned char
-    gCFormationInstanceSerializerStorage[sizeof(CFormationInstanceSerializer)] = {};
-  bool gCFormationInstanceSerializerConstructed = false;
-
-  [[nodiscard]] CFormationInstanceSerializer* AcquireCFormationInstanceSerializer()
-  {
-    if (!gCFormationInstanceSerializerConstructed) {
-      new (gCFormationInstanceSerializerStorage) CFormationInstanceSerializer();
-      gCFormationInstanceSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CFormationInstanceSerializer*>(gCFormationInstanceSerializerStorage);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CFormationInstanceSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(CFormationInstanceSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
+  // Address: 0x010AD2EC -- process-global `CFormationInstanceSerializer`
+  // singleton. Constructing it runs CFormationInstanceSerializer::
+  // CFormationInstanceSerializer() (0x00BCAC40), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
+  // InitNewHelpers() later dispatches Init() on it from within the first
+  // ReadArchive/WriteArchive construction. Its destructor
+  // (~CFormationInstanceSerializer, 0x00BF5AA0) runs at normal
+  // static-duration teardown, matching the real binary's atexit
+  // registration.
+  CFormationInstanceSerializer gCFormationInstanceSerializer;
 
   [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
   {
@@ -46,40 +29,6 @@ namespace
     }
     return type;
   }
-
-  /**
-   * Address: 0x00BF5AA0 (FUN_00BF5AA0, ??1CFormationInstanceSerializer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unlinks the helper node from the intrusive serializer chain and re-points
-   * both links at itself, leaving a valid one-element ring.
-   */
-  void cleanup_CFormationInstanceSerializer()
-  {
-    if (!gCFormationInstanceSerializerConstructed) {
-      return;
-    }
-
-    CFormationInstanceSerializer& serializer = *AcquireCFormationInstanceSerializer();
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-  }
-
-  struct CFormationInstanceSerializerStartupBootstrap
-  {
-    CFormationInstanceSerializerStartupBootstrap()
-    {
-      moho::register_CFormationInstanceSerializer();
-    }
-  };
-
-  [[maybe_unused]] CFormationInstanceSerializerStartupBootstrap gCFormationInstanceSerializerStartupBootstrap;
 } // namespace
 
 /**
@@ -115,11 +64,36 @@ void CFormationInstanceSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCAC40 (FUN_00BCAC40, dynamic initializer for the global
+ * `CFormationInstanceSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CFormationInstanceSerializer::CFormationInstanceSerializer()
+  : mLoadCallback(&CFormationInstanceSerializer::Deserialize)
+  , mSaveCallback(&CFormationInstanceSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF5AA0 (FUN_00BF5AA0, ??1CFormationInstanceSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks the helper node from the intrusive serializer chain and re-points
+ * both links at itself, leaving a valid one-element ring.
+ */
+CFormationInstanceSerializer::~CFormationInstanceSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * What it does:
  * Lazily resolves the `CFormationInstance` descriptor and installs this
  * helper's load/save callbacks into it.
  */
-void CFormationInstanceSerializer::RegisterSerializeFunctions()
+void CFormationInstanceSerializer::Init()
 {
   gpg::RType* const type = CachedCFormationInstanceType();
   if (type == nullptr) {
@@ -128,20 +102,4 @@ void CFormationInstanceSerializer::RegisterSerializeFunctions()
 
   type->serLoadFunc_ = mLoadCallback;
   type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x00BCAC40 (FUN_00BCAC40, register_CFormationInstanceSerializer)
- *
- * What it does:
- * Initializes the global `CFormationInstance` serializer helper, binds its
- * load/save callbacks, and installs process-exit cleanup.
- */
-void moho::register_CFormationInstanceSerializer()
-{
-  CFormationInstanceSerializer* const serializer = AcquireCFormationInstanceSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CFormationInstanceSerializer::Deserialize;
-  serializer->mSaveCallback = &CFormationInstanceSerializer::Serialize;
-  (void)std::atexit(&cleanup_CFormationInstanceSerializer);
 }

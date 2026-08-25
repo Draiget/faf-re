@@ -1,8 +1,6 @@
 #include "moho/ai/IAiNavigatorSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiNavigator.h"
@@ -11,46 +9,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiNavigatorSerializer) unsigned char gIAiNavigatorSerializerStorage[sizeof(IAiNavigatorSerializer)] = {};
-  bool gIAiNavigatorSerializerConstructed = false;
-
-  [[nodiscard]] IAiNavigatorSerializer* AcquireIAiNavigatorSerializer()
-  {
-    if (!gIAiNavigatorSerializerConstructed) {
-      new (gIAiNavigatorSerializerStorage) IAiNavigatorSerializer();
-      gIAiNavigatorSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<IAiNavigatorSerializer*>(gIAiNavigatorSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
+  // Address: 0x010AE788 -- process-global `IAiNavigatorSerializer` singleton.
+  // Constructing it runs IAiNavigatorSerializer::IAiNavigatorSerializer()
+  // (0x00BCC6C0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~IAiNavigatorSerializer,
+  // 0x00BF6D60) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  IAiNavigatorSerializer gIAiNavigatorSerializer;
 
   [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
   {
@@ -60,51 +27,6 @@ namespace
       IAiNavigator::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BF6D20 (FUN_00BF6D20, cleanup_IAiNavigatorSerializer)
-   *
-   * What it does:
-   * Unlinks recovered IAiNavigator serializer helper node from intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_IAiNavigatorSerializer()
-  {
-    if (!gIAiNavigatorSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireIAiNavigatorSerializer());
-  }
-
-  /**
-   * Address: 0x005A3320 (FUN_005A3320)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * IAiNavigator serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiNavigatorSerializerStartupThunkA()
-  {
-    return cleanup_IAiNavigatorSerializer();
-  }
-
-  /**
-   * Address: 0x005A3350 (FUN_005A3350)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * IAiNavigator serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiNavigatorSerializerStartupThunkB()
-  {
-    return cleanup_IAiNavigatorSerializer();
-  }
-
-  void cleanup_IAiNavigatorSerializer_atexit()
-  {
-    (void)cleanup_IAiNavigatorSerializer();
   }
 } // namespace
 
@@ -138,13 +60,38 @@ void IAiNavigatorSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC6C0 (FUN_00BCC6C0, dynamic initializer for the global
+ * `IAiNavigatorSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+IAiNavigatorSerializer::IAiNavigatorSerializer()
+  : mLoadCallback(&IAiNavigatorSerializer::Deserialize)
+  , mSaveCallback(&IAiNavigatorSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6D60 (FUN_00BF6D60, ??1IAiNavigatorSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+IAiNavigatorSerializer::~IAiNavigatorSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005A71A0 (FUN_005A71A0)
  *
  * What it does:
  * Lazily resolves IAiNavigator RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void IAiNavigatorSerializer::RegisterSerializeFunctions()
+void IAiNavigatorSerializer::Init()
 {
   gpg::RType* const type = CachedIAiNavigatorType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -152,33 +99,3 @@ void IAiNavigatorSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC6C0 (FUN_00BCC6C0, register_IAiNavigatorSerializer)
- *
- * What it does:
- * Initializes the global IAiNavigator serializer helper callbacks and
- * installs process-exit cleanup.
- */
-void moho::register_IAiNavigatorSerializer()
-{
-  IAiNavigatorSerializer* const serializer = AcquireIAiNavigatorSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &IAiNavigatorSerializer::Deserialize;
-  serializer->mSaveCallback = &IAiNavigatorSerializer::Serialize;
-  (void)std::atexit(&cleanup_IAiNavigatorSerializer_atexit);
-}
-
-namespace
-{
-  struct IAiNavigatorSerializerBootstrap
-  {
-    IAiNavigatorSerializerBootstrap()
-    {
-      moho::register_IAiNavigatorSerializer();
-    }
-  };
-
-  [[maybe_unused]] IAiNavigatorSerializerBootstrap gIAiNavigatorSerializerBootstrap;
-} // namespace
-
