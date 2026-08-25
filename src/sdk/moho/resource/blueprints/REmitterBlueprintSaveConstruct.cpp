@@ -22,31 +22,32 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gEmitterBlueprintType = nullptr;
-  moho::REmitterBlueprintSaveConstruct gEmitterBlueprintSaveConstruct;
 
-  void CleanupEmitterBlueprintSaveConstructAtexit()
+  // Address: 0x010AA830 -- process-global `REmitterBlueprintSaveConstruct`
+  // singleton. Constructing it runs REmitterBlueprintSaveConstruct::
+  // REmitterBlueprintSaveConstruct() (0x00BC80D0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::REmitterBlueprintSaveConstruct gREmitterBlueprintSaveConstructHelper;
+
+  /**
+   * Address: 0x00BF25C0 (FUN_00BF25C0)
+   *
+   * What it does:
+   * Unlinks the `REmitterBlueprintSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC80D0) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupREmitterBlueprintSaveConstruct()
   {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gEmitterBlueprintSaveConstruct);
+    gREmitterBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00510580 (FUN_00510580, sub_510580)
-   *
-   * What it does:
-   * Binds save-construct-args callback into REmitterBlueprint RTTI
-   * (`serSaveConstructArgsFunc_`).
-   */
-  void REmitterBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
-  {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<REmitterBlueprint>(gEmitterBlueprintType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
   /**
    * Address: 0x0050FCE0 (FUN_0050FCE0)
    *
@@ -94,31 +95,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC80D0 (FUN_00BC80D0, sub_BC80D0)
+   * Address: 0x00BC80D0 (FUN_00BC80D0, dynamic initializer for the global
+   * `REmitterBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Initializes and registers global save-construct helper for
-   * `REmitterBlueprint`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  int register_REmitterBlueprintSaveConstruct()
+  REmitterBlueprintSaveConstruct::REmitterBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_REmitterBlueprintThunk)
+      )
   {
-    blueprint_ser::InitializeHelperNode(gEmitterBlueprintSaveConstruct);
-    gEmitterBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_REmitterBlueprintThunk);
-    gEmitterBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupEmitterBlueprintSaveConstructAtexit);
+    (void)std::atexit(&CleanupREmitterBlueprintSaveConstruct);
+  }
+
+  /**
+   * Address: 0x00510580 (FUN_00510580, gpg::SerSaveConstructHelper<Moho::REmitterBlueprint>::Init)
+   *
+   * What it does:
+   * Resolves `REmitterBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
+   */
+  void REmitterBlueprintSaveConstruct::Init()
+  {
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<REmitterBlueprint>(REmitterBlueprint::sType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct REmitterBlueprintSaveConstructBootstrap
-  {
-    REmitterBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_REmitterBlueprintSaveConstruct();
-    }
-  };
-
-  REmitterBlueprintSaveConstructBootstrap gREmitterBlueprintSaveConstructBootstrap;
-} // namespace

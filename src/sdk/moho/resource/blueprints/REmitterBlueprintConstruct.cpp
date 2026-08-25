@@ -24,42 +24,14 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gEmitterBlueprintType = nullptr;
-  moho::REmitterBlueprintConstruct gEmitterBlueprintConstruct;
 
-  [[nodiscard]] gpg::SerHelperBase* ResetEmitterBlueprintConstructHelperLinks() noexcept
-  {
-    gEmitterBlueprintConstruct.mHelperNext->mPrev = gEmitterBlueprintConstruct.mHelperPrev;
-    gEmitterBlueprintConstruct.mHelperPrev->mNext = gEmitterBlueprintConstruct.mHelperNext;
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEmitterBlueprintConstruct.mHelperNext);
-    gEmitterBlueprintConstruct.mHelperPrev = self;
-    gEmitterBlueprintConstruct.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0050FDE0 (FUN_0050FDE0)
-   *
-   * What it does:
-   * Unlinks `REmitterBlueprintConstruct` helper node from the global helper
-   * intrusive list and restores it as a self-linked sentinel.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodePrimary() noexcept
-  {
-    return ResetEmitterBlueprintConstructHelperLinks();
-  }
-
-  /**
-   * Address: 0x0050FE10 (FUN_0050FE10)
-   *
-   * What it does:
-   * Secondary entrypoint for `REmitterBlueprintConstruct` helper-node unlink
-   * and self-link reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodeSecondary() noexcept
-  {
-    return ResetEmitterBlueprintConstructHelperLinks();
-  }
+  // Address: 0x010AA6C4 -- process-global `REmitterBlueprintConstruct`
+  // singleton. Constructing it runs REmitterBlueprintConstruct::
+  // REmitterBlueprintConstruct() (0x00BC8100), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::REmitterBlueprintConstruct gREmitterBlueprintConstructHelper;
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
@@ -77,30 +49,10 @@ namespace
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
   }
-
-  void CleanupEmitterBlueprintConstructAtexit()
-  {
-    (void)CleanupEmitterBlueprintConstructHelperNodePrimary();
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00510600 (FUN_00510600, sub_510600)
-   *
-   * What it does:
-   * Binds construct/delete callbacks into REmitterBlueprint RTTI
-   * (`serConstructFunc_`, `deleteFunc_`).
-   */
-  void REmitterBlueprintConstruct::RegisterConstructFunction()
-  {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<REmitterBlueprint>(gEmitterBlueprintType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
-  }
-
   /**
    * Address: 0x0050FE40 (FUN_0050FE40)
    *
@@ -127,7 +79,9 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     blueprintRef.mObj = blueprint;
-    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<REmitterBlueprint>(gEmitterBlueprintType) : nullptr;
+    blueprintRef.mType = blueprint
+      ? blueprint_ser::ResolveCachedType<REmitterBlueprint>(REmitterBlueprint::sType)
+      : nullptr;
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -143,30 +97,49 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC8100 (FUN_00BC8100, register_REmitterBlueprintConstruct)
+   * Address: 0x00BC8100 (FUN_00BC8100, dynamic initializer for the global
+   * `REmitterBlueprintConstruct` singleton)
    *
    * What it does:
-   * Initializes and registers global construct helper for `REmitterBlueprint`.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  int register_REmitterBlueprintConstruct()
+  REmitterBlueprintConstruct::REmitterBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_REmitterBlueprint))
+    , mDeleteCallback(&Delete_REmitterBlueprint)
+  {}
+
+  /**
+   * Address: 0x00BF25F0 (FUN_00BF25F0, Moho::REmitterBlueprintConstruct::~REmitterBlueprintConstruct)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  REmitterBlueprintConstruct::~REmitterBlueprintConstruct()
   {
-    blueprint_ser::InitializeHelperNode(gEmitterBlueprintConstruct);
-    gEmitterBlueprintConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_REmitterBlueprint);
-    gEmitterBlueprintConstruct.mDeleteCallback = &Delete_REmitterBlueprint;
-    gEmitterBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupEmitterBlueprintConstructAtexit);
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00510600 (FUN_00510600, gpg::SerConstructHelper<Moho::REmitterBlueprint>::Init)
+   *
+   * What it does:
+   * Lazily resolves `REmitterBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
+   */
+  void REmitterBlueprintConstruct::Init()
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<REmitterBlueprint>(REmitterBlueprint::sType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct REmitterBlueprintConstructBootstrap
-  {
-    REmitterBlueprintConstructBootstrap()
-    {
-      (void)moho::register_REmitterBlueprintConstruct();
-    }
-  };
-
-  REmitterBlueprintConstructBootstrap gREmitterBlueprintConstructBootstrap;
-} // namespace
