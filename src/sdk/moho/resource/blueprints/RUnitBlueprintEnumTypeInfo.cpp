@@ -7,42 +7,11 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  template <typename TEnum>
-  class EnumPrimitiveSerializer
-  {
-  public:
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType>, mHelperNext) == 0x04,
-    "EnumPrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType>, mHelperPrev) == 0x08,
-    "EnumPrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType>, mDeserialize) == 0x0C,
-    "EnumPrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType>, mSerialize) == 0x10,
-    "EnumPrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType>) == 0x14, "EnumPrimitiveSerializer size must be 0x14");
-
   alignas(moho::ERuleBPUnitBuildRestrictionTypeInfo)
     unsigned char gERuleBPUnitBuildRestrictionTypeInfoStorage[sizeof(moho::ERuleBPUnitBuildRestrictionTypeInfo)];
   bool gERuleBPUnitBuildRestrictionTypeInfoConstructed = false;
@@ -71,37 +40,71 @@ namespace
     unsigned char gUnitWeaponRangeCategoryTypeInfoStorage[sizeof(moho::UnitWeaponRangeCategoryTypeInfo)];
   bool gUnitWeaponRangeCategoryTypeInfoConstructed = false;
 
-  EnumPrimitiveSerializer<moho::ERuleBPUnitMovementType> gERuleBPUnitMovementTypePrimitiveSerializer;
-  EnumPrimitiveSerializer<moho::ERuleBPUnitCommandCaps> gERuleBPUnitCommandCapsPrimitiveSerializer;
-  EnumPrimitiveSerializer<moho::ERuleBPUnitToggleCaps> gERuleBPUnitToggleCapsPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitMovementType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ERuleBPUnitMovementType@Moho@@H@gpg'`):
+   * `FUN_00BC8930` (real, `__xc_a`-reachable, sole writer). Confirmed via raw
+   * asm: default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_00523AB0`/`FUN_00523AD0`, installs the
+   * `PrimitiveSerHelper<ERuleBPUnitMovementType,int>` vtable, and explicitly
+   * registers `atexit(&sub_BF31E0)` -- confirmed bare unlink-then-self-link
+   * shape matching `SerHelperBase::ResetLinks()`. Two zero-xref duplicate
+   * emissions of that unlink logic (`FUN_0051FC20`, `FUN_0051FC50`, formerly
+   * `CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary/Secondary`)
+   * are dead ICF twins (sha256-identical), never invoked.
+   *
+   * Previously modeled via a hand-rolled generic `EnumPrimitiveSerializer
+   * <TEnum>` template mimicking `SerHelperBase` with a raw `{ mHelperNext,
+   * mHelperPrev, mDeserialize, mSerialize }` layout, backed by a fabricated
+   * eager `register_ERuleBPUnitMovementTypePrimitiveSerializer()` call
+   * invoked a second time from this file's own
+   * `RUnitBlueprintEnumTypeInfoBootstrap` constructor -- absent from the
+   * real ctor's disassembly; removed.
+   */
+  using ERuleBPUnitMovementTypePrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitMovementType, int>;
 
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitCommandCaps,int>
+   *
+   * Real ctor confirmed via `vtable_writers`
+   * (`class_name='?$PrimitiveSerHelper@W4ERuleBPUnitCommandCaps@Moho@@H@gpg'`):
+   * `FUN_00BC8990` (real, `__xc_a`-reachable, sole writer). Same shape as
+   * `ERuleBPUnitMovementTypePrimitiveSerializer` above: binds
+   * `FUN_00523B20`/`FUN_00523B40`, explicitly registers
+   * `atexit(&sub_BF3220)`. Two zero-xref duplicate unlink emissions
+   * (`FUN_0051FFA0`, `FUN_0051FFD0`) are dead ICF twins.
+   */
+  using ERuleBPUnitCommandCapsPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitCommandCaps, int>;
 
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitToggleCaps,int>
+   *
+   * Real ctor confirmed via `vtable_writers`
+   * (`class_name='?$PrimitiveSerHelper@W4ERuleBPUnitToggleCaps@Moho@@H@gpg'`):
+   * `FUN_00BC89F0` (real, `__xc_a`-reachable, sole writer). Same shape as
+   * `ERuleBPUnitMovementTypePrimitiveSerializer` above: binds
+   * `FUN_00523B90`/`FUN_00523BB0`, explicitly registers
+   * `atexit(&sub_BF3260)`. Two zero-xref duplicate unlink emissions
+   * (`FUN_00520190`, `FUN_005201C0`) are dead ICF twins.
+   */
+  using ERuleBPUnitToggleCapsPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitToggleCaps, int>;
 
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
+  // Address: 0x010AB05C -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitMovementType,int>` singleton (constructed by FUN_00BC8930,
+  // self-registering via `__xc_a`).
+  ERuleBPUnitMovementTypePrimitiveSerializer gERuleBPUnitMovementTypePrimitiveSerializer;
 
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
+  // Address: 0x010AB41C -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitCommandCaps,int>` singleton (constructed by FUN_00BC8990,
+  // self-registering via `__xc_a`).
+  ERuleBPUnitCommandCapsPrimitiveSerializer gERuleBPUnitCommandCapsPrimitiveSerializer;
+
+  // Address: 0x010AB1C4 -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitToggleCaps,int>` singleton (constructed by FUN_00BC89F0,
+  // self-registering via `__xc_a`).
+  ERuleBPUnitToggleCapsPrimitiveSerializer gERuleBPUnitToggleCapsPrimitiveSerializer;
 
   template <typename TTypeInfo, typename TEnum>
   [[nodiscard]] gpg::REnumType* ConstructEnumTypeInfo(void* const storage)
@@ -115,29 +118,6 @@ namespace
   void DestroyEnumTypeInfo(void* const storage) noexcept
   {
     reinterpret_cast<TTypeInfo*>(storage)->~TTypeInfo();
-  }
-
-  template <typename TEnum>
-  void DeserializeEnumIntLane(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<TEnum*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<TEnum>(value);
-  }
-
-  template <typename TEnum>
-  void SerializeEnumIntLane(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto* const value = reinterpret_cast<const TEnum*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(*value));
   }
 
   void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
@@ -350,44 +330,6 @@ namespace
   }
 
   /**
-   * Address: 0x0051FC20 (FUN_0051FC20)
-   *
-   * What it does:
-   * Unlinks `ERuleBPUnitMovementType` primitive serializer helper node and
-   * restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x0051FC50 (FUN_0051FC50)
-   *
-   * What it does:
-   * Secondary unlink entrypoint for `ERuleBPUnitMovementType` primitive
-   * serializer helper-node cleanup; behavior matches the primary lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitMovementTypePrimitiveSerializerNodeSecondary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BF31E0 (FUN_00BF31E0)
-   *
-   * What it does:
-   * Unlinks the recovered `ERuleBPUnitMovementType` primitive serializer
-   * helper node.
-   */
-  void cleanup_ERuleBPUnitMovementTypePrimitiveSerializer()
-  {
-    (void)CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary();
-  }
-
-  /**
    * Address: 0x00BF3210 (FUN_00BF3210)
    *
    * What it does:
@@ -402,44 +344,6 @@ namespace
 
     DestroyEnumTypeInfo<moho::ERuleBPUnitCommandCapsTypeInfo>(gERuleBPUnitCommandCapsTypeInfoStorage);
     gERuleBPUnitCommandCapsTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x0051FFA0 (FUN_0051FFA0)
-   *
-   * What it does:
-   * Unlinks `ERuleBPUnitCommandCaps` primitive serializer helper node and
-   * restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodePrimary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x0051FFD0 (FUN_0051FFD0)
-   *
-   * What it does:
-   * Secondary unlink entrypoint for `ERuleBPUnitCommandCaps` primitive
-   * serializer helper-node cleanup; behavior matches the primary lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodeSecondary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BF3220 (FUN_00BF3220)
-   *
-   * What it does:
-   * Unlinks the recovered `ERuleBPUnitCommandCaps` primitive serializer
-   * helper node.
-   */
-  void cleanup_ERuleBPUnitCommandCapsPrimitiveSerializer()
-  {
-    (void)CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodePrimary();
   }
 
   /**
@@ -460,44 +364,6 @@ namespace
   }
 
   /**
-   * Address: 0x00520190 (FUN_00520190)
-   *
-   * What it does:
-   * Unlinks `ERuleBPUnitToggleCaps` primitive serializer helper node and
-   * restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodePrimary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x005201C0 (FUN_005201C0)
-   *
-   * What it does:
-   * Secondary unlink entrypoint for `ERuleBPUnitToggleCaps` primitive
-   * serializer helper-node cleanup; behavior matches the primary lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodeSecondary() noexcept
-  {
-    return UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
-  }
-
-  /**
-   * Address: 0x00BF3260 (FUN_00BF3260)
-   *
-   * What it does:
-   * Unlinks the recovered `ERuleBPUnitToggleCaps` primitive serializer helper
-   * node.
-   */
-  void cleanup_ERuleBPUnitToggleCapsPrimitiveSerializer()
-  {
-    (void)CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodePrimary();
-  }
-
-  /**
    * Address: 0x00BF3680 (FUN_00BF3680)
    *
    * What it does:
@@ -514,115 +380,6 @@ namespace
     gUnitWeaponRangeCategoryTypeInfoConstructed = false;
   }
 
-  /**
-   * Address: 0x00523AB0 (FUN_00523AB0)
-   *
-   * What it does:
-   * Reads one `int` enum lane from archive and stores it into
-   * `ERuleBPUnitMovementType`.
-   */
-  void Deserialize_ERuleBPUnitMovementType(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    DeserializeEnumIntLane<moho::ERuleBPUnitMovementType>(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00523AD0 (FUN_00523AD0)
-   *
-   * What it does:
-   * Writes one `ERuleBPUnitMovementType` enum lane as an `int` to archive.
-   */
-  void Serialize_ERuleBPUnitMovementType(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeEnumIntLane<moho::ERuleBPUnitMovementType>(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00523B20 (FUN_00523B20)
-   *
-   * What it does:
-   * Reads one `int` enum lane from archive and stores it into
-   * `ERuleBPUnitCommandCaps`.
-   */
-  void Deserialize_ERuleBPUnitCommandCaps(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    DeserializeEnumIntLane<moho::ERuleBPUnitCommandCaps>(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00523B40 (FUN_00523B40)
-   *
-   * What it does:
-   * Writes one `ERuleBPUnitCommandCaps` enum lane as an `int` to archive.
-   */
-  void Serialize_ERuleBPUnitCommandCaps(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeEnumIntLane<moho::ERuleBPUnitCommandCaps>(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00523B90 (FUN_00523B90)
-   *
-   * What it does:
-   * Reads one `int` enum lane from archive and stores it into
-   * `ERuleBPUnitToggleCaps`.
-   */
-  void Deserialize_ERuleBPUnitToggleCaps(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    DeserializeEnumIntLane<moho::ERuleBPUnitToggleCaps>(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00523BB0 (FUN_00523BB0)
-   *
-   * What it does:
-   * Writes one `ERuleBPUnitToggleCaps` enum lane as an `int` to archive.
-   */
-  void Serialize_ERuleBPUnitToggleCaps(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeEnumIntLane<moho::ERuleBPUnitToggleCaps>(archive, objectPtr, version, ownerRef);
-  }
-
-  template <typename TEnum>
-  void EnumPrimitiveSerializer<TEnum>::RegisterSerializeFunctions()
-  {
-    gpg::RType* const typeInfo = gpg::LookupRType(typeid(TEnum));
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(typeInfo->serLoadFunc_ == nullptr || typeInfo->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(typeInfo->serSaveFunc_ == nullptr || typeInfo->serSaveFunc_ == mSerialize);
-    typeInfo->serLoadFunc_ = mDeserialize;
-    typeInfo->serSaveFunc_ = mSerialize;
-  }
 } // namespace
 
 namespace moho
@@ -1047,18 +804,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC8930 (FUN_00BC8930, register_ERuleBPUnitMovementTypePrimitiveSerializer)
-   */
-  int register_ERuleBPUnitMovementTypePrimitiveSerializer()
-  {
-    (void)GetERuleBPUnitMovementTypeTypeInfo();
-    InitializeSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
-    gERuleBPUnitMovementTypePrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitMovementType;
-    gERuleBPUnitMovementTypePrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitMovementType;
-    return std::atexit(&cleanup_ERuleBPUnitMovementTypePrimitiveSerializer);
-  }
-
-  /**
    * Address: 0x00BC8970 (FUN_00BC8970, register_ERuleBPUnitCommandCapsTypeInfo)
    */
   int register_ERuleBPUnitCommandCapsTypeInfo()
@@ -1068,36 +813,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC8990 (FUN_00BC8990, register_ERuleBPUnitCommandCapsPrimitiveSerializer)
-   */
-  int register_ERuleBPUnitCommandCapsPrimitiveSerializer()
-  {
-    (void)GetERuleBPUnitCommandCapsTypeInfo();
-    InitializeSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
-    gERuleBPUnitCommandCapsPrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitCommandCaps;
-    gERuleBPUnitCommandCapsPrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitCommandCaps;
-    return std::atexit(&cleanup_ERuleBPUnitCommandCapsPrimitiveSerializer);
-  }
-
-  /**
    * Address: 0x00BC89D0 (FUN_00BC89D0, register_ERuleBPUnitToggleCapsTypeInfo)
    */
   int register_ERuleBPUnitToggleCapsTypeInfo()
   {
     (void)GetERuleBPUnitToggleCapsTypeInfo();
     return std::atexit(&cleanup_ERuleBPUnitToggleCapsTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC89F0 (FUN_00BC89F0, register_ERuleBPUnitToggleCapsPrimitiveSerializer)
-   */
-  int register_ERuleBPUnitToggleCapsPrimitiveSerializer()
-  {
-    (void)GetERuleBPUnitToggleCapsTypeInfo();
-    InitializeSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
-    gERuleBPUnitToggleCapsPrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitToggleCaps;
-    gERuleBPUnitToggleCapsPrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitToggleCaps;
-    return std::atexit(&cleanup_ERuleBPUnitToggleCapsPrimitiveSerializer);
   }
 
   /**
@@ -1120,11 +841,8 @@ namespace
       (void)moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo();
       (void)moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo();
       (void)moho::register_ERuleBPUnitMovementTypeTypeInfo();
-      (void)moho::register_ERuleBPUnitMovementTypePrimitiveSerializer();
       (void)moho::register_ERuleBPUnitCommandCapsTypeInfo();
-      (void)moho::register_ERuleBPUnitCommandCapsPrimitiveSerializer();
       (void)moho::register_ERuleBPUnitToggleCapsTypeInfo();
-      (void)moho::register_ERuleBPUnitToggleCapsPrimitiveSerializer();
       (void)moho::register_UnitWeaponRangeCategoryTypeInfo();
     }
   };
