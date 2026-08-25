@@ -1005,12 +1005,32 @@ namespace
     }
   }
 
+  // Forward declaration: `RefreshTrackedEntitySetAfterRelocation` is defined
+  // further below (next to `ReleaseSoundHandleRecordRuntime`, its sibling
+  // tree-lifecycle helper), but `EnsureSoundHandleStorage` calls it inside
+  // its grow-relocation loop, so the compiler needs to see the declaration
+  // first. Both live in the same anonymous namespace.
+  void RefreshTrackedEntitySetAfterRelocation(moho::SoundHandleRecord* record);
+
   /**
    * Address: 0x008AEA40 (FUN_008AEA40)
    *
    * What it does:
    * Ensures sound-handle storage has at least `requiredCount` slots, creating
    * new runtime-initialized records and rebuilding owner chains after moves.
+   *
+   * The real function is shaped like `gpg::fastvector_n<SoundHandleRecord,
+   * 256>::resize(requiredCount, prototype)` inlined into its one call site
+   * (grow-if-needed via `FUN_008AF760`, then construct every newly appended
+   * slot) -- see the Address: 0x008AF760 citation on
+   * `gpg::core::FastVectorN<T,N>::GrowInsert` (FastVector.h) for the grow
+   * lane this delegates to via `.Resize()`. When that grow lane actually
+   * reallocates, every pre-existing record needs
+   * `RefreshTrackedEntitySetAfterRelocation` (below) to match the binary's
+   * FUN_008AB160/FUN_008AEE40 per-relocated-record tree release-and-refresh;
+   * when growth stays within existing capacity (the common case), the binary
+   * never touches those records' trees at all, so the loop below is
+   * skipped entirely.
    */
   void EnsureSoundHandleStorage(moho::CUserSoundManager* const manager, const std::uint32_t requiredCount)
   {
@@ -1023,7 +1043,16 @@ namespace
       return;
     }
 
+    const bool willReallocate = requiredCount > static_cast<std::uint32_t>(manager->mSoundHandles.Capacity());
+
     manager->mSoundHandles.Resize(requiredCount, moho::SoundHandleRecord{});
+
+    if (willReallocate) {
+      for (std::uint32_t index = 0; index < currentCount; ++index) {
+        RefreshTrackedEntitySetAfterRelocation(&manager->mSoundHandles.start_[index]);
+      }
+    }
+
     for (std::uint32_t index = currentCount; index < requiredCount; ++index) {
       InitializeSoundHandleRecordRuntime(&manager->mSoundHandles.start_[index]);
     }
@@ -1123,6 +1152,62 @@ namespace
     record->mTrackedEntityCount = 0u;
 
     UnlinkRecordFromOwnerChain(record);
+  }
+
+  /**
+   * Address: 0x008AB160 (FUN_008AB160, the per-relocated-record release call
+   * `FUN_008AF760` makes on each pre-existing record immediately after
+   * copying it into freshly grown `mSoundHandles` storage -- see the
+   * Address: 0x008AF760 citation on `gpg::core::FastVectorN<T,N>::GrowInsert`,
+   * FastVector.h)
+   * Address: 0x008AEE40 (FUN_008AEE40, reached through FUN_008AECF0's
+   * per-element copy for that same relocated record -- installs a fresh
+   * empty sentinel rather than carrying the old copy's tree forward; same
+   * self-referencing sentinel shape `InitializeSoundHandleRecordRuntime`
+   * already builds for brand-new slots)
+   *
+   * What it does:
+   * `GrowInsert`'s plain field copy leaves a relocated record's
+   * `mTrackedEntitySetHead` pointing at the SAME tree its old-storage origin
+   * owned (the pointer value is copied verbatim, not the tree). The binary
+   * does not carry that tree forward across a relocation: it frees the
+   * (now-shared) tree exactly once and gives the relocated copy a brand-new
+   * empty one. This reproduces that combined effect for one already-relocated
+   * record. Deliberately narrower than `ReleaseSoundHandleRecordRuntime` --
+   * it must NOT touch `mOwnerHandle`/`mOwnerNextInChain`, which the plain
+   * field copy already carried over correctly and which
+   * `RebuildSoundHandleOwnerChains` re-threads right after.
+   *
+   * Known gap: FUN_008AEE40's real body also ends with an unconditional call
+   * to `FUN_008AF580`, whose own two register-passed arguments are never
+   * loaded by FUN_008AEE40 immediately before that call (they are apparently
+   * already live from earlier context), so its effect could not be pinned
+   * down with confidence from this call site alone and is not reproduced
+   * here. It runs after every field this helper cares about is already
+   * correct, so it is not required for the fresh-sentinel/owner-chain
+   * behavior this helper restores; it is left as a documented gap rather than
+   * a guessed citation.
+   */
+  void RefreshTrackedEntitySetAfterRelocation(moho::SoundHandleRecord* const record)
+  {
+    if (record == nullptr) {
+      return;
+    }
+
+    if (record->mTrackedEntitySetHead != nullptr) {
+      auto* const oldTree = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
+      DestroyEntityLoopTree(oldTree->mParent, oldTree);
+      ::operator delete(oldTree);
+    }
+
+    auto* const treeHead = CreateEntityLoopTreeSentinel();
+    treeHead->mIsSentinel = 1u;
+    treeHead->mLeft = treeHead;
+    treeHead->mParent = treeHead;
+    treeHead->mRight = treeHead;
+    record->mTrackedEntitySetHead = treeHead;
+
+    record->mTrackedEntityCount = 0u;
   }
 
   moho::HSound* LoopOwnerFromNode(LoopNode* node)
