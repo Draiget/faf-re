@@ -6,7 +6,6 @@
 
 namespace gpg
 {
-  struct SerHelperBase;
   class SerConstructResult;
 } // namespace gpg
 
@@ -16,9 +15,39 @@ namespace moho
    * VFTABLE: 0x00E1B3F8
    * COL:  0x00E70430
    */
-  class IAiCommandDispatchImplConstruct
+  class IAiCommandDispatchImplConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCBEC0 (FUN_00BCBEC0, dynamic initializer for the global
+     * `IAiCommandDispatchImplConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the construct/delete callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly, then
+     * installs `??_7IAiCommandDispatchImplConstruct@Moho@@6B@` -- no eager
+     * `RegisterConstructFunction()`/`Init()` call exists here. The `atexit`
+     * argument is the real mangled destructor
+     * (`??1IAiCommandDispatchImplConstruct@Moho@@QAE@@Z`), not a free
+     * function.
+     */
+    IAiCommandDispatchImplConstruct();
+
+    /**
+     * Address: 0x00BF66C0 (FUN_00BF66C0, Moho::IAiCommandDispatchImplConstruct::~IAiCommandDispatchImplConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently sits
+     * in and restores a self-linked sentinel state. Registered by the real
+     * dynamic initializer (0x00BCBEC0) as the global's `atexit` teardown.
+     * `FUN_005992C0` and `FUN_005992F0` are duplicate-emission twins of this
+     * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+     * addresses); neither has a distinct source-level body of its own.
+     */
+    ~IAiCommandDispatchImplConstruct();
+
     /**
      * Address: 0x00599320 (FUN_00599320, Moho::IAiCommandDispatchImplConstruct::Construct)
      *
@@ -38,28 +67,20 @@ namespace moho
     static void Deconstruct(void* object);
 
     /**
-     * Address: 0x00599650 (FUN_00599650)
+     * Address: 0x00599650 (FUN_00599650, gpg::SerConstructHelper_IAiCommandDispatchImpl::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into IAiCommandDispatchImpl RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;             // +0x04
-    gpg::SerHelperBase* mHelperPrev;             // +0x08
     gpg::RType::construct_func_t mConstructFunc; // +0x0C
     gpg::RType::delete_func_t mDeleteFunc;       // +0x10
   };
 
-  static_assert(
-    offsetof(IAiCommandDispatchImplConstruct, mHelperNext) == 0x04,
-    "IAiCommandDispatchImplConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(IAiCommandDispatchImplConstruct, mHelperPrev) == 0x08,
-    "IAiCommandDispatchImplConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(IAiCommandDispatchImplConstruct, mConstructFunc) == 0x0C,
     "IAiCommandDispatchImplConstruct::mConstructFunc offset must be 0x0C"
@@ -69,13 +90,4 @@ namespace moho
     "IAiCommandDispatchImplConstruct::mDeleteFunc offset must be 0x10"
   );
   static_assert(sizeof(IAiCommandDispatchImplConstruct) == 0x14, "IAiCommandDispatchImplConstruct size must be 0x14");
-
-  /**
-   * Address: 0x00BCBEC0 (FUN_00BCBEC0, register_IAiCommandDispatchImplConstruct)
-   *
-   * What it does:
-   * Initializes recovered construct helper storage/callback lanes and installs
-   * process-exit unlink cleanup.
-   */
-  void register_IAiCommandDispatchImplConstruct();
 } // namespace moho

@@ -10,48 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiCommandDispatchImplConstruct)
-  unsigned char gIAiCommandDispatchImplConstructStorage[sizeof(IAiCommandDispatchImplConstruct)] = {};
-  bool gIAiCommandDispatchImplConstructConstructed = false;
-
-  [[nodiscard]] IAiCommandDispatchImplConstruct* AcquireIAiCommandDispatchImplConstruct()
-  {
-    if (!gIAiCommandDispatchImplConstructConstructed) {
-      new (gIAiCommandDispatchImplConstructStorage) IAiCommandDispatchImplConstruct();
-      gIAiCommandDispatchImplConstructConstructed = true;
-    }
-
-    return reinterpret_cast<IAiCommandDispatchImplConstruct*>(gIAiCommandDispatchImplConstructStorage);
-  }
-
-  template <typename TConstruct>
-  [[nodiscard]] gpg::SerHelperBase* ConstructSelfNode(TConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  template <typename TConstruct>
-  void InitializeConstructNode(TConstruct& construct) noexcept
-  {
-    gpg::SerHelperBase* const self = ConstructSelfNode(construct);
-    construct.mHelperNext = self;
-    construct.mHelperPrev = self;
-  }
-
-  template <typename TConstruct>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkConstructNode(TConstruct& construct) noexcept
-  {
-    if (construct.mHelperNext != nullptr && construct.mHelperPrev != nullptr) {
-      construct.mHelperNext->mPrev = construct.mHelperPrev;
-      construct.mHelperPrev->mNext = construct.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = ConstructSelfNode(construct);
-    construct.mHelperPrev = self;
-    construct.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiCommandDispatchImplType()
   {
     gpg::RType* type = IAiCommandDispatchImpl::sType;
@@ -62,49 +20,20 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF66C0 (FUN_00BF66C0, cleanup_IAiCommandDispatchImplConstruct)
-   *
-   * What it does:
-   * Unlinks recovered construct helper node from intrusive serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplConstruct()
-  {
-    if (!gIAiCommandDispatchImplConstructConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkConstructNode(*AcquireIAiCommandDispatchImplConstruct());
-  }
-
-  /**
-   * Address: 0x005992C0 (FUN_005992C0)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * IAiCommandDispatchImpl construct-helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplConstructStartupThunkA()
-  {
-    return cleanup_IAiCommandDispatchImplConstruct();
-  }
-
-  /**
-   * Address: 0x005992F0 (FUN_005992F0)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * IAiCommandDispatchImpl construct-helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplConstructStartupThunkB()
-  {
-    return cleanup_IAiCommandDispatchImplConstruct();
-  }
-
-  void cleanup_IAiCommandDispatchImplConstruct_atexit()
-  {
-    (void)cleanup_IAiCommandDispatchImplConstruct();
-  }
+  // Address: 0x010AE404 -- process-global `IAiCommandDispatchImplConstruct`
+  // singleton. Constructing it runs IAiCommandDispatchImplConstruct::
+  // IAiCommandDispatchImplConstruct() (0x00BCBEC0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor
+  // (~IAiCommandDispatchImplConstruct, 0x00BF66C0) runs at normal
+  // static-duration teardown, matching the real binary's atexit
+  // registration. Nothing outside this translation unit calls
+  // `register_IAiCommandDispatchImplConstruct()` by name, so that
+  // compatibility wrapper is not needed here (unlike
+  // `CAiTransportImplConstruct`, whose equivalent is still called from
+  // `IAiTransport.cpp`).
+  IAiCommandDispatchImplConstruct gIAiCommandDispatchImplConstruct;
 } // namespace
 
 /**
@@ -129,46 +58,41 @@ void IAiCommandDispatchImplConstruct::Deconstruct(void* const object)
 }
 
 /**
- * Address: 0x00599650 (FUN_00599650)
+ * Address: 0x00BCBEC0 (FUN_00BCBEC0, dynamic initializer for the global
+ * `IAiCommandDispatchImplConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the construct/delete callback fields.
+ */
+IAiCommandDispatchImplConstruct::IAiCommandDispatchImplConstruct()
+  : mConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&IAiCommandDispatchImplConstruct::Construct))
+  , mDeleteFunc(&IAiCommandDispatchImplConstruct::Deconstruct)
+{}
+
+/**
+ * Address: 0x00BF66C0 (FUN_00BF66C0, Moho::IAiCommandDispatchImplConstruct::~IAiCommandDispatchImplConstruct)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+IAiCommandDispatchImplConstruct::~IAiCommandDispatchImplConstruct()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x00599650 (FUN_00599650, gpg::SerConstructHelper_IAiCommandDispatchImpl::Init)
  *
  * What it does:
  * Lazily resolves IAiCommandDispatchImpl RTTI and installs construct/delete
  * callbacks from this helper object into the type descriptor.
  */
-void IAiCommandDispatchImplConstruct::RegisterConstructFunction()
+void IAiCommandDispatchImplConstruct::Init()
 {
   gpg::RType* const type = CachedIAiCommandDispatchImplType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructFunc;
   type->deleteFunc_ = mDeleteFunc;
 }
-
-/**
- * Address: 0x00BCBEC0 (FUN_00BCBEC0, register_IAiCommandDispatchImplConstruct)
- *
- * What it does:
- * Initializes recovered construct helper storage/callback lanes and installs
- * process-exit unlink cleanup.
- */
-void moho::register_IAiCommandDispatchImplConstruct()
-{
-  IAiCommandDispatchImplConstruct* const construct = AcquireIAiCommandDispatchImplConstruct();
-  InitializeConstructNode(*construct);
-  construct->mConstructFunc = reinterpret_cast<gpg::RType::construct_func_t>(&IAiCommandDispatchImplConstruct::Construct);
-  construct->mDeleteFunc = &IAiCommandDispatchImplConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  (void)std::atexit(&cleanup_IAiCommandDispatchImplConstruct_atexit);
-}
-
-namespace
-{
-  struct IAiCommandDispatchImplConstructBootstrap
-  {
-    IAiCommandDispatchImplConstructBootstrap()
-    {
-      moho::register_IAiCommandDispatchImplConstruct();
-    }
-  };
-
-  [[maybe_unused]] IAiCommandDispatchImplConstructBootstrap gIAiCommandDispatchImplConstructBootstrap;
-} // namespace
