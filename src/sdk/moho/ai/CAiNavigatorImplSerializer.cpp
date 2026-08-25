@@ -1,9 +1,6 @@
 #include "moho/ai/CAiNavigatorImplSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiNavigatorImpl.h"
 
@@ -11,47 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorImplSerializer) unsigned char gCAiNavigatorImplSerializerStorage[sizeof(CAiNavigatorImplSerializer)] = {};
-  bool gCAiNavigatorImplSerializerConstructed = false;
-
-  [[nodiscard]] CAiNavigatorImplSerializer* AcquireCAiNavigatorImplSerializer()
-  {
-    if (!gCAiNavigatorImplSerializerConstructed) {
-      new (gCAiNavigatorImplSerializerStorage) CAiNavigatorImplSerializer();
-      gCAiNavigatorImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorImplSerializer*>(gCAiNavigatorImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
   {
     gpg::RType* type = CAiNavigatorImpl::sType;
@@ -62,66 +18,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF6DA0 (FUN_00BF6DA0, cleanup_CAiNavigatorImplSerializer)
-   *
-   * What it does:
-   * Unlinks recovered CAiNavigatorImpl serializer helper node from intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorImplSerializer()
-  {
-    if (!gCAiNavigatorImplSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiNavigatorImplSerializer());
-  }
-
-  /**
-   * Address: 0x005A3A30 (FUN_005A3A30)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAiNavigatorImplSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] CAiNavigatorImplSerializer* InitializeCAiNavigatorImplSerializerStartupThunk()
-  {
-    CAiNavigatorImplSerializer* const serializer = AcquireCAiNavigatorImplSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mLoadCallback = &CAiNavigatorImplSerializer::Deserialize;
-    serializer->mSaveCallback = &CAiNavigatorImplSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x005A3A60 (FUN_005A3A60)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * CAiNavigatorImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorImplSerializerStartupThunkA()
-  {
-    return cleanup_CAiNavigatorImplSerializer();
-  }
-
-  /**
-   * Address: 0x005A3A90 (FUN_005A3A90)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * CAiNavigatorImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorImplSerializerStartupThunkB()
-  {
-    return cleanup_CAiNavigatorImplSerializer();
-  }
-
-  void cleanup_CAiNavigatorImplSerializer_atexit()
-  {
-    (void)cleanup_CAiNavigatorImplSerializer();
-  }
+  // Address: 0x010AE79C -- process-global `CAiNavigatorImplSerializer`
+  // singleton. Constructing it runs CAiNavigatorImplSerializer::
+  // CAiNavigatorImplSerializer() (0x00BCC720), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiNavigatorImplSerializer,
+  // 0x00BF6DA0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiNavigatorImplSerializer gCAiNavigatorImplSerializer;
 } // namespace
 
 /**
@@ -159,13 +64,38 @@ void CAiNavigatorImplSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC720 (FUN_00BCC720, dynamic initializer for the global
+ * `CAiNavigatorImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiNavigatorImplSerializer::CAiNavigatorImplSerializer()
+  : mLoadCallback(&CAiNavigatorImplSerializer::Deserialize)
+  , mSaveCallback(&CAiNavigatorImplSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6DA0 (FUN_00BF6DA0, Moho::CAiNavigatorImplSerializer::~CAiNavigatorImplSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiNavigatorImplSerializer::~CAiNavigatorImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005A72A0 (FUN_005A72A0)
  *
  * What it does:
  * Lazily resolves CAiNavigatorImpl RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiNavigatorImplSerializer::RegisterSerializeFunctions()
+void CAiNavigatorImplSerializer::Init()
 {
   gpg::RType* const type = CachedCAiNavigatorImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -173,33 +103,3 @@ void CAiNavigatorImplSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC720 (FUN_00BCC720, register_CAiNavigatorImplSerializer)
- *
- * What it does:
- * Initializes the global CAiNavigatorImpl serializer helper callbacks and
- * installs process-exit cleanup.
- */
-void moho::register_CAiNavigatorImplSerializer()
-{
-  CAiNavigatorImplSerializer* const serializer = AcquireCAiNavigatorImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiNavigatorImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiNavigatorImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiNavigatorImplSerializer_atexit);
-}
-
-namespace
-{
-  struct CAiNavigatorImplSerializerBootstrap
-  {
-    CAiNavigatorImplSerializerBootstrap()
-    {
-      moho::register_CAiNavigatorImplSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiNavigatorImplSerializerBootstrap gCAiNavigatorImplSerializerBootstrap;
-} // namespace
-

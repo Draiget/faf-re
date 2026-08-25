@@ -1,9 +1,6 @@
 #include "moho/ai/CAiFormationDBImplSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiFormationDBImpl.h"
 
@@ -11,48 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiFormationDBImplSerializer)
-  unsigned char gCAiFormationDBImplSerializerStorage[sizeof(CAiFormationDBImplSerializer)] = {};
-  bool gCAiFormationDBImplSerializerConstructed = false;
-
-  [[nodiscard]] CAiFormationDBImplSerializer* AcquireCAiFormationDBImplSerializer()
-  {
-    if (!gCAiFormationDBImplSerializerConstructed) {
-      new (gCAiFormationDBImplSerializerStorage) CAiFormationDBImplSerializer();
-      gCAiFormationDBImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiFormationDBImplSerializer*>(gCAiFormationDBImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiFormationDBImplType()
   {
     static gpg::RType* sCachedType = nullptr;
@@ -62,50 +17,15 @@ namespace
     return sCachedType;
   }
 
-  /**
-   * Address: 0x00BF6890 (FUN_00BF6890, cleanup_CAiFormationDBImplSerializer)
-   *
-   * What it does:
-   * Unlinks recovered CAiFormationDBImpl serializer helper node from
-   * intrusive serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiFormationDBImplSerializer()
-  {
-    if (!gCAiFormationDBImplSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiFormationDBImplSerializer());
-  }
-
-  /**
-   * Address: 0x0059C6C0 (FUN_0059C6C0)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * CAiFormationDBImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiFormationDBImplSerializerStartupThunkA()
-  {
-    return cleanup_CAiFormationDBImplSerializer();
-  }
-
-  /**
-   * Address: 0x0059C6F0 (FUN_0059C6F0)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * CAiFormationDBImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiFormationDBImplSerializerStartupThunkB()
-  {
-    return cleanup_CAiFormationDBImplSerializer();
-  }
-
-  void cleanup_CAiFormationDBImplSerializer_atexit()
-  {
-    (void)cleanup_CAiFormationDBImplSerializer();
-  }
+  // Address: 0x010AE4E0 -- process-global `CAiFormationDBImplSerializer`
+  // singleton. Constructing it runs CAiFormationDBImplSerializer::
+  // CAiFormationDBImplSerializer() (0x00BCC1D0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiFormationDBImplSerializer,
+  // 0x00BF6890) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiFormationDBImplSerializer gCAiFormationDBImplSerializer;
 } // namespace
 
 /**
@@ -137,13 +57,38 @@ void CAiFormationDBImplSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC1D0 (FUN_00BCC1D0, dynamic initializer for the global
+ * `CAiFormationDBImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiFormationDBImplSerializer::CAiFormationDBImplSerializer()
+  : mLoadCallback(&CAiFormationDBImplSerializer::Deserialize)
+  , mSaveCallback(&CAiFormationDBImplSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6890 (FUN_00BF6890, Moho::CAiFormationDBImplSerializer::~CAiFormationDBImplSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiFormationDBImplSerializer::~CAiFormationDBImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x0059CBA0 (FUN_0059CBA0)
  *
  * What it does:
  * Lazily resolves CAiFormationDBImpl RTTI and installs load/save callbacks
  * from this helper object into the type descriptor.
  */
-void CAiFormationDBImplSerializer::RegisterSerializeFunctions()
+void CAiFormationDBImplSerializer::Init()
 {
   gpg::RType* const type = CachedCAiFormationDBImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -151,32 +96,3 @@ void CAiFormationDBImplSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC1D0 (FUN_00BCC1D0, register_CAiFormationDBImplSerializer)
- *
- * What it does:
- * Initializes the global formation-DB serializer helper callbacks and installs
- * process-exit cleanup.
- */
-void moho::register_CAiFormationDBImplSerializer()
-{
-  CAiFormationDBImplSerializer* const serializer = AcquireCAiFormationDBImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiFormationDBImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiFormationDBImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiFormationDBImplSerializer_atexit);
-}
-
-namespace
-{
-  struct CAiFormationDBImplSerializerBootstrap
-  {
-    CAiFormationDBImplSerializerBootstrap()
-    {
-      moho::register_CAiFormationDBImplSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiFormationDBImplSerializerBootstrap gCAiFormationDBImplSerializerBootstrap;
-} // namespace

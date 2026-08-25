@@ -1,9 +1,6 @@
 #include "moho/ai/CAiPathSplineSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiPathSpline.h"
 
@@ -11,9 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiPathSplineSerializer) unsigned char gCAiPathSplineSerializerStorage[sizeof(CAiPathSplineSerializer)];
-  bool gCAiPathSplineSerializerConstructed = false;
-
   /**
    * Address: 0x005B56F0 (FUN_005B56F0, j_Moho::CAiPathSpline::MemberDeserialize)
    *
@@ -82,44 +76,6 @@ namespace
     pathSpline->MemberSerialize(archive);
   }
 
-  [[nodiscard]] CAiPathSplineSerializer* AcquireCAiPathSplineSerializer()
-  {
-    if (!gCAiPathSplineSerializerConstructed) {
-      new (gCAiPathSplineSerializerStorage) CAiPathSplineSerializer();
-      gCAiPathSplineSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPathSplineSerializer*>(gCAiPathSplineSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiPathSplineType()
   {
     gpg::RType* type = CAiPathSpline::sType;
@@ -130,57 +86,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF7540 (FUN_00BF7540, cleanup_CAiPathSplineSerializer)
-   *
-   * What it does:
-   * Unlinks the startup serializer helper node from the intrusive helper list.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiPathSplineSerializer()
-  {
-    if (!gCAiPathSplineSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiPathSplineSerializer());
-  }
-
-  /**
-   * Address: 0x005B24F0 (FUN_005B24F0)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CAiPathSpline serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPathSplineSerializerStartupThunkA()
-  {
-    if (!gCAiPathSplineSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiPathSplineSerializer());
-  }
-
-  /**
-   * Address: 0x005B2520 (FUN_005B2520)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CAiPathSpline serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPathSplineSerializerStartupThunkB()
-  {
-    if (!gCAiPathSplineSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiPathSplineSerializer());
-  }
-
-  void CleanupCAiPathSplineSerializerAtexit()
-  {
-    (void)cleanup_CAiPathSplineSerializer();
-  }
+  // Address: 0x010AF098 -- process-global `CAiPathSplineSerializer`
+  // singleton. Constructing it runs CAiPathSplineSerializer::
+  // CAiPathSplineSerializer() (0x00BCD350), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiPathSplineSerializer,
+  // 0x00BF7540) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiPathSplineSerializer gCAiPathSplineSerializer;
 } // namespace
 
 /**
@@ -224,9 +138,34 @@ void CAiPathSplineSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCD350 (FUN_00BCD350, dynamic initializer for the global
+ * `CAiPathSplineSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiPathSplineSerializer::CAiPathSplineSerializer()
+  : mLoadCallback(&CAiPathSplineSerializer::Deserialize)
+  , mSaveCallback(&CAiPathSplineSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF7540 (FUN_00BF7540, Moho::CAiPathSplineSerializer::~CAiPathSplineSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiPathSplineSerializer::~CAiPathSplineSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005B48E0 (FUN_005B48E0)
  */
-void CAiPathSplineSerializer::RegisterSerializeFunctions()
+void CAiPathSplineSerializer::Init()
 {
   gpg::RType* const type = CachedCAiPathSplineType();
 
@@ -235,32 +174,3 @@ void CAiPathSplineSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCD350 (FUN_00BCD350, register_CAiPathSplineSerializer)
- *
- * What it does:
- * Initializes startup serializer callbacks for `CAiPathSpline` and installs
- * process-exit helper unlink cleanup.
- */
-int moho::register_CAiPathSplineSerializer()
-{
-  CAiPathSplineSerializer* const serializer = AcquireCAiPathSplineSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiPathSplineSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiPathSplineSerializer::Serialize;
-  return std::atexit(&CleanupCAiPathSplineSerializerAtexit);
-}
-
-namespace
-{
-  struct CAiPathSplineSerializerBootstrap
-  {
-    CAiPathSplineSerializerBootstrap()
-    {
-      (void)moho::register_CAiPathSplineSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiPathSplineSerializerBootstrap gCAiPathSplineSerializerBootstrap;
-} // namespace

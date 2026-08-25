@@ -4,20 +4,43 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1C100
    * COL:  0x00E71580
    */
-  class CAiNavigatorLandSerializer
+  class CAiNavigatorLandSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCC7E0 (FUN_00BCC7E0, dynamic initializer for the global
+     * `CAiNavigatorLandSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CAiNavigatorLandSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here.
+     */
+    CAiNavigatorLandSerializer();
+
+    /**
+     * Address: 0x00BF6EB0 (FUN_00BF6EB0, Moho::CAiNavigatorLandSerializer::~CAiNavigatorLandSerializer)
+     * Address: 0x005A4820 (FUN_005A4820), Address: 0x005A4850 (FUN_005A4850)
+     * -- duplicate emissions of the same unlink/self-link sequence hardcoded
+     * to the identical global; zero callers and zero incoming xrefs in the
+     * callgraph index.
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently sits
+     * in and restores a self-linked sentinel state. Registered by the real
+     * dynamic initializer (0x00BCC7E0) as the global's `atexit` teardown.
+     */
+    ~CAiNavigatorLandSerializer();
+
     /**
      * Address: 0x005A47D0 (FUN_005A47D0, Moho::CAiNavigatorLandSerializer::Deserialize)
      *
@@ -39,24 +62,16 @@ namespace moho
      *
      * What it does:
      * Binds load/save serializer callbacks into CAiNavigatorLand RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(
-    offsetof(CAiNavigatorLandSerializer, mHelperNext) == 0x04,
-    "CAiNavigatorLandSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAiNavigatorLandSerializer, mHelperPrev) == 0x08,
-    "CAiNavigatorLandSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CAiNavigatorLandSerializer, mLoadCallback) == 0x0C,
     "CAiNavigatorLandSerializer::mLoadCallback offset must be 0x0C"
@@ -66,13 +81,4 @@ namespace moho
     "CAiNavigatorLandSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiNavigatorLandSerializer) == 0x14, "CAiNavigatorLandSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BCC7E0 (FUN_00BCC7E0, register_CAiNavigatorLandSerializer)
-   *
-   * What it does:
-   * Initializes the global CAiNavigatorLand serializer helper callbacks and
-   * installs process-exit cleanup.
-   */
-  void register_CAiNavigatorLandSerializer();
 } // namespace moho
