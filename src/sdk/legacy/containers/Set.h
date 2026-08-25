@@ -98,9 +98,16 @@ namespace msvc8
         [[nodiscard]] iterator lower_bound(const key_type& k) const { return iterator(tree_.lower_bound_node(k)); }
         [[nodiscard]] iterator upper_bound(const key_type& k) const { return iterator(tree_.upper_bound_node(k)); }
 
+        /**
+         * `rb_tree::equal_range` (RbTree.h) carries this method's real
+         * addresses (0x00A59E20/0x00A59E80, `msvc8::set<std::uint32_t>`) --
+         * see that citation for the full evidence trail.
+         */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k) const
         {
-            return {lower_bound(k), upper_bound(k)};
+            const std::pair<typename tree_type::node_type*, typename tree_type::node_type*> range =
+                tree_.equal_range(k);
+            return {iterator(range.first), iterator(range.second)};
         }
 
         // -------- modifiers --------
@@ -132,15 +139,14 @@ namespace msvc8
          */
         iterator erase(iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
-        size_type erase(const key_type& k)
-        {
-            const iterator it = find(k);
-            if (it == end()) {
-                return 0;
-            }
-            (void)erase(it);
-            return 1;
-        }
+        /**
+         * `rb_tree::erase(const key_type&)` (RbTree.h) carries this method's
+         * real addresses (0x00A65B60/0x00A65C10, `msvc8::set<std::uint32_t>`)
+         * -- see that citation for the full evidence trail, including why
+         * the general equal-range-based shape (not a `find`+single-`erase`
+         * shortcut) is what the binary actually emits.
+         */
+        size_type erase(const key_type& k) { return tree_.erase(k); }
 
         /**
          * Erases `[first, last)` and returns a cursor on the first survivor.
