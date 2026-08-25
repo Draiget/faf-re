@@ -9380,19 +9380,6 @@ namespace
   }
 
   /**
-   * Address: 0x00543260 (FUN_00543260)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::LaunchInfoNew`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoLaunchInfoNewSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::LaunchInfoNew");
-  }
-
-  /**
    * Address: 0x005473B0 (FUN_005473B0)
    *
    * What it does:
