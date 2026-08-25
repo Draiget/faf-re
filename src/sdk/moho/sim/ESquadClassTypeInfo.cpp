@@ -5,41 +5,13 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   alignas(moho::ESquadClassTypeInfo) unsigned char gESquadClassTypeInfoStorage[sizeof(moho::ESquadClassTypeInfo)]{};
   bool gESquadClassTypeInfoConstructed = false;
-  struct ESquadClassSerializerHelper
-  {
-    void* mVtable;
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(ESquadClassSerializerHelper, mHelperNext) == 0x04,
-    "ESquadClassSerializerHelper::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ESquadClassSerializerHelper, mHelperPrev) == 0x08,
-    "ESquadClassSerializerHelper::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ESquadClassSerializerHelper, mDeserialize) == 0x0C,
-    "ESquadClassSerializerHelper::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ESquadClassSerializerHelper, mSerialize) == 0x10,
-    "ESquadClassSerializerHelper::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(ESquadClassSerializerHelper) == 0x14, "ESquadClassSerializerHelper size must be 0x14");
-
-  ESquadClassSerializerHelper gESquadClassSerializerHelper{};
 
   /**
    * Address: 0x00723B10 (FUN_00723B10, ESquadClassTypeInfo construct/register lane)
@@ -70,108 +42,10 @@ namespace
     }
   }
 
-  [[nodiscard]] gpg::RType* CachedESquadClassType()
-  {
-    gpg::RType* type = gpg::LookupRType(typeid(moho::ESquadClass));
-    if (type == nullptr) {
-      type = ConstructESquadClassTypeInfo();
-    }
-    return type;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  void DeserializeESquadClassFromArchive(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<moho::ESquadClass*>(static_cast<std::uintptr_t>(objectPtr)) =
-      static_cast<moho::ESquadClass>(value);
-  }
-
-  void SerializeESquadClassToArchive(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto* const value = reinterpret_cast<const moho::ESquadClass*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(*value));
-  }
-
-  void RegisterESquadClassSerializerCallbacks()
-  {
-    gpg::RType* const type = CachedESquadClassType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == gESquadClassSerializerHelper.mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == gESquadClassSerializerHelper.mSerialize);
-    type->serLoadFunc_ = gESquadClassSerializerHelper.mDeserialize;
-    type->serSaveFunc_ = gESquadClassSerializerHelper.mSerialize;
-  }
-
-  /**
-   * Address: 0x0072A4A0 (FUN_0072A4A0)
-   *
-   * What it does:
-   * Initializes startup ESquadClass primitive-serializer helper links and binds
-   * int load/save callbacks.
-   */
-  [[nodiscard]] ESquadClassSerializerHelper* InitializeESquadClassPrimitiveSerializerHelper()
-  {
-    InitializeHelperNode(gESquadClassSerializerHelper);
-    gESquadClassSerializerHelper.mDeserialize = &DeserializeESquadClassFromArchive;
-    gESquadClassSerializerHelper.mSerialize = &SerializeESquadClassToArchive;
-    RegisterESquadClassSerializerCallbacks();
-    return &gESquadClassSerializerHelper;
-  }
-
-  /**
-   * Address: 0x0072A9F0 (FUN_0072A9F0)
-   *
-   * What it does:
-   * Reinitializes startup ESquadClass save/load helper links and rebinds the
-   * same int load/save callbacks.
-   */
-  [[nodiscard]] ESquadClassSerializerHelper* InitializeESquadClassSaveLoadSerializerHelper()
-  {
-    return InitializeESquadClassPrimitiveSerializerHelper();
-  }
-
-  struct ESquadClassSerializerBootstrap
-  {
-    ESquadClassSerializerBootstrap()
-    {
-      (void)InitializeESquadClassSaveLoadSerializerHelper();
-    }
-  };
-
-  [[maybe_unused]] ESquadClassSerializerBootstrap gESquadClassSerializerBootstrap;
+  // Address: 0x010B9804 -- process-global `PrimitiveSerHelper<ESquadClass,int>`
+  // singleton (constructed by FUN_00BDAB80; see ESquadClassTypeInfo.h for the
+  // dead-duplicate-ctor and dead-sibling-writer evidence).
+  moho::ESquadClassPrimitiveSerializer gESquadClassSerializer;
 } // namespace
 
 namespace moho
