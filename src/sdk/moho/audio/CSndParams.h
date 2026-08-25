@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndVar.h"
 
@@ -18,6 +19,10 @@ namespace LuaPlus
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
 }
 
 namespace moho
@@ -133,6 +138,141 @@ namespace moho
   static_assert(offsetof(CSndParams, mCueId) == 0x46, "CSndParams::mCueId offset must be 0x46");
   static_assert(offsetof(CSndParams, mEngine) == 0x48, "CSndParams::mEngine offset must be 0x48");
   static_assert(sizeof(CSndParams) == 0x50, "CSndParams size must be 0x50");
+
+  /**
+   * VFTABLE: 0x00E0BA98
+   *
+   * Demangled: gpg::SerConstructHelper<class Moho::CSndParams>
+   *
+   * What it does:
+   * Reflection construct/delete helper for `CSndParams`: `Construct` resolves
+   * a `SParamKey` payload back to the (possibly-shared) cached `CSndParams`
+   * instance; `Deconstruct` deletes a heap-owned one.
+   */
+  class CSndParamsConstruct : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BC69F0 (FUN_00BC69F0, dynamic initializer for the global
+     * `CSndParamsConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the construct/delete callback fields.
+     */
+    CSndParamsConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CSndParamsConstruct();
+
+    /**
+     * Address: 0x004E0E10 (FUN_004E0E10, Moho::CSndParamsConstruct::Construct)
+     *
+     * What it does:
+     * Deserializes one `SParamKey`, resolves/creates the matching cached
+     * `CSndParams` instance, and returns it as an owned construct result.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x004E4CA0 (FUN_004E4CA0, Moho::CSndParamsConstruct::Deconstruct)
+     *
+     * What it does:
+     * Destroys one reflected `CSndParams` object and releases its allocation.
+     */
+    static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x004E1E30 (FUN_004E1E30, gpg::SerConstructHelper<Moho::CSndParams>::Init)
+     *
+     * What it does:
+     * Installs construct/delete callbacks into `CSndParams` RTTI. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
+  };
+
+  static_assert(
+    offsetof(CSndParamsConstruct, mConstructCallback) == 0x0C,
+    "CSndParamsConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CSndParamsConstruct, mDeleteCallback) == 0x10, "CSndParamsConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CSndParamsConstruct) == 0x14, "CSndParamsConstruct size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00E0BA88
+   *
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::CSndParams>
+   *
+   * What it does:
+   * Reflection save-construct-args helper for `CSndParams`: serializes the
+   * live descriptor into its `SParamKey` payload for later `Construct`.
+   */
+  class CSndParamsSaveConstruct : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BC69C0 (FUN_00BC69C0, dynamic initializer for the global
+     * `CSndParamsSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field.
+     */
+    CSndParamsSaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CSndParamsSaveConstruct();
+
+    /**
+     * Address: 0x004E0CD0 (FUN_004E0CD0, Moho::CSndParamsSaveConstruct::SaveConstructArgs)
+     * Address: 0x004E0C50 (FUN_004E0C50, thin thunk stored in the ctor;
+     * tail-calls the body above)
+     *
+     * What it does:
+     * Serializes one live `CSndParams` descriptor into its `SParamKey`
+     * payload.
+     */
+    static void SaveConstructArgs(
+      gpg::WriteArchive* archive,
+      int objectPtr,
+      int version,
+      gpg::SerSaveConstructArgsResult* result
+    );
+
+    /**
+     * Address: 0x004E1DB0 (FUN_004E1DB0, gpg::SerSaveConstructHelper<Moho::CSndParams>::Init)
+     *
+     * What it does:
+     * Binds the save-construct-args callback lane into `CSndParams` RTTI.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
+  };
+
+  static_assert(
+    offsetof(CSndParamsSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
+    "CSndParamsSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
+  );
+  static_assert(sizeof(CSndParamsSaveConstruct) == 0x10, "CSndParamsSaveConstruct size must be 0x10");
 
   /**
    * Address: 0x004E4A80 (FUN_004E4A80, func_NewCSndParams)

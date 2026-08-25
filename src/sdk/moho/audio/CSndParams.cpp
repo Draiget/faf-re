@@ -115,35 +115,6 @@ namespace
   constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
   constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
 
-  struct SerSaveConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-  static_assert(
-    offsetof(SerSaveConstructHelperView, mSaveConstructArgsCallback) == 0x0C,
-    "SerSaveConstructHelperView::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-
-  struct SerConstructHelperView
-  {
-    void* mVftable;
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
-    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
-    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
-  );
-
   [[nodiscard]] gpg::RType* ResolveCSndParamsType2()
   {
     gpg::RType* type = moho::CSndParams::sType2;
@@ -921,125 +892,29 @@ namespace
     result->SetOwned(1u);
   }
 
-  /**
-   * Address: 0x004E0C50 (FUN_004E0C50)
-   *
-   * What it does:
-   * Thin thunk forwarding CSndParams save-construct serialization.
-   */
-  void SaveConstructArgs_CSndParamsThunk(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    SaveConstructArgs_CSndParams(archive, objectPtr, version, ownerRef, result);
-  }
+  // Address: 0x00BC69F0 (dynamic initializer for the global
+  // `CSndParamsConstruct` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `Moho::CSndParamsConstruct` ctor (calls `gpg::SerHelperBase::SerHelperBase`,
+  // binds `mConstructCallback`/`mDeleteCallback`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CSndParamsConstruct@Moho@@QAE@@Z`, 0x00BF0FF0) via `atexit`.
+  moho::CSndParamsConstruct gCSndParamsConstruct;
 
-  /**
-   * Address: 0x004E0E10 (FUN_004E0E10)
-   *
-   * What it does:
-   * Deserializes `SParamKey`, resolves/creates one matching `CSndParams`, and
-   * returns it as an owned construct result.
-   */
-  void Construct_CSndParams(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
-  )
-  {
-    moho::SParamKey key{};
-    const gpg::RRef ownerRef{};
-    archive->Read(ResolveSParamKeyType(), &key, ownerRef);
-    moho::CSndParams* const params = FindOrCreateSndParamsByKey(key);
+  // Address: 0x00BC69C0 (dynamic initializer for the global
+  // `CSndParamsSaveConstruct` singleton, __xc_a-reachable) -- same shape as
+  // `gCSndParamsConstruct` above; registers the real mangled destructor
+  // (`??1CSndParamsSaveConstruct@Moho@@QAE@@Z`, 0x00BF0FC0) via `atexit`.
+  // Prior recovery modeled both of these globals' wiring via
+  // `SerConstructHelperView`/`SerSaveConstructHelperView` raw structs
+  // (`void* mVftable` field, no real base) passed by value into
+  // `InitCSndParamsConstructHelper`/`InitCSndParamsSaveConstructHelper` from
+  // a `RegisterCSndParamsSerializationCallbacks()` bootstrap function with no
+  // address citation of its own -- i.e. the reflection callbacks were never
+  // actually installed by any code path the binary itself runs. These
+  // globals' own static initialization fixes that.
+  moho::CSndParamsSaveConstruct gCSndParamsSaveConstruct;
 
-    gpg::RRef paramsRef{};
-    gpg::RRef_CSndParams(&paramsRef, params);
-    result->SetOwned(paramsRef, 1u);
-  }
-
-  /**
-   * Address: 0x004E4CA0 (FUN_004E4CA0, Moho::CSndParamsConstruct::Deconstruct)
-   *
-   * What it does:
-   * Destroys one reflected `CSndParams` object and releases its allocation.
-   */
-  void Delete_CSndParams(void* const objectPtr)
-  {
-    auto* const params = static_cast<moho::CSndParams*>(objectPtr);
-    if (params == nullptr) {
-      return;
-    }
-    delete params;
-  }
-
-  /**
-   * Address: 0x004E1DB0 (FUN_004E1DB0)
-   *
-   * What it does:
-   * Binds one CSndParams save-construct callback into RTTI.
-   */
-  [[nodiscard]] gpg::RType* InitCSndParamsSaveConstructHelper(const SerSaveConstructHelperView& helper)
-  {
-    gpg::RType* const type = ResolveCSndParamsType2();
-    if (type->serSaveConstructArgsFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kSaveConstructAssertText, kSerializationSaveConstructLine, kSerializationSourcePath);
-    }
-    type->serSaveConstructArgsFunc_ = helper.mSaveConstructArgsCallback;
-    return type;
-  }
-
-  /**
-   * Address: 0x004E1E30 (FUN_004E1E30)
-   *
-   * What it does:
-   * Binds one CSndParams construct callback and delete callback into RTTI.
-   */
-  [[nodiscard]] gpg::RType::construct_func_t InitCSndParamsConstructHelper(const SerConstructHelperView& helper)
-  {
-    gpg::RType* const type = ResolveCSndParamsType2();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = helper.mConstructCallback;
-    type->deleteFunc_ = helper.mDeleteCallback;
-    return helper.mConstructCallback;
-  }
-
-  void RegisterCSndParamsSerializationCallbacks()
-  {
-    const SerSaveConstructHelperView saveHelper{
-      .mVftable = nullptr,
-      .mNext = nullptr,
-      .mPrev = nullptr,
-      .mSaveConstructArgsCallback =
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_CSndParamsThunk),
-    };
-    (void)InitCSndParamsSaveConstructHelper(saveHelper);
-
-    const SerConstructHelperView constructHelper{
-      .mVftable = nullptr,
-      .mNext = nullptr,
-      .mPrev = nullptr,
-      .mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CSndParams),
-      .mDeleteCallback = &Delete_CSndParams,
-    };
-    (void)InitCSndParamsConstructHelper(constructHelper);
-  }
-
-  struct CSndParamsSerializationBootstrap
-  {
-    CSndParamsSerializationBootstrap()
-    {
-      RegisterCSndParamsSerializationCallbacks();
-    }
-  };
-
-  [[maybe_unused]] CSndParamsSerializationBootstrap gCSndParamsSerializationBootstrap;
 } // namespace
 
 namespace moho
@@ -1117,6 +992,106 @@ namespace moho
    * Releases one `CSndParams` descriptor's owned string and weak-engine lanes.
    */
   CSndParams::~CSndParams() = default;
+
+  /**
+   * Address: 0x004E0E10 (FUN_004E0E10, Moho::CSndParamsConstruct::Construct)
+   */
+  void CSndParamsConstruct::Construct(
+    gpg::ReadArchive* const archive,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    SParamKey key{};
+    const gpg::RRef ownerRef{};
+    archive->Read(ResolveSParamKeyType(), &key, ownerRef);
+    CSndParams* const params = FindOrCreateSndParamsByKey(key);
+
+    gpg::RRef paramsRef{};
+    gpg::RRef_CSndParams(&paramsRef, params);
+    result->SetOwned(paramsRef, 1u);
+  }
+
+  /**
+   * Address: 0x004E4CA0 (FUN_004E4CA0, Moho::CSndParamsConstruct::Deconstruct)
+   */
+  void CSndParamsConstruct::Deconstruct(void* const objectPtr)
+  {
+    auto* const params = static_cast<CSndParams*>(objectPtr);
+    if (params == nullptr) {
+      return;
+    }
+    delete params;
+  }
+
+  /**
+   * Address: 0x00BC69F0 (FUN_00BC69F0, dynamic initializer for the global
+   * `CSndParamsConstruct` singleton)
+   */
+  CSndParamsConstruct::CSndParamsConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CSndParamsConstruct::Construct))
+    , mDeleteCallback(&CSndParamsConstruct::Deconstruct)
+  {}
+
+  CSndParamsConstruct::~CSndParamsConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x004E1E30 (FUN_004E1E30, gpg::SerConstructHelper<Moho::CSndParams>::Init)
+   */
+  void CSndParamsConstruct::Init()
+  {
+    gpg::RType* const type = ResolveCSndParamsType2();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
+  }
+
+  /**
+   * Address: 0x004E0C50 (FUN_004E0C50, gpg::SerSaveConstructHelper<Moho::CSndParams>::SaveConstructArgs
+   * thunk target; tail-calls the body at 0x004E0CD0)
+   */
+  void CSndParamsSaveConstruct::SaveConstructArgs(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int version,
+    gpg::SerSaveConstructArgsResult* const result
+  )
+  {
+    SaveConstructArgs_CSndParams(archive, objectPtr, version, nullptr, result);
+  }
+
+  /**
+   * Address: 0x00BC69C0 (FUN_00BC69C0, dynamic initializer for the global
+   * `CSndParamsSaveConstruct` singleton)
+   */
+  CSndParamsSaveConstruct::CSndParamsSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CSndParamsSaveConstruct::SaveConstructArgs)
+      )
+  {}
+
+  CSndParamsSaveConstruct::~CSndParamsSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x004E1DB0 (FUN_004E1DB0, gpg::SerSaveConstructHelper<Moho::CSndParams>::Init)
+   */
+  void CSndParamsSaveConstruct::Init()
+  {
+    gpg::RType* const type = ResolveCSndParamsType2();
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kSaveConstructAssertText, kSerializationSaveConstructLine, kSerializationSourcePath);
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+  }
 
   namespace
   {
