@@ -4,16 +4,36 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CArmyStatsSerializer
+  /**
+   * VFTABLE: 0x00E31298
+   */
+  class CArmyStatsSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDA210 (FUN_00BDA210, register_CArmyStatsSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
+     * then installs `??_7CArmyStatsSerializer@Moho@@6B@` -- no eager
+     * `Init()` call exists here.
+     */
+    CArmyStatsSerializer();
+
+    /**
+     * Address: 0x00BFF850 (FUN_00BFF850, Moho::CArmyStatsSerializer::~CArmyStatsSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CArmyStatsSerializer();
+
     /**
      * Address: 0x0070E1F0 (FUN_0070E1F0, Moho::CArmyStatsSerializer::Deserialize)
      *
@@ -36,21 +56,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into CArmyStats RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CArmyStatsSerializer, mHelperNext) == 0x04, "CArmyStatsSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CArmyStatsSerializer, mHelperPrev) == 0x08, "CArmyStatsSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CArmyStatsSerializer, mLoadCallback) == 0x0C, "CArmyStatsSerializer::mLoadCallback offset must be 0x0C"
   );

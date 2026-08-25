@@ -28,7 +28,6 @@ namespace
   }
 
   gpg::RType* gCAiBrainType = nullptr;
-  moho::CArmyStatsConstruct gCArmyStatsConstruct;
 
   /**
    * Address: 0x0070E140 (FUN_0070E140, sub_70E140)
@@ -78,20 +77,21 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BDA1D0 (FUN_00BDA1D0, sub_BDA1D0)
+   * Address: 0x00BDA1D0 (FUN_00BDA1D0, dynamic initializer for the global
+   * `CArmyStatsConstruct` singleton)
    *
    * What it does:
-   * Initializes CArmyStats construct helper callback slots and registers
-   * them into reflected RTTI.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  void register_CArmyStatsConstruct()
+  CArmyStatsConstruct::CArmyStatsConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CArmyStats))
+    , mDeleteCallback(&Delete_CArmyStats)
+  {}
+
+  CArmyStatsConstruct::~CArmyStatsConstruct()
   {
-    gCArmyStatsConstruct.mHelperNext = nullptr;
-    gCArmyStatsConstruct.mHelperPrev = nullptr;
-    gCArmyStatsConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CArmyStats);
-    gCArmyStatsConstruct.mDeleteCallback = &Delete_CArmyStats;
-    gCArmyStatsConstruct.RegisterConstructFunction();
+    ResetLinks();
   }
 
   /**
@@ -100,7 +100,7 @@ namespace moho
    * IDA signature:
    * void (__cdecl *__thiscall sub_70F560(void (__cdecl **this)(void *)))(...);
    */
-  void CArmyStatsConstruct::RegisterConstructFunction()
+  void CArmyStatsConstruct::Init()
   {
     gpg::RType* const type = CArmyStats::StaticGetClass();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -111,13 +111,6 @@ namespace moho
 
 namespace
 {
-  struct CArmyStatsConstructBootstrap
-  {
-    CArmyStatsConstructBootstrap()
-    {
-      moho::register_CArmyStatsConstruct();
-    }
-  };
-
-  CArmyStatsConstructBootstrap gCArmyStatsConstructBootstrap;
+  // Address: 0x010B8FA0 -- process-global `CArmyStatsConstruct` singleton.
+  moho::CArmyStatsConstruct gCArmyStatsConstruct;
 } // namespace
