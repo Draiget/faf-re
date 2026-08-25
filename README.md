@@ -8,22 +8,22 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`97.99%`**
+- Progress coverage:  **`98.05%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,820`*
+  - *Total amount of completed tokens: `65,856`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,059` (80.61%)
-- `skip`: `7,130` (10.83%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,631` (8.56%) — proven third-party/import-boundary code
+- `recovered`: `53,059` (80.57%)
+- `skip`: `7,161` (10.87%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,636` (8.56%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `33` (0.05%)
 - `in_progress`: `9` (0.01%)
-- **`blocked`: `1,378` (2.05%)**
+- **`blocked`: `1,342` (2.00%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,411`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,411`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,375`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,375`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
@@ -42,15 +42,15 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (1,411 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (1,375 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `59` | 4.18% |
-| Vtable-anchored (recover with the owning class) | `125` | 8.86% |
-| Framework dispatch (wx/EH/Lua/reflection) | `8` | 0.57% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `640` | 45.36% |
-| No indexed callsite evidence (needs investigation/evidence) | `578` | 40.96% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `59` | 4.29% |
+| Vtable-anchored (recover with the owning class) | `125` | 9.09% |
+| Framework dispatch (wx/EH/Lua/reflection) | `8` | 0.58% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `635` | 46.18% |
+| No indexed callsite evidence (needs investigation/evidence) | `547` | 39.78% |
 | Unclassified data xref (manual review) | `1` | 0.07% |
 | RTTI-only | `0` | 0.00% |
 
