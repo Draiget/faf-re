@@ -91,6 +91,11 @@ namespace moho
      */
     CUnitMobileBuildTask* SetBlueprint(const RUnitBlueprint* blueprint) noexcept;
 
+    // Address: cached RTTI lane read/written by
+    // `CUnitMobileBuildTaskSerializer::Init` (0x005FBBA0); see
+    // `moho/unit/tasks/CUnitMobileBuildTaskSerializer.cpp`.
+    static gpg::RType* sType;
+
     /**
      * Address: 0x005FE710 (FUN_005FE710, Moho::CUnitMobileBuildTask::MemberDeserialize)
      *
