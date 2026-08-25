@@ -5232,9 +5232,16 @@ DistanceVector2dRuntime* InitializeDistanceVector2dRuntime(
  *
  * What it does:
  * Builds one 2-point support sphere lane `(center.xyz, radiusSquared)` from
- * two 3D points.
+ * two 3D points. This is Wm3::MinSphere3<double>::ExactSphere2
+ * (dependencies/WildMagic3p8/Foundation/Containment/Wm3ContSphere3.cpp) --
+ * every one of its callers traces back exclusively to FUN_00A4E390
+ * (MinSphere3<double>'s own constructor), which is provably unreachable
+ * (exhaustively byte-verified zero references anywhere in the shipped
+ * binary; same finding as the sibling MinSphere3<float> instantiation).
+ * Kept as [[maybe_unused]] rather than deleted: a correct, faithful
+ * recovery of real compiled bytes for a dead code path.
  */
-double* ComputeTwoPointSupportSphereRuntime(
+[[maybe_unused]] double* ComputeTwoPointSupportSphereRuntime(
   double* const outSphere4,
   const double* const pointA3,
   const double* const pointB3
@@ -5264,9 +5271,17 @@ double* ComputeTwoPointSupportSphereRuntime(
  *
  * What it does:
  * Computes one triangle-derived closest-point lane and squared distance; emits
- * `DBL_MAX` sentinel output when determinant is under tolerance.
+ * `DBL_MAX` sentinel output when determinant is under tolerance. This is
+ * Wm3::MinSphere3<double>::ExactSphere3 (dependencies/WildMagic3p8/
+ * Foundation/Containment/Wm3ContSphere3.cpp) -- every one of its callers
+ * traces back exclusively to FUN_00A4E390 (MinSphere3<double>'s own
+ * constructor), which is provably unreachable (exhaustively byte-verified
+ * zero references anywhere in the shipped binary; same finding as the
+ * sibling MinSphere3<float> instantiation). Kept as [[maybe_unused]] rather
+ * than deleted: a correct, faithful recovery of real compiled bytes for a
+ * dead code path.
  */
-double* ComputeTriangleClosestPointRuntime(
+[[maybe_unused]] double* ComputeTriangleClosestPointRuntime(
   const double* const toleranceLane,
   double* const outPoint4,
   const double* const p3,
