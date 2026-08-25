@@ -19150,17 +19150,6 @@ int moho::cfunc_GetUIControlsAlphaL(LuaPlus::LuaState* const state)
 namespace moho
 {
   /**
-   * One input window's pushed event handlers, detached while
-   * SuspendInputWindowEventHandlersAndFlushQueue() pumps the wx event queue
-   * empty, restored afterward in reverse pop order.
-   */
-  struct SuspendedInputWindowHandlers
-  {
-    wxWindowBase* topHandler = nullptr;  // first PopEventHandler() result
-    wxWindowBase* nextHandler = nullptr; // second PopEventHandler() result
-  };
-
-  /**
    * Address: 0x0084DA80 (FUN_0084DA80, sub_84DA80)
    *
    * IDA signature:
@@ -19168,26 +19157,53 @@ namespace moho
    *
    * What it does:
    * For every window in `g_UIManager->mInputWindows` (IDA's decompiler
-   * mis-typed this field's pointee as `Moho::WRenViewport`; the byte offset
-   * it reads -- UI_Manager+0x38/+0x3C, i.e. this vector's start_/end_ lanes
-   * -- lands exactly on `CUIManager::mInputWindows`, a
+   * mis-typed this field's pointee as `Moho::WRenViewport`; the raw
+   * `sub ebp, [ebx+38h]` displacement off the `Moho::UI_Manager` global
+   * lands exactly on `CUIManager::mInputWindows`, a
    * `gpg::fastvector_n<wxWindowBase*, 2>`, per CUIManager.h), pops that
-   * window's two topmost pushed event handlers (each window in this engine
-   * carries at most the MAUI input mapper plus one more), pumps the wx
-   * message queue empty via `wxTheApp->Pending()`/`Dispatch()` so raw wx
-   * events are processed without those handlers intercepting them, then
-   * pushes the two handlers back in reverse pop order (restoring the
-   * original front-to-back order, matching a real PushEventHandler/
-   * PopEventHandler stack).
+   * window's two topmost pushed event handlers.
+   *
+   * The saved-handler storage is a real `msvc8::vector<msvc8::vector<
+   * wxWindowBase*>>` (one dynamically-grown inner vector per window, using
+   * this project's `wxWindowBase*`-typed `PopEventHandler`/
+   * `PushEventHandler` stand-in for the real `wxEvtHandler*` -- see
+   * `WxRuntimeTypes.h`'s `PopEventHandler`/`PushEventHandler` declarations),
+   * not a fixed 2-slot pair -- the raw decompile shows a capacity-checked
+   * append-or-grow sequence per `PopEventHandler()` result
+   * (`if (size < capacity) *end++ = val; else <grow-call>;`), the exact
+   * shape of this container's `push_back`. The outer vector is
+   * `resize()`-d to `mInputWindows.size()` up front (`FUN_0084E8A0`),
+   * growing/shrinking through `FUN_0084EE20`/`FUN_0084EDB0`; the "move
+   * existing 16-byte inner-vector elements into the new buffer" step
+   * (`FUN_0084F820`/`FUN_0084F8A0`) calls `msvc8::vector<wxWindowBase*>::
+   * operator=` per element, cited as `FUN_0084FF80` on that template
+   * member in `Vector.h`. (`FUN_0084E8A0`/`FUN_0084EE20`/`FUN_0084EDB0`/
+   * `FUN_0084F8A0` are not yet independently address-annotated -- their
+   * register-heavy `__userpurge`/`__usercall` shapes need a dedicated pass;
+   * this call site is what makes their template instantiations real
+   * either way.)
+   *
+   * After popping, pumps the wx message queue empty via
+   * `wxTheApp->Pending()`/`Dispatch()` so raw wx events are processed
+   * without those handlers intercepting them, then pushes the two handlers
+   * back in reverse pop order (restoring the original front-to-back order,
+   * matching a real PushEventHandler/PopEventHandler stack).
+   *
+   * Previously modeled with a fixed `{topHandler, nextHandler}` struct in a
+   * `std::vector` -- behaviorally equivalent for the current 2-handler-per-
+   * window reality, but not what the binary actually built, and silently
+   * wrong if a window ever carries a different handler count. Corrected to
+   * match the real per-window dynamic vector.
    */
   void SuspendInputWindowEventHandlersAndFlushQueue()
   {
-    std::vector<SuspendedInputWindowHandlers> suspended(g_UIManager->mInputWindows.size());
+    msvc8::vector<msvc8::vector<wxWindowBase*>> suspended;
+    suspended.resize(g_UIManager->mInputWindows.size());
 
     std::size_t index = 0;
     for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
-      suspended[index].topHandler = inputWindow->PopEventHandler(false);
-      suspended[index].nextHandler = inputWindow->PopEventHandler(false);
+      suspended[index].push_back(inputWindow->PopEventHandler(false));
+      suspended[index].push_back(inputWindow->PopEventHandler(false));
       ++index;
     }
 
@@ -19197,8 +19213,8 @@ namespace moho
 
     index = 0;
     for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
-      inputWindow->PushEventHandler(suspended[index].nextHandler);
-      inputWindow->PushEventHandler(suspended[index].topHandler);
+      inputWindow->PushEventHandler(suspended[index][1]);
+      inputWindow->PushEventHandler(suspended[index][0]);
       ++index;
     }
   }
