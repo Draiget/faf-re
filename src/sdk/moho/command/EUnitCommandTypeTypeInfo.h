@@ -15,6 +15,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005520B0 (FUN_005520B0, Moho::EUnitCommandTypeTypeInfo::EUnitCommandTypeTypeInfo)
+     *
+     * What it does:
+     * Preregisters the enum type descriptor for `EUnitCommandType` with the reflection registry.
+     */
+    EUnitCommandTypeTypeInfo();
+
+    /**
      * Address: 0x00552140 (FUN_00552140, Moho::EUnitCommandTypeTypeInfo::dtr)
      */
     ~EUnitCommandTypeTypeInfo() override;
@@ -29,6 +37,7 @@ namespace moho
      */
     void Init() override;
 
+  private:
     /**
      * Address: 0x00552170 (FUN_00552170, Moho::EUnitCommandTypeTypeInfo::AddEnums)
      */
@@ -37,86 +46,29 @@ namespace moho
 
   static_assert(sizeof(EUnitCommandTypeTypeInfo) == 0x78, "EUnitCommandTypeTypeInfo size must be 0x78");
 
-  class EUnitCommandTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x00553540 (FUN_00553540, Deserialize_EUnitCommandType_Primitive)
-     *
-     * What it does:
-     * Reads one `int` enum lane and writes it to `EUnitCommandType`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00553560 (FUN_00553560, Serialize_EUnitCommandType_Primitive)
-     *
-     * What it does:
-     * Writes one `EUnitCommandType` enum lane as `int`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00552D60 (FUN_00552D60, gpg::SerSaveLoadHelper_EUnitCommandType::Init)
-     *
-     * What it does:
-     * Binds load/save callback lanes to reflected `EUnitCommandType` RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
-  };
-
-  static_assert(
-    offsetof(EUnitCommandTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EUnitCommandTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EUnitCommandTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EUnitCommandTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EUnitCommandTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EUnitCommandTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EUnitCommandTypePrimitiveSerializer, mSerialize) == 0x10,
-    "EUnitCommandTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EUnitCommandTypePrimitiveSerializer) == 0x14,
-    "EUnitCommandTypePrimitiveSerializer size must be 0x14"
-  );
-
   /**
-   * Address: 0x005520B0 (FUN_005520B0, preregister_EUnitCommandTypeTypeInfo)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EUnitCommandType,int>
    *
-   * What it does:
-   * Constructs/preregisters startup-owned RTTI descriptor storage for
-   * `EUnitCommandType`.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EUnitCommandType@Moho@@H@gpg'`):
+   * `FUN_00BC9C40` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). See the per-instantiation address list on
+   * `gpg::PrimitiveSerHelper` in Reflection.h.
    */
-  [[nodiscard]] gpg::REnumType* preregister_EUnitCommandTypeTypeInfo();
+  using EUnitCommandTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EUnitCommandType, int>;
 
   /**
-   * Address: 0x00BC9C20 (FUN_00BC9C20, register_EUnitCommandTypeTypeInfo)
+   * Address: 0x00BC9C20 (FUN_00BC9C20, sub_BC9C20)
    *
    * What it does:
-   * Runs `EUnitCommandType` typeinfo preregistration and installs process-exit
-   * cleanup.
+   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor in place --
+   * construction preregisters `EUnitCommandType` with the reflection
+   * registry -- and installs its atexit teardown. This is an independent
+   * `__xc_a` static-initializer entry, separate from (and not coupled to)
+   * `EUnitCommandTypePrimitiveSerializer`'s own independent initializer
+   * (`FUN_00BC9C40`); the two must not be constructed from one shared
+   * bootstrap.
    */
   int register_EUnitCommandTypeTypeInfo();
-
-  /**
-   * Address: 0x00BC9C40 (FUN_00BC9C40, register_EUnitCommandTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes startup primitive serializer helper links/callbacks for
-   * `EUnitCommandType` and installs process-exit cleanup.
-   */
-  int register_EUnitCommandTypePrimitiveSerializer();
 } // namespace moho
 
