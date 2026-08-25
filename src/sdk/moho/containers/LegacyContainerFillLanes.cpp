@@ -3873,79 +3873,16 @@ namespace
     UnlinkIntrusiveLinkRangeStride20(begin, end);
   }
 
-  struct RefCountedFloatLaneRuntimeView
-  {
-    std::uint8_t lane00 = 0;           // +0x00
-    std::uint8_t lane01_03[0x03]{};    // +0x01
-    std::uint32_t lane04 = 0;          // +0x04
-    std::uint32_t lane08 = 0;          // +0x08
-    std::uint32_t lane0C = 0;          // +0x0C
-    std::uint32_t ref10 = 0;           // +0x10
-    std::uint32_t lane14 = 0;          // +0x14
-    std::uint32_t ref18 = 0;           // +0x18
-    std::uint32_t lane1C = 0;          // +0x1C
-    std::uint32_t ref20 = 0;           // +0x20
-    float lane24 = 0.0f;               // +0x24
-    float lane28 = 0.0f;               // +0x28
-    float lane2C = 0.0f;               // +0x2C
-    std::uint8_t lane30 = 0;           // +0x30
-    std::uint8_t lane31_33[0x03]{};    // +0x31
-  };
-#if defined(_M_IX86)
-  static_assert(offsetof(RefCountedFloatLaneRuntimeView, ref10) == 0x10, "RefCountedFloatLaneRuntimeView::ref10 offset must be 0x10");
-  static_assert(offsetof(RefCountedFloatLaneRuntimeView, ref18) == 0x18, "RefCountedFloatLaneRuntimeView::ref18 offset must be 0x18");
-  static_assert(offsetof(RefCountedFloatLaneRuntimeView, ref20) == 0x20, "RefCountedFloatLaneRuntimeView::ref20 offset must be 0x20");
-  static_assert(offsetof(RefCountedFloatLaneRuntimeView, lane30) == 0x30, "RefCountedFloatLaneRuntimeView::lane30 offset must be 0x30");
-#endif
-
-  void IncrementRefCountWordIfPresent(std::uint32_t refWord) noexcept
-  {
-    if (refWord == 0u) {
-      return;
-    }
-
-    (void)InterlockedExchangeAdd(
-      reinterpret_cast<volatile LONG*>(static_cast<std::uintptr_t>(refWord) + 4u),
-      1
-    );
-  }
-
-  /**
-   * Address: 0x005C84D0 (FUN_005C84D0)
-   *
-   * What it does:
-   * Copies one mixed payload lane and bumps three intrusive ref-count lanes
-   * (`+0x10`, `+0x18`, `+0x20`) when present.
-   */
-  RefCountedFloatLaneRuntimeView* CopyRefCountedFloatLaneRuntime(
-    RefCountedFloatLaneRuntimeView* const destination,
-    const RefCountedFloatLaneRuntimeView* const source
-  ) noexcept
-  {
-    destination->lane00 = source->lane00;
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-
-    destination->ref10 = source->ref10;
-    IncrementRefCountWordIfPresent(destination->ref10);
-
-    destination->lane14 = source->lane14;
-
-    destination->ref18 = source->ref18;
-    IncrementRefCountWordIfPresent(destination->ref18);
-
-    destination->lane1C = source->lane1C;
-
-    destination->ref20 = source->ref20;
-    IncrementRefCountWordIfPresent(destination->ref20);
-
-    destination->lane24 = source->lane24;
-    destination->lane28 = source->lane28;
-    destination->lane2C = source->lane2C;
-    destination->lane30 = source->lane30;
-    return destination;
-  }
+  // NOTE: FUN_005C84D0 was formerly duplicated here as a bespoke
+  // "CopyRefCountedFloatLaneRuntime" free function over an anonymous
+  // RefCountedFloatLaneRuntimeView offset struct (a RULE ONE violation --
+  // per-type reach-in duplicating a typed member's own copy constructor).
+  // The real recovery is `Moho::SPerArmyReconInfo::SPerArmyReconInfo(const
+  // SPerArmyReconInfo&)` in ReconBlip.h/.cpp, which this address is now
+  // cited on; the three ref-count bumps at +0x10/+0x18/+0x20 are the
+  // `mMesh`/`mPriorPose`/`mPose` `boost::SharedPtrRaw<T>` members' own
+  // copy constructors, invoked by the compiler-synthesized memberwise
+  // copy, not hand-written here.
 
   struct Stride28SharedOwnerElementRuntimeView
   {
