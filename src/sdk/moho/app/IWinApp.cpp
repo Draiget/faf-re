@@ -70,6 +70,12 @@ namespace
     //   std::char_traits<char>>::basic_ofstream(const char*, ios_base::openmode))
     //   Address: 0x004C54A0 (FUN_004C54A0, std::basic_filebuf<char,
     //   std::char_traits<char>>::open) -- called by the ofstream ctor above.
+    //   Address: 0x004C5A10 (FUN_004C5A10, std::basic_streambuf<...>::getloc,
+    //   IDA's own inferred name says the wchar_t instantiation, but the
+    //   body only touches locale-refcounting state that isn't specialized
+    //   per character type, so it's plausibly ICF-shared with the char
+    //   version) -- called by basic_filebuf::open to read the ambient
+    //   locale's codecvt facet.
     //   Address: 0x00ABFC0F (FUN_00ABFC0F, std::_Fiopen) -- called by
     //   basic_filebuf::open.
     //   Address: 0x00ABFB55 (FUN_00ABFB55, std::_Fiopen, a second calling-
