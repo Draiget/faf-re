@@ -281,6 +281,26 @@ namespace moho
 
   /**
    * Address: 0x00734630 (FUN_00734630, ??0CSimConCommand@Moho@@QAE@EPBD@Z)
+   *
+   * Address: 0x00735170 (FUN_00735170) / 0x007355F0 (FUN_007355F0,
+   * IDA-typed against a guessed `Moho::CSimConFunc` node struct that does
+   * not reflect this map's real layout -- the field accesses it shows
+   * (`SimCon[2].name`/`SimCon[1].__vftable` gated on a `< 0x10` SSO check)
+   * are `std::string`'s own capacity/buffer-union fields, not a distinct
+   * engine class) -- MSVC8's compiled `SimConCommandRegistry::operator[]`
+   * (FUN_00735170, resolves the case-insensitive lower-bound via
+   * `func_GetSimCon`/`FindSimConLowerBound` above, `stricmp`-compares
+   * against the candidate key) and its internal RB-tree node
+   * construct-and-insert (FUN_007355F0, called only on the not-found
+   * path). No separate source line to write for these -- they are
+   * `operator[]`'s own standard-library internals, already fully covered
+   * by `GetSimConCommandRegistry()[mName] = this` below, the same way the
+   * `sSimConList` bookkeeping addresses above are covered by
+   * `registry.clear()`. Same rationale as this file's
+   * `SimConCommandRegistry` design note: a process-local map that never
+   * crosses the binary's serialized surface uses the current toolchain's
+   * own `std::map`, so its `operator[]` machinery is standard-library
+   * code, not engine code to hand-write.
    */
   CSimConCommand::CSimConCommand(const bool requiresCheat, const char* const name)
     : mName(name)
