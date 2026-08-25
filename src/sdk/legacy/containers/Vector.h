@@ -3082,7 +3082,24 @@ namespace msvc8
          * contains no `operator new` call, unlike the preceding reallocation
          * block at 0x0052DCB2-0x0052DCC8). The reallocation branch instead
          * relocates elements through FUN_00537860 (unrecovered, out of
-         * scope here).)
+         * scope here).
+         *
+         * A third direct callee, FUN_00536F10, is confirmed the same
+         * RRuleGameRulesLuaExportBinding-family shape as FUN_00536DA0/
+         * FUN_00537420 (its own body calls the identical sub_52D9C0
+         * erase-destination-tree + sub_530EE0 clone-source-tree pair,
+         * both already cited on that struct's assignment operator) but
+         * wraps that logic in an explicit range loop (`do { ...; } while
+         * (cursor != end)`) rather than being a single-element body
+         * itself -- an assignment-per-element LOOP, not the assignment
+         * operator proper. Exactly which of insert's branches emits this
+         * specific loop shape (vs. the already-mapped FUN_005334B0/
+         * FUN_00537420 tail-shift and FUN_00537860 relocate) was not
+         * disambiguated from register-level reconstruction alone;
+         * recorded here rather than left unattributed. FUN_005334A0 is a
+         * thin calling-convention bridge into it (`LOBYTE(this)=0;
+         * return sub_536F10(this,this,this);`, the same adapter idiom
+         * used throughout this cluster).)
          * Address: 0x00868040 (FUN_00868040, `msvc8::vector<
          * Moho::WeakEntitySetUserEntity>::insert(end(), count, value)` core for
          * the 12-byte selection-priority bucket vector -- `max_size` folds to
