@@ -25,6 +25,7 @@
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/console/CConFunc.h"
 #include "moho/sim/SOCellPos.h"
 #include "gpg/core/containers/String.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -680,6 +681,146 @@ namespace
 
     session->SetSelection(resultSet);
   }
+
+  /**
+   * Address: 0x00866A30 (FUN_00866A30, sub_866A30)
+   *
+   * std::vector_string*
+   *
+   * What it does:
+   * `UI_SelectByCategory [+add] [+nearest] [+idle] [+goto]
+   * [+excludeengineers] categoryExpression`. Splits arguments into `+`-prefixed
+   * modifier flags and free-text category-expression words (rejoined with a
+   * single space each), resolves the world camera, then dispatches
+   * `SelectUnitsByCategory` above with the parsed flags. Prints the usage
+   * block with fewer than two arguments, and a localized "no session" line
+   * with none active.
+   *
+   * Registrar: FUN_00BE6200 (`__xc_a` lane), data-xref
+   * `dword_F5B534 = offset sub_866A30` is the callsite evidence. Name is
+   * read from the PE `.data` initializer of `stru_F5B528`
+   * ("UI_SelectByCategory").
+   */
+  void UI_SelectByCategory(void* const commandArgs)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr) {
+      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
+      moho::CON_Printf(noSessionText.c_str());
+      return;
+    }
+
+    const moho::ConCommandArgsView args = moho::GetConCommandArgsView(commandArgs);
+    if (args.Count() < 2u) {
+      moho::CON_Printf(
+        "UI_SelectByCategory [+add] [+nearest] [+idle] [+goto] categoryExpression\n"
+        "Select a set of units with the following parameters....\n"
+        "+add : add to current selection\n"
+        "+nearest : select only nearest unit matching category\n"
+        "+idle : select only idle units\n"
+        "+inview: select only units in the current view\n"
+        "+goto: goto the unit if it's already selected\n"
+        "categoryExpression uses the format CAT1 CAT2, CAT3 CAT4 where a space means intersection and a comma means union\n"
+      );
+      return;
+    }
+
+    bool addToSelection = false;
+    bool inViewFrustum = false;
+    bool nearestToMouse = false;
+    bool mustBeIdle = false;
+    bool doCameraTarget = false;
+    bool excludeEngineerCommand = false;
+    std::string categoryExpr;
+
+    for (std::size_t index = 1u; index < args.Count(); ++index) {
+      const msvc8::string* const token = args.At(index);
+      if (token == nullptr) {
+        continue;
+      }
+
+      const char* const tokenText = token->c_str();
+      if (tokenText[0] == '+') {
+        if (_stricmp(tokenText, "+add") == 0) {
+          addToSelection = true;
+        } else if (_stricmp(tokenText, "+nearest") == 0) {
+          nearestToMouse = true;
+        } else if (_stricmp(tokenText, "+idle") == 0) {
+          mustBeIdle = true;
+        } else if (_stricmp(tokenText, "+inview") == 0) {
+          inViewFrustum = true;
+        } else if (_stricmp(tokenText, "+goto") == 0) {
+          doCameraTarget = true;
+        } else if (_stricmp(tokenText, "+excludeengineers") == 0) {
+          excludeEngineerCommand = true;
+        } else {
+          // The binary's `CON_Printf("Unknown modifier %s")` call at this
+          // point supplies no second argument (a genuine missing-vararg bug
+          // in the shipped build - the preceding `qmemcpy` of the offending
+          // token into scratch stack space is the closest thing to evidence
+          // of intent). Reading past the format string's %s would be
+          // undefined behavior here, so this recovery supplies the token
+          // the format string obviously wants instead of reproducing the
+          // stack-garbage read.
+          moho::CON_Printf("Unknown modifier %s", tokenText);
+        }
+        continue;
+      }
+
+      if (!categoryExpr.empty()) {
+        categoryExpr.push_back(' ');
+      }
+      categoryExpr.append(tokenText);
+    }
+
+    moho::RCamManager* const cameraManager = moho::CAM_GetManager();
+    moho::CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
+
+    SelectUnitsByCategory(
+      session,
+      camera,
+      categoryExpr.c_str(),
+      addToSelection,
+      inViewFrustum,
+      nearestToMouse,
+      mustBeIdle,
+      doCameraTarget,
+      excludeEngineerCommand
+    );
+  }
+
+  constexpr const char* kConsoleStartupUISelectByCategoryDescription = "Select a set of units by category";
+  moho::CConFunc gCConFunc_UI_SelectByCategory{};
+
+  void cleanup_CConFunc_UI_SelectByCategory()
+  {
+    moho::CleanupStartupConCommand(gCConFunc_UI_SelectByCategory);
+  }
+
+  /**
+   * Address: 0x00BE6200 (FUN_00BE6200, register_CConFunc_UI_SelectByCategory)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_SelectByCategory`.
+   */
+  void register_CConFunc_UI_SelectByCategory()
+  {
+    gCConFunc_UI_SelectByCategory.InitializeRecovered(
+      kConsoleStartupUISelectByCategoryDescription, "UI_SelectByCategory", &UI_SelectByCategory
+    );
+    (void)std::atexit(&cleanup_CConFunc_UI_SelectByCategory);
+  }
+
+  // The binary runs this registrar from the CRT static-initializer array;
+  // this file-scope bootstrap object reproduces that, matching the
+  // `ResolutionConsoleRegistrations` pattern established in
+  // moho/app/ResolutionCommands.cpp.
+  struct CCommandLuaFunctionConsoleRegistrations
+  {
+    CCommandLuaFunctionConsoleRegistrations() { register_CConFunc_UI_SelectByCategory(); }
+  };
+
+  [[maybe_unused]] CCommandLuaFunctionConsoleRegistrations gCCommandLuaFunctionConsoleRegistrations;
 
   [[nodiscard]] bool TryParseUnitCommandTypeLexical(
     const char* const lexicalCommandType,
