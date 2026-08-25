@@ -11,7 +11,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -25,6 +25,10 @@ namespace
   msvc8::string gDelayedSubVizVectorTypeName;
   bool gDelayedSubVizVectorTypeNameCleanupRegistered = false;
 
+  // Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
+  // -- MSVC's own compiler-generated dynamic initializer for this global; see
+  // gpg::SerSaveLoadHelper<T>'s class-level comment in Reflection.h (same
+  // shape already established for gpg::PrimitiveSerHelper<T,IntType>).
   moho::SDelayedSubVizInfoSerializer gSDelayedSubVizInfoSerializer;
   [[nodiscard]] DelayedSubVizVectorType* AcquireDelayedSubVizVectorType();
   [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant1(
@@ -1406,24 +1410,6 @@ namespace
     return reinterpret_cast<DelayedSubVizVectorType*>(gDelayedSubVizVectorTypeStorage);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* DelayedSubVizSerializerSelfNode(moho::SDelayedSubVizInfoSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkDelayedSubVizSerializerNode() noexcept
-  {
-    if (gSDelayedSubVizInfoSerializer.mHelperNext && gSDelayedSubVizInfoSerializer.mHelperPrev) {
-      gSDelayedSubVizInfoSerializer.mHelperNext->mPrev = gSDelayedSubVizInfoSerializer.mHelperPrev;
-      gSDelayedSubVizInfoSerializer.mHelperPrev->mNext = gSDelayedSubVizInfoSerializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = DelayedSubVizSerializerSelfNode(gSDelayedSubVizInfoSerializer);
-    gSDelayedSubVizInfoSerializer.mHelperPrev = self;
-    gSDelayedSubVizInfoSerializer.mHelperNext = self;
-    return self;
-  }
-
   /**
    * Address: 0x00BF1E80 (FUN_00BF1E80, delayed-sub-viz vector name cleanup)
    *
@@ -1558,19 +1544,12 @@ namespace
     gDelayedSubVizVectorTypeConstructed = false;
   }
 
-  void CleanupSDelayedSubVizInfoSerializerAtexit()
-  {
-    (void)moho::cleanup_SDelayedSubVizInfoSerializerVariant1();
-  }
-
   struct SDelayedSubVizInfoReflectionBootstrap
   {
     SDelayedSubVizInfoReflectionBootstrap()
     {
       (void)moho::preregister_SDelayedSubVizInfoTypeInfo();
-      (void)moho::initialize_SDelayedSubVizInfoSerializer();
-      (void)std::atexit(&CleanupSDelayedSubVizInfoSerializerAtexit);
-      (void)&moho::cleanup_SDelayedSubVizInfoSerializerVariant2;
+      moho::register_SDelayedSubVizInfoSerializer();
       (void)moho::register_SDelayedSubVizInfoVectorType_AtExit();
     }
   };
@@ -1668,83 +1647,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x00507010 (FUN_00507010, Moho::SDelayedSubVizInfoSerializer::Deserialize)
-   */
-  void SDelayedSubVizInfoSerializer::Deserialize(gpg::ReadArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<SDelayedSubVizInfo*>(objectStorage);
-    if (object) {
-      object->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00507020 (FUN_00507020, Moho::SDelayedSubVizInfoSerializer::Serialize)
-   */
-  void SDelayedSubVizInfoSerializer::Serialize(gpg::WriteArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<const SDelayedSubVizInfo*>(objectStorage);
-    if (object) {
-      object->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00507040 (FUN_00507040, init_SDelayedSubVizInfoSerializer)
-   */
-  SDelayedSubVizInfoSerializer* initialize_SDelayedSubVizInfoSerializer()
-  {
-    gpg::SerHelperBase* const self = DelayedSubVizSerializerSelfNode(gSDelayedSubVizInfoSerializer);
-    gSDelayedSubVizInfoSerializer.mHelperNext = self;
-    gSDelayedSubVizInfoSerializer.mHelperPrev = self;
-    gSDelayedSubVizInfoSerializer.mDeserialize = &SDelayedSubVizInfoSerializer::Deserialize;
-    gSDelayedSubVizInfoSerializer.mSerialize = &SDelayedSubVizInfoSerializer::Serialize;
-    return &gSDelayedSubVizInfoSerializer;
-  }
-
-  /**
-   * Address: 0x00507C90 (FUN_00507C90)
+   * Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
    *
    * What it does:
-   * Duplicate lane of delayed-sub-viz serializer callback initialization.
+   * Forces this translation unit's global `SDelayedSubVizInfoSerializer`
+   * instance to link into the reflection bootstrap sequence. The real
+   * ctor/vtable-install/atexit-dtor-registration sequence this address
+   * decompiles to is MSVC's own compiler-generated dynamic initializer for
+   * `gSDelayedSubVizInfoSerializer` (see the Doxygen comment on that global
+   * above), not hand-written source. `Deserialize`/`Serialize`/`Init()`
+   * (0x00507010 / 0x00507020 / 0x00507CC0) are now
+   * `gpg::SerSaveLoadHelper<SDelayedSubVizInfo>`'s own template bodies
+   * (Reflection.h); `Init()` caches its `RType*` on
+   * `SDelayedSubVizInfo::sType`, same slot `ResolveSDelayedSubVizInfoType()`
+   * above already uses.
    */
-  SDelayedSubVizInfoSerializer* initialize_SDelayedSubVizInfoSerializerVariantLegacy()
+  void register_SDelayedSubVizInfoSerializer()
   {
-    return initialize_SDelayedSubVizInfoSerializer();
-  }
-
-  /**
-   * Address: 0x00507070 (FUN_00507070, cleanup_SDelayedSubVizInfoSerializer)
-   */
-  gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant1()
-  {
-    return UnlinkDelayedSubVizSerializerNode();
-  }
-
-  /**
-   * Address: 0x005070A0 (FUN_005070A0, cleanup_SDelayedSubVizInfoSerializer duplicate lane)
-   */
-  gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant2()
-  {
-    return UnlinkDelayedSubVizSerializerNode();
-  }
-
-  /**
-   * Address: 0x00507CC0 (FUN_00507CC0, gpg::SerSaveLoadHelper<Moho::SDelayedSubVizInfo>::Init)
-   */
-  void SDelayedSubVizInfoSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveSDelayedSubVizInfoType();
-    GPG_ASSERT(type != nullptr);
-    if (!type) {
-      return;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    type->serLoadFunc_ = mDeserialize;
-
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serSaveFunc_ = mSerialize;
+    (void)gSDelayedSubVizInfoSerializer;
   }
 
   gpg::RType* register_SDelayedSubVizInfoVectorType()
