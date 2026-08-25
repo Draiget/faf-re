@@ -527,9 +527,25 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDirectionalAnimL(LuaPlus::LuaState* state);
 
-  class CAnimationManipulatorConstruct
+  class CAnimationManipulatorConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD2DB0 (FUN_00BD2DB0, register_CAnimationManipulatorConstruct,
+     * dynamic initializer for the global `CAnimationManipulatorConstruct`
+     * singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CAnimationManipulatorConstruct();
+
+    /**
+     * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
+     */
+    ~CAnimationManipulatorConstruct();
+
     /**
      * Address: 0x0063F220 (FUN_0063F220, Moho::CAnimationManipulatorConstruct::Construct)
      *
@@ -548,25 +564,47 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x00641E70 (FUN_00641E70, sub_641E70)
-     * Slot: 0
+     * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::Init)
+     *
+     * This body is ICF-folded/shared with vtable slot 0 of the
+     * never-constructed `gpg::SerConstructHelper<CAnimationManipulator>`
+     * template instantiation
+     * (`??_7?$SerConstructHelper@VCAnimationManipulator@Moho@@@gpg@@6B@`,
+     * confirmed to have zero vtable-writer ctors anywhere in the binary).
      *
      * What it does:
      * Installs serialization-construct and delete callbacks into
      * CAnimationManipulator RTTI descriptor.
      */
-    virtual void RegisterConstructFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
-  class CAnimationManipulatorSerializer
+  class CAnimationManipulatorSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD2DF0 (FUN_00BD2DF0, register_CAnimationManipulatorSerializer,
+     * dynamic initializer for the global `CAnimationManipulatorSerializer`
+     * singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     *
+     * A dead, zero-xref duplicate ctor with the identical body exists at
+     * 0x0063F2F0 (no `atexit`-registered dtor push, unreachable) -- skip.
+     */
+    CAnimationManipulatorSerializer();
+
+    /**
+     * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
+     */
+    ~CAnimationManipulatorSerializer();
+
     /**
      * Address: 0x0063F2C0 (FUN_0063F2C0, Moho::CAnimationManipulatorSerializer::Deserialize)
      *
@@ -588,19 +626,26 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00641EF0 (FUN_00641EF0, sub_641EF0)
-     * Slot: 0
+     * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::Init)
+     *
+     * This body is ICF-folded/shared with vtable slot 0 of the
+     * never-constructed `gpg::SerSaveLoadHelper<CAnimationManipulator>`
+     * template instantiation
+     * (`??_7?$SerSaveLoadHelper@VCAnimationManipulator@Moho@@@gpg@@6B@`,
+     * confirmed to have zero vtable-writer ctors anywhere in the binary).
+     * `CAnimationManipulatorSerializer` is not derived through that template:
+     * Deserialize/Serialize forward into free functions
+     * (`DeserializeCAnimationManipulatorState`/`SerializeCAnimationManipulatorState`),
+     * not a `CAnimationManipulator::MemberDeserialize`/`MemberSerialize` pair.
      *
      * What it does:
      * Installs CAnimationManipulator load/save callbacks into RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
 
   class CAnimationManipulatorTypeInfo : public gpg::RType
@@ -670,7 +715,23 @@ namespace moho
     "CAnimationManipulator::mDirectionalAnim offset must be 0xB5"
   );
   static_assert(sizeof(CAnimationManipulator) == 0xB8, "CAnimationManipulator size must be 0xB8");
+  static_assert(
+    offsetof(CAnimationManipulatorConstruct, mSerConstructFunc) == 0x0C,
+    "CAnimationManipulatorConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CAnimationManipulatorConstruct, mDeleteFunc) == 0x10,
+    "CAnimationManipulatorConstruct::mDeleteFunc offset must be 0x10"
+  );
   static_assert(sizeof(CAnimationManipulatorConstruct) == 0x14, "CAnimationManipulatorConstruct size must be 0x14");
+  static_assert(
+    offsetof(CAnimationManipulatorSerializer, mSerLoadFunc) == 0x0C,
+    "CAnimationManipulatorSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CAnimationManipulatorSerializer, mSerSaveFunc) == 0x10,
+    "CAnimationManipulatorSerializer::mSerSaveFunc offset must be 0x10"
+  );
   static_assert(sizeof(CAnimationManipulatorSerializer) == 0x14, "CAnimationManipulatorSerializer size must be 0x14");
   static_assert(sizeof(CAnimationManipulatorTypeInfo) == 0x64, "CAnimationManipulatorTypeInfo size must be 0x64");
 } // namespace moho
