@@ -63,6 +63,24 @@ namespace
     }
 
     const msvc8::string logFileName = FILE_SuggestedExt(logArgs[0].c_str(), "sclog");
+    // This construction is the real source-level trigger for a chain of
+    // Dinkumware iostream/CRT internals, none of which need a hand-written
+    // body -- they're satisfied automatically once this expression compiles:
+    //   Address: 0x004F2B50 (FUN_004F2B50, std::basic_ofstream<char,
+    //   std::char_traits<char>>::basic_ofstream(const char*, ios_base::openmode))
+    //   Address: 0x004C54A0 (FUN_004C54A0, std::basic_filebuf<char,
+    //   std::char_traits<char>>::open) -- called by the ofstream ctor above.
+    //   Address: 0x00ABFC0F (FUN_00ABFC0F, std::_Fiopen) -- called by
+    //   basic_filebuf::open.
+    //   Address: 0x00ABFB55 (FUN_00ABFB55, std::_Fiopen, a second calling-
+    //   convention/argument-shape emission of the same CRT primitive).
+    //   Address: 0x00ABFAA0 (FUN_00ABFAA0, std::_Xfsopen) -- the
+    //   out-of-range-openmode exception path both _Fiopen emissions share.
+    // DB-integrity fix: FUN_004F2B50 was marked `recovered` with a note
+    // claiming this exact call site as its citation, but no `Address:`
+    // annotation for it existed anywhere in src/sdk (fake-recovered-status
+    // contamination, same shape documented elsewhere this session) -- this
+    // comment is that citation, now real.
     std::ofstream* const logStream = new std::ofstream(logFileName.c_str(), std::ios::out | std::ios::trunc);
     const auto streamState = logStream->rdstate();
     if ((streamState & (std::ios::failbit | std::ios::badbit)) != 0) {
