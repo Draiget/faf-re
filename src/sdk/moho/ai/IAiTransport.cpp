@@ -1471,7 +1471,6 @@ namespace
     IAiTransportReflectionBootstrap()
     {
       (void)moho::register_EAiTransportEventTypeInfo();
-      (void)moho::register_EAiTransportEventPrimitiveSerializer();
       (void)moho::register_SAiReservedTransportBoneTypeInfo();
       (void)moho::register_SAiReservedTransportBoneSerializer();
       (void)moho::register_SAttachPointTypeInfo();
