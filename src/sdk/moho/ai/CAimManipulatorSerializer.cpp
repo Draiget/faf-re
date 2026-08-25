@@ -1,52 +1,12 @@
 #include "moho/ai/CAimManipulatorSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAimManipulator.h"
 
 namespace
 {
-  alignas(moho::CAimManipulatorSerializer) unsigned char gCAimManipulatorSerializerStorage[sizeof(moho::CAimManipulatorSerializer)] = {};
-  bool gCAimManipulatorSerializerConstructed = false;
-
-  [[nodiscard]] moho::CAimManipulatorSerializer* AcquireCAimManipulatorSerializer()
-  {
-    if (!gCAimManipulatorSerializerConstructed) {
-      new (gCAimManipulatorSerializerStorage) moho::CAimManipulatorSerializer();
-      gCAimManipulatorSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CAimManipulatorSerializer*>(gCAimManipulatorSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
   {
     gpg::RType* type = moho::CAimManipulator::sType;
@@ -57,67 +17,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00630060 (FUN_00630060)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAimManipulatorSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAimManipulatorSerializer* InitializeCAimManipulatorSerializerStartupThunk()
-  {
-    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::CAimManipulatorSerializer::Deserialize;
-    serializer->mSerialize = &moho::CAimManipulatorSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x00630090 (FUN_00630090, cleanup_CAimManipulatorSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the recovered `CAimManipulator`
-   * serializer node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAimManipulatorSerializerStartupThunkA()
-  {
-    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
-
-  /**
-   * Address: 0x006300C0 (FUN_006300C0, cleanup_CAimManipulatorSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the recovered
-   * `CAimManipulator` serializer node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAimManipulatorSerializerStartupThunkB()
-  {
-    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
-
-  /**
-   * Address: 0x00BFA960 (FUN_00BFA960, cleanup_CAimManipulatorSerializer)
-   *
-   * What it does:
-   * Unlinks static serializer helper storage for `CAimManipulator`.
-   */
-  void cleanup_CAimManipulatorSerializer()
-  {
-    if (!gCAimManipulatorSerializerConstructed) {
-      return;
-    }
-
-    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
-    UnlinkSerializerNode(*serializer);
-    serializer->~CAimManipulatorSerializer();
-    gCAimManipulatorSerializerConstructed = false;
-  }
+  // Address: 0x010B2148 -- process-global `CAimManipulatorSerializer`
+  // singleton. Constructing it runs CAimManipulatorSerializer::
+  // CAimManipulatorSerializer() (0x00BD2290), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAimManipulatorSerializer,
+  // 0x00BFA960) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAimManipulatorSerializer gCAimManipulatorSerializer;
 } // namespace
 
 namespace moho
@@ -141,13 +49,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BD2290 (FUN_00BD2290, dynamic initializer for the global
+   * `CAimManipulatorSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`) and binds the load/save callback fields.
+   */
+  CAimManipulatorSerializer::CAimManipulatorSerializer()
+    : mDeserialize(&CAimManipulatorSerializer::Deserialize)
+    , mSerialize(&CAimManipulatorSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BFA960 (FUN_00BFA960, ??1CAimManipulatorSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  CAimManipulatorSerializer::~CAimManipulatorSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00632D80 (FUN_00632D80)
    *
    * What it does:
    * Lazily resolves CAimManipulator RTTI and installs load/save callbacks from
    * this helper object into the type descriptor.
    */
-  void CAimManipulatorSerializer::RegisterSerializeFunctions()
+  void CAimManipulatorSerializer::Init()
   {
     gpg::RType* const type = CachedCAimManipulatorType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -157,18 +90,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2290 (FUN_00BD2290, register_CAimManipulatorSerializer)
+   * Address: 0x00BD2290 caller lane (`ManipulatorStartupRegistrations.cpp`'s
+   * reflection bootstrap sequence)
    *
    * What it does:
-   * Registers serializer callbacks for `CAimManipulator` and installs
-   * process-exit cleanup.
+   * Historically forced construction of the (then lazily-constructed)
+   * `CAimManipulatorSerializer` singleton from an explicit registration
+   * sequence. `gCAimManipulatorSerializer` is now a genuine namespace-scope
+   * global, so its constructor already runs unconditionally at static-init
+   * time; this call is kept only so `ManipulatorStartupRegistrations.cpp`'s
+   * existing bootstrap sequence does not need editing.
    */
   void register_CAimManipulatorSerializer()
   {
-    CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &CAimManipulatorSerializer::Deserialize;
-    serializer->mSerialize = &CAimManipulatorSerializer::Serialize;
-    (void)std::atexit(&cleanup_CAimManipulatorSerializer);
   }
 } // namespace moho

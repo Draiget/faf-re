@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiSiloBuildImpl.h"
@@ -11,57 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(SSiloBuildInfoSerializer) unsigned char gSSiloBuildInfoSerializerStorage[sizeof(SSiloBuildInfoSerializer)];
-  bool gSSiloBuildInfoSerializerConstructed = false;
-
-  alignas(CAiSiloBuildImplSerializer) unsigned char gCAiSiloBuildImplSerializerStorage[sizeof(CAiSiloBuildImplSerializer)];
-  bool gCAiSiloBuildImplSerializerConstructed = false;
-
-  [[nodiscard]] SSiloBuildInfoSerializer* AcquireSSiloBuildInfoSerializer()
-  {
-    if (!gSSiloBuildInfoSerializerConstructed) {
-      new (gSSiloBuildInfoSerializerStorage) SSiloBuildInfoSerializer();
-      gSSiloBuildInfoSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SSiloBuildInfoSerializer*>(gSSiloBuildInfoSerializerStorage);
-  }
-
-  [[nodiscard]] CAiSiloBuildImplSerializer* AcquireCAiSiloBuildImplSerializer()
-  {
-    if (!gCAiSiloBuildImplSerializerConstructed) {
-      new (gCAiSiloBuildImplSerializerStorage) CAiSiloBuildImplSerializer();
-      gCAiSiloBuildImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiSiloBuildImplSerializer*>(gCAiSiloBuildImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedSSiloBuildInfoType()
   {
     gpg::RType* type = SSiloBuildInfo::sType;
@@ -82,93 +30,36 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x005CECD0 (FUN_005CECD0, SSiloBuildInfoSerializer cleanup helper variant)
-   *
-   * What it does:
-   * Unlinks `SSiloBuildInfoSerializer` from the intrusive helper list, resets
-   * its links to self, and returns the helper node.
-   */
-  [[maybe_unused, nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer_primary()
-  {
-    SSiloBuildInfoSerializer* const serializer = reinterpret_cast<SSiloBuildInfoSerializer*>(gSSiloBuildInfoSerializerStorage);
-    return UnlinkSerializerNode(*serializer);
-  }
+  // Address: 0x010AFD8C -- process-global `SSiloBuildInfoSerializer`
+  // singleton. Constructing it runs SSiloBuildInfoSerializer::
+  // SSiloBuildInfoSerializer() (0x00BCE0B0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~SSiloBuildInfoSerializer,
+  // 0x00BF7EA0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  SSiloBuildInfoSerializer gSSiloBuildInfoSerializer;
+
+  // Address: 0x010AFDA0 -- process-global `CAiSiloBuildImplSerializer`
+  // singleton. Constructing it runs CAiSiloBuildImplSerializer::
+  // CAiSiloBuildImplSerializer() (0x00BCE150), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers and explicitly registers this
+  // translation unit's unlink callback via `atexit` (this class has no
+  // user-declared destructor).
+  CAiSiloBuildImplSerializer gCAiSiloBuildImplSerializer;
 
   /**
-   * Address: 0x005CED00 (FUN_005CED00, SSiloBuildInfoSerializer cleanup helper variant)
+   * Address: 0x00BF7F60 (FUN_00BF7F60)
    *
    * What it does:
-   * Secondary cleanup variant that unlinks `SSiloBuildInfoSerializer` from the
-   * intrusive helper list, resets self-links, and returns the helper node.
+   * Unlinks the global `CAiSiloBuildImplSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   * Registered by the real dynamic initializer (0x00BCE150) as the global's
+   * `atexit` teardown.
    */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer_secondary()
+  void CleanupCAiSiloBuildImplSerializer()
   {
-    SSiloBuildInfoSerializer* const serializer = reinterpret_cast<SSiloBuildInfoSerializer*>(gSSiloBuildInfoSerializerStorage);
-    return UnlinkSerializerNode(*serializer);
-  }
-
-  /**
-   * Address: 0x00BF7EA0 (FUN_00BF7EA0, cleanup_SSiloBuildInfoSerializer)
-   *
-   * What it does:
-   * Startup teardown hook that performs the serializer helper unlink/reset and
-   * returns the helper node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer()
-  {
-    return cleanup_SSiloBuildInfoSerializer_secondary();
-  }
-
-  void cleanup_SSiloBuildInfoSerializer_atexit()
-  {
-    (void)cleanup_SSiloBuildInfoSerializer();
-  }
-
-  /**
-   * Address: 0x005CF920 (FUN_005CF920, CAiSiloBuildImplSerializer cleanup helper variant)
-   *
-   * What it does:
-   * Unlinks `CAiSiloBuildImplSerializer` from the intrusive helper list,
-   * resets self-links, and returns the helper node.
-   */
-  [[maybe_unused, nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer_primary()
-  {
-    CAiSiloBuildImplSerializer* const serializer =
-      reinterpret_cast<CAiSiloBuildImplSerializer*>(gCAiSiloBuildImplSerializerStorage);
-    return UnlinkSerializerNode(*serializer);
-  }
-
-  /**
-   * Address: 0x005CF950 (FUN_005CF950, CAiSiloBuildImplSerializer cleanup helper variant)
-   *
-   * What it does:
-   * Secondary cleanup variant that unlinks
-   * `CAiSiloBuildImplSerializer` from the intrusive helper list, resets
-   * self-links, and returns the helper node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer_secondary()
-  {
-    CAiSiloBuildImplSerializer* const serializer =
-      reinterpret_cast<CAiSiloBuildImplSerializer*>(gCAiSiloBuildImplSerializerStorage);
-    return UnlinkSerializerNode(*serializer);
-  }
-
-  /**
-   * Address: 0x00BF7F60 (FUN_00BF7F60, cleanup_CAiSiloBuildImplSerializer)
-   *
-   * What it does:
-   * Startup teardown hook that performs the serializer helper unlink/reset and
-   * returns the helper node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer()
-  {
-    return cleanup_CAiSiloBuildImplSerializer_secondary();
-  }
-
-  void cleanup_CAiSiloBuildImplSerializer_atexit()
-  {
-    (void)cleanup_CAiSiloBuildImplSerializer();
+    gCAiSiloBuildImplSerializer.ResetLinks();
   }
 } // namespace
 
@@ -191,13 +82,38 @@ void SSiloBuildInfoSerializer::Serialize(gpg::WriteArchive* const archive, const
 }
 
 /**
+ * Address: 0x00BCE0B0 (FUN_00BCE0B0, dynamic initializer for the global
+ * `SSiloBuildInfoSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+SSiloBuildInfoSerializer::SSiloBuildInfoSerializer()
+  : mLoadCallback(&SSiloBuildInfoSerializer::Deserialize)
+  , mSaveCallback(&SSiloBuildInfoSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF7EA0 (FUN_00BF7EA0, ??1SSiloBuildInfoSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+SSiloBuildInfoSerializer::~SSiloBuildInfoSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005CFB60 (FUN_005CFB60)
  *
  * What it does:
  * Lazily resolves `SSiloBuildInfo` RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void SSiloBuildInfoSerializer::RegisterSerializeFunctions()
+void SSiloBuildInfoSerializer::Init()
 {
   gpg::RType* const type = CachedSSiloBuildInfoType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -207,19 +123,20 @@ void SSiloBuildInfoSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCE0B0 (FUN_00BCE0B0, register_SSiloBuildInfoSerializer)
+ * Address: 0x00BCE0B0 caller lane (`CAiSiloBuildImplTypeInfo.cpp`'s
+ * reflection bootstrap sequence)
  *
  * What it does:
- * Registers serializer callbacks for `SSiloBuildInfo` and installs
- * process-exit cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `SSiloBuildInfoSerializer` singleton from an explicit registration
+ * sequence. `gSSiloBuildInfoSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `CAiSiloBuildImplTypeInfo.cpp`'s existing
+ * bootstrap sequence does not need editing.
  */
 int moho::register_SSiloBuildInfoSerializer()
 {
-  SSiloBuildInfoSerializer* const serializer = AcquireSSiloBuildInfoSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &SSiloBuildInfoSerializer::Deserialize;
-  serializer->mSaveCallback = &SSiloBuildInfoSerializer::Serialize;
-  return std::atexit(&cleanup_SSiloBuildInfoSerializer_atexit);
+  return 0;
 }
 
 /**
@@ -249,19 +166,19 @@ void CAiSiloBuildImplSerializer::Serialize(gpg::WriteArchive* const archive, con
 }
 
 /**
- * Address: 0x00BCE150 (FUN_00BCE150, register_CAiSiloBuildImplSerializer)
+ * Address: 0x00BCE150 (FUN_00BCE150, dynamic initializer for the global
+ * `CAiSiloBuildImplSerializer` singleton)
  *
  * What it does:
- * Registers serializer callbacks for `CAiSiloBuildImpl` and installs
- * process-exit cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and explicitly
+ * registers `atexit` cleanup (this class has no user-declared destructor).
  */
-int moho::register_CAiSiloBuildImplSerializer()
+CAiSiloBuildImplSerializer::CAiSiloBuildImplSerializer()
+  : mLoadCallback(&CAiSiloBuildImplSerializer::Deserialize)
+  , mSaveCallback(&CAiSiloBuildImplSerializer::Serialize)
 {
-  CAiSiloBuildImplSerializer* const serializer = AcquireCAiSiloBuildImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiSiloBuildImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiSiloBuildImplSerializer::Serialize;
-  return std::atexit(&cleanup_CAiSiloBuildImplSerializer_atexit);
+  (void)std::atexit(&CleanupCAiSiloBuildImplSerializer);
 }
 
 /**
@@ -276,11 +193,28 @@ int moho::register_CAiSiloBuildImplSerializer()
  * Lazily resolves CAiSiloBuildImpl RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiSiloBuildImplSerializer::RegisterSerializeFunctions()
+void CAiSiloBuildImplSerializer::Init()
 {
   gpg::RType* const type = CachedCAiSiloBuildImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mLoadCallback;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
+}
+
+/**
+ * Address: 0x00BCE150 caller lane (`CAiSiloBuildImplTypeInfo.cpp`'s
+ * reflection bootstrap sequence)
+ *
+ * What it does:
+ * Historically forced construction of the (then lazily-constructed)
+ * `CAiSiloBuildImplSerializer` singleton from an explicit registration
+ * sequence. `gCAiSiloBuildImplSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `CAiSiloBuildImplTypeInfo.cpp`'s existing
+ * bootstrap sequence does not need editing.
+ */
+int moho::register_CAiSiloBuildImplSerializer()
+{
+  return 0;
 }

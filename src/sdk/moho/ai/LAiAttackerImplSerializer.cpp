@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -23,47 +22,6 @@ namespace
 
   static_assert(offsetof(LAiAttackerImplSerializationView, cImpl) == 0x1C, "LAiAttackerImpl::cImpl offset must be 0x1C");
   static_assert(sizeof(LAiAttackerImplSerializationView) == 0x20, "LAiAttackerImplSerializationView size must be 0x20");
-
-  alignas(LAiAttackerImplSerializer) unsigned char gLAiAttackerImplSerializerStorage[sizeof(LAiAttackerImplSerializer)];
-  bool gLAiAttackerImplSerializerConstructed = false;
-
-  [[nodiscard]] LAiAttackerImplSerializer* AcquireLAiAttackerImplSerializer()
-  {
-    if (!gLAiAttackerImplSerializerConstructed) {
-      new (gLAiAttackerImplSerializerStorage) LAiAttackerImplSerializer();
-      gLAiAttackerImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<LAiAttackerImplSerializer*>(gLAiAttackerImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-    return self;
-  }
 
   template <typename T>
   [[nodiscard]] gpg::RRef MakeDerivedRef(T* object, gpg::RType* staticType)
@@ -114,46 +72,26 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x005D6240 (FUN_005D6240)
-   *
-   * What it does:
-   * Unlinks the global `LAiAttackerImplSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_LAiAttackerImplSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(*AcquireLAiAttackerImplSerializer());
-  }
-
-  /**
-   * Address: 0x005D6270 (FUN_005D6270)
-   *
-   * What it does:
-   * Secondary unlink/reset thunk for the global
-   * `LAiAttackerImplSerializer` helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_LAiAttackerImplSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(*AcquireLAiAttackerImplSerializer());
-  }
+  // Address: 0x010B0358 -- process-global `LAiAttackerImplSerializer`
+  // singleton. Constructing it runs LAiAttackerImplSerializer::
+  // LAiAttackerImplSerializer() (0x00BCE850), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
+  // translation unit's unlink callback via `atexit` (this class has no
+  // user-declared destructor).
+  LAiAttackerImplSerializer gLAiAttackerImplSerializer;
 
   /**
    * Address: 0x00BF83D0 (FUN_00BF83D0, sub_BF83D0)
    *
    * What it does:
-   * Tears down recovered static `LAiAttackerImplSerializer` storage.
+   * Unlinks the global `LAiAttackerImplSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   * Registered by the real dynamic initializer (0x00BCE850) as the global's
+   * `atexit` teardown.
    */
-  void cleanup_LAiAttackerImplSerializer()
+  void CleanupLAiAttackerImplSerializer()
   {
-    if (!gLAiAttackerImplSerializerConstructed) {
-      return;
-    }
-
-    LAiAttackerImplSerializer* const serializer = AcquireLAiAttackerImplSerializer();
-    (void)cleanup_LAiAttackerImplSerializerStartupThunkA();
-    serializer->~LAiAttackerImplSerializer();
-    gLAiAttackerImplSerializerConstructed = false;
+    gLAiAttackerImplSerializer.ResetLinks();
   }
 
   [[nodiscard]] LAiAttackerImpl* AsLAiAttackerImpl(const int objectPtr)
@@ -224,13 +162,29 @@ void LAiAttackerImplSerializer::Serialize(gpg::WriteArchive* const archive, cons
 }
 
 /**
+ * Address: 0x00BCE850 (FUN_00BCE850, dynamic initializer for the global
+ * `LAiAttackerImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and explicitly
+ * registers `atexit` cleanup.
+ */
+LAiAttackerImplSerializer::LAiAttackerImplSerializer()
+  : mLoadCallback(&LAiAttackerImplSerializer::Deserialize)
+  , mSaveCallback(&LAiAttackerImplSerializer::Serialize)
+{
+  (void)std::atexit(&CleanupLAiAttackerImplSerializer);
+}
+
+/**
  * Address: 0x005DBF80 (FUN_005DBF80)
  *
  * What it does:
  * Lazily resolves `LAiAttackerImpl` RTTI and installs load/save callbacks
  * from this helper object into the type descriptor.
  */
-void LAiAttackerImplSerializer::RegisterSerializeFunctions()
+void LAiAttackerImplSerializer::Init()
 {
   gpg::RType* const type = CachedLAiAttackerImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -240,17 +194,17 @@ void LAiAttackerImplSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCE850 (FUN_00BCE850, register_LAiAttackerImplSerializer)
+ * Address: 0x00BCE850 caller lane (`CAiAttackerImplTypeInfo.cpp`'s
+ * reflection bootstrap sequence)
  *
  * What it does:
- * Registers `LAiAttackerImpl` serializer callbacks and installs process-exit
- * cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `LAiAttackerImplSerializer` singleton from an explicit registration
+ * sequence. `gLAiAttackerImplSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `CAiAttackerImplTypeInfo.cpp`'s existing
+ * bootstrap sequence does not need editing.
  */
 void moho::register_LAiAttackerImplSerializer()
 {
-  LAiAttackerImplSerializer* const serializer = AcquireLAiAttackerImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &LAiAttackerImplSerializer::Deserialize;
-  serializer->mSaveCallback = &LAiAttackerImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_LAiAttackerImplSerializer);
 }
