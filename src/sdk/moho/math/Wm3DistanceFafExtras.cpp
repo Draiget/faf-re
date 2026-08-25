@@ -1386,9 +1386,18 @@ namespace Wm3
    *
    * What it does:
    * Builds one 2-point support sphere from the current support's first point
-   * and one candidate point, then records the updated support state.
+   * and one candidate point, then records the updated support state. This is
+   * Wm3::MinSphere3<float>::UpdateSupport1 (dependencies/WildMagic3p8/
+   * Foundation/Containment/Wm3ContSphere3.cpp) -- its sole incoming reference
+   * is the address-taken store into MinSphere3<float>'s own constructor's
+   * update-function table (FUN_00A4E180), which is itself provably
+   * unreachable (exhaustively byte-verified zero references anywhere in the
+   * shipped binary; the engine only ever constructs MinSphere3<double>).
+   * Kept as [[maybe_unused]] rather than deleted: a correct, faithful
+   * recovery of real compiled bytes for a dead code path, matching this
+   * project's address-taken-into-a-table carve-out.
    */
-  float* UpdateTwoPointSupportSphereFromCandidate(
+  [[maybe_unused]] float* UpdateTwoPointSupportSphereFromCandidate(
     float* const outCenterRadiusSquared,
     const std::int32_t candidatePointIndex,
     const float* const* const shuffledPointTable,
