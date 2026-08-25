@@ -38,7 +38,8 @@ namespace
   // raw asm to just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT
   // duplicate ctor: 0x00696CB0.
   moho::MotorSinkAwaySerializer gMotorSinkAwaySerializer;
-  moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct{};
+  // Address: 0x010B528C -- process-global `MotorSinkAwayConstruct` singleton.
+  moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct;
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorSinkAwayIndex = 0;
 
   [[nodiscard]] moho::MotorSinkAwayTypeInfo& MotorSinkAwayTypeInfoStorageRef() noexcept
@@ -219,34 +220,6 @@ namespace
     return out;
   }
 
-  template <typename THelper>
-  [[nodiscard]] auto* HelperSelfNode(THelper& helper) noexcept
-  {
-    return &helper.mHelperLinks;
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    auto* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mNext = self;
-    helper.mHelperLinks.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] auto* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperLinks.mNext != nullptr && helper.mHelperLinks.mPrev != nullptr) {
-      helper.mHelperLinks.mNext->mPrev = helper.mHelperLinks.mPrev;
-      helper.mHelperLinks.mPrev->mNext = helper.mHelperLinks.mNext;
-    }
-
-    auto* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mPrev = self;
-    helper.mHelperLinks.mNext = self;
-    return self;
-  }
-
   /**
    * Address: 0x006967F0 (FUN_006967F0, construct helper body)
    * Address: 0x00696F70 (FUN_00696F70, construct helper thunk)
@@ -281,36 +254,6 @@ namespace
     delete static_cast<moho::MotorSinkAway*>(objectPtr);
   }
 
-  /**
-   * Address: 0x00696C30 (FUN_00696C30)
-   *
-   * What it does:
-   * Initializes the generic construct-helper lane for `MotorSinkAway`.
-   */
-  [[nodiscard]] moho::MotorSinkAwayConstruct* InitializeMotorSinkAwayConstructGenericHelperLane()
-  {
-    InitializeHelperNode(gMotorSinkAwayConstruct);
-    gMotorSinkAwayConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_MotorSinkAway_Callback);
-    gMotorSinkAwayConstruct.mDeleteCallback = &DeleteConstructedMotorSinkAway;
-    return &gMotorSinkAwayConstruct;
-  }
-
-  /**
-   * Address: 0x00696750 (FUN_00696750)
-   *
-   * What it does:
-   * Initializes the custom construct-helper lane for `MotorSinkAway`.
-   */
-  [[nodiscard]] moho::MotorSinkAwayConstruct* InitializeMotorSinkAwayConstructCustomHelperLane()
-  {
-    return InitializeMotorSinkAwayConstructGenericHelperLane();
-  }
-
-  void cleanup_MotorSinkAwayConstruct_atexit()
-  {
-    (void)moho::cleanup_MotorSinkAwayConstruct();
-  }
 } // namespace
 
 namespace moho
@@ -526,12 +469,29 @@ namespace moho
   }
 
   /**
-   * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::RegisterConstructFunction)
+   * Address: 0x00BD5D70 (FUN_00BD5D70, dynamic initializer for the global
+   * `MotorSinkAwayConstruct` singleton)
+   */
+  MotorSinkAwayConstruct::MotorSinkAwayConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_MotorSinkAway_Callback))
+    , mDeleteCallback(&DeleteConstructedMotorSinkAway)
+  {}
+
+  /**
+   * Address: 0x00BFD270 (FUN_00BFD270, Moho::MotorSinkAwayConstruct::~MotorSinkAwayConstruct)
+   */
+  MotorSinkAwayConstruct::~MotorSinkAwayConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::Init)
    *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `MotorSinkAway`.
    */
-  void MotorSinkAwayConstruct::RegisterConstructFunction()
+  void MotorSinkAwayConstruct::Init()
   {
     gpg::RType* const type = CachedMotorSinkAwayType();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -554,14 +514,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD270 (FUN_00BFD270, cleanup_MotorSinkAwayConstruct)
-   */
-  moho::TDatListItem<gpg::SerHelperBase, void>* cleanup_MotorSinkAwayConstruct()
-  {
-    return UnlinkHelperNode(gMotorSinkAwayConstruct);
-  }
-
-  /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
    */
   void register_MotorSinkAwayTypeInfo()
@@ -572,16 +524,6 @@ namespace moho
     }
 
     (void)std::atexit(&cleanup_MotorSinkAwayTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BD5D70 (FUN_00BD5D70, register_MotorSinkAwayConstruct)
-   */
-  int register_MotorSinkAwayConstruct()
-  {
-    (void)InitializeMotorSinkAwayConstructCustomHelperLane();
-    gMotorSinkAwayConstruct.RegisterConstructFunction();
-    return std::atexit(&cleanup_MotorSinkAwayConstruct_atexit);
   }
 
   /**
@@ -707,7 +649,6 @@ namespace
     MotorSinkAwayBootstrap()
     {
       moho::register_MotorSinkAwayTypeInfo();
-      (void)moho::register_MotorSinkAwayConstruct();
       (void)moho::register_MotorSinkAwaySerializer();
       (void)moho::register_CScrLuaMetatableFactory_MotorSinkAway_Index();
     }
