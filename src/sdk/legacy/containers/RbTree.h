@@ -201,6 +201,23 @@ namespace msvc8
          * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
          * reach-in instead of calling it.)
          */
+        /**
+         * Address: 0x006880F0 (FUN_006880F0, `_Min` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * `EntityDb.h`. Node layout confirmed against `FUN_006881C0`
+         * (`buy_node`, cited above): `IdPool`'s `alignas(8)` (see that
+         * type's own citation in `IdPool.h`) forces a 4-byte pad between
+         * the link triplet (ends at node+0x0C) and `value_type` (`pair<
+         * const uint32_t, IdPool>`), so the pair starts at node+0x10 (key)
+         * / node+0x18 (`IdPool`, `sizeof(IdPool)==0xCB0`), landing colour/
+         * isNil at node+0xCC8/node+0xCC9 -- exactly the raw `+3272`/`+3273`
+         * byte offsets this instantiation's emissions use throughout (`cmp
+         * byte ptr [esi+0CC9h], 0` in `FUN_00688030`'s own asm). Walks
+         * `_Left` (node+0x00) while `!_Isnil` (node+0xCC9), matching this
+         * member exactly. Reached from `erase_node`'s emission for this
+         * instantiation (`FUN_00687CC0`, cited below) via `rb_min(fix)`
+         * when the erased node was the tree's leftmost.
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -314,6 +331,16 @@ namespace msvc8
          * hand-rolled `RightmostCategoryLookupDescendant` free function in
          * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
          * reach-in instead of calling it.)
+         */
+        /**
+         * Address: 0x00688830 (FUN_00688830, `_Max` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * `EntityDb.h`, sibling of `rb_min`'s 0x006880F0 citation above
+         * (same node layout: colour/isNil at node+0xCC8/node+0xCC9). Walks
+         * `_Right` (node+0x08) while `!_Isnil` (node+0xCC9), matching this
+         * member exactly. Reached from `erase_node`'s emission for this
+         * instantiation (`FUN_00687CC0`, cited below) via `rb_max(fix)`
+         * when the erased node was the tree's rightmost.
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -1114,6 +1141,24 @@ namespace msvc8
              * have destroyed at most one node and leaked the rest; this
              * member does not have that bug. Reached automatically via
              * member destruction, `EntityDb.h`.)
+             * Address: 0x00684310 (FUN_00684310, sub_684310) -- the same
+             * `mIdPoolTree` instantiation's `~rb_tree()` emission for a
+             * *different* caller: `CEntityDb::CEntityDb`'s (0x00684230,
+             * `EntityDb.cpp`) SEH unwind funclet, torn down if a
+             * later-constructed member (`mRegisteredEntitySets`/
+             * `mEntityList`/`mAllUnits`, all declared after `mIdPoolTree` in
+             * `EntityDb.h`) throws during construction. Body identical to
+             * 0x006843B0's shape one level up (`erase_range(head->left,
+             * head)` via `sub_687190`, cited on `erase_range` above, then
+             * `operator delete(head)` and zero head/size) -- a compiler-
+             * generated EH-path clone, not a distinct source line, matching
+             * the same pattern already documented for 0x0052A390/0x0052CF10
+             * above. Sole caller confirmed by this pass's xref sweep: a
+             * `type=19` (unwind) edge from 0x00684230. `DestroyEntityListRuntime`
+             * (`EntityDb.cpp`) previously mis-cited this exact address as
+             * `mEntityList`'s node-walk teardown -- corrected there to its
+             * real address (0x006874E0) in the same pass as this citation;
+             * this address does not touch `mEntityList` at all.
              * Address: 0x006E0A70 (FUN_006E0A70, `Moho::CommandDatabase::
              * ~CommandDatabase` -- `msvc8::map<Moho::CmdId,
              * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
@@ -2396,6 +2441,72 @@ namespace msvc8
              * `gUiKeyActionMap.erase(keyMask)` call the mislabeled citation
              * pointed at instead).)
              */
+            /**
+             * Address: 0x00687CC0 (FUN_00687CC0, `erase(const_iterator)` for
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * mIdPoolTree` in `EntityDb.h`. 251-instruction body, unmistakably
+             * this member: checked-iterator guard throwing `std::out_of_range(
+             * "invalid map/set<T> iterator")` on a nil node (isNil@node+0xCC9,
+             * matching `rb_min`'s 0x006880F0 citation above), successor
+             * capture via `sub_6878C0` (`rb_increment`, cited above as this
+             * instantiation's `_Inc`) before any unlinking, the one-child/
+             * two-child relink split (`fix`/`fixParent` bookkeeping matches
+             * this member field for field), re-seating `head->left`/
+             * `head->right` through this instantiation's own `rb_min`/
+             * `rb_max` (`sub_6880F0`/`sub_688830`, both cited above) only
+             * when the erased node was an extremum, the black-height
+             * rebalance loop calling this instantiation's `_Lrotate`/
+             * `_Rrotate` (`sub_6880A0`/`sub_688120`, both already cited on
+             * those members below) exactly where `erase_rebalance` does, and
+             * finally the node's value teardown before `operator delete`.
+             *
+             * The value teardown is the one place this emission's shape does
+             * not reduce to a bare `n->value.~value_type()` today: `IdPool`/
+             * `SimSubRes2` (`IdPool.h`) currently declare no destructors, so
+             * `~pair<const uint32_t, IdPool>()` would be non-trivial only via
+             * `mReleasedLows`'s implicit `~BVIntSet()` (real `~FastVectorN()`
+             * on `mWords`) -- it would NOT reproduce `mSubRes2`'s teardown,
+             * because `SimSubRes2::mData` is currently modelled as a plain
+             * `SimSubRes3[100]` array, and an implicit `~SimSubRes2()` over
+             * that shape would loop all 100 slots unconditionally. The
+             * shipped body does not: it calls `struct_CyclicBuffer100_
+             * BVIntSet::struct_CyclicBuffer100_BVIntSet` (0x00403E70, already
+             * identified and recovered as `SimSubRes2::Reset()` in
+             * `IdPool.cpp` -- confirmed byte-identical against that address's
+             * own decompile: the bounded `while (mStart != mEnd) PopOldest();`
+             * drain, not a blind 100-element pass) on `node+0x40` (`mSubRes2`,
+             * landing exactly at the end of `rb_min`'s cited node layout:
+             * value starts node+0x10, `IdPool`@node+0x18, `mSubRes2`@
+             * `IdPool`+0x28 = node+0x40, sized 0xC88 to land exactly on
+             * colour@node+0xCC8), then inlines `mReleasedLows.mWords`'s
+             * `~FastVectorN()` release (`node+0x28`..`+0x34`: `if (begin !=
+             * &inline) { delete[] begin; begin = &inline; }`, matching
+             * `FastVectorN.h`'s already-recovered 0x00401DE0 body) before
+             * `operator delete(node)`. `IdPool::IdPool()` (0x00403920)
+             * confirms the same asymmetry from the construction side: it
+             * never touches `mData`, only `mUnused.mStart`/`mEnd` (see
+             * `IdPool.h`'s ctor citation) -- consistent with `mData` being
+             * raw, placement-managed storage in the true 2007 source rather
+             * than an auto-constructed/destructed array, which `IdPool.h`'s
+             * current recovery does not yet model. This citation records the
+             * evidence rather than guessing the fix: retyping `SimSubRes2::
+             * mData` to raw storage (with `AsBitSet`-style typed access, as
+             * `IdPool.cpp` already does for individual slots) would let a
+             * bare `n->value.~value_type()` reproduce this exactly, but that
+             * change ripples into `Sim.cpp` (`pool.mSubRes2.mData[retireIndex]`
+             * as a named `SimSubRes3&`), `CCommandDb.cpp` and
+             * `IdPoolTypeInfo.cpp` (`.mSubRes2.Reset()` call sites) and
+             * deserves its own verified pass rather than a rushed edit here.
+             * The divergence is behaviourally inert either way (a redundant,
+             * always-safe 100x SBO check nothing currently exercises), which
+             * is why it is flagged rather than blocking this recovery.
+             *
+             * Reached from `erase_range`'s emission for this instantiation
+             * (`FUN_00687190`, cited below) via `erase(_First++)` in its
+             * general (non-whole-tree) loop branch -- the same "successor
+             * captured, old cursor erased" pattern documented on
+             * `rb_increment` throughout this file.
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -2842,6 +2953,51 @@ namespace msvc8
              * two-shape dispatch over a
              * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
              * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x00687190 (FUN_00687190, `erase(iterator, iterator)`
+             * for `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * mIdPoolTree` in `EntityDb.h`. Matches this member's two-shape
+             * split exactly: `cmp [first],[head->left] / cmp [last],[head]`
+             * gates the whole-tree fast path (`sub_688030` = `destroy_
+             * subtree`, cited above, on `head->parent`, then self-link
+             * `head`'s three fields and zero size), else `do { successor =
+             * rb_increment(cursor) via sub_6878C0; erase_node(cursor) via
+             * sub_687CC0; cursor = successor; } while (cursor != last)`
+             * (both cited above).
+             *
+             * Four real callers, all `[leftmost(), header())` -- always the
+             * whole-tree fast path:
+             *   - `0x006843B0` (`Moho::EntityDB::~EntityDB`, cited in full on
+             *     `~rb_tree()` above) -- `mIdPoolTree`'s implicit member
+             *     destruction, inlining `~rb_tree()`'s body but keeping this
+             *     call out-of-line.
+             *   - `0x00684310` (`sub_684310`, cited separately below, right
+             *     after `~rb_tree()`) -- `CEntityDb::CEntityDb`'s (0x00684230)
+             *     SEH unwind funclet for the already-constructed
+             *     `mIdPoolTree` member, should a later member's construction
+             *     throw. Sole caller confirmed via this pass's xref sweep
+             *     (`type=19` edge from 0x00684230, the same edge-type this
+             *     file already uses elsewhere for constructor-unwind
+             *     callers, e.g. `j_??0struct_sim_subres2@@QAE@@Z_0`'s
+             *     0x00403C50 caller of `SimSubRes2::Reset()`/0x00403E70).
+             *   - `0x00685850`/`0x00686660` -- byte-identical siblings of
+             *     `0x00684310` (same body: `erase_range(head->left, head)`
+             *     then `operator delete(head)` and zero head/size). Both are
+             *     already `skip` in `recovered_progress.json`, backed by an
+             *     exhaustive PE byte-scan (every rel32/rel8/absolute-dword
+             *     reference in `bin/2025.7.1` and `bin/external`) finding
+             *     zero incoming references of any kind -- genuinely
+             *     unreferenced compiler output (TUs built without `/Gy`/
+             *     `/OPT:REF` stripping it), not a source-mapped call site.
+             *     Left uncited/uninvoked here to match that verdict; noted
+             *     only so a future reader does not mistake the silence for
+             *     an unchecked gap.
+             *
+             * Reached in practice via `mIdPoolTree`'s membership in
+             * `CEntityDb` (`EntityDb.h`) -- `~CEntityDb()`'s implicit member
+             * destruction (`EntityDb.cpp`) is what triggers `~rb_tree()`,
+             * which is what calls this member.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {

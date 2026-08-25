@@ -1061,6 +1061,11 @@ namespace
    *          0x007BDD90 (FUN_007BDD90) - basic_vtable0<>::assign_to dispatcher
    *          0x007BEAA0 (FUN_007BEAA0) - basic_vtable0<>::assign_to(...,function_obj_tag)
    *          0x007BECE0 (FUN_007BECE0) - assign_functor() heap-allocation branch
+   *          0x007BF180 (FUN_007BF180) - list2<value<this>,value<string>>
+   *          copy-construction into the heap-allocated bind_t clone (raw
+   *          12-byte copy of the mf1<> + CGpgNetInterface* prefix, then a
+   *          real Dinkumware std::string copy-construct via assign() for
+   *          the trailing value<std::string> member)
    *
    * What it does:
    * Builds the callable handed to the launch-template connect worker thread.
@@ -1100,12 +1105,14 @@ namespace
    * parameter rather than silently reintroducing a conflicting `StrArg`
    * class here; the mismatch is a known, evidenced gap, not a guess.
    *
-   * `FUN_007BEAA0`'s heap-allocation call chain bottoms out in two already
-   * -recovered, ICF-shared leaves cited elsewhere and intentionally not
-   * re-claimed here: `FUN_007BF120` (checked `operator new` for the 40-byte
-   * `bind_t` object, `src/sdk/legacy/containers/Vector.cpp`) and
-   * `FUN_007BF180` (raw field-copy construction of the same 40-byte shape,
-   * `src/sdk/moho/misc/CrtRuntimeHelpers.cpp`).
+   * `FUN_007BEAA0`'s heap-allocation call chain bottoms out through
+   * `FUN_007BECE0` in one already-recovered, ICF-shared allocator leaf
+   * cited elsewhere and intentionally not re-claimed here: `FUN_007BF120`
+   * (checked `operator new` for the 40-byte `bind_t` object,
+   * `src/sdk/legacy/containers/Vector.cpp`). `FUN_007BF180` (the matching
+   * construction half, see the Address list above) belongs to this same
+   * chain -- an earlier DB-integrity pass mis-attributed it to
+   * `CrtRuntimeHelpers.cpp` with no real citation there; corrected here.
    */
   [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
