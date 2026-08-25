@@ -4,20 +4,40 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E36BC4
    * COL: 0x00E900F4
    */
-  class IEffectSerializer
+  class IEffectSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDCF00 (FUN_00BDCF00, register_IEffectSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list) and
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7IEffectSerializer@Moho@@6B@` -- no eager `Init()` call exists
+     * here. Its atexit target (0x00C020E0) is a plain unmangled free
+     * function doing a bare unlink with no prior recovered name; declaring
+     * a real destructor below is sufficient for the compiler to emit the
+     * same implicit static-destructor registration.
+     */
+    IEffectSerializer();
+
+    /**
+     * Address: 0x00C020E0 (FUN_00C020E0, Moho::IEffectSerializer::~IEffectSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~IEffectSerializer();
+
     /**
      * Address: 0x007712D0 (FUN_007712D0, gpg::SerSaveLoadHelper_IEffect::Init)
      *
@@ -28,7 +48,7 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into `IEffect` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
     /**
@@ -42,14 +62,10 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(IEffectSerializer, mHelperNext) == 0x04, "IEffectSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(IEffectSerializer, mHelperPrev) == 0x08, "IEffectSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(IEffectSerializer, mLoadCallback) == 0x0C, "IEffectSerializer::mLoadCallback offset must be 0x0C"
   );

@@ -1,6 +1,5 @@
 #include "moho/effects/rendering/IEffectSerializer.h"
 
-#include <cstdint>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -12,47 +11,6 @@
 
 namespace
 {
-  moho::IEffectSerializer gIEffectSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::IEffectSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(moho::IEffectSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00771240 (FUN_00771240)
-   *
-   * What it does:
-   * Unlinks startup `IEffectSerializer` helper links and rewires the node into
-   * one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIEffectSerializerNodeVariantA() noexcept
-  {
-    return UnlinkSerializerNode(gIEffectSerializer);
-  }
-
-  /**
-   * Address: 0x00771270 (FUN_00771270)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `IEffectSerializer` helper links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIEffectSerializerNodeVariantB() noexcept
-  {
-    return UnlinkSerializerNode(gIEffectSerializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     if (!moho::CScriptObject::sType) {
@@ -114,33 +72,41 @@ namespace
     archive->WriteInt(effect->mScriptObjectToken);
   }
 
-  /**
-   * Address: 0x007713B0 (FUN_007713B0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one `IEffect` serializer-save thunk alias into
-   * `FUN_00771450` serialize body.
-   */
-  void SerializeIEffectThunkVariantA(gpg::RRef* const, moho::IEffect* const effect, gpg::WriteArchive* const archive)
-  {
-    SerializeIEffectBody(effect, archive);
-  }
-
-  /**
-   * Address: 0x007713D0 (FUN_007713D0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second `IEffect` serializer-save thunk alias into
-   * `FUN_00771450` serialize body.
-   */
-  void SerializeIEffectThunkVariantB(gpg::RRef* const, moho::IEffect* const effect, gpg::WriteArchive* const archive)
-  {
-    SerializeIEffectBody(effect, archive);
-  }
+  // Address: 0x010BB514 -- process-global `IEffectSerializer` singleton.
+  // Constructing it runs IEffectSerializer::IEffectSerializer()
+  // (0x00BDCF00), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::IEffectSerializer gIEffectSerializer;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BDCF00 (FUN_00BDCF00, register_IEffectSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  IEffectSerializer::IEffectSerializer()
+    : mLoadCallback(&IEffectSerializer::Deserialize)
+    , mSaveCallback(&IEffectSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00C020E0 (FUN_00C020E0, Moho::IEffectSerializer::~IEffectSerializer)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  IEffectSerializer::~IEffectSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x007711E0 (FUN_007711E0, Moho::IEffectSerializer::Deserialize)
    *
@@ -176,7 +142,7 @@ namespace moho
    * void (__cdecl *__thiscall gpg::SerSaveLoadHelper_IEffect::Init(_DWORD *this))
    * (gpg::ReadArchive *, int, int, gpg::RRef *);
    */
-  void IEffectSerializer::RegisterSerializeFunctions()
+  void IEffectSerializer::Init()
   {
     gpg::RType* const type = IEffect::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
