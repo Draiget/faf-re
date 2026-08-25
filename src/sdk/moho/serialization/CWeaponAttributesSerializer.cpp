@@ -1,6 +1,5 @@
 #include "moho/serialization/CWeaponAttributesSerializer.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -16,14 +15,6 @@
 
 namespace
 {
-  using Serializer = moho::CWeaponAttributesSerializer;
-
-  [[nodiscard]] Serializer& GetCWeaponAttributesSerializer() noexcept
-  {
-    static Serializer serializer{};
-    return serializer;
-  }
-
   [[nodiscard]] gpg::RType* CachedCWeaponAttributesType()
   {
     static gpg::RType* cached = nullptr;
@@ -279,31 +270,6 @@ namespace
     WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] moho::RUnitBlueprintWeapon* ReadRUnitBlueprintWeaponPointer(
     gpg::ReadArchive* archive, const gpg::RRef& ownerRef
   )
@@ -338,39 +304,6 @@ namespace
     ref.mObj = value;
     ref.mType = CachedRUnitBlueprintWeaponType();
     return ref;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* CleanupCWeaponAttributesSerializerNode()
-  {
-    return UnlinkSerializerNode(GetCWeaponAttributesSerializer());
-  }
-
-  /**
-   * Address: 0x006D37E0 (FUN_006D37E0)
-   *
-   * What it does:
-   * Splices `CWeaponAttributesSerializer` out of its intrusive helper lane
-   * when linked, then rewires helper links to the serializer self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCWeaponAttributesSerializerHelperNodeVariantA() noexcept
-  {
-    return CleanupCWeaponAttributesSerializerNode();
-  }
-
-  /**
-   * Address: 0x006D3810 (FUN_006D3810)
-   *
-   * What it does:
-   * Secondary serializer helper unlink/reset variant sharing the same behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCWeaponAttributesSerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkCWeaponAttributesSerializerHelperNodeVariantA();
-  }
-
-  void cleanup_CWeaponAttributesSerializer_atexit()
-  {
-    (void)moho::cleanup_CWeaponAttributesSerializer();
   }
 
   /**
@@ -476,8 +409,8 @@ namespace
    * Address: 0x006DD2A0 (FUN_006DD2A0, serializer save thunk alias)
    *
    * What it does:
-   * Tail-forwards one CWeaponAttributes serialize thunk alias into the shared
-   * save body (`FUN_006DF180`).
+   * Tail-forwards one CWeaponAttributes serialize thunk alias into the
+   * shared save body (`FUN_006DF180`).
    */
   void SaveCWeaponAttributesThunkVariantA(
     moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
@@ -513,35 +446,31 @@ namespace
     auto* const attributes = reinterpret_cast<moho::CWeaponAttributes*>(objectPtr);
     SaveCWeaponAttributesBody_006DF180(attributes, archive);
   }
-
-  /**
-   * Address: 0x006D37B0 (FUN_006D37B0)
-   *
-   * What it does:
-   * Alternate serializer startup leaf that initializes global helper links,
-   * binds deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_CWeaponAttributesSerializer_StartupLeaf()
-  {
-    Serializer& serializer = GetCWeaponAttributesSerializer();
-    InitializeSerializerNode(serializer);
-    serializer.mDeserialize = &LoadCWeaponAttributes;
-    serializer.mSerialize = &SaveCWeaponAttributes;
-    return SerializerSelfNode(serializer);
-  }
-
-  int RegisterCWeaponAttributesSerializerStartup()
-  {
-    Serializer& serializer = GetCWeaponAttributesSerializer();
-    (void)construct_CWeaponAttributesSerializer_StartupLeaf();
-    serializer.mDeserialize = &LoadCWeaponAttributes;
-    serializer.mSerialize = &SaveCWeaponAttributes;
-    return std::atexit(&cleanup_CWeaponAttributesSerializer_atexit);
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BD87D0 (FUN_00BD87D0, dynamic initializer for the global
+   * `CWeaponAttributesSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  CWeaponAttributesSerializer::CWeaponAttributesSerializer()
+    : mDeserialize(&CWeaponAttributesSerializer::Deserialize)
+    , mSerialize(&CWeaponAttributesSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BFE5F0 (FUN_00BFE5F0, Moho::CWeaponAttributesSerializer::~CWeaponAttributesSerializer)
+   */
+  CWeaponAttributesSerializer::~CWeaponAttributesSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
     * Alias of FUN_006D3780 (non-canonical helper lane).
    */
@@ -565,7 +494,7 @@ namespace moho
   /**
    * Address: 0x006DB4C0 (FUN_006DB4C0, Moho::CWeaponAttributesSerializer::RegisterSerializeFunctions)
    */
-  void CWeaponAttributesSerializer::RegisterSerializeFunctions()
+  void CWeaponAttributesSerializer::Init()
   {
     gpg::RType* const type = CachedCWeaponAttributesType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -573,20 +502,10 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, serializer helper unlink cleanup)
-   */
-  gpg::SerHelperBase* cleanup_CWeaponAttributesSerializer()
-  {
-    return UnlinkCWeaponAttributesSerializerHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, startup registration + atexit cleanup)
-   */
-  int register_CWeaponAttributesSerializer()
-  {
-    return RegisterCWeaponAttributesSerializerStartup();
-  }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010B7C70 -- process-global `CWeaponAttributesSerializer` singleton.
+  moho::CWeaponAttributesSerializer gCWeaponAttributesSerializer;
+} // namespace

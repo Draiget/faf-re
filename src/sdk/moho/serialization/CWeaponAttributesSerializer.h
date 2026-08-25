@@ -4,20 +4,38 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E2E228
    * COL: 0x00E87EDC
    */
-  class CWeaponAttributesSerializer
+  class CWeaponAttributesSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD87D0 (FUN_00BD87D0, dynamic initializer for the global
+     * `CWeaponAttributesSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CWeaponAttributesSerializer();
+
+    /**
+     * Address: 0x00BFE5F0 (FUN_00BFE5F0, Moho::CWeaponAttributesSerializer::~CWeaponAttributesSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. The ctor's atexit
+     * target has no mangled name in the binary (a plain unlink thunk, not a
+     * `??1...` symbol), so it is modeled as the compiler's implicit
+     * static-destructor registration rather than an explicit free-function
+     * atexit call.
+     */
+    ~CWeaponAttributesSerializer();
+
     /**
       * Alias of FUN_006D3780 (non-canonical helper lane).
      *
@@ -40,21 +58,13 @@ namespace moho
      * What it does:
      * Binds `CWeaponAttributes` RTTI load/save callbacks.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CWeaponAttributesSerializer, mHelperNext) == 0x04, "CWeaponAttributesSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CWeaponAttributesSerializer, mHelperPrev) == 0x08, "CWeaponAttributesSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CWeaponAttributesSerializer, mDeserialize) == 0x0C, "CWeaponAttributesSerializer::mDeserialize offset must be 0x0C"
   );
@@ -62,20 +72,4 @@ namespace moho
     offsetof(CWeaponAttributesSerializer, mSerialize) == 0x10, "CWeaponAttributesSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(CWeaponAttributesSerializer) == 0x14, "CWeaponAttributesSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, serializer helper unlink cleanup)
-   *
-   * What it does:
-   * Unlinks `CWeaponAttributesSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_CWeaponAttributesSerializer();
-
-  /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, startup registration + atexit cleanup)
-   *
-   * What it does:
-   * Initializes and registers `CWeaponAttributes` serializer callbacks.
-   */
-  int register_CWeaponAttributesSerializer();
 } // namespace moho
