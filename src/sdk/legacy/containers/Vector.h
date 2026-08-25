@@ -5401,6 +5401,20 @@ namespace msvc8
          * `GenerateNewBlips`/`UpdateBlips`, `CAiReconDBImpl.h`/`.cpp`) had
          * drifted to real `std::vector<SNewBlip>`, which would not emit this
          * symbol on rebuild; retyped to `msvc8::vector<SNewBlip>` to match.)
+         * Address: 0x005C6190 (FUN_005C6190, sub_5C6190) -- this
+         * instantiation's own `_Ufill` advance-returning adapter: `sub_5CBC70
+         * (dst@edi, srcValue@edx, count@esi); return &dst[3*count];`, the
+         * same "wrap the core fill loop, return `dst + n*sizeof(T)`" shape
+         * as `FUN_0092E920`/`FUN_0092EB70`/`FUN_006274B0` elsewhere in this
+         * file, wrapping the already-cited `uninit_fill_n` above with a
+         * variable `count` (not hardcoded to 1 the way `AppendPendingNewBlip`'s
+         * fast path uses it) -- matches `insert(pos, count, value)`'s
+         * reallocation-path tail-fill sub-branch for this instantiation.
+         * Stale in_progress claim (crt2-batch-3, 24h+, abandoned) reclaimed;
+         * its traced caller's own `recovered` status is itself unsupported
+         * (no citation anywhere in `src/sdk`) so cited here strictly against
+         * this member's own confirmed shape and the already-verified callee,
+         * not against that specific caller.)
          *
          * Address: 0x0092D0A0 (FUN_0092D0A0, `msvc8::vector<gpg::HaStar::
          * ClusterSearchEdgeTraversalLaneRuntime>::uninit_fill_n` for the
