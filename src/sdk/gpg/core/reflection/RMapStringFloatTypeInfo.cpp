@@ -9,6 +9,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "legacy/containers/Map.h"
 
 namespace
 {
@@ -98,7 +99,7 @@ namespace gpg
   msvc8::string RMapStringFloatTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
-    const auto* const map = static_cast<const std::map<std::string, float>*>(ref.mObj);
+    const auto* const map = static_cast<const msvc8::map<msvc8::string, float>*>(ref.mObj);
     const int size = map ? static_cast<int>(map->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
@@ -116,7 +117,7 @@ namespace gpg
       return;
     }
 
-    auto* const destination = reinterpret_cast<std::map<std::string, float>*>(objectPtr);
+    auto* const destination = reinterpret_cast<msvc8::map<msvc8::string, float>*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
@@ -126,7 +127,7 @@ namespace gpg
       float value = 0.0f;
       archive->ReadString(&key);
       archive->ReadFloat(&value);
-      (*destination)[key.c_str()] = value;
+      (*destination)[key] = value;
     }
   }
 
@@ -142,7 +143,7 @@ namespace gpg
       return;
     }
 
-    const auto* const source = reinterpret_cast<const std::map<std::string, float>*>(objectPtr);
+    const auto* const source = reinterpret_cast<const msvc8::map<msvc8::string, float>*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
 
@@ -151,7 +152,7 @@ namespace gpg
     }
 
     for (const auto& entry : *source) {
-      msvc8::string key(entry.first.c_str());
+      msvc8::string key(entry.first);
       archive->WriteString(&key);
       archive->WriteFloat(entry.second);
     }

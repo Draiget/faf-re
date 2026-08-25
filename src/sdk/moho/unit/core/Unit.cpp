@@ -846,9 +846,6 @@ namespace
   constexpr const char* kCreateUnitHPRHelpText = "blueprint, army, x, y, z, pitch, yaw, roll";
   constexpr const char* kUnitGetArmorMultName = "GetArmorMult";
   constexpr const char* kUnitGetArmorMultHelpText = "mult = Unit:GetArmorMult(damageTypeName)";
-  constexpr std::uint8_t kArmorMapColorRed = 0u;
-  constexpr std::uint8_t kArmorMapColorBlack = 1u;
-  constexpr std::uint32_t kArmorMapMaxSize = 0x07FFFFFEu;
   constexpr const char* kUnitClearFocusEntityName = "ClearFocusEntity";
   constexpr const char* kUnitClearFocusEntityHelpText = "ClearFocusEntity(self)";
   constexpr const char* kUnitSetFocusEntityName = "SetFocusEntity";
@@ -1950,380 +1947,24 @@ namespace
   }
 
   /**
-   * Address: 0x006ADD30 (FUN_006ADD30, func_hasArmorType)
+   * `Unit::ArmorMultipliers`'s red-black tree mechanics (lower-bound descent,
+   * hinted/unique insert, node buy/link/rebalance, subtree teardown) are no
+   * longer hand-rolled here (RULE ONE: container/template internals are
+   * recovered once, generically, on the container template itself, never as
+   * a per-type free-function reimplementation).
    *
-   * What it does:
-   * Performs one lower-bound lookup in the unit armor-multiplier map and
-   * returns the exact key-match node when present.
+   * `ArmorMultipliers` is now a real `msvc8::map<msvc8::string, float>` (see
+   * the field's doc comment in `Unit.h`). Real callers use its API directly:
+   * `.find()` (`Unit::ProcessArmorOnDamage`, `Unit::GetArmorMult`) and
+   * `operator[]` (`Unit::InitializeArmor`, `cfunc_UnitAlterArmorL`, below).
+   * The generic tree internals those calls compile down to
+   * (`find`/`operator[]` in `legacy/containers/Map.h`; `lower_bound_node`/
+   * `insert_hint`/`insert_unique`/`insert_at`/`buy_head`/`buy_node` in
+   * `legacy/containers/RbTree.h`) carry this instantiation's own `Address:`
+   * citations (0x006ADD30/0x006ADBF0/0x006AEDD0/0x006AF840/0x006AFA40/
+   * 0x006AFBF0/0x006B01C0/0x006B0200) alongside every other `msvc8::map`
+   * instantiation already documented there.
    */
-  [[nodiscard]] bool IsArmorMapSentinel(const SArmorMultiplierMapNode* const node) noexcept
-  {
-    return node == nullptr || node->isNil != 0u;
-  }
-
-  /**
-   * Address: 0x00736760 (FUN_00736760)
-   *
-   * What it does:
-   * Advances one armor-multiplier map node cursor to the next in-order
-   * sentinel-tree node and writes the advanced node back to the caller lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode*
-  AdvanceArmorMultiplierNodeCursor(SArmorMultiplierMapNode*& cursor) noexcept
-  {
-    if (IsArmorMapSentinel(cursor)) {
-      return cursor;
-    }
-
-    SArmorMultiplierMapNode* rightNode = cursor->right;
-    if (rightNode == nullptr) {
-      cursor = nullptr;
-      return cursor;
-    }
-
-    if (rightNode->isNil != 0u) {
-      for (SArmorMultiplierMapNode* parent = cursor->parent; parent != nullptr && parent->isNil == 0u; parent = parent->parent)
-      {
-        if (cursor != parent->right) {
-          cursor = parent;
-          return cursor;
-        }
-        cursor = parent;
-      }
-      cursor = (cursor != nullptr) ? cursor->parent : nullptr;
-      return cursor;
-    }
-
-    SArmorMultiplierMapNode* next = rightNode->left;
-    while (next != nullptr && next->isNil == 0u) {
-      rightNode = next;
-      next = next->left;
-    }
-
-    cursor = rightNode;
-    return cursor;
-  }
-
-  /**
-   * Address: 0x00736320 (FUN_00736320)
-   *
-   * What it does:
-   * Adapter lane that advances one armor-multiplier node cursor slot and
-   * returns the slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode** AdvanceArmorMultiplierNodeCursorSlotAdapter(
-    const std::uint32_t /*laneTag*/,
-    SArmorMultiplierMapNode** const cursorSlot
-  ) noexcept
-  {
-    (void)AdvanceArmorMultiplierNodeCursor(*cursorSlot);
-    return cursorSlot;
-  }
-
-  /**
-   * Address: 0x00736330 (FUN_00736330)
-   *
-   * What it does:
-   * Copies one armor-multiplier cursor slot into `destinationCursorSlot`, then
-   * advances the source slot to the next in-order node.
-   */
-  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode** CopyAndAdvanceArmorMultiplierNodeCursorSlot(
-    SArmorMultiplierMapNode** const sourceCursorSlot,
-    SArmorMultiplierMapNode** const destinationCursorSlot
-  ) noexcept
-  {
-    *destinationCursorSlot = *sourceCursorSlot;
-    (void)AdvanceArmorMultiplierNodeCursor(*sourceCursorSlot);
-    return destinationCursorSlot;
-  }
-
-  [[nodiscard]] bool ArmorTypeNameLess(const msvc8::string& lhs, const std::string_view rhs) noexcept
-  {
-    return lhs.view() < rhs;
-  }
-
-  [[nodiscard]] bool ArmorTypeNameLess(const std::string_view lhs, const msvc8::string& rhs) noexcept
-  {
-    return lhs < rhs.view();
-  }
-
-  /**
-   * Address: 0x006AEF60 (FUN_006AEF60, MSVC8 map tree erase helper)
-   *
-   * What it does:
-   * Erases armor-multiplier map nodes in the same right/current/left order
-   * used by the recovered map teardown lane.
-   */
-  void DestroyArmorMultiplierMapSubtree(
-    SArmorMultiplierMapNode* node,
-    const SArmorMultiplierMapNode* const head
-  ) noexcept
-  {
-    while (!IsArmorMapSentinel(node) && node != head) {
-      DestroyArmorMultiplierMapSubtree(node->right, head);
-      SArmorMultiplierMapNode* const left = node->left;
-      node->damageTypeName.tidy(true, 0u);
-      ::operator delete(node);
-      node = left;
-    }
-  }
-
-  /**
-   * Address: 0x006A5380 (FUN_006A5380, armor-multiplier map teardown)
-   *
-   * IDA signature:
-   * int __usercall sub_6A5380@<eax>(std::map_string_float *a1@<eax>);
-   *
-   * What it does:
-   * Destroys the `Unit::ArmorMultipliers` tree, releases its sentinel head
-   * node, then clears the map head/count lanes.
-   */
-  [[nodiscard]] std::int32_t DestroyArmorMultiplierMapStorage(
-    SArmorMultiplierMap& armorMap
-  ) noexcept
-  {
-    SArmorMultiplierMapNode* const head = armorMap.head;
-    if (head != nullptr) {
-      DestroyArmorMultiplierMapSubtree(head->parent, head);
-      ::operator delete(head);
-    }
-
-    armorMap.head = nullptr;
-    armorMap.size = 0u;
-    return 0;
-  }
-
-  [[nodiscard]] const SArmorMultiplierMapNode*
-  FindArmorLowerBoundNode(const SArmorMultiplierMap& armorMap, const std::string_view damageTypeName) noexcept
-  {
-    const SArmorMultiplierMapNode* const head = armorMap.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const SArmorMultiplierMapNode* candidate = head;
-    for (const SArmorMultiplierMapNode* node = head->parent; !IsArmorMapSentinel(node);) {
-      if (ArmorTypeNameLess(node->damageTypeName, damageTypeName)) {
-        node = node->right;
-      } else {
-        candidate = node;
-        node = node->left;
-      }
-    }
-
-    return candidate;
-  }
-
-  [[nodiscard]] const SArmorMultiplierMapNode*
-  FindArmorMultiplierNode(const SArmorMultiplierMap& armorMap, const std::string_view damageTypeName) noexcept
-  {
-    const SArmorMultiplierMapNode* const candidate = FindArmorLowerBoundNode(armorMap, damageTypeName);
-    if (candidate == nullptr) {
-      return nullptr;
-    }
-
-    const SArmorMultiplierMapNode* const head = armorMap.head;
-    if (candidate == head) {
-      return nullptr;
-    }
-
-    if (ArmorTypeNameLess(damageTypeName, candidate->damageTypeName) ||
-        ArmorTypeNameLess(candidate->damageTypeName, damageTypeName)) {
-      return nullptr;
-    }
-
-    return candidate;
-  }
-
-  void RotateArmorMapLeft(SArmorMultiplierMap& armorMap, SArmorMultiplierMapNode* const node) noexcept
-  {
-    SArmorMultiplierMapNode* const replacement = node->right;
-    node->right = replacement->left;
-    if (!IsArmorMapSentinel(replacement->left)) {
-      replacement->left->parent = node;
-    }
-
-    replacement->parent = node->parent;
-
-    SArmorMultiplierMapNode* const head = armorMap.head;
-    if (node == head->parent) {
-      head->parent = replacement;
-    } else if (node == node->parent->left) {
-      node->parent->left = replacement;
-    } else {
-      node->parent->right = replacement;
-    }
-
-    replacement->left = node;
-    node->parent = replacement;
-  }
-
-  void RotateArmorMapRight(SArmorMultiplierMap& armorMap, SArmorMultiplierMapNode* const node) noexcept
-  {
-    SArmorMultiplierMapNode* const replacement = node->left;
-    node->left = replacement->right;
-    if (!IsArmorMapSentinel(replacement->right)) {
-      replacement->right->parent = node;
-    }
-
-    replacement->parent = node->parent;
-
-    SArmorMultiplierMapNode* const head = armorMap.head;
-    if (node == head->parent) {
-      head->parent = replacement;
-    } else if (node == node->parent->right) {
-      node->parent->right = replacement;
-    } else {
-      node->parent->left = replacement;
-    }
-
-    replacement->right = node;
-    node->parent = replacement;
-  }
-
-  void RebalanceArmorMapAfterInsert(SArmorMultiplierMap& armorMap, SArmorMultiplierMapNode* insertedNode) noexcept
-  {
-    SArmorMultiplierMapNode* const head = armorMap.head;
-    while (insertedNode->parent->color == kArmorMapColorRed) {
-      if (insertedNode->parent == insertedNode->parent->parent->left) {
-        SArmorMultiplierMapNode* const uncle = insertedNode->parent->parent->right;
-        if (uncle->color == kArmorMapColorRed) {
-          insertedNode->parent->color = kArmorMapColorBlack;
-          uncle->color = kArmorMapColorBlack;
-          insertedNode->parent->parent->color = kArmorMapColorRed;
-          insertedNode = insertedNode->parent->parent;
-        } else {
-          if (insertedNode == insertedNode->parent->right) {
-            insertedNode = insertedNode->parent;
-            RotateArmorMapLeft(armorMap, insertedNode);
-          }
-          insertedNode->parent->color = kArmorMapColorBlack;
-          insertedNode->parent->parent->color = kArmorMapColorRed;
-          RotateArmorMapRight(armorMap, insertedNode->parent->parent);
-        }
-      } else {
-        SArmorMultiplierMapNode* const uncle = insertedNode->parent->parent->left;
-        if (uncle->color == kArmorMapColorRed) {
-          insertedNode->parent->color = kArmorMapColorBlack;
-          uncle->color = kArmorMapColorBlack;
-          insertedNode->parent->parent->color = kArmorMapColorRed;
-          insertedNode = insertedNode->parent->parent;
-        } else {
-          if (insertedNode == insertedNode->parent->left) {
-            insertedNode = insertedNode->parent;
-            RotateArmorMapRight(armorMap, insertedNode);
-          }
-          insertedNode->parent->color = kArmorMapColorBlack;
-          insertedNode->parent->parent->color = kArmorMapColorRed;
-          RotateArmorMapLeft(armorMap, insertedNode->parent->parent);
-        }
-      }
-    }
-    head->parent->color = kArmorMapColorBlack;
-  }
-
-  /**
-   * Address: 0x006B01C0 (FUN_006B01C0)
-   *
-   * IDA signature:
-   * struct_13 *__cdecl sub_6B01C0();
-   *
-   * What it does:
-   * Allocates one 48-byte armor-multiplier map node through the legacy
-   * 48-byte allocation lane, zeroes the RB-tree link triplet, and seeds
-   * `color = black`, `isNil = 0`. Callers (`Unit::Unit`, `Unit::Unit(Sim*)`,
-   * and the per-instance map sub-init lane) finish converting it into a
-   * sentinel head by setting `isNil = 1` and self-linking the triplet.
-   * Matches the MSVC8 `std::map<std::string,float>::_Buynode()` allocator
-   * shape: only the binary-touched fields are written; the embedded string
-   * key region is left uninitialized to mirror the binary, paired with
-   * `::operator delete` teardown in `DestroyArmorMultiplierMapStorage`.
-   */
-  [[nodiscard]] SArmorMultiplierMapNode* AllocateArmorMultiplierMapNodeRaw() noexcept
-  {
-    auto* const node = static_cast<SArmorMultiplierMapNode*>(
-      gpg::core::legacy::AllocateChecked48ByteLane(1u)
-    );
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = kArmorMapColorBlack;
-    node->isNil = 0u;
-    return node;
-  }
-
-  [[nodiscard]] SArmorMultiplierMapNode* CreateArmorMultiplierMapNode(
-    SArmorMultiplierMapNode* const head,
-    SArmorMultiplierMapNode* const parent,
-    const std::string_view damageTypeName
-  )
-  {
-    auto* const node = new SArmorMultiplierMapNode{};
-    try {
-      node->damageTypeName.assign_owned(damageTypeName);
-    } catch (...) {
-      delete node;
-      throw;
-    }
-
-    node->left = head;
-    node->parent = parent;
-    node->right = head;
-    node->armorMultiplier = 0.0f;
-    node->color = kArmorMapColorRed;
-    node->isNil = 0u;
-    node->reserved = 0u;
-    return node;
-  }
-
-  [[nodiscard]] float*
-  FindOrInsertArmorMultiplierValue(SArmorMultiplierMap& armorMap, const std::string_view damageTypeName)
-  {
-    SArmorMultiplierMapNode* const head = armorMap.head;
-    SArmorMultiplierMapNode* parent = head;
-    SArmorMultiplierMapNode* node = head->parent;
-    bool insertLeft = true;
-
-    while (!IsArmorMapSentinel(node)) {
-      parent = node;
-      if (ArmorTypeNameLess(damageTypeName, node->damageTypeName)) {
-        insertLeft = true;
-        node = node->left;
-      } else if (ArmorTypeNameLess(node->damageTypeName, damageTypeName)) {
-        insertLeft = false;
-        node = node->right;
-      } else {
-        return &node->armorMultiplier;
-      }
-    }
-
-    if (armorMap.size >= kArmorMapMaxSize) {
-      throw std::length_error("map/set<T> too long");
-    }
-
-    SArmorMultiplierMapNode* const inserted = CreateArmorMultiplierMapNode(head, parent, damageTypeName);
-    ++armorMap.size;
-
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-    } else if (insertLeft) {
-      parent->left = inserted;
-      if (parent == head->left) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (parent == head->right) {
-        head->right = inserted;
-      }
-    }
-
-    RebalanceArmorMapAfterInsert(armorMap, inserted);
-    return &inserted->armorMultiplier;
-  }
-
 
   struct UnitAttributesBuildRestrictionRuntimeView
   {
@@ -3257,7 +2898,7 @@ int moho::cfunc_UnitAlterArmorL(LuaPlus::LuaState* const state)
     damageTypeArg.TypeError("string");
     damageTypeName = "";
   }
-  const std::string armorTypeName(damageTypeName);
+  const msvc8::string armorTypeName(damageTypeName);
 
   const LuaPlus::LuaStackObject armorMultiplierArg(state, 3);
   if (lua_type(rawState, 3) != LUA_TNUMBER) {
@@ -3265,7 +2906,7 @@ int moho::cfunc_UnitAlterArmorL(LuaPlus::LuaState* const state)
   }
   const float armorMultiplier = lua_tonumber(rawState, 3);
 
-  *FindOrInsertArmorMultiplierValue(unit->ArmorMultipliers, std::string_view(armorTypeName)) = armorMultiplier;
+  unit->ArmorMultipliers[armorTypeName] = armorMultiplier;
   return 0;
 }
 
@@ -13619,14 +13260,11 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   FootprintDown = false;
   TransportLoadFactor = -1.0f;
 
-  // Armor-multiplier map: allocate the sentinel head node and self-link it.
-  SArmorMultiplierMapNode* const armorHead = AllocateArmorMultiplierMapNodeRaw();
-  ArmorMultipliers.head = armorHead;
-  armorHead->isNil = 1;
-  armorHead->parent = armorHead;
-  armorHead->left = armorHead;
-  armorHead->right = armorHead;
-  ArmorMultipliers.size = 0;
+  // ArmorMultipliers (msvc8::map<msvc8::string,float>) self-constructs its
+  // sentinel head via its own default constructor (member init) -- see
+  // legacy/containers/RbTree.h's buy_head(), cited for this instantiation
+  // (0x006B01C0) exactly where the binary's manual head-alloc-and-self-link
+  // used to be modeled by hand here.
 
   // mEconomyEventListHead self-links via its TDatListItem ctor (member init).
 
@@ -13766,13 +13404,9 @@ Unit::Unit(const SUnitConstructionParams& params)
   FootprintDown = false;
   TransportLoadFactor = -1.0f;
 
-  SArmorMultiplierMapNode* const armorHead = AllocateArmorMultiplierMapNodeRaw();
-  ArmorMultipliers.head = armorHead;
-  armorHead->isNil = 1;
-  armorHead->parent = armorHead;
-  armorHead->left = armorHead;
-  armorHead->right = armorHead;
-  ArmorMultipliers.size = 0;
+  // ArmorMultipliers (msvc8::map<msvc8::string,float>) self-constructs its
+  // sentinel head via its own default constructor (member init); see the
+  // sibling constructor above for the full citation.
 
   CurrentTerrainType = 0;
   mDebugAIStates = false;
@@ -14063,7 +13697,10 @@ Unit::~Unit()
   }
 
   ClearUnitOwnedSidecars(*this);
-  (void)DestroyArmorMultiplierMapStorage(ArmorMultipliers);
+  // ArmorMultipliers (msvc8::map<msvc8::string,float>) tears itself down via
+  // its own destructor (member teardown, reverse declaration order) -- see
+  // legacy/containers/RbTree.h's ~rb_tree()/destroy_subtree, matching the
+  // binary's 0x006A5380 teardown shape this used to hand-model.
   ClearGuardFormation(this);
   DestroyUnitEconomyEvents(*this);
   ReleaseOccupyGround();
@@ -15101,7 +14738,7 @@ void Unit::InitializeArmor()
     }
 
     const float armorMultiplier = static_cast<float>(std::atof(definitionCursor));
-    *FindOrInsertArmorMultiplierValue(ArmorMultipliers, std::string_view(damageTypeName.c_str())) = armorMultiplier;
+    ArmorMultipliers[damageTypeName] = armorMultiplier;
   }
 }
 
@@ -15115,10 +14752,8 @@ void Unit::InitializeArmor()
 float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageType) const
 {
   float scaledAmount = amount;
-  if (const SArmorMultiplierMapNode* const match =
-        FindArmorMultiplierNode(ArmorMultipliers, std::string_view(damageType.c_str()));
-      match != nullptr) {
-    scaledAmount *= match->armorMultiplier;
+  if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
+    scaledAmount *= match->second;
   }
 
   return scaledAmount;
@@ -15133,10 +14768,8 @@ float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageT
  */
 float Unit::GetArmorMult(const msvc8::string& damageType) const
 {
-  if (const SArmorMultiplierMapNode* const match =
-        FindArmorMultiplierNode(ArmorMultipliers, std::string_view(damageType.c_str()));
-      match != nullptr) {
-    return match->armorMultiplier;
+  if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
+    return match->second;
   }
 
   return 1.0f;

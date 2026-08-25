@@ -1,14 +1,30 @@
 #pragma once
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Map.h"
 
 namespace gpg
 {
   /**
-   * Reflection descriptor for `std::map<std::string,float>`.
+   * Reflection descriptor for `std::map<std::string,float>` (the shipped
+   * binary's real Dinkumware `std::_Tree` instantiation).
    *
    * VFTABLE: `gpg::RMapType<std::string,float>`
    * COL: from startup lane around `FUN_006B16B0`.
+   *
+   * `objectPtr` in `SerLoad`/`SerSave`/`GetLexical` below is reinterpreted as
+   * `msvc8::map<msvc8::string, float>*` -- the project's MSVC8-ABI-exact
+   * `std::map` reimplementation, not the modern toolchain's real `std::map`
+   * (whose layout differs under iterator-debug-enabled Debug builds and
+   * would misinterpret this field's actual 12-byte `{proxy,_Myhead,
+   * _Mysize}` bytes). Every field this descriptor is reached for (currently
+   * only `Unit::ArmorMultipliers`, `moho/unit/core/Unit.h`) is declared as
+   * `msvc8::map<msvc8::string, float>` for exactly this reason. The
+   * `typeid(std::map<std::string, float>)` used for RTTI
+   * registration/lookup (`register_MapStringFloat_Type_00` below) is a
+   * separate, purely compile-time type tag -- it is never used to interpret
+   * `objectPtr`'s bytes, so it does not need to (and does not) match the
+   * real storage type.
    */
   class RMapStringFloatTypeInfo final : public gpg::RType
   {

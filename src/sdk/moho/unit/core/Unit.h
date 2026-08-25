@@ -16,6 +16,7 @@
 #include "gpg/core/containers/String.h"
 #include "IUnit.h"
 #include "UnitAttributes.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
@@ -309,65 +310,6 @@ namespace moho
     offsetof(SInfoCache, mFormationHeadingHint) == 0x1C, "SInfoCache::mFormationHeadingHint offset must be 0x1C"
   );
   static_assert(sizeof(SInfoCache) == 0x28, "SInfoCache size must be 0x28");
-
-  /**
-   * Runtime RB-tree node payload used by unit armor-multiplier map lanes.
-   *
-   * Evidence:
-   * - func_hasArmorType (0x006ADD30) reads key lane via node+0x10 and value at
-   *   node+0x28.
-   * - sub_6B0200 (0x006B0200) initializes RB-tree color/isNil bytes at
-   *   node+0x2C/node+0x2D for inserted nodes (color=red, isNil=0).
-   * - sub_6B01C0 (0x006B01C0) allocates one 48-byte node via the legacy
-   *   48-byte lane and seeds the head sentinel pre-state (color=black,
-   *   isNil=0) before the caller flips isNil and self-links the triplet.
-   */
-  struct SArmorMultiplierMapNode
-  {
-    SArmorMultiplierMapNode* left; // +0x00
-    SArmorMultiplierMapNode* parent; // +0x04
-    SArmorMultiplierMapNode* right; // +0x08
-    msvc8::string damageTypeName; // +0x0C
-    float armorMultiplier; // +0x28
-    std::uint8_t color; // +0x2C (0=red, 1=black)
-    std::uint8_t isNil; // +0x2D (1 for sentinel/head)
-    std::uint16_t reserved; // +0x2E
-  };
-  static_assert(offsetof(SArmorMultiplierMapNode, left) == 0x00, "SArmorMultiplierMapNode::left offset must be 0x00");
-  static_assert(
-    offsetof(SArmorMultiplierMapNode, parent) == 0x04, "SArmorMultiplierMapNode::parent offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SArmorMultiplierMapNode, right) == 0x08, "SArmorMultiplierMapNode::right offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SArmorMultiplierMapNode, damageTypeName) == 0x0C,
-    "SArmorMultiplierMapNode::damageTypeName offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SArmorMultiplierMapNode, armorMultiplier) == 0x28,
-    "SArmorMultiplierMapNode::armorMultiplier offset must be 0x28"
-  );
-  static_assert(offsetof(SArmorMultiplierMapNode, color) == 0x2C, "SArmorMultiplierMapNode::color offset must be 0x2C");
-  static_assert(offsetof(SArmorMultiplierMapNode, isNil) == 0x2D, "SArmorMultiplierMapNode::isNil offset must be 0x2D");
-  static_assert(sizeof(SArmorMultiplierMapNode) == 0x30, "SArmorMultiplierMapNode size must be 0x30");
-
-  /**
-   * Runtime map lane (`std::map<std::string,float>`) embedded in `Unit`.
-   *
-   * Evidence:
-   * - cfunc_UnitGetArmorMultL (0x006C4200) passes `this+0x568` as map lane.
-   * - func_hasArmorType (0x006ADD30) reads sentinel head from map+0x04.
-   */
-  struct SArmorMultiplierMap
-  {
-    void* treeMeta;                // +0x00 (allocator/comparator payload lane)
-    SArmorMultiplierMapNode* head; // +0x04 (sentinel/end node)
-    std::uint32_t size;            // +0x08
-  };
-  static_assert(sizeof(SArmorMultiplierMap) == 0x0C, "SArmorMultiplierMap size must be 0x0C");
-  static_assert(offsetof(SArmorMultiplierMap, head) == 0x04, "SArmorMultiplierMap::head offset must be 0x04");
-  static_assert(offsetof(SArmorMultiplierMap, size) == 0x08, "SArmorMultiplierMap::size offset must be 0x08");
 
   /**
    * Reflection type in RTTI: Moho::SSTIUnitConstantData
@@ -2163,7 +2105,27 @@ namespace moho
     bool FootprintDown;                              // 0x0560
     char pad_0561[0x03];                             // 0x0561
     float TransportLoadFactor;                       // 0x0564
-    SArmorMultiplierMap ArmorMultipliers;            // 0x0568
+    /**
+     * Per-unit damage-type armor multiplier lookup (`std::map<std::string,
+     * float>` in the shipped binary; modeled here as `msvc8::map`, the
+     * project's MSVC8-ABI-exact `std::map` reimplementation).
+     *
+     * Evidence:
+     * - `cfunc_UnitGetArmorMultL` (0x006C4200) passes `this+0x568` as the map
+     *   lane, matching this field's offset exactly.
+     * - `Unit::InitializeArmor` (0x006A7B90), `Unit::ProcessArmorOnDamage`
+     *   (0x006A9D60) and `Unit::GetArmorMult` (0x006A9E10) all operate on
+     *   this same lane; see their bodies below for the real API call sites
+     *   (`find()`/`operator[]`) and `legacy/containers/{Map,RbTree}.h` for
+     *   the generic template-internal citations for this instantiation.
+     * - Node layout (48 bytes: 12-byte link triplet, 28-byte `msvc8::string`
+     *   key at +0x0C, `float` value at +0x28, color/isNil at +0x2C/+0x2D)
+     *   and container layout (12-byte `{proxy,_Myhead,_Mysize}` triplet)
+     *   match `msvc8::map<msvc8::string,float>` exactly -- see
+     *   `legacy/containers/Map.h`'s class doc comment for the shared layout
+     *   derivation (confirmed independently via `Moho::CCommandDb::commands`).
+     */
+    msvc8::map<msvc8::string, float> ArmorMultipliers; // 0x0568
     TDatListItem<void, void> mEconomyEventListHead;  // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
     bool mDebugAIStates;                             // 0x057D
@@ -2222,6 +2184,9 @@ namespace moho
     offsetof(Unit, ReservedOgridRectMaxZ) == 0x05B4, "Unit::ReservedOgridRectMaxZ offset must be 0x05B4"
   );
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
+  static_assert(
+    sizeof(msvc8::map<msvc8::string, float>) == 0x0C, "Unit::ArmorMultipliers (msvc8::map) size must be 0x0C"
+  );
   static_assert(
     offsetof(Unit, TransportLoadFactor) == 0x0564, "Unit::TransportLoadFactor offset must be 0x0564"
   );
