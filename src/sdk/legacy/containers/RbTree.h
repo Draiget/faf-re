@@ -2461,6 +2461,17 @@ namespace msvc8
              * `FUN_008D4ED0`/`FUN_008D58F0` (sibling adapter-setup
              * functions using the same local-tree pattern, not yet
              * individually traced).
+             *
+             * Address: 0x0077BD90 (FUN_0077BD90, sub_77BD90) -- CDecalBuffer's
+             * start-tick outer table's `erase_range` (`std::map<unsigned,
+             * std::set<CDecalHandle*>>`, isNil@+29, 0x20 outer node --
+             * see this file's own note on the CDecalBuffer start-tick family
+             * elsewhere). Whole-range fast path calls `sub_77CFE0`
+             * (`destroy_subtree`, this same instantiation); walk path calls
+             * `sub_77A3C0` -- CORRECTED elsewhere in this file from a
+             * mis-labeled "insert with rebalance" note to its real role,
+             * `erase_node` (see that citation, above the `insert_at`
+             * cluster it was previously filed under).
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -2986,8 +2997,15 @@ namespace msvc8
              * `right` and the insertion-point `where` node for `parent`),
              * copy-constructs the 24-byte `pair<const Wm3::Vector2i,
              * SBuildReserveInfo>` value in place at `+0x0C` through
-             * `sub_5816C0` (the pair's copy ctor -- not independently cited
-             * yet), then zeroes `color@+0x24`/`isNil@+0x25` -- matching
+             * `sub_5816C0` -- the pair's implicit, compiler-generated copy
+             * ctor: copies the 8-byte key, then `SBuildReserveInfo`'s own
+             * implicit memberwise copy of `mUnit`/`mCom` (`WeakPtr<Unit>`/
+             * `WeakPtr<CUnitCommand>`, `SBuildReserveInfo.h`), each relinked
+             * into the new object's storage (`result+2`/`result+4`) rather
+             * than left pointing at the source -- matching `WeakPtr<T>`'s
+             * intrusive-list-node copy semantics. No explicit source line
+             * produces this (neither type declares a copy ctor), per RULE
+             * ONE -- then zeroes `color@+0x24`/`isNil@+0x25` -- matching
              * `buy_head`'s "38, rounded to 40" node-size note exactly. Reached
              * from FUN_00580720's `_Insert`, which is not yet recovered
              * source itself.)
@@ -3880,11 +3898,17 @@ namespace msvc8
              * Address: 0x0077B600 (FUN_0077B600, inner bucket link-and-rebalance)
              * Address: 0x0077BE80 (FUN_0077BE80, outer map link-and-rebalance)
              * Address: 0x0077AF40 (FUN_0077AF40, the outer map's insert-position resolve)
-             * Address: 0x0077A3C0 (FUN_0077A3C0, the outer map's insert with
-             * rebalance -- the `_Xlen` throw, the rotates at 0x0077B0B0/0x0077B160
-             * and the successor at 0x0077CE50 are all reached from it. This was
-             * the CreateHandle insert-side left deferred when the CDecalBuffer
-             * tree first landed in 90e6ffa.)
+             * Address: 0x0077A3C0 (FUN_0077A3C0, the outer map's `erase_node` --
+             * CORRECTED: previously mis-labeled "insert with rebalance" here;
+             * this token's own decompile is unmistakably `erase_node`: throws
+             * `std::out_of_range("invalid map/set<T> iterator")` on a nil
+             * target (the `_SECURE_SCL` checked-iterator guard documented
+             * throughout this file, not `_Xlen`), captures the successor via
+             * `sub_77CE50` (`rb_increment`), CLRS transplant-then-fixup, and
+             * rebalances through the rotates at 0x0077B0B0/0x0077B160 --
+             * cited on `erase_node`'s canonical member below, not `insert_at`.
+             * Reached from this table's `erase_range` (`FUN_0077BD90`, cited
+             * on that member) walk path.)
              */
             /**
              * Address: 0x0052CD30 (FUN_0052CD30, the link-and-rebalance half of
