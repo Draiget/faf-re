@@ -5520,6 +5520,19 @@ namespace msvc8
          * exist in the same address neighbourhood but are not needed to
          * satisfy this instantiation's caller evidence.)
          *
+         * Address: 0x008C5EF0 (FUN_008C5EF0, list<const RUnitBlueprint*>
+         * node-buy lane -- same 12-byte-node, 4-byte-pointer-T shape as
+         * FUN_00AC2D10 above: allocator via sub_8C6330(1), _Next/_Prev
+         * from the first two args, _Value from one dereference of a
+         * const value_type& third arg. Reached from sub_8C1220
+         * (Moho::CollectUpgradeCommandTargetBlueprints,
+         * moho/unit/core/UserUnit.cpp) via a direct call.)
+         * Address: 0x008C5F30 (FUN_008C5F30, sibling overflow-checked
+         * size-increment lane for the same instantiation -- Mysize at
+         * +0x08, the 0x3FFFFFFF cap, "list<T> too long", byte-for-byte
+         * the same shape as FUN_004E3310/FUN_004E3490/sub_AC3140 above.
+         * Called immediately after the node buy in sub_8C1220.)
+         *
          * What it does:
          * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
          * node through the checked 12-byte-element lane (`AllocateChecked12ByteLane`,

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "gpg/core/containers/Rect2.h"
+#include "legacy/containers/List.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/command/CmdDefs.h"
@@ -1274,10 +1275,12 @@ namespace moho
    *
    * What it does:
    * Collects the target unit blueprints of every pending `Upgrade` command in
-   * `unit`'s active command queue into `out` (each queued upgrade helper's
-   * build blueprint upcast to `RUnitBlueprint`).
+   * `unit`'s active command queue into `out`, in queue order, allowing
+   * duplicates (each queued upgrade helper's build blueprint upcast to
+   * `RUnitBlueprint`). `out` is a real `std::list<T>` in the binary --
+   * see the definition in UserUnit.cpp for the node-buy/`_Incsize` evidence.
    */
-  void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, msvc8::set<const RUnitBlueprint*>& out);
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, msvc8::list<const RUnitBlueprint*>& out);
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):

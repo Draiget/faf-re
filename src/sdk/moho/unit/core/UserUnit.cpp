@@ -3836,15 +3836,29 @@ namespace moho
    * Address: 0x008C1220 (FUN_008C1220, sub_8C1220)
    *
    * IDA signature:
-   * void __thiscall sub_8C1220(UserUnit *unit, std::set<RUnitBlueprint const*> *out);
+   * void __thiscall sub_8C1220(UserUnit *unit, std::list<RUnitBlueprint const*> *out);
    *
    * What it does:
    * Walks one unit's active command queue and collects the target unit
    * blueprints referenced by every pending `Upgrade` command into `out`.
    * Each queued upgrade helper's build blueprint is wrapped in a reflection
-   * reference, upcast to `RUnitBlueprint`, and inserted into the output set.
+   * reference, upcast to `RUnitBlueprint`, and appended to the output list.
+   *
+   * `out` is a real `std::list<T>` in the binary (node-buy at 0x008C5EF0 +
+   * `_Incsize` at 0x008C5F30, both cited on `msvc8::list<T>::insert` in
+   * `legacy/containers/Vector.h`), not a set: it preserves queue order and
+   * allows duplicate blueprint pointers when multiple pending commands
+   * target the same blueprint. The IDA-signature comment previously (and
+   * wrongly) said `std::set<RUnitBlueprint const*>`, and the recovered
+   * body used `msvc8::set` to match -- the caller's own comment
+   * (`CCommandLuaFunctionRegistrations.cpp`) already documents that its
+   * loop's final state depends on which target is iterated *last*, which
+   * only matches the binary's real command-queue order under a real
+   * order-preserving list; a pointer-sorted set silently picks the
+   * "last" target by heap-address order instead, an observable behavior
+   * bug independent of the citation.
    */
-  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, msvc8::set<const RUnitBlueprint*>& out)
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, msvc8::list<const RUnitBlueprint*>& out)
   {
     UserCommandQueueLinkVector* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
     if (queue == nullptr) {
@@ -3868,7 +3882,7 @@ namespace moho
       );
       const gpg::RRef upcast = gpg::REF_UpcastPtr(entityRef, RUnitBlueprint::GetPointerType());
       if (upcast.mObj != nullptr) {
-        out.insert(static_cast<const RUnitBlueprint*>(upcast.mObj));
+        out.push_back(static_cast<const RUnitBlueprint*>(upcast.mObj));
       }
     }
   }
