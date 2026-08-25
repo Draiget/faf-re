@@ -16,12 +16,6 @@ namespace
     unsigned char gEAiNavigatorStatusTypeInfoStorage[sizeof(EAiNavigatorStatusTypeInfo)] = {};
   bool gEAiNavigatorStatusTypeInfoConstructed = false;
 
-  alignas(EAiNavigatorStatusPrimitiveSerializer)
-    unsigned char gEAiNavigatorStatusPrimitiveSerializerStorage[sizeof(EAiNavigatorStatusPrimitiveSerializer)] = {};
-  bool gEAiNavigatorStatusPrimitiveSerializerConstructed = false;
-
-  gpg::RType* gEAiNavigatorStatusType = nullptr;
-
   [[nodiscard]] EAiNavigatorStatusTypeInfo* AcquireEAiNavigatorStatusTypeInfo()
   {
     if (!gEAiNavigatorStatusTypeInfoConstructed) {
@@ -30,97 +24,6 @@ namespace
     }
 
     return reinterpret_cast<EAiNavigatorStatusTypeInfo*>(gEAiNavigatorStatusTypeInfoStorage);
-  }
-
-  [[nodiscard]] EAiNavigatorStatusPrimitiveSerializer* AcquireEAiNavigatorStatusPrimitiveSerializer()
-  {
-    if (!gEAiNavigatorStatusPrimitiveSerializerConstructed) {
-      new (gEAiNavigatorStatusPrimitiveSerializerStorage) EAiNavigatorStatusPrimitiveSerializer();
-      gEAiNavigatorStatusPrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<EAiNavigatorStatusPrimitiveSerializer*>(gEAiNavigatorStatusPrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiNavigatorStatusType()
-  {
-    if (!gEAiNavigatorStatusType) {
-      gEAiNavigatorStatusType = gpg::LookupRType(typeid(EAiNavigatorStatus));
-    }
-    return gEAiNavigatorStatusType;
-  }
-
-  /**
-   * Address: 0x00BF6C90 (FUN_00BF6C90, cleanup_EAiNavigatorStatusPrimitiveSerializer)
-   *
-   * What it does:
-   * Unlinks the recovered primitive serializer helper node from the intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_EAiNavigatorStatusPrimitiveSerializer()
-  {
-    if (!gEAiNavigatorStatusPrimitiveSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireEAiNavigatorStatusPrimitiveSerializer());
-  }
-
-  /**
-   * Address: 0x005A2FC0 (FUN_005A2FC0)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * EAiNavigatorStatus primitive serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_EAiNavigatorStatusPrimitiveSerializerStartupThunkA()
-  {
-    return cleanup_EAiNavigatorStatusPrimitiveSerializer();
-  }
-
-  /**
-   * Address: 0x005A2FF0 (FUN_005A2FF0)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * EAiNavigatorStatus primitive serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_EAiNavigatorStatusPrimitiveSerializerStartupThunkB()
-  {
-    return cleanup_EAiNavigatorStatusPrimitiveSerializer();
-  }
-
-  void cleanup_EAiNavigatorStatusPrimitiveSerializer_atexit()
-  {
-    (void)cleanup_EAiNavigatorStatusPrimitiveSerializer();
   }
 
   /**
@@ -138,6 +41,11 @@ namespace
     AcquireEAiNavigatorStatusTypeInfo()->~EAiNavigatorStatusTypeInfo();
     gEAiNavigatorStatusTypeInfoConstructed = false;
   }
+
+  // Address: 0x010AE774 -- process-global `PrimitiveSerHelper<EAiNavigatorStatus,int>`
+  // singleton (constructed by FUN_00BCC600, self-registering via `__xc_a`; see
+  // EAiNavigatorStatusTypeInfo.h for the real-ctor/atexit-target evidence).
+  moho::EAiNavigatorStatusPrimitiveSerializer gEAiNavigatorStatusPrimitiveSerializer;
 } // namespace
 
 /**
@@ -209,53 +117,6 @@ void EAiNavigatorStatusTypeInfo::Init()
 }
 
 /**
- * Address: 0x005A76B0 (FUN_005A76B0, gpg::PrimitiveSerHelper_EAiNavigatorStatus::Deserialize)
- */
-void EAiNavigatorStatusPrimitiveSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  int value = 0;
-  archive->ReadInt(&value);
-  *reinterpret_cast<EAiNavigatorStatus*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EAiNavigatorStatus>(value);
-}
-
-/**
- * Address: 0x005A76D0 (FUN_005A76D0, gpg::PrimitiveSerHelper_EAiNavigatorStatus::Serialize)
- */
-void EAiNavigatorStatusPrimitiveSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  const auto* const value = reinterpret_cast<const EAiNavigatorStatus*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteInt(static_cast<int>(*value));
-}
-
-void EAiNavigatorStatusPrimitiveSerializer::RegisterSerializeFunctions()
-{
-  gpg::RType* const type = CachedEAiNavigatorStatusType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
  * Address: 0x00BCC5E0 (FUN_00BCC5E0, register_EAiNavigatorStatusTypeInfo)
  *
  * What it does:
@@ -268,22 +129,6 @@ void moho::register_EAiNavigatorStatusTypeInfo()
   (void)std::atexit(&cleanup_EAiNavigatorStatusTypeInfo);
 }
 
-/**
- * Address: 0x00BCC600 (FUN_00BCC600, register_PrimitiveSerHelper_EAiNavigatorStatus)
- *
- * What it does:
- * Initializes primitive serializer callbacks for `EAiNavigatorStatus` and
- * installs process-exit helper unlink cleanup.
- */
-int moho::register_EAiNavigatorStatusPrimitiveSerializer()
-{
-  EAiNavigatorStatusPrimitiveSerializer* const serializer = AcquireEAiNavigatorStatusPrimitiveSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EAiNavigatorStatusPrimitiveSerializer::Deserialize;
-  serializer->mSaveCallback = &EAiNavigatorStatusPrimitiveSerializer::Serialize;
-  return std::atexit(&cleanup_EAiNavigatorStatusPrimitiveSerializer_atexit);
-}
-
 namespace
 {
   struct EAiNavigatorStatusTypeInfoBootstrap
@@ -291,7 +136,6 @@ namespace
     EAiNavigatorStatusTypeInfoBootstrap()
     {
       (void)moho::register_EAiNavigatorStatusTypeInfo();
-      (void)moho::register_EAiNavigatorStatusPrimitiveSerializer();
     }
   };
 

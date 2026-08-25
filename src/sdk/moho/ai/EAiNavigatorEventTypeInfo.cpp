@@ -16,12 +16,6 @@ namespace
     unsigned char gEAiNavigatorEventTypeInfoStorage[sizeof(EAiNavigatorEventTypeInfo)] = {};
   bool gEAiNavigatorEventTypeInfoConstructed = false;
 
-  alignas(EAiNavigatorEventPrimitiveSerializer)
-    unsigned char gEAiNavigatorEventPrimitiveSerializerStorage[sizeof(EAiNavigatorEventPrimitiveSerializer)] = {};
-  bool gEAiNavigatorEventPrimitiveSerializerConstructed = false;
-
-  gpg::RType* gEAiNavigatorEventType = nullptr;
-
   [[nodiscard]] EAiNavigatorEventTypeInfo* AcquireEAiNavigatorEventTypeInfo()
   {
     if (!gEAiNavigatorEventTypeInfoConstructed) {
@@ -30,73 +24,6 @@ namespace
     }
 
     return reinterpret_cast<EAiNavigatorEventTypeInfo*>(gEAiNavigatorEventTypeInfoStorage);
-  }
-
-  [[nodiscard]] EAiNavigatorEventPrimitiveSerializer* AcquireEAiNavigatorEventPrimitiveSerializer()
-  {
-    if (!gEAiNavigatorEventPrimitiveSerializerConstructed) {
-      new (gEAiNavigatorEventPrimitiveSerializerStorage) EAiNavigatorEventPrimitiveSerializer();
-      gEAiNavigatorEventPrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<EAiNavigatorEventPrimitiveSerializer*>(gEAiNavigatorEventPrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiNavigatorEventType()
-  {
-    if (!gEAiNavigatorEventType) {
-      gEAiNavigatorEventType = gpg::LookupRType(typeid(EAiNavigatorEvent));
-    }
-    return gEAiNavigatorEventType;
-  }
-
-  /**
-   * Address: 0x00BF6CD0 (FUN_00BF6CD0, cleanup_EAiNavigatorEventPrimitiveSerializer)
-   *
-   * What it does:
-   * Unlinks the recovered primitive serializer helper node from the intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_EAiNavigatorEventPrimitiveSerializer()
-  {
-    if (!gEAiNavigatorEventPrimitiveSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireEAiNavigatorEventPrimitiveSerializer());
-  }
-
-  void cleanup_EAiNavigatorEventPrimitiveSerializer_atexit()
-  {
-    (void)cleanup_EAiNavigatorEventPrimitiveSerializer();
   }
 
   /**
@@ -114,6 +41,11 @@ namespace
     AcquireEAiNavigatorEventTypeInfo()->~EAiNavigatorEventTypeInfo();
     gEAiNavigatorEventTypeInfoConstructed = false;
   }
+
+  // Address: 0x010AE6EC -- process-global `PrimitiveSerHelper<EAiNavigatorEvent,int>`
+  // singleton (constructed by FUN_00BCC660, self-registering via `__xc_a`; see
+  // EAiNavigatorEventTypeInfo.h for the real-ctor/atexit-target evidence).
+  moho::EAiNavigatorEventPrimitiveSerializer gEAiNavigatorEventPrimitiveSerializer;
 } // namespace
 
 /**
@@ -183,53 +115,6 @@ void EAiNavigatorEventTypeInfo::Init()
 }
 
 /**
- * Address: 0x005A7720 (FUN_005A7720, PrimitiveSerHelper_EAiNavigatorEvent::Deserialize)
- */
-void EAiNavigatorEventPrimitiveSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  int value = 0;
-  archive->ReadInt(&value);
-  *reinterpret_cast<EAiNavigatorEvent*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EAiNavigatorEvent>(value);
-}
-
-/**
- * Address: 0x005A7740 (FUN_005A7740, PrimitiveSerHelper_EAiNavigatorEvent::Serialize)
- */
-void EAiNavigatorEventPrimitiveSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  const auto* const value = reinterpret_cast<const EAiNavigatorEvent*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteInt(static_cast<int>(*value));
-}
-
-void EAiNavigatorEventPrimitiveSerializer::RegisterSerializeFunctions()
-{
-  gpg::RType* const type = CachedEAiNavigatorEventType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
  * Address: 0x00BCC640 (FUN_00BCC640, register_EAiNavigatorEventTypeInfo)
  *
  * What it does:
@@ -242,22 +127,6 @@ void moho::register_EAiNavigatorEventTypeInfo()
   (void)std::atexit(&cleanup_EAiNavigatorEventTypeInfo);
 }
 
-/**
- * Address: 0x00BCC660 (FUN_00BCC660)
- *
- * What it does:
- * Initializes primitive serializer callbacks for `EAiNavigatorEvent` and
- * installs process-exit helper unlink cleanup.
- */
-int moho::register_EAiNavigatorEventPrimitiveSerializer()
-{
-  EAiNavigatorEventPrimitiveSerializer* const serializer = AcquireEAiNavigatorEventPrimitiveSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EAiNavigatorEventPrimitiveSerializer::Deserialize;
-  serializer->mSaveCallback = &EAiNavigatorEventPrimitiveSerializer::Serialize;
-  return std::atexit(&cleanup_EAiNavigatorEventPrimitiveSerializer_atexit);
-}
-
 namespace
 {
   struct EAiNavigatorEventTypeInfoBootstrap
@@ -265,7 +134,6 @@ namespace
     EAiNavigatorEventTypeInfoBootstrap()
     {
       (void)moho::register_EAiNavigatorEventTypeInfo();
-      (void)moho::register_EAiNavigatorEventPrimitiveSerializer();
     }
   };
 
