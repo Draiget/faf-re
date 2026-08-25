@@ -1,11 +1,9 @@
 #include "moho/containers/BVIntSetSerializer.h"
 
 #include <cstdlib>
-#include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
 #include "moho/containers/BVIntSet.h"
-#include "moho/containers/TDatList.h"
 #include "moho/containers/BVIntSetTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -19,162 +17,18 @@ namespace moho
 
 namespace
 {
-  extern moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
-  extern moho::BVIntSetSerializer gBVIntSetSerializer;
+  moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
 
-  /**
-   * Address: 0x004028B0 (FUN_004028B0)
-   *
-   * What it does:
-   * Lazily resolves and caches reflection type descriptor for `moho::BVIntSet`.
-   */
-  [[nodiscard]] gpg::RType* CachedBVIntSetType()
-  {
-    gpg::RType* type = moho::BVIntSet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::BVIntSet));
-      moho::BVIntSet::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x00402C40 (FUN_00402C40, j_Moho::BVIntSet::MemberDeserialize)
-   *
-   * What it does:
-   * Thin forwarding thunk to `BVIntSet::MemberDeserialize`.
-   */
-  void BVIntSetMemberDeserializeThunk(moho::BVIntSet* const set, gpg::ReadArchive* const archive)
-  {
-    if (set) {
-      set->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00402C50 (FUN_00402C50, j_Moho::BVIntSet::MemberSerialize)
-   *
-   * What it does:
-   * Thin forwarding thunk to `BVIntSet::MemberSerialize`.
-   */
-  void BVIntSetMemberSerializeThunk(const moho::BVIntSet* const set, gpg::WriteArchive* const archive)
-  {
-    if (set) {
-      set->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x004015A0 (FUN_004015A0)
-   *
-   * What it does:
-   * Loads BVIntSet payload through the member deserializer wrapper.
-   */
-  void LoadBVIntSet(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const set = reinterpret_cast<moho::BVIntSet*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(set != nullptr);
-    if (!archive || !set) {
-      return;
-    }
-
-    BVIntSetMemberDeserializeThunk(set, archive);
-  }
-
-  /**
-   * Address: 0x004015B0 (FUN_004015B0)
-   *
-   * What it does:
-   * Saves BVIntSet payload through the member serializer wrapper.
-   */
-  void SaveBVIntSet(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const set = reinterpret_cast<const moho::BVIntSet*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(set != nullptr);
-    if (!archive || !set) {
-      return;
-    }
-
-    BVIntSetMemberSerializeThunk(set, archive);
-  }
-
-  /**
-   * Address: 0x004025F0 (FUN_004025F0)
-   *
-   * What it does:
-   * Initializes the global BVIntSet serializer helper callbacks and returns it.
-   */
-  [[nodiscard]] moho::BVIntSetSerializer* InitializeBVIntSetSerializer()
-  {
-    gBVIntSetSerializer.mHelperNext = nullptr;
-    gBVIntSetSerializer.mHelperPrev = nullptr;
-    gBVIntSetSerializer.mLoadCallback = &LoadBVIntSet;
-    gBVIntSetSerializer.mSaveCallback = &SaveBVIntSet;
-    return &gBVIntSetSerializer;
-  }
-
-  using SerHelperNode = moho::TDatListItem<void, void>;
-
-  struct SerHelperLayout
-  {
-    void* mVfptr;
-    SerHelperNode mNode;
-  };
-
-  [[nodiscard]] SerHelperNode* SerializerNode(moho::BVIntSetSerializer* const serializer)
-  {
-    return reinterpret_cast<SerHelperNode*>(&serializer->mHelperNext);
-  }
-
-  /**
-   * Address: 0x004015F0 (FUN_004015F0)
-   *
-   * What it does:
-   * Unlinks global BVIntSet serializer helper node from intrusive list and
-   * resets it to a self-linked singleton node.
-   */
-  [[maybe_unused]] SerHelperNode* ResetGlobalBVIntSetSerializerNodeA()
-  {
-    SerHelperNode* const node = SerializerNode(&gBVIntSetSerializer);
-
-    // The node is the serializer's own mHelperNext/mHelperPrev pair viewed as
-    // a list item, and it is only self-linked once the serializer joins a
-    // helper chain. This runs from static cleanup, where a serializer that was
-    // never linked still has null links - ListUnlink would then write through
-    // mPrev->mNext at address zero.
-    if (node->mNext != nullptr && node->mPrev != nullptr) {
-      node->ListUnlink();
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x00401620 (FUN_00401620)
-   *
-   * What it does:
-   * Unlinks `helper->mNode` from intrusive list and resets it to self-linked state.
-   */
-  [[maybe_unused]] SerHelperNode* ResetSerializerNode(SerHelperLayout* const helper)
-  {
-    SerHelperNode* const node = helper ? &helper->mNode : nullptr;
-    node->ListUnlink();
-    return node;
-  }
-
-  /**
-   * Address: 0x00401640 (FUN_00401640)
-   *
-   * What it does:
-   * Duplicate global atexit lane that unlinks and self-resets BVIntSet serializer node.
-   */
-  [[maybe_unused]] SerHelperNode* ResetGlobalBVIntSetSerializerNodeB()
-  {
-    SerHelperNode* const node = SerializerNode(&gBVIntSetSerializer);
-    node->ListUnlink();
-    return node;
-  }
+  // Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<BVIntSet>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real mangled
+  // destructor (`??1BVIntSetSerializer@Moho@@QAE@@Z`, 0x00BEDEE0) via
+  // `atexit`. There is no hand-written "register" function for this in the
+  // original source -- matches `gpg::PrimitiveSerHelper<T,IntType>`'s
+  // already-established modeling.
+  moho::BVIntSetSerializer gBVIntSetSerializer;
 
   /**
    * Address: 0x00BEDE80 (FUN_00BEDE80, ??1BVIntSetTypeInfo@Moho@@QAE@@Z)
@@ -187,20 +41,6 @@ namespace
     gBVIntSetTypeInfo.fields_.clear();
     gBVIntSetTypeInfo.bases_.clear();
   }
-
-  /**
-   * Address: 0x00BEDEE0 (FUN_00BEDEE0, ??1BVIntSetSerializer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unlinks global BVIntSet serializer helper node from intrusive registration list.
-   */
-  void cleanup_BVIntSetSerializer()
-  {
-    (void)ResetGlobalBVIntSetSerializerNodeA();
-  }
-
-  moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
-  moho::BVIntSetSerializer gBVIntSetSerializer;
 
   struct BVIntSetReflectionRegistration
   {
@@ -233,45 +73,17 @@ namespace moho
    * Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer)
    *
    * What it does:
-   * Materializes startup `BVIntSetSerializer` storage, installs serializer
-   * callback lanes, and registers process-exit teardown.
+   * Forces this translation unit's global `BVIntSetSerializer` instance to
+   * link into the reflection bootstrap sequence ahead of default-segment
+   * consumers that query BVIntSet RTTI. See the Doxygen comment on the
+   * declaration (BVIntSetSerializer.h) and on `gBVIntSetSerializer` above for
+   * why this function's body has no field-setting logic of its own.
    */
   void register_BVIntSetSerializer()
   {
-    InitializeBVIntSetSerializer();
-    (void)std::atexit(&cleanup_BVIntSetSerializer);
-  }
-
-  /**
-   * Address: 0x004015C0 (FUN_004015C0)
-   *
-   * What it does:
-   * Initializes serializer callback slots for BVIntSet load/save forwarding.
-   */
-  BVIntSetSerializer::BVIntSetSerializer()
-    : mHelperNext(nullptr)
-    , mHelperPrev(nullptr)
-    , mLoadCallback(&LoadBVIntSet)
-    , mSaveCallback(&SaveBVIntSet)
-  {}
-
-  /**
-   * Address: 0x00402620 (FUN_00402620, gpg::SerSaveLoadHelper<class Moho::BVIntSet>::Init)
-   *
-   * What it does:
-   * Resolves BVIntSet RTTI and installs load/save callbacks from this helper.
-   */
-  void BVIntSetSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedBVIntSetType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
+    (void)gBVIntSetSerializer;
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
