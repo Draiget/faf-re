@@ -704,6 +704,72 @@ namespace msvc8
          * `PublishCategoriesTable` before the migration, now folded into
          * `mCategoryMap`'s own range-for iteration.)
          */
+        /**
+         * Address: 0x00946830 (FUN_00946830, sub_946830) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s `_Inc`,
+         * isNil@+0x15, 8-byte value_type (`msvc8::map<d3d9::RenderState,
+         * unsigned int>`, `StateCache_D3DRENDERSTATETYPE.hpp`). Matches this
+         * member exactly (`.asm`: `cmp byte ptr [eax+15h],0` / `mov
+         * edx,[eax+8]` recurse-right-then-climb-parent shape). Five real
+         * callers (callgraph index `call_edges`): this instantiation's
+         * `erase_node` (`FUN_00947380`, cited above) via the
+         * successor-capture step every `erase_node` emission performs
+         * before unlinking -- itself reached from `erase_range`
+         * (`FUN_00947B90`, cited above), which `StateCache<d3d9::RenderState,
+         * unsigned int>::~StateCache` (0x00948190, `StateCache.cpp`) reaches
+         * through `tree_`'s own implicit `msvc8::map::~map()`, rooting this
+         * whole chain in already-recovered source; an `insert`-with-hint
+         * emission (`FUN_009496E0`, not independently exported in this
+         * pass); two zero-incoming-xref `operator++()` duplicate emissions
+         * (`FUN_00946DC0`/`FUN_00946F60`, cited below); and a third
+         * `operator++(int)` emission (`FUN_00947080`, not independently
+         * exported in this pass). Reachable in the callgraph index's
+         * `reachable` table via `??_7CScApp@@6B@` at depth 9.
+         *
+         * Corrects this token's previous ambiguous "std::map<type_info*,
+         * RType*> / std::map<const char*,RType*>" DB note: neither
+         * `gpg::core::reflection::TypeInfoMap` nor `Reflection.h`'s
+         * `TypeMap` iterate via `_Inc` anywhere in currently-recovered
+         * source (both are used only through `find`/`operator[]`/
+         * `lower_bound`/`insert` -- `Reflection.cpp` lines 3874-13791 --
+         * none of which need a successor walk); this `isNil@+0x15, 8-byte
+         * value` node shape is `gpg::gal::StateCache`'s, a subsystem
+         * unrelated to reflection. Previously `skip`'d ("orphan, 0 source
+         * callers"); corrected to `recovered` now that its real caller
+         * chain down to already-recovered `StateCache::~StateCache` is
+         * established, matching this file's own "recovered as an
+         * additional instantiation, owning class not pinned down further"
+         * precedent for identically-shaped zero-xref siblings elsewhere in
+         * this address neighbourhood (e.g. the 0x00947E00/0x00947E90/
+         * 0x00947F20 `~rb_tree()` trio above, 0x007B4C40, 0x007B2D40).
+         *
+         * Address: 0x00946880 (FUN_00946880, sub_946880) -- byte-identical
+         * sibling emission (same `function_sha256` as 0x00946830 above),
+         * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::
+         * tree_`'s own `_Inc`. Reached from this instantiation's
+         * `erase_node` (`FUN_00947630`, cited above), itself reached from
+         * `erase_range` (`FUN_00947C50`, cited above) via `StateCache<
+         * _D3DSAMPLERSTATETYPE, unsigned int>::~StateCache` (0x009481E0,
+         * `StateCache.cpp`). Reachable via `??_7CScApp@@6B@` at depth 10.
+         * Same five-caller shape as 0x00946830 above (`FUN_00946DD0`/
+         * `FUN_00946F70` `operator++()` duplicates cited below,
+         * `FUN_009470A0` `operator++(int)` cited below, `FUN_00949850`
+         * insert-with-hint not independently exported in this pass). Same
+         * DB-integrity correction as 0x00946830 above.
+         *
+         * Address: 0x009468D0 (FUN_009468D0, sub_9468D0) -- byte-identical
+         * sibling emission, `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+         * unsigned int>::tree_`'s own `_Inc`. Reached from this
+         * instantiation's `erase_node` (`FUN_009478E0`, cited above),
+         * itself reached from `erase_range` (`FUN_00947D10`, cited above)
+         * via `StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::
+         * ~StateCache` (0x00948230, `StateCache.cpp`). Reachable via
+         * `??_7CScApp@@6B@` at depth 10. Same five-caller shape
+         * (`FUN_00946DE0`/`FUN_00946F80` `operator++()` duplicates cited
+         * below, `FUN_009470C0` `operator++(int)` cited below,
+         * `FUN_009499C0` insert-with-hint not independently exported in
+         * this pass). Same DB-integrity correction as 0x00946830 above.
+         */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -1023,6 +1089,49 @@ namespace msvc8
             }
             [[nodiscard]] pointer operator->() const noexcept { return std::addressof(**this); }
 
+            /**
+             * Address: 0x00946DC0 (FUN_00946DC0, sub_946DC0) Address:
+             * 0x00946F60 (FUN_00946F60, sub_946F60) -- two zero-incoming-xref
+             * duplicate emissions of `gpg::gal::StateCache<d3d9::RenderState,
+             * unsigned int>::tree_`'s `iterator::operator++()`: `push esi;
+             * mov esi,ecx; call sub_946830 [rb_increment, cited above]; mov
+             * eax,esi; pop esi; retn` -- advances via this member and
+             * returns the same slot, matching this member's shape exactly.
+             * Callgraph index (`call_edges`/`incoming_xrefs`/`reachable`)
+             * shows zero callers for either address, same "compiled but not
+             * independently exercised" status as this file's other
+             * zero-xref `operator++()` duplicates (0x007B4500/0x007B4BC0
+             * above). Both previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path neither address ever
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field not pinned to a named
+             * `StateCache<d3d9::RenderState, unsigned int>` instance.
+             * Address: 0x00946DD0 (FUN_00946DD0, sub_946DD0) Address:
+             * 0x00946F70 (FUN_00946F70, sub_946F70) -- the same duplicate
+             * pair, one `StateCache` specialisation over: `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s
+             * `operator++()`, calling `sub_946880` (`rb_increment`, cited
+             * above) instead of `sub_946830`. Same zero-caller status
+             * (0x00946DD0 was already `skip`'d "zero callers found";
+             * 0x00946F70 was `blocked` citing the same false
+             * `CrtRuntimeHelpers.cpp` path as the 0x00946DC0 pair above).
+             * Address: 0x00946DE0 (FUN_00946DE0, sub_946DE0) Address:
+             * 0x00946F80 (FUN_00946F80, sub_946F80) -- the same duplicate
+             * pair for the third specialisation: `gpg::gal::StateCache<
+             * _D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * `operator++()`, calling `sub_9468D0` (`rb_increment`, cited
+             * above). Same zero-caller status (0x00946DE0 was already
+             * `skip`'d "zero callers found"; 0x00946F80 was `blocked`
+             * citing the same false `CrtRuntimeHelpers.cpp` path).
+             *
+             * All six addresses sit inside the same `StateCache<T, unsigned
+             * int>` address neighbourhood as `rb_increment`'s 0x00946830/
+             * 0x00946880/0x009468D0 citations and this file's existing
+             * 0x00947xxx `erase_range`/`erase_node` citations for the same
+             * three specialisations above; a fourth sibling, `FUN_00947080`
+             * (`d3d9::RenderState`'s `operator++(int)`), is not
+             * independently exported in this pass.
+             */
             rb_iterator& operator++() noexcept
             {
                 node_ = rb_increment(node_);
@@ -1050,6 +1159,32 @@ namespace msvc8
              * `CopyAndAdvanceCommandDbIteratorSlot` free function in Sim.cpp
              * that hand-rolled this same copy-and-advance over a
              * `CommandDbMapNodeView` reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x009470A0 (FUN_009470A0, sub_9470A0) -- `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s
+             * `operator++(int)`: copies `*this` into `*a2` (the
+             * pre-increment cursor), advances `*this` via `sub_946880`
+             * (`rb_increment`, cited on `rb_increment` above -- the binary
+             * calls the `_Inc` body directly rather than through a real
+             * `operator++()` invocation, matching this member's own
+             * `++*this` shape after inlining), returns `a2` -- matching
+             * this member's copy-then-advance shape exactly. Zero callers
+             * in the callgraph index (`call_edges`/`incoming_xrefs`/
+             * `reachable`). Previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path this address never
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field not pinned to a named
+             * `StateCache<_D3DSAMPLERSTATETYPE, unsigned int>` instance.
+             * Address: 0x009470C0 (FUN_009470C0, sub_9470C0) -- the same
+             * shape one `StateCache` specialisation over: `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * `operator++(int)`, advancing via `sub_9468D0` (`rb_increment`,
+             * cited above). Same zero-caller status and same DB-integrity
+             * correction as 0x009470A0 above.
+             *
+             * `d3d9::RenderState`'s sibling emission, `FUN_00947080`, is
+             * not independently exported in this pass.
              */
             rb_iterator operator++(int) noexcept
             {
@@ -3879,6 +4014,38 @@ namespace msvc8
              * boilerplate "batch 0x007B**** pass" note that cited nothing;
              * a full `src/sdk` sweep found zero real citations anywhere.
              * Owning field not yet pinned to a specific class.)
+             */
+            /**
+             * Address: 0x00946440 (FUN_00946440, sub_946440) Address:
+             * 0x00946520 (FUN_00946520, sub_946520) -- two node-deallocation
+             * shims in the same `gpg::gal::StateCache<T, unsigned int>`
+             * address neighbourhood as `rb_increment`'s 0x00946830/
+             * 0x00946880/0x009468D0 citations and the 0x00947xxx
+             * `erase_range`/`erase_node` citations above: `mov eax,
+             * [esp+arg_0]; push eax; call operator delete(void*); pop ecx;
+             * retn 8` -- plain `::operator delete(a1)`, matching this
+             * member's own behaviour exactly, with one shape difference:
+             * both take a second, entirely unread `int a2` stack argument
+             * (`__stdcall`, `retn 8` pops both), where this member and its
+             * other-instantiation citations above (e.g. 0x007B3F90) take
+             * only the node pointer. The extra discarded operand matches an
+             * allocator-style `deallocate(pointer, size_type)` call left
+             * un-inlined at these two call sites rather than a direct
+             * `free_raw(node_type*)` call; the observable effect --
+             * `operator delete` on the node with nothing else touched -- is
+             * identical either way. Neither address has any caller in the
+             * callgraph index (`call_edges`/`incoming_xrefs`/`reachable`
+             * all empty for both) or any data/vtable reference, and neither
+             * calls into or is called by any of the `rb_increment`/
+             * `operator++`/`erase_node` addresses cited throughout this
+             * neighbourhood, so which specific `StateCache<T, unsigned
+             * int>` specialisation each belongs to (if either belongs to
+             * one of the three already named above, rather than a fourth,
+             * unexported instantiation) is not distinguishable from the
+             * body alone. Both previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path neither address ever
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field/class not pinned down.
              */
             static void free_raw(node_type* const n) noexcept
             {
