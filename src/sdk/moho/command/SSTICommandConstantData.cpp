@@ -5,7 +5,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -26,49 +26,7 @@ namespace
     }
   };
 
-  moho::SSTICommandConstantDataSerializer gSSTICommandConstantDataSerializer{};
   gpg::RType* gQuatfType = nullptr;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetSSTICommandConstantDataSerializerHelperLinks() noexcept
-  {
-    gSSTICommandConstantDataSerializer.mHelperNext->mPrev = gSSTICommandConstantDataSerializer.mHelperPrev;
-    gSSTICommandConstantDataSerializer.mHelperPrev->mNext = gSSTICommandConstantDataSerializer.mHelperNext;
-    gpg::SerHelperBase* const self = HelperSelfNode(gSSTICommandConstantDataSerializer);
-    gSSTICommandConstantDataSerializer.mHelperNext = self;
-    gSSTICommandConstantDataSerializer.mHelperPrev = self;
-    return self;
-  }
-
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandConstantDataSerializerHelperNodePrimary() noexcept;
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandConstantDataSerializerHelperNodeSecondary() noexcept;
 
   [[nodiscard]] gpg::RType* ResolveQuatfType()
   {
@@ -76,50 +34,6 @@ namespace
       gQuatfType = gpg::LookupRType(typeid(Wm3::Quatf));
     }
     return gQuatfType;
-  }
-
-  void cleanup_SSTICommandConstantDataSerializer_Atexit()
-  {
-    (void)CleanupSSTICommandConstantDataSerializerHelperNodePrimary();
-  }
-
-  /**
-   * Address: 0x00552860 (FUN_00552860)
-   *
-   * What it does:
-   * Unlinks `SSTICommandConstantDataSerializer` helper node from the intrusive
-   * helper list and restores self-linked sentinel links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandConstantDataSerializerHelperNodePrimary() noexcept
-  {
-    return ResetSSTICommandConstantDataSerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00552890 (FUN_00552890)
-   *
-   * What it does:
-   * Secondary entrypoint for `SSTICommandConstantDataSerializer` helper-node
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandConstantDataSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetSSTICommandConstantDataSerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00BC9CA0 (FUN_00BC9CA0, register_SSTICommandConstantDataSerializer)
-   *
-   * What it does:
-   * Constructs the `SSTICommandConstantDataSerializer` helper-list sentinel,
-   * wires its load/save function pointers, and schedules exit-time cleanup.
-   */
-  void register_SSTICommandConstantDataSerializer()
-  {
-    InitializeHelperNode(gSSTICommandConstantDataSerializer);
-    gSSTICommandConstantDataSerializer.mSerLoadFunc = &moho::SSTICommandConstantDataSerializer::Deserialize;
-    gSSTICommandConstantDataSerializer.mSerSaveFunc = &moho::SSTICommandConstantDataSerializer::Serialize;
-    (void)std::atexit(&cleanup_SSTICommandConstantDataSerializer_Atexit);
   }
 
   /**
@@ -468,6 +382,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC9CA0 (FUN_00BC9CA0, dynamic initializer for the global
+   * `SSTICommandConstantDataSerializer` singleton)
+   */
+  SSTICommandConstantDataSerializer::SSTICommandConstantDataSerializer()
+    : mSerLoadFunc(&SSTICommandConstantDataSerializer::Deserialize)
+    , mSerSaveFunc(&SSTICommandConstantDataSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF49F0 (FUN_00BF49F0, Moho::SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer)
+   */
+  SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00552810 (FUN_00552810, Moho::SSTICommandConstantDataSerializer::Deserialize)
    */
   void SSTICommandConstantDataSerializer::Deserialize(
@@ -498,9 +429,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00552E00 (FUN_00552E00, gpg::SerSaveLoadHelper_SSTICommandConstantData::Init)
+   * Address: 0x00552E00 (FUN_00552E00, Moho::SSTICommandConstantDataSerializer::Init)
    */
-  void SSTICommandConstantDataSerializer::RegisterSerializeFunctions()
+  void SSTICommandConstantDataSerializer::Init()
   {
     gpg::RType* type = SSTICommandConstantData::sType;
     if (type == nullptr) {
@@ -518,16 +449,8 @@ namespace moho
 
 namespace
 {
-  struct SSTICommandConstantDataSerializerBootstrap
-  {
-    SSTICommandConstantDataSerializerBootstrap()
-    {
-      (void)moho::preregister_SSTICommandConstantDataTypeInfo();
-      register_SSTICommandConstantDataSerializer();
-    }
-  };
-
-  [[maybe_unused]] SSTICommandConstantDataSerializerBootstrap gSSTICommandConstantDataSerializerBootstrap;
+  // Address: 0x010AC540 -- process-global `SSTICommandConstantDataSerializer` singleton.
+  moho::SSTICommandConstantDataSerializer gSSTICommandConstantDataSerializer;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
