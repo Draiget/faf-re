@@ -20,93 +20,51 @@ namespace
     GPG_ASSERT(cached != nullptr);
     return cached;
   }
-
-  [[nodiscard]] gpg::RType* CachedSPhysConstantsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SPhysConstants));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BD6050 (FUN_00BD6050, dynamic initializer for the global
-   * `SPhysConstantsSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SPhysConstantsSerializer::SPhysConstantsSerializer()
-    : mLoadCallback(&SPhysConstantsSerializer::Deserialize)
-    , mSaveCallback(&SPhysConstantsSerializer::Serialize)
-  {}
-
-  SPhysConstantsSerializer::~SPhysConstantsSerializer()
-  {
-    ResetLinks();
-  }
+  gpg::RType* SPhysConstants::sType = nullptr;
 
   /**
-   * Address: 0x00699C10 (FUN_00699C10, Moho::SPhysConstantsSerializer::Deserialize)
+   * Address: 0x00699C10 (FUN_00699C10, Moho::SPhysConstants::MemberDeserialize)
    */
-  void SPhysConstantsSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const /*ownerRef*/
-  )
+  void SPhysConstants::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    auto* const object = reinterpret_cast<SPhysConstants*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedVector3fType(), &object->mGravity, nullOwner);
+    archive->Read(CachedVector3fType(), &mGravity, nullOwner);
   }
 
   /**
-   * Address: 0x00699C50 (FUN_00699C50, Moho::SPhysConstantsSerializer::Serialize)
+   * Address: 0x00699C50 (FUN_00699C50, Moho::SPhysConstants::MemberSerialize)
    */
-  void SPhysConstantsSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const /*ownerRef*/
-  )
+  void SPhysConstants::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    const auto* const object = reinterpret_cast<const SPhysConstants*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedVector3fType(), &object->mGravity, nullOwner);
-  }
-
-  /**
-   * Address: 0x00699ED0 (FUN_00699ED0, Moho::SPhysConstantsSerializer::RegisterSerializeFunctions)
-   *
-   * What it does:
-   * Binds `SPhysConstants` RTTI load/save callbacks.
-   */
-  void SPhysConstantsSerializer::Init()
-  {
-    gpg::RType* const type = CachedSPhysConstantsType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
+    archive->Write(CachedVector3fType(), &mGravity, nullOwner);
   }
 } // namespace moho
 
 namespace
 {
-  // Address: 0x010B5448 -- process-global `SPhysConstantsSerializer` singleton.
+  // Address: 0x00BD6050 (FUN_00BD6050, dynamic initializer for the global
+  // `SPhysConstantsSerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<SPhysConstants>` ctor (self-links into
+  // `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback` to the template's
+  // `Deserialize`/`Serialize`, installs the vtable) and registers the real
+  // destructor (0x00BFD460, no recovered mangled name; body confirmed via
+  // raw asm to just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT
+  // duplicate ctor: 0x00699EA0.
   moho::SPhysConstantsSerializer gSPhysConstantsSerializer;
 } // namespace
