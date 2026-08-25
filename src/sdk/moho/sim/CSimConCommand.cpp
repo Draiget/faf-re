@@ -17,6 +17,23 @@ namespace
     }
   };
 
+  /**
+   * Address: 0x007357C0 (FUN_007357C0)
+   * Address: 0x00735D40 (FUN_00735D40)
+   * Address: 0x00736390 (FUN_00736390)
+   *
+   * What it does:
+   * `SimConCommandRegistry` is `sSimConList`'s replacement in this
+   * recovery. It is declared with the current toolchain's own `std::map`
+   * rather than a legacy ABI container because it is a process-local
+   * static that never crosses the binary's serialized surface.
+   *
+   * The three addresses above are `sSimConList`'s own binary bookkeeping,
+   * inlined directly into the teardown caller at 0x00734720 (see
+   * `DestroySimConRegistryStorageLaneA` below), fully covered by
+   * `registry.clear()` in `DestroySimConRegistryStorage` below -- there is
+   * nothing further to hand-write for those three addresses.
+   */
   using SimConCommandRegistry = std::map<std::string, moho::CSimConCommand*, SimConCommandNameLess>;
 
   [[nodiscard]] SimConCommandRegistry& GetSimConCommandRegistry()
