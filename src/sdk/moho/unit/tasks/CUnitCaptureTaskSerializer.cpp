@@ -1,7 +1,5 @@
 #include "moho/unit/tasks/CUnitCaptureTaskSerializer.h"
 
-#include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -9,42 +7,6 @@
 
 namespace
 {
-  moho::CUnitCaptureTaskSerializer gCUnitCaptureTaskSerializer;
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(
-    moho::CUnitCaptureTaskSerializer& serializer
-  ) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(
-    moho::CUnitCaptureTaskSerializer& serializer
-  ) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  void ResetSerializerNode(moho::CUnitCaptureTaskSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitCaptureTaskType()
   {
     static gpg::RType* cached = nullptr;
@@ -54,22 +16,16 @@ namespace
     return cached;
   }
 
-  void CleanupCUnitCaptureTaskSerializerAtExit()
-  {
-    (void)moho::cleanup_CUnitCaptureTaskSerializer();
-  }
-
   /**
-   * Address: 0x00604330 (FUN_00604330, mirrored intrusive-unlink helper lane)
+   * Address: 0x00BCFFD0 (FUN_00BCFFD0, dynamic initializer for the global
+   * `CUnitCaptureTaskSerializer` singleton)
    *
    * What it does:
-   * Mirrored helper-node unlink lane that performs the same
-   * intrusive-list unlink/self-link sequence as the primary cleanup.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`).
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitCaptureTaskSerializerNodeSecondary()
-  {
-    return UnlinkSerializerNode(gCUnitCaptureTaskSerializer);
-  }
+  moho::CUnitCaptureTaskSerializer gCUnitCaptureTaskSerializer;
 } // namespace
 
 namespace moho
@@ -84,15 +40,7 @@ namespace moho
     gpg::RRef* /*ownerRef*/
   )
   {
-    auto* const task = reinterpret_cast<CUnitCaptureTask*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (archive == nullptr || task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
+    reinterpret_cast<CUnitCaptureTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   /**
@@ -105,15 +53,27 @@ namespace moho
     gpg::RRef* /*ownerRef*/
   )
   {
-    auto* const task = reinterpret_cast<CUnitCaptureTask*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (archive == nullptr || task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
+    reinterpret_cast<CUnitCaptureTask*>(objectPtr)->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BCFFD0 (FUN_00BCFFD0, register_CUnitCaptureTaskSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  CUnitCaptureTaskSerializer::CUnitCaptureTaskSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitCaptureTaskSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitCaptureTaskSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BF9880 (FUN_00BF9880, Moho::CUnitCaptureTaskSerializer::~CUnitCaptureTaskSerializer)
+   */
+  CUnitCaptureTaskSerializer::~CUnitCaptureTaskSerializer()
+  {
+    ResetLinks();
   }
 
   /**
@@ -123,7 +83,7 @@ namespace moho
    * Lazily resolves the `CUnitCaptureTask` reflected type and installs
    * this helper's load/save callbacks into its type descriptor.
    */
-  void CUnitCaptureTaskSerializer::RegisterSerializeFunctions()
+  void CUnitCaptureTaskSerializer::Init()
   {
     gpg::RType* const type = CachedCUnitCaptureTaskType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -131,36 +91,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00604300 (FUN_00604300, cleanup_CUnitCaptureTaskSerializer)
-   */
-  gpg::SerHelperBase* cleanup_CUnitCaptureTaskSerializer()
-  {
-    return UnlinkSerializerNode(gCUnitCaptureTaskSerializer);
-  }
-
-  /**
-   * Address: 0x00BCFFD0 (FUN_00BCFFD0, register_CUnitCaptureTaskSerializer)
-   */
-  void register_CUnitCaptureTaskSerializer()
-  {
-    ResetSerializerNode(gCUnitCaptureTaskSerializer);
-    gCUnitCaptureTaskSerializer.mDeserialize = &CUnitCaptureTaskSerializer::Deserialize;
-    gCUnitCaptureTaskSerializer.mSerialize = &CUnitCaptureTaskSerializer::Serialize;
-    (void)std::atexit(&CleanupCUnitCaptureTaskSerializerAtExit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct CUnitCaptureTaskSerializerBootstrap
-  {
-    CUnitCaptureTaskSerializerBootstrap()
-    {
-      moho::register_CUnitCaptureTaskSerializer();
-    }
-  };
-
-  CUnitCaptureTaskSerializerBootstrap gCUnitCaptureTaskSerializerBootstrap;
-} // namespace
