@@ -311,38 +311,14 @@ namespace
 
   alignas(TypeInfo) unsigned char gCAnimationManipulatorTypeInfoStorage[sizeof(TypeInfo)] = {};
   bool gCAnimationManipulatorTypeInfoConstructed = false;
+
+  // Address: 0x010B2930 -- process-global `CAnimationManipulatorConstruct` singleton.
   moho::CAnimationManipulatorConstruct gCAnimationManipulatorConstruct;
+
+  // Address: 0x010B291C -- process-global `CAnimationManipulatorSerializer` singleton.
   moho::CAnimationManipulatorSerializer gCAnimationManipulatorSerializer;
   gpg::RType* gWeakPtrUnitType = nullptr;
   gpg::RType* gVectorBoolType = nullptr;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      static_cast<gpg::SerHelperBase*>(helper.mNext)->mPrev = static_cast<gpg::SerHelperBase*>(helper.mPrev);
-      static_cast<gpg::SerHelperBase*>(helper.mPrev)->mNext = static_cast<gpg::SerHelperBase*>(helper.mNext);
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
 
   [[nodiscard]] TypeInfo& GetCAnimationManipulatorTypeInfo() noexcept
   {
@@ -570,80 +546,6 @@ namespace
     SerializeCAnimationManipulatorState(object, archive);
   }
 
-  gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructImpl()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
-  }
-
-  gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerImpl()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0063F2F0 (FUN_0063F2F0)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAnimationManipulatorSerializer`
-   * helper storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAnimationManipulatorSerializer*
-  InitializeCAnimationManipulatorSerializerStartupThunk()
-  {
-    InitializeHelperNode(gCAnimationManipulatorSerializer);
-    gCAnimationManipulatorSerializer.mSerLoadFunc = &moho::CAnimationManipulatorSerializer::Deserialize;
-    gCAnimationManipulatorSerializer.mSerSaveFunc = &moho::CAnimationManipulatorSerializer::Serialize;
-    return &gCAnimationManipulatorSerializer;
-  }
-
-  /**
-   * Address: 0x0063F1C0 (FUN_0063F1C0)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CAnimationManipulator construct helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructStartupThunkA()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
-  }
-
-  /**
-   * Address: 0x0063F1F0 (FUN_0063F1F0)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CAnimationManipulator construct helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructStartupThunkB()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
-  }
-
-  /**
-   * Address: 0x0063F320 (FUN_0063F320)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CAnimationManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x0063F350 (FUN_0063F350)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CAnimationManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
-  }
-
   void cleanup_CAnimationManipulatorTypeInfoImpl()
   {
     if (!gCAnimationManipulatorTypeInfoConstructed) {
@@ -652,16 +554,6 @@ namespace
 
     static_cast<gpg::RType*>(&GetCAnimationManipulatorTypeInfo())->~RType();
     gCAnimationManipulatorTypeInfoConstructed = false;
-  }
-
-  void CleanupCAnimationManipulatorConstructAtexit()
-  {
-    (void)cleanup_CAnimationManipulatorConstructImpl();
-  }
-
-  void CleanupCAnimationManipulatorSerializerAtexit()
-  {
-    (void)cleanup_CAnimationManipulatorSerializerImpl();
   }
 
   void CleanupCAnimationManipulatorTypeInfoAtexit()
@@ -1830,9 +1722,27 @@ namespace moho
   }
 
   /**
-   * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::RegisterConstructFunctions)
+   * Address: 0x00BD2DB0 (FUN_00BD2DB0, register_CAnimationManipulatorConstruct,
+   * dynamic initializer for the global `CAnimationManipulatorConstruct`
+   * singleton)
    */
-  void CAnimationManipulatorConstruct::RegisterConstructFunctions()
+  CAnimationManipulatorConstruct::CAnimationManipulatorConstruct()
+    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CAnimationManipulatorConstruct::Construct))
+    , mDeleteFunc(&CAnimationManipulatorConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
+   */
+  CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::Init)
+   */
+  void CAnimationManipulatorConstruct::Init()
   {
     gpg::RType* const type = CachedCAnimationManipulatorType();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -1861,9 +1771,27 @@ namespace moho
   }
 
   /**
-   * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::RegisterSerializeFunctions)
+   * Address: 0x00BD2DF0 (FUN_00BD2DF0, register_CAnimationManipulatorSerializer,
+   * dynamic initializer for the global `CAnimationManipulatorSerializer`
+   * singleton)
    */
-  void CAnimationManipulatorSerializer::RegisterSerializeFunctions()
+  CAnimationManipulatorSerializer::CAnimationManipulatorSerializer()
+    : mSerLoadFunc(&CAnimationManipulatorSerializer::Deserialize)
+    , mSerSaveFunc(&CAnimationManipulatorSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
+   */
+  CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::Init)
+   */
+  void CAnimationManipulatorSerializer::Init()
   {
     gpg::RType* const type = CachedCAnimationManipulatorType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
@@ -1906,17 +1834,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
-   *
-   * What it does:
-   * Unlinks the global construct helper node from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CAnimationManipulatorConstruct()
-  {
-    return cleanup_CAnimationManipulatorConstructImpl();
-  }
-
-  /**
    * Address: 0x00BFAF90 (FUN_00BFAF90, Moho::CAnimationManipulatorTypeInfo::~CAnimationManipulatorTypeInfo)
    *
    * What it does:
@@ -1925,47 +1842,6 @@ namespace moho
   void cleanup_CAnimationManipulatorTypeInfo()
   {
     cleanup_CAnimationManipulatorTypeInfoImpl();
-  }
-
-  /**
-   * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
-   *
-   * What it does:
-   * Unlinks the global serializer helper node from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializer()
-  {
-    return cleanup_CAnimationManipulatorSerializerImpl();
-  }
-
-  /**
-   * Address: 0x00BD2DF0 (FUN_00BD2DF0, register_CAnimationManipulatorSerializer)
-   *
-   * What it does:
-   * Initializes the global serializer helper callbacks and installs process-exit cleanup.
-   */
-  int register_CAnimationManipulatorSerializer()
-  {
-    InitializeHelperNode(gCAnimationManipulatorSerializer);
-    gCAnimationManipulatorSerializer.mSerLoadFunc = &CAnimationManipulatorSerializer::Deserialize;
-    gCAnimationManipulatorSerializer.mSerSaveFunc = &CAnimationManipulatorSerializer::Serialize;
-    return std::atexit(&CleanupCAnimationManipulatorSerializerAtexit);
-  }
-
-  /**
-   * Address: 0x00BD2DB0 (FUN_00BD2DB0, register_CAnimationManipulatorConstruct)
-   *
-   * What it does:
-   * Initializes the global construct helper callbacks and registers process-exit cleanup.
-   */
-  void register_CAnimationManipulatorConstruct()
-  {
-    InitializeHelperNode(gCAnimationManipulatorConstruct);
-    gCAnimationManipulatorConstruct.mSerConstructFunc =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CAnimationManipulatorConstruct::Construct);
-    gCAnimationManipulatorConstruct.mDeleteFunc = &CAnimationManipulatorConstruct::Deconstruct;
-    gCAnimationManipulatorConstruct.RegisterConstructFunctions();
-    (void)std::atexit(&CleanupCAnimationManipulatorConstructAtexit);
   }
 
   /**
@@ -1988,8 +1864,6 @@ namespace
     CAnimationManipulatorStartupBootstrap()
     {
       moho::register_CAnimationManipulatorTypeInfo();
-      moho::register_CAnimationManipulatorConstruct();
-      (void)moho::register_CAnimationManipulatorSerializer();
     }
   };
 
