@@ -204,16 +204,18 @@ namespace
   }
 
   /**
-   * Address: 0x007BBA90 (FUN_007BBA90)
+   * Address: 0x007BBA90 (FUN_007BBA90, msvc8::deque<Moho::SNetCommand>::
+   * clear_and_release -- see the citation on that method in Deque.h)
    *
    * What it does:
-   * Clears the queued command deque and releases its element payload lanes.
+   * Clears the queued command deque, releasing its element payload lanes
+   * AND every allocated node/map block -- not just a logical clear.
    */
   void ClearCommandQueue(
     msvc8::deque<SNetCommand>& commands
   ) noexcept
   {
-    commands.clear();
+    commands.clear_and_release();
   }
 
   /**

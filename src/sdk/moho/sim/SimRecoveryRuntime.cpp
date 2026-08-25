@@ -1529,24 +1529,6 @@ namespace
   };
 #pragma pack(pop)
 
-  struct WrappedPointerArrayRuntime
-  {
-    std::uint32_t lane00;
-    std::uint32_t* entries;
-    std::uint32_t baseIndex;
-  };
-
-  struct WrappedArrayCursorRuntime
-  {
-    WrappedPointerArrayRuntime* owner;
-    std::uint32_t logicalIndex;
-  };
-
-  struct NetCommandRecordRuntime
-  {
-    std::byte storage[0x30];
-  };
-
   struct Vector16ByteOwnerRuntime
   {
     std::uint32_t lane00;
@@ -1842,7 +1824,6 @@ namespace
   using OwnerTreeClearFn = void (*)(TreeStorageOwnerRuntime* owner);
   using TreeClearFn = void (*)(void* scratch, void* root, void* head);
   using TreeClearWithOwnerFn = void (*)(void* owner, void* scratch, void* root, void* head);
-  using NetCommandRecordCopyFn = void (*)(void* destinationRecord, const void* sourceRecord);
   using Vector16ConstructFn = int (*)(void* destination, std::uint32_t lane0, std::uint32_t lane1);
   using Vector16GrowFn = int (*)(Vector16ByteOwnerRuntime* owner, void* tail, std::uint32_t inputWord);
   using LookupNodeByTextFn = void* (*)(void* owner, const void* key);
@@ -1905,23 +1886,6 @@ namespace
     value->capacity = 15u;
     value->size = 0u;
     value->inlineStorage[0] = '\0';
-  }
-
-  [[nodiscard]] std::uint32_t ResolveWrappedPointerWord(
-    const WrappedPointerArrayRuntime* const cursorOwner,
-    const std::uint32_t logicalIndex
-  ) noexcept
-  {
-    if (cursorOwner == nullptr || cursorOwner->entries == nullptr) {
-      return 0u;
-    }
-
-    std::uint32_t resolvedIndex = logicalIndex;
-    if (cursorOwner->baseIndex <= logicalIndex) {
-      resolvedIndex = logicalIndex - cursorOwner->baseIndex;
-    }
-
-    return cursorOwner->entries[resolvedIndex];
   }
 
   [[nodiscard]] PairKeyNodeNil37Runtime* EnsurePairMapHeadRuntime(
@@ -10034,82 +9998,6 @@ MapInsertStatusRuntime* FindOrInsertMapNodeNil29Runtime(
 )
 {
   return FindOrInsertMapNodeByKey(map, key, outResult);
-}
-
-/**
- * Address: 0x007BE3B0 (FUN_007BE3B0)
- *
- * What it does:
- * Copies records from wrapped pointer arrays while walking source/destination
- * cursors backward.
- */
-WrappedArrayCursorRuntime* CopyWrappedRecordRangeReverseRuntime(
-  WrappedArrayCursorRuntime* const outCursor,
-  const WrappedArrayCursorRuntime stopCursor,
-  WrappedArrayCursorRuntime sourceCursor,
-  WrappedArrayCursorRuntime destinationCursor,
-  const NetCommandRecordCopyFn copyRecordFn
-)
-{
-  if (outCursor == nullptr) {
-    return nullptr;
-  }
-
-  while (stopCursor.owner != sourceCursor.owner || stopCursor.logicalIndex != sourceCursor.logicalIndex) {
-    --sourceCursor.logicalIndex;
-    const auto sourceWord = ResolveWrappedPointerWord(sourceCursor.owner, sourceCursor.logicalIndex);
-    auto* const sourceRecord = reinterpret_cast<const NetCommandRecordRuntime*>(static_cast<std::uintptr_t>(sourceWord));
-
-    --destinationCursor.logicalIndex;
-    const auto destinationWord = ResolveWrappedPointerWord(destinationCursor.owner, destinationCursor.logicalIndex);
-    auto* const destinationRecord = reinterpret_cast<NetCommandRecordRuntime*>(static_cast<std::uintptr_t>(destinationWord));
-
-    if (copyRecordFn != nullptr && destinationRecord != nullptr && sourceRecord != nullptr) {
-      copyRecordFn(destinationRecord, sourceRecord);
-    }
-  }
-
-  outCursor->owner = destinationCursor.owner;
-  outCursor->logicalIndex = destinationCursor.logicalIndex;
-  return outCursor;
-}
-
-/**
- * Address: 0x007BE430 (FUN_007BE430)
- *
- * What it does:
- * Copies records from wrapped pointer arrays while walking source/destination
- * cursors forward.
- */
-WrappedArrayCursorRuntime* CopyWrappedRecordRangeForwardRuntime(
-  WrappedArrayCursorRuntime* const outCursor,
-  const WrappedArrayCursorRuntime stopCursor,
-  WrappedArrayCursorRuntime sourceCursor,
-  WrappedArrayCursorRuntime destinationCursor,
-  const NetCommandRecordCopyFn copyRecordFn
-)
-{
-  if (outCursor == nullptr) {
-    return nullptr;
-  }
-
-  while (sourceCursor.owner != stopCursor.owner || sourceCursor.logicalIndex != stopCursor.logicalIndex) {
-    const auto sourceWord = ResolveWrappedPointerWord(sourceCursor.owner, sourceCursor.logicalIndex);
-    auto* const sourceRecord = reinterpret_cast<const NetCommandRecordRuntime*>(static_cast<std::uintptr_t>(sourceWord));
-    const auto destinationWord = ResolveWrappedPointerWord(destinationCursor.owner, destinationCursor.logicalIndex);
-    auto* const destinationRecord = reinterpret_cast<NetCommandRecordRuntime*>(static_cast<std::uintptr_t>(destinationWord));
-
-    if (copyRecordFn != nullptr && destinationRecord != nullptr && sourceRecord != nullptr) {
-      copyRecordFn(destinationRecord, sourceRecord);
-    }
-
-    ++sourceCursor.logicalIndex;
-    ++destinationCursor.logicalIndex;
-  }
-
-  outCursor->owner = destinationCursor.owner;
-  outCursor->logicalIndex = destinationCursor.logicalIndex;
-  return outCursor;
 }
 
 /**
