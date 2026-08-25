@@ -18901,215 +18901,41 @@ namespace
     return TakeScalarWordAndClear(lane);
   }
 
-  struct FiveWordLaneRuntimeView
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-    std::uint32_t lane0C; // +0x0C
-    std::uint32_t lane10; // +0x10
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(FiveWordLaneRuntimeView) == 0x14, "FiveWordLaneRuntimeView size must be 0x14");
-#endif
-
-  struct FourArgCallableRuntimeView
-  {
-    void* callableVtable;     // +0x00
-    std::uint32_t lane04;     // +0x04
-    std::uint32_t payload08;  // +0x08
-    std::uint32_t payload0C;  // +0x0C
-  };
-#if defined(_M_IX86)
-  static_assert(
-    offsetof(FourArgCallableRuntimeView, payload08) == 0x08,
-    "FourArgCallableRuntimeView::payload08 offset must be 0x08"
-  );
-#endif
-
-  struct DeferredCursorLaneRuntimeView
-  {
-    FourArgCallableRuntimeView callable; // +0x00
-    std::byte pad10_1F[0x10];
-    std::uint32_t committedLane20; // +0x20
-    std::uint32_t committedLane24; // +0x24
-    std::uint32_t activeLane28; // +0x28
-    std::uint32_t activeLane2C; // +0x2C
-    std::uint8_t activeFlag30; // +0x30
-    std::byte pad31_33[0x03];
-    std::uint32_t pendingLane34; // +0x34
-    std::uint32_t pendingLane38; // +0x38
-    std::uint32_t fallbackLane3C; // +0x3C
-    std::uint32_t fallbackLane40; // +0x40
-    std::uint8_t exhaustedFlag44; // +0x44
-  };
-#if defined(_M_IX86)
-  static_assert(
-    offsetof(DeferredCursorLaneRuntimeView, pendingLane34) == 0x34,
-    "DeferredCursorLaneRuntimeView::pendingLane34 offset must be 0x34"
-  );
-  static_assert(
-    offsetof(DeferredCursorLaneRuntimeView, fallbackLane3C) == 0x3C,
-    "DeferredCursorLaneRuntimeView::fallbackLane3C offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(DeferredCursorLaneRuntimeView, exhaustedFlag44) == 0x44,
-    "DeferredCursorLaneRuntimeView::exhaustedFlag44 offset must be 0x44"
-  );
-#endif
-
-  /**
-   * Address: 0x007CE8B0 (FUN_007CE8B0)
-   *
-   * What it does:
-   * Invokes one deferred four-argument callable payload and copies the
-   * resulting five-word lane into caller-provided output storage.
-   */
-  FiveWordLaneRuntimeView* InvokeDeferredCallableToFiveWordLane(
-    const FourArgCallableRuntimeView* const callable,
-    FiveWordLaneRuntimeView* const outValue,
-    const std::uint32_t laneA3,
-    const std::uint32_t laneA4,
-    const std::uint32_t laneA5,
-    const std::uint32_t laneA6
-  )
-  {
-    if (callable == nullptr || callable->callableVtable == nullptr) {
-      throw std::runtime_error("bad_function_call");
-    }
-
-    using InvokeFn = FiveWordLaneRuntimeView* (__cdecl*)(
-      void* scratchStorage,
-      void* callablePayload,
-      std::uint32_t,
-      std::uint32_t,
-      std::uint32_t,
-      std::uint32_t
-    );
-
-    std::byte scratchStorage[0x14]{};
-    auto* const vtableWords = reinterpret_cast<const std::uint32_t*>(callable->callableVtable);
-    const auto invoke = reinterpret_cast<InvokeFn>(vtableWords[1]);
-    FiveWordLaneRuntimeView* const produced = invoke(
-      scratchStorage,
-      const_cast<std::uint32_t*>(&callable->payload08),
-      laneA3,
-      laneA4,
-      laneA5,
-      laneA6
-    );
-
-    *outValue = *produced;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x007CDFB0 (FUN_007CDFB0)
-   *
-   * What it does:
-   * Advances one deferred-cursor lane by promoting pending lanes to committed
-   * state and resolving the next active window from deferred callable output.
-   */
-  std::uint32_t AdvanceDeferredCursorLane(
-    DeferredCursorLaneRuntimeView* const cursor
-  )
-  {
-    FiveWordLaneRuntimeView callableOutput{};
-    std::uint32_t nextActiveStart = 0u;
-    std::uint32_t nextActiveEnd = 0u;
-    std::uint32_t nextPendingStart = 0u;
-    std::uint32_t nextPendingEnd = 0u;
-
-    if (cursor->callable.callableVtable != nullptr) {
-      (void)InvokeDeferredCallableToFiveWordLane(
-        &cursor->callable,
-        &callableOutput,
-        cursor->pendingLane34,
-        cursor->pendingLane38,
-        cursor->fallbackLane3C,
-        cursor->fallbackLane40
-      );
-      nextActiveStart = callableOutput.lane00;
-      nextActiveEnd = callableOutput.lane04;
-      nextPendingStart = callableOutput.lane08;
-      nextPendingEnd = callableOutput.lane0C;
-    } else {
-      nextActiveStart = cursor->fallbackLane3C;
-      nextActiveEnd = cursor->fallbackLane40;
-      nextPendingStart = nextActiveStart;
-      nextPendingEnd = nextActiveEnd;
-    }
-
-    const std::uint32_t fallbackEnd = cursor->fallbackLane40;
-    if (
-      nextActiveEnd == fallbackEnd && nextPendingEnd == fallbackEnd &&
-      cursor->activeLane2C == fallbackEnd
-    ) {
-      cursor->exhaustedFlag44 = 1u;
-    }
-
-    cursor->committedLane20 = cursor->pendingLane34;
-    cursor->committedLane24 = cursor->pendingLane38;
-    cursor->activeLane28 = nextActiveStart;
-    cursor->activeLane2C = nextActiveEnd;
-    cursor->activeFlag30 = 0u;
-    cursor->pendingLane34 = nextPendingStart;
-    cursor->pendingLane38 = nextPendingEnd;
-
-    return cursor->committedLane24;
-  }
-
-  /**
-   * Address: 0x007CF150 (FUN_007CF150)
-   *
-   * What it does:
-   * Alias entrypoint for one deferred-cursor advance step.
-   */
-  std::uint32_t AdvanceDeferredCursorLaneAliasA(
-    DeferredCursorLaneRuntimeView* const cursor
-  )
-  {
-    return AdvanceDeferredCursorLane(cursor);
-  }
-
-  /**
-   * Address: 0x007CF380 (FUN_007CF380)
-   *
-   * What it does:
-   * Alias entrypoint for one deferred-cursor advance step.
-   */
-  std::uint32_t AdvanceDeferredCursorLaneAliasB(
-    DeferredCursorLaneRuntimeView* const cursor
-  )
-  {
-    return AdvanceDeferredCursorLane(cursor);
-  }
-
-  /**
-   * Address: 0x007CF3B0 (FUN_007CF3B0)
-   *
-   * What it does:
-   * Alias entrypoint for one deferred-cursor advance step.
-   */
-  std::uint32_t AdvanceDeferredCursorLaneAliasC(
-    DeferredCursorLaneRuntimeView* const cursor
-  )
-  {
-    return AdvanceDeferredCursorLane(cursor);
-  }
-
-  /**
-   * Address: 0x007CF630 (FUN_007CF630)
-   *
-   * What it does:
-   * Alias entrypoint for one deferred-cursor advance step.
-   */
-  std::uint32_t AdvanceDeferredCursorLaneAliasD(
-    DeferredCursorLaneRuntimeView* const cursor
-  )
-  {
-    return AdvanceDeferredCursorLane(cursor);
-  }
+  // Address: 0x007CE8B0 (FUN_007CE8B0), 0x007CDFB0 (FUN_007CDFB0),
+  // 0x007CF150/0x007CF380/0x007CF3B0/0x007CF630 (FUN_007CF150/007CF380/
+  // 007CF3B0/007CF630) -- re-homed, not deleted outright. These six
+  // addresses were previously modeled here as a bespoke "deferred cursor
+  // lane" (`FiveWordLaneRuntimeView`/`FourArgCallableRuntimeView`/
+  // `DeferredCursorLaneRuntimeView`, since removed) with invented
+  // "pending/active/committed lane" semantics that do not match what the
+  // disassembly actually does -- a RULE ONE violation compounded by the
+  // RuntimeView offset-reach-in anti-pattern this file is already flagged
+  // for. All six are genuine `boost::algorithm::string` tokenizer template
+  // emissions, not engine-specific "cursor" logic:
+  //   - 0x007CE8B0 is `boost::function2<iterator_range<IteratorT>,
+  //     IteratorT,IteratorT>::operator()` (the `vtable->invoker(functor,
+  //     args...)` dispatch every `boost::function` specialization gets;
+  //     IDA's own decompile already names the parameter
+  //     `boost::function1_void*` and calls out `bad_function_call`).
+  //   - 0x007CDFB0 is `boost::algorithm::split_iterator<IteratorT>::
+  //     increment()` (`do_find(m_Next,m_End)` through 0x007CE8B0, then
+  //     `m_Match = match_type(m_Next, FindMatch.begin()); m_Next =
+  //     FindMatch.end();`, with the null-finder/eof-detection guards boost's
+  //     own header specifies) -- confirmed field-for-field against every
+  //     read/write offset in `FUN_007CDFB0.c`/`.asm`.
+  //   - 0x007CF150/0x007CF380/0x007CF3B0/0x007CF630 are one-line
+  //     calling-convention thunks straight into 0x007CDFB0 (`sub_7CDFB0`),
+  //     each confirmed via its own `.c` export.
+  // Neither this function nor its five siblings had a real caller anywhere
+  // in `src/sdk/**` (grep-confirmed) -- they were orphaned from the day
+  // they were written. The real, in-`src/sdk` instantiation site for this
+  // whole family (this cluster plus the ~10 other addresses in the same
+  // `boost::algorithm::split`/`token_finder`/`is_any_of` pipeline) is
+  // `Moho::BuildLobbyIgnoreNameList` in `src/sdk/moho/net/CLobby.cpp`
+  // (`func_GetIgnoreNames`, 0x007CBC80) -- see that function's Doxygen
+  // block for the full address roster and evidence trail. Per RULE ONE,
+  // the real templated call there *is* the recovery for all of these;
+  // there is nothing left to model as free functions in this file.
 
   /**
    * Address: 0x007CDF90 (FUN_007CDF90)
