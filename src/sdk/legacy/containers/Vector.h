@@ -5557,7 +5557,21 @@ namespace msvc8
          * member, and this teardown is only reachable during unwind of
          * this project's own `uninit_fill_n<HeadSampleOption>`.
          *
-         * Uninitialized fill N with value starting at dst
+         * Address: 0x008F0090 (FUN_008F0090, sub_8F0090) -- `msvc8::
+         * vector<gpg::gal::AdapterD3D9>::uninit_fill_n` for
+         * `DeviceD3D9Runtime::adapters` (`D3D9Interfaces.cpp`, 112-byte
+         * polymorphic element, same instantiation as `insert(pos,count,
+         * value)`'s `FUN_008F1890` and `destroy_range`'s `FUN_008EA5C0`
+         * above). `for (i=dst; i!=dstEnd; i+=112) { copy 2 dwords; assign
+         * 3 embedded msvc8::strings; call sub_8EF870 on the modes
+         * sub-vector; }` -- per-slot copy-construct via this element's own
+         * copy ctor sub-pieces rather than a single ctor call (matches
+         * `FUN_008EFF80`'s own field layout exactly: 2 leading dwords,
+         * 3 string members, `modes` vector at +0x60). `FUN_008EF870` is
+         * already `recovered` (`msvc8::vector<AdapterModeD3D9>::
+         * operator=`). Previously `blocked` citing "caller integration
+         * lane FUN_008F1890" as unresolved -- that token is now recovered
+         * (cited above on `insert`), clearing the stated blocker.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
