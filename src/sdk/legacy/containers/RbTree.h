@@ -2060,6 +2060,25 @@ namespace msvc8
              * the full range). Not modeled for the same reason those were
              * skipped -- compiled into the binary, never exercised by the
              * one call site that reaches it.
+             *
+             * Address: 0x008D6650 (FUN_008D6650, sub_8D6650) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's `erase_node`
+             * (isNil@+29, color@+28 -- the same instantiation cited on
+             * `insert_unique`/`insert_at`/`buy_head`/`rb_decrement`/
+             * `erase_range`/`destroy_subtree` elsewhere in this file). Full
+             * CLRS transplant-then-fixup shape: throws `std::out_of_range
+             * ("invalid map/set<T> iterator")` on a nil erase target (the
+             * same `_SECURE_SCL` checked-iterator guard documented
+             * throughout this file), captures the successor before
+             * unlinking, patches `head->left`/`head->right` through this
+             * instantiation's own `rb_min`/`rb_max` when the erased node
+             * was an extremum, and rebalances through this instantiation's
+             * own `rotate_left`/`rotate_right` realizations `sub_8D61D0`/
+             * `sub_8D6230` (cited below on those members). Writes
+             * `Resolution::\`vftable'` before `operator delete`, matching
+             * `destroy_subtree`'s same vtable-write tell. Reached from this
+             * instantiation's `erase_range` (`FUN_008D6080`, cited above)
+             * walk path.
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -2425,6 +2444,23 @@ namespace msvc8
              * `Moho::CScriptObject`/`LuaPlus::LuaObject` fields from an
              * unrelated class, which is why the raw `.c` export reads as
              * script-object teardown at this call site.)
+             *
+             * Address: 0x008D6080 (FUN_008D6080, sub_8D6080) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's `erase_range`
+             * (isNil@+29, the same instantiation cited on `insert_unique`/
+             * `insert_at`/`buy_head`/`rb_decrement` elsewhere in this file).
+             * Whole-range fast path calls the already-cited-below
+             * `destroy_subtree` realization `sub_8D6B70`; walk path erases
+             * node-by-node via `sub_8D6650` (`erase_node`, cited below).
+             * Five real callers, all in `StartupHelpers.cpp`'s adapter-mode
+             * enumeration family: `FUN_008D21E0` (`SetupPrimaryAdapterSettings`,
+             * already recovered -- though its CURRENT source uses a
+             * simplified `HasMode` linear-scan dedup instead of this tree,
+             * a documented follow-up, see the `insert_unique`/`FUN_008D4F10`
+             * citation above) plus `FUN_008D26A0`/`FUN_008D26D0`/
+             * `FUN_008D4ED0`/`FUN_008D58F0` (sibling adapter-setup
+             * functions using the same local-tree pattern, not yet
+             * individually traced).
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -3407,6 +3443,17 @@ namespace msvc8
              * engine-instantiated tree teardown, not CRT/imported code).
              * `Moho::CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
              * unrecovered.)
+             *
+             * Address: 0x008D6B70 (FUN_008D6B70, sub_8D6B70) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's own
+             * `destroy_subtree` (isNil@+29). Per node: recurses right
+             * (`sub_8D6B70(i[2])`), iterates left, writes
+             * `Resolution::\`vftable'` into the node's vtable slot before
+             * `operator delete` -- matching this member's shape exactly and
+             * confirming genuine engine-instantiated teardown (a direct
+             * `Resolution::\`vftable'` reference cannot be CRT code).
+             * Reached from this instantiation's `erase_range`
+             * (`FUN_008D6080`, cited above) whole-range fast path.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -3639,6 +3686,12 @@ namespace msvc8
              * specialisation with its own distinct rotate helper address.
              * Reached from `insert_at`'s fixup loop for this instantiation
              * (`FUN_009478E0`'s `erase_node` citation above).
+             *
+             * Address: 0x008D61D0 (FUN_008D61D0, sub_8D61D0) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's left rotate
+             * (isNil@+29). Reached from both `insert_at`'s fixup loop and
+             * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
+             * this same instantiation.
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -3770,6 +3823,12 @@ namespace msvc8
              * specialisation with its own distinct rotate helper address.
              * Reached from `insert_at`'s fixup loop for this instantiation
              * (`FUN_009478E0`'s `erase_node` citation above).
+             *
+             * Address: 0x008D6230 (FUN_008D6230, sub_8D6230) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's right rotate
+             * (isNil@+29). Reached from both `insert_at`'s fixup loop and
+             * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
+             * this same instantiation.
              */
             void rotate_right(node_type* const n) noexcept
             {
