@@ -1331,9 +1331,20 @@ namespace msvc8
     template <class T, bool HasDebugProxy = true>
     class vector
 	{
+    public:
+        // `iterator`/`const_iterator` are public (unlike the fields below) so
+        // that generic code written against this container -- e.g.
+        // `boost::range_iterator<msvc8::vector<T>>` resolving
+        // `boost::algorithm::split`'s `SequenceSequenceT` for
+        // `BuildLobbyIgnoreNameList` (`CLobby.cpp`) -- can name them, the same
+        // way every real STL/Dinkumware container exposes its iterator
+        // typedefs publicly. Purely a visibility fix: both aliases already
+        // existed with this exact meaning, just unreachable from outside the
+        // class.
         using iterator = T*;
         using const_iterator = const T*;
 
+    private:
         [[msvc::no_unique_address]] std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxyLane> myProxy_; // +0x0 when present (opaque _Container_proxy*)
         T* first_;      // +0x4 (+0x0 when HasDebugProxy=false)
         T* last_;       // +0x8 (+0x4 when HasDebugProxy=false)
@@ -1392,6 +1403,44 @@ namespace msvc8
         vector(std::size_t count, const T& value) : vector() {
             if (count) {
                 insert(first_, count, value);
+            }
+        }
+
+        /**
+         * Address: 0x007CE770 (FUN_007CE770, tail-called through
+         * 0x007CDBC0/0x007CEBD0's by-value-parameter shells) --
+         * `msvc8::vector<Moho::CLobby's msvc8::string>::vector(InputIt,
+         * InputIt)` for `boost::algorithm::split`'s `SequenceSequenceT
+         * Tmp(itBegin, itEnd);` step in `func_GetIgnoreNames` (`CLobby.cpp`,
+         * `BuildLobbyIgnoreNameList`). The shipped body zero-inits
+         * `first_`/`last_`/`end_` (an ordinary empty-vector start, not a
+         * `reserve()` fast path) and then inserts one element per iterator
+         * step (`FUN_00411EA0`, cited on `insert(pos, value)` below) --
+         * because `boost::algorithm`'s `transform_iterator<copy_range_type,
+         * split_iterator<T>>` dereferences to a *by-value* `msvc8::string`
+         * rather than a real reference, `iterator_facade` downgrades its
+         * traversal category below `forward` even though the wrapped
+         * `split_iterator` is itself forward-traversal, so VC8's own
+         * `vector(InputIt,InputIt)` picks the naive single-pass insert-loop
+         * overload instead of the `_Distance`+`reserve`+`uninit_copy` bulk
+         * path every other citation on this file's constructors describes.
+         * This member models that same generic (always-single-pass) shape
+         * rather than trying to distinguish iterator categories, since nothing
+         * in this codebase's own container types provides a smaller-than-
+         * forward-but-labelled-forward iterator otherwise.
+         *
+         * Construct from an iterator range, inserting one element per step.
+         *
+         * Guarded against `InputIt` deducing to an integral type so that
+         * `vector(count, value)`-shaped calls keep resolving to the
+         * count/value constructor above instead of this one (the classic
+         * `vector(InputIt,InputIt)` vs. `vector(size_type,const T&)`
+         * overload-resolution pitfall).
+         */
+        template <class InputIt, class = std::enable_if_t<!std::is_integral_v<InputIt>>>
+        vector(InputIt first, InputIt last) : vector() {
+            for (; first != last; ++first) {
+                push_back(*first);
             }
         }
 
@@ -3609,6 +3658,19 @@ namespace msvc8
          * null-`pos` guard. Reached from `push_back`'s slow (no-spare-
          * capacity) path with `pos=last_`/`end()`.)
          *
+         * Address: 0x00411EA0 (FUN_00411EA0, sub_411EA0) -- `msvc8::
+         * vector<msvc8::string>::insert(pos, value)` for the 28-byte
+         * `msvc8::string` element. Same "capture offset, tail-call the
+         * count overload with `count=1` (`sub_412000`, cited on
+         * `insert(pos,count,value)` below), rebuild the iterator from the
+         * captured offset" shape as `FUN_008F1310` above, field for field.
+         * Reached from `boost::algorithm::split`'s per-token insert loop
+         * (`FUN_007CEFB0`, `iter_split`'s naive single-pass path -- see the
+         * `vector(InputIt,InputIt)` constructor's citation above for why
+         * this instantiation takes that path instead of a bulk copy) inside
+         * `func_GetIgnoreNames`/`BuildLobbyIgnoreNameList`
+         * (`CLobby.cpp`, `0x007CBC80`).
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -4263,6 +4325,39 @@ namespace msvc8
          * currently-traced caller -- same "compiled, not separately
          * runtime-exercised" shape as this file's other single-caller
          * count-overload citations.)
+         *
+         * Address: 0x00412000 (FUN_00412000, sub_412000) -- `msvc8::
+         * vector<msvc8::string>::insert(pos, count, value)` for the 28-byte
+         * `msvc8::string` element, the count-based core `FUN_00411EA0`
+         * (cited above on `insert(pos, value)`) tail-calls with `count=1`.
+         * Stages `const T localValue(value);` first via
+         * `std::string::assign` (this member's self-aliasing guard, see
+         * that line's own comment), the `153391689` (`=0xFFFFFFFF/28`)
+         * `max_size` overflow guard, the `(cap>>1)+cap` 1.5x growth
+         * formula, and the in-place-shift-vs-reallocate split matching
+         * this member's two branches field for field. Only ever reached
+         * with `count` hardcoded to 1 from `FUN_00411EA0`, same
+         * "compiled, not separately runtime-exercised" shape as this
+         * file's other single-caller count-overload citations.
+         *
+         * Address: 0x008F1890 (FUN_008F1890, sub_8F1890) -- `msvc8::
+         * vector<gpg::gal::AdapterD3D9>::insert(pos, count, value)` for
+         * `DeviceD3D9Runtime::adapters` (`D3D9Interfaces.cpp`, 112-byte
+         * polymorphic element). IDA's own decompile carries a "bad/positive
+         * sp value... may be wrong" disclaimer and its visible `.c` body
+         * does not show the reallocation-path cleanup calls at all --
+         * confirmed against the raw `.asm` instead: stages a local copy of
+         * `value` via this element's copy-ctor (`FUN_008EFF80`, already
+         * recovered as `AdapterD3D9::AdapterD3D9(const AdapterD3D9&)`),
+         * the `38347922`(=`0xFFFFFFFF/112`) `max_size` overflow guard, the
+         * `(cap>>1)+cap` 1.5x growth formula, and on the reallocation path
+         * calls this instantiation's own `destroy_range` (`FUN_008EA5C0`,
+         * cited above) 3x on the old buffer's live range before freeing it
+         * with `operator delete`, matching this member's shape field for
+         * field. This member itself is `DeviceD3D9::BuildDeviceCapabilities`'s
+         * (`FUN_008F2080`, already recovered, `D3D9Interfaces.cpp`)
+         * `runtime.adapters`-population path, growing the adapter list
+         * during device-capability enumeration.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -4444,6 +4539,22 @@ namespace msvc8
          * caller. Reached from `_Insert_n` FUN_00855DF0 (cited above on
          * `insert`), `mMeshes`'s reallocation branch, to tear down the old
          * buffer's live range after relocating into the new one.)
+         * Address: 0x008EA5C0 (FUN_008EA5C0, sub_8EA5C0) -- `msvc8::
+         * vector<gpg::gal::AdapterD3D9>::destroy_range` for the 112-byte
+         * polymorphic element (`AdapterD3D9` has a real vtable and virtual
+         * destructor, `Scalar-deleting wrapper: 0x008F0040`, already cited
+         * in `AdapterD3D9.hpp`) -- the same vtbl-slot-0 virtual-dtor loop
+         * shape as the sibling `AdapterModeD3D9`/`AdapterModeD3D10` entries
+         * above (`FUN_00857630`/`FUN_008EA5F0`), `flag=0`. IDA types the
+         * loop variable as a triple-indirected function-pointer, so its
+         * decompiled `+= 28` is 28 POINTER units (112 bytes), matching this
+         * element's real size, not a 28-byte stride. Reached 3x from
+         * `insert(pos,count,value)`'s emission for this instantiation
+         * (`FUN_008F1890`, cited below), all in the reallocation path's
+         * cleanup of the old buffer after relocating into the new one --
+         * the `.c` decompile for `FUN_008F1890` doesn't show these calls at
+         * all (its own "bad/positive sp value" disclaimer), only the raw
+         * `.asm` does; confirmed against that directly.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
