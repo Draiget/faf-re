@@ -3566,6 +3566,16 @@ namespace msvc8
              * tears down the nested `std::set<CDecalHandle*>` value via
              * `sub_77B4F0` before freeing the node. Reached from that
              * `erase_range`'s whole-range fast path.
+             *
+             * Address: 0x009470E0 (FUN_009470E0, sub_9470E0) --
+             * `gpg::gal::StateCache<_D3DRENDERSTATETYPE, unsigned int>::
+             * tree_`'s `destroy_subtree`, isNil@+0x15 -- plain
+             * `operator delete` per node (pointer-free value_type, no
+             * vtable/nested-container teardown needed), matching the shape
+             * `erase_range`'s citation above (`FUN_00947B90`) already
+             * described in prose as "recursive delete-all with no
+             * rebalancing" without its own Address block. Reached from
+             * that same `erase_range`'s whole-tree fast path.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
