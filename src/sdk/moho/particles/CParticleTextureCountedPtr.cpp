@@ -13,7 +13,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/CParticleTexture.h"
 #include "moho/resource/CParticleTextureReflection.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -216,6 +216,12 @@ namespace
     unsigned int requestedCount
   );
 
+  [[nodiscard]] moho::CountedPtr_CParticleTexture* RelinkCountedTextureSlotsForward(
+    moho::CountedPtr_CParticleTexture* destinationCursor,
+    const moho::CountedPtr_CParticleTexture* sourceCursor,
+    const moho::CountedPtr_CParticleTexture* sourceStop
+  );
+
   /**
    * Address: 0x0065A4C0 (FUN_0065A4C0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SerLoad)
    *
@@ -269,7 +275,62 @@ namespace
   }
 
   /**
+   * Address: 0x00658800 (FUN_00658800)
+   *
+   * IDA signature:
+   * int *__usercall sub_658800@<eax>(int *result@<eax>, int *a2@<ecx>, int *a3);
+   *
+   * What it does:
+   * Walks `[sourceCursor, sourceStop)` and `destinationCursor` in lockstep,
+   * relinking each destination slot onto the corresponding source slot's
+   * texture through `AssignCountedParticleTexturePtr` (self-compare guard,
+   * release the old target if the pointer is actually changing, then
+   * acquire the new one) instead of a raw pointer overwrite -- matching the
+   * binary's per-slot release-then-acquire refcount dance byte for byte
+   * (`_InterlockedExchangeAdd` decrement + vtable-slot-0 dispose on the old
+   * value when it hits zero, `_InterlockedExchangeAdd` increment on the new
+   * one). Returns the advanced destination cursor.
+   *
+   * `CountedPtr<T>` has no real `operator=` of its own by design (see
+   * `CountedObject.h`), so this per-slot glue lives beside its siblings
+   * `AssignCountedParticleTexturePtr` / `ResetCountedParticleTexturePtr`
+   * rather than as a generic `msvc8`/`FastVector` template member.
+   *
+   * Its caller, FUN_00657DB0, is a thin `erase(pos, end())` dispatcher --
+   * every call site in this binary passes `sourceCursor == sourceStop ==
+   * end()`, so the loop's trip count is always zero and this is a
+   * structural no-op at runtime. The instantiation is still emitted and
+   * still called because the compiler generated `erase`'s general
+   * two-step shift-then-destroy shape regardless of which specific range
+   * this specialization's one caller happens to pass (the same reasoning
+   * already documented on the `FUN_005CE020` `uninit_move_n` note in
+   * `ReconBlip.cpp` for an empty old-range call).
+   */
+  [[nodiscard]] moho::CountedPtr_CParticleTexture* RelinkCountedTextureSlotsForward(
+    moho::CountedPtr_CParticleTexture* destinationCursor,
+    const moho::CountedPtr_CParticleTexture* sourceCursor,
+    const moho::CountedPtr_CParticleTexture* sourceStop
+  )
+  {
+    for (; sourceCursor != sourceStop; ++sourceCursor, ++destinationCursor) {
+      (void)moho::AssignCountedParticleTexturePtr(destinationCursor, sourceCursor->tex);
+    }
+    return destinationCursor;
+  }
+
+  /**
    * Address: 0x00657900 (FUN_00657900)
+   *
+   * Shrink branch note:
+   * FUN_00657DB0 (reached here as its sole caller, confirmed via
+   * `_callgraph_index.sqlite` `incoming_xrefs`/`reachable`: root `WinMain`,
+   * depth 17) is inlined below: shift step `RelinkCountedTextureSlotsForward`
+   * (FUN_00658800, always degenerate here, see its own citation above) then
+   * release the vacated tail (FUN_00658170 -- `_InterlockedExchangeAdd`
+   * decrement + vtable-slot-0 dispose per non-null slot then zero it, which
+   * is exactly the loop below; it has five other call sites elsewhere in
+   * this neighborhood not traced in this pass, so it is expressed here as
+   * the loop rather than independently recovered as its own symbol).
    *
    * What it does:
    * Resizes one runtime `fastvector<CountedPtr<CParticleTexture>>` lane,
@@ -289,10 +350,12 @@ namespace
     const unsigned int currentCount = static_cast<unsigned int>(vec.size());
     if (requestedCount < currentCount) {
       moho::CountedPtr_CParticleTexture* const newEnd = vec.Data() + requestedCount;
-      for (moho::CountedPtr_CParticleTexture* cursor = newEnd; cursor != view.end; ++cursor) {
+      moho::CountedPtr_CParticleTexture* const shiftedEnd =
+        RelinkCountedTextureSlotsForward(newEnd, view.end, view.end);
+      for (moho::CountedPtr_CParticleTexture* cursor = shiftedEnd; cursor != view.end; ++cursor) {
         moho::ResetCountedParticleTexturePtr(*cursor);
       }
-      view.end = newEnd;
+      view.end = shiftedEnd;
       return requestedCount;
     }
 
