@@ -6,7 +6,6 @@
 
 namespace gpg
 {
-  struct SerHelperBase;
   class SerConstructResult;
 }
 
@@ -16,11 +15,25 @@ namespace moho
    * VFTABLE: 0x00E1C140
    * COL:  0x00E71484
    */
-  class CAiNavigatorAirConstruct
+  class CAiNavigatorAirConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-      * Alias of FUN_005A5630 (non-canonical helper lane).
+     * Address: 0x00BCC840 (FUN_00BCC840, dynamic initializer for the global
+     * `CAiNavigatorAirConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the construct/delete callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly, then
+     * installs `??_7CAiNavigatorAirConstruct@Moho@@6B@` -- no eager
+     * `RegisterConstructFunction()`/`Init()` call exists here.
+     */
+    CAiNavigatorAirConstruct();
+
+    /**
+     * Alias of FUN_005A5630 (non-canonical helper lane).
      *
      * What it does:
      * Allocates one `CAiNavigatorAir` and publishes it as unowned construct
@@ -37,28 +50,20 @@ namespace moho
     static void Deconstruct(void* object);
 
     /**
-     * Address: 0x005A74D0 (FUN_005A74D0)
+     * Address: 0x005A74D0 (FUN_005A74D0, gpg::SerConstructHelper_CAiNavigatorAir::Init)
      *
      * What it does:
-     * Binds construct/delete callbacks into CAiNavigatorAir RTTI.
+     * Binds construct/delete callbacks into CAiNavigatorAir RTTI. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
 
-  static_assert(
-    offsetof(CAiNavigatorAirConstruct, mHelperNext) == 0x04,
-    "CAiNavigatorAirConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAiNavigatorAirConstruct, mHelperPrev) == 0x08,
-    "CAiNavigatorAirConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CAiNavigatorAirConstruct, mConstructCallback) == 0x0C,
     "CAiNavigatorAirConstruct::mConstructCallback offset must be 0x0C"
@@ -68,14 +73,4 @@ namespace moho
     "CAiNavigatorAirConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiNavigatorAirConstruct) == 0x14, "CAiNavigatorAirConstruct size must be 0x14");
-
-  /**
-   * Address: 0x00BCC840 (FUN_00BCC840, register_CAiNavigatorAirConstruct)
-   *
-   * What it does:
-   * Initializes the global CAiNavigatorAir construct helper callbacks and
-   * installs process-exit cleanup.
-   */
-  int register_CAiNavigatorAirConstruct();
 } // namespace moho
-
