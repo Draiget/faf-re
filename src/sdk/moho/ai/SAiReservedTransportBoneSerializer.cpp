@@ -1,8 +1,6 @@
 #include "moho/ai/SAiReservedTransportBoneSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/SAiReservedTransportBone.h"
@@ -12,69 +10,16 @@ using namespace moho;
 
 namespace
 {
-  alignas(SAiReservedTransportBoneSerializer)
-    unsigned char gSAiReservedTransportBoneSerializerStorage[sizeof(SAiReservedTransportBoneSerializer)];
-  bool gSAiReservedTransportBoneSerializerConstructed = false;
-
-  [[nodiscard]] SAiReservedTransportBoneSerializer* AcquireSAiReservedTransportBoneSerializer()
-  {
-    if (!gSAiReservedTransportBoneSerializerConstructed) {
-      new (gSAiReservedTransportBoneSerializerStorage) SAiReservedTransportBoneSerializer();
-      gSAiReservedTransportBoneSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SAiReservedTransportBoneSerializer*>(gSAiReservedTransportBoneSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-    return SerializerSelfNode(serializer);
-  }
-
-  /**
-   * Address: 0x005E40F0 (FUN_005E40F0)
-   *
-   * What it does:
-   * Unlinks the global `SAiReservedTransportBoneSerializer` helper node from
-   * the intrusive serializer chain and restores it to a self-linked node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAiReservedTransportBoneSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(*AcquireSAiReservedTransportBoneSerializer());
-  }
-
-  /**
-   * Address: 0x005E4120 (FUN_005E4120)
-   *
-   * What it does:
-   * Secondary unlink/reset thunk for the global
-   * `SAiReservedTransportBoneSerializer` helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAiReservedTransportBoneSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(*AcquireSAiReservedTransportBoneSerializer());
-  }
+  // Address: 0x010B0864 -- process-global `SAiReservedTransportBoneSerializer`
+  // singleton. Constructing it runs SAiReservedTransportBoneSerializer::
+  // SAiReservedTransportBoneSerializer() (0x00BCED90), which splices this
+  // helper into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
+  // InitNewHelpers() later dispatches Init() on it from within the first
+  // ReadArchive/WriteArchive construction. Its destructor
+  // (~SAiReservedTransportBoneSerializer, 0x00BF8A00) runs at normal
+  // static-duration teardown, matching the real binary's atexit
+  // registration.
+  SAiReservedTransportBoneSerializer gSAiReservedTransportBoneSerializer;
 
   [[nodiscard]] gpg::RType* CachedWeakUnitType()
   {
@@ -104,19 +49,6 @@ namespace
     }
     return type;
   }
-
-  void cleanup_SAiReservedTransportBoneSerializer()
-  {
-    if (!gSAiReservedTransportBoneSerializerConstructed) {
-      return;
-    }
-
-    SAiReservedTransportBoneSerializer* const serializer = AcquireSAiReservedTransportBoneSerializer();
-    (void)cleanup_SAiReservedTransportBoneSerializerStartupThunkA();
-    serializer->~SAiReservedTransportBoneSerializer();
-    gSAiReservedTransportBoneSerializerConstructed = false;
-  }
-
 } // namespace
 
 /**
@@ -319,13 +251,38 @@ void SAiReservedTransportBoneSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCED90 (FUN_00BCED90, dynamic initializer for the global
+ * `SAiReservedTransportBoneSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+SAiReservedTransportBoneSerializer::SAiReservedTransportBoneSerializer()
+  : mLoadCallback(&SAiReservedTransportBoneSerializer::Deserialize)
+  , mSaveCallback(&SAiReservedTransportBoneSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF8A00 (FUN_00BF8A00, ??1SAiReservedTransportBoneSerializer@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits in
+ * and restores a self-linked sentinel state.
+ */
+SAiReservedTransportBoneSerializer::~SAiReservedTransportBoneSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005E8F70 (FUN_005E8F70)
  *
  * What it does:
  * Lazily resolves SAiReservedTransportBone RTTI and installs load/save
  * callbacks from this helper object into the type descriptor.
  */
-void SAiReservedTransportBoneSerializer::RegisterSerializeFunctions()
+void SAiReservedTransportBoneSerializer::Init()
 {
   gpg::RType* const type = CachedSAiReservedTransportBoneType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
@@ -335,17 +292,18 @@ void SAiReservedTransportBoneSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCED90 (FUN_00BCED90, register_SAiReservedTransportBoneSerializer)
+ * Address: 0x00BCED90 caller lane (`IAiTransport.cpp`'s reflection bootstrap
+ * sequence)
  *
  * What it does:
- * Registers serializer callbacks for `SAiReservedTransportBone` and installs
- * process-exit cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `SAiReservedTransportBoneSerializer` singleton from an explicit
+ * registration sequence. `gSAiReservedTransportBoneSerializer` is now a
+ * genuine namespace-scope global, so its constructor already runs
+ * unconditionally at static-init time; this call is kept only so
+ * `IAiTransport.cpp`'s existing bootstrap sequence does not need editing.
  */
 int moho::register_SAiReservedTransportBoneSerializer()
 {
-  SAiReservedTransportBoneSerializer* const serializer = AcquireSAiReservedTransportBoneSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &SAiReservedTransportBoneSerializer::Deserialize;
-  serializer->mSaveCallback = &SAiReservedTransportBoneSerializer::Serialize;
-  return std::atexit(&cleanup_SAiReservedTransportBoneSerializer);
+  return 0;
 }

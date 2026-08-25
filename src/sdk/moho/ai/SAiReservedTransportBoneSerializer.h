@@ -4,18 +4,13 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1F270
    * COL:  0x00E76A74
    */
-  class SAiReservedTransportBoneSerializer
+  class SAiReservedTransportBoneSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -35,28 +30,43 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00BCED90 (FUN_00BCED90, dynamic initializer for the global
+     * `SAiReservedTransportBoneSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SAiReservedTransportBoneSerializer@Moho@@6B@` -- no eager `Init()`
+     * call exists here.
+     */
+    SAiReservedTransportBoneSerializer();
+
+    /**
+     * Address: 0x00BF8A00 (FUN_00BF8A00, ??1SAiReservedTransportBoneSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SAiReservedTransportBoneSerializer();
+
+    /**
      * Address: 0x005E8F70 (FUN_005E8F70)
      *
      * What it does:
      * Binds load/save serializer callbacks into SAiReservedTransportBone RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mLoadCallback; // +0x0C
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(SAiReservedTransportBoneSerializer, mHelperNext) == 0x04,
-    "SAiReservedTransportBoneSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SAiReservedTransportBoneSerializer, mHelperPrev) == 0x08,
-    "SAiReservedTransportBoneSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SAiReservedTransportBoneSerializer, mLoadCallback) == 0x0C,
     "SAiReservedTransportBoneSerializer::mLoadCallback offset must be 0x0C"
@@ -71,11 +81,16 @@ namespace moho
   );
 
   /**
-   * Address: 0x00BCED90 (FUN_00BCED90, register_SAiReservedTransportBoneSerializer)
+   * Address: 0x00BCED90 caller lane (`IAiTransport.cpp`'s reflection
+   * bootstrap sequence)
    *
    * What it does:
-   * Registers serializer callbacks for `SAiReservedTransportBone` and installs
-   * process-exit cleanup.
+   * Historically forced construction of the (then lazily-constructed)
+   * `SAiReservedTransportBoneSerializer` singleton from an explicit
+   * registration sequence. `gSAiReservedTransportBoneSerializer` is now a
+   * genuine namespace-scope global, so its constructor already runs
+   * unconditionally at static-init time; this call is kept only so
+   * `IAiTransport.cpp`'s existing bootstrap sequence does not need editing.
    */
   int register_SAiReservedTransportBoneSerializer();
 } // namespace moho

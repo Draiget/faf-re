@@ -9,7 +9,7 @@ namespace moho
   /**
    * VFTABLE: 0x00E1F378
    */
-  class STransportPickUpInfoSerializer
+  class STransportPickUpInfoSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -29,28 +29,41 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x005E4650 (FUN_005E4650, nullsub_1637 placeholder lane)
+     * Address: 0x00BCEE50 (FUN_00BCEE50, dynamic initializer for the global
+     * `STransportPickUpInfoSerializer` singleton)
      *
      * What it does:
-     * Binds load/save serializer callbacks into `STransportPickUpInfo` RTTI.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7STransportPickUpInfoSerializer@Moho@@6B@` -- no eager `Init()`
+     * call exists here.
      */
-    virtual void RegisterSerializeFunctions();
+    STransportPickUpInfoSerializer();
+
+    /**
+     * Address: 0x00BF8B20 (FUN_00BF8B20, ??1STransportPickUpInfoSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~STransportPickUpInfoSerializer();
+
+    /**
+     * What it does:
+     * Binds load/save serializer callbacks into `STransportPickUpInfo` RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mLoadCallback; // +0x0C
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(STransportPickUpInfoSerializer, mHelperNext) == 0x04,
-    "STransportPickUpInfoSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(STransportPickUpInfoSerializer, mHelperPrev) == 0x08,
-    "STransportPickUpInfoSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(STransportPickUpInfoSerializer, mLoadCallback) == 0x0C,
     "STransportPickUpInfoSerializer::mLoadCallback offset must be 0x0C"
@@ -62,12 +75,16 @@ namespace moho
   static_assert(sizeof(STransportPickUpInfoSerializer) == 0x14, "STransportPickUpInfoSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BCEE50 (FUN_00BCEE50, register_STransportPickUpInfoSerializer)
+   * Address: 0x00BCEE50 caller lane (`IAiTransport.cpp`'s reflection
+   * bootstrap sequence)
    *
    * What it does:
-   * Registers serializer callbacks for `STransportPickUpInfo` and installs
-   * process-exit cleanup.
+   * Historically forced construction of the (then lazily-constructed)
+   * `STransportPickUpInfoSerializer` singleton from an explicit registration
+   * sequence. `gSTransportPickUpInfoSerializer` is now a genuine
+   * namespace-scope global, so its constructor already runs unconditionally
+   * at static-init time; this call is kept only so `IAiTransport.cpp`'s
+   * existing bootstrap sequence does not need editing.
    */
   int register_STransportPickUpInfoSerializer();
 } // namespace moho
-

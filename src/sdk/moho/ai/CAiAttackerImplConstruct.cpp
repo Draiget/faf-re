@@ -20,19 +20,6 @@ namespace gpg
 
 namespace
 {
-  alignas(CAiAttackerImplConstruct) unsigned char gCAiAttackerImplConstructStorage[sizeof(CAiAttackerImplConstruct)];
-  bool gCAiAttackerImplConstructConstructed = false;
-
-  [[nodiscard]] CAiAttackerImplConstruct* AcquireCAiAttackerImplConstruct()
-  {
-    if (!gCAiAttackerImplConstructConstructed) {
-      new (gCAiAttackerImplConstructStorage) CAiAttackerImplConstruct();
-      gCAiAttackerImplConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiAttackerImplConstruct*>(gCAiAttackerImplConstructStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
   {
     static gpg::RType* cached = nullptr;
@@ -67,64 +54,26 @@ namespace
     result->SetUnowned(MakeCAiAttackerImplRef(object), 0u);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiAttackerImplConstructHelperNode()
-  {
-    if (!gCAiAttackerImplConstructConstructed) {
-      return nullptr;
-    }
-
-    CAiAttackerImplConstruct* const construct = AcquireCAiAttackerImplConstruct();
-    if (construct->mHelperNext && construct->mHelperPrev) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&construct->mHelperNext);
-    construct->mHelperNext = self;
-    construct->mHelperPrev = self;
-    return self;
-  }
+  // Address: 0x010B028C -- process-global `CAiAttackerImplConstruct`
+  // singleton. Constructing it runs CAiAttackerImplConstruct::
+  // CAiAttackerImplConstruct() (0x00BCE890), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
+  // translation unit's unlink callback via `atexit` (this class has no
+  // user-declared destructor).
+  moho::CAiAttackerImplConstruct gCAiAttackerImplConstruct;
 
   /**
    * Address: 0x00BF8400 (FUN_00BF8400, sub_BF8400)
    *
    * What it does:
-   * Tears down recovered static `CAiAttackerImplConstruct` storage.
+   * Unlinks the global `CAiAttackerImplConstruct` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   * Registered by the real dynamic initializer (0x00BCE890) as the global's
+   * `atexit` teardown.
    */
-  void cleanup_CAiAttackerImplConstruct()
+  void CleanupCAiAttackerImplConstruct()
   {
-    if (!gCAiAttackerImplConstructConstructed) {
-      return;
-    }
-
-    CAiAttackerImplConstruct* const construct = AcquireCAiAttackerImplConstruct();
-    (void)UnlinkCAiAttackerImplConstructHelperNode();
-    construct->~CAiAttackerImplConstruct();
-    gCAiAttackerImplConstructConstructed = false;
-  }
-
-  /**
-   * Address: 0x005D8330 (FUN_005D8330)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks recovered
-   * `CAiAttackerImplConstruct` helper links and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplConstructStartupThunkA()
-  {
-    return UnlinkCAiAttackerImplConstructHelperNode();
-  }
-
-  /**
-   * Address: 0x005D8360 (FUN_005D8360)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `CAiAttackerImplConstruct` helper unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplConstructStartupThunkB()
-  {
-    return UnlinkCAiAttackerImplConstructHelperNode();
+    gCAiAttackerImplConstruct.ResetLinks();
   }
 } // namespace
 
@@ -159,13 +108,29 @@ void CAiAttackerImplConstruct::Deconstruct(void* const object)
 }
 
 /**
+ * Address: 0x00BCE890 (FUN_00BCE890, dynamic initializer for the global
+ * `CAiAttackerImplConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * explicitly registers `atexit` cleanup.
+ */
+CAiAttackerImplConstruct::CAiAttackerImplConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiAttackerImplConstruct::Construct))
+  , mDeleteCallback(&CAiAttackerImplConstruct::Deconstruct)
+{
+  (void)std::atexit(&CleanupCAiAttackerImplConstruct);
+}
+
+/**
  * Address: 0x005DC050 (FUN_005DC050)
  *
  * What it does:
  * Lazily resolves `CAiAttackerImpl` RTTI and installs construct/delete
  * callbacks from this helper object into the type descriptor.
  */
-void CAiAttackerImplConstruct::RegisterConstructFunction()
+void CAiAttackerImplConstruct::Init()
 {
   gpg::RType* const type = CachedCAiAttackerImplType();
   GPG_ASSERT(type != nullptr);
@@ -180,19 +145,18 @@ void CAiAttackerImplConstruct::RegisterConstructFunction()
 }
 
 /**
- * Address: 0x00BCE890 (FUN_00BCE890, register_CAiAttackerImplConstruct)
+ * Address: 0x00BCE890 caller lane (`CAiAttackerImplTypeInfo.cpp`'s
+ * reflection bootstrap sequence)
  *
  * What it does:
- * Registers `CAiAttackerImpl` construct/delete callbacks and installs
- * process-exit cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `CAiAttackerImplConstruct` singleton from an explicit registration
+ * sequence. `gCAiAttackerImplConstruct` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `CAiAttackerImplTypeInfo.cpp`'s existing
+ * bootstrap sequence does not need editing.
  */
 int moho::register_CAiAttackerImplConstruct()
 {
-  CAiAttackerImplConstruct* const construct = AcquireCAiAttackerImplConstruct();
-  construct->mHelperNext = reinterpret_cast<gpg::SerHelperBase*>(construct);
-  construct->mHelperPrev = reinterpret_cast<gpg::SerHelperBase*>(construct);
-  construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiAttackerImplConstruct::Construct);
-  construct->mDeleteCallback = &CAiAttackerImplConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiAttackerImplConstruct);
+  return 0;
 }

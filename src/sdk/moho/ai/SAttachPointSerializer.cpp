@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiTransportImpl.h"
@@ -11,55 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(SAttachPointSerializer) unsigned char gSAttachPointSerializerStorage[sizeof(SAttachPointSerializer)];
-  bool gSAttachPointSerializerConstructed = false;
-
-  [[nodiscard]] SAttachPointSerializer* AcquireSAttachPointSerializer()
-  {
-    if (!gSAttachPointSerializerConstructed) {
-      new (gSAttachPointSerializerStorage) SAttachPointSerializer();
-      gSAttachPointSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SAttachPointSerializer*>(gSAttachPointSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSAttachPointSerializerHelperNode()
-  {
-    if (!gSAttachPointSerializerConstructed) {
-      return nullptr;
-    }
-
-    SAttachPointSerializer* const serializer = AcquireSAttachPointSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedSAttachPointType()
   {
     static gpg::RType* cached = nullptr;
@@ -126,40 +76,26 @@ namespace
     return 1;
   }
 
-  void cleanup_SAttachPointSerializer()
-  {
-    if (!gSAttachPointSerializerConstructed) {
-      return;
-    }
-
-    SAttachPointSerializer* const serializer = AcquireSAttachPointSerializer();
-    (void)UnlinkSAttachPointSerializerHelperNode();
-    serializer->~SAttachPointSerializer();
-    gSAttachPointSerializerConstructed = false;
-  }
+  // Address: 0x010B07C4 -- process-global `SAttachPointSerializer`
+  // singleton. Constructing it runs SAttachPointSerializer::
+  // SAttachPointSerializer() (0x00BCEDF0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
+  // translation unit's unlink callback via `atexit` (this class has no
+  // user-declared destructor).
+  SAttachPointSerializer gSAttachPointSerializer;
 
   /**
-   * Address: 0x005E4340 (FUN_005E4340)
+   * Address: 0x00BF8A90 (FUN_00BF8A90)
    *
    * What it does:
-   * Alias startup-lane thunk that unlinks recovered `SAttachPointSerializer`
-   * helper links and restores self-links.
+   * Unlinks the global `SAttachPointSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   * Registered by the real dynamic initializer (0x00BCEDF0) as the global's
+   * `atexit` teardown.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAttachPointSerializerStartupThunkA()
+  void CleanupSAttachPointSerializer()
   {
-    return UnlinkSAttachPointSerializerHelperNode();
-  }
-
-  /**
-   * Address: 0x005E4370 (FUN_005E4370)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `SAttachPointSerializer` helper unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAttachPointSerializerStartupThunkB()
-  {
-    return UnlinkSAttachPointSerializerHelperNode();
+    gSAttachPointSerializer.ResetLinks();
   }
 } // namespace
 
@@ -189,7 +125,23 @@ void SAttachPointSerializer::Serialize(gpg::WriteArchive* const archive, const i
   (void)WriteSAttachPointPayload(point, archive);
 }
 
-void SAttachPointSerializer::RegisterSerializeFunctions()
+/**
+ * Address: 0x00BCEDF0 (FUN_00BCEDF0, dynamic initializer for the global
+ * `SAttachPointSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and explicitly
+ * registers `atexit` cleanup.
+ */
+SAttachPointSerializer::SAttachPointSerializer()
+  : mLoadCallback(&SAttachPointSerializer::Deserialize)
+  , mSaveCallback(&SAttachPointSerializer::Serialize)
+{
+  (void)std::atexit(&CleanupSAttachPointSerializer);
+}
+
+void SAttachPointSerializer::Init()
 {
   gpg::RType* const type = CachedSAttachPointType();
   GPG_ASSERT(type != nullptr);
@@ -200,17 +152,18 @@ void SAttachPointSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCEDF0 (FUN_00BCEDF0, register_SAttachPointSerializer)
+ * Address: 0x00BCEDF0 caller lane (`IAiTransport.cpp`'s reflection bootstrap
+ * sequence)
  *
  * What it does:
- * Registers serializer callbacks for `SAttachPoint` and installs process-exit
- * cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `SAttachPointSerializer` singleton from an explicit registration
+ * sequence. `gSAttachPointSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
+ * sequence does not need editing.
  */
 int moho::register_SAttachPointSerializer()
 {
-  SAttachPointSerializer* const serializer = AcquireSAttachPointSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &SAttachPointSerializer::Deserialize;
-  serializer->mSaveCallback = &SAttachPointSerializer::Serialize;
-  return std::atexit(&cleanup_SAttachPointSerializer);
+  return 0;
 }

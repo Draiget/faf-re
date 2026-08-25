@@ -9,7 +9,7 @@ namespace moho
   /**
    * VFTABLE: 0x00E1F2F4
    */
-  class SAttachPointSerializer
+  class SAttachPointSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -29,28 +29,37 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x005E42D0 (FUN_005E42D0, nullsub_1636 placeholder lane)
+     * Address: 0x00BCEDF0 (FUN_00BCEDF0, dynamic initializer for the global
+     * `SAttachPointSerializer` singleton)
      *
      * What it does:
-     * Binds load/save serializer callbacks into `SAttachPoint` RTTI.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SAttachPointSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here, and this class has no user-declared destructor (the real
+     * binary explicitly registers `atexit(&sub_BF8A90)` instead). Note: the
+     * previous recovery mis-attributed this class's `Init()` to 0x005E42D0
+     * (`nullsub_1636`, a genuinely empty function elsewhere in the binary) --
+     * the real dispatch address for this helper's `Init()` has not been
+     * located and is left uncited below.
      */
-    virtual void RegisterSerializeFunctions();
+    SAttachPointSerializer();
+
+    /**
+     * What it does:
+     * Binds load/save serializer callbacks into `SAttachPoint` RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
     gpg::RType::load_func_t mLoadCallback; // +0x0C
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(SAttachPointSerializer, mHelperNext) == 0x04,
-    "SAttachPointSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SAttachPointSerializer, mHelperPrev) == 0x08,
-    "SAttachPointSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SAttachPointSerializer, mLoadCallback) == 0x0C,
     "SAttachPointSerializer::mLoadCallback offset must be 0x0C"
@@ -62,12 +71,16 @@ namespace moho
   static_assert(sizeof(SAttachPointSerializer) == 0x14, "SAttachPointSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BCEDF0 (FUN_00BCEDF0, register_SAttachPointSerializer)
+   * Address: 0x00BCEDF0 caller lane (`IAiTransport.cpp`'s reflection
+   * bootstrap sequence)
    *
    * What it does:
-   * Registers serializer callbacks for `SAttachPoint` and installs process-exit
-   * cleanup.
+   * Historically forced construction of the (then lazily-constructed)
+   * `SAttachPointSerializer` singleton from an explicit registration
+   * sequence. `gSAttachPointSerializer` is now a genuine namespace-scope
+   * global, so its constructor already runs unconditionally at static-init
+   * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
+   * sequence does not need editing.
    */
   int register_SAttachPointSerializer();
 } // namespace moho
-

@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiTransportImpl.h"
@@ -11,9 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiTransportImplSerializer) unsigned char gCAiTransportImplSerializerStorage[sizeof(CAiTransportImplSerializer)];
-  bool gCAiTransportImplSerializerConstructed = false;
-
   /**
    * Address: 0x005EC3F0 (FUN_005EC3F0, j_Moho::CAiTransportImpl::MemberSerialize)
    *
@@ -48,70 +44,6 @@ namespace
     object->MemberSerialize(archive);
   }
 
-  [[nodiscard]] CAiTransportImplSerializer* AcquireCAiTransportImplSerializer()
-  {
-    if (!gCAiTransportImplSerializerConstructed) {
-      new (gCAiTransportImplSerializerStorage) CAiTransportImplSerializer();
-      gCAiTransportImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiTransportImplSerializer*>(gCAiTransportImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
-  /**
-   * Address: 0x005E85E0 (FUN_005E85E0)
-   *
-   * What it does:
-   * Splices this serializer helper node out of its intrusive lane when linked,
-   * then resets helper links to self and returns the self node pointer.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplSerializerHelperNodeVariantA(
-    CAiTransportImplSerializer& serializer
-  ) noexcept
-  {
-    UnlinkSerializerNode(serializer);
-    return SerializerSelfNode(serializer);
-  }
-
-  /**
-   * Address: 0x005E8610 (FUN_005E8610)
-   *
-   * What it does:
-   * Secondary helper-node unlink/reset variant that preserves the same
-   * intrusive unlink semantics and returns the helper self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplSerializerHelperNodeVariantB(
-    CAiTransportImplSerializer& serializer
-  ) noexcept
-  {
-    return UnlinkCAiTransportImplSerializerHelperNodeVariantA(serializer);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiTransportImplType()
   {
     gpg::RType* type = CAiTransportImpl::sType;
@@ -122,32 +54,26 @@ namespace
     return type;
   }
 
+  // Address: 0x010B07D8 -- process-global `CAiTransportImplSerializer`
+  // singleton. Constructing it runs CAiTransportImplSerializer::
+  // CAiTransportImplSerializer() (0x00BCEF50), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers and explicitly registers this
+  // translation unit's unlink callback via `atexit` (this class has no
+  // user-declared destructor).
+  CAiTransportImplSerializer gCAiTransportImplSerializer;
+
   /**
-   * Address: 0x005E85B0 (FUN_005E85B0)
+   * Address: 0x00BF8C70 (FUN_00BF8C70)
    *
    * What it does:
-   * Initializes callback lanes for global `CAiTransportImplSerializer` helper
-   * storage and returns that helper object.
+   * Unlinks the global `CAiTransportImplSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   * Registered by the real dynamic initializer (0x00BCEF50) as the global's
+   * `atexit` teardown.
    */
-  [[maybe_unused]] [[nodiscard]] CAiTransportImplSerializer* InitializeCAiTransportImplSerializerStartupThunk()
+  void CleanupCAiTransportImplSerializer()
   {
-    CAiTransportImplSerializer* const serializer = AcquireCAiTransportImplSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mLoadCallback = &CAiTransportImplSerializer::Deserialize;
-    serializer->mSaveCallback = &CAiTransportImplSerializer::Serialize;
-    return serializer;
-  }
-
-  void cleanup_CAiTransportImplSerializer()
-  {
-    if (!gCAiTransportImplSerializerConstructed) {
-      return;
-    }
-
-    CAiTransportImplSerializer* const serializer = AcquireCAiTransportImplSerializer();
-    (void)UnlinkCAiTransportImplSerializerHelperNodeVariantA(*serializer);
-    serializer->~CAiTransportImplSerializer();
-    gCAiTransportImplSerializerConstructed = false;
+    gCAiTransportImplSerializer.ResetLinks();
   }
 } // namespace
 
@@ -185,19 +111,19 @@ void CAiTransportImplSerializer::Serialize(
 }
 
 /**
- * Address: 0x00BCEF50 (FUN_00BCEF50, register_CAiTransportImplSerializer)
+ * Address: 0x00BCEF50 (FUN_00BCEF50, dynamic initializer for the global
+ * `CAiTransportImplSerializer` singleton)
  *
  * What it does:
- * Registers serializer callbacks for `CAiTransportImpl` and installs
- * process-exit cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the load/save callback fields, and explicitly
+ * registers `atexit` cleanup.
  */
-void moho::register_CAiTransportImplSerializer()
+CAiTransportImplSerializer::CAiTransportImplSerializer()
+  : mLoadCallback(&CAiTransportImplSerializer::Deserialize)
+  , mSaveCallback(&CAiTransportImplSerializer::Serialize)
 {
-  CAiTransportImplSerializer* const serializer = AcquireCAiTransportImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiTransportImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiTransportImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiTransportImplSerializer);
+  (void)std::atexit(&CleanupCAiTransportImplSerializer);
 }
 
 /**
@@ -207,11 +133,27 @@ void moho::register_CAiTransportImplSerializer()
  * Lazily resolves CAiTransportImpl RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiTransportImplSerializer::RegisterSerializeFunctions()
+void CAiTransportImplSerializer::Init()
 {
   gpg::RType* const type = CachedCAiTransportImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mLoadCallback;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
+}
+
+/**
+ * Address: 0x00BCEF50 caller lane (`IAiTransport.cpp`'s reflection bootstrap
+ * sequence)
+ *
+ * What it does:
+ * Historically forced construction of the (then lazily-constructed)
+ * `CAiTransportImplSerializer` singleton from an explicit registration
+ * sequence. `gCAiTransportImplSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
+ * sequence does not need editing.
+ */
+void moho::register_CAiTransportImplSerializer()
+{
 }
