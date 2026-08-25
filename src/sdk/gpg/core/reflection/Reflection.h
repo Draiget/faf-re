@@ -4581,6 +4581,21 @@ namespace gpg
      *   - T=Moho::SWorldBeam::BlendMode: 0x00BC5300 (no dead duplicate found)
      *   - T=Moho::SWorldParticle::BlendMode: 0x00BC53C0 (no dead duplicate found)
      *   - T=Moho::SWorldParticle::ZMode: 0x00BC5420 (no dead duplicate found)
+     *   - T=Moho::ELayer: 0x00BC7C80 (dead duplicate: 0x0050C660; a second,
+     *     unrelated writer -- FUN_0050CA60, demangled
+     *     `SerSaveLoadHelper<Moho::ELayer>` -- shares this global's storage
+     *     address but is itself zero-xref/unreachable too)
+     *   - T=Moho::EVisibilityMode: 0x00BC7AF0 (dead duplicate: 0x0050A740;
+     *     same `SerSaveLoadHelper<Moho::EVisibilityMode>` sibling-writer
+     *     situation at FUN_0050AA40, also zero-xref/unreachable)
+     *   - T=Moho::EStatType: 0x00BC3600 (no dead duplicate found)
+     *   - T=Moho::EPulseMode: 0x00BC3660 (no dead duplicate found)
+     *   - T=Moho::EmitterType: 0x00BD42B0 (no dead duplicate found)
+     *   - T=Moho::EResourceType: 0x00BC9610 (dead duplicate: 0x00547380;
+     *     was wrongly tagged `external_dependency` in progress tracking
+     *     before this recovery -- it is the same
+     *     SerHelperBase-ctor/field-set/vtable-install/atexit shape as every
+     *     other confirmed instantiation, not an OS/CRT/library import)
      */
     PrimitiveSerHelper()
       : mLoadCallback(&PrimitiveSerHelper::Deserialize)
@@ -4601,6 +4616,12 @@ namespace gpg
      *   - T=Moho::SWorldBeam::BlendMode: 0x0048FDA0 (FUN_0048FDA0)
      *   - T=Moho::SWorldParticle::BlendMode: 0x0048FE10 (FUN_0048FE10)
      *   - T=Moho::SWorldParticle::ZMode: 0x0048FE80 (FUN_0048FE80)
+     *   - T=Moho::ELayer: 0x0050CA20 (FUN_0050CA20)
+     *   - T=Moho::EVisibilityMode: 0x0050AA00 (FUN_0050AA00)
+     *   - T=Moho::EStatType: 0x00419A50 (FUN_00419A50)
+     *   - T=Moho::EPulseMode: 0x00419AC0 (FUN_00419AC0)
+     *   - T=Moho::EmitterType: 0x0065F3E0 (FUN_0065F3E0)
+     *   - T=Moho::EResourceType: 0x005478E0 (FUN_005478E0)
      *
      * What it does:
      * Reads one `IntType` lane from the archive and stores it into the
@@ -4626,6 +4647,12 @@ namespace gpg
      *   - T=Moho::SWorldBeam::BlendMode: 0x0048FDC0 (FUN_0048FDC0)
      *   - T=Moho::SWorldParticle::BlendMode: 0x0048FE30 (FUN_0048FE30)
      *   - T=Moho::SWorldParticle::ZMode: 0x0048FEA0 (FUN_0048FEA0)
+     *   - T=Moho::ELayer: 0x0050CA40 (FUN_0050CA40)
+     *   - T=Moho::EVisibilityMode: 0x0050AA20 (FUN_0050AA20)
+     *   - T=Moho::EStatType: 0x00419A70 (FUN_00419A70)
+     *   - T=Moho::EPulseMode: 0x00419AE0 (FUN_00419AE0)
+     *   - T=Moho::EmitterType: 0x0065F400 (FUN_0065F400)
+     *   - T=Moho::EResourceType: 0x00547900 (FUN_00547900)
      *
      * What it does:
      * Writes the reflected object's `T` value as one `IntType` lane.
@@ -4651,6 +4678,18 @@ namespace gpg
      *   - T=Moho::SWorldBeam::BlendMode: 0x0048FAB0 (FUN_0048FAB0)
      *   - T=Moho::SWorldParticle::BlendMode: 0x0048FBF0 (FUN_0048FBF0)
      *   - T=Moho::SWorldParticle::ZMode: 0x0048FC90 (FUN_0048FC90)
+     *   - T=Moho::ELayer: 0x0050C690 (FUN_0050C690)
+     *   - T=Moho::EVisibilityMode: 0x0050A770 (FUN_0050A770)
+     *   - T=Moho::EStatType: 0x004192B0 (FUN_004192B0)
+     *   - T=Moho::EPulseMode: 0x00419350 (FUN_00419350)
+     *   - T=Moho::EmitterType: 0x0065EE50 (FUN_0065EE50)
+     *   - T=Moho::EResourceType: 0x005473B0 (FUN_005473B0) -- previously
+     *     mis-modeled in ArchiveSerialization.cpp as a generic
+     *     `InstallSerSaveLoadHelperCallbacksByTypeName(helper,
+     *     "Moho::EResourceType")` dispatch (same mistake already caught for
+     *     ESTITargetType above); the real body at this address is
+     *     `__thiscall`, reads `this+0x0C`/`this+0x10` directly, and matches
+     *     this template's `Init()` exactly (confirmed against raw asm).
      *
      * What it does:
      * Lazily resolves `T`'s RTTI and installs load/save callbacks from this
