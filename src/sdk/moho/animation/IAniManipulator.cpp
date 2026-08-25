@@ -977,6 +977,21 @@ namespace
 
   moho::IAniManipulatorSerializer gIAniManipulatorSerializer{};
 
+  // Address: 0x00BD2460 (dynamic initializer for the global
+  // `CBoneEntityManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CBoneEntityManipulator>` ctor (self-links into
+  // `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback` to the template's
+  // `Deserialize`/`Serialize`, installs the vtable) and registers the real
+  // mangled destructor (`??1CBoneEntityManipulatorSerializer@Moho@@QAE@@Z`,
+  // 0x00BFAA10) via `atexit`. Dead zero-xref COMDAT duplicate ctors:
+  // 0x00634BE0, 0x00635110. Prior recovery (in
+  // moho/sim/ManipulatorLuaFunctionThunks.cpp) modeled this global's ctor
+  // via two `[[maybe_unused]]`, zero-caller `startup_*` functions that
+  // nothing in src/sdk/** ever called -- the reflection callbacks were never
+  // actually installed. This global's own static initialization fixes that.
+  moho::CBoneEntityManipulatorSerializer gCBoneEntityManipulatorSerializer;
+
   [[nodiscard]] gpg::RType* CachedCAniActorType()
   {
     if (!gCAniActorType) {
@@ -1009,6 +1024,23 @@ namespace
       moho::WeakPtr<moho::Unit>::sType = gWeakPtrUnitType;
     }
     return gWeakPtrUnitType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
+  {
+    if (!moho::WeakPtr<moho::Entity>::sType) {
+      moho::WeakPtr<moho::Entity>::sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
+    }
+    return moho::WeakPtr<moho::Entity>::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptEventType()
@@ -1950,6 +1982,50 @@ namespace moho
     mPivot.x = (bone->mBoundsMinX + bone->mBoundsMaxX) * 0.5f;
     mPivot.y = (bone->mBoundsMinY + bone->mBoundsMaxY) * 0.5f;
     mPivot.z = (bone->mBoundsMinZ + bone->mBoundsMaxZ) * 0.5f;
+  }
+
+  /**
+   * Address: 0x006356D0 (FUN_006356D0, Moho::CBoneEntityManipulator::MemberDeserialize)
+   *
+   * What it does:
+   * Loads `IAniManipulator` base state, goal/target weak-pointer lanes,
+   * reference-bone index, and pivot vector.
+   */
+  void CBoneEntityManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+    archive->Read(CachedWeakPtrUnitType(), &mGoalUnit, owner);
+    archive->Read(CachedWeakPtrEntityType(), &mTargetEntity, owner);
+    archive->ReadInt(&mReferenceBoneIndex);
+    archive->Read(CachedVector3fType(), &mPivot, owner);
+  }
+
+  /**
+   * Address: 0x006357D0 (FUN_006357D0, Moho::CBoneEntityManipulator::MemberSerialize)
+   *
+   * What it does:
+   * Saves `IAniManipulator` base state, goal/target weak-pointer lanes,
+   * reference-bone index, and pivot vector.
+   */
+  void CBoneEntityManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(
+      CachedIAniManipulatorType(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
+    );
+    archive->Write(CachedWeakPtrUnitType(), const_cast<moho::WeakPtr<moho::Unit>*>(&mGoalUnit), owner);
+    archive->Write(CachedWeakPtrEntityType(), const_cast<moho::WeakPtr<moho::Entity>*>(&mTargetEntity), owner);
+    archive->WriteInt(mReferenceBoneIndex);
+    archive->Write(CachedVector3fType(), const_cast<Wm3::Vector3f*>(&mPivot), owner);
   }
 
   /**

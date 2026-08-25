@@ -289,6 +289,24 @@ namespace moho
      */
     bool ManipulatorUpdate() override;
 
+    /**
+     * Address: 0x006356D0 (FUN_006356D0, Moho::CBoneEntityManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base state, goal/target weak-pointer lanes,
+     * reference-bone index, and pivot vector.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006357D0 (FUN_006357D0, Moho::CBoneEntityManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base state, goal/target weak-pointer lanes,
+     * reference-bone index, and pivot vector.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     WeakPtr<Unit> mGoalUnit;           // +0x80
     WeakPtr<Entity> mTargetEntity;     // +0x88
     std::int32_t mReferenceBoneIndex;  // +0x90
@@ -321,6 +339,34 @@ namespace moho
     "CBoneEntityManipulator::mPivot offset must be 0x94"
   );
   static_assert(sizeof(CBoneEntityManipulator) == 0xA0, "CBoneEntityManipulator size must be 0xA0");
+
+  /**
+   * VFTABLE: 0x00E215A0
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CBoneEntityManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer: 0x00BD2460 (__xc_a-reachable;
+   *    dead zero-xref COMDAT duplicates: 0x00634BE0, 0x00635110 -- the
+   *    second additionally installs a distinct byte-identical vtable copy
+   *    at 0x00E21520, same never-folded-sibling-copy shape documented for
+   *    other `SerSaveLoadHelper<T>` instantiations)
+   *  - dtor: 0x00BFAA10 (`??1CBoneEntityManipulatorSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x00635140
+   *  - Deserialize(): 0x00634BC0
+   *  - Serialize(): 0x00634BD0
+   *
+   * Prior recovery modeled this as a `CBoneEntityManipulatorSerializerStartupNode`
+   * raw struct (`void* mVtable` field, no real base) reached into via a
+   * `CBoneEntityManipulatorSerializerRuntimeView` struct that duplicated
+   * this class's own layout instead of using it directly, wired through two
+   * `[[maybe_unused]]`, zero-caller `startup_*` functions -- i.e. the
+   * reflection callbacks were never actually installed in that source. This
+   * template instance fixes both: no more runtime-view duplicate layout, and
+   * the global's own static initializer wires the callbacks unconditionally.
+   */
+  using CBoneEntityManipulatorSerializer = gpg::SerSaveLoadHelper<CBoneEntityManipulator>;
 
   /**
    * Owns reflected metadata for `CFootPlantManipulator`.
