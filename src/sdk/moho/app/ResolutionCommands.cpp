@@ -26,6 +26,18 @@ namespace
   // `dump_Frames`/`dump_Frame` registrars in FrameDumpCommands.cpp.
   moho::CConFunc gCConFunc_SC_PrimaryAdapter{};
 
+  /// 0x00E00779 (the same shared empty-string literal `SC_PrimaryAdapter`
+  /// uses), the `.data` initializer of `Moho::CConFunc_SC_VerticalSync`
+  /// (+0x08). No console-help text in the binary.
+  constexpr const char* kConsoleStartupSCVerticalSyncDescription = "";
+  moho::CConFunc gCConFunc_SC_VerticalSync{};
+
+  /// 0x00E4F1E0, the `.data` initializer of `Moho::CConFunc_SC_ToggleCursorClip`
+  /// (+0x08), read directly from the shipped PE.
+  constexpr const char* kConsoleStartupSCToggleCursorClipDescription =
+    "Set the cursor clip to either the pre-launch clip or the current clip";
+  moho::CConFunc gCConFunc_SC_ToggleCursorClip{};
+
   /// Style bits observed at the "argument is literally `windowed`" branch's
   /// `SetWindowStyleFlag` call site (0x008D35DB): decodes to
   /// `wxCAPTION | wxCLIP_CHILDREN | wxSYSTEM_MENU | wxMINIMIZE_BOX |
@@ -146,6 +158,106 @@ namespace moho
     );
     (void)std::atexit(&cleanup_CConFunc_SC_PrimaryAdapter);
   }
+
+  /**
+   * Address: 0x008D3BE0 (FUN_008D3BE0, sub_8D3BE0)
+   *
+   * What it does:
+   * See header. The binary's `atoi(args[1])==1` parse (0x008D3C67) has no
+   * side effects and its result is never read again, so it is omitted here;
+   * the observable behavior - an unconditional device-context reset gated
+   * only on argument *count* - is preserved exactly. Mirrors
+   * `SC_PrimaryAdapter`'s device-context-copy/`sDeviceLock`/`Clear`+
+   * `InitContext` idiom above; unlike that command, `deviceInstance` here is
+   * also never null-checked by the binary before the initial
+   * `GetDeviceContext()` dereference, matching what this recovery keeps.
+   */
+  void SC_VerticalSync(void* const commandArgs)
+  {
+    gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
+    CD3DDevice* const device = D3D_GetDevice();
+    gpg::gal::DeviceContext deviceContext(*deviceInstance->GetDeviceContext());
+
+    sDeviceLock = true;
+
+    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+    if (args.Count() == 2u) {
+      device->Clear();
+      (void)device->InitContext(&deviceContext);
+    }
+
+    sDeviceLock = false;
+  }
+
+  void cleanup_CConFunc_SC_VerticalSync()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_VerticalSync);
+  }
+
+  void register_CConFunc_SC_VerticalSync()
+  {
+    gCConFunc_SC_VerticalSync.InitializeRecovered(
+      kConsoleStartupSCVerticalSyncDescription, "SC_VerticalSync", &moho::SC_VerticalSync
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_VerticalSync);
+  }
+
+  /**
+   * Address: 0x008D41B0 (FUN_008D41B0, sub_8D41B0)
+   *
+   * What it does:
+   * See header. The binary's real comparison (Hex-Rays mis-renders it as a
+   * bogus `std::operator<<char>` call) is
+   * `args[1].compare(0, args[1].size(), "0", 1) == 0`, i.e. `*args[1] ==
+   * "0"`; equal releases the clip, anything else attempts to clip to the
+   * primary window's rect under the guards described in the header.
+   */
+  void SC_ToggleCursorClip(void* const commandArgs)
+  {
+    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+    if (args.Count() > 2u) {
+      return;
+    }
+
+    const msvc8::string* const modeToken = args.At(1u);
+    if (modeToken != nullptr && modeToken->view() == "0") {
+      ::ClipCursor(nullptr);
+      return;
+    }
+
+    gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
+    if (deviceInstance == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext* const deviceContext = deviceInstance->GetDeviceContext();
+    if (deviceContext == nullptr || deviceContext->GetHeadCount() != 1) {
+      return;
+    }
+
+    const gpg::gal::Head& head = deviceContext->GetHead(0);
+    if (!head.mWindowed) {
+      return;
+    }
+
+    const HWND windowHandle = static_cast<HWND>(head.mHandle);
+    RECT windowRect{};
+    ::GetWindowRect(windowHandle, &windowRect);
+    ::ClipCursor(&windowRect);
+  }
+
+  void cleanup_CConFunc_SC_ToggleCursorClip()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_ToggleCursorClip);
+  }
+
+  void register_CConFunc_SC_ToggleCursorClip()
+  {
+    gCConFunc_SC_ToggleCursorClip.InitializeRecovered(
+      kConsoleStartupSCToggleCursorClipDescription, "SC_ToggleCursorClip", &moho::SC_ToggleCursorClip
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_ToggleCursorClip);
+  }
 } // namespace moho
 
 namespace
@@ -155,7 +267,12 @@ namespace
   // `FrameDumpConsoleRegistrations` in FrameDumpCommands.cpp.
   struct ResolutionConsoleRegistrations
   {
-    ResolutionConsoleRegistrations() { moho::register_CConFunc_SC_PrimaryAdapter(); }
+    ResolutionConsoleRegistrations()
+    {
+      moho::register_CConFunc_SC_PrimaryAdapter();
+      moho::register_CConFunc_SC_VerticalSync();
+      moho::register_CConFunc_SC_ToggleCursorClip();
+    }
   };
 
   [[maybe_unused]] ResolutionConsoleRegistrations gResolutionConsoleRegistrations;
