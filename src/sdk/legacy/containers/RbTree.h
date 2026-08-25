@@ -2094,6 +2094,16 @@ namespace msvc8
              * `destroy_subtree`'s same vtable-write tell. Reached from this
              * instantiation's `erase_range` (`FUN_008D6080`, cited above)
              * walk path.
+             *
+             * Address: 0x00711BE0 (FUN_00711BE0, sub_711BE0) -- the local
+             * `blueprintKeys` variable's `erase_node` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * ArmyBlueprintNameView*>`, isNil@+0x11 -- the same
+             * instantiation cited on `erase_range`/`destroy_subtree` above
+             * as `FUN_00711350`/`FUN_00712090`). Same `out_of_range`
+             * checked-iterator guard shape as every other `erase_node`
+             * emission in this file. Reached from that `erase_range`'s
+             * walk path.
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -2447,7 +2457,33 @@ namespace msvc8
              * calls the already-cited `destroy_subtree` realization
              * `sub_5812C0` and resets head/size; walk path does an
              * iterative successor-walk erase via the already-cited
-             * `erase_node` realization `sub_57DA50`. Reached from
+             * `erase_node` realization `sub_57DA50`.
+             *
+             * Address: 0x00952240 (FUN_00952240, sub_952240) -- `gpg::
+             * WriteArchive::mRefCounts`'s `erase_range` (`msvc8::map<const
+             * gpg::RType*, int>`, isNil@+0x15, the same instantiation cited
+             * on the sentinel-allocate lane above, WriteArchive.cpp).
+             * Reached from `WriteArchive`'s destructor (`FUN_00953150`,
+             * `~WriteArchive`, WriteArchive.cpp) via `mRefCounts.clear()`.)
+             *
+             * Address: 0x007CA050 (FUN_007CA050, sub_7CA050) -- `Moho::
+             * SPeer::establishedUids`'s `erase_range` (`msvc8::set<
+             * int32_t>`, isNil@+0x11). Reached from `SPeer`'s destructor
+             * (`FUN_007C1340`, SPeer.cpp/.h) teardown of
+             * `establishedUids`.)
+             *
+             * Address: 0x00711350 (FUN_00711350, sub_711350) -- the local
+             * `blueprintKeys` variable's `erase_range` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * ArmyBlueprintNameView*>`, isNil@+0x11, 4-byte pointer
+             * value_type, CArmyStats.cpp:965). Whole-range fast path calls
+             * `sub_712090` (`destroy_subtree`, this same instantiation,
+             * cited below); walk path erases node-by-node via `sub_711BE0`
+             * (`erase_node`, cited below). Reached from `blueprintKeys`'s
+             * automatic (compiler-generated) end-of-scope destruction at
+             * the close of `ArmyXmlStatsNode`.)
+             *
+             * Reached from
              * `CAiBrain::~CAiBrain` (`FUN_0057A1E0`, CAiBrain.cpp) via
              * `DestroyBuildStructureMap` -- confirmed directly from the
              * destructor's own raw decompile, which calls this address as
@@ -3487,6 +3523,15 @@ namespace msvc8
              * `Resolution::\`vftable'` reference cannot be CRT code).
              * Reached from this instantiation's `erase_range`
              * (`FUN_008D6080`, cited above) whole-range fast path.
+             *
+             * Address: 0x00712090 (FUN_00712090, sub_712090) -- the local
+             * `blueprintKeys` variable's `destroy_subtree` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * ArmyBlueprintNameView*>`, isNil@+0x11 -- the same
+             * instantiation cited on `erase_range` above as
+             * `FUN_00711350`). Plain `operator delete` per node, no
+             * vtable write (the pointer value_type needs none). Reached
+             * from that `erase_range`'s whole-range fast path.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
