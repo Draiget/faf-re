@@ -191,12 +191,6 @@ namespace
     gSDecalInfoListTypeNameInitGuard = 0u;
   }
 
-  // Forward declarations: SDecalInfoSerializer's constructor below binds
-  // these as its load/save callback pointers; their bodies are defined
-  // further down in this same anonymous namespace.
-  void DeserializeSDecalInfoSerializerLane(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void SerializeSDecalInfoSerializerLane(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-
   /**
    * Demangled (by analogy to the established `gpg::Rect2iSerializer` /
    * `gpg::Rect2fSerializer` sibling shape in Reflection.h):
@@ -255,91 +249,39 @@ namespace
   CTextureScrollerSerializer gTextureScrollerSerializer;
 
   /**
-   * Demangled (by analogy to `gpg::Rect2iSerializer` / `gpg::Rect2fSerializer`):
-   * `gpg::SerSaveLoadHelper<class Moho::SDecalInfo>`.
+   * VFTABLE: 0x00E37368
+   *
+   * Demangled: gpg::SerSaveLoadHelper<struct Moho::SDecalInfo>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer: 0x00BDD820 (__xc_a-reachable;
+   *    dead zero-xref COMDAT duplicates: 0x0077A6A0, and the mangled
+   *    ??0SDecalInfoSerializer@Moho@@QAE@@Z body at 0x00778E40)
+   *  - dtor: 0x00C02820 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x0077A6D0
+   *  - Deserialize(): 0x00778E10
+   *  - Serialize(): 0x00778E20
+   *
+   * NOTE: prior recovery had mis-cited the ctor address as 0x0077A6A0 (a
+   * zero-xref dead duplicate) and had never identified 0x00BDD820 at all.
+   * `ArchiveSerialization.cpp`'s `InstallMohoSDecalInfoSerializerCallbacks`
+   * coincidentally cites this same Init() address (0x0077A6D0) via the
+   * generic by-type-name `InstallSerSaveLoadHelperCallbacksByTypeName`
+   * dispatch, but that whole citation family is already flagged elsewhere in
+   * this codebase as unreliable (the real body does a typeid/RTTI-pointer
+   * `LookupRType`, not a by-name string lookup); left untouched here.
    */
-  class SDecalInfoSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x0077A6A0 (FUN_0077A6A0)
-     *
-     * What it does:
-     * Binds this helper's load/save callback lanes to the decal-info member
-     * (de)serialize thunks. Base-class construction
-     * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices
-     * it into the pending `sNewHelpers` list.
-     */
-    SDecalInfoSerializer();
+  using SDecalInfoSerializer = gpg::SerSaveLoadHelper<moho::SDecalInfo>;
 
-    /**
-     * Address: 0x0077A6D0 (FUN_0077A6D0, InstallMohoSDecalInfoSerializerCallbacks
-     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
-     * template in gpg/core/containers/ArchiveSerialization.cpp)
-     *
-     * What it does:
-     * Resolves `SDecalInfo` reflected type metadata and publishes this
-     * helper's load/save callback lanes to it.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(SDecalInfoSerializer, mLoadCallback) == 0x0C, "SDecalInfoSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SDecalInfoSerializer, mSaveCallback) == 0x10, "SDecalInfoSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SDecalInfoSerializer) == 0x14, "SDecalInfoSerializer size must be 0x14");
-
-  SDecalInfoSerializer::SDecalInfoSerializer()
-    : mLoadCallback(&DeserializeSDecalInfoSerializerLane)
-    , mSaveCallback(&SerializeSDecalInfoSerializerLane)
-  {}
-
-  void SDecalInfoSerializer::Init()
-  {
-    gpg::RType* const type = CachedSDecalInfoType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
+  // Address: 0x00BDD820 (dynamic initializer for the global
+  // `SDecalInfoSerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<SDecalInfo>` ctor and registers the real
+  // destructor (0x00C02820) via `atexit`.
   SDecalInfoSerializer gSDecalInfoSerializer;
-
-  void DeserializeSDecalInfoSerializerLane(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const decalInfo = reinterpret_cast<moho::SDecalInfo*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (decalInfo != nullptr) {
-      decalInfo->MemberDeserialize(archive);
-    }
-  }
-
-  void SerializeSDecalInfoSerializerLane(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const decalInfo = reinterpret_cast<moho::SDecalInfo*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (decalInfo != nullptr) {
-      decalInfo->MemberSerialize(archive);
-    }
-  }
 
   /**
    * Address: 0x00777D90 (FUN_00777D90)
@@ -363,30 +305,6 @@ namespace
   [[maybe_unused]] void UnlinkTextureScrollerSerializerHelperSecondary() noexcept
   {
     gTextureScrollerSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00778E70 (FUN_00778E70)
-   *
-   * What it does:
-   * Unlinks `SDecalInfoSerializer` helper node from the intrusive helper list
-   * and restores self-links.
-   */
-  [[maybe_unused]] void UnlinkSDecalInfoSerializerHelperPrimary() noexcept
-  {
-    gSDecalInfoSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00778EA0 (FUN_00778EA0)
-   *
-   * What it does:
-   * Secondary entrypoint for `SDecalInfoSerializer` helper-node intrusive
-   * unlink + self-link reset.
-   */
-  [[maybe_unused]] void UnlinkSDecalInfoSerializerHelperSecondary() noexcept
-  {
-    gSDecalInfoSerializer.ResetLinks();
   }
 
   struct SDecalInfoListRuntimeView
