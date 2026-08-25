@@ -3492,6 +3492,24 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x0084C250 (FUN_0084C250, sub_84C250) -- a plain, no-refcount
+         * 12-byte-element `uninit_copy_n` (3-dword-stride copy loop, no
+         * `_InterlockedExchangeAdd`/refcount bump, unlike the
+         * `SPendingPoseCopy` specialization below -- a trivially-copyable
+         * POD element, not a `shared_ptr`-holding one). Owning `T` not yet
+         * identified. Reached via `FUN_0084B8B0` (`sub_84B8B0`, a thin
+         * 2-arg calling-convention adapter that zeroes a truncated flag
+         * byte before tail-calling this body) from `sub_849250`, a
+         * `vector<T>::insert`-growth emission whose allocator
+         * (`FUN_0084A560`) is `gpg::core::legacy::AllocateChecked12ByteLane`
+         * (`CheckedArrayAllocationLanes.h`). `FUN_0084B8B0` was previously
+         * mis-cited in `CWorldParticles.cpp` as a `TrailRuntimeView`
+         * (80+-byte, ref-counted-texture-pointer) range-copy bridge --
+         * disproven by this body's real shape (plain 3-dword copy, no
+         * texture/refcount handling at all) and corrected there;
+         * `CWorldParticles.cpp`'s real `TrailRuntimeView` copy bridge is
+         * `FUN_004A0310` alone, cited on the same member.)
+         *
          * Address: 0x0075FEA0 (FUN_0075FEA0, msvc8::vector<Moho::SPendingPoseCopy>::uninit_copy_n
          * for the 12-byte `{EntId, boost::shared_ptr<CAniPose>}` element — per-slot
          * dword-triple copy with an `_InterlockedExchangeAdd` refcount bump on the
