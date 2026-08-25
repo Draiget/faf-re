@@ -79,25 +79,6 @@ namespace
   {
     return handle.mLastPos.x != position.x || handle.mLastPos.y != position.y || handle.mLastPos.z != position.z;
   }
-
-  /**
-   * Address: 0x0076E6B0 (FUN_0076E6B0, gpg::SerSaveLoadHelper_CIntel load thunk)
-   *
-   * What it does:
-   * Forwards the installed mLoadCallback role into `CIntel::ReadArchive`.
-   */
-  int DeserializeCIntelFromArchiveBridge(const int archivePtr, const int objectPtr)
-  {
-    gpg::ReadArchive* const archive = reinterpret_cast<gpg::ReadArchive*>(archivePtr);
-    auto* const intel = reinterpret_cast<moho::CIntel*>(objectPtr);
-    if (archive == nullptr || intel == nullptr) {
-      return 0;
-    }
-
-    const gpg::RRef nullOwner{};
-    intel->ReadArchive(*archive, nullOwner);
-    return 0;
-  }
 } // namespace
 
 namespace moho
@@ -355,95 +336,6 @@ namespace moho
   }
 
   /**
-   * Demangled: gpg::SerSaveLoadHelper<Moho::CIntel>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='CIntelSerializer@Moho'`): `FUN_00BDCBE0` (real,
-   * `__xc_a`-reachable) vs. a dead zero-xref duplicate at `FUN_0076E6D0`
-   * (previously mis-modeled as `InitializeCIntelSerializerHelper()`). The
-   * real `Init()` body (`FUN_0076E810`, found via the class's own vtable
-   * slot-0 data xref) demangles as `gpg::SerSaveLoadHelper_CIntel::Init`,
-   * but `CIntel` exposes `ReadArchive`/`WriteArchive` rather than the
-   * template's expected `MemberDeserialize`/`MemberSerialize` names, so
-   * this stays a direct `SerHelperBase` derivative rather than a
-   * `gpg::SerSaveLoadHelper<CIntel>` alias (matching the precedent of
-   * `Rect2iSerializer`/`Rect2fSerializer` staying concrete).
-   */
-  class CIntelSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDCBE0 (FUN_00BDCBE0, dynamic initializer for the global
-     * `CIntelSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields. Plain unlink atexit target, modeled as
-     * the compiler's implicit static-destructor registration.
-     */
-    CIntelSerializer();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~CIntelSerializer();
-
-    /**
-     * Address: 0x0076E810 (FUN_0076E810, gpg::SerSaveLoadHelper_CIntel::Init)
-     *
-     * What it does:
-     * Binds load/save callbacks into reflected RTTI for `CIntel`.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
-
-  static_assert(
-    offsetof(CIntelSerializer, mLoadCallback) == 0x0C, "CIntelSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CIntelSerializer, mSaveCallback) == 0x10, "CIntelSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CIntelSerializer) == 0x14, "CIntelSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BDCBE0 (FUN_00BDCBE0, dynamic initializer for the global
-   * `CIntelSerializer` singleton)
-   */
-  CIntelSerializer::CIntelSerializer()
-    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCIntelFromArchiveBridge))
-    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&CIntel::SerializeSave))
-  {}
-
-  CIntelSerializer::~CIntelSerializer()
-  {
-    ResetLinks();
-  }
-
-  /**
-   * Address: 0x0076E810 (FUN_0076E810, gpg::SerSaveLoadHelper_CIntel::Init)
-   */
-  void CIntelSerializer::Init()
-  {
-    gpg::RType* type = CIntel::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CIntel));
-      CIntel::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
    * Address: 0x0076E010 (FUN_0076E010, Moho::CIntel::InitIntel)
    *
    * What it does:
@@ -539,9 +431,3 @@ namespace moho
     return mJamming.present != 0u && mJamming.enabled != 0u;
   }
 } // namespace moho
-
-namespace
-{
-  // Address: 0x010BB3D0 -- process-global `CIntelSerializer` singleton.
-  moho::CIntelSerializer gCIntelSerializer;
-} // namespace

@@ -1,70 +1,6 @@
 #include "moho/entity/intel/CIntelPosHandleSerializer.h"
 
-#include <cstdlib>
-
 #include "moho/entity/intel/CIntelPosHandle.h"
-
-namespace
-{
-  using Serializer = moho::CIntelPosHandleSerializer;
-
-  Serializer gCIntelPosHandleSerializer{};
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return &serializer.mHelperLinks;
-  }
-
-  template <class TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperLinks.mNext = self;
-    serializer.mHelperLinks.mPrev = self;
-  }
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    serializer.mHelperLinks.mNext->mPrev = serializer.mHelperLinks.mPrev;
-    serializer.mHelperLinks.mPrev->mNext = serializer.mHelperLinks.mNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperLinks.mPrev = self;
-    serializer.mHelperLinks.mNext = self;
-    return self;
-  }
-
-  void cleanup_CIntelPosHandleSerializer_atexit()
-  {
-    (void)moho::cleanup_CIntelPosHandleSerializer();
-  }
-
-  /**
-   * Address: 0x0076F430 (FUN_0076F430)
-   *
-   * What it does:
-   * Unlinks startup `CIntelPosHandleSerializer` helper links and rewires the
-   * node into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelPosHandleSerializerNodeVariantA() noexcept
-  {
-    return UnlinkSerializerNode(gCIntelPosHandleSerializer);
-  }
-
-  /**
-   * Address: 0x0076F460 (FUN_0076F460)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `CIntelPosHandleSerializer`
-   * helper links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelPosHandleSerializerNodeVariantB() noexcept
-  {
-    return UnlinkSerializerNode(gCIntelPosHandleSerializer);
-  }
-} // namespace
 
 namespace moho
 {
@@ -95,13 +31,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BDCCF0 (FUN_00BDCCF0, dynamic initializer for the global
+   * `CIntelPosHandleSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  CIntelPosHandleSerializer::CIntelPosHandleSerializer()
+    : mLoadCallback(&CIntelPosHandleSerializer::Deserialize)
+    , mSaveCallback(&CIntelPosHandleSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00C01ED0 (FUN_00C01ED0, Moho::CIntelPosHandleSerializer::~CIntelPosHandleSerializer)
+   */
+  CIntelPosHandleSerializer::~CIntelPosHandleSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x0076FB00 (FUN_0076FB00, gpg::SerSaveLoadHelper_CIntelPosHandle::Init)
    *
    * What it does:
    * Lazily resolves CIntelPosHandle RTTI and installs load/save callbacks
    * from this helper into the type descriptor.
    */
-  void CIntelPosHandleSerializer::RegisterSerializeFunctions()
+  void CIntelPosHandleSerializer::Init()
   {
     gpg::RType* const type = CIntelPosHandle::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -109,45 +66,14 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSaveCallback;
   }
-
-  /**
-   * Address: 0x00C01ED0 (FUN_00C01ED0, cleanup_CIntelPosHandleSerializer)
-   *
-   * What it does:
-   * Unlinks startup `CIntelPosHandleSerializer` helper links and rewires
-   * a self-linked sentinel lane.
-   */
-  gpg::SerHelperBase* cleanup_CIntelPosHandleSerializer()
-  {
-    return UnlinkSerializerNode(gCIntelPosHandleSerializer);
-  }
-
-  /**
-   * Address: 0x00BDCCF0 (FUN_00BDCCF0, register_CIntelPosHandleSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper lanes for `CIntelPosHandle` and
-   * installs process-exit cleanup.
-   */
-  void register_CIntelPosHandleSerializer()
-  {
-    InitializeSerializerNode(gCIntelPosHandleSerializer);
-    gCIntelPosHandleSerializer.mLoadCallback = &CIntelPosHandleSerializer::Deserialize;
-    gCIntelPosHandleSerializer.mSaveCallback = &CIntelPosHandleSerializer::Serialize;
-    gCIntelPosHandleSerializer.RegisterSerializeFunctions();
-    (void)std::atexit(&cleanup_CIntelPosHandleSerializer_atexit);
-  }
 } // namespace moho
 
 namespace
 {
-  struct CIntelPosHandleSerializerBootstrap
-  {
-    CIntelPosHandleSerializerBootstrap()
-    {
-      moho::register_CIntelPosHandleSerializer();
-    }
-  };
-
-  [[maybe_unused]] CIntelPosHandleSerializerBootstrap gCIntelPosHandleSerializerBootstrap;
+  // Address: 0x010BB414 -- process-global `CIntelPosHandleSerializer`
+  // singleton. Constructing it runs CIntelPosHandleSerializer::
+  // CIntelPosHandleSerializer() (0x00BDCCF0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; InitNewHelpers() later dispatches
+  // Init() on it.
+  moho::CIntelPosHandleSerializer gCIntelPosHandleSerializer{};
 } // namespace
