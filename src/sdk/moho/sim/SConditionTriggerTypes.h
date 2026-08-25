@@ -122,19 +122,9 @@ namespace moho
   void register_SConditionTypeInfo();
 
   /**
-   * Address: 0x00BDA060 (FUN_00BDA060, register_SConditionSerializer)
-   */
-  void register_SConditionSerializer();
-
-  /**
    * Address: 0x00BDA0A0 (FUN_00BDA0A0, sub_BDA0A0)
    */
   void register_STriggerTypeInfo();
-
-  /**
-   * Address: 0x00BDA0C0 (FUN_00BDA0C0, register_STriggerSerializer)
-   */
-  void register_STriggerSerializer();
 
   /**
    * Address: 0x00BDA160 (FUN_00BDA160, sub_BDA160)
