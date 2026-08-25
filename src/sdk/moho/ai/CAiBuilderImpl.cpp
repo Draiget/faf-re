@@ -648,6 +648,14 @@ namespace
    * Address: 0x005A0040 (FUN_005A0040, msvc8::map<uint, RUnitBlueprint*>::operator[])
    * Address: 0x005A08B0 (FUN_005A08B0, RB-tree node allocate-and-link inner
    * helper for the operator[] emission above)
+   * Address: 0x005A19B0 (FUN_005A19B0, `rb_increment` -- the in-order
+   * successor walk, isNil@+0x15, same shape as `legacy/containers/
+   * RbTree.h`'s `rb_increment` member. `FUN_005A08B0` calls it once, with
+   * its argument elided from the decompiled pseudocode (line "a2 ==
+   * *(DWORD*)v6 ... || (sub_5A19B0(), ...)"), to validate an `operator[]`
+   * insertion hint the classic MSVC8 way: increment the hint iterator and
+   * check the new key still compares less than the successor's key before
+   * trusting the hint, falling back to a full tree search otherwise.)
    *
    * The binary's `BuilderAddRebuildStructure` used the MSVC8
    * `map<uint, RUnitBlueprint*>::operator[]` template emission to
@@ -657,10 +665,12 @@ namespace
    * semantics through the typed `SBuilderRebuildMap` (a recovered
    * RB-tree layout with named fields and head sentinel) plus the
    * named `FindRebuildNode` / `CreateRebuildMapNode` helpers, so the
-   * binary's `_Tree::operator[]` template emission is absorbed by
-   * the modern hand-coded RB-tree insert path. Observable behavior
-   * is identical (existing key updates blueprint in place; new key
-   * allocates a node, links left/right under the parent walk, and
+   * binary's `_Tree::operator[]` template emission -- including its
+   * hint-validation fast path through `rb_increment` -- is absorbed by
+   * the modern hand-coded RB-tree insert path, which finds the
+   * insertion point directly instead of validating a hint. Observable
+   * behavior is identical (existing key updates blueprint in place; new
+   * key allocates a node, links left/right under the parent walk, and
    * refreshes head leftmost/rightmost extrema). The inner allocate-
    * and-link helper `FUN_005A08B0` (116 instr, RB-tree node insert +
    * parent-walk + leftmost/rightmost update) corresponds to the

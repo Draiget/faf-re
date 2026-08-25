@@ -4817,6 +4817,18 @@ namespace msvc8
          * own callers: `FUN_008D6280` (buy-node-with-value) and
          * `FUN_008D6940` (`buy_head`), both already recovered.)
          *
+         * sizeof(T) == 0x50 (80, `count > 0xFFFFFFFF/80` throws):
+         * Address: 0x008A9C60 (FUN_008A9C60, another cross-container reuse
+         * with `count=1` -- the single-node allocator for
+         * `TerrainEnvironmentLookupNodeRuntimeView`'s `msvc8::Tree<>`
+         * instantiation in `CWldMap.cpp` (0x50-byte node: 3 link fields +
+         * `pair<msvc8::string, boost::shared_ptr<RD3DTextureResource>>` +
+         * color/isNil). Called directly with a literal `1` from
+         * `FUN_008A9490` (`sub_8A9490() { return sub_8A9C60(1); }`), that
+         * tree's parameterless `alloc_raw`, already cited on
+         * `TerrainEnvironmentLookupNodeRuntimeView`'s constructor in
+         * CWldMap.cpp.)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
