@@ -213,6 +213,17 @@ namespace msvc8
          *          push_back -- same body, 4-byte T / kBlockSize==4
          *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
          *          guard `FUN_0073F940`, see SimDriver.cpp).
+         * Address: 0x007BB440 (FUN_007BB440, msvc8::deque<Moho::SNetCommand>::
+         *          push_back -- 0x30-byte T / kBlockSize==1 instantiation:
+         *          the "grow if within one slot of full" guard, wraparound
+         *          slot computation, and lazy per-slot node allocation are
+         *          the same shape as the two instantiations above; the
+         *          element is copy-constructed in place via
+         *          `SNetCommand::SNetCommand(const SNetCommand&)`
+         *          (FUN_007BCE70) rather than a placement-new of a trivial
+         *          type. Reached from `PushBackQueuedCommand`
+         *          (CGpgNetInterface.cpp), itself called from
+         *          `CGpgNetInterface::EnqueueCommand`.)
          */
         void push_back(const T& v)
         {
@@ -223,17 +234,26 @@ namespace msvc8
             ++_Mysize;
         }
 
+        /**
+         * Exception safety: compute the would-be front slot without
+         * mutating `_Myoff`/`_Mysize` until construction has actually
+         * succeeded (confirmed against the real `deque<Moho::SNetCommand>`
+         * push_front emission, FUN_007BE750: it writes `_Myoff` and bumps
+         * `_Mysize` only after its copy-construct call returns). The
+         * straight-line "decrement offset, then construct" version this
+         * replaced would leave `_Myoff` pointing at an uninitialized slot
+         * if `T`'s copy constructor throws.
+         */
         void push_front(const T& v)
         {
             grow_if_full(1);
-            // Move begin one step left in the circular space
-            if (_Myoff == 0)
-                _Myoff = capacity();
-            --_Myoff; // now begin() shifts left by one element
-
-            ensure_node_for_write(0);
-            T* p = ptr_at(0);
+            const size_type newOff = (_Myoff == 0) ? capacity() - 1 : _Myoff - 1;
+            const size_type nodeIdx = node_index_from_global(newOff, _Mapsize);
+            if (_Map[nodeIdx] == nullptr)
+                _Map[nodeIdx] = allocate_node();
+            T* const p = _Map[nodeIdx] + in_node_index_from_global(newOff);
             ::new (static_cast<void*>(p)) T(v);
+            _Myoff = newOff;
             ++_Mysize;
         }
 
@@ -298,6 +318,30 @@ namespace msvc8
         }
 
         allocator_type get_allocator() const { return allocator_type(); }
+
+        /**
+         * Address: 0x007BBA90 (FUN_007BBA90, msvc8::deque<Moho::SNetCommand>::
+         * clear-and-release lane, 0x30-byte element / kBlockSize==1) --
+         * drains every live element in logical order (the loop inlines
+         * `SNetCommand::~SNetCommand()` field-by-field: releases `mArgs`'
+         * heap buffer when non-null, resets its three pointer lanes, frees
+         * `mName`'s heap buffer when its capacity is >=16 and resets it to
+         * empty-SSO state), resetting `_Myoff` to 0 once fully drained
+         * exactly like `clear()` above, THEN additionally frees every
+         * allocated node in `_Map` and the map array itself -- strictly
+         * more than `clear()` alone does, matching `clear()` followed by
+         * `release_all()`. Reached from six recovered `CGpgNetInterface`
+         * call sites (`FUN_007B6900`, `FUN_007B7680`, `FUN_007B7710`,
+         * `FUN_007BB3C0`, `FUN_007BB4D0`, all in CGpgNetInterface.cpp) that
+         * tear the queued-command deque all the way down rather than just
+         * logically emptying it -- `ClearCommandQueue` below is the
+         * source-level call site.
+         */
+        void clear_and_release()
+        {
+            clear();
+            release_all();
+        }
 
         // Debug-proxy passthrough (opaque)
         void* get_debug_proxy() const { return _Myproxy; }
