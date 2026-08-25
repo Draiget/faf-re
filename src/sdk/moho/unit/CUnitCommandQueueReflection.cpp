@@ -25,37 +25,22 @@ namespace gpg
 namespace
 {
   moho::CUnitCommandQueueTypeInfo gCUnitCommandQueueTypeInfo;
+
+  // Address: 0x00BD92A0 -- dynamic initializer for the global
+  // CUnitCommandQueueSaveConstruct singleton (base-ctor -> field-set ->
+  // vtable-install -> atexit, no eager RegisterSaveConstructArgsFunction()
+  // dispatch, confirmed via raw asm).
   moho::CUnitCommandQueueSaveConstruct gCUnitCommandQueueSaveConstruct;
+
+  // Address: 0x00BD92D0 -- dynamic initializer for the global
+  // CUnitCommandQueueConstruct singleton, same shape, independent __xc_a
+  // static initializer.
   moho::CUnitCommandQueueConstruct gCUnitCommandQueueConstruct;
+
+  // Address: 0x00BD9310 -- dynamic initializer for the global
+  // CUnitCommandQueueSerializer singleton, same shape, independent __xc_a
+  // static initializer.
   moho::CUnitCommandQueueSerializer gCUnitCommandQueueSerializer;
-
-  template <class THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <class THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <class THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
 
   template <class TTypeInfo>
   void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
@@ -75,53 +60,6 @@ namespace
     ResetTypeInfoVectors(gCUnitCommandQueueTypeInfo);
   }
 
-  /**
-   * Address: 0x00BFEF10 (FUN_00BFEF10, sub_BFEF10)
-   *
-   * What it does:
-   * Unlinks the CUnitCommandQueue save-construct helper node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandQueueSaveConstruct()
-  {
-    return UnlinkHelperNode(gCUnitCommandQueueSaveConstruct);
-  }
-
-  /**
-   * Address: 0x00BFEF40 (FUN_00BFEF40, Moho::CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct)
-   *
-   * What it does:
-   * Unlinks the CUnitCommandQueue construct helper node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandQueueConstruct()
-  {
-    return UnlinkHelperNode(gCUnitCommandQueueConstruct);
-  }
-
-  /**
-   * Address: 0x00BFEF70 (FUN_00BFEF70, sub_BFEF70)
-   *
-   * What it does:
-   * Unlinks the CUnitCommandQueue serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandQueueSerializer()
-  {
-    return UnlinkHelperNode(gCUnitCommandQueueSerializer);
-  }
-
-  void CleanupSaveConstructAtexit()
-  {
-    (void)cleanup_CUnitCommandQueueSaveConstruct();
-  }
-
-  void CleanupConstructAtexit()
-  {
-    (void)cleanup_CUnitCommandQueueConstruct();
-  }
-
-  void CleanupSerializerAtexit()
-  {
-    (void)cleanup_CUnitCommandQueueSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -179,15 +117,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x006EDBD0 (FUN_006EDBD0)
+   * Address: 0x00BD92A0 (FUN_00BD92A0, register_CUnitCommandQueueSaveConstruct)
    *
    * What it does:
-   * Wrapper lane that forwards one base-registration dispatch to
-   * `AddBase_Broadcaster_EUnitCommandQueueStatus`.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
    */
-  void CUnitCommandQueueTypeInfo::AddBase_Broadcaster_EUnitCommandQueueStatusAdapter(gpg::RType* const typeInfo)
+  CUnitCommandQueueSaveConstruct::CUnitCommandQueueSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CUnitCommandQueueSaveConstruct::SaveConstructArgs)
+      )
+  {}
+
+  /**
+   * Address: 0x00BFEF10 (FUN_00BFEF10, sub_BFEF10)
+   */
+  CUnitCommandQueueSaveConstruct::~CUnitCommandQueueSaveConstruct()
   {
-    AddBase_Broadcaster_EUnitCommandQueueStatus(typeInfo);
+    ResetLinks();
   }
 
   /**
@@ -211,7 +158,7 @@ namespace moho
   /**
    * Address: 0x006F8420 (FUN_006F8420, Moho::CUnitCommandQueueSaveConstruct::RegisterSaveConstructArgsFunction)
    */
-  void CUnitCommandQueueSaveConstruct::RegisterSaveConstructArgsFunction()
+  void CUnitCommandQueueSaveConstruct::Init()
   {
     gpg::RType* type = CUnitCommandQueue::sType;
     if (type == nullptr) {
@@ -221,6 +168,26 @@ namespace moho
 
     GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
     type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+  }
+
+  /**
+   * Address: 0x00BD92D0 (FUN_00BD92D0, register_CUnitCommandQueueConstruct)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
+   */
+  CUnitCommandQueueConstruct::CUnitCommandQueueConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CUnitCommandQueueConstruct::Construct))
+    , mDeconstructCallback(&CUnitCommandQueueConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BFEF40 (FUN_00BFEF40, Moho::CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct)
+   */
+  CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -258,7 +225,7 @@ namespace moho
   /**
    * Address: 0x006F84A0 (FUN_006F84A0, Moho::CUnitCommandQueueConstruct::RegisterConstructFunction)
    */
-  void CUnitCommandQueueConstruct::RegisterConstructFunction()
+  void CUnitCommandQueueConstruct::Init()
   {
     gpg::RType* type = CUnitCommandQueue::sType;
     if (type == nullptr) {
@@ -269,6 +236,26 @@ namespace moho
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
     type->serConstructFunc_ = mConstructCallback;
     type->deleteFunc_ = mDeconstructCallback;
+  }
+
+  /**
+   * Address: 0x00BD9310 (FUN_00BD9310, register_CUnitCommandQueueSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  CUnitCommandQueueSerializer::CUnitCommandQueueSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitCommandQueueSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitCommandQueueSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BFEF70 (FUN_00BFEF70, sub_BFEF70)
+   */
+  CUnitCommandQueueSerializer::~CUnitCommandQueueSerializer()
+  {
+    ResetLinks();
   }
 
   /**
@@ -314,7 +301,7 @@ namespace moho
    * Binds `CUnitCommandQueue` load/save callbacks onto its reflected type
    * metadata; asserts neither slot is already claimed before installing them.
    */
-  void CUnitCommandQueueSerializer::RegisterSerializeFunctions()
+  void CUnitCommandQueueSerializer::Init()
   {
     gpg::RType* const type = CUnitCommandQueue::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -331,83 +318,7 @@ namespace moho
     (void)gCUnitCommandQueueTypeInfo;
     (void)std::atexit(&cleanup_CUnitCommandQueueTypeInfo);
   }
-
-  /**
-   * Address: 0x00BD92A0 (FUN_00BD92A0, sub_BD92A0)
-   */
-  void register_CUnitCommandQueueSaveConstruct()
-  {
-    InitializeHelperNode(gCUnitCommandQueueSaveConstruct);
-    gCUnitCommandQueueSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CUnitCommandQueueSaveConstruct::SaveConstructArgs);
-    gCUnitCommandQueueSaveConstruct.RegisterSaveConstructArgsFunction();
-    (void)std::atexit(&CleanupSaveConstructAtexit);
-  }
-
-  /**
-   * Address: 0x00BD92D0 (FUN_00BD92D0, register_CUnitCommandQueueConstruct)
-   */
-  void register_CUnitCommandQueueConstruct()
-  {
-    InitializeHelperNode(gCUnitCommandQueueConstruct);
-    gCUnitCommandQueueConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CUnitCommandQueueConstruct::Construct);
-    gCUnitCommandQueueConstruct.mDeconstructCallback = &CUnitCommandQueueConstruct::Deconstruct;
-    gCUnitCommandQueueConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupConstructAtexit);
-  }
-
-  /**
-   * Address: 0x00BD9310 (FUN_00BD9310, register_CUnitCommandQueueSerializer)
-   */
-  void register_CUnitCommandQueueSerializer()
-  {
-    InitializeHelperNode(gCUnitCommandQueueSerializer);
-    gCUnitCommandQueueSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CUnitCommandQueueSerializer::Deserialize);
-    gCUnitCommandQueueSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CUnitCommandQueueSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtexit);
-  }
-
-  /**
-   * Address: 0x006EEA70 (FUN_006EEA70)
-   *
-   * What it does:
-   * Duplicated teardown lane that unlinks `CUnitCommandQueueConstruct` helper
-   * links and self-links the node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandQueueConstruct_variant()
-  {
-    return cleanup_CUnitCommandQueueConstruct();
-  }
-
-  /**
-   * Address: 0x006EEC10 (FUN_006EEC10)
-   *
-   * What it does:
-   * Duplicated teardown lane that unlinks `CUnitCommandQueueSerializer` helper
-   * links and self-links the node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandQueueSerializer_variant()
-  {
-    return cleanup_CUnitCommandQueueSerializer();
-  }
 } // namespace moho
-
-namespace
-{
-  struct CUnitCommandQueueReflectionBootstrap
-  {
-    CUnitCommandQueueReflectionBootstrap()
-    {
-      moho::register_CUnitCommandQueueTypeInfo();
-      moho::register_CUnitCommandQueueSaveConstruct();
-      moho::register_CUnitCommandQueueConstruct();
-      moho::register_CUnitCommandQueueSerializer();
-    }
-  };
-
-  CUnitCommandQueueReflectionBootstrap gCUnitCommandQueueReflectionBootstrap;
-} // namespace
 
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
