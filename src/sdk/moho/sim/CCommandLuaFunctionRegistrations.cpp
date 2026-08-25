@@ -2536,7 +2536,7 @@ namespace moho
 
           (void)EntityCategory::Add(&perUnit, &buildable);
 
-          msvc8::set<const RUnitBlueprint*> upgradeTargets;
+          msvc8::list<const RUnitBlueprint*> upgradeTargets;
           CollectUpgradeCommandTargetBlueprints(unit, upgradeTargets);
           for (const RUnitBlueprint* const targetBp : upgradeTargets) {
             const auto* const targetEconomyCat =
