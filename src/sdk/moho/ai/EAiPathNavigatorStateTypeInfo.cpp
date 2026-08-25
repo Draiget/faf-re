@@ -5,7 +5,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathNavigator.h"
+#include "moho/ai/CAiPathNavigator.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -16,19 +16,11 @@ namespace
     unsigned char gEAiPathNavigatorStateTypeInfoStorage[sizeof(EAiPathNavigatorStateTypeInfo)] = {};
   bool gEAiPathNavigatorStateTypeInfoConstructed = false;
 
-  alignas(EAiPathNavigatorStatePrimitiveSerializer)
-    unsigned char gEAiPathNavigatorStatePrimitiveSerializerStorage[sizeof(EAiPathNavigatorStatePrimitiveSerializer)] =
-      {};
-  bool gEAiPathNavigatorStatePrimitiveSerializerConstructed = false;
-
-  gpg::RType* gEAiPathNavigatorStateType = nullptr;
-
   [[nodiscard]] EAiPathNavigatorStateTypeInfo* AcquireEAiPathNavigatorStateTypeInfo()
   {
     if (!gEAiPathNavigatorStateTypeInfoConstructed) {
       auto* const typeInfo = new (gEAiPathNavigatorStateTypeInfoStorage) EAiPathNavigatorStateTypeInfo();
       gpg::PreRegisterRType(typeid(EAiPathNavigatorState), typeInfo);
-      gEAiPathNavigatorStateType = typeInfo;
       gEAiPathNavigatorStateTypeInfoConstructed = true;
     }
 
@@ -47,53 +39,6 @@ namespace
     return AcquireEAiPathNavigatorStateTypeInfo();
   }
 
-  [[nodiscard]] EAiPathNavigatorStatePrimitiveSerializer* AcquireEAiPathNavigatorStatePrimitiveSerializer()
-  {
-    if (!gEAiPathNavigatorStatePrimitiveSerializerConstructed) {
-      new (gEAiPathNavigatorStatePrimitiveSerializerStorage) EAiPathNavigatorStatePrimitiveSerializer();
-      gEAiPathNavigatorStatePrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<EAiPathNavigatorStatePrimitiveSerializer*>(gEAiPathNavigatorStatePrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiPathNavigatorStateType()
-  {
-    if (!gEAiPathNavigatorStateType) {
-      gEAiPathNavigatorStateType = gpg::LookupRType(typeid(EAiPathNavigatorState));
-    }
-
-    return gEAiPathNavigatorStateType;
-  }
-
   /**
    * Address: 0x00BF7320 (FUN_00BF7320, cleanup_EAiPathNavigatorStateTypeInfo)
    *
@@ -108,56 +53,14 @@ namespace
 
     AcquireEAiPathNavigatorStateTypeInfo()->~EAiPathNavigatorStateTypeInfo();
     gEAiPathNavigatorStateTypeInfoConstructed = false;
-    gEAiPathNavigatorStateType = nullptr;
   }
 
-  /**
-   * Address: 0x00BF7330 (FUN_00BF7330, cleanup_EAiPathNavigatorStatePrimitiveSerializer)
-   *
-   * What it does:
-   * Unlinks the recovered primitive serializer helper node from the intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_EAiPathNavigatorStatePrimitiveSerializer()
-  {
-    if (!gEAiPathNavigatorStatePrimitiveSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireEAiPathNavigatorStatePrimitiveSerializer());
-  }
-
-  /**
-   * Address: 0x005AD310 (FUN_005AD310)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the recovered
-   * `EAiPathNavigatorState` primitive serializer helper node and restores
-   * self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  cleanup_EAiPathNavigatorStatePrimitiveSerializerStartupThunkA()
-  {
-    return cleanup_EAiPathNavigatorStatePrimitiveSerializer();
-  }
-
-  /**
-   * Address: 0x005AD340 (FUN_005AD340)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `EAiPathNavigatorState` primitive serializer helper unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
-  cleanup_EAiPathNavigatorStatePrimitiveSerializerStartupThunkB()
-  {
-    return cleanup_EAiPathNavigatorStatePrimitiveSerializer();
-  }
-
-  void cleanup_EAiPathNavigatorStatePrimitiveSerializer_atexit()
-  {
-    (void)cleanup_EAiPathNavigatorStatePrimitiveSerializer();
-  }
+  // Address: 0x010AEE20 -- process-global `PrimitiveSerHelper<CAiPathNavigator::
+  // State,int>` singleton (constructed by FUN_00BCCFE0, self-registering via
+  // `__xc_a`; see EAiPathNavigatorStateTypeInfo.h for the real-ctor/atexit-
+  // target evidence and the CAiPathNavigator::State vs. EAiPathNavigatorState
+  // naming note).
+  moho::EAiPathNavigatorStatePrimitiveSerializer gEAiPathNavigatorStatePrimitiveSerializer;
 } // namespace
 
 /**
@@ -190,66 +93,6 @@ void EAiPathNavigatorStateTypeInfo::Init()
 }
 
 /**
- * Address: 0x005B0290 (FUN_005B0290, Deserialize_EAiPathNavigatorState)
- *
- * What it does:
- * Deserializes one `EAiPathNavigatorState` enum lane from archive storage.
- */
-void EAiPathNavigatorStatePrimitiveSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  int value = 0;
-  archive->ReadInt(&value);
-  *reinterpret_cast<EAiPathNavigatorState*>(static_cast<std::uintptr_t>(objectPtr)) =
-    static_cast<EAiPathNavigatorState>(value);
-}
-
-/**
- * Address: 0x005B02B0 (FUN_005B02B0, Serialize_EAiPathNavigatorState)
- *
- * What it does:
- * Serializes one `EAiPathNavigatorState` enum lane to archive storage.
- */
-void EAiPathNavigatorStatePrimitiveSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  const auto* const value = reinterpret_cast<const EAiPathNavigatorState*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteInt(static_cast<int>(*value));
-}
-
-/**
- * Address: 0x005B0050 (FUN_005B0050)
- *
- * What it does:
- * Binds reflected load/save callbacks for `EAiPathNavigatorState`.
- */
-void EAiPathNavigatorStatePrimitiveSerializer::RegisterSerializeFunctions()
-{
-  gpg::RType* const type = CachedEAiPathNavigatorStateType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
  * Address: 0x00BCCFC0 (FUN_00BCCFC0, register_EAiPathNavigatorStateTypeInfo)
  *
  * What it does:
@@ -262,22 +105,6 @@ int moho::register_EAiPathNavigatorStateTypeInfo()
   return std::atexit(&cleanup_EAiPathNavigatorStateTypeInfo);
 }
 
-/**
- * Address: 0x00BCCFE0 (FUN_00BCCFE0, register_EAiPathNavigatorStatePrimitiveSerializer)
- *
- * What it does:
- * Registers primitive serializer callbacks for `EAiPathNavigatorState` and
- * installs process-exit cleanup.
- */
-int moho::register_EAiPathNavigatorStatePrimitiveSerializer()
-{
-  EAiPathNavigatorStatePrimitiveSerializer* const serializer = AcquireEAiPathNavigatorStatePrimitiveSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EAiPathNavigatorStatePrimitiveSerializer::Deserialize;
-  serializer->mSaveCallback = &EAiPathNavigatorStatePrimitiveSerializer::Serialize;
-  return std::atexit(&cleanup_EAiPathNavigatorStatePrimitiveSerializer_atexit);
-}
-
 namespace
 {
   struct EAiPathNavigatorStateTypeInfoBootstrap
@@ -285,7 +112,6 @@ namespace
     EAiPathNavigatorStateTypeInfoBootstrap()
     {
       (void)moho::register_EAiPathNavigatorStateTypeInfo();
-      (void)moho::register_EAiPathNavigatorStatePrimitiveSerializer();
     }
   };
 
