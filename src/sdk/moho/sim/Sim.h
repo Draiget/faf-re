@@ -7097,26 +7097,40 @@ namespace moho
    * VFTABLE: 0x00E3481C
    * COL:  0x00E8DF18
    */
-  class SimSerializer
+  class SimSerializer : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x0074CFB0 (FUN_0074CFB0, sub_74CFB0)
-     * Slot: 0
+     * Address: 0x00BDBC90 (FUN_00BDBC90, dynamic initializer for the global
+     * `SimSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SimSerializer();
+
+    /**
+     * Address: 0x00C00EC0 (FUN_00C00EC0, Moho::SimSerializer::~SimSerializer)
+     */
+    ~SimSerializer();
+
+    /**
+     * Address: 0x0074CFB0 (FUN_0074CFB0, Moho::SimSerializer::Init)
      *
      * What it does:
      * Binds Sim RTTI serializer callbacks (`serLoadFunc_` / `serSaveFunc_`).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    // Set by Sim serializer init helpers (0x0074CF80 / 0x00744F90) to 0x00744F70.
-    gpg::RType::load_func_t mSerLoadFunc;
-    // Set by Sim serializer init helpers (0x0074CF80 / 0x00744F90) to 0x00744F80.
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C, set to 0x00744F70 (SimSerializerLoadThunk)
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10, set to 0x00744F80 (SimSerializerSaveThunk)
   };
+
+  static_assert(offsetof(SimSerializer, mSerLoadFunc) == 0x0C, "SimSerializer::mSerLoadFunc offset must be 0x0C");
+  static_assert(offsetof(SimSerializer, mSerSaveFunc) == 0x10, "SimSerializer::mSerSaveFunc offset must be 0x10");
+  static_assert(sizeof(SimSerializer) == 0x14, "SimSerializer size must be 0x14");
 
   /**
    * VFTABLE: 0x00E347EC
