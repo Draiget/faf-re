@@ -483,31 +483,44 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BD20E0 (FUN_00BD20E0, register_EPathPointStatePrimitiveSerializer)
+   * Address: 0x00BD20E0 (FUN_00BD20E0, dynamic initializer for the global
+   * `EPathPointStatePrimitiveSerializer` singleton)
    *
    * What it does:
-   * Binds primitive enum load/save callbacks onto reflected `EPathPointState`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list), then
+   * binds the load/save callback fields. Confirmed from raw disassembly:
+   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+   * `??_7?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg@@6B@` (the
+   * `gpg::PrimitiveSerHelper<Moho::EPathPointState,int>` template's vtable;
+   * this class's own recovered shape mirrors the sibling per-enum
+   * `*PrimitiveSerializer` classes already established elsewhere, e.g.
+   * `ESiloTypePrimitiveSerializer`) -- no eager `Init()` call exists here,
+   * and this class has no user-declared destructor (the real binary
+   * explicitly registers `atexit(&sub_BFA7F0)` instead). Two duplicate
+   * zero-xref "construct+set-fields" emissions of this same ctor logic
+   * exist nearby (0x0062F840, 0x0062F9C0, formerly
+   * `InitializeEPathPointStatePrimitiveSerializerPrimitiveLane/SaveLoadLane`);
+   * they are superseded by this citation.
    */
-  class EPathPointStatePrimitiveSerializer
+  class EPathPointStatePrimitiveSerializer : public gpg::SerHelperBase
   {
   public:
-    virtual void RegisterSerializeFunctions();
+    EPathPointStatePrimitiveSerializer();
+
+    /**
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected
+     * `EPathPointState`. Dispatched by `gpg::SerHelperBase::InitNewHelpers`
+     * when this helper is drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mDeserialize;
     gpg::RType::save_func_t mSerialize;
   };
 
-  static_assert(
-    offsetof(EPathPointStatePrimitiveSerializer, mHelperNext) == 0x04,
-    "EPathPointStatePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EPathPointStatePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EPathPointStatePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(EPathPointStatePrimitiveSerializer, mDeserialize) == 0x0C,
     "EPathPointStatePrimitiveSerializer::mDeserialize offset must be 0x0C"
@@ -521,7 +534,7 @@ namespace moho
     "EPathPointStatePrimitiveSerializer size must be 0x14"
   );
 
-  class SCollisionInfoSerializer
+  class SCollisionInfoSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -541,28 +554,46 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x00BCBDD0 (FUN_00BCBDD0, dynamic initializer for the global
+     * `SCollisionInfoSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
+     * then installs `??_7SCollisionInfoSerializer@Moho@@6B@` -- no eager
+     * `Init()` call exists here.
+     */
+    SCollisionInfoSerializer();
+
+    /**
+     * Address: 0x00BF65B0 (FUN_00BF65B0, ??1SCollisionInfoSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. Two duplicate
+     * zero-xref emissions of this same unlink/self-link sequence exist
+     * nearby (0x005968D0, 0x00596900); they are superseded by this
+     * citation.
+     */
+    ~SCollisionInfoSerializer();
+
+    /**
      * Address: 0x00598390 (FUN_00598390, gpg::SerSaveLoadHelper<Moho::SCollisionInfo>::Init)
      *
      * What it does:
-     * Binds `SCollisionInfo` load/save callbacks onto reflected type metadata.
+     * Binds `SCollisionInfo` load/save callbacks onto reflected type
+     * metadata. Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this
+     * helper is drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mDeserialize;
     gpg::RType::save_func_t mSerialize;
   };
 
-  static_assert(
-    offsetof(SCollisionInfoSerializer, mHelperNext) == 0x04,
-    "SCollisionInfoSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SCollisionInfoSerializer, mHelperPrev) == 0x08,
-    "SCollisionInfoSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SCollisionInfoSerializer, mDeserialize) == 0x0C,
     "SCollisionInfoSerializer::mDeserialize offset must be 0x0C"
@@ -574,39 +605,43 @@ namespace moho
   static_assert(sizeof(SCollisionInfoSerializer) == 0x14, "SCollisionInfoSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BD2140 (FUN_00BD2140, register_CPathPointSerializer)
+   * Address: 0x00BD2140 (FUN_00BD2140, dynamic initializer for the global
+   * `CPathPointSerializer` singleton)
    *
    * What it does:
-   * Serializer helper that binds `CPathPoint` load/save callbacks.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list), then
+   * binds the load/save callback fields. Confirmed from raw disassembly:
+   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+   * `??_7CPathPointSerializer@Moho@@6B@` -- no eager `Init()` call exists
+   * here, and this class has no user-declared destructor (the real binary
+   * explicitly registers `atexit(&sub_BFA880)` instead).
    */
-  class CPathPointSerializer
+  class CPathPointSerializer : public gpg::SerHelperBase
   {
   public:
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    CPathPointSerializer();
 
     /**
      * Address: 0x0062F910 (FUN_0062F910, gpg::SerSaveLoadHelper<Moho::CPathPoint>::Init)
      *
      * What it does:
      * Binds `CPathPoint` load/save callbacks onto its reflected type
-     * metadata; asserts neither slot is already claimed before installing them.
+     * metadata; asserts neither slot is already claimed before installing
+     * them. Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this
+     * helper is drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mDeserialize;
     gpg::RType::save_func_t mSerialize;
   };
 
-  static_assert(offsetof(CPathPointSerializer, mHelperNext) == 0x04, "CPathPointSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CPathPointSerializer, mHelperPrev) == 0x08, "CPathPointSerializer::mHelperPrev offset must be 0x08");
-  static_assert(
-    offsetof(CPathPointSerializer, mDeserialize) == 0x0C,
-    "CPathPointSerializer::mDeserialize offset must be 0x0C"
-  );
+  static_assert(offsetof(CPathPointSerializer, mDeserialize) == 0x0C, "CPathPointSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(CPathPointSerializer, mSerialize) == 0x10, "CPathPointSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(CPathPointSerializer) == 0x14, "CPathPointSerializer size must be 0x14");
 
@@ -618,15 +653,6 @@ namespace moho
    * teardown.
    */
   int register_EPathPointStateTypeInfo();
-
-  /**
-   * Address: 0x00BD20E0 (FUN_00BD20E0, register_EPathPointStatePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `EPathPointState` and
-   * schedules helper-node teardown.
-   */
-  int register_EPathPointStatePrimitiveSerializer();
 
   /**
    * Address: 0x00BCBDB0 (FUN_00BCBDB0, register_SCollisionInfoTypeInfo)
@@ -645,37 +671,12 @@ namespace moho
   void register_ECollisionTypeTypeInfo();
 
   /**
-   * Address: 0x00BCBD70 (FUN_00BCBD70, register_PrimitiveSerHelper_ECollisionType_int)
-   *
-   * What it does:
-   * Initializes primitive enum serializer callbacks for `ECollisionType`.
-   */
-  void register_PrimitiveSerHelper_ECollisionType_int();
-
-  /**
-   * Address: 0x00BCBDD0 (FUN_00BCBDD0, register_SCollisionInfoSerializer)
-   *
-   * What it does:
-   * Initializes `SCollisionInfo` serializer callbacks and installs teardown.
-   */
-  void register_SCollisionInfoSerializer();
-
-  /**
    * Address: 0x00BD2120 (FUN_00BD2120, register_CPathPointTypeInfo)
    *
    * What it does:
    * Constructs and preregisters `CPathPoint` type-info, then schedules teardown.
    */
   int register_CPathPointTypeInfo();
-
-  /**
-   * Address: 0x00BD2140 (FUN_00BD2140, register_CPathPointSerializer)
-   *
-   * What it does:
-   * Initializes `CPathPoint` serializer callbacks and schedules helper-node
-   * teardown.
-   */
-  void register_CPathPointSerializer();
 
   /**
    * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointTypeAtexit)
