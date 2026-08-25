@@ -5,7 +5,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -36,30 +36,6 @@ namespace
     return *reinterpret_cast<moho::CTaskStageTypeInfo*>(gCTaskStageTypeInfoStorage);
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper* const helper)
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(helper);
-  }
-
-  template <typename THelper>
-  void ResetHelperIntrusiveLinks(THelper* const helper)
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper->mNext = self;
-    helper->mPrev = self;
-  }
-
-  template <typename THelper>
-  void UnlinkHelperIntrusiveLinks(THelper* const helper)
-  {
-    if (helper->mNext != nullptr && helper->mPrev != nullptr) {
-      helper->mNext->mPrev = helper->mPrev;
-      helper->mPrev->mNext = helper->mNext;
-    }
-    ResetHelperIntrusiveLinks(helper);
-  }
-
   [[nodiscard]] gpg::RType* CachedCTaskThreadType()
   {
     gpg::RType* type = moho::CTaskThread::sType;
@@ -76,17 +52,6 @@ namespace
     out.mObj = thread;
     out.mType = CachedCTaskThreadType();
     return out;
-  }
-
-  [[nodiscard]] moho::CTaskThreadConstruct* InitializeCTaskThreadConstructHelper(
-    moho::CTaskThreadConstruct* const constructHelper
-  )
-  {
-    ResetHelperIntrusiveLinks(constructHelper);
-    constructHelper->mSerConstructFunc =
-      reinterpret_cast<gpg::RType::construct_func_t>(&moho::CTaskThreadConstruct::Construct);
-    constructHelper->mDeleteFunc = &moho::CTaskThreadConstruct::Deconstruct;
-    return constructHelper;
   }
 
   /**
@@ -145,32 +110,6 @@ namespace
     result->SetUnowned(threadRef, 0u);
   }
 
-  /**
-   * Address: 0x00409630 (FUN_00409630, sub_409630)
-   *
-   * What it does:
-   * Initializes global CTaskThread serializer helper callback slots.
-   */
-  [[nodiscard]] moho::CTaskThreadSerializer* InitializeCTaskThreadSerializerHelper(
-    moho::CTaskThreadSerializer* const serializer
-  )
-  {
-    ResetHelperIntrusiveLinks(serializer);
-    serializer->mSerLoadFunc = &moho::CTaskThreadSerializer::Deserialize;
-    serializer->mSerSaveFunc = &moho::CTaskThreadSerializer::Serialize;
-    return serializer;
-  }
-
-  [[nodiscard]] moho::CTaskStageSerializer* InitializeCTaskStageSerializerHelper(
-    moho::CTaskStageSerializer* const serializer
-  )
-  {
-    ResetHelperIntrusiveLinks(serializer);
-    serializer->mSerLoadFunc = nullptr;
-    serializer->mSerSaveFunc = nullptr;
-    return serializer;
-  }
-
   [[nodiscard]] gpg::RType* InitializeCTaskThreadTypeInfoStorage()
   {
     if (!gCTaskThreadTypeInfoConstructed) {
@@ -192,33 +131,21 @@ namespace
     return &CTaskStageTypeInfoSlot();
   }
 
+  // Address: 0x010A67BC -- process-global `CTaskThreadConstruct` singleton.
   moho::CTaskThreadConstruct gCTaskThreadConstructHelper;
-  moho::CTaskThreadSerializer gCTaskThreadSerializerHelper;
-  moho::CTaskStageSerializer gCTaskStageSerializerHelper;
 
-  /**
-   * Address: 0x00BC3080 (FUN_00BC3080, register_CTaskThreadSerializer)
-   *
-   * What it does:
-   * Initializes the global CTaskThread serializer helper and binds task-thread
-   * load/save callbacks into reflected type metadata.
-   */
-  void RegisterCTaskThreadSerializerBootstrap()
-  {
-    (void)InitializeCTaskThreadSerializerHelper(&gCTaskThreadSerializerHelper);
-  }
+  // Address: 0x010A672C -- process-global `CTaskThreadSerializer` singleton.
+  moho::CTaskThreadSerializer gCTaskThreadSerializerHelper;
+
+  // Address: 0x010A6834 -- process-global `CTaskStageSerializer` singleton.
+  moho::CTaskStageSerializer gCTaskStageSerializerHelper;
 
   struct CTaskThreadSerializerRegistration
   {
     CTaskThreadSerializerRegistration()
     {
       moho::register_CTaskThreadTypeInfo();
-      moho::register_CTaskThreadConstruct();
       moho::register_CTaskStageTypeInfo();
-      moho::register_CTaskStageSerializer();
-
-      gCTaskThreadConstructHelper.RegisterConstructFunction();
-      RegisterCTaskThreadSerializerBootstrap();
     }
   };
 
@@ -244,18 +171,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEE3A0 (FUN_00BEE3A0, sub_BEE3A0)
-   *
-   * What it does:
-   * Unlinks startup `CTaskThreadConstruct` helper lanes and resets them to a
-   * self-linked singleton state.
-   */
-  void cleanup_CTaskThreadConstruct()
-  {
-    UnlinkHelperIntrusiveLinks(&gCTaskThreadConstructHelper);
-  }
-
-  /**
    * Address: 0x00BEE400 (FUN_00BEE400, ??1CTaskStageTypeInfo@Moho@@QAE@@Z)
    *
    * What it does:
@@ -272,18 +187,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEE460 (FUN_00BEE460, ??1CTaskStageSerializer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unlinks startup `CTaskStageSerializer` helper lanes and resets them to a
-   * self-linked singleton state.
-   */
-  void cleanup_CTaskStageSerializer()
-  {
-    UnlinkHelperIntrusiveLinks(&gCTaskStageSerializerHelper);
-  }
-
-  /**
    * Address: 0x00BC3020 (FUN_00BC3020, register_CTaskThreadTypeInfo)
    *
    * What it does:
@@ -294,19 +197,6 @@ namespace moho
   {
     (void)InitializeCTaskThreadTypeInfoStorage();
     (void)std::atexit(&cleanup_CTaskThreadTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC3040 (FUN_00BC3040, register_CTaskThreadConstruct)
-   *
-   * What it does:
-   * Initializes startup `CTaskThreadConstruct` helper callback lanes and
-   * registers process-exit intrusive-link cleanup.
-   */
-  void register_CTaskThreadConstruct()
-  {
-    InitializeCTaskThreadConstructHelper(&gCTaskThreadConstructHelper);
-    (void)std::atexit(&cleanup_CTaskThreadConstruct);
   }
 
   /**
@@ -323,16 +213,54 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC30E0 (FUN_00BC30E0, register_CTaskStageSerializer)
-   *
-   * What it does:
-   * Initializes startup `CTaskStageSerializer` helper callback lanes and
-   * registers process-exit intrusive-link cleanup.
+   * Address: 0x00BC3040 (FUN_00BC3040, dynamic initializer for the global
+   * `CTaskThreadConstruct` singleton)
    */
-  void register_CTaskStageSerializer()
+  CTaskThreadConstruct::CTaskThreadConstruct()
+    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CTaskThreadConstruct::Construct))
+    , mDeleteFunc(&CTaskThreadConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BEE3A0 (FUN_00BEE3A0, Moho::CTaskThreadConstruct::~CTaskThreadConstruct)
+   */
+  CTaskThreadConstruct::~CTaskThreadConstruct()
   {
-    InitializeCTaskStageSerializerHelper(&gCTaskStageSerializerHelper);
-    (void)std::atexit(&cleanup_CTaskStageSerializer);
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00BC3080 (FUN_00BC3080, dynamic initializer for the global
+   * `CTaskThreadSerializer` singleton)
+   */
+  CTaskThreadSerializer::CTaskThreadSerializer()
+    : mSerLoadFunc(&CTaskThreadSerializer::Deserialize)
+    , mSerSaveFunc(&CTaskThreadSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BEE3D0 (FUN_00BEE3D0, Moho::CTaskThreadSerializer::~CTaskThreadSerializer)
+   */
+  CTaskThreadSerializer::~CTaskThreadSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00BC30E0 (FUN_00BC30E0, dynamic initializer for the global
+   * `CTaskStageSerializer` singleton)
+   */
+  CTaskStageSerializer::CTaskStageSerializer()
+    : mSerLoadFunc(&CTaskStageSerializer::Deserialize)
+    , mSerSaveFunc(&CTaskStageSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BEE460 (FUN_00BEE460, Moho::CTaskStageSerializer::~CTaskStageSerializer)
+   */
+  CTaskStageSerializer::~CTaskStageSerializer()
+  {
+    ResetLinks();
   }
 } // namespace moho
 
