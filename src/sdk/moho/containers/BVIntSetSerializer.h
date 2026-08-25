@@ -1,58 +1,39 @@
 #pragma once
 
-#include <cstddef>
-
 #include "gpg/core/reflection/Reflection.h"
-
-namespace gpg
-{
-  struct SerHelperBase;
-}
+#include "moho/containers/BVIntSet.h"
 
 namespace moho
 {
   /**
    * VFTABLE: 0x00DFFF54
    * COL: 0x00E5C3D0
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::BVIntSet>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_BVIntSetSerializer`):
+   *    0x00BC2D00 (dead zero-xref COMDAT duplicate: 0x004025F0)
+   *  - dtor: 0x00BEDEE0 (`??1BVIntSetSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x00402620
+   *  - Deserialize(): 0x004015A0
+   *  - Serialize(): 0x004015B0
    */
-  class BVIntSetSerializer
-  {
-  public:
-    /**
-     * Address: 0x004015C0 (FUN_004015C0)
-     *
-     * What it does:
-     * Initializes serializer callback slots for BVIntSet save/load member paths.
-     */
-    BVIntSetSerializer();
-
-    /**
-     * Address: 0x00402620 (FUN_00402620, gpg::SerSaveLoadHelper<class Moho::BVIntSet>::Init)
-     *
-     * What it does:
-     * Binds BVIntSet load/save callbacks into reflected RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(offsetof(BVIntSetSerializer, mHelperNext) == 0x04, "BVIntSetSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(BVIntSetSerializer, mHelperPrev) == 0x08, "BVIntSetSerializer::mHelperPrev offset must be 0x08");
-  static_assert(offsetof(BVIntSetSerializer, mLoadCallback) == 0x0C, "BVIntSetSerializer::mLoadCallback offset must be 0x0C");
-  static_assert(offsetof(BVIntSetSerializer, mSaveCallback) == 0x10, "BVIntSetSerializer::mSaveCallback offset must be 0x10");
-  static_assert(sizeof(BVIntSetSerializer) == 0x14, "BVIntSetSerializer size must be 0x14");
+  using BVIntSetSerializer = gpg::SerSaveLoadHelper<BVIntSet>;
 
   /**
    * Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer)
    *
    * What it does:
-   * Materializes startup `BVIntSetSerializer` storage, installs serializer
-   * callback lanes, and registers process-exit teardown.
+   * Forces this translation unit's global `BVIntSetSerializer` instance to
+   * link into the reflection bootstrap sequence ahead of default-segment
+   * consumers that query BVIntSet RTTI during static initialization. The
+   * ctor/vtable-install/atexit-dtor-registration sequence this address
+   * decompiles to is MSVC's own compiler-generated dynamic initializer for
+   * that global, not hand-written source -- see `gpg::SerSaveLoadHelper<T>`
+   * in Reflection.h, which documents the same shape already established for
+   * `gpg::PrimitiveSerHelper<T,IntType>`.
    */
   void register_BVIntSetSerializer();
 } // namespace moho
