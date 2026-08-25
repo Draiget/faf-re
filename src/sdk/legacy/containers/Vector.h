@@ -2309,6 +2309,21 @@ namespace msvc8
          * `CSimConVarBase::mIndex`-driven grow-to-index path) and
          * `Sim.cpp:8297` (`mSimVars.resize(index + 1u, nullptr)`, the
          * same grow-by-index pattern in a sibling registration function).)
+         *
+         * Address: 0x0074D190 (FUN_0074D190, `msvc8::vector<Moho::
+         * SSTIArmyConstantData>::resize` for `SSyncData::mNewGrids`
+         * (`SimDriver.h`) -- `if (size() < newSize) { insert(end(),
+         * newSize-size(), T()); }`, tail-calling this instantiation's
+         * `insert(pos,count,value)` grow core (`FUN_0074E770`, cited
+         * below) with a default-constructed fill. Was wrongly classified
+         * `external_dependency` ("External library: std::vector_
+         * SSTIArmyConstantData::reserve") -- same mis-tag family as the
+         * sibling `mArmyUpdates`/`SSTIArmyVariableData` fix earlier this
+         * session (`FUN_0074D2B0`); `SSTIArmyConstantData` is this
+         * project's own engine type (`moho/sim/SSTIArmyConstantData.h`),
+         * not external. Reached from `Sim.cpp:8498`'s
+         * `outSyncData->mNewGrids.resize(armyCount)` call by name, already
+         * recovered.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -4498,6 +4513,21 @@ namespace msvc8
          * symbol and `__noreturn` tag are set aside. Sole caller is
          * `reserve`'s `FUN_0074D2B0` above. DB-integrity fix: was
          * `blocked` with no specific note.
+         *
+         * Address: 0x0074E770 (FUN_0074E770, sub_74E770) -- `msvc8::
+         * vector<Moho::SSTIArmyConstantData>::insert(pos, count, value)`
+         * for `SSyncData::mNewGrids` (128-byte element, `>>7` stride
+         * divide matches `sizeof(SSTIArmyConstantData)==0x80` exactly).
+         * Stages a local copy via this element's ctor
+         * (`Moho::SSTIArmyConstantData::SSTIArmyConstantData`), the
+         * max_size overflow guard, `(cap>>1)+cap` 1.5x growth, allocate
+         * via `sub_751950`, and calls this instantiation's own uninit-
+         * copy/shift helpers (`sub_757390`/`sub_7518D0`) on the
+         * reallocation and in-place paths respectively -- same shape as
+         * the sibling `SSTIArmyVariableData` instantiation above. IDA's
+         * own decompile carries a spurious `__noreturn` tag; the function
+         * returns normally. Sole caller is `resize`'s `FUN_0074D190`
+         * above.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
