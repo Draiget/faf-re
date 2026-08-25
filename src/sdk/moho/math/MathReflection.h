@@ -179,9 +179,28 @@ namespace moho
     void Init() override;
   };
 
-  class AxisAlignedBox3fSerializer
+  class AxisAlignedBox3fSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6C60 (FUN_00BC6C60, dynamic initializer for the global
+     * `AxisAlignedBox3fSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    AxisAlignedBox3fSerializer();
+
+    /**
+     * Address: 0x00BF1230 (FUN_00BF1230, Moho::AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~AxisAlignedBox3fSerializer();
+
     /**
      * Address: 0x004EA140 (FUN_004EA140, Moho::AxisAlignedBox3fSerializer::Deserialize)
      */
@@ -193,15 +212,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Wm3::AxisAlignedBox3f* box);
 
     /**
-     * Address: 0x00BF1230 (FUN_00BF1230, cleanup_AxisAlignedBox3fSerializer)
+     * Address: 0x004ED140 (FUN_004ED140, Moho::AxisAlignedBox3fSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::AxisAlignedBox3f` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3f>`
+     * vtable head (0x00E0BCF8) -- one function, two vtable-head symbols.
      */
-    virtual ~AxisAlignedBox3fSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector2iTypeInfo final : public gpg::RType
@@ -228,9 +251,28 @@ namespace moho
     void Init() override;
   };
 
-  class Vector2iSerializer
+  class Vector2iSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6CC0 (FUN_00BC6CC0, dynamic initializer for the global
+     * `Vector2iSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    Vector2iSerializer();
+
+    /**
+     * Address: 0x00BF12C0 (FUN_00BF12C0, Moho::Vector2iSerializer::~Vector2iSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Vector2iSerializer();
+
     /**
      * Address: 0x004EA370 (FUN_004EA370, Moho::Vector2iSerializer::Deserialize)
      */
@@ -242,15 +284,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Vector2i* vector);
 
     /**
-     * Address: 0x00BF12C0 (FUN_00BF12C0, cleanup_Vector2iSerializer)
+     * Address: 0x004ED1E0 (FUN_004ED1E0, Moho::Vector2iSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::IVector2<int>` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::IVector2<int>>`
+     * vtable head (0x00E0BD38) -- one function, two vtable-head symbols.
      */
-    virtual ~Vector2iSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector3iTypeInfo final : public gpg::RType
@@ -277,9 +323,28 @@ namespace moho
     void Init() override;
   };
 
-  class Vector3iSerializer
+  class Vector3iSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6D20 (FUN_00BC6D20, dynamic initializer for the global
+     * `Vector3iSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    Vector3iSerializer();
+
+    /**
+     * Address: 0x00BF1350 (FUN_00BF1350, Moho::Vector3iSerializer::~Vector3iSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Vector3iSerializer();
+
     /**
      * Address: 0x004EA650 (FUN_004EA650, Moho::Vector3iSerializer::Deserialize)
      */
@@ -291,15 +356,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Vector3i* vector);
 
     /**
-     * Address: 0x00BF1350 (FUN_00BF1350, cleanup_Vector3iSerializer)
+     * Address: 0x004ED280 (FUN_004ED280, Moho::Vector3iSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::IVector3<int>` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::IVector3<int>>`
+     * vtable head (0x00E0BD78) -- one function, two vtable-head symbols.
      */
-    virtual ~Vector3iSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector2fTypeInfo final : public gpg::RType
@@ -326,9 +395,28 @@ namespace moho
     void Init() override;
   };
 
-  class Vector2fSerializer
+  class Vector2fSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6D80 (FUN_00BC6D80, dynamic initializer for the global
+     * `Vector2fSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    Vector2fSerializer();
+
+    /**
+     * Address: 0x00BF13E0 (FUN_00BF13E0, Moho::Vector2fSerializer::~Vector2fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Vector2fSerializer();
+
     /**
      * Address: 0x004EA930 (FUN_004EA930, Moho::Vector2fSerializer::Deserialize)
      */
@@ -340,15 +428,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Vector2f* vector);
 
     /**
-     * Address: 0x00BF13E0 (FUN_00BF13E0, cleanup_Vector2fSerializer)
+     * Address: 0x004ED320 (FUN_004ED320, Moho::Vector2fSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::Vector2<float>` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::Vector2<float>>`
+     * vtable head (0x00E0BDB8) -- one function, two vtable-head symbols.
      */
-    virtual ~Vector2fSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector3fTypeInfo final : public gpg::RType
@@ -375,9 +467,28 @@ namespace moho
     void Init() override;
   };
 
-  class Vector3fSerializer
+  class Vector3fSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6DE0 (FUN_00BC6DE0, dynamic initializer for the global
+     * `Vector3fSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    Vector3fSerializer();
+
+    /**
+     * Address: 0x00BF1470 (FUN_00BF1470, Moho::Vector3fSerializer::~Vector3fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Vector3fSerializer();
+
     /**
      * Address: 0x004EAC20 (FUN_004EAC20, Moho::Vector3fSerializer::Deserialize)
      */
@@ -389,15 +500,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Vector3f* vector);
 
     /**
-     * Address: 0x00BF1470 (FUN_00BF1470, cleanup_Vector3fSerializer)
+     * Address: 0x004ED3C0 (FUN_004ED3C0, Moho::Vector3fSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::Vector3<float>` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::Vector3<float>>`
+     * vtable head (0x00E0BDF8) -- one function, two vtable-head symbols.
      */
-    virtual ~Vector3fSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector4fTypeInfo final : public gpg::RType
@@ -424,9 +539,28 @@ namespace moho
     void Init() override;
   };
 
-  class Vector4fSerializer
+  class Vector4fSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6E40 (FUN_00BC6E40, dynamic initializer for the global
+     * `Vector4fSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    Vector4fSerializer();
+
+    /**
+     * Address: 0x00BF1500 (FUN_00BF1500, Moho::Vector4fSerializer::~Vector4fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Vector4fSerializer();
+
     /**
      * Address: 0x004EAF70 (FUN_004EAF70, Moho::Vector4fSerializer::Deserialize)
      */
@@ -438,15 +572,24 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Vector4f* vector);
 
     /**
-     * Address: 0x00BF1500 (FUN_00BF1500, cleanup_Vector4fSerializer)
+     * Address: 0x004ED460 (FUN_004ED460, Moho::Vector4fSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Moho::Vector4f` RTTI and installs the load/save callbacks
+     * for this helper. Also the vtable slot-0 target shared with the
+     * RTTI-inferred `gpg::SerSaveLoadHelper<Moho::Vector4f>` vtable head
+     * (0x00E0BE38) -- one function, two vtable-head symbols. Disproven as
+     * `InstallMohoVector4fSerializerCallbacks` in
+     * `gpg/core/containers/ArchiveSerialization.cpp` (2026-08-25
+     * investigation, `REF_FindTypeNamed`-by-string claim did not match the
+     * raw asm); that wrong citation is removed in the same pass that adds
+     * this real one.
      */
-    virtual ~Vector4fSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class QuaternionfTypeInfo final : public gpg::RType
@@ -473,9 +616,28 @@ namespace moho
     void Init() override;
   };
 
-  class QuaternionfSerializer
+  class QuaternionfSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6EA0 (FUN_00BC6EA0, dynamic initializer for the global
+     * `QuaternionfSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    QuaternionfSerializer();
+
+    /**
+     * Address: 0x00BF1590 (FUN_00BF1590, Moho::QuaternionfSerializer::~QuaternionfSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~QuaternionfSerializer();
+
     /**
      * Address: 0x004EB2D0 (FUN_004EB2D0, Moho::QuaternionfSerializer::Deserialize)
      */
@@ -487,15 +649,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, Quaternionf* quaternion);
 
     /**
-     * Address: 0x00BF1590 (FUN_00BF1590, cleanup_QuaternionfSerializer)
+     * Address: 0x004ED500 (FUN_004ED500, Moho::QuaternionfSerializer::Init)
+     *
+     * What it does:
+     * Resolves `Wm3::Quaternion<float>` RTTI and installs the load/save
+     * callbacks for this helper. Also the vtable slot-0 target shared with
+     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::Quaternion<float>>`
+     * vtable head (0x00E0BE78) -- one function, two vtable-head symbols.
      */
-    virtual ~QuaternionfSerializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class VEulers3TypeInfo final : public gpg::RType
@@ -522,9 +688,28 @@ namespace moho
     void Init() override;
   };
 
-  class VEulers3Serializer
+  class VEulers3Serializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6F00 (FUN_00BC6F00, dynamic initializer for the global
+     * `VEulers3Serializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    VEulers3Serializer();
+
+    /**
+     * Address: 0x00BF1620 (FUN_00BF1620, Moho::VEulers3Serializer::~VEulers3Serializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~VEulers3Serializer();
+
     /**
      * Address: 0x004EC100 (FUN_004EC100, Moho::VEulers3Serializer::Deserialize)
      */
@@ -536,15 +721,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, VEulers3* eulers);
 
     /**
-     * Address: 0x00BF1620 (FUN_00BF1620, cleanup_VEulers3Serializer)
+     * Address: 0x004ED5A0 (FUN_004ED5A0, Moho::VEulers3Serializer::Init)
+     *
+     * What it does:
+     * Resolves `Moho::VEulers3` RTTI and installs the load/save callbacks
+     * for this helper. Also the vtable slot-0 target shared with the
+     * RTTI-inferred `gpg::SerSaveLoadHelper<Moho::VEulers3>` vtable head
+     * (0x00E0BEB8) -- one function, two vtable-head symbols.
      */
-    virtual ~VEulers3Serializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class VAxes3TypeInfo final : public gpg::RType
@@ -571,9 +760,37 @@ namespace moho
     void Init() override;
   };
 
-  class VAxes3Serializer
+  class VAxes3Serializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6F60 (FUN_00BC6F60, dynamic initializer for the global
+     * `VAxes3Serializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields to the `DeserializeVAxes3SerializerThunk`/
+     * `SerializeVAxes3SerializerThunk` forwarders below -- not directly to
+     * `Deserialize`/`Serialize`, since those take a concrete `VAxes3*`
+     * rather than the generic `load_func_t`/`save_func_t` object-storage-int
+     * shape every other class in this file reinterpret-casts around.
+     */
+    VAxes3Serializer();
+
+    /**
+     * Address: 0x00BF16B0 (FUN_00BF16B0, Moho::VAxes3Serializer::~VAxes3Serializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. IDA named this
+     * address a plain `sub_BF16B0` rather than the mangled destructor
+     * symbol, but its raw asm is byte-for-byte the same unlink+self-link
+     * shape as every other class's mangled dtor in this file (confirmed
+     * against `??1AxisAlignedBox3fSerializer@Moho@@QAE@@Z` at 0x00BF1230) --
+     * same `ResetLinks()` semantics, modeled the same way.
+     */
+    ~VAxes3Serializer();
+
     /**
      * Address: 0x004EE050 (FUN_004EE050, Moho::VAxes3Serializer::Deserialize)
      */
@@ -585,15 +802,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, VAxes3* axes);
 
     /**
-     * Address: 0x00BF16B0 (FUN_00BF16B0, cleanup_VAxes3Serializer)
+     * Address: 0x004ED640 (FUN_004ED640, Moho::VAxes3Serializer::Init)
+     *
+     * What it does:
+     * Resolves `Moho::VAxes3` RTTI and installs the load/save callbacks for
+     * this helper. Also the vtable slot-0 target shared with the
+     * RTTI-inferred `gpg::SerSaveLoadHelper<Moho::VAxes3>` vtable head
+     * (0x00E0BEF8) -- one function, two vtable-head symbols.
      */
-    virtual ~VAxes3Serializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   /**
@@ -658,9 +879,28 @@ namespace moho
     void Init() override;
   };
 
-  class VMatrix4Serializer
+  class VMatrix4Serializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC70B0 (FUN_00BC70B0, dynamic initializer for the global
+     * `VMatrix4Serializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    VMatrix4Serializer();
+
+    /**
+     * Address: 0x00BF1740 (FUN_00BF1740, Moho::VMatrix4Serializer::~VMatrix4Serializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~VMatrix4Serializer();
+
     /**
      * Address: 0x004F0220 (FUN_004F0220, Moho::VMatrix4Serializer::Deserialize)
      */
@@ -672,20 +912,17 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, VMatrix4* matrix);
 
     /**
-     * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::RegisterSerializeFunctions)
+     * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::Init)
+     *
+     * What it does:
+     * Resolves `Moho::VMatrix4` RTTI (cached on `VMatrix4::sType`) and
+     * installs the load/save callbacks for this helper.
      */
-    virtual void RegisterSerializeFunctions();
-
-    /**
-     * Address: 0x00BF1740 (FUN_00BF1740, cleanup_VMatrix4Serializer)
-     */
-    virtual ~VMatrix4Serializer() noexcept;
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   /**
@@ -712,19 +949,9 @@ namespace moho
   void register_math_GlobalRandomStream();
 
   /**
-   * Address: 0x00BC6C60 (FUN_00BC6C60, register_AxisAlignedBox3fSerializer)
-   */
-  void register_AxisAlignedBox3fSerializer();
-
-  /**
    * Address: 0x00BC6CA0 (FUN_00BC6CA0, register_Vector2iTypeInfo)
    */
   int register_Vector2iTypeInfo();
-
-  /**
-   * Address: 0x00BC6CC0 (FUN_00BC6CC0, register_Vector2iSerializer)
-   */
-  void register_Vector2iSerializer();
 
   /**
    * Address: 0x00BC6D00 (FUN_00BC6D00, register_Vector3iTypeInfo)
@@ -732,19 +959,9 @@ namespace moho
   int register_Vector3iTypeInfo();
 
   /**
-   * Address: 0x00BC6D20 (FUN_00BC6D20, register_Vector3iSerializer)
-   */
-  void register_Vector3iSerializer();
-
-  /**
    * Address: 0x00BC6D60 (FUN_00BC6D60, register_Vector2fTypeInfo)
    */
   int register_Vector2fTypeInfo();
-
-  /**
-   * Address: 0x00BC6D80 (FUN_00BC6D80, register_Vector2fSerializer)
-   */
-  void register_Vector2fSerializer();
 
   /**
    * Address: 0x00BC6DC0 (FUN_00BC6DC0, register_Vector3fTypeInfo)
@@ -752,19 +969,9 @@ namespace moho
   int register_Vector3fTypeInfo();
 
   /**
-   * Address: 0x00BC6DE0 (FUN_00BC6DE0, register_Vector3fSerializer)
-   */
-  void register_Vector3fSerializer();
-
-  /**
    * Address: 0x00BC6E20 (FUN_00BC6E20, register_Vector4fTypeInfo)
    */
   int register_Vector4fTypeInfo();
-
-  /**
-   * Address: 0x00BC6E40 (FUN_00BC6E40, register_Vector4fSerializer)
-   */
-  void register_Vector4fSerializer();
 
   /**
    * Address: 0x00BC6E80 (FUN_00BC6E80, register_QuaternionfTypeInfo)
@@ -772,29 +979,14 @@ namespace moho
   int register_QuaternionfTypeInfo();
 
   /**
-   * Address: 0x00BC6EA0 (FUN_00BC6EA0, register_QuaternionfSerializer)
-   */
-  void register_QuaternionfSerializer();
-
-  /**
    * Address: 0x00BC6EE0 (FUN_00BC6EE0, register_VEulers3TypeInfo)
    */
   int register_VEulers3TypeInfo();
 
   /**
-   * Address: 0x00BC6F00 (FUN_00BC6F00, register_VEulers3Serializer)
-   */
-  void register_VEulers3Serializer();
-
-  /**
    * Address: 0x00BC6F40 (FUN_00BC6F40, register_VAxes3TypeInfo)
    */
   int register_VAxes3TypeInfo();
-
-  /**
-   * Address: 0x00BC6F60 (FUN_00BC6F60, register_VAxes3Serializer)
-   */
-  int register_VAxes3Serializer();
 
   /**
    * Address: 0x00BC7000 (FUN_00BC7000, register_VMatrix4NaN)
@@ -805,11 +997,6 @@ namespace moho
    * Address: 0x00BC7090 (FUN_00BC7090, register_VMatrix4TypeInfo)
    */
   void register_VMatrix4TypeInfo();
-
-  /**
-   * Address: 0x00BC70B0 (FUN_00BC70B0, register_VMatrix4Serializer)
-   */
-  void register_VMatrix4Serializer();
 
   static_assert(sizeof(AxisAlignedBox3fTypeInfo) == 0x64, "AxisAlignedBox3fTypeInfo size must be 0x64");
   static_assert(sizeof(Vector2iTypeInfo) == 0x64, "Vector2iTypeInfo size must be 0x64");
@@ -822,62 +1009,42 @@ namespace moho
   static_assert(sizeof(VAxes3TypeInfo) == 0x64, "VAxes3TypeInfo size must be 0x64");
   static_assert(sizeof(VMatrix4TypeInfo) == 0x64, "VMatrix4TypeInfo size must be 0x64");
 
-  static_assert(offsetof(AxisAlignedBox3fSerializer, mHelperNext) == 0x04, "AxisAlignedBox3fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(AxisAlignedBox3fSerializer, mHelperPrev) == 0x08, "AxisAlignedBox3fSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(AxisAlignedBox3fSerializer, mDeserialize) == 0x0C, "AxisAlignedBox3fSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(AxisAlignedBox3fSerializer, mSerialize) == 0x10, "AxisAlignedBox3fSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(AxisAlignedBox3fSerializer) == 0x14, "AxisAlignedBox3fSerializer size must be 0x14");
 
-  static_assert(offsetof(Vector2iSerializer, mHelperNext) == 0x04, "Vector2iSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Vector2iSerializer, mHelperPrev) == 0x08, "Vector2iSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Vector2iSerializer, mDeserialize) == 0x0C, "Vector2iSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector2iSerializer, mSerialize) == 0x10, "Vector2iSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(Vector2iSerializer) == 0x14, "Vector2iSerializer size must be 0x14");
 
-  static_assert(offsetof(Vector3iSerializer, mHelperNext) == 0x04, "Vector3iSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Vector3iSerializer, mHelperPrev) == 0x08, "Vector3iSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Vector3iSerializer, mDeserialize) == 0x0C, "Vector3iSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector3iSerializer, mSerialize) == 0x10, "Vector3iSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(Vector3iSerializer) == 0x14, "Vector3iSerializer size must be 0x14");
 
-  static_assert(offsetof(Vector2fSerializer, mHelperNext) == 0x04, "Vector2fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Vector2fSerializer, mHelperPrev) == 0x08, "Vector2fSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Vector2fSerializer, mDeserialize) == 0x0C, "Vector2fSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector2fSerializer, mSerialize) == 0x10, "Vector2fSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(Vector2fSerializer) == 0x14, "Vector2fSerializer size must be 0x14");
 
-  static_assert(offsetof(Vector3fSerializer, mHelperNext) == 0x04, "Vector3fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Vector3fSerializer, mHelperPrev) == 0x08, "Vector3fSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Vector3fSerializer, mDeserialize) == 0x0C, "Vector3fSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector3fSerializer, mSerialize) == 0x10, "Vector3fSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(Vector3fSerializer) == 0x14, "Vector3fSerializer size must be 0x14");
 
-  static_assert(offsetof(Vector4fSerializer, mHelperNext) == 0x04, "Vector4fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Vector4fSerializer, mHelperPrev) == 0x08, "Vector4fSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Vector4fSerializer, mDeserialize) == 0x0C, "Vector4fSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector4fSerializer, mSerialize) == 0x10, "Vector4fSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(Vector4fSerializer) == 0x14, "Vector4fSerializer size must be 0x14");
 
-  static_assert(offsetof(QuaternionfSerializer, mHelperNext) == 0x04, "QuaternionfSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(QuaternionfSerializer, mHelperPrev) == 0x08, "QuaternionfSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(QuaternionfSerializer, mDeserialize) == 0x0C, "QuaternionfSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(QuaternionfSerializer, mSerialize) == 0x10, "QuaternionfSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(QuaternionfSerializer) == 0x14, "QuaternionfSerializer size must be 0x14");
 
-  static_assert(offsetof(VEulers3Serializer, mHelperNext) == 0x04, "VEulers3Serializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(VEulers3Serializer, mHelperPrev) == 0x08, "VEulers3Serializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(VEulers3Serializer, mDeserialize) == 0x0C, "VEulers3Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VEulers3Serializer, mSerialize) == 0x10, "VEulers3Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VEulers3Serializer) == 0x14, "VEulers3Serializer size must be 0x14");
 
-  static_assert(offsetof(VAxes3Serializer, mHelperNext) == 0x04, "VAxes3Serializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(VAxes3Serializer, mHelperPrev) == 0x08, "VAxes3Serializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(VAxes3Serializer, mDeserialize) == 0x0C, "VAxes3Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VAxes3Serializer, mSerialize) == 0x10, "VAxes3Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VAxes3Serializer) == 0x14, "VAxes3Serializer size must be 0x14");
 
-  static_assert(offsetof(VMatrix4Serializer, mHelperNext) == 0x04, "VMatrix4Serializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(VMatrix4Serializer, mHelperPrev) == 0x08, "VMatrix4Serializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(VMatrix4Serializer, mDeserialize) == 0x0C, "VMatrix4Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VMatrix4Serializer, mSerialize) == 0x10, "VMatrix4Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VMatrix4Serializer) == 0x14, "VMatrix4Serializer size must be 0x14");

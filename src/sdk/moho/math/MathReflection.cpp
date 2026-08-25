@@ -28,6 +28,27 @@ namespace
   bool gMathGlobalRandomMutexConstructed = false;
   bool gMathGlobalRandomStreamConstructed = false;
 
+  // Address: 0x010A96D4 -- process-global `AxisAlignedBox3fSerializer` singleton.
+  moho::AxisAlignedBox3fSerializer gAxisAlignedBox3fSerializer;
+  // Address: 0x010A9634 -- process-global `Vector2iSerializer` singleton.
+  moho::Vector2iSerializer gVector2iSerializer;
+  // Address: 0x010A9648 -- process-global `Vector3iSerializer` singleton.
+  moho::Vector3iSerializer gVector3iSerializer;
+  // Address: 0x010A965C -- process-global `Vector2fSerializer` singleton.
+  moho::Vector2fSerializer gVector2fSerializer;
+  // Address: 0x010A97C4 -- process-global `Vector3fSerializer` singleton.
+  moho::Vector3fSerializer gVector3fSerializer;
+  // Address: 0x010A98B4 -- process-global `Vector4fSerializer` singleton.
+  moho::Vector4fSerializer gVector4fSerializer;
+  // Address: 0x010A983C -- process-global `QuaternionfSerializer` singleton.
+  moho::QuaternionfSerializer gQuaternionfSerializer;
+  // Address: 0x010A974C -- process-global `VEulers3Serializer` singleton.
+  moho::VEulers3Serializer gVEulers3Serializer;
+  // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
+  moho::VAxes3Serializer gVAxes3Serializer;
+  // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
+  moho::VMatrix4Serializer gVMatrix4Serializer;
+
   template <typename T>
   struct TypeInfoStartupSlot
   {
@@ -40,19 +61,6 @@ namespace
 
   template <typename T>
   bool TypeInfoStartupSlot<T>::constructed = false;
-
-  template <typename T>
-  struct SerializerStartupSlot
-  {
-    alignas(T) static std::byte storage[sizeof(T)];
-    static bool constructed;
-  };
-
-  template <typename T>
-  alignas(T) std::byte SerializerStartupSlot<T>::storage[sizeof(T)]{};
-
-  template <typename T>
-  bool SerializerStartupSlot<T>::constructed = false;
 
   template <typename T>
   [[nodiscard]] T& AccessTypeInfoStartupSlot() noexcept
@@ -77,67 +85,6 @@ namespace
     TypeInfoStartupSlot<T>::constructed = false;
   }
 
-  template <typename T>
-  [[nodiscard]] T& AccessSerializerStartupSlot() noexcept
-  {
-    auto* const slot = reinterpret_cast<T*>(SerializerStartupSlot<T>::storage);
-    if (!SerializerStartupSlot<T>::constructed) {
-      ::new (static_cast<void*>(slot)) T();
-      SerializerStartupSlot<T>::constructed = true;
-    }
-
-    return *slot;
-  }
-
-  template <typename T>
-  void DestroySerializerStartupSlot() noexcept
-  {
-    if (!SerializerStartupSlot<T>::constructed) {
-      return;
-    }
-
-    AccessSerializerStartupSlot<T>().~T();
-    SerializerStartupSlot<T>::constructed = false;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeHelperNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkHelperNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeHelperNode(serializer);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkAndResetSerializerStartupHelperNode() noexcept
-  {
-    TSerializer& serializer = AccessSerializerStartupSlot<TSerializer>();
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* ResolveIntType()
   {
     static gpg::RType* cached = nullptr;
@@ -152,6 +99,142 @@ namespace
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
       cached = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED140 (FUN_004ED140) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `Wm3::AxisAlignedBox3f` reflection type,
+   * mirroring the binary's per-type cached `sType` static used by
+   * `AxisAlignedBox3fSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveAxisAlignedBox3fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(Wm3::AxisAlignedBox3f));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED1E0 (FUN_004ED1E0) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `Wm3::Vector2i` reflection type, mirroring
+   * the binary's per-type cached `sType` static used by
+   * `Vector2iSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVector2iType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector2i));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED280 (FUN_004ED280) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `Wm3::Vector3i` reflection type, mirroring
+   * the binary's per-type cached `sType` static used by
+   * `Vector3iSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVector3iType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector3i));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED320 (FUN_004ED320) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `Wm3::Vector2<float>` reflection type,
+   * mirroring the binary's per-type cached `sType` static used by
+   * `Vector2fSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVector2fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector2<float>));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED460 (FUN_004ED460) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `moho::Vector4f` reflection type,
+   * mirroring the binary's per-type cached `sType` static used by
+   * `Vector4fSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVector4fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::Vector4f));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED500 (FUN_004ED500) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `Wm3::Quaternion<float>` reflection type,
+   * mirroring the binary's per-type cached `sType` static used by
+   * `QuaternionfSerializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveQuaternionfType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED5A0 (FUN_004ED5A0) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `moho::VEulers3` reflection type,
+   * mirroring the binary's per-type cached `sType` static used by
+   * `VEulers3Serializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVEulers3Type()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::VEulers3));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x004ED640 (FUN_004ED640) call site.
+   *
+   * What it does:
+   * Lazily resolves and caches the `moho::VAxes3` reflection type, mirroring
+   * the binary's per-type cached `sType` static used by
+   * `VAxes3Serializer::Init`.
+   */
+  [[nodiscard]] gpg::RType* ResolveVAxes3Type()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::VAxes3));
     }
     return cached;
   }
@@ -213,12 +296,6 @@ namespace
   void CleanupTypeInfoAtExit()
   {
     DestroyTypeInfoStartupSlot<TTypeInfo>();
-  }
-
-  template <typename TSerializer>
-  void CleanupSerializerAtExit()
-  {
-    DestroySerializerStartupSlot<TSerializer>();
   }
 
   /**
@@ -580,35 +657,42 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA1A0 (FUN_004EA1A0)
-   *
-   * What it does:
-   * Unlinks the `AxisAlignedBox3fSerializer` startup helper node from its
-   * intrusive list, rewires it to self-link, and returns that self node.
+   * `FUN_004EA1A0`/`FUN_004EA1D0` (cleanup_AxisAlignedBox3fSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EA1A0.xrefs.txt`/`FUN_004EA1D0.xrefs.txt`,
+   * `xrefs_total: 0`), matching the same pattern already found and skipped
+   * across every other file in this campaign (e.g. `CColPrimitiveBox3f.cpp`'s
+   * `FUN_004FF8D0`/`FUN_004FF900`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_AxisAlignedBox3fSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6C60 (FUN_00BC6C60, dynamic initializer for the global
+   * `AxisAlignedBox3fSerializer` singleton)
+   */
+  AxisAlignedBox3fSerializer::AxisAlignedBox3fSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&AxisAlignedBox3fSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&AxisAlignedBox3fSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<AxisAlignedBox3fSerializer>();
   }
 
   /**
-   * Address: 0x004EA1D0 (FUN_004EA1D0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `AxisAlignedBox3fSerializer` that performs the
-   * same helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1230 (FUN_00BF1230, Moho::AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer)
    */
-  gpg::SerHelperBase* cleanup_AxisAlignedBox3fSerializerVariant2()
+  AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<AxisAlignedBox3fSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1230 (FUN_00BF1230, cleanup_AxisAlignedBox3fSerializer)
+   * Address: 0x004ED140 (FUN_004ED140, Moho::AxisAlignedBox3fSerializer::Init)
    */
-  AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer() noexcept
+  void AxisAlignedBox3fSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveAxisAlignedBox3fType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -676,35 +760,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA400 (FUN_004EA400)
-   *
-   * What it does:
-   * Unlinks the `Vector2iSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EA400`/`FUN_004EA430` (cleanup_Vector2iSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EA400.xrefs.txt`/`FUN_004EA430.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_Vector2iSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6CC0 (FUN_00BC6CC0, dynamic initializer for the global
+   * `Vector2iSerializer` singleton)
+   */
+  Vector2iSerializer::Vector2iSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector2iSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector2iSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector2iSerializer>();
   }
 
   /**
-   * Address: 0x004EA430 (FUN_004EA430)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `Vector2iSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF12C0 (FUN_00BF12C0, Moho::Vector2iSerializer::~Vector2iSerializer)
    */
-  gpg::SerHelperBase* cleanup_Vector2iSerializerVariant2()
+  Vector2iSerializer::~Vector2iSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector2iSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF12C0 (FUN_00BF12C0, cleanup_Vector2iSerializer)
+   * Address: 0x004ED1E0 (FUN_004ED1E0, Moho::Vector2iSerializer::Init)
    */
-  Vector2iSerializer::~Vector2iSerializer() noexcept
+  void Vector2iSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVector2iType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -775,35 +864,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA700 (FUN_004EA700)
-   *
-   * What it does:
-   * Unlinks the `Vector3iSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EA700`/`FUN_004EA730` (cleanup_Vector3iSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EA700.xrefs.txt`/`FUN_004EA730.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_Vector3iSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6D20 (FUN_00BC6D20, dynamic initializer for the global
+   * `Vector3iSerializer` singleton)
+   */
+  Vector3iSerializer::Vector3iSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector3iSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector3iSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector3iSerializer>();
   }
 
   /**
-   * Address: 0x004EA730 (FUN_004EA730)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `Vector3iSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1350 (FUN_00BF1350, Moho::Vector3iSerializer::~Vector3iSerializer)
    */
-  gpg::SerHelperBase* cleanup_Vector3iSerializerVariant2()
+  Vector3iSerializer::~Vector3iSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector3iSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1350 (FUN_00BF1350, cleanup_Vector3iSerializer)
+   * Address: 0x004ED280 (FUN_004ED280, Moho::Vector3iSerializer::Init)
    */
-  Vector3iSerializer::~Vector3iSerializer() noexcept
+  void Vector3iSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVector3iType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -870,35 +964,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA9C0 (FUN_004EA9C0)
-   *
-   * What it does:
-   * Unlinks the `Vector2fSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EA9C0`/`FUN_004EA9F0` (cleanup_Vector2fSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EA9C0.xrefs.txt`/`FUN_004EA9F0.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_Vector2fSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6D80 (FUN_00BC6D80, dynamic initializer for the global
+   * `Vector2fSerializer` singleton)
+   */
+  Vector2fSerializer::Vector2fSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector2fSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector2fSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector2fSerializer>();
   }
 
   /**
-   * Address: 0x004EA9F0 (FUN_004EA9F0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `Vector2fSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF13E0 (FUN_00BF13E0, Moho::Vector2fSerializer::~Vector2fSerializer)
    */
-  gpg::SerHelperBase* cleanup_Vector2fSerializerVariant2()
+  Vector2fSerializer::~Vector2fSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector2fSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF13E0 (FUN_00BF13E0, cleanup_Vector2fSerializer)
+   * Address: 0x004ED320 (FUN_004ED320, Moho::Vector2fSerializer::Init)
    */
-  Vector2fSerializer::~Vector2fSerializer() noexcept
+  void Vector2fSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVector2fType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -967,35 +1066,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EACD0 (FUN_004EACD0)
-   *
-   * What it does:
-   * Unlinks the `Vector3fSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EACD0`/`FUN_004EAD00` (cleanup_Vector3fSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EACD0.xrefs.txt`/`FUN_004EAD00.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_Vector3fSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6DE0 (FUN_00BC6DE0, dynamic initializer for the global
+   * `Vector3fSerializer` singleton)
+   */
+  Vector3fSerializer::Vector3fSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector3fSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector3fSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector3fSerializer>();
   }
 
   /**
-   * Address: 0x004EAD00 (FUN_004EAD00)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `Vector3fSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1470 (FUN_00BF1470, Moho::Vector3fSerializer::~Vector3fSerializer)
    */
-  gpg::SerHelperBase* cleanup_Vector3fSerializerVariant2()
+  Vector3fSerializer::~Vector3fSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector3fSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1470 (FUN_00BF1470, cleanup_Vector3fSerializer)
+   * Address: 0x004ED3C0 (FUN_004ED3C0, Moho::Vector3fSerializer::Init)
    */
-  Vector3fSerializer::~Vector3fSerializer() noexcept
+  void Vector3fSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVector3fType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1069,35 +1173,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EB030 (FUN_004EB030)
-   *
-   * What it does:
-   * Unlinks the `Vector4fSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EB030`/`FUN_004EB060` (cleanup_Vector4fSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EB030.xrefs.txt`/`FUN_004EB060.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_Vector4fSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6E40 (FUN_00BC6E40, dynamic initializer for the global
+   * `Vector4fSerializer` singleton)
+   */
+  Vector4fSerializer::Vector4fSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector4fSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector4fSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector4fSerializer>();
   }
 
   /**
-   * Address: 0x004EB060 (FUN_004EB060)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `Vector4fSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1500 (FUN_00BF1500, Moho::Vector4fSerializer::~Vector4fSerializer)
    */
-  gpg::SerHelperBase* cleanup_Vector4fSerializerVariant2()
+  Vector4fSerializer::~Vector4fSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<Vector4fSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1500 (FUN_00BF1500, cleanup_Vector4fSerializer)
+   * Address: 0x004ED460 (FUN_004ED460, Moho::Vector4fSerializer::Init)
    */
-  Vector4fSerializer::~Vector4fSerializer() noexcept
+  void Vector4fSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVector4fType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1171,35 +1280,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EB390 (FUN_004EB390)
-   *
-   * What it does:
-   * Unlinks the `QuaternionfSerializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EB390`/`FUN_004EB3C0` (cleanup_QuaternionfSerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EB390.xrefs.txt`/`FUN_004EB3C0.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_QuaternionfSerializerVariant1()
+
+  /**
+   * Address: 0x00BC6EA0 (FUN_00BC6EA0, dynamic initializer for the global
+   * `QuaternionfSerializer` singleton)
+   */
+  QuaternionfSerializer::QuaternionfSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&QuaternionfSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&QuaternionfSerializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<QuaternionfSerializer>();
   }
 
   /**
-   * Address: 0x004EB3C0 (FUN_004EB3C0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `QuaternionfSerializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1590 (FUN_00BF1590, Moho::QuaternionfSerializer::~QuaternionfSerializer)
    */
-  gpg::SerHelperBase* cleanup_QuaternionfSerializerVariant2()
+  QuaternionfSerializer::~QuaternionfSerializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<QuaternionfSerializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1590 (FUN_00BF1590, cleanup_QuaternionfSerializer)
+   * Address: 0x004ED500 (FUN_004ED500, Moho::QuaternionfSerializer::Init)
    */
-  QuaternionfSerializer::~QuaternionfSerializer() noexcept
+  void QuaternionfSerializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveQuaternionfType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1282,35 +1396,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EC1B0 (FUN_004EC1B0)
-   *
-   * What it does:
-   * Unlinks the `VEulers3Serializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EC1B0`/`FUN_004EC1E0` (cleanup_VEulers3SerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EC1B0.xrefs.txt`/`FUN_004EC1E0.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_VEulers3SerializerVariant1()
+
+  /**
+   * Address: 0x00BC6F00 (FUN_00BC6F00, dynamic initializer for the global
+   * `VEulers3Serializer` singleton)
+   */
+  VEulers3Serializer::VEulers3Serializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&VEulers3Serializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&VEulers3Serializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VEulers3Serializer>();
   }
 
   /**
-   * Address: 0x004EC1E0 (FUN_004EC1E0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `VEulers3Serializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1620 (FUN_00BF1620, Moho::VEulers3Serializer::~VEulers3Serializer)
    */
-  gpg::SerHelperBase* cleanup_VEulers3SerializerVariant2()
+  VEulers3Serializer::~VEulers3Serializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VEulers3Serializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF1620 (FUN_00BF1620, cleanup_VEulers3Serializer)
+   * Address: 0x004ED5A0 (FUN_004ED5A0, Moho::VEulers3Serializer::Init)
    */
-  VEulers3Serializer::~VEulers3Serializer() noexcept
+  void VEulers3Serializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVEulers3Type();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1383,35 +1502,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EC530 (FUN_004EC530)
-   *
-   * What it does:
-   * Unlinks the `VAxes3Serializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004EC530`/`FUN_004EC560` (cleanup_VAxes3SerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004EC530.xrefs.txt`/`FUN_004EC560.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_VAxes3SerializerVariant1()
+
+  /**
+   * Address: 0x00BC6F60 (FUN_00BC6F60, dynamic initializer for the global
+   * `VAxes3Serializer` singleton)
+   */
+  VAxes3Serializer::VAxes3Serializer()
+    : mDeserialize(&DeserializeVAxes3SerializerThunk)
+    , mSerialize(&SerializeVAxes3SerializerThunk)
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VAxes3Serializer>();
   }
 
   /**
-   * Address: 0x004EC560 (FUN_004EC560)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `VAxes3Serializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF16B0 (FUN_00BF16B0, Moho::VAxes3Serializer::~VAxes3Serializer)
    */
-  gpg::SerHelperBase* cleanup_VAxes3SerializerVariant2()
+  VAxes3Serializer::~VAxes3Serializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VAxes3Serializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x00BF16B0 (FUN_00BF16B0, cleanup_VAxes3Serializer)
+   * Address: 0x004ED640 (FUN_004ED640, Moho::VAxes3Serializer::Init)
    */
-  VAxes3Serializer::~VAxes3Serializer() noexcept
+  void VAxes3Serializer::Init()
   {
-    UnlinkHelperNode(*this);
+    gpg::RType* const type = ResolveVAxes3Type();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1606,33 +1730,34 @@ namespace moho
   }
 
   /**
-   * Address: 0x004F0270 (FUN_004F0270)
-   *
-   * What it does:
-   * Unlinks the `VMatrix4Serializer` startup helper node from its intrusive
-   * list, rewires it to self-link, and returns that self node.
+   * `FUN_004F0270`/`FUN_004F02A0` (cleanup_VMatrix4SerializerVariant1/2)
+   * removed here: both are zero-xref dead duplicate unlink-helper fragments
+   * (confirmed via `FUN_004F0270.xrefs.txt`/`FUN_004F02A0.xrefs.txt`,
+   * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-  gpg::SerHelperBase* cleanup_VMatrix4SerializerVariant1()
+
+  /**
+   * Address: 0x00BC70B0 (FUN_00BC70B0, dynamic initializer for the global
+   * `VMatrix4Serializer` singleton)
+   */
+  VMatrix4Serializer::VMatrix4Serializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&VMatrix4Serializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&VMatrix4Serializer::Serialize))
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VMatrix4Serializer>();
   }
 
   /**
-   * Address: 0x004F02A0 (FUN_004F02A0)
-   *
-   * What it does:
-   * Duplicate cleanup lane for `VMatrix4Serializer` that performs the same
-   * helper-node unlink and self-link reset, then returns the self node.
+   * Address: 0x00BF1740 (FUN_00BF1740, Moho::VMatrix4Serializer::~VMatrix4Serializer)
    */
-  gpg::SerHelperBase* cleanup_VMatrix4SerializerVariant2()
+  VMatrix4Serializer::~VMatrix4Serializer()
   {
-    return UnlinkAndResetSerializerStartupHelperNode<VMatrix4Serializer>();
+    ResetLinks();
   }
 
   /**
-   * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::RegisterSerializeFunctions)
+   * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::Init)
    */
-  void VMatrix4Serializer::RegisterSerializeFunctions()
+  void VMatrix4Serializer::Init()
   {
     gpg::RType* type = VMatrix4::sType;
     if (type == nullptr) {
@@ -1645,14 +1770,6 @@ namespace moho
     type->serLoadFunc_ = mDeserialize;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BF1740 (FUN_00BF1740, cleanup_VMatrix4Serializer)
-   */
-  VMatrix4Serializer::~VMatrix4Serializer() noexcept
-  {
-    UnlinkHelperNode(*this);
   }
 
   /**
@@ -2072,36 +2189,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC6C60 (FUN_00BC6C60, register_AxisAlignedBox3fSerializer)
-   */
-  void register_AxisAlignedBox3fSerializer()
-  {
-    AxisAlignedBox3fSerializer& serializer = AccessSerializerStartupSlot<AxisAlignedBox3fSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&AxisAlignedBox3fSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&AxisAlignedBox3fSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<AxisAlignedBox3fSerializer>);
-  }
-
-  /**
    * Address: 0x00BC6CA0 (FUN_00BC6CA0, register_Vector2iTypeInfo)
    */
   int register_Vector2iTypeInfo()
   {
     (void)AccessTypeInfoStartupSlot<Vector2iTypeInfo>();
     return std::atexit(&CleanupTypeInfoAtExit<Vector2iTypeInfo>);
-  }
-
-  /**
-   * Address: 0x00BC6CC0 (FUN_00BC6CC0, register_Vector2iSerializer)
-   */
-  void register_Vector2iSerializer()
-  {
-    Vector2iSerializer& serializer = AccessSerializerStartupSlot<Vector2iSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&Vector2iSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Vector2iSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<Vector2iSerializer>);
   }
 
   /**
@@ -2114,36 +2207,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC6D20 (FUN_00BC6D20, register_Vector3iSerializer)
-   */
-  void register_Vector3iSerializer()
-  {
-    Vector3iSerializer& serializer = AccessSerializerStartupSlot<Vector3iSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&Vector3iSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Vector3iSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<Vector3iSerializer>);
-  }
-
-  /**
    * Address: 0x00BC6D60 (FUN_00BC6D60, register_Vector2fTypeInfo)
    */
   int register_Vector2fTypeInfo()
   {
     (void)AccessTypeInfoStartupSlot<Vector2fTypeInfo>();
     return std::atexit(&CleanupTypeInfoAtExit<Vector2fTypeInfo>);
-  }
-
-  /**
-   * Address: 0x00BC6D80 (FUN_00BC6D80, register_Vector2fSerializer)
-   */
-  void register_Vector2fSerializer()
-  {
-    Vector2fSerializer& serializer = AccessSerializerStartupSlot<Vector2fSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&Vector2fSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Vector2fSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<Vector2fSerializer>);
   }
 
   /**
@@ -2156,36 +2225,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC6DE0 (FUN_00BC6DE0, register_Vector3fSerializer)
-   */
-  void register_Vector3fSerializer()
-  {
-    Vector3fSerializer& serializer = AccessSerializerStartupSlot<Vector3fSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&Vector3fSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Vector3fSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<Vector3fSerializer>);
-  }
-
-  /**
    * Address: 0x00BC6E20 (FUN_00BC6E20, register_Vector4fTypeInfo)
    */
   int register_Vector4fTypeInfo()
   {
     (void)AccessTypeInfoStartupSlot<Vector4fTypeInfo>();
     return std::atexit(&CleanupTypeInfoAtExit<Vector4fTypeInfo>);
-  }
-
-  /**
-   * Address: 0x00BC6E40 (FUN_00BC6E40, register_Vector4fSerializer)
-   */
-  void register_Vector4fSerializer()
-  {
-    Vector4fSerializer& serializer = AccessSerializerStartupSlot<Vector4fSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&Vector4fSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Vector4fSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<Vector4fSerializer>);
   }
 
   /**
@@ -2198,18 +2243,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC6EA0 (FUN_00BC6EA0, register_QuaternionfSerializer)
-   */
-  void register_QuaternionfSerializer()
-  {
-    QuaternionfSerializer& serializer = AccessSerializerStartupSlot<QuaternionfSerializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&QuaternionfSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&QuaternionfSerializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<QuaternionfSerializer>);
-  }
-
-  /**
    * Address: 0x00BC6EE0 (FUN_00BC6EE0, register_VEulers3TypeInfo)
    */
   int register_VEulers3TypeInfo()
@@ -2219,36 +2252,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC6F00 (FUN_00BC6F00, register_VEulers3Serializer)
-   */
-  void register_VEulers3Serializer()
-  {
-    VEulers3Serializer& serializer = AccessSerializerStartupSlot<VEulers3Serializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&VEulers3Serializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&VEulers3Serializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<VEulers3Serializer>);
-  }
-
-  /**
    * Address: 0x00BC6F40 (FUN_00BC6F40, register_VAxes3TypeInfo)
    */
   int register_VAxes3TypeInfo()
   {
     (void)AccessTypeInfoStartupSlot<VAxes3TypeInfo>();
     return std::atexit(&CleanupTypeInfoAtExit<VAxes3TypeInfo>);
-  }
-
-  /**
-   * Address: 0x00BC6F60 (FUN_00BC6F60, register_VAxes3Serializer)
-   */
-  int register_VAxes3Serializer()
-  {
-    VAxes3Serializer& serializer = AccessSerializerStartupSlot<VAxes3Serializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = &DeserializeVAxes3SerializerThunk;
-    serializer.mSerialize = &SerializeVAxes3SerializerThunk;
-    return std::atexit(&CleanupSerializerAtExit<VAxes3Serializer>);
   }
 
   /**
@@ -2274,17 +2283,6 @@ namespace moho
     (void)std::atexit(&CleanupTypeInfoAtExit<VMatrix4TypeInfo>);
   }
 
-  /**
-   * Address: 0x00BC70B0 (FUN_00BC70B0, register_VMatrix4Serializer)
-   */
-  void register_VMatrix4Serializer()
-  {
-    VMatrix4Serializer& serializer = AccessSerializerStartupSlot<VMatrix4Serializer>();
-    InitializeHelperNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&VMatrix4Serializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&VMatrix4Serializer::Serialize);
-    (void)std::atexit(&CleanupSerializerAtExit<VMatrix4Serializer>);
-  }
 } // namespace moho
 
 namespace
@@ -2296,26 +2294,16 @@ namespace
       moho::register_math_GlobalRandomStream();
       moho::register_math_GlobalRandomMutex();
       (void)moho::register_AxisAlignedBox3fTypeInfo();
-      moho::register_AxisAlignedBox3fSerializer();
       (void)moho::register_Vector2iTypeInfo();
-      moho::register_Vector2iSerializer();
       (void)moho::register_Vector3iTypeInfo();
-      moho::register_Vector3iSerializer();
       (void)moho::register_Vector2fTypeInfo();
-      moho::register_Vector2fSerializer();
       (void)moho::register_Vector3fTypeInfo();
-      moho::register_Vector3fSerializer();
       (void)moho::register_Vector4fTypeInfo();
-      moho::register_Vector4fSerializer();
       (void)moho::register_QuaternionfTypeInfo();
-      moho::register_QuaternionfSerializer();
       (void)moho::register_VEulers3TypeInfo();
-      moho::register_VEulers3Serializer();
       (void)moho::register_VAxes3TypeInfo();
-      (void)moho::register_VAxes3Serializer();
       moho::register_VMatrix4NaN();
       moho::register_VMatrix4TypeInfo();
-      moho::register_VMatrix4Serializer();
     }
   };
 
