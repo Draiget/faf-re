@@ -738,6 +738,20 @@ namespace moho
   void SC_LuaDebugger(void* commandArgs);
 
   /**
+   * Address: 0x0088E440 (FUN_0088E440, Moho::DoSimCommand)
+   *
+   * What it does:
+   * `DoSimCommand command args...`. Collects the current selection's entity
+   * IDs into a `BVSet<EntId, EntIdUniverse>`, rejoins the arguments after the
+   * command name into one string via `CON_UnparseCommand`, and dispatches
+   * through the active sim driver's `ISTIDriver::ExecuteDebugCommand` with
+   * the session's cursor world position and focus army. Prints the usage
+   * line with fewer than two arguments and localized "no session" feedback
+   * when no sim driver is active.
+   */
+  void DoSimCommand(void* commandArgs);
+
+  /**
    * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
    *
    * What it does:
