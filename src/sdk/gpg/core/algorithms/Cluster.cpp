@@ -9,6 +9,7 @@
 #include <cstring>
 #include <new>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <intrin.h>
@@ -17,6 +18,7 @@
 #include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/HashMap.h"
+#include "legacy/containers/Vector.h"
 
 namespace
 {
@@ -1776,20 +1778,28 @@ namespace
       "ClusterSearchOpenHeapEntryRuntime::mHandle offset must be 0x08"
     );
 
-    template <typename T>
-    struct ClusterSearchRuntimeVector
-    {
-        void* mProxy; // +0x00
-        T* mFirst;    // +0x04
-        T* mLast;     // +0x08
-        T* mEnd;      // +0x0C
-    };
-
+    /**
+     * `mHeap`/`mHandleToHeapIndex` are the two `struct_Ha2` (IDA's synthesized
+     * name) vector lanes threaded through the whole open-list subsystem below
+     * (`FUN_0092D1A0`/`FUN_0092D240`/`FUN_0092DCE0`/`FUN_0092EE30`/
+     * `FUN_00930440`/`FUN_00930820`). Both are the standard 16-byte
+     * `HasDebugProxy=true` `msvc8::vector<T>` layout, confirmed directly (not
+     * shape-guessed) from `FUN_0092EE30`'s raw `.asm`: `[esi+4]`/`[esi+8]` are
+     * `mHeap`'s `_Myfirst`/`_Mylast`, `[esi+14h]` is `mHandleToHeapIndex`'s
+     * `_Myfirst`, and `[esi+20h]` is `mFreeHandleHead` -- only consistent
+     * with two full 16-byte `{proxy,first,last,end}` quads back to back
+     * (0x00-0x10, 0x10-0x20), matching the size/offset asserts below exactly.
+     * `mHeap`'s real ctor (`struct_Ha1::struct_Ha1`, `FUN_00930C00`, the
+     * owning `struct_Ha1` scratch this subobject lives in as `mSubobj`) seeds
+     * `mFreeHandleHead` to `-1` ("no released handle") before
+     * `gpg::HaStar::ClusterBuild(const SubclusterData&)` (`FUN_009310E0`)
+     * runs its search loop.
+     */
     struct ClusterSearchOpenHeapRuntime
     {
-        ClusterSearchRuntimeVector<ClusterSearchOpenHeapEntryRuntime> mHeap; // +0x00
-        ClusterSearchRuntimeVector<std::int32_t> mHandleToHeapIndex;         // +0x10
-        std::int32_t mFreeHandleHead;                                         // +0x20
+        msvc8::vector<ClusterSearchOpenHeapEntryRuntime> mHeap; // +0x00
+        msvc8::vector<std::int32_t> mHandleToHeapIndex;         // +0x10
+        std::int32_t mFreeHandleHead;                           // +0x20
     };
     static_assert(sizeof(ClusterSearchOpenHeapRuntime) == 0x24, "ClusterSearchOpenHeapRuntime size must be 0x24");
     static_assert(offsetof(ClusterSearchOpenHeapRuntime, mHeap) == 0x00, "ClusterSearchOpenHeapRuntime::mHeap offset must be 0x00");
@@ -1802,29 +1812,33 @@ namespace
       "ClusterSearchOpenHeapRuntime::mFreeHandleHead offset must be 0x20"
     );
 
-    [[nodiscard]] std::uint32_t OpenHeapCount(const ClusterSearchOpenHeapRuntime& openHeap) noexcept
-    {
-        if (openHeap.mHeap.mFirst == nullptr || openHeap.mHeap.mLast == nullptr) {
-            return 0u;
-        }
-
-        return static_cast<std::uint32_t>(openHeap.mHeap.mLast - openHeap.mHeap.mFirst);
-    }
-
+    /**
+     * Address: 0x0092C3F0 (FUN_0092C3F0)
+     *
+     * What it does:
+     * Swaps two open-heap slots' 12-byte entries and rewrites both entries'
+     * `mHandleToHeapIndex` reverse-map slots to their post-swap positions.
+     * Reached out-of-line only from `RemoveClusterSearchOpenHeapEntryAt`'s
+     * (`FUN_0092EE30`) tail-swap call; `ClusterSearchOpenHeapSiftUp`
+     * (`FUN_0092D1A0`) and `ClusterSearchOpenHeapSiftDown` (`FUN_0092D240`)
+     * carry the identical swap+remap logic fully inlined at their own two
+     * call sites instead of calling this shared body -- confirmed directly
+     * from all three decompiled bodies (no `call sub_92C3F0` present in
+     * either sift function). One recovered function models all three
+     * emissions; this is domain logic (heap-slot swap plus handle-index
+     * remap), not a container primitive, so it keeps its own name rather
+     * than folding into `msvc8::vector<T>` -- only its element access now
+     * goes through `operator[]` instead of a raw `mFirst`-indexed pointer.
+     */
     void SwapOpenHeapEntries(
       ClusterSearchOpenHeapRuntime& openHeap,
       const std::uint32_t lhsIndex,
       const std::uint32_t rhsIndex
     ) noexcept
     {
-        auto* const heap = openHeap.mHeap.mFirst;
-        ClusterSearchOpenHeapEntryRuntime temp = heap[lhsIndex];
-        heap[lhsIndex] = heap[rhsIndex];
-        heap[rhsIndex] = temp;
-
-        auto* const heapIndexByHandle = openHeap.mHandleToHeapIndex.mFirst;
-        heapIndexByHandle[heap[lhsIndex].mHandle] = static_cast<std::int32_t>(lhsIndex);
-        heapIndexByHandle[heap[rhsIndex].mHandle] = static_cast<std::int32_t>(rhsIndex);
+        std::swap(openHeap.mHeap[lhsIndex], openHeap.mHeap[rhsIndex]);
+        openHeap.mHandleToHeapIndex[openHeap.mHeap[lhsIndex].mHandle] = static_cast<std::int32_t>(lhsIndex);
+        openHeap.mHandleToHeapIndex[openHeap.mHeap[rhsIndex].mHandle] = static_cast<std::int32_t>(rhsIndex);
     }
 
     /**
@@ -1842,8 +1856,7 @@ namespace
 
         do {
             const std::uint32_t parentIndex = (heapIndex - 1u) >> 1u;
-            auto* const heap = openHeap.mHeap.mFirst;
-            if (heap[heapIndex].mCost > heap[parentIndex].mCost) {
+            if (openHeap.mHeap[heapIndex].mCost > openHeap.mHeap[parentIndex].mCost) {
                 break;
             }
 
@@ -1871,13 +1884,12 @@ namespace
         while (leftChild < heapCount) {
             const std::uint32_t baseIndex = heapIndex;
             std::uint32_t bestIndex = heapIndex;
-            auto* const heap = openHeap.mHeap.mFirst;
 
-            if (heap[baseIndex].mCost > heap[leftChild].mCost) {
+            if (openHeap.mHeap[baseIndex].mCost > openHeap.mHeap[leftChild].mCost) {
                 bestIndex = leftChild;
             }
 
-            if (rightChild < heapCount && heap[bestIndex].mCost > heap[rightChild].mCost) {
+            if (rightChild < heapCount && openHeap.mHeap[bestIndex].mCost > openHeap.mHeap[rightChild].mCost) {
                 bestIndex = rightChild;
             }
 
@@ -1907,15 +1919,13 @@ namespace
       const float newCost
     )
     {
-        const auto* const heapIndexByHandle = openHeap.mHandleToHeapIndex.mFirst;
-        const std::uint32_t heapIndex = static_cast<std::uint32_t>(heapIndexByHandle[handle]);
-        auto* const heap = openHeap.mHeap.mFirst;
+        const std::uint32_t heapIndex = static_cast<std::uint32_t>(openHeap.mHandleToHeapIndex[handle]);
 
-        const float previousCost = heap[heapIndex].mCost;
-        heap[heapIndex].mCost = newCost;
+        const float previousCost = openHeap.mHeap[heapIndex].mCost;
+        openHeap.mHeap[heapIndex].mCost = newCost;
 
         if (previousCost <= newCost) {
-            const std::uint32_t heapCount = OpenHeapCount(openHeap);
+            const std::uint32_t heapCount = static_cast<std::uint32_t>(openHeap.mHeap.size());
             (void)ClusterSearchOpenHeapSiftDown(openHeap, heapIndex, heapCount);
             return;
         }
@@ -1935,8 +1945,7 @@ namespace
       const std::uint32_t heapIndex
     )
     {
-        auto* const heap = openHeap.mHeap.mFirst;
-        const std::uint32_t heapCount = OpenHeapCount(openHeap);
+        const std::uint32_t heapCount = static_cast<std::uint32_t>(openHeap.mHeap.size());
         const std::uint32_t tailIndex = heapCount - 1u;
 
         if (heapIndex != tailIndex) {
@@ -1944,13 +1953,16 @@ namespace
             (void)ClusterSearchOpenHeapSiftDown(openHeap, heapIndex, tailIndex);
         }
 
-        const std::int32_t removedHandle = openHeap.mHeap.mLast[-1].mHandle;
-        auto* const heapIndexByHandle = openHeap.mHandleToHeapIndex.mFirst;
-        heapIndexByHandle[removedHandle] = openHeap.mFreeHandleHead;
+        const std::int32_t removedHandle = openHeap.mHeap.back().mHandle;
+        openHeap.mHandleToHeapIndex[removedHandle] = openHeap.mFreeHandleHead;
         openHeap.mFreeHandleHead = removedHandle;
 
         if (heapCount != 0u) {
-            --openHeap.mHeap.mLast;
+            // Bare `_Mylast` decrement, matching the binary: the popped
+            // entry is a trivially-destructible POD (`ClusterSearchOpenHeapEntryRuntime`)
+            // and its slot was already relocated by the swap-to-tail above,
+            // so no destructor call is needed -- see `pop_back_no_destroy`.
+            openHeap.mHeap.pop_back_no_destroy();
         }
 
         return static_cast<std::int32_t>(heapCount);
@@ -2036,66 +2048,6 @@ namespace
         return it->second;
     }
 
-    template <typename T>
-    [[nodiscard]] std::uint32_t RuntimeVectorCount(const ClusterSearchRuntimeVector<T>& vector) noexcept
-    {
-      if (vector.mFirst == nullptr || vector.mLast == nullptr) {
-        return 0u;
-      }
-      return static_cast<std::uint32_t>(vector.mLast - vector.mFirst);
-    }
-
-    template <typename T>
-    [[nodiscard]] std::uint32_t RuntimeVectorCapacity(const ClusterSearchRuntimeVector<T>& vector) noexcept
-    {
-      if (vector.mFirst == nullptr || vector.mEnd == nullptr) {
-        return 0u;
-      }
-      return static_cast<std::uint32_t>(vector.mEnd - vector.mFirst);
-    }
-
-    template <typename T>
-    void RuntimeVectorReserveAtLeast(ClusterSearchRuntimeVector<T>& vector, const std::uint32_t requiredCount)
-    {
-      const std::uint32_t oldCapacity = RuntimeVectorCapacity(vector);
-      if (requiredCount <= oldCapacity) {
-        return;
-      }
-
-      const std::uint32_t oldCount = RuntimeVectorCount(vector);
-      std::uint32_t newCapacity = (oldCapacity != 0u) ? oldCapacity : 1u;
-      while (newCapacity < requiredCount) {
-        const std::uint32_t doubled = newCapacity * 2u;
-        if (doubled <= newCapacity) {
-          newCapacity = requiredCount;
-          break;
-        }
-        newCapacity = doubled;
-      }
-
-      auto* const newStorage = static_cast<T*>(::operator new(static_cast<std::size_t>(newCapacity) * sizeof(T)));
-      for (std::uint32_t i = 0u; i < oldCount; ++i) {
-        newStorage[i] = vector.mFirst[i];
-      }
-
-      if (vector.mFirst != nullptr) {
-        ::operator delete(vector.mFirst);
-      }
-
-      vector.mFirst = newStorage;
-      vector.mLast = newStorage + oldCount;
-      vector.mEnd = newStorage + newCapacity;
-    }
-
-    template <typename T>
-    void RuntimeVectorPushBack(ClusterSearchRuntimeVector<T>& vector, const T& value)
-    {
-      const std::uint32_t oldCount = RuntimeVectorCount(vector);
-      RuntimeVectorReserveAtLeast(vector, oldCount + 1u);
-      vector.mFirst[oldCount] = value;
-      vector.mLast = vector.mFirst + oldCount + 1u;
-    }
-
     struct ClusterSearchEdgeTraversalLaneRuntime
     {
       float mAccumulatedCost;                // +0x00
@@ -2104,30 +2056,18 @@ namespace
     };
     static_assert(sizeof(ClusterSearchEdgeTraversalLaneRuntime) == 0x0C, "ClusterSearchEdgeTraversalLaneRuntime size must be 0x0C");
 
-    using ClusterSearchEdgeTraversalVectorRuntime = ClusterSearchRuntimeVector<ClusterSearchEdgeTraversalLaneRuntime>;
-
     /**
-     * Address: 0x009302E0 (FUN_009302E0)
-     *
-     * What it does:
-     * Appends one 12-byte edge-traversal lane into the destination vector and
-     * advances the end cursor.
+     * `msvc8::vector<ClusterSearchEdgeTraversalLaneRuntime>::push_back` is
+     * `FUN_009302E0` -- see the `Address:` block cited onto `vector<T>::
+     * push_back` in `legacy/containers/Vector.h` for the full grow-chain
+     * evidence (`FUN_00930000` -> `FUN_0092F630`). The former per-type
+     * `AppendClusterSearchEdgeTraversalLane` wrapper added nothing over that
+     * member -- its capacity-checked fast path and the discarded `int`
+     * return (`edgeLanes.mFirst + size`, EAX left over from the callee, never
+     * read by either real caller) are exactly `push_back`'s own shape -- so
+     * callers now invoke `.push_back(lane)` directly.
      */
-    [[nodiscard]] int AppendClusterSearchEdgeTraversalLane(
-      ClusterSearchEdgeTraversalVectorRuntime& edgeLanes,
-      const ClusterSearchEdgeTraversalLaneRuntime& lane
-    )
-    {
-      const std::uint32_t size = RuntimeVectorCount(edgeLanes);
-      if (edgeLanes.mFirst != nullptr && size < RuntimeVectorCapacity(edgeLanes)) {
-        edgeLanes.mFirst[size] = lane;
-        edgeLanes.mLast = edgeLanes.mFirst + size + 1u;
-        return reinterpret_cast<int>(edgeLanes.mFirst + size);
-      }
-
-      RuntimeVectorPushBack(edgeLanes, lane);
-      return reinterpret_cast<int>(edgeLanes.mFirst + size);
-    }
+    using ClusterSearchEdgeTraversalVectorRuntime = msvc8::vector<ClusterSearchEdgeTraversalLaneRuntime>;
 
     struct ClusterSearchTraversalContextRuntime
     {
@@ -2304,7 +2244,7 @@ namespace
               static_cast<std::uint32_t>(static_cast<std::uint8_t>(tileBaseX + targetX))
               | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(tileBaseZ + targetZ)) << 8u);
             lane.mTraversalCost = traversalCost;
-            (void)AppendClusterSearchEdgeTraversalLane(outEdgeLanes, lane);
+            outEdgeLanes.push_back(lane);
           }
         }
       }
@@ -2312,6 +2252,15 @@ namespace
       return 0;
     }
 
+    /**
+     * Address: 0x00930440 (FUN_00930440)
+     *
+     * What it does:
+     * Acquires a handle for a newly pushed open-heap entry: reuses the head
+     * of the released-handle free list (`mFreeHandleHead`) when one is
+     * available, else appends a fresh slot to `mHandleToHeapIndex` and
+     * returns its index as the new handle.
+     */
     [[nodiscard]] std::int32_t AcquireOrReuseClusterSearchOpenHandle(
       ClusterSearchOpenHeapRuntime& openHeap,
       const std::int32_t heapIndex
@@ -2319,14 +2268,13 @@ namespace
     {
       const std::int32_t freeHead = openHeap.mFreeHandleHead;
       if (freeHead == -1) {
-        const std::int32_t newHandle = static_cast<std::int32_t>(RuntimeVectorCount(openHeap.mHandleToHeapIndex));
-        RuntimeVectorPushBack(openHeap.mHandleToHeapIndex, heapIndex);
+        const std::int32_t newHandle = static_cast<std::int32_t>(openHeap.mHandleToHeapIndex.size());
+        openHeap.mHandleToHeapIndex.push_back(heapIndex);
         return newHandle;
       }
 
-      auto* const handleToHeapIndex = openHeap.mHandleToHeapIndex.mFirst;
-      openHeap.mFreeHandleHead = handleToHeapIndex[freeHead];
-      handleToHeapIndex[freeHead] = heapIndex;
+      openHeap.mFreeHandleHead = openHeap.mHandleToHeapIndex[freeHead];
+      openHeap.mHandleToHeapIndex[freeHead] = heapIndex;
       return freeHead;
     }
 
@@ -2343,14 +2291,14 @@ namespace
       ClusterNodeSearchState* const nodeState
     )
     {
-      const std::int32_t heapIndex = static_cast<std::int32_t>(OpenHeapCount(openHeap));
+      const std::int32_t heapIndex = static_cast<std::int32_t>(openHeap.mHeap.size());
       const std::int32_t handle = AcquireOrReuseClusterSearchOpenHandle(openHeap, heapIndex);
 
       ClusterSearchOpenHeapEntryRuntime entry{};
       entry.mCost = cost;
       entry.mNode = nodeState;
       entry.mHandle = handle;
-      RuntimeVectorPushBack(openHeap.mHeap, entry);
+      openHeap.mHeap.push_back(entry);
 
       ClusterSearchOpenHeapSiftUp(openHeap, static_cast<std::uint32_t>(heapIndex));
       return handle;
@@ -2459,24 +2407,22 @@ namespace
       const ClusterSearchTraversalContextRuntime& context
     )
     {
+      // RAII: `edgeLanes`'s destructor now performs exactly what the
+      // original hand-rolled `releaseEdgeLanes()` lambda did by hand on
+      // every exit path (early-return and normal loop drain alike) --
+      // matching the original binary's own scope-exit teardown of this
+      // scratch vector, just expressed as the shared `msvc8::vector<T>`
+      // destructor instead of a bespoke `::operator delete[]` lambda (which
+      // additionally mismatched its own allocator: the vector's own growth
+      // path allocates with scalar `::operator new`, so freeing with
+      // `delete[]` was already undefined behavior prior to this migration).
       ClusterSearchEdgeTraversalVectorRuntime edgeLanes{};
 
-      const auto releaseEdgeLanes = [&edgeLanes]() noexcept {
-        if (edgeLanes.mFirst != nullptr) {
-          ::operator delete[](edgeLanes.mFirst);
-          edgeLanes.mFirst = nullptr;
-          edgeLanes.mLast = nullptr;
-          edgeLanes.mEnd = nullptr;
-        }
-      };
-
-      while (OpenHeapCount(openHeap) != 0u) {
-        ClusterNodeSearchState* const currentNode = openHeap.mHeap.mFirst[0].mNode;
+      while (openHeap.mHeap.size() != 0u) {
+        ClusterNodeSearchState* const currentNode = openHeap.mHeap.front().mNode;
 
         // The original code reuses the same storage and resets vector size each pass.
-        if (edgeLanes.mFirst != edgeLanes.mLast) {
-          edgeLanes.mLast = edgeLanes.mFirst;
-        }
+        edgeLanes.clear();
 
         const char expandStatus = ExpandClusterSearchFrontierEdges(
           context,
@@ -2484,16 +2430,15 @@ namespace
           edgeLanes
         );
         if (expandStatus != 0) {
-          releaseEdgeLanes();
           return expandStatus;
         }
 
         currentNode->mState = 2;
         (void)RemoveClusterSearchOpenHeapEntryAt(openHeap, 0u);
 
-        const std::uint32_t laneCount = RuntimeVectorCount(edgeLanes);
+        const std::uint32_t laneCount = static_cast<std::uint32_t>(edgeLanes.size());
         for (std::uint32_t laneIndex = 0u; laneIndex < laneCount; ++laneIndex) {
-          const ClusterSearchEdgeTraversalLaneRuntime& lane = edgeLanes.mFirst[laneIndex];
+          const ClusterSearchEdgeTraversalLaneRuntime& lane = edgeLanes[laneIndex];
           const std::uint8_t nodeX = static_cast<std::uint8_t>(lane.mPackedNodeCoordinate & 0xFFu);
           const std::uint8_t nodeZ = static_cast<std::uint8_t>((lane.mPackedNodeCoordinate >> 8u) & 0xFFu);
           ClusterNodeSearchState& nodeState = ClusterNodeStateMapIndex(stateByCoordinate, nodeX, nodeZ);
@@ -2534,7 +2479,6 @@ namespace
         }
       }
 
-      releaseEdgeLanes();
       return 0;
     }
 

@@ -1814,6 +1814,15 @@ namespace msvc8
          * member's own prose already named it as `FUN_008F7770`'s
          * `recommended_capacity` input but never gave it a formal Address
          * block until now.)
+         * Address: 0x0092BCA0 (FUN_0092BCA0, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::capacity` for the 12-byte
+         * element -- `first_ ? (end_-first_)/12 : 0`. Reached from the
+         * `_Insert_n` growth-branch capacity check `FUN_0092F630` (cited
+         * above on `insert`).)
+         * Address: 0x0092C280 (FUN_0092C280, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchOpenHeapEntryRuntime>::capacity` for the sibling
+         * 12-byte open-heap-entry instantiation -- same shape, reached from
+         * that element's own `_Insert_n` growth check `FUN_0092F240`.)
          *
          * Returns reserved element capacity from retained `[first_, end_)` range.
          */
@@ -2449,6 +2458,44 @@ namespace msvc8
          * `CEntityDbBoundedPropQueueRuntime::Insert` (EntityDb.h/.cpp),
          * the `gpg::PriorityQueue<SPropPriorityInfo, WeakPtr<Prop>>::Insert`
          * member reached from `Moho::EntityDB::AddBoundedProp`.)
+         * Address: 0x009302E0 (FUN_009302E0, msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::push_back for the 12-byte
+         * `{mAccumulatedCost, mPackedNodeCoordinate, mTraversalCost}` element
+         * -- checked-capacity fast append, else tail-calls the single-value
+         * `insert(pos, value)` overload FUN_00930000, whose own grow core is
+         * the `_Insert_n` emission FUN_0092F630 (cited below on `insert`).
+         * Emitted via `outEdgeLanes.push_back(lane)` in
+         * `ExpandClusterSearchFrontierEdges` (Cluster.cpp), the per-boundary-
+         * edge scratch vector `gpg::HaStar::ClusterBuild`'s open-frontier
+         * search (`ProcessClusterSearchOpenFrontier`, FUN_00930D60) refills
+         * every time it expands a node. The prior per-type
+         * `AppendClusterSearchEdgeTraversalLane` wrapper this token was
+         * attributed to was a `RULE ONE`-violating reach-in copy of exactly
+         * this member -- collapsed onto this citation instead of kept as a
+         * forked free function.)
+         * Address: 0x00930190 (FUN_00930190, `std::vector_Ha5::push_back` per
+         * IDA's own signature recognition -- `msvc8::vector<gpg::HaStar::
+         * ClusterSearchOpenHeapEntryRuntime>::push_back` for the 12-byte
+         * `{mCost, mNode, mHandle}` open-heap entry element. Checked-capacity
+         * fast append, else tail-calls `insert(pos, value)` FUN_0092FCD0,
+         * whose grow core is the `_Insert_n` emission FUN_0092F240 (cited
+         * below on `insert` -- structurally identical to FUN_0092F630 above,
+         * a separate instantiation for a different 12-byte element, not an
+         * ICF twin: distinct `function_sha256`, distinct private copies of
+         * every sub-helper). Emitted via `openHeap.mHeap.push_back(entry)` in
+         * `PushClusterSearchOpenNode` (FUN_00930820, Cluster.cpp), the open-
+         * heap insertion helper `RelaxClusterSearchNeighbor`/
+         * `ProcessClusterSearchOpenFrontier` call while opening a search
+         * node.)
+         * Address: 0x00686E80 (FUN_00686E80, `msvc8::vector<std::int32_t>::
+         * push_back` for the handle-to-heap-index reverse map
+         * (`ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, Cluster.cpp)
+         * -- checked-capacity fast append, else tail-calls `insert(pos,
+         * value)` FUN_00687B40, whose grow core is the `_Insert_n` emission
+         * FUN_004451A0 (cited below on `insert`). Emitted via
+         * `openHeap.mHandleToHeapIndex.push_back(heapIndex)` in
+         * `AcquireOrReuseClusterSearchOpenHandle` (FUN_00930440,
+         * Cluster.cpp) when the released-handle free list is empty.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -3372,6 +3419,28 @@ namespace msvc8
          * (`CWldSession.cpp:14703`, already recovered) when the bucket's
          * `mEdges` vector is at capacity.)
          *
+         * Address: 0x00930000 (FUN_00930000, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::insert(iterator, const T&)`
+         * for the 12-byte edge-traversal-lane element -- offset captured up
+         * front (`(pos-first_)/12`), tail-calls the `_Insert_n` grow core
+         * `FUN_0092F630` with `count = 1`, rebuilds the returned iterator as
+         * `first_ + offset`. Reached from this element's `push_back`
+         * (`FUN_009302E0`, cited above) capacity-full path.)
+         * Address: 0x0092FCD0 (FUN_0092FCD0, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchOpenHeapEntryRuntime>::insert(iterator, const T&)` for
+         * the 12-byte open-heap-entry element -- same offset-capture/tail-
+         * call/iterator-rebuild shape as the edge-lane instantiation
+         * immediately above, tail-calling its own private `_Insert_n` grow
+         * core `FUN_0092F240` with `count = 1`. Reached from this element's
+         * `push_back` (`FUN_00930190`, cited above) capacity-full path.)
+         * Address: 0x00687B40 (FUN_00687B40, `msvc8::vector<std::int32_t>::
+         * insert(iterator, const T&)` for the handle-to-heap-index reverse
+         * map (`ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`,
+         * Cluster.cpp) -- offset captured as `(pos-first_)>>2`, tail-calls
+         * the `_Insert_n` grow core `FUN_004451A0` with `count = 1`. Reached
+         * from this element's `push_back` (`FUN_00686E80`, cited above)
+         * capacity-full path.)
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -3810,6 +3879,77 @@ namespace msvc8
          * note on `operator=` above for the dumpbin-verified confirmation
          * that this inline loop -- not the separate `copy_or_move_assign`
          * helper -- is what actually gets compiled for `T = AdapterD3D9`.)
+         *
+         * Address: 0x0092F630 (FUN_0092F630, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::insert(iterator, size_type,
+         * const T&)` for the 12-byte edge-traversal-lane element -- the
+         * `_Insert_n` core `push_back`'s capacity-full path reaches with
+         * `count=1` (via the single-value `insert` at `FUN_00930000`, cited
+         * above). Carries the full VC8 shape byte-for-byte matching this
+         * member's own control flow: `max_size` guard folds to `357913941`
+         * (`0xFFFFFFFF/12`, throw lane `FUN_0092EFF0`, cited below on
+         * `throw_too_long`); in-place branch (capacity already covers
+         * `size()+count`) tail-shifts via the copy-alias `FUN_0092ED60` ->
+         * `FUN_0092D7D0` (cited below on `uninit_move_n`) then
+         * `FUN_0092DC80` (reverse/backward element-wise copy -- this
+         * instantiation is not recognized as the STL's "trivial scalar"
+         * fast-copy candidate despite being POD, so the binary emits an
+         * explicit backward-walking per-element loop here rather than a
+         * `memmove`; this member's own `if constexpr
+         * (is_trivially_copyable_v<T>)` branch reaches `std::memmove`
+         * instead for this same element -- both produce byte-identical
+         * results for a 3-field POD with no aliasing hazard, so this is a
+         * different-instructions/same-behavior case, not a divergence to
+         * fix per RULE ONE) or `FUN_92D0A0` (plain fill, cited below on
+         * `uninit_fill_n`); reallocation branch (the only branch this
+         * element's `push_back` call path ever actually exercises, since
+         * `push_back` only forwards to `insert` once capacity is already
+         * exhausted) computes `recommended_capacity` inline
+         * (`(cap>>1)+cap`, folding to `count+capacity()` on the `grown <
+         * need` fallback -- exactly this member's own `recommended_capacity`
+         * shape below), allocates via `FUN_0092C080` (cited below on
+         * `allocate_slots_checked`), head/tail-relocates the live range via
+         * two calls to `FUN_0092D7D0` (`uninit_move_n`), fills the gap via
+         * the advance-returning `FUN_0092E920` -> `FUN_0092DF10` adapter
+         * (cited below on `uninit_fill_n`), frees the old block and rebases
+         * `{first_,last_,end_}`. Emitted via `outEdgeLanes.push_back(lane)`
+         * in `ExpandClusterSearchFrontierEdges` (Cluster.cpp) once
+         * `edgeLanes` is at capacity.)
+         * Address: 0x0092F240 (FUN_0092F240, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchOpenHeapEntryRuntime>::insert(iterator, size_type,
+         * const T&)` for the 12-byte open-heap-entry element -- structurally
+         * identical to `FUN_0092F630` immediately above (same `357913941`
+         * max_size constant, same 1.5x growth, same in-place/reallocate
+         * branch shape), but a distinct instantiation with its own private
+         * sub-helpers throughout (`FUN_0092F060` throw, `FUN_0092C0E0`
+         * allocate, `FUN_0092C280` capacity, `FUN_0092D840`/`FUN_0092EEB0`
+         * move-copy, `FUN_0092DFC0` backward-copy, `FUN_0092D580` plain
+         * fill, `FUN_0092EB70` fill-advance adapter -- all cited below on
+         * their respective shared members) -- confirmed a separate
+         * emission, not an ICF twin: distinct `function_sha256`, every
+         * sub-call target differs. Reached from this element's `push_back`
+         * (`FUN_00930190`, cited above) capacity-full path via
+         * `FUN_0092FCD0` (cited above on the single-value `insert`
+         * overload).)
+         * Address: 0x004451A0 (FUN_004451A0, `msvc8::vector<std::int32_t>::
+         * insert(iterator, size_type, const T&)` for the handle-to-heap-
+         * index reverse map (`ClusterSearchOpenHeapRuntime::
+         * mHandleToHeapIndex`, Cluster.cpp) -- same shape again for the
+         * 4-byte element: `max_size` folds to `0x3FFFFFFF`, 1.5x growth,
+         * throw lane `FUN_00444270` (cited below on `throw_too_long`),
+         * allocate `FUN_00445B80` (cited below on `allocate_slots_checked`).
+         * Unlike the two 12-byte instantiations above, this element *is*
+         * recognized as the STL's trivial-scalar fast-copy candidate, so
+         * every copy/shift step (`FUN_00445F20`, called three times for the
+         * in-place tail-shift, the reallocation head-relocate, and the
+         * reallocation tail-relocate) is a direct `memmove_s` wrapper rather
+         * than a per-element loop -- exactly this member's own `if
+         * constexpr (is_trivially_copyable_v<T>) { std::memmove(...); }`
+         * fast path. The fill step `FUN_00445430` (cited below on
+         * `uninit_fill_n`) already returns the advanced pointer directly, no
+         * separate adapter needed for a 4-byte element. Reached from this
+         * element's `push_back` (`FUN_00686E80`, cited above) capacity-full
+         * path via `FUN_00687B40`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -4789,6 +4929,43 @@ namespace msvc8
          * drifted to real `std::vector<SNewBlip>`, which would not emit this
          * symbol on rebuild; retyped to `msvc8::vector<SNewBlip>` to match.)
          *
+         * Address: 0x0092D0A0 (FUN_0092D0A0, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::uninit_fill_n` for the
+         * 12-byte element -- same per-element 3-dword defensive-null-guarded
+         * copy loop shape as `FUN_005CBC70` above. Used directly by the
+         * `_Insert_n` in-place branch's "tail >= count" sub-branch (fills the
+         * vacated gap after the tail has been moved). Reached from the
+         * `_Insert_n` grow core `FUN_0092F630`, cited above on `insert`.)
+         * Address: 0x0092DF10 (FUN_0092DF10, a second, byte-distinct emission
+         * of the identical fill loop for the same `ClusterSearchEdgeTraversal
+         * LaneRuntime` instantiation -- not folded with `FUN_0092D0A0` above
+         * despite matching source/shape, reached only through the advance-
+         * returning adapter `FUN_0092E920` (`sub_92DF10(a1,a2,a3); return a1
+         * + 12*a2;`, this member's own "`_Ufill`" shape), which the
+         * `_Insert_n` in-place branch's "tail < count" sub-branch calls to
+         * fill the trailing-gap section. Both `FUN_0092D0A0` and
+         * `FUN_0092DF10` model this one member; recovered together.)
+         * Address: 0x0092D580 (FUN_0092D580, the sibling `msvc8::vector<gpg::
+         * HaStar::ClusterSearchOpenHeapEntryRuntime>::uninit_fill_n` for the
+         * 12-byte open-heap-entry element -- same shape as `FUN_0092D0A0`
+         * above, reached directly by the `_Insert_n` in-place branch's
+         * "tail >= count" sub-branch. Reached from the `_Insert_n` grow core
+         * `FUN_0092F240`, cited above on `insert`.)
+         * Address: 0x0092E010 (FUN_0092E010, the open-heap-entry sibling's
+         * own second byte-distinct fill-loop emission -- same relationship
+         * to `FUN_0092D580` as `FUN_0092DF10` has to `FUN_0092D0A0` above,
+         * reached only through this instantiation's own advance-returning
+         * adapter `FUN_0092EB70` (`sub_92E010(a1,a2,a3); return a1+12*a2;`)
+         * from the `_Insert_n` in-place branch's "tail < count" sub-branch.)
+         * Address: 0x00445430 (FUN_00445430, `msvc8::vector<std::int32_t>::
+         * uninit_fill_n` for the handle-to-heap-index reverse map
+         * (`ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, Cluster.cpp)
+         * -- `for (i=count; i; ++dst,--i) *dst = *value; return dst;`, the
+         * 4-byte-element analogue of the two 12-byte loops above, already
+         * returning the advanced pointer directly with no separate adapter
+         * needed. Reached from the `_Insert_n` grow core `FUN_004451A0`,
+         * cited above on `insert`.)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
@@ -5114,6 +5291,37 @@ namespace msvc8
          * `uninit_move_n(oldLast - count, count, oldLast)` call models.
          * Same SSTICommandSource mis-attribution and correction as
          * FUN_007BED70 immediately above.)
+         * Address: 0x0092D7D0 (FUN_0092D7D0, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::uninit_move_n` for the
+         * 12-byte element -- per-element 3-dword copy loop with a defensive
+         * `if (result)` null-check per iteration (same "defensive-null"
+         * shape documented elsewhere on this member), used both for the
+         * reallocation branch's head/tail relocation and, via its alias
+         * `FUN_0092ED60` (a plain tail-call, no logic of its own), for the
+         * in-place branch's move-the-trailing-elements step. Reached from
+         * the `_Insert_n` grow core `FUN_0092F630`, cited above on
+         * `insert`.)
+         * Address: 0x0092D840 (FUN_0092D840, the sibling `msvc8::vector<gpg::
+         * HaStar::ClusterSearchOpenHeapEntryRuntime>::uninit_move_n` for the
+         * 12-byte open-heap-entry element -- same per-element defensive-null
+         * loop shape, reached both directly and via its alias `FUN_0092EEB0`
+         * from the `_Insert_n` grow core `FUN_0092F240`, cited above on
+         * `insert`.)
+         * Address: 0x00445F20 (FUN_00445F20, `msvc8::vector<std::int32_t>::
+         * uninit_move_n` for the handle-to-heap-index reverse map
+         * (`ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, Cluster.cpp)
+         * -- this element type *is* the STL's trivial-scalar fast-copy
+         * candidate, so the compiled body is a direct `memmove_s` wrapper
+         * (`if (count) memmove_s(dst, count*4, src, count*4);`) rather than a
+         * per-element loop, matching this member's own `if constexpr
+         * (is_trivially_copyable_v<T>) { std::memcpy(...); }` fast path
+         * (`memmove_s`/`memcpy` are behaviourally interchangeable here since
+         * every call site relocates into non-overlapping freshly-allocated
+         * storage). The same symbol also serves the in-place branch's
+         * tail-shift step (`std::memmove` in that branch's own `if
+         * constexpr` arm) -- one compiled `memmove_s` wrapper backs both
+         * call shapes for this element. Reached from the `_Insert_n` grow
+         * core `FUN_004451A0`, cited above on `insert`.)
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -5437,7 +5645,11 @@ namespace msvc8
          * free functions.
          *
          * sizeof(T) == 4 (`count > 0x3FFFFFFF` throws):
-         * Address: 0x00445B80 (FUN_00445B80)
+         * Address: 0x00445B80 (FUN_00445B80, `msvc8::vector<std::int32_t>::
+         * allocate_slots_checked` for the handle-to-heap-index reverse map
+         * `ClusterSearchOpenHeapRuntime::mHandleToHeapIndex` (Cluster.cpp) --
+         * reached from the `_Insert_n` grow core `FUN_004451A0`, cited above
+         * on `insert`.)
          * Address: 0x00445C90 (FUN_00445C90)
          * Address: 0x00445DC0 (FUN_00445DC0)
          * Address: 0x00445E80 (FUN_00445E80)
@@ -5520,6 +5732,14 @@ namespace msvc8
          * Address: 0x004C6520 (FUN_004C6520, 64B)
          * Address: 0x008F6040 (FUN_008F6040, 0x74B)
          * Address: 0x00526080 (FUN_00526080, 0x184B, `moho::RUnitBlueprintWeapon`)
+         * Address: 0x0092C080 (FUN_0092C080, 12B, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchEdgeTraversalLaneRuntime>::allocate_slots_checked` --
+         * reached from the `_Insert_n` grow core `FUN_0092F630`, cited above
+         * on `insert`.)
+         * Address: 0x0092C0E0 (FUN_0092C0E0, 12B, `msvc8::vector<gpg::HaStar::
+         * ClusterSearchOpenHeapEntryRuntime>::allocate_slots_checked` --
+         * reached from the `_Insert_n` grow core `FUN_0092F240`, cited above
+         * on `insert`.)
          *
          * sizeof(T) == 56:
          * Address: 0x0044E650 (FUN_0044E650, allocator for one 56-byte
@@ -5703,6 +5923,20 @@ namespace msvc8
          * vector&)`) and from the `_Insert_n` grow lane `FUN_008F6A50` (cited
          * above on `insert`), both guarding the same `count > 0x9249249`
          * (`0xFFFFFFFF/28`) `max_size()` test.)
+         * Address: 0x0092EFF0 (FUN_0092EFF0, the 12-byte-stride throw lane for
+         * `msvc8::vector<gpg::HaStar::ClusterSearchEdgeTraversalLaneRuntime>`,
+         * reached from the `_Insert_n` grow lane `FUN_0092F630`'s
+         * `357913941 - size < count` (`0xFFFFFFFF/12`) max_size test,
+         * already cited above on `insert`.)
+         * Address: 0x0092F060 (FUN_0092F060, the sibling 12-byte-stride throw
+         * lane for `msvc8::vector<gpg::HaStar::ClusterSearchOpenHeapEntryRuntime>`,
+         * reached from that instantiation's own `_Insert_n` grow lane
+         * `FUN_0092F240`, already cited above on `insert`.)
+         * Address: 0x00444270 (FUN_00444270, the 4-byte-stride throw lane for
+         * `msvc8::vector<std::int32_t>`'s `ClusterSearchOpenHeapRuntime::
+         * mHandleToHeapIndex` instantiation, reached from the `_Insert_n`
+         * grow lane `FUN_004451A0`'s `0x3FFFFFFF - size < count` max_size
+         * test, already cited above on `insert`.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
