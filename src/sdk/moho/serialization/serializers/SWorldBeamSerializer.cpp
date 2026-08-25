@@ -1,6 +1,5 @@
 #include "moho/serialization/serializers/SWorldBeamSerializer.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <typeinfo>
 
@@ -11,9 +10,7 @@
 
 namespace
 {
-  using BeamSerializer = moho::SWorldBeamSerializer;
-
-  BeamSerializer gSWorldBeamSerializer{};
+  moho::SWorldBeamSerializer gSWorldBeamSerializer;
 
   /**
    * Address: 0x00BC5300 (FUN_00BC5300, dynamic initializer for the global
@@ -31,32 +28,6 @@ namespace
    */
   moho::SWorldBeamBlendModePrimitiveSerializer gSWorldBeamBlendModePrimitiveSerializer;
 
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   template <typename TType>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
   {
@@ -72,15 +43,33 @@ namespace
   {
     return ResolveCachedType<moho::SWorldBeam>(moho::SWorldBeam::sType);
   }
-
-  void cleanup_SWorldBeamSerializer_atexit()
-  {
-    (void)moho::cleanup_SWorldBeamSerializer();
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC5360 (FUN_00BC5360, reigster_SWorldBeamSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SWorldBeamSerializer::SWorldBeamSerializer()
+    : mDeserialize(&SWorldBeamSerializer::Deserialize)
+    , mSerialize(&SWorldBeamSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BEFED0 (FUN_00BEFED0, Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
+   *
+   * What it does:
+   * Unlinks the `SWorldBeamSerializer` helper node and rewires self-links.
+   */
+  SWorldBeamSerializer::~SWorldBeamSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x0048F480 (Moho::SWorldBeamSerializer::Deserialize)
    */
@@ -106,7 +95,7 @@ namespace moho
   /**
    * Address: 0x0048FB50 (gpg::SerSaveLoadHelper_SWorldBeam::Init)
    */
-  void SWorldBeamSerializer::RegisterSerializeFunctions()
+  void SWorldBeamSerializer::Init()
   {
     gpg::RType* const type = ResolveSWorldBeamType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -114,36 +103,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BEFED0 (Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
-   */
-  gpg::SerHelperBase* cleanup_SWorldBeamSerializer()
-  {
-    return UnlinkSerializerNode(gSWorldBeamSerializer);
-  }
-
-  /**
-   * Address: 0x00BC5360 (reigster_SWorldBeamSerializer)
-   */
-  int register_SWorldBeamSerializer()
-  {
-    InitializeSerializerNode(gSWorldBeamSerializer);
-    gSWorldBeamSerializer.mDeserialize = &SWorldBeamSerializer::Deserialize;
-    gSWorldBeamSerializer.mSerialize = &SWorldBeamSerializer::Serialize;
-    return std::atexit(&cleanup_SWorldBeamSerializer_atexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct SWorldBeamSerializerBootstrap
-  {
-    SWorldBeamSerializerBootstrap()
-    {
-      (void)moho::register_SWorldBeamSerializer();
-    }
-  };
-
-  [[maybe_unused]] SWorldBeamSerializerBootstrap gSWorldBeamSerializerBootstrap;
-} // namespace

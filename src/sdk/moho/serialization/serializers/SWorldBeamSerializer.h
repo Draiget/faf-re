@@ -5,19 +5,41 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/particles/SWorldBeam.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * SWorldBeam serializer helper used by the recovered startup registration.
    */
-  class SWorldBeamSerializer
+  class SWorldBeamSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC5360 (FUN_00BC5360, reigster_SWorldBeamSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed from raw disassembly: calls
+     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SWorldBeamSerializer@Moho@@6B@` -- no eager
+     * `RegisterSerializeFunctions`-style call exists here. The
+     * `push offset ~SWorldBeamSerializer; call _atexit` sequence visible in
+     * the real ctor's tail is the compiler's own implicit static-destructor
+     * registration for a global with a non-trivial destructor (it is not a
+     * call the 2007 source wrote), so it is not reproduced explicitly here
+     * -- declaring a real destructor below is sufficient for the compiler
+     * to emit the same registration.
+     */
+    SWorldBeamSerializer();
+
+    /**
+     * Address: 0x00BEFED0 (FUN_00BEFED0, Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SWorldBeamSerializer();
+
     /**
      * Address: 0x0048F480 (Moho::SWorldBeamSerializer::Deserialize)
      *
@@ -40,17 +62,13 @@ namespace moho
      * What it does:
      * Binds `SWorldBeam` RTTI load/save callbacks.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(SWorldBeamSerializer, mHelperNext) == 0x04, "SWorldBeamSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SWorldBeamSerializer, mHelperPrev) == 0x08, "SWorldBeamSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(SWorldBeamSerializer, mDeserialize) == 0x0C, "SWorldBeamSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(SWorldBeamSerializer, mSerialize) == 0x10, "SWorldBeamSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SWorldBeamSerializer) == 0x14, "SWorldBeamSerializer size must be 0x14");
@@ -67,20 +85,4 @@ namespace moho
    * No dead low-address duplicate found for this one.
    */
   using SWorldBeamBlendModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldBeam::BlendMode, int>;
-
-  /**
-   * Address: 0x00BEFED0 (Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
-   *
-   * What it does:
-   * Unlinks the `SWorldBeamSerializer` helper node and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_SWorldBeamSerializer();
-
-  /**
-   * Address: 0x00BC5360 (reigster_SWorldBeamSerializer)
-   *
-   * What it does:
-   * Initializes `SWorldBeam` serializer callbacks and schedules exit cleanup.
-   */
-  int register_SWorldBeamSerializer();
 } // namespace moho
