@@ -27266,6 +27266,22 @@ void moho::UI_NoteDisconnect(const IClient* const client)
  *          and payload (the MemBuffer copy bumps its shared refcount via
  *          `_InterlockedExchangeAdd`, matching `gpg::MemBuffer`'s own copy
  *          semantics)
+ * Address: 0x0088EED0 (FUN_0088EED0) - `list2<value<std::string>,
+ *          value<gpg::MemBuffer<char const>>>`'s element-copy relay: copies
+ *          the bound `std::string` by value (`std::string::assign`), bumps
+ *          the `gpg::MemBuffer`'s shared refcount (`_InterlockedExchangeAdd`
+ *          on the iterator-base count), then forwards into the node
+ *          constructor below; on the way out, releases the caller's
+ *          temporary refcount via the same two-phase
+ *          `dispose`/`destroy` vtable-slot release this project has
+ *          already identified elsewhere as `sp_counted_base::release()`
+ *          (RbTree.h's `erase_node` citations document the same shape).
+ * Address: 0x0088F040 (FUN_0088F040) - the `list2<...>` node constructor
+ *          itself: copy-constructs the `std::string` element in place
+ *          (`sub_420DD0`, already `skip` - CRT `std::string` copy-ctor
+ *          internals) and stores the `gpg::MemBuffer`'s
+ *          {iteratorBase, refcountPtr, begin, end} fields verbatim into the
+ *          node's trailing slots.
  * Address: 0x0088ECE0 (FUN_0088ECE0) - boost::function0<void>::function<F>
  *          converting constructor (installs the bind_t into the
  *          function_buffer)
