@@ -13,56 +13,17 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/StatItem.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(CCommandTaskSerializer) unsigned char gCCommandTaskSerializerStorage[sizeof(CCommandTaskSerializer)]{};
-  bool gCCommandTaskSerializerConstructed = false;
+  CCommandTaskSerializer gCCommandTaskSerializer{};
 
   alignas(CCommandTaskTypeInfo) unsigned char gCCommandTaskTypeInfoStorage[sizeof(CCommandTaskTypeInfo)]{};
   bool gCCommandTaskTypeInfoConstructed = false;
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
-  }
-
-  template <class TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mNext = self;
-    serializer.mPrev = self;
-  }
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mNext != nullptr && serializer.mPrev != nullptr) {
-      static_cast<gpg::SerHelperBase*>(serializer.mNext)->mPrev = static_cast<gpg::SerHelperBase*>(serializer.mPrev);
-      static_cast<gpg::SerHelperBase*>(serializer.mPrev)->mNext = static_cast<gpg::SerHelperBase*>(serializer.mNext);
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mPrev = self;
-    serializer.mNext = self;
-    return self;
-  }
-
-  [[nodiscard]] CCommandTaskSerializer* AcquireCCommandTaskSerializer()
-  {
-    if (!gCCommandTaskSerializerConstructed) {
-      new (gCCommandTaskSerializerStorage) CCommandTaskSerializer();
-      gCCommandTaskSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CCommandTaskSerializer*>(gCCommandTaskSerializerStorage);
-  }
 
   [[nodiscard]] CCommandTaskTypeInfo* AcquireCCommandTaskTypeInfo()
   {
@@ -294,25 +255,6 @@ namespace
 
     AcquireCCommandTaskTypeInfo()->~CCommandTaskTypeInfo();
     gCCommandTaskTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF9B40 (FUN_00BF9B40, CCommandTaskSerializer dtor/unlink)
-   *
-   * What it does:
-   * Unlinks static `CCommandTaskSerializer` helper node from intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CCommandTaskSerializer()
-  {
-    if (!gCCommandTaskSerializerConstructed) {
-      return nullptr;
-    }
-    return UnlinkSerializerNode(*AcquireCCommandTaskSerializer());
-  }
-
-  void cleanup_CCommandTaskSerializer_atexit()
-  {
-    (void)cleanup_CCommandTaskSerializer();
   }
 
   /**
@@ -588,7 +530,7 @@ void DeserializeCCommandTaskThunkVariantA(
   gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  AcquireCCommandTaskSerializer()->Deserialize(archive, objectPtr, version, ownerRef);
+  CCommandTaskSerializer::Deserialize(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -602,7 +544,7 @@ void DeserializeCCommandTaskThunkVariantB(
   gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  AcquireCCommandTaskSerializer()->Deserialize(archive, objectPtr, version, ownerRef);
+  CCommandTaskSerializer::Deserialize(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -652,7 +594,7 @@ void SerializeCCommandTaskThunkVariantA(
   gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  AcquireCCommandTaskSerializer()->Serialize(archive, objectPtr, version, ownerRef);
+  CCommandTaskSerializer::Serialize(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -666,19 +608,43 @@ void SerializeCCommandTaskThunkVariantB(
   gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  AcquireCCommandTaskSerializer()->Serialize(archive, objectPtr, version, ownerRef);
+  CCommandTaskSerializer::Serialize(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x00BD0590 (FUN_00BD0590, dynamic initializer for the global
+ * `CCommandTaskSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
+ * callback fields.
+ */
+CCommandTaskSerializer::CCommandTaskSerializer()
+  : mSerLoadFunc(&CCommandTaskSerializer::Deserialize)
+  , mSerSaveFunc(&CCommandTaskSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF9B40 (FUN_00BF9B40, Moho::CCommandTaskSerializer::~CCommandTaskSerializer)
+ */
+CCommandTaskSerializer::~CCommandTaskSerializer()
+{
+  ResetLinks();
 }
 
 /**
  * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)
+ *
+ * What it does:
+ * Binds load/save serializer callbacks into CCommandTask RTTI.
  */
-void CCommandTaskSerializer::RegisterSerializeFunctions()
+void CCommandTaskSerializer::Init()
 {
   gpg::RType* const type = CachedCCommandTaskType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc ? mSerLoadFunc : &CCommandTaskSerializer::Deserialize;
+  type->serLoadFunc_ = mSerLoadFunc;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc ? mSerSaveFunc : &CCommandTaskSerializer::Serialize;
+  type->serSaveFunc_ = mSerSaveFunc;
 }
 
 /**
@@ -760,22 +726,6 @@ namespace moho
     (void)construct_CCommandTaskTypeInfo();
     return std::atexit(&cleanup_CCommandTaskTypeInfo);
   }
-
-  /**
-   * Address: 0x00BD0590 (FUN_00BD0590, register_CCommandTaskSerializer)
-   *
-   * What it does:
-   * Initializes serializer helper storage and binds load/save callbacks onto
-   * `CCommandTask` reflected type metadata.
-   */
-  void register_CCommandTaskSerializer()
-  {
-    CCommandTaskSerializer* const serializer = AcquireCCommandTaskSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mSerLoadFunc = &CCommandTaskSerializer::Deserialize;
-    serializer->mSerSaveFunc = &CCommandTaskSerializer::Serialize;
-    (void)std::atexit(&cleanup_CCommandTaskSerializer_atexit);
-  }
 } // namespace moho
 
 namespace
@@ -785,7 +735,6 @@ namespace
     CCommandTaskReflectionBootstrap()
     {
       (void)moho::register_CCommandTaskTypeInfo();
-      moho::register_CCommandTaskSerializer();
     }
   };
 

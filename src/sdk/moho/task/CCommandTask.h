@@ -97,9 +97,24 @@ namespace moho
     EAiResult mLinkResult;        // 0x2C
   };
 
-  class CCommandTaskSerializer
+  class CCommandTaskSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD0590 (FUN_00BD0590, dynamic initializer for the global
+     * `CCommandTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CCommandTaskSerializer();
+
+    /**
+     * Address: 0x00BF9B40 (FUN_00BF9B40, Moho::CCommandTaskSerializer::~CCommandTaskSerializer)
+     */
+    ~CCommandTaskSerializer();
+
     /**
      * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
      *
@@ -118,22 +133,26 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-  public:
     /**
      * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)
-     * Slot: 0
      *
      * What it does:
      * Binds load/save serializer callbacks into CCommandTask RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(
+    offsetof(CCommandTaskSerializer, mSerLoadFunc) == 0x0C, "CCommandTaskSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CCommandTaskSerializer, mSerSaveFunc) == 0x10, "CCommandTaskSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CCommandTaskSerializer) == 0x14, "CCommandTaskSerializer size must be 0x14");
 
   class CCommandTaskTypeInfo : public gpg::RType
   {
@@ -175,7 +194,6 @@ namespace moho
     offsetof(CCommandTask, mDispatchResult) == 0x28, "CCommandTask::mDispatchResult offset must be 0x28"
   );
   static_assert(offsetof(CCommandTask, mLinkResult) == 0x2C, "CCommandTask::mLinkResult offset must be 0x2C");
-  static_assert(sizeof(CCommandTaskSerializer) == 0x14, "CCommandTaskSerializer size must be 0x14");
   static_assert(sizeof(CCommandTaskTypeInfo) == 0x64, "CCommandTaskTypeInfo size must be 0x64");
 } // namespace moho
 
