@@ -12,16 +12,34 @@ namespace moho
    * VFTABLE: 0x00E03944
    * COL: 0x00E600B0
    */
-  class Box3fSerializer
+  class Box3fSerializer : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper<Wm3::Box3<float>>::Init)
+     * Address: 0x00BC4A40 (FUN_00BC4A40, register_Box3fSerializer)
      *
      * What it does:
-     * Resolves Box3f RTTI and installs load/save callbacks for this helper.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed from raw disassembly: real
+     * base ctor call, field sets, vtable install -- no eager `Init()`
+     * call exists here, despite this address's own Doxygen citation
+     * historically reading "SerSaveLoadHelper<Box3f>::Init" (that name
+     * came from the demangled `Init()` slot 0 target below, not from
+     * this ctor). The real class identity, per `vtable_writers`, is
+     * `Box3fSerializer@Moho` specifically, not a `SerSaveLoadHelper<T>`
+     * instantiation -- kept as its own concrete class, same precedent as
+     * `Rect2iSerializer`/`Rect2fSerializer`.
      */
-    virtual void RegisterSerializeFunctions();
+    Box3fSerializer();
+
+    /**
+     * Address: 0x00BEF830 (FUN_00BEF830, Moho::Box3fSerializer::~Box3fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Box3fSerializer();
 
     /**
      * Address: 0x00474770 (FUN_00474770, Moho::Box3fSerializer::Deserialize)
@@ -39,27 +57,22 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper<Wm3::Box3<float>>::Init lane)
+     *
+     * What it does:
+     * Resolves Box3f RTTI and installs load/save callbacks for this helper.
+     */
+    void Init() override;
+
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(Box3fSerializer, mHelperNext) == 0x04, "Box3fSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(Box3fSerializer, mHelperPrev) == 0x08, "Box3fSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(Box3fSerializer, mLoadCallback) == 0x0C, "Box3fSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(Box3fSerializer, mSaveCallback) == 0x10, "Box3fSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(Box3fSerializer) == 0x14, "Box3fSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BC4A40 (FUN_00BC4A40, register_Box3fSerializer)
-   *
-   * What it does:
-   * Installs startup serializer callbacks for Box3f and registers shutdown
-   * unlink/teardown.
-   */
-  void register_Box3fSerializer();
 
   /**
    * Address: 0x00BC4A20 (FUN_00BC4A20, register_Box3fTypeInfo)
@@ -125,9 +138,28 @@ namespace moho
   /**
    * Serializer helper for `CColPrimitive<Wm3::Box3<float>>` archive lanes.
    */
-  class DColPrimBoxSerializer
+  class DColPrimBoxSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC76B0 (FUN_00BC76B0, dynamic initializer for the global
+     * `DColPrimBoxSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    DColPrimBoxSerializer();
+
+    /**
+     * Address: 0x00BF1BF0 (FUN_00BF1BF0, Moho::DColPrimBoxSerializer::~DColPrimBoxSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimBoxSerializer();
+
     /**
      * Address: 0x004FF880 (FUN_004FF880, Moho::DColPrimBoxSerializer::Deserialize)
      *
@@ -147,26 +179,18 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x004FFD70 (FUN_004FFD70, Moho::DColPrimBoxSerializer::RegisterSerializeFunctions)
+     * Address: 0x004FFD70 (FUN_004FFD70, Moho::DColPrimBoxSerializer::Init)
      *
      * What it does:
      * Binds load/save callbacks into `CColPrimitive<Wm3::Box3<float>>` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(DColPrimBoxSerializer, mHelperNext) == 0x04, "DColPrimBoxSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimBoxSerializer, mHelperPrev) == 0x08, "DColPrimBoxSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimBoxSerializer, mDeserialize) == 0x0C, "DColPrimBoxSerializer::mDeserialize offset must be 0x0C"
   );
@@ -178,30 +202,45 @@ namespace moho
   /**
    * Construct helper for `CColPrimitive<Wm3::Box3<float>>`.
    */
-  class DColPrimBoxConstruct
+  class DColPrimBoxConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x004FFCF0 (FUN_004FFCF0, Moho::DColPrimBoxConstruct::RegisterConstructFunction)
+     * Address: 0x00BC7670 (FUN_00BC7670, dynamic initializer for the global
+     * `DColPrimBoxConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields. Confirmed from raw disassembly:
+     * `mDeleteCallback` is the real global `operator delete(void*)`
+     * directly (a `jmp ??3@YAXPAX@Z` thunk, not a per-type wrapper that
+     * runs `~BoxCollisionPrimitive()` first) -- the ctor's own atexit
+     * target is a plain unlink thunk, so it is modeled as the compiler's
+     * implicit static-destructor registration rather than an explicit
+     * call.
+     */
+    DColPrimBoxConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimBoxConstruct();
+
+    /**
+     * Address: 0x004FFCF0 (FUN_004FFCF0, Moho::DColPrimBoxConstruct::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into `CColPrimitive<Wm3::Box3<float>>` RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
   };
 
-  static_assert(
-    offsetof(DColPrimBoxConstruct, mHelperNext) == 0x04, "DColPrimBoxConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimBoxConstruct, mHelperPrev) == 0x08, "DColPrimBoxConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimBoxConstruct, mConstructCallback) == 0x0C,
     "DColPrimBoxConstruct::mConstructCallback offset must be 0x0C"
@@ -215,31 +254,39 @@ namespace moho
   /**
    * Save-construct helper for `CColPrimitive<Wm3::Box3<float>>`.
    */
-  class DColPrimBoxSaveConstruct
+  class DColPrimBoxSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x004FFC70 (FUN_004FFC70, Moho::DColPrimBoxSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x00BC7640 (FUN_00BC7640, dynamic initializer for the global
+     * `DColPrimBoxSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field. Plain unlink atexit target,
+     * modeled as the compiler's implicit static-destructor registration.
+     */
+    DColPrimBoxSaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimBoxSaveConstruct();
+
+    /**
+     * Address: 0x004FFC70 (FUN_004FFC70, Moho::DColPrimBoxSaveConstruct::Init)
      *
      * What it does:
      * Binds save-construct-args callback into `CColPrimitive<Wm3::Box3<float>>` RTTI.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
   };
 
-  static_assert(
-    offsetof(DColPrimBoxSaveConstruct, mHelperNext) == 0x04,
-    "DColPrimBoxSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimBoxSaveConstruct, mHelperPrev) == 0x08,
-    "DColPrimBoxSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimBoxSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "DColPrimBoxSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -254,33 +301,6 @@ namespace moho
    * process-exit cleanup hook.
    */
   void register_DColPrimBoxTypeInfo();
-
-  /**
-   * Address: 0x00BC76B0 (FUN_00BC76B0, register_DColPrimBoxSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `DColPrimBox` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_DColPrimBoxSerializer();
-
-  /**
-   * Address: 0x00BC7670 (FUN_00BC7670, register_DColPrimBoxConstruct)
-   *
-   * What it does:
-   * Installs construct/delete callbacks for `DColPrimBox` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimBoxConstruct();
-
-  /**
-   * Address: 0x00BC7640 (FUN_00BC7640, register_DColPrimBoxSaveConstruct)
-   *
-   * What it does:
-   * Installs save-construct-args callbacks for `DColPrimBox` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimBoxSaveConstruct();
 
   /**
    * VFTABLE: 0x00E03914

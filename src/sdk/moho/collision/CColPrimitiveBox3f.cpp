@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -39,60 +39,20 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::SerHelperBase* Box3fSerializerSelfNode(moho::Box3fSerializer& serializer)
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
   moho::Box3fTypeInfo gBox3fTypeInfo;
-  moho::Box3fSerializer gBox3fSerializer;
 
-  /**
-   * Address: 0x004747D0 (FUN_004747D0)
-   *
-   * What it does:
-   * Unlinks global Box3f serializer helper node from its intrusive list and
-   * rewires it to a self-linked singleton node.
-   */
-  gpg::SerHelperBase* ResetBox3fSerializerLinksPrimary()
+  struct Box3fTypeInfoBootstrap
   {
-    gBox3fSerializer.mHelperNext->mPrev = gBox3fSerializer.mHelperPrev;
-    gBox3fSerializer.mHelperPrev->mNext = gBox3fSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = Box3fSerializerSelfNode(gBox3fSerializer);
-    gBox3fSerializer.mHelperPrev = self;
-    gBox3fSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00474800 (FUN_00474800)
-   *
-   * What it does:
-   * Duplicate emitted helper lane that performs the same serializer-list reset
-   * as `FUN_004747D0`.
-   */
-  gpg::SerHelperBase* ResetBox3fSerializerLinksSecondary()
-  {
-    return ResetBox3fSerializerLinksPrimary();
-  }
-
-  void CleanupBox3fSerializer()
-  {
-    (void)ResetBox3fSerializerLinksPrimary();
-  }
-
-  struct Box3fSerializerBootstrap
-  {
-    Box3fSerializerBootstrap()
+    Box3fTypeInfoBootstrap()
     {
       moho::register_Box3fTypeInfo();
-      moho::register_Box3fSerializer();
-      (void)&ResetBox3fSerializerLinksSecondary;
     }
   };
 
-  Box3fSerializerBootstrap gBox3fSerializerBootstrap;
+  Box3fTypeInfoBootstrap gBox3fTypeInfoBootstrap;
+
+  // Address: 0x010A7CBC -- process-global `Box3fSerializer` singleton.
+  moho::Box3fSerializer gBox3fSerializer;
 } // namespace
 
 namespace Wm3
@@ -201,9 +161,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper<Wm3::Box3<float>>::Init)
+   * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper<Wm3::Box3<float>>::Init lane)
    */
-  void Box3fSerializer::RegisterSerializeFunctions()
+  void Box3fSerializer::Init()
   {
     gpg::RType* const type = CachedBox3fType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -216,17 +176,17 @@ namespace moho
    * Address: 0x00BC4A40 (FUN_00BC4A40, register_Box3fSerializer)
    *
    * What it does:
-   * Installs startup serializer callbacks for Box3f and registers shutdown
-   * unlink/teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_Box3fSerializer()
+  Box3fSerializer::Box3fSerializer()
+    : mLoadCallback(&Box3fSerializer::Deserialize)
+    , mSaveCallback(&Box3fSerializer::Serialize)
+  {}
+
+  Box3fSerializer::~Box3fSerializer()
   {
-    gpg::SerHelperBase* const self = Box3fSerializerSelfNode(gBox3fSerializer);
-    gBox3fSerializer.mHelperNext = self;
-    gBox3fSerializer.mHelperPrev = self;
-    gBox3fSerializer.mLoadCallback = &Box3fSerializer::Deserialize;
-    gBox3fSerializer.mSaveCallback = &Box3fSerializer::Serialize;
-    (void)std::atexit(&CleanupBox3fSerializer);
+    ResetLinks();
   }
 
   /**
@@ -280,75 +240,6 @@ namespace
 {
   alignas(moho::DColPrimBoxTypeInfo) unsigned char gDColPrimBoxTypeInfoStorage[sizeof(moho::DColPrimBoxTypeInfo)];
   bool gDColPrimBoxTypeInfoConstructed = false;
-
-  moho::DColPrimBoxSerializer gDColPrimBoxSerializer{};
-  moho::DColPrimBoxConstruct gDColPrimBoxConstruct{};
-  moho::DColPrimBoxSaveConstruct gDColPrimBoxSaveConstruct{};
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x004FF8D0 (FUN_004FF8D0, DColPrimBoxSerializer helper unlink/reset)
-   *
-   * What it does:
-   * Unlinks the global `DColPrimBoxSerializer` helper node from its current
-   * intrusive lane, rewires it to a self-linked singleton node, and returns
-   * that self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimBoxSerializerHelperPrimary() noexcept
-  {
-    gDColPrimBoxSerializer.mHelperNext->mPrev = gDColPrimBoxSerializer.mHelperPrev;
-    gDColPrimBoxSerializer.mHelperPrev->mNext = gDColPrimBoxSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimBoxSerializer);
-    gDColPrimBoxSerializer.mHelperPrev = self;
-    gDColPrimBoxSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x004FF900 (FUN_004FF900, DColPrimBoxSerializer helper unlink/reset variant)
-   *
-   * What it does:
-   * Executes the duplicate serializer-helper unlink/reset lane and returns the
-   * self-linked helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimBoxSerializerHelperSecondary() noexcept
-  {
-    gDColPrimBoxSerializer.mHelperNext->mPrev = gDColPrimBoxSerializer.mHelperPrev;
-    gDColPrimBoxSerializer.mHelperPrev->mNext = gDColPrimBoxSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimBoxSerializer);
-    gDColPrimBoxSerializer.mHelperPrev = self;
-    gDColPrimBoxSerializer.mHelperNext = self;
-    return self;
-  }
 
   [[nodiscard]] gpg::RType* CachedDColPrimBoxPrimitiveType()
   {
@@ -407,21 +298,6 @@ namespace
 
     reinterpret_cast<moho::DColPrimBoxTypeInfo*>(gDColPrimBoxTypeInfoStorage)->~DColPrimBoxTypeInfo();
     gDColPrimBoxTypeInfoConstructed = false;
-  }
-
-  void CleanupDColPrimBoxSerializerAtExit()
-  {
-    (void)UnlinkDColPrimBoxSerializerHelperPrimary();
-  }
-
-  void CleanupDColPrimBoxConstructAtExit()
-  {
-    (void)UnlinkHelperNode(gDColPrimBoxConstruct);
-  }
-
-  void CleanupDColPrimBoxSaveConstructAtExit()
-  {
-    (void)UnlinkHelperNode(gDColPrimBoxSaveConstruct);
   }
 
   /**
@@ -486,31 +362,23 @@ namespace
   }
 
   /**
-   * Deletes one constructed box collision primitive.
+   * Address: 0x00500570 (FUN_00500570, j_j_func_tent_Destroy_4 -> ??3@YAXPAX@Z)
+   *
+   * What it does:
+   * Frees one constructed box collision primitive's raw storage. Confirmed
+   * from raw disassembly: the real delete-callback field is a direct jump
+   * thunk to the global `operator delete(void*)`, NOT a per-type wrapper
+   * that runs `~BoxCollisionPrimitive()` first -- `BoxCollisionPrimitive`
+   * is deleted through this path with no destructor call.
    */
   void DeleteDColPrimBox(void* const objectPtr)
   {
-    delete static_cast<moho::BoxCollisionPrimitive*>(objectPtr);
+    ::operator delete(objectPtr);
   }
 
   void cleanup_DColPrimBoxTypeInfo_atexit()
   {
     CleanupDColPrimBoxTypeInfoAtExit();
-  }
-
-  void cleanup_DColPrimBoxSerializer_atexit()
-  {
-    (void)CleanupDColPrimBoxSerializerAtExit();
-  }
-
-  void cleanup_DColPrimBoxConstruct_atexit()
-  {
-    (void)CleanupDColPrimBoxConstructAtExit();
-  }
-
-  void cleanup_DColPrimBoxSaveConstruct_atexit()
-  {
-    (void)CleanupDColPrimBoxSaveConstructAtExit();
   }
 } // namespace
 
@@ -585,7 +453,7 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   /**
    * Address: 0x004FFD70 (FUN_004FFD70, Moho::DColPrimBoxSerializer::RegisterSerializeFunctions)
    */
-  void DColPrimBoxSerializer::RegisterSerializeFunctions()
+  void DColPrimBoxSerializer::Init()
   {
     gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
     if (type->serLoadFunc_ != nullptr) {
@@ -599,9 +467,26 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   }
 
   /**
+   * Address: 0x00BC76B0 (FUN_00BC76B0, register_DColPrimBoxSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  DColPrimBoxSerializer::DColPrimBoxSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&DColPrimBoxSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&DColPrimBoxSerializer::Serialize))
+  {}
+
+  DColPrimBoxSerializer::~DColPrimBoxSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x004FFCF0 (FUN_004FFCF0, Moho::DColPrimBoxConstruct::RegisterConstructFunction)
    */
-  void DColPrimBoxConstruct::RegisterConstructFunction()
+  void DColPrimBoxConstruct::Init()
   {
     gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
     if (type->serConstructFunc_ != nullptr) {
@@ -612,15 +497,50 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   }
 
   /**
+   * Address: 0x00BC7670 (FUN_00BC7670, register_DColPrimBoxConstruct)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
+   */
+  DColPrimBoxConstruct::DColPrimBoxConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDColPrimBox))
+    , mDeleteCallback(&DeleteDColPrimBox)
+  {}
+
+  DColPrimBoxConstruct::~DColPrimBoxConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x004FFC70 (FUN_004FFC70, Moho::DColPrimBoxSaveConstruct::RegisterSaveConstructArgsFunction)
    */
-  void DColPrimBoxSaveConstruct::RegisterSaveConstructArgsFunction()
+  void DColPrimBoxSaveConstruct::Init()
   {
     gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
     if (type->serSaveConstructArgsFunc_ != nullptr) {
       gpg::HandleAssertFailure("!type->mSerSaveConstructArgsFunc", kSaveConstructArgsLine, kSerializationSourcePath);
     }
     type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+  }
+
+  /**
+   * Address: 0x00BC7640 (FUN_00BC7640, register_DColPrimBoxSaveConstruct)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
+   */
+  DColPrimBoxSaveConstruct::DColPrimBoxSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgsDColPrimBox)
+      )
+  {}
+
+  DColPrimBoxSaveConstruct::~DColPrimBoxSaveConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -639,67 +559,28 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
 
     (void)std::atexit(&cleanup_DColPrimBoxTypeInfo_atexit);
   }
-
-  /**
-   * Address: 0x00BC76B0 (FUN_00BC76B0, register_DColPrimBoxSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `DColPrimBox` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_DColPrimBoxSerializer()
-  {
-    InitializeHelperNode(gDColPrimBoxSerializer);
-    gDColPrimBoxSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&DColPrimBoxSerializer::Deserialize);
-    gDColPrimBoxSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&DColPrimBoxSerializer::Serialize);
-    (void)std::atexit(&cleanup_DColPrimBoxSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x00BC7670 (FUN_00BC7670, register_DColPrimBoxConstruct)
-   *
-   * What it does:
-   * Installs construct/delete callbacks for `DColPrimBox` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimBoxConstruct()
-  {
-    InitializeHelperNode(gDColPrimBoxConstruct);
-    gDColPrimBoxConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDColPrimBox);
-    gDColPrimBoxConstruct.mDeleteCallback = &DeleteDColPrimBox;
-    return std::atexit(&cleanup_DColPrimBoxConstruct_atexit);
-  }
-
-  /**
-   * Address: 0x00BC7640 (FUN_00BC7640, register_DColPrimBoxSaveConstruct)
-   *
-   * What it does:
-   * Installs save-construct-args callbacks for `DColPrimBox` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimBoxSaveConstruct()
-  {
-    InitializeHelperNode(gDColPrimBoxSaveConstruct);
-    gDColPrimBoxSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgsDColPrimBox);
-    return std::atexit(&cleanup_DColPrimBoxSaveConstruct_atexit);
-  }
 } // namespace moho
 
 namespace
 {
-  struct DColPrimBoxBootstrap
+  struct DColPrimBoxTypeInfoBootstrap
   {
-    DColPrimBoxBootstrap()
+    DColPrimBoxTypeInfoBootstrap()
     {
       (void)moho::register_DColPrimBoxTypeInfo();
-      (void)moho::register_DColPrimBoxSaveConstruct();
-      (void)moho::register_DColPrimBoxConstruct();
-      moho::register_DColPrimBoxSerializer();
     }
   };
 
-  [[maybe_unused]] DColPrimBoxBootstrap gDColPrimBoxBootstrap;
+  [[maybe_unused]] DColPrimBoxTypeInfoBootstrap gDColPrimBoxTypeInfoBootstrap;
+
+  // Address: 0x010A9C0C -- process-global `DColPrimBoxSerializer` singleton.
+  moho::DColPrimBoxSerializer gDColPrimBoxSerializer;
+
+  // Address: 0x010A9E14 -- process-global `DColPrimBoxConstruct` singleton.
+  moho::DColPrimBoxConstruct gDColPrimBoxConstruct;
+
+  // Address: 0x010A9C84 -- process-global `DColPrimBoxSaveConstruct` singleton.
+  moho::DColPrimBoxSaveConstruct gDColPrimBoxSaveConstruct;
 } // namespace
 
 
