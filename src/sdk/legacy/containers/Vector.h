@@ -2119,6 +2119,25 @@ namespace msvc8
          * (moho/terrain/water/WaveSystem.cpp), the per-entry append while
          * loading a `WavePattern`'s `parameters` array from Lua.)
          *
+         * Address: 0x007EFFA0 (FUN_007EFFA0, msvc8::vector<moho::
+         * SRangeRenderProfile>::push_back for the 136-byte (`0x88`) element --
+         * same `78787879h`/`sar 6` divide-by-136 magic-multiply pair as the
+         * `WaveParameters` instantiation immediately above (coincidental shape
+         * match from the identical 136-byte stride -- confirmed as a distinct
+         * type via the per-element copy body cited below, which touches
+         * `mExtractorName`/`mCategoryFilter`/three packed ring-color lanes,
+         * not `WaveParameters`'s layout). Fast path (`size() < capacity()`)
+         * copy-constructs the pushed value directly at `last_` via the
+         * `uninit_fill_n` emission FUN_007F38D0 (cited below on
+         * `uninit_fill_n`) and advances `last_` by `0x88`. Capacity-full path
+         * tail-calls the single-value `insert(pos, value)` overload
+         * FUN_007F0790 (cited below on `insert`), whose grow core is
+         * FUN_007F1490. This instantiation's only binary caller is
+         * `Moho::RangeRenderer::MoveCategories` (FUN_007EE950,
+         * `moho/render/RangeRenderer.cpp`, already recovered), which invokes
+         * it as `mVisibleProfiles.push_back(...)` by name while rebuilding
+         * the visible-profile list from category-name keys.)
+         *
          * Address: 0x007409D0 (FUN_007409D0, msvc8::vector<msvc8::string>::
          * push_back dispatcher for the 16-byte `msvc8::string` element —
          * `__thiscall` with the element count in `ecx` (always 1 at every
@@ -3001,6 +3020,36 @@ namespace msvc8
          * `uninit_copy_n`/the class's copy constructor (FUN_0088AB00), places
          * the inserted value, and releases the old storage, matching this
          * method's own reallocation-branch shape.)
+         *
+         * Address: 0x007F0790 (FUN_007F0790, `msvc8::vector<moho::
+         * SRangeRenderProfile>::insert(iterator, const T&)` for the 136-byte
+         * element -- `push_back`'s capacity-full path (FUN_007EFFA0, cited
+         * above) tail-calls this with `pos = last_`. Captures
+         * `offset = (size() == 0) ? 0 : pos - first_` before touching
+         * storage, tail-calls the `_Insert_n` grow core FUN_007F1490 passing
+         * `(value, vectorThis, pos)`, then rebuilds the returned iterator as
+         * `first_ + offset` since a capacity-full call reallocates and
+         * invalidates `pos`. This function's only binary caller is
+         * FUN_007EFFA0 (`push_back`'s capacity-full path, cited above),
+         * itself reached only from `Moho::RangeRenderer::MoveCategories`'s
+         * `mVisibleProfiles.push_back(...)` call.)
+         * Address: 0x007F1490 (FUN_007F1490, the `_Insert_n` grow core this
+         * `insert` tail-calls for the same 136-byte element -- copies the
+         * inserted value into a local guard temporary first (the standard
+         * self-aliasing-safe insert idiom, safe for `v.insert(v.begin(),
+         * v[i])`) through the element's own copy operation (FUN_007F0ED0,
+         * cited in `RangeRenderer.cpp` as `RebindAndCopyRangeRenderProfile`),
+         * computes size/capacity via the same `78787879h`/`sar 6`
+         * divide-by-136 pair, grows via this method's own
+         * `recommended_capacity` shape (1.5x, `(capacity>>1)+capacity`,
+         * falling back to `size()+1` -- the fallback's `size()` call is
+         * FUN_007EFF80, the `(_Mylast-_Myfirst)/136` element-count shape),
+         * allocates through the checked `allocate_slots_checked` emission
+         * FUN_007F3490 (`bad_alloc` guard is `0xFFFFFFFF/count < 136`, then
+         * `operator new(136*count)`), relocates the live range, places the
+         * guarded value, and releases the old block -- matching this
+         * method's own reallocation-branch shape and the sibling
+         * `WaveParameters` grow core above.)
          *
          * Address: 0x007BB780 (FUN_007BB780, msvc8::vector<Moho::
          * SNetCommandArg>::insert(iterator, const T&) for the 36-byte
@@ -4088,6 +4137,19 @@ namespace msvc8
          * the same mechanism `destroy_range` above documents for this type)
          * before rethrowing. Reached from `push_back`'s fast path
          * (FUN_00889C90, cited above, `n=1`).)
+         *
+         * Address: 0x007F38D0 (FUN_007F38D0, `msvc8::vector<moho::
+         * SRangeRenderProfile>::uninit_fill_n` for the 136-byte element --
+         * copy-constructs `n` copies of the same source value at `dst`
+         * through the element's own copy operation (FUN_007F0ED0, cited in
+         * `RangeRenderer.cpp` as `RebindAndCopyRangeRenderProfile`), dest
+         * stride `+0x88`, and on a mid-loop throw destroys the
+         * already-constructed prefix one element at a time (FUN_007EE860,
+         * cited in `RangeRenderer.cpp` as
+         * `ResetRangeRenderProfileTransientState`) before rethrowing via
+         * `CxxThrowException` -- the same construct/rollback shape this
+         * method implements generically. Reached from `push_back`'s fast
+         * path (FUN_007EFFA0, cited above, `n=1`).)
          *
          * Address: 0x007BD810 (FUN_007BD810, msvc8::vector<Moho::
          * SNetCommandArg>::uninit_fill_n for the 36-byte element --
