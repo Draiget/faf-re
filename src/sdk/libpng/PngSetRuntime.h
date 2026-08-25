@@ -290,6 +290,10 @@ constexpr std::uint32_t kPngInfoSrgb  = 0x0800;
 constexpr std::uint32_t kPngInfoIccp  = 0x1000;
 constexpr std::uint32_t kPngInfoSplt  = 0x2000;
 constexpr std::uint32_t kPngInfoScal  = 0x4000;
+// PNG_INFO_IDAT: row_pointers already hold decoded image data. Tested by
+// png_write_png (0x009E8AB8) via `SLOWORD(info_ptr->valid) < 0` (the sign
+// bit of the low 16 bits of the 32-bit `valid` field == bit 0x8000).
+constexpr std::uint32_t kPngInfoIdat  = 0x8000;
 
 // Maximum gamma value (libpng 1.2.x: 21474.83).
 constexpr double kPngGammaMaxValue = 21474.83;

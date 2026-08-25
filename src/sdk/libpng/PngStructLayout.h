@@ -258,6 +258,12 @@ constexpr std::uint32_t kPngFlagKeepUnsafeChunks    = 0x10000;
 constexpr std::uint32_t kPngHaveIhdr             = 0x0001;
 constexpr std::uint32_t kPngHavePlte             = 0x0002;
 constexpr std::uint32_t kPngHaveIdat             = 0x0004;
+// Verified from FUN_009E7D38.asm (png_write_end): `or dword ptr [ebx+68h], 8`
+// (mode |= PNG_AFTER_IDAT), and the same bit tested against
+// png_unknown_chunk::location (`test cl, 8`) to select post-IDAT trailer chunks.
+constexpr std::uint32_t kPngAfterIdat            = 0x0008;
+// Verified from FUN_00A24EA0.asm (png_write_IEND): `or [eax], 10h`.
+constexpr std::uint32_t kPngHaveIend             = 0x0010;
 constexpr std::uint32_t kPngWroteInfoBeforePlte  = 0x0400;
 constexpr std::uint32_t kPngHavePngSignature     = 0x1000;
 
