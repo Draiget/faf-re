@@ -38,6 +38,12 @@ namespace
     "Set the cursor clip to either the pre-launch clip or the current clip";
   moho::CConFunc gCConFunc_SC_ToggleCursorClip{};
 
+  /// 0x00E00779 (the same shared empty-string literal `SC_PrimaryAdapter`
+  /// uses), the `.data` initializer of `Moho::CConFunc_SC_SecondaryAdapter`
+  /// (+0x08). No console-help text in the binary.
+  constexpr const char* kConsoleStartupSCSecondaryAdapterDescription = "";
+  moho::CConFunc gCConFunc_SC_SecondaryAdapter{};
+
   /// Style bits observed at the "argument is literally `windowed`" branch's
   /// `SetWindowStyleFlag` call site (0x008D35DB): decodes to
   /// `wxCAPTION | wxCLIP_CHILDREN | wxSYSTEM_MENU | wxMINIMIZE_BOX |
@@ -258,6 +264,40 @@ namespace moho
     );
     (void)std::atexit(&cleanup_CConFunc_SC_ToggleCursorClip);
   }
+
+  /**
+   * Address: 0x008D37C0 (FUN_008D37C0, sub_8D37C0)
+   *
+   * What it does:
+   * See header. The binary's real comparison (Hex-Rays mis-renders it as a
+   * bogus `std::operator<<char>` call) is
+   * `args[1].compare(0, args[1].size(), "true", 4) == 0`, i.e. `*args[1] ==
+   * "true"`.
+   */
+  void SC_SecondaryAdapter(void* const commandArgs)
+  {
+    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+    if (args.Count() != 2u) {
+      return;
+    }
+
+    const msvc8::string* const modeToken = args.At(1u);
+    const bool adapterNotCommandLineOverridden = modeToken != nullptr && modeToken->view() == "true";
+    SetupSecondaryAdapterSettings(adapterNotCommandLineOverridden);
+  }
+
+  void cleanup_CConFunc_SC_SecondaryAdapter()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_SecondaryAdapter);
+  }
+
+  void register_CConFunc_SC_SecondaryAdapter()
+  {
+    gCConFunc_SC_SecondaryAdapter.InitializeRecovered(
+      kConsoleStartupSCSecondaryAdapterDescription, "SC_SecondaryAdapter", &moho::SC_SecondaryAdapter
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_SecondaryAdapter);
+  }
 } // namespace moho
 
 namespace
@@ -272,6 +312,7 @@ namespace
       moho::register_CConFunc_SC_PrimaryAdapter();
       moho::register_CConFunc_SC_VerticalSync();
       moho::register_CConFunc_SC_ToggleCursorClip();
+      moho::register_CConFunc_SC_SecondaryAdapter();
     }
   };
 

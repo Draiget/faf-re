@@ -95,4 +95,30 @@ namespace moho
    * `Moho::SC_ToggleCursorClip` in the image.
    */
   void register_CConFunc_SC_ToggleCursorClip();
+
+  /**
+   * Address: 0x008D37C0 (FUN_008D37C0)
+   *
+   * IDA signature:
+   * int __cdecl sub_8D37C0(int commandArgs);
+   *
+   * What it does:
+   * `SC_SecondaryAdapter <true|...>` console command. With exactly one
+   * argument, forwards `argument == "true"` to the already-recovered
+   * `SetupSecondaryAdapterSettings(bool adapterNotCommandLineOverridden)`
+   * (StartupHelpers.cpp), which republishes the secondary-adapter Lua
+   * options-menu state.
+   */
+  void SC_SecondaryAdapter(void* commandArgs);
+
+  /**
+   * Address: 0x00BE94C0 (FUN_00BE94C0, register_CConFunc_SC_SecondaryAdapter)
+   *
+   * What it does:
+   * Registers the `SC_SecondaryAdapter` startup console command and installs
+   * its process-exit teardown. The store
+   * `dword_F5BE6C = offset sub_8D37C0` at 0x00BE94D8 is the only reference to
+   * `Moho::SC_SecondaryAdapter` in the image.
+   */
+  void register_CConFunc_SC_SecondaryAdapter();
 } // namespace moho

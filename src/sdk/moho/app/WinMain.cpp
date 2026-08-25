@@ -30,6 +30,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Error.hpp"
 #include "WinApp.h"
+#include "moho/console/CConCommand.h"
+#include "moho/console/CConFunc.h"
 #include "moho/misc/StartupHelpers.h"
 
 namespace
@@ -430,6 +432,102 @@ namespace
     (void)::atexit(&func_CleanupAllocLoc);
     gpg::SetMemHook(&func_MemHook);
   }
+
+  /**
+   * Address: 0x008D4260 (FUN_008D4260, sub_8D4260)
+   *
+   * void*
+   *
+   * What it does:
+   * `SC_StartMemoryLog <filename>` console command. Forwards the filename
+   * argument straight to `InitializeAllocationLog` above.
+   *
+   * Registrar: FUN_00BE9700 (`__xc_a` lane), data-xref
+   * `dword_F5BEFC = offset sub_8D4260` is the callsite evidence.
+   */
+  void SC_StartMemoryLog(void* const commandArgs)
+  {
+    const moho::ConCommandArgsView args = moho::GetConCommandArgsView(commandArgs);
+    if (args.Count() != 2u) {
+      return;
+    }
+
+    const msvc8::string* const pathToken = args.At(1u);
+    if (pathToken == nullptr) {
+      return;
+    }
+
+    InitializeAllocationLog(pathToken->c_str());
+  }
+
+  /**
+   * Address: 0x008D42B0 (FUN_008D42B0, sub_8D42B0)
+   *
+   * What it does:
+   * `SC_StopMemoryLog` console command. `func_CleanupAllocLoc` above already
+   * reproduces the binary's exact teardown sequence (clear the mem hook,
+   * close the alloc-log runtime) - this command just runs it on demand
+   * instead of only at process exit.
+   *
+   * Registrar: FUN_00BE9740 (`__xc_a` lane), data-xref
+   * `dword_F5BF0C = offset sub_8D42B0` is the callsite evidence.
+   */
+  void SC_StopMemoryLog(void* const commandArgs)
+  {
+    (void)commandArgs;
+    func_CleanupAllocLoc();
+  }
+
+  /// 0x00E4F23C, the `.data` initializer of `Moho::CConFunc_SC_StartMemoryLog`
+  /// (+0x08), read directly from the shipped PE.
+  constexpr const char* kConsoleStartupSCStartMemoryLogDescription = "Start up memory logging to filename";
+  moho::CConFunc gCConFunc_SC_StartMemoryLog{};
+
+  /// 0x00E4F274, the `.data` initializer of `Moho::CConFunc_SC_StopMemoryLog`
+  /// (+0x08), read directly from the shipped PE.
+  constexpr const char* kConsoleStartupSCStopMemoryLogDescription = "Stop memory logging";
+  moho::CConFunc gCConFunc_SC_StopMemoryLog{};
+
+  void cleanup_CConFunc_SC_StartMemoryLog()
+  {
+    moho::CleanupStartupConCommand(gCConFunc_SC_StartMemoryLog);
+  }
+
+  void register_CConFunc_SC_StartMemoryLog()
+  {
+    gCConFunc_SC_StartMemoryLog.InitializeRecovered(
+      kConsoleStartupSCStartMemoryLogDescription, "SC_StartMemoryLog", &SC_StartMemoryLog
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_StartMemoryLog);
+  }
+
+  void cleanup_CConFunc_SC_StopMemoryLog()
+  {
+    moho::CleanupStartupConCommand(gCConFunc_SC_StopMemoryLog);
+  }
+
+  void register_CConFunc_SC_StopMemoryLog()
+  {
+    gCConFunc_SC_StopMemoryLog.InitializeRecovered(
+      kConsoleStartupSCStopMemoryLogDescription, "SC_StopMemoryLog", &SC_StopMemoryLog
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_StopMemoryLog);
+  }
+
+  // The binary runs these registrars from the CRT static-initializer array;
+  // this file-scope bootstrap object reproduces that, matching the
+  // `ResolutionConsoleRegistrations`/`FrameDumpConsoleRegistrations` pattern
+  // established in moho/app/ResolutionCommands.cpp / FrameDumpCommands.cpp.
+  struct WinMainConsoleRegistrations
+  {
+    WinMainConsoleRegistrations()
+    {
+      register_CConFunc_SC_StartMemoryLog();
+      register_CConFunc_SC_StopMemoryLog();
+    }
+  };
+
+  [[maybe_unused]] WinMainConsoleRegistrations gWinMainConsoleRegistrations;
 
   /**
    * Address: 0x004F1500 (FUN_004F1500)
