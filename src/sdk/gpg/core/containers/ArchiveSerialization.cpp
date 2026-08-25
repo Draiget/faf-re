@@ -10612,19 +10612,6 @@ namespace
     return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SDecalInfo");
   }
 
-  /**
-   * Address: 0x00899220 (FUN_00899220)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::SSessionSaveData`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoSSessionSaveDataSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSessionSaveData");
-  }
-
   [[nodiscard]] gpg::RType* ResolveInfluenceMapEntryArchiveAdapterType()
   {
     gpg::RType* type = moho::InfluenceMapEntry::sType;
