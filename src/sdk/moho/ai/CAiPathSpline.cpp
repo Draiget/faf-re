@@ -466,6 +466,7 @@ namespace
 
 gpg::RType* CAiPathSpline::sType = nullptr;
 gpg::RType* SContinueInfo::sType = nullptr;
+gpg::RType* CPathPoint::sType = nullptr;
 
 namespace
 {
@@ -599,11 +600,14 @@ namespace
   moho::EPathPointStatePrimitiveSerializer gEPathPointStatePrimitiveSerializer;
 
   // Address: 0x010B204C -- process-global `CPathPointSerializer` singleton.
-  // Constructing it runs CPathPointSerializer::CPathPointSerializer()
-  // (0x00BD2140), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // Constructing it runs MSVC's compiler-generated dynamic initializer for
+  // this global (0x00BD2140, __xc_a-reachable; dead zero-xref COMDAT
+  // duplicate: 0x0062F8E0), which runs the real `gpg::SerSaveLoadHelper<
+  // CPathPoint>` ctor (self-links into `sNewHelpers`, binds
+  // `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real destructor
+  // (0x00BFA880, no recovered mangled name; body confirmed via raw asm to
+  // just call `ResetLinks()`) via `atexit`.
   moho::CPathPointSerializer gCPathPointSerializer;
 
   gpg::RType* gWeakUnitType = nullptr;
@@ -938,23 +942,6 @@ namespace
     reinterpret_cast<moho::CPathPointTypeInfo*>(gCPathPointTypeInfoStorage)->~CPathPointTypeInfo();
     gCPathPointType = nullptr;
     gCPathPointTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BFA880 (FUN_00BFA880, cleanup_CPathPointSerializer)
-   *
-   * What it does:
-   * Unlinks the global `CPathPointSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BD2140) as the global's
-   * `atexit` teardown. Two duplicate zero-xref emissions of this same
-   * unlink/self-link sequence exist nearby (0x0062F7E0, 0x0062F810,
-   * formerly `cleanup_CPathPointSerializerStartupThunkA/B`); they are
-   * superseded by this citation.
-   */
-  void cleanup_CPathPointSerializer()
-  {
-    gCPathPointSerializer.ResetLinks();
   }
 
   /**
@@ -2021,108 +2008,30 @@ void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
 }
 
 /**
- * Address: 0x0062F790 (FUN_0062F790, CPathPointSerializer::Deserialize)
+ * Address: 0x0062FAA0 (FUN_0062FAA0, Moho::CPathPoint::MemberSerialize)
  *
  * What it does:
- * Loads `mPosition`, `mDirection`, and `mState` lanes for a `CPathPoint`.
+ * Writes `CPathPoint` position/direction vectors and path-state enum lanes
+ * into archive storage using reflected runtime types.
  */
-void CPathPointSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
+void CPathPoint::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (archive == nullptr || objectPtr == 0) {
+  if (archive == nullptr) {
     return;
   }
 
-  auto* const point = reinterpret_cast<CPathPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  point->MemberDeserialize(archive);
-}
+  gpg::RRef positionOwner{};
+  gpg::RRef directionOwner{};
+  gpg::RRef stateOwner{};
 
-namespace
-{
-  /**
-   * Address: 0x0062FAA0 (FUN_0062FAA0)
-   *
-   * What it does:
-   * Writes `CPathPoint` position/direction vectors and path-state enum lanes
-   * into archive storage using reflected runtime types.
-   */
-  void SerializePathPointSerializerBody(const moho::CPathPoint& point, gpg::WriteArchive* const archive)
-  {
-    if (archive == nullptr) {
-      return;
-    }
+  gpg::RType* const vectorType = ResolveVector3fType();
+  GPG_ASSERT(vectorType != nullptr);
+  archive->Write(vectorType, &mPosition, positionOwner);
+  archive->Write(vectorType, &mDirection, directionOwner);
 
-    gpg::RRef positionOwner{};
-    gpg::RRef directionOwner{};
-    gpg::RRef stateOwner{};
-
-    gpg::RType* const vectorType = ResolveVector3fType();
-    GPG_ASSERT(vectorType != nullptr);
-    archive->Write(vectorType, &point.mPosition, positionOwner);
-    archive->Write(vectorType, &point.mDirection, directionOwner);
-
-    gpg::RType* const stateType = ResolveEPathPointStateType();
-    GPG_ASSERT(stateType != nullptr);
-    archive->Write(stateType, &point.mState, stateOwner);
-  }
-} // namespace
-
-/**
- * Address: 0x0062F7A0 (FUN_0062F7A0, CPathPointSerializer::Serialize)
- *
- * What it does:
- * Saves `mPosition`, `mDirection`, and `mState` lanes for a `CPathPoint`.
- */
-void CPathPointSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (archive == nullptr || objectPtr == 0) {
-    return;
-  }
-
-  auto* const point = reinterpret_cast<CPathPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  SerializePathPointSerializerBody(*point, archive);
-}
-
-/**
- * Address: 0x00BD2140 (FUN_00BD2140, dynamic initializer for the global
- * `CPathPointSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
- */
-CPathPointSerializer::CPathPointSerializer()
-  : mDeserialize(&CPathPointSerializer::Deserialize)
-  , mSerialize(&CPathPointSerializer::Serialize)
-{
-  (void)std::atexit(&cleanup_CPathPointSerializer);
-}
-
-/**
- * Address: 0x0062F910 (FUN_0062F910, gpg::SerSaveLoadHelper<Moho::CPathPoint>::Init)
- *
- * What it does:
- * Binds `CPathPoint` load/save callbacks onto its reflected type metadata;
- * asserts neither slot is already claimed before installing them.
- */
-void CPathPointSerializer::Init()
-{
-  gpg::RType* const type = ResolveCPathPointType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mDeserialize;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerialize;
+  gpg::RType* const stateType = ResolveEPathPointStateType();
+  GPG_ASSERT(stateType != nullptr);
+  archive->Write(stateType, &mState, stateOwner);
 }
 
 /**

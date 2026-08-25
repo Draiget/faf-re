@@ -67,6 +67,8 @@ namespace moho
    */
   struct CPathPoint
   {
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0062F9F0 (FUN_0062F9F0, Moho::CPathPoint::MemberDeserialize)
      *
@@ -75,6 +77,18 @@ namespace moho
      * read archive payload.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0062FAA0 (FUN_0062FAA0, Moho::CPathPoint::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::CPathPoint::MemberSerialize(Moho::CPathPoint *a1@<eax>, BinaryWriteArchive *a2@<ebx>);
+     *
+     * What it does:
+     * Saves path-point position/direction vectors and state enum lanes into
+     * a write archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     Wm3::Vector3f mPosition;  // +0x00
     Wm3::Vector3f mDirection; // +0x0C
@@ -605,45 +619,24 @@ namespace moho
   static_assert(sizeof(SCollisionInfoSerializer) == 0x14, "SCollisionInfoSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BD2140 (FUN_00BD2140, dynamic initializer for the global
-   * `CPathPointSerializer` singleton)
+   * VFTABLE: 0x00E2107C
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list), then
-   * binds the load/save callback fields. Confirmed from raw disassembly:
-   * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
-   * `??_7CPathPointSerializer@Moho@@6B@` -- no eager `Init()` call exists
-   * here, and this class has no user-declared destructor (the real binary
-   * explicitly registers `atexit(&sub_BFA880)` instead).
+   * Demangled: gpg::SerSaveLoadHelper<struct Moho::CPathPoint>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CPathPointSerializer`):
+   *    0x00BD2140 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
+   *    0x0062F8E0)
+   *  - dtor: 0x00BFA880 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor; dead zero-xref duplicates of this unlink/self-link
+   *    sequence: 0x0062F7E0, 0x0062F810)
+   *  - Init(): 0x0062F910
+   *  - Deserialize(): 0x0062F790
+   *  - Serialize(): 0x0062F7A0
    */
-  class CPathPointSerializer : public gpg::SerHelperBase
-  {
-  public:
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    CPathPointSerializer();
-
-    /**
-     * Address: 0x0062F910 (FUN_0062F910, gpg::SerSaveLoadHelper<Moho::CPathPoint>::Init)
-     *
-     * What it does:
-     * Binds `CPathPoint` load/save callbacks onto its reflected type
-     * metadata; asserts neither slot is already claimed before installing
-     * them. Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this
-     * helper is drained from the pending list (vtable slot 0).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(offsetof(CPathPointSerializer, mDeserialize) == 0x0C, "CPathPointSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(CPathPointSerializer, mSerialize) == 0x10, "CPathPointSerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(CPathPointSerializer) == 0x14, "CPathPointSerializer size must be 0x14");
+  using CPathPointSerializer = gpg::SerSaveLoadHelper<CPathPoint>;
 
   /**
    * Address: 0x00BD20C0 (FUN_00BD20C0, register_EPathPointStateTypeInfo)
