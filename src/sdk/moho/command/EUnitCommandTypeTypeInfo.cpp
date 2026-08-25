@@ -1,110 +1,62 @@
 #include "moho/command/EUnitCommandTypeTypeInfo.h"
 
 #include <cstdlib>
-#include <cstdint>
-#include <new>
-#include <typeinfo>
+#include <typeinfo>
+
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  alignas(moho::EUnitCommandTypeTypeInfo)
-    unsigned char gEUnitCommandTypeTypeInfoStorage[sizeof(moho::EUnitCommandTypeTypeInfo)];
-  bool gEUnitCommandTypeTypeInfoConstructed = false;
-  bool gEUnitCommandTypeTypeInfoPreregistered = false;
-
-  alignas(moho::EUnitCommandTypePrimitiveSerializer)
-    unsigned char gEUnitCommandTypePrimitiveSerializerStorage[sizeof(moho::EUnitCommandTypePrimitiveSerializer)];
-  bool gEUnitCommandTypePrimitiveSerializerConstructed = false;
-
-  gpg::RType* gEUnitCommandTypeCachedType = nullptr;
-
-  [[nodiscard]] moho::EUnitCommandTypeTypeInfo* AcquireEUnitCommandTypeTypeInfo()
-  {
-    if (!gEUnitCommandTypeTypeInfoConstructed) {
-      new (gEUnitCommandTypeTypeInfoStorage) moho::EUnitCommandTypeTypeInfo();
-      gEUnitCommandTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EUnitCommandTypeTypeInfo*>(gEUnitCommandTypeTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::EUnitCommandTypePrimitiveSerializer* AcquireEUnitCommandTypePrimitiveSerializer()
-  {
-    if (!gEUnitCommandTypePrimitiveSerializerConstructed) {
-      new (gEUnitCommandTypePrimitiveSerializerStorage) moho::EUnitCommandTypePrimitiveSerializer();
-      gEUnitCommandTypePrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EUnitCommandTypePrimitiveSerializer*>(gEUnitCommandTypePrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-    return self;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEUnitCommandType()
-  {
-    if (!gEUnitCommandTypeCachedType) {
-      gEUnitCommandTypeCachedType = gpg::LookupRType(typeid(moho::EUnitCommandType));
-    }
-    return gEUnitCommandTypeCachedType;
-  }
+  gpg::StaticTypeInfoStorage<moho::EUnitCommandTypeTypeInfo> gEUnitCommandTypeTypeInfoStorage{};
 
   /**
    * Address: 0x00BF4950 (FUN_00BF4950, cleanup_EUnitCommandTypeTypeInfo)
+   *
+   * What it does:
+   * Process-exit teardown for the `EUnitCommandTypeTypeInfo` descriptor.
+   * The real ctor's atexit push at 0x00BC9C20 targets a plain destructor
+   * call, not a mangled symbol.
    */
   void cleanup_EUnitCommandTypeTypeInfo()
   {
-    if (!gEUnitCommandTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEUnitCommandTypeTypeInfo()->~EUnitCommandTypeTypeInfo();
-    gEUnitCommandTypeTypeInfoConstructed = false;
-    gEUnitCommandTypeTypeInfoPreregistered = false;
-    gEUnitCommandTypeCachedType = nullptr;
+    gEUnitCommandTypeTypeInfoStorage.Destroy();
   }
+
+  // Address: 0x010AC568 -- process-global `EUnitCommandTypeTypeInfo` singleton
+  // storage (constructed in place by `register_EUnitCommandTypeTypeInfo`).
 
   /**
-   * Address: 0x00BF4960 (FUN_00BF4960, cleanup_EUnitCommandTypePrimitiveSerializer)
+   * Address: 0x00553540 (FUN_00553540, Deserialize_EUnitCommandType_Primitive)
+   * Address: 0x00553560 (FUN_00553560, Serialize_EUnitCommandType_Primitive)
+   * Address: 0x00BC9C40 (FUN_00BC9C40, dynamic initializer for the global
+   * `PrimitiveSerHelper<EUnitCommandType,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `EUnitCommandTypeTypeInfo`'s own
+   * initializer above -- the prior recovery wrongly coupled both into one
+   * shared bootstrap struct.
    */
-  void cleanup_EUnitCommandTypePrimitiveSerializer()
-  {
-    if (!gEUnitCommandTypePrimitiveSerializerConstructed) {
-      return;
-    }
-
-    (void)UnlinkSerializerNode(*AcquireEUnitCommandTypePrimitiveSerializer());
-  }
+  moho::EUnitCommandTypePrimitiveSerializer gEUnitCommandTypePrimitiveSerializer;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005520B0 (FUN_005520B0, Moho::EUnitCommandTypeTypeInfo::EUnitCommandTypeTypeInfo)
+   *
+   * What it does:
+   * Preregisters the enum type descriptor for `EUnitCommandType` with the reflection registry.
+   */
+  EUnitCommandTypeTypeInfo::EUnitCommandTypeTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EUnitCommandType), this);
+  }
+
   /**
    * Address: 0x00552140 (FUN_00552140, Moho::EUnitCommandTypeTypeInfo::dtr)
    */
@@ -178,109 +130,19 @@ namespace moho
   }
 
   /**
-   * Address: 0x00553540 (FUN_00553540, Deserialize_EUnitCommandType_Primitive)
-   */
-  void EUnitCommandTypePrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<EUnitCommandType*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EUnitCommandType>(value);
-  }
-
-  /**
-   * Address: 0x00553560 (FUN_00553560, Serialize_EUnitCommandType_Primitive)
-   */
-  void EUnitCommandTypePrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const EUnitCommandType*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  /**
-   * Address: 0x00552D60 (FUN_00552D60, gpg::SerSaveLoadHelper_EUnitCommandType::Init)
-   */
-  void EUnitCommandTypePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveEUnitCommandType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x005520B0 (FUN_005520B0, preregister_EUnitCommandTypeTypeInfo)
-   */
-  gpg::REnumType* preregister_EUnitCommandTypeTypeInfo()
-  {
-    auto* const typeInfo = AcquireEUnitCommandTypeTypeInfo();
-    if (!gEUnitCommandTypeTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(EUnitCommandType), typeInfo);
-      gEUnitCommandTypeTypeInfoPreregistered = true;
-    }
-
-    gEUnitCommandTypeCachedType = typeInfo;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x00BC9C20 (FUN_00BC9C20, register_EUnitCommandTypeTypeInfo)
+   * Address: 0x00BC9C20 (FUN_00BC9C20, sub_BC9C20)
+   *
+   * What it does:
+   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor in place and
+   * installs its atexit teardown.
    */
   int register_EUnitCommandTypeTypeInfo()
   {
-    (void)preregister_EUnitCommandTypeTypeInfo();
+    (void)gEUnitCommandTypeTypeInfoStorage.Ensure();
     return std::atexit(&cleanup_EUnitCommandTypeTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BC9C40 (FUN_00BC9C40, register_EUnitCommandTypePrimitiveSerializer)
-   */
-  int register_EUnitCommandTypePrimitiveSerializer()
-  {
-    auto* const serializer = AcquireEUnitCommandTypePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &EUnitCommandTypePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &EUnitCommandTypePrimitiveSerializer::Serialize;
-    return std::atexit(&cleanup_EUnitCommandTypePrimitiveSerializer);
   }
 } // namespace moho
 
-namespace
-{
-  struct EUnitCommandTypeTypeInfoBootstrap
-  {
-    EUnitCommandTypeTypeInfoBootstrap()
-    {
-      (void)moho::register_EUnitCommandTypeTypeInfo();
-      (void)moho::register_EUnitCommandTypePrimitiveSerializer();
-    }
-  };
-
-  [[maybe_unused]] EUnitCommandTypeTypeInfoBootstrap gEUnitCommandTypeTypeInfoBootstrap;
-} // namespace
-
-
-
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_EUnitCommandTypeTypeInfo_14a04b, moho::register_EUnitCommandTypeTypeInfo)
-
-GPG_PREREGISTER_INIT(preregister_EUnitCommandTypeTypeInfo_14a04b, moho::preregister_EUnitCommandTypeTypeInfo)
