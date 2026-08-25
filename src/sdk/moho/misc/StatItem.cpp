@@ -50,13 +50,36 @@ namespace
 
   moho::EStatTypeTypeInfo gEStatTypeTypeInfo;
   moho::EPulseModeTypeInfo gEPulseModeTypeInfo;
+
+  /**
+   * Address: 0x00BC3600 (FUN_00BC3600, dynamic initializer for the global
+   * `PrimitiveSerHelper<EStatType,int>` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (which self-links this
+   * helper onto the process-global pending-helper list) and binds the
+   * load/save callback fields; `Init()` is dispatched later, from
+   * `gpg::SerHelperBase::InitNewHelpers`. Prior to this recovery, this
+   * global was a hand-rolled POD that never actually inherited
+   * `SerHelperBase` and was only ever wired up by a manual
+   * `register_PrimitiveSerHelper_EStatType()` call with a wrong 2-arg
+   * callback signature (`reinterpret_cast` from a 2-arg shape into the real
+   * 4-arg `RType::load_func_t`/`save_func_t`).
+   */
   moho::EStatTypePrimitiveSerializer gEStatTypePrimitiveSerializer;
+
+  /**
+   * Address: 0x00BC3660 (FUN_00BC3660, dynamic initializer for the global
+   * `PrimitiveSerHelper<EPulseMode,int>` singleton)
+   *
+   * What it does:
+   * Same shape/defect as `gEStatTypePrimitiveSerializer` above, for
+   * `EPulseMode`.
+   */
   moho::EPulseModePrimitiveSerializer gEPulseModePrimitiveSerializer;
   moho::StatItemTypeInfo gStatItemTypeInfo;
   moho::StatItemSerializer gStatItemSerializer;
   moho::StatsRType<moho::StatItem> gStatsRTypeStatItem;
-  gpg::RType* gEStatTypeRuntimeType = nullptr;
-  gpg::RType* gEPulseModeRuntimeType = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
@@ -92,70 +115,6 @@ namespace
       moho::Stats<moho::StatItem>::sType = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
     }
     return moho::Stats<moho::StatItem>::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEStatTypeType()
-  {
-    if (!gEStatTypeRuntimeType) {
-      gEStatTypeRuntimeType = gpg::LookupRType(typeid(moho::EStatType));
-    }
-    return gEStatTypeRuntimeType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEPulseModeType()
-  {
-    if (!gEPulseModeRuntimeType) {
-      gEPulseModeRuntimeType = gpg::LookupRType(typeid(moho::EPulseMode));
-    }
-    return gEPulseModeRuntimeType;
-  }
-
-  /**
-   * Address: 0x00419A50 (FUN_00419A50, gpg::PrimitiveSerHelper_EStatType::Deserialize)
-   *
-   * What it does:
-   * Reads one archive `int` and stores it as `EStatType`.
-   */
-  void DeserializeEStatType(gpg::ReadArchive* archive, moho::EStatType* value)
-  {
-    std::int32_t rawValue = 0;
-    archive->ReadInt(&rawValue);
-    *value = static_cast<moho::EStatType>(rawValue);
-  }
-
-  /**
-   * Address: 0x00419A70 (FUN_00419A70, gpg::PrimitiveSerHelper_EStatType::Serialize)
-   *
-   * What it does:
-   * Writes one `EStatType` value as archive `int`.
-   */
-  void SerializeEStatType(gpg::WriteArchive* archive, const moho::EStatType* value)
-  {
-    archive->WriteInt(static_cast<std::int32_t>(*value));
-  }
-
-  /**
-   * Address: 0x00419AC0 (FUN_00419AC0, gpg::PrimitiveSerHelper_EPulseModeTypeInfo::Deserialize)
-   *
-   * What it does:
-   * Reads one archive `int` and stores it as `EPulseMode`.
-   */
-  void DeserializeEPulseMode(gpg::ReadArchive* archive, moho::EPulseMode* value)
-  {
-    std::int32_t rawValue = 0;
-    archive->ReadInt(&rawValue);
-    *value = static_cast<moho::EPulseMode>(rawValue);
-  }
-
-  /**
-   * Address: 0x00419AE0 (FUN_00419AE0, gpg::PrimitiveSerHelper_EPulseModeTypeInfo::Serialize)
-   *
-   * What it does:
-   * Writes one `EPulseMode` value as archive `int`.
-   */
-  void SerializeEPulseMode(gpg::WriteArchive* archive, const moho::EPulseMode* value)
-  {
-    archive->WriteInt(static_cast<std::int32_t>(*value));
   }
 
   template <class TObject>
@@ -2402,30 +2361,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004192B0 (FUN_004192B0, gpg::PrimitiveSerHelper<Moho::EStatType,int>::Init)
-   */
-  void EStatTypePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedEStatTypeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
-   * Address: 0x00419350 (FUN_00419350, gpg::PrimitiveSerHelper<Moho::EPulseMode,int>::Init)
-   */
-  void EPulseModePrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedEPulseModeType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
    * Address: 0x004184B0 (FUN_004184B0, Moho::StatItemTypeInfo::StatItemTypeInfo)
    */
   StatItemTypeInfo::StatItemTypeInfo()
@@ -2586,40 +2521,6 @@ namespace moho
     deleteFunc_ = &DeleteStatsStatItem;
   }
 
-  /**
-   * Address: 0x00BC3600 (FUN_00BC3600, register_PrimitiveSerHelper_EStatType)
-   *
-   * What it does:
-   * Initializes primitive serializer helper callbacks for `EStatType`.
-   */
-  void register_PrimitiveSerHelper_EStatType()
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEStatTypePrimitiveSerializer.mHelperNext);
-    gEStatTypePrimitiveSerializer.mHelperNext = self;
-    gEStatTypePrimitiveSerializer.mHelperPrev = self;
-    gEStatTypePrimitiveSerializer.mSerLoadFunc =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeEStatType);
-    gEStatTypePrimitiveSerializer.mSerSaveFunc =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeEStatType);
-  }
-
-  /**
-   * Address: 0x00BC3660 (FUN_00BC3660, register_PrimitiveSerHelper_EPulseModeTypeInfo)
-   *
-   * What it does:
-   * Initializes primitive serializer helper callbacks for `EPulseMode`.
-   */
-  void register_PrimitiveSerHelper_EPulseModeTypeInfo()
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEPulseModePrimitiveSerializer.mHelperNext);
-    gEPulseModePrimitiveSerializer.mHelperNext = self;
-    gEPulseModePrimitiveSerializer.mHelperPrev = self;
-    gEPulseModePrimitiveSerializer.mSerLoadFunc =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeEPulseMode);
-    gEPulseModePrimitiveSerializer.mSerSaveFunc =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeEPulseMode);
-  }
-
   void register_StatItemSerializer()
   {
     gStatItemSerializer.mNext = nullptr;
@@ -2684,12 +2585,19 @@ namespace moho
     MaterializeReflectionSingleton(gStatsRTypeStatItem);
   }
 
+  /**
+   * `gEStatTypePrimitiveSerializer`/`gEPulseModePrimitiveSerializer` used to
+   * be wired up here via a manual `register_PrimitiveSerHelper_EStatType()`/
+   * `register_PrimitiveSerHelper_EPulseModeTypeInfo()` call. Now that both
+   * globals are real `gpg::PrimitiveSerHelper<T,int>` instances, their own
+   * constructors (running at ordinary static/dynamic init, matching the
+   * real binary's FUN_00BC3600/FUN_00BC3660) do that self-registration; no
+   * explicit call is needed.
+   */
   void RegisterStatItemReflectionBootstrapBatch()
   {
     RegisterEStatTypeTypeInfoBootstrap();
     RegisterEPulseModeTypeInfoBootstrap();
-    register_PrimitiveSerHelper_EStatType();
-    register_PrimitiveSerHelper_EPulseModeTypeInfo();
     RegisterStatItemTypeInfoBootstrap();
     RegisterStatItemSerializerBootstrap();
     RegisterStatsRTypeStatItemBootstrap();
@@ -2762,8 +2670,9 @@ namespace
 } // namespace
 
 
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_PrimitiveSerHelper_EPulseModeTypeInfo_448311, moho::register_PrimitiveSerHelper_EPulseModeTypeInfo)
-
-GPG_PREREGISTER_INIT(register_PrimitiveSerHelper_EStatType_448311, moho::register_PrimitiveSerHelper_EStatType)
+// EStatType/EPulseMode's primitive-serializer registration used to be
+// phase-1 pre-registered here via register_PrimitiveSerHelper_EStatType()/
+// register_PrimitiveSerHelper_EPulseModeTypeInfo(). Both are gone now that
+// gEStatTypePrimitiveSerializer/gEPulseModePrimitiveSerializer are real
+// gpg::PrimitiveSerHelper<T,int> instances whose own constructors do the
+// self-registration (see RegisterStatItemReflectionBootstrapBatch above).

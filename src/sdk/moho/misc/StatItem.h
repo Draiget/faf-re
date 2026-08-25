@@ -329,82 +329,32 @@ namespace moho
   static_assert(offsetof(StatItemSerializer, mSerSaveFunc) == 0x10, "StatItemSerializer::mSerSaveFunc offset must be 0x10");
 
   /**
-   * VFTABLE: 0x00E010B4
-   * COL: 0x00E5DB04
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EStatType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EStatType@Moho@@H@gpg'`):
+   * `FUN_00BC3600` (real, `__xc_a`-reachable; no dead low-address duplicate
+   * found for this instantiation). Previously modeled in this file as a
+   * hand-rolled `{ void* mVtable; SerHelperBase* mHelperNext, mHelperPrev;
+   * ... }` POD that was never actually constructed anywhere in `src/sdk`
+   * (a plain global of this wrong type, with no real `SerHelperBase` base,
+   * never self-registers onto the pending-helper list) -- `EStatType`'s
+   * serialize/deserialize callbacks were never installed under any code
+   * path. `SerHelperBase`'s own ctor now performs the real
+   * self-registration.
    */
-  class EStatTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x004192B0 (FUN_004192B0, gpg::PrimitiveSerHelper<Moho::EStatType,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EStatType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(EStatTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EStatTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EStatTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EStatTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EStatTypePrimitiveSerializer, mSerLoadFunc) == 0x0C,
-    "EStatTypePrimitiveSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EStatTypePrimitiveSerializer, mSerSaveFunc) == 0x10,
-    "EStatTypePrimitiveSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(EStatTypePrimitiveSerializer) == 0x14, "EStatTypePrimitiveSerializer size must be 0x14");
+  using EStatTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EStatType, int>;
 
   /**
-   * VFTABLE: 0x00E010F4
-   * COL: 0x00E5DA04
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPulseMode,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EPulseMode@Moho@@H@gpg'`):
+   * `FUN_00BC3660` (real, `__xc_a`-reachable; no dead low-address duplicate
+   * found for this instantiation). Same "never actually constructed" defect
+   * as `EStatTypePrimitiveSerializer` above.
    */
-  class EPulseModePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x00419350 (FUN_00419350, gpg::PrimitiveSerHelper<Moho::EPulseMode,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EPulseMode`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(EPulseModePrimitiveSerializer, mHelperNext) == 0x04,
-    "EPulseModePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EPulseModePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EPulseModePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EPulseModePrimitiveSerializer, mSerLoadFunc) == 0x0C,
-    "EPulseModePrimitiveSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EPulseModePrimitiveSerializer, mSerSaveFunc) == 0x10,
-    "EPulseModePrimitiveSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(EPulseModePrimitiveSerializer) == 0x14, "EPulseModePrimitiveSerializer size must be 0x14");
+  using EPulseModePrimitiveSerializer = gpg::PrimitiveSerHelper<EPulseMode, int>;
 
   /**
    * VFTABLE: 0x00E01104
