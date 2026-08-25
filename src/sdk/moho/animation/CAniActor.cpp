@@ -32,7 +32,8 @@ namespace
   alignas(moho::CAniActorTypeInfo) unsigned char gCAniActorTypeInfoStorage[sizeof(moho::CAniActorTypeInfo)] = {};
   bool gCAniActorTypeInfoConstructed = false;
 
-  moho::CAniActorConstruct gCAniActorConstruct{};
+  // Address: 0x010B284C -- process-global `CAniActorConstruct` singleton.
+  moho::CAniActorConstruct gCAniActorConstruct;
 
   // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
@@ -45,34 +46,6 @@ namespace
   moho::CAniActorSerializer gCAniActorSerializer;
 
   gpg::RType* gCAniPoseType = nullptr;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
 
   [[nodiscard]] gpg::RType* CachedCAniActorType()
   {
@@ -472,65 +445,10 @@ namespace
     gCAniActorTypeInfoConstructed = false;
   }
 
-  /**
-    * Alias of FUN_00BFACD0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks `CAniActorConstruct` helper node from intrusive helper list.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAniActorConstruct_Impl()
-  {
-    return UnlinkHelperNode(gCAniActorConstruct);
-  }
-
-  /**
-   * Address: 0x0063AFC0 (FUN_0063AFC0, cleanup_CAniActorConstructStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the global `CAniActorConstruct` node
-   * and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorConstructStartupThunkA()
-  {
-    return cleanup_CAniActorConstruct_Impl();
-  }
-
-  /**
-   * Address: 0x0063AFF0 (FUN_0063AFF0, cleanup_CAniActorConstructStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the global
-   * `CAniActorConstruct` node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorConstructStartupThunkB()
-  {
-    return cleanup_CAniActorConstruct_Impl();
-  }
-
   void CleanupCAniActorTypeInfoAtexit()
   {
     cleanup_CAniActorTypeInfo_Impl();
   }
-
-  void CleanupCAniActorConstructAtexit()
-  {
-    (void)cleanup_CAniActorConstruct_Impl();
-  }
-
-  /**
-   * Address: 0x0063C160 (FUN_0063C160, sub_63C160)
-   *
-   * What it does:
-   * Initializes `CAniActorConstruct` helper callbacks and returns helper singleton.
-   */
-  [[nodiscard]] moho::CAniActorConstruct* setup_CAniActorConstructHelper()
-  {
-    InitializeHelperNode(gCAniActorConstruct);
-    gCAniActorConstruct.mSerConstructFunc = reinterpret_cast<gpg::RType::construct_func_t>(&moho::CAniActorConstruct::Construct);
-    gCAniActorConstruct.mDeleteFunc = &moho::CAniActorConstruct::Deconstruct;
-    return &gCAniActorConstruct;
-  }
-
 } // namespace
 
 namespace moho
@@ -968,14 +886,31 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063C190 (FUN_0063C190, sub_63C190)
+   * Address: 0x0063C190 (FUN_0063C190, Moho::CAniActorConstruct::Init)
    */
-  void CAniActorConstruct::RegisterConstructFunctions()
+  void CAniActorConstruct::Init()
   {
     gpg::RType* const type = CachedCAniActorType();
     GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mSerConstructFunc);
     type->serConstructFunc_ = mSerConstructFunc;
     type->deleteFunc_ = mDeleteFunc;
+  }
+
+  /**
+   * Address: 0x00BD2B20 (FUN_00BD2B20, dynamic initializer for the global
+   * `CAniActorConstruct` singleton)
+   */
+  CAniActorConstruct::CAniActorConstruct()
+    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CAniActorConstruct::Construct))
+    , mDeleteFunc(&CAniActorConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
+   */
+  CAniActorConstruct::~CAniActorConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -1021,17 +956,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
-   *
-   * What it does:
-   * Unlinks global construct helper node from intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CAniActorConstruct()
-  {
-    return cleanup_CAniActorConstruct_Impl();
-  }
-
-  /**
    * Address: 0x00BD2B00 (FUN_00BD2B00, register_CAniActorTypeInfo)
    *
    * What it does:
@@ -1041,19 +965,6 @@ namespace moho
   {
     (void)AcquireCAniActorTypeInfo();
     (void)std::atexit(&CleanupCAniActorTypeInfoAtexit);
-  }
-
-  /**
-   * Address: 0x00BD2B20 (FUN_00BD2B20, register_CAniActorConstruct)
-   *
-   * What it does:
-   * Initializes global construct helper callbacks and installs exit cleanup.
-   */
-  void register_CAniActorConstruct()
-  {
-    CAniActorConstruct* const construct = setup_CAniActorConstructHelper();
-    construct->RegisterConstructFunctions();
-    (void)std::atexit(&CleanupCAniActorConstructAtexit);
   }
 
   /**
@@ -1078,7 +989,6 @@ namespace
     CAniActorStartupBootstrap()
     {
       moho::register_CAniActorTypeInfo();
-      moho::register_CAniActorConstruct();
       moho::register_CAniActorSerializer();
     }
   };
