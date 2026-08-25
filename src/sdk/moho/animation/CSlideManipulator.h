@@ -86,6 +86,24 @@ namespace moho
      */
     void SetWorldUnits(bool enabled) noexcept;
 
+    /**
+     * Address: 0x00648B10 (FUN_00648B10, Moho::CSlideManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base state, current/goal vectors, scalar
+     * motion parameters, and the world-units flag.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00648C20 (FUN_00648C20, Moho::CSlideManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base state, current/goal vectors, scalar
+     * motion parameters, and the world-units flag.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     static gpg::RType* sType;
 
     Wm3::Vector3f mCurrentPosition{}; // +0x80
@@ -106,6 +124,23 @@ namespace moho
   static_assert(offsetof(CSlideManipulator, mDeceleration) == 0xA4, "CSlideManipulator::mDeceleration offset must be 0xA4");
   static_assert(offsetof(CSlideManipulator, mWorldUnits) == 0xA8, "CSlideManipulator::mWorldUnits offset must be 0xA8");
   static_assert(sizeof(CSlideManipulator) == 0xB0, "CSlideManipulator size must be 0xB0");
+
+  /**
+   * VFTABLE: 0x00E22F7C
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CSlideManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer
+   *    (`register_CSlideManipulatorSerializer`): 0x00BD34C0
+   *    (__xc_a-reachable; dead zero-xref COMDAT duplicate: 0x00648490)
+   *  - dtor: 0x00BFB2C0 (`??1CSlideManipulatorSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x006484C0
+   *  - Deserialize(): 0x00646F60
+   *  - Serialize(): 0x00646F70
+   */
+  using CSlideManipulatorSerializer = gpg::SerSaveLoadHelper<CSlideManipulator>;
 
   class CSlideManipulatorTypeInfo : public gpg::RType
   {
