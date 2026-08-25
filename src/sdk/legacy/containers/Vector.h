@@ -4358,6 +4358,28 @@ namespace msvc8
          * (`FUN_008F2080`, already recovered, `D3D9Interfaces.cpp`)
          * `runtime.adapters`-population path, growing the adapter list
          * during device-capability enumeration.
+         *
+         * Address: 0x005C6580 (FUN_005C6580, sub_5C6580) -- `insert(pos,
+         * count, value)` for the same unidentified 0x1C-byte WeakPtr-shaped
+         * element as `uninit_copy_n`'s `FUN_005CDEF0` above (3-dword header,
+         * tag byte@+0x0C, raw pointer@+0x10, `_InterlockedExchangeAdd`-
+         * bumped refcount-block pointer@+0x14, trailing byte@+0x18) -- one
+         * of that citation's five previously-unidentified candidate callers
+         * (`0x005C6580`/`0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`),
+         * now confirmed by field-for-field match against the local-copy
+         * staging this member performs (`const T localValue(value)`'s
+         * real emission here: copies the 3-dword header + tag into a local
+         * buffer, `_InterlockedExchangeAdd`-bumps the refcount block if
+         * non-null, matching this member's self-aliasing guard exactly).
+         * IDA's own decompile carries a "bad/positive sp value... may be
+         * wrong" disclaimer. Calls this instantiation's own `_Ufill`/tail-
+         * shift helpers (`sub_5C9D60`/`sub_5C9DA0`/`sub_5CBCC0`) and the
+         * `153391689`(=`0xFFFFFFFF/28`) `max_size` overflow guard, matching
+         * this member's shape. Owning element/class identity and this
+         * member's own real caller remain open -- the other four candidate
+         * addresses from the `uninit_copy_n` citation are still
+         * unidentified; this citation resolves one of five, not the whole
+         * cluster.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -4831,10 +4853,13 @@ namespace msvc8
          * verbatim; the `test eax,eax` dst-null guard wraps only the copy
          * body (same defensive-null shape as FUN_00549BC0/FUN_00832B80
          * above) while all four cursors still advance by the 0x1C stride
-         * every iteration. Owning element type and caller not yet
-         * identified -- none of the five candidate callers (0x005C6580,
-         * 0x005C9D60, 0x005CBCA0, 0x005CD0E0, 0x005CD9E0) are recovered
-         * source yet.)
+         * every iteration. Owning element type still not identified. One
+         * of the five candidate callers is now resolved: `0x005C6580` is
+         * this instantiation's own `insert(pos, count, value)` (cited
+         * below on that member) -- confirmed by field-for-field match of
+         * its local-copy staging against this element's exact layout. The
+         * other four (`0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`)
+         * remain unrecovered source.)
          *
          * Address: 0x00832BC0 (FUN_00832BC0, `msvc8::vector<void*>::
          * uninit_copy_n` for a 4-byte pointer element -- `[first@ecx,
