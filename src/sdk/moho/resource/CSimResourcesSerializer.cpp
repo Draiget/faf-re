@@ -11,70 +11,6 @@
 
 namespace
 {
-  using Serializer = moho::CSimResourcesSerializer;
-
-  Serializer gCSimResourcesSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* ResetCSimResourcesSerializerHelperLinks() noexcept
-  {
-    gCSimResourcesSerializer.mHelperNext->mPrev = gCSimResourcesSerializer.mHelperPrev;
-    gCSimResourcesSerializer.mHelperPrev->mNext = gCSimResourcesSerializer.mHelperNext;
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCSimResourcesSerializer);
-    gCSimResourcesSerializer.mHelperPrev = self;
-    gCSimResourcesSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00546C20 (FUN_00546C20)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CSimResourcesSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] Serializer* InitializeCSimResourcesSerializerStartupThunk() noexcept
-  {
-    InitializeSerializerNode(gCSimResourcesSerializer);
-    gCSimResourcesSerializer.mDeserialize = &moho::CSimResourcesSerializer::Deserialize;
-    gCSimResourcesSerializer.mSerialize = &moho::CSimResourcesSerializer::Serialize;
-    return &gCSimResourcesSerializer;
-  }
-
-  /**
-   * Address: 0x00546C50 (FUN_00546C50)
-   *
-   * What it does:
-   * Unlinks `CSimResourcesSerializer` helper node from the intrusive helper
-   * list and restores self-linked sentinel links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupCSimResourcesSerializerHelperNodePrimary() noexcept
-  {
-    return ResetCSimResourcesSerializerHelperLinks();
-  }
-
-  /**
-   * Address: 0x00546C80 (FUN_00546C80)
-   *
-   * What it does:
-   * Secondary entrypoint for `CSimResourcesSerializer` helper-node unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCSimResourcesSerializerHelperNodeSecondary() noexcept
-  {
-    return ResetCSimResourcesSerializerHelperLinks();
-  }
-
   [[nodiscard]] const gpg::RRef& NullOwnerRef() noexcept
   {
     static const gpg::RRef kNullOwner{nullptr, nullptr};
@@ -90,15 +26,11 @@ namespace
     return sType;
   }
 
-  struct CSimResourcesSerializerStartup
-  {
-    CSimResourcesSerializerStartup()
-    {
-      moho::register_CSimResourcesSerializer();
-    }
-  };
-
-  [[maybe_unused]] CSimResourcesSerializerStartup gCSimResourcesSerializerStartup;
+  // Address: 0x010ABFDC -- process-global `CSimResourcesSerializer` singleton
+  // (constructed by FUN_00BC96D0, self-registering via `__xc_a`; see
+  // CSimResourcesSerializer.h for the real-ctor/atexit-target/dead-duplicate
+  // evidence).
+  moho::CSimResourcesSerializer gCSimResourcesSerializer;
 } // namespace
 
 namespace moho
@@ -128,28 +60,23 @@ namespace moho
   /**
    * Address: 0x00547870 (FUN_00547870, gpg::SerSaveLoadHelper_CSimResources::Init)
    */
-  void CSimResourcesSerializer::RegisterSerializeFunctions()
+  void CSimResourcesSerializer::Init()
   {
     gpg::RType* const typeInfo = resource_reflection::ResolveCSimResourcesType();
     resource_reflection::RegisterSerializeCallbacks(typeInfo, mDeserialize, mSerialize);
   }
 
   /**
-   * Address: 0x00BF42C0 (FUN_00BF42C0, cleanup_CSimResourcesSerializer)
+   * Address: 0x00BC96D0 (FUN_00BC96D0, dynamic initializer for the global
+   * `CSimResourcesSerializer` singleton)
    */
-  void cleanup_CSimResourcesSerializer()
-  {
-    (void)CleanupCSimResourcesSerializerHelperNodePrimary();
-  }
+  CSimResourcesSerializer::CSimResourcesSerializer()
+    : mDeserialize(&CSimResourcesSerializer::Deserialize)
+    , mSerialize(&CSimResourcesSerializer::Serialize)
+  {}
 
-  /**
-   * Address: 0x00BC96D0 (FUN_00BC96D0, register_CSimResourcesSerializer)
-   */
-  void register_CSimResourcesSerializer()
+  CSimResourcesSerializer::~CSimResourcesSerializer()
   {
-    InitializeSerializerNode(gCSimResourcesSerializer);
-    gCSimResourcesSerializer.mDeserialize = &CSimResourcesSerializer::Deserialize;
-    gCSimResourcesSerializer.mSerialize = &CSimResourcesSerializer::Serialize;
-    (void)std::atexit(&cleanup_CSimResourcesSerializer);
+    ResetLinks();
   }
 } // namespace moho
