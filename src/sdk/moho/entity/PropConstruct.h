@@ -4,56 +4,55 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E2F4E4
    * COL: 0x00E8D85C
    */
-  class PropConstruct
+  class PropConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x006FA9E0 (FUN_006FA9E0, sub_6FA9E0)
+     * Address: 0x00BD98D0 (FUN_00BD98D0, dynamic initializer for the global
+     * `PropConstruct` singleton)
      *
      * What it does:
-     * Binds Prop construct/delete callbacks into reflected RTTI.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the construct/delete callback fields. Plain unlink atexit
+     * target, modeled as the compiler's implicit static-destructor
+     * registration.
      */
-    virtual void RegisterConstructFunction();
+    PropConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~PropConstruct();
+
+    /**
+     * Address: 0x006FA9E0 (FUN_006FA9E0, gpg::SerConstructHelper_Prop::Init)
+     *
+     * What it does:
+     * Asserts `Prop`'s reflected construct callback is not already bound,
+     * then installs the construct/delete callback lanes into `Prop` RTTI
+     * (unconditional on the delete lane -- the binary does not assert it).
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
   };
 
-  static_assert(offsetof(PropConstruct, mHelperLinks) == 0x04, "PropConstruct::mHelperLinks offset must be 0x04");
   static_assert(
     offsetof(PropConstruct, mConstructCallback) == 0x0C, "PropConstruct::mConstructCallback offset must be 0x0C"
   );
   static_assert(offsetof(PropConstruct, mDeleteCallback) == 0x10, "PropConstruct::mDeleteCallback offset must be 0x10");
   static_assert(sizeof(PropConstruct) == 0x14, "PropConstruct size must be 0x14");
-
-  /**
-   * Address: 0x00BFF200 (FUN_00BFF200, sub_BFF200)
-   *
-   * What it does:
-   * Unlinks `PropConstruct` helper node from global serializer intrusive list.
-   */
-  gpg::SerHelperBase* cleanup_PropConstruct();
-
-  /**
-   * Address: 0x00BD98D0 (FUN_00BD98D0, sub_BD98D0)
-   *
-   * What it does:
-   * Initializes `PropConstruct` helper callback slots and registers them.
-   */
-  void register_PropConstruct();
 } // namespace moho
-
-
