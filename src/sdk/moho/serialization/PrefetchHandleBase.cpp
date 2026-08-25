@@ -228,6 +228,8 @@ namespace
   PrefetchSetTypeRegistration gPrefetchSetTypeRegistration{};
 
   moho::PrefetchHandleBaseTypeInfo gPrefetchHandleBaseTypeInfo;
+
+  // Address: 0x010A8938 -- process-global `PrefetchHandleBaseSerializer` singleton.
   moho::PrefetchHandleBaseSerializer gPrefetchHandleBaseSerializer;
 
   void CleanupPrefetchHandleBaseTypeInfoAtExit() noexcept
@@ -236,34 +238,10 @@ namespace
     gPrefetchHandleBaseTypeInfo.bases_ = msvc8::vector<gpg::RField>{};
   }
 
-  void CleanupPrefetchHandleBaseSerializerAtExit()
-  {
-    (void)moho::ResetPrefetchHandleBaseSerializerLinksVariant1();
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::PrefetchHandleBaseSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  gpg::SerHelperBase* ResetSerializerLinks(moho::PrefetchHandleBaseSerializer& serializer)
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   void EnsurePrefetchHandleBaseRegistered()
   {
     static const bool kRegistered = []() {
       moho::register_PrefetchHandleBaseTypeInfo();
-      moho::register_PrefetchHandleBaseSerializer();
       return true;
     }();
 
@@ -289,27 +267,6 @@ namespace moho
     gpg::PreRegisterRType(typeid(PrefetchHandleBase), &gPrefetchHandleBaseTypeInfo);
     static const bool kAtexitRegistered = []() {
       (void)std::atexit(&CleanupPrefetchHandleBaseTypeInfoAtExit);
-      return true;
-    }();
-    (void)kAtexitRegistered;
-  }
-
-  /**
-   * Address: 0x00BC5BE0 (FUN_00BC5BE0, register_PrefetchHandleBaseSerializer)
-   *
-   * What it does:
-   * Materializes prefetch-handle serializer startup registration.
-   */
-  void register_PrefetchHandleBaseSerializer()
-  {
-    gPrefetchHandleBaseSerializer.mHelperNext = nullptr;
-    gPrefetchHandleBaseSerializer.mHelperPrev = nullptr;
-    (void)ResetSerializerLinks(gPrefetchHandleBaseSerializer);
-    gPrefetchHandleBaseSerializer.mLoadCallback = &PrefetchHandleBaseSerializer::Deserialize;
-    gPrefetchHandleBaseSerializer.mSaveCallback = &PrefetchHandleBaseSerializer::Serialize;
-    gPrefetchHandleBaseSerializer.RegisterSerializeFunctions();
-    static const bool kAtexitRegistered = []() {
-      (void)std::atexit(&CleanupPrefetchHandleBaseSerializerAtExit);
       return true;
     }();
     (void)kAtexitRegistered;
@@ -429,22 +386,6 @@ namespace moho
   {
     GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRequest != nullptr);
     return mPtr->mRequest->mResourceType;
-  }
-
-  /**
-   * Address: 0x004ABDA0 (FUN_004ABDA0)
-   */
-  gpg::SerHelperBase* ResetPrefetchHandleBaseSerializerLinksVariant1()
-  {
-    return ResetSerializerLinks(gPrefetchHandleBaseSerializer);
-  }
-
-  /**
-   * Address: 0x004ABDD0 (FUN_004ABDD0)
-   */
-  gpg::SerHelperBase* ResetPrefetchHandleBaseSerializerLinksVariant2()
-  {
-    return ResetSerializerLinks(gPrefetchHandleBaseSerializer);
   }
 } // namespace moho
 

@@ -78,14 +78,6 @@ namespace moho
    */
   void register_PrefetchHandleBaseTypeInfo();
 
-  /**
-   * Address: 0x00BC5BE0 (FUN_00BC5BE0, register_PrefetchHandleBaseSerializer)
-   *
-   * What it does:
-   * Materializes prefetch-handle serializer startup registration.
-   */
-  void register_PrefetchHandleBaseSerializer();
-
   class PrefetchHandleBase
   {
   public:
