@@ -161,6 +161,29 @@ namespace msvc8
          * shift/ctrl/alt/keycode chord and runs the bound command string
          * through `Moho::CON_Execute` on a hit.
          */
+        /**
+         * Address: 0x006ADD30 (FUN_006ADD30, func_hasArmorType -- IDA's own
+         * inferred name; not a real "has type" predicate, see below) --
+         * `msvc8::map<msvc8::string, float>::find` -- `Unit::
+         * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D. Same
+         * fused shape as `FUN_0083A950` above: `find_node`'s nil-or-key-
+         * greater verify step is inlined into this emission (via
+         * `std::operator<<char>`, the `msvc8::string` less-than compare)
+         * rather than called out separately, while the lower-bound descent
+         * itself remains out-of-line as `lower_bound_node`'s emission for
+         * this instantiation (`FUN_006AFBF0`, cited in `RbTree.h`). Three
+         * confirmed real callers, all in `Unit.cpp`: `Unit::
+         * ProcessArmorOnDamage` (0x006A9D60, `ArmorMultipliers.find(...)` in
+         * the recovered combat-math body), `Unit::GetArmorMult` (0x006A9E10,
+         * same pattern), and `cfunc_UnitGetArmorMultL` (0x006C4200) via
+         * `Unit::GetArmorMult`. Previously `recovered` with an address
+         * annotation attached to `IsArmorMapSentinel` -- a trivial
+         * null-or-isNil predicate that does not implement this function's
+         * documented lower-bound-then-verify behavior at all (a
+         * mis-attribution, not a real recovery of this address); that
+         * helper is deleted and this member's real call sites (`.find()`)
+         * are the recovery now (DB-integrity fix).
+         */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
 
@@ -308,6 +331,34 @@ namespace msvc8
          * Locates the lower bound for `k`; when that cursor is `end()` or holds a
          * greater key, inserts `value_type(k, mapped_type())` at the located gap.
          * Returns a reference to the mapped value either way.
+         */
+        /**
+         * Address: 0x006ADBF0 (FUN_006ADBF0) -- `msvc8::map<msvc8::string,
+         * float>::operator[]` -- `Unit::ArmorMultipliers` in `moho/unit/
+         * core/Unit.h`, isNil@+0x2D. IDA's own inferred listing name for
+         * this address is `std::map_string_float::find` -- WRONG: `find()`
+         * never mutates, but this emission constructs a fresh key copy and
+         * calls the hinted-insert internal (`insert_hint`'s emission for
+         * this instantiation, `FUN_006AEDD0`, cited in `RbTree.h`) whenever
+         * the lower-bound miss, then returns `&result->second` (a raw
+         * `float*`/`mapped_type&`, trivial ABI, not the hidden-pointer
+         * `iterator` convention `find()`'s own emission above uses) --
+         * exactly this member's find-then-conditional-insert-then-return-
+         * reference shape, not `find()`'s read-only shape. Three confirmed
+         * real callers, all in `Unit.cpp`: `Unit::InitializeArmor`
+         * (0x006A7B90, `ArmorMultipliers[damageTypeName] = armorMultiplier`
+         * seeding entries from blueprint armor definitions), an
+         * owner=<none> inlined chunk at 0x006A9DF6 (inside one of the two
+         * recovered callers above), and `cfunc_UnitAlterArmorL` (0x006C4000,
+         * the Lua `Unit:AlterArmor(damageTypeName, multiplier)` setter,
+         * `unit->ArmorMultipliers[armorTypeName] = armorMultiplier`).
+         * Previously marked `external_dependency` with a generic bulk-tag
+         * note ("STL template instantiation / codec helper - external") --
+         * wrong on two counts: this is a real engine-instantiated map
+         * (`Unit`'s own armor data, not a generic/third-party codec), and
+         * per RULE ONE its recovery is this member's own call sites in
+         * `Unit.cpp`, not a hand-rolled free function or an external tag
+         * (DB-integrity fix).
          */
         mapped_type& operator[](const key_type& k)
         {

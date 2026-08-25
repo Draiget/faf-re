@@ -938,23 +938,6 @@ namespace
     std::int32_t lane8;
   };
 
-  struct StringFloatMapNodeRuntime
-  {
-    StringFloatMapNodeRuntime* left;
-    StringFloatMapNodeRuntime* parent;
-    StringFloatMapNodeRuntime* right;
-    std::uint8_t color;
-    std::uint8_t isNil;
-    std::uint8_t pad0E[2];
-    std::string key;
-    float value;
-  };
-
-  struct StringFloatMapRuntime
-  {
-    StringFloatMapNodeRuntime* head;
-  };
-
   struct RbMapFlag65Runtime
   {
     std::uint32_t allocatorCookie;
@@ -4195,38 +4178,6 @@ TripleIntNodeRuntime* AllocateTripleIntNodeRuntime(
   node->lane4 = lane4;
   node->lane8 = lane8Source != nullptr ? *lane8Source : 0;
   return node;
-}
-
-/**
- * Address: 0x006AFBF0 (FUN_006AFBF0)
- *
- * What it does:
- * Returns lower-bound candidate node for one key in a string->float RB-tree.
- */
-StringFloatMapNodeRuntime* LowerBoundStringFloatMapRuntime(
-  StringFloatMapRuntime* const map,
-  const std::string* const key
-)
-{
-  if (map == nullptr || map->head == nullptr) {
-    return nullptr;
-  }
-
-  const std::string emptyKey;
-  const std::string& lookupKey = key != nullptr ? *key : emptyKey;
-
-  StringFloatMapNodeRuntime* candidate = map->head;
-  StringFloatMapNodeRuntime* cursor = map->head->parent;
-  while (cursor != nullptr && cursor->isNil == 0u) {
-    const int compare = cursor->key.compare(lookupKey);
-    if (compare >= 0) {
-      candidate = cursor;
-      cursor = cursor->left;
-    } else {
-      cursor = cursor->right;
-    }
-  }
-  return candidate;
 }
 
 /**
