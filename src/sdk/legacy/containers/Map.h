@@ -312,17 +312,29 @@ namespace msvc8
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
         /**
-         * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) --
-         * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>::erase(const
-         * key_type&)` (`gUiKeyActionMap`, `UiRuntimeTypes.cpp:1394`,
-         * isNil@+0x15). `find_node`-then-conditionally-`erase_node` shape
+         * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) -- CORRECTED: was
+         * mislabeled `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>`
+         * here despite already noting `isNil@+0x15` -- that offset belongs
+         * to `UiKeyRepeatMap`, not `UiKeyActionMap` (which is isNil@+0x2D;
+         * see `FUN_0083A640` cited on `erase(const_iterator)` above). This
+         * is `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::erase(const
+         * key_type&)` (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:
+         * 1395`). `find_node`-then-conditionally-`erase_node` shape
          * matching this member exactly (`RemoveUiKeyMapEntries`'s
-         * `gUiKeyActionMap.erase(keyMask)`, `UiRuntimeTypes.cpp:1465`,
-         * already recovered). The `out_of_range` guard this compiles in
-         * (via `erase_node`'s own `_SECURE_SCL` checked-iterator machinery,
-         * see this file's `~rb_tree()` note in `RbTree.h`) is unreachable
-         * here since `n` is always either nil (short-circuited before the
-         * call) or a genuinely-found, valid node.)
+         * `gUiKeyRepeatMap.erase(keyMask)`, `UiRuntimeTypes.cpp:1466` --
+         * not `:1465`, which is the sibling `gUiKeyActionMap.erase(keyMask)`
+         * call the mislabeled version pointed at instead -- already
+         * recovered). The compiled body is FUN_0083AA70's own `erase_node`
+         * shape with the `find_node` descent inlined directly into
+         * `RemoveUiKeyMapEntries` (`FUN_00839270`) rather than compiled as
+         * a separate `erase(key)` symbol for this instantiation; the real
+         * canonical home and full evidence trail is `erase_node`'s
+         * citation for this same address in `RbTree.h`. The `out_of_range`
+         * guard this compiles in (via `erase_node`'s own `_SECURE_SCL`
+         * checked-iterator machinery, see this file's `~rb_tree()` note in
+         * `RbTree.h`) is unreachable here since `n` is always either nil
+         * (short-circuited before the call) or a genuinely-found, valid
+         * node.)
          */
         size_type erase(const key_type& k)
         {
