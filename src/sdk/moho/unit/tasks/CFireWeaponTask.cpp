@@ -22,9 +22,7 @@ using namespace moho;
 
 namespace moho
 {
-  class CFireWeaponTaskSerializer;
   class CFireWeaponTaskTypeInfo;
-  void register_CFireWeaponTaskSerializer();
   void register_CFireWeaponTaskTypeInfo();
 
   template <>
@@ -346,8 +344,10 @@ namespace
   {
     FireWeaponTaskReflectionBootstrap()
     {
+      // moho::CFireWeaponTaskSerializer registers itself via its own plain
+      // global's dynamic initializer (see CFireWeaponTaskSerializer.cpp);
+      // this bootstrap only needs to force the TypeInfo provider.
       (void)moho::register_CFireWeaponTaskTypeInfo();
-      (void)moho::register_CFireWeaponTaskSerializer();
     }
   };
 
