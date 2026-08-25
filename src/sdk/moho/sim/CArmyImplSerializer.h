@@ -4,16 +4,33 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CArmyImplSerializer
+  /**
+   * VFTABLE: 0x00E2FC2C
+   */
+  class CArmyImplSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD9C20 (FUN_00BD9C20, dynamic initializer for the global
+     * `CArmyImplSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CArmyImplSerializer();
+
+    /**
+     * Address: 0x00BFF410 (FUN_00BFF410, ??1CArmyImplSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CArmyImplSerializer();
+
     /**
      * Address: 0x00701000 (FUN_00701000, Moho::CArmyImplSerializer::Deserialize)
      *
@@ -36,21 +53,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into CArmyImpl RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CArmyImplSerializer, mHelperNext) == 0x04, "CArmyImplSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CArmyImplSerializer, mHelperPrev) == 0x08, "CArmyImplSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CArmyImplSerializer, mLoadCallback) == 0x0C, "CArmyImplSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -58,13 +67,4 @@ namespace moho
     offsetof(CArmyImplSerializer, mSaveCallback) == 0x10, "CArmyImplSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CArmyImplSerializer) == 0x14, "CArmyImplSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BD9C20 (FUN_00BD9C20, register_CArmyImplSerializer)
-   *
-   * What it does:
-   * Initializes serializer callback lanes for `CArmyImpl` and binds them into
-   * reflected RTTI.
-   */
-  void register_CArmyImplSerializer();
 } // namespace moho
