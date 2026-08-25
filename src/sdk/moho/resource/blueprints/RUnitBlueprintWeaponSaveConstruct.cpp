@@ -19,37 +19,38 @@ namespace gpg
 
 namespace
 {
+  // See the matching comment in RUnitBlueprintWeaponConstruct.cpp:
+  // RUnitBlueprintWeapon has no plain `sType` static member, so this TU
+  // keeps its own lazily resolved cache rather than adding a new data
+  // member to RUnitBlueprintWeapon's binary layout.
   gpg::RType* gUnitBlueprintType = nullptr;
   gpg::RType* gUnitBlueprintWeaponType = nullptr;
-  moho::RUnitBlueprintWeaponSaveConstruct gUnitBlueprintWeaponSaveConstruct;
+
+  // Address: 0x010AB4A8 -- process-global `RUnitBlueprintWeaponSaveConstruct`
+  // singleton. Constructing it runs RUnitBlueprintWeaponSaveConstruct::
+  // RUnitBlueprintWeaponSaveConstruct() (0x00BC8CA0), which splices this
+  // helper into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
+  // InitNewHelpers() later dispatches Init() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::RUnitBlueprintWeaponSaveConstruct gRUnitBlueprintWeaponSaveConstructHelper;
 
   /**
-   * Address: 0x00522E00 (FUN_00522E00)
+   * Address: 0x00BF37B0 (FUN_00BF37B0)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintWeaponSaveConstruct` helper node from the global
-   * serializer-helper intrusive list and restores self-links.
-   */
-  [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary() noexcept
-  {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintWeaponSaveConstruct);
-  }
-
-  /**
-   * Address: 0x00522E30 (FUN_00522E30)
+   * Unlinks the `RUnitBlueprintWeaponSaveConstruct` helper node from
+   * whatever intrusive list it currently sits in and restores a self-linked
+   * sentinel state. Registered by the real dynamic initializer (0x00BC8CA0)
+   * as the global's `atexit` teardown.
    *
-   * What it does:
-   * Secondary unlink entrypoint for `RUnitBlueprintWeaponSaveConstruct`
-   * helper-node cleanup; behavior matches the primary lane.
+   * ICF twins: 0x00522E00 (FUN_00522E00) and 0x00522E30 (FUN_00522E30) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintWeaponSaveConstructHelperNodeSecondary() noexcept
+  void CleanupRUnitBlueprintWeaponSaveConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintWeaponSaveConstruct);
-  }
-
-  void CleanupUnitBlueprintWeaponSaveConstructAtexit()
-  {
-    (void)CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary();
+    gRUnitBlueprintWeaponSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
@@ -102,57 +103,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x005237C0 (FUN_005237C0, sub_5237C0)
+   * Address: 0x00BC8CA0 (FUN_00BC8CA0, dynamic initializer for the global
+   * `RUnitBlueprintWeaponSaveConstruct` singleton)
    *
    * What it does:
-   * Binds `RUnitBlueprintWeapon` save-construct-args callback into reflected
-   * RTTI (`serSaveConstructArgsFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  void RUnitBlueprintWeaponSaveConstruct::RegisterSaveConstructArgsFunction()
+  RUnitBlueprintWeaponSaveConstruct::RUnitBlueprintWeaponSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintWeaponThunk)
+      )
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RUnitBlueprintWeapon>(gUnitBlueprintWeaponType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+    (void)std::atexit(&CleanupRUnitBlueprintWeaponSaveConstruct);
   }
 
   /**
-   * Address: 0x00BF37B0 (FUN_00BF37B0, sub_BF37B0)
+   * Address: 0x005237C0 (FUN_005237C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprintWeapon>::Init)
    *
    * What it does:
-   * Unlinks `RUnitBlueprintWeaponSaveConstruct` helper links and rewires
-   * self-links.
+   * Resolves `RUnitBlueprintWeapon` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RUnitBlueprintWeaponSaveConstruct()
+  void RUnitBlueprintWeaponSaveConstruct::Init()
   {
-    return CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary();
-  }
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00BC8CA0 (FUN_00BC8CA0, sub_BC8CA0)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RUnitBlueprintWeapon`.
-   */
-  int register_RUnitBlueprintWeaponSaveConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gUnitBlueprintWeaponSaveConstruct);
-    gUnitBlueprintWeaponSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintWeaponThunk);
-    gUnitBlueprintWeaponSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupUnitBlueprintWeaponSaveConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RUnitBlueprintWeapon>(gUnitBlueprintWeaponType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RUnitBlueprintWeaponSaveConstructBootstrap
-  {
-    RUnitBlueprintWeaponSaveConstructBootstrap()
-    {
-      (void)moho::register_RUnitBlueprintWeaponSaveConstruct();
-    }
-  };
-
-  RUnitBlueprintWeaponSaveConstructBootstrap gRUnitBlueprintWeaponSaveConstructBootstrap;
-} // namespace

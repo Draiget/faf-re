@@ -15,35 +15,45 @@ namespace moho
   /**
    * VFTABLE: 0x00E15ACC
    * COL: 0x00E693A4
+   *
+   * Demangled: gpg::SerConstructHelper<class Moho::RUnitBlueprintWeapon>
+   *
+   * What it does:
+   * Binds the construct/delete callbacks used to materialize
+   * `RUnitBlueprintWeapon` references during load. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  class RUnitBlueprintWeaponConstruct
+  class RUnitBlueprintWeaponConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00523840 (FUN_00523840, sub_523840)
-     * Slot: 0
+     * Address: 0x00BC8CD0 (FUN_00BC8CD0, dynamic initializer for the global
+     * `RUnitBlueprintWeaponConstruct` singleton)
      *
      * What it does:
-     * Binds `RUnitBlueprintWeapon` construct/delete callbacks into reflected
-     * RTTI (`serConstructFunc_`, `deleteFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the construct/delete callback fields, and registers process-exit
+     * cleanup.
      */
-    virtual void RegisterConstructFunction();
+    RUnitBlueprintWeaponConstruct();
+
+    /**
+     * Address: 0x00523840 (FUN_00523840, gpg::SerConstructHelper<Moho::RUnitBlueprintWeapon>::Init)
+     *
+     * What it does:
+     * Lazily resolves the `RUnitBlueprintWeapon` reflection descriptor,
+     * asserts the construct callback slot is empty, and publishes this
+     * helper's construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
-
-  static_assert(
-    offsetof(RUnitBlueprintWeaponConstruct, mHelperNext) == 0x04,
-    "RUnitBlueprintWeaponConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintWeaponConstruct, mHelperPrev) == 0x08,
-    "RUnitBlueprintWeaponConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RUnitBlueprintWeaponConstruct, mConstructCallback) == 0x0C,
     "RUnitBlueprintWeaponConstruct::mConstructCallback offset must be 0x0C"
@@ -75,22 +85,4 @@ namespace moho
    * Deletes one constructed `RUnitBlueprintWeapon`.
    */
   void Delete_RUnitBlueprintWeapon(void* objectPtr);
-
-  /**
-   * Address: 0x00BF37E0 (FUN_00BF37E0, sub_BF37E0)
-   *
-   * What it does:
-   * Unlinks `RUnitBlueprintWeaponConstruct` helper links and rewires
-   * self-links.
-   */
-  gpg::SerHelperBase* cleanup_RUnitBlueprintWeaponConstruct();
-
-  /**
-   * Address: 0x00BC8CD0 (FUN_00BC8CD0, sub_BC8CD0)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for
-   * `RUnitBlueprintWeapon`.
-   */
-  int register_RUnitBlueprintWeaponConstruct();
 } // namespace moho
