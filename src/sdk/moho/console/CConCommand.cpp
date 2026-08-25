@@ -1,5 +1,6 @@
 #include "moho/console/CConCommand.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
@@ -148,6 +149,8 @@ namespace
   constexpr const char* kConsoleStartupWLDAdvanceBeatDescription = "Advance the sim one beat.";
   constexpr const char* kConsoleStartupWLDSingleStepDescription = "Single-step the sim one tick.";
   constexpr const char* kConsoleStartupWLDGameSpeedDescription = "Set a new game speed";
+  constexpr const char* kConsoleStartupConFindUnitDescription =
+    "Find a unit by a (case insensitive) string contained in its description.";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
@@ -3267,6 +3270,79 @@ void moho::WLD_GameSpeed(void* const commandArgs)
 }
 
 /**
+ * Address: 0x008D3CC0 (FUN_008D3CC0, sub_8D3CC0)
+ *
+ * std::vector_string*
+ *
+ * What it does:
+ * `FindUnit term...`. Lowercases every argument after the command name into
+ * a scratch term list, then walks the active session's rules' unit
+ * blueprint map (`RRuleGameRulesImpl::GetUnitBlueprints`, an ordinary
+ * `msvc8::map<msvc8::string, void*>` - iterated in place, matching the
+ * no-defensive-copy idiom `InitializeArmyUnitCategorySets` in
+ * CArmyImpl.cpp already established for this exact container). A blueprint
+ * matches when every lowercased term is a substring of its (also
+ * lowercased) `Display.DisplayName`; each match prints `"id - displayName"`
+ * and a trailing `"%d units matching"` line reports the count. Silently
+ * does nothing with no active session or fewer than two arguments - the
+ * binary has no localized "no session" feedback here, unlike most of this
+ * file's other selection/session commands.
+ *
+ * Registrar: FUN_00BE95C0 (`__xc_a` lane), data-xref
+ * `dword_F5BEAC = offset sub_8D3CC0` is the callsite evidence. Name is read
+ * from the PE `.data` initializer of `stru_F5BEA0` ("FindUnit"); the
+ * description string sits in the same struct.
+ */
+void moho::CON_FindUnit(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  msvc8::vector<msvc8::string> searchTermsLower;
+  for (std::size_t index = 1u; index < args.Count(); ++index) {
+    searchTermsLower.push_back(gpg::STR_ToLower(TokenDataOrEmpty(args.At(index))));
+  }
+
+  RRuleGameRulesImpl* const rules = session->mRules;
+  int matchCount = 0;
+  for (const auto& [blueprintId, blueprintPtr] : rules->GetUnitBlueprints()) {
+    auto* const unitBlueprint = static_cast<RUnitBlueprint*>(blueprintPtr);
+    if (unitBlueprint == nullptr) {
+      continue;
+    }
+
+    const msvc8::string nameLower = gpg::STR_ToLower(unitBlueprint->Display.DisplayName.c_str());
+    const bool allTermsMatch = std::all_of(
+      searchTermsLower.begin(),
+      searchTermsLower.end(),
+      [&nameLower](const msvc8::string& term) { return std::strstr(nameLower.c_str(), term.c_str()) != nullptr; }
+    );
+
+    if (allTermsMatch) {
+      CON_Printf("%s - %s", blueprintId.c_str(), unitBlueprint->Display.DisplayName.c_str());
+      ++matchCount;
+    }
+  }
+
+  CON_Printf("%d units matching", matchCount);
+
+  // `msvc8::string` has no destructor by design (String.h); release each
+  // term's owned heap buffer explicitly, matching the established
+  // `.tidy(true, 0u)` cleanup idiom (REntityBlueprintTypeInfo.cpp,
+  // LaunchInfoBase.cpp) rather than leaking non-SSO search terms.
+  for (msvc8::string& term : searchTermsLower) {
+    term.tidy(true, 0u);
+  }
+}
+
+/**
  * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
  *
  * What it does:
@@ -3984,6 +4060,7 @@ namespace
   CConFunc gCConFunc_WLD_AdvanceBeat{};
   CConFunc gCConFunc_WLD_SingleStep{};
   CConFunc gCConFunc_WLD_GameSpeed{};
+  CConFunc gCConFunc_FindUnit{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_EFX_CreateEmitterWindow{};
@@ -4380,6 +4457,37 @@ namespace moho
       "WLD_GameSpeed",
       &moho::WLD_GameSpeed,
       &cleanup_CConFunc_WLD_GameSpeed
+    );
+  }
+
+  /**
+   * Address: 0x00C08E20 (FUN_00C08E20, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `FindUnit`.
+   */
+  void cleanup_CConFunc_FindUnit()
+  {
+    CleanupStartupConCommand(gCConFunc_FindUnit);
+  }
+
+  /**
+   * Address: 0x00BE95C0 (FUN_00BE95C0, register_CConFunc_FindUnit)
+   *
+   * What it does:
+   * Registers startup console callback for `FindUnit`. The store
+   * `dword_F5BEAC = offset sub_8D3CC0` at 0x00BE95CC is the only reference to
+   * `Moho::CON_FindUnit` anywhere in the image.
+   */
+  void register_CConFunc_FindUnit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_FindUnit,
+      kConsoleStartupConFindUnitDescription,
+      "FindUnit",
+      &moho::CON_FindUnit,
+      &cleanup_CConFunc_FindUnit
     );
   }
 
@@ -6048,6 +6156,7 @@ namespace
       moho::register_CConFunc_WLD_AdvanceBeat();
       moho::register_CConFunc_WLD_SingleStep();
       moho::register_CConFunc_WLD_GameSpeed();
+      moho::register_CConFunc_FindUnit();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();

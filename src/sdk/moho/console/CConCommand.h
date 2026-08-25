@@ -713,6 +713,19 @@ namespace moho
   void WLD_GameSpeed(void* commandArgs);
 
   /**
+   * Address: 0x008D3CC0 (FUN_008D3CC0, Moho::CON_FindUnit)
+   *
+   * What it does:
+   * `FindUnit term...`. Lowercases every argument after the command name and
+   * requires all of them to appear as substrings of a unit blueprint's
+   * display name (also lowercased) before printing `"id - displayName"` for
+   * that blueprint; prints a trailing match count. Silently does nothing
+   * with no active session or fewer than two arguments (no localized
+   * "no session" feedback, matching the binary).
+   */
+  void CON_FindUnit(void* commandArgs);
+
+  /**
    * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
    *
    * What it does:
