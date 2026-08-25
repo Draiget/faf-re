@@ -96,14 +96,48 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
-  class SSTICommandVariableDataSerializer
+  class SSTICommandVariableDataSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC9D00 (FUN_00BC9D00, dynamic initializer for the global
+     * `SSTICommandVariableDataSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed real (RTTI class name
+     * `SSTICommandVariableDataSerializer@Moho` via `vtable_writers`,
+     * standalone class, not a template instantiation).
+     */
+    SSTICommandVariableDataSerializer();
+
+    /**
+     * Address: 0x00BF4A80 (FUN_00BF4A80) -- IDA's own demangler resolves
+     * this destructor's mangled symbol to
+     * `Moho::SSTICommandVariableDataSerialize::~SSTICommandVariableDataSerialize`
+     * (missing the trailing "r"), while the vtable symbol
+     * (`??_7SSTICommandVariableDataSerializer@Moho@@6B@`) and both member
+     * functions (`Serialize`/`Deserialize`) consistently spell the class
+     * name with the "r". Treated as the same class's destructor -- the
+     * vtable + two independent member-function symbols outweigh the one
+     * discrepant destructor symbol.
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SSTICommandVariableDataSerializer();
+
     /**
      * Address: 0x00552B20 (FUN_00552B20, Moho::SSTICommandVariableDataSerializer::Serialize)
      *
      * What it does:
      * Forwards archive-load callback flow into `SSTICommandVariableData::MemberDeserialize`.
+     * Named `Serialize` despite taking a `ReadArchive*` and performing a
+     * load -- confirmed to match the real binary's own mangled symbol
+     * (`Moho::SSTICommandVariableDataSerializer::Serialize`), so this is
+     * the original 2007 source's own naming, not a recovery artifact; kept
+     * as-is rather than "corrected" to match its behavior.
      */
     static void Serialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
@@ -112,22 +146,23 @@ namespace moho
      *
      * What it does:
      * Forwards archive-save callback flow into `SSTICommandVariableData::MemberSerialize`.
+     * Named `Deserialize` despite taking a `WriteArchive*` and performing a
+     * save -- see `Serialize` above; same real-binary-confirmed naming
+     * inversion, preserved faithfully.
      */
     static void Deserialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00553260 (FUN_00553260, gpg::SerSaveLoadHelper_SSTICommandVariableData::Init)
+     * Address: 0x00553260 (FUN_00553260, Moho::SSTICommandVariableDataSerializer::Init)
      *
      * What it does:
      * Binds load/save serializer callbacks into `SSTICommandVariableData` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSTICommandVariableData, mEntIds) == 0x00, "SSTICommandVariableData::mEntIds offset must be 0x00");
@@ -156,14 +191,6 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSTICommandVariableData, v23) == 0x68, "SSTICommandVariableData::v23 offset must be 0x68"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSTICommandVariableDataSerializer, mHelperNext) == 0x04,
-    "SSTICommandVariableDataSerializer::mHelperNext offset must be 0x04"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSTICommandVariableDataSerializer, mHelperPrev) == 0x08,
-    "SSTICommandVariableDataSerializer::mHelperPrev offset must be 0x08"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSTICommandVariableDataSerializer, mSerLoadFunc) == 0x0C,
