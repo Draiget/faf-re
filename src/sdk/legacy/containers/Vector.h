@@ -4775,6 +4775,17 @@ namespace msvc8
          * shape as the 0x14 emission above):
          * Address: 0x008D9190 (FUN_008D9190, sole caller FUN_008D9CC7 is an
          * untracked code fragment; no concrete `T` identified yet)
+         * Address: 0x0087D570 (FUN_0087D570, alloc_raw callee of one of the
+         * two `Moho::CDecalManager` `buy_head` emissions RbTree.h's
+         * `buy_head` catalog cites at 0x0087C3B0 -- "owning member names
+         * not yet pinned down" there; this completes that citation's
+         * `alloc_raw` half.)
+         * Address: 0x0087D5F0 (FUN_0087D5F0, byte-identical sibling of
+         * FUN_0087D570 -- the `alloc_raw` callee of `buy_head`'s
+         * FUN_0087C5F0, the second distinct `CDecalManager` map/set
+         * instantiation. Two genuinely distinct addresses, not an ICF
+         * twin, matching `buy_head`'s own note that the two callers differ
+         * only in which of these two allocators they call.)
          *
          * sizeof(T) == 0x80 (128, `count > 0xFFFFFFFF/128` throws via the
          * reciprocal-division form `0xFFFFFFFF/count < 0x80`):
