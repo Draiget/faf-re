@@ -160,60 +160,6 @@ namespace LuaPlus
   } // namespace
 
   /**
-   * Address: 0x009232E0 (FUN_009232E0)
-   *
-   * What it does:
-   * Initializes TString save-construct helper links and binds the construct
-   * callback lane.
-   */
-  TStringSaveConstruct::TStringSaveConstruct()
-    : vftable_(nullptr),
-      mNext(nullptr),
-      mPrev(nullptr),
-      mConstruct(&TStringSaveConstruct::Construct)
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&mNext);
-    mNext = self;
-    mPrev = self;
-  }
-
-  /**
-   * Address: 0x00923360 (FUN_00923360)
-   *
-   * What it does:
-   * Initializes table save-construct helper links and binds the construct
-   * callback lane.
-   */
-  TableSaveConstruct::TableSaveConstruct()
-    : vftable_(nullptr),
-      mNext(nullptr),
-      mPrev(nullptr),
-      mConstruct(&TableSaveConstruct::Construct)
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&mNext);
-    mNext = self;
-    mPrev = self;
-  }
-
-  /**
-   * Address: 0x009235B0 (FUN_009235B0)
-   *
-   * What it does:
-   * Initializes lua-thread save-construct helper links and binds the
-   * construct callback lane.
-   */
-  lua_StateSaveConstruct::lua_StateSaveConstruct()
-    : vftable_(nullptr),
-      mNext(nullptr),
-      mPrev(nullptr),
-      mConstruct(&lua_StateSaveConstruct::Construct)
-  {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&mNext);
-    mNext = self;
-    mPrev = self;
-  }
-
-  /**
    * Address: 0x0090BC50 (FUN_0090BC50, LuaPlus::LuaStateSaveConstruct::Construct)
    *
    * What it does:
@@ -229,6 +175,22 @@ namespace LuaPlus
   )
   {
     ApplyLuaStateSaveConstructCompatibilityLane(state, result);
+  }
+
+  /**
+   * Address: 0x00BE9F90 (FUN_00BE9F90, dynamic initializer for the global
+   * `LuaStateSaveConstruct` singleton)
+   */
+  LuaStateSaveConstruct::LuaStateSaveConstruct()
+    : mConstruct(&LuaStateSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09820 (FUN_00C09820, LuaPlus::LuaStateSaveConstruct::~LuaStateSaveConstruct)
+   */
+  LuaStateSaveConstruct::~LuaStateSaveConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -249,6 +211,22 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA530 (FUN_00BEA530, dynamic initializer for the global
+   * `UpValSaveConstruct` singleton)
+   */
+  UpValSaveConstruct::UpValSaveConstruct()
+    : mConstruct(&UpValSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09BB0 (FUN_00C09BB0, UpValSaveConstruct::~UpValSaveConstruct)
+   */
+  UpValSaveConstruct::~UpValSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x0091E520 (FUN_0091E520, ProtoSaveConstruct::Construct)
    *
    * What it does:
@@ -263,6 +241,22 @@ namespace LuaPlus
   )
   {
     result->SetOwned(0u);
+  }
+
+  /**
+   * Address: 0x00BEA640 (FUN_00BEA640, dynamic initializer for the global
+   * `ProtoSaveConstruct` singleton)
+   */
+  ProtoSaveConstruct::ProtoSaveConstruct()
+    : mConstruct(&ProtoSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09C40 (FUN_00C09C40, ProtoSaveConstruct::~ProtoSaveConstruct)
+   */
+  ProtoSaveConstruct::~ProtoSaveConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -286,6 +280,22 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA860 (FUN_00BEA860, dynamic initializer for the global
+   * `UdataSaveConstruct` singleton)
+   */
+  UdataSaveConstruct::UdataSaveConstruct()
+    : mConstruct(&UdataSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09D60 (FUN_00C09D60, UdataSaveConstruct::~UdataSaveConstruct)
+   */
+  UdataSaveConstruct::~UdataSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x0091F490 (FUN_0091F490, LClosureSaveConstruct::Construct)
    *
    * What it does:
@@ -306,6 +316,22 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA420 (FUN_00BEA420, dynamic initializer for the global
+   * `LClosureSaveConstruct` singleton)
+   */
+  LClosureSaveConstruct::LClosureSaveConstruct()
+    : mConstruct(&LClosureSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09B20 (FUN_00C09B20, LClosureSaveConstruct::~LClosureSaveConstruct)
+   */
+  LClosureSaveConstruct::~LClosureSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x009220A0 (FUN_009220A0, TStringSaveConstruct::Construct)
    *
    * What it does:
@@ -320,6 +346,22 @@ namespace LuaPlus
   )
   {
     SerializeTStringSaveConstructPayload(archive, value, result);
+  }
+
+  /**
+   * Address: 0x00BEA200 (FUN_00BEA200, dynamic initializer for the global
+   * `TStringSaveConstruct` singleton)
+   */
+  TStringSaveConstruct::TStringSaveConstruct()
+    : mConstruct(&TStringSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09A00 (FUN_00C09A00, TStringSaveConstruct::~TStringSaveConstruct)
+   */
+  TStringSaveConstruct::~TStringSaveConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -340,6 +382,22 @@ namespace LuaPlus
   }
 
   /**
+   * Address: 0x00BEA310 (FUN_00BEA310, dynamic initializer for the global
+   * `TableSaveConstruct` singleton)
+   */
+  TableSaveConstruct::TableSaveConstruct()
+    : mConstruct(&TableSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09A90 (FUN_00C09A90, TableSaveConstruct::~TableSaveConstruct)
+   */
+  TableSaveConstruct::~TableSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x00922610 (FUN_00922610, lua_StateSaveConstruct::Construct)
    *
    * What it does:
@@ -357,13 +415,29 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x00BEA750 (FUN_00BEA750, dynamic initializer for the global
+   * `lua_StateSaveConstruct` singleton)
+   */
+  lua_StateSaveConstruct::lua_StateSaveConstruct()
+    : mConstruct(&lua_StateSaveConstruct::Construct)
+  {}
+
+  /**
+   * Address: 0x00C09CD0 (FUN_00C09CD0, lua_StateSaveConstruct::~lua_StateSaveConstruct)
+   */
+  lua_StateSaveConstruct::~lua_StateSaveConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for
    * `LuaPlus::LuaState`.
    */
-  void LuaStateSaveConstruct::RegisterSaveConstructArgsFunction()
+  void LuaStateSaveConstruct::Init()
   {
     static gpg::RType* sLuaStateType = nullptr;
     if (sLuaStateType == nullptr) {
@@ -375,12 +449,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091F930 (FUN_0091F930, TStringSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x0091F930 (FUN_0091F930, TStringSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `TString`.
    */
-  void TStringSaveConstruct::RegisterSaveConstructArgsFunction()
+  void TStringSaveConstruct::Init()
   {
     static gpg::RType* sTStringType = nullptr;
     if (sTStringType == nullptr) {
@@ -392,12 +466,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FAC0 (FUN_0091FAC0, TableSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x0091FAC0 (FUN_0091FAC0, TableSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `Table`.
    */
-  void TableSaveConstruct::RegisterSaveConstructArgsFunction()
+  void TableSaveConstruct::Init()
   {
     static gpg::RType* sTableType = nullptr;
     if (sTableType == nullptr) {
@@ -409,12 +483,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FC50 (FUN_0091FC50, LClosureSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x0091FC50 (FUN_0091FC50, LClosureSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `LClosure`.
    */
-  void LClosureSaveConstruct::RegisterSaveConstructArgsFunction()
+  void LClosureSaveConstruct::Init()
   {
     static gpg::RType* sLClosureType = nullptr;
     if (sLClosureType == nullptr) {
@@ -426,12 +500,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FDE0 (FUN_0091FDE0, UpValSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x0091FDE0 (FUN_0091FDE0, UpValSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `UpVal`.
    */
-  void UpValSaveConstruct::RegisterSaveConstructArgsFunction()
+  void UpValSaveConstruct::Init()
   {
     static gpg::RType* sUpValType = nullptr;
     if (sUpValType == nullptr) {
@@ -443,12 +517,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x0091FF70 (FUN_0091FF70, ProtoSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x0091FF70 (FUN_0091FF70, ProtoSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `Proto`.
    */
-  void ProtoSaveConstruct::RegisterSaveConstructArgsFunction()
+  void ProtoSaveConstruct::Init()
   {
     static gpg::RType* sProtoType = nullptr;
     if (sProtoType == nullptr) {
@@ -460,13 +534,13 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x00920100 (FUN_00920100, lua_StateSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x00920100 (FUN_00920100, lua_StateSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for
    * `lua_State`.
    */
-  void lua_StateSaveConstruct::RegisterSaveConstructArgsFunction()
+  void lua_StateSaveConstruct::Init()
   {
     static gpg::RType* sLuaThreadType = nullptr;
     if (sLuaThreadType == nullptr) {
@@ -478,12 +552,12 @@ namespace LuaPlus
   }
 
   /**
-   * Address: 0x00920290 (FUN_00920290, UdataSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x00920290 (FUN_00920290, UdataSaveConstruct::Init)
    *
    * What it does:
    * Binds the save-construct-args callback into reflected RTTI for `Udata`.
    */
-  void UdataSaveConstruct::RegisterSaveConstructArgsFunction()
+  void UdataSaveConstruct::Init()
   {
     static gpg::RType* sUdataType = nullptr;
     if (sUdataType == nullptr) {
@@ -497,66 +571,27 @@ namespace LuaPlus
 
 namespace
 {
-  LuaPlus::UdataSaveConstruct gUdataSaveConstructHelper{};
+  // Address: 0x00F8E5C0 -- process-global `LuaStateSaveConstruct` singleton.
+  LuaPlus::LuaStateSaveConstruct gLuaStateSaveConstruct;
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
+  // Address: 0x00F8E6E0 -- process-global `lua_StateSaveConstruct` singleton.
+  LuaPlus::lua_StateSaveConstruct gLuaThreadStateSaveConstruct;
 
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
+  // Address: 0x00F8E89C -- process-global `TStringSaveConstruct` singleton.
+  LuaPlus::TStringSaveConstruct gTStringSaveConstruct;
 
-  template <typename THelper>
-  void UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
+  // Address: 0x00F8E87C -- process-global `TableSaveConstruct` singleton.
+  LuaPlus::TableSaveConstruct gTableSaveConstruct;
 
-    InitializeHelperNode(helper);
-  }
+  // Address: 0x00F8E88C -- process-global `LClosureSaveConstruct` singleton.
+  LuaPlus::LClosureSaveConstruct gLClosureSaveConstruct;
 
-  /**
-   * Address: 0x00C09D60 (FUN_00C09D60, UdataSaveConstruct::~UdataSaveConstruct)
-   *
-   * What it does:
-   * Unlinks the global Udata save-construct helper from intrusive helper
-   * links.
-   */
-  void cleanup_UdataSaveConstruct()
-  {
-    UnlinkHelperNode(gUdataSaveConstructHelper);
-  }
+  // Address: 0x00F8E924 -- process-global `UpValSaveConstruct` singleton.
+  LuaPlus::UpValSaveConstruct gUpValSaveConstruct;
 
-  /**
-   * Address: 0x00BEA860 (FUN_00BEA860, register_UdataSaveConstruct)
-   *
-   * What it does:
-   * Initializes Udata save-construct helper callback and schedules teardown.
-   */
-  void register_UdataSaveConstruct()
-  {
-    InitializeHelperNode(gUdataSaveConstructHelper);
-    gUdataSaveConstructHelper.mConstruct = &LuaPlus::UdataSaveConstruct::Construct;
-    gUdataSaveConstructHelper.RegisterSaveConstructArgsFunction();
-    (void)std::atexit(&cleanup_UdataSaveConstruct);
-  }
+  // Address: 0x00F8EA24 -- process-global `ProtoSaveConstruct` singleton.
+  LuaPlus::ProtoSaveConstruct gProtoSaveConstruct;
 
-  struct UdataSaveConstructBootstrap
-  {
-    UdataSaveConstructBootstrap()
-    {
-      register_UdataSaveConstruct();
-    }
-  };
-
-  [[maybe_unused]] UdataSaveConstructBootstrap gUdataSaveConstructBootstrap{};
+  // Address: 0x00F8E86C -- process-global `UdataSaveConstruct` singleton.
+  LuaPlus::UdataSaveConstruct gUdataSaveConstruct;
 } // namespace
