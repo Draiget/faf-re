@@ -490,8 +490,10 @@ void CDecalBuffer::ReadDecalHandles(gpg::ReadArchive* const ar)
  * call pair, gated on `mStartTick != 0` exactly as the binary gates it
  * (decals with no start tick were never inserted into the bucket tree by
  * `CreateHandle` in the first place). CreateHandle's own insert-side wiring
- * into the same start-tick bucket tree is deferred (needs `FUN_0077A930`
- * and its own dependency closure).
+ * into the same start-tick bucket tree (`mStartTickBuckets[...].insert(handle)`,
+ * see `CreateHandle` above) is already done -- `FUN_0077A930`/`FUN_0077CE50`
+ * are both recovered, cited on `legacy/containers/RbTree.h`'s canonical
+ * insert member for this map/set instantiation.
  */
 void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
 {
