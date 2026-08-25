@@ -28514,84 +28514,37 @@ gpg::RType* Sim::sType = nullptr;
 
 namespace
 {
-  SimSerializer gSimSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SimSerializerSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gSimSerializer.mNext);
-  }
-
-  void InitializeSimSerializerNode() noexcept
-  {
-    gpg::SerHelperBase* const self = SimSerializerSelfNode();
-    gSimSerializer.mNext = self;
-    gSimSerializer.mPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSimSerializerNode() noexcept
-  {
-    if (gSimSerializer.mNext != nullptr && gSimSerializer.mPrev != nullptr) {
-      gSimSerializer.mNext->mPrev = gSimSerializer.mPrev;
-      gSimSerializer.mPrev->mNext = gSimSerializer.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SimSerializerSelfNode();
-    gSimSerializer.mPrev = self;
-    gSimSerializer.mNext = self;
-    return self;
-  }
-
-  struct SimSerializerNodeBootstrap
-  {
-    SimSerializerNodeBootstrap()
-    {
-      InitializeSimSerializerNode();
-    }
-  };
-
-  SimSerializerNodeBootstrap gSimSerializerNodeBootstrap;
+  // Address: 0x010BA3F0 -- process-global `SimSerializer` singleton.
+  SimSerializer gSimSerializer;
 } // namespace
 
 /**
- * Address: 0x0074CFB0 (FUN_0074CFB0, sub_74CFB0)
+ * Address: 0x00BDBC90 (FUN_00BDBC90, dynamic initializer for the global
+ * `SimSerializer` singleton)
  */
-void SimSerializer::RegisterSerializeFunctions()
-{
-  // 0x0074CF80 / 0x00744F90 initialize these callback slots in static init.
-  if (mSerLoadFunc == nullptr) {
-    mSerLoadFunc = &SimSerializerLoadThunk;
-  }
-  if (mSerSaveFunc == nullptr) {
-    mSerSaveFunc = &SimSerializerSaveThunk;
-  }
+SimSerializer::SimSerializer()
+  : mSerLoadFunc(&SimSerializerLoadThunk)
+  , mSerSaveFunc(&SimSerializerSaveThunk)
+{}
 
-  gpg::RType* type = gpg::LookupRType(typeid(Sim));
+/**
+ * Address: 0x00C00EC0 (FUN_00C00EC0, Moho::SimSerializer::~SimSerializer)
+ */
+SimSerializer::~SimSerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x0074CFB0 (FUN_0074CFB0, Moho::SimSerializer::Init)
+ */
+void SimSerializer::Init()
+{
+  gpg::RType* const type = gpg::LookupRType(typeid(Sim));
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mSerLoadFunc;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
- * Address: 0x00744FC0 (FUN_00744FC0)
- *
- * What it does:
- * Duplicated teardown lane for `SimSerializer` helper links.
- */
-gpg::SerHelperBase* cleanup_SimSerializer_variant_primary()
-{
-  return UnlinkSimSerializerNode();
-}
-
-/**
- * Address: 0x00744FF0 (FUN_00744FF0)
- *
- * What it does:
- * Secondary duplicated teardown lane for `SimSerializer` helper links.
- */
-gpg::SerHelperBase* cleanup_SimSerializer_variant_secondary()
-{
-  return UnlinkSimSerializerNode();
 }
 
 /**
