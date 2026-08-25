@@ -1801,6 +1801,19 @@ namespace msvc8
          * msvc8::vector<Moho::SAniSkelBone>::capacity)
          * Address: 0x0054DCA0 (FUN_0054DCA0,
          * msvc8::vector<Moho::SAniSkelBoneNameIndex>::capacity)
+         * Address: 0x008F5D90 (FUN_008F5D90, `msvc8::vector<AdapterModeD3D10>::
+         * capacity` for the 0x74-byte (116) element -- `this->first_ ?
+         * (this->end_-this->first_)/116 : 0`, same ternary null-guard shape
+         * as the sibling `FUN_008F5E00`/`size()` entry above. Reached from
+         * `_Insert_n`'s growth-branch capacity check (`FUN_008F7770`, cited
+         * below on `insert`, `cur+count > capacity()`). DB previously
+         * mis-attributed this token to `CrtRuntimeHelpers.cpp` with no real
+         * citation there (same "DB-integrity bulk fix 2026-08-24... plausible-
+         * sounding boilerplate" contamination already documented for several
+         * other tokens this session); corrected to `recovered` here -- this
+         * member's own prose already named it as `FUN_008F7770`'s
+         * `recommended_capacity` input but never gave it a formal Address
+         * block until now.)
          *
          * Returns reserved element capacity from retained `[first_, end_)` range.
          */
@@ -3679,6 +3692,18 @@ namespace msvc8
          * together. `sub_751D30`/`sub_751D70`/`sub_751DA0` (the in-place
          * shift / destroy-tail / allocate sub-helpers this instantiation
          * calls) are not individually cited yet -- follow-up.)
+         * Address: 0x00751D30 (FUN_00751D30, this `CSimConVarInstanceBase*`
+         * instantiation's in-place tail-shift sub-step -- `count =
+         * (rangeEnd-rangeBegin)>>2` (4-byte pointer stride), `memmove_s(
+         * dest, count*4, rangeBegin, count*4)` when `count != 0`, returns
+         * `dest + count*4` (the new range end). Reached from `FUN_0074F8E0`
+         * above's in-place branch (tail-shift-by-memmove for the trivially-
+         * copyable pointer element). DB previously mis-attributed this
+         * token to `CrtRuntimeHelpers.cpp` with no real citation there (same
+         * "DB-integrity bulk fix 2026-08-24... plausible-sounding
+         * boilerplate" contamination documented for several other tokens
+         * this session); corrected to `recovered` here, resolving the
+         * "not individually cited yet" follow-up noted just above.)
          * Address: 0x008F7770 (FUN_008F7770, `msvc8::vector<AdapterModeD3D10>::
          * insert(pos, count, value)` / `_Insert_n` core for the 0x74-byte
          * (116) non-trivial `AdapterModeD3D10` element -- `AdapterD3D10::
