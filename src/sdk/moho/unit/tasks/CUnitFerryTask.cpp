@@ -5,6 +5,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/CAiTarget.h"
@@ -46,6 +47,34 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CUnitFerryTask));
       moho::CUnitFerryTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFerryTaskCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFerryTaskVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFerryTaskWeakPtrUnitType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
     }
     return type;
   }
@@ -1036,6 +1065,33 @@ namespace moho
       default:
         return 1;
     }
+  }
+
+  /**
+   * Address: 0x006109B0 (FUN_006109B0, sub_6109B0)
+   *
+   * What it does:
+   * Loads this ferry task's own state on top of the base CCommandTask load:
+   * mDispatch, mCommandIndex, mFollowsExistingRoute, mPos, then mRouteUnit/
+   * mFerryUnit/mBeacon in that order.
+   */
+  [[maybe_unused]] void CUnitFerryTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef owner{};
+
+    archive->Read(CachedFerryTaskCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
+
+    CCommandTask* dispatchAsCommandTask = nullptr;
+    archive->ReadPointer_CCommandTask(&dispatchAsCommandTask, &owner);
+    mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchAsCommandTask);
+
+    archive->ReadInt(&mCommandIndex);
+    archive->ReadBool(&mFollowsExistingRoute);
+
+    archive->Read(CachedFerryTaskVector3fType(), &mPos, owner);
+    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mRouteUnit, owner);
+    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mFerryUnit, owner);
+    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mBeacon, owner);
   }
 } // namespace moho
 
