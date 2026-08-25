@@ -1697,6 +1697,11 @@ namespace {
 using libpng_layout::Field;
 using libpng_layout::RawBase;
 using libpng_layout::kPngStructSize;
+// Read-state mode bits: kPngHaveIhdr/kPngHavePlte/kPngHaveIdat now live in
+// libpng_layout (PngStructLayout.h), shared with the write path.
+using libpng_layout::kPngHaveIhdr;
+using libpng_layout::kPngHavePlte;
+using libpng_layout::kPngHaveIdat;
 
 // libpng version string the runtime expects from the application header.
 constexpr const char* kPngLibraryVersion = "1.2.5rc3";
@@ -1708,9 +1713,6 @@ constexpr std::size_t kOffMallocFn = 0x248;
 constexpr std::size_t kOffFreeFn   = 0x24C;
 
 // Read-state mode bits used here.
-constexpr std::uint32_t kPngHaveIhdr      = 0x0001;
-constexpr std::uint32_t kPngHavePlte      = 0x0002;
-constexpr std::uint32_t kPngHaveIdat      = 0x0004;
 constexpr std::uint32_t kPngAfterIdat     = 0x0008;
 constexpr std::uint32_t kPngHaveIend      = 0x0010;
 constexpr std::uint32_t kPngHaveFileSig   = 0x1000;

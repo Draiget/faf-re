@@ -92,14 +92,31 @@ struct png_text
 using png_textp = png_text*;
 static_assert(sizeof(png_text) == 16, "png_text must be 16 bytes");
 
+// libpng png_sPLT_entry (10-byte record): one suggested-palette entry.
+// Always stored as five native uint16 fields regardless of spalette->depth;
+// png_write_sPLT truncates red/green/blue/alpha to their low byte on output
+// only when depth == 8 (frequency stays a full 16-bit value either way).
+// Binary evidence: png_write_sPLT (0x00A25023) walks spalette->entries in
+// 10-byte (5 x uint16) strides regardless of depth.
+struct png_sPLT_entry
+{
+  std::uint16_t red;        // +0x00
+  std::uint16_t green;      // +0x02
+  std::uint16_t blue;       // +0x04
+  std::uint16_t alpha;      // +0x06
+  std::uint16_t frequency;  // +0x08
+};
+static_assert(sizeof(png_sPLT_entry) == 0x0A, "png_sPLT_entry size must be 0x0A");
+using png_sPLT_entryp = const png_sPLT_entry*;
+
 // libpng png_sPLT_t (16-byte record). png_free_data touches .name and .entries.
 struct png_sPLT_t
 {
-  char*         name;          // +0x00
-  std::uint8_t  depth;         // +0x04
-  std::uint8_t  pad_05_08[3];  // +0x05
-  void*         entries;       // +0x08
-  std::int32_t  nentries;      // +0x0C
+  char*             name;          // +0x00
+  std::uint8_t      depth;         // +0x04
+  std::uint8_t      pad_05_08[3];  // +0x05
+  png_sPLT_entry*   entries;       // +0x08
+  std::int32_t      nentries;      // +0x0C
 };
 using png_sPLT_tp = png_sPLT_t*;
 static_assert(sizeof(png_sPLT_t) == 16, "png_sPLT_t must be 16 bytes");
@@ -259,13 +276,20 @@ static_assert(offsetof(png_info_struct, unknown_chunks_num) == 0xC0);
 constexpr std::uint32_t kPngInfoGamma = 0x0001;
 constexpr std::uint32_t kPngInfoSbit  = 0x0002;
 constexpr std::uint32_t kPngInfoChrm  = 0x0004;
+constexpr std::uint32_t kPngInfoPlte  = 0x0008;
+constexpr std::uint32_t kPngInfoTrns  = 0x0010;
 constexpr std::uint32_t kPngInfoBkgd  = 0x0020;
+constexpr std::uint32_t kPngInfoHist  = 0x0040;
 constexpr std::uint32_t kPngInfoPhys  = 0x0080;
 constexpr std::uint32_t kPngInfoOffs  = 0x0100;
 constexpr std::uint32_t kPngInfoTime  = 0x0200;
 // png_struct.mode flag PNG_WROTE_tIME (guards png_set_tIME from overwriting):
 constexpr std::uint32_t kPngWroteTime = 0x0200;
+constexpr std::uint32_t kPngInfoPcal  = 0x0400;
 constexpr std::uint32_t kPngInfoSrgb  = 0x0800;
+constexpr std::uint32_t kPngInfoIccp  = 0x1000;
+constexpr std::uint32_t kPngInfoSplt  = 0x2000;
+constexpr std::uint32_t kPngInfoScal  = 0x4000;
 
 // Maximum gamma value (libpng 1.2.x: 21474.83).
 constexpr double kPngGammaMaxValue = 21474.83;

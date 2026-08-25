@@ -50,8 +50,11 @@ constexpr std::size_t kOffFlags             = 0x6C;   // png_uint_32 flags
 constexpr std::size_t kOffTransformations   = 0x70;   // png_uint_32 transformations
 constexpr std::size_t kOffZbuf              = 0xAC;   // png_bytep   zbuf
 constexpr std::size_t kOffZbufSize          = 0xB0;   // png_size_t  zbuf_size
+constexpr std::size_t kOffZlibLevel         = 0xB4;   // int         zlib_level (set by png_write_IHDR = Z_DEFAULT_COMPRESSION)
 constexpr std::size_t kOffZlibMethod        = 0xB8;   // int         zlib_method
 constexpr std::size_t kOffZlibWindowBits    = 0xBC;   // int         zlib_window_bits
+constexpr std::size_t kOffZlibMemLevel      = 0xC0;   // int         zlib_mem_level
+constexpr std::size_t kOffZlibStrategy      = 0xC4;   // int         zlib_strategy
 constexpr std::size_t kOffZstream           = 0x74;   // z_stream    zstream
 constexpr std::size_t kOffZstreamNextIn     = 0x74;   // z_stream.next_in
 constexpr std::size_t kOffZstreamAvailIn    = 0x78;   // z_stream.avail_in
@@ -77,6 +80,7 @@ constexpr std::size_t kOffChunkList         = 0x224;  // png_bytep   chunk_list
 constexpr std::size_t kOffWidth             = 0xC8;   // png_uint_32 width       (set by png_handle_IHDR)
 constexpr std::size_t kOffHeight            = 0xCC;   // png_uint_32 height      (set by png_handle_IHDR)
 constexpr std::size_t kOffNumRows           = 0xD0;   // png_uint_32 num_rows    (rows in current pass)
+constexpr std::size_t kOffUsrWidth          = 0xD4;   // png_uint_32 usr_width   (set by png_write_IHDR = width)
 constexpr std::size_t kOffRowbytes          = 0xD8;   // png_uint_32 rowbytes    (bytes in a full row)
 constexpr std::size_t kOffIrowbytes         = 0xDC;   // png_uint_32 irowbytes   (bytes in current interlaced row)
 constexpr std::size_t kOffIwidth            = 0xE0;   // png_uint_32 iwidth      (pixels in current interlaced row)
@@ -98,6 +102,7 @@ constexpr std::size_t kOffUsrChannels       = 0x12B;  // png_byte usr_channels (
 constexpr std::size_t kOffUsrBitDepth       = 0x128;  // png_byte usr_bit_depth(offset 296)
 constexpr std::size_t kOffInterlaced        = 0x123;  // png_byte interlaced (offset 291)
 constexpr std::size_t kOffPass              = 0x124;  // png_byte pass       (offset 292)
+constexpr std::size_t kOffDoFilter          = 0x125;  // png_byte do_filter  (offset 293), set by png_write_IHDR
 constexpr std::size_t kOffFiller            = 0x12E;  // png_uint_16 filler  (offset 302)
 constexpr std::size_t kOffShift             = 0x181;  // png_color_8 shift   (offset 385, 5 bytes)
 
@@ -175,11 +180,15 @@ template <typename T>
 [[nodiscard]] inline std::uint8_t&  ColorType(png_structp p) noexcept   { return *(RawBase(p) + kOffColorType); }
 [[nodiscard]] inline std::uint8_t&  Interlaced(png_structp p) noexcept  { return *(RawBase(p) + kOffInterlaced); }
 [[nodiscard]] inline std::uint8_t&  Pass(png_structp p) noexcept        { return *(RawBase(p) + kOffPass); }
+[[nodiscard]] inline std::uint8_t&  DoFilter(png_structp p) noexcept    { return *(RawBase(p) + kOffDoFilter); }
 [[nodiscard]] inline std::uint8_t&  UsrBitDepth(png_structp p) noexcept { return *(RawBase(p) + kOffUsrBitDepth); }
 [[nodiscard]] inline std::uint8_t&  UsrChannels(png_structp p) noexcept { return *(RawBase(p) + kOffUsrChannels); }
 [[nodiscard]] inline std::uint16_t& Filler(png_structp p) noexcept      { return Field<std::uint16_t>(p, kOffFiller); }
 
 [[nodiscard]] inline std::uint32_t& NumRows(png_structp p) noexcept     { return Field<std::uint32_t>(p, kOffNumRows); }
+[[nodiscard]] inline std::uint32_t& UsrWidth(png_structp p) noexcept    { return Field<std::uint32_t>(p, kOffUsrWidth); }
+[[nodiscard]] inline std::uint16_t& NumPalette(png_structp p) noexcept  { return Field<std::uint16_t>(p, kOffNumPalette); }
+[[nodiscard]] inline std::uint32_t& MngFeaturesPermitted(png_structp p) noexcept { return Field<std::uint32_t>(p, kOffMngFeaturesPermitted); }
 
 // ----------------------------------------------------------------------------
 // libpng transformation flag constants used by recovered helpers
@@ -202,6 +211,29 @@ constexpr std::uint32_t kPngInvertMono     = 0x0020;
 constexpr std::uint32_t kPngSwapBytes      = 0x0010;
 constexpr std::uint32_t kPngFlagZlibCustomWindowBits = 0x0008;
 constexpr std::uint32_t kPngFlagZlibCustomMethod = 0x0010;
+// png_ptr->flags bits used by png_write_IHDR to seed zlib defaults on first use.
+constexpr std::uint32_t kPngFlagZlibCustomStrategy  = 0x0001;
+constexpr std::uint32_t kPngFlagZlibCustomLevel     = 0x0002;
+constexpr std::uint32_t kPngFlagZlibCustomMemLevel  = 0x0004;
+// png_ptr->flags bit honoured by the unknown-chunk write filter (before_PLTE / write_info).
+constexpr std::uint32_t kPngFlagKeepUnsafeChunks    = 0x10000;
+
+// png_ptr->mode bits (libpng 1.2.x png.h). Distinct bit space from png_info::valid.
+constexpr std::uint32_t kPngHaveIhdr             = 0x0001;
+constexpr std::uint32_t kPngHavePlte             = 0x0002;
+constexpr std::uint32_t kPngHaveIdat             = 0x0004;
+constexpr std::uint32_t kPngWroteInfoBeforePlte  = 0x0400;
+constexpr std::uint32_t kPngHavePngSignature     = 0x1000;
+
+// png_ptr->do_filter bitmask (libpng 1.2.x png.h): PNG_FILTER_NONE plus the
+// four real filter types, and PNG_ALL_FILTERS = SUB|UP|AVG|PAETH.
+constexpr std::uint8_t kPngFilterNone = 0x08;
+constexpr std::uint8_t kPngAllFilters = 0xF8;
+
+// png_ptr->mng_features_permitted bits (libpng 1.2.x png.h). Distinct bit
+// space from both png_info::valid and png_ptr->flags.
+constexpr std::uint32_t kPngFlagMngEmptyPlte = 0x0001;
+constexpr std::uint32_t kPngFlagMngFilter64  = 0x0004;
 
 // png_set_filler "flags" extra bit (PNG_FILLER_BEFORE flag stored at offset 0x6C+0x80 in
 // the binary's flag word; recovered binary uses bit 0x80 in field at offset 108 (0x6C)).
