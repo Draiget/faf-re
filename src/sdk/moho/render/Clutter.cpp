@@ -1285,132 +1285,27 @@ namespace
   }
 
   /**
-   * Address: 0x007D9970 (FUN_007D9970)
-   */
-  moho::ClutterSurfaceElement* CopyClutterSeedRange(
-    moho::ClutterSurfaceElement* destination,
-    const moho::ClutterSurfaceElement* source,
-    int count
-  )
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (; count > 0; --count, destinationAddress += sizeof(moho::ClutterSurfaceElement)) {
-      if (destinationAddress != 0u) {
-        auto* const out = reinterpret_cast<moho::ClutterSurfaceElement*>(destinationAddress);
-        ResetClutterSeedVtable(out);
-        out->selectionWeight = source->selectionWeight;
-        out->uniformScale = source->uniformScale;
-        out->meshBlueprint = source->meshBlueprint;
-      }
-    }
-
-    return reinterpret_cast<moho::ClutterSurfaceElement*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x007D94F0 (FUN_007D94F0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one clutter-seed range copy into the
-   * canonical count-based copy lane.
-   */
-  [[maybe_unused]] moho::ClutterSurfaceElement* CopyClutterSeedRangeAdapterA(
-    moho::ClutterSurfaceElement* const destination,
-    const moho::ClutterSurfaceElement* const source,
-    const std::uint32_t count
-  )
-  {
-    return CopyClutterSeedRange(destination, source, static_cast<int>(count));
-  }
-
-  /**
-   * Address: 0x007D7F00 (FUN_007D7F00)
-   *
-   * What it does:
-   * Copies `count` repeated `ClutterSurfaceElement` values from one seed value
-   * lane and returns one-past-end destination.
-   */
-  [[maybe_unused]] moho::ClutterSurfaceElement* CopyClutterSeedValueRange(
-    moho::ClutterSurfaceElement* const destination,
-    const moho::ClutterSurfaceElement& seedValue,
-    const std::int32_t count
-  )
-  {
-    if (count <= 0) {
-      return destination;
-    }
-
-    return CopyClutterSeedRange(destination, &seedValue, count);
-  }
-
-  /**
    * Address: 0x007D78B0 (FUN_007D78B0)
+   *
+   * What it does:
+   * Appends one seed to a surface's seed vector, growing capacity 1.5x when
+   * full. `Moho::Clutter::Surface::mSeeds` is `msvc8::vector<
+   * ClutterSurfaceElement>` (`Clutter.h`) -- this call is the natural
+   * source-level `insert(pos, value)` the compiler folded to `count=1` at
+   * `FUN_007D8620`/`FUN_007D9620` (cited on the canonical
+   * `insert(pos,count,value)` member, `Vector.h`). Previously hand-rolled
+   * here via `CopyClutterSeedRange`/`CopyClutterSeedValueRange`
+   * (0x007D9970/0x007D7F00) reaching directly into the raw begin/end/
+   * capacity triple -- collapsed into the canonical template per RULE ONE;
+   * those two addresses are now cited on `uninit_fill_n` (`Vector.h`).
    */
   std::uint32_t AppendSurfaceSeed(
     moho::ClutterSurfaceEntry* const surface,
     const moho::ClutterSurfaceElement& seed
   )
   {
-    auto* const begin = surface->eraseLane.begin;
-    auto* const end = surface->eraseLane.end;
-    auto* const cap = surface->capacity;
-    const std::uint32_t size = begin ? static_cast<std::uint32_t>(end - begin) : 0u;
-
-    if (begin != nullptr && end != cap) {
-      (void)CopyClutterSeedRange(end, &seed, 1);
-      surface->eraseLane.end = end + 1;
-      return static_cast<std::uint32_t>(surface->eraseLane.end - surface->eraseLane.begin);
-    }
-
-    constexpr std::uint32_t kMaxSurfaceSeedCount = 0x0FFFFFFFu;
-    if (size == kMaxSurfaceSeedCount) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    std::uint32_t targetCapacity = size + (size / 2u);
-    if (targetCapacity < size + 1u) {
-      targetCapacity = size + 1u;
-    }
-
-    if (targetCapacity > kMaxSurfaceSeedCount) {
-      targetCapacity = kMaxSurfaceSeedCount;
-    }
-
-    auto* const nextStorage =
-      static_cast<moho::ClutterSurfaceElement*>(::operator new(sizeof(moho::ClutterSurfaceElement) * targetCapacity));
-    moho::ClutterSurfaceElement* write = CopyClutterSeedRange(nextStorage, begin, static_cast<int>(size));
-    write = CopyClutterSeedRange(write, &seed, 1);
-
-    if (begin != nullptr) {
-      ::operator delete(begin);
-    }
-
-    surface->eraseLane.begin = nextStorage;
-    surface->eraseLane.end = write;
-    surface->capacity = nextStorage + targetCapacity;
-    return static_cast<std::uint32_t>(surface->eraseLane.end - surface->eraseLane.begin);
-  }
-
-  /**
-   * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z)
-   */
-  void DestroySurfacePayloadLane(
-    moho::ClutterSurfaceEraseLane* const lane,
-    moho::ClutterSurfaceElement*& capacity
-  )
-  {
-    moho::ClutterSurfaceElement* const begin = lane->begin;
-    if (begin) {
-      moho::ClutterSurfaceElement* const finish = lane->end;
-      for (moho::ClutterSurfaceElement* element = begin; element != finish; ++element) {
-        element->DestroyInPlace();
-      }
-      ::operator delete(begin);
-    }
-
-    lane->begin = nullptr;
-    lane->end = nullptr;
-    capacity = nullptr;
+    (void)surface->mSeeds.insert(surface->mSeeds.end(), seed);
+    return static_cast<std::uint32_t>(surface->mSeeds.size());
   }
 } // namespace
 
@@ -1460,25 +1355,40 @@ namespace moho
 
   /**
    * Address: 0x007D5CF0 (FUN_007D5CF0, ??0Surface@Clutter@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Resets the vtable to the poison/reset token and zeroes `density`.
+   * `mSeeds` default-constructs itself via member init (empty, no
+   * allocation) -- matches the real binary exactly: `Clutter::Clutter`
+   * (`FUN_007D60D0`) constructs the 256-entry `mSurfaces` array through the
+   * compiler-emitted `` `eh vector constructor iterator' `` helper calling
+   * this constructor, rather than an explicit hand-written per-entry loop.
    */
-  static ClutterSurfaceEntry* InitializeSurfaceEntry(ClutterSurfaceEntry* const surface)
+  ClutterSurfaceEntry::ClutterSurfaceEntry()
+    : vtable(SurfaceVtableResetToken())
+    , density(0)
   {
-    surface->vtable = SurfaceVtableResetToken();
-    surface->density = 0;
-    surface->eraseLane.allocatorCookie = 0;
-    surface->eraseLane.begin = nullptr;
-    surface->eraseLane.end = nullptr;
-    surface->capacity = nullptr;
-    return surface;
   }
 
   /**
    * Address: 0x007D5D10 (FUN_007D5D10)
+   * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Resets the vtable to the poison/reset token; `mSeeds` destroys its live
+   * elements and releases its buffer through its own destructor (matching
+   * the removed `DestroySurfacePayloadLane` helper's per-element
+   * `DestroyInPlace()` sweep + `operator delete`, which reduces to a no-op
+   * per element since `ClutterSurfaceElement`'s poisoned vtable resets to
+   * `SeedVtableResetTag`'s trivial defaulted destructor -- see
+   * `ResetClutterSeedVtable`/`SeedVtableResetToken` above). Reached via
+   * `Clutter::~Clutter` (`FUN_007D61E0`)'s compiler-emitted
+   * `` `eh vector destructor iterator' `` teardown of `mSurfaces`, rather
+   * than an explicit hand-written per-entry loop.
    */
-  static void DestroySurfaceEntryWrapper(ClutterSurfaceEntry* const surface)
+  ClutterSurfaceEntry::~ClutterSurfaceEntry()
   {
-    surface->vtable = SurfaceVtableResetToken();
-    DestroySurfacePayloadLane(&surface->eraseLane, surface->capacity);
+    vtable = SurfaceVtableResetToken();
   }
 
   /**
@@ -1492,9 +1402,9 @@ namespace moho
     mList2.head = reinterpret_cast<ClutterRegionListNode*>(AllocateListSentinelNode());
     mList2.size = 0;
 
-    for (ClutterSurfaceEntry& surface : mSurfaces) {
-      (void)InitializeSurfaceEntry(&surface);
-    }
+    // mSurfaces[256] (moho::ClutterSurfaceEntry, real ctor above) is
+    // default-constructed automatically here, matching the real binary's
+    // `` `eh vector constructor iterator' `` call in this constructor.
 
     mKeys.head = AllocateRegionKeyNode();
     mKeys.head->isNil = 1;
@@ -1522,9 +1432,10 @@ namespace moho
       ClearRegionKeyTreeStorage(&mKeys);
     }
 
-    for (ClutterSurfaceEntry& surface : mSurfaces) {
-      DestroySurfaceEntryWrapper(&surface);
-    }
+    // mSurfaces[256] (moho::ClutterSurfaceEntry, real dtor above) is
+    // destroyed automatically as part of this destructor's implicit member
+    // teardown, matching the real binary's `` `eh vector destructor
+    // iterator' `` call in `~Clutter`.
 
     if (mList2.head) {
       ClearIntrusiveListNodes(reinterpret_cast<ClutterIntrusiveListState*>(&mList2));
@@ -1740,50 +1651,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007D94B0 (FUN_007D94B0)
-   */
-  ClutterSurfaceElement* CompactSurfaceElements(
-    ClutterSurfaceElement* destination,
-    ClutterSurfaceElement* sourceBegin,
-    ClutterSurfaceElement* sourceEnd
-  )
-  {
-    ClutterSurfaceElement* out = destination;
-    for (ClutterSurfaceElement* src = sourceBegin; src != sourceEnd; ++src, ++out) {
-      out->selectionWeight = src->selectionWeight;
-      out->uniformScale = src->uniformScale;
-      out->meshBlueprint = src->meshBlueprint;
-    }
-    return out;
-  }
-
-  /**
-   * Address: 0x007D7E00 (FUN_007D7E00)
-   */
-  ClutterSurfaceElement** __stdcall ResetSurfaceEntryRange(
-    ClutterSurfaceEraseLane* const lane,
-    ClutterSurfaceElement** const outBegin,
-    ClutterSurfaceElement* const eraseBegin,
-    ClutterSurfaceElement* const eraseEnd
-  )
-  {
-    if (eraseBegin == eraseEnd) {
-      *outBegin = eraseBegin;
-      return outBegin;
-    }
-
-    ClutterSurfaceElement* const oldEnd = lane->end;
-    ClutterSurfaceElement* const newEnd = CompactSurfaceElements(eraseBegin, eraseEnd, oldEnd);
-    for (ClutterSurfaceElement* it = newEnd; it != oldEnd; ++it) {
-      it->DestroyInPlace();
-    }
-
-    lane->end = newEnd;
-    *outBegin = eraseBegin;
-    return outBegin;
-  }
-
-  /**
    * Address: 0x007D9400 (FUN_007D9400)
    */
   std::uint8_t ReleaseRegionListPayloads(
@@ -1979,8 +1846,8 @@ namespace moho
       return;
     }
 
-    ClutterSurfaceElement* const seedBegin = surface.eraseLane.begin;
-    ClutterSurfaceElement* const seedEnd = surface.eraseLane.end;
+    ClutterSurfaceElement* const seedBegin = surface.mSeeds.begin();
+    ClutterSurfaceElement* const seedEnd = surface.mSeeds.end();
     if (!seedBegin || seedEnd <= seedBegin) {
       return;
     }
@@ -2184,8 +2051,11 @@ namespace moho
     std::memset(mBuffer, 0, sizeof(mBuffer));
 
     for (ClutterSurfaceEntry& surface : mSurfaces) {
-      ClutterSurfaceElement* beginCopy = nullptr;
-      (void)ResetSurfaceEntryRange(&surface.eraseLane, &beginCopy, surface.eraseLane.begin, surface.eraseLane.end);
+      // Erasing the full live range [begin, end) is exactly `clear()`; the
+      // removed `ResetSurfaceEntryRange`/`CompactSurfaceElements` helpers
+      // handled the general mid-range erase shape, but this call site (the
+      // only one) always erased everything.
+      surface.mSeeds.clear();
     }
 
     if (mList2.head) {
