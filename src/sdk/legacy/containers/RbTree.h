@@ -306,6 +306,23 @@ namespace msvc8
          * offsets are independently confirmed against the `.asm` and are
          * unaffected by the key-type question.
          */
+        /**
+         * Address: 0x007CB130 (FUN_007CB130, sub_7CB130) -- `msvc8::
+         * set<char>`'s `rb_min`, the same `CLobby.cpp` ignore-names
+         * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+         * `~rb_tree`/`erase_range`/`destroy_subtree` above (node 0x10,
+         * colour@0x0D/isNil@0x0E). Register-convention body (`__usercall
+         * sub_7CB130@<eax>(_DWORD *result@<eax>)`): walks `*result`
+         * (offset 0, `_Left`) while `!isNil` (offset+0x0E), matching this
+         * member exactly. Sole caller is this instantiation's `erase_node`
+         * (`FUN_007CAC80`, cited below) via `rb_min(x)` when the erased
+         * node's replacement needs `header()->left` re-seated -- same
+         * "template-instantiated, only the per-node erase-rebalance path
+         * keeps a standalone symbol" shape as the `0x0052D960`/
+         * `0x006880F0`/`0x0094EE60` precedents above. Sibling `rb_max` for
+         * this instantiation is `FUN_007CB110` (already `skip`, walks
+         * `_Right`/offset+8).
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -2921,6 +2938,50 @@ namespace msvc8
             // earlier pass in this session mistakenly re-cited the same
             // address here as an "unidentified msvc8::set<uint32_t>" -- see
             // recovered_progress.json's FUN_00A633D0 correction note.
+            /**
+             * Address: 0x007CAC80 (FUN_007CAC80, sub_7CAC80) -- `msvc8::
+             * set<char>`'s `erase_node`, the same `CLobby.cpp` ignore-names
+             * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+             * `~rb_tree`/`erase_range`/`destroy_subtree`/`rb_min`/
+             * `rotate_left`/`rotate_right` above (node 0x10, colour@0x0D/
+             * isNil@0x0E). 233-instruction body, unmistakably this member:
+             * opens with the same `_SECURE_SCL` checked-iterator guard used
+             * throughout this file (`if (erased->isNil) throw std::
+             * out_of_range("invalid map/set<T> iterator")`), calls this
+             * instantiation's successor-find (`sub_7CB230`, already
+             * `recovered`) to pick the physically-spliced node exactly as
+             * CLRS's `y = (z has <=1 child) ? z : TREE-SUCCESSOR(z)`, then
+             * the standard single-child/two-child transplant (matching this
+             * member's `fix`/`fixParent` bookkeeping field for field,
+             * re-seating `header()->left`/`header()->right` through this
+             * instantiation's own `rb_min`/`rb_max` -- `sub_7CB130`/
+             * `sub_7CB110`, both cited above -- only when the erased node
+             * was an extremum), and finally the full black-height
+             * rebalance loop. That loop's four-case structure (mirrored for
+             * "x is left child" vs "x is right child") calls this
+             * instantiation's `rotate_left`/`rotate_right` (`sub_7CB0C0`/
+             * `sub_7CB170`, both cited above) at exactly the six call sites
+             * CLRS's `RB-DELETE-FIXUP` makes -- independently re-derived
+             * against this function's own decompile (register roles: `v8`=
+             * `x`, `v10`=`x->parent`, `v18`=`w`/sibling) rather than
+             * inferred from the rotates' shapes alone. Ends with `operator
+             * delete(erased)` and the tree's size decrement, matching this
+             * member's tail exactly.
+             *
+             * Sole caller is `erase_range`'s emission for this
+             * instantiation (`FUN_007CA730`, cited above) via
+             * `erase(_First++)` in its general (non-whole-tree) loop
+             * branch. That caller's own citation already records that its
+             * one real invocation (`~rb_tree()`'s `FUN_007CC2B0`, cited
+             * above) always takes the fast whole-tree-clear path -- so, per
+             * this file's established "template-instantiated but the
+             * per-node erase-rebalance path is compiled, not separately
+             * runtime-exercised through the currently-traced caller" shape
+             * (the `0x0052D960`/`0x006880F0`/`0x0094EE60` `rb_min`
+             * precedents above), this member and its two rotate/two
+             * extremum helpers are genuine compiled emissions of real
+             * template code, kept `recovered` rather than `skip`.
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -5060,6 +5121,33 @@ namespace msvc8
              * callers anywhere in `src/sdk`; not consolidated in this pass
              * (see the `header()` note above for why).)
              */
+            /**
+             * Address: 0x007CB0C0 (FUN_007CB0C0, sub_7CB0C0) -- `msvc8::
+             * set<char>`'s left rotate, the same `CLobby.cpp` ignore-names
+             * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+             * `~rb_tree`/`erase_range`/`destroy_subtree`/`rb_min` above
+             * (node 0x10, colour@0x0D/isNil@0x0E). IDA's own type recovery
+             * already names this instantiation's fields (`std::set_char::
+             * _Node`, `_Left`/`_Right`/`_Parent`/`_Isnil`/`_Myhead`) and the
+             * body is the textbook shape unmodified: `pivot=this->_Right;
+             * this->_Right=pivot->_Left; if(!pivot->_Left->_Isnil) pivot->
+             * _Left->_Parent=this; pivot->_Parent=this->_Parent; ...;
+             * pivot->_Left=this; this->_Parent=pivot;`, matching this
+             * member exactly. `this` (the node to rotate about) arrives in
+             * `ecx` (`__thiscall`); the sole caller's own decompile
+             * (`erase_node`'s `FUN_007CAC80`, cited below) renders the call
+             * as `sub_7CB0C0(a2)` with only the tree pointer visible --
+             * Hex-Rays failed to propagate the implicit `ecx` argument
+             * through the `erase_node` call site's function-pointer-style
+             * cast, but the real target node is unambiguous from the CLRS
+             * `RB-DELETE-FIXUP` shape: called 3x in `erase_node`'s fixup
+             * loop, twice on `parent` (the "x is left child, sibling red"
+             * case and the final rebalancing case) and once on the sibling
+             * `w` (the mirrored "x is right child" branch's case-3) --
+             * exactly the three `LEFT-ROTATE` call sites CLRS's algorithm
+             * makes, confirmed independently against this member's own
+             * unambiguous body, not just the caller's shape.
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -5250,6 +5338,28 @@ namespace msvc8
              * `moho/containers/LegacyContainerRuntime.cpp` with zero
              * callers anywhere in `src/sdk`; not consolidated in this pass
              * (see the `header()` note above for why).)
+             */
+            /**
+             * Address: 0x007CB170 (FUN_007CB170, sub_7CB170) -- `msvc8::
+             * set<char>`'s right rotate, mirror of `rotate_left`'s
+             * `FUN_007CB0C0` above, same `CLobby.cpp` ignore-names
+             * separator-set instantiation (node 0x10, colour@0x0D/isNil@
+             * 0x0E). Same IDA-recovered `std::set_char::_Node` typing as
+             * its mirror; body is the exact textbook mirror shape:
+             * `pivot=this->_Left; this->_Left=pivot->_Right; if(!pivot->
+             * _Right->_Isnil) pivot->_Right->_Parent=this; pivot->_Parent=
+             * this->_Parent; ...; pivot->_Right=this; this->_Parent=
+             * pivot;`, matching this member exactly. `this` arrives in
+             * `ecx`, same call-site rendering caveat as `FUN_007CB0C0`
+             * (`erase_node`'s decompile shows `sub_7CB170(a2)`, implicit
+             * `ecx` not propagated by Hex-Rays). Called 3x in `erase_node`'s
+             * (`FUN_007CAC80`, cited below) fixup loop: once on the sibling
+             * `w` (the "x is left child" branch's case-3) and twice on
+             * `parent` (the mirrored "x is right child, sibling red" case
+             * and its final rebalancing case) -- the exact three
+             * `RIGHT-ROTATE` call sites CLRS's `RB-DELETE-FIXUP` makes,
+             * confirmed independently against this member's own
+             * unambiguous body.
              */
             void rotate_right(node_type* const n) noexcept
             {
