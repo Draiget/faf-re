@@ -12,16 +12,27 @@ namespace moho
    * VFTABLE: 0x00E038FC
    * COL: 0x00E60048
    */
-  class Sphere3fSerializer
+  class Sphere3fSerializer : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00473FF0 (FUN_00473FF0, gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::Init)
+     * Address: 0x00BC4970 (FUN_00BC4970, dynamic initializer for the global
+     * `Sphere3fSerializer` singleton)
      *
      * What it does:
-     * Resolves Sphere3f RTTI and installs load/save callbacks for this helper.
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
      */
-    virtual void RegisterSerializeFunctions();
+    Sphere3fSerializer();
+
+    /**
+     * Address: 0x00BEF780 (FUN_00BEF780, Moho::Sphere3fSerializer::~Sphere3fSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~Sphere3fSerializer();
 
     /**
      * Address: 0x004730E0 (FUN_004730E0, Moho::Sphere3fSerializer::Deserialize)
@@ -39,19 +50,19 @@ namespace moho
      */
     static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x00473FF0 (FUN_00473FF0, gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::Init lane)
+     *
+     * What it does:
+     * Resolves Sphere3f RTTI and installs load/save callbacks for this helper.
+     */
+    void Init() override;
+
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(Sphere3fSerializer, mHelperNext) == 0x04, "Sphere3fSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(Sphere3fSerializer, mHelperPrev) == 0x08, "Sphere3fSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(Sphere3fSerializer, mLoadCallback) == 0x0C, "Sphere3fSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -59,15 +70,6 @@ namespace moho
     offsetof(Sphere3fSerializer, mSaveCallback) == 0x10, "Sphere3fSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(Sphere3fSerializer) == 0x14, "Sphere3fSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BC4970 (FUN_00BC4970, register_Sphere3fSerializer)
-   *
-   * What it does:
-   * Installs startup serializer callbacks for Sphere3f and registers shutdown
-   * unlink/teardown.
-   */
-  void register_Sphere3fSerializer();
 
   /**
    * Owns reflected metadata for `CColPrimitive<Wm3::Sphere3<float>>`.
@@ -115,9 +117,28 @@ namespace moho
   /**
    * Serializer helper for `CColPrimitive<Wm3::Sphere3<float>>` archive lanes.
    */
-  class DColPrimSphereSerializer
+  class DColPrimSphereSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC75E0 (FUN_00BC75E0, dynamic initializer for the global
+     * `DColPrimSphereSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    DColPrimSphereSerializer();
+
+    /**
+     * Address: 0x00BF1B00 (FUN_00BF1B00, Moho::DColPrimSphereSerializer::~DColPrimSphereSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimSphereSerializer();
+
     /**
      * Address: 0x004FEF40 (FUN_004FEF40, Moho::DColPrimSphereSerializer::Deserialize)
      *
@@ -137,26 +158,18 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x004FFB40 (FUN_004FFB40, Moho::DColPrimSphereSerializer::RegisterSerializeFunctions)
+     * Address: 0x004FFB40 (FUN_004FFB40, Moho::DColPrimSphereSerializer::Init)
      *
      * What it does:
      * Binds load/save callbacks into `CColPrimitive<Wm3::Sphere3<float>>` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(DColPrimSphereSerializer, mHelperNext) == 0x04, "DColPrimSphereSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimSphereSerializer, mHelperPrev) == 0x08, "DColPrimSphereSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimSphereSerializer, mDeserialize) == 0x0C, "DColPrimSphereSerializer::mDeserialize offset must be 0x0C"
   );
@@ -168,30 +181,46 @@ namespace moho
   /**
    * Construct helper for `CColPrimitive<Wm3::Sphere3<float>>`.
    */
-  class DColPrimSphereConstruct
+  class DColPrimSphereConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x004FFAC0 (FUN_004FFAC0, Moho::DColPrimSphereConstruct::RegisterConstructFunction)
+     * Address: 0x00BC75A0 (FUN_00BC75A0, dynamic initializer for the global
+     * `DColPrimSphereConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields. Confirmed from raw disassembly:
+     * `mDeleteCallback` is the real global `operator delete(void*)`
+     * directly (a `jmp ??3@YAXPAX@Z` thunk via `j_j_func_tent_Destroy_3`
+     * at 0x00500430, not a per-type wrapper that runs
+     * `~SphereCollisionPrimitive()` first) -- the ctor's own atexit
+     * target is a plain unlink thunk, so it is modeled as the compiler's
+     * implicit static-destructor registration rather than an explicit
+     * call.
+     */
+    DColPrimSphereConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimSphereConstruct();
+
+    /**
+     * Address: 0x004FFAC0 (FUN_004FFAC0, Moho::DColPrimSphereConstruct::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into `CColPrimitive<Wm3::Sphere3<float>>` RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
   };
 
-  static_assert(
-    offsetof(DColPrimSphereConstruct, mHelperNext) == 0x04, "DColPrimSphereConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimSphereConstruct, mHelperPrev) == 0x08, "DColPrimSphereConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimSphereConstruct, mConstructCallback) == 0x0C,
     "DColPrimSphereConstruct::mConstructCallback offset must be 0x0C"
@@ -205,31 +234,39 @@ namespace moho
   /**
    * Save-construct helper for `CColPrimitive<Wm3::Sphere3<float>>`.
    */
-  class DColPrimSphereSaveConstruct
+  class DColPrimSphereSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x004FFA40 (FUN_004FFA40, Moho::DColPrimSphereSaveConstruct::RegisterSaveConstructArgsFunction)
+     * Address: 0x00BC7570 (FUN_00BC7570, dynamic initializer for the global
+     * `DColPrimSphereSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field. Plain unlink atexit target,
+     * modeled as the compiler's implicit static-destructor registration.
+     */
+    DColPrimSphereSaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~DColPrimSphereSaveConstruct();
+
+    /**
+     * Address: 0x004FFA40 (FUN_004FFA40, Moho::DColPrimSphereSaveConstruct::Init)
      *
      * What it does:
      * Binds save-construct-args callback into `CColPrimitive<Wm3::Sphere3<float>>` RTTI.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
   };
 
-  static_assert(
-    offsetof(DColPrimSphereSaveConstruct, mHelperNext) == 0x04,
-    "DColPrimSphereSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DColPrimSphereSaveConstruct, mHelperPrev) == 0x08,
-    "DColPrimSphereSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(DColPrimSphereSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "DColPrimSphereSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -244,33 +281,6 @@ namespace moho
    * process-exit cleanup hook.
    */
   int register_DColPrimSphereTypeInfo();
-
-  /**
-   * Address: 0x00BC75E0 (FUN_00BC75E0, register_DColPrimSphereSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `DColPrimSphere` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_DColPrimSphereSerializer();
-
-  /**
-   * Address: 0x00BC75A0 (FUN_00BC75A0, register_DColPrimSphereConstruct)
-   *
-   * What it does:
-   * Installs construct/delete callbacks for `DColPrimSphere` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimSphereConstruct();
-
-  /**
-   * Address: 0x00BC7570 (FUN_00BC7570, register_DColPrimSphereSaveConstruct)
-   *
-   * What it does:
-   * Installs save-construct-args callbacks for `DColPrimSphere` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimSphereSaveConstruct();
 
   template <class T>
   [[nodiscard]] const T& Invalid();

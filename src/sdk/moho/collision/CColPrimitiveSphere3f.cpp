@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -38,41 +38,6 @@ namespace
     GPG_ASSERT(cached != nullptr);
     return cached;
   }
-
-  [[nodiscard]] gpg::SerHelperBase* Sphere3fSerializerSelfNode(moho::Sphere3fSerializer& serializer)
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  moho::Sphere3fSerializer gSphere3fSerializer;
-
-  [[nodiscard]] gpg::SerHelperBase* ResetSphere3fSerializerLinks()
-  {
-    if (gSphere3fSerializer.mHelperNext != nullptr && gSphere3fSerializer.mHelperPrev != nullptr) {
-      gSphere3fSerializer.mHelperNext->mPrev = gSphere3fSerializer.mHelperPrev;
-      gSphere3fSerializer.mHelperPrev->mNext = gSphere3fSerializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = Sphere3fSerializerSelfNode(gSphere3fSerializer);
-    gSphere3fSerializer.mHelperPrev = self;
-    gSphere3fSerializer.mHelperNext = self;
-    return self;
-  }
-
-  void CleanupSphere3fSerializer()
-  {
-    (void)ResetSphere3fSerializerLinks();
-  }
-
-  struct Sphere3fSerializerBootstrap
-  {
-    Sphere3fSerializerBootstrap()
-    {
-      moho::register_Sphere3fSerializer();
-    }
-  };
-
-  Sphere3fSerializerBootstrap gSphere3fSerializerBootstrap;
 } // namespace
 
 namespace Wm3
@@ -125,7 +90,7 @@ namespace moho
   /**
    * Address: 0x00473FF0 (FUN_00473FF0, gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::Init)
    */
-  void Sphere3fSerializer::RegisterSerializeFunctions()
+  void Sphere3fSerializer::Init()
   {
     gpg::RType* const type = CachedSphere3fType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -135,20 +100,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC4970 (FUN_00BC4970, register_Sphere3fSerializer)
+   * Address: 0x00BC4970 (FUN_00BC4970, dynamic initializer for the global
+   * `Sphere3fSerializer` singleton)
    *
    * What it does:
-   * Installs startup serializer callbacks for Sphere3f and registers shutdown
-   * unlink/teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_Sphere3fSerializer()
+  Sphere3fSerializer::Sphere3fSerializer()
+    : mLoadCallback(&Sphere3fSerializer::Deserialize)
+    , mSaveCallback(&Sphere3fSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BEF780 (FUN_00BEF780, Moho::Sphere3fSerializer::~Sphere3fSerializer)
+   */
+  Sphere3fSerializer::~Sphere3fSerializer()
   {
-    gpg::SerHelperBase* const self = Sphere3fSerializerSelfNode(gSphere3fSerializer);
-    gSphere3fSerializer.mHelperNext = self;
-    gSphere3fSerializer.mHelperPrev = self;
-    gSphere3fSerializer.mLoadCallback = &Sphere3fSerializer::Deserialize;
-    gSphere3fSerializer.mSaveCallback = &Sphere3fSerializer::Serialize;
-    (void)std::atexit(&CleanupSphere3fSerializer);
+    ResetLinks();
   }
 
   /**
@@ -191,75 +160,6 @@ namespace
   alignas(moho::DColPrimSphereTypeInfo) unsigned char
     gDColPrimSphereTypeInfoStorage[sizeof(moho::DColPrimSphereTypeInfo)];
   bool gDColPrimSphereTypeInfoConstructed = false;
-
-  moho::DColPrimSphereSerializer gDColPrimSphereSerializer{};
-  moho::DColPrimSphereConstruct gDColPrimSphereConstruct{};
-  moho::DColPrimSphereSaveConstruct gDColPrimSphereSaveConstruct{};
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x004FEF90 (FUN_004FEF90, DColPrimSphereSerializer helper unlink/reset)
-   *
-   * What it does:
-   * Unlinks the global `DColPrimSphereSerializer` helper node from its current
-   * intrusive lane, rewires it to a self-linked singleton node, and returns
-   * that self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimSphereSerializerHelperPrimary() noexcept
-  {
-    gDColPrimSphereSerializer.mHelperNext->mPrev = gDColPrimSphereSerializer.mHelperPrev;
-    gDColPrimSphereSerializer.mHelperPrev->mNext = gDColPrimSphereSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimSphereSerializer);
-    gDColPrimSphereSerializer.mHelperPrev = self;
-    gDColPrimSphereSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x004FEFC0 (FUN_004FEFC0, DColPrimSphereSerializer helper unlink/reset variant)
-   *
-   * What it does:
-   * Executes the duplicate serializer-helper unlink/reset lane and returns the
-   * self-linked helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimSphereSerializerHelperSecondary() noexcept
-  {
-    gDColPrimSphereSerializer.mHelperNext->mPrev = gDColPrimSphereSerializer.mHelperPrev;
-    gDColPrimSphereSerializer.mHelperPrev->mNext = gDColPrimSphereSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimSphereSerializer);
-    gDColPrimSphereSerializer.mHelperPrev = self;
-    gDColPrimSphereSerializer.mHelperNext = self;
-    return self;
-  }
 
   [[nodiscard]] gpg::RType* CachedDColPrimSpherePrimitiveType()
   {
@@ -309,7 +209,6 @@ namespace
     return ref;
   }
 
-
   void CleanupDColPrimSphereTypeInfoAtExit()
   {
     if (!gDColPrimSphereTypeInfoConstructed) {
@@ -318,21 +217,6 @@ namespace
 
     reinterpret_cast<moho::DColPrimSphereTypeInfo*>(gDColPrimSphereTypeInfoStorage)->~DColPrimSphereTypeInfo();
     gDColPrimSphereTypeInfoConstructed = false;
-  }
-
-  void CleanupDColPrimSphereSerializerAtExit()
-  {
-    (void)UnlinkDColPrimSphereSerializerHelperPrimary();
-  }
-
-  void CleanupDColPrimSphereConstructAtExit()
-  {
-    (void)UnlinkHelperNode(gDColPrimSphereConstruct);
-  }
-
-  void CleanupDColPrimSphereSaveConstructAtExit()
-  {
-    (void)UnlinkHelperNode(gDColPrimSphereSaveConstruct);
   }
 
   /**
@@ -401,37 +285,23 @@ namespace
   }
 
   /**
-   * Deletes one constructed sphere collision primitive.
+   * Address: 0x00500430 (FUN_00500430, j_j_func_tent_Destroy_3 -> ??3@YAXPAX@Z)
+   *
+   * What it does:
+   * Frees one constructed sphere collision primitive's raw storage. Confirmed
+   * from raw disassembly: the real delete-callback field is a direct jump
+   * thunk to the global `operator delete(void*)`, NOT a per-type wrapper
+   * that runs `~SphereCollisionPrimitive()` first -- `SphereCollisionPrimitive`
+   * is deleted through this path with no destructor call.
    */
   void DeleteDColPrimSphere(void* const objectPtr)
   {
-    delete static_cast<moho::SphereCollisionPrimitive*>(objectPtr);
+    ::operator delete(objectPtr);
   }
 
-  /**
-   * Address: 0x00BF1A40 (FUN_00BF1A40)
-   *
-   * What it does:
-   * Unlinks the global `DColPrimSphereTypeInfo` storage at process exit.
-   */
   void cleanup_DColPrimSphereTypeInfo_atexit()
   {
     CleanupDColPrimSphereTypeInfoAtExit();
-  }
-
-  void cleanup_DColPrimSphereSerializer_atexit()
-  {
-    (void)CleanupDColPrimSphereSerializerAtExit();
-  }
-
-  void cleanup_DColPrimSphereConstruct_atexit()
-  {
-    (void)CleanupDColPrimSphereConstructAtExit();
-  }
-
-  void cleanup_DColPrimSphereSaveConstruct_atexit()
-  {
-    (void)CleanupDColPrimSphereSaveConstructAtExit();
   }
 } // namespace
 
@@ -451,27 +321,27 @@ namespace moho
   }
 
   /**
- * Address: 0x00500390 (FUN_00500390, Moho::DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase)
- *
- * What it does:
- * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
- * the primitive derives from it singly.
- */
-void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
-{
-  GPG_ASSERT(typeInfo != nullptr);
-  GPG_ASSERT(!typeInfo->initFinished_);
+   * Address: 0x00500390 (FUN_00500390, Moho::DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase)
+   *
+   * What it does:
+   * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
+   * the primitive derives from it singly.
+   */
+  void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    GPG_ASSERT(!typeInfo->initFinished_);
 
-  gpg::RField baseField{};
-  baseField.mName = CachedCColPrimitiveBaseType()->GetName();
-  baseField.mType = CachedCColPrimitiveBaseType();
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
-}
+    gpg::RField baseField{};
+    baseField.mName = CachedCColPrimitiveBaseType()->GetName();
+    baseField.mType = CachedCColPrimitiveBaseType();
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
 
-/**
+  /**
    * Address: 0x004FE6A0 (FUN_004FE6A0, Moho::DColPrimSphereTypeInfo::Init)
    */
   void DColPrimSphereTypeInfo::Init()
@@ -495,9 +365,9 @@ void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInf
   {}
 
   /**
-   * Address: 0x004FFB40 (FUN_004FFB40, Moho::DColPrimSphereSerializer::RegisterSerializeFunctions)
+   * Address: 0x004FFB40 (FUN_004FFB40, Moho::DColPrimSphereSerializer::Init)
    */
-  void DColPrimSphereSerializer::RegisterSerializeFunctions()
+  void DColPrimSphereSerializer::Init()
   {
     gpg::RType* const type = CachedDColPrimSpherePrimitiveType();
     if (type->serLoadFunc_ != nullptr) {
@@ -511,9 +381,27 @@ void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInf
   }
 
   /**
-   * Address: 0x004FFAC0 (FUN_004FFAC0, Moho::DColPrimSphereConstruct::RegisterConstructFunction)
+   * Address: 0x00BC75E0 (FUN_00BC75E0, dynamic initializer for the global
+   * `DColPrimSphereSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void DColPrimSphereConstruct::RegisterConstructFunction()
+  DColPrimSphereSerializer::DColPrimSphereSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&DColPrimSphereSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&DColPrimSphereSerializer::Serialize))
+  {}
+
+  DColPrimSphereSerializer::~DColPrimSphereSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x004FFAC0 (FUN_004FFAC0, Moho::DColPrimSphereConstruct::Init)
+   */
+  void DColPrimSphereConstruct::Init()
   {
     gpg::RType* const type = CachedDColPrimSpherePrimitiveType();
     if (type->serConstructFunc_ != nullptr) {
@@ -524,15 +412,52 @@ void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInf
   }
 
   /**
-   * Address: 0x004FFA40 (FUN_004FFA40, Moho::DColPrimSphereSaveConstruct::RegisterSaveConstructArgsFunction)
+   * Address: 0x00BC75A0 (FUN_00BC75A0, dynamic initializer for the global
+   * `DColPrimSphereConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  void DColPrimSphereSaveConstruct::RegisterSaveConstructArgsFunction()
+  DColPrimSphereConstruct::DColPrimSphereConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDColPrimSphere))
+    , mDeleteCallback(&DeleteDColPrimSphere)
+  {}
+
+  DColPrimSphereConstruct::~DColPrimSphereConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x004FFA40 (FUN_004FFA40, Moho::DColPrimSphereSaveConstruct::Init)
+   */
+  void DColPrimSphereSaveConstruct::Init()
   {
     gpg::RType* const type = CachedDColPrimSpherePrimitiveType();
     if (type->serSaveConstructArgsFunc_ != nullptr) {
       gpg::HandleAssertFailure("!type->mSerSaveConstructArgsFunc", kSaveConstructArgsLine, kSerializationSourcePath);
     }
     type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+  }
+
+  /**
+   * Address: 0x00BC7570 (FUN_00BC7570, dynamic initializer for the global
+   * `DColPrimSphereSaveConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
+   */
+  DColPrimSphereSaveConstruct::DColPrimSphereSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgsDColPrimSphere)
+      )
+  {}
+
+  DColPrimSphereSaveConstruct::~DColPrimSphereSaveConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -566,75 +491,34 @@ void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInf
     (void)preregister_DColPrimSphereTypeInfo();
     return std::atexit(&cleanup_DColPrimSphereTypeInfo_atexit);
   }
-
-  /**
-   * Address: 0x00BC75E0 (FUN_00BC75E0, register_DColPrimSphereSerializer)
-   *
-   * What it does:
-   * Installs serializer callbacks for `DColPrimSphere` and registers shutdown
-   * unlink/destruction.
-   */
-  void register_DColPrimSphereSerializer()
-  {
-    InitializeHelperNode(gDColPrimSphereSerializer);
-    gDColPrimSphereSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&DColPrimSphereSerializer::Deserialize);
-    gDColPrimSphereSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&DColPrimSphereSerializer::Serialize);
-    (void)std::atexit(&cleanup_DColPrimSphereSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x00BC75A0 (FUN_00BC75A0, register_DColPrimSphereConstruct)
-   *
-   * What it does:
-   * Installs construct/delete callbacks for `DColPrimSphere` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimSphereConstruct()
-  {
-    InitializeHelperNode(gDColPrimSphereConstruct);
-    gDColPrimSphereConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDColPrimSphere);
-    gDColPrimSphereConstruct.mDeleteCallback = &DeleteDColPrimSphere;
-    return std::atexit(&cleanup_DColPrimSphereConstruct_atexit);
-  }
-
-  /**
-   * Address: 0x00BC7570 (FUN_00BC7570, register_DColPrimSphereSaveConstruct)
-   *
-   * What it does:
-   * Installs save-construct-args callbacks for `DColPrimSphere` and registers
-   * shutdown unlink/destruction.
-   */
-  int register_DColPrimSphereSaveConstruct()
-  {
-    InitializeHelperNode(gDColPrimSphereSaveConstruct);
-    gDColPrimSphereSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgsDColPrimSphere);
-    return std::atexit(&cleanup_DColPrimSphereSaveConstruct_atexit);
-  }
 } // namespace moho
 
 namespace
 {
-  struct DColPrimSphereBootstrap
+  struct DColPrimSphereTypeInfoBootstrap
   {
-    DColPrimSphereBootstrap()
+    DColPrimSphereTypeInfoBootstrap()
     {
       (void)moho::register_DColPrimSphereTypeInfo();
-      (void)moho::register_DColPrimSphereSaveConstruct();
-      (void)moho::register_DColPrimSphereConstruct();
-      moho::register_DColPrimSphereSerializer();
     }
   };
 
-  [[maybe_unused]] DColPrimSphereBootstrap gDColPrimSphereBootstrap;
+  [[maybe_unused]] DColPrimSphereTypeInfoBootstrap gDColPrimSphereTypeInfoBootstrap;
+
+  // Address: 0x010A7C34 -- process-global `Sphere3fSerializer` singleton.
+  moho::Sphere3fSerializer gSphere3fSerializer;
+
+  // Address: 0x010A9D84 -- process-global `DColPrimSphereSerializer` singleton.
+  moho::DColPrimSphereSerializer gDColPrimSphereSerializer;
+
+  // Address: 0x010A9CA4 -- process-global `DColPrimSphereConstruct` singleton.
+  moho::DColPrimSphereConstruct gDColPrimSphereConstruct;
+
+  // Address: 0x010A9C94 -- process-global `DColPrimSphereSaveConstruct` singleton.
+  moho::DColPrimSphereSaveConstruct gDColPrimSphereSaveConstruct;
 } // namespace
-
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_DColPrimSphereTypeInfo_2459d0, moho::register_DColPrimSphereTypeInfo)
-
 GPG_PREREGISTER_INIT(preregister_DColPrimSphereTypeInfo_2459d0, moho::preregister_DColPrimSphereTypeInfo)
