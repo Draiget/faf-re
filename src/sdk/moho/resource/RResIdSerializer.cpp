@@ -9,56 +9,15 @@
 
 namespace
 {
-  moho::RResIdSerializer gRResIdSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::RResIdSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(moho::RResIdSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  gpg::SerHelperBase* ResetSerializerLinks(moho::RResIdSerializer& serializer)
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  void CleanupRResIdSerializerAtExit()
-  {
-    (void)moho::ResetRResIdSerializerLinksVariant2();
-  }
-
-  struct RResIdSerializerBootstrap
-  {
-    RResIdSerializerBootstrap()
-    {
-      (void)moho::register_RResIdSerializer();
-    }
-  };
-
-  RResIdSerializerBootstrap gRResIdSerializerBootstrap;
+  // Address: 0x010A8924 -- process-global `RResIdSerializer` singleton
+  // (constructed by FUN_00BC5A80, self-registering via `__xc_a`; see
+  // RResIdSerializer.h for the real-ctor/atexit-target/dead-duplicate
+  // evidence).
+  moho::RResIdSerializer gRResIdSerializer;
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x004A9680 (FUN_004A9680, nullsub_693)
-   */
-  void nullsub_693() {}
-
   /**
    * Address: 0x004A9690 (FUN_004A9690, Moho::RResIdSerializer::Deserialize)
    */
@@ -92,7 +51,7 @@ namespace moho
   /**
    * Address: 0x004A9790 (FUN_004A9790, gpg::SerSaveLoadHelper<Moho::RResId>::Init)
    */
-  void RResIdSerializer::RegisterSerializeFunctions()
+  void RResIdSerializer::Init()
   {
     gpg::RType* const type = RResId::StaticGetClass();
     GPG_ASSERT(type != nullptr);
@@ -107,30 +66,17 @@ namespace moho
   }
 
   /**
-   * Address: 0x004A9700 (FUN_004A9700)
+   * Address: 0x00BC5A80 (FUN_00BC5A80, dynamic initializer for the global
+   * `RResIdSerializer` singleton)
    */
-  gpg::SerHelperBase* ResetRResIdSerializerLinksVariant1()
-  {
-    return ResetSerializerLinks(gRResIdSerializer);
-  }
+  RResIdSerializer::RResIdSerializer()
+    : mDeserialize(&RResIdSerializer::Deserialize)
+    , mSerialize(&RResIdSerializer::Serialize)
+  {}
 
-  /**
-   * Address: 0x004A9730 (FUN_004A9730)
-   */
-  gpg::SerHelperBase* ResetRResIdSerializerLinksVariant2()
+  RResIdSerializer::~RResIdSerializer()
   {
-    return ResetSerializerLinks(gRResIdSerializer);
-  }
-
-  /**
-   * Address: 0x00BC5A80 (FUN_00BC5A80, register_RResIdSerializer)
-   */
-  int register_RResIdSerializer()
-  {
-    InitializeSerializerNode(gRResIdSerializer);
-    gRResIdSerializer.mDeserialize = &RResIdSerializer::Deserialize;
-    gRResIdSerializer.mSerialize = &RResIdSerializer::Serialize;
-    return std::atexit(&CleanupRResIdSerializerAtExit);
+    ResetLinks();
   }
 } // namespace moho
 
