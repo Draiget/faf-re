@@ -6790,10 +6790,17 @@ namespace
 
   /**
    * Address: 0x004A0310 (FUN_004A0310, sub_4A0310)
-   * Address: 0x0084B8B0 (FUN_0084B8B0)
    *
    * What it does:
    * Calling-convention bridge thunk for trail-runtime range copy-construction.
+   *
+   * FUN_0084B8B0 was previously (wrongly) also cited here. Its real body is
+   * a plain 3-dword-stride copy loop with no texture-pointer/refcount
+   * handling at all -- it cannot be a TrailRuntimeView (80+ bytes,
+   * ref-counted texture pointers) bridge. It is really the thin
+   * calling-convention adapter for an unrelated 12-byte-element
+   * `uninit_copy_n` instantiation; see the `Address: 0x0084C250` entry on
+   * `legacy/containers/Vector.h`'s `uninit_copy_n` catalog.
    */
   moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunkDuplicateA(
     moho::TrailRuntimeView* const destination,
