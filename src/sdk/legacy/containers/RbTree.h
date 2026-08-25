@@ -3532,6 +3532,15 @@ namespace msvc8
              * `FUN_00711350`). Plain `operator delete` per node, no
              * vtable write (the pointer value_type needs none). Reached
              * from that `erase_range`'s whole-range fast path.
+             *
+             * Address: 0x0077CFE0 (FUN_0077CFE0, sub_77CFE0) -- CDecalBuffer's
+             * start-tick outer table's `destroy_subtree` (`std::map<
+             * unsigned, std::set<CDecalHandle*>>`, isNil@+29, the same
+             * instantiation cited on `erase_range` above as
+             * `FUN_0077BD90`). Per node: recurses right, iterates left,
+             * tears down the nested `std::set<CDecalHandle*>` value via
+             * `sub_77B4F0` before freeing the node. Reached from that
+             * `erase_range`'s whole-range fast path.
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {

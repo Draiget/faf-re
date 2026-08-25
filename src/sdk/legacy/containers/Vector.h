@@ -3729,6 +3729,17 @@ namespace msvc8
          * the same thin calling-convention bridge shape as `FUN_0075FCF0`
          * above -- zeroes the low byte of its `this`-shaped third argument
          * and forwards `(a3, this, this)` on to `sub_76B6B0`.)
+         * Address: 0x006DFFF0 (FUN_006DFFF0, `msvc8::vector<Moho::
+         * EntityCategorySet>::uninit_copy_n` for the 40-byte element --
+         * per-slot copies the two raw dwords at `+0x00`/`+0x08`, then
+         * re-establishes the embedded `gpg::fastvector_uint`'s inline-SBO
+         * self-pointers at `+0x10..+0x1C` before deep-copying its bitset
+         * payload via the already-cited `gpg::fastvector_uint::cpy`
+         * (`FUN_004028E0`, `FastVector.h`) -- exactly `EntityCategorySet`'s
+         * own copy-construct shape, not a raw memberwise copy. Reached
+         * from this instantiation's copy constructor (`FUN_006DE100`,
+         * cited above on `vector(const vector&)`), `CPlatoon::
+         * FindPrioritizedUnit`'s `priorityList = squad->mCats`.)
          *
          * Uninitialized copy N from src to dst
          */
