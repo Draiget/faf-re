@@ -1,7 +1,6 @@
 #include "moho/ai/SPickUpInfo.h"
 
-#include <cstddef>
-#include <cstdlib>
+#include <cstdint>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -10,48 +9,6 @@
 
 namespace
 {
-  struct SPickUpInfoSerializerStartupNode
-  {
-    void* mVtable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
-    gpg::RType::save_func_t mSave = nullptr;   // +0x10
-  };
-
-  static_assert(
-    offsetof(SPickUpInfoSerializerStartupNode, mHelperNext) == 0x04,
-    "SPickUpInfoSerializerStartupNode::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SPickUpInfoSerializerStartupNode, mHelperPrev) == 0x08,
-    "SPickUpInfoSerializerStartupNode::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    sizeof(SPickUpInfoSerializerStartupNode) == 0x14,
-    "SPickUpInfoSerializerStartupNode size must be 0x14"
-  );
-
-  SPickUpInfoSerializerStartupNode gSPickUpInfoSerializerStartupNode{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(SPickUpInfoSerializerStartupNode& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(SPickUpInfoSerializerStartupNode& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
   {
     gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
@@ -61,6 +18,26 @@ namespace
     }
     return type;
   }
+
+  [[nodiscard]] gpg::RType* CachedSPickUpInfoType()
+  {
+    gpg::RType* type = moho::SPickUpInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SPickUpInfo));
+      moho::SPickUpInfo::sType = type;
+    }
+    return type;
+  }
+
+  // Address: 0x010B1F50 -- process-global `SPickUpInfoSerializer` singleton.
+  // Constructing it runs SPickUpInfoSerializer::SPickUpInfoSerializer()
+  // (0x00BD1C50), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~SPickUpInfoSerializer,
+  // 0x00BFA520) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::SPickUpInfoSerializer gSPickUpInfoSerializer;
 } // namespace
 
 namespace moho
@@ -131,30 +108,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00624870 (FUN_00624870, cleanup_SPickUpInfoSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the `SPickUpInfo` serializer helper
-   * node and restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_SPickUpInfoSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gSPickUpInfoSerializerStartupNode);
-  }
-
-  /**
-   * Address: 0x006248A0 (FUN_006248A0, cleanup_SPickUpInfoSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the `SPickUpInfo` serializer
-   * helper node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SPickUpInfoSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gSPickUpInfoSerializerStartupNode);
-  }
-
-  /**
    * Address: 0x00627EB0 (FUN_00627EB0)
    *
    * What it does:
@@ -199,68 +152,81 @@ namespace moho
     }
     archive->WriteFloat(mDistanceSq);
   }
-} // namespace moho
 
-namespace
-{
-  void DeserializeSPickUpInfoSerializerCallback(
+  /**
+   * Address: 0x00624810 (FUN_00624810, Moho::SPickUpInfoSerializer::Deserialize)
+   */
+  void SPickUpInfoSerializer::Deserialize(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::RRef*
+    gpg::RRef* const
   )
   {
-    reinterpret_cast<moho::SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    if (!archive || objectPtr == 0) {
+      return;
+    }
+
+    reinterpret_cast<SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
   }
 
-  void SerializeSPickUpInfoSerializerCallback(
+  /**
+   * Address: 0x00624820 (FUN_00624820, Moho::SPickUpInfoSerializer::Serialize)
+   */
+  void SPickUpInfoSerializer::Serialize(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::RRef*
+    gpg::RRef* const
   )
   {
-    reinterpret_cast<const moho::SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    if (!archive || objectPtr == 0) {
+      return;
+    }
+
+    reinterpret_cast<const SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  void cleanup_SPickUpInfoSerializer_atexit()
-  {
-    (void)moho::cleanup_SPickUpInfoSerializerStartupThunkA();
-  }
-} // namespace
-
-namespace moho
-{
   /**
-   * Address: 0x00BD1C50 (FUN_00BD1C50, register_SPickUpInfoSerializer)
+   * Address: 0x00BD1C50 (FUN_00BD1C50, dynamic initializer for the global
+   * `SPickUpInfoSerializer` singleton)
    *
    * What it does:
-   * Initializes the global SPickUpInfo serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`) and binds the load/save callback fields.
    */
-  void register_SPickUpInfoSerializer()
+  SPickUpInfoSerializer::SPickUpInfoSerializer()
+    : mLoad(&SPickUpInfoSerializer::Deserialize)
+    , mSave(&SPickUpInfoSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BFA520 (FUN_00BFA520, ??1SPickUpInfoSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  SPickUpInfoSerializer::~SPickUpInfoSerializer()
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gSPickUpInfoSerializerStartupNode);
-    gSPickUpInfoSerializerStartupNode.mHelperNext = self;
-    gSPickUpInfoSerializerStartupNode.mHelperPrev = self;
-    gSPickUpInfoSerializerStartupNode.mLoad = &DeserializeSPickUpInfoSerializerCallback;
-    gSPickUpInfoSerializerStartupNode.mSave = &SerializeSPickUpInfoSerializerCallback;
-    (void)std::atexit(&cleanup_SPickUpInfoSerializer_atexit);
+    ResetLinks();
+  }
+
+  /**
+   * What it does:
+   * Binds the `SPickUpInfo` serializer callbacks into reflected RTTI.
+   */
+  void SPickUpInfoSerializer::Init()
+  {
+    gpg::RType* const type = CachedSPickUpInfoType();
+    if (type == nullptr) {
+      return;
+    }
+
+    type->serLoadFunc_ = mLoad;
+    type->serSaveFunc_ = mSave;
   }
 } // namespace moho
-
-namespace
-{
-  struct SPickUpInfoSerializerStartupBootstrap
-  {
-    SPickUpInfoSerializerStartupBootstrap()
-    {
-      moho::register_SPickUpInfoSerializer();
-    }
-  };
-
-  [[maybe_unused]] SPickUpInfoSerializerStartupBootstrap gSPickUpInfoSerializerStartupBootstrap;
-} // namespace
 
 namespace gpg
 {
