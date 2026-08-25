@@ -200,58 +200,6 @@ namespace
     return ref;
   }
 
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return &helper.mHelperLinks;
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mNext = self;
-    helper.mHelperLinks.mPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperLinks.mNext != nullptr && helper.mHelperLinks.mPrev != nullptr) {
-      helper.mHelperLinks.mNext->mPrev = helper.mHelperLinks.mPrev;
-      helper.mHelperLinks.mPrev->mNext = helper.mHelperLinks.mNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperLinks.mPrev = self;
-    helper.mHelperLinks.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x006950E0 (FUN_006950E0)
-   *
-   * What it does:
-   * Unlinks global `MotorFallDownSerializer` helper links and resets the node
-   * to the canonical self-linked state.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkMotorFallDownSerializerHelperNodePrimary() noexcept
-  {
-    return UnlinkHelperNode(gMotorFallDownSerializer);
-  }
-
-  /**
-   * Address: 0x00695110 (FUN_00695110)
-   *
-   * What it does:
-   * Secondary unlink/reset entry for the global
-   * `MotorFallDownSerializer` helper node.
-   */
-  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkMotorFallDownSerializerHelperNodeSecondary() noexcept
-  {
-    return UnlinkHelperNode(gMotorFallDownSerializer);
-  }
-
   /**
    * Address: 0x00694FF0 (FUN_00694FF0, construct helper body)
    * Address: 0x00695DA0 (FUN_00695DA0, construct helper thunk)
@@ -414,15 +362,6 @@ namespace
     return index;
   }
 
-  void cleanup_MotorFallDownConstruct_atexit()
-  {
-    (void)moho::cleanup_MotorFallDownConstruct();
-  }
-
-  void cleanup_MotorFallDownSerializer_atexit()
-  {
-    (void)moho::cleanup_MotorFallDownSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -678,9 +617,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x006950B0 (FUN_006950B0, serializer registration lane)
+   * Address: 0x00BD5C40 (FUN_00BD5C40, dynamic initializer for the global
+   * `MotorFallDownSerializer` singleton)
    */
-  void MotorFallDownSerializer::RegisterSerializeFunctions()
+  MotorFallDownSerializer::MotorFallDownSerializer()
+    : mDeserialize(&MotorFallDownSerializer::Deserialize)
+    , mSerialize(&MotorFallDownSerializer::Serialize)
+  {}
+
+  MotorFallDownSerializer::~MotorFallDownSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00695AC0 (FUN_00695AC0, MotorFallDownSerializer::Init)
+   */
+  void MotorFallDownSerializer::Init()
   {
     gpg::RType* const type = CachedMotorFallDownType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
@@ -690,9 +643,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00694F50 (FUN_00694F50, construct registration lane)
+   * Address: 0x00BD5C00 (FUN_00BD5C00, dynamic initializer for the global
+   * `MotorFallDownConstruct` singleton)
    */
-  void MotorFallDownConstruct::RegisterConstructFunction()
+  MotorFallDownConstruct::MotorFallDownConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructMotorFallDownCallback))
+    , mDeleteCallback(&DeleteConstructedMotorFallDown)
+  {}
+
+  MotorFallDownConstruct::~MotorFallDownConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00695A40 (FUN_00695A40, MotorFallDownConstruct::Init)
+   */
+  void MotorFallDownConstruct::Init()
   {
     gpg::RType* const type = CachedMotorFallDownType();
     GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
@@ -716,22 +683,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD190 (FUN_00BFD190, cleanup_MotorFallDownConstruct)
-   */
-  gpg::SerHelperBase* cleanup_MotorFallDownConstruct()
-  {
-    return UnlinkHelperNode(gMotorFallDownConstruct);
-  }
-
-  /**
-   * Address: 0x00BFD1C0 (FUN_00BFD1C0, cleanup_MotorFallDownSerializer)
-   */
-  gpg::SerHelperBase* cleanup_MotorFallDownSerializer()
-  {
-    return UnlinkMotorFallDownSerializerHelperNodePrimary();
-  }
-
-  /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)
    */
   void register_MotorFallDownTypeInfo()
@@ -742,30 +693,6 @@ namespace moho
     }
 
     (void)std::atexit(&cleanup_MotorFallDownTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BD5C00 (FUN_00BD5C00, register_MotorFallDownConstruct)
-   */
-  int register_MotorFallDownConstruct()
-  {
-    InitializeHelperNode(gMotorFallDownConstruct);
-    gMotorFallDownConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructMotorFallDownCallback);
-    gMotorFallDownConstruct.mDeleteCallback = &DeleteConstructedMotorFallDown;
-    gMotorFallDownConstruct.RegisterConstructFunction();
-    return std::atexit(&cleanup_MotorFallDownConstruct_atexit);
-  }
-
-  /**
-   * Address: 0x00BD5C40 (FUN_00BD5C40, register_MotorFallDownSerializer)
-   */
-  int register_MotorFallDownSerializer()
-  {
-    InitializeHelperNode(gMotorFallDownSerializer);
-    gMotorFallDownSerializer.mDeserialize = &MotorFallDownSerializer::Deserialize;
-    gMotorFallDownSerializer.mSerialize = &MotorFallDownSerializer::Serialize;
-    return std::atexit(&cleanup_MotorFallDownSerializer_atexit);
   }
 
   /**
@@ -975,8 +902,6 @@ namespace
     MotorFallDownBootstrap()
     {
       moho::register_MotorFallDownTypeInfo();
-      (void)moho::register_MotorFallDownConstruct();
-      (void)moho::register_MotorFallDownSerializer();
       (void)moho::register_CScrLuaMetatableFactory_MotorFallDown_Index();
     }
   };
