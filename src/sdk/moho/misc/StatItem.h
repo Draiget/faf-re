@@ -215,9 +215,12 @@ namespace moho
      * Address: 0x00419090 (FUN_00419090, Moho::StatItem::SerializeList)
      *
      * What it does:
-     * Serializes owned child pointers as a null-terminated list.
+     * Serializes owned child pointers as a null-terminated list. `const`
+     * for the same reason `MemberSerialize` (which is this method's only
+     * caller) is `const` -- it only walks the intrusive child chain, never
+     * mutates it.
      */
-    void SerializeList(gpg::WriteArchive* archive);
+    void SerializeList(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00419110 (FUN_00419110, Moho::StatItem::DeserializeList)
@@ -240,8 +243,14 @@ namespace moho
      *
      * What it does:
      * Saves stat payload lanes, name, pulse mode, and owned children to archive.
+     *
+     * `const`-qualified to match `gpg::SerSaveLoadHelper<StatItem>::Serialize`,
+     * which the real binary's `StatItemSerializer` vtable dispatches through
+     * (`reinterpret_cast<const StatItem*>(objectPtr)->MemberSerialize(...)`);
+     * `mLock` is `mutable` for the same reason every other locked-under-const
+     * read path in the engine marks its mutex `mutable`.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00436650 (FUN_00436650, Moho::StatItem::Synchronize)
@@ -294,7 +303,7 @@ namespace moho
 
     EStatType mType{EStatType::kNone};         // +0x90
     volatile std::int32_t mUseRealtimeSlot{0}; // +0x94
-    boost::mutex mLock;                        // +0x98
+    mutable boost::mutex mLock;                // +0x98
   };
   static_assert(offsetof(StatItem, mSampleTag) == 0x64, "StatItem::mSampleTag offset must be 0x64");
   static_assert(offsetof(StatItem, mSampleHistory) == 0x68, "StatItem::mSampleHistory offset must be 0x68");
@@ -304,29 +313,33 @@ namespace moho
   /**
    * VFTABLE: 0x00E01134
    * COL: 0x00E5D908
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::StatItem>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_StatItemSerializer`):
+   *    0x00BC36C0 (__xc_a-reachable, exactly one xref; no dead duplicate
+   *    ctor found for this instantiation)
+   *  - dtor: 0x00BEE9D0 (`??1StatItemSerializer@Moho@@QAE@@Z`; exactly one
+   *    xref, from the real ctor's atexit push)
+   *  - Init(): 0x004194E0
+   *  - Deserialize(): 0x00418FE0 (tail-calls `StatItem::MemberDeserialize`
+   *    at 0x0041AD70)
+   *  - Serialize(): 0x00418FF0 (tail-calls `StatItem::MemberSerialize` at
+   *    0x0041AEE0)
+   *
+   * Prior recovery modeled this as a hand-rolled `StatItemSerializer` class
+   * with untyped `void* mNext`/`void* mPrev` fields (no real base) and a
+   * `virtual void RegisterSerializeFunctions()` standing in for the real
+   * `Init()` override, wired through a `register_StatItemSerializer()` free
+   * function that only ever wrote to the class's own orphan fields --
+   * `StatItem::sType`'s `serLoadFunc_`/`serSaveFunc_` slots were never
+   * actually installed. This template instantiation fixes that. The sibling
+   * `EStatTypePrimitiveSerializer`/`EPulseModePrimitiveSerializer` aliases
+   * below already used the correct shape.
    */
-  class StatItemSerializer
-  {
-  public:
-    /**
-     * Address: 0x004194E0 (FUN_004194E0, sub_4194E0)
-     *
-     * What it does:
-     * Registers serializer load/save callbacks into `StatItem` RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(sizeof(StatItemSerializer) == 0x14, "StatItemSerializer size must be 0x14");
-  static_assert(offsetof(StatItemSerializer, mNext) == 0x04, "StatItemSerializer::mNext offset must be 0x04");
-  static_assert(offsetof(StatItemSerializer, mPrev) == 0x08, "StatItemSerializer::mPrev offset must be 0x08");
-  static_assert(offsetof(StatItemSerializer, mSerLoadFunc) == 0x0C, "StatItemSerializer::mSerLoadFunc offset must be 0x0C");
-  static_assert(offsetof(StatItemSerializer, mSerSaveFunc) == 0x10, "StatItemSerializer::mSerSaveFunc offset must be 0x10");
+  using StatItemSerializer = gpg::SerSaveLoadHelper<StatItem>;
 
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::EStatType,int>
