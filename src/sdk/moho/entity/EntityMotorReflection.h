@@ -50,51 +50,24 @@ namespace moho
 
   static_assert(sizeof(MotorTypeInfo) == 0x64, "MotorTypeInfo size must be 0x64");
 
-  class MotorSerializer
-  {
-  public:
-    /**
-     * Address: 0x00694940 (FUN_00694940, Moho::MotorSerializer::Deserialize)
-     *
-     * What it does:
-     * No-op load callback for `moho::Motor` (base motor has no serialized fields).
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00694950 (FUN_00694950, Moho::MotorSerializer::Serialize)
-     *
-     * What it does:
-     * No-op save callback for `moho::Motor` (base motor has no serialized fields).
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00694A20 (FUN_00694A20, gpg::SerSaveLoadHelper<Moho::Motor>::Init)
-     *
-     * What it does:
-     * Binds load/save callbacks into the reflected `moho::Motor` type descriptor.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(offsetof(MotorSerializer, mHelperLinks) == 0x04, "MotorSerializer::mHelperLinks offset must be 0x04");
-  static_assert(offsetof(MotorSerializer, mDeserialize) == 0x0C, "MotorSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(MotorSerializer, mSerialize) == 0x10, "MotorSerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(MotorSerializer) == 0x14, "MotorSerializer size must be 0x14");
-
   /**
-   * Address: 0x00BFCF60 (FUN_00BFCF60)
+   * VFTABLE: 0x00E28F64
    *
-   * What it does:
-   * Unlinks `MotorSerializer` helper links and restores a self-linked node.
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::Motor>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_MotorSerializer`):
+   *    0x00BD5930 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
+   *    0x006949F0)
+   *  - dtor: 0x00BFCF60 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x00694A20
+   *  - Deserialize(): 0x00694940
+   *  - Serialize(): 0x00694950
    */
-  gpg::SerHelperBase* cleanup_MotorSerializer();
+  using MotorSerializer = gpg::SerSaveLoadHelper<EntityMotor>;
 
   /**
    * Address: 0x00BD5910 (FUN_00BD5910, register_MotorTypeInfo)
@@ -108,7 +81,11 @@ namespace moho
    * Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer)
    *
    * What it does:
-   * Initializes `MotorSerializer` callback lanes and schedules exit cleanup.
+   * Forces this translation unit's global `MotorSerializer` instance to link
+   * into the reflection bootstrap sequence. The ctor/vtable-install/
+   * atexit-dtor-registration sequence this address decompiles to is MSVC's
+   * own compiler-generated dynamic initializer for that global, not
+   * hand-written source -- see `gpg::SerSaveLoadHelper<T>` in Reflection.h.
    */
   void register_MotorSerializer();
 } // namespace moho

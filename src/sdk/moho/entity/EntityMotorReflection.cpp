@@ -4,17 +4,25 @@
 #include <new>
 #include <typeinfo>
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::MotorTypeInfo;
-  using Serializer = moho::MotorSerializer;
 
   alignas(TypeInfo) unsigned char gMotorTypeInfoStorage[sizeof(TypeInfo)];
   bool gMotorTypeInfoConstructed = false;
-  Serializer gMotorSerializer{};
+
+  // Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<EntityMotor>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real destructor
+  // (0x00BFCF60, no recovered mangled name; body confirmed via raw asm to
+  // just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT duplicate
+  // ctor: 0x006949F0.
+  moho::MotorSerializer gMotorSerializer;
 
   [[nodiscard]] TypeInfo& GetMotorTypeInfo() noexcept
   {
@@ -42,67 +50,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedMotorType()
-  {
-    if (!moho::EntityMotor::sType) {
-      moho::EntityMotor::sType = gpg::LookupRType(typeid(moho::EntityMotor));
-    }
-
-    GPG_ASSERT(moho::EntityMotor::sType != nullptr);
-    return moho::EntityMotor::sType;
-  }
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return &serializer.mHelperLinks;
-  }
-
-  template <class TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperLinks.mNext = self;
-    serializer.mHelperLinks.mPrev = self;
-  }
-
-  template <class TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperLinks.mNext != nullptr && serializer.mHelperLinks.mPrev != nullptr) {
-      serializer.mHelperLinks.mNext->mPrev = serializer.mHelperLinks.mPrev;
-      serializer.mHelperLinks.mPrev->mNext = serializer.mHelperLinks.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperLinks.mPrev = self;
-    serializer.mHelperLinks.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00694990 (FUN_00694990)
-   *
-   * What it does:
-   * Unlinks global `MotorSerializer` helper links and resets the node to the
-   * canonical self-linked state.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkMotorSerializerHelperNodePrimary() noexcept
-  {
-    return UnlinkSerializerNode(gMotorSerializer);
-  }
-
-  /**
-   * Address: 0x006949C0 (FUN_006949C0)
-   *
-   * What it does:
-   * Secondary unlink/reset entry for the global `MotorSerializer` helper node.
-   */
-  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkMotorSerializerHelperNodeSecondary() noexcept
-  {
-    return UnlinkSerializerNode(gMotorSerializer);
-  }
-
   void cleanup_MotorTypeInfo_Atexit()
   {
     if (!gMotorTypeInfoConstructed) {
@@ -112,11 +59,6 @@ namespace
     GetMotorTypeInfo().~MotorTypeInfo();
     gMotorTypeInfoConstructed = false;
     moho::EntityMotor::sType = nullptr;
-  }
-
-  void cleanup_MotorSerializer_Atexit()
-  {
-    (void)moho::cleanup_MotorSerializer();
   }
 } // namespace
 
@@ -177,48 +119,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00694940 (FUN_00694940, Moho::MotorSerializer::Deserialize)
-   */
-  void MotorSerializer::Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-  {
-    (void)archive;
-    (void)objectPtr;
-    (void)version;
-    (void)ownerRef;
-  }
-
-  /**
-   * Address: 0x00694950 (FUN_00694950, Moho::MotorSerializer::Serialize)
-   */
-  void MotorSerializer::Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-  {
-    (void)archive;
-    (void)objectPtr;
-    (void)version;
-    (void)ownerRef;
-  }
-
-  /**
-   * Address: 0x00694A20 (FUN_00694A20, gpg::SerSaveLoadHelper<Moho::Motor>::Init)
-   */
-  void MotorSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedMotorType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BFCF60 (FUN_00BFCF60)
-   */
-  gpg::SerHelperBase* cleanup_MotorSerializer()
-  {
-    return UnlinkMotorSerializerHelperNodePrimary();
-  }
-
-  /**
    * Address: 0x00BD5910 (FUN_00BD5910, register_MotorTypeInfo)
    */
   void register_MotorTypeInfo()
@@ -228,42 +128,17 @@ namespace moho
   }
 
   /**
-   * Address: 0x00694960 (FUN_00694960)
-   *
-   * What it does:
-   * Startup leaf that initializes global `MotorSerializer` callback lanes and
-   * returns its serializer helper pointer.
-   */
-  gpg::SerHelperBase* construct_MotorSerializer_StartupLeaf()
-  {
-    InitializeSerializerNode(gMotorSerializer);
-    gMotorSerializer.mDeserialize = &MotorSerializer::Deserialize;
-    gMotorSerializer.mSerialize = &MotorSerializer::Serialize;
-    return SerializerSelfNode(gMotorSerializer);
-  }
-
-  /**
-   * Address: 0x006949F0 (FUN_006949F0)
-   *
-   * What it does:
-   * Alternate startup leaf that rebuilds global `MotorSerializer` helper links,
-   * rewires deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_MotorSerializer_SaveLoadStartupLeaf()
-  {
-    InitializeSerializerNode(gMotorSerializer);
-    gMotorSerializer.mDeserialize = &MotorSerializer::Deserialize;
-    gMotorSerializer.mSerialize = &MotorSerializer::Serialize;
-    return SerializerSelfNode(gMotorSerializer);
-  }
-
-  /**
    * Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer)
+   *
+   * What it does:
+   * Forces this translation unit's global `MotorSerializer` instance to link
+   * into the reflection bootstrap sequence. See the Doxygen comment on the
+   * declaration (EntityMotorReflection.h) and on `gMotorSerializer` above for
+   * why this function's body has no field-setting logic of its own.
    */
   void register_MotorSerializer()
   {
-    (void)construct_MotorSerializer_StartupLeaf();
-    (void)std::atexit(&cleanup_MotorSerializer_Atexit);
+    (void)gMotorSerializer;
   }
 } // namespace moho
 
