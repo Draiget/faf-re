@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/render/camera/VTransform.h"
 
 namespace gpg
@@ -332,4 +333,35 @@ namespace moho
   static_assert(offsetof(CAniPose, mBones) == 0x28, "CAniPose::mBones offset must be 0x28");
   static_assert(offsetof(CAniPose, mMaxOffset) == 0x88, "CAniPose::mMaxOffset offset must be 0x88");
   static_assert(sizeof(CAniPose) == 0x90, "CAniPose size must be 0x90");
+
+  /**
+   * VFTABLE: 0x00E1742C
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CAniPose>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CAniPoseSerializer`):
+   *    0x00BC9960 (dead zero-xref COMDAT duplicate: 0x0054C5E0)
+   *  - dtor: 0x00BF4610 (`??1CAniPoseSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0054C610
+   *  - Deserialize(): 0x0054BA00
+   *  - Serialize(): 0x0054BA10
+   */
+  using CAniPoseSerializer = gpg::SerSaveLoadHelper<CAniPose>;
+
+  /**
+   * VFTABLE: 0x00E174B0
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CAniPoseBone>
+   *
+   * Per-instantiation addresses:
+   *  - ctor / compiler dynamic-initializer (`register_CAniPoseBoneSerializer`):
+   *    0x00BC99C0 (dead zero-xref COMDAT duplicate: 0x0054C8C0)
+   *  - dtor: 0x00BF46A0 (`??1CAniPoseBoneSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0054C8F0
+   *  - Deserialize(): 0x0054BF70
+   *  - Serialize(): 0x0054BF80
+   */
+  using CAniPoseBoneSerializer = gpg::SerSaveLoadHelper<CAniPoseBone>;
 } // namespace moho
