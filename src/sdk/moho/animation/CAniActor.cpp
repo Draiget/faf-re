@@ -13,7 +13,7 @@
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -33,7 +33,16 @@ namespace
   bool gCAniActorTypeInfoConstructed = false;
 
   moho::CAniActorConstruct gCAniActorConstruct{};
-  moho::CAniActorSerializer gCAniActorSerializer{};
+
+  // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CAniActor>` ctor (self-links into `sNewHelpers`,
+  // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
+  // `Serialize`, installs the vtable) and registers the real destructor
+  // (0x00BFAD00, no recovered mangled name; body confirmed via raw asm to
+  // just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT duplicate
+  // ctor: 0x0063C1E0.
+  moho::CAniActorSerializer gCAniActorSerializer;
 
   gpg::RType* gCAniPoseType = nullptr;
 
@@ -475,17 +484,6 @@ namespace
   }
 
   /**
-   * Address: 0x00BFAD00 (FUN_00BFAD00, sub_BFAD00)
-   *
-   * What it does:
-   * Unlinks `CAniActorSerializer` helper node from intrusive helper list.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAniActorSerializer_Impl()
-  {
-    return UnlinkHelperNode(gCAniActorSerializer);
-  }
-
-  /**
    * Address: 0x0063AFC0 (FUN_0063AFC0, cleanup_CAniActorConstructStartupThunkA)
    *
    * What it does:
@@ -509,30 +507,6 @@ namespace
     return cleanup_CAniActorConstruct_Impl();
   }
 
-  /**
-   * Address: 0x0063B100 (FUN_0063B100, cleanup_CAniActorSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the global `CAniActorSerializer` node
-   * and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorSerializerStartupThunkA()
-  {
-    return cleanup_CAniActorSerializer_Impl();
-  }
-
-  /**
-   * Address: 0x0063B130 (FUN_0063B130, cleanup_CAniActorSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the global
-   * `CAniActorSerializer` node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorSerializerStartupThunkB()
-  {
-    return cleanup_CAniActorSerializer_Impl();
-  }
-
   void CleanupCAniActorTypeInfoAtexit()
   {
     cleanup_CAniActorTypeInfo_Impl();
@@ -541,11 +515,6 @@ namespace
   void CleanupCAniActorConstructAtexit()
   {
     (void)cleanup_CAniActorConstruct_Impl();
-  }
-
-  void CleanupCAniActorSerializerAtexit()
-  {
-    (void)cleanup_CAniActorSerializer_Impl();
   }
 
   /**
@@ -562,19 +531,6 @@ namespace
     return &gCAniActorConstruct;
   }
 
-  /**
-   * Address: 0x0063C1E0 (FUN_0063C1E0, sub_63C1E0)
-   *
-   * What it does:
-   * Initializes `CAniActorSerializer` helper callbacks and returns helper singleton.
-   */
-  [[nodiscard]] moho::CAniActorSerializer* setup_CAniActorSerializerHelper()
-  {
-    InitializeHelperNode(gCAniActorSerializer);
-    gCAniActorSerializer.mSerLoadFunc = &moho::CAniActorSerializer::Deserialize;
-    gCAniActorSerializer.mSerSaveFunc = &moho::CAniActorSerializer::Serialize;
-    return &gCAniActorSerializer;
-  }
 } // namespace
 
 namespace moho
@@ -1023,44 +979,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063B0A0 (FUN_0063B0A0, Moho::CAniActorSerializer::Deserialize)
-   */
-  void CAniActorSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-  {
-    auto* const actor = reinterpret_cast<CAniActor*>(static_cast<std::uintptr_t>(objectPtr));
-    if (!actor) {
-      return;
-    }
-    actor->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0063B0C0 (FUN_0063B0C0, Moho::CAniActorSerializer::Serialize)
-   */
-  void CAniActorSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    auto* const actor = reinterpret_cast<const CAniActor*>(static_cast<std::uintptr_t>(objectPtr));
-    if (!actor) {
-      return;
-    }
-    actor->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0063C210 (FUN_0063C210, sub_63C210)
-   */
-  void CAniActorSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedCAniActorType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
    * Address: 0x0063A770 (FUN_0063A770, ??0CAniActorTypeInfo@Moho@@QAE@@Z)
    */
   CAniActorTypeInfo::CAniActorTypeInfo()
@@ -1114,17 +1032,6 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00BFAD00 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks global serializer helper node from intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CAniActorSerializer()
-  {
-    return cleanup_CAniActorSerializer_Impl();
-  }
-
-  /**
    * Address: 0x00BD2B00 (FUN_00BD2B00, register_CAniActorTypeInfo)
    *
    * What it does:
@@ -1153,12 +1060,14 @@ namespace moho
    * Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer)
    *
    * What it does:
-   * Initializes global serializer helper callbacks and installs exit cleanup.
+   * Forces this translation unit's global `CAniActorSerializer` instance to
+   * link into the reflection bootstrap sequence. See the Doxygen comment on
+   * the declaration (CAniActor.h) and on `gCAniActorSerializer` above for why
+   * this function's body has no field-setting logic of its own.
    */
   void register_CAniActorSerializer()
   {
-    (void)setup_CAniActorSerializerHelper();
-    (void)std::atexit(&CleanupCAniActorSerializerAtexit);
+    (void)gCAniActorSerializer;
   }
 } // namespace moho
 

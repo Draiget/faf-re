@@ -224,39 +224,22 @@ namespace moho
     gpg::RType::delete_func_t mDeleteFunc;
   };
 
-  class CAniActorSerializer
-  {
-  public:
-    /**
-     * Address: 0x0063B0A0 (FUN_0063B0A0, Moho::CAniActorSerializer::Deserialize)
-     *
-     * What it does:
-     * Dispatches archive load flow into `CAniActor::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063B0C0 (FUN_0063B0C0, Moho::CAniActorSerializer::Serialize)
-     *
-     * What it does:
-     * Dispatches archive save flow into `CAniActor::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063C210 (FUN_0063C210, sub_63C210)
-     *
-     * What it does:
-     * Installs load/save callbacks into `CAniActor` RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CAniActor>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CAniActorSerializer`):
+   *    0x00BD2B60 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
+   *    0x0063C1E0)
+   *  - dtor: 0x00BFAD00 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x0063C210
+   *  - Deserialize(): 0x0063B0A0
+   *  - Serialize(): 0x0063B0C0
+   */
+  using CAniActorSerializer = gpg::SerSaveLoadHelper<CAniActor>;
 
   class CAniActorTypeInfo : public gpg::RType
   {
@@ -311,7 +294,11 @@ namespace moho
    * Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer)
    *
    * What it does:
-   * Initializes global serializer helper callbacks and installs exit cleanup.
+   * Forces this translation unit's global `CAniActorSerializer` instance to
+   * link into the reflection bootstrap sequence. The ctor/vtable-install/
+   * atexit-dtor-registration sequence this address decompiles to is MSVC's
+   * own compiler-generated dynamic initializer for that global, not
+   * hand-written source -- see `gpg::SerSaveLoadHelper<T>` in Reflection.h.
    */
   void register_CAniActorSerializer();
 
@@ -332,14 +319,5 @@ namespace moho
     offsetof(CAniActorConstruct, mDeleteFunc) == 0x10, "CAniActorConstruct::mDeleteFunc offset must be 0x10"
   );
   static_assert(sizeof(CAniActorConstruct) == 0x14, "CAniActorConstruct size must be 0x14");
-  static_assert(offsetof(CAniActorSerializer, mHelperNext) == 0x04, "CAniActorSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CAniActorSerializer, mHelperPrev) == 0x08, "CAniActorSerializer::mHelperPrev offset must be 0x08");
-  static_assert(
-    offsetof(CAniActorSerializer, mSerLoadFunc) == 0x0C, "CAniActorSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CAniActorSerializer, mSerSaveFunc) == 0x10, "CAniActorSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CAniActorSerializer) == 0x14, "CAniActorSerializer size must be 0x14");
   static_assert(sizeof(CAniActorTypeInfo) == 0x64, "CAniActorTypeInfo size must be 0x64");
 } // namespace moho
