@@ -7,41 +7,8 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffect.h"
 
-namespace moho
-{
-  gpg::SerHelperBase* cleanup_CEffectManagerImplSerializer();
-} // namespace moho
-
 namespace
 {
-  moho::CEffectManagerImplSerializer gCEffectManagerImplSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    helper.mHelperNext->mPrev = helper.mHelperPrev;
-    helper.mHelperPrev->mNext = helper.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] moho::IEffect* DecodeTrackedIEffect(const gpg::TrackedPointerInfo& tracked)
   {
     if (!tracked.object) {
@@ -135,51 +102,6 @@ namespace
   }
 
   /**
-   * Address: 0x0066C2E0 (FUN_0066C2E0)
-   *
-   * What it does:
-   * Thunk lane that forwards into
-   * `SerializeActiveEffectsList_CEffectManagerImpl`.
-   */
-  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkA(
-    const moho::CEffectManagerImpl* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
-  }
-
-  /**
-   * Address: 0x0066C640 (FUN_0066C640)
-   *
-   * What it does:
-   * Duplicate thunk lane that forwards into
-   * `SerializeActiveEffectsList_CEffectManagerImpl`.
-   */
-  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkB(
-    const moho::CEffectManagerImpl* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
-  }
-
-  /**
-   * Address: 0x0066D090 (FUN_0066D090)
-   *
-   * What it does:
-   * Duplicate thunk lane that forwards into
-   * `SerializeActiveEffectsList_CEffectManagerImpl`.
-   */
-  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkC(
-    const moho::CEffectManagerImpl* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
-  }
-
-  /**
    * Address: 0x0066BBD0 (FUN_0066BBD0, Deserialize_CEffectManagerImpl)
    *
    * What it does:
@@ -205,14 +127,46 @@ namespace
     SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
   }
 
-  void cleanup_CEffectManagerImplSerializer_atexit()
+  // Address: 0x010B3D2C -- process-global `CEffectManagerImplSerializer`
+  // singleton. Constructing it runs
+  // CEffectManagerImplSerializer::CEffectManagerImplSerializer()
+  // (0x00BD4600), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::CEffectManagerImplSerializer gCEffectManagerImplSerializer;
+
+  /**
+   * Address: 0x00BFC060 (FUN_00BFC060, cleanup_CEffectManagerImplSerializer)
+   *
+   * What it does:
+   * Process-exit cleanup that unlinks the `CEffectManagerImplSerializer`
+   * helper node. The real ctor pushes this plain free function (not a
+   * mangled destructor) as its atexit target.
+   */
+  void cleanup_CEffectManagerImplSerializer()
   {
-    (void)moho::cleanup_CEffectManagerImplSerializer();
+    gCEffectManagerImplSerializer.ResetLinks();
   }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BD4600 (FUN_00BD4600, register_CEffectManagerImplSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields, then registers
+   * `cleanup_CEffectManagerImplSerializer` as the explicit atexit teardown.
+   */
+  CEffectManagerImplSerializer::CEffectManagerImplSerializer()
+    : mLoadCallback(&Deserialize_CEffectManagerImpl)
+    , mSaveCallback(&Serialize_CEffectManagerImpl)
+  {
+    (void)std::atexit(&cleanup_CEffectManagerImplSerializer);
+  }
+
   /**
    * Address: 0x0066C160 (FUN_0066C160, gpg::SerSaveLoadHelper_CEffectManagerImpl::Init)
    *
@@ -221,7 +175,7 @@ namespace moho
    *   void (__cdecl **this)(gpg::WriteArchive *, void *obj, int version, const gpg::RRef *a5)))
    * (gpg::ReadArchive *arch, void *obj, int cont, gpg::RRef *res);
    */
-  void CEffectManagerImplSerializer::RegisterSerializeFunctions()
+  void CEffectManagerImplSerializer::Init()
   {
     gpg::RType* const type = CEffectManagerImpl::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -229,44 +183,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSaveCallback;
   }
-
-  /**
-   * Address: 0x00BFC060 (FUN_00BFC060, cleanup_CEffectManagerImplSerializer)
-   *
-   * What it does:
-   * Unlinks startup `CEffectManagerImplSerializer` helper node and restores
-   * self-linked sentinel state.
-   */
-  gpg::SerHelperBase* cleanup_CEffectManagerImplSerializer()
-  {
-    return UnlinkHelperNode(gCEffectManagerImplSerializer);
-  }
-
-  /**
-   * Address: 0x00BD4600 (FUN_00BD4600, register_CEffectManagerImplSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer helper callbacks for
-   * `CEffectManagerImpl` and installs process-exit cleanup.
-   */
-  int register_CEffectManagerImplSerializer()
-  {
-    InitializeHelperNode(gCEffectManagerImplSerializer);
-    gCEffectManagerImplSerializer.mLoadCallback = &Deserialize_CEffectManagerImpl;
-    gCEffectManagerImplSerializer.mSaveCallback = &Serialize_CEffectManagerImpl;
-    return std::atexit(&cleanup_CEffectManagerImplSerializer_atexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct CEffectManagerImplSerializerBootstrap
-  {
-    CEffectManagerImplSerializerBootstrap()
-    {
-      (void)moho::register_CEffectManagerImplSerializer();
-    }
-  };
-
-  [[maybe_unused]] CEffectManagerImplSerializerBootstrap gCEffectManagerImplSerializerBootstrap;
-} // namespace
