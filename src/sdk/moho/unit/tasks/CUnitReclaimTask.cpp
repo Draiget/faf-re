@@ -74,48 +74,6 @@ namespace
     moho::SEconValue savedReclaimPerSecond{0.0f, 0.0f};
   };
 
-  struct CUnitReclaimTaskSerializerStartupNode
-  {
-    void* mVtable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
-    gpg::RType::save_func_t mSave = nullptr;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CUnitReclaimTaskSerializerStartupNode, mHelperNext) == 0x04,
-    "CUnitReclaimTaskSerializerStartupNode::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitReclaimTaskSerializerStartupNode, mHelperPrev) == 0x08,
-    "CUnitReclaimTaskSerializerStartupNode::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    sizeof(CUnitReclaimTaskSerializerStartupNode) == 0x14,
-    "CUnitReclaimTaskSerializerStartupNode size must be 0x14"
-  );
-
-  CUnitReclaimTaskSerializerStartupNode gCUnitReclaimTaskSerializerStartupNode{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CUnitReclaimTaskSerializerStartupNode& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CUnitReclaimTaskSerializerStartupNode& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] constexpr moho::ETaskState NextTaskState(const moho::ETaskState current) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<int>(current) + 1);
@@ -486,30 +444,6 @@ namespace moho
     mTargetHasNoMotor = (commandTargetEntity == nullptr);
     mTaskState = TASKSTATE_Preparing;
     WakeTaskThreadForImmediateTick(mOwnerThread);
-  }
-
-  /**
-   * Address: 0x0061EF00 (FUN_0061EF00, cleanup_CUnitReclaimTaskSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the `CUnitReclaimTask` serializer
-   * helper node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitReclaimTaskSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCUnitReclaimTaskSerializerStartupNode);
-  }
-
-  /**
-   * Address: 0x0061EF30 (FUN_0061EF30, cleanup_CUnitReclaimTaskSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the `CUnitReclaimTask`
-   * serializer helper node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitReclaimTaskSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCUnitReclaimTaskSerializerStartupNode);
   }
 
   /**
@@ -890,36 +824,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00620750 (FUN_00620750, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CUnitReclaimTask serializer-save thunk alias into
-   * `CUnitReclaimTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCUnitReclaimTaskThunkVariantA(
-    CUnitReclaimTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x006209D0 (FUN_006209D0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second CUnitReclaimTask serializer-save thunk alias into
-   * `CUnitReclaimTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCUnitReclaimTaskThunkVariantB(
-    CUnitReclaimTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
    * Address: 0x00620110 (FUN_00620110, sub_620110)
    *
    * What it does:
@@ -942,99 +846,113 @@ namespace moho
 
 } // namespace moho
 
-namespace
+namespace moho
 {
-  void DeserializeCUnitReclaimTaskSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<moho::CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
-  }
-
-  void SerializeCUnitReclaimTaskSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<const moho::CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-  }
-
-  void cleanup_CUnitReclaimTaskSerializer_atexit()
-  {
-    (void)moho::cleanup_CUnitReclaimTaskSerializerStartupThunkA();
-  }
-
   /**
-   * Address: 0x00BD17E0 (FUN_00BD17E0, register_CUnitReclaimTaskSerializer)
-   *
-   * What it does:
-   * Initializes the global CUnitReclaimTask serializer helper callbacks and
-   * installs process-exit cleanup.
+   * RTTI Class Hierarchy Descriptor shows this class's base chain running
+   * through `.?AU?$SerSaveLoadHelper@VCUnitReclaimTask@Moho@@@gpg@@` before
+   * `gpg::SerHelperBase`. `CUnitReclaimTask::MemberDeserialize`/
+   * `MemberSerialize` are non-static instance methods, so this class needs
+   * its own static forwarding methods to bind into the `__cdecl`-shaped
+   * callback fields (same situation as the sibling `CUnitPodAssistSerializer`
+   * fixed earlier this session). Kept as a concrete `SerHelperBase`-derived
+   * class rather than a naked `gpg::SerSaveLoadHelper<CUnitReclaimTask>`
+   * alias, matching the `Rect2iSerializer`-style precedent.
    */
-  void register_CUnitReclaimTaskSerializer()
+  class CUnitReclaimTaskSerializer final : public gpg::SerHelperBase
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitReclaimTaskSerializerStartupNode);
-    gCUnitReclaimTaskSerializerStartupNode.mHelperNext = self;
-    gCUnitReclaimTaskSerializerStartupNode.mHelperPrev = self;
-    gCUnitReclaimTaskSerializerStartupNode.mLoad = &DeserializeCUnitReclaimTaskSerializerCallback;
-    gCUnitReclaimTaskSerializerStartupNode.mSave = &SerializeCUnitReclaimTaskSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitReclaimTaskSerializer_atexit);
-  }
+  public:
+    /**
+     * Address: 0x00BD17E0 (FUN_00BD17E0, register_CUnitReclaimTaskSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitReclaimTaskSerializer()
+      : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitReclaimTaskSerializer::Deserialize))
+      , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitReclaimTaskSerializer::Serialize))
+    {}
 
-  struct CUnitReclaimTaskSerializerStartupBootstrap
-  {
-    CUnitReclaimTaskSerializerStartupBootstrap()
+    /**
+     * Address: 0x00BFA310 (FUN_00BFA310, Moho::CUnitReclaimTaskSerializer::~CUnitReclaimTaskSerializer)
+     *
+     * What it does:
+     * Unlinks the serializer helper from the intrusive helper list.
+     */
+    ~CUnitReclaimTaskSerializer()
     {
-      register_CUnitReclaimTaskSerializer();
+      ResetLinks();
     }
+
+    /**
+     * What it does:
+     * Forwards one archive load callback into
+     * `CUnitReclaimTask::MemberDeserialize` on the supplied object pointer.
+     */
+    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    }
+
+    /**
+     * What it does:
+     * Forwards one archive save callback into
+     * `CUnitReclaimTask::MemberSerialize` on the supplied object pointer.
+     */
+    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<const CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    }
+
+    /**
+     * Address: 0x006204B0 (FUN_006204B0, gpg::SerSaveLoadHelper<Moho::CUnitReclaimTask>::Init)
+     *
+     * What it does:
+     * Lazily resolves `CUnitReclaimTask` RTTI and installs load/save
+     * callbacks from this helper object into the type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = CachedCUnitReclaimTaskType();
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mDeserialize;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerialize;
+    }
+
+  public:
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  [[maybe_unused]] CUnitReclaimTaskSerializerStartupBootstrap gCUnitReclaimTaskSerializerStartupBootstrap;
+  static_assert(
+    offsetof(CUnitReclaimTaskSerializer, mDeserialize) == 0x0C,
+    "CUnitReclaimTaskSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitReclaimTaskSerializer, mSerialize) == 0x10,
+    "CUnitReclaimTaskSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(CUnitReclaimTaskSerializer) == 0x14, "CUnitReclaimTaskSerializer size must be 0x14");
+} // namespace moho
+
+namespace
+{
+  /**
+   * Address: 0x00BD17E0 (FUN_00BD17E0, dynamic initializer for the global
+   * `CUnitReclaimTaskSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`).
+   */
+  moho::CUnitReclaimTaskSerializer gCUnitReclaimTaskSerializer;
 } // namespace
 
 namespace gpg
 {
-  /**
-   * Address: 0x0060D610 (FUN_0060D610, reflection pair-pack thunk alias)
-   *
-   * What it does:
-   * Builds one `EAiResult` reflection reference then writes the pair into
-   * caller-provided `RRef` storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackEAiResultRefPair(
-    moho::EAiResult* const value,
-    gpg::RRef* const outPair
-  )
-  {
-    gpg::RRef typedRef{};
-    (void)gpg::RRef_EAiResult(&typedRef, value);
-    *outPair = typedRef;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x00620990 (FUN_00620990, reflection pair-pack thunk alias)
-   *
-   * What it does:
-   * Builds one `CUnitReclaimTask` reflection reference then writes the pair
-   * into caller-provided `RRef` storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackCUnitReclaimTaskRefPair(
-    moho::CUnitReclaimTask* const value,
-    gpg::RRef* const outPair
-  )
-  {
-    gpg::RRef typedRef{};
-    (void)gpg::RRef_CUnitReclaimTask(&typedRef, value);
-    *outPair = typedRef;
-    return outPair;
-  }
-
   /**
    * Address: 0x00620AB0 (FUN_00620AB0, gpg::RRef_CUnitReclaimTask)
    *
