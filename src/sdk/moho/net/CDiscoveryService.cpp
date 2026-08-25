@@ -91,7 +91,7 @@ namespace
    */
   void RemoveTrackedDiscoveryGames(moho::CDiscoveryService* const discoveryService)
   {
-    if (discoveryService == nullptr || discoveryService->mGamesBegin == nullptr) {
+    if (discoveryService == nullptr || discoveryService->mGames.empty()) {
       return;
     }
 
@@ -100,9 +100,8 @@ namespace
       --remainingGames;
       discoveryService->CallbackInt("RemoveGame", remainingGames);
 
-      moho::DiscoveredGameRecord* const gamesBegin = discoveryService->mGamesBegin;
-      if (gamesBegin != nullptr && discoveryService->mGamesEnd != gamesBegin) {
-        --discoveryService->mGamesEnd;
+      if (!discoveryService->mGames.empty()) {
+        discoveryService->mGames.pop_back();
       }
     }
   }
@@ -129,8 +128,9 @@ namespace
     float nextWakeDelaySeconds = 5.0f;
     int removeIndex = 0;
 
-    moho::DiscoveredGameRecord* record = discoveryService->mGamesBegin;
-    while (record != nullptr && record != discoveryService->mGamesEnd) {
+    auto& games = discoveryService->mGames;
+    moho::DiscoveredGameRecord* record = games.begin();
+    while (record != games.end()) {
       const float ageSinceReply = record->mLastReplyTimeSeconds - timeoutCutoffSeconds;
       if (ageSinceReply >= 0.0f) {
         if (nextWakeDelaySeconds > ageSinceReply) {
@@ -144,14 +144,11 @@ namespace
       const msvc8::string hostName = moho::NET_GetHostName(record->mHostAddress);
       gpg::Logf("LOBBY: Discovery reply from %s:%d timed out.", hostName.c_str(), record->mHostPort);
 
-      for (moho::DiscoveredGameRecord* nextRecord = record + 1; nextRecord != discoveryService->mGamesEnd; ++nextRecord) {
-        *(nextRecord - 1) = *nextRecord;
-      }
-      --discoveryService->mGamesEnd;
+      record = games.erase(record);
       discoveryService->CallbackInt("RemoveGame", removeIndex);
     }
 
-    if (discoveryService->mGamesBegin != nullptr && discoveryService->GetGameCount() > 0) {
+    if (!games.empty()) {
       moho::WIN_SetWakeupTimer(nextWakeDelaySeconds * 1000.0f);
     }
   }
@@ -242,9 +239,9 @@ moho::CDiscoveryService::CDiscoveryService(const LuaPlus::LuaObject& clazz)
   ::new (static_cast<void*>(mPullTaskStorage)) CDiscoveryServicePullTask();
   ::new (static_cast<void*>(mPushTaskStorage)) CDiscoveryServicePushTask();
 
-  mGamesBegin = nullptr;
-  mGamesEnd = nullptr;
-  mGamesCapacityEnd = nullptr;
+  // mGames default-constructs itself (empty, no allocation) as part of this
+  // object's implicit member init; the real ctor's `gamesStart=0; gamesEnd=0;
+  // capacityEnd=0` is exactly that default state, not separate assignment.
   mNextDiscoveryBroadcastTimeSeconds = 0.0f;
 
   INetDatagramSocket* const openedSocket = NET_OpenDatagramSocket(0, this);
@@ -277,13 +274,7 @@ moho::CDiscoveryService::~CDiscoveryService()
     delete mDatagramSocket;
   }
 
-  if (mGamesBegin != nullptr) {
-    ::operator delete(static_cast<void*>(mGamesBegin));
-  }
-
-  mGamesBegin = nullptr;
-  mGamesEnd = nullptr;
-  mGamesCapacityEnd = nullptr;
+  mGames.tidy();
 
   PushTaskSubobject(this)->~CTask();
   PullTaskSubobject(this)->~CTask();
@@ -380,45 +371,22 @@ gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
  * int __usercall sub_7C87E0@<eax>(int a1@<edx>, _DWORD *a2@<esi>);
  *
  * What it does:
- * Appends `newRecord` to `mGamesBegin..mGamesEnd`. When the backing
- * allocation still has room (`count < capacity`), copies the record in
- * place and bumps `mGamesEnd`. Otherwise grows the allocation by ~1.5x
- * (minimum `count + 1`, matching the capacity math in FUN_007C9CD0's
- * realloc path), copies the existing records into the new buffer, appends
- * `newRecord`, and releases the old buffer.
+ * Appends `newRecord` to `mGames`. Real asm (0x007C87E0-0x007C8843) is a
+ * thin two-branch dispatcher, not hand-rolled growth math: the
+ * capacity-available fast path copy-constructs one element in place via
+ * `sub_7CCEB0` (`uninit_fill_n`, count=1) and bumps the end pointer by
+ * 0x10; the capacity-exhausted path tail-calls `sub_7C9CD0`
+ * (`this=mGames`-shaped field group, `pos=mGamesEnd`, `val=&newRecord`) --
+ * the generic `_Insert_n` growth-and-insert core (~1.5x growth, floor
+ * `count+1`, `uninit_copy_n` head-range relocation via `sub_7CBF90`/
+ * `sub_7CED40`). That is exactly `msvc8::vector<T>::push_back`'s own
+ * two-branch shape (see its class doc / `Address:` catalog in Vector.h),
+ * so the faithful recovery is the one-line call below, not a duplicate of
+ * the growth arithmetic.
  */
 void moho::CDiscoveryService::AddDiscoveredGame(const DiscoveredGameRecord& newRecord)
 {
-  const auto count = static_cast<std::size_t>(mGamesEnd - mGamesBegin);
-  const auto capacity = static_cast<std::size_t>(mGamesCapacityEnd - mGamesBegin);
-
-  if (mGamesBegin != nullptr && count < capacity) {
-    *mGamesEnd = newRecord;
-    ++mGamesEnd;
-    return;
-  }
-
-  std::size_t newCapacity = capacity + capacity / 2;
-  if (newCapacity < count + 1) {
-    newCapacity = count + 1;
-  }
-
-  auto* const newBegin =
-    static_cast<DiscoveredGameRecord*>(::operator new(newCapacity * sizeof(DiscoveredGameRecord)));
-  DiscoveredGameRecord* newEnd = newBegin;
-  for (const DiscoveredGameRecord* src = mGamesBegin; src != mGamesEnd; ++src, ++newEnd) {
-    *newEnd = *src;
-  }
-  *newEnd = newRecord;
-  ++newEnd;
-
-  if (mGamesBegin != nullptr) {
-    ::operator delete(static_cast<void*>(mGamesBegin));
-  }
-
-  mGamesBegin = newBegin;
-  mGamesEnd = newEnd;
-  mGamesCapacityEnd = newBegin + newCapacity;
+  mGames.push_back(newRecord);
 }
 
 /**
@@ -521,7 +489,7 @@ void moho::CDiscoveryService::OnDatagram(
   );
 
   DiscoveredGameRecord* record = nullptr;
-  for (DiscoveredGameRecord* candidate = mGamesBegin; candidate != mGamesEnd; ++candidate) {
+  for (DiscoveredGameRecord* candidate = mGames.begin(); candidate != mGames.end(); ++candidate) {
     if (candidate->mHostAddress == address && candidate->mHostPort == hostPort) {
       record = candidate;
       break;
@@ -536,7 +504,7 @@ void moho::CDiscoveryService::OnDatagram(
     newRecord.mHostPort = hostPort;
     newRecord.mLastReplyTimeSeconds = 0.0f;
     AddDiscoveredGame(newRecord);
-    record = mGamesEnd - 1;
+    record = &mGames.back();
   }
 
   record->mLastReplyTimeSeconds = mTimer.ElapsedSeconds();
@@ -545,12 +513,7 @@ void moho::CDiscoveryService::OnDatagram(
 
 int moho::CDiscoveryService::GetGameCount() const noexcept
 {
-  const DiscoveredGameRecord* const gamesBegin = mGamesBegin;
-  if (gamesBegin == nullptr) {
-    return 0;
-  }
-
-  return static_cast<int>(mGamesEnd - gamesBegin);
+  return static_cast<int>(mGames.size());
 }
 
 /**

@@ -5696,31 +5696,6 @@ SetCharNodeNil14Runtime* AdvanceTreeIteratorFlag14Runtime(
 }
 
 /**
- * Address: 0x007CCEB0 (FUN_007CCEB0)
- *
- * What it does:
- * Writes one repeated 4-dword payload lane into `count` contiguous slots.
- */
-std::uint32_t* FillStride4DwordLaneRuntimeA(
-  std::uint32_t* destination,
-  const std::uint32_t* const source,
-  std::uint32_t count
-)
-{
-  while (count != 0u) {
-    if (destination != nullptr) {
-      destination[0] = source[0];
-      destination[1] = source[1];
-      destination[2] = source[2];
-      destination[3] = source[3];
-      destination += 4;
-    }
-    --count;
-  }
-  return destination;
-}
-
-/**
  * Address: 0x007CCEF0 (FUN_007CCEF0)
  *
  * What it does:
@@ -5753,21 +5728,6 @@ LuaPlus::LuaObject* FillStride24WordLuaObjectLaneRuntime(
   }
 
   return lastConstructed;
-}
-
-/**
- * Address: 0x007CBEE0 (FUN_007CBEE0)
- *
- * What it does:
- * Forwards one 4-dword lane fill into `FillStride4DwordLaneRuntimeA` while
- * preserving the legacy null-source adapter semantics.
- */
-std::uint32_t* FillStride4DwordLaneRuntimeANullSourceAdapter(
-  std::uint32_t* const destination,
-  const std::uint32_t count
-)
-{
-  return FillStride4DwordLaneRuntimeA(destination, nullptr, count);
 }
 
 /**
