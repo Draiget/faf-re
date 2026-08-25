@@ -1,48 +1,15 @@
 #include "moho/effects/rendering/CEfxBeamSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
 #include "moho/effects/rendering/CEfxBeam.h"
-#include "moho/effects/rendering/CEfxBeamTypeInfo.h"
 #include "moho/entity/SEntAttachInfo.h"
 #include "moho/particles/SWorldBeam.h"
 
 namespace
 {
-  using BeamSerializer = moho::CEfxBeamSerializer;
-
-  BeamSerializer gCEfxBeamSerializer{};
-  bool gCEfxBeamSerializerRegistered = false;
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   template <typename TType>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
   {
@@ -74,51 +41,45 @@ namespace
     return ownerRef ? *ownerRef : gpg::RRef{};
   }
 
-  void cleanup_CEfxBeamSerializer_atexit()
-  {
-    (void)moho::cleanup_CEfxBeamSerializer();
-  }
-
-  struct CEfxBeamSerializerBootstrap
-  {
-    CEfxBeamSerializerBootstrap()
-    {
-      (void)moho::register_CEfxBeamSerializer();
-    }
-  };
-
-  [[maybe_unused]] CEfxBeamSerializerBootstrap gCEfxBeamSerializerBootstrap;
+  // Address: 0x010B3A44 -- process-global `CEfxBeamSerializer` singleton.
+  // Constructing it runs CEfxBeamSerializer::CEfxBeamSerializer()
+  // (0x00BD3F50), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::CEfxBeamSerializer gCEfxBeamSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00655FC0 (FUN_00655FC0)
+   * Address: 0x00BD3F50 (FUN_00BD3F50, register_CEfxBeamSerializer)
    *
    * What it does:
-   * Unlinks the global CEfxBeam serializer helper node and restores
-   * self-links on the serializer node.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  gpg::SerHelperBase* UnlinkCEfxBeamSerializerNodeVariantA()
-  {
-    return UnlinkSerializerNode(gCEfxBeamSerializer);
-  }
+  CEfxBeamSerializer::CEfxBeamSerializer()
+    : mLoadCallback(&CEfxBeamSerializer::Deserialize)
+    , mSaveCallback(&CEfxBeamSerializer::Serialize)
+  {}
 
   /**
-   * Address: 0x00655FF0 (FUN_00655FF0)
+   * Address: 0x00BFB910 (FUN_00BFB910, Moho::CEfxBeamSerializer::~CEfxBeamSerializer)
    *
    * What it does:
-   * Runs the duplicate CEfxBeam serializer helper-node unlink/reset lane.
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
    */
-  gpg::SerHelperBase* UnlinkCEfxBeamSerializerNodeVariantB()
+  CEfxBeamSerializer::~CEfxBeamSerializer()
   {
-    return UnlinkSerializerNode(gCEfxBeamSerializer);
+    ResetLinks();
   }
 
   /**
    * Address: 0x00657B80 (FUN_00657B80, gpg::SerSaveLoadHelper_CEfxBeam::Init)
    */
-  void CEfxBeamSerializer::RegisterSerializeFunctions()
+  void CEfxBeamSerializer::Init()
   {
     gpg::RType* const type = ResolveCEfxBeamType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -165,37 +126,5 @@ namespace moho
     archive->Write(ResolveSEntAttachInfoType(), &object->mEnd, owner);
     archive->Write(ResolveSWorldBeamType(), &object->mBeam, owner);
     archive->WriteBool(object->mIsNew);
-  }
-
-  /**
-   * Address: 0x00BFB910 (FUN_00BFB910, cleanup_CEfxBeamSerializer)
-   *
-   * What it does:
-   * Unlinks startup CEfxBeam serializer helper node and restores self-links.
-   */
-  void cleanup_CEfxBeamSerializer()
-  {
-    (void)UnlinkSerializerNode(gCEfxBeamSerializer);
-  }
-
-  /**
-   * Address: 0x00BD3F50 (FUN_00BD3F50, register_CEfxBeamSerializer)
-   *
-   * What it does:
-   * Initializes startup CEfxBeam serializer helper callbacks and installs
-   * process-exit cleanup.
-   */
-  void register_CEfxBeamSerializer()
-  {
-    if (gCEfxBeamSerializerRegistered) {
-      return;
-    }
-
-    (void)moho::register_CEfxBeamTypeInfo_AtExit();
-    InitializeSerializerNode(gCEfxBeamSerializer);
-    gCEfxBeamSerializer.mLoadCallback = &CEfxBeamSerializer::Deserialize;
-    gCEfxBeamSerializer.mSaveCallback = &CEfxBeamSerializer::Serialize;
-    gCEfxBeamSerializerRegistered = true;
-    (void)std::atexit(&cleanup_CEfxBeamSerializer);
   }
 } // namespace moho

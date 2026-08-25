@@ -6,16 +6,46 @@
 
 namespace moho
 {
-  class CEfxBeamSerializer
+  class CEfxBeamSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD3F50 (FUN_00BD3F50, register_CEfxBeamSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list) and
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CEfxBeamSerializer@Moho@@6B@` -- no eager `Init()` call and no
+     * call to `register_CEfxBeamTypeInfo_AtExit()` exist here (both were
+     * fabricated in the prior recovery). The `push offset ~CEfxBeamSerializer;
+     * call _atexit` sequence visible in the real ctor's tail is the
+     * compiler's own implicit static-destructor registration for a global
+     * with a non-trivial destructor (it pushes the mangled
+     * `??1CEfxBeamSerializer@Moho@@QAE@@Z` symbol directly, not a call the
+     * 2007 source wrote), so it is not reproduced explicitly here --
+     * declaring a real destructor below is sufficient for the compiler to
+     * emit the same registration.
+     */
+    CEfxBeamSerializer();
+
+    /**
+     * Address: 0x00BFB910 (FUN_00BFB910, Moho::CEfxBeamSerializer::~CEfxBeamSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CEfxBeamSerializer();
+
     /**
      * Address: 0x00657B80 (FUN_00657B80, gpg::SerSaveLoadHelper_CEfxBeam::Init)
      *
      * What it does:
      * Binds load/save serializer callbacks into `CEfxBeam` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
     /**
@@ -29,14 +59,10 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(CEfxBeamSerializer, mHelperNext) == 0x04, "CEfxBeamSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CEfxBeamSerializer, mHelperPrev) == 0x08, "CEfxBeamSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(CEfxBeamSerializer, mLoadCallback) == 0x0C, "CEfxBeamSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -44,21 +70,4 @@ namespace moho
     offsetof(CEfxBeamSerializer, mSaveCallback) == 0x10, "CEfxBeamSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CEfxBeamSerializer) == 0x14, "CEfxBeamSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFB910 (FUN_00BFB910, cleanup_CEfxBeamSerializer)
-   *
-   * What it does:
-   * Unlinks startup CEfxBeam serializer helper node and restores self-links.
-   */
-  void cleanup_CEfxBeamSerializer();
-
-  /**
-   * Address: 0x00BD3F50 (FUN_00BD3F50, register_CEfxBeamSerializer)
-   *
-   * What it does:
-   * Initializes startup CEfxBeam serializer helper callbacks and installs
-   * process-exit cleanup.
-   */
-  void register_CEfxBeamSerializer();
 } // namespace moho
