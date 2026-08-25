@@ -2621,6 +2621,26 @@ namespace msvc8
          * `openHeap.mHandleToHeapIndex.push_back(heapIndex)` in
          * `AcquireOrReuseClusterSearchOpenHandle` (FUN_00930440,
          * Cluster.cpp) when the released-handle free list is empty.)
+         * Address: 0x0074C060 (FUN_0074C060, `std::vector_SDesyncInfo::
+         * push_back` per IDA's own signature recognition --
+         * `msvc8::vector<moho::SDesyncInfo>::push_back` for the 0x28-byte
+         * `{int32_t beat; int32_t army; gpg::MD5Digest hash1; gpg::MD5Digest
+         * hash2}` element (`Sim::mDesyncs`, `Sim.h`). Checked-capacity fast
+         * append constructs the pushed value at `_Mylast` through the
+         * `uninit_fill_n` core FUN_00753A90 (`n=1`, cited below on
+         * `uninit_fill_n`) then advances `_Mylast`, else tail-calls
+         * `insert(pos, value)` FUN_0074DA00 (cited below on `insert`), whose
+         * grow core is the count=1-specialized `_Insert_n` emission
+         * FUN_0074F060 (cited alongside it). Emitted via
+         * `mDesyncs.push_back(desync)` in `Sim::VerifyChecksum`
+         * (FUN_007487C0, already recovered, `Sim.cpp`) -- the only lane this
+         * element type is ever appended through. DB-integrity fix: was
+         * mis-tagged `external_dependency` ("External library:
+         * std::vector_SDesyncInfo::push_back") -- despite the IDA-inferred
+         * `std::vector_...` name looking library-shaped, this is this
+         * project's own `msvc8::vector<T>` internals for an engine-owned
+         * element type declared in `moho/sim/SDesyncInfo.h`; nothing here is
+         * external.)
          * Address: 0x008F1760 (FUN_008F1760, sub_8F1760) --
          * `msvc8::vector<gpg::gal::HeadSampleOption>::push_back` for
          * `Head::mStrs` (`Head.hpp`, 0x24/36-byte element -- `{sampleType,
@@ -3689,6 +3709,65 @@ namespace msvc8
          * this instantiation takes that path instead of a bulk copy) inside
          * `func_GetIgnoreNames`/`BuildLobbyIgnoreNameList`
          * (`CLobby.cpp`, `0x007CBC80`).
+         *
+         * Address: 0x0074DA00 (FUN_0074DA00, `msvc8::vector<moho::
+         * SDesyncInfo>::insert(iterator, const T&)` for the 0x28-byte
+         * element (`Sim::mDesyncs`) -- captures `offset = (_Myfirst ==
+         * nullptr) ? 0 : (pos - _Myfirst)/40` before touching storage (the
+         * null-`_Myfirst` guard matches this member's own `size()==0` check
+         * field for field), tail-calls the count=1-specialized `_Insert_n`
+         * core FUN_0074F060 with `(vectorThis, pos, value)` -- no explicit
+         * count parameter, both this wrapper and the core it calls are
+         * count=1-specialized emissions, not the general N-count body
+         * (same precedent as `FUN_007BB780`/`FUN_007BBD60` above) -- then
+         * rebuilds the returned iterator as `_Myfirst + offset*40` since the
+         * insert may have reallocated. Reached from `push_back`'s
+         * capacity-full path (FUN_0074C060, cited above on `push_back`)
+         * with `pos = _Mylast`/`end()`, itself reached only from
+         * `Sim::VerifyChecksum`'s `mDesyncs.push_back(desync)` (already
+         * recovered, `Sim.cpp`) -- the only lane this element type is ever
+         * inserted through.)
+         * Address: 0x0074F060 (FUN_0074F060, the count=1-specialized
+         * `_Insert_n` core this `insert` tail-calls for the same
+         * `SDesyncInfo` instantiation -- copies the inserted value into a
+         * local 40-byte stack temporary first (the standard
+         * self-aliasing-safe insert idiom, matching this method's own
+         * `const T localValue(value)` copy-out), `max_size` guard folds to
+         * `0x6666666` (`0xFFFFFFFF/40`), throwing via the already-recovered
+         * `throw_too_long` helper FUN_0074F320 (`CrtRuntimeHelpers.cpp`) on
+         * overflow. Capacity-available branch splits on whether `pos` is
+         * the current end: the at-end sub-branch -- the only one this
+         * instantiation's real caller ever reaches, since `push_back`
+         * always passes `pos=_Mylast` -- constructs the new value at
+         * `_Mylast` through the `uninit_fill_n` advance-returning adapter
+         * FUN_0074DAC0 (cited below on `uninit_fill_n`) and advances
+         * `_Mylast` by 40; the sibling not-at-end sub-branch (compiled as
+         * part of this shared emission but never reached by any caller in
+         * this binary -- `mDesyncs` is only ever mutated through
+         * `push_back`) shifts the current last element and the remaining
+         * tail through FUN_00751AF0/FUN_00751B30, already `recovered` as
+         * the generic by-stride `CopyForward40ByteTailRangeAdapter`/
+         * `CopyBackward40ByteLaneSourceFirstNullScratchAdapterB` in
+         * `gpg/core/containers/FastVectorInsertLanes.cpp`. Both
+         * capacity-available sub-branches converge on a shared finishing
+         * call, FUN_00753D60 (grouped with FUN_00756990 below as the same
+         * `CopyForward40ByteLaneSourceFirst` shape in that same file),
+         * which performs the gap-fill assignment the not-at-end branch
+         * still needs and is a harmless same-value rewrite on the at-end
+         * branch already constructed via FUN_0074DAC0. The reallocation
+         * branch grows through the by-stride size helper FUN_0074D9E0
+         * (`Count40ByteElementVectorLanes`, `Vector.cpp`, this method's own
+         * `size()` reuse) with a 1.5x/`size()+1` fallback, allocates
+         * through the checked 40-byte allocator FUN_00751B60
+         * (`AllocateChecked40ByteElements`, `Vector.cpp`, this method's own
+         * `allocate_slots_checked`), and relocates the pre-/post-insertion
+         * spans through two calls into the shared forward-copy lane
+         * FUN_00756990. FUN_00751AF0/FUN_00751B30/FUN_00751B60/
+         * FUN_00756990/FUN_00753D60/FUN_0074D9E0 are pre-existing
+         * RULE-ONE-flagged generic by-stride emissions (not per-element-type),
+         * already `recovered` and shared with unrelated 40-byte vector
+         * instantiations elsewhere in the engine -- cited here by address
+         * for completeness, not re-derived or renamed.)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -5611,6 +5690,45 @@ namespace msvc8
          * operator=`). Previously `blocked` citing "caller integration
          * lane FUN_008F1890" as unresolved -- that token is now recovered
          * (cited above on `insert`), clearing the stated blocker.
+         *
+         * Address: 0x00753A90 (FUN_00753A90, `msvc8::vector<moho::
+         * SDesyncInfo>::uninit_fill_n` for the 0x28-byte element
+         * (`Sim::mDesyncs`, `Sim.h`) -- `(count@eax, dst@edx, srcValue@ecx)`
+         * loop: `*dst = *srcValue` (unrolled 10-dword copy) then `dst +=
+         * 10` (0x28-byte stride), `srcValue` never advanced, once per
+         * remaining count; the `test edx,edx`/`if (dst)` null guard wraps
+         * only the copy body while `dst` still advances every iteration
+         * regardless, matching the same defensive-null shape already
+         * documented on FUN_00549BC0/FUN_00832B80/FUN_007CCEB0 above (the
+         * destination is freshly-allocated or in-place storage the compiler
+         * cannot prove non-null). Reached with `count=1` from `push_back`'s
+         * (FUN_0074C060, cited above on `push_back`) capacity-available
+         * fast path -- this method's own `if (size() < capacity()) {
+         * uninit_fill_n(last_, 1u, value); ++last_; }` branch -- which is
+         * `Sim::VerifyChecksum`'s entire `mDesyncs.push_back(desync)` call
+         * (already recovered, `Sim.cpp`), and with `count=1` again from the
+         * `_Insert_n` core FUN_0074F060's at-end sub-branch (cited above on
+         * `insert`) via the advance-returning adapter FUN_0074DAC0
+         * immediately below. DB-integrity fix: was `blocked` citing
+         * `src/sdk/moho/misc/CrtRuntimeHelpers.cpp` boilerplate that does
+         * not contain this address at all (systematic DB-integrity
+         * contamination pattern); this is this project's own
+         * `msvc8::vector<T>` internals for an engine-owned element type,
+         * not CRT code.)
+         * Address: 0x0074DAC0 (FUN_0074DAC0, the advance-returning `_Ufill`
+         * adapter around FUN_00753A90 above, for this same `SDesyncInfo`
+         * specialization -- `int __userpurge sub_74DAC0(dest@edi, count@esi,
+         * srcValue) { uninit_fill_n(dest, count, srcValue); return dest +
+         * 40*count; }`, matching the `_Ufill` adapter shape already
+         * documented on FUN_00868580 above. Called once from the
+         * `_Insert_n` core FUN_0074F060's at-end sub-branch (cited above on
+         * `insert`) to construct the newly-appended element and obtain the
+         * advanced end pointer. DB-integrity fix: was mis-tagged
+         * `external_dependency` ("All-external-callees thunk... no
+         * Moho/gpg engine references") -- its only callee is FUN_00753A90,
+         * this project's own `uninit_fill_n` core for this same
+         * engine-owned `moho::SDesyncInfo` element, not third-party
+         * runtime.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
