@@ -11,6 +11,7 @@ namespace gpg
 {
   class RRef;
   class RType;
+  class ReadArchive;
 }
 
 namespace moho
@@ -153,6 +154,27 @@ namespace moho
      * `UNITSTATE_ForceSpeedThrough` state bit per phase.
      */
     int Execute() override;
+
+    /**
+     * Address: 0x006109B0 (FUN_006109B0, sub_6109B0)
+     *
+     * What it does:
+     * Loads this ferry task's own state on top of the base `CCommandTask`
+     * load: `mDispatch` (typed pointer read), `mCommandIndex` (int),
+     * `mFollowsExistingRoute` (bool), `mPos` (Vector3f), then `mRouteUnit`/
+     * `mFerryUnit`/`mBeacon` (three `WeakPtr<Unit>` reads in that order) --
+     * confirmed field-for-field against this class's own offsets
+     * (0x30/0x34/0x38/0x3C/0x48/0x50/0x58). `[[maybe_unused]]`: this class
+     * has no `CUnitFerryTaskSerializer`/`RegisterSerializeFunctions`
+     * wiring yet (unlike the sibling `CCommandTaskSerializer` pattern in
+     * `CCommandTask.h`) -- real destiny is `&CUnitFerryTaskSerializer::
+     * Deserialize`'s address being stored into `gpg::RType::serLoadFunc_`,
+     * an address-taken registration this session did not locate a
+     * confirmed call site for. See
+     * project_fun_006109b0_reflection_lead.md for the write-direction
+     * (`MemberSerialize`) and registration-wiring follow-up.
+     */
+    [[maybe_unused]] void MemberDeserialize(gpg::ReadArchive* archive);
 
   private:
     /**
