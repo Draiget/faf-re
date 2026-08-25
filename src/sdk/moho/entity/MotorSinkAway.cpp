@@ -11,7 +11,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/StatItem.h"
-#include "moho/misc/Stats.h"
+#include "moho/misc/Stats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -28,7 +28,16 @@ namespace
   alignas(moho::MotorSinkAwayTypeInfo)
     unsigned char gMotorSinkAwayTypeInfoStorage[sizeof(moho::MotorSinkAwayTypeInfo)];
   bool gMotorSinkAwayTypeInfoConstructed = false;
-  moho::MotorSinkAwaySerializer gMotorSinkAwaySerializer{};
+  // Address: 0x00BD5DB0 (dynamic initializer for the global
+  // `MotorSinkAwaySerializer` singleton, __xc_a-reachable) -- MSVC's own
+  // compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<MotorSinkAway>` ctor (self-links into
+  // `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback` to the template's
+  // `Deserialize`/`Serialize`, installs the vtable) and registers the real
+  // destructor (0x00BFD2A0, no recovered mangled name; body confirmed via
+  // raw asm to just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT
+  // duplicate ctor: 0x00696CB0.
+  moho::MotorSinkAwaySerializer gMotorSinkAwaySerializer;
   moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct{};
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorSinkAwayIndex = 0;
 
@@ -211,7 +220,7 @@ namespace
   }
 
   template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  [[nodiscard]] auto* HelperSelfNode(THelper& helper) noexcept
   {
     return &helper.mHelperLinks;
   }
@@ -219,20 +228,20 @@ namespace
   template <typename THelper>
   void InitializeHelperNode(THelper& helper) noexcept
   {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    auto* const self = HelperSelfNode(helper);
     helper.mHelperLinks.mNext = self;
     helper.mHelperLinks.mPrev = self;
   }
 
   template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
+  [[nodiscard]] auto* UnlinkHelperNode(THelper& helper) noexcept
   {
     if (helper.mHelperLinks.mNext != nullptr && helper.mHelperLinks.mPrev != nullptr) {
       helper.mHelperLinks.mNext->mPrev = helper.mHelperLinks.mPrev;
       helper.mHelperLinks.mPrev->mNext = helper.mHelperLinks.mNext;
     }
 
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    auto* const self = HelperSelfNode(helper);
     helper.mHelperLinks.mPrev = self;
     helper.mHelperLinks.mNext = self;
     return self;
@@ -298,107 +307,9 @@ namespace
     return InitializeMotorSinkAwayConstructGenericHelperLane();
   }
 
-  /**
-   * Address: 0x00696CB0 (FUN_00696CB0)
-   *
-   * What it does:
-   * Initializes the save/load serializer helper lane for `MotorSinkAway`.
-   */
-  [[nodiscard]] moho::MotorSinkAwaySerializer* InitializeMotorSinkAwaySerializerHelperLane()
-  {
-    InitializeHelperNode(gMotorSinkAwaySerializer);
-    gMotorSinkAwaySerializer.mDeserialize = &moho::MotorSinkAwaySerializer::Deserialize;
-    gMotorSinkAwaySerializer.mSerialize = &moho::MotorSinkAwaySerializer::Serialize;
-    return &gMotorSinkAwaySerializer;
-  }
-
-  /**
-   * Address: 0x00697200 (FUN_00697200, serializer load body)
-   */
-  void DeserializeMotorSinkAwayBody(moho::MotorSinkAway* const object, gpg::ReadArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->Read(CachedMotorType(), static_cast<moho::EntityMotor*>(object), nullOwner);
-    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(object), nullOwner);
-    archive->ReadFloat(&object->mSinkDeltaY);
-  }
-
-  /**
-   * Address: 0x00697290 (FUN_00697290, serializer save body)
-   */
-  void SerializeMotorSinkAwayBody(const moho::MotorSinkAway* const object, gpg::WriteArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->Write(CachedMotorType(), static_cast<const moho::EntityMotor*>(object), nullOwner);
-    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(object), nullOwner);
-    archive->WriteFloat(object->mSinkDeltaY);
-  }
-
-  /**
-   * Address: 0x00696FB0 (FUN_00696FB0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the MotorSinkAway deserialize thunk alias to the recovered
-   * serializer load body.
-   */
-  void DeserializeMotorSinkAwayThunkVariantA(moho::MotorSinkAway* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeMotorSinkAwayBody(object, archive);
-  }
-
-  /**
-   * Address: 0x00696FC0 (FUN_00696FC0, serializer save thunk alias)
-   * Address: 0x00672550 (FUN_00672550)
-   *
-   * What it does:
-   * Tail-forwards the MotorSinkAway serialize thunk alias to the recovered
-   * serializer save body.
-   */
-  void SerializeMotorSinkAwayThunkVariantA(const moho::MotorSinkAway* const object, gpg::WriteArchive* const archive)
-  {
-    SerializeMotorSinkAwayBody(object, archive);
-  }
-
-  /**
-   * Address: 0x006971B0 (FUN_006971B0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the second MotorSinkAway deserialize thunk alias to the
-   * recovered serializer load body.
-   */
-  void DeserializeMotorSinkAwayThunkVariantB(moho::MotorSinkAway* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeMotorSinkAwayBody(object, archive);
-  }
-
-  /**
-   * Address: 0x006971C0 (FUN_006971C0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the second MotorSinkAway serialize thunk alias to the
-   * recovered serializer save body.
-   */
-  void SerializeMotorSinkAwayThunkVariantB(const moho::MotorSinkAway* const object, gpg::WriteArchive* const archive)
-  {
-    SerializeMotorSinkAwayBody(object, archive);
-  }
-
   void cleanup_MotorSinkAwayConstruct_atexit()
   {
     (void)moho::cleanup_MotorSinkAwayConstruct();
-  }
-
-  void cleanup_MotorSinkAwaySerializer_atexit()
-  {
-    (void)moho::cleanup_MotorSinkAwaySerializer();
   }
 } // namespace
 
@@ -585,31 +496,33 @@ namespace moho
   }
 
   /**
-   * Address: 0x00696880 (FUN_00696880, serializer load thunk)
+   * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)
    */
-  void MotorSinkAwaySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void MotorSinkAway::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    DeserializeMotorSinkAwayBody(reinterpret_cast<MotorSinkAway*>(objectPtr), archive);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Read(CachedMotorType(), static_cast<moho::EntityMotor*>(this), nullOwner);
+    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(this), nullOwner);
+    archive->ReadFloat(&mSinkDeltaY);
   }
 
   /**
-   * Address: 0x00696890 (FUN_00696890, serializer save thunk)
+   * Address: 0x00697290 (FUN_00697290, Moho::MotorSinkAway::MemberSerialize)
    */
-  void MotorSinkAwaySerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void MotorSinkAway::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    SerializeMotorSinkAwayBody(reinterpret_cast<const MotorSinkAway*>(objectPtr), archive);
-  }
+    if (!archive) {
+      return;
+    }
 
-  /**
-   * Address: 0x006968B0 (FUN_006968B0, serializer registration lane)
-   */
-  void MotorSinkAwaySerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = CachedMotorSinkAwayType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
+    const gpg::RRef nullOwner{};
+    archive->Write(CachedMotorType(), static_cast<const moho::EntityMotor*>(this), nullOwner);
+    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(this), nullOwner);
+    archive->WriteFloat(mSinkDeltaY);
   }
 
   /**
@@ -643,17 +556,9 @@ namespace moho
   /**
    * Address: 0x00BFD270 (FUN_00BFD270, cleanup_MotorSinkAwayConstruct)
    */
-  gpg::SerHelperBase* cleanup_MotorSinkAwayConstruct()
+  moho::TDatListItem<gpg::SerHelperBase, void>* cleanup_MotorSinkAwayConstruct()
   {
     return UnlinkHelperNode(gMotorSinkAwayConstruct);
-  }
-
-  /**
-   * Address: 0x00BFD2A0 (FUN_00BFD2A0, cleanup_MotorSinkAwaySerializer)
-   */
-  gpg::SerHelperBase* cleanup_MotorSinkAwaySerializer()
-  {
-    return UnlinkHelperNode(gMotorSinkAwaySerializer);
   }
 
   /**
@@ -681,11 +586,18 @@ namespace moho
 
   /**
    * Address: 0x00BD5DB0 (FUN_00BD5DB0, register_MotorSinkAwaySerializer)
+   *
+   * What it does:
+   * Forces this translation unit's global `MotorSinkAwaySerializer` instance
+   * to link into the reflection bootstrap sequence. See the Doxygen comment
+   * on the declaration (MotorSinkAway.h) and on `gMotorSinkAwaySerializer`
+   * above for why this function's body has no field-setting logic of its
+   * own.
    */
   int register_MotorSinkAwaySerializer()
   {
-    (void)InitializeMotorSinkAwaySerializerHelperLane();
-    return std::atexit(&cleanup_MotorSinkAwaySerializer_atexit);
+    (void)gMotorSinkAwaySerializer;
+    return 0;
   }
 
   /**

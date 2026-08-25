@@ -61,6 +61,24 @@ namespace moho
      */
     void Update(Entity* entity) override;
 
+    /**
+     * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `EntityMotor` and `CScriptObject` base state, then the sink-speed
+     * scalar.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00697290 (FUN_00697290, Moho::MotorSinkAway::MemberSerialize)
+     *
+     * What it does:
+     * Saves `EntityMotor` and `CScriptObject` base state, then the sink-speed
+     * scalar.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     float mSinkDeltaY; // +0x38
   };
@@ -136,43 +154,23 @@ namespace moho
 
   static_assert(sizeof(MotorSinkAwayTypeInfo) == 0x64, "MotorSinkAwayTypeInfo size must be 0x64");
 
-  class MotorSinkAwaySerializer
-  {
-  public:
-    /**
-     * Address: 0x00696880 (FUN_00696880, serializer load thunk)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00696890 (FUN_00696890, serializer save thunk)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x006968B0 (FUN_006968B0, serializer registration lane)
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(MotorSinkAwaySerializer, mHelperLinks) == 0x04,
-    "MotorSinkAwaySerializer::mHelperLinks offset must be 0x04"
-  );
-  static_assert(
-    offsetof(MotorSinkAwaySerializer, mDeserialize) == 0x0C,
-    "MotorSinkAwaySerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(MotorSinkAwaySerializer, mSerialize) == 0x10,
-    "MotorSinkAwaySerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(MotorSinkAwaySerializer) == 0x14, "MotorSinkAwaySerializer size must be 0x14");
+  /**
+   * VFTABLE: 0x00E292C8
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::MotorSinkAway>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer: 0x00BD5DB0 (__xc_a-reachable;
+   *    dead zero-xref COMDAT duplicate: 0x00696CB0)
+   *  - dtor: 0x00BFD2A0 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x00696CE0
+   *  - Deserialize(): 0x00696880
+   *  - Serialize(): 0x00696890
+   */
+  using MotorSinkAwaySerializer = gpg::SerSaveLoadHelper<MotorSinkAway>;
 
   class MotorSinkAwayConstruct
   {
@@ -183,7 +181,7 @@ namespace moho
     virtual void RegisterConstructFunction();
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
+    moho::TDatListItem<gpg::SerHelperBase, void> mHelperLinks; // +0x04 (intrusive helper node)
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
@@ -210,12 +208,7 @@ namespace moho
   /**
    * Address: 0x00BFD270 (FUN_00BFD270, cleanup_MotorSinkAwayConstruct)
    */
-  gpg::SerHelperBase* cleanup_MotorSinkAwayConstruct();
-
-  /**
-   * Address: 0x00BFD2A0 (FUN_00BFD2A0, cleanup_MotorSinkAwaySerializer)
-   */
-  gpg::SerHelperBase* cleanup_MotorSinkAwaySerializer();
+  moho::TDatListItem<gpg::SerHelperBase, void>* cleanup_MotorSinkAwayConstruct();
 
   /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
@@ -229,6 +222,13 @@ namespace moho
 
   /**
    * Address: 0x00BD5DB0 (FUN_00BD5DB0, register_MotorSinkAwaySerializer)
+   *
+   * What it does:
+   * Forces this translation unit's global `MotorSinkAwaySerializer` instance
+   * to link into the reflection bootstrap sequence. The ctor/vtable-install/
+   * atexit-dtor-registration sequence this address decompiles to is MSVC's
+   * own compiler-generated dynamic initializer for that global, not
+   * hand-written source -- see `gpg::SerSaveLoadHelper<T>` in Reflection.h.
    */
   int register_MotorSinkAwaySerializer();
 
