@@ -3228,7 +3228,7 @@ namespace
  * Returns the process-global input-capture vector storage, ignoring one
  * stdcall argument lane.
  */
-[[maybe_unused]] [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>*
+[[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>*
 ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 {
   return &sInputCapture;
@@ -3240,7 +3240,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
  * What it does:
  * Returns the process-global input-capture vector storage.
  */
-[[maybe_unused]] [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
+[[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
 {
   return ResolveInputCaptureStorageWithArg(0);
 }
@@ -3255,8 +3255,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     moho::WeakPtr<moho::CMauiControl>** const outBegin
   ) noexcept
   {
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    *outBegin = view.begin;
+    *outBegin = sInputCapture.begin();
     return outBegin;
   }
 
@@ -3270,8 +3269,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     moho::WeakPtr<moho::CMauiControl>** const outEnd
   ) noexcept
   {
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    *outEnd = view.end;
+    *outEnd = sInputCapture.end();
     return outEnd;
   }
 
@@ -3286,8 +3284,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     const std::size_t index
   ) noexcept
   {
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    return view.begin + static_cast<std::ptrdiff_t>(index);
+    return sInputCapture.begin() + static_cast<std::ptrdiff_t>(index);
   }
 
   void UnlinkInputCaptureWeakPtrRange(
@@ -3310,11 +3307,19 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    */
   [[maybe_unused]] void CleanupInputCaptureAtExit() noexcept
   {
-    auto& captureView = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    if (captureView.begin != nullptr) {
-      UnlinkInputCaptureWeakPtrRange(captureView.begin, captureView.end);
-      ::operator delete(static_cast<void*>(captureView.begin));
+    if (sInputCapture.begin() != nullptr) {
+      UnlinkInputCaptureWeakPtrRange(sInputCapture.begin(), sInputCapture.end());
+      ::operator delete(static_cast<void*>(sInputCapture.begin()));
     }
+
+    // No public msvc8::vector<T> API releases an externally-freed buffer
+    // without also re-invoking element destructors on it -- the
+    // WeakPtr<CMauiControl> lanes above are already unlinked and their
+    // storage already freed by hand, so this only needs to zero the
+    // triplet. Matches the established WeakPtr.h precedent
+    // (EnsureWeakPtrVectorCapacity) for this same narrow "commit cleared
+    // internal state" step; no reads happen through this view.
+    auto& captureView = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
     captureView.begin = nullptr;
     captureView.end = nullptr;
     captureView.capacityEnd = nullptr;
@@ -3340,12 +3345,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    */
   [[nodiscard]] std::size_t InputCaptureCount() noexcept
   {
-    const auto& captureVector = *ResolveInputCaptureStorage();
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(captureVector);
-    if (view.begin == nullptr || view.end == nullptr) {
-      return 0;
-    }
-    return static_cast<std::size_t>(view.end - view.begin);
+    return ResolveInputCaptureStorage()->size();
   }
 
   /**
@@ -3411,15 +3411,29 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     moho::WeakPtr<moho::CMauiControl>* eraseEnd
   ) noexcept;
 
+  /**
+   * Address: inlined at 0x007A4713 (inside CompactInputCaptureStack,
+   * FUN_007A4720) and 0x007A57F3 (inside func_RemoveInputCapture's chain,
+   * FUN_007A45D0) -- both are `owner=<none>` chunks per the callgraph
+   * index's xref data, not a standalone out-of-line body: this operation
+   * is inlined at each of its two call sites, both of which tail directly
+   * into EraseInputCaptureRangeCompacting (FUN_007A58C0). A third xref from
+   * `Moho::CUIManager::SetNewLuaState` (FUN_0084CC50) reaches
+   * EraseInputCaptureRangeCompacting directly rather than through this
+   * inlined shape.
+   *
+   * What it does:
+   * Erases the weak-control entry at `index` from the global input-capture
+   * stack, unlinking it first and then compacting the tail down over it.
+   */
   void RemoveInputCaptureAt(const std::size_t index) noexcept
   {
-    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    const std::size_t count = InputCaptureCount();
-    if (view.begin == nullptr || index >= count) {
+    const std::size_t count = sInputCapture.size();
+    if (sInputCapture.begin() == nullptr || index >= count) {
       return;
     }
 
-    view.begin[index].ResetFromObject(nullptr);
+    sInputCapture.begin()[index].ResetFromObject(nullptr);
 
     // Erase one weak-capture slot by delegating to the general range-erase
     // helper (FUN_007A58C0). It shifts `[index+1, end)` down onto `[index,
@@ -3427,8 +3441,8 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     // updates `_Mylast`.
     (void)EraseInputCaptureRangeCompacting(
       nullptr,
-      &view.begin[index],
-      &view.begin[index + 1u]
+      sInputCapture.begin() + index,
+      sInputCapture.begin() + index + 1u
     );
   }
 
@@ -3460,8 +3474,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   ) noexcept
   {
     if (eraseBegin != eraseEnd) {
-      auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-      moho::WeakPtr<moho::CMauiControl>* const oldEnd = view.end;
+      moho::WeakPtr<moho::CMauiControl>* const oldEnd = sInputCapture.end();
 
       // Shift the live tail [eraseEnd, oldEnd) down onto eraseBegin while
       // preserving intrusive weak-owner chain slots for every moved entry.
@@ -3470,7 +3483,13 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 
       // Unlink the now-vacant trailing slots from their weak owner chains.
       UnlinkInputCaptureWeakPtrRange(compactedEnd, oldEnd);
-      view.end = compactedEnd;
+
+      // No public msvc8::vector<T> API shrinks `_Mylast` in place without
+      // re-destroying the (already-unlinked) trailing slots -- same narrow
+      // "commit updated internal state" reach-in as
+      // CleanupInputCaptureAtExit above; nothing here is read through the
+      // view, only written.
+      moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = compactedEnd;
     }
 
     if (outIterator != nullptr) {
@@ -3480,13 +3499,164 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   }
 
 /**
+   * Address: 0x007A5A70 (FUN_007A5A70)
+   *
+   * IDA signature:
+   * void __stdcall sub_7A5A70(int insertAt, WeakPtr<CMauiControl> *value);
+   * (IDA flags this export's `.c` pseudocode "bad sp value at call has been
+   * detected" / "positive sp value has been detected" -- recovered here
+   * from the raw `.asm` instead, cross-checked instruction-by-instruction
+   * against the real bodies of every callee below, since call-argument
+   * groupings are exactly what that decompiler warning calls into
+   * question.)
+   *
+   * What it does:
+   * The real out-of-line `insert(pos, value)`-with-growth core for
+   * `sInputCapture`'s `msvc8::vector<WeakPtr<CMauiControl>>` storage --
+   * `InsertInputCaptureWithGrowth` (FUN_007A5870) is a thin wrapper that
+   * only computes the pre-call index and rebases the returned iterator;
+   * this function does the actual capacity check, growth/relocation, and
+   * intrusive-chain-safe element placement.
+   *
+   * First stages a by-value copy of `value` into a stack-local temporary,
+   * splicing it in at the head of `value`'s owner chain in place of
+   * `value` itself (mirrors `ResetFromOwnerLinkSlot`'s own unlink-and-relink
+   * dance exactly) so the rest of the function can safely read the staged
+   * value even if `value` itself aliases into `sInputCapture`'s own storage
+   * across the shift/reallocation below; the temporary is unlinked again
+   * before returning, on every exit path including exceptional ones (the
+   * real binary does this via SEH state tracking plus an EH funclet at
+   * 0x00B953B0 that tail-calls FUN_0079DB60 -- compiler-emitted unwind
+   * glue, not distinct source; expressed here as a scope guard instead).
+   *
+   * Then, guarding `size() == max_size()` (throws via `throw_too_long()`,
+   * FUN_007A5D20, cited on `msvc8::vector<T>::throw_too_long` in Vector.h):
+   *   - Capacity available (`capacity() >= size()+1`): if inserting before
+   *     the end, extends the live range by duplicating the current last
+   *     element into the new slot (`CopyWeakPtrRangeStdOrder`), shifts the
+   *     middle range `[insertAt, oldLast)` backward by one
+   *     (`AssignWeakPtrRangeBackward`), then assigns the staged value into
+   *     the vacated gap (`WeakPtr<T>::AssignFillRange`); if inserting at
+   *     the end, constructs the staged value directly at `_Mylast`
+   *     (`WeakPtr<T>::FillConstructRange`) and bumps it by one element.
+   *   - Capacity exhausted: computes 1.5x growth via `recommended_capacity`
+   *     (its own internal fallback to `need` matches the binary's
+   *     redundant re-derivation of `size()+1` for the "1.5x wasn't enough"
+   *     case), allocates the new buffer (`allocate_slots_checked`,
+   *     FUN_007A5EF0), copies the prefix `[begin,insertAt)` into it
+   *     (`CopyWeakPtrRangeStdOrder`), fill-constructs the staged value into
+   *     the gap (`WeakPtr<T>::FillConstructRange`), copies the suffix
+   *     `[insertAt,end)` after it (`CopyWeakPtrRangeStdOrder`), then (if
+   *     there was an old buffer) unlinks its live range
+   *     (`UnlinkWeakPtrRangeWithoutClearing`) and frees it, and commits the
+   *     new `{begin,end,capacityEnd}` triplet.
+   */
+  void GrowAndInsertInputCaptureWeakRef(
+    moho::WeakPtr<moho::CMauiControl>* const insertAt,
+    const moho::WeakPtr<moho::CMauiControl>& value
+  )
+  {
+    using CaptureWeakPtr = moho::WeakPtr<moho::CMauiControl>;
+    using VoidWeakPtr = moho::WeakPtr<void>;
+
+    // Stage a relink-safe local copy of `value` (see doc comment above) and
+    // guarantee its owner chain is restored on every exit path, including
+    // exceptional ones raised by throw_too_long()/allocate_slots_checked()
+    // below.
+    CaptureWeakPtr stagedValue{};
+    stagedValue.ResetFromOwnerLinkSlot(value.ownerLinkSlot);
+    struct StagedValueUnlinkGuard
+    {
+      CaptureWeakPtr* target;
+      ~StagedValueUnlinkGuard() { target->UnlinkFromOwnerChain(); }
+    } stagedValueUnlinkGuard{&stagedValue};
+
+    if (InputCaptureCount() == sInputCapture.max_size()) {
+      sInputCapture.throw_too_long();
+    }
+
+    const std::size_t oldSize = sInputCapture.size();
+    if (sInputCapture.capacity() >= oldSize + 1u) {
+      // In-place branch: capacity already covers the new element.
+      CaptureWeakPtr* const oldLast = sInputCapture.end();
+      if (insertAt != oldLast) {
+        // Real shift: duplicate the last live element into the new
+        // (currently uninitialized) one-past-end slot, extending the live
+        // range by one -- this is a *construct*, matching
+        // CopyWeakPtrRangeStdOrder's shape, not an assign.
+        VoidWeakPtr* const newEnd = moho::CopyWeakPtrRangeStdOrder(
+          reinterpret_cast<VoidWeakPtr*>(oldLast),
+          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1),
+          reinterpret_cast<const VoidWeakPtr*>(oldLast)
+        );
+        moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = reinterpret_cast<CaptureWeakPtr*>(newEnd);
+
+        // Shift [insertAt, oldLast-1) backward by one to open the gap.
+        (void)moho::AssignWeakPtrRangeBackward(
+          reinterpret_cast<VoidWeakPtr*>(oldLast),
+          reinterpret_cast<const VoidWeakPtr*>(insertAt),
+          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1)
+        );
+
+        // Assign the staged value into the now-vacated gap.
+        (void)CaptureWeakPtr::AssignFillRange(insertAt, insertAt + 1, stagedValue);
+      } else {
+        // Append: construct the staged value directly at the old end.
+        (void)CaptureWeakPtr::FillConstructRange(oldLast, 1, stagedValue);
+        moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = oldLast + 1;
+      }
+    } else {
+      // Reallocation branch: geometric growth, single-pass gap-aware copy.
+      const std::size_t newCapacity = sInputCapture.recommended_capacity(InputCaptureCount() + 1u);
+      CaptureWeakPtr* const newBuffer = newCapacity != 0u
+        ? sInputCapture.allocate_slots_checked(newCapacity)
+        : static_cast<CaptureWeakPtr*>(::operator new(0u));
+
+      VoidWeakPtr* const afterPrefixVoid = moho::CopyWeakPtrRangeStdOrder(
+        reinterpret_cast<VoidWeakPtr*>(newBuffer),
+        reinterpret_cast<const VoidWeakPtr*>(sInputCapture.begin()),
+        reinterpret_cast<const VoidWeakPtr*>(insertAt)
+      );
+      CaptureWeakPtr* const afterPrefix = reinterpret_cast<CaptureWeakPtr*>(afterPrefixVoid);
+
+      (void)CaptureWeakPtr::FillConstructRange(afterPrefix, 1, stagedValue);
+
+      (void)moho::CopyWeakPtrRangeStdOrder(
+        reinterpret_cast<VoidWeakPtr*>(afterPrefix + 1),
+        reinterpret_cast<const VoidWeakPtr*>(insertAt),
+        reinterpret_cast<const VoidWeakPtr*>(sInputCapture.end())
+      );
+
+      if (sInputCapture.begin() != nullptr) {
+        moho::UnlinkWeakPtrRangeWithoutClearing(
+          reinterpret_cast<VoidWeakPtr*>(sInputCapture.begin()),
+          reinterpret_cast<VoidWeakPtr*>(sInputCapture.end())
+        );
+        ::operator delete(static_cast<void*>(sInputCapture.begin()));
+      }
+
+      // No public msvc8::vector<T> API adopts an externally-built,
+      // already-relocated buffer -- same narrow "commit new internal
+      // state" reach-in as CleanupInputCaptureAtExit/
+      // EraseInputCaptureRangeCompacting above.
+      auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+      view.begin = newBuffer;
+      view.end = newBuffer + oldSize + 1u;
+      view.capacityEnd = newBuffer + newCapacity;
+    }
+  }
+
+  /**
    * Address: 0x007A5870 (FUN_007A5870)
    *
    * What it does:
-   * Inserts one weak-control capture lane at the requested position in the
-   * global `sInputCapture` vector and returns the rebased inserted iterator.
+   * Computes the pre-growth index of `insertAt` within `sInputCapture`,
+   * delegates the actual insert-with-growth work to
+   * `GrowAndInsertInputCaptureWeakRef` (FUN_007A5A70), then rebases the
+   * (possibly-reallocated) inserted position using that pre-growth index
+   * and stores it into `*outIterator`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** InsertInputCaptureWithGrowth(
+  [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** InsertInputCaptureWithGrowth(
     moho::WeakPtr<moho::CMauiControl>** const outIterator,
     moho::WeakPtr<moho::CMauiControl>* const insertAt,
     const moho::WeakPtr<moho::CMauiControl>* const value
@@ -3494,40 +3664,15 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   {
     using CaptureWeakPtr = moho::WeakPtr<moho::CMauiControl>;
 
-    const CaptureWeakPtr* const begin = sInputCapture.data();
-    const std::size_t count = sInputCapture.size();
-
     std::size_t insertIndex = 0u;
-    if (begin != nullptr && count != 0u && insertAt != nullptr) {
-      const std::uintptr_t beginAddress = reinterpret_cast<std::uintptr_t>(begin);
-      const std::uintptr_t insertAddress = reinterpret_cast<std::uintptr_t>(insertAt);
-      if (insertAddress >= beginAddress) {
-        insertIndex = static_cast<std::size_t>((insertAddress - beginAddress) / sizeof(CaptureWeakPtr));
-      }
-    }
-    insertIndex = std::min(insertIndex, count);
-
-    CaptureWeakPtr captureValue{};
-    if (value != nullptr) {
-      captureValue = *value;
+    if (sInputCapture.begin() != nullptr && sInputCapture.size() != 0u && insertAt != nullptr) {
+      insertIndex = static_cast<std::size_t>(insertAt - sInputCapture.begin());
     }
 
-    moho::EnsureWeakPtrVectorCapacity(sInputCapture, count + 1u);
-    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    for (std::size_t i = count; i > insertIndex; --i) {
-      view.begin[i].ResetFromOwnerLinkSlot(view.begin[i - 1u].ownerLinkSlot);
-      view.begin[i - 1u].ResetFromObject(nullptr);
-    }
-
-    if (value != nullptr) {
-      view.begin[insertIndex].ResetFromOwnerLinkSlot(captureValue.ownerLinkSlot);
-    } else {
-      view.begin[insertIndex].ResetFromObject(nullptr);
-    }
-    view.end = view.begin + count + 1u;
+    GrowAndInsertInputCaptureWeakRef(insertAt, *value);
 
     if (outIterator != nullptr) {
-      CaptureWeakPtr* const rebasedBegin = view.begin;
+      CaptureWeakPtr* const rebasedBegin = sInputCapture.begin();
       *outIterator = rebasedBegin != nullptr ? rebasedBegin + insertIndex : nullptr;
     }
     return outIterator;
@@ -3544,11 +3689,10 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   {
     std::vector<std::size_t> staleIndices{};
 
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    const std::size_t count = InputCaptureCount();
-    if (view.begin != nullptr && count > 0u) {
+    const std::size_t count = sInputCapture.size();
+    if (sInputCapture.begin() != nullptr && count > 0u) {
       for (std::size_t index = 0; index < count; ++index) {
-        if (view.begin[index].GetObjectPtr() == nullptr) {
+        if (sInputCapture.begin()[index].GetObjectPtr() == nullptr) {
           staleIndices.push_back(index);
         }
       }
@@ -3570,23 +3714,30 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   {
     CompactInputCaptureStack();
 
-    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    const std::size_t count = InputCaptureCount();
-    if (view.begin == nullptr || count == 0u) {
+    const std::size_t count = sInputCapture.size();
+    if (sInputCapture.begin() == nullptr || count == 0u) {
       return nullptr;
     }
 
-    return view.begin[count - 1u].GetObjectPtr();
+    return sInputCapture.begin()[count - 1u].GetObjectPtr();
   }
 
   /**
    * Address: 0x007A5710 (FUN_007A5710, sub_7A5710)
    *
    * What it does:
-   * Appends one weak-control entry to the global input-capture vector,
-   * growing capacity when needed.
+   * `push_back`-shaped append: if capacity is exhausted, delegates to the
+   * growth-aware insert-at-end core (`InsertInputCaptureWithGrowth`,
+   * FUN_007A5870); otherwise constructs the new lane directly at the
+   * current `_Mylast` (`WeakPtr<T>::FillConstructRange`) and bumps it by
+   * one element. The binary's own return value (`result`, echoed straight
+   * through from whichever path ran) is never read by either of this
+   * function's two real callers (`AddInputCaptureControl` discards it
+   * explicitly), so the exact returned pointer is not independently
+   * observable; this returns a pointer to the newly appended lane on both
+   * paths.
    */
-  [[maybe_unused]] static moho::WeakPtr<moho::CMauiControl>* AppendInputCaptureWeakReference(
+  [[nodiscard]] static moho::WeakPtr<moho::CMauiControl>* AppendInputCaptureWeakReference(
     const moho::WeakPtr<moho::CMauiControl>* const captureRef
   )
   {
@@ -3594,13 +3745,19 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
       return nullptr;
     }
 
-    const std::size_t count = InputCaptureCount();
-    moho::EnsureWeakPtrVectorCapacity(sInputCapture, count + 1u);
+    if (sInputCapture.begin() == nullptr || sInputCapture.size() >= sInputCapture.capacity()) {
+      // Slow path: delegate to the growth-aware insert-at-end core.
+      moho::WeakPtr<moho::CMauiControl>* rebasedPosition = nullptr;
+      (void)InsertInputCaptureWithGrowth(&rebasedPosition, sInputCapture.end(), captureRef);
+      return rebasedPosition;
+    }
 
-    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    view.begin[count].ResetFromOwnerLinkSlot(captureRef->ownerLinkSlot);
-    view.end = view.begin + count + 1u;
-    return &view.begin[count];
+    // Fast path: capacity already covers one more element -- construct
+    // directly at the current end and bump it.
+    moho::WeakPtr<moho::CMauiControl>* const oldEnd = sInputCapture.end();
+    (void)moho::WeakPtr<moho::CMauiControl>::FillConstructRange(oldEnd, 1, *captureRef);
+    moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = oldEnd + 1;
+    return oldEnd;
   }
 
   /**
@@ -27501,15 +27658,14 @@ void moho::func_RemoveInputCapture(CMauiControl* const control)
 
   CompactInputCaptureStack();
 
-  const auto& view = AsWeakPtrVectorRuntimeView(sInputCapture);
-  const std::size_t count = InputCaptureCount();
-  if (view.begin == nullptr || count == 0) {
+  const std::size_t count = sInputCapture.size();
+  if (sInputCapture.begin() == nullptr || count == 0) {
     return;
   }
 
   for (std::size_t i = count; i > 0; --i) {
     const std::size_t index = i - 1u;
-    if (view.begin[index].GetObjectPtr() == control) {
+    if (sInputCapture.begin()[index].GetObjectPtr() == control) {
       RemoveInputCaptureAt(index);
       return;
     }

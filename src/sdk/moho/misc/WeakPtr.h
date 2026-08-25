@@ -72,6 +72,83 @@ namespace moho
   template <class T>
   struct WeakPtr
   {
+    /**
+     * Address: 0x006EC5B0 (FUN_006EC5B0, `FillConstructWeakPtrCUnitCommandLanes`
+     * in CUnitCommandWeakPtrReflection.h/.cpp -- the `WeakPtr<CUnitCommand>`-typed
+     * sibling emission of this same body)
+     * Address: 0x007A5FE0 (FUN_007A5FE0, ICF twin, identical `function_sha256`
+     * to FUN_006EC5B0. Reached from `GrowAndInsertInputCaptureWeakRef`
+     * (`FUN_007A5A70`, UiRuntimeTypes.cpp): the reallocation branch fill-
+     * constructs the staged insert value into the freshly copied buffer's
+     * gap, and the in-place append-at-end branch fill-constructs it directly
+     * at the old `_Mylast`.)
+     *
+     * IDA signature:
+     * void *__fastcall sub_7A5FE0(WeakPtr<T> *destination@<eax>,
+     *                              int count@<edx>, WeakPtr<T> *source@<edi>);
+     *
+     * What it does:
+     * Fill-constructs `count` lanes starting at `destination`, all copying
+     * the same `source` node's owner-link slot and relinking each filled
+     * lane at the owner-chain head. Unlike `AssignFillRange` below, this
+     * assumes the destination lanes are uninitialized (no prior chain
+     * membership to detach) -- the construct-into-fresh-storage half of the
+     * canonical VC8 `_Insert_n`/fill-lane pair.
+     */
+    static WeakPtr<T>* FillConstructRange(
+      WeakPtr<T>* destination, std::int32_t count, const WeakPtr<T>& source
+    ) noexcept
+    {
+      for (; count > 0; --count, ++destination) {
+        if (destination == nullptr) {
+          continue;
+        }
+
+        void* const ownerLinkSlot = source.ownerLinkSlot;
+        destination->ownerLinkSlot = ownerLinkSlot;
+        if (ownerLinkSlot == nullptr) {
+          destination->nextInOwner = nullptr;
+        } else {
+          auto** const ownerHead = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
+          destination->nextInOwner = *ownerHead;
+          *ownerHead = destination;
+        }
+      }
+      return destination;
+    }
+
+    /**
+     * Address: 0x007A6030 (FUN_007A6030, moved off `AssignWeakPtrRangeForward`
+     * in this file -- that citation was wrong. `FUN_007A6030`'s own
+     * disassembly (`cmp eax,esi` / `jz done`; the loop body re-reads `[edx]`
+     * for the source lane every iteration without ever advancing `edx`;
+     * `eax` advances by 8 and is compared against the fixed `esi` bound) is
+     * a single-source *fill*, not a two-range copy -- the source never
+     * moves, only the destination does. Reached from
+     * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`, UiRuntimeTypes.cpp)
+     * to assign the staged insert value into the single-slot gap opened by
+     * that function's in-place tail-shift branch; the reallocation branch
+     * and the append-at-end branch both pass an empty
+     * `[destination,destinationEnd)` range here, making the call a
+     * documented no-op in those two paths.
+     *
+     * What it does:
+     * Assign-fills every lane in `[destination, destinationEnd)` from the
+     * same single `source` lane via `ResetFromOwnerLinkSlot`, which detaches
+     * each destination lane's previous chain membership first when it
+     * differs from source's -- the assign-into-live-storage counterpart to
+     * `FillConstructRange` above.
+     */
+    static WeakPtr<T>* AssignFillRange(
+      WeakPtr<T>* destination, WeakPtr<T>* const destinationEnd, const WeakPtr<T>& source
+    ) noexcept
+    {
+      for (; destination != destinationEnd; ++destination) {
+        destination->ResetFromOwnerLinkSlot(source.ownerLinkSlot);
+      }
+      return destination;
+    }
+
     inline static gpg::RType* sType = nullptr;
 
     // Owner link points at the owner's intrusive weak-link head slot.
@@ -643,7 +720,6 @@ namespace moho
    * Address: 0x006EC520 (FUN_006EC520)
    * Address: 0x006EB810 (FUN_006EB810)
    * Address: 0x007A5EB0 (FUN_007A5EB0)
-   * Address: 0x007A6030 (FUN_007A6030)
    * Address: 0x007F3B90 (FUN_007F3B90, ICF twin of FUN_005725A0/FUN_00573140/
    *          FUN_006B2400 above -- identical `function_sha256`. Direct
    *          callers are `FUN_007F20E0` (`AssignCameraFrustumWeakRefRange`,
