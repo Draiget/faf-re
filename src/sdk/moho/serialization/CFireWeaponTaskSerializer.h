@@ -9,26 +9,30 @@ namespace moho
   class CFireWeaponTask;
 
   /**
-   * Address: 0x00BD8890 (FUN_00BD8890, register_CFireWeaponTaskSerializer)
-   *
-   * What it does:
-   * Forces `CFireWeaponTaskSerializer` helper registration and schedules exit
-   * cleanup.
+   * VFTABLE: 0x00E2E2EC (`??_7CFireWeaponTaskSerializer@Moho@@6B@`)
    */
-  void register_CFireWeaponTaskSerializer();
-
-  /**
-   * Address: 0x00BFE710 (FUN_00BFE710, cleanup_CFireWeaponTaskSerializer)
-   *
-   * What it does:
-   * Restores the serializer helper node to a self-linked singleton lane during
-   * process exit.
-   */
-  void cleanup_CFireWeaponTaskSerializer();
-
-  class CFireWeaponTaskSerializer
+  class CFireWeaponTaskSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8890 (FUN_00BD8890, dynamic initializer for the global
+     * `CFireWeaponTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CFireWeaponTaskSerializer();
+
+    /**
+     * Address: 0x00BFE710 (FUN_00BFE710, Moho::CFireWeaponTaskSerializer::~CFireWeaponTaskSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CFireWeaponTaskSerializer();
+
     /**
      * Address: 0x006D3EF0 (FUN_006D3EF0, Moho::CFireWeaponTaskSerializer::Deserialize)
      *
@@ -51,17 +55,13 @@ namespace moho
      * What it does:
      * Binds `CFireWeaponTask` load/save callbacks into reflected RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(CFireWeaponTaskSerializer, mHelperNext) == 0x04, "CFireWeaponTaskSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CFireWeaponTaskSerializer, mHelperPrev) == 0x08, "CFireWeaponTaskSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(CFireWeaponTaskSerializer, mDeserialize) == 0x0C, "CFireWeaponTaskSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(CFireWeaponTaskSerializer, mSerialize) == 0x10, "CFireWeaponTaskSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(CFireWeaponTaskSerializer) == 0x14, "CFireWeaponTaskSerializer size must be 0x14");
