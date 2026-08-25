@@ -9122,12 +9122,36 @@ namespace
    * `gpg::SerSaveLoadHelper<T>::Init`), using a cached-static +
    * `gpg::LookupRType(typeid(T))` lookup -- never `gpg::REF_FindTypeNamed`
    * by string, which is what this shared helper does. 9/9 sampled addresses
-   * were wrong. Four are fixed (HPathCell/PathQueue in
+   * were wrong.
+   *
+   * Follow-up pass (same day): the whole `Moho::*Serializer::Init` family in
+   * `moho/math/MathReflection.{h,cpp}` (`AxisAlignedBox3fSerializer`,
+   * `Vector2iSerializer`, `Vector3iSerializer`, `Vector2fSerializer`,
+   * `Vector3fSerializer`, `Vector4fSerializer`, `QuaternionfSerializer`,
+   * `VEulers3Serializer`, `VAxes3Serializer`) turned out to be the SAME
+   * raw-`SerHelperBase`-mimic anti-pattern being purged project-wide this
+   * session, independently of this file. Recovering it properly required
+   * claiming the exact 9 addresses this comment already flagged as
+   * disproven for `Wm3::AxisAlignedBox3f`/`Moho::Vector4f` plus 7 more in the
+   * same family this pass additionally confirmed wrong by the identical raw
+   * `.asm` read (`Wm3::Vector2i`/`Wm3::Vector3i`/`Wm3::Vector2f`/
+   * `Wm3::Vector3f`/`Wm3::Quaternion<float>`/`Moho::VEulers3`/`Moho::VAxes3`
+   * at 0x004ED1E0/0x004ED280/0x004ED320/0x004ED3C0/0x004ED500/0x004ED5A0/
+   * 0x004ED640). All 9 `InstallXxxSerializerCallbacks` wrappers below for
+   * these types are removed (see the removal-note comments left in their
+   * place); the real bodies now live as `Init()` overrides on their real
+   * `gpg::SerHelperBase`-derived classes in `MathReflection.cpp`, matching
+   * the ctor/dtor/ctor-atexit evidence already fully researched there.
+   *
+   * Six are fixed as of this pass (HPathCell/PathQueue in
    * `moho/ai/HPathCellSerializer.*` and `moho/path/PathTables.cpp`; the two
    * CUnitCarrier* citations were plain duplicates of already-correct
-   * recoveries and were deleted outright). The remaining ~120 callers below
-   * are UNVERIFIED, not confirmed-correct -- treat every one as a lead to
-   * re-check against its own raw `.asm`, not as settled. See
+   * recoveries and were deleted outright; all 9 math types above moved to
+   * `MathReflection.cpp`). `Moho::VTransform` (0x004F0840) is still
+   * disproven-but-unfixed -- same shape, own ctor/Deserialize/Serialize
+   * research not yet done. The remaining ~110 callers below are UNVERIFIED,
+   * not confirmed-correct -- treat every one as a lead to re-check against
+   * its own raw `.asm`, not as settled. See
    * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md
    * for the full methodology and findings.
    */
@@ -9159,121 +9183,74 @@ namespace
   }
 
   /**
-   * Address: 0x004ED140 (FUN_004ED140)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::AxisAlignedBox3f`.
+   * `InstallWm3AxisAlignedBox3fSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED140` citation was disproven by this
+   * investigation (typeid-cached `gpg::LookupRType`, not
+   * `REF_FindTypeNamed`) and had zero callers in this file. The real body is
+   * now `Moho::AxisAlignedBox3fSerializer::Init()` in
+   * `moho/math/MathReflection.cpp`, backed by that class's own
+   * ctor/dtor/Deserialize/Serialize address evidence. See
+   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3AxisAlignedBox3fSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::AxisAlignedBox3f");
-  }
 
   /**
-   * Address: 0x004ED1E0 (FUN_004ED1E0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::IVector2i`.
+   * `InstallWm3IVector2iSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED1E0` citation was disproven the same
+   * way (identical raw-asm shape to the AxisAlignedBox3f case above) and had
+   * zero callers in this file. The real body is now
+   * `Moho::Vector2iSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3IVector2iSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::IVector2i");
-  }
 
   /**
-   * Address: 0x004ED280 (FUN_004ED280)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::IVector3i`.
+   * `InstallWm3IVector3iSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED280` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::Vector3iSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3IVector3iSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::IVector3i");
-  }
 
   /**
-   * Address: 0x004ED320 (FUN_004ED320)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::Vector2f`.
+   * `InstallWm3Vector2fSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED320` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::Vector2fSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3Vector2fSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::Vector2f");
-  }
 
   /**
-   * Address: 0x004ED3C0 (FUN_004ED3C0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::Vector3f`.
+   * `InstallWm3Vector3fSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED3C0` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::Vector3fSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3Vector3fSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::Vector3f");
-  }
 
   /**
-   * Address: 0x004ED460 (FUN_004ED460)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::Vector4f`.
+   * `InstallMohoVector4fSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED460` citation was disproven by this
+   * investigation and had zero callers in this file. The real body is now
+   * `Moho::Vector4fSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoVector4fSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::Vector4f");
-  }
 
   /**
-   * Address: 0x004ED500 (FUN_004ED500)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Wm3::Quaternionf`.
+   * `InstallWm3QuaternionfSerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED500` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::QuaternionfSerializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallWm3QuaternionfSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Wm3::Quaternionf");
-  }
 
   /**
-   * Address: 0x004ED5A0 (FUN_004ED5A0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::VEulers3`.
+   * `InstallMohoVEulers3SerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED5A0` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::VEulers3Serializer::Init()` in `moho/math/MathReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoVEulers3SerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::VEulers3");
-  }
 
   /**
-   * Address: 0x004ED640 (FUN_004ED640)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::VAxes3`.
+   * `InstallMohoVAxes3SerializerCallbacks` removed here (2026-08-25
+   * follow-up): its `Address: 0x004ED640` citation was disproven the same
+   * way and had zero callers in this file. The real body is now
+   * `Moho::VAxes3Serializer::Init()` in `moho/math/MathReflection.cpp`,
+   * binding through the same `DeserializeVAxes3SerializerThunk`/
+   * `SerializeVAxes3SerializerThunk` forwarders that file already modeled.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoVAxes3SerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::VAxes3");
-  }
 
   /**
    * Address: 0x004F0840 (FUN_004F0840)
