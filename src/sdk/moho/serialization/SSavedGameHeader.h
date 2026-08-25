@@ -81,23 +81,73 @@ namespace moho
 
   static_assert(sizeof(SSavedGameHeaderTypeInfo) == 0x64, "SSavedGameHeaderTypeInfo size must be 0x64");
 
-  class SSavedGameHeaderSerializer
+  class SSavedGameHeaderSerializer : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00882330 (FUN_00882330)
+     * Address: 0x00BE7040 (FUN_00BE7040, register_SSavedGameHeaderSerializer,
+     * dynamic initializer for the global `SSavedGameHeaderSerializer`
+     * singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SSavedGameHeaderSerializer();
+
+    /**
+     * Address: 0x00C07D50 (FUN_00C07D50, ??1SSavedGameHeaderSerializer@Moho@@QAE@@Z)
+     */
+    ~SSavedGameHeaderSerializer();
+
+    /**
+     * Address: 0x00880260 (FUN_00880260, Moho::SSavedGameHeaderSerializer::Deserialize)
+     *
+     * What it does:
+     * Thin forwarder into the real load body at 0x008831C0 (a single-caller
+     * internal function the compiler passes `archive`/`objectPtr` through
+     * `esi`/`edi` for, confirmed from raw asm -- not a normal 4-arg cdecl
+     * call at the machine-code level, but behaviourally identical).
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00880280 (FUN_00880280, Moho::SSavedGameHeaderSerializer::Serialize)
+     *
+     * What it does:
+     * Thin forwarder into the real save body at 0x00883280 (same
+     * single-caller register-passing shape as Deserialize/0x008831C0).
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00882330 (FUN_00882330, Moho::SSavedGameHeaderSerializer::Init)
+     *
+     * This body is ICF-folded/shared with vtable slot 0 of the
+     * never-constructed `gpg::SerSaveLoadHelper<SSavedGameHeader>` template
+     * instantiation (`??_7?$SerSaveLoadHelper@USSavedGameHeader@Moho@@@gpg@@6B@`,
+     * confirmed to have zero vtable-writer ctors anywhere in the binary).
+     * `SSavedGameHeaderSerializer` is not derived through that template:
+     * `SSavedGameHeader` has no `MemberDeserialize`/`MemberSerialize` pair for
+     * the template to forward into in the first place.
      *
      * What it does:
      * Registers save/load callbacks for SSavedGameHeader.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
 
+  static_assert(
+    offsetof(SSavedGameHeaderSerializer, mSerLoadFunc) == 0x0C,
+    "SSavedGameHeaderSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSavedGameHeaderSerializer, mSerSaveFunc) == 0x10,
+    "SSavedGameHeaderSerializer::mSerSaveFunc offset must be 0x10"
+  );
   static_assert(sizeof(SSavedGameHeaderSerializer) == 0x14, "SSavedGameHeaderSerializer size must be 0x14");
 } // namespace moho
