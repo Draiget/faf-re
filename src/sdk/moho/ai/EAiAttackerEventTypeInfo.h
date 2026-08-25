@@ -52,66 +52,28 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BCE770 (FUN_00BCE770, register_EAiAttackerEventPrimitiveSerializer)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiAttackerEvent,int>
    *
-   * What it does:
-   * Binds primitive enum load/save callbacks onto reflected
-   * `EAiAttackerEvent`.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiAttackerEvent@Moho@@H@gpg'`):
+   * `FUN_00BCE770` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found for this instantiation). Confirmed via raw asm:
+   * default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_005DC390`/`FUN_005DC3B0`, installs the
+   * `PrimitiveSerHelper<EAiAttackerEvent,int>` vtable, and pushes plain
+   * unmangled `FUN_00BF8250` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiAttackerEventPrimitiveSerializer()`
+   * free function eagerly invoked a second time from `IAiAttacker.cpp`'s
+   * `IAiAttackerReflectionBootstrap` constructor -- that second call is
+   * absent from the real ctor's disassembly (`FUN_00BCE770` already
+   * self-registers via `__xc_a` like every other `PrimitiveSerHelper<T,int>`
+   * instantiation); removed from both files.
    */
-  class EAiAttackerEventPrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005DC390 (FUN_005DC390)
-     *
-     * What it does:
-     * Deserializes one `EAiAttackerEvent` enum value from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005DC3B0 (FUN_005DC3B0)
-     *
-     * What it does:
-     * Serializes one `EAiAttackerEvent` enum value to archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005DC3E0 (FUN_005DC3E0)
-     *
-     * What it does:
-     * Binds load/save callbacks into `EAiAttackerEvent` reflected metadata.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(EAiAttackerEventPrimitiveSerializer, mHelperNext) == 0x04,
-    "EAiAttackerEventPrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EAiAttackerEventPrimitiveSerializer, mHelperPrev) == 0x08,
-    "EAiAttackerEventPrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EAiAttackerEventPrimitiveSerializer, mLoadCallback) == 0x0C,
-    "EAiAttackerEventPrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EAiAttackerEventPrimitiveSerializer, mSaveCallback) == 0x10,
-    "EAiAttackerEventPrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EAiAttackerEventPrimitiveSerializer) == 0x14,
-    "EAiAttackerEventPrimitiveSerializer size must be 0x14"
-  );
+  using EAiAttackerEventPrimitiveSerializer = gpg::PrimitiveSerHelper<EAiAttackerEvent, int>;
 
   /**
    * Address: 0x00BCE750 (FUN_00BCE750, sub_BCE750)
@@ -121,15 +83,6 @@ namespace moho
    * cleanup.
    */
   int register_EAiAttackerEventTypeInfo();
-
-  /**
-   * Address: 0x00BCE770 (FUN_00BCE770, sub_BCE770)
-   *
-   * What it does:
-   * Registers primitive serializer callbacks for `EAiAttackerEvent` and
-   * installs process-exit cleanup.
-   */
-  int register_EAiAttackerEventPrimitiveSerializer();
 
   static_assert(sizeof(EAiAttackerEventTypeInfo) == 0x78, "EAiAttackerEventTypeInfo size must be 0x78");
 } // namespace moho

@@ -1054,7 +1054,6 @@ namespace
     IAiAttackerReflectionBootstrap()
     {
       (void)moho::register_EAiAttackerEventTypeInfo();
-      (void)moho::register_EAiAttackerEventPrimitiveSerializer();
       (void)moho::register_IAiAttackerTypeInfo();
       (void)moho::register_IAiAttackerSerializer();
       (void)moho::register_RBroadcasterRType_EAiAttackerEvent();

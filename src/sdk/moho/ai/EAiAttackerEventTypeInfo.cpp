@@ -5,7 +5,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/EAiAttackerEvent.h"
+#include "moho/ai/EAiAttackerEvent.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -15,10 +15,6 @@ namespace
   alignas(EAiAttackerEventTypeInfo) unsigned char gEAiAttackerEventTypeInfoStorage[sizeof(EAiAttackerEventTypeInfo)];
   bool gEAiAttackerEventTypeInfoConstructed = false;
 
-  alignas(EAiAttackerEventPrimitiveSerializer)
-    unsigned char gEAiAttackerEventPrimitiveSerializerStorage[sizeof(EAiAttackerEventPrimitiveSerializer)];
-  bool gEAiAttackerEventPrimitiveSerializerConstructed = false;
-
   [[nodiscard]] EAiAttackerEventTypeInfo* AcquireEAiAttackerEventTypeInfo()
   {
     if (!gEAiAttackerEventTypeInfoConstructed) {
@@ -27,61 +23,6 @@ namespace
     }
 
     return reinterpret_cast<EAiAttackerEventTypeInfo*>(gEAiAttackerEventTypeInfoStorage);
-  }
-
-  [[nodiscard]] EAiAttackerEventPrimitiveSerializer* AcquireEAiAttackerEventPrimitiveSerializer()
-  {
-    if (!gEAiAttackerEventPrimitiveSerializerConstructed) {
-      new (gEAiAttackerEventPrimitiveSerializerStorage) EAiAttackerEventPrimitiveSerializer();
-      gEAiAttackerEventPrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<EAiAttackerEventPrimitiveSerializer*>(gEAiAttackerEventPrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiAttackerEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EAiAttackerEvent));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkEAiAttackerEventPrimitiveSerializerHelperNode()
-  {
-    if (!gEAiAttackerEventPrimitiveSerializerConstructed) {
-      return nullptr;
-    }
-
-    EAiAttackerEventPrimitiveSerializer* const serializer = AcquireEAiAttackerEventPrimitiveSerializer();
-    UnlinkSerializerNode(*serializer);
-    return SerializerSelfNode(*serializer);
   }
 
   /**
@@ -100,45 +41,10 @@ namespace
     gEAiAttackerEventTypeInfoConstructed = false;
   }
 
-  /**
-   * Address: 0x00BF8250 (FUN_00BF8250, sub_BF8250)
-   *
-   * What it does:
-   * Unlinks recovered primitive serializer helper node and restores self-links.
-   */
-  void cleanup_EAiAttackerEventPrimitiveSerializer()
-  {
-    if (!gEAiAttackerEventPrimitiveSerializerConstructed) {
-      return;
-    }
-
-    (void)UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
-    gEAiAttackerEventPrimitiveSerializerConstructed = false;
-  }
-
-  /**
-   * Address: 0x005D5AB0 (FUN_005D5AB0)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the recovered `EAiAttackerEvent`
-   * primitive serializer helper node and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiAttackerEventPrimitiveSerializerStartupThunkA()
-  {
-    return UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
-  }
-
-  /**
-   * Address: 0x005D5AE0 (FUN_005D5AE0)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same `EAiAttackerEvent`
-   * primitive serializer helper unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiAttackerEventPrimitiveSerializerStartupThunkB()
-  {
-    return UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
-  }
+  // Address: 0x010B0304 -- process-global `PrimitiveSerHelper<EAiAttackerEvent,int>`
+  // singleton (constructed by FUN_00BCE770, self-registering via `__xc_a`; see
+  // EAiAttackerEventTypeInfo.h for the real-ctor/atexit-target evidence).
+  moho::EAiAttackerEventPrimitiveSerializer gEAiAttackerEventPrimitiveSerializer;
 } // namespace
 
 /**
@@ -197,53 +103,6 @@ void EAiAttackerEventTypeInfo::Init()
 }
 
 /**
- * Address: 0x005DC390 (FUN_005DC390, sub_5DC390)
- */
-void EAiAttackerEventPrimitiveSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  int value = 0;
-  archive->ReadInt(&value);
-  *reinterpret_cast<EAiAttackerEvent*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EAiAttackerEvent>(value);
-}
-
-/**
- * Address: 0x005DC3B0 (FUN_005DC3B0, sub_5DC3B0)
- */
-void EAiAttackerEventPrimitiveSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  const auto* const value = reinterpret_cast<const EAiAttackerEvent*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteInt(static_cast<int>(*value));
-}
-
-void EAiAttackerEventPrimitiveSerializer::RegisterSerializeFunctions()
-{
-  gpg::RType* const type = CachedEAiAttackerEventType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
  * Address: 0x00BCE750 (FUN_00BCE750, sub_BCE750)
  *
  * What it does:
@@ -254,22 +113,6 @@ int moho::register_EAiAttackerEventTypeInfo()
 {
   (void)AcquireEAiAttackerEventTypeInfo();
   return std::atexit(&cleanup_EAiAttackerEventTypeInfo);
-}
-
-/**
- * Address: 0x00BCE770 (FUN_00BCE770, sub_BCE770)
- *
- * What it does:
- * Registers primitive serializer callbacks for `EAiAttackerEvent` and
- * installs process-exit cleanup.
- */
-int moho::register_EAiAttackerEventPrimitiveSerializer()
-{
-  EAiAttackerEventPrimitiveSerializer* const serializer = AcquireEAiAttackerEventPrimitiveSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EAiAttackerEventPrimitiveSerializer::Deserialize;
-  serializer->mSaveCallback = &EAiAttackerEventPrimitiveSerializer::Serialize;
-  return std::atexit(&cleanup_EAiAttackerEventPrimitiveSerializer);
 }
 
 
