@@ -453,6 +453,17 @@ namespace msvc8
          * instantiation's `erase_node` (via the successor-capture step
          * every `erase_node` emission in this file performs before
          * unlinking).
+         *
+         * Address: 0x005A19B0 (FUN_005A19B0, sub_5A19B0) --
+         * `msvc8::map<uint32_t, moho::RUnitBlueprint*>::operator[]`'s
+         * hint-validation increment, isNil@+0x15. Called from the
+         * `operator[]` inner helper `FUN_005A08B0`
+         * (`moho/ai/CAiBuilderImpl.cpp`) to advance an insertion hint and
+         * re-check the key ordering before trusting it. The recovered
+         * `AddOrUpdateRebuildNode` absorbs this whole `operator[]`
+         * emission (including this increment step) into a direct
+         * find-then-insert path -- see the "Absorbs binary helper"
+         * comment on `FUN_005A08B0`'s citation there.
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {

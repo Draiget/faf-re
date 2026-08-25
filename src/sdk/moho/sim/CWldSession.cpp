@@ -4557,6 +4557,23 @@ namespace moho
    * destructor on `node + 0x10` before `operator delete(node)`, so `TNode`
    * opts in through `DestroyPayload`. Without that call each cleared node
    * leaks both spilled dword lanes and one weak reference.
+   *
+   * Address: 0x0082EFF0 (FUN_0082EFF0, the `HashListNode88` instantiation
+   * predicted above -- confirmed against its own decompile, not just the
+   * prose prediction: `_DWORD* v2` per-node cursor, `v2 + 4` in the raw
+   * pseudocode is DWORD-stride pointer arithmetic (`v2` is `_DWORD*`), i.e.
+   * byte offset `+0x10`, matching this citation's "node + 0x10" exactly.
+   * Self-link reset (`*headSlot = headSlot`) happens BEFORE the destroy
+   * loop, matching this member's reentrancy-safety ordering. Reached from
+   * three call sites: `UICommandGraph::UICommandGraph` (0x00824810),
+   * `~UICommandGraph` (0x00824B80), and `InitMapAB` (0x0082BF40, cited
+   * below) -- `InitMapAB` calling a clear routine before its own
+   * from-scratch setup reads as a defensive pre-clear; the ctor's own
+   * direct call likely covers a table `InitMapAB` doesn't own. The
+   * "0x0082EF80" address this comment predicted for the per-node
+   * destructor-calling helper is a separate, still-unrecovered token from
+   * this one (0x0082EFF0 is the whole clear-loop, not the inner call);
+   * not chased down further in this pass.)
    */
   template <typename TNode>
   void UICommandGraph::ClearHashListNodes(HashTable<TNode>& table) noexcept
