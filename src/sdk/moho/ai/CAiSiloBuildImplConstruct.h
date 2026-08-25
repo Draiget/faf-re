@@ -8,7 +8,6 @@ namespace gpg
 {
   class ReadArchive;
   class SerConstructResult;
-  struct SerHelperBase;
 } // namespace gpg
 
 namespace moho
@@ -17,9 +16,33 @@ namespace moho
    * VFTABLE: 0x00E1DE38
    * COL:  0x00E748A4
    */
-  class CAiSiloBuildImplConstruct
+  class CAiSiloBuildImplConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCE110 (FUN_00BCE110, dynamic initializer for the global
+     * `CAiSiloBuildImplConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the construct/delete callback fields. Confirmed from raw
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly, then
+     * installs `??_7CAiSiloBuildImplConstruct@Moho@@6B@` -- no eager `Init()`
+     * call exists here.
+     */
+    CAiSiloBuildImplConstruct();
+
+    /**
+     * Address: 0x00BF7F30 (FUN_00BF7F30, Moho::CAiSiloBuildImplConstruct::~CAiSiloBuildImplConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently sits
+     * in and restores a self-linked sentinel state. Registered by the real
+     * dynamic initializer (0x00BCE110) as the global's `atexit` teardown.
+     */
+    ~CAiSiloBuildImplConstruct();
+
     /**
      * Address: 0x005CF840 (FUN_005CF840, Moho::CAiSiloBuildImplConstruct::Construct)
      *
@@ -37,33 +60,20 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x005CFEB0 (FUN_005CFEB0)
-     *
-     * void ()
-     *
-     * IDA signature:
-     * int __thiscall sub_5CFEB0(_DWORD *this);
+     * Address: 0x005CFEB0 (FUN_005CFEB0, gpg::SerConstructHelper_CAiSiloBuildImpl::Init)
      *
      * What it does:
-     * Binds construct/delete callbacks into CAiSiloBuildImpl RTTI.
+     * Binds construct/delete callbacks into CAiSiloBuildImpl RTTI. Dispatched
+     * by `gpg::SerHelperBase::InitNewHelpers` when this helper is drained
+     * from the pending list (vtable slot 0).
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;             // +0x04
-    gpg::SerHelperBase* mHelperPrev;             // +0x08
     gpg::RType::construct_func_t mConstructCallback; // +0x0C
     gpg::RType::delete_func_t mDeleteCallback;   // +0x10
   };
 
-  static_assert(
-    offsetof(CAiSiloBuildImplConstruct, mHelperNext) == 0x04,
-    "CAiSiloBuildImplConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAiSiloBuildImplConstruct, mHelperPrev) == 0x08,
-    "CAiSiloBuildImplConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CAiSiloBuildImplConstruct, mConstructCallback) == 0x0C,
     "CAiSiloBuildImplConstruct::mConstructCallback offset must be 0x0C"
@@ -75,11 +85,9 @@ namespace moho
   static_assert(sizeof(CAiSiloBuildImplConstruct) == 0x14, "CAiSiloBuildImplConstruct size must be 0x14");
 
   /**
-   * Address: 0x00BCE110 (FUN_00BCE110, register_CAiSiloBuildImplConstruct)
-   *
-   * What it does:
-   * Registers construct/delete callbacks for `CAiSiloBuildImpl` and installs
-   * process-exit cleanup.
+   * Compatibility no-op: `CAiSiloBuildImplTypeInfo.cpp`'s reflection
+   * bootstrap sequence still calls this by name. See the definition in
+   * CAiSiloBuildImplConstruct.cpp for why it no longer needs to do anything.
    */
   int register_CAiSiloBuildImplConstruct();
 } // namespace moho
