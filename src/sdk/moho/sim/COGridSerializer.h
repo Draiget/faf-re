@@ -4,20 +4,34 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E3195C
    * COL: 0x00E8E5B4
    */
-  class COGridSerializer
+  class COGridSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDAAB0 (FUN_00BDAAB0, dynamic initializer for the global
+     * `COGridSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    COGridSerializer();
+
+    /**
+     * Address: 0x00C003E0 (FUN_00C003E0, ??1COGridSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~COGridSerializer();
+
     /**
      * Address: 0x00722CC0 (FUN_00722CC0, Moho::COGridSerializer::Deserialize)
      *
@@ -40,27 +54,14 @@ namespace moho
      * What it does:
      * Resolves `COGrid` RTTI and installs serializer load/save callback lanes.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(COGridSerializer, mHelperNext) == 0x04, "COGridSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(COGridSerializer, mHelperPrev) == 0x08, "COGridSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(COGridSerializer, mLoadCallback) == 0x0C, "COGridSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(COGridSerializer, mSaveCallback) == 0x10, "COGridSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(COGridSerializer) == 0x14, "COGridSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BDAAB0 (FUN_00BDAAB0, register_COGridSerializer)
-   *
-   * What it does:
-   * Materializes startup serializer helper state for `COGrid` and installs
-   * process-exit teardown.
-   */
-  void register_COGridSerializer();
 } // namespace moho
