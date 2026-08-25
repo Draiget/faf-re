@@ -13,33 +13,46 @@ namespace gpg
 
 namespace moho
 {
-  class RBeamBlueprintSaveConstruct
+  /**
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RBeamBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `RBeamBlueprint` reference on load. Base-class
+   * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
+   * and splices it into the pending `sNewHelpers` list; `InitNewHelpers`
+   * later dispatches `Init()` on it. This is the save-side counterpart of
+   * `RBeamBlueprintConstruct` (that class's `Init()` writes
+   * `serConstructFunc_`/`deleteFunc_`; this one writes
+   * `serSaveConstructArgsFunc_`).
+   */
+  class RBeamBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00510780 (FUN_00510780, sub_510780)
-     * Slot: 0
+     * Address: 0x00BC81B0 (FUN_00BC81B0, dynamic initializer for the global
+     * `RBeamBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds save-construct-args callback into RBeamBlueprint RTTI
-     * (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    RBeamBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x00510780 (FUN_00510780, gpg::SerSaveConstructHelper<Moho::RBeamBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `RBeamBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(
-    offsetof(RBeamBlueprintSaveConstruct, mHelperNext) == 0x04,
-    "RBeamBlueprintSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RBeamBlueprintSaveConstruct, mHelperPrev) == 0x08,
-    "RBeamBlueprintSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RBeamBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "RBeamBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -75,13 +88,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00BC81B0 (FUN_00BC81B0, sub_BC81B0)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RBeamBlueprint`.
-   */
-  int register_RBeamBlueprintSaveConstruct();
 } // namespace moho

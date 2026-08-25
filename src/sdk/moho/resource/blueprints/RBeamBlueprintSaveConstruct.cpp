@@ -21,43 +21,36 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gBeamBlueprintType = nullptr;
-  moho::RBeamBlueprintSaveConstruct gBeamBlueprintSaveConstruct;
+
+  // Address: 0x010AA81C -- process-global `RBeamBlueprintSaveConstruct`
+  // singleton. Constructing it runs RBeamBlueprintSaveConstruct::
+  // RBeamBlueprintSaveConstruct() (0x00BC81B0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RBeamBlueprintSaveConstruct gRBeamBlueprintSaveConstructHelper;
 
   /**
-   * Address: 0x00510230 (FUN_00510230)
+   * Address: 0x00BF2680 (FUN_00BF2680)
    *
    * What it does:
-   * Unlinks the global `RBeamBlueprintSaveConstruct` helper node from the
-   * intrusive serializer-helper list and restores self-links.
+   * Unlinks the `RBeamBlueprintSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC81B0) as the
+   * global's `atexit` teardown.
+   *
+   * ICF twin: 0x00510230 (FUN_00510230) is a byte-identical duplicate
+   * hardcoded to this same global's link fields, confirmed zero independent
+   * callers via the callgraph index -- a dead linker-emitted copy.
    */
-  [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintSaveConstructHelperNodePrimary() noexcept
+  void CleanupRBeamBlueprintSaveConstruct()
   {
-    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintSaveConstruct);
-  }
-
-  void CleanupBeamBlueprintSaveConstructAtexit()
-  {
-    (void)CleanupBeamBlueprintSaveConstructHelperNodePrimary();
+    gRBeamBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00510780 (FUN_00510780, sub_510780)
-   *
-   * What it does:
-   * Binds save-construct-args callback into RBeamBlueprint RTTI
-   * (`serSaveConstructArgsFunc_`).
-   */
-  void RBeamBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
-  {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RBeamBlueprint>(gBeamBlueprintType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
   /**
    * Address: 0x005101E0 (FUN_005101E0)
    *
@@ -105,31 +98,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC81B0 (FUN_00BC81B0, sub_BC81B0)
+   * Address: 0x00BC81B0 (FUN_00BC81B0, dynamic initializer for the global
+   * `RBeamBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RBeamBlueprint`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  int register_RBeamBlueprintSaveConstruct()
+  RBeamBlueprintSaveConstruct::RBeamBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RBeamBlueprintThunk)
+      )
   {
-    blueprint_ser::InitializeHelperNode(gBeamBlueprintSaveConstruct);
-    gBeamBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RBeamBlueprintThunk);
-    gBeamBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupBeamBlueprintSaveConstructAtexit);
+    (void)std::atexit(&CleanupRBeamBlueprintSaveConstruct);
+  }
+
+  /**
+   * Address: 0x00510780 (FUN_00510780, gpg::SerSaveConstructHelper<Moho::RBeamBlueprint>::Init)
+   *
+   * What it does:
+   * Resolves `RBeamBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
+   */
+  void RBeamBlueprintSaveConstruct::Init()
+  {
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RBeamBlueprint>(RBeamBlueprint::sType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RBeamBlueprintSaveConstructBootstrap
-  {
-    RBeamBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_RBeamBlueprintSaveConstruct();
-    }
-  };
-
-  RBeamBlueprintSaveConstructBootstrap gRBeamBlueprintSaveConstructBootstrap;
-} // namespace
