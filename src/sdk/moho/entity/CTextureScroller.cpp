@@ -10,7 +10,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
@@ -42,61 +41,85 @@ namespace
   static_assert(offsetof(EntityTextureRuntimeView, mScroll1) == 0xF8, "EntityTextureRuntimeView::mScroll1 offset must be 0xF8");
   static_assert(offsetof(EntityTextureRuntimeView, mScroll2) == 0x100, "EntityTextureRuntimeView::mScroll2 offset must be 0x100");
 
-  gpg::SerSaveLoadHelperListRuntime gSScrollerSerializerHelper{};
-
   constexpr const char* kSerializationHeaderPath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
 
-  struct SerSaveLoadHelperInitRuntimeView
-  {
-    void* mVTable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoadCallback = nullptr; // +0x0C
-    gpg::RType::save_func_t mSaveCallback = nullptr; // +0x10
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperInitRuntimeView::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperInitRuntimeView::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mLoadCallback) == 0x0C,
-    "SerSaveLoadHelperInitRuntimeView::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mSaveCallback) == 0x10,
-    "SerSaveLoadHelperInitRuntimeView::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(SerSaveLoadHelperInitRuntimeView) == 0x14,
-    "SerSaveLoadHelperInitRuntimeView size must be 0x14"
-  );
+  // Forward declaration: defined further down in this namespace; used by
+  // SScrollerSerializer::Init() below.
+  [[nodiscard]] gpg::RType* CachedScrollerType();
 
   /**
-   * Address: 0x007774D0 (FUN_007774D0, SerSaveLoadHelper<SScroller>::unlink lane A)
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::SScroller> (Init() body
+   * confirmed at FUN_00777EC0, see below; matches the shared
+   * `InstallSerSaveLoadHelperCallbacksByTypeName` template's expansion for
+   * "Moho::SScroller" in gpg/core/containers/ArchiveSerialization.cpp).
+   *
+   * NOTE: no citation in this TU identifies a constructor that binds
+   * `mLoadCallback`/`mSaveCallback` for this specific helper -- both load/save
+   * fields stay null, matching this file's pre-existing (already-uncalled)
+   * state. `CTextureScroller::MemberDeserialize` / `MemberSerialize` bypass
+   * this generic per-type dispatch entirely and call
+   * `DeserializeSScrollerConfigPayload` / `SerializeSScrollerConfigPayload`
+   * directly, so this helper may simply be unused at runtime.
+   */
+  class SScrollerSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00777EC0 (FUN_00777EC0, InstallMohoSScrollerSerializerCallbacks
+     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
+     * template in gpg/core/containers/ArchiveSerialization.cpp)
+     *
+     * What it does:
+     * Resolves `SScroller` reflected type metadata and publishes this
+     * helper's (currently null) load/save callback lanes to it.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(SScrollerSerializer, mLoadCallback) == 0x0C, "SScrollerSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SScrollerSerializer, mSaveCallback) == 0x10, "SScrollerSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(SScrollerSerializer) == 0x14, "SScrollerSerializer size must be 0x14");
+
+  void SScrollerSerializer::Init()
+  {
+    gpg::RType* const type = CachedScrollerType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  SScrollerSerializer gSScrollerSerializerHelper;
+
+  /**
+   * Address: 0x007774D0 (FUN_007774D0)
    *
    * What it does:
    * Unlinks `SScrollerSerializer` helper node from the intrusive helper list
    * and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSScrollerSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkSScrollerSerializerNodeVariantA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSScrollerSerializerHelper);
+    gSScrollerSerializerHelper.ResetLinks();
   }
 
   /**
-   * Address: 0x00777500 (FUN_00777500, SerSaveLoadHelper<SScroller>::unlink lane B)
+   * Address: 0x00777500 (FUN_00777500)
    *
    * What it does:
    * Duplicate unlink/reset lane for the `SScrollerSerializer` helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSScrollerSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkSScrollerSerializerNodeVariantB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSScrollerSerializerHelper);
+    gSScrollerSerializerHelper.ResetLinks();
   }
 
   [[nodiscard]] EntityTextureRuntimeView& AccessEntityTextureRuntime(moho::Entity& entity) noexcept
@@ -484,39 +507,6 @@ namespace
   // helper directly with the four callbacks below.
 
   /**
-   * Address: 0x00777F80 (FUN_00777F80, gpg::SerSaveLoadHelper_CTextureScroller::Init)
-   *
-   * What it does:
-   * Resolves reflected type metadata for `CTextureScroller`, installs
-   * serializer callbacks from helper storage, and returns the load callback.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallTextureScrollerSerializerCallbacks(
-    SerSaveLoadHelperInitRuntimeView* const helper
-  )
-  {
-    gpg::RType* type = moho::CTextureScroller::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CTextureScroller));
-      moho::CTextureScroller::sType = type;
-    }
-
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
-    }
-
-    const bool saveWasNull = type->serSaveFunc_ == nullptr;
-    const gpg::RType::load_func_t loadCallback = helper->mLoadCallback;
-    type->serLoadFunc_ = loadCallback;
-
-    if (!saveWasNull) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
-    }
-
-    type->serSaveFunc_ = helper->mSaveCallback;
-    return loadCallback;
-  }
-
-  /**
    * Address: 0x00778690 (FUN_00778690)
    *
    * What it does:
@@ -887,44 +877,79 @@ namespace moho
 
 namespace
 {
-  struct CTextureScrollerSerializerHelper
+  // Forward declarations: CTextureScrollerSerializer's constructor binds
+  // these as its load/save callback pointers; bodies defined below.
+  void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void cleanup_CTextureScrollerSerializer_atexit();
+
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CTextureScroller>
+   */
+  class CTextureScrollerSerializer : public gpg::SerHelperBase
   {
-    void* mVTable = nullptr;
-    gpg::SerHelperBase* mHelperNext = nullptr;
-    gpg::SerHelperBase* mHelperPrev = nullptr;
+  public:
+    /**
+     * Address: 0x00BDD750 (FUN_00BDD750, register_CTextureScrollerSerializer)
+     *
+     * What it does:
+     * Binds this helper's load/save callback lanes and registers process-exit
+     * cleanup. Base-class construction (`gpg::SerHelperBase::SerHelperBase`)
+     * self-links this node and splices it into the pending `sNewHelpers`
+     * list.
+     */
+    CTextureScrollerSerializer();
+
+    /**
+     * Address: 0x00777F80 (FUN_00777F80, gpg::SerSaveLoadHelper_CTextureScroller::Init)
+     *
+     * What it does:
+     * Resolves reflected type metadata for `CTextureScroller` and installs
+     * this helper's load/save callback lanes.
+     */
+    void Init() override;
+
+  public:
     gpg::RType::load_func_t mLoadCallback = nullptr;
     gpg::RType::save_func_t mSaveCallback = nullptr;
   };
   static_assert(
-    offsetof(CTextureScrollerSerializerHelper, mHelperNext) == 0x04,
-    "CTextureScrollerSerializerHelper::mHelperNext offset must be 0x04"
+    offsetof(CTextureScrollerSerializer, mLoadCallback) == 0x0C,
+    "CTextureScrollerSerializer::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(CTextureScrollerSerializerHelper, mHelperPrev) == 0x08,
-    "CTextureScrollerSerializerHelper::mHelperPrev offset must be 0x08"
+    offsetof(CTextureScrollerSerializer, mSaveCallback) == 0x10,
+    "CTextureScrollerSerializer::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    sizeof(CTextureScrollerSerializerHelper) == 0x14, "CTextureScrollerSerializerHelper size must be 0x14"
-  );
+  static_assert(sizeof(CTextureScrollerSerializer) == 0x14, "CTextureScrollerSerializer size must be 0x14");
 
-  CTextureScrollerSerializerHelper gCTextureScrollerSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* CTextureScrollerSerializerSelfNode() noexcept
+  CTextureScrollerSerializer::CTextureScrollerSerializer()
+    : mLoadCallback(&DeserializeCTextureScrollerSerializerCallback)
+    , mSaveCallback(&SerializeCTextureScrollerSerializerCallback)
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gCTextureScrollerSerializer.mHelperNext);
+    (void)std::atexit(&cleanup_CTextureScrollerSerializer_atexit);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCTextureScrollerSerializerNode() noexcept
+  void CTextureScrollerSerializer::Init()
   {
-    if (gCTextureScrollerSerializer.mHelperNext != nullptr && gCTextureScrollerSerializer.mHelperPrev != nullptr) {
-      gCTextureScrollerSerializer.mHelperNext->mPrev = gCTextureScrollerSerializer.mHelperPrev;
-      gCTextureScrollerSerializer.mHelperPrev->mNext = gCTextureScrollerSerializer.mHelperNext;
+    gpg::RType* type = moho::CTextureScroller::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CTextureScroller));
+      moho::CTextureScroller::sType = type;
     }
-    gpg::SerHelperBase* const self = CTextureScrollerSerializerSelfNode();
-    gCTextureScrollerSerializer.mHelperPrev = self;
-    gCTextureScrollerSerializer.mHelperNext = self;
-    return self;
+
+    if (type->serLoadFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
+    }
+    type->serLoadFunc_ = mLoadCallback;
+
+    if (type->serSaveFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
+    }
+    type->serSaveFunc_ = mSaveCallback;
   }
+
+  CTextureScrollerSerializer gCTextureScrollerSerializer;
 
   void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -948,42 +973,12 @@ namespace
 
   void cleanup_CTextureScrollerSerializer_atexit()
   {
-    (void)UnlinkCTextureScrollerSerializerNode();
+    gCTextureScrollerSerializer.ResetLinks();
   }
 } // namespace
 
-namespace moho
-{
-  /**
-   * Address: 0x00BDD750 (FUN_00BDD750, register_CTextureScrollerSerializer)
-   *
-   * What it does:
-   * Initializes the global CTextureScroller serializer helper callbacks and
-   * installs process-exit cleanup.
-   */
-  void register_CTextureScrollerSerializer()
-  {
-    gpg::SerHelperBase* const self = CTextureScrollerSerializerSelfNode();
-    gCTextureScrollerSerializer.mHelperNext = self;
-    gCTextureScrollerSerializer.mHelperPrev = self;
-    gCTextureScrollerSerializer.mLoadCallback = &DeserializeCTextureScrollerSerializerCallback;
-    gCTextureScrollerSerializer.mSaveCallback = &SerializeCTextureScrollerSerializerCallback;
-    (void)std::atexit(&cleanup_CTextureScrollerSerializer_atexit);
-  }
-} // namespace moho
-
 namespace
 {
-  struct CTextureScrollerSerializerStartupBootstrap
-  {
-    CTextureScrollerSerializerStartupBootstrap()
-    {
-      moho::register_CTextureScrollerSerializer();
-    }
-  };
-
-  [[maybe_unused]] CTextureScrollerSerializerStartupBootstrap gCTextureScrollerSerializerStartupBootstrap;
-
   alignas(moho::CTextureScrollerTypeInfo)
   unsigned char gCTextureScrollerTypeInfoStorage[sizeof(moho::CTextureScrollerTypeInfo)] = {};
   bool gCTextureScrollerTypeInfoConstructed = false;

@@ -221,8 +221,18 @@ namespace moho
   /**
    * VFTABLE: 0x00E36FE4
    * COL:  0x00E90A24
+   *
+   * Demangled: gpg::SerConstructHelper<class Moho::CEconomyEvent>
+   *
+   * NOTE: no global singleton instance of this class exists anywhere in the
+   * codebase (verified across all of src/sdk) - Init() is currently
+   * unreachable at runtime, matching this class's pre-existing (already
+   * unreferenced) state. That gap predates this structural fix and is not
+   * resolved here: fabricating a singleton ctor with no independent binary
+   * citation would be a new recovery, not a re-expression of already-cited
+   * behavior.
    */
-  class CEconomyEventConstruct
+  class CEconomyEventConstruct : public gpg::SerHelperBase
   {
   public:
     /**
@@ -231,11 +241,9 @@ namespace moho
      * What it does:
      * Registers construct/delete callbacks for CEconomyEvent into RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
     gpg::RType::construct_func_t mSerConstructFunc;
     gpg::RType::delete_func_t mDeleteFunc;
   };
@@ -243,8 +251,19 @@ namespace moho
   /**
    * VFTABLE: 0x00E36FF4
    * COL:  0x00E90978
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CEconomyEvent>
+   *
+   * NOTE: no global singleton instance of this class exists anywhere in the
+   * codebase (verified across all of src/sdk) - Init() is currently
+   * unreachable at runtime, matching this class's pre-existing (already
+   * unreferenced) state. Two address-cited unlink lanes previously modeled
+   * this class's link pair as a disconnected bare 3-field struct in
+   * CEconomyEvent.cpp (FUN_007755D0/FUN_00775600, "SerSaveLoadHelper
+   * <CEconomyEvent>::unlink lane A/B") - those addresses are this class's own
+   * inherited ResetLinks() emissions and are cited there now instead.
    */
-  class CEconomyEventSerializer
+  class CEconomyEventSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -253,11 +272,9 @@ namespace moho
      * What it does:
      * Registers load/save callbacks for CEconomyEvent into RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };
@@ -407,7 +424,22 @@ namespace moho
   static_assert(
     sizeof(CScrLuaMetatableFactory<CEconomyEvent>) == 0x08, "CScrLuaMetatableFactory<CEconomyEvent> size must be 0x08"
   );
+  static_assert(
+    offsetof(CEconomyEventConstruct, mSerConstructFunc) == 0x0C,
+    "CEconomyEventConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CEconomyEventConstruct, mDeleteFunc) == 0x10, "CEconomyEventConstruct::mDeleteFunc offset must be 0x10"
+  );
   static_assert(sizeof(CEconomyEventConstruct) == 0x14, "CEconomyEventConstruct size must be 0x14");
+  static_assert(
+    offsetof(CEconomyEventSerializer, mSerLoadFunc) == 0x0C,
+    "CEconomyEventSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CEconomyEventSerializer, mSerSaveFunc) == 0x10,
+    "CEconomyEventSerializer::mSerSaveFunc offset must be 0x10"
+  );
   static_assert(sizeof(CEconomyEventSerializer) == 0x14, "CEconomyEventSerializer size must be 0x14");
   static_assert(sizeof(CEconomyEventTypeInfo) == 0x64, "CEconomyEventTypeInfo size must be 0x64");
 } // namespace moho
