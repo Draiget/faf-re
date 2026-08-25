@@ -1224,6 +1224,16 @@ namespace moho
   bool ui_DrawPathPreview = false;          // 0x010A6443
   bool ui_PathPreview = false;              // 0x010A6448
 
+  // Per-army team-color palette, distinct from `StrategicIconAuxView`'s own
+  // Self/Ally/Enemy/Neutral relation colors: `RenderUnitIcon` (0x0085D9A0)
+  // indexes this one directly by the icon's owning army's `mArmyIndex`
+  // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, the cold
+  // out-of-line chunk at 0x0128E837..0x0128E83C). Sized to the original
+  // game's eight-slot army cap; no loader/population site has been
+  // identified yet, so - like the console variables above - it ships
+  // zeroed until one is found.
+  std::uint32_t teamcolors[8]{}; // 0x0128F1C0
+
   // Entity ids carry their family in the top nibble; 0x1_______ is a projectile.
   constexpr std::uint32_t kEntityFamilyMask = 0xF0000000u;
   constexpr std::uint32_t kEntityFamilyProjectile = 0x10000000u;
@@ -19573,6 +19583,175 @@ namespace moho
 
       return textOrigin;
     }
+
+    /**
+     * Draws one centered, screen-aligned strategic-icon quad sized to
+     * `texture`'s own pixel dimensions (halved to radii). `RenderUnitIcon`
+     * repeats this exact corner-building shape at all four of its
+     * quad-draw sites - 0x0085DC96 (identified underlay), 0x0085DDAA (base
+     * icon), 0x0085DEA7 (paused overlay), 0x0085DFA3 (stunned overlay) -
+     * each computing `texture->mWidth >> 1` / `mHeight >> 1` then the same
+     * four corners, so it is lifted here once instead of four times.
+     */
+    void DrawStrategicIconQuad(
+      CD3DPrimBatcher& primBatcher,
+      const float centerX,
+      const float centerY,
+      const CD3DBatchTexture& texture,
+      const std::uint32_t color
+    )
+    {
+      const float halfWidth = static_cast<float>(texture.mWidth >> 1);
+      const float halfHeight = static_cast<float>(texture.mHeight >> 1);
+
+      primBatcher.DrawQuad(
+        Wm3::Vector3f(centerX - halfWidth, centerY - halfHeight, 0.0f),
+        Wm3::Vector3f(centerX + halfWidth, centerY - halfHeight, 0.0f),
+        Wm3::Vector3f(centerX + halfWidth, centerY + halfHeight, 0.0f),
+        Wm3::Vector3f(centerX - halfWidth, centerY + halfHeight, 0.0f),
+        color
+      );
+    }
+
+    /**
+     * Address: 0x0085DBD9..0x0085DC02 (inline in FUN_0085D9A0)
+     *
+     * What it does:
+     * Halves an ARGB color's R/G/B channels while leaving alpha untouched:
+     * each channel's top 7 bits (`channel >> 1`) are repacked into the same
+     * byte position with the low bit cleared. Used to darken a strategic
+     * icon's tint for units whose intel carries bit 0x40.
+     */
+    [[nodiscard]] std::uint32_t DarkenRgbPreserveAlpha(const std::uint32_t argb)
+    {
+      const std::uint32_t alpha = argb & 0xFF000000u;
+      const std::uint32_t red = ((argb >> 16) & 0xFFu) >> 1;
+      const std::uint32_t green = ((argb >> 8) & 0xFFu) >> 1;
+      const std::uint32_t blue = (argb & 0xFFu) >> 1;
+      return alpha | (red << 16) | (green << 8) | blue;
+    }
+
+    /**
+     * Address: 0x0085D9A0 (FUN_0085D9A0, RenderUnitIcon)
+     *
+     * IDA signature:
+     * void __cdecl RenderUnitIcon(struct_UnitIconData *a1, struct_IconAux *a2);
+     *
+     * What it does:
+     * Draws one classified unit's strategic-icon quads. Called once per icon
+     * collected into `StrategicIconAuxView`'s ground/air/high-priority/
+     * selected runs by `RenderStrategicIcons`.
+     *
+     * Projects the icon's world position through the camera to a floored
+     * screen point, then resolves a display color: when the unit is either
+     * not a real `UserUnit` or its intel carries full blueprint data
+     * (`mIntelStateFlags` bit 0x10, the same bit `PickUnitStrategicIconTexture`
+     * already names), the icon's owning army's real color - `teamcolors[]`
+     * in team-color mode with a focus army active, else the army's own
+     * `mVarDat.mPlayerColorBgra`; otherwise the flat `aux.mUnidentifiedColor`
+     * placeholder.
+     *
+     * A formation-preview ghost (`mIsFormationGhost`) short-circuits
+     * straight to the quad stack below with that color's sign/alpha-high
+     * bit cleared (`& 0x7FFFFFFF`) instead of team-colored, skipping
+     * everything else in this function - no darken check, no blink gate, no
+     * identified-icon draw. Otherwise, a unit whose intel carries bit 0x40
+     * gets its color darkened (`DarkenRgbPreserveAlpha`).
+     *
+     * A friendly unit (`mIsFriendly`) that was damaged while under the local
+     * player's focus within the last `ui_StrategicIconBlinkDuration * 10`
+     * ticks (`UserEntity::mLastFocusDamageGameTick`) blinks: on the "off"
+     * half of the `ui_StrategicIconBlinkRate` cycle the function returns
+     * without drawing anything at all for this icon this frame.
+     *
+     * When an owning army was resolved, the unit's own strategic-underlay
+     * texture (`UserEntity::GetStrategicUnderlayTexture`, itself the
+     * recovered form of the `WeakPtr_CD3DBatchTexture` constructor this
+     * function calls at 0x0085DC74) draws first, at full opacity with no
+     * additional tint. Finally the shared quad stack draws the base icon
+     * (unless `mSuppressBaseIcon`), then the paused and stunned overlay
+     * badges when present - only the base icon is tinted with the
+     * resolved/darkened color; the underlay and both overlays draw at their
+     * own native texture color.
+     */
+    void RenderUnitIcon(const UnitIconData& icon, const StrategicIconAuxView& aux)
+    {
+      constexpr std::uint32_t kOverlayNoTintColor = 0xFFFFFFFFu;
+
+      const Wm3::Vector2f screenPoint = aux.mCamera->Project(
+        Wm3::Vector3f(icon.mWorldX, icon.mWorldY, icon.mWorldZ), 0.0f, aux.mViewportWidth, aux.mViewportHeight, 0.0f
+      );
+      const float screenX = std::floor(screenPoint.X());
+      const float screenY = std::floor(screenPoint.Y());
+
+      const UserUnit* const asUnit = icon.mUnit->IsUserUnit();
+
+      // Same bit `PickUnitStrategicIconTexture` names `kHasBlueprintIconDataMask`
+      // on `mIntelStateFlags` ("has-data"); re-declared locally for the same
+      // file-private-constant reason noted there.
+      constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
+      const bool hasIdentifiedOwner = asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) != 0u;
+
+      std::uint32_t iconColor;
+      if (hasIdentifiedOwner) {
+        if (aux.mSession->mTeamColorMode && aux.mSession->GetFocusArmy() != nullptr) {
+          iconColor = teamcolors[static_cast<std::size_t>(icon.mUnit->mArmy->mArmyIndex)];
+        } else {
+          iconColor = icon.mUnit->mArmy->mVarDat.mPlayerColorBgra;
+        }
+      } else {
+        iconColor = aux.mUnidentifiedColor;
+      }
+
+      if (icon.mIsFormationGhost) {
+        iconColor &= 0x7FFFFFFFu;
+      } else {
+        constexpr std::uint32_t kDarkenedTintMask = 0x40u;
+        if (asUnit != nullptr && (asUnit->mIntelStateFlags & kDarkenedTintMask) != 0u) {
+          iconColor = DarkenRgbPreserveAlpha(iconColor);
+        }
+
+        if (icon.mIsFriendly) {
+          const std::int32_t lastFocusDamageTick = icon.mUnit->mLastFocusDamageGameTick;
+          if (lastFocusDamageTick != 0) {
+            // `* 10.0f`: 0x0085DC2A.
+            constexpr float kBlinkDurationTickScale = 10.0f;
+            const float ticksSinceDamage = static_cast<float>(aux.mSession->mGameTick - lastFocusDamageTick);
+            if ((ui_StrategicIconBlinkDuration * kBlinkDurationTickScale) > ticksSinceDamage) {
+              const double simTime =
+                static_cast<double>(aux.mSession->mGameTick) + static_cast<double>(aux.mTickFraction);
+              const double blinkPhase = std::fmod(simTime * static_cast<double>(ui_StrategicIconBlinkRate), 1.0);
+              if (blinkPhase <= 0.5) {
+                return;
+              }
+            }
+          }
+        }
+
+        if (hasIdentifiedOwner) {
+          const boost::shared_ptr<CD3DBatchTexture> identifiedTexture = icon.mUnit->GetStrategicUnderlayTexture();
+          if (identifiedTexture) {
+            aux.mBatcher->SetTexture(identifiedTexture);
+            DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *identifiedTexture, kOverlayNoTintColor);
+          }
+        }
+      }
+
+      if (!icon.mSuppressBaseIcon) {
+        aux.mBatcher->SetTexture(icon.mIconTexture);
+        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mIconTexture, iconColor);
+      }
+
+      if (icon.mShowPausedOverlay && icon.mPausedTexture) {
+        aux.mBatcher->SetTexture(icon.mPausedTexture);
+        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mPausedTexture, kOverlayNoTintColor);
+      }
+
+      if (icon.mShowStunnedOverlay && icon.mStunnedTexture) {
+        aux.mBatcher->SetTexture(icon.mStunnedTexture);
+        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mStunnedTexture, kOverlayNoTintColor);
+      }
+    }
   } // namespace
 
   /**
@@ -19610,15 +19789,20 @@ namespace moho
    *  - The selection-set name label (`DrawUnitSelectionSetNameLabel`,
    *    0x0085E3A0), which stacks under the custom name using the same
    *    cursor protocol, is now wired into phase 4 below.
+   *  - The icon-quad draw itself (`RenderUnitIcon`, 0x0085D9A0) is now
+   *    recovered and wired into phase 3.5 below, for all four of the
+   *    ground/air/high-priority/selected runs: world-to-screen projection,
+   *    the `Moho::teamcolors` per-army palette (`+0x0128F1C0`, read when
+   *    `mTeamColorMode` is on) vs. the flat unidentified color, the
+   *    formation-ghost alpha-clear and intel-bit darken tints, the
+   *    recently-focus-damaged blink timer, and the identified-icon
+   *    underlay / base icon / paused / stunned quad stack.
    *
    * Deferred to a follow-up pass - not drawn by this function yet:
-   *  - The actual draw calls (`RenderUnitIcon`, 0x0085D9A0): the icon-quad
-   *    geometry, the `Moho::teamcolors` per-army palette
-   *    (`+0x0128F1C0`, read when `mTeamColorMode` is on), the blink timer,
-   *    and the single dedicated "hovered unit" slot (this function's local
-   *    `v148.playableRectX1` in the original - hovered units are excluded
-   *    from all four runs below, matching the binary, but nothing consumes
-   *    them yet).
+   *  - The single dedicated "hovered unit" slot (this function's local
+   *    `v148.playableRectX1` in the original binary - hovered units are
+   *    excluded from all four runs below, matching the binary, but nothing
+   *    collects or consumes that slot's own icon data yet).
    *  - The "toggled off a scripted ability" half of the paused-overlay flag
    *    below, which currently reflects only `mUnitVarDat.mIsPaused`.
    *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
@@ -19848,10 +20032,36 @@ namespace moho
       }
     }
 
+    // --- Phase 3.5: draw the classified icon quads -----------------------
+    // The four runs collected above, each drawn through `RenderUnitIcon`
+    // (0x0085D9A0) under its own technique (0x0085B79D..0x0085BCCD in the
+    // binary). This runs before the lifebar pass below, matching the
+    // binary's own SetTexture/DrawQuad-then-Flush ordering (0x0085BBE9..
+    // 0x0085BCCD then Flush at 0x0085BFA9). The single dedicated "hovered
+    // unit" slot and the formation-ghost pass that follow this in the
+    // binary (`v148.playableRectX1` / "TStrategicFormationIcon") are still
+    // deferred - see the function comment.
+    (void)primBatcher->Setup("TStrategicIcon");
+
+    for (UnitIconData& groundIcon : aux.mGroundIcons) {
+      RenderUnitIcon(groundIcon, aux);
+    }
+    for (UnitIconData& airIcon : aux.mAirIcons) {
+      RenderUnitIcon(airIcon, aux);
+    }
+    for (UnitIconData& highPriorityIcon : aux.mHighPriorityIcons) {
+      RenderUnitIcon(highPriorityIcon, aux);
+    }
+    for (UnitIconData& selectedIcon : aux.mSelectedIcons) {
+      RenderUnitIcon(selectedIcon, aux);
+    }
+
+    primBatcher->Flush();
+
     // --- Phase 4: draw the lifebar / label stack ------------------------
-    // The icon-quad runs collected above are still drawn by the deferred
-    // 0x0085D9A0 pass; this is the bar-and-label stack that follows it in
-    // the binary (0x0085C890..0x0085C9DB).
+    // The icon-quad runs collected above are drawn by phase 3.5's
+    // `RenderUnitIcon` pass just above; this is the bar-and-label stack
+    // that follows it in the binary (0x0085C890..0x0085C9DB).
     (void)primBatcher->Setup("TLifeBar");
 
     for (UnitIconData& lifebarIcon : aux.mLifebarIcons) {
