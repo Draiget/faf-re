@@ -33,48 +33,6 @@
 
 namespace
 {
-  struct CUnitPodAssistSerializerStartupNode
-  {
-    void* mVtable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
-    gpg::RType::save_func_t mSave = nullptr;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CUnitPodAssistSerializerStartupNode, mHelperNext) == 0x04,
-    "CUnitPodAssistSerializerStartupNode::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitPodAssistSerializerStartupNode, mHelperPrev) == 0x08,
-    "CUnitPodAssistSerializerStartupNode::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    sizeof(CUnitPodAssistSerializerStartupNode) == 0x14,
-    "CUnitPodAssistSerializerStartupNode size must be 0x14"
-  );
-
-  CUnitPodAssistSerializerStartupNode gCUnitPodAssistSerializerStartupNode{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CUnitPodAssistSerializerStartupNode& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CUnitPodAssistSerializerStartupNode& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitPodAssistType()
   {
     gpg::RType* type = moho::CUnitPodAssist::sType;
@@ -301,30 +259,6 @@ namespace moho
     }
 
     mTaskState = TASKSTATE_Waiting;
-  }
-
-  /**
-   * Address: 0x0061D770 (FUN_0061D770, cleanup_CUnitPodAssistSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the `CUnitPodAssist` serializer helper
-   * node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitPodAssistSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCUnitPodAssistSerializerStartupNode);
-  }
-
-  /**
-   * Address: 0x0061D7A0 (FUN_0061D7A0, cleanup_CUnitPodAssistSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the `CUnitPodAssist`
-   * serializer helper node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitPodAssistSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCUnitPodAssistSerializerStartupNode);
   }
 
   /**
@@ -680,81 +614,117 @@ namespace moho
   }
 } // namespace moho
 
-namespace
+namespace moho
 {
-  void DeserializeCUnitPodAssistSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<moho::CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
-  }
-
-  void SerializeCUnitPodAssistSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    reinterpret_cast<const moho::CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-  }
-
-  void cleanup_CUnitPodAssistSerializer_atexit()
-  {
-    (void)moho::cleanup_CUnitPodAssistSerializerStartupThunkA();
-  }
-
   /**
-   * Address: 0x00BD1590 (FUN_00BD1590, register_CUnitPodAssistSerializer)
-   *
-   * What it does:
-   * Initializes the global CUnitPodAssist serializer helper callbacks and
-   * installs process-exit cleanup.
+   * RTTI Class Hierarchy Descriptor shows this class's base chain running
+   * through `.?AU?$SerSaveLoadHelper@VCUnitPodAssist@Moho@@@gpg@@` before
+   * `gpg::SerHelperBase`. `CUnitPodAssist::MemberDeserialize`/
+   * `MemberSerialize` are non-static instance methods, so (unlike the
+   * `CAcquireTargetTaskSerializer` sibling, whose Member* methods are
+   * static) this class needs its own static forwarding methods to bind
+   * into the `__cdecl`-shaped callback fields. Kept as a concrete
+   * `SerHelperBase`-derived class rather than a naked
+   * `gpg::SerSaveLoadHelper<CUnitPodAssist>` alias, matching the
+   * `Rect2iSerializer`-style precedent.
    */
-  void register_CUnitPodAssistSerializer()
+  class CUnitPodAssistSerializer final : public gpg::SerHelperBase
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitPodAssistSerializerStartupNode);
-    gCUnitPodAssistSerializerStartupNode.mHelperNext = self;
-    gCUnitPodAssistSerializerStartupNode.mHelperPrev = self;
-    gCUnitPodAssistSerializerStartupNode.mLoad = &DeserializeCUnitPodAssistSerializerCallback;
-    gCUnitPodAssistSerializerStartupNode.mSave = &SerializeCUnitPodAssistSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitPodAssistSerializer_atexit);
-  }
+  public:
+    /**
+     * Address: 0x00BD1590 (FUN_00BD1590, register_CUnitPodAssistSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitPodAssistSerializer()
+      : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitPodAssistSerializer::Deserialize))
+      , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitPodAssistSerializer::Serialize))
+    {}
 
-  struct CUnitPodAssistSerializerStartupBootstrap
-  {
-    CUnitPodAssistSerializerStartupBootstrap()
+    /**
+     * Address: 0x00BFA260 (FUN_00BFA260, Moho::CUnitPodAssistSerializer::~CUnitPodAssistSerializer)
+     *
+     * What it does:
+     * Unlinks the serializer helper from the intrusive helper list.
+     */
+    ~CUnitPodAssistSerializer()
     {
-      register_CUnitPodAssistSerializer();
+      ResetLinks();
     }
+
+    /**
+     * What it does:
+     * Forwards one archive load callback into
+     * `CUnitPodAssist::MemberDeserialize` on the supplied object pointer.
+     */
+    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    }
+
+    /**
+     * What it does:
+     * Forwards one archive save callback into
+     * `CUnitPodAssist::MemberSerialize` on the supplied object pointer.
+     */
+    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+    {
+      reinterpret_cast<const CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    }
+
+    /**
+     * Address: 0x0061E500 (FUN_0061E500, gpg::SerSaveLoadHelper<Moho::CUnitPodAssist>::Init)
+     *
+     * What it does:
+     * Lazily resolves `CUnitPodAssist` RTTI and installs load/save
+     * callbacks from this helper object into the type descriptor.
+     * Previously mis-cited in `ArchiveSerialization.cpp` as a generic
+     * `InstallSerSaveLoadHelperCallbacksByTypeName` dispatch (same
+     * mis-citation family already caught this session for several other
+     * classes).
+     */
+    void Init() override
+    {
+      gpg::RType* const type = CachedCUnitPodAssistType();
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mDeserialize;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerialize;
+    }
+
+  public:
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  [[maybe_unused]] CUnitPodAssistSerializerStartupBootstrap gCUnitPodAssistSerializerStartupBootstrap;
+  static_assert(
+    offsetof(CUnitPodAssistSerializer, mDeserialize) == 0x0C,
+    "CUnitPodAssistSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitPodAssistSerializer, mSerialize) == 0x10, "CUnitPodAssistSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(CUnitPodAssistSerializer) == 0x14, "CUnitPodAssistSerializer size must be 0x14");
+} // namespace moho
+
+namespace
+{
+  /**
+   * Address: 0x00BD1590 (FUN_00BD1590, dynamic initializer for the global
+   * `CUnitPodAssistSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`).
+   */
+  moho::CUnitPodAssistSerializer gCUnitPodAssistSerializer;
 } // namespace
 
 namespace gpg
 {
-  /**
-   * Address: 0x0061E770 (FUN_0061E770, reflection pair-pack thunk alias)
-   *
-   * What it does:
-   * Builds one `CUnitPodAssist` reflection reference then writes the pair into
-   * caller-provided `RRef` storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackCUnitPodAssistRefPair(
-    moho::CUnitPodAssist* const value,
-    gpg::RRef* const outPair
-  )
-  {
-    gpg::RRef typedRef{};
-    (void)gpg::RRef_CUnitPodAssist(&typedRef, value);
-    *outPair = typedRef;
-    return outPair;
-  }
-
   /**
    * Address: 0x0061E7C0 (FUN_0061E7C0, gpg::RRef_CUnitPodAssist)
    *
