@@ -263,10 +263,30 @@ namespace moho
 
   /**
    * Serializer helper for `CUnitMeleeAttackTargetTask`.
+   *
+   * VFTABLE: 0x00E205C0 (`??_7CUnitMeleeAttackTargetTaskSerializer@Moho@@6B@`)
+   * Also installed as: 0x00E205C8 (`??_7?$SerSaveLoadHelper@VCUnitMeleeAttackTargetTask@Moho@@@gpg@@6B@`)
+   *
+   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+   * other `SerHelperBase`-derived serializer in this codebase.
    */
-  class CUnitMeleeAttackTargetTaskSerializer
+  class CUnitMeleeAttackTargetTaskSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD0E00 (FUN_00BD0E00, dynamic initializer for the global
+     * `CUnitMeleeAttackTargetTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields and installs process-exit
+     * cleanup via `atexit`.
+     */
+    CUnitMeleeAttackTargetTaskSerializer();
+
     /**
      * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)
      *
@@ -286,29 +306,19 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x006177B0 (FUN_006177B0)
+     * Address: 0x006177B0 (FUN_006177B0, gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::Init)
      *
      * What it does:
      * Resolves melee-task RTTI and binds this helper's load/save callbacks
      * into the type descriptor.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;      // +0x04
-    gpg::SerHelperBase* mHelperPrev;      // +0x08
     gpg::RType::load_func_t mDeserialize; // +0x0C
     gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskSerializer, mHelperNext) == 0x04,
-    "CUnitMeleeAttackTargetTaskSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskSerializer, mHelperPrev) == 0x08,
-    "CUnitMeleeAttackTargetTaskSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitMeleeAttackTargetTaskSerializer, mDeserialize) == 0x0C,
     "CUnitMeleeAttackTargetTaskSerializer::mDeserialize offset must be 0x0C"

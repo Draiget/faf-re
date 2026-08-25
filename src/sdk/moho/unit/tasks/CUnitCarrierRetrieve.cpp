@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/entity/Entity.h"
@@ -52,6 +52,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CUnitCarrierRetrieve::sType = nullptr;
+
   /**
    * Address: 0x00605D10 (FUN_00605D10, Moho::CUnitCarrierRetrieve::CUnitCarrierRetrieve)
    *
@@ -452,63 +454,58 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes) - `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by every
-  // SerHelperBase-derived serializer, so it undersized this global (same
-  // bug found and fixed for several sibling serializers this session).
-  struct CUnitCarrierRetrieveSerializerHelper
+  /**
+   * VFTABLE: 0x00E20080 (`??_7CUnitCarrierRetrieveSerializer@Moho@@6B@`)
+   * Also installed as: 0x00E20088 (`??_7?$SerSaveLoadHelper@VCUnitCarrierRetrieve@Moho@@@gpg@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CUnitCarrierRetrieve>
+   *
+   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+   * sibling `SerHelperBase`-derived serializer in this codebase.
+   */
+  class CUnitCarrierRetrieveSerializerHelper : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mLoadCallback = nullptr;
-    gpg::RType::save_func_t mSaveCallback = nullptr;
+  public:
+    /**
+     * Address: 0x00BD0220 (FUN_00BD0220, dynamic initializer for the global
+     * `CUnitCarrierRetrieveSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the deserialize/serialize callback fields and installs
+     * process-exit cleanup.
+     */
+    CUnitCarrierRetrieveSerializerHelper();
+
+    /**
+     * Address: 0x00607730 (FUN_00607730, gpg::SerSaveLoadHelper<Moho::CUnitCarrierRetrieve>::Init)
+     *
+     * What it does:
+     * Resolves `CUnitCarrierRetrieve` RTTI and installs this helper's
+     * load/save callbacks into the reflected type descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
   };
   static_assert(
-    offsetof(CUnitCarrierRetrieveSerializerHelper, mNext) == 0x04,
-    "CUnitCarrierRetrieveSerializerHelper::mNext offset must be 0x04"
+    offsetof(CUnitCarrierRetrieveSerializerHelper, mLoadCallback) == 0x0C,
+    "CUnitCarrierRetrieveSerializerHelper::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(CUnitCarrierRetrieveSerializerHelper, mPrev) == 0x08,
-    "CUnitCarrierRetrieveSerializerHelper::mPrev offset must be 0x08"
+    offsetof(CUnitCarrierRetrieveSerializerHelper, mSaveCallback) == 0x10,
+    "CUnitCarrierRetrieveSerializerHelper::mSaveCallback offset must be 0x10"
   );
   static_assert(
     sizeof(CUnitCarrierRetrieveSerializerHelper) == 0x14, "CUnitCarrierRetrieveSerializerHelper size must be 0x14"
   );
 
-  CUnitCarrierRetrieveSerializerHelper gCUnitCarrierRetrieveSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    CUnitCarrierRetrieveSerializerHelper& helper
-  ) noexcept
-  {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
-  }
-
-  /**
-   * Address: 0x006063F0 (FUN_006063F0)
-   *
-   * What it does:
-   * Unlinks `CUnitCarrierRetrieveSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierRetrieveSerializerNodePrimary()
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitCarrierRetrieveSerializer));
-  }
-
-  /**
-   * Address: 0x00606420 (FUN_00606420)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCarrierRetrieveSerializer` helper storage.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierRetrieveSerializerNodeSecondary()
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitCarrierRetrieveSerializer));
-  }
+  CUnitCarrierRetrieveSerializerHelper gCUnitCarrierRetrieveSerializer;
 
   void DeserializeCUnitCarrierRetrieveSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -531,35 +528,53 @@ namespace
       ->MemberSerialize(archive);
   }
 
-  void cleanup_CUnitCarrierRetrieveSerializer_atexit()
+  /**
+   * Address: 0x006063F0 (FUN_006063F0)
+   *
+   * What it does:
+   * Unlinks `CUnitCarrierRetrieveSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  void UnlinkCUnitCarrierRetrieveSerializerNodePrimary()
   {
-    (void)UnlinkCUnitCarrierRetrieveSerializerNodePrimary();
+    gCUnitCarrierRetrieveSerializer.ResetLinks();
   }
 
   /**
-   * Address: 0x00BD0220 (FUN_00BD0220, register_CUnitCarrierRetrieveSerializer)
+   * Address: 0x00606420 (FUN_00606420)
    *
    * What it does:
-   * Initializes the global CUnitCarrierRetrieve serializer helper callbacks
-   * and installs process-exit cleanup.
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCarrierRetrieveSerializer` helper storage.
    */
-  void register_CUnitCarrierRetrieveSerializer()
+  [[maybe_unused]] void UnlinkCUnitCarrierRetrieveSerializerNodeSecondary()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitCarrierRetrieveSerializer.mNext);
-    gCUnitCarrierRetrieveSerializer.mNext = self;
-    gCUnitCarrierRetrieveSerializer.mPrev = self;
-    gCUnitCarrierRetrieveSerializer.mLoadCallback = &DeserializeCUnitCarrierRetrieveSerializerCallback;
-    gCUnitCarrierRetrieveSerializer.mSaveCallback = &SerializeCUnitCarrierRetrieveSerializerCallback;
+    gCUnitCarrierRetrieveSerializer.ResetLinks();
+  }
+
+  void cleanup_CUnitCarrierRetrieveSerializer_atexit()
+  {
+    UnlinkCUnitCarrierRetrieveSerializerNodePrimary();
+  }
+
+  CUnitCarrierRetrieveSerializerHelper::CUnitCarrierRetrieveSerializerHelper()
+    : mLoadCallback(&DeserializeCUnitCarrierRetrieveSerializerCallback)
+    , mSaveCallback(&SerializeCUnitCarrierRetrieveSerializerCallback)
+  {
     (void)std::atexit(&cleanup_CUnitCarrierRetrieveSerializer_atexit);
   }
 
-  struct CUnitCarrierRetrieveSerializerStartupBootstrap
+  void CUnitCarrierRetrieveSerializerHelper::Init()
   {
-    CUnitCarrierRetrieveSerializerStartupBootstrap()
-    {
-      register_CUnitCarrierRetrieveSerializer();
+    gpg::RType* type = moho::CUnitCarrierRetrieve::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CUnitCarrierRetrieve));
+      moho::CUnitCarrierRetrieve::sType = type;
     }
-  };
 
-  [[maybe_unused]] CUnitCarrierRetrieveSerializerStartupBootstrap gCUnitCarrierRetrieveSerializerStartupBootstrap;
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
 } // namespace

@@ -10,7 +10,6 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -47,6 +46,16 @@ namespace
     return type;
   }
 
+  [[nodiscard]] gpg::RType* CachedCUnitRepairTaskType()
+  {
+    gpg::RType* type = moho::CUnitRepairTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitRepairTask));
+      moho::CUnitRepairTask::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedCBuildTaskHelperType()
   {
     static gpg::RType* cached = nullptr;
@@ -69,6 +78,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CUnitRepairTask::sType = nullptr;
+
   /**
    * Address: 0x005FED70 (FUN_005FED70, Moho::CUnitRepairTask::MemberDeserialize)
    *
@@ -613,14 +624,44 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase).
-  struct CUnitRepairTaskSerializerHelperNode
+  /**
+   * VFTABLE: 0x00E1FACC (`??_7CUnitRepairTaskSerializer@Moho@@6B@`)
+   * Also installed as: 0x00E1FAD4 (`??_7?$SerSaveLoadHelper@VCUnitRepairTask@Moho@@@gpg@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CUnitRepairTask>
+   *
+   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
+   * other `SerHelperBase`-derived serializer in this codebase.
+   */
+  class CUnitRepairTaskSerializerHelperNode : public gpg::SerHelperBase
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  public:
+    /**
+     * Address: 0x00BCF950 (FUN_00BCF950, dynamic initializer for the global
+     * `CUnitRepairTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields and installs process-exit
+     * cleanup via `atexit`.
+     */
+    CUnitRepairTaskSerializerHelperNode();
+
+    /**
+     * Address: 0x005FBD50 (FUN_005FBD50, gpg::SerSaveLoadHelper<Moho::CUnitRepairTask>::Init)
+     *
+     * What it does:
+     * Resolves `CUnitRepairTask` RTTI and installs this helper's load/save
+     * callbacks into the reflected type descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(CUnitRepairTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -635,15 +676,15 @@ namespace
     "CUnitRepairTaskSerializerHelperNode size must be 0x14"
   );
 
-  CUnitRepairTaskSerializerHelperNode gCUnitRepairTaskSerializer{};
+  CUnitRepairTaskSerializerHelperNode gCUnitRepairTaskSerializer;
 
   /**
    * Unlinks `CUnitRepairTaskSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitRepairTaskSerializerNodePrimary()
+  void UnlinkCUnitRepairTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitRepairTaskSerializer.mListLinks);
+    gCUnitRepairTaskSerializer.ResetLinks();
   }
 
   /**
@@ -702,32 +743,22 @@ namespace
    */
   void cleanup_CUnitRepairTaskSerializer_atexit()
   {
-    (void)UnlinkCUnitRepairTaskSerializerNodePrimary();
+    UnlinkCUnitRepairTaskSerializerNodePrimary();
   }
 
-  /**
-   * Address: 0x00BCF950 (FUN_00BCF950, register_CUnitRepairTaskSerializer)
-   *
-   * What it does:
-   * Initializes the global `CUnitRepairTask` serializer helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`.
-   */
-  void register_CUnitRepairTaskSerializer()
+  CUnitRepairTaskSerializerHelperNode::CUnitRepairTaskSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeCUnitRepairTaskSerializerCallback)
+    , mSerSaveFunc(&SerializeCUnitRepairTaskSerializerCallback)
   {
-    (void)UnlinkCUnitRepairTaskSerializerNodePrimary();
-    gCUnitRepairTaskSerializer.mSerLoadFunc = &DeserializeCUnitRepairTaskSerializerCallback;
-    gCUnitRepairTaskSerializer.mSerSaveFunc = &SerializeCUnitRepairTaskSerializerCallback;
     (void)std::atexit(&cleanup_CUnitRepairTaskSerializer_atexit);
   }
 
-  struct CUnitRepairTaskSerializerStartupBootstrap
+  void CUnitRepairTaskSerializerHelperNode::Init()
   {
-    CUnitRepairTaskSerializerStartupBootstrap()
-    {
-      register_CUnitRepairTaskSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitRepairTaskSerializerStartupBootstrap gCUnitRepairTaskSerializerStartupBootstrap;
+    gpg::RType* const type = CachedCUnitRepairTaskType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
 } // namespace

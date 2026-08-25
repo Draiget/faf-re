@@ -49,6 +49,8 @@ namespace moho
     , public Listener<ECommandEvent>
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00614D50 (FUN_00614D50)
      *

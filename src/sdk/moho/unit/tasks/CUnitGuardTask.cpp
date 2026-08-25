@@ -12,7 +12,6 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/IAiBuilder.h"
@@ -51,64 +50,57 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching register_CUnitGuardTaskSerializer writing
-  // .mDeserialize/.mSerialize/.__vftable on it) -
-  // `gpg::SerSaveLoadHelperListRuntime` only models the leading 0x0C-byte
-  // intrusive-list header shared by every SerHelperBase-derived serializer,
-  // so it undersized this specific global. Use the full shape here.
-  struct CUnitGuardTaskSerializerHelper
+  /**
+   * VFTABLE: 0x00E20510 (`??_7CUnitGuardTaskSerializer@Moho@@6B@`)
+   * Also installed as: 0x00E20518 (`??_7?$SerSaveLoadHelper@VCUnitGuardTask@Moho@@@gpg@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CUnitGuardTask>
+   *
+   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
+   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
+   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes.
+   */
+  class CUnitGuardTaskSerializerHelper : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mLoadCallback = nullptr;
-    gpg::RType::save_func_t mSaveCallback = nullptr;
+  public:
+    /**
+     * Address: 0x00BD0BB0 (FUN_00BD0BB0, dynamic initializer for the global
+     * `CUnitGuardTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * then binds the load/save callback fields and installs process-exit
+     * cleanup via `atexit`.
+     */
+    CUnitGuardTaskSerializerHelper();
+
+    /**
+     * Address: 0x006148A0 (FUN_006148A0, gpg::SerSaveLoadHelper<Moho::CUnitGuardTask>::Init)
+     *
+     * What it does:
+     * Resolves `CUnitGuardTask` RTTI and installs this helper's load/save
+     * callbacks into the reflected type descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
   };
   static_assert(
-    offsetof(CUnitGuardTaskSerializerHelper, mNext) == 0x04,
-    "CUnitGuardTaskSerializerHelper::mNext offset must be 0x04"
+    offsetof(CUnitGuardTaskSerializerHelper, mLoadCallback) == 0x0C,
+    "CUnitGuardTaskSerializerHelper::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(CUnitGuardTaskSerializerHelper, mPrev) == 0x08,
-    "CUnitGuardTaskSerializerHelper::mPrev offset must be 0x08"
+    offsetof(CUnitGuardTaskSerializerHelper, mSaveCallback) == 0x10,
+    "CUnitGuardTaskSerializerHelper::mSaveCallback offset must be 0x10"
   );
   static_assert(
     sizeof(CUnitGuardTaskSerializerHelper) == 0x14, "CUnitGuardTaskSerializerHelper size must be 0x14"
   );
 
-  CUnitGuardTaskSerializerHelper gCUnitGuardTaskSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    CUnitGuardTaskSerializerHelper& helper
-  ) noexcept
-  {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
-  }
-
-  /**
-   * Address: 0x00611090 (FUN_00611090)
-   *
-   * What it does:
-   * Unlinks `CUnitGuardTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGuardTaskSerializerNodePrimary()
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitGuardTaskSerializer));
-  }
-
-  /**
-   * Address: 0x006110C0 (FUN_006110C0)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitGuardTaskSerializer` helper storage.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGuardTaskSerializerNodeSecondary()
-  {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitGuardTaskSerializer));
-  }
+  CUnitGuardTaskSerializerHelper gCUnitGuardTaskSerializer;
 
   void DeserializeCUnitGuardTaskSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -130,37 +122,55 @@ namespace
     reinterpret_cast<const moho::CUnitGuardTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  void cleanup_CUnitGuardTaskSerializer_atexit()
+  /**
+   * Address: 0x00611090 (FUN_00611090)
+   *
+   * What it does:
+   * Unlinks `CUnitGuardTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  void UnlinkCUnitGuardTaskSerializerNodePrimary()
   {
-    (void)UnlinkCUnitGuardTaskSerializerNodePrimary();
+    gCUnitGuardTaskSerializer.ResetLinks();
   }
 
   /**
-   * Address: 0x00BD0BB0 (FUN_00BD0BB0, register_CUnitGuardTaskSerializer)
+   * Address: 0x006110C0 (FUN_006110C0)
    *
    * What it does:
-   * Initializes the global CUnitGuardTask serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitGuardTaskSerializer` helper storage.
    */
-  void register_CUnitGuardTaskSerializer()
+  [[maybe_unused]] void UnlinkCUnitGuardTaskSerializerNodeSecondary()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitGuardTaskSerializer.mNext);
-    gCUnitGuardTaskSerializer.mNext = self;
-    gCUnitGuardTaskSerializer.mPrev = self;
-    gCUnitGuardTaskSerializer.mLoadCallback = &DeserializeCUnitGuardTaskSerializerCallback;
-    gCUnitGuardTaskSerializer.mSaveCallback = &SerializeCUnitGuardTaskSerializerCallback;
+    gCUnitGuardTaskSerializer.ResetLinks();
+  }
+
+  void cleanup_CUnitGuardTaskSerializer_atexit()
+  {
+    UnlinkCUnitGuardTaskSerializerNodePrimary();
+  }
+
+  CUnitGuardTaskSerializerHelper::CUnitGuardTaskSerializerHelper()
+    : mLoadCallback(&DeserializeCUnitGuardTaskSerializerCallback)
+    , mSaveCallback(&SerializeCUnitGuardTaskSerializerCallback)
+  {
     (void)std::atexit(&cleanup_CUnitGuardTaskSerializer_atexit);
   }
 
-  struct CUnitGuardTaskSerializerStartupBootstrap
+  void CUnitGuardTaskSerializerHelper::Init()
   {
-    CUnitGuardTaskSerializerStartupBootstrap()
-    {
-      register_CUnitGuardTaskSerializer();
+    gpg::RType* type = moho::CUnitGuardTask::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CUnitGuardTask));
+      moho::CUnitGuardTask::sType = type;
     }
-  };
 
-  [[maybe_unused]] CUnitGuardTaskSerializerStartupBootstrap gCUnitGuardTaskSerializerStartupBootstrap;
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
 } // namespace
 
 namespace
@@ -388,6 +398,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CUnitGuardTask::sType = nullptr;
+
   /**
    * Address: 0x00614D50 (FUN_00614D50)
    *
