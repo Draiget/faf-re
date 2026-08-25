@@ -1990,6 +1990,23 @@ namespace msvc8
          * `allocate_slots_checked`'s `bad_alloc` guard below is `_Allocate<T>`'s
          * own backstop for internal grow paths that call it directly; the two
          * are separate real guards, not duplicates.
+         *
+         * Address: 0x005C7680 (FUN_005C7680, sub_5C7680) --
+         * `msvc8::vector<Moho::ReconBlip*>::reserve` for the 4-byte pointer
+         * element (`Moho::CAiReconDBImpl::mBblips`/`mTempBlips`,
+         * `CAiReconDBImpl.h`). Opens with the max_size guard against
+         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw lane `FUN_005C79A0`), allocates
+         * via `FUN_005CA040`, uninit-copies the live range through
+         * `FUN_005CE060` (cited below on `uninit_copy_n`), frees the old
+         * block and rebases the three lanes -- confirmed against the `.asm`.
+         * Reached from `DeserializeReconBlipPointerVector`'s (`FUN_005C58E0`,
+         * `CAiReconDBImplTypeInfo.cpp`, already recovered) `storage->
+         * reserve(count)` call, made immediately after reading the archived
+         * element count and before the per-element read loop -- confirmed
+         * against the `.c`: `sub_5C7680(v6)` is the first call after
+         * `ReadUInt`. Previously mis-tracked `external_dependency`
+         * ("all-external-callees thunk"); every real callee is this
+         * template's own engine code, not third-party runtime.
          */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
@@ -4587,6 +4604,28 @@ namespace msvc8
          * a2, a3) { LOBYTE(this) = 0; return sub_832BE0(a3, this, this); }`,
          * pure register-shuffle into FUN_00832BE0 with no logic of its own.)
          *
+         * Address: 0x005CE060 (FUN_005CE060, sub_5CE060) --
+         * `msvc8::vector<Moho::ReconBlip*>::uninit_copy_n` for the 4-byte
+         * pointer element (`Moho::CAiReconDBImpl::mBblips`/`mTempBlips`,
+         * `CAiReconDBImpl.h`) -- `for (; a2 != a3; ++result) { if (result)
+         * *result = *a2; ++a2; }`, byte-for-byte confirmed against the `.asm`,
+         * the same per-element pointer-assignment loop family as
+         * `FUN_00832BE0` above (the `if (result)` null guard is the same
+         * defensive "compiler cannot prove the freshly-allocated destination
+         * is non-null" pattern already documented on `uninit_move_n`'s
+         * `FUN_007FC2F0` entry, not a real runtime branch). Reached from
+         * `reserve`'s emission for this instantiation (`FUN_005C7680`, cited
+         * above) as its live-range copy-into-the-new-buffer step. Has 24 ICF
+         * twins (canonical `FUN_0054F6B0`); this address's own instantiation
+         * identity is independently confirmed via its sole real caller
+         * (`FUN_005C7680`) rather than inferred from the twin group -- of its
+         * five raw code xrefs, four (`FUN_005C9FA0`/`FUN_005CBF80`/
+         * `FUN_005CD2C0`/`FUN_005CDA50`) are themselves confirmed zero-caller
+         * dead fragments (`call_edges` has no incoming edge for any of the
+         * four), leaving `FUN_005C7680` as the only live path. Previously
+         * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
+         * the address never appeared in.
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -5349,6 +5388,21 @@ namespace msvc8
          * constexpr` arm) -- one compiled `memmove_s` wrapper backs both
          * call shapes for this element. Reached from the `_Insert_n` grow
          * core `FUN_004451A0`, cited above on `insert`.)
+         * Address: 0x0084F940 (FUN_0084F940, `msvc8::vector<wxWindowBase*>::
+         * uninit_move_n` for `SuspendInputWindowEventHandlersAndFlushQueue`'s
+         * per-window saved-handler vector (`UiRuntimeTypes.cpp`) -- same
+         * trivial-scalar shape as `FUN_00445F20` immediately above: `count =
+         * (rangeEnd-rangeBegin)>>2`, `memmove_s(dst, count*4, rangeBegin,
+         * count*4)` when `count != 0`, returns `dst + count*4`. Reached from
+         * the single-value `insert(pos, value)` overload's capacity-available
+         * branch, `FUN_0084F200` (cited below on that overload) -- there it
+         * serves as the "move the current last element into the freshly
+         * grown one-past-end slot" step (`count = 1`), the same role
+         * `FUN_007BCD00` documents above for the 36-byte `SNetCommandArg`
+         * element. DB previously mis-attributed this token to
+         * `CrtRuntimeHelpers.cpp` with no real citation there ("DB-integrity
+         * bulk fix 2026-08-24" boilerplate contamination documented for
+         * several other tokens this session); corrected to `recovered` here.)
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -6730,4 +6784,24 @@ namespace msvc8
     	void* tail;
     };
     static_assert(sizeof(linked_list<int>) == 8, "linked_list<int> == 8");
+
+    namespace detail
+    {
+        // `StringIntHeapLane` (`{const char* key; std::int32_t value;}`, defined in
+        // Vector.cpp) is the layout twin of SimRecoveryRuntime.cpp's
+        // `StringRankLaneRuntime` -- both are the 8-byte shape MSVC8's `std::sort`
+        // instantiated for the `(string,rank)` bone-name-index sort recovered as
+        // `Moho::CAniSkel::CAniSkel`'s `SortStringRankLaneRuntimeRange`
+        // (FUN_0054E4B0). Forward-declared here (full definition stays local to
+        // Vector.cpp) so that recovered driver can call these already-recovered
+        // heap/insertion-sort fallbacks by name instead of duplicating them.
+        struct StringIntHeapLane;
+
+        // Address: 0x0054F990 (FUN_0054F990, sub_54F990) -- Floyd `make_heap`.
+        const char* MakeHeapOverStringIntHeapLaneRange(StringIntHeapLane* first, StringIntHeapLane* last, int userTagArg) noexcept;
+        // Address: 0x0054F9E0 (FUN_0054F9E0, sub_54F9E0) -- `sort_heap` via repeated `pop_heap`.
+        std::int32_t SortHeapStringIntHeapLaneRange(StringIntHeapLane* first, StringIntHeapLane* last, int userTagArg) noexcept;
+        // Address: 0x0054F290 (FUN_0054F290, sub_54F290) -- small-range insertion sort.
+        char InsertionSortStringIntHeapLaneRangeAscending(StringIntHeapLane* first, StringIntHeapLane* last) noexcept;
+    } // namespace detail
 }
