@@ -4,37 +4,50 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CUnitMotionConstruct
+  class CUnitMotionConstruct final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD7240 (FUN_00BD7240, register_CUnitMotionConstruct)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CUnitMotionConstruct();
+
+    /**
+     * Address: 0x00BFE070 (FUN_00BFE070, cleanup_CUnitMotionConstruct)
+     *
+     * What it does:
+     * Unlinks the `CUnitMotionConstruct` helper from the intrusive helper
+     * list and rewires it as a self-linked singleton.
+     */
+    ~CUnitMotionConstruct();
+
     /**
      * Address: 0x006BA7F0 (FUN_006BA7F0, gpg::SerConstructHelper_CUnitMotion::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into CUnitMotion RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitMotionConstruct, mHelperNext) == 0x04, "CUnitMotionConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitMotionConstruct, mHelperPrev) == 0x08, "CUnitMotionConstruct::mHelperPrev offset must be 0x08"
-  );
+  /**
+   * Address: 0x006BAC40 (FUN_006BAC40, destroy_CUnitMotion)
+   *
+   * What it does:
+   * Runs `CUnitMotion` teardown and frees the backing allocation when present.
+   */
+  void destroy_CUnitMotion(void* objectPtr);
+
   static_assert(
     offsetof(CUnitMotionConstruct, mConstructCallback) == 0x0C,
     "CUnitMotionConstruct::mConstructCallback offset must be 0x0C"
