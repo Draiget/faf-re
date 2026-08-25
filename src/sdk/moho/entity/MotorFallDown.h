@@ -147,9 +147,27 @@ namespace moho
 
   static_assert(sizeof(MotorFallDownTypeInfo) == 0x64, "MotorFallDownTypeInfo size must be 0x64");
 
-  class MotorFallDownSerializer
+  class MotorFallDownSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD5C40 (FUN_00BD5C40, dynamic initializer for the global
+     * `MotorFallDownSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Plain unlink atexit target, modeled as the
+     * compiler's implicit static-destructor registration.
+     */
+    MotorFallDownSerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~MotorFallDownSerializer();
+
     /**
      * Address: 0x00695080 (FUN_00695080, serializer load thunk)
      */
@@ -161,20 +179,15 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x006950B0 (FUN_006950B0, serializer registration lane)
+     * Address: 0x00695AC0 (FUN_00695AC0, MotorFallDownSerializer::Init)
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(MotorFallDownSerializer, mHelperLinks) == 0x04,
-    "MotorFallDownSerializer::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(MotorFallDownSerializer, mDeserialize) == 0x0C,
     "MotorFallDownSerializer::mDeserialize offset must be 0x0C"
@@ -185,24 +198,37 @@ namespace moho
   );
   static_assert(sizeof(MotorFallDownSerializer) == 0x14, "MotorFallDownSerializer size must be 0x14");
 
-  class MotorFallDownConstruct
+  class MotorFallDownConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00694F50 (FUN_00694F50, construct registration lane)
+     * Address: 0x00BD5C00 (FUN_00BD5C00, dynamic initializer for the global
+     * `MotorFallDownConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields. Plain unlink atexit target, modeled
+     * as the compiler's implicit static-destructor registration.
      */
-    virtual void RegisterConstructFunction();
+    MotorFallDownConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~MotorFallDownConstruct();
+
+    /**
+     * Address: 0x00695A40 (FUN_00695A40, MotorFallDownConstruct::Init)
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
   };
 
-  static_assert(
-    offsetof(MotorFallDownConstruct, mHelperLinks) == 0x04,
-    "MotorFallDownConstruct::mHelperLinks offset must be 0x04"
-  );
   static_assert(
     offsetof(MotorFallDownConstruct, mConstructCallback) == 0x0C,
     "MotorFallDownConstruct::mConstructCallback offset must be 0x0C"
@@ -219,29 +245,9 @@ namespace moho
   void cleanup_MotorFallDownTypeInfo();
 
   /**
-   * Address: 0x00BFD190 (FUN_00BFD190, cleanup_MotorFallDownConstruct)
-   */
-  gpg::SerHelperBase* cleanup_MotorFallDownConstruct();
-
-  /**
-   * Address: 0x00BFD1C0 (FUN_00BFD1C0, cleanup_MotorFallDownSerializer)
-   */
-  gpg::SerHelperBase* cleanup_MotorFallDownSerializer();
-
-  /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)
    */
   void register_MotorFallDownTypeInfo();
-
-  /**
-   * Address: 0x00BD5C00 (FUN_00BD5C00, register_MotorFallDownConstruct)
-   */
-  int register_MotorFallDownConstruct();
-
-  /**
-   * Address: 0x00BD5C40 (FUN_00BD5C40, register_MotorFallDownSerializer)
-   */
-  int register_MotorFallDownSerializer();
 
   /**
    * Address: 0x00BD5CC0 (FUN_00BD5CC0, register_CScrLuaMetatableFactory_MotorFallDown_Index)
