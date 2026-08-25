@@ -14084,25 +14084,423 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
   }
 
+  // The CRT's pristine, process-startup-captured wide environment array
+  // pointer (real symbol at 0x00FB7D7C) -- compared against
+  // gCrtWideEnvironPointerArray (0x00FB7D78) by
+  // RuntimePublishWideEnvironmentVariable to detect whether the working
+  // array still just aliases the untouched startup snapshot (in which case
+  // it must be privately duplicated before any in-place mutation, matching
+  // the real MSVCRT `__winitenv` convention). No writer to this symbol
+  // appears anywhere in this binary's traced call graph -- consistent with
+  // it being set only by CRT process-startup code outside the currently-
+  // recovered address range; the role is inferred from observed comparison
+  // behavior, not proven via vendored source or an additional xref.
+  wchar_t** gCrtWideEnvironStartupSnapshot = nullptr;
+
+  // Cached result of probing SetEnvironmentVariableW() support (real symbol
+  // at 0x00F3F7A4) -- a one-way latch like gCrtEnvironmentStringsWSupport
+  // above: starts at 1 (assume supported), permanently cleared to 0 the
+  // first time SetEnvironmentVariableW fails with ERROR_CALL_NOT_IMPLEMENTED.
+  int gCrtSetEnvironmentVariableWSupport = 1;
+
+  /**
+   * Address: 0x00ABDCC1 (FUN_00ABDCC1, sub_ABDCC1)
+   *
+   * IDA signature:
+   * int __usercall sub_ABDCC1@<eax>(int a1@<edi>, int a2);
+   *
+   * What it does:
+   * Linear-scans `gCrtWideEnvironPointerArray` for an entry whose first
+   * `nameLength` characters case-insensitively match `needleName`
+   * (`_wcsnicoll`) and whose character right after that prefix is `=` or
+   * the string terminator (a whole-name match, not a prefix hit). Returns
+   * the matching entry's index on success, or the negated entry count
+   * scanned before reaching the null terminator when nothing matches.
+   *
+   * DB-integrity fix: was tagged `external_dependency` ("all-external-
+   * callees thunk") -- wrong: its only real callee, `_wcsnicoll`, is
+   * engine-recovered in this same file, not third-party runtime.
+   */
+  [[nodiscard]] int RuntimeFindWideEnvironmentEntryIndex(
+    const std::uint32_t nameLength,
+    const wchar_t* const needleName
+  )
+  {
+    int index = 0;
+    for (;; ++index) {
+      const wchar_t* const entry = gCrtWideEnvironPointerArray[index];
+      if (entry == nullptr) {
+        return -index;
+      }
+      if (_wcsnicoll(needleName, entry, nameLength) == 0) {
+        const wchar_t afterPrefix = entry[nameLength];
+        if (afterPrefix == L'=' || afterPrefix == L'\0') {
+          return index;
+        }
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00ABDD12 (FUN_00ABDD12, sub_ABDD12)
+   *
+   * What it does:
+   * Duplicates one null-terminated `wchar_t**` environment pointer vector
+   * into CRT heap storage and deep-copies each entry -- the wide sibling of
+   * `_copy_environ` above, `wcsdup` (`RuntimeWideStringDuplicate`) in place
+   * of `_strdup`.
+   *
+   * DB-integrity fix: was tagged `external_dependency` ("MSVC CRT internal
+   * ... duplicator") -- wrong: its per-entry callee, `wcsdup`
+   * (`RuntimeWideStringDuplicate`), is engine-recovered in this same file.
+   */
+  [[nodiscard]] wchar_t** RuntimeDuplicateWideEnvironmentArray(
+    wchar_t** const sourceArray
+  )
+  {
+    if (sourceArray == nullptr) {
+      return nullptr;
+    }
+
+    std::size_t entryCount = 0u;
+    while (sourceArray[entryCount] != nullptr) {
+      ++entryCount;
+    }
+
+    auto** const duplicateArray = static_cast<wchar_t**>(_calloc_crt(entryCount + 1u, sizeof(wchar_t*)));
+    if (duplicateArray == nullptr) {
+      __amsg_exit(9);
+      return nullptr;
+    }
+
+    for (std::size_t entryIndex = 0u; entryIndex < entryCount; ++entryIndex) {
+      duplicateArray[entryIndex] = RuntimeWideStringDuplicate(sourceArray[entryIndex]);
+    }
+    duplicateArray[entryCount] = nullptr;
+    return duplicateArray;
+  }
+
+  // Forward declaration: RuntimePublishWideEnvironmentVariable's own
+  // bootstrap path can call RuntimeSyncWideEnvironFromAnsiFallback (real
+  // definition below, at 0x00AAEA1D), which is itself defined in terms of
+  // RuntimePublishWideEnvironmentVariable -- a genuine mutual recursion in
+  // the shipped binary, not a layering mistake here.
+  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback();
+
+  /**
+   * Address: 0x00ABDD6F (FUN_00ABDD6F, sub_ABDD6F)
+   *
+   * IDA signature:
+   * int __cdecl sub_ABDD6F(struct_Frame **a1, int a2);
+   *
+   * What it does:
+   * The shared VC8 `_putenv`/`_wputenv` internal. Called with a fully-formed
+   * heap-owned "NAME=value" (or "NAME=", a delete request) wide string in
+   * `*assignmentSlot`; takes ownership of that string, and on every return
+   * path either stores it into `gCrtWideEnvironPointerArray`/`_wenviron` or
+   * frees it, always clearing `*assignmentSlot` to null before returning.
+   *
+   * If the working array (`gCrtWideEnvironPointerArray`) still just
+   * aliases the pristine startup snapshot (`gCrtWideEnvironStartupSnapshot`
+   * -- this also covers "not yet built at all", since both start null), it
+   * is first privately duplicated via `RuntimeDuplicateWideEnvironmentArray`.
+   * If no array is available even after that: when `synchronizeNativeEnvironment`
+   * is set and `_wenviron` exists, attempts the native rebuild chain
+   * (`RuntimeBuildWideEnvironmentBlock` + `RuntimePublishWideEnvironFromBlock`,
+   * falling back to `RuntimeSyncWideEnvironFromAnsiFallback` -- the mutual-
+   * recursion partner that reaches this function itself, always with
+   * `synchronizeNativeEnvironment=false`); otherwise bootstraps both
+   * `_wenviron` and the working array as fresh single-null-entry arrays.
+   *
+   * Looks up an existing entry by name (`RuntimeFindWideEnvironmentEntryIndex`).
+   * If found: on a delete request, shifts every later entry down by one slot
+   * and shrinks the array (`__recalloc_crt`); otherwise replaces the
+   * existing entry's string in place. If not found: on a delete request
+   * this is a no-op success (early return); otherwise grows the array by
+   * one slot (`__recalloc_crt`) and appends the new entry.
+   *
+   * When `synchronizeNativeEnvironment` is set, additionally pushes the
+   * change to the OS via `SetEnvironmentVariableW` (probing support once
+   * via `gCrtSetEnvironmentVariableWSupport`, degrading permanently to an
+   * ANSI `SetEnvironmentVariableA` fallback -- through a
+   * `WideCharToMultiByte` conversion of both name and value -- the first
+   * time the native call fails with `ERROR_CALL_NOT_IMPLEMENTED`). Binary
+   * quirk preserved: if the temporary "NAME\0value" buffer allocation
+   * itself fails, the function returns success (0) without attempting any
+   * OS publish -- matches the shipped binary exactly, not a mistake
+   * introduced here.
+   *
+   * Real caller: `RuntimeSyncWideEnvironFromAnsiFallback` (0x00AAEA1D,
+   * cited below), always with `synchronizeNativeEnvironment=false` -- the
+   * only reachable call path for this function in this binary, matching
+   * `RuntimeSyncWideEnvironFromAnsiFallback`'s own status as a dead-in-
+   * practice pre-NT fallback. The `synchronizeNativeEnvironment=true`
+   * branches are preserved faithfully (this is the shared general-purpose
+   * CRT internal) even though nothing in this binary's reachable call
+   * graph currently exercises them.
+   */
+  int RuntimePublishWideEnvironmentVariable(
+    wchar_t** const assignmentSlot,
+    const bool synchronizeNativeEnvironment
+  )
+  {
+    if (assignmentSlot == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return -1;
+    }
+
+    wchar_t* const newAssignment = *assignmentSlot;
+    if (newAssignment == nullptr) {
+      *_errno() = EINVAL;
+      return -1;
+    }
+
+    const wchar_t* const equalsSign = std::wcschr(newAssignment, L'=');
+    if (equalsSign == nullptr || equalsSign == newAssignment) {
+      *_errno() = EINVAL;
+      return -1;
+    }
+
+    const bool isDeleteRequest = (equalsSign[1] == L'\0');
+    const std::uint32_t nameLength = static_cast<std::uint32_t>(equalsSign - newAssignment);
+
+    wchar_t** workingArray = gCrtWideEnvironPointerArray;
+    if (gCrtWideEnvironPointerArray == gCrtWideEnvironStartupSnapshot) {
+      workingArray = RuntimeDuplicateWideEnvironmentArray(gCrtWideEnvironPointerArray);
+      gCrtWideEnvironPointerArray = workingArray;
+    }
+
+    if (workingArray == nullptr) {
+      if (synchronizeNativeEnvironment && _wenviron != nullptr) {
+        gCrtRawWideEnvironmentBlock = RuntimeBuildWideEnvironmentBlock();
+        if (RuntimePublishWideEnvironFromBlock() < 0 && RuntimeSyncWideEnvironFromAnsiFallback() != 0) {
+          *_errno() = EINVAL;
+          return -1;
+        }
+      } else {
+        if (isDeleteRequest) {
+          return 0;
+        }
+        if (_wenviron == nullptr) {
+          wchar_t** const freshWenviron = static_cast<wchar_t**>(std::malloc(sizeof(wchar_t*)));
+          _wenviron = freshWenviron;
+          if (freshWenviron == nullptr) {
+            return -1;
+          }
+          *freshWenviron = nullptr;
+        }
+        if (gCrtWideEnvironPointerArray == nullptr) {
+          wchar_t** const freshArray = static_cast<wchar_t**>(std::malloc(sizeof(wchar_t*)));
+          gCrtWideEnvironPointerArray = freshArray;
+          if (freshArray == nullptr) {
+            return -1;
+          }
+          *freshArray = nullptr;
+        }
+      }
+    }
+
+    if (gCrtWideEnvironPointerArray == nullptr) {
+      return -1;
+    }
+
+    int publishResult = 0;
+    const int matchIndex = RuntimeFindWideEnvironmentEntryIndex(nameLength, newAssignment);
+    if (matchIndex < 0 || gCrtWideEnvironPointerArray[0] == nullptr) {
+      if (!isDeleteRequest) {
+        const std::size_t existingCount = (matchIndex < 0) ? static_cast<std::size_t>(-matchIndex) : 0u;
+        if (existingCount + 2u <= existingCount || existingCount + 2u >= 0x3FFFFFFFu) {
+          return -1;
+        }
+        auto** const grownArray = static_cast<wchar_t**>(
+          __recalloc_crt(gCrtWideEnvironPointerArray, sizeof(wchar_t*), existingCount + 2u)
+        );
+        if (grownArray == nullptr) {
+          return -1;
+        }
+        grownArray[existingCount] = newAssignment;
+        grownArray[existingCount + 1u] = nullptr;
+        *assignmentSlot = nullptr;
+        gCrtWideEnvironPointerArray = grownArray;
+      } else {
+        _free_crt(newAssignment);
+        *assignmentSlot = nullptr;
+        return 0;
+      }
+    } else {
+      _free_crt(gCrtWideEnvironPointerArray[matchIndex]);
+      if (!isDeleteRequest) {
+        gCrtWideEnvironPointerArray[matchIndex] = newAssignment;
+        *assignmentSlot = nullptr;
+      } else {
+        std::size_t shiftPosition = static_cast<std::size_t>(matchIndex);
+        while (gCrtWideEnvironPointerArray[shiftPosition] != nullptr) {
+          gCrtWideEnvironPointerArray[shiftPosition] = gCrtWideEnvironPointerArray[shiftPosition + 1u];
+          ++shiftPosition;
+        }
+
+        if (shiftPosition < 0x3FFFFFFFu) {
+          auto** const shrunkArray = static_cast<wchar_t**>(
+            __recalloc_crt(gCrtWideEnvironPointerArray, shiftPosition, sizeof(wchar_t*))
+          );
+          if (shrunkArray != nullptr) {
+            gCrtWideEnvironPointerArray = shrunkArray;
+          }
+        }
+      }
+    }
+
+    if (!synchronizeNativeEnvironment) {
+      if (isDeleteRequest) {
+        _free_crt(newAssignment);
+        *assignmentSlot = nullptr;
+      }
+      return publishResult;
+    }
+
+    const std::size_t fullLength = wstrlen(newAssignment);
+    wchar_t* const nameOnlyCopy = static_cast<wchar_t*>(_calloc_crt(fullLength + 2u, sizeof(wchar_t)));
+    if (nameOnlyCopy != nullptr) {
+      if (wstrcpy(nameOnlyCopy, static_cast<int>(fullLength + 2u), newAssignment) != 0) {
+        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+      }
+      nameOnlyCopy[nameLength] = L'\0';
+      const wchar_t* const valuePart = &nameOnlyCopy[nameLength + 1u];
+
+      bool skipAnsiFallback = false;
+      if (gCrtSetEnvironmentVariableWSupport == 1) {
+        if (!SetEnvironmentVariableW(nameOnlyCopy, isDeleteRequest ? nullptr : valuePart)) {
+          if (GetLastError() == ERROR_CALL_NOT_IMPLEMENTED) {
+            gCrtSetEnvironmentVariableWSupport = 0;
+          } else {
+            publishResult = -1;
+            skipAnsiFallback = true;
+          }
+        } else {
+          skipAnsiFallback = true;
+        }
+      }
+
+      if (!skipAnsiFallback && gCrtSetEnvironmentVariableWSupport == 0) {
+        bool ansiPublishSucceeded = false;
+        char* ansiName = nullptr;
+        char* ansiValue = nullptr;
+
+        const int ansiNameLength = WideCharToMultiByte(CP_ACP, 0, nameOnlyCopy, -1, nullptr, 0, nullptr, nullptr);
+        if (ansiNameLength != 0) {
+          ansiName = static_cast<char*>(_calloc_crt(static_cast<std::size_t>(ansiNameLength), 1u));
+          if (ansiName != nullptr &&
+              WideCharToMultiByte(CP_ACP, 0, nameOnlyCopy, -1, ansiName, ansiNameLength, nullptr, nullptr) != 0)
+          {
+            bool valueReady = isDeleteRequest;
+            if (!isDeleteRequest) {
+              const int ansiValueLength = WideCharToMultiByte(CP_ACP, 0, valuePart, -1, nullptr, 0, nullptr, nullptr);
+              if (ansiValueLength != 0) {
+                ansiValue = static_cast<char*>(_calloc_crt(static_cast<std::size_t>(ansiValueLength), 1u));
+                if (ansiValue != nullptr) {
+                  valueReady = (WideCharToMultiByte(CP_ACP, 0, valuePart, -1, ansiValue, ansiValueLength, nullptr, nullptr) != 0);
+                }
+              }
+            }
+
+            if (valueReady && SetEnvironmentVariableA(ansiName, isDeleteRequest ? nullptr : ansiValue)) {
+              ansiPublishSucceeded = true;
+            }
+          }
+        }
+
+        publishResult = ansiPublishSucceeded ? 0 : -1;
+        _free_crt(ansiValue);
+        _free_crt(ansiName);
+      }
+
+      if (publishResult == -1) {
+        *_errno() = 42;  // Literal preserved from the binary; no standard
+                           // errno name in <cerrno> matches this exact code.
+      }
+      _free_crt(nameOnlyCopy);
+    }
+
+    if (isDeleteRequest) {
+      _free_crt(newAssignment);
+      *assignmentSlot = nullptr;
+    }
+    return publishResult;
+  }
+
   /**
    * Address: 0x00AAEA1D (FUN_00AAEA1D, sub_AAEA1D)
    *
-   * Not recovered this pass. ANSI-to-wide environment sync fallback, only
-   * reached from `RuntimeGetWideEnvironmentValue` when
-   * `RuntimePublishWideEnvironFromBlock` fails on the pre-NT
+   * IDA signature:
+   * int sub_AAEA1D(void);
+   *
+   * What it does:
+   * ANSI-to-wide environment sync fallback, reached from
+   * `RuntimeGetWideEnvironmentValue` only when `_wenviron` is already
+   * non-null but `RuntimePublishWideEnvironFromBlock` fails on the pre-NT
    * `GetEnvironmentStringsW`-unsupported path (dead in practice on every
-   * Windows version this game targets). IDA's decompile shows it reading
-   * `_wenviron` (confirmed via raw asm: `mov esi, _wenviron` at 0x00AAEA24)
-   * but immediately treating each entry as a narrow `CHAR*` for
-   * `MultiByteToWideChar` -- a real type-confusion in the VC8 source this
-   * needs a dedicated pass to resolve, not a guess -- before publishing
-   * each converted entry through the also-unrecovered `_wputenv` internal
-   * (FUN_00ABDD6F, its own ~90-instruction function with further
-   * dependencies). Declared here, matching this file's existing pattern
-   * for not-yet-individually-recovered CRT internals (`_output_l`,
-   * `outfn`, `woutput_l` above are the same shape).
+   * Windows version this game targets).
+   *
+   * Preserves a real type-confusion confirmed in the shipped binary (raw
+   * asm: `mov esi, _wenviron` at 0x00AAEA24): each `_wenviron` entry --
+   * already a `wchar_t*` -- is reinterpreted as a narrow `const char*` and
+   * fed to `MultiByteToWideChar`, which reads through it as ANSI bytes
+   * rather than UTF-16 code units. This is almost certainly a genuine VC8
+   * source-level bug (`_wenviron` used where `_environ` was meant), but it
+   * is what the shipped binary does, and this path is unreachable on any
+   * target OS this game actually ships for -- preserved as-is rather than
+   * "corrected" to what was presumably intended, per this project's
+   * binary-fidelity contract.
+   *
+   * For each `_wenviron` entry: probes the required wide buffer length via
+   * `MultiByteToWideChar`, allocates it, converts, and publishes the result
+   * through `RuntimePublishWideEnvironmentVariable` (with
+   * `synchronizeNativeEnvironment=false` -- this function is the mutual-
+   * recursion fallback partner that function's own bootstrap path can
+   * reach). Returns 0 once every entry has been processed, or -1 on the
+   * first conversion, allocation, or publish failure.
    */
-  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback();
+  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback()
+  {
+    wchar_t** environEntry = _wenviron;
+    if (*environEntry == nullptr) {
+      return 0;
+    }
+
+    const char* sourceText = reinterpret_cast<const char*>(*environEntry);
+    for (;;) {
+      const int requiredWideChars = MultiByteToWideChar(0, 0, sourceText, -1, nullptr, 0);
+      if (requiredWideChars == 0) {
+        return -1;
+      }
+
+      wchar_t* convertedEntry = static_cast<wchar_t*>(
+        _calloc_crt(static_cast<std::size_t>(requiredWideChars), sizeof(wchar_t))
+      );
+      if (convertedEntry == nullptr) {
+        return -1;
+      }
+
+      if (MultiByteToWideChar(0, 0, sourceText, -1, convertedEntry, requiredWideChars) == 0) {
+        _free_crt(convertedEntry);
+        return -1;
+      }
+
+      if (RuntimePublishWideEnvironmentVariable(&convertedEntry, false) < 0) {
+        if (convertedEntry != nullptr) {
+          _free_crt(convertedEntry);
+        }
+        return -1;
+      }
+
+      ++environEntry;
+      if (*environEntry == nullptr) {
+        return 0;
+      }
+      sourceText = reinterpret_cast<const char*>(*environEntry);
+    }
+  }
 
   /**
    * Address: 0x00A907EB (FUN_00A907EB, sub_A907EB)
