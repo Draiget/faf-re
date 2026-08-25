@@ -726,6 +726,18 @@ namespace moho
   void CON_FindUnit(void* commandArgs);
 
   /**
+   * Address: 0x008D4150 (FUN_008D4150, Moho::SC_LuaDebugger)
+   *
+   * What it does:
+   * Opens the script-debug window (`SCR_CreateDebugWindow`, a no-op if one
+   * is already active) and binds the debug hook onto the user Lua state,
+   * then onto the active world session's Lua state when a session is
+   * active. `SCR_HookState` already reproduces the binary's own
+   * `if (sSrcDebugWindow) lua_sethook(...)` guard internally.
+   */
+  void SC_LuaDebugger(void* commandArgs);
+
+  /**
    * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
    *
    * What it does:
