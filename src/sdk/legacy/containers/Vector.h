@@ -4171,6 +4171,50 @@ namespace msvc8
          * practice. Previously `blocked` ("requires deeper evidence/
          * caller-context before recovery"); this pass supplies the full
          * instantiation and caller evidence.
+         *
+         * Address: 0x008A9100 (FUN_008A9100, sub_8A9100) --
+         * `msvc8::vector<moho::TerrainEnvironmentLookupPair>::insert(
+         * iterator, size_type, const T&)` (`_Insert_n`) for the 56-byte
+         * `pair<msvc8::string, msvc8::string>` element
+         * (`moho::TerrainEnvironmentLookupPairs`, `CWldMap.cpp`'s
+         * `AppendEnvironmentLookupPair`/`IWldTerrainRes::EnumerateEnvLookup`
+         * output vector). `max_size` folds to 76695844
+         * (`0xFFFFFFFF / 56`, throw lane `FUN_008A95C0`). Copies the
+         * inserted value into a local first (`FUN_004D4970`, the pair
+         * copy-ctor -- an aliased-element-survives-reallocation guard,
+         * matching this member's own `const T localValue(value);` comment
+         * above). In-place branch: `tail > 0` sub-case moves the last
+         * element (`FUN_008A9B70`), shifts the remaining tail
+         * (`FUN_008A9BB0`), assigns the new value into the vacated slot
+         * (`FUN_008A9FA0`); `tail == 0` (append) sub-case calls the same
+         * move helper with a zero-length range then assigns the value
+         * directly. Reallocation branch: 1.5x growth
+         * (`recommended_capacity`-shaped, `FUN_008A8A60`), allocates via
+         * `allocate_slots_checked` (`FUN_008A9BF0`, cited above), moves
+         * the head and tail spans via two calls to `FUN_008AA180`
+         * (`uninit_move_n`-shaped for this non-trivial element), destroys
+         * and frees the old block (`FUN_008A9F10` + `operator delete`).
+         * None of `FUN_004D4970`/`FUN_008A9B70`/`FUN_008A9BB0`/
+         * `FUN_008A9FA0`/`FUN_008A8A60`/`FUN_008AA180`/`FUN_008A9F10` are
+         * yet individually recovered -- all are this instantiation's own
+         * `msvc8::string`-pair construct/destroy/relocate helpers, matched
+         * by shape and call position, not fabricated. Reached from this
+         * element's single-value `insert(pos, value)` overload
+         * (`FUN_008A8A90`, `skip`'d as a RULE ONE offset-capture/
+         * tail-call-with-`count=1` wrapper) with `count = 1`, itself
+         * reached from `push_back`
+         * (`FUN_008A8310`/`AppendEnvironmentLookupPair`, `CWldMap.cpp`,
+         * already recovered) capacity-full path, itself reached from
+         * `IWldTerrainRes::EnumerateEnvLookup` (`FUN_008A1500`, already
+         * recovered). Previously `blocked` on `owner_layout` pending
+         * "deeper dependency closure/owner-layout evidence"; this pass
+         * supplies the instantiation identity and the full caller chain
+         * back to already-recovered source. Its own seven listed callees
+         * remain open (callee-side health low) -- each is this
+         * instantiation's own non-trivial-element construct/destroy/
+         * relocate helper, not a blocker on this citation, and each is a
+         * legitimate next target for a dedicated `pair<string,string>`
+         * follow-up pass.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6196,6 +6240,17 @@ namespace msvc8
          * tree's parameterless `alloc_raw`, already cited on
          * `TerrainEnvironmentLookupNodeRuntimeView`'s constructor in
          * CWldMap.cpp.)
+         *
+         * sizeof(T) == 0x38 (56, `pair<msvc8::string, msvc8::string>`,
+         * `count > 0xFFFFFFFF/56` throws, confirmed `cmp eax,38h` against
+         * the `.asm`):
+         * Address: 0x008A9BF0 (FUN_008A9BF0, msvc8::vector<
+         * moho::TerrainEnvironmentLookupPair>::allocate_slots_checked --
+         * `moho::TerrainEnvironmentLookupPairs`, `CWldMap.cpp`'s
+         * `AppendEnvironmentLookupPair`/`IWldTerrainRes::EnumerateEnvLookup`
+         * output vector, keyed/valued by two `msvc8::string`s. Reached from
+         * the `_Insert_n` reallocation branch for this instantiation
+         * (`FUN_008A9100`, cited below on `insert`).)
          *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
