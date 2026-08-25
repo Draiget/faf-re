@@ -10,9 +10,24 @@
 namespace moho
 {
   /**
-   * Address: 0x004ABD20 (FUN_004ABD20, nullsub_694)
+   * Address: 0x00BC5BE0 (FUN_00BC5BE0, register_PrefetchHandleBaseSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void nullsub_694() {}
+  PrefetchHandleBaseSerializer::PrefetchHandleBaseSerializer()
+    : mLoadCallback(&PrefetchHandleBaseSerializer::Deserialize)
+    , mSaveCallback(&PrefetchHandleBaseSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF0620 (FUN_00BF0620, Moho::PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer)
+   */
+  PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer()
+  {
+    ResetLinks();
+  }
 
   /**
    * Address: 0x004ABD30 (FUN_004ABD30, Moho::PrefetchHandleBaseSerializer::Deserialize)
@@ -56,7 +71,7 @@ namespace moho
   /**
    * Address: 0x004ACCF0 (FUN_004ACCF0)
    */
-  void PrefetchHandleBaseSerializer::RegisterSerializeFunctions()
+  void PrefetchHandleBaseSerializer::Init()
   {
     gpg::RType* type = PrefetchHandleBase::sType;
     if (!type) {

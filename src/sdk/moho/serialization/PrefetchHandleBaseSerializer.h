@@ -4,20 +4,34 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E07658
    * COL: 0x00E62088
    */
-  class PrefetchHandleBaseSerializer
+  class PrefetchHandleBaseSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC5BE0 (FUN_00BC5BE0, register_PrefetchHandleBaseSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    PrefetchHandleBaseSerializer();
+
+    /**
+     * Address: 0x00BF0620 (FUN_00BF0620, Moho::PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. The real ctor
+     * pushes this mangled destructor symbol as its atexit target.
+     */
+    ~PrefetchHandleBaseSerializer();
+
     /**
      * Address: 0x004ABD30 (FUN_004ABD30, Moho::PrefetchHandleBaseSerializer::Deserialize)
      *
@@ -40,23 +54,13 @@ namespace moho
      * What it does:
      * Registers prefetch-handle save/load callbacks in reflected RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(PrefetchHandleBaseSerializer, mHelperNext) == 0x04,
-    "PrefetchHandleBaseSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(PrefetchHandleBaseSerializer, mHelperPrev) == 0x08,
-    "PrefetchHandleBaseSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(PrefetchHandleBaseSerializer, mLoadCallback) == 0x0C,
     "PrefetchHandleBaseSerializer::mLoadCallback offset must be 0x0C"
@@ -66,19 +70,4 @@ namespace moho
     "PrefetchHandleBaseSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(PrefetchHandleBaseSerializer) == 0x14, "PrefetchHandleBaseSerializer size must be 0x14");
-
-  /**
-   * Address: 0x004ABD20 (FUN_004ABD20, nullsub_694)
-   */
-  void nullsub_694();
-
-  /**
-   * Address: 0x004ABDA0 (FUN_004ABDA0)
-   */
-  gpg::SerHelperBase* ResetPrefetchHandleBaseSerializerLinksVariant1();
-
-  /**
-   * Address: 0x004ABDD0 (FUN_004ABDD0)
-   */
-  gpg::SerHelperBase* ResetPrefetchHandleBaseSerializerLinksVariant2();
 } // namespace moho
