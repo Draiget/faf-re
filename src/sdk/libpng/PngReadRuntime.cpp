@@ -1706,9 +1706,9 @@ constexpr std::size_t kOffMemPtr   = 0x244;
 constexpr std::size_t kOffMallocFn = 0x248;
 constexpr std::size_t kOffFreeFn   = 0x24C;
 
-// Read-state mode bits used here.
-constexpr std::uint32_t kPngAfterIdat     = 0x0008;
-constexpr std::uint32_t kPngHaveIend      = 0x0010;
+// Read-state mode bits used here. kPngAfterIdat/kPngHaveIend moved to the
+// shared libpng_layout namespace in PngStructLayout.h (same values, 0x0008/
+// 0x0010) so the read and write paths reference one definition.
 constexpr std::uint32_t kPngHaveFileSig   = 0x1000;
 
 // Flag bits used by version handshake / read state.
