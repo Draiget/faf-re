@@ -32,14 +32,79 @@ namespace moho
 {
   struct CEntityDbBoundedPropQueueNode
   {
-    std::uint8_t mUnknown0000_0007[0x08]{};        // +0x00
-    CEntityDbBoundedPropQueueNode** mLinkBackRef;   // +0x08
-    CEntityDbBoundedPropQueueNode* mLinkNext;       // +0x0C
-    std::uint32_t mUnknown0010;                     // +0x10
+    std::int32_t mPriority;                 // +0x00 (SPropPriorityInfo::mPriority)
+    std::int32_t mBoundedTick;              // +0x04 (SPropPriorityInfo::mBoundedTick)
+    moho::WeakPtr<Prop> mOwnerLink;         // +0x08 (ownerLinkSlot +0x08, nextInOwner +0x0C)
+    std::int32_t mHandleId;                 // +0x10
+
+    CEntityDbBoundedPropQueueNode() noexcept = default;
+
+    /**
+     * Address: 0x00686D70 (FUN_00686D70)
+     *
+     * IDA signature:
+     * _DWORD *__userpurge sub_686D70@<eax>(_DWORD *result@<eax>, int a2, int a3, _DWORD *a4, int a5, int a6);
+     *
+     * What it does:
+     * Builds one bounded-prop queue node value from its four logical
+     * fields. `ownerLink` is expected to already be linked at the head of
+     * its target prop's intrusive weak-observer chain (see
+     * `moho::WeakPtr<T>`'s object constructor); this copies that
+     * currently-linked snapshot into the node being built.
+     */
+    CEntityDbBoundedPropQueueNode(
+      const std::int32_t priority,
+      const std::int32_t boundedTick,
+      const moho::WeakPtr<Prop>& ownerLink,
+      const std::int32_t handleId
+    ) noexcept
+      : mPriority(priority)
+      , mBoundedTick(boundedTick)
+      , mOwnerLink(ownerLink)
+      , mHandleId(handleId)
+    {}
+
+    /**
+     * Address: 0x006892E0 (FUN_006892E0)
+     *
+     * IDA signature:
+     * void __usercall sub_6892E0(int a1@<edx>, int a2@<esi>);
+     *
+     * What it does:
+     * Unlinks each node's owner-chain link in [begin, end) from whatever
+     * intrusive weak-observer chain it currently belongs to. Shared by
+     * every bounded-prop queue teardown/shrink path (queue reset,
+     * swap-to-tail removal, etc).
+     */
+    static void UnlinkRange(
+      CEntityDbBoundedPropQueueNode* begin, CEntityDbBoundedPropQueueNode* const end
+    ) noexcept
+    {
+      for (; begin != nullptr && begin != end; ++begin) {
+        begin->mOwnerLink.UnlinkFromOwnerChain();
+      }
+    }
+
+    /**
+     * Binary min-heap comparator: lexicographic on `(mPriority, mBoundedTick)`.
+     */
+    [[nodiscard]] static bool IsLowerPriority(
+      const CEntityDbBoundedPropQueueNode& lhs, const CEntityDbBoundedPropQueueNode& rhs
+    ) noexcept
+    {
+      if (lhs.mPriority != rhs.mPriority) {
+        return lhs.mPriority < rhs.mPriority;
+      }
+      return lhs.mBoundedTick < rhs.mBoundedTick;
+    }
   };
   static_assert(
     sizeof(CEntityDbBoundedPropQueueNode) == 0x14, "CEntityDbBoundedPropQueueNode size must be 0x14"
   );
+  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mPriority) == 0x00, "CEntityDbBoundedPropQueueNode::mPriority offset must be 0x00");
+  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mBoundedTick) == 0x04, "CEntityDbBoundedPropQueueNode::mBoundedTick offset must be 0x04");
+  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mOwnerLink) == 0x08, "CEntityDbBoundedPropQueueNode::mOwnerLink offset must be 0x08");
+  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mHandleId) == 0x10, "CEntityDbBoundedPropQueueNode::mHandleId offset must be 0x10");
 } // namespace moho
 
 namespace
@@ -825,36 +890,6 @@ namespace
   }
 
   /**
-   * Address: 0x00686880 (FUN_00686880)
-   *
-   * What it does:
-   * Clears bounded-prop queue range lanes (`start/end/capacity`) to null.
-   */
-  moho::CEntityDbBoundedPropQueueRuntime* ClearBoundedPropQueueRangeLanes(
-    moho::CEntityDbBoundedPropQueueRuntime* const queue
-  ) noexcept
-  {
-    queue->start = nullptr;
-    queue->end = nullptr;
-    queue->capacity = nullptr;
-    return queue;
-  }
-
-  /**
-   * Address: 0x006868B0 (FUN_006868B0)
-   *
-   * What it does:
-   * Returns element pointer at one bounded-prop queue index (`start + index`).
-   */
-  moho::CEntityDbBoundedPropQueueNode* ResolveBoundedPropQueueNodeAtIndex(
-    const std::int32_t index,
-    const moho::CEntityDbBoundedPropQueueRuntime* const queue
-  ) noexcept
-  {
-    return queue->start + index;
-  }
-
-  /**
    * Address: 0x00686C70 (FUN_00686C70)
    * Address: 0x00688740 (FUN_00688740)
    *
@@ -932,54 +967,6 @@ namespace
       node->next = nullptr;
     }
     return node;
-  }
-
-  /**
-   * Address: 0x00687690 (FUN_00687690)
-   *
-   * What it does:
-   * Pushes one released bounded-prop handle index into the freelist lane and
-   * updates queue `lastHandle`.
-   */
-  moho::CEntityDbBoundedPropQueueRuntime* PushBoundedPropHandleFreeList(
-    moho::CEntityDbBoundedPropQueueRuntime* const queue,
-    const std::int32_t releasedHandle
-  ) noexcept
-  {
-    auto* const freeListStorage = static_cast<std::int32_t*>(queue->storageBegin);
-    freeListStorage[releasedHandle] = queue->lastHandle;
-    queue->lastHandle = releasedHandle;
-    return queue;
-  }
-
-  /**
-   * Address: 0x006876A0 (FUN_006876A0)
-   *
-   * What it does:
-   * Returns bounded-prop queue capacity-count lane (`capacity - start`) in
-   * node units, or zero when start is null.
-   */
-  std::int32_t CountBoundedPropQueueCapacityNodes(
-    const moho::CEntityDbBoundedPropQueueRuntime* const queue
-  ) noexcept
-  {
-    if (queue->start == nullptr) {
-      return 0;
-    }
-    return static_cast<std::int32_t>(queue->capacity - queue->start);
-  }
-
-  /**
-   * Address: 0x006876D0 (FUN_006876D0)
-   *
-   * What it does:
-   * Returns pointer to the previous bounded-prop queue slot (`end - 1`).
-   */
-  moho::CEntityDbBoundedPropQueueNode* GetBoundedPropQueuePreviousEndSlot(
-    const moho::CEntityDbBoundedPropQueueRuntime* const queue
-  ) noexcept
-  {
-    return queue->end - 1;
   }
 
   /**
@@ -1113,18 +1100,6 @@ namespace
   {
     (void)UnlinkEmbeddedBackLinkHookOwnerSlot(value);
     return value;
-  }
-
-  /**
-   * Address: 0x006882A0 (FUN_006882A0)
-   *
-   * What it does:
-   * Returns true when bounded-prop queue occupancy lane is empty (`start` is
-   * null or `end == start`).
-   */
-  bool IsBoundedPropQueueEmpty(const moho::CEntityDbBoundedPropQueueRuntime* const queue) noexcept
-  {
-    return (queue->start == nullptr) || ((queue->end - queue->start) == 0);
   }
 
   /**
@@ -1271,271 +1246,6 @@ namespace
   moho::StatItem* sEngineStat_EntityCount_Projectile = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Shield = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Unknown = nullptr;
-
-  struct BoundedPropQueueEntry
-  {
-    std::int32_t priority = 0;
-    std::int32_t boundedTick = 0;
-    moho::WeakPtr<moho::Prop> weakProp{};
-    std::int32_t handleIndex = -1;
-  };
-
-  struct BoundedPropQueueRuntime
-  {
-    std::vector<std::unique_ptr<BoundedPropQueueEntry>> heap{};
-    std::vector<std::int32_t> handleToHeapIndex{};
-    std::int32_t lastFreeHandle = -1;
-  };
-
-  std::unordered_map<const moho::CEntityDb*, BoundedPropQueueRuntime> gRuntimeBoundedProps;
-
-  [[nodiscard]] bool IsHigherBoundedPropPriority(
-    const BoundedPropQueueEntry& lhs, const BoundedPropQueueEntry& rhs
-  ) noexcept
-  {
-    // Binary comparator is lexicographic min-heap on (priority, boundedTick).
-    if (lhs.priority != rhs.priority) {
-      return lhs.priority < rhs.priority;
-    }
-
-    return lhs.boundedTick < rhs.boundedTick;
-  }
-
-  [[nodiscard]] std::int32_t AcquireBoundedPropHandle(
-    BoundedPropQueueRuntime& queue, const std::int32_t heapIndex
-  )
-  {
-    if (queue.lastFreeHandle == -1) {
-      const std::int32_t newHandle = static_cast<std::int32_t>(queue.handleToHeapIndex.size());
-      queue.handleToHeapIndex.push_back(heapIndex);
-      return newHandle;
-    }
-
-    const std::int32_t reusedHandle = queue.lastFreeHandle;
-    queue.lastFreeHandle = queue.handleToHeapIndex[static_cast<std::size_t>(reusedHandle)];
-    queue.handleToHeapIndex[static_cast<std::size_t>(reusedHandle)] = heapIndex;
-    return reusedHandle;
-  }
-
-  void ReleaseBoundedPropHandle(BoundedPropQueueRuntime& queue, const std::int32_t handleIndex)
-  {
-    if (handleIndex < 0) {
-      return;
-    }
-
-    const std::size_t handle = static_cast<std::size_t>(handleIndex);
-    if (handle >= queue.handleToHeapIndex.size()) {
-      queue.handleToHeapIndex.resize(handle + 1u, -1);
-    }
-
-    queue.handleToHeapIndex[handle] = queue.lastFreeHandle;
-    queue.lastFreeHandle = handleIndex;
-  }
-
-  void UpdateBoundedPropHandleMapping(BoundedPropQueueRuntime& queue, const std::size_t heapIndex)
-  {
-    if (heapIndex >= queue.heap.size() || !queue.heap[heapIndex]) {
-      return;
-    }
-
-    const std::int32_t handleIndex = queue.heap[heapIndex]->handleIndex;
-    if (handleIndex < 0) {
-      return;
-    }
-
-    const std::size_t handle = static_cast<std::size_t>(handleIndex);
-    if (handle >= queue.handleToHeapIndex.size()) {
-      queue.handleToHeapIndex.resize(handle + 1u, -1);
-    }
-    queue.handleToHeapIndex[handle] = static_cast<std::int32_t>(heapIndex);
-  }
-
-  /**
-   * The semantic counterpart of the queue swap at 0x00687530, which is
-   * recovered as `SwapPriorityQueueEntries` in `moho/sim/SimRecoveryRuntime.cpp`
-   * against the binary's own layout.
-   *
-   * Deliberately NOT annotated with that address: this is not a 1:1 recovery of
-   * it. The binary stores entries by value in a 20-byte array and physically
-   * moves them, which is why it has to carry each entry's weak node across the
-   * exchange. This model stores owning pointers and swaps those, so nothing
-   * moves and no relink is needed. Same observable behaviour, different layout.
-   *
-   * Two models of one queue is debt. If they are ever unified, the sim-side one
-   * is the binary's layout and this one is the safer abstraction - pick
-   * deliberately, and do not add a third.
-   */
-  void SwapBoundedPropHeapEntries(BoundedPropQueueRuntime& queue, const std::size_t lhs, const std::size_t rhs)
-  {
-    if (lhs == rhs) {
-      return;
-    }
-
-    std::swap(queue.heap[lhs], queue.heap[rhs]);
-    UpdateBoundedPropHandleMapping(queue, lhs);
-    UpdateBoundedPropHandleMapping(queue, rhs);
-  }
-
-  void SiftBoundedPropUp(BoundedPropQueueRuntime& queue, std::size_t heapIndex)
-  {
-    while (heapIndex > 0u) {
-      const std::size_t parent = (heapIndex - 1u) / 2u;
-      if (!IsHigherBoundedPropPriority(*queue.heap[heapIndex], *queue.heap[parent])) {
-        break;
-      }
-
-      SwapBoundedPropHeapEntries(queue, parent, heapIndex);
-      heapIndex = parent;
-    }
-  }
-
-  void SiftBoundedPropDown(BoundedPropQueueRuntime& queue, std::size_t heapIndex)
-  {
-    const std::size_t count = queue.heap.size();
-    for (;;) {
-      const std::size_t leftChild = heapIndex * 2u + 1u;
-      if (leftChild >= count) {
-        return;
-      }
-
-      std::size_t best = heapIndex;
-      if (IsHigherBoundedPropPriority(*queue.heap[leftChild], *queue.heap[best])) {
-        best = leftChild;
-      }
-
-      const std::size_t rightChild = leftChild + 1u;
-      if (rightChild < count && IsHigherBoundedPropPriority(*queue.heap[rightChild], *queue.heap[best])) {
-        best = rightChild;
-      }
-
-      if (best == heapIndex) {
-        return;
-      }
-
-      SwapBoundedPropHeapEntries(queue, heapIndex, best);
-      heapIndex = best;
-    }
-  }
-
-  [[nodiscard]] std::int32_t PushBoundedPropEntry(
-    BoundedPropQueueRuntime& queue, moho::Prop* const prop, const std::int32_t priority, const std::int32_t boundedTick
-  )
-  {
-    const std::int32_t heapIndex = static_cast<std::int32_t>(queue.heap.size());
-    const std::int32_t handleIndex = AcquireBoundedPropHandle(queue, heapIndex);
-
-    auto entry = std::make_unique<BoundedPropQueueEntry>();
-    entry->priority = priority;
-    entry->boundedTick = boundedTick;
-    entry->weakProp.ResetFromObject(prop);
-    entry->handleIndex = handleIndex;
-
-    queue.heap.push_back(std::move(entry));
-    SiftBoundedPropUp(queue, queue.heap.size() - 1u);
-    UpdateBoundedPropHandleMapping(queue, queue.heap.size() - 1u);
-    return handleIndex;
-  }
-
-  /**
-   * Address: 0x006867F0 (FUN_006867F0)
-   *
-   * IDA signature:
-   * void __usercall sub_6867F0(int index@<ebx>, gpg::PriorityQueue *queue@<edi>);
-   *
-   * What it does:
-   * Removes one entry from the prop-reclaim priority queue at `heapIndex`:
-   * swaps it with the tail entry (unless already at tail), sifts the moved
-   * entry down so the heap invariant is restored from the new tail-insertion
-   * position (binary invokes `sub_687530` swap + `sub_6875F0` sift), reads
-   * back the removed entry's handle index (binary reads
-   * `end[-1].mBoundedTick`, which is the handle-index field inside the tail
-   * entry), links that handle back into the free-handle list via
-   * `mLastHandle` push, then shrinks the heap by popping the tail slot.
-   *
-   * This helper is the common inner step of:
-   *   - `AddBoundedProp` (evict head when queue is full)
-   *   - `RemoveBoundedProp` / `RemoveBoundedPropByHandle` (explicit removal)
-   *   - `Prop::~Prop` (auto-unregister on prop destruction)
-   */
-  [[nodiscard]] std::unique_ptr<BoundedPropQueueEntry> RemoveBoundedPropAtHeapIndex(
-    BoundedPropQueueRuntime& queue,
-    const std::size_t heapIndex
-  )
-  {
-    if (heapIndex >= queue.heap.size()) {
-      return {};
-    }
-
-    const std::size_t lastIndex = queue.heap.size() - 1u;
-    if (heapIndex != lastIndex) {
-      SwapBoundedPropHeapEntries(queue, heapIndex, lastIndex);
-      SiftBoundedPropDown(queue, heapIndex);
-    }
-
-    std::unique_ptr<BoundedPropQueueEntry> removed = std::move(queue.heap.back());
-    queue.heap.pop_back();
-
-    if (removed) {
-      ReleaseBoundedPropHandle(queue, removed->handleIndex);
-    }
-    return removed;
-  }
-
-  [[nodiscard]] moho::Prop* PopBoundedPropHead(BoundedPropQueueRuntime& queue)
-  {
-    if (queue.heap.empty()) {
-      return nullptr;
-    }
-
-    std::unique_ptr<BoundedPropQueueEntry> removed = RemoveBoundedPropAtHeapIndex(queue, 0u);
-    if (!removed) {
-      return nullptr;
-    }
-
-    moho::Prop* const removedProp = removed->weakProp.GetObject();
-    removed->weakProp.ResetFromObject(nullptr);
-    return removedProp;
-  }
-
-  [[nodiscard]] moho::Prop* RemoveBoundedPropByHandle(
-    BoundedPropQueueRuntime& queue,
-    const std::int32_t handleIndex
-  )
-  {
-    if (handleIndex < 0) {
-      return nullptr;
-    }
-
-    const std::size_t handle = static_cast<std::size_t>(handleIndex);
-    if (handle >= queue.handleToHeapIndex.size()) {
-      return nullptr;
-    }
-
-    const std::int32_t heapIndex = queue.handleToHeapIndex[handle];
-    if (heapIndex < 0) {
-      return nullptr;
-    }
-
-    const std::size_t removeIndex = static_cast<std::size_t>(heapIndex);
-    std::unique_ptr<BoundedPropQueueEntry> removed = RemoveBoundedPropAtHeapIndex(queue, removeIndex);
-    if (!removed) {
-      return nullptr;
-    }
-
-    moho::Prop* const removedProp = removed->weakProp.GetObject();
-    if (removedProp != nullptr) {
-      removedProp->mHandleIndex = -1;
-    }
-    removed->weakProp.ResetFromObject(nullptr);
-
-    // Re-establish the heap invariant at the position the moved tail entry
-    // landed at: both directions because a handle-targeted remove can break
-    // the invariant upward or downward (unlike head-pop which only goes down).
-    if (removeIndex < queue.heap.size()) {
-      SiftBoundedPropUp(queue, removeIndex);
-    }
-    return removedProp;
-  }
 
   [[nodiscard]] moho::StatItem* EnsureEntityCountStatSlot(moho::StatItem*& slot, const char* const statPath)
   {
@@ -2827,43 +2537,6 @@ namespace
 
   void ClearEntityListNodes(moho::CEntityDbListHead* const head) noexcept;
 
-  /**
-   * Address: 0x006868C0 (FUN_006868C0)
-   *
-   * What it does:
-   * Appends one bounded-prop queue record to contiguous storage, preserving
-   * the record payload and returning a pointer to the stored element.
-   */
-  [[nodiscard]] BoundedPropQueueEntry*
-  AppendBoundedPropQueueEntry(msvc8::vector<BoundedPropQueueEntry>& entries, const BoundedPropQueueEntry& entry)
-  {
-    entries.push_back(entry);
-    return &entries.back();
-  }
-
-  void DestroyBoundedPropQueueNodeRange(
-    moho::CEntityDbBoundedPropQueueNode* begin,
-    moho::CEntityDbBoundedPropQueueNode* const end
-  ) noexcept
-  {
-    while (begin != nullptr && begin != end) {
-      if (begin->mLinkBackRef != nullptr) {
-        moho::CEntityDbBoundedPropQueueNode** const backRef = begin->mLinkBackRef;
-        if (*backRef == begin) {
-          *backRef = begin->mLinkNext;
-        }
-      }
-
-      if (begin->mLinkNext != nullptr) {
-        begin->mLinkNext->mLinkBackRef = begin->mLinkBackRef;
-      }
-
-      begin->mLinkBackRef = nullptr;
-      begin->mLinkNext = nullptr;
-      ++begin;
-    }
-  }
-
   struct BackRefListNodeRuntime
   {
     BackRefListNodeRuntime* next;
@@ -2910,50 +2583,6 @@ namespace
       *outNextNode = nextNode;
     }
     return outNextNode;
-  }
-
-  /**
-   * Address: 0x00685980 (FUN_00685980)
-   *
-   * What it does:
-   * Resets bounded-prop queue pointer lanes to empty state and seeds
-   * `lastHandle` to `-1`.
-   */
-  void InitializeBoundedPropQueueLane(moho::CEntityDbBoundedPropQueueRuntime& queue) noexcept
-  {
-    queue.start = nullptr;
-    queue.end = nullptr;
-    queue.capacity = nullptr;
-    queue.storageBegin = nullptr;
-    queue.storageCurrent = nullptr;
-    queue.storageEnd = nullptr;
-    queue.lastHandle = -1;
-  }
-
-  /**
-   * Address: 0x00684360 (FUN_00684360)
-   *
-   * What it does:
-   * Releases the bounded-prop queue lanes, unlinks each intrusive queue node
-   * from its link chain, and clears the legacy buffer pointers.
-   */
-  void ResetBoundedPropQueueLane(moho::CEntityDbBoundedPropQueueRuntime& queue) noexcept
-  {
-    DestroyBoundedPropQueueNodeRange(queue.start, queue.end);
-    if (queue.start != nullptr) {
-      ::operator delete(queue.start);
-    }
-
-    if (queue.storageBegin) {
-      ::operator delete(queue.storageBegin);
-    }
-
-    queue.start = nullptr;
-    queue.end = nullptr;
-    queue.capacity = nullptr;
-    queue.storageBegin = nullptr;
-    queue.storageCurrent = nullptr;
-    queue.storageEnd = nullptr;
   }
 
   /**
@@ -3699,7 +3328,9 @@ namespace moho
     mEntityList.head = AllocateEntityListHeadNode();
     mEntityList.size = 0u;
 
-    InitializeBoundedPropQueueLane(mBoundedProps);
+    // mBoundedProps (Address: 0x00685980, FUN_00685980) starts empty via its
+    // own default member initialization -- see the constructor citation on
+    // `CEntityDbBoundedPropQueueRuntime` in EntityDb.h.
   }
 
   /**
@@ -3719,7 +3350,7 @@ namespace moho
    */
   CEntityDb::~CEntityDb()
   {
-    ResetBoundedPropQueueLane(mBoundedProps);
+    mBoundedProps.Reset();
 
     DestroyEntityListRuntime(mEntityList);
 
@@ -3739,7 +3370,6 @@ namespace moho
     mAllUnits = nullptr;
     mAllUnitsSize = 0u;
 
-    gRuntimeBoundedProps.erase(this);
     gRuntimeEntityLists.erase(this);
     gRuntimePools.erase(this);
   }
@@ -4005,30 +3635,218 @@ namespace moho
   }
 
   /**
+   * Mirrors the swap-and-relink algorithm already canonically recovered at
+   * 0x00687530 (`SwapPriorityQueueEntries` in `moho/sim/SimRecoveryRuntime.cpp`).
+   * That recovery's `PriorityQueue20Runtime` parameter type lives in an
+   * anonymous namespace private to that translation unit, so it cannot be
+   * called from here; this is a second, address-uncited expression of the
+   * same binary operation against this type.
+   */
+  void CEntityDbBoundedPropQueueRuntime::Swap(const std::int32_t lhs, const std::int32_t rhs) noexcept
+  {
+    if (lhs == rhs) {
+      return;
+    }
+
+    CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
+    std::swap(nodes[lhs], nodes[rhs]);
+
+    std::int32_t* const positionMap = handleSlots.begin();
+    positionMap[nodes[lhs].mHandleId] = lhs;
+    positionMap[nodes[rhs].mHandleId] = rhs;
+  }
+
+  /**
+   * Mirrors the handle-acquire-or-reuse algorithm already canonically
+   * recovered at 0x00686790 (`AcquireOrReusePriorityHandleRuntime` in
+   * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
+   * same reason as `Swap`.
+   */
+  std::int32_t CEntityDbBoundedPropQueueRuntime::AcquireHandle(const std::int32_t payload) noexcept
+  {
+    if (lastHandle == -1) {
+      const std::int32_t index = static_cast<std::int32_t>(handleSlots.size());
+      handleSlots.push_back(payload);
+      return index;
+    }
+
+    std::int32_t* const slots = handleSlots.begin();
+    const std::int32_t reusedIndex = lastHandle;
+    lastHandle = slots[reusedIndex];
+    slots[reusedIndex] = payload;
+    return reusedIndex;
+  }
+
+  /**
+   * Mirrors the sift-up algorithm already canonically recovered at
+   * 0x00686740 (`SiftPriorityQueueEntryUpRuntime` in
+   * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
+   * same reason as `Swap`.
+   */
+  std::int32_t CEntityDbBoundedPropQueueRuntime::SiftUp(std::int32_t index) noexcept
+  {
+    CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
+    while (index != 0) {
+      const std::int32_t parentIndex = (index - 1) / 2;
+      if (CEntityDbBoundedPropQueueNode::IsLowerPriority(nodes[parentIndex], nodes[index])) {
+        break;
+      }
+
+      Swap(parentIndex, index);
+      index = parentIndex;
+    }
+    return index;
+  }
+
+  /**
+   * Address: 0x006875F0 (FUN_006875F0)
+   *
+   * What it does:
+   * Sifts the node at `index` down toward the leaves using
+   * `(priority, boundedTick)` ordering -- at each level, swaps with
+   * whichever child sorts lower -- until the heap invariant is restored or a
+   * leaf is reached. `count` is the current node count.
+   */
+  void CEntityDbBoundedPropQueueRuntime::SiftDown(std::int32_t index, const std::int32_t count) noexcept
+  {
+    CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
+    for (;;) {
+      const std::int32_t leftChild = index * 2 + 1;
+      if (leftChild >= count) {
+        return;
+      }
+
+      std::int32_t best = index;
+      if (CEntityDbBoundedPropQueueNode::IsLowerPriority(nodes[leftChild], nodes[best])) {
+        best = leftChild;
+      }
+
+      const std::int32_t rightChild = leftChild + 1;
+      if (rightChild < count && CEntityDbBoundedPropQueueNode::IsLowerPriority(nodes[rightChild], nodes[best])) {
+        best = rightChild;
+      }
+
+      if (best == index) {
+        return;
+      }
+
+      Swap(index, best);
+      index = best;
+    }
+  }
+
+  /**
+   * Address: 0x006859F0 (FUN_006859F0)
+   *
+   * IDA signature:
+   * gpg::PriorityQueue_SPropPriorityInfo::Handle __userpurge sub_6859F0@<eax>(
+   *     gpg::PriorityQueue_SPropPriorityInfo *a1@<ebx>, int a2, int a3,
+   *     Moho::TDatListItem_CScriptObject **a4, Moho::TDatListItem_CScriptObject *a5);
+   *
+   * What it does:
+   * Inserts one (priority, boundedTick, prop) entry into the bounded
+   * reclaim-priority queue: acquires a handle id, links a temporary weak
+   * pointer to `prop` at the head of its owner observer chain, pushes a
+   * node built from that linked snapshot onto `heap` (growing storage when
+   * full -- see the `push_back` citation for this element type in
+   * `legacy/containers/Vector.h`), unlinks the temporary from the chain
+   * again (the binary's own explicit walk-and-patch step -- matches
+   * `WeakPtr<T>::UnlinkFromOwnerChain`), then restores the heap invariant by
+   * sifting the new node up. Returns the acquired handle id.
+   *
+   * Sole caller: `Moho::EntityDB::AddBoundedProp` (0x00684C30), which calls
+   * this at 0x00684CCF.
+   */
+  std::int32_t CEntityDbBoundedPropQueueRuntime::Insert(
+    const std::int32_t priority, const std::int32_t boundedTick, Prop* const prop
+  ) noexcept
+  {
+    const std::int32_t index = static_cast<std::int32_t>(heap.size());
+    const std::int32_t handleId = AcquireHandle(index);
+
+    WeakPtr<Prop> link(prop);
+    heap.push_back(CEntityDbBoundedPropQueueNode(priority, boundedTick, link, handleId));
+    link.UnlinkFromOwnerChain();
+
+    (void)SiftUp(index);
+    return handleId;
+  }
+
+  /**
+   * Address: 0x006867F0 (FUN_006867F0)
+   *
+   * IDA signature:
+   * void __usercall sub_6867F0(int index@<ebx>, gpg::PriorityQueue *queue@<edi>);
+   *
+   * What it does:
+   * Removes the queue node at `index`: swaps it with the tail node (unless
+   * already the tail) and sifts the moved node back down to restore the
+   * heap invariant, releases the removed node's handle id back to the
+   * free-handle list (mirrors the algorithm already recovered at
+   * 0x00687690, `PushBoundedPropHandleFreeList`), unlinks the removed
+   * node's owner-chain link, then shrinks `heap` by one node.
+   *
+   * Common inner step of `AddBoundedProp` (evict head when queue is full),
+   * `RemoveBoundedProp` (explicit removal by handle), and `Prop::~Prop`
+   * (auto-unregister on prop destruction).
+   */
+  void CEntityDbBoundedPropQueueRuntime::PopAt(const std::int32_t index) noexcept
+  {
+    if (heap.empty()) {
+      return;
+    }
+
+    const std::int32_t lastIndex = static_cast<std::int32_t>(heap.size()) - 1;
+    if (index != lastIndex) {
+      Swap(index, lastIndex);
+      SiftDown(index, lastIndex);
+    }
+
+    CEntityDbBoundedPropQueueNode& tail = heap.begin()[lastIndex];
+    const std::int32_t releasedHandle = tail.mHandleId;
+    std::int32_t* const slots = handleSlots.begin();
+    slots[releasedHandle] = lastHandle;
+    lastHandle = releasedHandle;
+
+    CEntityDbBoundedPropQueueNode::UnlinkRange(&tail, &tail + 1);
+    heap.pop_back();
+  }
+
+  /**
+   * Address: 0x00684360 (FUN_00684360)
+   *
+   * What it does:
+   * Releases the bounded-prop queue lanes: unlinks each node's owner-chain
+   * link, then empties `heap` and `handleSlots` (which frees their backing
+   * storage, matching the binary's `::operator delete` of both buffers).
+   */
+  void CEntityDbBoundedPropQueueRuntime::Reset() noexcept
+  {
+    CEntityDbBoundedPropQueueNode::UnlinkRange(heap.begin(), heap.end());
+    heap.tidy();
+    handleSlots.tidy();
+  }
+
+  /**
    * Address: 0x00684C30 (FUN_00684C30, Moho::EntityDB::AddBoundedProp)
    *
    * What it does:
-   * Pushes one Prop into the bounded reclaim-priority queue and evicts queue
-   * head entries while occupancy is at least 1000.
+   * Evicts bounded reclaim-priority-queue head entries while occupancy is
+   * at least 1000 (destroying each evicted prop), then inserts `prop`. The
+   * binary does not null-check `prop` before dereferencing its
+   * priority/boundedTick fields (0x00684CBF/0x00684CC5), so this preserves
+   * that precondition: `prop` must be non-null.
    */
   std::int32_t CEntityDb::AddBoundedProp(Prop* const prop)
   {
-    BoundedPropQueueRuntime& queue = gRuntimeBoundedProps[this];
-    while (queue.heap.size() >= kBoundedPropQueueMaxSize) {
-      Prop* const evictedProp = PopBoundedPropHead(queue);
-      if (!evictedProp) {
-        continue;
-      }
-
+    while (!mBoundedProps.heap.empty() && mBoundedProps.heap.size() >= kBoundedPropQueueMaxSize) {
+      Prop* const evictedProp = mBoundedProps.heap.begin()[0].mOwnerLink.GetObjectPtr();
+      mBoundedProps.PopAt(0);
       evictedProp->mHandleIndex = -1;
       evictedProp->Destroy();
     }
 
-    if (!prop) {
-      return -1;
-    }
-
-    return PushBoundedPropEntry(queue, prop, prop->mPriorityInfo.mPriority, prop->mPriorityInfo.mBoundedTick);
+    return mBoundedProps.Insert(prop->mPriorityInfo.mPriority, prop->mPriorityInfo.mBoundedTick, prop);
   }
 
   /**
@@ -4036,17 +3854,15 @@ namespace moho
    * Mangled: ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
    *
    * What it does:
-   * Resolves one bounded-prop queue handle to its heap entry and removes it
-   * from runtime bounded-prop storage.
+   * Resolves one bounded-prop queue handle to its current heap index
+   * through the handle map (`this->mBoundedProps.handleSlots`, read at
+   * `EntityDB + 0x40`, i.e. `mBoundedProps + 0x14` -- the flattened offset
+   * of `handleSlots`'s own `first_` field), then removes that queue node.
    */
   void CEntityDb::RemoveBoundedProp(const std::int32_t handle)
   {
-    auto it = gRuntimeBoundedProps.find(this);
-    if (it == gRuntimeBoundedProps.end()) {
-      return;
-    }
-
-    (void)RemoveBoundedPropByHandle(it->second, handle);
+    const std::int32_t heapIndex = mBoundedProps.handleSlots.begin()[handle];
+    mBoundedProps.PopAt(heapIndex);
   }
 
   msvc8::list<Entity*>& CEntityDb::Entities() noexcept
