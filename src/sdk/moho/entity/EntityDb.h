@@ -367,20 +367,20 @@ namespace moho
     void RegisterEntitySet(EntitySetBase& set) noexcept;
 
     /**
-     * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberSerialize)
+     * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberDeserialize)
      *
      * What it does:
      * Loads EntityDB-owned entity/id-pool/set payload lanes from a read archive.
      */
-    void MemberSerialize(gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
-     * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberDeserialize)
+     * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberSerialize)
      *
      * What it does:
      * Saves EntityDB-owned entity/id-pool/set payload lanes into a write archive.
      */
-    void MemberDeserialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive);
 
     /**
      * Address: 0x00684AA0 (FUN_00684AA0, Moho::EntityDB::SerEntities read lane)
@@ -455,7 +455,7 @@ namespace moho
      * Address: 0x00684910 (FUN_00684910, Moho::EntityDBSerializer::Deserialize)
      *
      * What it does:
-     * Forwards archive-load flow into `CEntityDb::MemberSerialize`.
+     * Forwards archive-load flow into `CEntityDb::MemberDeserialize`.
      */
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
@@ -463,7 +463,7 @@ namespace moho
      * Address: 0x00684920 (FUN_00684920, Moho::EntityDBSerializer::Serialize)
      *
      * What it does:
-     * Forwards archive-save flow into `CEntityDb::MemberDeserialize`.
+     * Forwards archive-save flow into `CEntityDb::MemberSerialize`.
      */
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 

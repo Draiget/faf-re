@@ -4048,9 +4048,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberSerialize)
+   * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberDeserialize)
    */
-  void CEntityDb::MemberSerialize(gpg::ReadArchive* const archive)
+  void CEntityDb::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     if (!archive) {
       return;
@@ -4096,9 +4096,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberDeserialize)
+   * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberSerialize)
    */
-  void CEntityDb::MemberDeserialize(gpg::WriteArchive* const archive)
+  void CEntityDb::MemberSerialize(gpg::WriteArchive* const archive)
   {
     if (!archive) {
       return;
@@ -4143,54 +4143,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00688A70 (FUN_00688A70)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one read-archive member load lane into
-   * `CEntityDb::MemberSerialize`.
-   */
-  void LoadEntityDbMembersThunkPrimary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
-  {
-    entityDb->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00688A80 (FUN_00688A80)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one write-archive member save lane into
-   * `CEntityDb::MemberDeserialize`.
-   */
-  void SaveEntityDbMembersThunkPrimary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
-  {
-    entityDb->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x006892B0 (FUN_006892B0)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards one read-archive member load lane
-   * into `CEntityDb::MemberSerialize`.
-   */
-  void LoadEntityDbMembersThunkSecondary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
-  {
-    entityDb->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x006892C0 (FUN_006892C0)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards one write-archive member save
-   * lane into `CEntityDb::MemberDeserialize`.
-   */
-  void SaveEntityDbMembersThunkSecondary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
-  {
-    entityDb->MemberDeserialize(archive);
-  }
-
-  /**
    * Address: 0x00684910 (FUN_00684910, Moho::EntityDBSerializer::Deserialize)
    */
   void EntityDBSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
@@ -4200,7 +4152,7 @@ namespace moho
       return;
     }
 
-    entityDb->MemberSerialize(archive);
+    entityDb->MemberDeserialize(archive);
   }
 
   /**
@@ -4213,7 +4165,7 @@ namespace moho
       return;
     }
 
-    entityDb->MemberDeserialize(archive);
+    entityDb->MemberSerialize(archive);
   }
 
   /**
