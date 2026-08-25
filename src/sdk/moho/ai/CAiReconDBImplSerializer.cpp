@@ -15,7 +15,7 @@
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -23,12 +23,21 @@ using namespace moho;
 namespace
 {
   alignas(SReconKeyTypeInfo) unsigned char gSReconKeyTypeInfoStorage[sizeof(SReconKeyTypeInfo)] = {};
-  alignas(SReconKeySerializer) unsigned char gSReconKeySerializerStorage[sizeof(SReconKeySerializer)] = {};
-  bool gSReconKeySerializerConstructed = false;
 
-  alignas(CAiReconDBImplSerializer) unsigned char
-    gCAiReconDBImplSerializerStorage[sizeof(CAiReconDBImplSerializer)] = {};
-  bool gCAiReconDBImplSerializerConstructed = false;
+  // Address: 0x010AF89C -- process-global `SReconKeySerializer` singleton.
+  // Constructing it runs SReconKeySerializer::SReconKeySerializer()
+  // (0x00BCDD40), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~SReconKeySerializer,
+  // 0x00BF79C0) runs at normal static-duration teardown.
+  moho::SReconKeySerializer gSReconKeySerializer;
+
+  // Address: 0x010AF824 -- process-global `CAiReconDBImplSerializer`
+  // singleton. Same construction/teardown shape as `gSReconKeySerializer`
+  // above, via CAiReconDBImplSerializer::CAiReconDBImplSerializer()
+  // (0x00BCDDC0) and ~CAiReconDBImplSerializer() (0x00BF7AB0).
+  moho::CAiReconDBImplSerializer gCAiReconDBImplSerializer;
 
   gpg::RType* gWeakPtrEntityType = nullptr;
   gpg::RType* gEntIdType = nullptr;
@@ -48,46 +57,6 @@ namespace
       slot = gpg::LookupRType(typeid(TObject));
     }
     return slot;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mNext != nullptr && serializer.mPrev != nullptr) {
-      serializer.mNext->mPrev = serializer.mPrev;
-      serializer.mPrev->mNext = serializer.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mNext = self;
-    serializer.mPrev = self;
-    return self;
-  }
-
-  [[nodiscard]] SReconKeySerializer* AcquireSReconKeySerializer()
-  {
-    if (!gSReconKeySerializerConstructed) {
-      new (gSReconKeySerializerStorage) SReconKeySerializer();
-      gSReconKeySerializerConstructed = true;
-    }
-
-    return reinterpret_cast<SReconKeySerializer*>(gSReconKeySerializerStorage);
-  }
-
-  [[nodiscard]] CAiReconDBImplSerializer* AcquireCAiReconDBImplSerializer()
-  {
-    if (!gCAiReconDBImplSerializerConstructed) {
-      new (gCAiReconDBImplSerializerStorage) CAiReconDBImplSerializer();
-      gCAiReconDBImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiReconDBImplSerializer*>(gCAiReconDBImplSerializerStorage);
   }
 
   [[nodiscard]] SReconKeyTypeInfo* SReconKeyTypeInfoStorageRef()
@@ -511,35 +480,15 @@ namespace
   }
 
   /**
-   * Address: 0x00BF79C0 (FUN_00BF79C0, cleanup_SReconKeySerializer)
-   *
-   * What it does:
-   * Unlinks startup SReconKey serializer helper node and rewires it to
-   * self-linked inert state.
-   */
-  void cleanup_SReconKeySerializer()
-  {
-    if (!gSReconKeySerializerConstructed) {
-      return;
-    }
-
-    (void)UnlinkSerializerNode(*AcquireSReconKeySerializer());
-  }
-
-  /**
    * Address: 0x005BFF20 (FUN_005BFF20)
    *
    * What it does:
    * Startup helper-cleanup thunk for `SReconKeySerializer` that unlinks the
-   * intrusive node and returns the helper self node.
+   * intrusive node and restores self-links.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SReconKeySerializerStartupThunkA()
+  [[maybe_unused]] void cleanup_SReconKeySerializerStartupThunkA()
   {
-    if (!gSReconKeySerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireSReconKeySerializer());
+    gSReconKeySerializer.ResetLinks();
   }
 
   /**
@@ -549,25 +498,9 @@ namespace
    * Secondary startup helper-cleanup thunk for `SReconKeySerializer` with
    * identical unlink/self-link behavior.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SReconKeySerializerStartupThunkB()
+  [[maybe_unused]] void cleanup_SReconKeySerializerStartupThunkB()
   {
-    return cleanup_SReconKeySerializerStartupThunkA();
-  }
-
-  /**
-   * Address: 0x00BF7AB0 (FUN_00BF7AB0, Moho::CAiReconDBImplSerializer::~CAiReconDBImplSerializer)
-   *
-   * What it does:
-   * Unlinks startup CAiReconDBImpl serializer helper node and rewires it to
-   * self-linked inert state.
-   */
-  void cleanup_CAiReconDBImplSerializer()
-  {
-    if (!gCAiReconDBImplSerializerConstructed) {
-      return;
-    }
-
-    (void)UnlinkSerializerNode(*AcquireCAiReconDBImplSerializer());
+    gSReconKeySerializer.ResetLinks();
   }
 
   /**
@@ -575,15 +508,11 @@ namespace
    *
    * What it does:
    * Startup helper-cleanup thunk for `CAiReconDBImplSerializer` that unlinks
-   * the intrusive node and returns the helper self node.
+   * the intrusive node and restores self-links.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiReconDBImplSerializerStartupThunkA()
+  [[maybe_unused]] void cleanup_CAiReconDBImplSerializerStartupThunkA()
   {
-    if (!gCAiReconDBImplSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiReconDBImplSerializer());
+    gCAiReconDBImplSerializer.ResetLinks();
   }
 
   /**
@@ -593,9 +522,9 @@ namespace
    * Secondary startup helper-cleanup thunk for `CAiReconDBImplSerializer` with
    * identical unlink/self-link behavior.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiReconDBImplSerializerStartupThunkB()
+  [[maybe_unused]] void cleanup_CAiReconDBImplSerializerStartupThunkB()
   {
-    return cleanup_CAiReconDBImplSerializerStartupThunkA();
+    gCAiReconDBImplSerializer.ResetLinks();
   }
 
   struct CAiReconDBSerializerBootstrap
@@ -603,8 +532,6 @@ namespace
     CAiReconDBSerializerBootstrap()
     {
       (void)moho::register_SReconKeyTypeInfo();
-      moho::register_SReconKeySerializer();
-      moho::register_CAiReconDBImplSerializer();
     }
   };
 
@@ -713,9 +640,23 @@ void SReconKeySerializer::Serialize(gpg::WriteArchive* const archive, const int 
 }
 
 /**
- * Address: 0x005C4450 (FUN_005C4450)
+ * Address: 0x00BCDD40 (FUN_00BCDD40, dynamic initializer for the global
+ * `SReconKeySerializer` singleton)
  */
-void SReconKeySerializer::RegisterSerializeFunctions()
+SReconKeySerializer::SReconKeySerializer()
+  : mSerLoadFunc(&SReconKeySerializer::Deserialize)
+  , mSerSaveFunc(&SReconKeySerializer::Serialize)
+{}
+
+SReconKeySerializer::~SReconKeySerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x005C4450 (FUN_005C4450, Moho::SReconKeySerializer::Init)
+ */
+void SReconKeySerializer::Init()
 {
   gpg::RType* type = SReconKey::sType;
   if (!type) {
@@ -736,19 +677,6 @@ int moho::register_SReconKeyTypeInfo()
 {
   (void)PreregisterSReconKeyTypeInfo();
   return std::atexit(&cleanup_SReconKeyTypeInfo);
-}
-
-/**
- * Address: 0x00BCDD40 (FUN_00BCDD40, register_SReconKeySerializer)
- */
-void moho::register_SReconKeySerializer()
-{
-  SReconKeySerializer* const serializer = AcquireSReconKeySerializer();
-  serializer->mNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mSerLoadFunc = &SReconKeySerializer::Deserialize;
-  serializer->mSerSaveFunc = &SReconKeySerializer::Serialize;
-  (void)std::atexit(&cleanup_SReconKeySerializer);
 }
 
 /**
@@ -774,9 +702,23 @@ void CAiReconDBImplSerializer::Serialize(
 }
 
 /**
- * Address: 0x005C4EE0 (FUN_005C4EE0)
+ * Address: 0x00BCDDC0 (FUN_00BCDDC0, dynamic initializer for the global
+ * `CAiReconDBImplSerializer` singleton)
  */
-void CAiReconDBImplSerializer::RegisterSerializeFunctions()
+CAiReconDBImplSerializer::CAiReconDBImplSerializer()
+  : mSerLoadFunc(&CAiReconDBImplSerializer::Deserialize)
+  , mSerSaveFunc(&CAiReconDBImplSerializer::Serialize)
+{}
+
+CAiReconDBImplSerializer::~CAiReconDBImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x005C4EE0 (FUN_005C4EE0, Moho::CAiReconDBImplSerializer::Init)
+ */
+void CAiReconDBImplSerializer::Init()
 {
   gpg::RType* type = CAiReconDBImpl::sType;
   if (!type) {
@@ -788,23 +730,6 @@ void CAiReconDBImplSerializer::RegisterSerializeFunctions()
   type->serLoadFunc_ = mSerLoadFunc;
   GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
   type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
- * Address: 0x00BCDDC0 (FUN_00BCDDC0, register_CAiReconDBImplSerializer)
- *
- * What it does:
- * Constructs startup serializer helper storage for CAiReconDBImpl and binds
- * archive load/save callbacks.
- */
-void moho::register_CAiReconDBImplSerializer()
-{
-  CAiReconDBImplSerializer* const serializer = AcquireCAiReconDBImplSerializer();
-  serializer->mNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mSerLoadFunc = &CAiReconDBImplSerializer::Deserialize;
-  serializer->mSerSaveFunc = &CAiReconDBImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiReconDBImplSerializer);
 }
 
 
