@@ -8,6 +8,11 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 
+namespace gpg
+{
+  class SerConstructResult;
+}
+
 namespace moho
 {
   class CWaitForTask : public CTask
@@ -69,43 +74,117 @@ namespace moho
     LuaPlus::LuaObject mEventObject;          // 0x24
   };
 
-  class CWaitForTaskConstruct
+  class CWaitForTaskConstruct : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC62A0 (FUN_00BC62A0, dynamic initializer for the global
+     * `CWaitForTaskConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CWaitForTaskConstruct();
+
+    /**
+     * Address: 0x00BF0C10 (FUN_00BF0C10, Moho::CWaitForTaskConstruct::~CWaitForTaskConstruct)
+     */
+    ~CWaitForTaskConstruct();
+
+    /**
+     * Address: 0x004CA740 (FUN_004CA740, Moho::CWaitForTaskConstruct::Construct)
+     *
+     * What it does:
+     * Thin reflection-dispatcher thunk: ignores the archive/objectStorage/
+     * version parameters and forwards only `result` to the allocate +
+     * default-construct + `SetUnowned` body (FUN_004CA750). The callback
+     * allocates its own `CWaitForTask` storage rather than using any
+     * caller-provided storage.
+     */
+    static void Construct(void* archive, void* objectStorage, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x004CB9E0 (FUN_004CB9E0, CWaitForTask construct delete callback)
+     *
+     * What it does:
+     * Deletes one construct-path CWaitForTask object through its virtual
+     * deleting destructor.
+     */
+    static void Deconstruct(void* object);
+
+    /**
      * Address: 0x004CB1B0 (FUN_004CB1B0, sub_4CB1B0)
-     * Slot: 0
      *
      * What it does:
      * Binds construct/delete callbacks into CWaitForTask RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
-  class CWaitForTaskSerializer
+  static_assert(
+    offsetof(CWaitForTaskConstruct, mSerConstructFunc) == 0x0C,
+    "CWaitForTaskConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CWaitForTaskConstruct, mDeleteFunc) == 0x10, "CWaitForTaskConstruct::mDeleteFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CWaitForTaskConstruct) == 0x14, "CWaitForTaskConstruct size must be 0x14");
+
+  class CWaitForTaskSerializer : public gpg::SerHelperBase
   {
   public:
     /**
+     * Address: 0x00BC62E0 (FUN_00BC62E0, dynamic initializer for the global
+     * `CWaitForTaskSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CWaitForTaskSerializer();
+
+    /**
+     * Address: 0x00BF0C40 (FUN_00BF0C40, Moho::CWaitForTaskSerializer::~CWaitForTaskSerializer)
+     */
+    ~CWaitForTaskSerializer();
+
+    /**
+     * Address: 0x004CA7E0 (FUN_004CA7E0, CWaitForTaskSerializer::Deserialize callback)
+     * Chain:   0x004CC3B0 (FUN_004CC3B0)
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x004CA7F0 (FUN_004CA7F0, CWaitForTaskSerializer::Serialize callback)
+     * Chain:   0x004CC460 (FUN_004CC460)
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x004CB230 (FUN_004CB230, sub_4CB230)
-     * Slot: 0
      *
      * What it does:
      * Binds load/save serializer callbacks into CWaitForTask RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+
+  static_assert(
+    offsetof(CWaitForTaskSerializer, mSerLoadFunc) == 0x0C, "CWaitForTaskSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CWaitForTaskSerializer, mSerSaveFunc) == 0x10, "CWaitForTaskSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CWaitForTaskSerializer) == 0x14, "CWaitForTaskSerializer size must be 0x14");
 
   class CWaitForTaskTypeInfo : public gpg::RType
   {
@@ -134,8 +213,6 @@ namespace moho
   static_assert(offsetof(CWaitForTask, mReserved18) == 0x18, "CWaitForTask::mReserved18 offset must be 0x18");
   static_assert(offsetof(CWaitForTask, mEventLinkRef) == 0x1C, "CWaitForTask::mEventLinkRef offset must be 0x1C");
   static_assert(offsetof(CWaitForTask, mEventObject) == 0x24, "CWaitForTask::mEventObject offset must be 0x24");
-  static_assert(sizeof(CWaitForTaskConstruct) == 0x14, "CWaitForTaskConstruct size must be 0x14");
-  static_assert(sizeof(CWaitForTaskSerializer) == 0x14, "CWaitForTaskSerializer size must be 0x14");
   static_assert(sizeof(CWaitForTaskTypeInfo) == 0x64, "CWaitForTaskTypeInfo size must be 0x64");
 
   /**
@@ -146,32 +223,4 @@ namespace moho
    * type-info cleanup at process exit.
    */
   void register_CWaitForTaskTypeInfo();
-
-  /**
-   * Address: 0x00BC62A0 (FUN_00BC62A0, CWaitForTask startup construct registration)
-   *
-   * What it does:
-   * Initializes construct/delete callback helper lanes for `CWaitForTask` and
-   * schedules intrusive helper cleanup at process exit.
-   */
-  void register_CWaitForTaskConstruct();
-
-  /**
-   * Address: 0x00BC62E0 (FUN_00BC62E0, register_CWaitForTaskSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer callback lanes for `CWaitForTask` and
-   * schedules intrusive helper cleanup at process exit.
-   */
-  void register_CWaitForTaskSerializer();
-
-  /**
-     * Address: 0x004CA830 (FUN_004CA830)
-     * Address: 0x004CA860 (FUN_004CA860)
-   *
-   * What it does:
-   * Unlinks static serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CWaitForTaskSerializer();
 } // namespace moho
