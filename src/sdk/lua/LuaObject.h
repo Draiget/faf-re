@@ -1047,6 +1047,8 @@ namespace LuaPlus
 	class LuaState
 	{
 	public:
+		inline static gpg::RType* sType = nullptr;
+
 		enum StandardLibraries : int32_t
 		{
 			LIB_NONE = 0,
