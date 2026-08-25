@@ -37,67 +37,40 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BCCFE0 (FUN_00BCCFE0, register_EAiPathNavigatorStatePrimitiveSerializer)
+   * Demangled (real binary RTTI): gpg::PrimitiveSerHelper<enum Moho::CAiPathNavigator::State,int>
    *
-   * What it does:
-   * Binds primitive enum load/save callbacks onto reflected
-   * `EAiPathNavigatorState`.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4State@CAiPathNavigator@Moho@@H@gpg'`):
+   * `FUN_00BCCFE0` (real, sole writer for this global's storage). Raw asm
+   * confirms the standard shape: default-constructs `gpg::SerHelperBase`,
+   * binds `mLoadCallback`/`mSaveCallback` to `FUN_005B0290`/`FUN_005B02B0`,
+   * installs the `PrimitiveSerHelper<CAiPathNavigator::State,int>` vtable,
+   * and pushes plain unmangled `FUN_00BF7330` (bare unlink-then-self-link
+   * shape, matching `SerHelperBase::ResetLinks()`) as its `atexit` target --
+   * modeled by the template's own real destructor, no explicit `atexit`
+   * call needed.
+   *
+   * KNOWN TYPE-IDENTITY DIVERGENCE (not fixed by this pass): the binary's
+   * real RTTI names this instantiation's enum argument
+   * `Moho::CAiPathNavigator::State` -- a NESTED enum inside `CAiPathNavigator`
+   * -- but this repo's earlier recovery pass declared it as a free
+   * namespace-scope `moho::EAiPathNavigatorState` in `CAiPathNavigator.h`
+   * (used for the `mState` field and everywhere else in this file). Renaming/
+   * re-nesting that enum to match the binary exactly touches
+   * `CAiPathNavigator.h`/`.cpp` broadly and is out of scope for this
+   * SerHelperBase-mimic conversion pass (those files are not in this
+   * packet's file list); flagged here for a future dedicated pass. This
+   * `using` alias intentionally keeps the existing (pre-established, if
+   * imperfectly named) `EAiPathNavigatorState` type so the rest of this
+   * file's already-correct enum-value table stays untouched.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiPathNavigatorStatePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `EAiPathNavigatorStateTypeInfoBootstrap` constructor -- absent from the
+   * real ctor's disassembly; removed.
    */
-  class EAiPathNavigatorStatePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005B0290 (FUN_005B0290, Deserialize_EAiPathNavigatorState)
-     *
-     * What it does:
-     * Deserializes one `EAiPathNavigatorState` enum lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005B02B0 (FUN_005B02B0, Serialize_EAiPathNavigatorState)
-     *
-     * What it does:
-     * Serializes one `EAiPathNavigatorState` enum lane to archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005B0050 (FUN_005B0050)
-     *
-     * What it does:
-     * Binds load/save callbacks into `EAiPathNavigatorState` reflected
-     * metadata.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(EAiPathNavigatorStatePrimitiveSerializer, mHelperNext) == 0x04,
-    "EAiPathNavigatorStatePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EAiPathNavigatorStatePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EAiPathNavigatorStatePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EAiPathNavigatorStatePrimitiveSerializer, mLoadCallback) == 0x0C,
-    "EAiPathNavigatorStatePrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EAiPathNavigatorStatePrimitiveSerializer, mSaveCallback) == 0x10,
-    "EAiPathNavigatorStatePrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(EAiPathNavigatorStatePrimitiveSerializer) == 0x14,
-    "EAiPathNavigatorStatePrimitiveSerializer size must be 0x14"
-  );
+  using EAiPathNavigatorStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EAiPathNavigatorState, int>;
 
   /**
    * Address: 0x00BCCFC0 (FUN_00BCCFC0, register_EAiPathNavigatorStateTypeInfo)
@@ -107,15 +80,6 @@ namespace moho
    * process-exit cleanup.
    */
   int register_EAiPathNavigatorStateTypeInfo();
-
-  /**
-   * Address: 0x00BCCFE0 (FUN_00BCCFE0, register_EAiPathNavigatorStatePrimitiveSerializer)
-   *
-   * What it does:
-   * Registers primitive serializer callbacks for `EAiPathNavigatorState` and
-   * installs process-exit cleanup.
-   */
-  int register_EAiPathNavigatorStatePrimitiveSerializer();
 
   static_assert(sizeof(EAiPathNavigatorStateTypeInfo) == 0x78, "EAiPathNavigatorStateTypeInfo size must be 0x78");
 } // namespace moho
