@@ -8,7 +8,6 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
@@ -306,30 +305,59 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them.
-  struct CUnitCarrierLandSerializerHelperNode
+  [[nodiscard]] gpg::RType* CachedCUnitCarrierLandType()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::CUnitCarrierLand));
+    }
+    return cached;
+  }
+
+  /**
+   * VFTABLE: 0x00E200CC (`??_7CUnitCarrierLandSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitCarrierLand> (IDA
+   * infers `Moho::CUnitCarrierLandSerializer`). The binary global is 0x14
+   * bytes (vtable + inherited link pair + load/save callback lanes),
+   * matching every other `SerHelperBase`-derived serializer in this
+   * codebase.
+   */
+  struct CUnitCarrierLandSerializer : public gpg::SerHelperBase
+  {
+    /**
+     * Address: 0x006077F0 (FUN_006077F0, Moho::CUnitCarrierLandSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `CUnitCarrierLand` RTTI and installs this helper's
+     * load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
   static_assert(
-    offsetof(CUnitCarrierLandSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "CUnitCarrierLandSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+    offsetof(CUnitCarrierLandSerializer, mSerLoadFunc) == 0x0C,
+    "CUnitCarrierLandSerializer::mSerLoadFunc offset must be 0x0C"
   );
   static_assert(
-    offsetof(CUnitCarrierLandSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "CUnitCarrierLandSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+    offsetof(CUnitCarrierLandSerializer, mSerSaveFunc) == 0x10,
+    "CUnitCarrierLandSerializer::mSerSaveFunc offset must be 0x10"
   );
-  static_assert(
-    sizeof(CUnitCarrierLandSerializerHelperNode) == 0x14,
-    "CUnitCarrierLandSerializerHelperNode size must be 0x14"
-  );
+  static_assert(sizeof(CUnitCarrierLandSerializer) == 0x14, "CUnitCarrierLandSerializer size must be 0x14");
 
-  CUnitCarrierLandSerializerHelperNode gCUnitCarrierLandSerializer{};
+  void CUnitCarrierLandSerializer::Init()
+  {
+    gpg::RType* const type = CachedCUnitCarrierLandType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  CUnitCarrierLandSerializer gCUnitCarrierLandSerializer{};
 
   /**
    * Address: 0x00606D20 (FUN_00606D20)
@@ -338,9 +366,9 @@ namespace
    * Unlinks `CUnitCarrierLandSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLandSerializerNodePrimary()
+  void UnlinkCUnitCarrierLandSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLandSerializer.mListLinks);
+    gCUnitCarrierLandSerializer.ResetLinks();
   }
 
   /**
@@ -348,11 +376,13 @@ namespace
    *
    * What it does:
    * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCarrierLandSerializer` helper storage.
+   * `CUnitCarrierLandSerializer` helper storage. No in-binary caller was
+   * recovered for this address (distinct from the primary lane above); kept
+   * as a thin address-anchored wrapper rather than dropped.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLandSerializerNodeSecondary()
+  [[maybe_unused]] void UnlinkCUnitCarrierLandSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLandSerializer.mListLinks);
+    gCUnitCarrierLandSerializer.ResetLinks();
   }
 
   /**
@@ -411,20 +441,21 @@ namespace
    */
   void cleanup_CUnitCarrierLandSerializer_atexit()
   {
-    (void)UnlinkCUnitCarrierLandSerializerNodePrimary();
+    UnlinkCUnitCarrierLandSerializerNodePrimary();
   }
 
   /**
-   * Address: 0x00BD0280 (FUN_00BD0280, register_CUnitCarrierLandSerializer)
+   * Address: 0x00BD0280 (FUN_00BD0280, register_CUnitCarrierLandSerializer,
+   * dynamic initializer for the global `CUnitCarrierLandSerializer` singleton)
    *
    * What it does:
-   * Initializes the global `CUnitCarrierLand` serializer helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link call here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`.
    */
   void register_CUnitCarrierLandSerializer()
   {
-    (void)UnlinkCUnitCarrierLandSerializerNodePrimary();
     gCUnitCarrierLandSerializer.mSerLoadFunc = &DeserializeCUnitCarrierLandSerializerCallback;
     gCUnitCarrierLandSerializer.mSerSaveFunc = &SerializeCUnitCarrierLandSerializerCallback;
     (void)std::atexit(&cleanup_CUnitCarrierLandSerializer_atexit);

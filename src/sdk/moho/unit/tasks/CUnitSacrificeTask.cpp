@@ -13,7 +13,6 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -501,37 +500,70 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase).
-  struct CUnitSacrificeTaskSerializerHelperNode
+  [[nodiscard]] gpg::RType* CachedCUnitSacrificeTaskType()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::CUnitSacrificeTask));
+    }
+    return cached;
+  }
+
+  /**
+   * VFTABLE: 0x00E1FB6C (`??_7CUnitSacrificeTaskSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitSacrificeTask> (IDA
+   * infers `Moho::CUnitSacrificeTaskSerializer`). The binary global is 0x14
+   * bytes (vtable + inherited link pair + load/save callback lanes),
+   * matching every other `SerHelperBase`-derived serializer in this
+   * codebase.
+   */
+  struct CUnitSacrificeTaskSerializer : public gpg::SerHelperBase
+  {
+    /**
+     * Address: 0x005FBED0 (FUN_005FBED0, Moho::CUnitSacrificeTaskSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `CUnitSacrificeTask` RTTI and installs this helper's
+     * load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
   static_assert(
-    offsetof(CUnitSacrificeTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "CUnitSacrificeTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+    offsetof(CUnitSacrificeTaskSerializer, mSerLoadFunc) == 0x0C,
+    "CUnitSacrificeTaskSerializer::mSerLoadFunc offset must be 0x0C"
   );
   static_assert(
-    offsetof(CUnitSacrificeTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "CUnitSacrificeTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+    offsetof(CUnitSacrificeTaskSerializer, mSerSaveFunc) == 0x10,
+    "CUnitSacrificeTaskSerializer::mSerSaveFunc offset must be 0x10"
   );
   static_assert(
-    sizeof(CUnitSacrificeTaskSerializerHelperNode) == 0x14,
-    "CUnitSacrificeTaskSerializerHelperNode size must be 0x14"
+    sizeof(CUnitSacrificeTaskSerializer) == 0x14,
+    "CUnitSacrificeTaskSerializer size must be 0x14"
   );
 
-  CUnitSacrificeTaskSerializerHelperNode gCUnitSacrificeTaskSerializer{};
+  void CUnitSacrificeTaskSerializer::Init()
+  {
+    gpg::RType* const type = CachedCUnitSacrificeTaskType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  CUnitSacrificeTaskSerializer gCUnitSacrificeTaskSerializer{};
 
   /**
    * Unlinks `CUnitSacrificeTaskSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitSacrificeTaskSerializerNodePrimary()
+  void UnlinkCUnitSacrificeTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitSacrificeTaskSerializer.mListLinks);
+    gCUnitSacrificeTaskSerializer.ResetLinks();
   }
 
   /**
@@ -590,20 +622,22 @@ namespace
    */
   void cleanup_CUnitSacrificeTaskSerializer_atexit()
   {
-    (void)UnlinkCUnitSacrificeTaskSerializerNodePrimary();
+    UnlinkCUnitSacrificeTaskSerializerNodePrimary();
   }
 
   /**
-   * Address: 0x00BCFA10 (FUN_00BCFA10, register_CUnitSacrificeTaskSerializer)
+   * Address: 0x00BCFA10 (FUN_00BCFA10, register_CUnitSacrificeTaskSerializer,
+   * dynamic initializer for the global `CUnitSacrificeTaskSerializer`
+   * singleton)
    *
    * What it does:
-   * Initializes the global `CUnitSacrificeTask` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`.
    */
   void register_CUnitSacrificeTaskSerializer()
   {
-    (void)UnlinkCUnitSacrificeTaskSerializerNodePrimary();
     gCUnitSacrificeTaskSerializer.mSerLoadFunc = &DeserializeCUnitSacrificeTaskSerializerCallback;
     gCUnitSacrificeTaskSerializer.mSerSaveFunc = &SerializeCUnitSacrificeTaskSerializerCallback;
     (void)std::atexit(&cleanup_CUnitSacrificeTaskSerializer_atexit);

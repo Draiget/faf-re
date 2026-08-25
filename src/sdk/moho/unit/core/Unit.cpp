@@ -20,7 +20,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
@@ -11217,56 +11216,121 @@ namespace
     }
   };
 
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them.
-  struct UnitWeaponInfoSerializerHelperNode
+  [[nodiscard]] gpg::RType* CachedUnitWeaponInfoType()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::UnitWeaponInfo));
+    }
+    return cached;
+  }
+
+  /**
+   * VFTABLE: 0x00E1879C (`??_7UnitWeaponInfoSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::UnitWeaponInfo> (IDA
+   * infers `Moho::UnitWeaponInfoSerializer`). The binary global is 0x14
+   * bytes (vtable + inherited link pair + load/save callback lanes),
+   * matching every other `SerHelperBase`-derived serializer in this
+   * codebase.
+   */
+  struct UnitWeaponInfoSerializer : public gpg::SerHelperBase
+  {
+    /**
+     * Address: 0x0055CA40 (FUN_0055CA40, Moho::UnitWeaponInfoSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `UnitWeaponInfo` RTTI and installs this helper's
+     * load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
   static_assert(
-    offsetof(UnitWeaponInfoSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "UnitWeaponInfoSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+    offsetof(UnitWeaponInfoSerializer, mSerLoadFunc) == 0x0C,
+    "UnitWeaponInfoSerializer::mSerLoadFunc offset must be 0x0C"
   );
   static_assert(
-    offsetof(UnitWeaponInfoSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "UnitWeaponInfoSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+    offsetof(UnitWeaponInfoSerializer, mSerSaveFunc) == 0x10,
+    "UnitWeaponInfoSerializer::mSerSaveFunc offset must be 0x10"
   );
   static_assert(
-    sizeof(UnitWeaponInfoSerializerHelperNode) == 0x14,
-    "UnitWeaponInfoSerializerHelperNode size must be 0x14"
+    sizeof(UnitWeaponInfoSerializer) == 0x14,
+    "UnitWeaponInfoSerializer size must be 0x14"
   );
 
-  UnitWeaponInfoSerializerHelperNode gUnitWeaponInfoSerializer{};
-
-  // Runtime shape of the binary's `SerSaveLoadHelper<SSTIUnitVariableData>`
-  // static-init global: the 0x0C intrusive-list links followed by the two
-  // published reflection callbacks (load @ +0x0C, save @ +0x10). The engine
-  // install path copies mSerLoadFunc / mSerSaveFunc into the reflection
-  // descriptor's serLoadFunc_ / serSaveFunc_ slots.
-  struct SSTIUnitVariableDataSerializerHelperNode
+  void UnitWeaponInfoSerializer::Init()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType* const type = CachedUnitWeaponInfoType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  UnitWeaponInfoSerializer gUnitWeaponInfoSerializer{};
+
+  [[nodiscard]] gpg::RType* CachedSSTIUnitVariableDataType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::SSTIUnitVariableData));
+    }
+    return cached;
+  }
+
+  /**
+   * VFTABLE: 0x00E188E4 (`??_7SSTIUnitVariableDataSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::SSTIUnitVariableData>
+   * (IDA infers `Moho::SSTIUnitVariableDataSerializer`). The binary global
+   * is 0x14 bytes (vtable + inherited link pair + load/save callback
+   * lanes), matching every other `SerHelperBase`-derived serializer in this
+   * codebase. The engine install path copies mSerLoadFunc / mSerSaveFunc
+   * into the reflection descriptor's serLoadFunc_ / serSaveFunc_ slots via
+   * `Init()`.
+   */
+  struct SSTIUnitVariableDataSerializer : public gpg::SerHelperBase
+  {
+    /**
+     * Address: 0x0055D100 (FUN_0055D100, Moho::SSTIUnitVariableDataSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `SSTIUnitVariableData` RTTI and installs this
+     * helper's load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
   static_assert(
-    offsetof(SSTIUnitVariableDataSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "SSTIUnitVariableDataSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+    offsetof(SSTIUnitVariableDataSerializer, mSerLoadFunc) == 0x0C,
+    "SSTIUnitVariableDataSerializer::mSerLoadFunc offset must be 0x0C"
   );
   static_assert(
-    offsetof(SSTIUnitVariableDataSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "SSTIUnitVariableDataSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+    offsetof(SSTIUnitVariableDataSerializer, mSerSaveFunc) == 0x10,
+    "SSTIUnitVariableDataSerializer::mSerSaveFunc offset must be 0x10"
   );
   static_assert(
-    sizeof(SSTIUnitVariableDataSerializerHelperNode) == 0x14,
-    "SSTIUnitVariableDataSerializerHelperNode size must be 0x14"
+    sizeof(SSTIUnitVariableDataSerializer) == 0x14,
+    "SSTIUnitVariableDataSerializer size must be 0x14"
   );
 
-  SSTIUnitVariableDataSerializerHelperNode gSSTIUnitVariableDataSerializer{};
+  void SSTIUnitVariableDataSerializer::Init()
+  {
+    gpg::RType* const type = CachedSSTIUnitVariableDataType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mSerLoadFunc;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  SSTIUnitVariableDataSerializer gSSTIUnitVariableDataSerializer{};
 
   /**
    * Address: 0x0055C1B0 (FUN_0055C1B0, SerSaveLoadHelper<UnitWeaponInfo>::unlink lane A)
@@ -11275,9 +11339,9 @@ namespace
    * Unlinks `UnitWeaponInfo` serializer helper links and restores self-links
    * for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneA() noexcept
+  void UnlinkUnitWeaponInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer.mListLinks);
+    gUnitWeaponInfoSerializer.ResetLinks();
   }
 
   /**
@@ -11287,9 +11351,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the `UnitWeaponInfo` serializer
    * helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkUnitWeaponInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer.mListLinks);
+    gUnitWeaponInfoSerializer.ResetLinks();
   }
 
   /**
@@ -11348,20 +11412,21 @@ namespace
    */
   void cleanup_UnitWeaponInfoSerializer_atexit()
   {
-    (void)UnlinkUnitWeaponInfoSerializerLaneA();
+    UnlinkUnitWeaponInfoSerializerLaneA();
   }
 
   /**
-   * Address: 0x00BCA580 (FUN_00BCA580, register_UnitWeaponInfoSerializer)
+   * Address: 0x00BCA580 (FUN_00BCA580, register_UnitWeaponInfoSerializer,
+   * dynamic initializer for the global `UnitWeaponInfoSerializer` singleton)
    *
    * What it does:
-   * Initializes the global `UnitWeaponInfo` serializer helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`.
    */
   void register_UnitWeaponInfoSerializer()
   {
-    (void)UnlinkUnitWeaponInfoSerializerLaneA();
     gUnitWeaponInfoSerializer.mSerLoadFunc = &DeserializeUnitWeaponInfoSerializerCallback;
     gUnitWeaponInfoSerializer.mSerSaveFunc = &SerializeUnitWeaponInfoSerializerCallback;
     (void)std::atexit(&cleanup_UnitWeaponInfoSerializer_atexit);
@@ -11385,9 +11450,9 @@ namespace
    * Unlinks `SSTIUnitVariableData` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
+  void UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer.mListLinks);
+    gSSTIUnitVariableDataSerializer.ResetLinks();
   }
 
   /**
@@ -11397,9 +11462,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the
    * `SSTIUnitVariableData` serializer helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkSSTIUnitVariableDataSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer.mListLinks);
+    gSSTIUnitVariableDataSerializer.ResetLinks();
   }
 
   /**
@@ -11464,22 +11529,24 @@ namespace
    */
   void cleanup_SSTIUnitVariableDataSerializer_atexit()
   {
-    (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
+    UnlinkSSTIUnitVariableDataSerializerLaneA();
   }
 
   /**
-   * Address: 0x00BCA6A0 (FUN_00BCA6A0, register_SSTIUnitVariableDataSerializer)
+   * Address: 0x00BCA6A0 (FUN_00BCA6A0, register_SSTIUnitVariableDataSerializer,
+   * dynamic initializer for the global `SSTIUnitVariableDataSerializer`
+   * singleton)
    *
    * What it does:
-   * Initializes the global `SSTIUnitVariableData` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`. Binding both facades by name
-   * here is the source-level invocation that keeps FUN_0055E030 /
-   * FUN_0055E420 reachable.
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`. Binding
+   * both facades by name here is the source-level invocation that keeps
+   * FUN_0055E030 / FUN_0055E420 reachable.
    */
   void register_SSTIUnitVariableDataSerializer()
   {
-    (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
     gSSTIUnitVariableDataSerializer.mSerLoadFunc = &SSTIUnitVariableDataSerializerDeserialize;
     gSSTIUnitVariableDataSerializer.mSerSaveFunc = &SSTIUnitVariableDataSerializerSerialize;
     (void)std::atexit(&cleanup_SSTIUnitVariableDataSerializer_atexit);

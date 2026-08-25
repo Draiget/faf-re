@@ -9,7 +9,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityId.h"
@@ -50,24 +49,42 @@ namespace
     return sType;
   }
 
-  struct CUnitUpgradeTaskSerializerStartupNode
+  /**
+   * VFTABLE: 0x00E1FA78 (`??_7CUnitUpgradeTaskSerializer@Moho@@6B@`)
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitUpgradeTask> (IDA
+   * infers `Moho::CUnitUpgradeTaskSerializer`). The binary global is 0x14
+   * bytes (vtable + inherited link pair + load/save callback lanes),
+   * matching every other `SerHelperBase`-derived serializer in this
+   * codebase.
+   */
+  struct CUnitUpgradeTaskSerializer : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
+    /**
+     * Address: 0x005FBC90 (FUN_005FBC90, Moho::CUnitUpgradeTaskSerializer::Init,
+     * vtable slot 0)
+     *
+     * What it does:
+     * Lazily resolves `CUnitUpgradeTask` RTTI and installs this helper's
+     * load/save callback pair onto the reflected type descriptor.
+     */
+    void Init() override;
+
     gpg::RType::load_func_t mLoad = nullptr;
     gpg::RType::save_func_t mSave = nullptr;
   };
-  static_assert(sizeof(CUnitUpgradeTaskSerializerStartupNode) == 0x14, "CUnitUpgradeTaskSerializerStartupNode size must be 0x14");
+  static_assert(sizeof(CUnitUpgradeTaskSerializer) == 0x14, "CUnitUpgradeTaskSerializer size must be 0x14");
 
-  CUnitUpgradeTaskSerializerStartupNode gCUnitUpgradeTaskSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    CUnitUpgradeTaskSerializerStartupNode& helper
-  ) noexcept
+  void CUnitUpgradeTaskSerializer::Init()
   {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+    gpg::RType* const type = ResolveCachedType<moho::CUnitUpgradeTask>();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoad;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSave;
   }
+
+  CUnitUpgradeTaskSerializer gCUnitUpgradeTaskSerializer{};
 
   void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
@@ -91,26 +108,27 @@ namespace
    */
   void cleanup_CUnitUpgradeTaskSerializer_atexit()
   {
-    (void)gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitUpgradeTaskSerializer));
+    gCUnitUpgradeTaskSerializer.ResetLinks();
   }
 
   /**
-   * Address: 0x00BCF8F0 (FUN_00BCF8F0, register_CUnitUpgradeTaskSerializer)
+   * Address: 0x00BCF8F0 (FUN_00BCF8F0, register_CUnitUpgradeTaskSerializer,
+   * dynamic initializer for the global `CUnitUpgradeTaskSerializer`
+   * singleton)
    *
    * What it does:
-   * Initializes the global `CUnitUpgradeTaskSerializer` helper's load/save
-   * callback lanes (self-linking the intrusive helper node) and installs
-   * process-exit cleanup via `atexit`. Supersedes the previous orphaned
-   * startup thunk (cited at FUN_005F8800, a distinct real binary function
-   * that performs the same self-link/field-store sequence but is never
-   * called from any recovered path and installs no `atexit` cleanup -- left
-   * unrecovered pending its own callsite evidence).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+   * splices it into the process-global `sNewHelpers` pending list; this was
+   * previously modeled as a manual self-link here), binds the load/save
+   * callback lanes, and installs process-exit cleanup via `atexit`.
+   * Supersedes the previous orphaned startup thunk (cited at FUN_005F8800, a
+   * distinct real binary function that performs the same self-link/field-
+   * store sequence but is never called from any recovered path and installs
+   * no `atexit` cleanup -- left unrecovered pending its own callsite
+   * evidence).
    */
   void register_CUnitUpgradeTaskSerializer()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitUpgradeTaskSerializer.mNext);
-    gCUnitUpgradeTaskSerializer.mPrev = self;
-    gCUnitUpgradeTaskSerializer.mNext = self;
     gCUnitUpgradeTaskSerializer.mLoad = &DeserializeCUnitUpgradeTaskSerializerCallback;
     gCUnitUpgradeTaskSerializer.mSave = &SerializeCUnitUpgradeTaskSerializerCallback;
     (void)std::atexit(&cleanup_CUnitUpgradeTaskSerializer_atexit);
