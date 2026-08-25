@@ -52,21 +52,19 @@ namespace
   alignas(moho::CCollisionManipulatorTypeInfo)
     std::byte gCCollisionManipulatorTypeInfoStorage[sizeof(moho::CCollisionManipulatorTypeInfo)]{};
   bool gCCollisionManipulatorTypeInfoConstructed = false;
+
+  // Address: 0x00BD2720 (dynamic initializer for the global
+  // `CCollisionManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
+  // own compiler-generated dynamic initializer for this global runs the real
+  // `gpg::SerSaveLoadHelper<CCollisionManipulator>` ctor (calls
+  // `gpg::SerHelperBase::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback`
+  // to the template's `Deserialize`/`Serialize`, installs the vtable) and
+  // registers the real mangled destructor
+  // (`??1CCollisionManipulatorSerializer@Moho@@QAE@@Z`, 0x00BFAB70) via
+  // `atexit`. Dead zero-xref duplicate ctor with no atexit registration of
+  // its own: 0x00637A80. See the Doxygen comment on the declaration
+  // (CCollisionManipulator.h) for the full per-instantiation address list.
   moho::CCollisionManipulatorSerializer gCCollisionManipulatorSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -325,108 +323,6 @@ namespace
   }
 
   /**
-   * Address: 0x00638F00 (FUN_00638F00)
-   *
-   * What it does:
-   * Loads IAniManipulator base payload, then reads owner-unit pointer and two
-   * collision mode booleans.
-   */
-  void DeserializeCCollisionManipulator(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
-  {
-    auto* const object = reinterpret_cast<moho::CCollisionManipulator*>(objectPtr);
-    GPG_ASSERT(object != nullptr);
-
-    if (gpg::RType* const baseType = CachedIAniManipulatorType();
-        baseType != nullptr && baseType->serLoadFunc_ != nullptr) {
-      baseType->serLoadFunc_(archive, objectPtr, baseType->version_, ownerRef);
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    object->mOwnerUnit = ReadUnitPointer(archive, owner);
-    archive->ReadBool(&object->mCollisionCallbacksEnabled);
-    archive->ReadBool(&object->mTerrainCollisionCheckEnabled);
-  }
-
-  /**
-   * Address: 0x00638930 (FUN_00638930, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CCollisionManipulator deserialize thunk alias into the
-   * shared deserialize callback body.
-   */
-  void DeserializeCCollisionManipulatorThunkVariantA(
-    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    DeserializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00638C20 (FUN_00638C20, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second CCollisionManipulator deserialize thunk alias into
-   * the shared deserialize callback body.
-   */
-  void DeserializeCCollisionManipulatorThunkVariantB(
-    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    DeserializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00638F90 (FUN_00638F90)
-   *
-   * What it does:
-   * Saves IAniManipulator base payload, then writes owner-unit pointer and two
-   * collision mode booleans.
-   */
-  void SerializeCCollisionManipulator(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
-  {
-    auto* const object = reinterpret_cast<moho::CCollisionManipulator*>(objectPtr);
-    GPG_ASSERT(object != nullptr);
-
-    if (gpg::RType* const baseType = CachedIAniManipulatorType();
-        baseType != nullptr && baseType->serSaveFunc_ != nullptr) {
-      baseType->serSaveFunc_(archive, objectPtr, baseType->version_, ownerRef);
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    WriteUnitPointer(archive, object->mOwnerUnit, owner);
-    archive->WriteBool(object->mCollisionCallbacksEnabled);
-    archive->WriteBool(object->mTerrainCollisionCheckEnabled);
-  }
-
-  /**
-   * Address: 0x00638940 (FUN_00638940, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CCollisionManipulator serialize thunk alias into the
-   * shared serialize callback body.
-   */
-  void SerializeCCollisionManipulatorThunkVariantA(
-    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    SerializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00638C30 (FUN_00638C30, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second CCollisionManipulator serialize thunk alias into
-   * the shared serialize callback body.
-   */
-  void SerializeCCollisionManipulatorThunkVariantB(
-    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    SerializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
     * Alias of FUN_00638770 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::RRef CreateCollisionManipulatorRefOwned()
@@ -536,6 +432,42 @@ namespace moho
    * Address: 0x00639030 (FUN_00639030, deleting thunk from CScriptObject view)
    */
   CCollisionManipulator::~CCollisionManipulator() = default;
+
+  /**
+   * Address: 0x00638F00 (FUN_00638F00, gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::Deserialize thunk target)
+   *
+   * What it does:
+   * Loads `IAniManipulator` base state, then the owner-unit pointer and the
+   * two collision mode booleans. The binary always builds a fresh, zeroed
+   * owner `RRef` for these reads (confirmed via raw asm: `a6 = 0; a3.mObj =
+   * 0;` before every `Read`), matching every sibling manipulator serializer
+   * in this family rather than propagating any caller-supplied owner.
+   */
+  void CCollisionManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(this), owner);
+    mOwnerUnit = ReadUnitPointer(archive, owner);
+    archive->ReadBool(&mCollisionCallbacksEnabled);
+    archive->ReadBool(&mTerrainCollisionCheckEnabled);
+  }
+
+  /**
+   * Address: 0x00638F90 (FUN_00638F90, gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::Serialize thunk target)
+   *
+   * What it does:
+   * Saves `IAniManipulator` base state, then the owner-unit pointer and the
+   * two collision mode booleans, mirroring `MemberDeserialize` -- fresh
+   * zeroed owner `RRef`, not the caller's.
+   */
+  void CCollisionManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef owner{};
+    archive->Write(CachedIAniManipulatorType(), static_cast<const IAniManipulator*>(this), owner);
+    WriteUnitPointer(archive, mOwnerUnit, owner);
+    archive->WriteBool(mCollisionCallbacksEnabled);
+    archive->WriteBool(mTerrainCollisionCheckEnabled);
+  }
 
   /**
    * Address: 0x00637860 (FUN_00637860, ?GetClass@CCollisionManipulator@Moho@@UBEPAVRType@gpg@@XZ)
@@ -960,18 +892,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006386E0 (FUN_006386E0, sub_6386E0)
-   */
-  void CCollisionManipulatorSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveCCollisionManipulatorTypeCacheSecondary();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc ? mSerLoadFunc : &DeserializeCCollisionManipulator;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc ? mSerSaveFunc : &SerializeCCollisionManipulator;
-  }
-
-  /**
    * Address: 0x006379A0 (FUN_006379A0, scalar deleting destructor thunk)
    */
   /**
@@ -1046,90 +966,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00637A80 (FUN_00637A80)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CCollisionManipulatorSerializer`
-   * helper storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulatorSerializer*
-  InitializeCCollisionManipulatorSerializerStartupThunkPrimary()
-  {
-    InitializeHelperNode(gCCollisionManipulatorSerializer);
-    gCCollisionManipulatorSerializer.mSerLoadFunc = &DeserializeCCollisionManipulator;
-    gCCollisionManipulatorSerializer.mSerSaveFunc = &SerializeCCollisionManipulator;
-    return &gCCollisionManipulatorSerializer;
-  }
-
-  /**
-   * Address: 0x006386B0 (FUN_006386B0)
-   *
-   * What it does:
-   * Secondary startup-init entry for global
-   * `CCollisionManipulatorSerializer` helper storage that mirrors the primary
-   * callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulatorSerializer*
-  InitializeCCollisionManipulatorSerializerStartupThunkSecondary()
-  {
-    return InitializeCCollisionManipulatorSerializerStartupThunkPrimary();
-  }
-
-  /**
-   * Address: 0x00BFAB70 (FUN_00BFAB70, cleanup_CCollisionManipulatorSerializer)
-   *
-   * What it does:
-   * Unlinks the global serializer helper node from the intrusive serializer
-   * helper list and rewires it as a self-linked singleton.
-   */
-  gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializer()
-  {
-    gCCollisionManipulatorSerializer.mNext->mPrev = gCCollisionManipulatorSerializer.mPrev;
-    gCCollisionManipulatorSerializer.mPrev->mNext = gCCollisionManipulatorSerializer.mNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gCCollisionManipulatorSerializer);
-    gCCollisionManipulatorSerializer.mPrev = self;
-    gCCollisionManipulatorSerializer.mNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00637AB0 (FUN_00637AB0, cleanup_CCollisionManipulatorSerializerStartupThunkA)
-   *
-   * What it does:
-   * Unlinks one startup helper lane for the global
-   * `CCollisionManipulatorSerializer` node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializerStartupThunkA()
-  {
-    return cleanup_CCollisionManipulatorSerializer();
-  }
-
-  /**
-   * Address: 0x00637AE0 (FUN_00637AE0, cleanup_CCollisionManipulatorSerializerStartupThunkB)
-   *
-   * What it does:
-   * Unlinks the mirrored startup helper lane for the global
-   * `CCollisionManipulatorSerializer` node and restores self-links.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializerStartupThunkB()
-  {
-    return cleanup_CCollisionManipulatorSerializer();
-  }
-
-  /**
    * Address: 0x00BD2720 (FUN_00BD2720, register_CCollisionManipulatorSerializer)
    *
    * What it does:
-   * Initializes global `CCollisionManipulatorSerializer` callback lanes,
-   * binds load/save callbacks into RTTI, and installs process-exit cleanup.
+   * Forces this translation unit's global `CCollisionManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the
+   * Doxygen comment on the declaration (CCollisionManipulator.h) and on
+   * `gCCollisionManipulatorSerializer` above for why this function's body
+   * has no field-setting logic of its own.
    */
   void register_CCollisionManipulatorSerializer()
   {
-    InitializeHelperNode(gCCollisionManipulatorSerializer);
-    gCCollisionManipulatorSerializer.mSerLoadFunc = &DeserializeCCollisionManipulator;
-    gCCollisionManipulatorSerializer.mSerSaveFunc = &SerializeCCollisionManipulator;
-    (void)std::atexit(reinterpret_cast<void (*)()>(&cleanup_CCollisionManipulatorSerializer));
+    (void)gCCollisionManipulatorSerializer;
   }
 
   /**

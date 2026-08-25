@@ -118,6 +118,26 @@ namespace moho
 
     [[nodiscard]] Unit* GetOwnerUnit() const noexcept;
 
+    /**
+     * Address: 0x00638F00 (FUN_00638F00, gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::Deserialize thunk target)
+     *
+     * What it does:
+     * Loads `IAniManipulator` base state (via a freshly-zeroed owner `RRef`,
+     * not the caller's), then the owner-unit pointer and the two collision
+     * mode booleans.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00638F90 (FUN_00638F90, gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::Serialize thunk target)
+     *
+     * What it does:
+     * Saves `IAniManipulator` base state (via a freshly-zeroed owner `RRef`,
+     * not the caller's), then the owner-unit pointer and the two collision
+     * mode booleans.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     static gpg::RType* sType;
 
@@ -181,25 +201,42 @@ namespace moho
   /**
    * VFTABLE: 0x00E21A30
    * COL: 0x00E7B48C
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CCollisionManipulator>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CCollisionManipulatorSerializer`):
+   *    0x00BD2720 (__xc_a-reachable, exactly one xref). Dead zero-xref
+   *    duplicate ctor with no atexit dtor registration of its own:
+   *    0x00637A80.
+   *  - dtor: 0x00BFAB70 (`??1CCollisionManipulatorSerializer@Moho@@QAE@@Z`;
+   *    exactly one xref, from the real ctor's atexit push)
+   *  - Init(): 0x006386E0 (slot 0)
+   *  - Deserialize(): 0x00637A50 (tail-calls `MemberDeserialize` at 0x00638F00)
+   *  - Serialize(): 0x00637A60 (tail-calls `MemberSerialize` at 0x00638F90)
+   *
+   * Prior recovery modeled this as a hand-rolled `CCollisionManipulatorSerializer`
+   * class with raw `gpg::SerHelperBase* mNext/mPrev` fields (no real base)
+   * and a `virtual void RegisterSerializeFunctions()` standing in for the
+   * real `Init()` override, wired through free functions
+   * `register_CCollisionManipulatorSerializer()`/
+   * `cleanup_CCollisionManipulatorSerializer()` that only ever wrote to the
+   * orphan struct's own fields -- `CCollisionManipulator::sType`'s
+   * `serLoadFunc_`/`serSaveFunc_` slots were never actually installed. This
+   * template instantiation fixes that. It also fixes a real fidelity bug in
+   * the load/save bodies found while re-deriving them from raw asm at
+   * 0x00638F00/0x00638F90: the binary always builds a *fresh, zeroed* owner
+   * `RRef` for the base-state read/write and the owner-unit pointer (exactly
+   * the pattern every sibling manipulator serializer uses), never the
+   * `RRef` handed in by the reflection dispatcher -- the prior source
+   * propagated the caller's `ownerRef` instead, and additionally dispatched
+   * the base state through a raw `baseType->serLoadFunc_(...)`/
+   * `serSaveFunc_(...)` call rather than the standard
+   * `archive->Read/Write(CachedIAniManipulatorType(), ...)` helper every
+   * other manipulator in this family uses.
    */
-  class CCollisionManipulatorSerializer
-  {
-  public:
-    /**
-     * Address: 0x006386E0 (FUN_006386E0, sub_6386E0)
-     * Slot: 0
-     *
-     * What it does:
-     * Registers CCollisionManipulator load/save callbacks into RTTI.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
+  using CCollisionManipulatorSerializer = gpg::SerSaveLoadHelper<CCollisionManipulator>;
 
   /**
    * VFTABLE: 0x00E21A00
