@@ -31,11 +31,11 @@ namespace moho
    * `SCoordsVec2` RType, then reads the trailing `float mVal` (`+0x08`).
    *
    * Caller chain (from CRT static-init root):
-   *   - `gSMassInfoSerializerBootstrap` file-scope static
-   *     (`SMassInfoSerializer.cpp:180`).
-   *   - `register_SMassInfoSerializer()` installs
-   *     `&SMassInfoSerializer::Deserialize` as the typed
-   *     `gpg::RType::serLoadFunc_` for `SMassInfo`.
+   *   - `gSMassInfoSerializer` file-scope global
+   *     (`SMassInfoSerializer.cpp`) default-constructs, binding
+   *     `&SMassInfoSerializer::Deserialize` into `mLoadCallback`.
+   *   - `SMassInfoSerializer::Init()` installs that callback as the
+   *     typed `gpg::RType::serLoadFunc_` for `SMassInfo`.
    *   - At deserialization time `gpg::ReadArchive::Read` resolves the
    *     load callback by type and dispatches into
    *     `SMassInfoSerializer::Deserialize`, which forwards to this
@@ -61,8 +61,8 @@ namespace moho
    * payload via reflection, then writes the trailing `float mVal`.
    *
    * Caller chain (from CRT static-init root):
-   *   - Same `gSMassInfoSerializerBootstrap` lane as the deserialize
-   *     path; `register_SMassInfoSerializer()` installs
+   *   - Same `gSMassInfoSerializer` global as the deserialize path;
+   *     `SMassInfoSerializer::Init()` installs
    *     `&SMassInfoSerializer::Serialize` as `gpg::RType::serSaveFunc_`.
    *   - At save time `gpg::WriteArchive::Write` resolves the save
    *     callback by type and dispatches into

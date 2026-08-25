@@ -8,20 +8,6 @@
 
 namespace
 {
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -32,7 +18,6 @@ namespace
   }
 
   gpg::RType* gVec3fType = nullptr;
-  moho::InfluenceMapEntrySerializer gInfluenceMapEntrySerializer;
 
   // Alias of FUN_007178F0 behavior from CInfluenceMap.cpp.
   void DeserializeInfluenceMapEntrySerializerBridge(
@@ -105,31 +90,35 @@ namespace
     archive->WriteFloat(entry->threatDecay);
     archive->WriteInt(entry->decayTicks);
   }
-
-  /**
-   * Address: 0x00718BD0 (FUN_00718BD0)
-   *
-   * What it does:
-   * Initializes startup `InfluenceMapEntry` helper links and callback slots.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::InfluenceMapEntrySerializer* InitializeInfluenceMapEntrySerializerHelperStorage() noexcept
-  {
-    InitializeHelperNode(gInfluenceMapEntrySerializer);
-    gInfluenceMapEntrySerializer.mLoadCallback = &DeserializeInfluenceMapEntrySerializerBridge;
-    gInfluenceMapEntrySerializer.mSaveCallback = &SerializeInfluenceMapEntrySerializerBridge;
-    return &gInfluenceMapEntrySerializer;
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BDA720 (FUN_00BDA720, dynamic initializer for the global
+   * `InfluenceMapEntrySerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  InfluenceMapEntrySerializer::InfluenceMapEntrySerializer()
+    : mLoadCallback(&DeserializeInfluenceMapEntrySerializerBridge)
+    , mSaveCallback(&SerializeInfluenceMapEntrySerializerBridge)
+  {}
+
+  InfluenceMapEntrySerializer::~InfluenceMapEntrySerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x00718C00 (FUN_00718C00, gpg::SerSaveLoadHelper_InfluenceMapEntry::Init)
    *
    * IDA signature:
    * void __thiscall gpg::SerSaveLoadHelper_InfluenceMapEntry::Init(_DWORD *this);
    */
-  void InfluenceMapEntrySerializer::RegisterSerializeFunctions()
+  void InfluenceMapEntrySerializer::Init()
   {
     gpg::RType* const type = InfluenceMapEntry::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -141,13 +130,6 @@ namespace moho
 
 namespace
 {
-  struct InfluenceMapEntrySerializerBootstrap
-  {
-    InfluenceMapEntrySerializerBootstrap()
-    {
-      (void)InitializeInfluenceMapEntrySerializerHelperStorage();
-    }
-  };
-
-  [[maybe_unused]] InfluenceMapEntrySerializerBootstrap gInfluenceMapEntrySerializerBootstrap;
+  // Address: 0x010B9470 -- process-global `InfluenceMapEntrySerializer` singleton.
+  moho::InfluenceMapEntrySerializer gInfluenceMapEntrySerializer;
 } // namespace
