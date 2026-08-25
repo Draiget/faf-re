@@ -7075,6 +7075,16 @@ namespace msvc8
          * and can be recovered as the one-arg `allocate(size_t)` overload
          * calling this member by name.
          *
+         * sizeof(T) == 0x28 (40 bytes, owner not confirmed):
+         * Address: 0x0092C150 (FUN_0092C150) -- max_size 0x0666666,
+         * standard `bad_alloc`-throw shape. Sole caller (0x0092CF27) sits
+         * in an IDA-unclassified gap; same 40-byte size and address
+         * neighbourhood (0x0092Cxxx-0x0092Dxxx) as the `std::hash_map_
+         * unk_unk` cluster cited on `buy_head` above (`FUN_0092DC30`'s
+         * header node is also 0x28 bytes), plausibly that same hash_map's
+         * checked bucket-vector allocator -- not proven, recorded as the
+         * strongest available lead rather than a guess presented as fact.
+         *
          * sizeof(T) == 0x70 (112 bytes, `gpg::gal::backends::d3d9::
          * AdapterD3D9`, `static_assert(sizeof(AdapterD3D9)==0x70)`,
          * `AdapterD3D9.hpp`):

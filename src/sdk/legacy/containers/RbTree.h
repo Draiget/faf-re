@@ -2558,6 +2558,20 @@ namespace msvc8
              * citation/source/report (`depends_on: [FUN_006AFA40,
              * FUN_006B03D0]`, both since resolved -- DB-integrity gap, not a
              * false attribution); this is the real source.
+             *
+             * Address: 0x0070F040 (FUN_0070F040, sub_70F040) -- the same
+             * `moho::CArmyStats`-owned 4-byte-`uint32_t`-value tree's
+             * `insert_unique`: full descent tracking the last branch taken,
+             * final uniqueness compare, tail-calls `insert_at` (`sub_710030`,
+             * cited above) on the accepted leftmost-child branch (`*v3 =
+             * *insert_at(&a3,1,a2); v3[4]=1; return v3;`) -- matches this
+             * member field for field. Real caller is `Moho::CArmyStats::
+             * ArmyXmlStatsNode` (`FUN_0070CC40`, already recovered,
+             * `CArmyStats.cpp`), which calls this token twice while
+             * building its XML stats node. Was `skip` with the note "No
+             * source line can currently be produced" after a DB-integrity
+             * revert -- corrected here now that the real source can be
+             * produced.
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -4488,6 +4502,27 @@ namespace msvc8
              * function in `Unit.cpp` that only replicated the raw-alloc
              * half and left the self-link/isNil flip open-coded at each of
              * the two call sites.
+             *
+             * Address: 0x0092DC30 (FUN_0092DC30, sub_92DC30) -- a 40-byte
+             * (`0x28`) header-node buy for a not-yet-owner-pinned tree/map
+             * instantiation: `operator new(0x28)` then self-links only the
+             * first two fields (`result[0]=result; result[1]=result;`),
+             * leaving the remaining header fields for the caller to
+             * finish -- a partial split shape (2 of 3 pointer fields, no
+             * colour/isNil flip here), distinct from this member's full
+             * 3-field self-link + `isNil=1` shape but the same family of
+             * "binary splits buy_head's work across the call site"
+             * variants this file documents throughout (e.g. `FUN_00556DE0`/
+             * `FUN_0083C220` above). Two real callers: `FUN_0092E980`
+             * (`this[1]=buy_head(); this[2]=0; return this;`, a plain
+             * tree/map default-ctor) and `FUN_00930790` (IDA-typed
+             * `std::hash_map_unk_unk::hash_map`, corrected below from a
+             * wrong `external_dependency` tag -- initializes `mBool`,
+             * `_List._Myhead` via this token, `_List._Mysize=0`, the bucket
+             * vector via `sub_9300D0`, `_Mask=1`, `_Maxidx=1`; its own
+             * caller `FUN_00930C00` names the field `mHashMap`, independent
+             * confirmation this is a genuine hash_map container field, not
+             * CRT scaffolding).
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -4885,6 +4920,16 @@ namespace msvc8
              * data, not third-party/generic runtime (DB-integrity fix, the
              * same correction already applied to `FUN_0083BC50`/
              * `FUN_00580510` above).
+             *
+             * Address: 0x007114F0 (FUN_007114F0, sub_7114F0) -- a
+             * `moho::CArmyStats`-owned tree's `buy_node` for a 4-byte
+             * `uint32_t` value_type (`CArmyStats.cpp`): allocates via
+             * `sub_712A70(1u)` (the checked scaled node allocator), sets
+             * Left/Parent/Right/value (18 logical bytes, value copied by
+             * dereferencing the caller's pointer arg) then
+             * `color=0`(red)/`isNil=0` at +16/+17. Matches this member
+             * exactly. Sole caller is `insert_at`'s emission for this
+             * instantiation (`FUN_00710030`, cited below).
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -6192,6 +6237,21 @@ namespace msvc8
              * above) on its fast-path branches -- the same
              * `insert_at(addLeft, where, v)` calls this member's own C++
              * source performs.
+             *
+             * Address: 0x00710030 (FUN_00710030, sub_710030) -- the same
+             * `moho::CArmyStats`-owned 4-byte-`uint32_t`-value tree's
+             * `insert_at`: throws `std::length_error("map/set<T> too
+             * long")` past the verbatim msvc8 threshold, buys the node via
+             * `sub_7114F0` (`buy_node`, cited above), links under the
+             * caller's hint/side, then rebalances calling `sub_711440`/
+             * `sub_7114A0` (already `skip`-tagged ICF twins of the
+             * canonical `rotate_left`/`rotate_right` emissions in
+             * `ParticleRenderBuckets.cpp`). Sole caller is `insert_unique`'s
+             * emission for this instantiation (`FUN_0070F040`, cited
+             * below). Was previously `recovered` with an entirely empty
+             * `note`/`source_paths` -- a DB-integrity gap (blank metadata,
+             * not a false attribution), corrected here with a real
+             * citation.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
