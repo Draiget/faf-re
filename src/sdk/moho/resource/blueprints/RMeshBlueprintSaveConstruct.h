@@ -16,34 +16,43 @@ namespace moho
   /**
    * VFTABLE: 0x00E0FE90
    * COL: 0x00E68C10
+   *
+   * Demangled: gpg::SerSaveConstructHelper<class Moho::RMeshBlueprint>
+   *
+   * What it does:
+   * Binds the save-construct-args callback used to serialize the arguments
+   * needed to reconstruct an `RMeshBlueprint` reference on load. This is the
+   * save-side counterpart of `RMeshBlueprintConstruct` (that class's
+   * `Init()` writes `serConstructFunc_`/`deleteFunc_`; this one writes
+   * `serSaveConstructArgsFunc_`).
    */
-  class RMeshBlueprintSaveConstruct
+  class RMeshBlueprintSaveConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00519470 (FUN_00519470, sub_519470)
-     * Slot: 0
+     * Address: 0x00BC8550 (FUN_00BC8550, dynamic initializer for the global
+     * `RMeshBlueprintSaveConstruct` singleton)
      *
      * What it does:
-     * Binds `RMeshBlueprint` save-construct-args callback into reflected RTTI
-     * (`serSaveConstructArgsFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the save-construct-args callback field, and registers
+     * process-exit cleanup.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    RMeshBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x00519470 (FUN_00519470, gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::Init)
+     *
+     * What it does:
+     * Resolves `RMeshBlueprint` RTTI and installs this helper's
+     * save-construct-args callback into the type descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
   };
-
-  static_assert(
-    offsetof(RMeshBlueprintSaveConstruct, mHelperNext) == 0x04,
-    "RMeshBlueprintSaveConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RMeshBlueprintSaveConstruct, mHelperPrev) == 0x08,
-    "RMeshBlueprintSaveConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RMeshBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "RMeshBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
@@ -79,30 +88,4 @@ namespace moho
     gpg::RRef* ownerRef,
     gpg::SerSaveConstructArgsResult* result
   );
-
-  /**
-   * Address: 0x00518F60 (FUN_00518F60, sub_518F60)
-   *
-   * What it does:
-   * Unlinks `RMeshBlueprintSaveConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintSaveConstructPrimary();
-
-  /**
-   * Address: 0x00518F90 (FUN_00518F90, sub_518F90)
-   *
-   * What it does:
-   * Secondary unlink thunk for `RMeshBlueprintSaveConstruct` helper links.
-   */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintSaveConstructSecondary();
-
-  /**
-   * Address: 0x00BC8550 (FUN_00BC8550, sub_BC8550)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RMeshBlueprint`.
-   */
-  int register_RMeshBlueprintSaveConstruct();
 } // namespace moho
-

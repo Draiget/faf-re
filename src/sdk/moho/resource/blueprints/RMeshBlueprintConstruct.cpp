@@ -24,8 +24,32 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gMeshBlueprintType = nullptr;
-  moho::RMeshBlueprintConstruct gMeshBlueprintConstruct;
+
+  // Address: 0x010AABC4 -- process-global `RMeshBlueprintConstruct` singleton.
+  // Constructing it runs RMeshBlueprintConstruct::RMeshBlueprintConstruct()
+  // (0x00BC8580), which splices this helper into gpg::SerHelperBase::
+  // sNewHelpers; gpg::SerHelperBase::InitNewHelpers() later dispatches
+  // Init() on it from within the first ReadArchive/WriteArchive construction.
+  moho::RMeshBlueprintConstruct gRMeshBlueprintConstructHelper;
+
+  /**
+   * Address: 0x00BF2CF0 (FUN_00BF2CF0)
+   *
+   * What it does:
+   * Unlinks the `RMeshBlueprintConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8580) as the
+   * global's `atexit` teardown.
+   *
+   * ICF twins: 0x00519040 (FUN_00519040) and 0x00519070 (FUN_00519070) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
+   */
+  void CleanupRMeshBlueprintConstruct()
+  {
+    gRMeshBlueprintConstructHelper.ResetLinks();
+  }
 
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
@@ -42,11 +66,6 @@ namespace
       moho::blueprint_ser::ResolveCachedType<moho::RRuleGameRules>(gRuleGameRulesType)
     );
     return static_cast<moho::RRuleGameRules*>(upcast.mObj);
-  }
-
-  void CleanupMeshBlueprintConstructAtexit()
-  {
-    (void)moho::cleanup_RMeshBlueprintConstructPrimary();
   }
 } // namespace
 
@@ -78,7 +97,7 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     blueprintRef.mObj = blueprint;
-    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RMeshBlueprint>(gMeshBlueprintType) : nullptr;
+    blueprintRef.mType = blueprint ? blueprint_ser::ResolveCachedType<RMeshBlueprint>(RMeshBlueprint::sType) : nullptr;
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -103,67 +122,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x005194F0 (FUN_005194F0, sub_5194F0)
+   * Address: 0x00BC8580 (FUN_00BC8580, dynamic initializer for the global
+   * `RMeshBlueprintConstruct` singleton)
    *
    * What it does:
-   * Binds `RMeshBlueprint` construct/delete callbacks into reflected RTTI
-   * (`serConstructFunc_`, `deleteFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
-  void RMeshBlueprintConstruct::RegisterConstructFunction()
+  RMeshBlueprintConstruct::RMeshBlueprintConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RMeshBlueprint))
+    , mDeleteCallback(&Delete_RMeshBlueprint)
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RMeshBlueprint>(gMeshBlueprintType);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = mConstructCallback;
-    typeInfo->deleteFunc_ = mDeleteCallback;
+    (void)std::atexit(&CleanupRMeshBlueprintConstruct);
   }
 
   /**
-   * Address: 0x00519040 (FUN_00519040, sub_519040)
+   * Address: 0x005194F0 (FUN_005194F0, gpg::SerConstructHelper<Moho::RMeshBlueprint>::Init)
    *
    * What it does:
-   * Unlinks `RMeshBlueprintConstruct` helper links and rewires self-links.
+   * Lazily resolves `RMeshBlueprint` RTTI and installs construct/delete
+   * callbacks from this helper into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintConstructPrimary()
+  void RMeshBlueprintConstruct::Init()
   {
-    return blueprint_ser::UnlinkHelperNode(gMeshBlueprintConstruct);
-  }
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00519070 (FUN_00519070, sub_519070)
-   *
-   * What it does:
-   * Secondary unlink thunk for `RMeshBlueprintConstruct` helper links.
-   */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintConstructSecondary()
-  {
-    return cleanup_RMeshBlueprintConstructPrimary();
-  }
-
-  /**
-   * Address: 0x00BC8580 (FUN_00BC8580, sub_BC8580)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for `RMeshBlueprint`.
-   */
-  int register_RMeshBlueprintConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gMeshBlueprintConstruct);
-    gMeshBlueprintConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RMeshBlueprint);
-    gMeshBlueprintConstruct.mDeleteCallback = &Delete_RMeshBlueprint;
-    gMeshBlueprintConstruct.RegisterConstructFunction();
-    return std::atexit(&CleanupMeshBlueprintConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RMeshBlueprint>(RMeshBlueprint::sType);
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RMeshBlueprintConstructBootstrap
-  {
-    RMeshBlueprintConstructBootstrap()
-    {
-      (void)moho::register_RMeshBlueprintConstruct();
-    }
-  };
-
-  RMeshBlueprintConstructBootstrap gRMeshBlueprintConstructBootstrap;
-} // namespace

@@ -21,12 +21,32 @@ namespace gpg
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;
-  gpg::RType* gMeshBlueprintType = nullptr;
-  moho::RMeshBlueprintSaveConstruct gMeshBlueprintSaveConstruct;
 
-  void CleanupMeshBlueprintSaveConstructAtexit()
+  // Address: 0x010AAC3C -- process-global `RMeshBlueprintSaveConstruct`
+  // singleton. Constructing it runs RMeshBlueprintSaveConstruct::
+  // RMeshBlueprintSaveConstruct() (0x00BC8550), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::RMeshBlueprintSaveConstruct gRMeshBlueprintSaveConstructHelper;
+
+  /**
+   * Address: 0x00BF2CC0 (FUN_00BF2CC0)
+   *
+   * What it does:
+   * Unlinks the `RMeshBlueprintSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC8550) as the
+   * global's `atexit` teardown.
+   *
+   * ICF twins: 0x00518F60 (FUN_00518F60) and 0x00518F90 (FUN_00518F90) are
+   * byte-identical duplicates hardcoded to this same global's link fields,
+   * confirmed zero independent callers via the callgraph index -- dead
+   * linker-emitted copies, not separate binary behavior.
+   */
+  void CleanupRMeshBlueprintSaveConstruct()
   {
-    (void)moho::cleanup_RMeshBlueprintSaveConstructPrimary();
+    gRMeshBlueprintSaveConstructHelper.ResetLinks();
   }
 } // namespace
 
@@ -79,68 +99,44 @@ namespace moho
   }
 
   /**
-   * Address: 0x00519470 (FUN_00519470, sub_519470)
+   * Address: 0x00BC8550 (FUN_00BC8550, dynamic initializer for the global
+   * `RMeshBlueprintSaveConstruct` singleton)
    *
    * What it does:
-   * Binds `RMeshBlueprint` save-construct-args callback into reflected RTTI
-   * (`serSaveConstructArgsFunc_`).
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
-  void RMeshBlueprintSaveConstruct::RegisterSaveConstructArgsFunction()
+  RMeshBlueprintSaveConstruct::RMeshBlueprintSaveConstruct()
+    : mSaveConstructArgsCallback(
+        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RMeshBlueprintThunk)
+      )
   {
-    gpg::RType* const typeInfo = blueprint_ser::ResolveCachedType<RMeshBlueprint>(gMeshBlueprintType);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
+    (void)std::atexit(&CleanupRMeshBlueprintSaveConstruct);
   }
 
   /**
-   * Address: 0x00518F60 (FUN_00518F60, sub_518F60)
+   * Address: 0x00519470 (FUN_00519470, gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::Init)
    *
    * What it does:
-   * Unlinks `RMeshBlueprintSaveConstruct` helper links and rewires self-links.
+   * Resolves `RMeshBlueprint` RTTI and installs this helper's
+   * save-construct-args callback into the type descriptor.
    */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintSaveConstructPrimary()
+  void RMeshBlueprintSaveConstruct::Init()
   {
-    return blueprint_ser::UnlinkHelperNode(gMeshBlueprintSaveConstruct);
-  }
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
 
-  /**
-   * Address: 0x00518F90 (FUN_00518F90, sub_518F90)
-   *
-   * What it does:
-   * Secondary unlink thunk for `RMeshBlueprintSaveConstruct` helper links.
-   */
-  gpg::SerHelperBase* cleanup_RMeshBlueprintSaveConstructSecondary()
-  {
-    return cleanup_RMeshBlueprintSaveConstructPrimary();
-  }
-
-  /**
-   * Address: 0x00BC8550 (FUN_00BC8550, sub_BC8550)
-   *
-   * What it does:
-   * Initializes and registers global save-construct helper for
-   * `RMeshBlueprint`.
-   */
-  int register_RMeshBlueprintSaveConstruct()
-  {
-    blueprint_ser::InitializeHelperNode(gMeshBlueprintSaveConstruct);
-    gMeshBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RMeshBlueprintThunk);
-    gMeshBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
-    return std::atexit(&CleanupMeshBlueprintSaveConstructAtexit);
+    gpg::RType* const type = blueprint_ser::ResolveCachedType<RMeshBlueprint>(RMeshBlueprint::sType);
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 } // namespace moho
-
-namespace
-{
-  struct RMeshBlueprintSaveConstructBootstrap
-  {
-    RMeshBlueprintSaveConstructBootstrap()
-    {
-      (void)moho::register_RMeshBlueprintSaveConstruct();
-    }
-  };
-
-  RMeshBlueprintSaveConstructBootstrap gRMeshBlueprintSaveConstructBootstrap;
-} // namespace
-
