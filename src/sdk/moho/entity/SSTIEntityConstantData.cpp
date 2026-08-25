@@ -9,9 +9,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -32,13 +31,51 @@ namespace
     }
   };
 
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them.
-  struct SSTIEntityConstantDataSerializerHelperNode
+  /**
+   * Element-type reflection cache for `SSTIEntityConstantData` itself, mirroring
+   * the `Cached<Type>Type()`/`Resolve<Type>Type()` helpers used throughout this
+   * codebase for the same lazy-resolve-and-cache need (e.g. `CachedShieldType`
+   * in Shield.cpp).
+   */
+  [[nodiscard]] gpg::RType* CachedSSTIEntityConstantDataType()
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::SSTIEntityConstantData));
+    }
+    return sType;
+  }
+
+  /**
+   * VFTABLE: matches every other `SerSaveLoadHelper<T>` payload in this
+   * codebase (vtable + `moho::TDatListItem` link pair + load/save callback
+   * lanes = 0x14 bytes total).
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::SSTIEntityConstantData>
+   */
+  struct SSTIEntityConstantDataSerializerHelperNode : public gpg::SerHelperBase
+  {
+    /**
+     * Address: 0x00BC9FE0 vtable slot 0 dispatch target (dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
+     * the pending list).
+     *
+     * What it does:
+     * Binds this helper's already-cited load/save callbacks
+     * (`DeserializeSSTIEntityConstantDataSerializerCallback` /
+     * `SerializeSSTIEntityConstantDataSerializerCallback`) onto
+     * `SSTIEntityConstantData`'s reflected type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = CachedSSTIEntityConstantDataType();
+      GPG_ASSERT(type != nullptr);
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mSerLoadFunc;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerSaveFunc;
+    }
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
@@ -64,9 +101,9 @@ namespace
    * Unlinks `SSTIEntityConstantData` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityConstantDataSerializerLaneA() noexcept
+  void UnlinkSSTIEntityConstantDataSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityConstantDataSerializer.mListLinks);
+    gSSTIEntityConstantDataSerializer.ResetLinks();
   }
 
   /**
@@ -76,9 +113,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the
    * `SSTIEntityConstantData` serializer helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityConstantDataSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkSSTIEntityConstantDataSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityConstantDataSerializer.mListLinks);
+    gSSTIEntityConstantDataSerializer.ResetLinks();
   }
 
   /**
@@ -139,20 +176,22 @@ namespace
    */
   void cleanup_SSTIEntityConstantDataSerializer_atexit()
   {
-    (void)UnlinkSSTIEntityConstantDataSerializerLaneA();
+    UnlinkSSTIEntityConstantDataSerializerLaneA();
   }
 
   /**
    * Address: 0x00BC9FE0 (FUN_00BC9FE0, register_SSTIEntityConstantDataSerializer)
    *
    * What it does:
-   * Initializes the global `SSTIEntityConstantData` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`.
+   * Binds the global `SSTIEntityConstantData` serializer helper's load/save
+   * callback lanes and installs process-exit cleanup via `atexit`. The
+   * helper node self-links and splices into `gpg::SerHelperBase::sNewHelpers`
+   * automatically as part of its own construction (base-class construction
+   * order guarantees this runs before this function does), so this no longer
+   * needs to unlink/self-link the node itself before setting the callbacks.
    */
   void register_SSTIEntityConstantDataSerializer()
   {
-    (void)UnlinkSSTIEntityConstantDataSerializerLaneA();
     gSSTIEntityConstantDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityConstantDataSerializerCallback;
     gSSTIEntityConstantDataSerializer.mSerSaveFunc = &SerializeSSTIEntityConstantDataSerializerCallback;
     (void)std::atexit(&cleanup_SSTIEntityConstantDataSerializer_atexit);

@@ -202,8 +202,10 @@ namespace moho
   /**
    * VFTABLE: 0x00E17FA0
    * COL:  0x00E6C8FC
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::SSTIEntityVariableData>
    */
-  class SSTIEntityVariableDataSerializer
+  class SSTIEntityVariableDataSerializer : public gpg::SerHelperBase
   {
   public:
     /**
@@ -212,12 +214,12 @@ namespace moho
      *
      * What it does:
      * Binds prebuilt load/save callbacks into `SSTIEntityVariableData` RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };

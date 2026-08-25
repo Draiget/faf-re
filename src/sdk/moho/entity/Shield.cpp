@@ -8,7 +8,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/lua/CScrLuaBaseClassSpec.h"
@@ -41,7 +41,16 @@ namespace
   constexpr std::uint32_t kShieldCollisionBucketFlags = 0x800u;
   constexpr std::uint32_t kShieldFamilyMaskSourceBits = 0x400u;
   constexpr std::uint32_t kInvalidArmySourceIndex = 0xFFu;
-  gpg::SerSaveLoadHelperListRuntime gShieldSerializerHelper{};
+
+  // `moho::ShieldSerializer` (Shield.h) is the real `SerSaveLoadHelper<Shield>`
+  // payload type these two lanes are named after, but no global instance of it
+  // exists anywhere in the recovered tree yet -- its RTTI-binding wiring is a
+  // separate, not-yet-recovered gap. This node exists solely so the two real
+  // FUN_ addresses below keep a typed, self-linking intrusive node to operate
+  // on; it deliberately reuses the project's own `moho::TDatListItem` node
+  // (the same base `gpg::SerHelperBase` itself derives from) instead of the
+  // deprecated `gpg::SerSaveLoadHelperListRuntime` reach-in view.
+  moho::TDatListItem<gpg::SerHelperBase, void> gShieldSerializerHelper{};
 
   /**
    * Address: 0x007769C0 (FUN_007769C0, SerSaveLoadHelper<Shield>::unlink lane A)
@@ -50,9 +59,9 @@ namespace
    * Unlinks `ShieldSerializer` helper node from the intrusive helper list and
    * restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkShieldSerializerNodeVariantA() noexcept
+  [[maybe_unused]] void UnlinkShieldSerializerNodeVariantA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gShieldSerializerHelper);
+    gShieldSerializerHelper.ListUnlinkSelf();
   }
 
   /**
@@ -61,9 +70,9 @@ namespace
    * What it does:
    * Duplicate unlink/reset lane for the `ShieldSerializer` helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkShieldSerializerNodeVariantB() noexcept
+  [[maybe_unused]] void UnlinkShieldSerializerNodeVariantB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gShieldSerializerHelper);
+    gShieldSerializerHelper.ListUnlinkSelf();
   }
 
   gpg::RType* CachedShieldType()

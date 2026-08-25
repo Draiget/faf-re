@@ -11,7 +11,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
@@ -19,7 +19,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityId.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
-#include "moho/resource/RScmResource.h"
+#include "moho/resource/RScmResource.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -61,26 +61,55 @@ namespace
 
   moho::SSTIEntityVariableDataSerializer gSSTIEntityVariableDataSerializer{};
 
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer
-  // in this codebase) - `gpg::SerSaveLoadHelperListRuntime` only models the
-  // leading 0x0C-byte intrusive-list header shared by all of them, so it
-  // undersized this specific global. Use the full shape here instead.
-  struct EntityAttributesSerializerHelper
+  constexpr const char* kSerializationHeaderPath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
+
+  // Defined further below (needs ResolveTypeByAnyName, defined later still);
+  // forward-declared so `EntityAttributesSerializerHelper::Init` below can
+  // call it -- inline member bodies are a complete-class context, but the
+  // free function they call must already be visible by name.
+  [[nodiscard]] gpg::RType* ResolveEntityAttributesType();
+
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::EntityAttributes>
+   *
+   * The binary global is 0x14 bytes (vtable + `moho::TDatListItem` link pair
+   * + load/save callback lanes, matching every other SerHelperBase-derived
+   * serializer in this codebase).
+   */
+  struct EntityAttributesSerializerHelper : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
+    /**
+     * Address: 0x00BCA0A0 vtable slot 0 dispatch target (dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
+     * the pending list).
+     *
+     * What it does:
+     * Binds this helper's already-cited load/save callbacks
+     * (`DeserializeEntityAttributesSerializerCallback` /
+     * `SerializeEntityAttributesSerializerCallback`) onto `EntityAttributes`'s
+     * reflected type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = ResolveEntityAttributesType();
+      GPG_ASSERT(type != nullptr);
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mLoadCallback;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSaveCallback;
+    }
+
     gpg::RType::load_func_t mLoadCallback = nullptr;
     gpg::RType::save_func_t mSaveCallback = nullptr;
   };
   static_assert(
-    offsetof(EntityAttributesSerializerHelper, mNext) == 0x04,
-    "EntityAttributesSerializerHelper::mNext offset must be 0x04"
+    offsetof(EntityAttributesSerializerHelper, mLoadCallback) == 0x0C,
+    "EntityAttributesSerializerHelper::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(EntityAttributesSerializerHelper, mPrev) == 0x08,
-    "EntityAttributesSerializerHelper::mPrev offset must be 0x08"
+    offsetof(EntityAttributesSerializerHelper, mSaveCallback) == 0x10,
+    "EntityAttributesSerializerHelper::mSaveCallback offset must be 0x10"
   );
   static_assert(
     sizeof(EntityAttributesSerializerHelper) == 0x14, "EntityAttributesSerializerHelper size must be 0x14"
@@ -88,23 +117,63 @@ namespace
 
   EntityAttributesSerializerHelper gEntityAttributesSerializer{};
 
-  // Same 0x14-byte SerHelperBase-derived shape as gEntityAttributesSerializer
-  // above (vtable + mNext/mPrev + load/save callback lanes) -- reused here
-  // rather than duplicating the layout for a second serializer global.
-  EntityAttributesSerializerHelper gSSTIEntityAttachInfoSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    EntityAttributesSerializerHelper& helper
-  ) noexcept
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::SSTIEntityAttachInfo>
+   *
+   * Same 0x14-byte SerHelperBase-derived shape as `EntityAttributesSerializerHelper`
+   * above (vtable + `moho::TDatListItem` link pair + load/save callback
+   * lanes) but binds a different reflected type, so it needs its own `Init`
+   * override -- kept as a distinct type instead of reusing
+   * `EntityAttributesSerializerHelper` for a second serializer global.
+   */
+  struct SSTIEntityAttachInfoSerializerHelper : public gpg::SerHelperBase
   {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
-  }
+    /**
+     * Address: 0x00558B20 (FUN_00558B20, gpg::SerSaveLoadHelper_SSTIEntityAttachInfo::Init)
+     *
+     * What it does:
+     * Resolves reflected type metadata for `SSTIEntityAttachInfo` and binds
+     * this helper's load/save callback lanes into that RTTI entry.
+     */
+    void Init() override
+    {
+      gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
+      if (type == nullptr) {
+        type = gpg::LookupRType(typeid(moho::SSTIEntityAttachInfo));
+        moho::SSTIEntityAttachInfo::sType = type;
+      }
 
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime&
-  AsSerSaveLoadHelperListRuntime(moho::SSTIEntityVariableDataSerializer& serializer) noexcept
-  {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&serializer);
-  }
+      if (type->serLoadFunc_ != nullptr) {
+        gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
+      }
+
+      const bool saveWasNull = type->serSaveFunc_ == nullptr;
+      type->serLoadFunc_ = mLoadCallback;
+
+      if (!saveWasNull) {
+        gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
+      }
+
+      type->serSaveFunc_ = mSaveCallback;
+    }
+
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(SSTIEntityAttachInfoSerializerHelper, mLoadCallback) == 0x0C,
+    "SSTIEntityAttachInfoSerializerHelper::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSTIEntityAttachInfoSerializerHelper, mSaveCallback) == 0x10,
+    "SSTIEntityAttachInfoSerializerHelper::mSaveCallback offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SSTIEntityAttachInfoSerializerHelper) == 0x14,
+    "SSTIEntityAttachInfoSerializerHelper size must be 0x14"
+  );
+
+  SSTIEntityAttachInfoSerializerHelper gSSTIEntityAttachInfoSerializer{};
 
   /**
    * Address: 0x005583C0 (FUN_005583C0, SerSaveLoadHelper<SSTIEntityAttachInfo>::unlink lane A)
@@ -113,9 +182,9 @@ namespace
    * Unlinks `SSTIEntityAttachInfo` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
+  void UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityAttachInfoSerializer));
+    gSSTIEntityAttachInfoSerializer.ResetLinks();
   }
 
   /**
@@ -125,9 +194,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the
    * `SSTIEntityAttachInfo` serializer helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkSSTIEntityAttachInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityAttachInfoSerializer));
+    gSSTIEntityAttachInfoSerializer.ResetLinks();
   }
 
   /**
@@ -187,21 +256,21 @@ namespace
    */
   void cleanup_SSTIEntityAttachInfoSerializer_atexit()
   {
-    (void)UnlinkSSTIEntityAttachInfoSerializerLaneA();
+    UnlinkSSTIEntityAttachInfoSerializerLaneA();
   }
 
   /**
    * Address: 0x00BCA040 (FUN_00BCA040, register_SSTIEntityAttachInfoSerializer)
    *
    * What it does:
-   * Initializes the global SSTIEntityAttachInfo serializer helper callbacks
-   * and installs process-exit cleanup.
+   * Binds the global SSTIEntityAttachInfo serializer helper callbacks and
+   * installs process-exit cleanup. The helper node self-links and splices
+   * into `gpg::SerHelperBase::sNewHelpers` automatically as part of its own
+   * construction, which runs before this function does, so this no longer
+   * needs to unlink/self-link the node itself first.
    */
   void register_SSTIEntityAttachInfoSerializer()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gSSTIEntityAttachInfoSerializer.mNext);
-    gSSTIEntityAttachInfoSerializer.mNext = self;
-    gSSTIEntityAttachInfoSerializer.mPrev = self;
     gSSTIEntityAttachInfoSerializer.mLoadCallback = &DeserializeSSTIEntityAttachInfoSerializerCallback;
     gSSTIEntityAttachInfoSerializer.mSaveCallback = &SerializeSSTIEntityAttachInfoSerializerCallback;
     (void)std::atexit(&cleanup_SSTIEntityAttachInfoSerializer_atexit);
@@ -214,9 +283,9 @@ namespace
    * Unlinks `EntityAttributes` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkEntityAttributesSerializerLaneA() noexcept
+  void UnlinkEntityAttributesSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gEntityAttributesSerializer));
+    gEntityAttributesSerializer.ResetLinks();
   }
 
   /**
@@ -226,9 +295,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the
    * `EntityAttributes` serializer helper node.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkEntityAttributesSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkEntityAttributesSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gEntityAttributesSerializer));
+    gEntityAttributesSerializer.ResetLinks();
   }
 
   void DeserializeEntityAttributesSerializerCallback(
@@ -253,21 +322,21 @@ namespace
 
   void cleanup_EntityAttributesSerializer_atexit()
   {
-    (void)UnlinkEntityAttributesSerializerLaneA();
+    UnlinkEntityAttributesSerializerLaneA();
   }
 
   /**
    * Address: 0x00BCA0A0 (FUN_00BCA0A0, register_EntityAttributesSerializer)
    *
    * What it does:
-   * Initializes the global EntityAttributes serializer helper callbacks and
-   * installs process-exit cleanup.
+   * Binds the global EntityAttributes serializer helper callbacks and
+   * installs process-exit cleanup. The helper node self-links and splices
+   * into `gpg::SerHelperBase::sNewHelpers` automatically as part of its own
+   * construction, which runs before this function does, so this no longer
+   * needs to unlink/self-link the node itself first.
    */
   void register_EntityAttributesSerializer()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEntityAttributesSerializer.mNext);
-    gEntityAttributesSerializer.mNext = self;
-    gEntityAttributesSerializer.mPrev = self;
     gEntityAttributesSerializer.mLoadCallback = &DeserializeEntityAttributesSerializerCallback;
     gEntityAttributesSerializer.mSaveCallback = &SerializeEntityAttributesSerializerCallback;
     (void)std::atexit(&cleanup_EntityAttributesSerializer_atexit);
@@ -280,9 +349,9 @@ namespace
    * Unlinks `SSTIEntityVariableData` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
+  void UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityVariableDataSerializer));
+    gSSTIEntityVariableDataSerializer.ResetLinks();
   }
 
   /**
@@ -292,9 +361,9 @@ namespace
    * Mirrors lane A unlink/self-link reset for the
    * `SSTIEntityVariableData` serializer helper node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneB() noexcept
+  [[maybe_unused]] void UnlinkSSTIEntityVariableDataSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityVariableDataSerializer));
+    gSSTIEntityVariableDataSerializer.ResetLinks();
   }
 
   void DeserializeSSTIEntityVariableDataSerializerCallback(
@@ -331,15 +400,16 @@ namespace
    * Address: 0x005588D0 (FUN_005588D0)
    *
    * What it does:
-   * Initializes callback lanes for global `SSTIEntityVariableDataSerializer`
-   * helper storage and returns that helper object.
+   * Binds callback lanes for global `SSTIEntityVariableDataSerializer`
+   * helper storage and returns that helper object. The helper node
+   * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
+   * automatically as part of its own construction, which runs before this
+   * function does, so this no longer needs to unlink/self-link the node
+   * itself first.
    */
   [[nodiscard]] moho::SSTIEntityVariableDataSerializer*
   InitializeSSTIEntityVariableDataSerializerStartupThunk()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gSSTIEntityVariableDataSerializer.mNext);
-    gSSTIEntityVariableDataSerializer.mPrev = self;
-    gSSTIEntityVariableDataSerializer.mNext = self;
     gSSTIEntityVariableDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityVariableDataSerializerCallback;
     gSSTIEntityVariableDataSerializer.mSerSaveFunc = &SerializeSSTIEntityVariableDataSerializerCallback;
     return &gSSTIEntityVariableDataSerializer;
@@ -347,7 +417,7 @@ namespace
 
   void cleanup_SSTIEntityVariableDataSerializer_atexit()
   {
-    (void)UnlinkSSTIEntityVariableDataSerializerLaneA();
+    UnlinkSSTIEntityVariableDataSerializerLaneA();
   }
 
   /**
@@ -758,66 +828,6 @@ namespace
     return CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
   }
 
-  constexpr const char* kSerializationHeaderPath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
-  struct SerSaveLoadHelperInitRuntimeView
-  {
-    void* mVTable = nullptr;                    // +0x00
-    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
-    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
-    gpg::RType::load_func_t mLoadCallback = nullptr; // +0x0C
-    gpg::RType::save_func_t mSaveCallback = nullptr; // +0x10
-  };
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperNext) == 0x04,
-    "SerSaveLoadHelperInitRuntimeView::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperPrev) == 0x08,
-    "SerSaveLoadHelperInitRuntimeView::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mLoadCallback) == 0x0C,
-    "SerSaveLoadHelperInitRuntimeView::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerSaveLoadHelperInitRuntimeView, mSaveCallback) == 0x10,
-    "SerSaveLoadHelperInitRuntimeView::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(SerSaveLoadHelperInitRuntimeView) == 0x14,
-    "SerSaveLoadHelperInitRuntimeView size must be 0x14"
-  );
-
-  /**
-   * Address: 0x00558B20 (FUN_00558B20, gpg::SerSaveLoadHelper_SSTIEntityAttachInfo::Init)
-   *
-   * What it does:
-   * Resolves reflected type metadata for `SSTIEntityAttachInfo` and binds one
-   * serializer helper's load/save callback lanes into that RTTI entry.
-   */
-  void InstallSSTIEntityAttachInfoSerializerCallbacks(SerSaveLoadHelperInitRuntimeView* const helper)
-  {
-    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SSTIEntityAttachInfo));
-      moho::SSTIEntityAttachInfo::sType = type;
-    }
-
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
-    }
-
-    const bool saveWasNull = type->serSaveFunc_ == nullptr;
-    type->serLoadFunc_ = helper->mLoadCallback;
-
-    if (!saveWasNull) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
-    }
-
-    type->serSaveFunc_ = helper->mSaveCallback;
-  }
 } // namespace
 
 namespace moho
@@ -1188,8 +1198,14 @@ namespace moho
 
   /**
    * Address: 0x00558E40 (FUN_00558E40, sub_558E40)
+   *
+   * What it does:
+   * Binds this helper's already-cited load/save callbacks onto
+   * `SSTIEntityVariableData`'s reflected type descriptor. Dispatched by
+   * `gpg::SerHelperBase::InitNewHelpers` when this helper is drained from
+   * the pending list (vtable slot 0).
    */
-  void SSTIEntityVariableDataSerializer::RegisterSerializeFunctions()
+  void SSTIEntityVariableDataSerializer::Init()
   {
     gpg::RType* type = SSTIEntityVariableData::sType;
     if (type == nullptr) {

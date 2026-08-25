@@ -9,7 +9,6 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -44,6 +43,15 @@ namespace
     static gpg::RType* type = nullptr;
     if (type == nullptr) {
       type = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCFactoryBuildTaskType()
+  {
+    static gpg::RType* type = nullptr;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CFactoryBuildTask));
     }
     return type;
   }
@@ -558,12 +566,36 @@ namespace moho
 
 namespace
 {
-  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
-  // callback lanes, matching every other SerHelperBase-derived serializer in
-  // this codebase).
-  struct CFactoryBuildTaskSerializerHelperNode
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CFactoryBuildTask>
+   *
+   * The binary global is 0x14 bytes (vtable + `moho::TDatListItem` link pair
+   * + load/save callback lanes, matching every other SerHelperBase-derived
+   * serializer in this codebase).
+   */
+  struct CFactoryBuildTaskSerializerHelperNode : public gpg::SerHelperBase
   {
-    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    /**
+     * Address: 0x00BCF9B0 vtable slot 0 dispatch target (dispatched by
+     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
+     * the pending list).
+     *
+     * What it does:
+     * Binds this helper's already-cited load/save callbacks
+     * (`DeserializeCFactoryBuildTaskSerializerCallback` /
+     * `SerializeCFactoryBuildTaskSerializerCallback`) onto
+     * `CFactoryBuildTask`'s reflected type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = ResolveCFactoryBuildTaskType();
+      GPG_ASSERT(type != nullptr);
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mSerLoadFunc;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSerSaveFunc;
+    }
+
     gpg::RType::load_func_t mSerLoadFunc = nullptr;
     gpg::RType::save_func_t mSerSaveFunc = nullptr;
   };
@@ -586,9 +618,9 @@ namespace
    * Unlinks `CFactoryBuildTaskSerializer` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCFactoryBuildTaskSerializerNodePrimary()
+  void UnlinkCFactoryBuildTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCFactoryBuildTaskSerializer.mListLinks);
+    gCFactoryBuildTaskSerializer.ResetLinks();
   }
 
   /**
@@ -647,20 +679,22 @@ namespace
    */
   void cleanup_CFactoryBuildTaskSerializer_atexit()
   {
-    (void)UnlinkCFactoryBuildTaskSerializerNodePrimary();
+    UnlinkCFactoryBuildTaskSerializerNodePrimary();
   }
 
   /**
    * Address: 0x00BCF9B0 (FUN_00BCF9B0, register_CFactoryBuildTaskSerializer)
    *
    * What it does:
-   * Initializes the global `CFactoryBuildTask` serializer helper's
-   * load/save callback lanes (self-linking the intrusive helper node) and
-   * installs process-exit cleanup via `atexit`.
+   * Binds the global `CFactoryBuildTask` serializer helper's load/save
+   * callback lanes and installs process-exit cleanup via `atexit`. The
+   * helper node self-links and splices into `gpg::SerHelperBase::sNewHelpers`
+   * automatically as part of its own construction, which runs before this
+   * function does, so this no longer needs to unlink/self-link the node
+   * itself first.
    */
   void register_CFactoryBuildTaskSerializer()
   {
-    (void)UnlinkCFactoryBuildTaskSerializerNodePrimary();
     gCFactoryBuildTaskSerializer.mSerLoadFunc = &DeserializeCFactoryBuildTaskSerializerCallback;
     gCFactoryBuildTaskSerializer.mSerSaveFunc = &SerializeCFactoryBuildTaskSerializerCallback;
     (void)std::atexit(&cleanup_CFactoryBuildTaskSerializer_atexit);

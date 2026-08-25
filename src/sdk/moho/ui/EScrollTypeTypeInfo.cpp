@@ -7,9 +7,10 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/StaticTypeInfoStorage.h"
+#include "moho/containers/TDatList.h"
 
 namespace
 {
@@ -84,24 +85,29 @@ namespace
 {
   // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
   // callback lanes) -- same shape as the sibling CUnitFerryTask /
-  // CUnitCarrierRetrieve serializer-helper globals in
-  // gpg/core/reflection/SerSaveLoadHelperListRuntime.h.
+  // CUnitCarrierRetrieve serializer-helper globals, and byte-identical to
+  // `gpg::SerSaveLoadHelperInitView` (gpg/core/containers/ArchiveSerialization.cpp),
+  // the runtime view `InstallMohoEScrollTypeSerializerCallbacks` (0x00777E20)
+  // actually binds through when it drains this helper's load/save lanes onto
+  // `EScrollType`'s reflected RType by looked-up type name. That install
+  // function -- and the dispatcher that calls it -- lives outside this file
+  // and is not part of this pass; this struct only replaces its hand-rolled
+  // `gpg::SerHelperBase* mNext, mPrev` pair with the project's real
+  // `moho::TDatListItem` node (the same base `gpg::SerHelperBase` itself
+  // derives from) so the two lanes below stop routing through the deprecated
+  // `gpg::SerSaveLoadHelperListRuntime` reach-in view. It deliberately does
+  // NOT inherit `gpg::SerHelperBase` here: that would require this file to
+  // also own binding this helper's callbacks onto `EScrollType`'s RType (an
+  // `Init()` override), which is the job the real, already-cited
+  // `InstallMohoEScrollTypeSerializerCallbacks` performs elsewhere -- adding a
+  // second, competing binder here would risk double-registering the callback.
   struct EScrollTypePrimitiveSerializerHelper
   {
     void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
+    moho::TDatListItem<gpg::SerHelperBase, void> mLink{};
     gpg::RType::load_func_t mLoadCallback = nullptr;
     gpg::RType::save_func_t mSaveCallback = nullptr;
   };
-  static_assert(
-    offsetof(EScrollTypePrimitiveSerializerHelper, mNext) == 0x04,
-    "EScrollTypePrimitiveSerializerHelper::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EScrollTypePrimitiveSerializerHelper, mPrev) == 0x08,
-    "EScrollTypePrimitiveSerializerHelper::mPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(EScrollTypePrimitiveSerializerHelper, mLoadCallback) == 0x0C,
     "EScrollTypePrimitiveSerializerHelper::mLoadCallback offset must be 0x0C"
@@ -116,13 +122,6 @@ namespace
   );
 
   EScrollTypePrimitiveSerializerHelper gEScrollTypePrimitiveSerializer{};
-
-  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
-    EScrollTypePrimitiveSerializerHelper& helper
-  ) noexcept
-  {
-    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
-  }
 
   /**
    * Address: 0x00777FF0 (FUN_00777FF0, gpg::PrimitiveSerHelper<Moho::EScrollType,int>::Deserialize)
@@ -185,14 +184,14 @@ namespace
    * via `atexit`. Unlinks the global `PrimitiveSerHelper<EScrollType,int>`
    * helper node and restores its self-linked sentinel state.
    */
-  [[nodiscard]] gpg::SerHelperBase* CleanupEScrollTypePrimitiveSerializerAtExit()
+  void CleanupEScrollTypePrimitiveSerializerAtExit() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gEScrollTypePrimitiveSerializer));
+    gEScrollTypePrimitiveSerializer.mLink.ListUnlinkSelf();
   }
 
   void cleanup_EScrollTypePrimitiveSerializer_atexit()
   {
-    (void)CleanupEScrollTypePrimitiveSerializerAtExit();
+    CleanupEScrollTypePrimitiveSerializerAtExit();
   }
 
   /**
@@ -200,21 +199,21 @@ namespace
    *
    * What it does:
    * Static-init constructor for the global
-   * `gpg::PrimitiveSerHelper<Moho::EScrollType,int>` helper: self-links its
-   * intrusive-list node, binds `DeserializeEScrollTypeSerializerCallback` /
+   * `gpg::PrimitiveSerHelper<Moho::EScrollType,int>` helper: binds
+   * `DeserializeEScrollTypeSerializerCallback` /
    * `SerializeEScrollTypeSerializerCallback` as its load/save callbacks
    * (real typed `load_func_t`/`save_func_t`, no type erasure needed --
    * matching the CUnitFerryTask/CUnitCarrierRetrieve registration shape),
-   * and installs process-exit cleanup. The callbacks are later copied onto
+   * and installs process-exit cleanup. `gEScrollTypePrimitiveSerializer.mLink`
+   * self-links as part of the global's own construction (its `moho::TDatListItem`
+   * default constructor), which runs before this function does, so this no
+   * longer needs to self-link the node itself. The callbacks are later copied onto
    * `EScrollType`'s reflected `RType` by `InstallMohoEScrollTypeSerializerCallbacks`
    * (0x00777E20, in ArchiveSerialization.cpp) when the pending helper list
    * is drained.
    */
   void register_EScrollTypePrimitiveSerializer()
   {
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEScrollTypePrimitiveSerializer.mNext);
-    gEScrollTypePrimitiveSerializer.mNext = self;
-    gEScrollTypePrimitiveSerializer.mPrev = self;
     gEScrollTypePrimitiveSerializer.mLoadCallback = &DeserializeEScrollTypeSerializerCallback;
     gEScrollTypePrimitiveSerializer.mSaveCallback = &SerializeEScrollTypeSerializerCallback;
     (void)std::atexit(&cleanup_EScrollTypePrimitiveSerializer_atexit);
