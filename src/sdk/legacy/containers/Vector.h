@@ -2091,6 +2091,25 @@ namespace msvc8
          * helper - external") -- `SSTIArmyVariableData` is this project's
          * own engine type (`moho/sim/SSTIArmyVariableData.h`), not generic/
          * external.
+         *
+         * Address: 0x005C6D10 (FUN_005C6D10, msvc8::vector<Moho::
+         * SPerArmyReconInfo>::reserve for the 52-byte element) -- exact
+         * shape of this member: early return when `newCap <= capacity()`
+         * (`result < a2` guard on the current `(myEnd-myFirst)/52` capacity),
+         * max_size guard against `0x4EC4EC4` (`0xFFFFFFFF/52`, throw lane
+         * `FUN_005C7290`, cited on `throw_too_long` above), checked
+         * allocation via `FUN_005C9F40` (cited below on
+         * `allocate_slots_checked`), uninit-copies the live range through
+         * `FUN_005CE020` (a separate compiled `uninit_copy_n` copy for this
+         * call site, cited below), then destroys and frees the old buffer
+         * and rebases the three lanes. Reached from `LoadVectorSPerArmyReconInfo`
+         * (`FUN_005C5700`, `ArchiveSerialization.cpp`) as `loaded.reserve(
+         * count)`, called immediately after reading the archived element
+         * count and before the per-element read loop -- confirmed against
+         * the `.c`: `sub_5C6D10(&v9, a6)` is the first call after
+         * `ReadUInt`. DB-integrity fix: was fake-recovered (batch r14/
+         * codex-needs-evidence, zero real src/sdk citation for this token or
+         * its caller `FUN_005C3EF0`).
          */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
@@ -2710,6 +2729,44 @@ namespace msvc8
          * option);` in `DeviceD3D9::BuildDeviceCapabilities`
          * (`FUN_008F2080`, `D3D9Interfaces.cpp`, already recovered) while
          * enumerating multisample options.)
+         * Address: 0x0064E120 (FUN_0064E120, sub_64E120) --
+         * `msvc8::vector<moho::SDebugScreenText>::push_back` for
+         * `CDebugCanvas::screenText` (`CDebugCanvas.h`, 0x48-byte element).
+         * Same two-way split as this member's other instantiations:
+         * `size()<capacity()` fast path constructs at `_Mylast` through the
+         * `uninit_fill_n` core `FUN_0064F910` (`n=1`, cited below on
+         * `uninit_fill_n`) then advances `_Mylast` by 0x48 in place; the
+         * capacity-exhausted path tail-jumps into the single-element
+         * `insert(end(), value)` wrapper `FUN_0064E2F0` (cited above on
+         * `insert`), whose grow core is the count=1-specialized `_Insert_n`
+         * emission `FUN_0064E490` (cited below on `insert(pos,count,
+         * value)`). DB-integrity fix: was mis-tagged `recovered` citing
+         * "Cited on the canonical template" -- the address did not appear
+         * anywhere in `src/sdk` at all; this is the real recovery.
+         * Caller-evidence note: this token's own only caller,
+         * `FUN_0064CC70` (`sub_64CC70`, `call sub_64E120` at 0x0064CCB5,
+         * confirmed via `FUN_0064E120.xrefs.txt`), builds a `SDebugScreenText`
+         * record from an oriented-label call and pushes it here -- but
+         * `FUN_0064CC70` itself has zero incoming xrefs of any kind (code,
+         * data, or vtable) after an exhaustive search: its own
+         * `.xrefs.txt`/`.meta.json` are empty, the callgraph index's lone
+         * `call_edges` row into it (from `FUN_0064E490`) is contradicted by
+         * `FUN_0064E490`'s own disassembly (no `call sub_64CC70` appears
+         * anywhere in it -- a phantom edge, most likely seeded from the same
+         * fabricated `depends_on` list this DB-integrity pass is correcting),
+         * and neither `RDebugGrid.cpp`'s `DrawGridCellRecursive` nor
+         * `RDebugRadar.cpp`'s `TraverseRadarCellsRecursive`/`DrawReconGrid`
+         * (the two already-recovered leaf renderers that plausibly would
+         * emit an oriented text label) currently call anything
+         * `SDebugScreenText`-shaped. `FUN_0064CC70` and its record-builder
+         * `FUN_0064CB90` are therefore left `wip` (not `recovered`, not
+         * `blocked`) pending discovery of their own real trigger site; this
+         * mirrors the "trivial calling-convention forwarders... have no
+         * discoverable callers of their own... recorded as such rather than
+         * guessed" precedent already on this file's `uninit_copy_n` member
+         * above. This `push_back` instantiation's own evidence (a real,
+         * direct, `.asm`-confirmed call from `FUN_0064CC70`) stands
+         * regardless of that upstream gap.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -3879,6 +3936,25 @@ namespace msvc8
          * `.asm`-confirmed call sites at 0x688529 (shift-insert,
          * `sub_688DF0(v16-20, v16)`) and 0x68859B (append-at-end,
          * `sub_688DF0(arg4, arg4+20)`).)
+         * Address: 0x0064E2F0 (FUN_0064E2F0, sub_64E2F0) --
+         * `msvc8::vector<moho::SDebugScreenText>::insert(iterator, const
+         * T&)` for the 0x48-byte element (`CDebugCanvas::screenText`).
+         * `.asm`-confirmed shape: `EDI@this` (register), stack args
+         * `(outIterator, pos)`, `ECX@value` (register, forwarded from this
+         * wrapper's own incoming `ECX`) -- captures `offset = (_Myfirst ==
+         * nullptr || size() == 0) ? 0 : (pos - _Myfirst)/0x48` before
+         * touching storage (the null/empty guard matches this member's own
+         * `size() == 0u` check field for field), tail-calls the count=1
+         * `_Insert_n` core `FUN_0064E490` with `(this, pos)` and `value`
+         * still in `ECX`, then rebuilds `*outIterator = _Myfirst + offset*
+         * 0x48` using the *new* `_Myfirst` (post-reallocation) -- the same
+         * "capture offset up front, rebuild after" idiom as this method's
+         * own body. Direct caller (`.asm`-confirmed, `call sub_64E2F0` at
+         * 0x0064E19E): `FUN_0064E120` (`push_back`, cited above), on its
+         * capacity-exhausted path with `pos = _Mylast`. DB-integrity fix:
+         * was mis-tagged `recovered` citing "Cited on the canonical
+         * template" -- the address did not appear anywhere in `src/sdk`;
+         * this is the real recovery.)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -4674,6 +4750,66 @@ namespace msvc8
          * `iterator` type (different `Key` in `list<pair<const Key,T>>`)
          * with the identical 4-byte-trivial shape, not ICF-folded across
          * because the two are separate instantiations.)
+         *
+         * Address: 0x0064E490 (FUN_0064E490, sub_64E490) -- the count=1
+         * `_Insert_n` core `msvc8::vector<moho::SDebugScreenText>::insert`
+         * (0x48-byte element, `CDebugCanvas::screenText`). `.asm`-confirmed
+         * calling shape: `this@arg_0` (stack), `pos@arg_4` (stack),
+         * `value@ECX` (register, unused directly -- forwarded straight into
+         * the entry-point copy below). Body:
+         *   - `sub_64EC50(EDI=value, ESI=&localTemp)` first, copy-
+         *     constructing `value` into a stack-local `SDebugScreenText`
+         *     (this member's own `const T localValue(value)` aliasing-safety
+         *     idiom -- `sub_64EC50` is this element's compiler-generated
+         *     copy ctor, cited on `SDebugScreenText.h`).
+         *   - `max_size()` guard folds to `0x38E38E3` (`0xFFFFFFFF/0x48`);
+         *     throws through `throw_too_long`'s `FUN_0064EE20` (cited below)
+         *     on overflow.
+         *   - Growth branch (`capacity() < size()+1`): 1.5x
+         *     `recommended_capacity` (`(cap>>1)+cap`, clamped to `size()+1`
+         *     via the out-of-line `size()` thunk `FUN_00452160` /
+         *     `GetDebugScreenTextCount`, `CDebugCanvas.h`), allocates
+         *     through `allocate_slots_checked`'s `FUN_0064F860` (cited
+         *     below), then relocates `[_Myfirst, pos)` into the new buffer
+         *     through `uninit_move_n`'s `FUN_00650160` (`ECX=srcBegin,
+         *     stack=(srcEnd=pos, dstBegin=newBuf)`, cited below), releases
+         *     the old buffer if the SSO-adjacent local exceeds inline
+         *     capacity, and rebinds `_Myfirst/_Mylast/_Myend` to the new
+         *     block sized via the `lea reg,[base+idx*8]`/`*9` stride-0x48
+         *     folds at 0x0064E64B-0x0064E65E.
+         *   - Tail-shift branch (`tail = (_Mylast-pos)/0x48`): `tail==0`
+         *     (append -- the only sub-branch `CDebugCanvas::screenText`'s
+         *     confirmed caller chain ever reaches, see `push_back`
+         *     `FUN_0064E120` above) constructs the new element at `_Mylast`
+         *     from `localTemp` through the advance-returning `_Ufill`
+         *     adapter `FUN_0064E360` (`count=1`, cited below on
+         *     `uninit_fill_n`) and advances `_Mylast` by 0x48; `tail>=1`
+         *     (mid-vector insert -- compiled as part of this shared
+         *     emission but never reached by any caller in this binary,
+         *     matching the documented `SDesyncInfo`/other-instantiation
+         *     precedent above) shifts the tail backward one slot through
+         *     the calling-convention adapter `FUN_0064F760` into
+         *     `CopyDebugScreenTextRangeBackward` (`FUN_0064FFB0`,
+         *     `Vector.cpp`, already recovered) and fills the vacated slot
+         *     from `localTemp` via `FUN_0064E360` again.
+         *   - The reallocation branch's own head-copy call
+         *     (`sub_650160(ECX=_Myfirst, arg_0=pos, arg_4=newBuf)`) and the
+         *     append-branch's degenerate `sub_64F720(pos, pos+0x48)` call
+         *     (an empty-range no-op present only because this is the
+         *     shared general-position emission) are both this member's
+         *     `uninit_move_n`/its adapter, cited below.
+         * Direct caller (`.asm`-confirmed, `call sub_64E490` at
+         * 0x0064E33A): `FUN_0064E2F0` (`insert(iterator,const T&)`, cited
+         * above), with `count` folded to 1. DB-integrity fix: was
+         * mis-tagged `recovered` citing "Cited on the canonical template"
+         * -- `grep -n "64E490" src/sdk/legacy/containers/Vector.h` found
+         * nothing; this is the real recovery. The claimed dependency
+         * `FUN_0064CC70` in the stale note's `depends_on` list does **not**
+         * appear anywhere in this function's `.asm` (no `call sub_64CC70`)
+         * and is not part of this instantiation's real call graph -- see
+         * the caller-evidence note on `push_back` `FUN_0064E120` above for
+         * where that address actually fits (two hops further up, and
+         * itself still uncalled).
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5506,6 +5642,18 @@ namespace msvc8
          * thirteen were `[[maybe_unused]]` orphans with zero real callers.
          * Collapsed into this citation; the hand-rolled bodies are removed.
          *
+         * Address: 0x005CE020 (FUN_005CE020, msvc8::vector<Moho::
+         * SPerArmyReconInfo>::uninit_copy_n for the 52-byte element) --
+         * another separate compiled copy of this method for the same
+         * instantiation, reached from `reserve`'s (`FUN_005C6D10`, cited
+         * above) inlined growth path rather than `_Insert_n`'s (which
+         * already cites its own pair, `FUN_005CDAE0`/`FUN_005C9EC0`, above).
+         * Forward range-copy loop over `[src, srcEnd)` into `dst`, advancing
+         * both by 52 bytes per element and copy-constructing each slot
+         * through `FUN_005C84D0` (`SPerArmyReconInfo`'s copy ctor, cited
+         * elsewhere in this file); returns the one-past-the-end dst pointer.
+         * Matches this method's non-trivial-T loop exactly.
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -6081,6 +6229,42 @@ namespace msvc8
          * (desync detection). `FUN_0074DAC0` (the `_Ufill` adapter cited
          * above) forwards into this token too; corrected alongside it from
          * the same wrong `external_dependency` tag.
+         *
+         * Address: 0x0064F910 (FUN_0064F910, sub_64F910) --
+         * `msvc8::vector<moho::SDebugScreenText>::uninit_fill_n` for the
+         * 0x48-byte element (`CDebugCanvas::screenText`). Count-driven loop
+         * (`count` register-carried) that, per slot, copy-constructs
+         * `value` through this element's compiler-generated copy ctor
+         * `FUN_0064EC50` (cited on `SDebugScreenText.h`) and advances the
+         * destination by 0x48; the guard-list bookkeeping local
+         * (`v5[3]`/`v5[4]` in the decompile) is the VC8 SEH cleanup-scope
+         * idiom that destroys the already-constructed prefix through the
+         * element dtor `FUN_00453710` (already `skip`-tagged) and rethrows
+         * via `_CxxThrowException` on an exception mid-loop -- IDA's own
+         * `__noreturn` tag on this function (and its adapter below) is
+         * spurious, matching the documented pattern elsewhere in this file:
+         * both return normally on every path actually exercised by their
+         * callers. Called with `count=1` from `push_back`'s
+         * (`FUN_0064E120`, cited above) capacity-available fast path and
+         * from `_Insert_n`'s (`FUN_0064E490`, cited above on
+         * `insert(pos,count,value)`) reallocation-branch fill step. DB-
+         * integrity fix: was `recovered` citing "Cited on the canonical
+         * template" with no such citation anywhere in `src/sdk`; this is
+         * the real recovery.
+         * Address: 0x0064E360 (FUN_0064E360, sub_64E360) -- the
+         * advance-returning `_Ufill` adapter around `FUN_0064F910` above,
+         * for the same `SDebugScreenText` specialization: forwards its
+         * `EDI`-carried destination straight into `FUN_0064F910`, matching
+         * the `_Ufill` adapter shape already documented on
+         * `FUN_0074DAC0`/`FUN_0092EA50` above. Called once from `_Insert_n`
+         * `FUN_0064E490`'s at-end sub-branch (`count=1`) to construct the
+         * newly-appended element from the aliasing-safe local copy and
+         * obtain the advanced end pointer. DB-integrity fix: was
+         * mis-tagged `skip` ("`__noreturn` 1-statement tail-call typed
+         * throw shim") -- its only callee, `FUN_0064F910`, is this
+         * project's own `uninit_fill_n` core, not a throw lane; the
+         * `__noreturn` tag both functions carry is the same spurious-tag
+         * artifact called out above, not evidence of throw-only behavior.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -6570,6 +6754,45 @@ namespace msvc8
          * Sole caller `FUN_00869D30` is already `skip`-tagged (RULE ONE
          * compiler/template emission, `vector<T*>::_Insert` single-element,
          * stride 4, canonical home `Vector.h`).
+         *
+         * Address: 0x00650160 (FUN_00650160, sub_650160) --
+         * `msvc8::vector<moho::SDebugScreenText>::uninit_move_n` for the
+         * 0x48-byte element (`CDebugCanvas::screenText`). `.asm`-confirmed
+         * shape: `ECX=srcBegin` (register), stack args
+         * `(arg_0=srcEnd, arg_4=dstBegin)`; loops `while (src != srcEnd) {
+         * copy-construct *dst from *src via FUN_0064EC50; src+=0x48;
+         * dst+=0x48; }`, matching this member's non-trivial-`T` branch
+         * exactly (`::new (dst+i) T(src[i])` with `src[i]` an lvalue --
+         * VC8/2007 predates move semantics, so this member's "move" of the
+         * live range during grow/insert is a true copy through
+         * `SDebugScreenText`'s compiler-generated copy ctor `FUN_0064EC50`,
+         * cited on `SDebugScreenText.h`). On exception mid-loop, destroys
+         * the constructed destination prefix through the element dtor
+         * `FUN_00453710` (already `skip`-tagged) and rethrows -- the same
+         * EH-cleanup shape as `uninit_fill_n`'s `FUN_0064F910` above.
+         * Called directly from `_Insert_n`'s (`FUN_0064E490`, cited above
+         * on `insert(pos,count,value)`) reallocation branch to relocate
+         * `[_Myfirst, pos)` into the new buffer. DB-integrity fix: was
+         * mis-tagged `external_dependency` ("All-external-callees thunk...
+         * no Moho/gpg engine references") -- its only non-CRT callee,
+         * `FUN_0064EC50`, is this project's own `SDebugScreenText` copy
+         * ctor, not third-party runtime.
+         * Address: 0x0064F720 (FUN_0064F720, sub_64F720) -- a
+         * calling-convention adapter into `FUN_00650160` above, for the
+         * same `SDebugScreenText` specialization (`__fastcall`
+         * register/stack reshuffle, no logic of its own, matching the
+         * adapter idiom already documented throughout this file, e.g.
+         * `FUN_00688DF0`/`FUN_0092ED90` above). Called twice from
+         * `_Insert_n` `FUN_0064E490`: once in the reallocation branch's
+         * tail-relocate step, and once in the at-end sub-branch as a
+         * degenerate `sub_64F720(pos, pos+0x48)` empty-range no-op
+         * (present only because this is the shared general-position
+         * emission -- the same "harmless same-value rewrite on the at-end
+         * branch" shape already documented on the `SDesyncInfo`
+         * instantiation above). DB-integrity fix: was mis-tagged `skip`
+         * ("1-statement tail-call thunk (compiler-emitted ABI shim)") with
+         * no element-type identification; corrected to a real,
+         * address-cited adapter.
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -7166,6 +7389,21 @@ namespace msvc8
          * (stride 20, uses `func_ReleaseRefsRange_TrackedPointerInfo` and
          * locals typed `gpg::ReadArchive::TrackedPointerInfo*`).
          *
+         * sizeof(T) == 0x48 (72 bytes, `moho::SDebugScreenText`,
+         * `static_assert(sizeof==0x48)`, `SDebugScreenText.h`):
+         * Address: 0x0064F860 (FUN_0064F860, sub_64F860) -- `if (0xFFFFFFFF
+         * / count < 0x48) throw std::bad_alloc; return operator new(0x48 *
+         * count);`, this member's plain constant-folded-`max_size` shape.
+         * Sole `src/sdk`-reachable caller is `_Insert_n`'s `FUN_0064E490`
+         * (cited above on `insert(pos,count,value)`), called with `ECX =
+         * newCap` (the 1.5x-growth-or-needed-size candidate). Two further
+         * callers, `FUN_0064EEBF` and `FUN_0074E10F`, are not yet exported
+         * as their own functions in this namespace; not needed to satisfy
+         * this instantiation's caller evidence. DB-integrity fix: was
+         * `blocked` ("DB integrity revert... zero citation anywhere in
+         * src/sdk... needs real recovery from scratch"); this is that real
+         * recovery.
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
@@ -7291,6 +7529,18 @@ namespace msvc8
          * `0x3FFFFFFF - size() < count` guard. DB previously listed this
          * token `recovered` with a blank note and no citation anywhere in
          * `src/sdk` -- corrected here.)
+         * Address: 0x0064EE20 (FUN_0064EE20, sub_64EE20) -- the 0x48-byte-
+         * stride throw lane for `msvc8::vector<moho::SDebugScreenText>`,
+         * reached from the `_Insert_n` grow lane `FUN_0064E490`'s
+         * `size() == 0x38E38E3` (`0xFFFFFFFF/0x48`) `max_size` test, already
+         * cited above on `insert(pos,count,value)`. Builds `std::
+         * length_error("vector<T> too long")` via the same `std::string` +
+         * `std::logic_error::logic_error` + vtable-overwrite-to-
+         * `length_error` shape as this member's other emissions, then
+         * routes through `_CxxThrowException`. DB-integrity fix: was
+         * `recovered` citing "Cited on the canonical throw_too_long member"
+         * with no such citation anywhere in `src/sdk`; this is the real
+         * recovery.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

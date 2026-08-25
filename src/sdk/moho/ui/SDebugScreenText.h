@@ -10,6 +10,24 @@ namespace moho
 {
   /**
    * Address: 0x004516C0 (FUN_004516C0 payload in Moho::CDebugCanvas::Render)
+   * Address: 0x0064EC50 (FUN_0064EC50, the compiler-generated copy
+   * constructor -- memberwise-copies the three `Wm3::Vec3f` members
+   * (9 floats, offsets 0x00-0x24), default-constructs then `assign`s
+   * `text` (the standard VC8 SSO construct-then-assign idiom: capacity
+   * field set to 15, size set to 0, first inline byte set to 0, then
+   * `msvc8::string::assign` copies the real content), and copies
+   * `pointSize`/`color`. This struct has no user-declared special
+   * member, so this out-of-line body is pure compiler-emitted glue for
+   * the implicit copy constructor, not hand-written source (CLAUDE.md's
+   * "compiler-emitted glue is not source at all" applies directly).
+   * Reached from `msvc8::vector<SDebugScreenText>`'s `_Insert_n`
+   * (`FUN_0064E490`), `uninit_fill_n` (`FUN_0064F910`), and
+   * `uninit_move_n` (`FUN_00650160`) instantiations, all cited on their
+   * respective template members in `legacy/containers/Vector.h` --
+   * VC8/2007 predates C++ move semantics, so `uninit_move_n`'s
+   * "move" of the live range during grow/insert is this same copy
+   * constructor, matching the binary exactly (see that member's own
+   * citation for the `T(src[i])`-from-lvalue detail).
    *
    * What it does:
    * Carries one oriented world-space text draw command for debug rendering.
