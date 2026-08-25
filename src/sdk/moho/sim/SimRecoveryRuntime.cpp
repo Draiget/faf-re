@@ -4196,39 +4196,6 @@ TripleIntNodeRuntime* AllocateTripleIntNodeRuntime(
 }
 
 /**
- * Address: 0x006874E0 (FUN_006874E0)
- *
- * What it does:
- * Clears one linearized tree list lane by unlinking head sentinels and
- * deleting each chained node.
- */
-LinearTreeNodeRuntime* ClearLinearTreeStorageRuntime(
-  LinearTreeStorageRuntime* const storage
-)
-{
-  if (storage == nullptr || storage->head == nullptr) {
-    if (storage != nullptr) {
-      storage->size = 0u;
-    }
-    return nullptr;
-  }
-
-  LinearTreeNodeRuntime* const head = storage->head;
-  LinearTreeNodeRuntime* cursor = head->next;
-  head->next = head;
-  head->prev = head;
-  storage->size = 0u;
-
-  while (cursor != nullptr && cursor != head) {
-    LinearTreeNodeRuntime* const next = cursor->next;
-    ::operator delete(cursor);
-    cursor = next;
-  }
-
-  return cursor;
-}
-
-/**
  * Address: 0x006AFBF0 (FUN_006AFBF0)
  *
  * What it does:

@@ -2623,11 +2623,37 @@ namespace
   }
 
   /**
-   * Address: 0x00684310 (FUN_00684310)
+   * Address: 0x006874E0 (FUN_006874E0, sub_6874E0)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_6874E0@<eax>(int a1@<esi>);
    *
    * What it does:
-   * Destroys the entity-list sentinel head, releases each tracked node, and
-   * clears the cached head/size lanes.
+   * Releases every tracked node in `mEntityList`'s sentinel-headed circular
+   * list, self-links the sentinel back to empty, and clears the size lane.
+   * Does not free the sentinel head itself -- the caller (`~CEntityDb`)
+   * does that separately, matching the shipped body: `sub_6874E0(&mEntList)`
+   * followed directly by `operator delete(mEntList._Myhead)`.
+   *
+   * DB-integrity fix: this pair was previously mis-cited to `0x00684310`,
+   * which is a *different* function -- `CEntityDb::CEntityDb`'s SEH unwind
+   * funclet for `mIdPoolTree` (now correctly cited on `rb_tree::~rb_tree()`
+   * in `legacy/containers/RbTree.h`; it does not reference `mEntityList` at
+   * all). The real `0x006874E0` was independently (and correctly, in shape)
+   * recovered a second time as `ClearLinearTreeStorageRuntime` over a
+   * generic, untyped `LinearTreeStorageRuntime` reach-in in
+   * `SimRecoveryRuntime.cpp` -- removed there in the same pass as this fix,
+   * since this typed pair is `mEntityList`'s real, evidenced owner.
+   *
+   * Node value fields: `Purge()`'s own body (0x00684560) walks the same
+   * list through a differently-typed `_List_nod_Entity::_Node` (`{_Next,
+   * _Prev, _Myval}`) to reach each entry's `Entity*` for `dtr_Entity`, so
+   * real (non-sentinel) `mEntityList` nodes carry a third field this walk
+   * never reads. `ClearEntityListNodes` only ever touches `next`/`prev`
+   * (a valid common prefix, matching `sub_6874E0`'s own field-agnostic
+   * walk-and-delete shape), so the narrower `CEntityDbListHead` header is
+   * sufficient here; modelling the value field is `Purge()`'s own recovery
+   * question, not this pair's.
    */
   void DestroyEntityListRuntime(moho::CEntityDbEntityListRuntime& entityList) noexcept
   {
@@ -3347,6 +3373,23 @@ namespace moho
    * leaked the rest; `sub_688030`'s real argument, confirmed from
    * `std::map_IdPool::Deserialize`'s call site, is `head->parent`. The
    * container's own destructor does not have that bug.)
+   *
+   * `mAllUnits`'s teardown is the shipped body's direct call `sub_686EF0(
+   * this, &outIter, mAllUnits->_Myhead->_Left, mAllUnits->_Myhead)` --
+   * `EraseAllUnitsRange(leftmost(), header())`, cited on that member above
+   * (0x00686EF0) -- not an inlined recursive destroy. DB-integrity fix:
+   * this body previously called `DestroyAllUnitsSubtreeRecursive(mAllUnits
+   * ->left)` directly, i.e. from the *leftmost* node instead of the real
+   * root (`mAllUnits->parent`) -- the exact same wrong-root bug already
+   * documented and fixed for `mIdPoolTree` above, independently reintroduced
+   * here for `mAllUnits`. Since leftmost() has no left child by definition,
+   * that call would destroy at most leftmost's own right subtree and then
+   * stop, leaking essentially the entire all-units tree (every tracked
+   * `Unit`) on every `CEntityDb` teardown. Routing through the already-
+   * recovered `EraseAllUnitsRange` (which internally calls
+   * `DestroyAllUnitsSubtreeRecursive(head->parent)`, the correct root, via
+   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and
+   * matches the real call target.
    */
   CEntityDb::~CEntityDb()
   {
@@ -3361,10 +3404,7 @@ namespace moho
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
     if (mAllUnits != nullptr) {
-      DestroyAllUnitsSubtreeRecursive(mAllUnits->left);
-      mAllUnits->parent = mAllUnits;
-      mAllUnits->left = mAllUnits;
-      mAllUnits->right = mAllUnits;
+      (void)EraseAllUnitsRange(mAllUnits->left, mAllUnits);
     }
     ::operator delete(mAllUnits);
     mAllUnits = nullptr;
