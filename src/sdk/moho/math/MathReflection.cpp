@@ -2415,6 +2415,54 @@ extern "C" double __cdecl ceil(double value)
   return CeilScalarCore(value);
 }
 
+/**
+ * Address: 0x00A9AC84 (FUN_00A9AC84)
+ *
+ * IDA signature:
+ * double __cdecl sub_A9AC84(double a1);
+ *
+ * What it does:
+ * `ceil`'s x87 fallback body (the branch taken above when `global_mode_sse2`
+ * is unset or the FPU is not in the default environment). Per the .asm at
+ * 0x00A9AC84-0x00A9AD55: masks the FPU control word to round-toward-+inf
+ * (`sub_A9A813(dword_F3EE8C, 0xFFFF)`, saving the previous word), classifies
+ * the argument via `sub_A99EAA` (recovered as `RuntimeClassifyDoubleWords`
+ * above), and for +/-Inf or NaN inputs dispatches to `sub_A9A676`/
+ * `sub_A9A5C4` (both `external_dependency` -- CRT `_except`-style FP
+ * exception entry points) before returning the input unchanged. For
+ * ordinary finite inputs it calls `sub_AB7F03` (recovered as
+ * `RuntimeRoundDoubleToNearestFpuMode` -- its own doc calls it "distinct
+ * from floor/ceil's fixed-direction rounding", which is true in isolation:
+ * the direction comes entirely from the round-toward-+inf control word this
+ * function installs first, not from `sub_AB7F03` itself), then compares the
+ * rounded result against the original value and, only if they differ *and*
+ * the caller's original control word had the precision-exception mask
+ * clear, forwards to `sub_A9A676` to signal an inexact-result FP exception
+ * instead of returning normally. The control word is restored via a second
+ * `sub_A9A813` call on the masked-precision-exception and NaN/Inf-early-out
+ * paths, but *not* on the unmasked-precision-exception path (the original
+ * binary leaves the round-toward-+inf word in place there).
+ *
+ * This whole mechanism only diverges from plain arithmetic when the
+ * *caller's* FPU environment has already unmasked precision exceptions --
+ * something this engine never does (exceptions are masked by default and
+ * nothing in this codebase calls `_controlfp` to change that). Under the
+ * default environment this function's observable contract collapses to
+ * plain IEEE-754 `ceil`, which `CeilScalarCore` above already implements
+ * via `std::trunc` (including NaN/Inf pass-through and the negative-subunit
+ * `-0.0` lane) without needing the FPU-control-word dance. `sub_A9A813` and
+ * `sub_AB7F03` are already recovered in `CrtRuntimeHelpers.cpp`
+ * (`RuntimeSetFpuControlMasked`/`RuntimeRoundDoubleToNearestFpuMode`) but
+ * are not wired to a call here, since doing so would only reproduce the
+ * unmasked-precision-exception signaling path, which depends on two
+ * `external_dependency` CRT entry points (`sub_A9A676`/`sub_A9A5C4`) that
+ * have no recovered C++ signature to call by name. Classified
+ * `external_dependency`: this is MSVC8's statically-linked CRT `ceil.c`
+ * fallback body (the same `#pragma function(ceil)` situation as `ceil`
+ * above -- the compiler ships a real out-of-line body instead of
+ * intrinsic-ifying the call), not FAF-authored engine code, and its
+ * observable behavior is already covered by the existing recovery.
+ */
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
