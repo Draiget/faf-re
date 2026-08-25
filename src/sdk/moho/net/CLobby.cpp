@@ -11,6 +11,10 @@
 #include <typeinfo>
 #include <vector>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/range/iterator_range.hpp>
+
 #include "CClientManagerImpl.h"
 #include "CDiscoveryService.h"
 #include "CMessageStream.h"
@@ -391,13 +395,165 @@ namespace
    * int __cdecl func_GetIgnoreNames(std::vector_string *outNames, std::set_char separators);
    *
    * What it does:
-   * Splits global `lob_IgnoreNames` CSV text into trimmed ignore-name tokens
-   * used by `CLobby::ConnectToPeer`. The real binary takes the separator set
-   * by value and immediately copy-constructs a local from it
+   * Splits global `lob_IgnoreNames` CSV text into ignore-name tokens used by
+   * `CLobby::ConnectToPeer`. The real binary takes the separator set by
+   * value and immediately copy-constructs a local from it
    * (`sub_7CC2F0(&local.mSet, &separators)`) before consuming it in the
    * tokenizer pipeline; mirrored here as an explicit local copy so the
    * `msvc8::set<char>` copy constructor is genuinely invoked rather than
    * elided.
+   *
+   * The tokenizer pipeline itself is a genuine
+   * `boost::algorithm::split(Result, Input, is_any_of(Set), eCompress)`
+   * instantiation (`dependencies/boost_1_34_1/boost/algorithm/string/
+   * split.hpp` -> `iter_split` -> `token_finder`+`split_iterator`) -- this
+   * project's first, confirmed field-for-field against the vendored
+   * headers and, where a header read alone was ambiguous, against a
+   * throwaway MSVC probe that compiled those exact headers and printed
+   * real `sizeof`/`offsetof` (see the recovery report for the probe
+   * source). A prior pass on part of this family (`FUN_007CDFB0`/
+   * `FUN_007CE8B0`, re-homed from `LegacyContainerFillLanes.cpp` -- see
+   * that file's note at the old location) invented "deferred cursor lane"
+   * semantics instead of recognizing the boost origin; another pass
+   * marked the driver functions `skip`/`external_dependency` on the
+   * theory that a template emission has nothing left to recover -- both
+   * wrong. Per RULE ONE, the call below *is* the recovery: every address
+   * in this note is `recovered`, cited here, once this call compiles.
+   *
+   * Was previously elided behind a hand-rolled `SplitBySeparatorSet`
+   * (comma/whitespace scan with an explicit trim pass). That trim pass was
+   * an invention: `is_any_ofF<char>`'s predicate tests set membership only
+   * (`m_Set.find(ch)!=m_Set.end()`), so the shipped binary does *not* trim
+   * whitespace around tokens -- `"A, B"` really does split to `{"A", " B"}`.
+   * `SplitBySeparatorSet` is removed (StringUtils.h/.cpp) now that its one
+   * caller calls the real pipeline.
+   *
+   * Address roster for this instantiation (all reached only from this call
+   * per `_callgraph_index.sqlite`/the `.asm` exports read for this pass):
+   *
+   *   - 0x007CCA70 (FUN_007CCA70) -- builds `token_finderF<is_any_ofF<
+   *     char>>` from the separator set (`is_any_ofF<char>` via
+   *     `FUN_007CD300`, then folds in the `token_compress_mode_type`
+   *     lane). Calls the already-recovered `msvc8::set<char>` members
+   *     `copy_from`/`erase_range`/`~rb_tree` (`FUN_007CC2F0`/
+   *     `FUN_007CA730`/`FUN_007CC2B0`, `RbTree.h`).
+   *   - 0x007CD300 (FUN_007CD300) -- `token_finderF`'s by-value
+   *     pass-through copy/destroy-temporary helper.
+   *   - 0x007CCB50 (FUN_007CCB50) -- the `iter_split(Result,Input,Finder)`
+   *     driver: builds `itBegin` (`FUN_007CDA70` + a `FUN_007CD3A0` clone
+   *     + `FUN_007CDB40`'s transform-wrap), builds `itEnd` the same way
+   *     from a default-constructed `split_iterator`, constructs
+   *     `Tmp(itBegin,itEnd)` (`FUN_007CDBC0`), swaps it into `Result`.
+   *     Extracts `Moho::lob_IgnoreNames`'s raw buffer directly
+   *     (`_Bx._Ptr`/`_Bx._Buf` SSO branch + `_Mysize`) -- matches
+   *     `.data()`/`.size()` below exactly.
+   *   - 0x007CDA70 (FUN_007CDA70) -- `split_iterator(Begin,End,Finder)`'s
+   *     3-arg constructor: builds `m_Finder` (`FUN_007CE6A0`), writes the
+   *     raw `m_Match`/`m_Next`/`m_End`/`m_bEof` tail, calls `increment()`
+   *     (`FUN_007CDFB0`).
+   *   - 0x007CE6A0 (FUN_007CE6A0) -- `boost::function2<...>`'s converting
+   *     constructor from `token_finderF<is_any_ofF<char>>` (`assign_to`;
+   *     the functor fits `function_base`'s 24-byte SBO buffer, confirmed
+   *     via the compiled probe, so this is a placement-new, not a heap
+   *     allocation).
+   *   - 0x007CD3A0 (FUN_007CD3A0) -- **this dedicated-pass target**:
+   *     `split_iterator<IteratorT>::split_iterator(const split_iterator&)`,
+   *     the copy constructor. Clones `m_Finder` through the vtable manager
+   *     (`clone_functor_tag=0`, called at `source+8`/`dest+8` -- confirmed
+   *     against a compiled `offsetof(boost::function_base, functor)` probe,
+   *     which is 8, not the 4 a plain header read suggests) then copies the
+   *     raw tail and resets `m_bEof` to `false` (boost's `m_bEof(false)`
+   *     member-init, not a copy of the source's flag). 7 real call sites:
+   *     3 in `FUN_007CCB50`, 1 each in `FUN_007CDB40`/`FUN_007CE770`\*2/
+   *     `FUN_007CDBC0`\*2/`FUN_007CEBD0`\*2 (by-value parameter passing at
+   *     each `make_transform_iterator`/`SequenceSequenceT(itBegin,itEnd)`/
+   *     vector-range-ctor boundary). 4 more `call sub_7CD3A0` sites the
+   *     callgraph index records (`FUN_007CD213`/`FUN_007CD283`/
+   *     `FUN_007CDFA3`/`FUN_007CE273`) resolve to no disassembled
+   *     instruction anywhere in this namespace's exports -- no `.asm` file
+   *     contains them, no `functions` row, no containing-function range;
+   *     phantom edges from the indexer's byte-pattern scan, not real
+   *     callers.
+   *   - 0x007CDFB0 (FUN_007CDFB0) -- `split_iterator::increment()`
+   *     (`do_find` via `FUN_007CE6A0`... invoked via `FUN_007CE8B0`, then
+   *     the `m_Match`/`m_Next` advance). Re-homed from a fabricated
+   *     `AdvanceDeferredCursorLane` in `LegacyContainerFillLanes.cpp`; see
+   *     that file for the correction note. `FUN_007CF150`/`FUN_007CF380`/
+   *     `FUN_007CF3B0`/`FUN_007CF630` are one-line thunks straight into
+   *     this same address (each confirmed via its own `.c` export).
+   *   - 0x007CE8B0 (FUN_007CE8B0) -- `boost::function2<...>::operator()`
+   *     (`vtable->invoker(functor,args...)`), i.e. `m_Finder(Begin,End)`
+   *     -> `token_finderF::operator()` -> `std::find_if(Begin,End,m_Pred)`.
+   *     IDA's own decompile already names the parameter
+   *     `boost::function1_void*` and calls `boost::bad_function_call`/
+   *     `boost::throw_exception` on the empty-finder path. Also re-homed
+   *     from `LegacyContainerFillLanes.cpp`.
+   *   - 0x007CDB40 (FUN_007CDB40) -- `make_transform_iterator`'s by-value
+   *     parameter plumbing: copy-constructs `transform_iterator::
+   *     m_iterator` from the by-value `split_iterator` parameter
+   *     (`FUN_007CD3A0`), then destroys that temporary.
+   *   - 0x007CDBC0 (FUN_007CDBC0) -- `SequenceSequenceT Tmp(itBegin,
+   *     itEnd)`'s outer shell: receives both `transform_iterator`s by
+   *     value (20 dwords/80 bytes each), clones each again
+   *     (`FUN_007CD3A0`\*2), delegates to `FUN_007CE770`, destroys its own
+   *     by-value copies.
+   *   - 0x007CE770 (FUN_007CE770) -- the vector range-constructor's
+   *     zero-init prologue (`_Myfirst=_Mylast=_Myend=nullptr`), clones its
+   *     by-value iterator params again, delegates to `FUN_007CEBD0` with
+   *     the insertion cursor (`_Myfirst`).
+   *   - 0x007CEBD0 (FUN_007CEBD0) -- another by-value clone/forward shell,
+   *     delegates to `FUN_007CEFB0`.
+   *   - 0x007CEFB0 (FUN_007CEFB0) -- the per-token loop: `for (; it !=
+   *     itEnd; ++it) Result.insert(pos, *it);`. `transform_iterator::
+   *     operator*` returns `msvc8::string` *by value*, which downgrades
+   *     its traversal category below `forward` (boost's iterator_facade
+   *     requires a real reference for the Forward Iterator concept) even
+   *     though the wrapped `split_iterator` is itself forward-traversal --
+   *     this is why the vector build below is a naive single-pass insert
+   *     loop rather than a pre-counted bulk copy, and why `msvc8::
+   *     vector<T>` needed a real `vector(InputIt,InputIt)` constructor
+   *     (added in `Vector.h`) instead of reusing the `reserve`+
+   *     `uninit_copy_n` fast path every other constructor there uses.
+   *     Calls `FUN_007CF130` (dereference/copy), `FUN_00411EA0`
+   *     (`msvc8::vector<msvc8::string>::insert(pos,value)`, cited in
+   *     `Vector.h`), `FUN_007CDFB0` (`increment()`, above), and
+   *     `FUN_007CFE00` (`split_iterator::equal()`'s non-eof branch:
+   *     `m_Match==Other.m_Match && m_Next==Other.m_Next &&
+   *     m_End==Other.m_End`).
+   *   - 0x007CF130 (FUN_007CF130) --
+   *     `copy_iterator_rangeF<msvc8::string,IteratorT>::operator()`, i.e.
+   *     `copy_range<msvc8::string>(Range) = msvc8::string(boost::begin(
+   *     Range), boost::end(Range))` -- the existing `msvc8::string(const
+   *     char*, const char*)` constructor (`legacy/containers/String.h`).
+   *   - 0x00411EA0 / 0x00412000 -- `msvc8::vector<msvc8::string>::
+   *     insert(const_iterator,const T&)` / `insert(const_iterator,
+   *     size_type,const T&)` for the 28-byte `msvc8::string` element
+   *     (`0xFFFFFFFF/28 = 153391689` max_size guard, confirmed in
+   *     `FUN_00412000`'s disassembly). Both already generically modeled by
+   *     `Vector.h`'s existing members; only `Address:` citations were
+   *     needed there.
+   *   - 0x007C7640 (FUN_007C7640) -- a further duplicate emission of
+   *     `msvc8::set<char>::~rb_tree()` (`erase_range` + `free_raw(head_)`
+   *     + zero `head_`/`size_`, reading them at the same `+0x04`/`+0x08`
+   *     offsets as `FUN_007CC2B0`, already cited on `~rb_tree()` in
+   *     `RbTree.h`) for this same `msvc8::set<char>` instantiation --
+   *     reached from `FUN_007CCA70`'s cold/EH-unwind path.
+   *
+   * `token_compress_off` (boost's own default when the 4th `split()`
+   * argument is omitted) is used below: the copy-through chain
+   * (`FUN_007CBC40`->`FUN_007CBC80`->`FUN_007CCA70`->`FUN_007CD300`->
+   * `FUN_007CCB50`->`FUN_007CDA70`) never writes a literal into the
+   * `m_eCompress` lane in any of those five `.asm` exports, only ever
+   * copies it forward from `FUN_007CCA70`'s own by-value input -- and
+   * that input traces back to `FUN_007CBC80`'s local, which is built from
+   * *only* the 12-byte `msvc8::set<char>` (no `token_finderF` wrapper, no
+   * separate literal write anywhere in its disassembly either). Whichever
+   * mode the original source specified could not be pinned to a concrete
+   * instruction from the exports available to this pass; `token_compress_
+   * off` is boost's default and produces identical *observable* behavior
+   * here regardless, since `IsPeerNameInIgnoreList` only ever compares
+   * ignore-list tokens against real peer names and an empty token from
+   * compressed-away adjacent separators can never match one.
    */
   [[nodiscard]] msvc8::vector<msvc8::string> BuildLobbyIgnoreNameList(const msvc8::set<char>& separatorsParam)
   {
@@ -408,8 +564,39 @@ namespace
 
     const msvc8::set<char> localSeparators(separatorsParam);
 
-    ignoreNames.reserve(8);
-    SplitBySeparatorSet(moho::lob_IgnoreNames, localSeparators, ignoreNames);
+    // `is_any_of`'s templated constructor resolves its argument's begin/end
+    // through unqualified `begin(Range)`/`end(Range)` calls, which pick up
+    // both `boost::begin`/`boost::end` (ordinary lookup, this call sits
+    // inside `boost::algorithm::detail`) and `std::begin`/`std::end` (ADL --
+    // `msvc8::set<char>`'s second template argument defaults to
+    // `std::less<char>`, which drags `std` into the type's associated
+    // namespaces). The two are ambiguous under C++20's generic
+    // `std::begin`/`std::end`, a incompatibility this 2006-era boost header
+    // could not have anticipated. Decaying to a raw `const char*` pair
+    // sidesteps it entirely (fundamental/pointer types have no associated
+    // namespace for ADL) -- the same fix already applied to the input range
+    // above, and the same technique a throwaway MSVC probe against the
+    // vendored headers confirmed while investigating this recovery.
+    // Behaviourally inert: `is_any_ofF`'s constructor immediately copies the
+    // characters into its own `std::set<char>` regardless of what range they
+    // arrived through.
+    std::vector<char> separatorChars(localSeparators.begin(), localSeparators.end());
+    const boost::iterator_range<const char*> separatorRange(
+      separatorChars.data(),
+      separatorChars.data() + separatorChars.size()
+    );
+
+    const char* const first = moho::lob_IgnoreNames.data();
+    const char* const last = first + moho::lob_IgnoreNames.size();
+    boost::iterator_range<const char*> inputRange(first, last);
+
+    boost::algorithm::split(
+      ignoreNames,
+      inputRange,
+      boost::algorithm::is_any_of(separatorRange),
+      boost::algorithm::token_compress_off
+    );
+
     return ignoreNames;
   }
 

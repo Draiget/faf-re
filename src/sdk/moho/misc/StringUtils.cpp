@@ -51,36 +51,6 @@ void moho::SplitByComma(const msvc8::string& src, msvc8::vector<msvc8::string>& 
   }
 }
 
-void moho::SplitBySeparatorSet(const msvc8::string& src, const msvc8::set<char>& separators, msvc8::vector<msvc8::string>& out)
-{
-  const char* s = src.c_str();
-  const size_t n = src.size();
-  size_t i = 0;
-  while (i < n) {
-    // skip delimiters and spaces
-    while (i < n && (separators.find(s[i]) != separators.end() || gpg::STR_IsAsciiWhitespace(s[i]))) {
-      ++i;
-    }
-    if (i >= n) {
-      break;
-    }
-
-    // read token till next separator
-    size_t j = i;
-    while (j < n && separators.find(s[j]) == separators.end())
-      ++j;
-
-    // trim [i, j)
-    const char* tb;
-    const char* te;
-    TrimRange(s + i, j - i, tb, te);
-    if (te > tb) {
-      out.push_back(msvc8::string(tb, static_cast<size_t>(te - tb)));
-    }
-    i = (j < n ? j + 1 : j);
-  }
-}
-
 msvc8::string moho::Join(const msvc8::vector<msvc8::string>& items, const char* sep)
 {
   msvc8::string out;

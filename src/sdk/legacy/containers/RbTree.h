@@ -1754,16 +1754,30 @@ namespace msvc8
              * `size_=0`. All 11 recorded incoming xrefs are `jmp`s from
              * cold/EH-funclet chunks of unrelated-looking `sub_7CCxxx`/
              * `sub_7CFxxx` addresses -- those are the local-unwind cleanup
-             * paths of the (still unrecovered) `boost::algorithm::split`
-             * tokenizer pipeline `func_GetIgnoreNames` drives for the
-             * actual character-by-character split (see the `FUN_007CD3A0`
-             * open item in `decomp/recovery/reports/FUN_007CD3A0.md`), not
-             * eleven separate hand-written callers of this member. Reached
-             * in the recovered tree via `BuildLobbyIgnoreNameList`'s
+             * paths of the `boost::algorithm::split` tokenizer pipeline
+             * `func_GetIgnoreNames` drives for the actual
+             * character-by-character split (fully recovered as of the
+             * `FUN_007CD3A0` dedicated pass -- see `Moho::
+             * BuildLobbyIgnoreNameList`'s Doxygen block in `CLobby.cpp` for
+             * the whole instantiation's address roster), not eleven
+             * separate hand-written callers of this member. Reached in the
+             * recovered tree via `BuildLobbyIgnoreNameList`'s
              * `localSeparators` local (`CLobby.cpp`) going out of scope --
              * an ordinary implicit local destructor call, the same
              * evidentiary pattern as every other implicit `~rb_tree()`
              * citation in this file.
+             *
+             * Address: 0x007C7640 (FUN_007C7640, sub_7C7640) -- a further
+             * duplicate emission of the same `msvc8::set<char>` instance's
+             * destructor, reached from `FUN_007CCA70`'s (the pipeline's
+             * `is_any_ofF<char>`/`token_finderF` builder, `CLobby.cpp`)
+             * cold/EH-unwind path rather than its own call instruction.
+             * Reads `head_`/`size_` at the same `+0x04`/`+0x08` offsets as
+             * `FUN_007CC2B0` above and performs the identical `erase_range`
+             * + `operator delete(head_)` + zero sequence -- one compiled
+             * body, addressed twice because the compiler placed this
+             * instantiation's unwind path in its own cold section rather
+             * than sharing `FUN_007CC2B0`'s.
              */
             ~rb_tree()
             {
