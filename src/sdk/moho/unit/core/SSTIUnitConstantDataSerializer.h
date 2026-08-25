@@ -4,11 +4,6 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   struct SSTIUnitConstantData;
@@ -16,10 +11,42 @@ namespace moho
   /**
    * VFTABLE: 0x00E1881C
    * COL: 0x00E73818
+   *
+   * RTTI Class Hierarchy Descriptor shows this class's base chain running
+   * through `.?AU?$SerSaveLoadHelper@USSTIUnitConstantData@Moho@@@gpg@@`
+   * before `gpg::SerHelperBase` (same pattern observed on every
+   * `PrimitiveSerHelper<T,int>` instantiation this session). Not converted
+   * to a naked `gpg::SerSaveLoadHelper<SSTIUnitConstantData>` alias: that
+   * template's generic `Deserialize`/`Serialize` call
+   * `T::MemberDeserialize(archive)`/`T::MemberSerialize(archive)` with no
+   * `version` parameter, but `SSTIUnitConstantData::MemberDeserialize`/
+   * `MemberSerialize` require `version` (real body throws on
+   * `version < 1`). Same situation already documented for
+   * `Rect2iSerializer`/`Rect2fSerializer` above: this stays a concrete
+   * `SerHelperBase`-derived class with its own `Deserialize`/`Serialize`
+   * static methods that thread `version` through.
    */
-  class SSTIUnitConstantDataSerializer
+  class SSTIUnitConstantDataSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCA640 (FUN_00BCA640, register_SSTIUnitConstantDataSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SSTIUnitConstantDataSerializer();
+
+    /**
+     * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
+     *
+     * What it does:
+     * Unlinks the serializer helper node from the intrusive helper list and
+     * restores self-links.
+     */
+    ~SSTIUnitConstantDataSerializer();
+
     /**
      * Address: 0x0055C550 (FUN_0055C550, Moho::SSTIUnitConstantDataSerializer::Deserialize)
      *
@@ -42,23 +69,13 @@ namespace moho
      * What it does:
      * Binds serializer load/save callbacks into `SSTIUnitConstantData` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(SSTIUnitConstantDataSerializer, mHelperNext) == 0x04,
-    "SSTIUnitConstantDataSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SSTIUnitConstantDataSerializer, mHelperPrev) == 0x08,
-    "SSTIUnitConstantDataSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SSTIUnitConstantDataSerializer, mDeserialize) == 0x0C,
     "SSTIUnitConstantDataSerializer::mDeserialize offset must be 0x0C"
@@ -79,21 +96,4 @@ namespace moho
    * Constructs/preregisters RTTI metadata for `SSTIUnitConstantData`.
    */
   [[nodiscard]] gpg::RType* preregister_SSTIUnitConstantDataTypeInfo();
-
-  /**
-   * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  void cleanup_SSTIUnitConstantDataSerializer();
-
-  /**
-   * Address: 0x00BCA640 (FUN_00BCA640, register_SSTIUnitConstantDataSerializer)
-   *
-   * What it does:
-   * Initializes serializer callback pointers, vftable lane, and atexit cleanup.
-   */
-  void register_SSTIUnitConstantDataSerializer();
 } // namespace moho

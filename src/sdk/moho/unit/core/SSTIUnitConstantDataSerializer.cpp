@@ -10,7 +10,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/Stats.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -31,6 +31,17 @@ namespace
     }
   };
 
+  /**
+   * Address: 0x00BCA640 (FUN_00BCA640, dynamic initializer for the global
+   * `SSTIUnitConstantDataSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
+   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
+   * static initializer, separate from `SSTIUnitConstantDataTypeInfo`'s own
+   * initializer.
+   */
   moho::SSTIUnitConstantDataSerializer gSSTIUnitConstantDataSerializer;
 
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
@@ -98,85 +109,6 @@ namespace
     rawPointer.release();
   }
 
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gSSTIUnitConstantDataSerializer.mHelperNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeCore() noexcept
-  {
-    if (
-      gSSTIUnitConstantDataSerializer.mHelperNext != nullptr &&
-      gSSTIUnitConstantDataSerializer.mHelperPrev != nullptr
-    ) {
-      gSSTIUnitConstantDataSerializer.mHelperNext->mPrev = gSSTIUnitConstantDataSerializer.mHelperPrev;
-      gSSTIUnitConstantDataSerializer.mHelperPrev->mNext = gSSTIUnitConstantDataSerializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode();
-    gSSTIUnitConstantDataSerializer.mHelperPrev = self;
-    gSSTIUnitConstantDataSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x0055C5C0 (FUN_0055C5C0, SerSaveLoadHelper<SSTIUnitConstantData>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `SSTIUnitConstantData` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeLaneA() noexcept
-  {
-    return UnlinkSSTIUnitConstantDataSerializerNodeCore();
-  }
-
-  /**
-   * Address: 0x0055C5F0 (FUN_0055C5F0, SerSaveLoadHelper<SSTIUnitConstantData>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `SSTIUnitConstantData` serializer helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeLaneB() noexcept
-  {
-    return UnlinkSSTIUnitConstantDataSerializerNodeCore();
-  }
-
-  void ResetSerializerNode() noexcept
-  {
-    if (
-      gSSTIUnitConstantDataSerializer.mHelperNext == nullptr ||
-      gSSTIUnitConstantDataSerializer.mHelperPrev == nullptr
-    ) {
-      gpg::SerHelperBase* const self = SerializerSelfNode();
-      gSSTIUnitConstantDataSerializer.mHelperPrev = self;
-      gSSTIUnitConstantDataSerializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSSTIUnitConstantDataSerializerNodeLaneA();
-  }
-
-  /**
-   * Address: 0x0055C590 (FUN_0055C590, serializer singleton init lane)
-   *
-   * What it does:
-   * Re-initializes helper-list links and callback pointers on the global
-   * `SSTIUnitConstantDataSerializer` instance and returns that singleton.
-   */
-  [[nodiscard]] moho::SSTIUnitConstantDataSerializer* InitializeSSTIUnitConstantDataSerializerSingleton()
-  {
-    ResetSerializerNode();
-    gSSTIUnitConstantDataSerializer.mDeserialize = &moho::SSTIUnitConstantDataSerializer::Deserialize;
-    gSSTIUnitConstantDataSerializer.mSerialize = &moho::SSTIUnitConstantDataSerializer::Serialize;
-    return &gSSTIUnitConstantDataSerializer;
-  }
-
-  void cleanup_SSTIUnitConstantDataSerializer_atexit()
-  {
-    moho::cleanup_SSTIUnitConstantDataSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -314,63 +246,48 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BCA640 (FUN_00BCA640, register_SSTIUnitConstantDataSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SSTIUnitConstantDataSerializer::SSTIUnitConstantDataSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SSTIUnitConstantDataSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SSTIUnitConstantDataSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
+   */
+  SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x0055CB80 (FUN_0055CB80, gpg::SerSaveLoadHelper<Moho::SSTIUnitConstantData>::Init lane)
    *
    * What it does:
-   * Binds serializer load/save callbacks into `SSTIUnitConstantData` RTTI.
+   * Binds serializer load/save callbacks into `SSTIUnitConstantData` RTTI;
+   * caches the resolved type on `SSTIUnitConstantData::sType`. Real body
+   * resolves via a direct `gpg::LookupRType(typeid(SSTIUnitConstantData))`,
+   * not via `preregister_SSTIUnitConstantDataTypeInfo()` (prior recovery's
+   * fallback path called the wrong helper).
    */
-  void SSTIUnitConstantDataSerializer::RegisterSerializeFunctions()
+  void SSTIUnitConstantDataSerializer::Init()
   {
-    gpg::RType* type = SSTIUnitConstantData::sType;
-    if (type == nullptr) {
-      type = preregister_SSTIUnitConstantDataTypeInfo();
-      SSTIUnitConstantData::sType = type;
+    if (SSTIUnitConstantData::sType == nullptr) {
+      SSTIUnitConstantData::sType = gpg::LookupRType(typeid(SSTIUnitConstantData));
     }
 
+    gpg::RType* const type = SSTIUnitConstantData::sType;
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  void cleanup_SSTIUnitConstantDataSerializer()
-  {
-    (void)UnlinkSSTIUnitConstantDataSerializerNodeLaneA();
-  }
-
-  /**
-   * Address: 0x00BCA640 (FUN_00BCA640, register_SSTIUnitConstantDataSerializer)
-   *
-   * What it does:
-   * Initializes serializer callback pointers, vftable lane, and atexit cleanup.
-   */
-  void register_SSTIUnitConstantDataSerializer()
-  {
-    (void)preregister_SSTIUnitConstantDataTypeInfo();
-    (void)InitializeSSTIUnitConstantDataSerializerSingleton();
-    (void)std::atexit(&cleanup_SSTIUnitConstantDataSerializer_atexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct SSTIUnitConstantDataSerializerBootstrap
-  {
-    SSTIUnitConstantDataSerializerBootstrap()
-    {
-      moho::register_SSTIUnitConstantDataSerializer();
-    }
-  };
-
-  [[maybe_unused]] SSTIUnitConstantDataSerializerBootstrap gSSTIUnitConstantDataSerializerBootstrap;
-} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
