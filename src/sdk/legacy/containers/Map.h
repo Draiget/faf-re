@@ -143,6 +143,24 @@ namespace msvc8
 
         // ---- lookup -----------------------------------------------------------
 
+        /**
+         * Address: 0x0083A950 (FUN_0083A950, sub_83A950) --
+         * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>::find` --
+         * `gUiKeyActionMap` (`moho/ui/UiRuntimeTypes.cpp:1394`), isNil@+0x2D
+         * (see the sibling instantiation's `lower_bound_node` citation in
+         * `RbTree.h` for the full node-layout derivation). `find_node`'s
+         * nil-or-key-greater verify step is inlined into this emission
+         * rather than called out separately; the lower-bound descent itself
+         * remains out-of-line as `FUN_0083B050` (cited on `lower_bound_node`,
+         * `RbTree.h`). Return type `iterator` uses MSVC8's hidden-return-
+         * pointer ABI for non-trivial-return-type accessors (matching
+         * `begin()`'s `FUN_006E1580` citation above): `edi`=hidden output
+         * slot, `esi`=`&key`. Sole confirmed caller in this sweep is
+         * `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10,
+         * `moho/ui/UiRuntimeTypes.h`/`.cpp`), which looks up the packed
+         * shift/ctrl/alt/keycode chord and runs the bound command string
+         * through `Moho::CON_Execute` on a hit.
+         */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
 

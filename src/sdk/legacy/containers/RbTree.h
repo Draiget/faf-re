@@ -1940,6 +1940,26 @@ namespace msvc8
              * (`FUN_0083A9D0`, cited in `Map.h`) and `find_node`'s emission
              * (`FUN_0083AD60`, cited below), both real call sites.)
              */
+            /**
+             * Address: 0x0083B050 (FUN_0083B050, sub_83B050) --
+             * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>`'s
+             * lower-bound descent (`gUiKeyActionMap`,
+             * `moho/ui/UiRuntimeTypes.cpp:1394`), a sibling instantiation of
+             * the same map keyed on the same `UiKeyMask` but with a 28-byte
+             * `msvc8::string` mapped value instead of `bool`: key at node+0xC
+             * (4 bytes, [0xC,0x10)), value at node+0x10 (28 bytes,
+             * [0x10,0x2C)), color byte at +0x2C, isNil@+0x2D -- 0xC + 4 + 28
+             * = 0x2C for color, +1 for isNil, matching the confirmed asm
+             * read exactly and requiring no padding (matches
+             * `UiKeyActionMapBase`'s node layout exactly).
+             * Store-into-hidden-return-pointer shape like `FUN_006E1D30`/
+             * `FUN_0083B440` above (`*result = candidate; return result;`,
+             * `result`@eax both in and out). Sole confirmed caller in this
+             * sweep is `FUN_0083A950` (`find`'s emission for this
+             * instantiation, cited on `Map.h`'s `find()`), itself called from
+             * `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10,
+             * `moho/ui/UiRuntimeTypes.h`/`.cpp`).
+             */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
                 node_type* found = head_;

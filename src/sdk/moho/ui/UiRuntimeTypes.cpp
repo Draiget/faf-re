@@ -11803,6 +11803,12 @@ namespace
    * (key code), `[esi+0x2C..0x2E]` (control/shift/alt flag bytes),
    * `[esi+0x34]` (raw key code) and the `[esi+0x1C]` skip byte in the shared
    * `wxEvent` header.
+   *
+   * `mRawFlags` (+0x38, matching real wx's `wxKeyEvent::m_rawFlags`) is
+   * confirmed by `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10) at
+   * `[ebp+3Ah]`: a 16-bit read starting two bytes into this field, testing
+   * bit 0x4000 of the high half -- i.e. bit 30 of the full 32-bit value, the
+   * documented Win32 `WM_KEYDOWN` `lParam` "previously down" auto-repeat bit.
    */
   struct WxKeyEventDispatchRuntimeView
   {
@@ -11816,6 +11822,7 @@ namespace
     std::uint8_t mMetaDown = 0;        // +0x2F
     std::int32_t mScanCode = 0;        // +0x30
     std::int32_t mRawKeyCode = 0;      // +0x34
+    std::uint32_t mRawFlags = 0;       // +0x38 wxKeyEvent::m_rawFlags
   };
   static_assert(
     offsetof(WxKeyEventDispatchRuntimeView, mSkipped) == 0x1C,
@@ -11833,6 +11840,13 @@ namespace
     offsetof(WxKeyEventDispatchRuntimeView, mRawKeyCode) == 0x34,
     "WxKeyEventDispatchRuntimeView::mRawKeyCode offset must be 0x34"
   );
+  static_assert(
+    offsetof(WxKeyEventDispatchRuntimeView, mRawFlags) == 0x38,
+    "WxKeyEventDispatchRuntimeView::mRawFlags offset must be 0x38"
+  );
+
+  /** Win32 `WM_KEYDOWN`/`WM_KEYUP` `lParam` bit 30: the key was already down. */
+  constexpr std::uint32_t kWxKeyEventRawFlagPreviouslyDown = 0x40000000u;
 
   /**
    * Shared body of the three `CMauiWxEventMapper` keyboard event-table sinks
@@ -29409,6 +29423,98 @@ void moho::IN_BindKey(void* const commandArgs)
   }
 
   gUiKeyActionMap[static_cast<UiKeyMask>(parsedKeyMask)].assign_owned_strong(actionText.view());
+}
+
+/**
+ * Address: 0x00838D10 (FUN_00838D10, Moho::CUIKeyHandler::OnKeyDown)
+ *
+ * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
+ */
+void moho::CUIKeyHandlerRuntime::OnKeyDown(wxEventRuntime& keyEventRef)
+{
+  auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
+
+  if (moho::Maui_CurrentFocusControl.ResolveFocusedControl() != nullptr) {
+    keyEvent->mSkipped = 1;
+    return;
+  }
+
+  const bool shiftDown = keyEvent->mShiftDown != 0;
+  const bool ctrlDown = keyEvent->mControlDown != 0;
+  const bool altDown = keyEvent->mAltDown != 0;
+
+  UiKeyMask packedKeyMask = static_cast<UiKeyMask>(keyEvent->mRawKeyCode);
+  if (shiftDown) { packedKeyMask |= 0x80000000u; }
+  if (ctrlDown) { packedKeyMask |= 0x40000000u; }
+  if (altDown) { packedKeyMask |= 0x20000000u; }
+
+  const bool keyIsTrackedForRepeat = gUiKeyRepeatMap.find(packedKeyMask) != gUiKeyRepeatMap.end();
+  if (!keyIsTrackedForRepeat && (keyEvent->mRawFlags & kWxKeyEventRawFlagPreviouslyDown) != 0) {
+    // Stray Win32 auto-repeat for a key this handler never saw go down
+    // (e.g. focus changed mid-press): drop it rather than firing a binding.
+    keyEvent->mSkipped = 1;
+    return;
+  }
+
+  const auto boundCommand = gUiKeyActionMap.find(packedKeyMask);
+  if (boundCommand != gUiKeyActionMap.end()) {
+    CON_Execute(boundCommand->second.c_str());
+    keyEvent->mSkipped = 1;
+    return;
+  }
+
+  // No user key binding claimed this chord: fall back to the two hardcoded
+  // shortcuts. Neither branch marks the event skipped -- matches the binary
+  // exactly, so wx keeps propagating the key afterward.
+  constexpr std::int32_t kKeyCodeEnter = 13;
+  constexpr std::int32_t kKeyCodeTilde = 0x7E; // '~'
+  switch (keyEvent->mKeyCode) {
+  case kKeyCodeEnter:
+    UI_ActivateChat(shiftDown, ctrlDown, altDown);
+    return;
+  case kKeyCodeTilde:
+    MAUI_ToggleConsole();
+    return;
+  default:
+    keyEvent->mSkipped = 1;
+    return;
+  }
+}
+
+/**
+ * Address: 0x00838E30 (FUN_00838E30, sub_838E30)
+ *
+ * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
+ */
+void moho::CUIKeyHandlerRuntime::OnKeyUp(wxEventRuntime& keyEventRef)
+{
+  auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
+  keyEvent->mSkipped = 1;
+}
+
+/**
+ * Models the compiled `CUIKeyHandler` event table's dispatch role directly
+ * (binary table at `0x00F5B150`: row 1 `wxEVT_KEY_UP` -> `OnKeyUp`, row 2
+ * `wxEVT_KEY_DOWN` -> `OnKeyDown`), the same approach
+ * `CMauiWxEventMapperRuntime::ProcessWxEvent` uses for its own keyboard rows.
+ */
+bool moho::CUIKeyHandlerRuntime::ProcessWxEvent(void* const event)
+{
+  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
+  if (wxEvent == nullptr) {
+    return false;
+  }
+
+  switch (moho::WX_ClassifyEventType(wxEvent->mEventType)) {
+  case moho::WxEventFamily::KeyDown:
+    OnKeyDown(*wxEvent);
+    return wxEvent->mSkipped == 0;
+  case moho::WxEventFamily::KeyUp:
+    OnKeyUp(*wxEvent);
+    return wxEvent->mSkipped == 0;
+  default:
+    return false;
+  }
 }
 
 moho::wxEvtHandlerRuntime* moho::UI_CreateKeyHandler()
