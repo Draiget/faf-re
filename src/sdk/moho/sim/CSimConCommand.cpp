@@ -160,6 +160,34 @@ namespace
 
   /**
    * Address: 0x00735290 (FUN_00735290, sub_735290)
+   * Address: 0x00736760 (FUN_00736760, sub_736760) -- `std::map<std::string,
+   * moho::CSimConCommand*, SimConCommandNameLess>::iterator`'s in-order
+   * successor walk (Dinkumware `_Tree::_Inc`/`_Incr`, real toolchain
+   * `std::map` -- see `SimConCommandRegistry`'s declaration comment above),
+   * exercised by `++upperBound` below. No new source line needed: the real
+   * `std::map` this project's own toolchain compiles for `registry` already
+   * provides this walk, the same "satisfied by std::map's own internals"
+   * substitution already documented for `FUN_00735D40`/`FUN_007355F0`
+   * elsewhere in this file. Eight real callers confirmed via the callgraph
+   * index, all inside this same neighborhood's `SimConCommandRegistry`
+   * bookkeeping (0x00735290/this function, 0x007355F0, 0x00735D40, plus
+   * four owner=<none> inlined chunks in the 0x736xxx range).
+   * Address: 0x00736320 (FUN_00736320, sub_736320) -- `iterator&
+   * operator++()` (prefix): calls the successor walk above then returns the
+   * same slot, matching `++upperBound`'s prefix-increment ABI shape.
+   * Address: 0x00736330 (FUN_00736330, sub_736330) -- `iterator
+   * operator++(int)` (postfix): copies the current iterator out before
+   * calling the successor walk above, matching the pair's postfix-increment
+   * shape. Neither has an incoming xref recorded in this export sweep
+   * (small COMDATs the linker can fold/inline per call site); both are the
+   * same real `std::map` iterator machinery as `FUN_00736760` above, not
+   * separate engine logic. Corrects a prior mis-attribution: all three were
+   * previously cited as an "armor-map node successor helper" hand-rolled in
+   * `moho/unit/core/Unit.cpp` (`AdvanceArmorMultiplierNodeCursor` and its
+   * two slot adapters) -- that Unit.cpp code had zero real callers (dead
+   * weight predating the `Unit::ArmorMultipliers` -> `msvc8::map`
+   * migration) and has been deleted; these addresses' real callers, per the
+   * callgraph index, were always here.
    *
    * What it does:
    * Removes every registry entry case-insensitively equivalent to
