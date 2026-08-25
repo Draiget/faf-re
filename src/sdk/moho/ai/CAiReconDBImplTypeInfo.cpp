@@ -819,6 +819,17 @@ namespace
 
   /**
    * Address: 0x005C58E0 (FUN_005C58E0)
+   *
+   * What it does:
+   * Reads the archived element count, reserves exactly that many slots on a
+   * fresh local vector, decodes and appends each tracked pointer in turn,
+   * then move-assigns the finished vector into the destination -- confirmed
+   * against the `.c`: `sub_5C7680(count)` (`reserve`) runs immediately after
+   * `ReadUInt`, each element is written through the reserved capacity
+   * (`*v2++ = v7`), and only at the very end are the destination's three
+   * lanes overwritten and its previous buffer freed (`operator delete(v4)`),
+   * so a mid-read failure leaves the destination untouched rather than
+   * partially overwritten.
    */
   void DeserializeReconBlipPointerVector(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
   {
@@ -832,14 +843,16 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    storage->clear();
-    storage->resize(static_cast<size_t>(count), nullptr);
-
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+
+    msvc8::vector<ReconBlip*> newBlips;
+    newBlips.reserve(static_cast<size_t>(count));
     for (unsigned int i = 0; i < count; ++i) {
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-      (*storage)[i] = DecodeTrackedReconBlipPointer(tracked);
+      newBlips.push_back(DecodeTrackedReconBlipPointer(tracked));
     }
+
+    *storage = std::move(newBlips);
   }
 
   /**
