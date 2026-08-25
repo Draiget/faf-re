@@ -12,9 +12,6 @@ namespace
   bool gELayerTypeInfoConstructed = false;
   bool gELayerTypeInfoPreregistered = false;
 
-  alignas(moho::ELayerPrimitiveSerializer) unsigned char gELayerPrimitiveSerializerStorage[sizeof(moho::ELayerPrimitiveSerializer)]{};
-  bool gELayerPrimitiveSerializerConstructed = false;
-
   gpg::RType* gELayerCachedType = nullptr;
 
   [[nodiscard]] moho::ELayerTypeInfo* AcquireELayerTypeInfo()
@@ -27,87 +24,20 @@ namespace
     return reinterpret_cast<moho::ELayerTypeInfo*>(gELayerTypeInfoStorage);
   }
 
-  [[nodiscard]] moho::ELayerPrimitiveSerializer* AcquireELayerPrimitiveSerializer()
-  {
-    if (!gELayerPrimitiveSerializerConstructed) {
-      new (gELayerPrimitiveSerializerStorage) moho::ELayerPrimitiveSerializer();
-      gELayerPrimitiveSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ELayerPrimitiveSerializer*>(gELayerPrimitiveSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
   /**
-   * Address: 0x0050C660 (FUN_0050C660)
+   * Address: 0x00BC7C80 (FUN_00BC7C80, dynamic initializer for the global
+   * `PrimitiveSerHelper<ELayer,int>` singleton)
    *
    * What it does:
-   * Initializes callback lanes for startup-owned `ELayer` primitive serializer
-   * helper storage and returns that helper object.
+   * Default-constructs the `gpg::SerHelperBase` base (which self-links this
+   * helper onto the process-global pending-helper list) and binds the
+   * load/save callback fields; `Init()` is dispatched later, from
+   * `gpg::SerHelperBase::InitNewHelpers`. Prior to this recovery, this
+   * global was a hand-rolled POD that never actually inherited
+   * `SerHelperBase`, so `ELayer`'s serialize/deserialize callbacks were
+   * never installed under any code path.
    */
-  [[nodiscard]] moho::ELayerPrimitiveSerializer*
-  InitializeELayerPrimitiveSerializerStartupThunkPrimary()
-  {
-    auto* const serializer = AcquireELayerPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::ELayerPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::ELayerPrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050CA60 (FUN_0050CA60)
-   *
-   * What it does:
-   * Secondary startup-init entry for the `ELayer` primitive serializer helper
-   * storage that mirrors the primary callback initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ELayerPrimitiveSerializer*
-  InitializeELayerPrimitiveSerializerStartupThunkSecondary()
-  {
-    auto* const serializer = AcquireELayerPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &moho::ELayerPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &moho::ELayerPrimitiveSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x0050CA90 (FUN_0050CA90, resolve_ELayerType)
-   */
-  [[nodiscard]] gpg::RType* ResolveELayerType()
-  {
-    if (!gELayerCachedType) {
-      gELayerCachedType = gpg::LookupRType(typeid(moho::ELayer));
-    }
-    return gELayerCachedType;
-  }
+  moho::ELayerPrimitiveSerializer gELayerPrimitiveSerializer;
 
   /**
    * Address: 0x00BF2070 (FUN_00BF2070, cleanup_ELayerTypeInfo)
@@ -122,18 +52,6 @@ namespace
     gELayerTypeInfoConstructed = false;
     gELayerTypeInfoPreregistered = false;
     gELayerCachedType = nullptr;
-  }
-
-  /**
-   * Address: 0x00BF2080 (FUN_00BF2080, cleanup_ELayerPrimitiveSerializer)
-   */
-  void cleanup_ELayerPrimitiveSerializer()
-  {
-    if (!gELayerPrimitiveSerializerConstructed) {
-      return;
-    }
-
-    UnlinkSerializerNode(*AcquireELayerPrimitiveSerializer());
   }
 } // namespace
 
@@ -184,55 +102,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050CA20 (FUN_0050CA20, PrimitiveSerHelper<ELayer>::Deserialize)
-   */
-  void ELayerPrimitiveSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    int value = 0;
-    archive->ReadInt(&value);
-    *reinterpret_cast<ELayer*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<ELayer>(value);
-  }
-
-  /**
-   * Address: 0x0050CA40 (FUN_0050CA40, PrimitiveSerHelper<ELayer>::Serialize)
-   */
-  void ELayerPrimitiveSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto value = *reinterpret_cast<const ELayer*>(static_cast<std::uintptr_t>(objectPtr));
-    archive->WriteInt(static_cast<int>(value));
-  }
-
-  /**
-   * Address: 0x0050C690 (FUN_0050C690, gpg::PrimitiveSerHelper<Moho::ELayer,int>::Init)
-   */
-  void ELayerPrimitiveSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveELayerType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x0050B9F0 (FUN_0050B9F0, preregister_ELayerTypeInfo)
    */
   gpg::REnumType* preregister_ELayerTypeInfo()
@@ -255,15 +124,6 @@ namespace moho
     (void)preregister_ELayerTypeInfo();
     return std::atexit(&cleanup_ELayerTypeInfo);
   }
-
-  /**
-   * Address: 0x00BC7C80 (FUN_00BC7C80, register_ELayerPrimitiveSerializer)
-   */
-  int register_ELayerPrimitiveSerializer()
-  {
-    (void)InitializeELayerPrimitiveSerializerStartupThunkPrimary();
-    return std::atexit(&cleanup_ELayerPrimitiveSerializer);
-  }
 } // namespace moho
 
 namespace
@@ -273,7 +133,6 @@ namespace
     ELayerTypeInfoBootstrap()
     {
       (void)moho::register_ELayerTypeInfo();
-      (void)moho::register_ELayerPrimitiveSerializer();
     }
   };
 
