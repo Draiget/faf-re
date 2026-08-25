@@ -219,24 +219,26 @@ namespace msvc8
          * when the erased node was the tree's leftmost.
          */
         /**
-         * Address: 0x00A52650 (FUN_00A52650, sub_A52650) -- the same
-         * `msvc8::set<std::uint32_t>` instantiation cited on `equal_range`/
-         * `erase(const key_type&)`/`erase_node` above (isNil@+0x11). Walks
-         * `_Left` (node+0x00) while `!_Isnil` (node+0x11), matching this
-         * member exactly. Reached from `erase_node`'s emission for this
-         * instantiation (`FUN_00A633D0`, cited above) to re-seat `head->left`
-         * when the erased node was the tree's leftmost, and transitively from
-         * `Wm3::ConvexHull3<float>::~ConvexHull3()` (0x00A66440) tearing down
-         * the `rb_tree` member at `this+0x68`. Owning field/class beyond
-         * `ConvexHull3<float>` not yet pinned down.
+         * Address: 0x00A52650 (FUN_00A52650, sub_A52650) -- CORRECTED: not
+         * this project's `msvc8::set<std::uint32_t>` (an earlier pass in this
+         * session mis-labelled it that way). Real identity (commit
+         * `ea2e46c3`): `std::set<HullTriangle3<float>*>`'s `rb_min`,
+         * isNil@+0x11 -- `Wm3::ConvexHull3<float>::m_kHull`. Walks `_Left`
+         * (node+0x00) while `!_Isnil` (node+0x11), matching this member
+         * exactly. Reached from `erase_node`'s WildMagic emission for this
+         * instantiation (`FUN_00A633D0`, cited on `erase_node` above) to
+         * re-seat `head->left`, transitively from `~ConvexHull3<float>()`
+         * (0x00A66440). WildMagic is CLAUDE.md's named terminal
+         * `external_dependency` category -- kept here as cross-reference
+         * confirmation only; see `recovered_progress.json`.
          * Address: 0x00A526A0 (FUN_00A526A0) -- byte-identical ICF twin of
-         * 0x00A52650 (`function_icf_twins`), reached instead from
-         * `ConvexHull3<double>`'s sibling `erase_node` emission
-         * (`FUN_00A63690`) -- mark `skip "ICF twin of FUN_00A52650"`.
+         * 0x00A52650, reached instead from `ConvexHull3<double>`'s sibling
+         * `erase_node` emission (`FUN_00A63690`) -- same classification.
          *
          * Address: 0x00A3A170 (FUN_00A3A170, sub_A3A170) -- a distinct
-         * 8-byte-value ("Nil21") tree instantiation, isNil@+0x15. Same walk,
-         * one addressing-mode step removed (`__cdecl` locals instead of the
+         * 8-byte-value ("Nil21") tree instantiation, isNil@+0x15, genuinely
+         * this project's own (not traced to WildMagic). Same walk, one
+         * addressing-mode step removed (`__cdecl` locals instead of the
          * `for`-loop shape above; behaviourally identical). Re-homed out of
          * `moho/math/Wm3DistanceFafExtras.cpp`'s `QueryTree` reach-in cluster
          * (`QueryTreeLeftmostNil21LaneC`). This body is an ICF twin of an
@@ -244,23 +246,22 @@ namespace msvc8
          * (`src/sdk/gpg/core/reflection/Reflection.cpp`, reached from
          * `func_PopTreeNode`) -- cited here on its own confirmed evidence
          * (read directly against its `.c` export, not inferred from the twin
-         * group) rather than inheriting that group's skip rationale, which
-         * this pass did not verify. Sole caller in this sweep is
-         * `FUN_00A3E450` (itself `skip`, chain not resolved in this pass);
-         * flagged as a follow-up rather than guessed at. Owning field/class
-         * not yet pinned down.
+         * group). Marked `skip` in `recovered_progress.json`: its sole caller
+         * `FUN_00A3E450` (and that function's own caller `FUN_00A3E800`) are
+         * independently verified "transitively unreachable, 2 hops deep" by
+         * a prior pass. Owning field/class not pinned down.
          *
-         * Address: 0x00A52BF0 (FUN_00A52BF0, sub_A52BF0) -- a 20-byte-value
-         * ("Nil33") tree instantiation, isNil@+0x21. Same walk. Re-homed out
-         * of `QueryTreeLeftmostNil33LaneA` in the same `QueryTree` reach-in
-         * cluster. Sole caller in this sweep is `FUN_00A63DD0` (currently
-         * misfiled `external_dependency` -- its own `vtable_writes` hit for
-         * `out_of_range@std` marks it as another `erase_node`-shaped emission,
-         * i.e. engine code, not a real external import; not reclassified in
-         * this pass). Owning field/class not yet pinned down.
+         * Address: 0x00A52BF0 (FUN_00A52BF0, sub_A52BF0) -- CORRECTED: not
+         * this project's own tree. Real identity: `kTerminator`, a
+         * `std::map<int, TerminatorData>` local to `Wm3::ConvexHull3<Real>::
+         * Update` (see `FUN_00A63DD0`/`FUN_00A64110`'s `erase_node`
+         * emissions, `external_dependency`), a 20-byte-value ("Nil33") tree,
+         * isNil@+0x21. Same walk. Re-homed out of `QueryTreeLeftmostNil33LaneA`
+         * in the same `QueryTree` reach-in cluster. WildMagic terminal
+         * category; cross-reference confirmation only.
          * Address: 0x00A52D40 (FUN_00A52D40) -- byte-identical ICF twin of
-         * 0x00A52BF0, reached from `FUN_00A64110`'s sibling emission; mark
-         * `skip "ICF twin of FUN_00A52BF0"`.
+         * 0x00A52BF0, reached from `FUN_00A64110`'s sibling emission; same
+         * classification.
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -386,34 +387,35 @@ namespace msvc8
          * instantiation (`FUN_00687CC0`, cited below) via `rb_max(fix)`
          * when the erased node was the tree's rightmost.
          *
-         * Address: 0x00A52630 (FUN_00A52630, sub_A52630) -- the same
-         * `msvc8::set<std::uint32_t>` instantiation cited on `equal_range`/
-         * `erase(const key_type&)`/`erase_node`/`rb_min` above (isNil@+0x11).
-         * Walks `_Right` (node+0x08) while `!_Isnil` (node+0x11), matching
-         * this member exactly. Reached from `erase_node`'s emission for this
-         * instantiation (`FUN_00A633D0`, cited above) to re-seat `head->right`
-         * when the erased node was the tree's rightmost, and transitively
-         * from `Wm3::ConvexHull3<float>::~ConvexHull3()` (0x00A66440).
+         * Address: 0x00A52630 (FUN_00A52630, sub_A52630) -- CORRECTED: not
+         * this project's own tree (see `rb_min`'s 0x00A52650 note above for
+         * the full correction). Real identity: `std::set<HullTriangle3<
+         * float>*>`'s `rb_max`, isNil@+0x11, `Wm3::ConvexHull3<float>::
+         * m_kHull`. Walks `_Right` (node+0x08) while `!_Isnil` (node+0x11),
+         * matching this member exactly. Reached from `erase_node`'s WildMagic
+         * emission for this instantiation (`FUN_00A633D0`, cited on
+         * `erase_node` above) to re-seat `head->right`, transitively from
+         * `~ConvexHull3<float>()` (0x00A66440). WildMagic terminal category;
+         * cross-reference confirmation only.
          * Address: 0x00A52680 (FUN_00A52680) -- byte-identical ICF twin of
          * 0x00A52630, reached instead from `ConvexHull3<double>`'s sibling
-         * `erase_node` emission (`FUN_00A63690`) -- mark `skip "ICF twin of
-         * FUN_00A52630"`.
+         * `erase_node` emission (`FUN_00A63690`) -- same classification.
          *
          * Address: 0x00A3A240 (FUN_00A3A240, sub_A3A240) -- the same 8-byte-
          * value ("Nil21") tree instantiation cited on `rb_min`'s 0x00A3A170
-         * above, isNil@+0x15. Same "ICF twin of an already-`skip`'d
-         * Reflection.cpp group, cited here on its own confirmed evidence"
-         * situation as that member -- see its note. Owning field/class not
-         * yet pinned down.
+         * above, isNil@+0x15, genuinely this project's own. Same `skip`
+         * rationale as that member (transitively-unreachable caller chain,
+         * plus ICF twin of an already-`skip`'d Reflection.cpp group) -- see
+         * its note. Owning field/class not pinned down.
          *
-         * Address: 0x00A52BD0 (FUN_00A52BD0, sub_A52BD0) -- the same 20-byte-
-         * value ("Nil33") tree instantiation cited on `rb_min`'s 0x00A52BF0
-         * above, isNil@+0x21. Sole caller in this sweep is `FUN_00A63DD0`
-         * (see that member's note on its `external_dependency` mis-tag).
-         * Owning field/class not yet pinned down.
+         * Address: 0x00A52BD0 (FUN_00A52BD0, sub_A52BD0) -- CORRECTED: not
+         * this project's own tree. Real identity: `kTerminator` (`std::map<
+         * int, TerminatorData>` local to `ConvexHull3<Real>::Update`, see
+         * `rb_min`'s 0x00A52BF0 note above), isNil@+0x21. WildMagic terminal
+         * category; cross-reference confirmation only.
          * Address: 0x00A52D20 (FUN_00A52D20) -- byte-identical ICF twin of
-         * 0x00A52BD0, reached from `FUN_00A64110`'s sibling emission; mark
-         * `skip "ICF twin of FUN_00A52BD0"`.
+         * 0x00A52BD0, reached from `FUN_00A64110`'s sibling emission; same
+         * classification.
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -1613,19 +1615,30 @@ namespace msvc8
             }
 
             /**
-             * Address: 0x00A59E20 (FUN_00A59E20, sub_A59E20) -- `msvc8::set<
-             * std::uint32_t>::equal_range` for a distinct instantiation, isNil@
-             * +0x11 (4-byte value_type). `this`=ecx=tree, `a2`=hidden struct-
-             * return slot for the `pair<iterator,iterator>` (4 dwords), `a3`=
-             * `const key_type&`, matching a real `__thiscall` member -- not a
-             * free function taking a tree pointer, despite how the decompiler
-             * originally rendered it. Owning field/class not yet pinned down
-             * (re-homed out of `moho/math/Wm3DistanceFafExtras.cpp`'s `QueryTree`
-             * reach-in cluster, which had zero real callers of its own for this
-             * address; kept here as the template's generic emission per the
-             * "no confirmed engine caller" precedent used throughout this file).
-             * Address: 0x00A59E80 (FUN_00A59E80) -- ICF twin of 0x00A59E20
-             * (`function_icf_twins`); mark `skip "ICF twin of FUN_00A59E20"`.
+             * Address: 0x00A59E20 (FUN_00A59E20, sub_A59E20) -- CORRECTED:
+             * an earlier pass in this session mis-labelled this
+             * `msvc8::set<std::uint32_t>, owner unidentified`. Real identity
+             * (confirmed by a concurrent pass, commit `ea2e46c3`):
+             * `std::set<HullTriangle3<float>*>::equal_range`, isNil@+0x11 (a
+             * bare 4-byte pointer value_type, not a `uint32_t` this project
+             * owns) -- `Wm3::ConvexHull3<float>::m_kHull`
+             * (`dependencies/WildMagic3p8/Foundation/Containment/
+             * Wm3ConvexHull3.h:89`), reached from `m_kHull.erase(pkTri)`
+             * (`Wm3ConvexHull3.cpp:324`, cited in full on `erase(const
+             * key_type&)` below). WildMagic is CLAUDE.md's named terminal
+             * `external_dependency` category -- kept here purely as
+             * cross-reference confirmation that this member's shape matches
+             * a real, independent MSVC8-compiled `_Tree::equal_range`
+             * emission, not as engine recovery work; see
+             * `recovered_progress.json`. `this`=ecx=tree, `a2`=hidden
+             * struct-return slot for the `pair<iterator,iterator>` (4
+             * dwords), `a3`=`const key_type&` -- a real `__thiscall` member,
+             * not a free function taking a tree pointer, despite how the
+             * decompiler originally rendered it (and despite how a prior
+             * pass mis-recovered it as one: `BuildQueryTreeEqualRangeNil17LaneA`
+             * in `moho/math/Wm3DistanceFafExtras.cpp`, deleted).
+             * Address: 0x00A59E80 (FUN_00A59E80) -- byte-identical ICF twin
+             * of 0x00A59E20 (`function_icf_twins`); same external classification.
              *
              * What it does:
              * The shipped body computes the upper bound first, then the lower
@@ -1633,10 +1646,14 @@ namespace msvc8
              * call to `lower_bound_node`/`upper_bound_node` -- the same two
              * descents those members perform, just inlined into one emission
              * for this instantiation (order is immaterial: the two descents
-             * don't share mutable state). Recovered here as the natural 2007
-             * source line, `{lower_bound(k), upper_bound(k)}`, which is exactly
-             * what Dinkumware's `_Tree::equal_range` compiles to and what this
-             * template's `erase(const key_type&)` below already relies on.
+             * don't share mutable state). This member is written as the
+             * natural 2007 source line, `{lower_bound(k), upper_bound(k)}`,
+             * which is exactly what Dinkumware's `_Tree::equal_range`
+             * compiles to and what this template's `erase(const key_type&)`
+             * below already relies on -- genuinely useful, cited engine
+             * infrastructure for this project's own `msvc8::set`/`msvc8::map`
+             * (used e.g. by `CCommandDb`/`EntityDb`), independent of the
+             * external addresses that happen to confirm its shape above.
              */
             [[nodiscard]] std::pair<node_type*, node_type*> equal_range(const key_type& k) const
             {
@@ -1762,26 +1779,31 @@ namespace msvc8
              * duplicate.)
              */
             /**
-             * Address: 0x00A5D810 (FUN_00A5D810, sub_A5D810) -- a 20-byte-
-             * value ("Nil33") tree instantiation, isNil@+0x21. Confirmed via
-             * `.asm`: real `this`=ecx (thiscall), one stack arg = `const
-             * key_type&` (dereferenced for the descent's key), one stack arg
-             * = a hidden-return-pointer slot the body writes `{node, owner}`
-             * into before returning (`retn 8` pops both stack args) -- the
-             * same "store-into-hidden-return-pointer adapter" convention as
-             * `lower_bound_node`'s `FUN_006E1D30` cited above, just for this
-             * member: lower-bound descent (`cursor->key >= *key` walking
-             * left, else right) inlined directly rather than calling out to
-             * `lower_bound_node`, then the same nil-or-key-less rejection
-             * this member performs. Re-homed out of `moho/math/
-             * Wm3DistanceFafExtras.cpp`'s `QueryTree` reach-in cluster
-             * (`FindExactQueryTreeNodeNil33LaneA`). Sole caller in this sweep
-             * is `FUN_00A666F0` (currently misfiled `external_dependency`;
-             * not reclassified in this pass). Owning field/class not yet
-             * pinned down.
-             * Address: 0x00A5D8A0 (FUN_00A5D8A0) -- ICF twin of 0x00A5D810
-             * (`function_icf_twins`), reached from `FUN_00A66C00`'s sibling
-             * emission; mark `skip "ICF twin of FUN_00A5D810"`.
+             * Address: 0x00A5D810 (FUN_00A5D810, sub_A5D810) -- CORRECTED:
+             * not this project's own tree (an earlier pass in this session
+             * left this "owner not yet pinned down"). Real identity:
+             * `kTerminator`, a `std::map<int, TerminatorData>` local to
+             * `Wm3::ConvexHull3<Real>::Update` (see `rb_min`'s 0x00A52BF0
+             * note above; `FUN_00A63DD0`/`FUN_00A64110` are this same local's
+             * `erase_node`), a 20-byte-value ("Nil33") tree, isNil@+0x21.
+             * Confirmed via `.asm`: real `this`=ecx (thiscall), one stack arg
+             * = `const key_type&` (dereferenced for the descent's key), one
+             * stack arg = a hidden-return-pointer slot the body writes
+             * `{node, owner}` into before returning (`retn 8` pops both stack
+             * args) -- the same "store-into-hidden-return-pointer adapter"
+             * convention as `lower_bound_node`'s `FUN_006E1D30` cited above,
+             * just for this member: lower-bound descent (`cursor->key >=
+             * *key` walking left, else right) inlined directly rather than
+             * calling out to `lower_bound_node`, then the same nil-or-key-
+             * less rejection this member performs. Sole caller in this sweep
+             * is `FUN_00A666F0`, confirmed `Wm3::ConvexHull3<float>::
+             * Update(HullTriangle3<float>*&, int)` itself, correctly
+             * `external_dependency` (not a mis-tag, as an earlier pass in
+             * this session guessed). WildMagic terminal category;
+             * cross-reference confirmation only.
+             * Address: 0x00A5D8A0 (FUN_00A5D8A0) -- byte-identical ICF twin
+             * of 0x00A5D810, reached from `FUN_00A66C00`'s sibling emission
+             * (`ConvexHull3<double>::Update`) -- same classification.
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -2633,34 +2655,15 @@ namespace msvc8
              * captured, old cursor erased" pattern documented on
              * `rb_increment` throughout this file.
              */
-            /**
-             * Address: 0x00A633D0 (FUN_00A633D0, sub_A633D0) -- the same
-             * `msvc8::set<std::uint32_t>` instantiation cited on `equal_range`/
-             * `erase(const key_type&)` above (isNil@+0x11, colour@+0x10).
-             * Matches this member field for field: `_Isnil` guard building and
-             * throwing `std::out_of_range("invalid map/set<T> iterator")`
-             * (`std::logic_error::logic_error` then a vftable patch to
-             * `std::out_of_range` before `CxxThrowException`, the same
-             * two-step construction this file's other `erase_node` emissions
-             * use), successor capture via `sub_A52760(&a3)` (`rb_increment`,
-             * matching `node_type* const next = rb_increment(erased);` before
-             * any unlinking), the one-child/two-child relink split, re-seating
-             * `head->left`/`head->right` through this instantiation's own
-             * `rb_min`/`rb_max` (`sub_A52650`/`sub_A52630`, both cited above)
-             * only when the erased node was an extremum, the colour swap at
-             * node+0x10 for the two-child case, and the black-height rebalance
-             * loop (colour checks at +0x10) calling what are almost certainly
-             * this instantiation's own `rotate_left`/`rotate_right`
-             * (`sub_A553A0`/`sub_A553F0` -- identified but not separately
-             * disambiguated/cited in this pass; a follow-up can confirm which
-             * is which from their own bodies). Was previously (and
-             * incorrectly) marked `recovered` in `recovered_progress.json`
-             * with zero source citation anywhere in `src/sdk` -- this
-             * citation is that missing source mapping. Reached from
-             * `Wm3::ConvexHull3<float>::~ConvexHull3()` (0x00A66440) via
-             * `erase_range`'s (0x00A65320, cited above) `erase(_First++)`
-             * loop when tearing down the `rb_tree` member at `this+0x68`.
-             */
+            // NOTE: 0x00A633D0/0x00A63690 (this template's shape matched against
+            // std::set<HullTriangle3<float/double>*>::erase(const_iterator),
+            // Wm3::ConvexHull3<Real>::m_kHull) are already cited above, on
+            // `destroy_subtree`/`erase_node`'s original citation block --
+            // WildMagic vendor code (CLAUDE.md's named terminal external
+            // category), not this project's own msvc8::set<uint32_t>. An
+            // earlier pass in this session mistakenly re-cited the same
+            // address here as an "unidentified msvc8::set<uint32_t>" -- see
+            // recovered_progress.json's FUN_00A633D0 correction note.
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -3170,36 +3173,52 @@ namespace msvc8
             }
 
             /**
-             * Address: 0x00A65B60 (FUN_00A65B60, sub_A65B60) -- the same
-             * `msvc8::set<std::uint32_t>` instantiation cited on `equal_range`
-             * above (isNil@+0x11), erase-by-key. `this`=ecx=tree, one stack arg
-             * = `const key_type&`, `retn 4` -- a real `__thiscall` member.
-             * Re-homed out of `moho/math/Wm3DistanceFafExtras.cpp`'s `QueryTree`
-             * reach-in cluster (`EraseQueryTreeKeyRangeNil17LaneA`), which hand-
-             * rolled this exact algorithm as an uncited private RB-tree
-             * reimplementation (`QueryTreeCountNodesInRange`/`QueryTreeEraseRange`/
-             * `QueryTreeEraseSingleNode`/`QueryTreeRotateLeft`/`QueryTreeRotateRight`,
-             * none of which carried an `Address:` citation) instead of calling
-             * this shared template.
-             * Address: 0x00A65C10 (FUN_00A65C10, sub_A65C10) -- a second, non-
-             * ICF-folded real emission of the same member (confirmed distinct
-             * from 0x00A65B60 via `_callgraph_index.sqlite`'s `function_icf_twins`
-             * view: zero twins recorded for either address).
+             * Address: 0x00A65B60 (FUN_00A65B60, sub_A65B60) -- CORRECTED: an
+             * earlier pass in this session mis-labelled this `msvc8::set<
+             * std::uint32_t>, owner unidentified`. Real identity (commit
+             * `ea2e46c3`): `std::set<HullTriangle3<float>*>::erase(const
+             * key_type&)`, isNil@+0x11 -- `Wm3::ConvexHull3<float>::m_kHull`
+             * (`dependencies/WildMagic3p8/Foundation/Containment/
+             * Wm3ConvexHull3.h:89`). `this`=ecx=tree, one stack arg = `const
+             * key_type&`, `retn 4` -- a real `__thiscall` member. Source line
+             * is `m_kHull.erase(pkTri)` in `ConvexHull3<Real>::Update`
+             * (`Wm3ConvexHull3.cpp:324`). WildMagic is CLAUDE.md's named
+             * terminal `external_dependency` category -- kept here purely as
+             * cross-reference confirmation of this member's shape, not as
+             * engine recovery work; see `recovered_progress.json`.
+             * Was `EraseQueryTreeKeyRangeNil17LaneA` in `moho/math/
+             * Wm3DistanceFafExtras.cpp` (deleted), which hand-rolled this
+             * exact algorithm as an uncited private RB-tree reimplementation
+             * (`QueryTreeCountNodesInRange`/`QueryTreeEraseRange`/
+             * `QueryTreeEraseSingleNode`/`QueryTreeRotateLeft`/
+             * `QueryTreeRotateRight`, none of which carried an `Address:`
+             * citation) instead of naming this shared template -- or, since
+             * the real owner is external, instead of simply noting "this is
+             * `m_kHull.erase(pkTri)`, WildMagic, external_dependency" the way
+             * this citation now does.
+             * Address: 0x00A65C10 (FUN_00A65C10, sub_A65C10) -- a second,
+             * non-ICF-folded real emission of the same member (confirmed
+             * distinct from 0x00A65B60 via `_callgraph_index.sqlite`'s
+             * `function_icf_twins` view: zero twins recorded for either
+             * address) -- was `EraseQueryTreeKeyRangeNil17LaneB`.
              *
              * What it does:
              * `equal_range(k)` locates `[first,last)`, then the shipped body
              * calls a checked "how many nodes between these two iterators"
              * counting helper (`sub_A598A0`, stepping via the `rb_increment`-
              * equivalent `sub_A52760`) before erasing the range through
-             * `erase_range` (0x00A65320, cited above) -- exactly the classic
-             * Dinkumware `_Tree::erase(const key_type&)` shape (necessary
-             * because `_Tree` is shared by `set`/`map`/`multiset`/`multimap`
-             * and can't assume at most one match). `sub_A598A0`/`sub_A52760`
-             * are themselves real addresses, currently misfiled as a blocked
-             * token in `moho/misc/CrtRuntimeHelpers.cpp` (out of scope for this
-             * pass); the count loop below reconstructs the same observable
-             * behavior with `rb_increment`, which is already canonical here,
-             * rather than re-citing an unrecovered helper under a new name.
+             * `erase_range` (`sub_A65320`, also WildMagic/`external_dependency`
+             * for this same `m_kHull` -- see that token's note) -- exactly the
+             * classic Dinkumware `_Tree::erase(const key_type&)` shape
+             * (necessary because `_Tree` is shared by `set`/`map`/`multiset`/
+             * `multimap` and can't assume at most one match). This member is
+             * written as that natural 2007 source shape -- genuinely useful,
+             * cited engine infrastructure for this project's own
+             * `msvc8::set`/`msvc8::map`, independent of the external address
+             * that happens to confirm it above. The count loop below uses
+             * `rb_increment` (already canonical here) rather than a
+             * separately named helper, matching what `sub_A598A0`/
+             * `sub_A52760` do for the external instantiation.
              */
             size_type erase(const key_type& k)
             {
