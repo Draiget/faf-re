@@ -4008,6 +4008,23 @@ namespace gpg
     static RType* sType;
 
     /**
+     * Address: 0x00F8E540 -- dedicated `typeid(LuaPlus::TObject)` cache slot
+     * hosted directly on `RType` rather than on the served type itself.
+     *
+     * Confirmed via a genuine linker-mangled symbol (not an IDA-guessed
+     * label, unlike every sibling `T::sType` cache this session): the raw
+     * asm at `TObjectSerializer`'s `Init()` (0x0091F8A0) reads/writes
+     * `?TObject@RType@gpg@@3PAVRType@gpg@@A`, i.e. `gpg::RType::TObject`.
+     * `LuaPlus::TObject` is a tightly `#pragma pack(push, 4)` tagged-value
+     * POD reused inside `union Value`; the original engineers evidently
+     * chose not to grow it with a reflection-owned static and centralized
+     * this one cache on `RType` instead. Every other Lua runtime type
+     * (`Table`, `Proto`, `Udata`, `LClosure`, `lua_State`) caches on its own
+     * `T::sType` as usual -- this member is the sole confirmed exception.
+     */
+    static RType* TObject;
+
+    /**
      * Address: 0x008DD950 (FUN_008DD950, ??0RType@gpg@@QAE@XZ_0)
      *
      * What it does:

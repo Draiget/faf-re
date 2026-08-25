@@ -120,6 +120,9 @@ extern "C" std::FILE* __cdecl __iob_func(void)
 
 gpg::RType* Table::sType = nullptr;
 gpg::RType* Proto::sType = nullptr;
+gpg::RType* Udata::sType = nullptr;
+gpg::RType* LClosure::sType = nullptr;
+gpg::RType* lua_State::sType = nullptr;
 
 class TableSerializer : public gpg::SerHelperBase
 {
@@ -245,9 +248,24 @@ void TableSerializer::Serialize(
 	Table::MemberSerialize(archive, object, version, ownerRef);
 }
 
-class LClosureSerializer
+class LClosureSerializer : public gpg::SerHelperBase
 {
 public:
+	/**
+	 * Address: 0x00BEA490 (FUN_00BEA490, dynamic initializer for the global
+	 * `LClosureSerializer` singleton)
+	 *
+	 * What it does:
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
+	 */
+	LClosureSerializer();
+
+	/**
+	 * Address: 0x00C09B80 (FUN_00C09B80, LClosureSerializer::~LClosureSerializer)
+	 */
+	~LClosureSerializer();
+
 	/**
 	 * Address: 0x00921370 (FUN_00921370, LClosureSerializer::Serialize)
 	 * Address: 0x0098FF80 (FUN_0098FF80)
@@ -265,7 +283,22 @@ public:
 	 * using the provided archive owner reference lane.
 	 */
 	static void Deserialize(gpg::ReadArchive* archive, LClosure* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x0091FD50 (FUN_0091FD50, LClosureSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into `LClosure` RTTI.
+	 */
+	void Init() override;
+
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
+
+static_assert(offsetof(LClosureSerializer, mDeserialize) == 0x0C, "LClosureSerializer::mDeserialize offset must be 0x0C");
+static_assert(offsetof(LClosureSerializer, mSerialize) == 0x10, "LClosureSerializer::mSerialize offset must be 0x10");
+static_assert(sizeof(LClosureSerializer) == 0x14, "LClosureSerializer size must be 0x14");
 
 class ProtoSerializer : public gpg::SerHelperBase
 {
@@ -317,9 +350,24 @@ static_assert(offsetof(ProtoSerializer, mDeserialize) == 0x0C, "ProtoSerializer:
 static_assert(offsetof(ProtoSerializer, mSerialize) == 0x10, "ProtoSerializer::mSerialize offset must be 0x10");
 static_assert(sizeof(ProtoSerializer) == 0x14, "ProtoSerializer size must be 0x14");
 
-class lua_StateSerializer
+class lua_StateSerializer : public gpg::SerHelperBase
 {
 public:
+	/**
+	 * Address: 0x00BEA7C0 (FUN_00BEA7C0, dynamic initializer for the global
+	 * `lua_StateSerializer` singleton)
+	 *
+	 * What it does:
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
+	 */
+	lua_StateSerializer();
+
+	/**
+	 * Address: 0x00C09D30 (FUN_00C09D30, lua_StateSerializer::~lua_StateSerializer)
+	 */
+	~lua_StateSerializer();
+
 	/**
 	 * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
 	 *
@@ -335,11 +383,41 @@ public:
 	 * Forwards one Lua thread save lane into `lua_State::MemberSerialize`.
 	 */
 	static void Serialize(gpg::WriteArchive* archive, lua_State* state, int version, const gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00920200 (FUN_00920200, lua_StateSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into `lua_State` RTTI.
+	 */
+	void Init() override;
+
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
 
-class TObjectSerializer
+static_assert(offsetof(lua_StateSerializer, mDeserialize) == 0x0C, "lua_StateSerializer::mDeserialize offset must be 0x0C");
+static_assert(offsetof(lua_StateSerializer, mSerialize) == 0x10, "lua_StateSerializer::mSerialize offset must be 0x10");
+static_assert(sizeof(lua_StateSerializer) == 0x14, "lua_StateSerializer size must be 0x14");
+
+class TObjectSerializer : public gpg::SerHelperBase
 {
 public:
+	/**
+	 * Address: 0x00BEA160 (FUN_00BEA160, dynamic initializer for the global
+	 * `TObjectSerializer` singleton)
+	 *
+	 * What it does:
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
+	 */
+	TObjectSerializer();
+
+	/**
+	 * Address: 0x00C09DF0 (FUN_00C09DF0, TObjectSerializer::~TObjectSerializer)
+	 */
+	~TObjectSerializer();
+
 	/**
 	 * Address: 0x00921FC0 (FUN_00921FC0, TObjectSerializer::Serialize)
 	 *
@@ -355,11 +433,42 @@ public:
 	 * Forwards one tagged Lua value load lane into `TObject::MemberDeserialize`.
 	 */
 	static void Deserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x0091F8A0 (FUN_0091F8A0, TObjectSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into the dedicated `gpg::RType::TObject`
+	 * cache slot (see the Doxygen comment on that member in Reflection.h).
+	 */
+	void Init() override;
+
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
 
-class UdataSerializer
+static_assert(offsetof(TObjectSerializer, mDeserialize) == 0x0C, "TObjectSerializer::mDeserialize offset must be 0x0C");
+static_assert(offsetof(TObjectSerializer, mSerialize) == 0x10, "TObjectSerializer::mSerialize offset must be 0x10");
+static_assert(sizeof(TObjectSerializer) == 0x14, "TObjectSerializer size must be 0x14");
+
+class UdataSerializer : public gpg::SerHelperBase
 {
 public:
+	/**
+	 * Address: 0x00BEA8D0 (FUN_00BEA8D0, dynamic initializer for the global
+	 * `UdataSerializer` singleton)
+	 *
+	 * What it does:
+	 * Default-constructs the `gpg::SerHelperBase` base and binds the
+	 * load/save callback fields.
+	 */
+	UdataSerializer();
+
+	/**
+	 * Address: 0x00C09DC0 (FUN_00C09DC0, UdataSerializer::~UdataSerializer)
+	 */
+	~UdataSerializer();
+
 	/**
 	 * Address: 0x00923660 (FUN_00923660)
 	 *
@@ -375,147 +484,62 @@ public:
 	 * Forwards one userdata save lane into `Udata::MemberSerialize`.
 	 */
 	static void Serialize(gpg::WriteArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00920390 (FUN_00920390, UdataSerializer::Init)
+	 *
+	 * What it does:
+	 * Binds load/save callbacks into `Udata` RTTI.
+	 */
+	void Init() override;
+
+	gpg::RType::load_func_t mDeserialize; // +0x0C
+	gpg::RType::save_func_t mSerialize;   // +0x10
 };
 
-namespace
+static_assert(offsetof(UdataSerializer, mDeserialize) == 0x0C, "UdataSerializer::mDeserialize offset must be 0x0C");
+static_assert(offsetof(UdataSerializer, mSerialize) == 0x10, "UdataSerializer::mSerialize offset must be 0x10");
+static_assert(sizeof(UdataSerializer) == 0x14, "UdataSerializer size must be 0x14");
+
+/**
+ * Address: 0x00BEA490 (FUN_00BEA490, dynamic initializer for the global
+ * `LClosureSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
+ */
+LClosureSerializer::LClosureSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&LClosureSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&LClosureSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00C09B80 (FUN_00C09B80, LClosureSerializer::~LClosureSerializer)
+ */
+LClosureSerializer::~LClosureSerializer()
 {
-	struct SerializerHelperRuntimeView
-	{
-		void* vftable;
-		gpg::SerHelperBase* mNext;
-		gpg::SerHelperBase* mPrev;
-		gpg::RType::load_func_t mDeserialize;
-		gpg::RType::save_func_t mSerialize;
-	};
+	ResetLinks();
+}
 
-	static_assert(sizeof(SerializerHelperRuntimeView) == 0x14, "SerializerHelperRuntimeView size must be 0x14");
-
-	/**
-	 * Address: 0x00923260 (FUN_00923260)
-	 *
-	 * What it does:
-	 * Initializes one serializer-helper lane for `TObject` load/save callbacks.
-	 */
-	SerializerHelperRuntimeView* InitializeTObjectSerializerHelper(
-		SerializerHelperRuntimeView* const helper
-	) noexcept
-	{
-		if (helper == nullptr) {
-			return nullptr;
-		}
-
-		helper->vftable = nullptr;
-		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
-		helper->mNext = self;
-		helper->mPrev = self;
-		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&TObjectSerializer::Deserialize);
-		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&TObjectSerializer::Serialize);
-		return helper;
+/**
+ * Address: 0x0091FD50 (FUN_0091FD50, LClosureSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into `LClosure` RTTI.
+ */
+void LClosureSerializer::Init()
+{
+	gpg::RType* type = LClosure::sType;
+	if (!type) {
+		type = gpg::LookupRType(typeid(LClosure));
+		LClosure::sType = type;
 	}
 
-	/**
-	 * Address: 0x00923440 (FUN_00923440)
-	 *
-	 * What it does:
-	 * Initializes one serializer-helper lane for `LClosure` load/save callbacks.
-	 */
-	SerializerHelperRuntimeView* InitializeLClosureSerializerHelper(
-		SerializerHelperRuntimeView* const helper
-	) noexcept
-	{
-		if (helper == nullptr) {
-			return nullptr;
-		}
-
-		helper->vftable = nullptr;
-		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
-		helper->mNext = self;
-		helper->mPrev = self;
-		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&LClosureSerializer::Deserialize);
-		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&LClosureSerializer::Serialize);
-		return helper;
-	}
-
-	/**
-	 * Address: 0x00923670 (FUN_00923670)
-	 *
-	 * What it does:
-	 * Initializes one serializer-helper lane for userdata load/save callbacks.
-	 */
-	SerializerHelperRuntimeView* InitializeUdataSerializerHelper(
-		SerializerHelperRuntimeView* const helper
-	) noexcept
-	{
-		if (helper == nullptr) {
-			return nullptr;
-		}
-
-		helper->vftable = nullptr;
-		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
-		helper->mNext = self;
-		helper->mPrev = self;
-		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&UdataSerializer::Deserialize);
-		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&UdataSerializer::Serialize);
-		return helper;
-	}
-
-	/**
-	 * Address: 0x00BEA7C0 (register_lua_StateSerializer)
-	 *
-	 * IDA signature:
-	 * void __cdecl register_lua_StateSerializer();
-	 *
-	 * What it does:
-	 * Initializes one serializer-helper lane for Lua thread load/save callbacks.
-	 * The binary runs SerHelperBase::SerHelperBase to self-link the ring, binds
-	 * both callbacks, stores the vftable and registers the destructor with
-	 * atexit; the ring self-link plus callback binding is the observable part.
-	 */
-	SerializerHelperRuntimeView* InitializeLuaStateSerializerHelper(
-		SerializerHelperRuntimeView* const helper
-	) noexcept
-	{
-		if (helper == nullptr) {
-			return nullptr;
-		}
-
-		helper->vftable = nullptr;
-		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
-		helper->mNext = self;
-		helper->mPrev = self;
-		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&lua_StateSerializer::Deserialize);
-		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&lua_StateSerializer::Serialize);
-		return helper;
-	}
-
-	/**
-	 * Address: 0x00BEA160 (register_TObjectSerializer)
-	 * Address: 0x00BEA490 (register_LClosureSerializer)
-	 * Address: 0x00BEA8D0 (register_UdataSerializer)
-	 *
-	 * What it does:
-	 * Brings the Lua serializer helper lanes into existence. Each helper links
-	 * itself into its own intrusive ring and binds its load/save callbacks; the
-	 * binary drives all three from its CRT initializer table. Without this the
-	 * Initialize* lanes above are never called and no Lua value has a serializer.
-	 */
-	SerializerHelperRuntimeView gTObjectSerializerHelper{};
-	SerializerHelperRuntimeView gLClosureSerializerHelper{};
-	SerializerHelperRuntimeView gUdataSerializerHelper{};
-	SerializerHelperRuntimeView gLuaStateSerializerHelper{};
-
-	struct LuaSerializerHelperBootstrap
-	{
-		LuaSerializerHelperBootstrap()
-		{
-			(void)InitializeTObjectSerializerHelper(&gTObjectSerializerHelper);
-			(void)InitializeLClosureSerializerHelper(&gLClosureSerializerHelper);
-			(void)InitializeUdataSerializerHelper(&gUdataSerializerHelper);
-			(void)InitializeLuaStateSerializerHelper(&gLuaStateSerializerHelper);
-		}
-	};
-
-	LuaSerializerHelperBootstrap gLuaSerializerHelperBootstrap;
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
 }
 
 /**
@@ -593,6 +617,18 @@ namespace
 
 	// Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
 	ProtoSerializer gProtoSerializer;
+
+	// Address: 0x00F8E8AC -- process-global `TObjectSerializer` singleton.
+	TObjectSerializer gTObjectSerializer;
+
+	// Address: 0x00F8E768 -- process-global `LClosureSerializer` singleton.
+	LClosureSerializer gLClosureSerializer;
+
+	// Address: 0x00F8E6F0 -- process-global `UdataSerializer` singleton.
+	UdataSerializer gUdataSerializer;
+
+	// Address: 0x00F8EAAC -- process-global `lua_StateSerializer` singleton.
+	lua_StateSerializer gLuaStateSerializer;
 }
 
 /**
@@ -628,6 +664,47 @@ void ProtoSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BEA7C0 (FUN_00BEA7C0, dynamic initializer for the global
+ * `lua_StateSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
+ */
+lua_StateSerializer::lua_StateSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&lua_StateSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&lua_StateSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00C09D30 (FUN_00C09D30, lua_StateSerializer::~lua_StateSerializer)
+ */
+lua_StateSerializer::~lua_StateSerializer()
+{
+	ResetLinks();
+}
+
+/**
+ * Address: 0x00920200 (FUN_00920200, lua_StateSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into `lua_State` RTTI.
+ */
+void lua_StateSerializer::Init()
+{
+	gpg::RType* type = lua_State::sType;
+	if (!type) {
+		type = gpg::LookupRType(typeid(lua_State));
+		lua_State::sType = type;
+	}
+
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
+}
+
+/**
  * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
  *
  * What it does:
@@ -660,6 +737,48 @@ void lua_StateSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BEA160 (FUN_00BEA160, dynamic initializer for the global
+ * `TObjectSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
+ */
+TObjectSerializer::TObjectSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&TObjectSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&TObjectSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00C09DF0 (FUN_00C09DF0, TObjectSerializer::~TObjectSerializer)
+ */
+TObjectSerializer::~TObjectSerializer()
+{
+	ResetLinks();
+}
+
+/**
+ * Address: 0x0091F8A0 (FUN_0091F8A0, TObjectSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into the dedicated `gpg::RType::TObject` cache
+ * slot (see the Doxygen comment on that member in Reflection.h).
+ */
+void TObjectSerializer::Init()
+{
+	gpg::RType* type = gpg::RType::TObject;
+	if (!type) {
+		type = gpg::LookupRType(typeid(TObject));
+		gpg::RType::TObject = type;
+	}
+
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
+}
+
+/**
  * Address: 0x00921FC0 (FUN_00921FC0, TObjectSerializer::Serialize)
  *
  * What it does:
@@ -689,6 +808,47 @@ void TObjectSerializer::Deserialize(
 )
 {
 	TObject::MemberDeserialize(archive, object, version, ownerRef);
+}
+
+/**
+ * Address: 0x00BEA8D0 (FUN_00BEA8D0, dynamic initializer for the global
+ * `UdataSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base and binds the
+ * load/save callback fields.
+ */
+UdataSerializer::UdataSerializer()
+	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&UdataSerializer::Deserialize))
+	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&UdataSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00C09DC0 (FUN_00C09DC0, UdataSerializer::~UdataSerializer)
+ */
+UdataSerializer::~UdataSerializer()
+{
+	ResetLinks();
+}
+
+/**
+ * Address: 0x00920390 (FUN_00920390, UdataSerializer::Init)
+ *
+ * What it does:
+ * Binds load/save callbacks into `Udata` RTTI.
+ */
+void UdataSerializer::Init()
+{
+	gpg::RType* type = Udata::sType;
+	if (!type) {
+		type = gpg::LookupRType(typeid(Udata));
+		Udata::sType = type;
+	}
+
+	GPG_ASSERT(type->serLoadFunc_ == nullptr);
+	type->serLoadFunc_ = mDeserialize;
+	GPG_ASSERT(type->serSaveFunc_ == nullptr);
+	type->serSaveFunc_ = mSerialize;
 }
 
 /**

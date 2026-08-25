@@ -10258,43 +10258,33 @@ namespace
   }
 
   /**
-   * Address: 0x00693DE0 (FUN_00693DE0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EntitySetBase`.
+   * `InstallMohoEntitySetBaseSerializerCallbacks` removed here (2026-08-26
+   * follow-up): its `Address: 0x00693DE0` citation was disproven the same
+   * way (typeid-cached `EntitySetBase::sType` + `gpg::LookupRType`, not
+   * `REF_FindTypeNamed`) and had zero callers in this file. The real body
+   * is now `Moho::EntitySetBaseSerializer::Init()` in
+   * `moho/entity/EntitySetReflection.cpp`, backed by that class's own
+   * ctor/dtor/Deserialize/Serialize address evidence (`vtable_writers` for
+   * `EntitySetBaseSerializer@Moho`).
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEntitySetBaseSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EntitySetBase");
-  }
 
   /**
-   * Address: 0x00693E80 (FUN_00693E80)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EntitySetTemplate_Entity`.
+   * `InstallMohoEntitySetTemplateEntitySerializerCallbacks` removed here
+   * (2026-08-26 follow-up): its `Address: 0x00693E80` citation was
+   * disproven the same way (typeid-cached `EntitySetTemplate<Entity>::
+   * sType`) and had zero callers in this file. The real body is now
+   * `Moho::EntitySetSerializer::Init()` in
+   * `moho/entity/EntitySetReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEntitySetTemplateEntitySerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EntitySetTemplate_Entity");
-  }
 
   /**
-   * Address: 0x00693F20 (FUN_00693F20)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::WeakEntitySetTemplate_Entity`.
+   * `InstallMohoWeakEntitySetTemplateEntitySerializerCallbacks` removed
+   * here (2026-08-26 follow-up): its `Address: 0x00693F20` citation was
+   * disproven the same way (typeid-cached `WeakEntitySetTemplate<Entity>::
+   * sType`) and had zero callers in this file. The real body is now
+   * `Moho::WeakEntitySetSerializer::Init()` in
+   * `moho/entity/EntitySetReflection.cpp`.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoWeakEntitySetTemplateEntitySerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::WeakEntitySetTemplate_Entity");
-  }
 
   /**
    * Address: 0x00696CE0 (FUN_00696CE0)
@@ -10642,97 +10632,6 @@ namespace
   )
   {
     return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::SSessionSaveData");
-  }
-
-  /**
-   * Address: 0x0091FA30 (FUN_0091FA30)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::TString`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaTStringSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::TString");
-  }
-
-  /**
-   * Address: 0x0091FBC0 (FUN_0091FBC0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::Table`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaTableSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::Table");
-  }
-
-  /**
-   * Address: 0x0091FD50 (FUN_0091FD50)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::LClosure`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaLClosureSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::LClosure");
-  }
-
-  /**
-   * Address: 0x0091FEE0 (FUN_0091FEE0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::UpVal`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaUpValSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::UpVal");
-  }
-
-  /**
-   * Address: 0x00920070 (FUN_00920070)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::Proto`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaProtoSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::Proto");
-  }
-
-  /**
-   * Address: 0x00920200 (FUN_00920200)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::lua_State`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstalllualuaStateSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::lua_State");
-  }
-
-  /**
-   * Address: 0x00920390 (FUN_00920390)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `lua::Udata`.
-   */
-  [[nodiscard]] gpg::RType::load_func_t InstallluaUdataSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "lua::Udata");
   }
 
   [[nodiscard]] gpg::RType* ResolveInfluenceMapEntryArchiveAdapterType()
