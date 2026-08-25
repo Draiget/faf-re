@@ -8,7 +8,7 @@
 namespace moho
 {
   /**
-   * Address: 0x006E7D60 (FUN_006E7D60, sub_6E7D60)
+   * Address: 0x006E7D60 (FUN_006E7D60, Moho::ECommandEventTypeInfo::ECommandEventTypeInfo)
    *
    * What it does:
    * Owns the reflected enum descriptor for `ECommandEvent`.
@@ -17,7 +17,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006E7D60 (FUN_006E7D60, sub_6E7D60)
+     * Address: 0x006E7D60 (FUN_006E7D60, Moho::ECommandEventTypeInfo::ECommandEventTypeInfo)
      *
      * What it does:
      * Constructs and preregisters `ECommandEvent` enum RTTI.
@@ -39,58 +39,43 @@ namespace moho
 
   static_assert(sizeof(ECommandEventTypeInfo) == 0x78, "ECommandEventTypeInfo size must be 0x78");
 
-  class ECommandEventPrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x00BD8EF0 (FUN_00BD8EF0, sub_BD8EF0)
-     *
-     * What it does:
-     * Binds enum load/save callbacks onto the reflected `ECommandEvent` type.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(ECommandEventPrimitiveSerializer, mHelperNext) == 0x04,
-    "ECommandEventPrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ECommandEventPrimitiveSerializer, mHelperPrev) == 0x08,
-    "ECommandEventPrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ECommandEventPrimitiveSerializer, mDeserialize) == 0x0C,
-    "ECommandEventPrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ECommandEventPrimitiveSerializer, mSerialize) == 0x10,
-    "ECommandEventPrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(ECommandEventPrimitiveSerializer) == 0x14, "ECommandEventPrimitiveSerializer size must be 0x14"
-  );
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ECommandEvent,int>
+   *
+   * Investigated per RTTI: `ECommandEvent` has vtable_writer entries for
+   * BOTH `?$PrimitiveSerHelper@W4ECommandEvent@Moho@@H@gpg` (two ctor
+   * writers) and `?$SerSaveLoadHelper@W4ECommandEvent@Moho@@@gpg` (one ctor
+   * writer). Only ONE of the three is `__xc_a`-reachable:
+   *   - `FUN_00BD8EF0` (`PrimitiveSerHelper<ECommandEvent,int>` ctor):
+   *     `incoming_xrefs=1`, `reachable via ctor_static depth 0` -- REAL.
+   *   - `FUN_006E9730` (`PrimitiveSerHelper<ECommandEvent,int>` ctor, same
+   *     vtable as above): `incoming_xrefs=0`, unreachable -- dead duplicate
+   *     (same low-address/high-address shape as every other
+   *     `PrimitiveSerHelper<T,int>` instantiation; a prior recovery pass
+   *     wrongly labeled THIS address "the real, distinct ctor").
+   *   - `FUN_006EA770` (`SerSaveLoadHelper<ECommandEvent>` ctor):
+   *     `incoming_xrefs=0`, unreachable -- dead sibling-writer, same
+   *     "shares a global's storage address but is itself unreachable" shape
+   *     already documented for ELayer/EVisibilityMode/ESquadClass in
+   *     `gpg::PrimitiveSerHelper<T,IntType>`'s Reflection.h class comment.
+   * `Init()` confirmed at `FUN_006E9760` via the RTTI vftable dump
+   * (`vftable@0xE2E968` slot 0) -- a THIRD address, previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ECommandEvent")`
+   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly
+   * (same mis-citation family already caught this session for
+   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
+   * `Deserialize`/`Serialize` at 0x006EA730/0x006EA750 already matched this
+   * template's generic bodies exactly (no fabricated null-check needed).
+   */
+  using ECommandEventPrimitiveSerializer = gpg::PrimitiveSerHelper<ECommandEvent, int>;
 
   /**
-   * Address: 0x00BD8ED0 (FUN_00BD8ED0, sub_BD8ED0)
+   * Address: 0x006E7D60 (FUN_006E7D60, sub_6E7D60)
    *
    * What it does:
    * Ensures `ECommandEvent` type-info is registered and schedules teardown.
    */
   int register_ECommandEventTypeInfo();
-
-  /**
-   * Address: 0x00BD8EF0 (FUN_00BD8EF0, sub_BD8EF0)
-   *
-   * What it does:
-   * Registers enum primitive load/save helper callbacks for `ECommandEvent`.
-   */
-  int register_ECommandEventPrimitiveSerializer();
 } // namespace moho
-

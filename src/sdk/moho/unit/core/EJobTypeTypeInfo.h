@@ -50,55 +50,24 @@ namespace moho
     void AddEnums();
   };
 
-  class EJobTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0055D370 (FUN_0055D370, PrimitiveSerHelper<EJobType>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EJobType` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0055D390 (FUN_0055D390, PrimitiveSerHelper<EJobType>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EJobType` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EJobType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EJobTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EJobTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EJobTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EJobTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EJobTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EJobTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EJobTypePrimitiveSerializer, mSerialize) == 0x10,
-    "EJobTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EJobTypePrimitiveSerializer) == 0x14, "EJobTypePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EJobType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EJobType@Moho@@H@gpg'`):
+   * `FUN_00BCA460` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). `Init()` confirmed at `FUN_0055C860` via the RTTI
+   * vftable dump (`vftable@0xE186DC` slot 0) -- previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EJobType")`
+   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly
+   * (same mis-citation family already caught this session for
+   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
+   * `Deserialize`/`Serialize` at 0x0055D370/0x0055D390 already matched this
+   * template's generic bodies exactly (no fabricated null-check).
+   */
+  using EJobTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EJobType, int>;
 
   static_assert(sizeof(EJobTypeTypeInfo) == 0x78, "EJobTypeTypeInfo size must be 0x78");
 

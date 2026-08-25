@@ -11,6 +11,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0055BB10 (FUN_0055BB10, Moho::EUnitStateTypeInfo::EUnitStateTypeInfo)
+     *
+     * What it does:
+     * Preregisters the enum type descriptor for `EUnitState` with the reflection registry.
+     */
+    EUnitStateTypeInfo();
+
+    /**
      * Address: 0x0055BBA0 (FUN_0055BBA0, Moho::EUnitStateTypeInfo::dtr)
      */
     ~EUnitStateTypeInfo() override;
@@ -32,65 +40,35 @@ namespace moho
     void AddEnums();
   };
 
-  class EUnitStatePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0055D450 (FUN_0055D450, PrimitiveSerHelper<EUnitState>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EUnitState` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0055D470 (FUN_0055D470, PrimitiveSerHelper<EUnitState>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EUnitState` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EUnitState`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EUnitStatePrimitiveSerializer, mHelperNext) == 0x04,
-    "EUnitStatePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EUnitStatePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EUnitStatePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EUnitStatePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EUnitStatePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EUnitStatePrimitiveSerializer, mSerialize) == 0x10,
-    "EUnitStatePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EUnitStatePrimitiveSerializer) == 0x14, "EUnitStatePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EUnitState,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EUnitState@Moho@@H@gpg'`):
+   * `FUN_00BCA520` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). `Init()` confirmed at `FUN_0055C9A0` via the RTTI
+   * vftable dump (`vftable@0xE1875C` slot 0) -- previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EUnitState")`
+   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly
+   * (same mis-citation family already caught this session for
+   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
+   * `Deserialize`/`Serialize` at 0x0055D450/0x0055D470 already matched this
+   * template's generic bodies exactly (no fabricated null-check).
+   */
+  using EUnitStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EUnitState, int>;
 
   static_assert(sizeof(EUnitState) == 0x04, "EUnitState size must be 0x04");
   static_assert(sizeof(EUnitStateTypeInfo) == 0x78, "EUnitStateTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x0055BB10 (FUN_0055BB10, preregister_EUnitStateTypeInfo)
+   * Address: 0x0055BB10 (FUN_0055BB10, static-init lane)
    *
    * What it does:
-   * Constructs startup-owned `EUnitStateTypeInfo` storage and preregisters
-   * RTTI ownership for `EUnitState`.
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
    */
   [[nodiscard]] gpg::REnumType* preregister_EUnitStateTypeInfo();
 } // namespace moho

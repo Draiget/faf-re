@@ -50,55 +50,24 @@ namespace moho
     void AddEnums();
   };
 
-  class EFireStatePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0055D3E0 (FUN_0055D3E0, PrimitiveSerHelper<EFireState>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `EFireState` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0055D400 (FUN_0055D400, PrimitiveSerHelper<EFireState>::Serialize)
-     *
-     * What it does:
-     * Serializes one `EFireState` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `EFireState`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(EFireStatePrimitiveSerializer, mHelperNext) == 0x04,
-    "EFireStatePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EFireStatePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EFireStatePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EFireStatePrimitiveSerializer, mDeserialize) == 0x0C,
-    "EFireStatePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EFireStatePrimitiveSerializer, mSerialize) == 0x10,
-    "EFireStatePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(EFireStatePrimitiveSerializer) == 0x14, "EFireStatePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EFireState,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EFireState@Moho@@H@gpg'`):
+   * `FUN_00BCA4C0` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). `Init()` confirmed at `FUN_0055C900` via the RTTI
+   * vftable dump (`vftable@0xE1871C` slot 0) -- previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EFireState")`
+   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly
+   * (same mis-citation family already caught this session for
+   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
+   * `Deserialize`/`Serialize` at 0x0055D3E0/0x0055D400 already matched this
+   * template's generic bodies exactly (no fabricated null-check).
+   */
+  using EFireStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EFireState, int>;
 
   static_assert(sizeof(EFireStateTypeInfo) == 0x78, "EFireStateTypeInfo size must be 0x78");
 
