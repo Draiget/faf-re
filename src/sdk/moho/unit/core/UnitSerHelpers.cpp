@@ -17,104 +17,30 @@ namespace gpg
 
 namespace
 {
-  gpg::RType* gUnitType = nullptr;
+  /**
+   * Address: 0x00BD6B20 (FUN_00BD6B20, dynamic initializer for the global
+   * `UnitConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields (vtable slot 0 `Init()` dispatched
+   * later by `gpg::SerHelperBase::InitNewHelpers`). Confirmed via raw asm:
+   * base-ctor call -> field-set -> vtable-install -> atexit, with no eager
+   * `RegisterConstructFunction()` dispatch (the prior recovery fabricated
+   * that eager call from `register_UnitConstruct`).
+   */
   moho::UnitConstruct gUnitConstruct{};
+
+  /**
+   * Address: 0x00BD6B60 (FUN_00BD6B60, dynamic initializer for the global
+   * `UnitSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Independent `__xc_a` static initializer,
+   * separate from `UnitConstruct`'s own initializer above.
+   */
   moho::UnitSerializer gUnitSerializer{};
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x006AD340 (FUN_006AD340)
-   *
-   * What it does:
-   * Splices the `UnitConstruct` helper node out of its intrusive lane when
-   * linked, then rewires helper links to its self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitConstructHelperNodeVariantA() noexcept
-  {
-    return UnlinkHelperNode(gUnitConstruct);
-  }
-
-  /**
-   * Address: 0x006AD370 (FUN_006AD370)
-   *
-   * What it does:
-   * Secondary `UnitConstruct` helper unlink/reset variant sharing the same
-   * behavior and return value.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitConstructHelperNodeVariantB() noexcept
-  {
-    return UnlinkUnitConstructHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x006AD4E0 (FUN_006AD4E0)
-   *
-   * What it does:
-   * Splices the `UnitSerializer` helper node out of its intrusive lane when
-   * linked, then rewires helper links to its self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSerializerHelperNodeVariantA() noexcept
-  {
-    return UnlinkHelperNode(gUnitSerializer);
-  }
-
-  /**
-   * Address: 0x006AD510 (FUN_006AD510)
-   *
-   * What it does:
-   * Secondary `UnitSerializer` helper unlink/reset variant sharing the same
-   * behavior and return value.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkUnitSerializerHelperNodeVariantA();
-  }
-
-  void CleanupUnitConstructAtexit()
-  {
-    (void)moho::cleanup_UnitConstruct();
-  }
-
-  void CleanupUnitSerializerAtexit()
-  {
-    (void)moho::cleanup_UnitSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -189,14 +115,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BD6B20 (FUN_00BD6B20, register_UnitConstruct)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
+   */
+  UnitConstruct::UnitConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&UnitConstruct::Construct))
+    , mDeconstructCallback(&UnitConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BFDA00 (FUN_00BFDA00, Moho::UnitConstruct::~UnitConstruct)
+   */
+  UnitConstruct::~UnitConstruct()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x006AE9A0 (FUN_006AE9A0, Moho::UnitConstruct::RegisterConstructFunction)
    *
    * What it does:
-   * Binds construct/delete callbacks into reflected RTTI for `Unit`.
+   * Binds construct/delete callbacks into reflected RTTI for `Unit`. Real
+   * body caches on `Unit::sType` directly; reached here through the
+   * already-established `Unit::StaticGetClass()` accessor rather than the
+   * prior recovery's disconnected local `gUnitType` cache.
    */
-  void UnitConstruct::RegisterConstructFunction()
+  void UnitConstruct::Init()
   {
-    gpg::RType* const type = ResolveCachedType<Unit>(gUnitType);
+    gpg::RType* const type = Unit::StaticGetClass();
 
     GPG_ASSERT(type != nullptr);
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -205,81 +154,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BD6B60 (FUN_00BD6B60, register_UnitSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  UnitSerializer::UnitSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&UnitSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&UnitSerializer::Serialize))
+  {}
+
+  /**
+   * Address: 0x00BFDA30 (FUN_00BFDA30, Moho::UnitSerializer::~UnitSerializer)
+   */
+  UnitSerializer::~UnitSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x006AEA20 (FUN_006AEA20, gpg::SerSaveLoadHelper<Moho::Unit>::Init lane)
+   *
    * What it does:
    * Binds load/save callbacks into reflected RTTI for `Unit`.
    */
-  void UnitSerializer::RegisterSerializeFunctions()
+  void UnitSerializer::Init()
   {
-    gpg::RType* const type = ResolveCachedType<Unit>(gUnitType);
+    gpg::RType* const type = Unit::StaticGetClass();
     GPG_ASSERT(type != nullptr);
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
     GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
     type->serLoadFunc_ = mDeserialize;
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BFDA00 (FUN_00BFDA00, cleanup_UnitConstruct)
-   *
-   * What it does:
-   * Unlinks `UnitConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_UnitConstruct()
-  {
-    return UnlinkUnitConstructHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00BFDA30 (FUN_00BFDA30, cleanup_UnitSerializer)
-   *
-   * What it does:
-   * Unlinks `UnitSerializer` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_UnitSerializer()
-  {
-    return UnlinkUnitSerializerHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00BD6B20 (FUN_00BD6B20, register_UnitConstruct)
-   *
-   * What it does:
-   * Initializes and registers `UnitConstruct` startup helper.
-   */
-  void register_UnitConstruct()
-  {
-    InitializeHelperNode(gUnitConstruct);
-    gUnitConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&UnitConstruct::Construct);
-    gUnitConstruct.mDeconstructCallback = &UnitConstruct::Deconstruct;
-    gUnitConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupUnitConstructAtexit);
-  }
-
-  /**
-   * Address: 0x00BD6B60 (FUN_00BD6B60, register_UnitSerializer)
-   *
-   * What it does:
-   * Initializes and registers `UnitSerializer` startup helper.
-   */
-  void register_UnitSerializer()
-  {
-    InitializeHelperNode(gUnitSerializer);
-    gUnitSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&UnitSerializer::Deserialize);
-    gUnitSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&UnitSerializer::Serialize);
-    (void)std::atexit(&CleanupUnitSerializerAtexit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct UnitSerHelpersBootstrap
-  {
-    UnitSerHelpersBootstrap()
-    {
-      moho::register_UnitConstruct();
-      moho::register_UnitSerializer();
-    }
-  };
-
-  UnitSerHelpersBootstrap gUnitSerHelpersBootstrap;
-} // namespace
