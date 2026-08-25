@@ -1,6 +1,5 @@
 #include "moho/serialization/WeakUnitSetSerializer.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -10,22 +9,6 @@
 
 namespace
 {
-  using Serializer = moho::WeakUnitSetSerializer;
-
-  Serializer gWeakUnitSetSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
   [[nodiscard]] gpg::RType* ResolveUnitSetType()
   {
     gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
@@ -55,46 +38,34 @@ namespace
     GPG_ASSERT(type != nullptr);
     return type;
   }
-
-  /**
-   * Address: 0x006D2CD0 (FUN_006D2CD0, sub_6D2CD0)
-   *
-   * What it does:
-   * Initializes global `WeakUnitSetSerializer` links and callback pointers.
-   */
-  Serializer& construct_WeakUnitSetSerializerVariant1()
-  {
-    InitializeSerializerNode(gWeakUnitSetSerializer);
-    gWeakUnitSetSerializer.mDeserialize = &moho::WeakUnitSetSerializer::Deserialize;
-    gWeakUnitSetSerializer.mSerialize = &moho::WeakUnitSetSerializer::Serialize;
-    return gWeakUnitSetSerializer;
-  }
-
-  /**
-   * Address: 0x006D2E00 (FUN_006D2E00, sub_6D2E00)
-   *
-   * What it does:
-   * `SerSaveLoadHelper<WeakEntitySetTemplate<Unit>>` thunk lane that reuses
-   * weak unit-set serializer initialization.
-   */
-  Serializer& construct_WeakUnitSetSerializerVariant2()
-  {
-    return construct_WeakUnitSetSerializerVariant1();
-  }
-
-  void cleanup_WeakUnitSetSerializer_00BFE4E0_atexit()
-  {
-    (void)moho::cleanup_WeakUnitSetSerializer();
-  }
 } // namespace
 
 namespace moho
 {
   /**
+   * Address: 0x00BD84E0 (FUN_00BD84E0, dynamic initializer for the global
+   * `WeakUnitSetSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  WeakUnitSetSerializer::WeakUnitSetSerializer()
+    : mDeserialize(&WeakUnitSetSerializer::Deserialize)
+    , mSerialize(&WeakUnitSetSerializer::Serialize)
+  {}
+
+  WeakUnitSetSerializer::~WeakUnitSetSerializer()
+  {
+    ResetLinks();
+  }
+
+  /**
    * Address: 0x006D2C50 (FUN_006D2C50, sub_6D2C50)
    */
-  void
-  WeakUnitSetSerializer::Deserialize(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
+  void WeakUnitSetSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
@@ -109,8 +80,9 @@ namespace moho
   /**
    * Address: 0x006D2C90 (FUN_006D2C90, sub_6D2C90)
    */
-  void
-  WeakUnitSetSerializer::Serialize(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
+  void WeakUnitSetSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
@@ -125,7 +97,7 @@ namespace moho
   /**
    * Address: 0x006D2E30 (FUN_006D2E30, sub_6D2E30)
    */
-  void WeakUnitSetSerializer::RegisterSerializeFunctions()
+  void WeakUnitSetSerializer::Init()
   {
     gpg::RType* const type = ResolveWeakUnitSetType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -133,46 +105,10 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BFE4E0 (FUN_00BFE4E0, sub_BFE4E0)
-   */
-  gpg::SerHelperBase* cleanup_WeakUnitSetSerializer()
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gWeakUnitSetSerializer);
-    if (!gWeakUnitSetSerializer.mHelperNext || !gWeakUnitSetSerializer.mHelperPrev) {
-      gWeakUnitSetSerializer.mHelperNext = self;
-      gWeakUnitSetSerializer.mHelperPrev = self;
-      return self;
-    }
-
-    gWeakUnitSetSerializer.mHelperNext->mPrev = gWeakUnitSetSerializer.mHelperPrev;
-    gWeakUnitSetSerializer.mHelperPrev->mNext = gWeakUnitSetSerializer.mHelperNext;
-    gWeakUnitSetSerializer.mHelperPrev = self;
-    gWeakUnitSetSerializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00BD84E0 (FUN_00BD84E0, sub_BD84E0)
-   */
-  int register_WeakUnitSetSerializer()
-  {
-    (void)construct_WeakUnitSetSerializerVariant1();
-    (void)construct_WeakUnitSetSerializerVariant2();
-    return std::atexit(&cleanup_WeakUnitSetSerializer_00BFE4E0_atexit);
-  }
 } // namespace moho
 
 namespace
 {
-  struct WeakUnitSetSerializerBootstrap
-  {
-    WeakUnitSetSerializerBootstrap()
-    {
-      (void)moho::register_WeakUnitSetSerializer();
-    }
-  };
-
-  WeakUnitSetSerializerBootstrap gWeakUnitSetSerializerBootstrap;
+  // Address: 0x010B76B8 -- process-global `WeakUnitSetSerializer` singleton.
+  moho::WeakUnitSetSerializer gWeakUnitSetSerializer;
 } // namespace

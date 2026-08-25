@@ -4,20 +4,34 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E2D82C
    * COL: 0x00E86F2C
    */
-  class WeakUnitSetSerializer
+  class WeakUnitSetSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD84E0 (FUN_00BD84E0, dynamic initializer for the global
+     * `WeakUnitSetSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    WeakUnitSetSerializer();
+
+    /**
+     * Address: 0x00BFE4E0 (FUN_00BFE4E0, ??1WeakUnitSetSerializer@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~WeakUnitSetSerializer();
+
     /**
      * Address: 0x006D2C50 (FUN_006D2C50, sub_6D2C50)
      *
@@ -40,21 +54,13 @@ namespace moho
      * What it does:
      * Binds `WeakEntitySetTemplate<Unit>` RTTI serializer callbacks.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(WeakUnitSetSerializer, mHelperNext) == 0x04, "WeakUnitSetSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(WeakUnitSetSerializer, mHelperPrev) == 0x08, "WeakUnitSetSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(WeakUnitSetSerializer, mDeserialize) == 0x0C, "WeakUnitSetSerializer::mDeserialize offset must be 0x0C"
   );
@@ -62,20 +68,4 @@ namespace moho
     offsetof(WeakUnitSetSerializer, mSerialize) == 0x10, "WeakUnitSetSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(WeakUnitSetSerializer) == 0x14, "WeakUnitSetSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFE4E0 (FUN_00BFE4E0, sub_BFE4E0)
-   *
-   * What it does:
-   * Unlinks `WeakUnitSetSerializer` helper-node links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_WeakUnitSetSerializer();
-
-  /**
-   * Address: 0x00BD84E0 (FUN_00BD84E0, sub_BD84E0)
-   *
-   * What it does:
-   * Initializes `WeakUnitSetSerializer`, binds callbacks, and registers exit cleanup.
-   */
-  int register_WeakUnitSetSerializer();
 } // namespace moho
