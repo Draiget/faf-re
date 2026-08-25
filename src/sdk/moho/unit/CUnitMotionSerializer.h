@@ -4,16 +4,29 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CUnitMotionSerializer
+  class CUnitMotionSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD7280 (FUN_00BD7280, register_CUnitMotionSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitMotionSerializer();
+
+    /**
+     * Address: 0x00BFE0A0 (FUN_00BFE0A0, Moho::CUnitMotionSerializer::~CUnitMotionSerializer)
+     *
+     * What it does:
+     * Unlinks the `CUnitMotionSerializer` helper from the intrusive
+     * serializer helper list and rewires it as a self-linked singleton.
+     */
+    ~CUnitMotionSerializer();
+
     /**
      * Address: 0x006BA2E0 (FUN_006BA2E0, Moho::CUnitMotionSerializer::Deserialize)
      *
@@ -36,21 +49,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into CUnitMotion RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CUnitMotionSerializer, mHelperNext) == 0x04, "CUnitMotionSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CUnitMotionSerializer, mHelperPrev) == 0x08, "CUnitMotionSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CUnitMotionSerializer, mLoadCallback) == 0x0C,
     "CUnitMotionSerializer::mLoadCallback offset must be 0x0C"
