@@ -1677,6 +1677,36 @@ namespace msvc8
          * this token `blocked` ("stale in_progress claim after reboot, no
          * Address evidence") with zero citations anywhere in `src/sdk`;
          * corrected to `recovered` here.)
+         * Address: 0x008EF870 (FUN_008EF870,
+         * msvc8::vector<gpg::gal::AdapterModeD3D9>::operator=(const vector&)
+         * -- the full VC8 assign shape for this element, called on
+         * `gpg::gal::AdapterD3D9::modes` (offset +0x60) as part of
+         * `AdapterD3D9`'s compiler-synthesized memberwise `operator=`
+         * (`AdapterD3D9` declares no user `operator=` in `AdapterD3D9.hpp`,
+         * only a copy ctor/dtor). `AdapterD3D9::operator=` itself is needed
+         * by this method's own gap-fill (`insertAt[i] = localValue`) and
+         * tail-shift (`insertAt[count+i-1] = ...insertAt[i-1]`) assign
+         * expressions once `T = AdapterD3D9` -- the real binary keeps the
+         * tail-shift loop out of line as `FUN_008EFCD0` (112-byte element,
+         * reverse pointer-walk, bridged through `FUN_008F0380` from the
+         * `_Insert_n`-shaped grow/shift lane `FUN_008F1890`), while this
+         * template inlines the equivalent loop directly into `insert`.
+         * Empirically confirmed, not just theorized: compiling
+         * `D3D9Interfaces.cpp` (tucheck, unchanged by this pass) and
+         * inspecting the object file with `dumpbin /symbols` shows both
+         * `msvc8::vector<AdapterModeD3D9,1>::operator=` and
+         * `gpg::gal::AdapterD3D9::operator=` as real `SECT`-defined symbols
+         * -- genuinely instantiated, not merely declared. Source trigger:
+         * `AsDeviceD3D9Runtime(device).adapters.push_back(adapter);` in
+         * `D3D9Interfaces.cpp`, where `adapters` is
+         * `DeviceD3D9BackendObject::adapters` /
+         * `DeviceD3D9RuntimeView::adapters`, both
+         * `msvc8::vector<gpg::gal::AdapterD3D9>`. Note:
+         * `msvc8::vector<AdapterD3D9>::copy_or_move_assign` itself does
+         * *not* appear in that object file -- confirming this template's
+         * `insert` never calls the separate `copy_or_move_assign` helper,
+         * unlike `assign`/`operator=`, which is why `FUN_008EFCD0` is cited
+         * on `insert` below rather than on `copy_or_move_assign`.)
          *
          * Copy assignment (strong exception safety)
          */
@@ -3730,6 +3760,31 @@ namespace msvc8
          * stale: layout is `AdapterModeD3D10` (`AdapterD3D10.hpp`, already
          * recovered) and `FUN_008F6DD0` is `recovered`; corrected to
          * `recovered` here.)
+         * Address: 0x008EFCD0 (FUN_008EFCD0, the same
+         * `copy_backward`-shaped tail-shift-by-assignment sub-step as
+         * `FUN_008F70A0` above, for the 112-byte `gpg::gal::AdapterD3D9`
+         * element: reverse pointer-walk (`v3 -= 112; v4 -= 112;` per
+         * iteration, copying from high addresses down to `a1`) assigning
+         * the two leading `uint32_t` id lanes directly, three
+         * `std::string::assign` calls for `driver`/`deviceName`/
+         * `description` (real `std::string::assign` per IDA, matching
+         * `msvc8::string`'s VC8-ABI-compatible layout), then this element
+         * type's own `operator=` (`FUN_008EF870`,
+         * `msvc8::vector<AdapterModeD3D9>::operator=`, cited above) for the
+         * `modes` member at `+0x60`/`+96` -- together the compiler-
+         * synthesized memberwise `AdapterD3D9::operator=`. Bridged through
+         * the thin forwarder `FUN_008F0380` (`return sub_8EFCD0(a1,a2,a3);`,
+         * no logic of its own) from the `_Insert_n`-shaped grow/shift lane
+         * `FUN_008F1890` (that function's own decompile carries IDA's
+         * "bad/positive sp value" unreliability warning -- its precise
+         * argument wiring was not relied on here, only the `call
+         * sub_8F0380` instruction, which is a plain, register-independent
+         * fact). Source trigger:
+         * `AsDeviceD3D9Runtime(device).adapters.push_back(adapter);`
+         * (D3D9Interfaces.cpp) instantiates this template member; see the
+         * note on `operator=` above for the dumpbin-verified confirmation
+         * that this inline loop -- not the separate `copy_or_move_assign`
+         * helper -- is what actually gets compiled for `T = AdapterD3D9`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
