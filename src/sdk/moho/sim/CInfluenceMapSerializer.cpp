@@ -8,20 +8,6 @@
 
 namespace
 {
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -34,7 +20,6 @@ namespace
   gpg::RType* gCArmyImplType = nullptr;
   gpg::RType* gBlipCellSetType = nullptr;
   gpg::RType* gInfluenceGridVectorType = nullptr;
-  moho::CInfluenceMapSerializer gCInfluenceMapSerializer;
 
   /**
    * Address: 0x0071F330 (FUN_0071F330, sub_71F330)
@@ -109,34 +94,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071CB00 (FUN_0071CB00)
-   *
-   * What it does:
-   * Register-lane alias that forwards into `Deserialize_CInfluenceMap`.
-   */
-  [[maybe_unused]] void Deserialize_CInfluenceMapRegisterAlias(
-    gpg::ReadArchive* const archive,
-    const int objectPtr
-  )
-  {
-    Deserialize_CInfluenceMap(archive, objectPtr, 0, nullptr);
-  }
-
-  /**
-   * Address: 0x0071CB10 (FUN_0071CB10)
-   *
-   * What it does:
-   * Register-lane alias that forwards into `Serialize_CInfluenceMap`.
-   */
-  [[maybe_unused]] void Serialize_CInfluenceMapRegisterAlias(
-    const int objectPtr,
-    gpg::WriteArchive* const archive
-  )
-  {
-    Serialize_CInfluenceMap(archive, objectPtr, 0, nullptr);
-  }
-
-  /**
    * Address: 0x00717700 (FUN_00717700, sub_717700)
    */
   int Deserialize_CInfluenceMapThunk(const int archivePtr, const int objectPtr)
@@ -153,36 +110,31 @@ namespace
     Serialize_CInfluenceMap(reinterpret_cast<gpg::WriteArchive*>(archivePtr), objectPtr, 0, nullptr);
     return 0;
   }
-
-  /**
-   * Address: 0x00718B30 (FUN_00718B30)
-   *
-   * What it does:
-   * Initializes startup `CInfluenceMap` save/load helper links and callbacks.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CInfluenceMapSerializer* InitializeCInfluenceMapSerializerHelperStorage() noexcept
-  {
-    InitializeHelperNode(gCInfluenceMapSerializer);
-    gCInfluenceMapSerializer.mLoadCallback =
-      reinterpret_cast<gpg::RType::load_func_t>(&Deserialize_CInfluenceMapThunk);
-    gCInfluenceMapSerializer.mSaveCallback =
-      reinterpret_cast<gpg::RType::save_func_t>(&Serialize_CInfluenceMapThunk);
-    return &gCInfluenceMapSerializer;
-  }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BDA6C0 (FUN_00BDA6C0, sub_BDA6C0)
+   * Address: 0x00BDA6C0 (FUN_00BDA6C0, dynamic initializer for the global
+   * `CInfluenceMapSerializer` singleton)
    *
    * What it does:
-   * Initializes CInfluenceMap serializer helper callbacks and binds them into
-   * CInfluenceMap RTTI.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields. Prior to this recovery, this class was
+   * never given a real constructor at all -- `register_CInfluenceMapSerializer()`
+   * only set the raw struct's fields directly without ever running
+   * `gpg::SerHelperBase::SerHelperBase()`, so this helper was never
+   * spliced into `sNewHelpers` and `CInfluenceMap`'s load/save callbacks
+   * were never installed under any code path.
    */
-  void register_CInfluenceMapSerializer()
+  CInfluenceMapSerializer::CInfluenceMapSerializer()
+    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&Deserialize_CInfluenceMapThunk))
+    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&Serialize_CInfluenceMapThunk))
+  {}
+
+  CInfluenceMapSerializer::~CInfluenceMapSerializer()
   {
-    (void)InitializeCInfluenceMapSerializerHelperStorage();
+    ResetLinks();
   }
 
   /**
@@ -191,7 +143,7 @@ namespace moho
    * IDA signature:
    * void (__cdecl *__thiscall sub_718B60(void (__cdecl **this)(...)))(...);
    */
-  void CInfluenceMapSerializer::RegisterSerializeFunctions()
+  void CInfluenceMapSerializer::Init()
   {
     gpg::RType* const type = CInfluenceMap::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -203,13 +155,6 @@ namespace moho
 
 namespace
 {
-  struct CInfluenceMapSerializerBootstrap
-  {
-    CInfluenceMapSerializerBootstrap()
-    {
-      moho::register_CInfluenceMapSerializer();
-    }
-  };
-
-  CInfluenceMapSerializerBootstrap gCInfluenceMapSerializerBootstrap;
+  // Address: 0x010B9434 -- process-global `CInfluenceMapSerializer` singleton.
+  moho::CInfluenceMapSerializer gCInfluenceMapSerializer;
 } // namespace

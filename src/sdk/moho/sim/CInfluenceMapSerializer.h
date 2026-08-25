@@ -4,37 +4,49 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class CInfluenceMapSerializer
+  /**
+   * VFTABLE: 0x00E3176C
+   */
+  class CInfluenceMapSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDA6C0 (FUN_00BDA6C0, dynamic initializer for the global
+     * `CInfluenceMapSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Prior to this recovery, this class was
+     * never given a real constructor at all -- `register_CInfluenceMapSerializer()`
+     * only set the raw struct's fields directly without ever running
+     * `gpg::SerHelperBase::SerHelperBase()`, so this helper was never
+     * spliced into `sNewHelpers` and `CInfluenceMap`'s load/save callbacks
+     * were never installed under any code path.
+     */
+    CInfluenceMapSerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CInfluenceMapSerializer();
+
     /**
      * Address: 0x00718B60 (FUN_00718B60, gpg::SerSaveLoadHelper_CInfluenceMap::Init)
      *
      * What it does:
      * Binds load/save serializer callbacks into CInfluenceMap RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(
-    offsetof(CInfluenceMapSerializer, mHelperNext) == 0x04, "CInfluenceMapSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CInfluenceMapSerializer, mHelperPrev) == 0x08, "CInfluenceMapSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CInfluenceMapSerializer, mLoadCallback) == 0x0C,
     "CInfluenceMapSerializer::mLoadCallback offset must be 0x0C"
