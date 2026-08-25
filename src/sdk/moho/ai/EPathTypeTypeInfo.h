@@ -59,61 +59,28 @@ namespace moho
   };
 
   /**
-   * VFTABLE: 0x00E1C85C
-   * COL:  0x00E725A4
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPathType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EPathType@Moho@@H@gpg'`):
+   * `FUN_00BCD290` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
+   * `FUN_005B4E90`/`FUN_005B4EB0`, installs the
+   * `PrimitiveSerHelper<EPathType,int>` vtable, and pushes plain unmangled
+   * `FUN_00BF7420` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EPathTypePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `EPathTypeTypeInfoBootstrap` constructor -- absent from the real ctor's
+   * disassembly; removed.
    */
-  class EPathTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005B4E90 (FUN_005B4E90)
-     *
-     * What it does:
-     * Deserializes one `EPathType` enum lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005B4EB0 (FUN_005B4EB0)
-     *
-     * What it does:
-     * Serializes one `EPathType` enum lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005B4780 (FUN_005B4780)
-     *
-     * What it does:
-     * Binds load/save callbacks into reflected `EPathType` metadata.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
+  using EPathTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EPathType, int>;
 
   static_assert(sizeof(EPathTypeTypeInfo) == 0x78, "EPathTypeTypeInfo size must be 0x78");
-  static_assert(
-    offsetof(EPathTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "EPathTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EPathTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "EPathTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EPathTypePrimitiveSerializer, mLoadCallback) == 0x0C,
-    "EPathTypePrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EPathTypePrimitiveSerializer, mSaveCallback) == 0x10,
-    "EPathTypePrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(EPathTypePrimitiveSerializer) == 0x14, "EPathTypePrimitiveSerializer size must be 0x14");
 
   /**
    * Address: 0x00BCD270 (FUN_00BCD270, register_EPathTypeTypeInfo)
@@ -123,13 +90,4 @@ namespace moho
    * installs process-exit cleanup.
    */
   int register_EPathTypeTypeInfo();
-
-  /**
-   * Address: 0x00BCD290 (FUN_00BCD290, register_EPathTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `EPathType` and installs
-   * process-exit helper unlink cleanup.
-   */
-  int register_EPathTypePrimitiveSerializer();
 } // namespace moho
