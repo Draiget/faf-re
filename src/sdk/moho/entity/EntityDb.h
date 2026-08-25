@@ -56,21 +56,120 @@ namespace moho
   };
   static_assert(sizeof(CEntityDbEntityListRuntime) == 0x0C, "CEntityDbEntityListRuntime size must be 0x0C");
 
+  /**
+   * Binary layout of `gpg::PriorityQueue<Moho::SPropPriorityInfo,
+   * Moho::WeakPtr<Moho::Prop>>` as used by `EntityDB::mBoundedProps`: a
+   * min-heap of `CEntityDbBoundedPropQueueNode` ordered by
+   * `(mPriority, mBoundedTick)`, plus a stable-id -> heap-index map
+   * (`handleSlots`, doubling as a free list via `lastHandle`) that lets a
+   * `Handle` returned by `Insert` keep resolving to the right node across
+   * heap reorders.
+   */
   struct CEntityDbBoundedPropQueueRuntime
   {
-    std::uint32_t queueProxy; // +0x00
-    CEntityDbBoundedPropQueueNode* start; // +0x04
-    CEntityDbBoundedPropQueueNode* end;   // +0x08
-    CEntityDbBoundedPropQueueNode* capacity; // +0x0C
-    std::uint32_t vectorProxy; // +0x10
-    void* storageBegin;       // +0x14
-    void* storageCurrent;     // +0x18
-    void* storageEnd;         // +0x1C
-    std::int32_t lastHandle;  // +0x20
+    msvc8::vector<CEntityDbBoundedPropQueueNode> heap; // +0x00 (proxy +0x00, first +0x04, last +0x08, end +0x0C)
+    msvc8::vector<std::int32_t> handleSlots;           // +0x10 (proxy +0x10, first +0x14, last +0x18, end +0x1C)
+    std::int32_t lastHandle = -1;                      // +0x20
+
+    /**
+     * Address: 0x00685980 (FUN_00685980)
+     *
+     * What it does:
+     * The binary's "initialize to empty" lane sets the pointer triples null
+     * and seeds `lastHandle` to `-1`; the default-constructed `heap` and
+     * `handleSlots` members already start empty, so only `lastHandle`'s
+     * default member initializer above is needed to reproduce it.
+     */
+    CEntityDbBoundedPropQueueRuntime() noexcept = default;
+
+    /**
+     * Address: 0x00684360 (FUN_00684360)
+     *
+     * What it does:
+     * Releases the bounded-prop queue lanes: unlinks each node's
+     * owner-chain link, then empties `heap` and `handleSlots` (which frees
+     * their backing storage).
+     */
+    void Reset() noexcept;
+
+    /**
+     * Address: 0x006859F0 (FUN_006859F0)
+     *
+     * What it does:
+     * Inserts one (priority, boundedTick, prop) entry into the bounded
+     * reclaim-priority queue: acquires a handle id, links a temporary weak
+     * pointer to `prop` at the head of its owner observer chain, copies that
+     * linked snapshot into a fresh node appended to `heap` (growing storage
+     * when full), unlinks the temporary from the chain again, then restores
+     * the heap invariant by sifting the new node up. Returns the acquired
+     * handle id.
+     *
+     * Sole caller: `Moho::EntityDB::AddBoundedProp` (0x00684C30), which
+     * calls this at 0x00684CCF.
+     */
+    [[nodiscard]] std::int32_t Insert(std::int32_t priority, std::int32_t boundedTick, Prop* prop) noexcept;
+
+    /**
+     * Address: 0x006867F0 (FUN_006867F0)
+     *
+     * What it does:
+     * Removes the queue node at `index`: swaps it with the tail node
+     * (unless already the tail) and sifts the moved node back down to
+     * restore the heap invariant, releases the removed node's handle id
+     * back to the free-handle list, unlinks the removed node's owner-chain
+     * link, then shrinks `heap` by one node.
+     *
+     * Common inner step of `AddBoundedProp` (evict head when queue is
+     * full), `RemoveBoundedProp` (explicit removal by handle), and
+     * `Prop::~Prop` (auto-unregister on prop destruction).
+     */
+    void PopAt(std::int32_t index) noexcept;
+
+  private:
+    /**
+     * Mirrors the handle-acquire-or-reuse algorithm already canonically
+     * recovered at 0x00686790 (`AcquireOrReusePriorityHandleRuntime` in
+     * `moho/sim/SimRecoveryRuntime.cpp`) -- that recovery's
+     * `PriorityQueue20Runtime` parameter type lives in an anonymous
+     * namespace private to that translation unit and is not reachable from
+     * here, so this is a second, address-uncited expression of the same
+     * binary operation against this type.
+     */
+    [[nodiscard]] std::int32_t AcquireHandle(std::int32_t payload) noexcept;
+
+    /**
+     * Mirrors the sift-up algorithm already canonically recovered at
+     * 0x00686740 (`SiftPriorityQueueEntryUpRuntime` in
+     * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
+     * same reason as `AcquireHandle`.
+     */
+    [[nodiscard]] std::int32_t SiftUp(std::int32_t index) noexcept;
+
+    /**
+     * Address: 0x006875F0 (FUN_006875F0)
+     *
+     * What it does:
+     * Sifts the node at `index` down toward the leaves using
+     * `(priority, boundedTick)` ordering -- at each level, swaps with
+     * whichever child sorts lower -- until the heap invariant is restored
+     * or a leaf is reached. `count` is the current node count.
+     */
+    void SiftDown(std::int32_t index, std::int32_t count) noexcept;
+
+    /**
+     * Mirrors the swap-and-relink algorithm already canonically recovered
+     * at 0x00687530 (`SwapPriorityQueueEntries` in
+     * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
+     * same reason as `AcquireHandle`.
+     */
+    void Swap(std::int32_t lhs, std::int32_t rhs) noexcept;
   };
   static_assert(
     sizeof(CEntityDbBoundedPropQueueRuntime) == 0x24, "CEntityDbBoundedPropQueueRuntime size must be 0x24"
   );
+  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, heap) == 0x00, "CEntityDbBoundedPropQueueRuntime::heap offset must be 0x00");
+  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, handleSlots) == 0x10, "CEntityDbBoundedPropQueueRuntime::handleSlots offset must be 0x10");
+  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, lastHandle) == 0x20, "CEntityDbBoundedPropQueueRuntime::lastHandle offset must be 0x20");
 
   /**
    * Iterator payload used by all-army unit scans against `CEntityDb::mAllUnits`.
