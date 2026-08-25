@@ -21,6 +21,7 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/app/WEmitterWx.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
@@ -3783,6 +3784,8 @@ namespace
     "Paranoid-mode flag controlling rule-driven defensive runtime checks.";
   constexpr const char* kConsoleStartupRuleBlueprintReloadDelayDescription =
     "Minimum delay in seconds between blueprint hot-reload probes.";
+  /// 0x00E3C758, the `.data` initializer of `Moho::CConFunc_ANI_DumpSkeleton` (+0x08).
+  constexpr const char* kConsoleStartupConAniDumpSkeletonDescription = "Dump the skeleton for the selected entity";
 
   CConFunc gCConFunc_CON_Echo{};
   CConFunc gCConFunc_CON_ListCommands{};
@@ -3797,6 +3800,7 @@ namespace
   CConFunc gCConFunc_IN_BindKey{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
+  CConFunc gCConFunc_ANI_DumpSkeleton{};
   CConFunc gCConFunc_d3d_AntiAliasingSamples{};
   CConFunc gCConFunc_ren_MipSkipLevels{};
   CConFunc gCConFunc_DumpPreloadedTextures{};
@@ -4510,6 +4514,39 @@ namespace moho
       "CON_ExecuteLastCommand",
       reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand),
       &cleanup_CConFunc_CON_ExecuteLastCommand
+    );
+  }
+
+  /**
+   * Address: 0x00C036D0 (FUN_00C036D0, ??1CConFunc_ANI_DumpSkeleton@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ANI_DumpSkeleton`.
+   */
+  void cleanup_CConFunc_ANI_DumpSkeleton()
+  {
+    CleanupStartupConCommand(gCConFunc_ANI_DumpSkeleton);
+  }
+
+  /**
+   * Address: 0x00BDF8D0 (FUN_00BDF8D0, register_CConFunc_ANI_DumpSkeleton)
+   *
+   * What it does:
+   * Registers startup console callback for `ANI_DumpSkeleton`. The store
+   * `Moho__CConFunc_ANI_DumpSkeleton.mFunc = offset Moho__ANI_DumpSkeleton`
+   * at 0x00BDF8F0 is the only reference to `Moho::ANI_DumpSkeleton` in the
+   * image. `Moho::ANI_DumpSkeleton` takes no arguments, so it is cast to
+   * `CConFunc::Callback` the same way the other zero-argument command in
+   * this file (`CON_ExecuteLastCommand`, above) is.
+   */
+  void register_CConFunc_ANI_DumpSkeleton()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ANI_DumpSkeleton,
+      kConsoleStartupConAniDumpSkeletonDescription,
+      "ANI_DumpSkeleton",
+      reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton),
+      &cleanup_CConFunc_ANI_DumpSkeleton
     );
   }
 
@@ -5634,6 +5671,7 @@ namespace
       moho::register_CConFunc_CON_ListCommands();
       moho::register_CConFunc_GetVersion();
       moho::register_CConFunc_CON_ExecuteLastCommand();
+      moho::register_CConFunc_ANI_DumpSkeleton();
       moho::register_CConFunc_IN_BindKey();
       moho::register_console_command_buffer();
       moho::register_sConsoleOutputHandlers();
