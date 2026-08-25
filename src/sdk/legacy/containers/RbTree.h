@@ -3153,6 +3153,31 @@ namespace msvc8
              * FUN_00534690 cited above.)
              */
             /**
+             * Four more siblings of the same `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) node-buy family as
+             * FUN_00535CA0 above -- one per registered blueprint type, each
+             * byte-identical in shape (allocate one node via that type's own
+             * `operator new(1)` wrapper, write left/parent/right from the
+             * caller's where/head arguments, `msvc8::string::assign` the key
+             * at node+0x0C, copy the source pair's `.second` (+0x1C) into
+             * node+0x28, zero color/isNil at +0x2C/+0x2D). Each is reached
+             * from its own `insert_at` bridge, cited in the `insert_unique`
+             * catalog above (0x00534140/0x00534360/0x00534470/0x00534580):
+             *   - Address: 0x005358E0 (FUN_005358E0) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90.
+             *   - Address: 0x00535A60 (FUN_00535A60) -- T=RMeshBlueprint;
+             *     reached from insert_at FUN_00534EF0.
+             *   - Address: 0x00535B20 (FUN_00535B20) -- T=REmitterBlueprint's
+             *     map (`GetOrCreateRegisteredEffectBlueprint`); reached from
+             *     insert_at FUN_005350A0.
+             *   - Address: 0x00535BE0 (FUN_00535BE0) -- T=RBeamBlueprint;
+             *     reached from insert_at FUN_00535250.
+             * Same RULE ONE reasoning as FUN_00535CA0: compiler/template
+             * emission of `::new (...) value_type(args...)` with no
+             * hand-written body of its own -- tracked `skip` in
+             * `recovered_progress.json` for that reason.
+             */
+            /**
              * Address: 0x00950430 (FUN_00950430, node buy for an unidentified
              * `msvc8::map<K,V>`/`msvc8::set<T>` instantiation with a 24-byte
              * `value_type` -- `operator new(0x28)` (40 bytes: 12 link dwords

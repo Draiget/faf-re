@@ -8,22 +8,22 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`97.80%`**
+- Progress coverage:  **`97.81%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,687`*
+  - *Total amount of completed tokens: `65,693`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,026` (80.73%)
-- `skip`: `7,113` (10.83%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `53,026` (80.72%)
+- `skip`: `7,119` (10.84%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,548` (8.45%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `34` (0.05%)
 - `in_progress`: `10` (0.01%)
-- **`blocked`: `1,509` (2.25%)**
+- **`blocked`: `1,503` (2.24%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,543`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,543`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,537`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,537`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
@@ -42,16 +42,16 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (1,543 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (1,537 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `92` | 5.96% |
-| Vtable-anchored (recover with the owning class) | `129` | 8.36% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `86` | 5.60% |
+| Vtable-anchored (recover with the owning class) | `129` | 8.39% |
 | Framework dispatch (wx/EH/Lua/reflection) | `8` | 0.52% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `716` | 46.40% |
-| No indexed callsite evidence (needs investigation/evidence) | `597` | 38.69% |
-| Unclassified data xref (manual review) | `1` | 0.06% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `716` | 46.58% |
+| No indexed callsite evidence (needs investigation/evidence) | `597` | 38.84% |
+| Unclassified data xref (manual review) | `1` | 0.07% |
 | RTTI-only | `0` | 0.00% |
 
 *Set `FAF_README_SKIP_VERDICTS=1` to skip this block during tight worker loops.*
