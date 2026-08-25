@@ -1884,6 +1884,31 @@ extern "C" png_infop png_create_info_struct(png_structp png_ptr)
 /**
  * Address: 0x009E0B6E (FUN_009E0B6E)
  * Mangled: png_create_read_struct_2
+ *
+ * The two `setjmp(...)` calls below are real recovery/abort targets for a
+ * `longjmp` fired deeper in libpng's own allocation/init failure paths
+ * (`png_malloc`/`png_error`). When that `longjmp` crosses this TU's C++
+ * frames, MSVC8's CRT `longjmp` (`FUN_00A8FF0C`, already
+ * `external_dependency`) drives the local-unwind state machine to run any
+ * intervening destructors/`__finally` blocks before jumping -- this pulls
+ * in two more CRT/SEH internals, previously mass-mis-attributed to
+ * `CrtRuntimeHelpers.cpp` by the 2026-08-24 DB-integrity bulk pass
+ * (neither address is present in that file):
+ *   Address: 0x00AA3A85 (FUN_00AA3A85) -- the `_local_unwind2`-shaped state
+ *     walker: walks a scope-table's state chain (12-byte entries, `state =
+ *     table[state].previousState`) down to the target state, invoking each
+ *     scope's termination (`__finally`) handler along the way when one is
+ *     registered. Confirmed against its own `.c`: `__usercall` with the
+ *     frame in `ebp`, table-walk-and-conditional-handler-call shape
+ *     matching no other engine pattern in this codebase.
+ *   Address: 0x00AAC6FC (FUN_00AAC6FC) -- trivial `__stdcall(int) -> 1`
+ *     stub in the same unwind-filter family, called from the same
+ *     `longjmp` implementation (`FUN_00A8FF0C`).
+ * Both are generic CRT/SEH runtime, not libpng- or engine-specific; no
+ * vendored libpng source exists under `dependencies/` to compare against
+ * (this project reconstructs libpng directly into `src/sdk/libpng/`), but
+ * neither address's behavior resembles any libpng function -- they operate
+ * purely on MSVC's internal EH scope-table representation.
  */
 extern "C" png_structp png_create_read_struct_2(
   const char*    user_png_ver,
