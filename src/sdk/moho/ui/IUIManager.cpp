@@ -374,11 +374,15 @@ void moho::UI_ActivateChat(const bool shiftDown, const bool ctrlDown, const bool
  * What it does:
  * Decodes one serialized Lua payload from network chat bytes and invokes
  * `/lua/ui/game/gamemain.lua:ReceiveChat(senderName, payloadObject)`.
+ *
+ * Signature correction: void return and `data` by const reference, per the
+ * ReceiveChat `boost::bind` chain's manager RTTI -- see the declaration in
+ * `UiRuntimeTypes.h` for the full citation and the `gpg::StrArg` gap note.
  */
-int moho::func_ReceiveChat(const char* const senderName, const gpg::MemBuffer<const char> data)
+void moho::func_ReceiveChat(const msvc8::string& senderName, const gpg::MemBuffer<const char>& data)
 {
   if (g_UIManager == nullptr || g_UIManager->mLuaState == nullptr) {
-    return 0;
+    return;
   }
 
   LuaPlus::LuaState* const state = g_UIManager->mLuaState;
@@ -391,7 +395,7 @@ int moho::func_ReceiveChat(const char* const senderName, const gpg::MemBuffer<co
   LuaPlus::LuaObject receiveChat = gameMainModule["ReceiveChat"];
   LuaPlus::LuaFunction callback(receiveChat);
   try {
-    callback.Call_StrObject(senderName != nullptr ? senderName : "", payloadObject);
+    callback.Call_StrObject(senderName.c_str(), payloadObject);
   } catch (const std::exception& exception) {
     gpg::Warnf(
       "Error running '/lua/ui/game/gamemain.lua:ReceiveChat': %s",
@@ -400,8 +404,6 @@ int moho::func_ReceiveChat(const char* const senderName, const gpg::MemBuffer<co
   } catch (...) {
     gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:ReceiveChat': %s", "<unknown>");
   }
-
-  return 0;
 }
 
 /**

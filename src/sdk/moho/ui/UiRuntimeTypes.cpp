@@ -27196,8 +27196,18 @@ namespace
    * "<LOC Engine0002>%s disconnected." message and console-prints it with the
    * disconnected client's nickname. Posted onto the main thread by
    * CWldUiInterface::NoteDisconnect.
+   *
+   * Signature note: the manager RTTI installed by the NoteDisconnect
+   * `boost::bind` chain (0x0088FBD0, `get_functor_type_tag`) publishes this
+   * function's pointer type as `void (__cdecl *)(gpg::StrArg)`. As with
+   * `func_ReceiveChat` (see `UiRuntimeTypes.h`), this SDK's `gpg::StrArg` is
+   * currently the simplified `= const char*` alias with no implicit
+   * conversion from `msvc8::string`, so the parameter is kept as
+   * `const msvc8::string&` -- a known, evidenced gap, not a guess (see
+   * `gpg/core/utils/Logging.h`'s `LogScopeEntry` note and
+   * `CGpgNetInterface.cpp`'s `MakeConnectThreadLaunchCallback`).
    */
-  void ConPrintClientDisconnected(const msvc8::string nickname)
+  void ConPrintClientDisconnected(const msvc8::string& nickname)
   {
     const msvc8::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
     moho::CON_Printf(message.c_str(), nickname.c_str());
@@ -27206,33 +27216,94 @@ namespace
 
 /**
  * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
+ * Address: 0x0088EA50 (FUN_0088EA50, boost::bind_ConPrintDisconnect) - builds
+ *          the `bind_t<void, void(__cdecl*)(gpg::StrArg),
+ *          list1<value<std::string>>>` from the captured nickname
+ * Address: 0x0088EB10 (FUN_0088EB10) - boost::function0<void>::function<F>
+ *          converting constructor (installs the bind_t into the
+ *          function_buffer)
+ * Address: 0x0088F150 (FUN_0088F150) - assign_to<F> relay
+ * Address: 0x0088F270 (FUN_0088F270) - magic-statics guard (dword_110413C)
+ *          around the one-time manager/invoker install for this bind_t<>
+ * Address: 0x0088F470 (FUN_0088F470) - basic_vtable<F>::init relay
+ * Address: 0x0088F500 (FUN_0088F500) - functor-non-empty relay, checked
+ *          unconditionally on every assign (not just the guarded first-init
+ *          path) to decide whether `*arg0` gets the vtable pointer or null
+ * Address: 0x0088F700 (FUN_0088F700) - writes {manager=FUN_0088FBD0,
+ *          invoker=FUN_0088FBA0} into the static vtable pair
+ *          (dword_1104130 / dword_1104134)
+ * Address: 0x0088FBD0 (FUN_0088FBD0) - basic_vtable<F>::manager (RTTI-
+ *          confirmed via the embedded `bind_t<void,void(__cdecl*)(gpg::StrArg),
+ *          list1<value<std::string>>>` type descriptor returned for
+ *          `get_functor_type_tag`)
+ * Address: 0x0088FBA0 (FUN_0088FBA0) - basic_vtable<F>::invoker: SSO-aware
+ *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr)` against the
+ *          bound string
  *
  * What it does:
  * IClientMgrUIInterface::NoteDisconnect override: captures the disconnected
  * client's nickname and posts the localized console disconnect notice onto the
- * main thread (so console output happens on the UI thread).
+ * main thread (so console output happens on the UI thread). The binary builds
+ * this callback via `boost::bind(&ConPrintClientDisconnected, nickname)` (a
+ * free-function bind storing a real `std::string` copy, per the manager RTTI)
+ * rather than a closure object -- expressed here the same way so this call
+ * site is the one that actually instantiates the cited manager/invoker pair.
  */
 void moho::UI_NoteDisconnect(const IClient* const client)
 {
   const msvc8::string nickname = client->GetNickname();
-  boost::function<void(), std::allocator<void>> callback = [nickname]() { ConPrintClientDisconnected(nickname); };
+  boost::function<void(), std::allocator<void>> callback =
+    boost::bind(&ConPrintClientDisconnected, nickname);
   THREAD_InvokeAsync(callback, 0u);
 }
 
 /**
  * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
+ * Address: 0x0088EB90 (FUN_0088EB90, boost::bind_ReceiveChat) - builds the
+ *          `bind_t<void, void(__cdecl*)(gpg::StrArg,gpg::MemBuffer<char
+ *          const> const&), list2<value<std::string>,
+ *          value<gpg::MemBuffer<char const>>>>` from the captured nickname
+ *          and payload (the MemBuffer copy bumps its shared refcount via
+ *          `_InterlockedExchangeAdd`, matching `gpg::MemBuffer`'s own copy
+ *          semantics)
+ * Address: 0x0088ECE0 (FUN_0088ECE0) - boost::function0<void>::function<F>
+ *          converting constructor (installs the bind_t into the
+ *          function_buffer)
+ * Address: 0x0088F1D0 (FUN_0088F1D0) - assign_to<F> relay
+ * Address: 0x0088F350 (FUN_0088F350) - magic-statics guard (dword_1104138)
+ *          around the one-time manager/invoker install for this bind_t<>
+ * Address: 0x0088F590 (FUN_0088F590) - basic_vtable<F>::init relay
+ * Address: 0x0088F600 (FUN_0088F600) - functor-non-empty relay, checked
+ *          unconditionally on every assign (not just the guarded first-init
+ *          path) to decide whether `*arg0` gets the vtable pointer or null
+ * Address: 0x0088F860 (FUN_0088F860) - writes {manager=FUN_0088FC70,
+ *          invoker=FUN_0088FC40} into the static vtable pair (stru_1104128)
+ * Address: 0x0088FC70 (FUN_0088FC70) - basic_vtable<F>::manager (RTTI-
+ *          confirmed via the embedded `bind_t<void,void(__cdecl*)(gpg::StrArg,
+ *          gpg::MemBuffer<char const> const&),list2<value<std::string>,
+ *          value<gpg::MemBuffer<char const>>>>` type descriptor returned for
+ *          `get_functor_type_tag`)
+ * Address: 0x0088FC40 (FUN_0088FC40) - basic_vtable<F>::invoker: SSO-aware
+ *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr, memBuffer)`
+ *          against the bound string and MemBuffer (cdecl, 2 args, `add
+ *          esp,8` confirms the arity)
  *
  * What it does:
  * IClientMgrUIInterface::ReceiveChat override: captures the sender's nickname
  * and the received chat payload, then posts the recovered func_ReceiveChat
  * decoder (which forwards to /lua/ui/game/gamemain.lua:ReceiveChat) onto the
- * main thread. The MemBuffer's shared payload is kept alive by the capture.
+ * main thread. The binary builds this callback via
+ * `boost::bind(&func_ReceiveChat, nickname, data)` (a free-function bind
+ * storing real `std::string`/`MemBuffer` copies, per the manager RTTI) rather
+ * than a closure object -- expressed here the same way so this call site is
+ * the one that actually instantiates the cited manager/invoker pair. The
+ * MemBuffer's shared payload is kept alive by the bind_t's own copy.
  */
 void moho::UI_ReceiveChat(const IClient* const sender, const gpg::MemBuffer<const char> data)
 {
   const msvc8::string nickname = sender->GetNickname();
   boost::function<void(), std::allocator<void>> callback =
-    [nickname, data]() { (void)func_ReceiveChat(nickname.c_str(), data); };
+    boost::bind(&func_ReceiveChat, nickname, data);
   THREAD_InvokeAsync(callback, 0u);
 }
 
