@@ -1799,6 +1799,13 @@ namespace
    *
    * What it does:
    * Stable-sorts the rendered-child lane by each control's resolved depth.
+   *
+   * The binary's own `std::stable_sort` internals (merge-sort recursion
+   * setup + buffer-size calc `FUN_0078AEE0`, its merge-step callee
+   * `FUN_0078B470`) are satisfied by the `std::stable_sort` call below,
+   * same pattern as this session's other STL-algorithm citations
+   * (`std::sort`/`std::nth_element` in CCommandLuaFunctionRegistrations.cpp/
+   * CWldSplat.cpp) -- CRT/STL-internal, not engine code.
    */
   void SortRenderedChildrenByDepth(msvc8::vector<moho::CMauiControl*>& renderedChildren)
   {

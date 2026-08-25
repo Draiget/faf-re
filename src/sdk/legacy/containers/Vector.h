@@ -2409,6 +2409,16 @@ namespace msvc8
          * Address: 0x00882BA0 (FUN_00882BA0, msvc8::vector<msvc8::string>::_Insert_n
          * grow-and-fill lane; emitted via ResizeLegacyStringVectorExact
          * outStrings.resize(n, fillValue) (CSaveGameRequestImpl.cpp:125)).
+         * Address: 0x00883820 (FUN_00883820, this instantiation's forward
+         * fill-via-assign sub-step -- walks `[dst, dstEnd)` calling
+         * `std::string::assign` on each already-constructed slot, the
+         * gap-fill half of this member's in-place branch for a non-trivial
+         * element. Reached from `FUN_00882BA0` above.)
+         * Address: 0x00883840 (FUN_00883840, this instantiation's backward
+         * tail-shift-by-assign sub-step -- decrements both cursors then
+         * `std::string::assign`s, the `copy_backward`-shaped shift half of
+         * this member's in-place branch. Reached from `FUN_00882BA0`
+         * above.)
          * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
          * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
@@ -3194,6 +3204,35 @@ namespace msvc8
          * when the gap is bigger than the live tail, constructs the
          * trailing slots fresh through this method's own `uninit_fill_n`
          * instantiation FUN_008575A0 (cited below); the fill step in the
+         * Address: 0x0076A890 (FUN_0076A890, `msvc8::vector<hash_map<Key,T,
+         * Traits>::iterator>::uninit_fill_n` for the 4-byte pointer-wrapper
+         * element -- the same `PathQueue::ImplBase` node-table instantiation
+         * cited on `insert` as `FUN_00768090`. Fills `count` copies of the
+         * plain-dword iterator value into fresh slots. Reached from this
+         * instantiation's `insert`, `FUN_00768090`, itself reached from
+         * `_Init()`'s `mVec.resize(Traits::min_buckets + 1, mList.end())`
+         * (`FUN_00767C70`, cited above on `insert`).)
+         * Address: 0x008326C0 (FUN_008326C0, `msvc8::vector<void*>::
+         * uninit_fill_n` for UICommandGraph's hash-bucket vector, same
+         * 4-byte pointer / same-shape emission as `FUN_0076A890` above.
+         * Reached from this instantiation's `_Insert_n`, `FUN_0082DE90`
+         * (cited above on `insert`).)
+         * Address: 0x00832710 (FUN_00832710, `msvc8::vector<void*>::
+         * uninit_fill_n` for UICommandGraph's MapC hash-bucket table, same
+         * shape as the two addresses immediately above. Reached from this
+         * instantiation's `assign(9, sentinel)`, `FUN_0082F680` (cited
+         * above on `assign`), the same call chain as the MapC
+         * `deallocate_all` sibling `FUN_0082DBF0` cited on that member.)
+         * Address: 0x007E6460 (FUN_007E6460, `msvc8::vector<Wm3::Vector3f>::
+         * uninit_fill_n` for the 12-byte three-float element -- the same
+         * instantiation as the `_Insert_n` core `FUN_008523C0` cited on
+         * `insert` above (`WavePattern`-adjacent `insert-and-rebase` lane).
+         * Reached both from `push_back`'s own fast path (`FUN_008522A0`,
+         * cited above on `push_back` -- confirmed as this token's real
+         * direct caller via the callgraph, filling this member's "no
+         * grow-core citation found" gap noted there) and from `_Insert_n`'s
+         * gap-construct branches.)
+         *
          * tail-shift sub-branch is a per-element copy-assign broadcast of
          * `localValue`, FUN_008576A0 -- both FUN_00857880 and FUN_008576A0
          * assign into *already-constructed* slots (add-ref the incoming
@@ -3215,6 +3254,22 @@ namespace msvc8
          * UiRuntimeTypes.cpp, already recovered) own raw decompile, which
          * tail-calls `sub_855DF0((int)a2, a2[2], 1u, a1)` on its
          * capacity-full path.)
+         *
+         * Address: 0x007FB8D0 (FUN_007FB8D0, thin argument-reordering
+         * bridge into FUN_007FBFE0) -- `msvc8::vector<moho::
+         * WRenViewportWorldViewParamRuntime>::insert(pos, count, value)`'s
+         * in-place tail-shift-by-assign sub-step for the 20-byte element
+         * (`{IRenderWorldView* view; int head; int depth; boost::
+         * shared_ptr<TerrainCommon> terrain}`, the same instantiation
+         * cited on `uninit_move_n` below as `FUN_007FC2F0`) -- backward
+         * walk, raw dword copy for view/head/depth, `terrain`'s control
+         * block add-ref/release juggling on assign, matching this method's
+         * own non-trivial-element tail-shift-by-move-assign loop. Reached
+         * from `InsertWorldViewParamAt` (`FUN_007FB060`, WxRuntimeTypes.cpp)
+         * when the insertion position isn't at `end()` and spare capacity
+         * already covers the request -- the in-place branch this
+         * instantiation's `uninit_move_n` citation below did not yet
+         * cover (that one documents the reallocation branch only).
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3832,6 +3887,11 @@ namespace msvc8
          * calls the ICF-identical sibling FUN_00594A20 directly for the same
          * fill. See FUN_00592460's citation on `insert(iterator, const T&)`
          * above for the caller chain and reachability evidence.)
+         * Address: 0x00594A20 (FUN_00594A20, the ICF-identical sibling named
+         * immediately above -- own decompile confirmed byte-for-byte the
+         * same three-`mov`-per-dword broadcast-fill shape, reached from
+         * `FUN_00592460`'s in-place (non-reallocating) branch instead of
+         * the reallocation branch `FUN_00592030` covers.)
          * Address: 0x005EAA10 (FUN_005EAA10, `uninit_fill_n` for the 20-byte
          * `moho::SAttachPoint` element (`CAiTransportImpl.h`,
          * `sizeof(SAttachPoint) == 0x14`) -- broadcast-copies a stack-local
@@ -4167,6 +4227,18 @@ namespace msvc8
          * uninit_move_n` for the same 4-byte pointer shape, the D3D10
          * backend swap-chain vector. Reached from the `_Insert_n` grow lane
          * `FUN_008FE010` (already recovered above).)
+         * Address: 0x00831730 (FUN_00831730, `msvc8::vector<UICommandGraph::
+         * CommandGraphEdge*>::uninit_move_n` for the same 4-byte pointer
+         * shape, `memmove_s`-based. Reached from this instantiation's
+         * `_Insert_n`, `FUN_0082E950` (cited above on `insert`).)
+         * Address: 0x00950670 (FUN_00950670, `msvc8::vector<gpg::TypeHandle>::
+         * uninit_move_n` for the 8-byte `{type,version}` element -- backward
+         * `[src,srcEnd)` walk, raw 8-byte copy. Already named (not
+         * previously address-cited) on this instantiation's `_Insert_n`
+         * entry above (`FUN_00951F30`) as "the in-place growth path's
+         * tail-shift... corresponds to FUN_00950670" -- degenerate/empty
+         * in practice since `gpg::AppendTypeHandle`'s sole call site always
+         * inserts at `mLast`, but the compiled body is real and reached.)
          * Address: 0x00814480 (FUN_00814480, `msvc8::vector<
          * boost::shared_ptr<moho::ShoreCell>>::uninit_move_n` -- the
          * range-copy body FUN_00813E40's register-shuffle wrapper (cited
@@ -4456,6 +4528,17 @@ namespace msvc8
          * deallocate_all -- exact match: `if(first_) operator delete(first_);
          * first_=last_=end_=nullptr;`. Reached from SnapshotUserArmyVector's
          * `*outSnapshot = source` operator= in Sim.cpp)
+         * Address: 0x0082D8D0 (FUN_0082D8D0, msvc8::vector<void*>::
+         * deallocate_all for UICommandGraph's MapAB hash-bucket table --
+         * same exact shape. `assign(9, sentinel)`'s own `clear()` step only
+         * logically empties (keeps capacity); this address's caller
+         * (`FUN_0082F110`, `assign`'s MapAB emission, cited above) fully
+         * releases the old buffer first so the following `assign` always
+         * lands a fresh exact-9-slot allocation, matching `UICommandGraph::
+         * PrepareForRebuild`'s reset-then-rebuild semantics.)
+         * Address: 0x0082DBF0 (FUN_0082DBF0, the MapC sibling of the above --
+         * byte-identical shape, reached from `FUN_0082F680` (`assign`'s
+         * MapC emission, cited above) the same way.)
          *
          * What it does:
          * Frees retained heap storage and clears all pointer lanes.
