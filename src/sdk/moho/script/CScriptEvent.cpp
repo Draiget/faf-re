@@ -44,7 +44,9 @@ namespace
 {
   alignas(moho::CScriptEventTypeInfo) std::byte gCScriptEventTypeInfoStorage[sizeof(moho::CScriptEventTypeInfo)]{};
   bool gCScriptEventTypeInfoConstructed = false;
-  moho::CScriptEventSerializer gCScriptEventSerializer{};
+
+  // Address: 0x010A8D04 -- process-global `CScriptEventSerializer` singleton.
+  moho::CScriptEventSerializer gCScriptEventSerializer;
 
   [[nodiscard]] moho::CScriptEventTypeInfo& CScriptEventTypeInfoSlot()
   {
@@ -113,41 +115,6 @@ namespace
     CScriptEventTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
     CScriptEventTypeInfoSlot().~CScriptEventTypeInfo();
     gCScriptEventTypeInfoConstructed = false;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    auto* const next = static_cast<gpg::SerHelperBase*>(serializer.mNext);
-    auto* const prev = static_cast<gpg::SerHelperBase*>(serializer.mPrev);
-    if (next != nullptr && prev != nullptr) {
-      next->mPrev = prev;
-      prev->mNext = next;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mPrev = self;
-    serializer.mNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mNext == nullptr || serializer.mPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mPrev = self;
-      serializer.mNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
   }
 
   gpg::RType* CachedCScriptEventType()
@@ -3057,48 +3024,35 @@ void CScriptEventSerializer::Serialize(
 }
 
 /**
- * Address: 0x004CB0A0 (FUN_004CB0A0, sub_4CB0A0)
+ * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer, dynamic
+ * initializer for the global `CScriptEventSerializer` singleton)
  */
-void CScriptEventSerializer::RegisterSerializeFunctions()
+CScriptEventSerializer::CScriptEventSerializer()
+  : mSerLoadFunc(reinterpret_cast<gpg::RType::load_func_t>(&CScriptEventSerializer::Deserialize))
+  , mSerSaveFunc(reinterpret_cast<gpg::RType::save_func_t>(&CScriptEventSerializer::Serialize))
+{}
+
+/**
+ * Address: 0x00BF0B80 (FUN_00BF0B80, ??1CScriptEventSerializer@Moho@@QAE@@Z)
+ */
+CScriptEventSerializer::~CScriptEventSerializer()
+{
+  ResetLinks();
+}
+
+/**
+ * Address: 0x004CB0A0 (FUN_004CB0A0, Moho::CScriptEventSerializer::Init)
+ *
+ * What it does:
+ * Binds CScriptEvent serializer callbacks into RTTI.
+ */
+void CScriptEventSerializer::Init()
 {
   gpg::RType* const type = CachedCScriptEventType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mSerLoadFunc;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSerSaveFunc;
-}
-
-static void InitializeCScriptEventSerializer()
-{
-  ResetSerializerNode(gCScriptEventSerializer);
-  gCScriptEventSerializer.mSerLoadFunc = &moho::CScriptEventSerializer::Deserialize;
-  gCScriptEventSerializer.mSerSaveFunc = &moho::CScriptEventSerializer::Serialize;
-}
-
-static void CleanupCScriptEventSerializerAtExit()
-{
-  (void)moho::cleanup_CScriptEventSerializer();
-}
-
-/**
- * Address: 0x004CA2D0 (FUN_004CA2D0, CScriptEvent serializer cleanup alias A)
- */
-[[nodiscard]] gpg::SerHelperBase* CleanupCScriptEventSerializerVariantAliasA()
-{
-  return UnlinkSerializerNode(gCScriptEventSerializer);
-}
-
-/**
- * Address: 0x004CA300 (FUN_004CA300, CScriptEvent serializer cleanup alias B)
- */
-[[nodiscard]] gpg::SerHelperBase* CleanupCScriptEventSerializerVariantAliasB()
-{
-  return UnlinkSerializerNode(gCScriptEventSerializer);
-}
-
-gpg::SerHelperBase* moho::cleanup_CScriptEventSerializer()
-{
-  return CleanupCScriptEventSerializerVariantAliasA();
 }
 
 /**
@@ -3116,19 +3070,6 @@ void moho::register_CScriptEventTypeInfo()
     return true;
   }();
   (void)kRegistered;
-}
-
-/**
- * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer)
- *
- * What it does:
- * Initializes startup serializer callback lanes for `CScriptEvent` and
- * schedules intrusive helper cleanup at process exit.
- */
-void moho::register_CScriptEventSerializer()
-{
-  InitializeCScriptEventSerializer();
-  (void)std::atexit(&CleanupCScriptEventSerializerAtExit);
 }
 
 /**
