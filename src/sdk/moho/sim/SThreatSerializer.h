@@ -4,16 +4,34 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
-  class SThreatSerializer
+  /**
+   * VFTABLE: 0x00E318D4
+   */
+  class SThreatSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDA780 (FUN_00BDA780, dynamic initializer for the global
+     * `SThreatSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. The ctor's atexit target is a plain
+     * unlink thunk, not a mangled destructor, so it is modeled as the
+     * compiler's implicit static-destructor registration rather than an
+     * explicit call.
+     */
+    SThreatSerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SThreatSerializer();
+
     /**
      * Address: 0x00717AF0 (FUN_00717AF0, Moho::SThreatSerializer::Deserialize)
      *
@@ -36,17 +54,13 @@ namespace moho
      * What it does:
      * Binds load/save serializer callbacks into SThreat RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
-  static_assert(offsetof(SThreatSerializer, mHelperNext) == 0x04, "SThreatSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SThreatSerializer, mHelperPrev) == 0x08, "SThreatSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(SThreatSerializer, mLoadCallback) == 0x0C, "SThreatSerializer::mLoadCallback offset must be 0x0C"
   );
