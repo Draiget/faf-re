@@ -486,30 +486,56 @@ namespace
     return ::new (listener) PauseEventListenerRuntimeLane();
   }
 
-  struct SessionSaveDataSerializerHelperRuntimeView
+  /**
+   * Demangled: Moho::SSessionSaveDataSerializer
+   *
+   * What it does:
+   * Forwards `SSessionSaveData`'s load/save lanes to its embedded
+   * `mNodeMap` field's own reflected type -- `SSessionSaveData` has no
+   * `MemberDeserialize`/`MemberSerialize` of its own; the whole struct is
+   * `{ SSessionSaveNodeMap mNodeMap; }` at offset 0, so the generic
+   * `archive->Read/Write(mapType, payload, owner)` dispatch through
+   * `SSessionSaveNodeMap`'s RType IS the struct's serialization. Base-class
+   * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
+   * and splices it into the pending `sNewHelpers` list; `InitNewHelpers`
+   * later dispatches `Init()` on it.
+   */
+  class SSessionSaveDataSerializer : public gpg::SerHelperBase
   {
-    void* mVTable;                          // +0x00
-    gpg::SerHelperBase* mHelperNext;        // +0x04
-    gpg::SerHelperBase* mHelperPrev;        // +0x08
-    gpg::RType::load_func_t mLoadCallback;  // +0x0C
-    gpg::RType::save_func_t mSaveCallback;  // +0x10
+  public:
+    /**
+     * Address: 0x00BE7790 (FUN_00BE7790, dynamic initializer for the global
+     * `SSessionSaveDataSerializer` singleton)
+     */
+    SSessionSaveDataSerializer();
+
+    /**
+     * Address: 0x00C08220 (FUN_00C08220, Moho::SSessionSaveDataSerializer::~SSessionSaveDataSerializer)
+     */
+    ~SSessionSaveDataSerializer();
+
+    /**
+     * Address: 0x00899220 (FUN_00899220, Moho::SSessionSaveDataSerializer::Init)
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
+
   static_assert(
-    offsetof(SessionSaveDataSerializerHelperRuntimeView, mHelperNext) == 0x04,
-    "SessionSaveDataSerializerHelperRuntimeView::mHelperNext offset must be 0x04"
+    offsetof(SSessionSaveDataSerializer, mLoadCallback) == 0x0C,
+    "SSessionSaveDataSerializer::mLoadCallback offset must be 0x0C"
   );
   static_assert(
-    offsetof(SessionSaveDataSerializerHelperRuntimeView, mHelperPrev) == 0x08,
-    "SessionSaveDataSerializerHelperRuntimeView::mHelperPrev offset must be 0x08"
+    offsetof(SSessionSaveDataSerializer, mSaveCallback) == 0x10,
+    "SSessionSaveDataSerializer::mSaveCallback offset must be 0x10"
   );
-  static_assert(sizeof(SessionSaveDataSerializerHelperRuntimeView) == 0x14, "SessionSaveDataSerializerHelperRuntimeView size must be 0x14");
+  static_assert(sizeof(SSessionSaveDataSerializer) == 0x14, "SSessionSaveDataSerializer size must be 0x14");
 
-  SessionSaveDataSerializerHelperRuntimeView gSessionSaveDataSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SessionSaveDataSerializerSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gSessionSaveDataSerializer.mHelperNext);
-  }
+  // Address: 0x010C51C8 -- process-global `SSessionSaveDataSerializer` singleton.
+  SSessionSaveDataSerializer gSessionSaveDataSerializer;
 
   [[nodiscard]] gpg::RType* ResolveSessionSaveNodeMapArchiveType()
   {
@@ -518,26 +544,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::SSessionSaveNodeMap));
     }
     return cached;
-  }
-
-  void InitializeSessionSaveDataSerializerHelperNode() noexcept
-  {
-    gpg::SerHelperBase* const self = SessionSaveDataSerializerSelfNode();
-    gSessionSaveDataSerializer.mHelperNext = self;
-    gSessionSaveDataSerializer.mHelperPrev = self;
-    gSessionSaveDataSerializer.mLoadCallback = nullptr;
-    gSessionSaveDataSerializer.mSaveCallback = nullptr;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperNode() noexcept
-  {
-    gSessionSaveDataSerializer.mHelperNext->mPrev = gSessionSaveDataSerializer.mHelperPrev;
-    gSessionSaveDataSerializer.mHelperPrev->mNext = gSessionSaveDataSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = SessionSaveDataSerializerSelfNode();
-    gSessionSaveDataSerializer.mHelperPrev = self;
-    gSessionSaveDataSerializer.mHelperNext = self;
-    return self;
   }
 
   /**
@@ -593,54 +599,37 @@ namespace
   }
 
   /**
-   * Address: 0x008974F0 (FUN_008974F0)
-   *
-   * What it does:
-   * Initializes startup `SSessionSaveDataSerializer` helper links and binds
-   * deserialize/serialize callback lanes.
+   * Address: 0x00BE7790 (FUN_00BE7790, dynamic initializer for the global
+   * `SSessionSaveDataSerializer` singleton)
    */
-  [[nodiscard]] SessionSaveDataSerializerHelperRuntimeView* InitializeSessionSaveDataSerializerHelperStorage() noexcept
+  SSessionSaveDataSerializer::SSessionSaveDataSerializer()
+    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSessionSaveDataSerializerCallback))
+    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeSessionSaveDataSerializerCallback))
+  {}
+
+  /**
+   * Address: 0x00C08220 (FUN_00C08220, Moho::SSessionSaveDataSerializer::~SSessionSaveDataSerializer)
+   */
+  SSessionSaveDataSerializer::~SSessionSaveDataSerializer()
   {
-    InitializeSessionSaveDataSerializerHelperNode();
-    gSessionSaveDataSerializer.mLoadCallback =
-      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSessionSaveDataSerializerCallback);
-    gSessionSaveDataSerializer.mSaveCallback =
-      reinterpret_cast<gpg::RType::save_func_t>(&SerializeSessionSaveDataSerializerCallback);
-    return &gSessionSaveDataSerializer;
+    ResetLinks();
   }
 
-  struct SessionSaveDataSerializerBootstrap
+  /**
+   * Address: 0x00899220 (FUN_00899220, Moho::SSessionSaveDataSerializer::Init)
+   */
+  void SSessionSaveDataSerializer::Init()
   {
-    SessionSaveDataSerializerBootstrap()
-    {
-      (void)InitializeSessionSaveDataSerializerHelperStorage();
+    gpg::RType* type = moho::SSessionSaveData::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SSessionSaveData));
+      moho::SSessionSaveData::sType = type;
     }
-  };
 
-  SessionSaveDataSerializerBootstrap gSessionSaveDataSerializerBootstrap;
-
-  /**
-   * Address: 0x00897520 (FUN_00897520)
-   *
-   * What it does:
-   * Unlinks `SSessionSaveDataSerializer` helper node from the intrusive helper
-   * list, rewires self-links, and returns the helper self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperPrimary() noexcept
-  {
-    return UnlinkSessionSaveDataSerializerHelperNode();
-  }
-
-  /**
-   * Address: 0x00897550 (FUN_00897550)
-   *
-   * What it does:
-   * Secondary entrypoint for `SSessionSaveDataSerializer` helper-node
-   * intrusive unlink + self-link reset.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperSecondary() noexcept
-  {
-    return UnlinkSessionSaveDataSerializerHelperNode();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
   }
 
   // The formation-preview container emissions used to live here as one
@@ -703,6 +692,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* SSessionSaveData::sType = nullptr;
+
   // Beat-scoped console toggles, defined in `moho/misc/RuntimeTuningGlobals.cpp`.
   extern bool ren_FogOfWar;
   extern bool dbg_Metronome;

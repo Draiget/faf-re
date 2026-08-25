@@ -26,6 +26,11 @@
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class RType;
+} // namespace gpg
+
 namespace moho
 {
   using EntId = std::int32_t;
@@ -649,6 +654,8 @@ namespace moho
 
   struct SSessionSaveData
   {
+    static gpg::RType* sType;
+
     SSessionSaveNodeMap mNodeMap; // +0x00
 
     /**
