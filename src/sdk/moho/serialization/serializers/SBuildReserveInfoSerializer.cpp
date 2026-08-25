@@ -1,7 +1,6 @@
 #include "moho/serialization/serializers/SBuildReserveInfoSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -10,39 +9,6 @@
 namespace
 {
   moho::SBuildReserveInfoSerializer gSBuildReserveInfoSerializer;
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  template <typename TSerializer>
-  void ResetSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
-      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-      serializer.mHelperPrev = self;
-      serializer.mHelperNext = self;
-      return;
-    }
-
-    (void)UnlinkSerializerNode(serializer);
-  }
 
   [[nodiscard]] gpg::RType* CachedSBuildReserveInfoType()
   {
@@ -54,15 +20,34 @@ namespace
 
     return type;
   }
-
-  void CleanupSBuildReserveInfoSerializerAtExit()
-  {
-    (void)moho::cleanup_SBuildReserveInfoSerializer();
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BCB390 (FUN_00BCB390, register_SBuildReserveInfoSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SBuildReserveInfoSerializer::SBuildReserveInfoSerializer()
+    : mDeserialize(&SBuildReserveInfoSerializer::Deserialize)
+    , mSerialize(&SBuildReserveInfoSerializer::Serialize)
+  {}
+
+  /**
+   * Address: 0x00BF6230 (FUN_00BF6230, Moho::SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer)
+   *
+   * What it does:
+   * Unlinks the serializer helper node from the intrusive helper list and
+   * restores self-links.
+   */
+  SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x00579A70 (FUN_00579A70, Moho::SBuildReserveInfoSerializer::Deserialize)
    *
@@ -104,7 +89,7 @@ namespace moho
    * Binds this serializer helper's load/save callbacks into
    * `SBuildReserveInfo` RTTI.
    */
-  void SBuildReserveInfoSerializer::RegisterSerializeFunctions()
+  void SBuildReserveInfoSerializer::Init()
   {
     gpg::RType* const type = CachedSBuildReserveInfoType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -112,68 +97,4 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
-
-  /**
-   * Address: 0x00BF6230 (FUN_00BF6230, Moho::SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializer()
-  {
-    return UnlinkSerializerNode(gSBuildReserveInfoSerializer);
-  }
-
-  /**
-   * Address: 0x00579AC0 (FUN_00579AC0)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * SBuildReserveInfo serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializerStartupThunkA()
-  {
-    return cleanup_SBuildReserveInfoSerializer();
-  }
-
-  /**
-   * Address: 0x00579AF0 (FUN_00579AF0)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * SBuildReserveInfo serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializerStartupThunkB()
-  {
-    return cleanup_SBuildReserveInfoSerializer();
-  }
-
-  /**
-   * Address: 0x00BCB390 (FUN_00BCB390, register_SBuildReserveInfoSerializer)
-   *
-   * What it does:
-   * Initializes `SBuildReserveInfo` serializer callback pointers and schedules
-   * process-exit helper unlink cleanup.
-   */
-  void register_SBuildReserveInfoSerializer()
-  {
-    ResetSerializerNode(gSBuildReserveInfoSerializer);
-    gSBuildReserveInfoSerializer.mDeserialize = &SBuildReserveInfoSerializer::Deserialize;
-    gSBuildReserveInfoSerializer.mSerialize = &SBuildReserveInfoSerializer::Serialize;
-    (void)std::atexit(&CleanupSBuildReserveInfoSerializerAtExit);
-  }
 } // namespace moho
-
-namespace
-{
-  struct SBuildReserveInfoSerializerBootstrap
-  {
-    SBuildReserveInfoSerializerBootstrap()
-    {
-      moho::register_SBuildReserveInfoSerializer();
-    }
-  };
-
-  SBuildReserveInfoSerializerBootstrap gSBuildReserveInfoSerializerBootstrap;
-} // namespace

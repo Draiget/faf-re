@@ -4,11 +4,6 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-}
-
 namespace moho
 {
   struct SBuildReserveInfo;
@@ -16,9 +11,36 @@ namespace moho
   /**
    * Serializer helper for reflected `SBuildReserveInfo` archive callbacks.
    */
-  class SBuildReserveInfoSerializer
+  class SBuildReserveInfoSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCB390 (FUN_00BCB390, register_SBuildReserveInfoSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Confirmed from raw disassembly: calls
+     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7SBuildReserveInfoSerializer@Moho@@6B@` -- no eager
+     * `RegisterSerializeFunctions`-style call exists here. The
+     * `push offset ~SBuildReserveInfoSerializer; call _atexit` sequence
+     * visible in the real ctor's tail is the compiler's own implicit
+     * static-destructor registration for a global with a non-trivial
+     * destructor (it is not a call the 2007 source wrote), so it is not
+     * reproduced explicitly here -- declaring a real destructor below is
+     * sufficient for the compiler to emit the same registration.
+     */
+    SBuildReserveInfoSerializer();
+
+    /**
+     * Address: 0x00BF6230 (FUN_00BF6230, Moho::SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~SBuildReserveInfoSerializer();
+
     /**
      * Address: 0x00579A70 (FUN_00579A70, Moho::SBuildReserveInfoSerializer::Deserialize)
      *
@@ -42,23 +64,13 @@ namespace moho
      * Binds this serializer helper's load/save callbacks into
      * `SBuildReserveInfo` RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext; // +0x04
-    gpg::SerHelperBase* mHelperPrev; // +0x08
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(
-    offsetof(SBuildReserveInfoSerializer, mHelperNext) == 0x04,
-    "SBuildReserveInfoSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SBuildReserveInfoSerializer, mHelperPrev) == 0x08,
-    "SBuildReserveInfoSerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(SBuildReserveInfoSerializer, mDeserialize) == 0x0C,
     "SBuildReserveInfoSerializer::mDeserialize offset must be 0x0C"
@@ -68,22 +80,4 @@ namespace moho
     "SBuildReserveInfoSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(SBuildReserveInfoSerializer) == 0x14, "SBuildReserveInfoSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BF6230 (FUN_00BF6230, Moho::SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializer();
-
-  /**
-   * Address: 0x00BCB390 (FUN_00BCB390, register_SBuildReserveInfoSerializer)
-   *
-   * What it does:
-   * Initializes `SBuildReserveInfo` serializer callback pointers and schedules
-   * process-exit helper unlink cleanup.
-   */
-  void register_SBuildReserveInfoSerializer();
 } // namespace moho
