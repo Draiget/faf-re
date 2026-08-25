@@ -16,9 +16,34 @@ namespace moho
 {
   class CCommandDb;
 
-  class CCommandDBSaveConstruct
+  class CCommandDBSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8C60 (FUN_00BD8C60, dynamic initializer for the global
+     * `CCommandDBSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CCommandDBSaveConstruct@Moho@@6B@` -- no eager `Init()` call
+     * exists here. The ctor's atexit target (0x00BFE9A0) is a plain unlink
+     * thunk, not a mangled destructor symbol, so it is modeled as the
+     * compiler's implicit static-destructor registration for a global with
+     * a non-trivial destructor rather than an explicit `atexit` call --
+     * declaring a real destructor below is sufficient for the compiler to
+     * emit the same registration.
+     */
+    CCommandDBSaveConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CCommandDBSaveConstruct();
+
     /**
      * Address: 0x006E1040 (FUN_006E1040, sub_6E1040)
      *
@@ -35,25 +60,42 @@ namespace moho
      * What it does:
      * Binds `CCommandDb` save-construct-args callback into the reflected RTTI slot.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
   };
 
-  static_assert(offsetof(CCommandDBSaveConstruct, mHelperNext) == 0x04, "CCommandDBSaveConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CCommandDBSaveConstruct, mHelperPrev) == 0x08, "CCommandDBSaveConstruct::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(CCommandDBSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "CCommandDBSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
   );
   static_assert(sizeof(CCommandDBSaveConstruct) == 0x10, "CCommandDBSaveConstruct size must be 0x10");
 
-  class CCommandDBConstruct
+  class CCommandDBConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8C90 (FUN_00BD8C90, dynamic initializer for the global
+     * `CCommandDBConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields. The ctor's atexit target
+     * (0x00BFE9D0) is a plain unlink thunk, not a mangled destructor
+     * symbol, so it is modeled as the compiler's implicit
+     * static-destructor registration rather than an explicit `atexit`
+     * call.
+     */
+    CCommandDBConstruct();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~CCommandDBConstruct();
+
     /**
      * Address: 0x006E1220 (FUN_006E1220, sub_6E1220)
      *
@@ -68,24 +110,45 @@ namespace moho
      * What it does:
      * Binds `CCommandDb` construct/delete callbacks into the reflected RTTI slot.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeconstructCallback;
+    gpg::RType::construct_func_t mConstructCallback;  // +0x0C
+    gpg::RType::delete_func_t mDeconstructCallback;    // +0x10
   };
 
-  static_assert(offsetof(CCommandDBConstruct, mHelperNext) == 0x04, "CCommandDBConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CCommandDBConstruct, mHelperPrev) == 0x08, "CCommandDBConstruct::mHelperPrev offset must be 0x08");
-  static_assert(offsetof(CCommandDBConstruct, mConstructCallback) == 0x0C, "CCommandDBConstruct::mConstructCallback offset must be 0x0C");
-  static_assert(offsetof(CCommandDBConstruct, mDeconstructCallback) == 0x10, "CCommandDBConstruct::mDeconstructCallback offset must be 0x10");
+  static_assert(
+    offsetof(CCommandDBConstruct, mConstructCallback) == 0x0C, "CCommandDBConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CCommandDBConstruct, mDeconstructCallback) == 0x10, "CCommandDBConstruct::mDeconstructCallback offset must be 0x10"
+  );
   static_assert(sizeof(CCommandDBConstruct) == 0x14, "CCommandDBConstruct size must be 0x14");
 
-  class CCommandDBSerializer
+  class CCommandDBSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8CD0 (FUN_00BD8CD0, dynamic initializer for the global
+     * `CCommandDBSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CCommandDBSerializer();
+
+    /**
+     * Address: 0x00BFEA00 (FUN_00BFEA00, Moho::CCommandDBSerializer::~CCommandDBSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. The real ctor
+     * pushes this mangled destructor symbol as its atexit target, so it is
+     * the compiler's own implicit static-destructor registration.
+     */
+    ~CCommandDBSerializer();
+
     /**
      * Address: 0x006E12E0 (FUN_006E12E0, Moho::CCommandDBSerializer::Deserialize)
      *
@@ -108,66 +171,14 @@ namespace moho
      * What it does:
      * Binds `CCommandDb` load/save callbacks into the reflected RTTI slot.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(CCommandDBSerializer, mHelperNext) == 0x04, "CCommandDBSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CCommandDBSerializer, mHelperPrev) == 0x08, "CCommandDBSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(CCommandDBSerializer, mDeserialize) == 0x0C, "CCommandDBSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(CCommandDBSerializer, mSerialize) == 0x10, "CCommandDBSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(CCommandDBSerializer) == 0x14, "CCommandDBSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFE9A0 (FUN_00BFE9A0, sub_BFE9A0)
-   *
-   * What it does:
-   * Unlinks the `CCommandDBSaveConstruct` helper node from the intrusive list.
-   */
-  gpg::SerHelperBase* cleanup_CCommandDBSaveConstruct();
-
-  /**
-   * Address: 0x00BFE9D0 (FUN_00BFE9D0, sub_BFE9D0)
-   *
-   * What it does:
-   * Unlinks the `CCommandDBConstruct` helper node from the intrusive list.
-   */
-  gpg::SerHelperBase* cleanup_CCommandDBConstruct();
-
-  /**
-   * Address: 0x00BFEA00 (FUN_00BFEA00, sub_BFEA00)
-   *
-   * What it does:
-   * Unlinks the `CCommandDBSerializer` helper node from the intrusive list.
-   */
-  gpg::SerHelperBase* cleanup_CCommandDBSerializer();
-
-  /**
-   * Address: 0x00BD8C60 (FUN_00BD8C60, sub_BD8C60)
-   *
-   * What it does:
-   * Initializes `CCommandDBSaveConstruct` helper callback slots and registers them.
-   */
-  void register_CCommandDBSaveConstruct();
-
-  /**
-   * Address: 0x00BD8C90 (FUN_00BD8C90, sub_BD8C90)
-   *
-   * What it does:
-   * Initializes `CCommandDBConstruct` helper callback slots and registers them.
-   */
-  void register_CCommandDBConstruct();
-
-  /**
-   * Address: 0x00BD8CD0 (FUN_00BD8CD0, register_CCommandDBSerializer)
-   *
-   * What it does:
-   * Initializes `CCommandDBSerializer` helper callback slots and registers them.
-   */
-  void register_CCommandDBSerializer();
 } // namespace moho
