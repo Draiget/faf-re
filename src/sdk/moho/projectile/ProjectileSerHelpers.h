@@ -13,9 +13,41 @@ namespace gpg
 
 namespace moho
 {
-  class ProjectileSaveConstruct
+  /**
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='ProjectileSaveConstruct@Moho'`): `FUN_00BD6410` (real,
+   * `__xc_a`-reachable) vs. a dead zero-xref duplicate at `FUN_0069E340`
+   * (same field writes, no `atexit` call, confirmed via raw asm never
+   * live). Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mSaveConstructArgsCallback` to
+   * `FUN_0069E370`, installs the `ProjectileSaveConstruct` vtable, and
+   * pushes plain unmangled `FUN_00BFD670` (bare unlink-then-self-link
+   * shape, matching `SerHelperBase::ResetLinks()`) as its `atexit` target
+   * -- no eager `RegisterSaveConstructArgsFunction`/`Init()` call exists
+   * in the real ctor.
+   */
+  class ProjectileSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD6410 (FUN_00BD6410, dynamic initializer for the global
+     * `ProjectileSaveConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * save-construct-args callback field.
+     */
+    ProjectileSaveConstruct();
+
+    /**
+     * Address: 0x00BFD670 (FUN_00BFD670, Moho::ProjectileSaveConstruct::~ProjectileSaveConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ProjectileSaveConstruct();
+
     /**
      * Address: 0x0069E370 (FUN_0069E370, Moho::ProjectileSaveConstruct::SaveConstructArgs)
      *
@@ -36,25 +68,51 @@ namespace moho
      * What it does:
      * Binds save-construct callback into reflected RTTI for `Projectile`.
      */
-    virtual void RegisterSaveConstructArgsFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
   };
 
-  static_assert(offsetof(ProjectileSaveConstruct, mHelperNext) == 0x04, "ProjectileSaveConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(ProjectileSaveConstruct, mHelperPrev) == 0x08, "ProjectileSaveConstruct::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(ProjectileSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
     "ProjectileSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
   );
   static_assert(sizeof(ProjectileSaveConstruct) == 0x10, "ProjectileSaveConstruct size must be 0x10");
 
-  class ProjectileConstruct
+  /**
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='ProjectileConstruct@Moho'`): `FUN_00BD6440` (real, sole
+   * writer, `__xc_a`-reachable). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mConstructCallback`/`mDeconstructCallback`
+   * to `FUN_0069E500`/`FUN_0069F880`, installs the `ProjectileConstruct`
+   * vtable, and pushes plain unmangled `FUN_00BFD6A0` (bare
+   * unlink-then-self-link shape, matching `SerHelperBase::ResetLinks()`) as
+   * its `atexit` target -- no eager `RegisterConstructFunction`/`Init()`
+   * call exists in the real ctor.
+   */
+  class ProjectileConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD6440 (FUN_00BD6440, dynamic initializer for the global
+     * `ProjectileConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    ProjectileConstruct();
+
+    /**
+     * Address: 0x00BFD6A0 (FUN_00BFD6A0, Moho::ProjectileConstruct::~ProjectileConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ProjectileConstruct();
+
     /**
      * Address: 0x0069E500 (FUN_0069E500, Moho::ProjectileConstruct::Construct)
      *
@@ -77,17 +135,13 @@ namespace moho
      * What it does:
      * Binds construct/delete callbacks into reflected RTTI for `Projectile`.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeconstructCallback;
+    gpg::RType::construct_func_t mConstructCallback;   // +0x0C
+    gpg::RType::delete_func_t mDeconstructCallback;    // +0x10
   };
 
-  static_assert(offsetof(ProjectileConstruct, mHelperNext) == 0x04, "ProjectileConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(ProjectileConstruct, mHelperPrev) == 0x08, "ProjectileConstruct::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(ProjectileConstruct, mConstructCallback) == 0x0C,
     "ProjectileConstruct::mConstructCallback offset must be 0x0C"
@@ -98,9 +152,40 @@ namespace moho
   );
   static_assert(sizeof(ProjectileConstruct) == 0x14, "ProjectileConstruct size must be 0x14");
 
-  class ProjectileSerializer
+  /**
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='ProjectileSerializer@Moho'`): `FUN_00BD6480` (real, sole
+   * writer, `__xc_a`-reachable). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_0069E5D0`/`FUN_0069E5E0`, installs the `ProjectileSerializer`
+   * vtable, and pushes the real mangled destructor
+   * `??1ProjectileSerializer@Moho@@QAE@@Z` (`FUN_00BFD6D0`, confirmed
+   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
+   * call exists in the real ctor.
+   */
+  class ProjectileSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD6480 (FUN_00BD6480, dynamic initializer for the global
+     * `ProjectileSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    ProjectileSerializer();
+
+    /**
+     * Address: 0x00BFD6D0 (FUN_00BFD6D0, Moho::ProjectileSerializer::~ProjectileSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~ProjectileSerializer();
+
     /**
      * Address: 0x0069E5D0 (FUN_0069E5D0, Moho::ProjectileSerializer::Deserialize)
      *
@@ -123,17 +208,13 @@ namespace moho
      * What it does:
      * Binds load/save callbacks into reflected RTTI for `Projectile`.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(ProjectileSerializer, mHelperNext) == 0x04, "ProjectileSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(ProjectileSerializer, mHelperPrev) == 0x08, "ProjectileSerializer::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(ProjectileSerializer, mDeserialize) == 0x0C,
     "ProjectileSerializer::mDeserialize offset must be 0x0C"
@@ -142,52 +223,4 @@ namespace moho
     offsetof(ProjectileSerializer, mSerialize) == 0x10, "ProjectileSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(ProjectileSerializer) == 0x14, "ProjectileSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFD670 (FUN_00BFD670, cleanup_ProjectileSaveConstruct)
-   *
-   * What it does:
-   * Unlinks `ProjectileSaveConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_ProjectileSaveConstruct();
-
-  /**
-   * Address: 0x00BFD6A0 (FUN_00BFD6A0, cleanup_ProjectileConstruct)
-   *
-   * What it does:
-   * Unlinks `ProjectileConstruct` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_ProjectileConstruct();
-
-  /**
-   * Address: 0x00BFD6D0 (FUN_00BFD6D0, cleanup_ProjectileSerializer)
-   *
-   * What it does:
-   * Unlinks `ProjectileSerializer` helper links and rewires self-links.
-   */
-  gpg::SerHelperBase* cleanup_ProjectileSerializer();
-
-  /**
-   * Address: 0x00BD6410 (FUN_00BD6410, register_ProjectileSaveConstruct)
-   *
-   * What it does:
-   * Initializes and registers `ProjectileSaveConstruct` startup helper.
-   */
-  int register_ProjectileSaveConstruct();
-
-  /**
-   * Address: 0x00BD6440 (FUN_00BD6440, register_ProjectileConstruct)
-   *
-   * What it does:
-   * Initializes and registers `ProjectileConstruct` startup helper.
-   */
-  int register_ProjectileConstruct();
-
-  /**
-   * Address: 0x00BD6480 (FUN_00BD6480, register_ProjectileSerializer)
-   *
-   * What it does:
-   * Initializes and registers `ProjectileSerializer` startup helper.
-   */
-  void register_ProjectileSerializer();
 } // namespace moho
