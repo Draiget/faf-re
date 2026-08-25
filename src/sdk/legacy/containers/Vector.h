@@ -1630,6 +1630,22 @@ namespace msvc8
          * `skip`-classified as an ICF-foldable shard) also reaches this same
          * body from `WavePattern`'s Lua constructor's EH unwind funclet.)
          *
+         * Address: 0x0085A1F0 (FUN_0085A1F0, msvc8::vector<T>::~vector for a
+         * 16-byte element made of two independent shared/weak-pointer-style
+         * handle pairs -- same element shape as `FUN_0085AB80`'s
+         * `uninit_copy_n` cited above, reached via `Moho::CUIWorldView`'s
+         * subsystem): destroys each element through `FUN_00859E90` (dual
+         * `_InterlockedExchangeAdd` release at elem+4/elem+12, confirming
+         * the two handle pairs) then frees the buffer and nulls the three
+         * pointer lanes at file-scope globals `dword_10C425C`/`_4260`/
+         * `_4264` -- a global instance, not a class member. Real caller is
+         * `FUN_00C06B20`, a one-instruction `jmp` thunk (`sub_85A1F0();
+         * return;`) address-taken into the CRT static-teardown table by
+         * `FUN_00BE52F0` (an `__xc_a`-lane registrar, the same shape as 327
+         * sibling atexit cleanup thunks already `skip`-tagged in this
+         * codebase) -- a known linker-emitted bridge citing this body's own
+         * evidence, not an independent function.
+         *
          * Destructor: destroy elements and free storage if allowed
          */
         ~vector() {
@@ -5106,10 +5122,19 @@ namespace msvc8
          * `blockPtr+4`) atomically incremented (`lock xadd`), matching
          * `boost::shared_ptr`/`weak_ptr`'s copy-construct semantics without
          * calling a named copy-ctor per element. Reached via
-         * `Moho::CUIWorldView`'s vtable; owning element type and exact
-         * caller not yet identified -- none of the five candidate callers
-         * (0x0085A2D0, 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60) are
-         * recovered source yet.)
+         * `Moho::CUIWorldView`'s vtable; owning element type not yet fully
+         * identified. Of the five candidate callers (0x0085A2D0,
+         * 0x0085A7E0, 0x0085A970, 0x0085AAB0, 0x0085AB60), 0x0085A7E0 is
+         * now confirmed: `FUN_0085A7E0` is a thin calling-convention
+         * adapter (`LOBYTE(this)=0; return sub_85AB80(a3,this);`,
+         * matching this file's `FUN_007CBF90`-style adapter pattern),
+         * called from `FUN_0085A2D0` (this instantiation's `_Insert_n`-
+         * shaped orchestrator: max_size check against `0x0FFFFFFF ==
+         * 0xFFFFFFFF/16 - 1`, two call sites -- the grow-in-place
+         * tail-shift path and the insert-at-end path). `FUN_0085A2D0`
+         * itself is real but not yet independently recovered (honestly
+         * `blocked` pending a dedicated evidence pass, not contamination);
+         * the other four candidates remain unconfirmed.)
          *
          * Address: 0x007CED40 (FUN_007CED40, `msvc8::vector<Moho::
          * CDiscoveryService::DiscoveredGameRecord, false>::uninit_copy_n`
@@ -5955,6 +5980,21 @@ namespace msvc8
          * branch to construct the trailing gap (`uninit_fill_n(oldLast,
          * count-tail, localValue)`) and once from its reallocation branch
          * to construct the inserted run in the fresh buffer.)
+         *
+         * Address: 0x00753A90 (FUN_00753A90, sub_753A90) --
+         * `msvc8::vector<Moho::SDesyncInfo>::uninit_fill_n` for the 40-byte
+         * (`SDesyncInfo.h`, `static_assert(sizeof==0x28)`) element:
+         * `eax=count, edx=dest, ecx=source_value_ptr` fills `count` copies
+         * of one value into consecutive slots, source pointer never
+         * advances -- textbook `uninit_fill_n`, not a range copy. Real
+         * caller `FUN_0074C060` is IDA-named `std::vector_SDesyncInfo::
+         * push_back` (corrected below from a wrong `external_dependency`
+         * tag -- `std::` here just names the STL *template*, `SDesyncInfo`
+         * is the engine value type used by `Moho::Sim::mDesyncs`/
+         * `SimDriver.h`); real caller chain is `Moho::Sim::VerifyChecksum`
+         * (desync detection). `FUN_0074DAC0` (the `_Ufill` adapter cited
+         * above) forwards into this token too; corrected alongside it from
+         * the same wrong `external_dependency` tag.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -6435,6 +6475,15 @@ namespace msvc8
          * tail, insertAt+count)`); that same instantiation's reallocation
          * branch calls `FUN_0092D810` directly instead of through this
          * trampoline.)
+         *
+         * Address: 0x0086A0B0 (FUN_0086A0B0, sub_86A0B0) --
+         * `msvc8::vector<T*>::uninit_move_n` for a 4-byte pointer element:
+         * `count=(a3-src)>>2; if (count) memmove_s(dst, 4*count, src,
+         * 4*count); return dst+4*count;` -- trivially-relocatable-element
+         * move via `memmove_s`, matching this member's fast path exactly.
+         * Sole caller `FUN_00869D30` is already `skip`-tagged (RULE ONE
+         * compiler/template emission, `vector<T*>::_Insert` single-element,
+         * stride 4, canonical home `Vector.h`).
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -6959,6 +7008,67 @@ namespace msvc8
          * Reached from the reallocation branch of
          * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`,
          * UiRuntimeTypes.cpp).)
+         *
+         * sizeof(T) == 4 / 0x14 / 0x24 (four not-yet-typed instantiations,
+         * `T` unresolved): `if (n) { if (0xFFFFFFFF/n < sizeof(T)) throw
+         * bad_alloc; } else n=0; return operator new(sizeof(T)*n);` --
+         * this member's plain constant-folded-`max_size` shape. None of
+         * the four addresses below is exported by IDA as a function of its
+         * own (`owner=<none>` at each single call site); each is the
+         * *middle* of a tiny (~18-byte) individually-compiled,
+         * `0xCC`-padded single-argument convenience wrapper (`T*
+         * allocate(size_t n) { return allocate(n, nullptr); }`-shaped)
+         * that IDA's auto-analysis never carved into its own token --
+         * identity independently confirmed by decoding the raw PE bytes at
+         * each wrapper address and verifying the `call` displacement lands
+         * exactly on the address below (not inferred from proximity
+         * alone):
+         * Address: 0x00A53AD0 (FUN_00A53AD0) -- sizeof(T)==4, max_size
+         * 0x3FFFFFFF; wrapper at 0x00A55580 (`E8 44 E5 FF FF` @0x00A55587).
+         * Address: 0x00A53C40 (FUN_00A53C40) -- sizeof(T)==0x14, max_size
+         * 0x0CCCCCCC; wrapper at 0x00A558D0 (`E8 64 E3 FF FF` @0x00A558D7).
+         * Address: 0x00A53E10 (FUN_00A53E10) -- sizeof(T)==0x24, max_size
+         * 0x071C71C7; wrapper at 0x00A55B80 (`E8 84 E2 FF FF` @0x00A55B87).
+         * Address: 0x00A53EB0 (FUN_00A53EB0) -- sizeof(T)==0x24 (distinct
+         * `function_sha256` from 0x00A53E10 -- a second, separate 36-byte
+         * instantiation, not an ICF twin), same max_size; wrapper at
+         * 0x00A55BE0 (`E8 C4 E2 FF FF` @0x00A55BE7).
+         * Follow-up: the four wrapper addresses above should be
+         * (re-)exported from IDA as their own functions -- they were
+         * silently skipped by the auto-analysis pass, most likely because
+         * they sit between `0xCC` padding rather than after a `retn` the
+         * analyzer followed -- so they get their own token/xrefs/meta.json
+         * and can be recovered as the one-arg `allocate(size_t)` overload
+         * calling this member by name.
+         *
+         * sizeof(T) == 0x70 (112 bytes, `gpg::gal::backends::d3d9::
+         * AdapterD3D9`, `static_assert(sizeof(AdapterD3D9)==0x70)`,
+         * `AdapterD3D9.hpp`):
+         * Address: 0x008E8790 (FUN_008E8790) -- confirmed via the sibling
+         * `max_size()` emission `FUN_008E9070` (`mov eax,2492492h; retn`,
+         * and `0xFFFFFFFF/112 == 0x02492492` exactly). Three callers: one
+         * in an IDA-unclassified gap (0x008E9087, likely a third growth
+         * call site not independently exported); `FUN_008EEFC0` (corrected
+         * below from a fabricated generic "VisionDB handle teardown lane"
+         * `recovered` note with zero real citation anywhere in `src/sdk`);
+         * and `FUN_008F1890`, already cited on `insert` elsewhere in this
+         * file as `msvc8::vector<AdapterD3D9>::insert(pos,count,value)` for
+         * `DeviceD3D9Runtime::adapters` (`D3D9Interfaces.cpp`).
+         *
+         * sizeof(T) == 0x14 (20 bytes, `gpg::ReadArchive::
+         * TrackedPointerInfo`, `static_assert(sizeof==0x14)`,
+         * `ArchiveSerialization.h`):
+         * Address: 0x0094F210 (FUN_0094F210) -- three callers:
+         * `FUN_0094F990` (already `skip`, trivial 1-arg forwarder, honest
+         * note citing this token's then-unresolved status -- now
+         * resolved); `FUN_00951EA0` (corrected below from the same
+         * fabricated "VisionDB handle teardown lane" `recovered` note as
+         * `FUN_008EEFC0` above -- real body is `reserve(n)`-shaped: zero 3
+         * pointer fields, length-check, `v4 = allocate_slots_checked(a2)`,
+         * `begin=end=v4, capacityEnd=v4+20*a2`); and `FUN_00952770`,
+         * already `skip`-tagged as this instantiation's `_Insert_n`
+         * (stride 20, uses `func_ReleaseRefsRange_TrackedPointerInfo` and
+         * locals typed `gpg::ReadArchive::TrackedPointerInfo*`).
          *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
