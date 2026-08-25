@@ -20,24 +20,6 @@ namespace gpg
 
 namespace
 {
-  alignas(CAiPersonalityConstruct) unsigned char gCAiPersonalityConstructStorage[sizeof(CAiPersonalityConstruct)];
-  bool gCAiPersonalityConstructConstructed = false;
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNode(CAiPersonalityConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  [[nodiscard]] CAiPersonalityConstruct* AcquireCAiPersonalityConstruct()
-  {
-    if (!gCAiPersonalityConstructConstructed) {
-      new (gCAiPersonalityConstructStorage) CAiPersonalityConstruct();
-      gCAiPersonalityConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPersonalityConstruct*>(gCAiPersonalityConstructStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiPersonalityType()
   {
     gpg::RType* type = CAiPersonality::sType;
@@ -74,57 +56,29 @@ namespace
     result->SetUnowned(MakeCAiPersonalityRef(personality), 0u);
   }
 
+  // Address: 0x010AF130 -- process-global `CAiPersonalityConstruct` singleton.
+  // Constructing it runs CAiPersonalityConstruct::CAiPersonalityConstruct()
+  // (0x00BCD620), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  CAiPersonalityConstruct gCAiPersonalityConstruct;
+
   /**
    * Address: 0x00BF7710 (FUN_00BF7710, cleanup_CAiPersonalityConstruct)
    *
    * What it does:
-   * Unlinks the global construct helper node and restores self-links.
+   * Unlinks the `CAiPersonalityConstruct` helper node from whatever intrusive
+   * list it currently sits in and restores a self-linked sentinel state.
+   * Registered by the real dynamic initializer (0x00BCD620) as the global's
+   * `atexit` teardown. `FUN_005B6980` and `FUN_005B69B0` are duplicate-
+   * emission twins of this exact unlink/reset lane (same `ResetLinks()`
+   * shape, folded to separate addresses); neither has a distinct
+   * source-level body of its own.
    */
-  gpg::SerHelperBase* cleanup_CAiPersonalityConstruct()
+  void CleanupCAiPersonalityConstructStartup()
   {
-    if (!gCAiPersonalityConstructConstructed) {
-      return nullptr;
-    }
-
-    CAiPersonalityConstruct* const construct = reinterpret_cast<CAiPersonalityConstruct*>(gCAiPersonalityConstructStorage);
-    gpg::SerHelperBase* const selfNode = HelperNode(*construct);
-    if (construct->mHelperNext != nullptr && construct->mHelperPrev != nullptr) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
-    construct->mHelperNext = selfNode;
-    construct->mHelperPrev = selfNode;
-    return selfNode;
-  }
-
-  /**
-   * Address: 0x005B6980 (FUN_005B6980)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the global
-   * `CAiPersonalityConstruct` helper node and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiPersonalityConstructStartupThunkA()
-  {
-    return cleanup_CAiPersonalityConstruct();
-  }
-
-  /**
-   * Address: 0x005B69B0 (FUN_005B69B0)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `CAiPersonalityConstruct` helper unlink/reset path.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiPersonalityConstructStartupThunkB()
-  {
-    return cleanup_CAiPersonalityConstruct();
-  }
-
-  void CleanupCAiPersonalityConstructAtexit()
-  {
-    (void)cleanup_CAiPersonalityConstruct();
+    gCAiPersonalityConstruct.ResetLinks();
   }
 } // namespace
 
@@ -156,55 +110,32 @@ void CAiPersonalityConstruct::Deconstruct(void* const object)
 }
 
 /**
- * Address: 0x005B92D0 (FUN_005B92D0)
+ * Address: 0x00BCD620 (FUN_00BCD620, dynamic initializer for the global
+ * `CAiPersonalityConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * registers process-exit cleanup.
+ */
+CAiPersonalityConstruct::CAiPersonalityConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiPersonalityConstruct::Construct))
+  , mDeleteCallback(&CAiPersonalityConstruct::Deconstruct)
+{
+  (void)std::atexit(&CleanupCAiPersonalityConstructStartup);
+}
+
+/**
+ * Address: 0x005B92D0 (FUN_005B92D0, gpg::SerConstructHelper_CAiPersonality::Init)
  *
  * What it does:
  * Lazily resolves CAiPersonality RTTI and installs construct/delete callbacks
  * from this helper object into the type descriptor.
  */
-void CAiPersonalityConstruct::RegisterConstructFunction()
+void CAiPersonalityConstruct::Init()
 {
   gpg::RType* type = CachedCAiPersonalityType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-  GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
-  if (!type) {
-    return;
-  }
-
+  GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
 }
-
-/**
- * Address: 0x00BCD620 (FUN_00BCD620, register_CAiPersonalityConstruct)
- *
- * What it does:
- * Initializes the global personality construct helper and installs
- * process-exit cleanup.
- */
-int moho::register_CAiPersonalityConstruct()
-{
-  CAiPersonalityConstruct* const construct = AcquireCAiPersonalityConstruct();
-  gpg::SerHelperBase* const selfNode = HelperNode(*construct);
-  construct->mHelperNext = selfNode;
-  construct->mHelperPrev = selfNode;
-  construct->mConstructCallback =
-    reinterpret_cast<gpg::RType::construct_func_t>(&CAiPersonalityConstruct::Construct);
-  construct->mDeleteCallback = &CAiPersonalityConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  return std::atexit(&CleanupCAiPersonalityConstructAtexit);
-}
-
-namespace
-{
-  struct CAiPersonalityConstructBootstrap
-  {
-    CAiPersonalityConstructBootstrap()
-    {
-      (void)moho::register_CAiPersonalityConstruct();
-    }
-  };
-
-  [[maybe_unused]] CAiPersonalityConstructBootstrap gCAiPersonalityConstructBootstrap;
-} // namespace
