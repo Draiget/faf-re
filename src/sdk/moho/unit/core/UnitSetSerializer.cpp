@@ -10,34 +10,7 @@
 
 namespace
 {
-  using Serializer = moho::UnitSetSerializer;
-
-  Serializer gUnitSetSerializer{};
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
+  void cleanup_UnitSetSerializer();
 
   [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
   {
@@ -115,59 +88,6 @@ namespace
     archive->Write(ResolveUnitSetType(), objectSlot, ownerRef);
   }
 
-  /**
-   * Address: 0x006D2A80 (FUN_006D2A80, sub_6D2A80)
-   *
-   * What it does:
-   * Initializes global `UnitSetSerializer` links and callback pointers.
-   */
-  Serializer& construct_UnitSetSerializerVariant1()
-  {
-    InitializeSerializerNode(gUnitSetSerializer);
-    gUnitSetSerializer.mDeserialize = &moho::UnitSetSerializer::Deserialize;
-    gUnitSetSerializer.mSerialize = &moho::UnitSetSerializer::Serialize;
-    return gUnitSetSerializer;
-  }
-
-  /**
-   * Address: 0x006D2D60 (FUN_006D2D60, sub_6D2D60)
-   *
-   * What it does:
-   * `SerSaveLoadHelper<EntitySetTemplate<Unit>>` thunk lane that reuses
-   * `UnitSetSerializer` callback/link initialization.
-   */
-  Serializer& construct_UnitSetSerializerVariant2()
-  {
-    return construct_UnitSetSerializerVariant1();
-  }
-
-  /**
-   * Address: 0x006D2AB0 (FUN_006D2AB0)
-   *
-   * What it does:
-   * Splices `UnitSetSerializer` out of its intrusive helper lane when linked,
-   * then rewires helper links to the serializer self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSetSerializerHelperNodeVariantA() noexcept
-  {
-    return UnlinkSerializerNode(gUnitSetSerializer);
-  }
-
-  /**
-   * Address: 0x006D2AE0 (FUN_006D2AE0)
-   *
-   * What it does:
-   * Secondary serializer helper unlink/reset variant sharing the same behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSetSerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkUnitSetSerializerHelperNodeVariantA();
-  }
-
-  void cleanup_UnitSetSerializer_00BFE450_atexit()
-  {
-    (void)moho::cleanup_UnitSetSerializer();
-  }
 } // namespace
 
 namespace moho
@@ -205,7 +125,7 @@ namespace moho
   /**
    * Address: 0x006D2D90 (FUN_006D2D90, sub_6D2D90)
    */
-  void UnitSetSerializer::RegisterSerializeFunctions()
+  void UnitSetSerializer::Init()
   {
     gpg::RType* const type = ResolveUnitSetType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -215,33 +135,36 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE450 (FUN_00BFE450, sub_BFE450)
+   * Address: 0x00BD8480 (FUN_00BD8480, dynamic initializer for the global
+   * `UnitSetSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  gpg::SerHelperBase* cleanup_UnitSetSerializer()
+  UnitSetSerializer::UnitSetSerializer()
+    : mDeserialize(&UnitSetSerializer::Deserialize)
+    , mSerialize(&UnitSetSerializer::Serialize)
   {
-    return UnlinkUnitSetSerializerHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00BD8480 (FUN_00BD8480, sub_BD8480)
-   */
-  int register_UnitSetSerializer()
-  {
-    (void)construct_UnitSetSerializerVariant1();
-    (void)construct_UnitSetSerializerVariant2();
-    return std::atexit(&cleanup_UnitSetSerializer_00BFE450_atexit);
+    (void)std::atexit(&cleanup_UnitSetSerializer);
   }
 } // namespace moho
 
 namespace
 {
-  struct UnitSetSerializerBootstrap
-  {
-    UnitSetSerializerBootstrap()
-    {
-      (void)moho::register_UnitSetSerializer();
-    }
-  };
+  // Address: 0x010B75D4 -- process-global `UnitSetSerializer` singleton.
+  moho::UnitSetSerializer gUnitSetSerializer;
 
-  UnitSetSerializerBootstrap gUnitSetSerializerBootstrap;
+  /**
+   * Address: 0x00BFE450 (FUN_00BFE450, cleanup_UnitSetSerializer)
+   *
+   * What it does:
+   * Unlinks `UnitSetSerializer` helper-node links and rewires self-links.
+   * The real ctor registers this plain free function (not a mangled
+   * destructor) as its explicit atexit target.
+   */
+  void cleanup_UnitSetSerializer()
+  {
+    gUnitSetSerializer.ResetLinks();
+  }
 } // namespace
