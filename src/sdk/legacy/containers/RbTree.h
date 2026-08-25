@@ -477,13 +477,19 @@ namespace msvc8
          * `FUN_0052F0A0`, `FUN_00530DC4`); owning field/class not yet
          * pinned down.
          *
-         * Address: 0x0083C2E0 (FUN_0083C2E0, sub_83C2E0) -- `UiKeyActionMap`/
-         * `msvc8::map<UiKeyMask, msvc8::string>`'s in-order successor walk
-         * (isNil@+0x15, the same instantiation cited on `erase(const
-         * key_type&)` as `FUN_0083AA70` in Map.h). Reached from this
-         * instantiation's `erase_node` (via the successor-capture step
-         * every `erase_node` emission in this file performs before
-         * unlinking).
+         * Address: 0x0083C2E0 (FUN_0083C2E0, sub_83C2E0) -- CORRECTED: was
+         * mislabeled `UiKeyActionMap`/`msvc8::map<UiKeyMask,
+         * msvc8::string>` here despite already noting `isNil@+0x15` --
+         * that offset belongs to the *other* UI key map. This is
+         * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s in-order
+         * successor walk (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:
+         * 1395`; `UiKeyActionMap` is isNil@+0x2D, see `FUN_0083A640` cited
+         * on `erase(const_iterator)` above). Two real call sites: this
+         * instantiation's `erase_node` (`FUN_0083AA70`, corrected
+         * alongside this entry, cited on that member below) via the
+         * successor-capture step every `erase_node` emission performs
+         * before unlinking, and `insert_hint`'s emission (`FUN_0083B320`,
+         * cited below) via its successor-straddle check on a miss-hint.
          *
          * Address: 0x005A19B0 (FUN_005A19B0, sub_5A19B0) --
          * `msvc8::map<uint32_t, moho::RUnitBlueprint*>::operator[]`'s
@@ -648,6 +654,23 @@ namespace msvc8
          * `_Insert_lower_bound` (`FUN_004E1890`, the per-T canonical-
          * template-helper binding for this map), which uses the predecessor
          * check during hinted/unique insert.
+         */
+        /**
+         * Address: 0x0083C400 (FUN_0083C400, sub_83C400) --
+         * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s predecessor
+         * lookup (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:1395`,
+         * isNil@+0x15). Standard three-way shape (right-child predecessor
+         * via a `rb_max`-equivalent inline right-spine walk, ancestor climb
+         * while descending from a left branch, or direct left-child
+         * descent) matching this member exactly. Reached from
+         * `insert_hint`'s emission (`FUN_0083B320`, cited below) as the
+         * `before = rb_decrement(hint)` straddle check. Currently also
+         * carries a second, generic-templated recovery as
+         * `RetreatTreeIteratorFlag21RuntimeA`/`RetreatRbIteratorRuntime<
+         * RbNodeFlag21Runtime, 0x15u>` in `moho/sim/SimRecoveryRuntime.cpp`
+         * -- a per-offset duplicate of this same member; not consolidated
+         * in this pass (out of scope), flagged for a follow-up template
+         * clean-up.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -1306,6 +1329,24 @@ namespace msvc8
              * emitted again at 0x0087CC20)
              * Address: 0x0087CC20 (FUN_0087CC20, sibling emission of FUN_00498060 described above)
              */
+            /**
+             * Address: 0x0083B4B0 (FUN_0083B4B0)  Address: 0x0083AA60 (FUN_0083AA60)
+             *
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s `end()` lane
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`). Two
+             * calling-convention emissions of the same sentinel-head return,
+             * matching the multi-address `end()` pattern documented
+             * throughout this member's citation catalog: `FUN_0083B4B0`
+             * returns `head_` directly in `eax`; `FUN_0083AA60` stores it
+             * through a caller-supplied out-parameter instead. Both are
+             * currently duplicated as free-function reach-ins
+             * (`ReadSecondaryGlobalPointerValue`/`LoadSecondaryGlobalPointerValue`)
+             * in `moho/containers/LegacyContainerRuntime.cpp`, confirmed to
+             * have zero callers anywhere in `src/sdk` -- orphans, not
+             * consolidated in this pass (out of scope; that file also
+             * covers the sibling `UiKeyActionMap` tree and other unrelated
+             * sentinel offsets, a larger clean-up than this task).
+             */
             [[nodiscard]] node_type* header() const noexcept { return head_; }
             [[nodiscard]] node_type* root() const noexcept { return head_->parent; }
             /**
@@ -1325,9 +1366,30 @@ namespace msvc8
              * emitted again at 0x0087CC40)
              * Address: 0x0087CC40 (FUN_0087CC40, sibling emission of FUN_00498080 described above)
              */
+            /**
+             * Address: 0x0083BC30 (FUN_0083BC30, sub_83BC30) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s `head_->left`
+             * begin lane -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:
+             * 1395`), out-parameter-store shape like the trail-segment
+             * pool's minimum above. Currently duplicated as a free-function
+             * reach-in (`LoadSecondaryGlobalPointerPointee`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src/sdk`; not consolidated in this pass
+             * (see the `header()` note above for why).
+             */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
 
+            /**
+             * Address: 0x0083BC40 (FUN_0083BC40, sub_83BC40) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::size()` --
+             * `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`), direct
+             * `dword_10C3750` return. Currently duplicated as a
+             * free-function reach-in (`ReadSecondaryGlobalScalarValue`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src/sdk`; not consolidated in this pass
+             * (see the `header()` note above for why).
+             */
             [[nodiscard]] size_type size() const noexcept { return size_; }
             [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
 
@@ -1393,6 +1455,15 @@ namespace msvc8
              * in this sweep for both) -- none of `CCommandDb`'s recovered
              * methods call `lower_bound`/`operator[]` directly, so this
              * emission's real call site remains unidentified.)
+             */
+            /**
+             * Address: 0x0083B440 (FUN_0083B440, sub_83B440) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s lower-bound
+             * descent (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:1395`,
+             * isNil@+0x15), store-into-hidden-return-pointer shape like
+             * `FUN_006E1D30` above. Reached from `operator[]`'s emission
+             * (`FUN_0083A9D0`, cited in `Map.h`) and `find_node`'s emission
+             * (`FUN_0083AD60`, cited below), both real call sites.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -1525,6 +1596,21 @@ namespace msvc8
              * (sampler-state), FUN_00948E60 from `FUN_00949D40`
              * (texture-stage), both already recovered as this template's
              * citation above.
+             */
+            /**
+             * Address: 0x0083AD60 (FUN_0083AD60, sub_83AD60) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::find` --
+             * `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Lower-bound-then-verify shape matching this
+             * member exactly: calls `sub_83B440` (`lower_bound_node`,
+             * cited above), then rejects a nil or key-greater candidate
+             * back to `header()`. No confirmed engine caller in this
+             * sweep; `incoming_xrefs` is empty and no recovered
+             * `CUIKeyHandler` method currently calls `find` directly on
+             * this map (`AddUiKeyMapEntries`/`RemoveUiKeyMapEntries` use
+             * `operator[]`/`erase` instead). Kept here as the template's
+             * generic emission for this instantiation, not a per-type
+             * duplicate.)
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -1743,6 +1829,25 @@ namespace msvc8
              * (`SetupPrimaryAdapterSettings`/`SetupSecondaryAdapterSettings`'s
              * RAW, un-recovered binary bodies).
              */
+            /**
+             * Address: 0x0083BC50 (FUN_0083BC50, sub_83BC50) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_unique`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Descends recording the last branch (`addLeft`),
+             * fast-paths when the descent bottomed out at `leftmost()`
+             * (tail-calls `insert_at`/`FUN_0083BDE0`, cited below, with
+             * `addLeft=true`), otherwise confirms uniqueness against the
+             * candidate directly (no separate `rb_decrement` call in this
+             * emission -- the compiler folded the predecessor check into
+             * the same descent that produced `where`) before tail-calling
+             * `insert_at` either way. Reached from `insert_hint`'s emission
+             * (`FUN_0083B320`, cited below) as its final fallback branch --
+             * the same `insert_unique(v).first` tail call this member's
+             * own C++ source performs. Previously mis-tracked
+             * `external_dependency` ("all-external-callees thunk"); its
+             * sole real callee, `sub_83BDE0`, is engine code (this
+             * template's own `insert_at`), not third-party runtime.)
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -1849,6 +1954,30 @@ namespace msvc8
              * `value_type(parentPtr, mapped_type())` temporary -- exactly
              * this member's documented role. `Moho::CON_ANI_DumpSkeleton`
              * itself (CAniSkel.cpp) is not yet recovered.)
+             */
+            /**
+             * Address: 0x0083B320 (FUN_0083B320, sub_83B320) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_hint`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Matches this member's full branch structure:
+             * empty-tree fast path straight to `insert_at` (`size_==0`
+             * reads as `!dword_10C3750`), `hint == leftmost()` check,
+             * `hint == end()` check against `rightmost()`, then the
+             * predecessor/successor straddle checks via `sub_83C400`
+             * (`rb_decrement`, cited above) / `sub_83C2E0` (`rb_increment`,
+             * cited above), each falling through to `insert_at`
+             * (`FUN_0083BDE0`, cited below) with the decided `addLeft`,
+             * and a final fallback to `insert_unique` (`FUN_0083BC50`,
+             * cited above) taking its `.first`. Reached from `operator[]`'s
+             * emission (`FUN_0083A9D0`, `msvc8::map<UiKeyMask,bool>::
+             * operator[]`, cited in `Map.h`) passing its own `lower_bound`
+             * result as the hint -- the same "fill the gap we just
+             * located" usage this member's doc comment above describes --
+             * confirmed via `AddUiKeyMapEntries`'s `gUiKeyRepeatMap[keyMask]
+             * = true` (`UiRuntimeTypes.cpp:1442`). Was `recovered` with no
+             * citation or report at all prior to this pass -- a DB-integrity
+             * gap, not a false attribution, but unverifiable either way
+             * without one.)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -2234,6 +2363,38 @@ namespace msvc8
              * transplant-and-rebalance over a
              * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
              * reach-in instead of calling it.)
+             *
+             * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) -- CORRECTED:
+             * `Map.h`'s `erase(const key_type&)` citation for this address
+             * previously mislabeled it `UiKeyActionMap`/`msvc8::map<
+             * UiKeyMask, msvc8::string>` despite already noting
+             * `isNil@+0x15` -- that offset is `UiKeyRepeatMap`'s, not
+             * `UiKeyActionMap`'s (see the `rotate_left`/`rotate_right`/
+             * `rb_increment` corrections alongside this one). This is
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::erase_node`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`).
+             * Full CLRS transplant-then-fixup shape matching this member
+             * exactly: throws `std::out_of_range("invalid map/set<T>
+             * iterator")` on a nil erase target, captures the successor via
+             * `rb_increment` (`FUN_0083C2E0`, corrected and cited above)
+             * before unlinking, re-seats `head->left`/`head->right` through
+             * this instantiation's own `rb_min`/`rb_max`-equivalent walks
+             * (`FUN_0083B530`/`FUN_0083B510`, already `recovered` in
+             * `moho/containers/LegacyContainerRuntime.cpp` and correctly
+             * attributed there) only when the erased node was an extremum,
+             * and rebalances through `rotate_left`/`rotate_right`
+             * (`FUN_0083B4C0`/`FUN_0083B570`, both cited above). Called
+             * with an already-resolved node/iterator, not a raw key --
+             * `RemoveUiKeyMapEntries`'s own binary body (`FUN_00839270`)
+             * performs its own inline lower-bound descent and conditional
+             * call, matching `Map.h`'s `erase(const key_type&)` shape
+             * (`find_node` then conditional `erase_node`) fused into the
+             * caller rather than compiled as a separate `erase(key)`
+             * symbol for this instantiation -- confirmed via
+             * `RemoveUiKeyMapEntries`'s `gUiKeyRepeatMap.erase(keyMask)`,
+             * `UiRuntimeTypes.cpp:1466` (not `:1465`, which is the sibling
+             * `gUiKeyActionMap.erase(keyMask)` call the mislabeled citation
+             * pointed at instead).)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -3455,6 +3616,36 @@ namespace msvc8
              * `InsertCommandNode` free-function pair in Sim.cpp cited on
              * `insert_unique` above.)
              */
+            /**
+             * Address: 0x0083C260 (FUN_0083C260, sub_83C260) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::buy_node` --
+             * `gUiKeyRepeatMap` in `moho/ui/UiRuntimeTypes.cpp:1395`
+             * (`Moho::CUIKeyHandler`'s per-key "repeat enabled" registry,
+             * populated by `AddUiKeyMapEntries`/`FUN_00838FD0` when a Lua
+             * key binding's `keyRepeat` flag is true). Allocates one node
+             * via `sub_83C6E0(1)` (`alloc_raw`), writes `left`/`parent`/
+             * `right` straight from its own arguments (the caller passes
+             * `head_` for both `left` and `right` and the insertion-point
+             * `where` node for `parent`, the same "compiler optimisation,
+             * not a different operation" pattern the IdPool/CommandManager
+             * instantiations above document), copies the 8-byte
+             * `pair<const UiKeyMask, bool>` value from a `const
+             * value_type*` argument (`*a1`/`a1[1]`) to `node+0x0C`/
+             * `node+0x10`, then writes `color=0`(red)/`isNil=0` at
+             * `node+0x14`/`node+0x15` -- the same `nil-0x15` shape already
+             * used to identify this instantiation's rotation helpers
+             * (`FUN_0083B4C0`/`FUN_0083B570`, both cited below). Reached
+             * from `insert_at`'s emission (`FUN_0083BDE0`, cited below),
+             * which calls this member internally rather than receiving an
+             * already-built node -- the binary fuses `buy_node` +
+             * `link_and_rebalance` into one function for this
+             * instantiation, the same fusion `buy_head`'s `FUN_00556DE0`
+             * citation above documents for a sibling map. DB-integrity fix:
+             * this token was reverted from a false `recovered` status
+             * citing `src/sdk/moho/misc/CrtRuntimeHelpers.cpp` (address not
+             * present in that file, confirmed by a full-file grep); this
+             * catalog is the real home.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -4098,6 +4289,22 @@ namespace msvc8
              * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
              * reach-in instead of calling it.)
              */
+            /**
+             * Address: 0x0083B4C0 (FUN_0083B4C0, sub_83B4C0) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s left rotate
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Matches this member exactly: `pivot=n->right;
+             * n->right=pivot->left; ...; pivot->left=n; n->parent=pivot;`.
+             * Reached from `insert_at`'s emission (`FUN_0083BDE0`, cited
+             * below) and `erase_node`'s emission (`FUN_0083AA70`, cited
+             * below), the same insert-side/erase-side dual-caller shape
+             * `rotate_left`'s other instantiations show throughout this
+             * file. Currently duplicated as a free-function template
+             * instantiation (`RotateOffset15TreeLeftViaSecondaryGlobalHead`)
+             * in `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src/sdk`; not consolidated in this pass
+             * (see the `header()` note above for why).)
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -4272,6 +4479,22 @@ namespace msvc8
              * RRuleGameRules.cpp that rotated over a
              * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTableRuntimeView&`
              * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x0083B570 (FUN_0083B570, sub_83B570) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s right rotate
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Mirror of `rotate_left`'s `FUN_0083B4C0` above,
+             * same instantiation: `pivot=n->left; n->left=pivot->right;
+             * ...; pivot->right=n; n->parent=pivot;`. Reached from the same
+             * two fixup loops as `FUN_0083B4C0` -- `insert_at`'s emission
+             * (`FUN_0083BDE0`, cited below) and `erase_node`'s emission
+             * (`FUN_0083AA70`, cited below). Currently duplicated as a
+             * free-function template instantiation
+             * (`RotateOffset15TreeRightViaSecondaryGlobalHead`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src/sdk`; not consolidated in this pass
+             * (see the `header()` note above for why).)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -4482,6 +4705,36 @@ namespace msvc8
              * (`rb_decrement`, cited below) and `sub_8D5020` (lower_bound,
              * currently cited on the orphaned `ResolveAdapterModeSortInsertionAnchor`)
              * complete this instantiation's primitive set.
+             */
+            /**
+             * Address: 0x0083BDE0 (FUN_0083BDE0, sub_83BDE0) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_at` --
+             * `gUiKeyRepeatMap` in `moho/ui/UiRuntimeTypes.cpp:1395`. The
+             * `(unsigned)dword_10C3750 >= 0x1FFFFFFE` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<const UiKeyMask, bool>` value_type (`0xFFFFFFFF/8 - 1
+             * == 0x1FFFFFFE`, the same constant already confirmed for the
+             * 8-byte CmdId maps above -- independent confirmation that
+             * `bool` is padded to a full 4-byte slot in this pair), throwing
+             * `std::length_error("map/set<T> too long")` (built via
+             * `std::logic_error::logic_error` then vftable-patched to
+             * `std::length_error`, the standard shape documented throughout
+             * this file). Buys the node through `sub_83C260` (`buy_node`,
+             * cited above), links it under the caller's `where`/`addLeft`
+             * in the same `where==head_` / `addLeft` / general three-case
+             * shape as `link_and_rebalance` above, then repairs the
+             * red-red violation calling `sub_83B4C0`/`sub_83B570`
+             * (`rotate_left`/`rotate_right`, both cited below) on the
+             * uncle-red/uncle-black branches. Reached from `insert_hint`'s
+             * emission (`FUN_0083B320`, cited above) on every accepted
+             * branch -- itself reached from `operator[]`'s emission
+             * (`FUN_0083A9D0`, cited in `Map.h`) passing its own
+             * `lower_bound` result as the hint, confirmed via
+             * `AddUiKeyMapEntries`'s `gUiKeyRepeatMap[keyMask] = true`
+             * (`UiRuntimeTypes.cpp:1442`). Was `recovered` with no citation,
+             * report, or note of any kind prior to this pass -- neither
+             * proven false nor verifiable; this catalog entry is the first
+             * real evidence trail for it.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
