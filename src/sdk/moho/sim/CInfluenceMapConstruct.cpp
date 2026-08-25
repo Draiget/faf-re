@@ -16,22 +16,6 @@ namespace gpg
 
 namespace
 {
-  moho::CInfluenceMapConstruct gCInfluenceMapConstruct;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
   /**
    * Address: 0x00717670 (FUN_00717670, sub_717670)
    */
@@ -63,18 +47,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071CAC0 (FUN_0071CAC0)
-   *
-   * What it does:
-   * Register-lane adapter that forwards into the canonical
-   * `Construct_CInfluenceMapThunk` path.
-   */
-  [[maybe_unused]] int Construct_CInfluenceMapRegisterAdapter(gpg::SerConstructResult* const result)
-  {
-    return Construct_CInfluenceMapThunk(0, 0, 0, result);
-  }
-
-  /**
    * Address: 0x0071CAA0 (FUN_0071CAA0, sub_71CAA0)
    */
   void Delete_CInfluenceMap(void* const objectPtr)
@@ -87,36 +59,26 @@ namespace
     object->~CInfluenceMap();
     ::operator delete(object);
   }
-
-  /**
-   * Address: 0x00718AB0 (FUN_00718AB0)
-   *
-   * What it does:
-   * Initializes startup `CInfluenceMap` construct-helper links and callbacks.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CInfluenceMapConstruct* InitializeCInfluenceMapConstructHelperStorage() noexcept
-  {
-    InitializeHelperNode(gCInfluenceMapConstruct);
-    gCInfluenceMapConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CInfluenceMapThunk);
-    gCInfluenceMapConstruct.mDeleteCallback = &Delete_CInfluenceMap;
-    return &gCInfluenceMapConstruct;
-  }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BDA680 (FUN_00BDA680, sub_BDA680)
+   * Address: 0x00BDA680 (FUN_00BDA680, dynamic initializer for the global
+   * `CInfluenceMapConstruct` singleton)
    *
    * What it does:
-   * Initializes CInfluenceMap construct helper callbacks and binds them into
-   * CInfluenceMap RTTI.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  void register_CInfluenceMapConstruct()
+  CInfluenceMapConstruct::CInfluenceMapConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CInfluenceMapThunk))
+    , mDeleteCallback(&Delete_CInfluenceMap)
+  {}
+
+  CInfluenceMapConstruct::~CInfluenceMapConstruct()
   {
-    CInfluenceMapConstruct* const helper = InitializeCInfluenceMapConstructHelperStorage();
-    helper->RegisterConstructFunction();
+    ResetLinks();
   }
 
   /**
@@ -125,7 +87,7 @@ namespace moho
    * IDA signature:
    * void (__cdecl *__thiscall sub_718AE0(void (__cdecl **this)(void *)))(...);
    */
-  void CInfluenceMapConstruct::RegisterConstructFunction()
+  void CInfluenceMapConstruct::Init()
   {
     gpg::RType* const type = CInfluenceMap::StaticGetClass();
     GPG_ASSERT(type->serConstructFunc_ == nullptr);
@@ -136,13 +98,6 @@ namespace moho
 
 namespace
 {
-  struct CInfluenceMapConstructBootstrap
-  {
-    CInfluenceMapConstructBootstrap()
-    {
-      moho::register_CInfluenceMapConstruct();
-    }
-  };
-
-  CInfluenceMapConstructBootstrap gCInfluenceMapConstructBootstrap;
+  // Address: 0x010B92CC -- process-global `CInfluenceMapConstruct` singleton.
+  moho::CInfluenceMapConstruct gCInfluenceMapConstruct;
 } // namespace
