@@ -7,11 +7,14 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/CRandomStream.h"
-#include "moho/sim/CRandomStreamTypeInfo.h"
+#include "moho/sim/CRandomStreamTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-// Make CRandomStream registration run before default-segment bootstrap objects
-// that query RTTI during static initialization.
+// Make CRandomStream type-info registration run before default-segment
+// bootstrap objects that query RTTI during static initialization. This is
+// orthogonal to CRandomStreamSerializer below: CRandomStreamTypeInfo derives
+// from gpg::RType directly (not gpg::SerHelperBase) and its own real ctor
+// (0x00BC3360) is independently __xc_a-reachable.
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCRandomStreamType()
@@ -24,67 +27,12 @@ namespace
     return type;
   }
 
-  template <typename TObject>
-  void LoadMemberThunk(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<TObject*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    object->MemberDeserialize(archive);
-  }
-
-  template <typename TObject>
-  void SaveMemberThunk(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const object = reinterpret_cast<const TObject*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0040F1D0 (FUN_0040F1D0)
-   *
-   * What it does:
-   * Loads CRandomStream payload through the member deserializer wrapper.
-   */
-  void LoadCRandomStream(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    LoadMemberThunk<moho::CRandomStream>(archive, objectPtr, 0, nullptr);
-  }
-
-  /**
-   * Address: 0x0040F1E0 (FUN_0040F1E0)
-   *
-   * What it does:
-   * Saves CRandomStream payload through the member serializer wrapper.
-   */
-  void SaveCRandomStream(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    SaveMemberThunk<moho::CRandomStream>(archive, objectPtr, 0, nullptr);
-  }
-
   alignas(moho::CRandomStreamTypeInfo) std::byte gCRandomStreamTypeInfoStorage[sizeof(moho::CRandomStreamTypeInfo)]{};
-  alignas(moho::CRandomStreamSerializer) std::byte gCRandomStreamSerializerStorage[sizeof(moho::CRandomStreamSerializer)]{};
   bool gCRandomStreamTypeInfoInitialized = false;
-  bool gCRandomStreamSerializerInitialized = false;
 
   [[nodiscard]] moho::CRandomStreamTypeInfo& CRandomStreamTypeInfoSlot()
   {
     return *reinterpret_cast<moho::CRandomStreamTypeInfo*>(gCRandomStreamTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CRandomStreamSerializer& CRandomStreamSerializerSlot()
-  {
-    return *reinterpret_cast<moho::CRandomStreamSerializer*>(gCRandomStreamSerializerStorage);
   }
 
   /**
@@ -100,31 +48,6 @@ namespace
       gCRandomStreamTypeInfoInitialized = false;
     }
   }
-
-  /**
-   * Address: 0x00BEE780 (FUN_00BEE780, ??1CRandomStreamSerializer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for CRandomStream serializer helper storage.
-   */
-  void cleanup_CRandomStreamSerializer()
-  {
-    if (gCRandomStreamSerializerInitialized) {
-      CRandomStreamSerializerSlot().~CRandomStreamSerializer();
-      gCRandomStreamSerializerInitialized = false;
-    }
-  }
-
-  struct CRandomStreamReflectionRegistration
-  {
-    CRandomStreamReflectionRegistration()
-    {
-      moho::register_CRandomStreamTypeInfo();
-      moho::register_CRandomStreamSerializer();
-    }
-  };
-
-  CRandomStreamReflectionRegistration gCRandomStreamReflectionRegistration;
 } // namespace
 
 namespace moho
@@ -146,25 +69,55 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC3380 (FUN_00BC3380, register_CRandomStreamSerializer)
+   * Address: 0x00BC3380 (FUN_00BC3380, dynamic initializer for the global
+   * `CRandomStreamSerializer` singleton)
    *
    * What it does:
-   * Startup thunk that initializes CRandomStream serializer helper lanes and
-   * registers process-exit teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_CRandomStreamSerializer()
+  CRandomStreamSerializer::CRandomStreamSerializer()
+    : mLoadCallback(&CRandomStreamSerializer::Deserialize)
+    , mSaveCallback(&CRandomStreamSerializer::Serialize)
+  {}
+
+  CRandomStreamSerializer::~CRandomStreamSerializer()
   {
-    CRandomStreamSerializer& serializer = CRandomStreamSerializerSlot();
-    if (!gCRandomStreamSerializerInitialized) {
-      new (&serializer) CRandomStreamSerializer();
-      gCRandomStreamSerializerInitialized = true;
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x0040F1D0 (FUN_0040F1D0, Moho::CRandomStreamSerializer::Deserialize)
+   */
+  void CRandomStreamSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<CRandomStream*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(object != nullptr);
+    if (!archive || !object) {
+      return;
     }
 
-    serializer.mHelperNext = nullptr;
-    serializer.mHelperPrev = nullptr;
-    serializer.mLoadCallback = &LoadCRandomStream;
-    serializer.mSaveCallback = &SaveCRandomStream;
-    (void)std::atexit(&cleanup_CRandomStreamSerializer);
+    object->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0040F1E0 (FUN_0040F1E0, Moho::CRandomStreamSerializer::Serialize)
+   */
+  void CRandomStreamSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
+  )
+  {
+    const auto* const object = reinterpret_cast<const CRandomStream*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(object != nullptr);
+    if (!archive || !object) {
+      return;
+    }
+
+    object->MemberSerialize(archive);
   }
 
   /**
@@ -173,7 +126,7 @@ namespace moho
    * What it does:
    * Resolves CRandomStream RTTI and installs load/save callbacks from this helper.
    */
-  void CRandomStreamSerializer::RegisterSerializeFunctions()
+  void CRandomStreamSerializer::Init()
   {
     gpg::RType* const type = CachedCRandomStreamType();
     GPG_ASSERT(type != nullptr);
@@ -184,6 +137,11 @@ namespace moho
   }
 } // namespace moho
 
+namespace
+{
+  // Address: 0x010A6A14 -- process-global `CRandomStreamSerializer` singleton.
+  moho::CRandomStreamSerializer gCRandomStreamSerializer;
+} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

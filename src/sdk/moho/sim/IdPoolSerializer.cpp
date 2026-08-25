@@ -6,17 +6,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/IdPool.h"
 
-// Keep IdPool serializer registration in the lib init segment so runtime
-// bootstrap sees the callbacks before first IdPool RTTI lookup.
-namespace moho
-{
-  void register_IdPoolSerializer();
-}
-
 namespace
 {
-  extern moho::IdPoolSerializer gIdPoolSerializer;
-
   [[nodiscard]] gpg::RType* CachedIdPoolType()
   {
     gpg::RType* type = moho::IdPool::sType;
@@ -27,102 +18,50 @@ namespace
     GPG_ASSERT(type != nullptr);
     return type;
   }
-
-  /**
-   * Address: 0x00403B90 (FUN_00403B90, Moho::IdPoolSerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards archive loading to `IdPool::MemberDeserialize`.
-   */
-  void DeserializeIdPool(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<moho::IdPool*>(objectPtr);
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00403BA0 (FUN_00403BA0, Moho::IdPoolSerializer::Serialize)
-   *
-   * What it does:
-   * Forwards archive saving to `IdPool::MemberSerialize`.
-   */
-  void SerializeIdPool(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const object = reinterpret_cast<const moho::IdPool*>(objectPtr);
-    object->MemberSerialize(archive);
-  }
-
-  struct SerHelperNode
-  {
-    SerHelperNode* prev;
-    SerHelperNode* next;
-
-    void ListUnlink()
-    {
-      if (!prev || !next) {
-        prev = this;
-        next = this;
-        return;
-      }
-
-      next->prev = prev;
-      prev->next = next;
-      prev = this;
-      next = this;
-    }
-  };
-
-  [[nodiscard]] SerHelperNode* SerializerNode(moho::IdPoolSerializer* const serializer)
-  {
-    return reinterpret_cast<SerHelperNode*>(&serializer->mHelperNext);
-  }
-
-  /**
-   * Address: 0x00BEE060 (FUN_00BEE060, ??1IdPoolSerializer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unlinks global IdPool serializer helper node from intrusive registration list.
-   */
-  void cleanup_IdPoolSerializer()
-  {
-    SerializerNode(&gIdPoolSerializer)->ListUnlink();
-  }
-
-  moho::IdPoolSerializer gIdPoolSerializer;
-
-  struct IdPoolSerializerRegistration
-  {
-    IdPoolSerializerRegistration()
-    {
-      moho::register_IdPoolSerializer();
-    }
-  };
-
-  IdPoolSerializerRegistration gIdPoolSerializerRegistration;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BC2DA0 (FUN_00BC2DA0, register_IdPoolSerializer)
+   * Address: 0x00BC2DA0 (FUN_00BC2DA0, dynamic initializer for the global
+   * `IdPoolSerializer` singleton)
    *
    * What it does:
-   * Materializes startup `IdPoolSerializer` storage, installs serializer
-   * callback lanes, and registers process-exit teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void register_IdPoolSerializer()
+  IdPoolSerializer::IdPoolSerializer()
+    : mLoadCallback(&IdPoolSerializer::Deserialize)
+    , mSaveCallback(&IdPoolSerializer::Serialize)
+  {}
+
+  IdPoolSerializer::~IdPoolSerializer()
   {
-    gIdPoolSerializer.mHelperNext = nullptr;
-    gIdPoolSerializer.mHelperPrev = nullptr;
-    gIdPoolSerializer.mLoadCallback = &DeserializeIdPool;
-    gIdPoolSerializer.mSaveCallback = &SerializeIdPool;
-    (void)std::atexit(&cleanup_IdPoolSerializer);
+    ResetLinks();
+  }
+
+  /**
+   * Address: 0x00403B90 (FUN_00403B90, Moho::IdPoolSerializer::Deserialize)
+   */
+  void IdPoolSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const object = reinterpret_cast<IdPool*>(objectPtr);
+    object->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00403BA0 (FUN_00403BA0, Moho::IdPoolSerializer::Serialize)
+   */
+  void IdPoolSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    const auto* const object = reinterpret_cast<const IdPool*>(objectPtr);
+    object->MemberSerialize(archive);
   }
 
   /**
    * Address: 0x00403DC0 (FUN_00403DC0, gpg::SerSaveLoadHelper<class Moho::IdPool>::Init)
    */
-  void IdPoolSerializer::RegisterSerializeFunctions()
+  void IdPoolSerializer::Init()
   {
     gpg::RType* const type = CachedIdPoolType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -131,3 +70,9 @@ namespace moho
     type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010A6584 -- process-global `IdPoolSerializer` singleton.
+  moho::IdPoolSerializer gIdPoolSerializer;
+} // namespace
