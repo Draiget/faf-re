@@ -170,6 +170,30 @@ namespace
 
   struct TerrainEnvironmentLookupNodeRuntimeView : msvc8::Tree<TerrainEnvironmentLookupNodeRuntimeView>
   {
+    /**
+     * Address: 0x008A9490 (FUN_008A9490)
+     *
+     * IDA signature:
+     * void *__cdecl sub_8A9490(void);
+     *
+     * What it does:
+     * Checked node allocator for this map's node type: buys one 0x50-byte
+     * node, then defensively zero-initializes the left/parent/right
+     * intrusive-tree pointers one at a time (each write guarded against the
+     * allocation having landed at the very top of the address space, where
+     * the pointer-plus-offset could itself read as -4/-8 and fault) before
+     * setting color=1/isNil=0. The caller then self-links the three
+     * pointers to itself and promotes isNil to 1 to turn the fresh node
+     * into the empty-tree head sentinel -- the same "checked
+     * node-allocate-and-default-init, caller promotes isNil and self-links"
+     * shape already documented on `gpg::WriteArchive`'s ctor
+     * (`WriteArchive.cpp`, FUN_00950540) and `CAiFormationInstance.cpp`'s
+     * default formation-lane entry. Reached from the terrain-resource ctor
+     * (0x008A0AD0, `ConstructTerrainResFields` below) via `v1 =
+     * sub_8A9490(); mEnvLookup.mHead = v1; v1->isNil = 1; ...` self-links;
+     * collapsed here into this one constructor since it performs both the
+     * allocate-and-init and the promote-and-self-link steps together.
+     */
     TerrainEnvironmentLookupNodeRuntimeView()
       : mKey()
       , mValue(msvc8::string(), boost::shared_ptr<moho::RD3DTextureResource>{})
