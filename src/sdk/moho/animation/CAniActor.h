@@ -190,9 +190,24 @@ namespace moho
     TDatList<IAniManipulator, void> mManipulatorsByPrecedence; // +0x10
   };
 
-  class CAniActorConstruct
+  class CAniActorConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD2B20 (FUN_00BD2B20, dynamic initializer for the global
+     * `CAniActorConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CAniActorConstruct();
+
+    /**
+     * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
+     */
+    ~CAniActorConstruct();
+
     /**
      * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
      *
@@ -210,18 +225,16 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x0063C190 (FUN_0063C190, sub_63C190)
+     * Address: 0x0063C190 (FUN_0063C190, Moho::CAniActorConstruct::Init)
      *
      * What it does:
      * Installs construct/delete callbacks into `CAniActor` RTTI.
      */
-    virtual void RegisterConstructFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
   /**
@@ -283,14 +296,6 @@ namespace moho
   void register_CAniActorTypeInfo();
 
   /**
-   * Address: 0x00BD2B20 (FUN_00BD2B20, register_CAniActorConstruct)
-   *
-   * What it does:
-   * Initializes global construct helper callbacks and installs exit cleanup.
-   */
-  void register_CAniActorConstruct();
-
-  /**
    * Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer)
    *
    * What it does:
@@ -309,8 +314,6 @@ namespace moho
     "CAniActor::mManipulatorsByPrecedence offset must be 0x10"
   );
   static_assert(sizeof(CAniActor) == 0x18, "CAniActor size must be 0x18");
-  static_assert(offsetof(CAniActorConstruct, mHelperNext) == 0x04, "CAniActorConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CAniActorConstruct, mHelperPrev) == 0x08, "CAniActorConstruct::mHelperPrev offset must be 0x08");
   static_assert(
     offsetof(CAniActorConstruct, mSerConstructFunc) == 0x0C,
     "CAniActorConstruct::mSerConstructFunc offset must be 0x0C"
