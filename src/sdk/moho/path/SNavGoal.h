@@ -58,11 +58,14 @@ namespace moho
     /**
      * Address: 0x0050CDB0 (FUN_0050CDB0, Moho::SNavGoal::MemberDeserialize)
      *
+     * IDA signature:
+     * void __usercall Moho::SNavGoal::MemberDeserialize(Moho::SNavGoal *a1@<eax>, gpg::ReadArchive *a2@<ebx>);
+     *
      * What it does:
      * Loads the first rectangle, secondary rectangle, and layer payload in
      * exact binary archive order.
      */
-    static void MemberDeserialize(SNavGoal* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x0050CE60 (FUN_0050CE60, Moho::SNavGoal::MemberSerialize)
@@ -71,7 +74,7 @@ namespace moho
      * Stores the first rectangle, secondary rectangle, and layer payload in
      * exact binary archive order.
      */
-    static void MemberSerialize(const SNavGoal* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   using SAiNavigatorGoal = SNavGoal;
@@ -130,49 +133,22 @@ namespace moho
   };
 
   /**
-   * Serializer helper for `SNavGoal` archive lanes.
+   * VFTABLE: 0x00E0DDB4
+   *
+   * Demangled: gpg::SerSaveLoadHelper<struct Moho::SNavGoal>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_SNavGoalSerializer`):
+   *    0x00BC7DA0 (__xc_a-reachable; dead zero-xref COMDAT duplicates:
+   *    0x0050C190, 0x0050C840)
+   *  - dtor: 0x00BF2230 (`??1SNavGoalSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0050C870
+   *  - Deserialize(): 0x0050C170
+   *  - Serialize(): 0x0050C180
    */
-  class SNavGoalSerializer
-  {
-  public:
-    /**
-     * Address: 0x0050C170 (FUN_0050C170, Moho::SNavGoalSerializer::Deserialize)
-     *
-     * What it does:
-     * Forwards archive loading to `SNavGoal::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, SNavGoal* goal);
+  using SNavGoalSerializer = gpg::SerSaveLoadHelper<SNavGoal>;
 
-    /**
-     * Address: 0x0050C180 (FUN_0050C180, Moho::SNavGoalSerializer::Serialize)
-     *
-     * What it does:
-     * Forwards archive saving to `SNavGoal::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, SNavGoal* goal);
-
-    /**
-     * Address: 0x0050C870 (FUN_0050C870, Moho::SNavGoalSerializer::RegisterSerializeFunctions)
-     *
-     * What it does:
-     * Binds the serializer callbacks into `SNavGoal` RTTI.
-     */
-    void RegisterSerializeFunctions();
-
-    virtual ~SNavGoalSerializer() noexcept;
-
-  public:
-    gpg::SerHelperBase* mHelperNext;       // +0x04
-    gpg::SerHelperBase* mHelperPrev;       // +0x08
-    gpg::RType::load_func_t mDeserialize;  // +0x0C
-    gpg::RType::save_func_t mSerialize;    // +0x10
-  };
-
-  static_assert(offsetof(SNavGoalSerializer, mHelperNext) == 0x04, "SNavGoalSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(SNavGoalSerializer, mHelperPrev) == 0x08, "SNavGoalSerializer::mHelperPrev offset must be 0x08");
-  static_assert(offsetof(SNavGoalSerializer, mDeserialize) == 0x0C, "SNavGoalSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(SNavGoalSerializer, mSerialize) == 0x10, "SNavGoalSerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(SNavGoalSerializer) == 0x14, "SNavGoalSerializer size must be 0x14");
   static_assert(sizeof(SNavGoalTypeInfo) == 0x64, "SNavGoalTypeInfo size must be 0x64");
 
   /**
@@ -187,8 +163,13 @@ namespace moho
    * Address: 0x00BC7DA0 (FUN_00BC7DA0, register_SNavGoalSerializer)
    *
    * What it does:
-   * Installs serializer callbacks for `SNavGoal` and registers shutdown
-   * unlink/destruction.
+   * Forces this translation unit's global `SNavGoalSerializer` instance to
+   * link into the reflection bootstrap sequence ahead of default-segment
+   * consumers that query SNavGoal RTTI during static initialization. The
+   * ctor/vtable-install/atexit-dtor-registration sequence this address
+   * decompiles to is MSVC's own compiler-generated dynamic initializer for
+   * that global, not hand-written source -- see `gpg::SerSaveLoadHelper<T>`
+   * in Reflection.h.
    */
   void register_SNavGoalSerializer();
 } // namespace moho
