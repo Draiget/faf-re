@@ -266,99 +266,134 @@ namespace
    * `PathQueueSerializerHelper` / `PathQueueImplSerializerHelper`
    * (moho/path/PathTables.cpp).
    *
-   * `gNavPathSerializerHelper` below is deliberately left as-is (still dead,
-   * still unwired): its real `Init()` is confirmed by the same raw-asm
-   * method (0x00763370, typeid-cached lookup, not `REF_FindTypeNamed`), but
-   * wiring it correctly requires first resolving what concrete C++ type
-   * `Moho::NavPath` (RTTI name, no "S" prefix) actually is -- it is NOT the
-   * same type as the already-declared `moho::SNavPath` (0x10-byte struct in
-   * IAiNavigator.h). See
-   * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md
-   * for the full writeup, including a pre-existing `typeid(SNavPath)` vs.
-   * `typeid(NavPath)` mismatch this investigation found (but did not fix) in
-   * `moho/path/NavPathTypeInfo.cpp`.
+   * Demangled: gpg::SerSaveLoadHelper<class std::vector<Moho::HPathCell>>
    *
-   * This placeholder is intentionally self-contained (its own local struct
-   * + inline unlink bodies below) rather than sharing the generic
-   * `SerSaveLoadHelperNodeRuntime`/`UnlinkSerSaveLoadHelperNode` apparatus
-   * every other consumer in this file used to lean on -- that apparatus had
-   * zero remaining consumers once HPathCell/PathQueue/PathQueueImpl moved
-   * to real classes and has been deleted, per "0 vtable pointers as void*
-   * in the whole project."
+   * `NavPathSerializer` (real ctor `register_NavPathSerializer`,
+   * 0x00BDC690, confirmed via vtable_writers class_name
+   * `NavPathSerializer@Moho`) is the previously-deferred one from the same
+   * investigation. It is now fully recovered: raw asm for `Deserialize`
+   * (0x00763190) and `Serialize` (0x007631D0) shows both operate through
+   * the `std::vector<Moho::HPathCell>` RType (`gpg::LookupRType(typeid(
+   * msvc8::vector<moho::HPathCell>))`, cached), calling `archive->Read/
+   * Write(type, objectPtr, RRef{})` directly on the raw object pointer with
+   * NO field-offset adjustment and a *fresh empty* owner ref (the real
+   * caller's owner ref is not forwarded) -- so this recovery does not need
+   * to open up or reinterpret `moho::SNavPath`'s own fields at all; it just
+   * has to resolve the right RType and forward the archive call, exactly
+   * like every other vector-of-leaf serializer in this file.
+   *
+   * One real, still-open discrepancy this investigation surfaced but did
+   * NOT fix (out of scope for this recovery, doesn't affect its
+   * correctness): `moho::SNavPath` (`moho/ai/IAiNavigator.h`) types its
+   * `start`/`finish`/`capacity` triple as `SOCellPos*`, but the RTTI
+   * evidence above proves the real element type is `HPathCell`. Both are
+   * plain `{int16 x; int16 z;}`-shaped 4-byte cells (`SOCellPos` signed,
+   * `HPathCell` unsigned) so the byte layout is identical either way and
+   * nothing here is unsafe -- but `SNavPath`'s own typing is very likely a
+   * pre-existing naming mistake worth a dedicated pass (would ripple into
+   * `AppendCells`/`PrependCells`/`AssignCopy`'s `SOCellPos*` parameters and
+   * every caller of those methods, so not rushed here).
    */
-  struct NavPathSerializerDeadNodeRuntime
+  class NavPathSerializer : public gpg::SerHelperBase
   {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    void* mLoadCallback = nullptr;
-    void* mSaveCallback = nullptr;
+  public:
+    /**
+     * Address: 0x00BDC690 (FUN_00BDC690, register_NavPathSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. The ctor's atexit target (`sub_C01770`)
+     * is a plain unlink thunk, not a mangled destructor, so it is modeled
+     * as the compiler's implicit static-destructor registration rather
+     * than an explicit call.
+     */
+    NavPathSerializer();
+
+    /**
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state.
+     */
+    ~NavPathSerializer();
+
+    /**
+     * Address: 0x00763190 (FUN_00763190, Moho::NavPathSerializer::Deserialize)
+     *
+     * What it does:
+     * Reads one `std::vector<HPathCell>` payload directly at `objectPtr`
+     * through the reflected vector type. `version` and the incoming
+     * `ownerRef` are unused -- the real body passes a fresh empty `RRef`
+     * to the nested archive call rather than forwarding either.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x007631D0 (FUN_007631D0, Moho::NavPathSerializer::Serialize)
+     *
+     * What it does:
+     * Writes one `std::vector<HPathCell>` payload directly at `objectPtr`
+     * through the reflected vector type, mirroring `Deserialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00763370 (FUN_00763370, gpg::SerSaveLoadHelper_NavPath::Init)
+     *
+     * What it does:
+     * Lazily resolves the `Moho::NavPath` RTTI (registered under
+     * `typeid(moho::SNavPath)` by `NavPathTypeInfo`, whose `GetName()`
+     * returns `"NavPath"`) and installs load/save callbacks from this
+     * helper object into the type descriptor.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
   };
-  static_assert(
-    offsetof(NavPathSerializerDeadNodeRuntime, mNext) == 0x04,
-    "NavPathSerializerDeadNodeRuntime::mNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(NavPathSerializerDeadNodeRuntime, mPrev) == 0x08,
-    "NavPathSerializerDeadNodeRuntime::mPrev offset must be 0x08"
-  );
-  static_assert(
-    sizeof(NavPathSerializerDeadNodeRuntime) == 0x14, "NavPathSerializerDeadNodeRuntime size must be 0x14"
-  );
+  static_assert(offsetof(NavPathSerializer, mLoadCallback) == 0x0C, "NavPathSerializer::mLoadCallback offset must be 0x0C");
+  static_assert(offsetof(NavPathSerializer, mSaveCallback) == 0x10, "NavPathSerializer::mSaveCallback offset must be 0x10");
+  static_assert(sizeof(NavPathSerializer) == 0x14, "NavPathSerializer size must be 0x14");
 
-  NavPathSerializerDeadNodeRuntime gNavPathSerializerHelper{};
+  NavPathSerializer::NavPathSerializer()
+    : mLoadCallback(&NavPathSerializer::Deserialize)
+    , mSaveCallback(&NavPathSerializer::Serialize)
+  {}
+
+  NavPathSerializer::~NavPathSerializer()
+  {
+    ResetLinks();
+  }
+
+  void NavPathSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
+  {
+    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    const gpg::RRef emptyOwner{};
+    archive->Read(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
+  }
+
+  void NavPathSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
+  {
+    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    const gpg::RRef emptyOwner{};
+    archive->Write(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
+  }
+
+  void NavPathSerializer::Init()
+  {
+    gpg::RType* const type = CachedCompatRType<moho::SNavPath>();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  NavPathSerializer gNavPathSerializerHelper;
   SPathNeighborSerializer gSPathNeighborSerializerHelper;
-
-  /**
-   * Address: 0x00763240 (FUN_00763240)
-   *
-   * What it does:
-   * Unlinks startup `NavPathSerializer` helper links and rewires the node into
-   * one self-linked sentinel lane.
-   */
-  [[maybe_unused]] void UnlinkNavPathSerializerNodeVariantA() noexcept
-  {
-    gNavPathSerializerHelper.mNext->mPrev = gNavPathSerializerHelper.mPrev;
-    gNavPathSerializerHelper.mPrev->mNext = gNavPathSerializerHelper.mNext;
-    auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gNavPathSerializerHelper.mNext);
-    gNavPathSerializerHelper.mPrev = self;
-    gNavPathSerializerHelper.mNext = self;
-  }
-
-  /**
-   * Address: 0x00763270 (FUN_00763270)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `NavPathSerializer` helper links.
-   */
-  [[maybe_unused]] void UnlinkNavPathSerializerNodeVariantB() noexcept
-  {
-    UnlinkNavPathSerializerNodeVariantA();
-  }
-
-  /**
-   * Address: 0x0076D500 (FUN_0076D500)
-   *
-   * What it does:
-   * Unlinks startup `SPathNeighborSerializer` helper links and rewires the
-   * node into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] void UnlinkSPathNeighborSerializerNodeVariantA() noexcept
-  {
-    gSPathNeighborSerializerHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0076D530 (FUN_0076D530)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `SPathNeighborSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] void UnlinkSPathNeighborSerializerNodeVariantB() noexcept
-  {
-    gSPathNeighborSerializerHelper.ResetLinks();
-  }
 
   [[nodiscard]] gpg::RType* ResolveHPathCellSerializerType()
   {
