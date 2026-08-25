@@ -19,12 +19,15 @@ namespace moho
      *
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
+     * load/save callback fields. The ctor's atexit target (0x00BFE4E0) is
+     * a plain unlink thunk (IDA name `sub_BFE4E0`, no mangled destructor
+     * symbol exists for this class), so it is modeled as the compiler's
+     * implicit static-destructor registration rather than an explicit call.
      */
     WeakUnitSetSerializer();
 
     /**
-     * Address: 0x00BFE4E0 (FUN_00BFE4E0, ??1WeakUnitSetSerializer@Moho@@QAE@@Z)
+     * Address: 0x00BFE4E0 (FUN_00BFE4E0, sub_BFE4E0)
      *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
