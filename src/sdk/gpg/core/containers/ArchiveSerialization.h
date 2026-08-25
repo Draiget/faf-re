@@ -246,4 +246,27 @@ namespace gpg
    * the binary's only reference to this body.
    */
   void SaveFastVectorUnitWeaponInfo(WriteArchive* archive, int objectPtr, int version, RRef* ownerRef);
+
+  /**
+   * Address: 0x005C5860 (FUN_005C5860)
+   *
+   * What it does:
+   * Writes one contiguous `vector<SPerArmyReconInfo>` payload by saving the
+   * element count and each reflected lane in order. Declared here so
+   * `SPerArmyReconInfoVectorTypeRuntime::Init` (ReconBlipTypeInfo.cpp) can
+   * bind it into `serSaveFunc_`.
+   */
+  void SaveVectorSPerArmyReconInfo(WriteArchive* archive, int objectPtr, int version, RRef* ownerRef);
+
+  /**
+   * Address: 0x005C5700 (FUN_005C5700)
+   *
+   * What it does:
+   * Reads one contiguous `vector<SPerArmyReconInfo>` payload by reading the
+   * element count and that many reflected lanes into a fresh temporary
+   * vector, which replaces the destination vector's storage. Declared here
+   * so `SPerArmyReconInfoVectorTypeRuntime::Init` (ReconBlipTypeInfo.cpp)
+   * can bind it into `serLoadFunc_`.
+   */
+  void LoadVectorSPerArmyReconInfo(ReadArchive* archive, int objectPtr, int version, RRef* ownerRef);
 } // namespace gpg

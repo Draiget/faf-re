@@ -4,6 +4,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/ReconBlip.h"
@@ -69,10 +70,22 @@ namespace
       return this;
     }
 
+    /**
+     * Address: 0x005C3EF0 (FUN_005C3EF0, gpg::RVectorType_SPerArmyReconInfo::Init)
+     *
+     * What it does:
+     * Records the element byte-size (16 = `sizeof(msvc8::vector<
+     * moho::SPerArmyReconInfo>)`), version 1, and installs the element
+     * (de)serialize callbacks (`serSaveFunc_ = &gpg::SaveVectorSPerArmyReconInfo`,
+     * `serLoadFunc_ = &gpg::LoadVectorSPerArmyReconInfo`) -- mirrors
+     * `gpg::RVectorType<moho::SimArmy*>::Init` (Reflection.cpp).
+     */
     void Init() override
     {
       size_ = sizeof(msvc8::vector<moho::SPerArmyReconInfo>);
       version_ = 1;
+      serSaveFunc_ = &gpg::SaveVectorSPerArmyReconInfo;
+      serLoadFunc_ = &gpg::LoadVectorSPerArmyReconInfo;
     }
 
     gpg::RRef SubscriptIndex(void* const obj, const int ind) const override
