@@ -72,245 +72,29 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00648B10 (FUN_00648B10)
-   *
-   * What it does:
-   * Deserializes one `CSlideManipulator` lane by loading `IAniManipulator`
-   * base state, current/goal vectors, scalar motion parameters, and the
-   * world-units flag.
-   */
-  void DeserializeCSlideManipulatorSerializerBody(
-    moho::CSlideManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
-
-    gpg::RType* const vectorType = CachedVector3fSerializationType();
-    archive->Read(vectorType, &manipulator->mCurrentPosition, owner);
-    archive->Read(vectorType, &manipulator->mGoal, owner);
-
-    archive->ReadFloat(&manipulator->mSpeed);
-    archive->ReadFloat(&manipulator->mCurrentSpeed);
-    archive->ReadFloat(&manipulator->mAcceleration);
-    archive->ReadFloat(&manipulator->mDeceleration);
-
-    bool worldUnits = manipulator->mWorldUnits != 0u;
-    archive->ReadBool(&worldUnits);
-    manipulator->mWorldUnits = worldUnits ? 1u : 0u;
-  }
-
-  /**
-   * Address: 0x00648C20 (FUN_00648C20)
-   *
-   * What it does:
-   * Serializes one `CSlideManipulator` lane by writing `IAniManipulator` base
-   * state, current/goal vectors, scalar motion parameters, and the world-units
-   * flag.
-   */
-  void SerializeCSlideManipulatorSerializerBody(
-    const moho::CSlideManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (!archive || !manipulator) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    archive->Write(
-      CachedIAniManipulatorType(),
-      const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(manipulator)),
-      owner
-    );
-
-    gpg::RType* const vectorType = CachedVector3fSerializationType();
-    archive->Write(vectorType, &manipulator->mCurrentPosition, owner);
-    archive->Write(vectorType, &manipulator->mGoal, owner);
-
-    archive->WriteFloat(manipulator->mSpeed);
-    archive->WriteFloat(manipulator->mCurrentSpeed);
-    archive->WriteFloat(manipulator->mAcceleration);
-    archive->WriteFloat(manipulator->mDeceleration);
-    archive->WriteBool(manipulator->mWorldUnits != 0u);
-  }
-
-  /**
-   * Address: 0x006486D0 (FUN_006486D0)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards slide manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerThunkAliasA(
-    moho::CSlideManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x006486E0 (FUN_006486E0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards slide manipulator serialize lanes into the
-   * shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCSlideManipulatorSerializerThunkAliasA(
-    const moho::CSlideManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00648900 (FUN_00648900)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards slide manipulator deserialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerThunkAliasB(
-    moho::CSlideManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00648910 (FUN_00648910)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards slide manipulator serialize lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCSlideManipulatorSerializerThunkAliasB(
-    const moho::CSlideManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  struct CSlideManipulatorSerializerHelperNode
-  {
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
-  };
-  static_assert(sizeof(CSlideManipulatorSerializerHelperNode) == 0x10, "CSlideManipulatorSerializerHelperNode size must be 0x10");
-
-  CSlideManipulatorSerializerHelperNode gCSlideManipulatorSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
-  {
-    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
-      helper.mNext->mPrev = helper.mPrev;
-      helper.mPrev->mNext = helper.mNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  void DeserializeCSlideManipulatorSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const manipulator = reinterpret_cast<moho::CSlideManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  void SerializeCSlideManipulatorSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto* const manipulator = reinterpret_cast<const moho::CSlideManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00648490 (FUN_00648490)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CSlideManipulator` serializer helper
-   * storage and returns that helper object.
-   */
-  [[nodiscard]] CSlideManipulatorSerializerHelperNode* InitializeCSlideManipulatorSerializerStartupThunk()
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gCSlideManipulatorSerializer);
-    gCSlideManipulatorSerializer.mPrev = self;
-    gCSlideManipulatorSerializer.mNext = self;
-    gCSlideManipulatorSerializer.mSerLoadFunc = &DeserializeCSlideManipulatorSerializerCallback;
-    gCSlideManipulatorSerializer.mSerSaveFunc = &SerializeCSlideManipulatorSerializerCallback;
-    return &gCSlideManipulatorSerializer;
-  }
-
-  /**
-   * Address: 0x00646FC0 (FUN_00646FC0)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CSlideManipulator serializer helper node.
-   */
-  gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(gCSlideManipulatorSerializer);
-  }
-
-  /**
-   * Address: 0x00646FF0 (FUN_00646FF0)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CSlideManipulator serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(gCSlideManipulatorSerializer);
-  }
-
-  void cleanup_CSlideManipulatorSerializer_atexit()
-  {
-    (void)cleanup_CSlideManipulatorSerializerStartupThunkA();
-  }
+  // Address: 0x00BD34C0 (FUN_00BD34C0, register_CSlideManipulatorSerializer)
+  // -- MSVC's own compiler-generated dynamic initializer for this global runs
+  // the real `gpg::SerSaveLoadHelper<CSlideManipulator>` ctor (self-links
+  // into `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback` to the
+  // template's `Deserialize`/`Serialize`, installs the vtable) and registers
+  // the real mangled destructor (`??1CSlideManipulatorSerializer@Moho@@QAE@@Z`,
+  // 0x00BFB2C0) via `atexit`. Dead zero-xref COMDAT duplicate ctor:
+  // 0x00648490.
+  moho::CSlideManipulatorSerializer gCSlideManipulatorSerializer;
 
   /**
    * Address: 0x00BD34C0 (FUN_00BD34C0, register_CSlideManipulatorSerializer)
    *
    * What it does:
-   * Initializes the global `CSlideManipulator` serializer helper callbacks
-   * and installs process-exit cleanup.
+   * Forces this translation unit's global `CSlideManipulatorSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (CSlideManipulator.h) and on
+   * `gCSlideManipulatorSerializer` above for why this function's body has no
+   * field-setting logic of its own.
    */
   void register_CSlideManipulatorSerializer()
   {
-    (void)InitializeCSlideManipulatorSerializerStartupThunk();
-    (void)std::atexit(&cleanup_CSlideManipulatorSerializer_atexit);
+    (void)gCSlideManipulatorSerializer;
   }
 
   struct CSlideManipulatorSerializerStartupBootstrap
@@ -638,6 +422,65 @@ namespace moho
   gpg::RType* CSlideManipulator::sType = nullptr;
   CScrLuaMetatableFactory<CSlideManipulator> CScrLuaMetatableFactory<CSlideManipulator>::sInstance{};
 } // namespace moho
+
+/**
+ * Address: 0x00648B10 (FUN_00648B10, Moho::CSlideManipulator::MemberDeserialize)
+ *
+ * What it does:
+ * Loads `IAniManipulator` base state, current/goal vectors, scalar motion
+ * parameters, and the world-units flag.
+ */
+void moho::CSlideManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+
+  gpg::RType* const vectorType = CachedVector3fSerializationType();
+  archive->Read(vectorType, &mCurrentPosition, owner);
+  archive->Read(vectorType, &mGoal, owner);
+
+  archive->ReadFloat(&mSpeed);
+  archive->ReadFloat(&mCurrentSpeed);
+  archive->ReadFloat(&mAcceleration);
+  archive->ReadFloat(&mDeceleration);
+
+  bool worldUnits = mWorldUnits != 0u;
+  archive->ReadBool(&worldUnits);
+  mWorldUnits = worldUnits ? 1u : 0u;
+}
+
+/**
+ * Address: 0x00648C20 (FUN_00648C20, Moho::CSlideManipulator::MemberSerialize)
+ *
+ * What it does:
+ * Saves `IAniManipulator` base state, current/goal vectors, scalar motion
+ * parameters, and the world-units flag.
+ */
+void moho::CSlideManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  archive->Write(
+    CachedIAniManipulatorType(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
+  );
+
+  gpg::RType* const vectorType = CachedVector3fSerializationType();
+  archive->Write(vectorType, &mCurrentPosition, owner);
+  archive->Write(vectorType, &mGoal, owner);
+
+  archive->WriteFloat(mSpeed);
+  archive->WriteFloat(mCurrentSpeed);
+  archive->WriteFloat(mAcceleration);
+  archive->WriteFloat(mDeceleration);
+  archive->WriteBool(mWorldUnits != 0u);
+}
 
 /**
   * Alias of FUN_10015880 (non-canonical helper lane).
