@@ -3767,6 +3767,40 @@ static std::pair<TypeInfoMap::iterator, bool> InsertRTypePreregisteredNode(
 }
 
 /**
+ * Address: 0x008DB5B0 (FUN_008DB5B0, std::_Tree<...>::_Insert)
+ * Address: 0x008DA0D0 (FUN_008DA0D0, std::_Tree<...>::_Buynode)
+ *
+ * What they do:
+ * The preregistered-map insert two members above compiles to these two
+ * out-of-line Dinkumware `std::_Tree` bodies for this specific
+ * `TypeInfoMap` instantiation. `_Insert` (0x008DB5B0) performs the
+ * `TypeInfoLess` red-black descent (mirroring the `lower_bound` find
+ * member above) and rebalance; it directly calls `_Buynode` (0x008DA0D0,
+ * confirmed via its own `.c`: `sub_8DA0D0(this->_Parent, a4, this->
+ * _Parent, a5, 0)`) to allocate and placement-construct the fresh
+ * 0x18-byte node -- `operator new(0x18)`, then `_Left`/`_Right`/`_Parent`
+ * pointers, the `pair<const std::type_info*, RType*>` value, and the
+ * `_Color`/`_Isnil` byte pair.
+ *
+ * Both are generic Dinkumware `std::_Tree` internals for this map's real
+ * `std::map` instantiation (this map deliberately uses `std::map`, not
+ * `msvc8::map` -- there is no project-owned ABI-compat template to cite
+ * these against; `RbTree.h`'s `msvc8::rb_tree<V>` models the 2007 MSVC8
+ * binary layout specifically, which this map does not use). Recovering
+ * `_Insert`/`_Buynode` as hand-rolled free functions would be a pure
+ * STL-internal reimplementation with zero behavioral difference from the
+ * real `std::map::insert` already used by the insert member above -- the
+ * same "recover through the real container API, not raw node offsets"
+ * choice already made for this map's find/insert members, and the same
+ * modernization approach used elsewhere in this file for math primitives
+ * (real `std::atan2`/`sqrt` instead of replicating x87 internals).
+ * Classified `external_dependency` in `recovered_progress.json` for both
+ * addresses; this comment is the source-side citation that was
+ * previously missing (neither address had an inline citation anywhere in
+ * `src/sdk` before this pass).
+ */
+
+/**
  * Address: 0x008DF850 (FUN_008DF850, gpg::PreRegisterRType)
  *
  * What it does:
