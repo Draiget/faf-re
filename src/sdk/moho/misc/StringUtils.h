@@ -3,6 +3,7 @@
 #include <locale>
 
 #include "gpg/core/containers/String.h"
+#include "legacy/containers/Set.h"
 #include "legacy/containers/Vector.h"
 
 namespace msvc8
@@ -22,6 +23,17 @@ namespace moho
    * Writes into out (appends).
    */
   void SplitByComma(const msvc8::string& src, msvc8::vector<msvc8::string>& out);
+
+  /**
+   * Split by any character present in `separators`, trim tokens, skip empty.
+   * Writes into out (appends).
+   *
+   * General form of `SplitByComma`, generalised to an arbitrary delimiter
+   * set -- matches the shipped `func_GetIgnoreNames` (0x007CBC80,
+   * `CLobby.cpp`), whose real signature takes a `std::set<char> const&` of
+   * separator characters rather than hardcoding a single comma.
+   */
+  void SplitBySeparatorSet(const msvc8::string& src, const msvc8::set<char>& separators, msvc8::vector<msvc8::string>& out);
 
   /**
    * Join strings with a separator.
