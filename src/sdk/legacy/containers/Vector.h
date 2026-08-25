@@ -4833,6 +4833,52 @@ namespace msvc8
          * Address: 0x005C9EC0 (FUN_005C9EC0, the same specialisation emitted a
          * second time for FUN_005C6F90's in-place-insert branch, where it
          * copy-constructs the relocated tail past the old `mLast`)
+         *
+         * `FUN_005CDAB0` (sub_5CDAB0) is a *third*, byte-distinct (not
+         * sha256-identical, so not a strict ICF twin) but structurally and
+         * behaviorally identical non-folded emission of this exact
+         * specialisation: `if (dst) sub_5C84D0(dst, src); dst += 0x34;
+         * src += 0x34;` per element, `.asm`-confirmed (`add esi,34h` /
+         * `add edi,34h` at 0x005CDACE/0x005CDAD1), calling the same
+         * per-element copy ctor `FUN_005C84D0` (`Moho::SPerArmyReconInfo::
+         * SPerArmyReconInfo`, cited on this template's ctor above). Its
+         * only three code xrefs (`_callgraph_index.sqlite`
+         * `incoming_xrefs`, cross-checked against `data_refs` and
+         * `vtable_writers` -- all empty for all three) are `FUN_005CC4B0`
+         * and `FUN_005CD370`, thin "hardcode one bool arg false, forward
+         * the rest" calling-convention bridges with zero callers of their
+         * own, and `FUN_005CA8D0` -- which, fully decoded from its own
+         * `.asm` since Hex-Rays' decompile of it drops an argument (the
+         * allocation call's real arguments), is itself a genuine, distinct
+         * engine function: `msvc8::vector<Moho::SPerArmyReconInfo>::
+         * vector(const vector& other)`, this template's own copy
+         * constructor -- `allocate_slots_checked` (`FUN_005C5530`, which
+         * internally calls the already-cited allocator `FUN_005C9F40` and
+         * throw lane `FUN_005C7290`) for exactly `other.size()` slots,
+         * matching this ctor's `if (n) { reserve(n); ...}` body below,
+         * then `uninit_copy_n` via `FUN_005CDAB0`. `FUN_005CA8D0` has the
+         * same zero-xrefs profile (`incoming_xrefs`/`data_refs`/
+         * `vtable_writers` all empty, absent from the seeded-root
+         * `reachable` closure) -- `ReconBlip::mReconDat` is this
+         * specialisation's only instantiating field in the whole binary
+         * and it is never value-copied (`ReconBlip` has no copy
+         * constructor; `IAiReconDB`/`CAiReconDBImpl` have no `Clone`-style
+         * virtual either), so this copy constructor is real,
+         * correctly-typed, compiler-emitted code the shipped build
+         * apparently never calls at runtime. This is the same situation
+         * already documented on `FUN_008F7020`/`FUN_008F7110` above (on
+         * `vector(const vector&)`): a structurally-confirmed instantiation
+         * with an exhaustively-searched-empty caller set. Matching that
+         * precedent, `FUN_005CDAB0`/`FUN_005CD370`/`FUN_005CA8D0` are
+         * `skip`-classified (not `recovered` -- the source-level-
+         * invocation rule has no caller to wire to; not `blocked` -- RULE
+         * TWO) rather than forcing a citation neither (1)-(4) of the
+         * callsite-verification rule supports. `FUN_005CA8D0`'s DB entry
+         * pre-dated this pass as `external_dependency`/"no engine
+         * references", which was wrong for the reason CLAUDE.md's "Engine
+         * code is not external" rule describes; corrected to `skip` here,
+         * this note being the accurate record of what it actually is.
+         *
          * Address: 0x00549BC0 (FUN_00549BC0,
          * msvc8::vector<Moho::ResourceDeposit>::uninit_copy_n for the 20-byte
          * element -- copies five dwords per slot at stride 0x14, taking
