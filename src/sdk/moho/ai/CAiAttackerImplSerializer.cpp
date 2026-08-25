@@ -57,9 +57,6 @@ namespace
   );
   static_assert(sizeof(CAiAttackerImplSerializationView) == 0xA4, "CAiAttackerImpl serialized view size must be 0xA4");
 
-  alignas(CAiAttackerImplSerializer) unsigned char gCAiAttackerImplSerializerStorage[sizeof(CAiAttackerImplSerializer)];
-  bool gCAiAttackerImplSerializerConstructed = false;
-
   [[nodiscard]] CAiAttackerImplSerializationView* AsSerializationView(moho::CAiAttackerImpl* const object)
   {
     return reinterpret_cast<CAiAttackerImplSerializationView*>(object);
@@ -78,44 +75,6 @@ namespace
     for (T*& value : storage) {
       value = nullptr;
     }
-  }
-
-  [[nodiscard]] CAiAttackerImplSerializer* AcquireCAiAttackerImplSerializer()
-  {
-    if (!gCAiAttackerImplSerializerConstructed) {
-      new (gCAiAttackerImplSerializerStorage) CAiAttackerImplSerializer();
-      gCAiAttackerImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiAttackerImplSerializer*>(gCAiAttackerImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-    return self;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
@@ -176,48 +135,18 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x005D8480 (FUN_005D8480)
-   *
-   * What it does:
-   * Unlinks the global `CAiAttackerImplSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplSerializerStartupThunkA()
-  {
-    return UnlinkSerializerNode(*AcquireCAiAttackerImplSerializer());
-  }
-
-  /**
-   * Address: 0x005D84B0 (FUN_005D84B0)
-   *
-   * What it does:
-   * Secondary unlink/reset thunk for the global
-   * `CAiAttackerImplSerializer` helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplSerializerStartupThunkB()
-  {
-    return UnlinkSerializerNode(*AcquireCAiAttackerImplSerializer());
-  }
-
-  /**
-   * Address: 0x00BF8430 (FUN_00BF8430, cleanup thunk)
-   *
-   * What it does:
-   * Tears down recovered static `CAiAttackerImplSerializer` storage.
-   */
-  void cleanup_CAiAttackerImplSerializer()
-  {
-    if (!gCAiAttackerImplSerializerConstructed) {
-      return;
-    }
-
-    CAiAttackerImplSerializer* const serializer = AcquireCAiAttackerImplSerializer();
-    (void)cleanup_CAiAttackerImplSerializerStartupThunkA();
-
-    serializer->~CAiAttackerImplSerializer();
-    gCAiAttackerImplSerializerConstructed = false;
-  }
+  // Address: 0x010B01E4 -- process-global `CAiAttackerImplSerializer`
+  // singleton. Constructing it runs CAiAttackerImplSerializer::
+  // CAiAttackerImplSerializer() (0x00BCE8D0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiAttackerImplSerializer,
+  // 0x00BF8430) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration. Two additional zero-caller, zero-xref
+  // duplicate emissions of the same unlink/self-link sequence hardcoded to
+  // this global exist at 0x005D8480 (FUN_005D8480) and 0x005D84B0
+  // (FUN_005D84B0).
+  moho::CAiAttackerImplSerializer gCAiAttackerImplSerializer;
 } // namespace
 
 /**
@@ -469,13 +398,38 @@ void CAiAttackerImplSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCE8D0 (FUN_00BCE8D0, dynamic initializer for the global
+ * `CAiAttackerImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiAttackerImplSerializer::CAiAttackerImplSerializer()
+  : mLoadCallback(&CAiAttackerImplSerializer::Deserialize)
+  , mSaveCallback(&CAiAttackerImplSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF8430 (FUN_00BF8430, Moho::CAiAttackerImplSerializer::~CAiAttackerImplSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiAttackerImplSerializer::~CAiAttackerImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005DC0D0 (FUN_005DC0D0)
  *
  * What it does:
  * Lazily resolves `CAiAttackerImpl` RTTI and installs load/save callbacks
  * from this helper object into the type descriptor.
  */
-void CAiAttackerImplSerializer::RegisterSerializeFunctions()
+void CAiAttackerImplSerializer::Init()
 {
   gpg::RType* const type = CachedCAiAttackerImplType();
   GPG_ASSERT(type != nullptr);
@@ -490,17 +444,17 @@ void CAiAttackerImplSerializer::RegisterSerializeFunctions()
 }
 
 /**
- * Address: 0x00BCE8D0 (FUN_00BCE8D0, register_CAiAttackerImplSerializer)
+ * Address: 0x010B01E4 caller lane (`CAiAttackerImplTypeInfo.cpp`'s reflection
+ * bootstrap sequence)
  *
  * What it does:
- * Registers `CAiAttackerImpl` serializer callbacks and installs process-exit
- * cleanup.
+ * Historically forced construction of the (then lazily-constructed)
+ * `CAiAttackerImplSerializer` singleton from an explicit registration
+ * sequence. `gCAiAttackerImplSerializer` is now a genuine namespace-scope
+ * global, so its constructor already runs unconditionally at static-init
+ * time; this call is kept only so `CAiAttackerImplTypeInfo.cpp`'s existing
+ * bootstrap sequence does not need editing.
  */
 void moho::register_CAiAttackerImplSerializer()
 {
-  CAiAttackerImplSerializer* const serializer = AcquireCAiAttackerImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiAttackerImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiAttackerImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiAttackerImplSerializer);
 }

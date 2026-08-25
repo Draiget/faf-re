@@ -1,9 +1,6 @@
 #include "moho/ai/CAiNavigatorAirSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiNavigatorAir.h"
 
@@ -11,9 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorAirSerializer) unsigned char gCAiNavigatorAirSerializerStorage[sizeof(CAiNavigatorAirSerializer)] = {};
-  bool gCAiNavigatorAirSerializerConstructed = false;
-
   /**
    * Address: 0x005A7F30 (FUN_005A7F30, j_Moho::CAiNavigatorAir::MemberDeserialize)
    *
@@ -83,44 +77,6 @@ namespace
     moho::CAiNavigatorAir::MemberSerialize(navigator, archive);
   }
 
-  [[nodiscard]] CAiNavigatorAirSerializer* AcquireCAiNavigatorAirSerializer()
-  {
-    if (!gCAiNavigatorAirSerializerConstructed) {
-      new (gCAiNavigatorAirSerializerStorage) CAiNavigatorAirSerializer();
-      gCAiNavigatorAirSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorAirSerializer*>(gCAiNavigatorAirSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiNavigatorAirType()
   {
     gpg::RType* type = CAiNavigatorAir::sType;
@@ -131,74 +87,15 @@ namespace
     return type;
   }
 
-  /**
-    * Alias of FUN_00BF6F40 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks recovered CAiNavigatorAir serializer helper node from intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializer()
-  {
-    if (!gCAiNavigatorAirSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiNavigatorAirSerializer());
-  }
-
-  /**
-   * Address: 0x005A5700 (FUN_005A5700)
-   *
-   * What it does:
-   * Initializes callback lanes for global `CAiNavigatorAirSerializer` helper
-   * storage and returns that helper object.
-   */
-  [[maybe_unused]] [[nodiscard]] CAiNavigatorAirSerializer* InitializeCAiNavigatorAirSerializerStartupThunk()
-  {
-    CAiNavigatorAirSerializer* const serializer = AcquireCAiNavigatorAirSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mLoadCallback = &CAiNavigatorAirSerializer::Deserialize;
-    serializer->mSaveCallback = &CAiNavigatorAirSerializer::Serialize;
-    return serializer;
-  }
-
-  /**
-   * Address: 0x005A5730 (FUN_005A5730)
-   *
-   * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
-   * CAiNavigatorAir serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializerStartupThunkA()
-  {
-    if (!gCAiNavigatorAirSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiNavigatorAirSerializer());
-  }
-
-  /**
-   * Address: 0x005A5760 (FUN_005A5760)
-   *
-   * What it does:
-   * Secondary startup cleanup variant that unlinks and self-resets the global
-   * CAiNavigatorAir serializer helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializerStartupThunkB()
-  {
-    if (!gCAiNavigatorAirSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiNavigatorAirSerializer());
-  }
-
-  void cleanup_CAiNavigatorAirSerializer_atexit()
-  {
-    (void)cleanup_CAiNavigatorAirSerializer();
-  }
+  // Address: 0x010AEC28 -- process-global `CAiNavigatorAirSerializer`
+  // singleton. Constructing it runs CAiNavigatorAirSerializer::
+  // CAiNavigatorAirSerializer() (0x00BCC880), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiNavigatorAirSerializer,
+  // 0x00BF6F70) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiNavigatorAirSerializer gCAiNavigatorAirSerializer;
 } // namespace
 
 /**
@@ -240,13 +137,38 @@ void CAiNavigatorAirSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC880 (FUN_00BCC880, dynamic initializer for the global
+ * `CAiNavigatorAirSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiNavigatorAirSerializer::CAiNavigatorAirSerializer()
+  : mLoadCallback(&CAiNavigatorAirSerializer::Deserialize)
+  , mSaveCallback(&CAiNavigatorAirSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6F70 (FUN_00BF6F70, Moho::CAiNavigatorAirSerializer::~CAiNavigatorAirSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiNavigatorAirSerializer::~CAiNavigatorAirSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005A7550 (FUN_005A7550)
  *
  * What it does:
  * Lazily resolves CAiNavigatorAir RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiNavigatorAirSerializer::RegisterSerializeFunctions()
+void CAiNavigatorAirSerializer::Init()
 {
   gpg::RType* const type = CachedCAiNavigatorAirType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -254,33 +176,3 @@ void CAiNavigatorAirSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC880 (FUN_00BCC880, register_CAiNavigatorAirSerializer)
- *
- * What it does:
- * Initializes the global CAiNavigatorAir serializer helper callbacks and
- * installs process-exit cleanup.
- */
-void moho::register_CAiNavigatorAirSerializer()
-{
-  CAiNavigatorAirSerializer* const serializer = AcquireCAiNavigatorAirSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiNavigatorAirSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiNavigatorAirSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiNavigatorAirSerializer_atexit);
-}
-
-namespace
-{
-  struct CAiNavigatorAirSerializerBootstrap
-  {
-    CAiNavigatorAirSerializerBootstrap()
-    {
-      moho::register_CAiNavigatorAirSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiNavigatorAirSerializerBootstrap gCAiNavigatorAirSerializerBootstrap;
-} // namespace
-

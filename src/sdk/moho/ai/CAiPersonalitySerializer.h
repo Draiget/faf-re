@@ -4,20 +4,43 @@
 
 #include "gpg/core/reflection/Reflection.h"
 
-namespace gpg
-{
-  struct SerHelperBase;
-} // namespace gpg
-
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1CAA8
    * COL:  0x00E729EC
    */
-  class CAiPersonalitySerializer
+  class CAiPersonalitySerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCD660 (FUN_00BCD660, dynamic initializer for the global
+     * `CAiPersonalitySerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CAiPersonalitySerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here.
+     */
+    CAiPersonalitySerializer();
+
+    /**
+     * Address: 0x00BF7740 (FUN_00BF7740, Moho::CAiPersonalitySerializer::~CAiPersonalitySerializer)
+     * Address: 0x005B6AE0 (FUN_005B6AE0), Address: 0x005B6B10 (FUN_005B6B10)
+     * -- duplicate emissions of the same unlink/self-link sequence hardcoded
+     * to the identical global; zero callers and zero incoming xrefs in the
+     * callgraph index.
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently sits
+     * in and restores a self-linked sentinel state. Registered by the real
+     * dynamic initializer (0x00BCD660) as the global's `atexit` teardown.
+     */
+    ~CAiPersonalitySerializer();
+
     /**
      * Address: 0x005B6A80 (FUN_005B6A80, Moho::CAiPersonalitySerializer::Deserialize)
      *
@@ -39,26 +62,17 @@ namespace moho
      *
      * What it does:
      * Binds load/save serializer callbacks into CAiPersonality RTTI.
+     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
+     * drained from the pending list (vtable slot 0).
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    // Intrusive list links from gpg::DListItem<gpg::SerHelperBase>.
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     // Serializer callbacks consumed by gpg::serialization.h registration flow.
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(
-    offsetof(CAiPersonalitySerializer, mHelperNext) == 0x04,
-    "CAiPersonalitySerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAiPersonalitySerializer, mHelperPrev) == 0x08,
-    "CAiPersonalitySerializer::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(CAiPersonalitySerializer, mLoadCallback) == 0x0C,
     "CAiPersonalitySerializer::mLoadCallback offset must be 0x0C"
@@ -77,22 +91,4 @@ namespace moho
    * process-exit cleanup.
    */
   int register_SValuePairTypeInfo();
-
-  /**
-   * Address: 0x00BCD5C0 (FUN_00BCD5C0, register_SValuePairSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer callbacks for `SValuePair` and installs
-   * process-exit helper unlink cleanup.
-   */
-  int register_SValuePairSerializer();
-
-  /**
-   * Address: 0x00BCD660 (FUN_00BCD660, register_CAiPersonalitySerializer)
-   *
-   * What it does:
-   * Initializes global CAiPersonality serializer helper callbacks and installs
-   * process-exit cleanup.
-   */
-  int register_CAiPersonalitySerializer();
 } // namespace moho

@@ -1,9 +1,6 @@
 #include "moho/ai/CAiBuilderImplSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiBuilderImpl.h"
 
@@ -11,10 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiBuilderImplSerializer)
-  unsigned char gCAiBuilderImplSerializerStorage[sizeof(CAiBuilderImplSerializer)] = {};
-  bool gCAiBuilderImplSerializerConstructed = false;
-
   /**
    * Address: 0x005A1CF0 (FUN_005A1CF0, j_Moho::CAiBuilderImpl::MemberSerialize)
    *
@@ -51,44 +44,6 @@ namespace
     builder->MemberSerialize(archive);
   }
 
-  [[nodiscard]] CAiBuilderImplSerializer* AcquireCAiBuilderImplSerializer()
-  {
-    if (!gCAiBuilderImplSerializerConstructed) {
-      new (gCAiBuilderImplSerializerStorage) CAiBuilderImplSerializer();
-      gCAiBuilderImplSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiBuilderImplSerializer*>(gCAiBuilderImplSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiBuilderImplType()
   {
     gpg::RType* type = CAiBuilderImpl::sType;
@@ -99,50 +54,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF6AF0 (FUN_00BF6AF0, cleanup_CAiBuilderImplSerializer)
-   *
-   * What it does:
-   * Unlinks recovered CAiBuilderImpl serializer helper node from intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiBuilderImplSerializer()
-  {
-    if (!gCAiBuilderImplSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiBuilderImplSerializer());
-  }
-
-  /**
-   * Address: 0x0059FE70 (FUN_0059FE70)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * CAiBuilderImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiBuilderImplSerializerStartupThunkA()
-  {
-    return cleanup_CAiBuilderImplSerializer();
-  }
-
-  /**
-   * Address: 0x0059FEA0 (FUN_0059FEA0)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * CAiBuilderImpl serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiBuilderImplSerializerStartupThunkB()
-  {
-    return cleanup_CAiBuilderImplSerializer();
-  }
-
-  void cleanup_CAiBuilderImplSerializer_atexit()
-  {
-    (void)cleanup_CAiBuilderImplSerializer();
-  }
+  // Address: 0x010AE5CC -- process-global `CAiBuilderImplSerializer`
+  // singleton. Constructing it runs CAiBuilderImplSerializer::
+  // CAiBuilderImplSerializer() (0x00BCC320), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiBuilderImplSerializer,
+  // 0x00BF6AF0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiBuilderImplSerializer gCAiBuilderImplSerializer;
 } // namespace
 
 /**
@@ -187,13 +107,38 @@ void CAiBuilderImplSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC320 (FUN_00BCC320, dynamic initializer for the global
+ * `CAiBuilderImplSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiBuilderImplSerializer::CAiBuilderImplSerializer()
+  : mLoadCallback(&CAiBuilderImplSerializer::Deserialize)
+  , mSaveCallback(&CAiBuilderImplSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6AF0 (FUN_00BF6AF0, Moho::CAiBuilderImplSerializer::~CAiBuilderImplSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiBuilderImplSerializer::~CAiBuilderImplSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005A06D0 (FUN_005A06D0)
  *
  * What it does:
  * Lazily resolves CAiBuilderImpl RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiBuilderImplSerializer::RegisterSerializeFunctions()
+void CAiBuilderImplSerializer::Init()
 {
   gpg::RType* type = CachedCAiBuilderImplType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -201,32 +146,3 @@ void CAiBuilderImplSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC320 (FUN_00BCC320, register_CAiBuilderImplSerializer)
- *
- * What it does:
- * Initializes the global builder serializer helper callbacks and installs
- * process-exit cleanup.
- */
-void moho::register_CAiBuilderImplSerializer()
-{
-  CAiBuilderImplSerializer* const serializer = AcquireCAiBuilderImplSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiBuilderImplSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiBuilderImplSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiBuilderImplSerializer_atexit);
-}
-
-namespace
-{
-  struct CAiBuilderImplSerializerBootstrap
-  {
-    CAiBuilderImplSerializerBootstrap()
-    {
-      moho::register_CAiBuilderImplSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiBuilderImplSerializerBootstrap gCAiBuilderImplSerializerBootstrap;
-} // namespace

@@ -1,9 +1,6 @@
 #include "moho/ai/CAiNavigatorLandSerializer.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
 
 #include "moho/ai/CAiNavigatorLand.h"
 
@@ -11,9 +8,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorLandSerializer) unsigned char gCAiNavigatorLandSerializerStorage[sizeof(CAiNavigatorLandSerializer)] = {};
-  bool gCAiNavigatorLandSerializerConstructed = false;
-
   /**
    * Address: 0x005A7E60 (FUN_005A7E60, j_Moho::CAiNavigatorLand::MemberSerialize)
    *
@@ -48,44 +42,6 @@ namespace
     moho::CAiNavigatorLand::MemberSerialize(navigator, archive);
   }
 
-  [[nodiscard]] CAiNavigatorLandSerializer* AcquireCAiNavigatorLandSerializer()
-  {
-    if (!gCAiNavigatorLandSerializerConstructed) {
-      new (gCAiNavigatorLandSerializerStorage) CAiNavigatorLandSerializer();
-      gCAiNavigatorLandSerializerConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorLandSerializer*>(gCAiNavigatorLandSerializerStorage);
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiNavigatorLandType()
   {
     gpg::RType* type = CAiNavigatorLand::sType;
@@ -96,50 +52,15 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF6EA0 (FUN_00BF6EA0, cleanup_CAiNavigatorLandSerializer)
-   *
-   * What it does:
-   * Unlinks recovered CAiNavigatorLand serializer helper node from intrusive
-   * serializer chain.
-   */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorLandSerializer()
-  {
-    if (!gCAiNavigatorLandSerializerConstructed) {
-      return nullptr;
-    }
-
-    return UnlinkSerializerNode(*AcquireCAiNavigatorLandSerializer());
-  }
-
-  /**
-   * Address: 0x005A4820 (FUN_005A4820)
-   *
-   * What it does:
-   * Legacy startup-cleanup thunk lane that forwards to the canonical
-   * CAiNavigatorLand serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorLandSerializerStartupThunkA()
-  {
-    return cleanup_CAiNavigatorLandSerializer();
-  }
-
-  /**
-   * Address: 0x005A4850 (FUN_005A4850)
-   *
-   * What it does:
-   * Secondary startup-cleanup thunk lane that forwards to the canonical
-   * CAiNavigatorLand serializer helper unlink path.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorLandSerializerStartupThunkB()
-  {
-    return cleanup_CAiNavigatorLandSerializer();
-  }
-
-  void cleanup_CAiNavigatorLandSerializer_atexit()
-  {
-    (void)cleanup_CAiNavigatorLandSerializer();
-  }
+  // Address: 0x010AEC14 -- process-global `CAiNavigatorLandSerializer`
+  // singleton. Constructing it runs CAiNavigatorLandSerializer::
+  // CAiNavigatorLandSerializer() (0x00BCC7E0), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction. Its destructor (~CAiNavigatorLandSerializer,
+  // 0x00BF6EB0) runs at normal static-duration teardown, matching the real
+  // binary's atexit registration.
+  moho::CAiNavigatorLandSerializer gCAiNavigatorLandSerializer;
 } // namespace
 
 /**
@@ -178,13 +99,38 @@ void CAiNavigatorLandSerializer::Serialize(
 }
 
 /**
+ * Address: 0x00BCC7E0 (FUN_00BCC7E0, dynamic initializer for the global
+ * `CAiNavigatorLandSerializer` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`) and binds the load/save callback fields.
+ */
+CAiNavigatorLandSerializer::CAiNavigatorLandSerializer()
+  : mLoadCallback(&CAiNavigatorLandSerializer::Deserialize)
+  , mSaveCallback(&CAiNavigatorLandSerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BF6EB0 (FUN_00BF6EB0, Moho::CAiNavigatorLandSerializer::~CAiNavigatorLandSerializer)
+ *
+ * What it does:
+ * Unlinks this helper node from whatever intrusive list it currently sits
+ * in and restores a self-linked sentinel state.
+ */
+CAiNavigatorLandSerializer::~CAiNavigatorLandSerializer()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x005A7430 (FUN_005A7430)
  *
  * What it does:
  * Lazily resolves CAiNavigatorLand RTTI and installs load/save callbacks from
  * this helper object into the type descriptor.
  */
-void CAiNavigatorLandSerializer::RegisterSerializeFunctions()
+void CAiNavigatorLandSerializer::Init()
 {
   gpg::RType* const type = CachedCAiNavigatorLandType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -192,32 +138,3 @@ void CAiNavigatorLandSerializer::RegisterSerializeFunctions()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCC7E0 (FUN_00BCC7E0, register_CAiNavigatorLandSerializer)
- *
- * What it does:
- * Initializes the global CAiNavigatorLand serializer helper callbacks and
- * installs process-exit cleanup.
- */
-void moho::register_CAiNavigatorLandSerializer()
-{
-  CAiNavigatorLandSerializer* const serializer = AcquireCAiNavigatorLandSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &CAiNavigatorLandSerializer::Deserialize;
-  serializer->mSaveCallback = &CAiNavigatorLandSerializer::Serialize;
-  (void)std::atexit(&cleanup_CAiNavigatorLandSerializer_atexit);
-}
-
-namespace
-{
-  struct CAiNavigatorLandSerializerBootstrap
-  {
-    CAiNavigatorLandSerializerBootstrap()
-    {
-      moho::register_CAiNavigatorLandSerializer();
-    }
-  };
-
-  [[maybe_unused]] CAiNavigatorLandSerializerBootstrap gCAiNavigatorLandSerializerBootstrap;
-} // namespace
