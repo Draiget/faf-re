@@ -770,6 +770,16 @@ namespace moho
    * What it does:
    * Rebuilds the global blueprint range-extractor registry and installs
    * all known extractor instances by blueprint key.
+   *
+   * Container substitution note: the real binary's tree-erase/clear core
+   * for `sBlueprintExtractors` (FUN_007F1990, a `msvc8::map`-shaped
+   * `erase(first,last)`/`clear()` walk) is deliberately NOT cited on
+   * `registry.clear()` above. `BlueprintExtractorRegistry` holds
+   * `std::unique_ptr<moho::RangeExtractor>` values -- a move-only owning
+   * smart pointer this project's binary-layout-focused `msvc8::map` has no
+   * way to model or store -- so the real `std::map` here is an intentional
+   * substitution, not a fidelity gap to migrate away. `FUN_007F1990` marked
+   * `skip` for this reason.
    */
   void InitializeBlueprintExtractors()
   {
