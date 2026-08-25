@@ -756,10 +756,13 @@ namespace
    *
    * What it does:
    * Appends one platoon unit-search entry to the bounded result lane used by
-   * `FormPlatoon()` candidate filtering.
+   * `FormPlatoon()`'s nearest-first candidate filtering. Checked-capacity
+   * fast append (constructs in place at `_Mylast`), else tail-calls the
+   * reallocating single-insert grow path `msvc8::vector<PlatoonUnitSearchEntry>::
+   * insert(iterator, const T&)` (`FUN_007336C0`).
    */
-  [[maybe_unused]] void AppendPlatoonUnitSearchEntry(
-    std::vector<PlatoonUnitSearchEntry>& entries,
+  void AppendPlatoonUnitSearchEntry(
+    msvc8::vector<PlatoonUnitSearchEntry>& entries,
     moho::Unit* const unit,
     const float distanceSq
   )
@@ -4252,12 +4255,7 @@ namespace moho
         const float radius = static_cast<float>(lua_tonumber(state->m_state, 5));
         const float radiusSquared = radius * radius;
 
-        struct CandidateDistance
-        {
-          Unit* unit;
-          float distanceSquared;
-        };
-        std::vector<CandidateDistance> nearbyUnits;
+        msvc8::vector<PlatoonUnitSearchEntry> nearbyUnits;
         for (Entity* const* entityIt = candidates.mVec.begin(); entityIt != candidates.mVec.end(); ++entityIt) {
           Entity* const entity = *entityIt;
           if (entity == nullptr) {
@@ -4272,20 +4270,20 @@ namespace moho
           const float deltaZ = unitPosition.z - center.z;
           const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
           if (radiusSquared > distanceSquared) {
-            nearbyUnits.push_back(CandidateDistance{unit, distanceSquared});
+            AppendPlatoonUnitSearchEntry(nearbyUnits, unit, distanceSquared);
           }
         }
 
         std::sort(
           nearbyUnits.begin(),
           nearbyUnits.end(),
-          [](const CandidateDistance& lhs, const CandidateDistance& rhs) noexcept {
-            return lhs.distanceSquared < rhs.distanceSquared;
+          [](const PlatoonUnitSearchEntry& lhs, const PlatoonUnitSearchEntry& rhs) noexcept {
+            return lhs.distanceSq < rhs.distanceSq;
           }
         );
 
         int added = 0;
-        for (const CandidateDistance& candidate : nearbyUnits) {
+        for (const PlatoonUnitSearchEntry& candidate : nearbyUnits) {
           (void)ref.AddUnit(candidate.unit);
           if (++added == requiredSize) {
             break;
