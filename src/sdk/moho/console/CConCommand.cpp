@@ -41,6 +41,7 @@
 #include "moho/lua/SCR_String.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/ScrDebugHooks.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/misc/IConOutputHandler.h"
 #include "moho/misc/Stats.h"
@@ -151,6 +152,7 @@ namespace
   constexpr const char* kConsoleStartupWLDGameSpeedDescription = "Set a new game speed";
   constexpr const char* kConsoleStartupConFindUnitDescription =
     "Find a unit by a (case insensitive) string contained in its description.";
+  constexpr const char* kConsoleStartupSCLuaDebuggerDescription = "Open Lua debugger window";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
@@ -3343,6 +3345,39 @@ void moho::CON_FindUnit(void* const commandArgs)
 }
 
 /**
+ * Address: 0x008D4150 (FUN_008D4150, sub_8D4150)
+ *
+ * What it does:
+ * Opens the script-debug window and binds the debug hook onto the user Lua
+ * state, then onto the active world session's Lua state when a session is
+ * active. `SCR_HookState` already reproduces the binary's own
+ * `if (sSrcDebugWindow) lua_sethook(state, DebugLuaHook, 4, 0)` guard
+ * internally (via `SCR_IsDebugWindowActive`), so this recovery does not
+ * duplicate that check.
+ *
+ * Registrar: FUN_00BE9680 (`__xc_a` lane), data-xref
+ * `dword_F5BEDC = offset sub_8D4150` is the callsite evidence. Name is read
+ * from the PE `.data` initializer of `stru_F5BED0` ("SC_LuaDebugger").
+ */
+void moho::SC_LuaDebugger(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  LuaPlus::LuaState* const userLuaState = USER_GetLuaState();
+  if (userLuaState == nullptr) {
+    return;
+  }
+
+  SCR_CreateDebugWindow();
+  SCR_HookState(userLuaState);
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session != nullptr) {
+    SCR_HookState(session->mState);
+  }
+}
+
+/**
  * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
  *
  * What it does:
@@ -4061,6 +4096,7 @@ namespace
   CConFunc gCConFunc_WLD_SingleStep{};
   CConFunc gCConFunc_WLD_GameSpeed{};
   CConFunc gCConFunc_FindUnit{};
+  CConFunc gCConFunc_SC_LuaDebugger{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_EFX_CreateEmitterWindow{};
@@ -4488,6 +4524,37 @@ namespace moho
       "FindUnit",
       &moho::CON_FindUnit,
       &cleanup_CConFunc_FindUnit
+    );
+  }
+
+  /**
+   * Address: 0x00C08EB0 (FUN_00C08EB0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_LuaDebugger`.
+   */
+  void cleanup_CConFunc_SC_LuaDebugger()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_LuaDebugger);
+  }
+
+  /**
+   * Address: 0x00BE9680 (FUN_00BE9680, register_CConFunc_SC_LuaDebugger)
+   *
+   * What it does:
+   * Registers startup console callback for `SC_LuaDebugger`. The store
+   * `dword_F5BEDC = offset sub_8D4150` at 0x00BE968C is the only reference to
+   * `Moho::SC_LuaDebugger` anywhere in the image.
+   */
+  void register_CConFunc_SC_LuaDebugger()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_SC_LuaDebugger,
+      kConsoleStartupSCLuaDebuggerDescription,
+      "SC_LuaDebugger",
+      &moho::SC_LuaDebugger,
+      &cleanup_CConFunc_SC_LuaDebugger
     );
   }
 
@@ -6157,6 +6224,7 @@ namespace
       moho::register_CConFunc_WLD_SingleStep();
       moho::register_CConFunc_WLD_GameSpeed();
       moho::register_CConFunc_FindUnit();
+      moho::register_CConFunc_SC_LuaDebugger();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();
