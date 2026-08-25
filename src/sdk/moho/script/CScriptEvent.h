@@ -126,9 +126,24 @@ namespace moho
     static gpg::RType* sType;
   };
 
-  class CScriptEventSerializer
+  class CScriptEventSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer,
+     * dynamic initializer for the global `CScriptEventSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CScriptEventSerializer();
+
+    /**
+     * Address: 0x00BF0B80 (FUN_00BF0B80, ??1CScriptEventSerializer@Moho@@QAE@@Z)
+     */
+    ~CScriptEventSerializer();
+
     /**
      * Address: 0x004CA280 (FUN_004CA280, Moho::CScriptEventSerializer::Deserialize)
      *
@@ -146,20 +161,33 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x004CB0A0 (FUN_004CB0A0, sub_4CB0A0)
-     * Slot: 0
+     * Address: 0x004CB0A0 (FUN_004CB0A0, Moho::CScriptEventSerializer::Init)
+     *
+     * This body is ICF-folded/shared with vtable slot 0 of the
+     * never-constructed `gpg::SerSaveLoadHelper<CScriptEvent>` template
+     * instantiation (`??_7?$SerSaveLoadHelper@VCScriptEvent@Moho@@@gpg@@6B@`,
+     * confirmed to have zero vtable-writer ctors anywhere in the binary).
+     * `CScriptEventSerializer` is not derived through that template: its real
+     * ctor (0x00BC6240) writes `??_7CScriptEventSerializer@Moho@@6B@` directly
+     * onto the object with no intermediate vtable write, and
+     * `CScriptEvent::MemberSerialize` is not `const`-qualified, so it does not
+     * fit the template's `const T*` forwarding shape exactly.
      *
      * What it does:
      * Binds CScriptEvent serializer callbacks into RTTI.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    void* mNext;
-    void* mPrev;
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
+    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
+    gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
+  static_assert(
+    offsetof(CScriptEventSerializer, mSerLoadFunc) == 0x0C, "CScriptEventSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CScriptEventSerializer, mSerSaveFunc) == 0x10, "CScriptEventSerializer::mSerSaveFunc offset must be 0x10"
+  );
 
   class CScriptEventTypeInfo : public gpg::RType
   {
@@ -920,22 +948,4 @@ namespace moho
    */
   void register_CScriptEventTypeInfo();
 
-  /**
-   * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer)
-   *
-   * What it does:
-   * Initializes startup serializer callback lanes for `CScriptEvent` and
-   * schedules intrusive helper cleanup at process exit.
-   */
-  void register_CScriptEventSerializer();
-
-  /**
-   * Address: 0x004CA2D0 (FUN_004CA2D0, serializer cleanup alias A)
-   * Address: 0x004CA300 (FUN_004CA300, serializer cleanup alias B)
-   *
-   * What it does:
-   * Unlinks static serializer helper node from the intrusive helper list and
-   * restores self-links.
-   */
-  gpg::SerHelperBase* cleanup_CScriptEventSerializer();
 } // namespace moho
