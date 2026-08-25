@@ -283,6 +283,14 @@ namespace
    * confirmed via `FUN_007F00A0`'s own 12 real callers all owned by
    * `FUN_007ED4B0` (`InitializeBlueprintExtractors`, already recovered
    * above).
+   *
+   * Address: 0x007F1890 (FUN_007F1890) -- the same instantiation's
+   * `_Tree::_Buynode`-shaped node allocate-and-link step: walks
+   * `Moho::sBlueprintExtractors._Myhead`'s parent/leftmost-descent chain
+   * to find the real insertion point, allocates and links the fresh
+   * `pair<const std::string, std::unique_ptr<RangeExtractor>>` node.
+   * Called directly from `FUN_007F0960` above (`*a2 =
+   * *(DWORD*)sub_7F1890();`), the same `operator[]` insert-on-miss path.
    */
   void RegisterExtractor(
     BlueprintExtractorRegistry& registry,
