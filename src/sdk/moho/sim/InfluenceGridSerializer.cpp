@@ -7,20 +7,6 @@
 
 namespace
 {
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -33,7 +19,6 @@ namespace
   gpg::RType* gInfluenceEntrySetType = nullptr;
   gpg::RType* gSThreatVectorType = nullptr;
   gpg::RType* gSThreatType = nullptr;
-  moho::InfluenceGridSerializer gInfluenceGridSerializer;
 
   // Alias of FUN_00717CF0 behavior from CInfluenceMap.cpp.
   void DeserializeInfluenceGridSerializerBridge(
@@ -90,31 +75,35 @@ namespace
     archive->Write(threatType, const_cast<moho::SThreat*>(&grid->threat), owner);
     archive->Write(threatType, const_cast<moho::SThreat*>(&grid->decay), owner);
   }
-
-  /**
-   * Address: 0x007193E0 (FUN_007193E0)
-   *
-   * What it does:
-   * Initializes startup `InfluenceGrid` helper links and callback slots.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::InfluenceGridSerializer* InitializeInfluenceGridSerializerHelperStorage() noexcept
-  {
-    InitializeHelperNode(gInfluenceGridSerializer);
-    gInfluenceGridSerializer.mLoadCallback = &DeserializeInfluenceGridSerializerBridge;
-    gInfluenceGridSerializer.mSaveCallback = &SerializeInfluenceGridSerializerBridge;
-    return &gInfluenceGridSerializer;
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BDA7E0 (FUN_00BDA7E0, dynamic initializer for the global
+   * `InfluenceGridSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  InfluenceGridSerializer::InfluenceGridSerializer()
+    : mLoadCallback(&DeserializeInfluenceGridSerializerBridge)
+    , mSaveCallback(&SerializeInfluenceGridSerializerBridge)
+  {}
+
+  InfluenceGridSerializer::~InfluenceGridSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x00719410 (FUN_00719410, gpg::SerSaveLoadHelper_InfluenceGrid::Init)
    *
    * IDA signature:
    * void __thiscall sub_719410(_DWORD *this);
    */
-  void InfluenceGridSerializer::RegisterSerializeFunctions()
+  void InfluenceGridSerializer::Init()
   {
     gpg::RType* const type = InfluenceGrid::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -126,13 +115,6 @@ namespace moho
 
 namespace
 {
-  struct InfluenceGridSerializerBootstrap
-  {
-    InfluenceGridSerializerBootstrap()
-    {
-      (void)InitializeInfluenceGridSerializerHelperStorage();
-    }
-  };
-
-  [[maybe_unused]] InfluenceGridSerializerBootstrap gInfluenceGridSerializerBootstrap;
+  // Address: 0x010B9204 -- process-global `InfluenceGridSerializer` singleton.
+  moho::InfluenceGridSerializer gInfluenceGridSerializer;
 } // namespace

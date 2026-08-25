@@ -1,6 +1,5 @@
 #include "moho/sim/SPhysConstantsSerializer.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -11,14 +10,6 @@
 
 namespace
 {
-  using Serializer = moho::SPhysConstantsSerializer;
-
-  [[nodiscard]] Serializer& GetSPhysConstantsSerializer() noexcept
-  {
-    static Serializer serializer{};
-    return serializer;
-  }
-
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* cached = nullptr;
@@ -40,63 +31,28 @@ namespace
     GPG_ASSERT(cached != nullptr);
     return cached;
   }
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
-  }
-
-  /**
-   * Address: 0x00699CC0 (FUN_00699CC0)
-   *
-   * What it does:
-   * Splices the serializer helper node out of the intrusive lane when linked,
-   * then rewires helper links to self and returns the self node.
-   */
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSPhysConstantsSerializerHelperNodeVariantA() noexcept
-  {
-    return UnlinkSerializerNode(GetSPhysConstantsSerializer());
-  }
-
-  /**
-   * Address: 0x00699CF0 (FUN_00699CF0)
-   *
-   * What it does:
-   * Secondary serializer helper unlink/reset variant sharing the same behavior.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSPhysConstantsSerializerHelperNodeVariantB() noexcept
-  {
-    return UnlinkSPhysConstantsSerializerHelperNodeVariantA();
-  }
-
-  void cleanup_SPhysConstantsSerializer_atexit()
-  {
-    (void)moho::cleanup_SPhysConstantsSerializer();
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BD6050 (FUN_00BD6050, dynamic initializer for the global
+   * `SPhysConstantsSerializer` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
+   */
+  SPhysConstantsSerializer::SPhysConstantsSerializer()
+    : mLoadCallback(&SPhysConstantsSerializer::Deserialize)
+    , mSaveCallback(&SPhysConstantsSerializer::Serialize)
+  {}
+
+  SPhysConstantsSerializer::~SPhysConstantsSerializer()
+  {
+    ResetLinks();
+  }
+
   /**
    * Address: 0x00699C10 (FUN_00699C10, Moho::SPhysConstantsSerializer::Deserialize)
    */
@@ -139,60 +95,18 @@ namespace moho
    * What it does:
    * Binds `SPhysConstants` RTTI load/save callbacks.
    */
-  void SPhysConstantsSerializer::RegisterSerializeFunctions()
+  void SPhysConstantsSerializer::Init()
   {
     gpg::RType* const type = CachedSPhysConstantsType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
+    type->serLoadFunc_ = mLoadCallback;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BFD460 (FUN_00BFD460, cleanup_SPhysConstantsSerializer)
-   */
-  gpg::SerHelperBase* cleanup_SPhysConstantsSerializer()
-  {
-    return UnlinkSPhysConstantsSerializerHelperNodeVariantA();
-  }
-
-  /**
-   * Address: 0x00699EA0 (FUN_00699EA0)
-   *
-   * What it does:
-   * Alternate serializer startup leaf that initializes global helper links,
-   * binds deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_SPhysConstantsSerializer_SaveLoadStartupLeaf()
-  {
-    Serializer& serializer = GetSPhysConstantsSerializer();
-    InitializeSerializerNode(serializer);
-    serializer.mDeserialize = &SPhysConstantsSerializer::Deserialize;
-    serializer.mSerialize = &SPhysConstantsSerializer::Serialize;
-    return SerializerSelfNode(serializer);
-  }
-
-  /**
-   * Address: 0x00BD6050 (FUN_00BD6050, register_SPhysConstantsSerializer)
-   */
-  int register_SPhysConstantsSerializer()
-  {
-    Serializer& serializer = GetSPhysConstantsSerializer();
-    (void)construct_SPhysConstantsSerializer_SaveLoadStartupLeaf();
-    (void)serializer;
-    return std::atexit(&cleanup_SPhysConstantsSerializer_atexit);
+    type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
 
 namespace
 {
-  struct SPhysConstantsSerializerBootstrap
-  {
-    SPhysConstantsSerializerBootstrap()
-    {
-      (void)moho::register_SPhysConstantsSerializer();
-    }
-  };
-
-  [[maybe_unused]] SPhysConstantsSerializerBootstrap gSPhysConstantsSerializerBootstrap;
+  // Address: 0x010B5448 -- process-global `SPhysConstantsSerializer` singleton.
+  moho::SPhysConstantsSerializer gSPhysConstantsSerializer;
 } // namespace
