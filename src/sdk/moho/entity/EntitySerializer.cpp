@@ -11,72 +11,8 @@ using namespace moho;
 
 namespace
 {
-  alignas(EntitySerializer) unsigned char gEntitySerializerStorage[sizeof(EntitySerializer)] = {};
-  bool gEntitySerializerConstructed = false;
-
-  [[nodiscard]] EntitySerializer* AcquireEntitySerializer()
-  {
-    if (!gEntitySerializerConstructed) {
-      new (gEntitySerializerStorage) EntitySerializer();
-      gEntitySerializerConstructed = true;
-    }
-
-    return reinterpret_cast<EntitySerializer*>(gEntitySerializerStorage);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(EntitySerializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeSerializerNode(EntitySerializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntityTypeForSerializer()
-  {
-    if (moho::Entity::sType == nullptr) {
-      moho::Entity::sType = gpg::LookupRType(typeid(moho::Entity));
-    }
-    return moho::Entity::sType;
-  }
-
-  /**
-   * Address: 0x00BFC870 (FUN_00BFC870, cleanup_EntitySerializer)
-   *
-   * What it does:
-   * Unlinks the helper node from the intrusive serializer chain and re-points
-   * both links at itself, leaving a valid one-element ring.
-   */
-  void cleanup_EntitySerializer()
-  {
-    if (!gEntitySerializerConstructed) {
-      return;
-    }
-
-    EntitySerializer& serializer = *AcquireEntitySerializer();
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-  }
-
-  struct EntitySerializerStartupBootstrap
-  {
-    EntitySerializerStartupBootstrap()
-    {
-      moho::register_EntitySerializer();
-    }
-  };
-
-  [[maybe_unused]] EntitySerializerStartupBootstrap gEntitySerializerStartupBootstrap;
+  // Address: 0x010B43E4 -- process-global `EntitySerializer` singleton.
+  EntitySerializer gEntitySerializer;
 } // namespace
 
 /**
@@ -117,33 +53,40 @@ void EntitySerializer::Serialize(
 }
 
 /**
+ * Address: 0x0067C600 (FUN_0067C600, gpg::SerSaveLoadHelper_Entity::Init)
+ *
  * What it does:
  * Lazily resolves the `Entity` descriptor and installs this helper's load/save
  * callbacks into it.
  */
-void EntitySerializer::RegisterSerializeFunctions()
+void EntitySerializer::Init()
 {
-  gpg::RType* const type = CachedEntityTypeForSerializer();
+  gpg::RType* type = moho::Entity::sType;
   if (type == nullptr) {
-    return;
+    type = gpg::LookupRType(typeid(moho::Entity));
+    moho::Entity::sType = type;
   }
 
+  GPG_ASSERT(type != nullptr);
+  GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mLoadCallback;
+  GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
 
 /**
- * Address: 0x00BD5050 (FUN_00BD5050, register_EntitySerializer)
- *
- * What it does:
- * Initializes the global `Entity` serializer helper, binds its load/save
- * callbacks, and installs process-exit cleanup.
+ * Address: 0x00BD5050 (FUN_00BD5050, dynamic initializer for the global
+ * `EntitySerializer` singleton)
  */
-void moho::register_EntitySerializer()
+EntitySerializer::EntitySerializer()
+  : mLoadCallback(&EntitySerializer::Deserialize)
+  , mSaveCallback(&EntitySerializer::Serialize)
+{}
+
+/**
+ * Address: 0x00BFC870 (FUN_00BFC870, Moho::EntitySerializer::~EntitySerializer)
+ */
+EntitySerializer::~EntitySerializer()
 {
-  EntitySerializer* const serializer = AcquireEntitySerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EntitySerializer::Deserialize;
-  serializer->mSaveCallback = &EntitySerializer::Serialize;
-  (void)std::atexit(&cleanup_EntitySerializer);
+  ResetLinks();
 }

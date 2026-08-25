@@ -80,9 +80,23 @@ namespace
   struct EntityAttributesSerializerHelper : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCA0A0 vtable slot 0 dispatch target (dispatched by
-     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
-     * the pending list).
+     * Address: 0x00BCA0A0 (FUN_00BCA0A0, dynamic initializer for the global
+     * `EntityAttributesSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields. Mangled dtor atexit target
+     * (`??1EntityAttributesSerializer@Moho@@QAE@@Z`, FUN_00BF4F60).
+     */
+    EntityAttributesSerializerHelper();
+
+    /**
+     * Address: 0x00BF4F60 (FUN_00BF4F60, Moho::EntityAttributesSerializer::~EntityAttributesSerializer)
+     */
+    ~EntityAttributesSerializerHelper();
+
+    /**
+     * Address: 0x00558BC0 (FUN_00558BC0, gpg::SerSaveLoadHelper_EntityAttributes::Init)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -115,7 +129,7 @@ namespace
     sizeof(EntityAttributesSerializerHelper) == 0x14, "EntityAttributesSerializerHelper size must be 0x14"
   );
 
-  EntityAttributesSerializerHelper gEntityAttributesSerializer{};
+  EntityAttributesSerializerHelper gEntityAttributesSerializer;
 
   /**
    * Demangled: gpg::SerSaveLoadHelper<class Moho::SSTIEntityAttachInfo>
@@ -128,6 +142,21 @@ namespace
    */
   struct SSTIEntityAttachInfoSerializerHelper : public gpg::SerHelperBase
   {
+    /**
+     * Address: 0x00BCA040 (FUN_00BCA040, dynamic initializer for the global
+     * `SSTIEntityAttachInfoSerializer` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    SSTIEntityAttachInfoSerializerHelper();
+
+    /**
+     * Address: 0x00BF4ED0 (FUN_00BF4ED0, Moho::SSTIEntityAttachInfoSerializer::~SSTIEntityAttachInfoSerializer)
+     */
+    ~SSTIEntityAttachInfoSerializerHelper();
+
     /**
      * Address: 0x00558B20 (FUN_00558B20, gpg::SerSaveLoadHelper_SSTIEntityAttachInfo::Init)
      *
@@ -173,31 +202,7 @@ namespace
     "SSTIEntityAttachInfoSerializerHelper size must be 0x14"
   );
 
-  SSTIEntityAttachInfoSerializerHelper gSSTIEntityAttachInfoSerializer{};
-
-  /**
-   * Address: 0x005583C0 (FUN_005583C0, SerSaveLoadHelper<SSTIEntityAttachInfo>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `SSTIEntityAttachInfo` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
-  {
-    gSSTIEntityAttachInfoSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005583F0 (FUN_005583F0, SerSaveLoadHelper<SSTIEntityAttachInfo>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `SSTIEntityAttachInfo` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkSSTIEntityAttachInfoSerializerLaneB() noexcept
-  {
-    gSSTIEntityAttachInfoSerializer.ResetLinks();
-  }
+  SSTIEntityAttachInfoSerializerHelper gSSTIEntityAttachInfoSerializer;
 
   /**
    * Address: 0x00558310 (FUN_00558310, Moho::SSTIEntityAttachInfoSerializer::Deserialize)
@@ -248,56 +253,20 @@ namespace
   }
 
   /**
+   * Address: 0x00BCA040 (FUN_00BCA040, dynamic initializer for the global
+   * `SSTIEntityAttachInfoSerializer` singleton)
+   */
+  SSTIEntityAttachInfoSerializerHelper::SSTIEntityAttachInfoSerializerHelper()
+    : mLoadCallback(&DeserializeSSTIEntityAttachInfoSerializerCallback)
+    , mSaveCallback(&SerializeSSTIEntityAttachInfoSerializerCallback)
+  {}
+
+  /**
    * Address: 0x00BF4ED0 (FUN_00BF4ED0, Moho::SSTIEntityAttachInfoSerializer::~SSTIEntityAttachInfoSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `SSTIEntityAttachInfo` serializer
-   * helper node, matching the sibling `EntityAttributes` cleanup lane.
    */
-  void cleanup_SSTIEntityAttachInfoSerializer_atexit()
+  SSTIEntityAttachInfoSerializerHelper::~SSTIEntityAttachInfoSerializerHelper()
   {
-    UnlinkSSTIEntityAttachInfoSerializerLaneA();
-  }
-
-  /**
-   * Address: 0x00BCA040 (FUN_00BCA040, register_SSTIEntityAttachInfoSerializer)
-   *
-   * What it does:
-   * Binds the global SSTIEntityAttachInfo serializer helper callbacks and
-   * installs process-exit cleanup. The helper node self-links and splices
-   * into `gpg::SerHelperBase::sNewHelpers` automatically as part of its own
-   * construction, which runs before this function does, so this no longer
-   * needs to unlink/self-link the node itself first.
-   */
-  void register_SSTIEntityAttachInfoSerializer()
-  {
-    gSSTIEntityAttachInfoSerializer.mLoadCallback = &DeserializeSSTIEntityAttachInfoSerializerCallback;
-    gSSTIEntityAttachInfoSerializer.mSaveCallback = &SerializeSSTIEntityAttachInfoSerializerCallback;
-    (void)std::atexit(&cleanup_SSTIEntityAttachInfoSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x005585C0 (FUN_005585C0, SerSaveLoadHelper<EntityAttributes>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `EntityAttributes` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkEntityAttributesSerializerLaneA() noexcept
-  {
-    gEntityAttributesSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005585F0 (FUN_005585F0, SerSaveLoadHelper<EntityAttributes>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `EntityAttributes` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkEntityAttributesSerializerLaneB() noexcept
-  {
-    gEntityAttributesSerializer.ResetLinks();
+    ResetLinks();
   }
 
   void DeserializeEntityAttributesSerializerCallback(
@@ -320,26 +289,21 @@ namespace
     reinterpret_cast<const moho::EntityAttributes*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  void cleanup_EntityAttributesSerializer_atexit()
-  {
-    UnlinkEntityAttributesSerializerLaneA();
-  }
+  /**
+   * Address: 0x00BCA0A0 (FUN_00BCA0A0, dynamic initializer for the global
+   * `EntityAttributesSerializer` singleton)
+   */
+  EntityAttributesSerializerHelper::EntityAttributesSerializerHelper()
+    : mLoadCallback(&DeserializeEntityAttributesSerializerCallback)
+    , mSaveCallback(&SerializeEntityAttributesSerializerCallback)
+  {}
 
   /**
-   * Address: 0x00BCA0A0 (FUN_00BCA0A0, register_EntityAttributesSerializer)
-   *
-   * What it does:
-   * Binds the global EntityAttributes serializer helper callbacks and
-   * installs process-exit cleanup. The helper node self-links and splices
-   * into `gpg::SerHelperBase::sNewHelpers` automatically as part of its own
-   * construction, which runs before this function does, so this no longer
-   * needs to unlink/self-link the node itself first.
+   * Address: 0x00BF4F60 (FUN_00BF4F60, Moho::EntityAttributesSerializer::~EntityAttributesSerializer)
    */
-  void register_EntityAttributesSerializer()
+  EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper()
   {
-    gEntityAttributesSerializer.mLoadCallback = &DeserializeEntityAttributesSerializerCallback;
-    gEntityAttributesSerializer.mSaveCallback = &SerializeEntityAttributesSerializerCallback;
-    (void)std::atexit(&cleanup_EntityAttributesSerializer_atexit);
+    ResetLinks();
   }
 
   /**
@@ -1295,8 +1259,6 @@ namespace
     SSTIEntityVariableDataSerializerStartupBootstrap()
     {
       register_SSTIEntityVariableDataSerializer();
-      register_EntityAttributesSerializer();
-      register_SSTIEntityAttachInfoSerializer();
     }
   };
 
