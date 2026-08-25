@@ -4858,8 +4858,17 @@ namespace msvc8
          * this instantiation's own `insert(pos, count, value)` (cited
          * below on that member) -- confirmed by field-for-field match of
          * its local-copy staging against this element's exact layout. The
-         * other four (`0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`)
-         * remain unrecovered source.)
+         * other four are now resolved too, all thin calling-convention
+         * bridges: `0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`
+         * each tail-call straight into this member (`sub_5CDEF0`) with
+         * register/stack argument reshuffling and nothing else -- e.g.
+         * `sub_5CBCA0(edx@a1, a2, a3) { return sub_5CDEF0(a3, a2, a1); }`.
+         * `0x005C9DA0` is the one exception: it bridges to a DIFFERENT
+         * address, `FUN_005CD100` (this element's `copy_or_move_assign`
+         * emission, cited there, not this plain-copy one) -- `insert(pos,
+         * count, value)`'s `FUN_005C6580` above calls both this member and
+         * `copy_or_move_assign` for different parts of its shift/fill
+         * logic, and each has its own bridge.)
          *
          * Address: 0x00832BC0 (FUN_00832BC0, `msvc8::vector<void*>::
          * uninit_copy_n` for a 4-byte pointer element -- `[first@ecx,
@@ -6146,6 +6155,26 @@ namespace msvc8
          * SuspendInputWindowEventHandlersAndFlushQueue`'s
          * `suspended.resize(g_UIManager->mInputWindows.size())` call
          * instantiates it (UiRuntimeTypes.cpp).)
+         *
+         * Address: 0x005CD100 (FUN_005CD100, sub_5CD100) -- backward
+         * (`dst -= 28`/`src -= 28`) tail-shift-and-reassign loop for the
+         * same unidentified 0x1C-byte WeakPtr-shaped element cited on
+         * `uninit_copy_n`'s `FUN_005CDEF0`/`insert(pos,count,value)`'s
+         * `FUN_005C6580` above (3-dword header, tag byte, raw pointer +
+         * refcount-block-pointer handle pair, trailing byte). Unlike the
+         * plain-copy `uninit_copy_n` shape, this member does REAL
+         * assignment semantics per slot: `_InterlockedExchangeAdd`-bumps
+         * the incoming handle's refcount, and if the outgoing slot's own
+         * old refcount hits zero on release, dispatches two virtual calls
+         * through its vtable (`vtbl[1]`/`vtbl[2]`) before overwriting --
+         * matching a `boost::shared_ptr`/`weak_ptr`-style full
+         * release-then-reassign, not a blind relocate. Reached from this
+         * instantiation's own `sub_5C9DA0` (`(a1,a2,a3) -> sub_5CD100(a1,
+         * a3)`), itself reached from `insert(pos,count,value)`'s
+         * `FUN_005C6580` above (`insert`'s in-place-shift branch calling
+         * `copy_or_move_assign` on the pre-move tail, matching this
+         * member's non-trivial branch exactly since the element owns a
+         * refcounted handle and is not `is_trivially_copy_assignable_v`).
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
