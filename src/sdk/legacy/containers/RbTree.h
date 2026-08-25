@@ -809,6 +809,36 @@ namespace msvc8
          * in this pass (out of scope), flagged for a follow-up template
          * clean-up.)
          */
+        /**
+         * Address: 0x00581620 (FUN_00581620, sub_581620) --
+         * `Moho::CAiBrain::mBuildStructureMap`'s predecessor lookup --
+         * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25
+         * (0x0C node header + sizeof(pair<Vector2i(8), SBuildReserveInfo(0x10)>)
+         * = 0x24), the same instantiation cited on `buy_head`/`buy_node`/
+         * `rb_max` elsewhere in this file (0x00581330/0x00581370/0x0057F1B0).
+         * A thin `_Node**` slot-pointer wrapper adapter around this member,
+         * matching the `FUN_004E4440` shape immediately above byte-for-byte
+         * against the `.asm`: `mov eax,[edx]` loads `*slot`; the nil (header)
+         * case writes `slot->right`; the real-left-subtree case inlines the
+         * `rb_max(n->left)` walk directly instead of calling out, and always
+         * writes; the no-left-subtree case climbs `parent` while
+         * `n == ancestor->left`, writing `*slot` only when the walked-to node
+         * is not nil -- exactly this member's `rb_is_nil(n) ? n : ancestor`
+         * guard. Two real callers, both this map's insert emissions:
+         * `insert_unique`'s emission (`FUN_00580510`, cited below) via its
+         * `probe = rb_decrement(where)` non-leftmost branch, and
+         * `insert_hint`'s emission (`FUN_0057EFF0`, cited below) via its
+         * `before = rb_decrement(at)` straddle check -- confirmed against
+         * both callers' `.asm` (`lea edx,[slot]` immediately before
+         * `call sub_581620`, no other registers/stack args). Both insert
+         * paths are reached from this map's `operator[]`: `moho::func_
+         * ScheduleBuildStructure`'s `brain->mBuildStructureMap[where]`
+         * (`CAiBrain.cpp`, already recovered) and `BuildReserveMapTypeInfo::
+         * SerLoad`'s `(*mapObject)[key]` (`CAiBrain.cpp`, already recovered)
+         * -- the two real `operator[]` use sites for this map. Previously
+         * mis-tracked `blocked`, citing `CrtRuntimeHelpers.cpp` boilerplate
+         * the address never actually appeared in (DB-integrity fix).
+         */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -2076,6 +2106,40 @@ namespace msvc8
              * sole real callee, `sub_83BDE0`, is engine code (this
              * template's own `insert_at`), not third-party runtime.)
              */
+            /**
+             * Address: 0x00580510 (FUN_00580510, sub_580510) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s unique insert --
+             * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25,
+             * the same instantiation cited on `buy_head`/`buy_node`/
+             * `rb_max`/`rb_decrement` elsewhere in this file
+             * (0x00581330/0x00581370/0x0057F1B0/0x00581620). The descent
+             * loop inlines the two-`int` `Wm3::Vector2i` field-by-field
+             * comparator (x then y, matching `this->comp()` for this key
+             * type) directly into the tree walk instead of calling out,
+             * confirmed against the `.c`: `v11 = node->key[i]; if (key[i] <
+             * v11) less; if (key[i] > v11) greater; else ++i, retry, equal
+             * at i==2`. Non-leftmost branch calls `rb_decrement`
+             * (`FUN_00581620`, cited above) for the `probe` predecessor
+             * check via `lea edx,[local]` / `call sub_581620` (confirmed
+             * against the `.asm`, no other args -- the out-param-slot
+             * calling convention); both branches tail into `insert_at`
+             * (`FUN_00580720`, already recovered) and the final uniqueness
+             * test calls the same comparator (`FUN_00582A10`) on
+             * `probe->value`/`v`. Two real callers: `insert_hint`'s emission
+             * for this instantiation (`FUN_0057EFF0`, cited below) as its
+             * final fallback (`return insert_unique(v).first`), and
+             * `BuildReserveMapTypeInfo::SerLoad` (`CAiBrain.cpp`, already
+             * recovered) directly -- `operator[]`/`insert_hint` are fully
+             * inlined at that particular call site (`(*mapObject)[key]`
+             * inside `SerLoad`'s per-entry loop), leaving only this member
+             * as a real out-of-line call in that emission (confirmed: `.c`
+             * shows `sub_580510(a2, v15, v20)` called directly from
+             * `SerLoad`'s loop body). Previously mis-tracked
+             * `external_dependency` ("all-external-callees thunk"); every
+             * real callee (`sub_580720`/`sub_581620`/`sub_582A10`) is this
+             * template's own engine code, not third-party runtime
+             * (DB-integrity fix).
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -2206,6 +2270,40 @@ namespace msvc8
              * citation or report at all prior to this pass -- a DB-integrity
              * gap, not a false attribution, but unverifiable either way
              * without one.)
+             */
+            /**
+             * Address: 0x0057EFF0 (FUN_0057EFF0, sub_57EFF0) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s hinted insert --
+             * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25,
+             * the same instantiation cited on `insert_unique`/`rb_decrement`
+             * above (0x00580510/0x00581620). Matches this member's full
+             * branch structure against the `.c`: empty-tree fast path
+             * (`!size_`) straight to `insert_at` (`FUN_00580720`, already
+             * recovered); `at == leftmost()` check with a `comp(v,
+             * at->value)` guard, tail-calling `insert_at(true, ...)`;
+             * `at == head_` (`rb_is_nil(at)`, tested by pointer identity
+             * against the cached head in this emission) with a
+             * `comp(rightmost->value, v)` guard, tail-calling
+             * `insert_at(false, rightmost(), ...)`; a `comp(v, at->value)`
+             * straddle branch calling `rb_decrement` (`FUN_00581620`, cited
+             * above) for `before` and re-testing `comp(before->value, v)`;
+             * an increment straddle branch calling `rb_increment`
+             * (`FUN_00581500`, sibling `rb_increment` instantiation for this
+             * same map, not yet recovered) for `after`; and a final fallback
+             * to `insert_unique` (`FUN_00580510`, cited above) taking its
+             * `.first` when no fast path applies. Reached from `operator[]`'s
+             * emission for this instantiation (`FUN_0057D910`, `skip`'d as a
+             * RULE ONE compiler emission, `Map.h`) passing its own
+             * `lower_bound` result as the hint -- the same "fill the gap we
+             * just located" usage this member's doc comment above describes.
+             * `operator[]`'s real use site for that emission is not yet
+             * pinned to a specific `CAiBrain.cpp` line (unlike
+             * `insert_unique`/`rb_decrement`'s two directly-cited
+             * `operator[]` call sites above, which fully inline this member
+             * instead of calling it out-of-line). Previously `blocked`
+             * ("owner_layout", additional evidence needed); this pass
+             * supplies the full instantiation, calling-convention, and
+             * caller evidence.
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
