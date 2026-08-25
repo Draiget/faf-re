@@ -51,6 +51,15 @@ using png_infopp = png_info_struct**;
 // Opaque png_sPLT_t forward declaration (full layout in PngSetRuntime.h).
 struct png_sPLT_t;
 
+// Opaque png_row_info forward declaration (full layout in PngSetRuntime.h;
+// same guarded typedef pattern as PngTransformRuntime.h so all three headers
+// can be included in any order).
+struct png_row_info;
+#ifndef FA_LIBPNG_PNG_ROW_INFOP_DEFINED
+#define FA_LIBPNG_PNG_ROW_INFOP_DEFINED
+using png_row_infop = png_row_info*;
+#endif
+
 // libpng png_color_16 (10-byte record): palette index + 16-bit RGB + gray.
 // Used verbatim (no byte-swap) as the in-memory representation of
 // png_info::trans_values (tRNS) and png_info::background (bKGD); only the
@@ -686,8 +695,155 @@ extern "C" void png_write_info_before_PLTE(png_structp png_ptr, png_infop info_p
  * before IDAT that are safe (or forced) to copy, writing each via
  * png_write_chunk.
  *
- * Callers: wxPNGHandler::SaveFile (0x00975370), png_write_png (0x009E8AB8).
- * Both remain unrecovered (separate wx image-handler / top-level-API
- * subsystems) — see the recovery report for this token.
+ * Callers: wxPNGHandler::SaveFile (0x00975370, still unrecovered -- see
+ * decomp/recovery/reports/FUN_00975370.md for the wxImage/vtable evidence
+ * and the ready-to-execute plan, blocked on a concurrently-locked file) and
+ * png_write_png (0x009E8AB8, recovered below).
  */
 extern "C" void png_write_info(png_structp png_ptr, png_infop info_ptr);
+
+// ============================================================================
+// png_write_row chain: row buffering, Adam7 pass skip, adaptive filtering,
+// zlib deflate draining, and the two top-level entry points.
+// ============================================================================
+
+/**
+ * Address: 0x00A24E7F (FUN_00A24E7F)
+ * Mangled: png_write_IDAT
+ *
+ * What it does:
+ * Emits one IDAT chunk carrying `length` bytes of already-deflated image
+ * data, then marks PNG_HAVE_IDAT on png_ptr->mode.
+ */
+extern "C" void png_write_IDAT(png_structp png_ptr, std::uint8_t* data, std::uint32_t length);
+
+/**
+ * Address: 0x009E9F5E (FUN_009E9F5E)
+ * Mangled: png_flush
+ *
+ * What it does:
+ * Invokes the installed output_flush_fn callback, if any (no-op otherwise).
+ */
+extern "C" void png_flush(png_structp png_ptr);
+
+/**
+ * Address: 0x00A247E4 (FUN_00A247E4)
+ * Mangled: png_write_start_row
+ *
+ * What it does:
+ * One-time (per image) row-pipeline setup: allocates row_buf and the
+ * per-filter-type scratch buffers (sub_row/up_row/avg_row/paeth_row) that
+ * do_filter enables, seeds each with its PNG_FILTER_VALUE_* tag byte, and
+ * computes num_rows/usr_width for the first Adam7 pass or the whole image.
+ */
+extern "C" void png_write_start_row(png_structp png_ptr);
+
+/**
+ * Address: 0x00A259BC (FUN_00A259BC)
+ * Mangled: png_write_finish_row
+ *
+ * What it does:
+ * Advances row_number/pass bookkeeping; once the whole datastream's rows are
+ * written, flushes the deflate stream to completion (Z_FINISH), draining
+ * zbuf through png_write_IDAT.
+ */
+extern "C" void png_write_finish_row(png_structp png_ptr);
+
+/**
+ * Address: 0x00A25B38 (FUN_00A25B38)
+ * Mangled: png_write_filtered_row
+ *
+ * What it does:
+ * Feeds one already-filtered scanline through zlib deflate (Z_NO_FLUSH),
+ * draining zbuf into IDAT chunks; swaps row_buf/prev_row; advances to
+ * png_write_finish_row; periodically flushes early per flush_dist.
+ */
+extern "C" void png_write_filtered_row(png_structp png_ptr, std::uint8_t* filteredRow);
+
+/**
+ * Address: 0x009E80D0 (FUN_009E80D0)
+ * Mangled: png_write_flush
+ *
+ * What it does:
+ * Early-flushes the deflate stream mid-image (Z_SYNC_FLUSH), draining zbuf
+ * into IDAT chunks, then invokes the user-visible png_flush callback.
+ */
+extern "C" void png_write_flush(png_structp png_ptr);
+
+/**
+ * Address: 0x00A25BF5 (FUN_00A25BF5)
+ * Mangled: png_write_find_filter
+ *
+ * What it does:
+ * Chooses which PNG filter type (None/Sub/Up/Average/Paeth) best compresses
+ * the current scanline (or applies the sole enabled filter unconditionally),
+ * using libpng's "minimum sum of absolute differences" heuristic (optionally
+ * weighted by recent filter-type history), then writes it via
+ * png_write_filtered_row.
+ */
+extern "C" void png_write_find_filter(png_structp png_ptr, png_row_infop row_info);
+
+/**
+ * Address: 0x009E7EC5 (FUN_009E7EC5)
+ * Mangled: png_write_row
+ *
+ * What it does:
+ * Writes one scanline: lazily runs png_write_start_row on the first call,
+ * skips rows outside the current Adam7 pass, copies/transforms the pixel
+ * data into row_buf, and dispatches to png_write_find_filter.
+ *
+ * Callers: png_write_rows (0x009E89A2, still unrecovered), png_write_image
+ * (0x009E89C6, below), wxPNGHandler::SaveFile (0x00975370, still unrecovered).
+ */
+extern "C" void png_write_row(png_structp png_ptr, std::uint8_t* row);
+
+/**
+ * Address: 0x009E89C6 (FUN_009E89C6)
+ * Mangled: png_write_image
+ *
+ * What it does:
+ * Writes every scanline of a full in-memory image, one png_write_row call
+ * per row per Adam7 pass (png_set_interlace_handling supplies the pass count).
+ *
+ * Sole caller: png_write_png (0x009E8AB8), below.
+ */
+extern "C" void png_write_image(png_structp png_ptr, std::uint8_t** image);
+
+/**
+ * Address: 0x00A24EA0 (FUN_00A24EA0)
+ * Mangled: png_write_IEND
+ *
+ * What it does:
+ * Writes the empty IEND chunk and marks PNG_HAVE_IEND on png_ptr->mode.
+ *
+ * Sole caller: png_write_end (0x009E7D38), below.
+ */
+extern "C" void png_write_IEND(png_structp png_ptr);
+
+/**
+ * Address: 0x009E7D38 (FUN_009E7D38)
+ * Mangled: png_write_end
+ *
+ * What it does:
+ * Finishes writing a PNG datastream: trailing tIME/text/unknown-chunk pass
+ * (matching png_write_info's chunk-writing conventions), then PNG_AFTER_IDAT
+ * + IEND.
+ *
+ * Callers: wxPNGHandler::SaveFile (0x00975370, still unrecovered),
+ * png_write_png (0x009E8AB8, below).
+ */
+extern "C" void png_write_end(png_structp png_ptr, png_infop info_ptr);
+
+/**
+ * Address: 0x009E8AB8 (FUN_009E8AB8)
+ * Mangled: png_write_png
+ *
+ * What it does:
+ * libpng's "write the whole image in one call" convenience API: applies the
+ * caller-selected PNG_TRANSFORM_* pixel transforms around png_write_info /
+ * png_write_image / png_write_end. See the .cpp definition's doc comment for
+ * this token's callsite-evidence exception (zero binary callers, proven via
+ * exhaustive PE byte-scan, recorded recovered rather than skip/external
+ * because the source identity is proven beyond doubt).
+ */
+extern "C" void png_write_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params);

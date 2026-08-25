@@ -8,6 +8,7 @@
 #include "libpng/PngCommonRuntime.h"  // png_reset_crc / png_calculate_crc
 #include "libpng/PngMemRuntime.h"     // png_zalloc / png_zfree
 #include "libpng/PngSetRuntime.h"     // png_info_struct, png_sPLT_t, png_text, png_unknown_chunk
+#include "libpng/PngTransformRuntime.h"  // png_do_write_interlace/transformations/intrapixel, png_do_pack
 
 #include <cstdio>
 #include <cstdlib>
@@ -28,6 +29,10 @@ int deflateInit2_(z_stream_s* strm, int level, int method, int windowBits,
 // Shared read/write-path helper (recovered in PngReadRuntime.cpp @ 0x009E0A5E):
 // classifies an unknown chunk name against the user-registered keep list.
 int png_handle_as_unknown(png_structp png_ptr, const std::uint8_t* chunk_name);
+// Shared low-level helper (recovered in PngReadRuntime.cpp @ 0x00A2106A):
+// bounds-checked memcpy used by both row pipelines to fill the row buffer.
+void png_memcpy_check(png_structp png_ptr, void* dst, void* src, std::uint32_t length);
+// png_set_interlace_handling is declared by the already-included PngSetRuntime.h.
 }
 
 // Fixed-point scale constants from libpng 1.2.x:
@@ -1890,4 +1895,957 @@ extern "C" void png_write_info(png_structp png_ptr, png_infop info_ptr)
       png_write_chunk(png_ptr, const_cast<std::uint8_t*>(chunk.name), chunk.data, chunk.size);
     }
   }
+}
+
+// ============================================================================
+// png_write_row chain: row buffering, Adam7 pass skip, adaptive filtering,
+// zlib deflate draining, and the two top-level entry points
+// (wxPNGHandler::SaveFile's granular API and png_write_png's convenience API).
+// ============================================================================
+
+/**
+ * Address: 0x00A24E7F (FUN_00A24E7F)
+ * Mangled: png_write_IDAT
+ *
+ * IDA signature:
+ * void __cdecl png_write_IDAT(png_structp png_ptr, png_bytep data, png_size_t length);
+ *
+ * What it does:
+ * Emits one IDAT chunk carrying `length` bytes of already-deflated image
+ * data, then marks PNG_HAVE_IDAT on png_ptr->mode.
+ */
+extern "C" void png_write_IDAT(png_structp png_ptr, std::uint8_t* data, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  std::uint8_t chunkName[4]{'I', 'D', 'A', 'T'};
+  png_write_chunk(png_ptr, chunkName, data, length);
+  Mode(png_ptr) |= kPngHaveIdat;
+}
+
+/**
+ * Address: 0x009E9F5E (FUN_009E9F5E)
+ * Mangled: png_flush
+ *
+ * IDA signature:
+ * void __cdecl png_flush(png_structp png_ptr);
+ *
+ * What it does:
+ * Invokes the installed output_flush_fn callback, if any (no-op otherwise).
+ */
+extern "C" void png_flush(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+  using png_flush_ptr = void (*)(png_structp);
+  if (const auto flushFn = Field<png_flush_ptr>(png_ptr, kOffOutputFlushFn)) {
+    flushFn(png_ptr);
+  }
+}
+
+/**
+ * Address: 0x00A247E4 (FUN_00A247E4)
+ * Mangled: png_write_start_row
+ *
+ * IDA signature:
+ * void __cdecl png_write_start_row(png_structp png_ptr);
+ *
+ * What it does:
+ * One-time (per image) row-pipeline setup, run from png_write_row on its
+ * very first call. Allocates the row_buf scratch buffer (image row width
+ * plus one lead byte for the filter-type tag) and, for every filter kind
+ * enabled in do_filter, its dedicated candidate buffer (sub_row/up_row/
+ * avg_row/paeth_row), each pre-seeded with its PNG_FILTER_VALUE_* tag byte.
+ * prev_row is allocated and zero-filled whenever any of UP/AVG/PAETH is
+ * enabled (they read the previous scanline). Computes num_rows/usr_width
+ * for Adam7 pass 0 when interlaced writing is being driven pass-by-pass
+ * (the caller has not pre-expanded PNG_INTERLACE), or for the whole image
+ * otherwise, then points the deflate stream's output cursor at zbuf.
+ *
+ * Sole caller: png_write_row (0x009E7EC5), on the first row of each image.
+ */
+extern "C" void png_write_start_row(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t bufSize =
+    ((Width(png_ptr) * UsrChannels(png_ptr) * UsrBitDepth(png_ptr) + 7) >> 3) + 1;
+
+  RowBuf(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, bufSize));
+  RowBuf(png_ptr)[0] = kPngFilterValueNone;
+
+  const std::uint8_t doFilter = DoFilter(png_ptr);
+  if ((doFilter & kPngFilterSub) != 0) {
+    SubRow(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, Rowbytes(png_ptr) + 1));
+    SubRow(png_ptr)[0] = kPngFilterValueSub;
+  }
+
+  if ((doFilter & (kPngFilterAvg | kPngFilterUp | kPngFilterPaeth)) != 0) {
+    PrevRow(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, bufSize));
+    std::memset(PrevRow(png_ptr), 0, bufSize);
+
+    if ((doFilter & kPngFilterUp) != 0) {
+      UpRow(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, Rowbytes(png_ptr) + 1));
+      UpRow(png_ptr)[0] = kPngFilterValueUp;
+    }
+    if ((doFilter & kPngFilterAvg) != 0) {
+      AvgRow(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, Rowbytes(png_ptr) + 1));
+      AvgRow(png_ptr)[0] = kPngFilterValueAvg;
+    }
+    if ((doFilter & kPngFilterPaeth) != 0) {
+      PaethRow(png_ptr) = static_cast<std::uint8_t*>(png_malloc(png_ptr, Rowbytes(png_ptr) + 1));
+      PaethRow(png_ptr)[0] = kPngFilterValuePaeth;
+    }
+  }
+
+  if (Interlaced(png_ptr) != 0 && (Transformations(png_ptr) & kPngInterlace) == 0) {
+    NumRows(png_ptr) = (Height(png_ptr) - kPngPassYStart[0] + kPngPassYInc[0] - 1) / kPngPassYInc[0];
+    UsrWidth(png_ptr) = (Width(png_ptr) - kPngPassStart[0] + kPngPassInc[0] - 1) / kPngPassInc[0];
+  } else {
+    NumRows(png_ptr) = Height(png_ptr);
+    UsrWidth(png_ptr) = Width(png_ptr);
+  }
+
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) =
+    static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+  Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+}
+
+/**
+ * Address: 0x00A259BC (FUN_00A259BC)
+ * Mangled: png_write_finish_row
+ *
+ * IDA signature:
+ * void __cdecl png_write_finish_row(png_structp png_ptr);
+ *
+ * What it does:
+ * Advances row_number; if the current pass isn't finished yet, returns.
+ * Otherwise (interlaced) advances to the next pass -- skipping any pass
+ * with zero rows or zero columns when the caller is driving passes
+ * one-by-one -- and resets prev_row's lead region for it, returning early.
+ * Once every pass is done (or the image was never interlaced), flushes the
+ * deflate stream to completion (Z_FINISH), draining zbuf through
+ * png_write_IDAT as it fills, then resets the zlib stream for the next image.
+ *
+ * Callers: png_write_filtered_row (0x00A25B38, every row), and png_write_row
+ * (0x009E7EC5, directly, for a row skipped by the Adam7 pass filter).
+ */
+extern "C" void png_write_finish_row(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  if (++RowNumber(png_ptr) < NumRows(png_ptr)) {
+    return;
+  }
+
+  if (Interlaced(png_ptr) != 0) {
+    RowNumber(png_ptr) = 0;
+
+    if ((Transformations(png_ptr) & kPngInterlace) != 0) {
+      *(RawBase(png_ptr) + kOffPass) += 1;
+    } else {
+      // Loop until a non-empty pass is found (or every pass is exhausted).
+      while (true) {
+        const std::uint8_t pass = static_cast<std::uint8_t>(*(RawBase(png_ptr) + kOffPass) + 1);
+        *(RawBase(png_ptr) + kOffPass) = pass;
+        if (pass >= 7) {
+          break;
+        }
+        UsrWidth(png_ptr) =
+          (Width(png_ptr) - kPngPassStart[pass] + kPngPassInc[pass] - 1) / kPngPassInc[pass];
+        NumRows(png_ptr) =
+          (Height(png_ptr) - kPngPassYStart[pass] + kPngPassYInc[pass] - 1) / kPngPassYInc[pass];
+        if (UsrWidth(png_ptr) != 0 && NumRows(png_ptr) != 0) {
+          break;
+        }
+      }
+    }
+
+    if (*(RawBase(png_ptr) + kOffPass) < 7) {
+      if (std::uint8_t* const prevRow = PrevRow(png_ptr)) {
+        std::memset(prevRow, 0,
+                    ((static_cast<std::uint32_t>(UsrChannels(png_ptr)) * UsrBitDepth(png_ptr) *
+                      Width(png_ptr) + 7) >> 3) + 1);
+      }
+      return;
+    }
+  }
+
+  // Final row of the datastream (or a non-interlaced image): flush the
+  // compressor to completion, draining zbuf into IDAT chunks as it fills.
+  auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+  int ret;
+  do {
+    // Z_FINISH == 4.
+    ret = deflate(zstream, 4);
+    if (ret == 0 /* Z_OK */) {
+      if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0) {
+        png_write_IDAT(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf),
+                       static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize)));
+        Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+        Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) =
+          static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+      }
+    } else if (ret != 1 /* Z_STREAM_END */) {
+      const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+      png_error(png_ptr, zmsg != nullptr ? zmsg : "zlib error");
+    }
+  } while (ret != 1 /* Z_STREAM_END */);
+
+  const std::uint32_t zbufSize = static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+  const std::uint32_t availOut = Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut);
+  if (availOut < zbufSize) {
+    png_write_IDAT(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), zbufSize - availOut);
+  }
+
+  deflateReset(zstream);
+}
+
+/**
+ * Address: 0x00A25B38 (FUN_00A25B38)
+ * Mangled: png_write_filtered_row
+ *
+ * IDA signature:
+ * void __cdecl png_write_filtered_row(png_structp png_ptr, png_bytep filtered_row);
+ *
+ * What it does:
+ * Feeds one already-filtered scanline (filter tag byte + payload) through
+ * zlib deflate (Z_NO_FLUSH), draining zbuf into IDAT chunks as it fills.
+ * Swaps row_buf/prev_row (the just-written row becomes the next row's
+ * "previous row" for the UP/AVG/PAETH filters), advances to
+ * png_write_finish_row, then flushes the stream early once flush_rows
+ * reaches flush_dist (when the caller configured periodic flushing).
+ *
+ * Sole caller: png_write_find_filter (0x00A25BF5), once per row.
+ */
+extern "C" void png_write_filtered_row(png_structp png_ptr, std::uint8_t* filteredRow)
+{
+  using namespace libpng_layout;
+
+  auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+  Field<std::uint8_t*>(png_ptr, kOffZstreamNextIn) = filteredRow;
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) =
+    Field<std::uint32_t>(png_ptr, kOffRowInfoRowbytes) + 1;
+
+  do {
+    // Z_NO_FLUSH == 0.
+    if (deflate(zstream, 0) != 0) {
+      const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+      png_error(png_ptr, zmsg != nullptr ? zmsg : "zlib error");
+    }
+    if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0) {
+      png_write_IDAT(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf),
+                     static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize)));
+      Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+      Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) =
+        static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+    }
+  } while (Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) != 0);
+
+  if (std::uint8_t* const prevRow = PrevRow(png_ptr)) {
+    std::uint8_t* const savedRowBuf = RowBuf(png_ptr);
+    RowBuf(png_ptr) = prevRow;
+    PrevRow(png_ptr) = savedRowBuf;
+  }
+
+  png_write_finish_row(png_ptr);
+
+  // flush_rows is incremented unconditionally (even when flush_dist == 0 and
+  // no flush will ever trigger) -- matches the binary's instruction order.
+  const std::uint32_t flushRows = ++FlushRows(png_ptr);
+  const std::uint32_t flushDist = FlushDist(png_ptr);
+  if (flushDist != 0 && flushRows >= flushDist) {
+    png_write_flush(png_ptr);
+  }
+}
+
+/**
+ * Address: 0x009E80D0 (FUN_009E80D0)
+ * Mangled: png_write_flush
+ *
+ * IDA signature:
+ * void __cdecl png_write_flush(png_structp png_ptr);
+ *
+ * What it does:
+ * Early-flushes the deflate stream mid-image (Z_SYNC_FLUSH) so a streaming
+ * consumer can see partial data, draining zbuf into IDAT chunks as it fills.
+ * No-op once the whole image has already been written (row_number >=
+ * num_rows, i.e. png_write_end's own Z_FINISH flush already ran). Resets
+ * flush_rows and invokes the user-visible png_flush callback.
+ *
+ * Sole caller: png_write_filtered_row (0x00A25B38, every flush_dist rows).
+ */
+extern "C" void png_write_flush(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  if (RowNumber(png_ptr) >= NumRows(png_ptr)) {
+    return;
+  }
+
+  auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+  while (true) {
+    // Z_SYNC_FLUSH == 2.
+    if (deflate(zstream, 2) != 0) {
+      const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+      png_error(png_ptr, zmsg != nullptr ? zmsg : "zlib error");
+    }
+    if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) != 0) {
+      break;
+    }
+    png_write_IDAT(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf),
+                   static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize)));
+    Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) =
+      static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+  }
+
+  const std::uint32_t zbufSize = static_cast<std::uint32_t>(Field<std::uint32_t>(png_ptr, kOffZbufSize));
+  const std::uint32_t availOut = Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut);
+  if (availOut != zbufSize) {
+    png_write_IDAT(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), zbufSize - availOut);
+  }
+
+  FlushRows(png_ptr) = 0;
+  png_flush(png_ptr);
+}
+
+namespace {
+
+// Paeth predictor (PNG spec section 6.6): predicts the current byte from its
+// left (a), above (b), and upper-left (c) neighbours. Matches the binary's
+// "fast" shape (PNG_SLOW_PAETH is not defined for this build).
+[[nodiscard]] inline int PaethPredictor(int a, int b, int c) noexcept
+{
+  const int p        = b - c;
+  const int pcRaw     = a - c;
+  const int pa        = p < 0 ? -p : p;
+  const int pb        = pcRaw < 0 ? -pcRaw : pcRaw;
+  const int pcAbs      = (p + pcRaw) < 0 ? -(p + pcRaw) : (p + pcRaw);
+  if (pa <= pb && pa <= pcAbs) {
+    return a;
+  }
+  return (pb <= pcAbs) ? b : c;
+}
+
+// libpng's "weighted minimum sum of absolute differences" filter-selection
+// heuristic (PNG_WRITE_WEIGHTED_FILTER_SUPPORTED, pngwutil.c
+// png_write_find_filter). Folds `sum` through the running per-history-slot
+// weight table for filter type `filterValue`, then through the fixed
+// per-filter cost. Reproduces libpng's PNG_HISHIFT/PNG_LOMASK/PNG_HIMASK
+// 16-bit hi/lo split bit-for-bit, including its intentional truncation and
+// overflow-to-PNG_MAXSUM behaviour. `useInverse` selects
+// filter_weights/filter_costs (scoring a freshly computed candidate) vs.
+// inv_filter_weights/inv_filter_costs (converting the running best `mins`
+// into this candidate's early-exit threshold) -- matching upstream's two
+// call shapes exactly.
+[[nodiscard]] std::uint32_t ApplyWeightedFilterHeuristic(
+  const PngStructWeightedFilterView& filter, std::uint32_t sum,
+  std::uint8_t filterValue, bool useInverse) noexcept
+{
+  constexpr std::uint32_t kHiShift = 10;           // PNG_HISHIFT
+  constexpr std::uint32_t kLoMask  = 0xFFFFu;      // PNG_LOMASK
+  constexpr std::uint32_t kHiMask  = 0x3FFFC0u;    // PNG_HIMASK
+  constexpr std::uint32_t kMaxSum  = 0x7FFFFFFFu;  // PNG_MAXSUM
+
+  std::uint32_t lo = sum & kLoMask;
+  std::uint32_t hi = (sum >> kHiShift) & kHiMask;
+
+  const std::uint16_t* const weights = useInverse ? filter.inv_filter_weights : filter.filter_weights;
+  for (int j = 0; j < filter.num_prev_filters; ++j) {
+    if (filter.prev_filters[j] == filterValue) {
+      const std::uint16_t w = weights[j];
+      lo = (lo * w) >> 8;  // PNG_WEIGHT_SHIFT
+      hi = (hi * w) >> 8;
+    }
+  }
+
+  const std::uint16_t cost = (useInverse ? filter.inv_filter_costs : filter.filter_costs)[filterValue];
+  lo = (lo * cost) >> 3;  // PNG_COST_SHIFT
+  hi = (hi * cost) >> 3;
+
+  return (hi > kHiMask) ? kMaxSum : (hi << kHiShift) + lo;
+}
+
+} // namespace
+
+/**
+ * Address: 0x00A25BF5 (FUN_00A25BF5)
+ * Mangled: png_write_find_filter
+ *
+ * IDA signature:
+ * void __cdecl png_write_find_filter(png_structp png_ptr, png_row_infop row_info);
+ *
+ * What it does:
+ * Chooses which PNG filter type (None/Sub/Up/Average/Paeth) to apply to the
+ * current scanline and writes it. When do_filter enables only a single
+ * filter type, that filter always wins and no scoring happens. When more
+ * than one is enabled, each candidate is scored by the "minimum sum of
+ * absolute differences" heuristic (each byte treated as signed: values >=
+ * 128 count as 256-v), optionally scaled by the "weighted" heuristic
+ * (PNG_FILTER_HEURISTIC_WEIGHTED) which favours filter types used on recent
+ * rows via png_set_filter_heuristics' weight/cost tables, with an early
+ * exit once a candidate's running sum exceeds the current best. The
+ * lowest-scoring candidate's buffer (row_buf/sub_row/up_row/avg_row/
+ * paeth_row) is handed to png_write_filtered_row, then the chosen filter's
+ * PNG_FILTER_VALUE_* tag (best_row[0]) is pushed onto the prev_filters ring
+ * for the next row's weighted heuristic.
+ *
+ * NOTE (binary-faithful, not a transcription error): upstream libpng
+ * 1.2.5rc3 has two quirks in this function, confirmed present in both the
+ * vendored source (dependencies/wxWindows-2.4.2/src/png/pngwutil.c) and this
+ * binary's disassembly, and preserved here exactly:
+ *   1. The AVG filter's post-loop weighted-heuristic scaling tests
+ *      prev_filters[j] against PNG_FILTER_VALUE_NONE (0) instead of
+ *      PNG_FILTER_VALUE_AVG (3) -- an upstream copy-paste bug.
+ *   2. The PAETH filter's "sum < mins" branch updates best_row but never
+ *      updates mins itself -- harmless in practice since PAETH is always the
+ *      last filter tested this row, but preserved for exactness.
+ *
+ * Sole caller: png_write_row (0x009E7EC5), once per row when more than one
+ * do_filter bit -- or an application-forced single filter -- is active.
+ */
+extern "C" void png_write_find_filter(png_structp png_ptr, png_row_infop row_info)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t rowBytes = row_info->rowbytes;
+  const std::uint32_t bpp = (row_info->pixel_depth + 7) / 8;
+
+  std::uint8_t* const rowBuf  = RowBuf(png_ptr);
+  std::uint8_t* const prevRow = PrevRow(png_ptr);
+  std::uint8_t* bestRow = rowBuf;
+
+  const std::uint8_t filterToDo = DoFilter(png_ptr);
+  std::uint32_t mins = 0x7FFFFFFFu;  // PNG_MAXSUM
+
+  auto* const filter = reinterpret_cast<PngStructWeightedFilterView*>(
+    RawBase(png_ptr) + kPngStructWeightedFilterOffset);
+  const bool weighted = filter->heuristic_method == kPngFilterHeuristicWeighted;
+
+  // --- None: score only (row_buf is already the "none" candidate). ---
+  if ((filterToDo & kPngFilterNone) != 0 && filterToDo != kPngFilterNone) {
+    std::uint32_t sum = 0;
+    for (std::uint32_t i = 0; i < rowBytes; ++i) {
+      const int v = rowBuf[i + 1];
+      sum += (v < 128) ? static_cast<std::uint32_t>(v) : static_cast<std::uint32_t>(256 - v);
+    }
+    if (weighted) {
+      sum = ApplyWeightedFilterHeuristic(*filter, sum, kPngFilterValueNone, /*useInverse=*/false);
+    }
+    mins = sum;
+  }
+
+  // --- Sub: dp[i] = rp[i] - rp[i-bpp] (rp[i-bpp] treated as 0 for i<bpp). ---
+  if (filterToDo == kPngFilterSub) {
+    std::uint8_t* const dp = SubRow(png_ptr) + 1;
+    for (std::uint32_t i = 0; i < bpp; ++i) {
+      dp[i] = rowBuf[1 + i];
+    }
+    for (std::uint32_t i = bpp; i < rowBytes; ++i) {
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - rowBuf[1 + i - bpp]);
+    }
+    bestRow = SubRow(png_ptr);
+  } else if ((filterToDo & kPngFilterSub) != 0) {
+    std::uint8_t* const dp = SubRow(png_ptr) + 1;
+    std::uint32_t sum = 0;
+    const std::uint32_t lmins = weighted
+      ? ApplyWeightedFilterHeuristic(*filter, mins, kPngFilterValueSub, /*useInverse=*/true)
+      : mins;
+
+    std::uint32_t i = 0;
+    for (; i < bpp; ++i) {
+      const std::uint8_t v = rowBuf[1 + i];
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+    }
+    for (; i < rowBytes; ++i) {
+      const std::uint8_t v = static_cast<std::uint8_t>(rowBuf[1 + i] - rowBuf[1 + i - bpp]);
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+      if (sum > lmins) {
+        break;
+      }
+    }
+
+    if (weighted) {
+      sum = ApplyWeightedFilterHeuristic(*filter, sum, kPngFilterValueSub, /*useInverse=*/false);
+    }
+    if (sum < mins) {
+      mins = sum;
+      bestRow = SubRow(png_ptr);
+    }
+  }
+
+  // --- Up: dp[i] = rp[i] - pp[i] (pp = prev_row). ---
+  if (filterToDo == kPngFilterUp) {
+    std::uint8_t* const dp = UpRow(png_ptr) + 1;
+    for (std::uint32_t i = 0; i < rowBytes; ++i) {
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - prevRow[1 + i]);
+    }
+    bestRow = UpRow(png_ptr);
+  } else if ((filterToDo & kPngFilterUp) != 0) {
+    std::uint8_t* const dp = UpRow(png_ptr) + 1;
+    std::uint32_t sum = 0;
+    const std::uint32_t lmins = weighted
+      ? ApplyWeightedFilterHeuristic(*filter, mins, kPngFilterValueUp, /*useInverse=*/true)
+      : mins;
+
+    for (std::uint32_t i = 0; i < rowBytes; ++i) {
+      const std::uint8_t v = static_cast<std::uint8_t>(rowBuf[1 + i] - prevRow[1 + i]);
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+      if (sum > lmins) {
+        break;
+      }
+    }
+
+    if (weighted) {
+      sum = ApplyWeightedFilterHeuristic(*filter, sum, kPngFilterValueUp, /*useInverse=*/false);
+    }
+    if (sum < mins) {
+      mins = sum;
+      bestRow = UpRow(png_ptr);
+    }
+  }
+
+  // --- Average: dp[i] = rp[i] - avg(rp[i-bpp], pp[i]) (rp[i-bpp]==0 for i<bpp). ---
+  if (filterToDo == kPngFilterAvg) {
+    std::uint8_t* const dp = AvgRow(png_ptr) + 1;
+    for (std::uint32_t i = 0; i < bpp; ++i) {
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - (prevRow[1 + i] / 2));
+    }
+    for (std::uint32_t i = bpp; i < rowBytes; ++i) {
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - ((prevRow[1 + i] + rowBuf[1 + i - bpp]) / 2));
+    }
+    bestRow = AvgRow(png_ptr);
+  } else if ((filterToDo & kPngFilterAvg) != 0) {
+    std::uint8_t* const dp = AvgRow(png_ptr) + 1;
+    std::uint32_t sum = 0;
+    const std::uint32_t lmins = weighted
+      ? ApplyWeightedFilterHeuristic(*filter, mins, kPngFilterValueAvg, /*useInverse=*/true)
+      : mins;
+
+    std::uint32_t i = 0;
+    for (; i < bpp; ++i) {
+      const std::uint8_t v = static_cast<std::uint8_t>(rowBuf[1 + i] - (prevRow[1 + i] / 2));
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+    }
+    for (; i < rowBytes; ++i) {
+      const std::uint8_t v =
+        static_cast<std::uint8_t>(rowBuf[1 + i] - ((prevRow[1 + i] + rowBuf[1 + i - bpp]) / 2));
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+      if (sum > lmins) {
+        break;
+      }
+    }
+
+    if (weighted) {
+      // Binary-faithful upstream quirk: scores against PNG_FILTER_VALUE_NONE
+      // (0), not PNG_FILTER_VALUE_AVG -- see the function-level doc comment.
+      sum = ApplyWeightedFilterHeuristic(*filter, sum, kPngFilterValueNone, /*useInverse=*/false);
+    }
+    if (sum < mins) {
+      mins = sum;
+      bestRow = AvgRow(png_ptr);
+    }
+  }
+
+  // --- Paeth: dp[i] = rp[i] - Paeth(rp[i-bpp], pp[i], pp[i-bpp]). ---
+  if (filterToDo == kPngFilterPaeth) {
+    std::uint8_t* const dp = PaethRow(png_ptr) + 1;
+    for (std::uint32_t i = 0; i < bpp; ++i) {
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - prevRow[1 + i]);
+    }
+    for (std::uint32_t i = bpp; i < rowBytes; ++i) {
+      const int predicted = PaethPredictor(rowBuf[1 + i - bpp], prevRow[1 + i], prevRow[1 + i - bpp]);
+      dp[i] = static_cast<std::uint8_t>(rowBuf[1 + i] - predicted);
+    }
+    bestRow = PaethRow(png_ptr);
+  } else if ((filterToDo & kPngFilterPaeth) != 0) {
+    std::uint8_t* const dp = PaethRow(png_ptr) + 1;
+    std::uint32_t sum = 0;
+    const std::uint32_t lmins = weighted
+      ? ApplyWeightedFilterHeuristic(*filter, mins, kPngFilterValuePaeth, /*useInverse=*/true)
+      : mins;
+
+    std::uint32_t i = 0;
+    for (; i < bpp; ++i) {
+      const std::uint8_t v = static_cast<std::uint8_t>(rowBuf[1 + i] - prevRow[1 + i]);
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+    }
+    for (; i < rowBytes; ++i) {
+      const int predicted = PaethPredictor(rowBuf[1 + i - bpp], prevRow[1 + i], prevRow[1 + i - bpp]);
+      const std::uint8_t v = static_cast<std::uint8_t>(rowBuf[1 + i] - predicted);
+      dp[i] = v;
+      sum += (v < 128) ? v : static_cast<std::uint32_t>(256 - v);
+      if (sum > lmins) {
+        break;
+      }
+    }
+
+    if (weighted) {
+      sum = ApplyWeightedFilterHeuristic(*filter, sum, kPngFilterValuePaeth, /*useInverse=*/false);
+    }
+    if (sum < mins) {
+      // Binary-faithful upstream quirk: `mins` is deliberately not updated
+      // here -- see the function-level doc comment. Harmless: PAETH is the
+      // last filter tested, so mins is never read again this row.
+      bestRow = PaethRow(png_ptr);
+    }
+  }
+
+  png_write_filtered_row(png_ptr, bestRow);
+
+  // Not gated on `weighted`: the binary checks only num_prev_filters > 0
+  // (set whenever png_set_filter_heuristics configured a history depth,
+  // independent of the *current* row's heuristic_method value).
+  if (filter->num_prev_filters > 0) {
+    int j = 1;
+    for (; j < filter->num_prev_filters; ++j) {
+      filter->prev_filters[j] = filter->prev_filters[j - 1];
+    }
+    filter->prev_filters[j] = bestRow[0];
+  }
+}
+
+/**
+ * Address: 0x009E7EC5 (FUN_009E7EC5)
+ * Mangled: png_write_row
+ *
+ * IDA signature:
+ * void __cdecl png_write_row(png_structp png_ptr, png_bytep row);
+ *
+ * What it does:
+ * Writes one scanline of image data. On the very first call for an image
+ * (row_number==0, pass==0), requires png_write_info_before_PLTE to have
+ * already run (PNG_WROTE_INFO_BEFORE_PLTE set in mode) and lazily allocates
+ * the row buffers via png_write_start_row. For an interlaced image being
+ * driven pass-by-pass (the caller did not pre-expand PNG_INTERLACE), skips
+ * rows that don't belong to the current Adam7 pass -- calling
+ * png_write_finish_row and returning early for a skipped row. Otherwise:
+ * copies/expands `row` into row_buf via png_memcpy_check, compacts it to
+ * the current pass with png_do_write_interlace when applicable (finishing
+ * the row immediately if the pass has zero columns for this row), or else
+ * runs the full transform pipeline (png_do_write_transformations), the
+ * optional MNG intrapixel filter, and png_write_find_filter -- then invokes
+ * the optional write_row_fn progress callback.
+ *
+ * Callers: png_write_rows (0x009E89A2), png_write_image (0x009E89C6),
+ * wxPNGHandler::SaveFile (0x00975370, direct per-row calls).
+ */
+extern "C" void png_write_row(png_structp png_ptr, std::uint8_t* row)
+{
+  using namespace libpng_layout;
+
+  if (RowNumber(png_ptr) == 0 && *(RawBase(png_ptr) + kOffPass) == 0) {
+    if ((Mode(png_ptr) & kPngWroteInfoBeforePlte) == 0) {
+      png_error(png_ptr, "png_write_info was never called before png_write_row.");
+    }
+    png_write_start_row(png_ptr);
+  }
+
+  if (Interlaced(png_ptr) != 0 && (Transformations(png_ptr) & kPngInterlace) != 0) {
+    const std::uint8_t pass = *(RawBase(png_ptr) + kOffPass);
+    const std::uint32_t rowNumber = RowNumber(png_ptr);
+    bool skipThisRow;
+    switch (pass) {
+      case 0:  skipThisRow = (rowNumber & 7) != 0; break;
+      case 1:  skipThisRow = (rowNumber & 7) != 0 || Width(png_ptr) < 5; break;
+      case 2:  skipThisRow = (rowNumber & 7) != 4; break;
+      case 3:  skipThisRow = (rowNumber & 3) != 0 || Width(png_ptr) < 3; break;
+      case 4:  skipThisRow = (rowNumber & 3) != 2; break;
+      case 5:  skipThisRow = (rowNumber & 1) != 0 || Width(png_ptr) < 2; break;
+      case 6:  skipThisRow = (rowNumber & 1) == 0; break;
+      default: skipThisRow = false; break;
+    }
+    if (skipThisRow) {
+      png_write_finish_row(png_ptr);
+      return;
+    }
+  }
+
+  auto* const rowInfo = reinterpret_cast<png_row_infop>(RawBase(png_ptr) + 0x100);
+  const std::uint8_t usrChannels = UsrChannels(png_ptr);
+  const std::uint32_t usrWidth   = UsrWidth(png_ptr);
+  const std::uint8_t usrBitDepth = UsrBitDepth(png_ptr);
+  const std::uint8_t pixelDepth  = static_cast<std::uint8_t>(usrChannels * usrBitDepth);
+  const std::uint32_t rowbytes   = (usrWidth * pixelDepth + 7) >> 3;
+
+  rowInfo->color_type  = *(RawBase(png_ptr) + kOffColorType);
+  rowInfo->bit_depth   = usrBitDepth;
+  rowInfo->pixel_depth = pixelDepth;
+  rowInfo->rowbytes    = rowbytes;
+  rowInfo->width       = usrWidth;
+  rowInfo->channels    = usrChannels;
+
+  std::uint8_t* const rowBufDst = RowBuf(png_ptr) + 1;
+  png_memcpy_check(png_ptr, rowBufDst, row, rowbytes);
+
+  const std::uint8_t pass = *(RawBase(png_ptr) + kOffPass);
+  if (Interlaced(png_ptr) != 0 && pass < 6 && (Transformations(png_ptr) & kPngInterlace) != 0) {
+    png_do_write_interlace(rowInfo, rowBufDst, pass);
+    if (rowInfo->width == 0) {
+      png_write_finish_row(png_ptr);
+      return;
+    }
+  }
+
+  if (Transformations(png_ptr) != 0) {
+    png_do_write_transformations(png_ptr);
+  }
+  if ((MngFeaturesPermitted(png_ptr) & kPngFlagMngFilter64) != 0 && FilterType(png_ptr) == 64) {
+    png_do_write_intrapixel(rowInfo, rowBufDst);
+  }
+  png_write_find_filter(png_ptr, rowInfo);
+
+  using png_write_status_ptr = void (*)(png_structp, std::uint32_t, int);
+  if (const auto writeRowFn = Field<png_write_status_ptr>(png_ptr, kOffWriteRowFn)) {
+    writeRowFn(png_ptr, RowNumber(png_ptr), *(RawBase(png_ptr) + kOffPass));
+  }
+}
+
+/**
+ * Address: 0x009E89C6 (FUN_009E89C6)
+ * Mangled: png_write_image
+ *
+ * IDA signature:
+ * void __cdecl png_write_image(png_structp png_ptr, png_bytepp image);
+ *
+ * What it does:
+ * Writes every scanline of a full in-memory image: png_set_interlace_handling
+ * returns the number of Adam7 passes to drive (7 for an interlaced image, 1
+ * otherwise), and png_write_row is called once per row per pass. Re-reads
+ * png_ptr->height on every iteration rather than caching it, matching the
+ * binary exactly.
+ *
+ * Sole caller: png_write_png (0x009E8AB8), the PNG_INFO_IDAT convenience path.
+ */
+extern "C" void png_write_image(png_structp png_ptr, std::uint8_t** image)
+{
+  using namespace libpng_layout;
+
+  const int numPasses = png_set_interlace_handling(png_ptr);
+  if (numPasses <= 0) {
+    return;
+  }
+
+  for (int pass = 0; pass < numPasses; ++pass) {
+    std::uint8_t** row = image;
+    for (std::uint32_t i = 0; i < Height(png_ptr); ++i, ++row) {
+      png_write_row(png_ptr, *row);
+    }
+  }
+}
+
+/**
+ * Address: 0x00A24EA0 (FUN_00A24EA0)
+ * Mangled: png_write_IEND
+ *
+ * IDA signature:
+ * void __cdecl png_write_IEND(png_structp png_ptr);
+ *
+ * What it does:
+ * Writes the empty IEND chunk (0-length payload) and marks PNG_HAVE_IEND on
+ * png_ptr->mode.
+ *
+ * Sole caller: png_write_end (0x009E7D38).
+ */
+extern "C" void png_write_IEND(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+  std::uint8_t chunkName[4]{'I', 'E', 'N', 'D'};
+  png_write_chunk(png_ptr, chunkName, nullptr, 0u);
+  Mode(png_ptr) |= kPngHaveIend;
+}
+
+/**
+ * Address: 0x009E7D38 (FUN_009E7D38)
+ * Mangled: png_write_end
+ *
+ * IDA signature:
+ * void __cdecl png_write_end(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * Finishes writing a PNG datastream: requires PNG_HAVE_IDAT to already be
+ * set (png_error otherwise). When info_ptr is supplied, writes the tIME
+ * chunk if not already written by png_write_info, walks info_ptr->text
+ * writing any tEXt/zTXt records not already flushed (marking each record's
+ * "already written" sentinel so a later call is a no-op), then walks
+ * unknown_chunks for entries located after IDAT that are safe (or forced)
+ * to copy. Finally marks PNG_AFTER_IDAT and writes the IEND chunk.
+ *
+ * Corrects prior external_dependency mis-tag (systemic libpng-write-chunk
+ * mis-tag batch).
+ *
+ * Callers: wxPNGHandler::SaveFile (0x00975370), png_write_png (0x009E8AB8).
+ */
+extern "C" void png_write_end(png_structp png_ptr, png_infop info_ptr)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIdat) == 0) {
+    png_error(png_ptr, "No IDATs written into file");
+  }
+
+  if (info_ptr != nullptr) {
+    if ((info_ptr->valid & kPngInfoTime) != 0 && (Mode(png_ptr) & kPngWroteTime) == 0) {
+      png_write_tIME(png_ptr, info_ptr->mod_time);
+    }
+
+    constexpr std::int32_t kTextCompressionNoneWr = -3;  // already written, uncompressed
+    constexpr std::int32_t kTextCompressionZtxtWr = -2;  // already written, compressed
+    constexpr std::int32_t kTextCompressionNone   = -1;  // write as tEXt
+    for (std::int32_t i = 0; i < info_ptr->num_text; ++i) {
+      png_text& textRecord = info_ptr->text[i];
+      if (textRecord.compression > 0) {
+        png_warning(png_ptr, "Unable to write international text\n");
+        textRecord.compression = kTextCompressionNoneWr;
+      } else if (textRecord.compression == 0) {  // PNG_TEXT_COMPRESSION_zTXt
+        png_write_zTXt(
+          png_ptr, reinterpret_cast<std::uint8_t*>(textRecord.key), textRecord.text, textRecord.compression);
+        textRecord.compression = kTextCompressionZtxtWr;
+      } else if (textRecord.compression == kTextCompressionNone) {
+        png_write_tEXt(png_ptr, textRecord.key, textRecord.text);
+        textRecord.compression = kTextCompressionNoneWr;
+      }
+      // Any other value (-2/-3, or anything more negative) means this record
+      // was already written by a prior png_write_info/png_write_end call --
+      // leave it untouched, matching the binary's no-op re-entry.
+    }
+
+    for (std::uint32_t i = 0; i < info_ptr->unknown_chunks_num; ++i) {
+      const png_unknown_chunk& chunk = info_ptr->unknown_chunks[i];
+      const int keep = png_handle_as_unknown(png_ptr, chunk.name);
+      if (keep != 1 /* HANDLE_CHUNK_NEVER */ && chunk.location != 0 &&
+          (chunk.location & kPngAfterIdat) != 0 &&
+          ((chunk.name[3] & kPngChunkAncillaryBit) != 0 || keep == 3 /* HANDLE_CHUNK_ALWAYS */ ||
+           (Flags(png_ptr) & kPngFlagKeepUnsafeChunks) != 0)) {
+        png_write_chunk(png_ptr, const_cast<std::uint8_t*>(chunk.name), chunk.data, chunk.size);
+      }
+    }
+  }
+
+  Mode(png_ptr) |= kPngAfterIdat;
+  png_write_IEND(png_ptr);
+}
+
+/**
+ * Address: 0x009E8AB8 (FUN_009E8AB8)
+ * Mangled: png_write_png
+ *
+ * IDA signature:
+ * void __cdecl png_write_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params);
+ *
+ * What it does:
+ * libpng's PNG_INFO_IMAGE_SUPPORTED "write the whole image in one call"
+ * convenience API (dependencies/wxWindows-2.4.2/src/png/pngwrite.c
+ * png_write_png). Applies the PNG_TRANSFORM_INVERT_ALPHA transform before
+ * writing the header info, writes the header via png_write_info, applies
+ * the remaining PNG_TRANSFORM_* pixel transforms requested by `transforms`
+ * (invert-mono/shift/pack/swap-alpha/strip-filler/bgr/swap-endian/packswap),
+ * writes the pixel data from info_ptr->row_pointers via png_write_image
+ * when info_ptr->valid has PNG_INFO_IDAT set, and finishes the datastream
+ * via png_write_end. `params` is accepted for API compatibility but never
+ * read by this build.
+ *
+ * CALLSITE EVIDENCE (exception, recorded per CLAUDE.md's callsite-
+ * verification rule): this token has zero incoming references anywhere in
+ * either shipped binary (bin/external/ForgedAlliance.exe,
+ * bin/2025.7.1/ForgedAlliance.exe) -- confirmed by (1) the IDA-exported
+ * meta/xrefs (callers_count=0, incoming_xrefs_count=0), (2) every
+ * _callgraph_index.sqlite table that could show a reference
+ * (call_edges/incoming_xrefs/data_refs/roots/reachable/function_icf_twins),
+ * all empty for FUN_009E8AB8, and (3) an independent raw-PE byte scan
+ * across every section of both binaries for every x86 reference encoding
+ * (E8/E9 rel32, 0F8x rel32, EB/7x rel8, and an unaligned absolute-dword
+ * scan) -- zero hits. The scanner was validated against two known-good
+ * controls first: png_write_info (0x009E7A92, expected >=2 callers) found
+ * exactly its two known real callers (this function and
+ * wxPNGHandler::SaveFile), and wxPNGHandler::SaveFile (0x00975370) found
+ * exactly its one known vtable-slot data xref -- so the zero-hit result for
+ * png_write_png is a proven absence, not a search gap. Neither binary has a
+ * PE export table (this is a standalone .exe, not a DLL), so no external
+ * export path exists either.
+ *
+ * The likely explanation, consistent with this project's own prior finding
+ * (389 similarly-orphaned tokens project-wide, see the
+ * reference-pe-byte-reference-scan memory) is that pngwrite.c was linked
+ * without function-level (/Gy) COMDAT granularity: png_write_end
+ * (0x009E7D38) and png_write_image (0x009E89C6) -- this function's own
+ * callees, both real, both from the same source file -- DO have proven
+ * callers elsewhere in the binary, so the whole translation unit was pulled
+ * into the link; this convenience entry point came along unreferenced.
+ *
+ * This is recorded `recovered`, not `skip`/`external_dependency`, as a
+ * deliberate documented exception: the source identity is proven beyond
+ * reasonable doubt (byte-for-byte match to the vendored file, including
+ * every PNG_TRANSFORM_* bit and the exact transform-application order), and
+ * neither terminal status accurately describes "real, correctly-identified
+ * source with proven zero binary callers" -- skip means an IDA
+ * misclassification with no source line behind it (the opposite of this
+ * case), external_dependency means the body is not in this binary (it
+ * demonstrably is, at 0x009E8AB8-0x009E8B77). No caller is fabricated: this
+ * function is not invoked from any other src/sdk/** source, matching the
+ * binary's own reality.
+ */
+extern "C" void png_write_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params)
+{
+  // libpng's public PNG_TRANSFORM_* API constants (png.h), scoped to this
+  // function since they describe the caller-supplied `transforms` argument,
+  // not any internal png_ptr->transformations bit.
+  constexpr int kTransformPacking     = 0x0004;  // PNG_TRANSFORM_PACKING
+  constexpr int kTransformPackswap    = 0x0008;  // PNG_TRANSFORM_PACKSWAP
+  constexpr int kTransformInvertMono  = 0x0020;  // PNG_TRANSFORM_INVERT_MONO
+  constexpr int kTransformShift       = 0x0040;  // PNG_TRANSFORM_SHIFT
+  constexpr int kTransformBgr         = 0x0080;  // PNG_TRANSFORM_BGR
+  constexpr int kTransformSwapAlpha   = 0x0100;  // PNG_TRANSFORM_SWAP_ALPHA
+  constexpr int kTransformSwapEndian  = 0x0200;  // PNG_TRANSFORM_SWAP_ENDIAN
+  constexpr int kTransformInvertAlpha = 0x0400;  // PNG_TRANSFORM_INVERT_ALPHA
+  constexpr int kTransformStripFiller = 0x0800;  // PNG_TRANSFORM_STRIP_FILLER
+
+  (void)params;  // accepted for libpng API compatibility; never read by this build
+
+  if ((transforms & kTransformInvertAlpha) != 0) {
+    png_set_invert_alpha(png_ptr);
+  }
+
+  // Write the file header information.
+  png_write_info(png_ptr, info_ptr);
+
+  // ------ these transformations don't touch the info structure -------
+  if ((transforms & kTransformInvertMono) != 0) {
+    png_set_invert_mono(png_ptr);
+  }
+  if ((transforms & kTransformShift) != 0 && (info_ptr->valid & kPngInfoSbit) != 0) {
+    png_set_shift(png_ptr, info_ptr->sig_bit);
+  }
+  if ((transforms & kTransformPacking) != 0) {
+    png_set_packing(png_ptr);
+  }
+  if ((transforms & kTransformSwapAlpha) != 0) {
+    png_set_swap_alpha(png_ptr);
+  }
+  if ((transforms & kTransformStripFiller) != 0) {
+    png_set_filler(png_ptr, 0, 0 /* PNG_FILLER_AFTER */);
+  }
+  if ((transforms & kTransformBgr) != 0) {
+    png_set_bgr(png_ptr);
+  }
+  if ((transforms & kTransformSwapEndian) != 0) {
+    png_set_swap(png_ptr);
+  }
+  if ((transforms & kTransformPackswap) != 0) {
+    png_set_packswap(png_ptr);
+  }
+  // ----------------------- end of transformations -------------------
+
+  // Write the bits.
+  if ((info_ptr->valid & kPngInfoIdat) != 0) {
+    png_write_image(png_ptr, info_ptr->row_pointers);
+  }
+
+  // It is REQUIRED to call this to finish writing the rest of the file.
+  png_write_end(png_ptr, info_ptr);
 }
