@@ -88,6 +88,22 @@ namespace
      *
      * What it does:
      * Normalizes the bucket-head vector size used by the symbol-address cache.
+     *
+     * Address: 0x008D5D70 (FUN_008D5D70, sub_8D5D70) -- the compiler's
+     * out-of-line `std::vector<SymbolAddressNode*>::_Insert_n` emission
+     * triggered by this function's `bucketHeads.insert(bucketHeads.end(),
+     * size - bucketHeads.size(), fillValue)` call below (grow branch):
+     * `__thiscall(this, outIter, count, &value)`, handles the capacity-full
+     * reallocate-and-copy path and the capacity-available shift-and-fill
+     * path for a 4-byte pointer element. Genuine `std::` (not `msvc8::`)
+     * STL internals for this file's own `std::vector` usage -- not
+     * hand-modeled here since the recovered source already invokes the
+     * real `std::vector::insert` API that the compiler lowers to this body.
+     * Address: 0x008D72F0 (FUN_008D72F0, sub_8D72F0) -- this instantiation's
+     * fill-n sub-step, called from `FUN_008D5D70`'s capacity-available
+     * path: `for (; count; ++dst) { if (dst) *dst = value; --count; }
+     * return count;`, a trivial per-element pointer broadcast matching
+     * `_Uninit_fill_n`/`fill_n` for a 4-byte trivially-copyable element.
      */
     static void NormalizeBucketVectorSize(
       std::vector<SymbolAddressNode*>& bucketHeads, const std::size_t size, SymbolAddressNode* const fillValue
