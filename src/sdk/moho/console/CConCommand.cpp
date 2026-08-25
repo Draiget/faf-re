@@ -153,6 +153,7 @@ namespace
   constexpr const char* kConsoleStartupConFindUnitDescription =
     "Find a unit by a (case insensitive) string contained in its description.";
   constexpr const char* kConsoleStartupSCLuaDebuggerDescription = "Open Lua debugger window";
+  constexpr const char* kConsoleStartupDoSimCommandDescription = "do a sim command.";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
@@ -3378,6 +3379,84 @@ void moho::SC_LuaDebugger(void* const commandArgs)
 }
 
 /**
+ * Address: 0x0088E440 (FUN_0088E440, sub_88E440)
+ *
+ * What it does:
+ * See header. The binary's raw control flow (confirmed against the raw .asm,
+ * 0x0088E466-0x0088E6AF - Hex-Rays' decompiled .c wrongly merges the
+ * no-sim-driver branch into a fall-through of the main path):
+ *   - fewer than 2 arguments: print the usage line, return;
+ *   - no active sim driver: print localized "no session" feedback, return;
+ *   - otherwise: walk the selection, dispatch, return (no further output).
+ * The binary reads `Moho::sWldSession` unconditionally once `sSimDriver` is
+ * confirmed (no separate null check), trusting the engine invariant that an
+ * active driver implies an active session; this recovery adds a defensive
+ * null check instead of reproducing that latent unchecked dereference,
+ * falling back to an empty selection / zeroed world position and focus army
+ * if the invariant is ever violated - undefined behavior avoidance per the
+ * project's fidelity contract, not an observed-behavior change on any
+ * reachable path.
+ *
+ * The dispatch's exact 4-argument mapping (command/worldPos/focusArmy/
+ * entities) was reconstructed from an instruction-by-instruction
+ * esp-relative trace of the call site cross-checked against the callee's
+ * own prologue (`Moho::CSimDriver::ExecuteDebugCommand`, FUN_0073D1B0,
+ * SimDriver.cpp): `command` is `CON_UnparseCommand`'s result c_str(),
+ * `worldPos` is `session->CursorWorldPos`, `focusArmy` is
+ * `session->FocusArmy`, and `entities` is a `BVSet<EntId, EntIdUniverse>`
+ * built from the current selection's entity IDs. The raw call site also
+ * passes a 5th, undocumented hidden out-pointer that the already-recovered
+ * `ISTIDriver::ExecuteDebugCommand` wrapper folds into an ordinary `CmdId`
+ * return value (unread here, matching the binary discarding it too).
+ *
+ * Registrar: FUN_00BE74D0 (`__xc_a` lane), data-xref
+ * `dword_F5B760 = offset sub_88E440` is the callsite evidence. Name is read
+ * from the PE `.data` initializer of `stru_F5B754` ("DoSimCommand").
+ */
+void moho::DoSimCommand(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() <= 1u) {
+    CON_Printf("usage: DoSimCommand command args...");
+    return;
+  }
+
+  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  if (simDriver == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+
+  BVSet<EntId, EntIdUniverse> entities{};
+  msvc8::vector<msvc8::string> remainingArgs;
+  Wm3::Vector3f worldPos{};
+  std::uint32_t focusArmy = 0u;
+
+  if (session != nullptr) {
+    msvc8::vector<UserUnit*> selectedUnits;
+    session->GetSelectionUnits(selectedUnits);
+    for (UserUnit* const userUnit : selectedUnits) {
+      UserEntity* const entityView = ResolveUserEntityView(userUnit);
+      (void)entities.Bits().Add(entityView->mParams.mEntityId);
+    }
+
+    worldPos = session->CursorWorldPos;
+    focusArmy = static_cast<std::uint32_t>(session->FocusArmy);
+  }
+
+  for (std::size_t index = 1u; index < args.Count(); ++index) {
+    if (const msvc8::string* const token = args.At(index); token != nullptr) {
+      remainingArgs.push_back(*token);
+    }
+  }
+
+  const msvc8::string unparsedCommand = CON_UnparseCommand(remainingArgs);
+  (void)simDriver->ExecuteDebugCommand(unparsedCommand.c_str(), worldPos, focusArmy, entities);
+}
+
+/**
  * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
  *
  * What it does:
@@ -4097,6 +4176,7 @@ namespace
   CConFunc gCConFunc_WLD_GameSpeed{};
   CConFunc gCConFunc_FindUnit{};
   CConFunc gCConFunc_SC_LuaDebugger{};
+  CConFunc gCConFunc_DoSimCommand{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_EFX_CreateEmitterWindow{};
@@ -4555,6 +4635,37 @@ namespace moho
       "SC_LuaDebugger",
       &moho::SC_LuaDebugger,
       &cleanup_CConFunc_SC_LuaDebugger
+    );
+  }
+
+  /**
+   * Address: 0x00C08050 (FUN_00C08050, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DoSimCommand`.
+   */
+  void cleanup_CConFunc_DoSimCommand()
+  {
+    CleanupStartupConCommand(gCConFunc_DoSimCommand);
+  }
+
+  /**
+   * Address: 0x00BE74D0 (FUN_00BE74D0, register_CConFunc_DoSimCommand)
+   *
+   * What it does:
+   * Registers startup console callback for `DoSimCommand`. The store
+   * `dword_F5B760 = offset sub_88E440` at 0x00BE74F0 is the only reference to
+   * `Moho::DoSimCommand` anywhere in the image.
+   */
+  void register_CConFunc_DoSimCommand()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DoSimCommand,
+      kConsoleStartupDoSimCommandDescription,
+      "DoSimCommand",
+      &moho::DoSimCommand,
+      &cleanup_CConFunc_DoSimCommand
     );
   }
 
@@ -6225,6 +6336,7 @@ namespace
       moho::register_CConFunc_WLD_GameSpeed();
       moho::register_CConFunc_FindUnit();
       moho::register_CConFunc_SC_LuaDebugger();
+      moho::register_CConFunc_DoSimCommand();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();
