@@ -29,57 +29,37 @@ namespace moho
 
   static_assert(sizeof(ESiloTypeTypeInfo) == 0x78, "ESiloTypeTypeInfo size must be 0x78");
 
-  class ESiloTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x0050AA70 (FUN_0050AA70, PrimitiveSerHelper<ESiloType>::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `ESiloType` lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050AA90 (FUN_0050AA90, PrimitiveSerHelper<ESiloType>::Serialize)
-     *
-     * What it does:
-     * Serializes one `ESiloType` lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0050A810 (FUN_0050A810, gpg::PrimitiveSerHelper<Moho::ESiloType,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `ESiloType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
-  };
-
-  static_assert(
-    offsetof(ESiloTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "ESiloTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ESiloTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "ESiloTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ESiloTypePrimitiveSerializer, mDeserialize) == 0x0C,
-    "ESiloTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ESiloTypePrimitiveSerializer, mSerialize) == 0x10,
-    "ESiloTypePrimitiveSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(ESiloTypePrimitiveSerializer) == 0x14, "ESiloTypePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESiloType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESiloType@Moho@@H@gpg'`):
+   * `FUN_00BC7B50` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_0050A7E0` (same fields, no `atexit` call -- confirmed via raw
+   * asm never live). A third writer for the same global's storage address,
+   * `FUN_0050AAB0` (demangled `gpg::SerSaveLoadHelper<Moho::ESiloType>`), is
+   * itself zero-xref/unreachable too -- same "dead sibling-writer" pattern
+   * already documented for `EAlliance`/`ELayer`/`EVisibilityMode`/
+   * `ESquadClass`/`EThreatType` on the `PrimitiveSerHelper` template itself
+   * (see `Reflection.h`); already corrected to `skip` in the progress DB by
+   * an earlier pass this session. There is no real
+   * `SerSaveLoadHelper<ESiloType>` instance in this binary.
+   *
+   * Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_0050AA70`/`FUN_0050AA90`, installs the
+   * `PrimitiveSerHelper<ESiloType,int>` vtable, and pushes plain unmangled
+   * `FUN_00BF1FE0` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_ESiloTypePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `ESiloTypeTypeInfoBootstrap` constructor -- absent from the real ctor's
+   * disassembly; removed.
+   */
+  using ESiloTypePrimitiveSerializer = gpg::PrimitiveSerHelper<ESiloType, int>;
 
   /**
    * Address: 0x0050A270 (FUN_0050A270, preregister_ESiloTypeTypeInfo)
@@ -98,13 +78,4 @@ namespace moho
    * cleanup.
    */
   int register_ESiloTypeTypeInfo();
-
-  /**
-   * Address: 0x00BC7B50 (FUN_00BC7B50, register_ESiloTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes startup primitive serializer helper links/callbacks for
-   * `ESiloType` and installs process-exit cleanup.
-   */
-  int register_ESiloTypePrimitiveSerializer();
 } // namespace moho

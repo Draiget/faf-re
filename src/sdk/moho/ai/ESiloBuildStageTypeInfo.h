@@ -32,66 +32,26 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BCE050 (FUN_00BCE050, register_ESiloBuildStagePrimitiveSerializer)
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESiloBuildStage,int>
    *
-   * What it does:
-   * Binds primitive enum load/save callbacks onto reflected
-   * `ESiloBuildStage`.
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESiloBuildStage@Moho@@H@gpg'`):
+   * `FUN_00BCE050` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
+   * `FUN_005CFFB0`/`FUN_005CFFD0`, installs the
+   * `PrimitiveSerHelper<ESiloBuildStage,int>` vtable, and pushes plain
+   * unmangled `FUN_00BF7E10` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_ESiloBuildStagePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `ESiloBuildStageReflectionBootstrap` constructor -- absent from the
+   * real ctor's disassembly; removed.
    */
-  class ESiloBuildStagePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005CFFB0 (FUN_005CFFB0, sub_5CFFB0)
-     *
-     * What it does:
-     * Deserializes one `ESiloBuildStage` enum value from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005CFFD0 (FUN_005CFFD0, sub_5CFFD0)
-     *
-     * What it does:
-     * Serializes one `ESiloBuildStage` enum value to archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005CFAC0 (FUN_005CFAC0, sub_5CFAC0)
-     *
-     * What it does:
-     * Binds load/save callbacks into `ESiloBuildStage` reflected metadata.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(ESiloBuildStagePrimitiveSerializer, mHelperNext) == 0x04,
-    "ESiloBuildStagePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ESiloBuildStagePrimitiveSerializer, mHelperPrev) == 0x08,
-    "ESiloBuildStagePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ESiloBuildStagePrimitiveSerializer, mLoadCallback) == 0x0C,
-    "ESiloBuildStagePrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ESiloBuildStagePrimitiveSerializer, mSaveCallback) == 0x10,
-    "ESiloBuildStagePrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(
-    sizeof(ESiloBuildStagePrimitiveSerializer) == 0x14,
-    "ESiloBuildStagePrimitiveSerializer size must be 0x14"
-  );
+  using ESiloBuildStagePrimitiveSerializer = gpg::PrimitiveSerHelper<ESiloBuildStage, int>;
 
   /**
    * Address: 0x00BCE030 (FUN_00BCE030, register_ESiloBuildStageTypeInfo)
@@ -101,15 +61,6 @@ namespace moho
    * cleanup.
    */
   int register_ESiloBuildStageTypeInfo();
-
-  /**
-   * Address: 0x00BCE050 (FUN_00BCE050, register_ESiloBuildStagePrimitiveSerializer)
-   *
-   * What it does:
-   * Registers primitive serializer callbacks for `ESiloBuildStage` and
-   * installs process-exit cleanup.
-   */
-  int register_ESiloBuildStagePrimitiveSerializer();
 
   static_assert(sizeof(ESiloBuildStageTypeInfo) == 0x78, "ESiloBuildStageTypeInfo size must be 0x78");
 } // namespace moho

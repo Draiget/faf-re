@@ -42,57 +42,31 @@ namespace moho
 
   static_assert(sizeof(ESearchTypeTypeInfo) == 0x78, "ESearchTypeTypeInfo size must be 0x78");
 
-  class ESearchTypePrimitiveSerializer
-  {
-  public:
-    /**
-     * Address: 0x005AB520 (FUN_005AB520, PrimitiveSerHelper_ESearchType::Deserialize)
-     *
-     * What it does:
-     * Deserializes one `ESearchType` enum lane from archive storage.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005AB540 (FUN_005AB540, PrimitiveSerHelper_ESearchType::Serialize)
-     *
-     * What it does:
-     * Serializes one `ESearchType` enum lane into archive storage.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005AB120 (FUN_005AB120, gpg::PrimitiveSerHelper<Moho::ESearchType,int>::Init)
-     *
-     * What it does:
-     * Binds primitive enum load/save callbacks onto reflected `ESearchType`.
-     */
-    virtual void RegisterSerializeFunctions();
-
-  public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-
-  static_assert(
-    offsetof(ESearchTypePrimitiveSerializer, mHelperNext) == 0x04,
-    "ESearchTypePrimitiveSerializer::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ESearchTypePrimitiveSerializer, mHelperPrev) == 0x08,
-    "ESearchTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ESearchTypePrimitiveSerializer, mLoadCallback) == 0x0C,
-    "ESearchTypePrimitiveSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ESearchTypePrimitiveSerializer, mSaveCallback) == 0x10,
-    "ESearchTypePrimitiveSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(ESearchTypePrimitiveSerializer) == 0x14, "ESearchTypePrimitiveSerializer size must be 0x14");
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESearchType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESearchType@Moho@@H@gpg'`):
+   * `FUN_00BCCD10` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
+   * `FUN_005AB520`/`FUN_005AB540`, installs the
+   * `PrimitiveSerHelper<ESearchType,int>` vtable, and pushes plain unmangled
+   * `FUN_00BF71B0` (bare unlink-then-self-link shape, matching
+   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_ESearchTypePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `ESearchTypeTypeInfoBootstrap` constructor -- absent from the real
+   * ctor's disassembly; removed. `FUN_005AB120`'s asm (lazy `LookupRType(
+   * typeid(ESearchType))` into a cached global, two `GPG_ASSERT`-shaped
+   * null checks, then `serLoadFunc_`/`serSaveFunc_` writes) matches this
+   * template's generic `Init()` exactly and is now provided by
+   * `gpg::PrimitiveSerHelper<T,int>::Init()` in Reflection.h.
+   */
+  using ESearchTypePrimitiveSerializer = gpg::PrimitiveSerHelper<ESearchType, int>;
 
   /**
    * Address: 0x00BCCCF0 (FUN_00BCCCF0, register_ESearchTypeTypeInfo)
@@ -102,13 +76,4 @@ namespace moho
    * installs process-exit cleanup.
    */
   int register_ESearchTypeTypeInfo();
-
-  /**
-   * Address: 0x00BCCD10 (FUN_00BCCD10, register_ESearchTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `ESearchType` and installs
-   * process-exit helper unlink cleanup.
-   */
-  int register_ESearchTypePrimitiveSerializer();
 } // namespace moho
