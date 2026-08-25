@@ -1,7 +1,5 @@
 #include "moho/audio/SAudioRequestSerializer.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -13,49 +11,12 @@
 
 namespace
 {
-  using Serializer = moho::SAudioRequestSerializer;
-
   constexpr int kSerializationLoadLine = 84;
   constexpr int kSerializationSaveLine = 87;
   constexpr const char* kSerializationSourcePath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
   constexpr const char* kLoadAssertText = "!type->mSerLoadFunc";
   constexpr const char* kSaveAssertText = "!type->mSerSaveFunc";
-
-  alignas(Serializer) unsigned char gSAudioRequestSerializerStorage[sizeof(Serializer)];
-  bool gSAudioRequestSerializerConstructed = false;
-
-  [[nodiscard]] Serializer& GetSAudioRequestSerializer() noexcept
-  {
-    if (!gSAudioRequestSerializerConstructed) {
-      new (gSAudioRequestSerializerStorage) Serializer();
-      gSAudioRequestSerializerConstructed = true;
-    }
-
-    return *reinterpret_cast<Serializer*>(gSAudioRequestSerializerStorage);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* SelfNode(Serializer& serializer) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
-  }
-
-  void InitializeNode(Serializer& serializer) noexcept
-  {
-    gpg::SerHelperBase* const self = SelfNode(serializer);
-    serializer.mHelperNext = self;
-    serializer.mHelperPrev = self;
-  }
-
-  void UnlinkNode(Serializer& serializer) noexcept
-  {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeNode(serializer);
-  }
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
@@ -76,34 +37,39 @@ namespace
     return type;
   }
 
-  void cleanup_SAudioRequestSerializer()
-  {
-    if (!gSAudioRequestSerializerConstructed) {
-      return;
-    }
-
-    GetSAudioRequestSerializer().~SAudioRequestSerializer();
-    gSAudioRequestSerializerConstructed = false;
-  }
+  // Address: 0x010A933C -- process-global `SAudioRequestSerializer` singleton.
+  // Constructing it runs SAudioRequestSerializer::SAudioRequestSerializer()
+  // (0x00BC6A50), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::SAudioRequestSerializer gSAudioRequestSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x004E1EB0 (FUN_004E1EB0, gpg::SerSaveLoadHelper<Moho::SAudioRequest>::Init)
+   * Address: 0x00BC6A50 (FUN_00BC6A50, register_SAudioRequestSerializer)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  void SAudioRequestSerializer::RegisterSerializeFunctions()
-  {
-    gpg::RType* const type = ResolveSAudioRequestType();
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
-    }
-    type->serLoadFunc_ = mDeserialize;
+  SAudioRequestSerializer::SAudioRequestSerializer()
+    : mDeserialize(&SAudioRequestSerializer::Deserialize)
+    , mSerialize(&SAudioRequestSerializer::Serialize)
+  {}
 
-    if (type->serSaveFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kSaveAssertText, kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serSaveFunc_ = mSerialize;
+  /**
+   * Address: 0x00BF1080 (FUN_00BF1080, Moho::SAudioRequestSerializer::~SAudioRequestSerializer)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  SAudioRequestSerializer::~SAudioRequestSerializer() noexcept
+  {
+    ResetLinks();
   }
 
   /**
@@ -140,50 +106,58 @@ namespace moho
 
   /**
    * Address: 0x004E1040 (FUN_004E1040, Moho::SAudioRequestSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `SAudioRequest`. Forwards the
+   * reflected object pointer to `SAudioRequest::MemberDeserialize`.
    */
-  void SAudioRequestSerializer::Deserialize(gpg::ReadArchive* const archive, SAudioRequest* const request)
+  void SAudioRequestSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
-    request->MemberDeserialize(archive);
+    auto* const request = reinterpret_cast<SAudioRequest*>(objectPtr);
+    if (request != nullptr) {
+      request->MemberDeserialize(archive);
+    }
   }
 
   /**
    * Address: 0x004E1050 (FUN_004E1050, Moho::SAudioRequestSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `SAudioRequest`. Forwards the
+   * reflected object pointer to `SAudioRequest::MemberSerialize`.
    */
-  void SAudioRequestSerializer::Serialize(gpg::WriteArchive* const archive, SAudioRequest* const request)
+  void SAudioRequestSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
-    request->MemberSerialize(archive);
+    const auto* const request = reinterpret_cast<const SAudioRequest*>(objectPtr);
+    if (request != nullptr) {
+      request->MemberSerialize(archive);
+    }
   }
 
   /**
-   * Address: 0x004E10C0 (FUN_004E10C0, Moho::SAudioRequestSerializer::dtr)
+   * Address: 0x004E1EB0 (FUN_004E1EB0, gpg::SerSaveLoadHelper<Moho::SAudioRequest>::Init)
    */
-  SAudioRequestSerializer::~SAudioRequestSerializer() noexcept
+  void SAudioRequestSerializer::Init()
   {
-    UnlinkNode(*this);
-  }
+    gpg::RType* const type = ResolveSAudioRequestType();
+    if (type->serLoadFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
+    }
+    type->serLoadFunc_ = mDeserialize;
 
-  /**
-   * Address: 0x00BC6A50 (FUN_00BC6A50, register_SAudioRequestSerializer)
-   */
-  void register_SAudioRequestSerializer()
-  {
-    SAudioRequestSerializer& serializer = GetSAudioRequestSerializer();
-    InitializeNode(serializer);
-    serializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&SAudioRequestSerializer::Deserialize);
-    serializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&SAudioRequestSerializer::Serialize);
-    (void)std::atexit(&cleanup_SAudioRequestSerializer);
+    if (type->serSaveFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kSaveAssertText, kSerializationSaveLine, kSerializationSourcePath);
+    }
+    type->serSaveFunc_ = mSerialize;
   }
 } // namespace moho
-
-namespace
-{
-  struct SAudioRequestSerializerBootstrap
-  {
-    SAudioRequestSerializerBootstrap()
-    {
-      moho::register_SAudioRequestSerializer();
-    }
-  };
-
-  [[maybe_unused]] SAudioRequestSerializerBootstrap gSAudioRequestSerializerBootstrap;
-} // namespace
