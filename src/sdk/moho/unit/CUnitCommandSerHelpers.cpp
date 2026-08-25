@@ -12,122 +12,8 @@ namespace gpg
   };
 } // namespace gpg
 
-namespace
-{
-  moho::CUnitCommandConstruct gCUnitCommandConstruct;
-  moho::CUnitCommandSerializer gCUnitCommandSerializer;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  void CleanupCUnitCommandConstructAtexit()
-  {
-    (void)moho::cleanup_CUnitCommandConstruct();
-  }
-
-  void CleanupCUnitCommandSerializerAtexit()
-  {
-    (void)moho::cleanup_CUnitCommandSerializer();
-  }
-} // namespace
-
 namespace moho
 {
-  /**
-   * Address: 0x00BFEBE0 (FUN_00BFEBE0, Moho::CUnitCommandConstruct::~CUnitCommandConstruct)
-   *
-   * What it does:
-   * Unlinks the construct helper from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandConstruct()
-  {
-    return UnlinkHelperNode(gCUnitCommandConstruct);
-  }
-
-  /**
-   * Address: 0x006E9150 (FUN_006E9150)
-   *
-   * What it does:
-   * Duplicated teardown lane that unlinks `CUnitCommandConstruct` helper
-   * links and self-links the node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandConstruct_variant_primary()
-  {
-    return UnlinkHelperNode(gCUnitCommandConstruct);
-  }
-
-  /**
-   * Address: 0x006E9180 (FUN_006E9180)
-   *
-   * What it does:
-   * Secondary duplicated teardown lane for `CUnitCommandConstruct` helper
-   * links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandConstruct_variant_secondary()
-  {
-    return UnlinkHelperNode(gCUnitCommandConstruct);
-  }
-
-  /**
-   * Address: 0x00BFEC10 (FUN_00BFEC10, Moho::CUnitCommandSerializer::~CUnitCommandSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandSerializer()
-  {
-    return UnlinkHelperNode(gCUnitCommandSerializer);
-  }
-
-  /**
-   * Address: 0x006E92C0 (FUN_006E92C0)
-   *
-   * What it does:
-   * Duplicated teardown lane that unlinks `CUnitCommandSerializer` helper
-   * links and self-links the node.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandSerializer_variant_primary()
-  {
-    return UnlinkHelperNode(gCUnitCommandSerializer);
-  }
-
-  /**
-   * Address: 0x006E92F0 (FUN_006E92F0)
-   *
-   * What it does:
-   * Secondary duplicated teardown lane for `CUnitCommandSerializer` helper
-   * links.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandSerializer_variant_secondary()
-  {
-    return UnlinkHelperNode(gCUnitCommandSerializer);
-  }
-
   /**
    * Address: 0x006E91B0 (FUN_006E91B0, Moho::CUnitCommandConstruct::Construct)
    *
@@ -165,31 +51,42 @@ namespace moho
   }
 
   /**
-   * Address: 0x006EB730 (FUN_006EB730)
+   * Address: 0x006EA060 (FUN_006EA060, Moho::CUnitCommandConstruct::RegisterConstructFunction)
    *
    * What it does:
-   * Register-shape adapter that forwards one construct-result lane to
-   * `CUnitCommand::MemberConstruct`.
+   * Binds `CUnitCommand` construct/delete callbacks into RTTI.
    */
-  [[maybe_unused]] void ForwardCUnitCommandMemberConstruct(gpg::SerConstructResult* const result)
+  void CUnitCommandConstruct::Init()
   {
-    CUnitCommand::MemberConstruct(result);
+    gpg::RType* type = CUnitCommand::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(CUnitCommand));
+      CUnitCommand::sType = type;
+    }
+
+    GPG_ASSERT(type->serConstructFunc_ == nullptr);
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeconstructCallback;
   }
 
   /**
-   * Address: 0x006EB740 (FUN_006EB740)
+   * Address: 0x00BD8F50 (FUN_00BD8F50, register_CUnitCommandConstruct)
    *
    * What it does:
-   * Register-shape adapter that forwards one deserialize lane to
-   * `CUnitCommand::MemberDeserialize`.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * construct/delete callback fields.
    */
-  [[maybe_unused]] void ForwardCUnitCommandMemberDeserialize(
-    const int version,
-    CUnitCommand* const command,
-    gpg::ReadArchive* const archive
-  )
+  CUnitCommandConstruct::CUnitCommandConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CUnitCommandConstruct::Construct))
+    , mDeconstructCallback(&CUnitCommandConstruct::Deconstruct)
+  {}
+
+  /**
+   * Address: 0x00BFEBE0 (FUN_00BFEBE0, Moho::CUnitCommandConstruct::~CUnitCommandConstruct)
+   */
+  CUnitCommandConstruct::~CUnitCommandConstruct()
   {
-    CUnitCommand::MemberDeserialize(archive, command, version);
+    ResetLinks();
   }
 
   /**
@@ -235,32 +132,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x006EA060 (FUN_006EA060, Moho::CUnitCommandConstruct::RegisterConstructFunction)
-   *
-   * What it does:
-   * Binds `CUnitCommand` construct/delete callbacks into RTTI.
-   */
-  void CUnitCommandConstruct::RegisterConstructFunction()
-  {
-    gpg::RType* type = CUnitCommand::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(CUnitCommand));
-      CUnitCommand::sType = type;
-    }
-
-    GPG_ASSERT(type->serConstructFunc_ == nullptr);
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeconstructCallback;
-  }
-
-  /**
    * Address: 0x006EA0E0 (FUN_006EA0E0, gpg::SerSaveLoadHelper<Moho::CUnitCommand>::Init)
    *
    * What it does:
    * Binds `CUnitCommand` load/save callbacks onto its reflected type
    * metadata; asserts neither slot is already claimed before installing them.
    */
-  void CUnitCommandSerializer::RegisterSerializeFunctions()
+  void CUnitCommandSerializer::Init()
   {
     gpg::RType* const type = CUnitCommand::StaticGetClass();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
@@ -270,103 +148,31 @@ namespace moho
   }
 
   /**
-   * Address: 0x006E9120 (FUN_006E9120)
+   * Address: 0x00BD8F90 (FUN_00BD8F90, register_CUnitCommandSerializer)
    *
    * What it does:
-   * Alternate startup leaf that initializes global construct-helper links,
-   * binds construct/deconstruct callbacks, and returns the helper node.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * load/save callback fields.
    */
-  [[maybe_unused]] gpg::SerHelperBase* construct_CUnitCommandConstruct_ClassStartupLeaf()
-  {
-    InitializeHelperNode(gCUnitCommandConstruct);
-    gCUnitCommandConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CUnitCommandConstruct::Construct);
-    gCUnitCommandConstruct.mDeconstructCallback = &CUnitCommandConstruct::Deconstruct;
-    return HelperSelfNode(gCUnitCommandConstruct);
-  }
+  CUnitCommandSerializer::CUnitCommandSerializer()
+    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitCommandSerializer::Deserialize))
+    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitCommandSerializer::Serialize))
+  {}
 
   /**
-   * Address: 0x006EA030 (FUN_006EA030)
-   *
-   * What it does:
-   * Alternate startup leaf that rebuilds global construct-helper links,
-   * rewires construct/deconstruct callbacks, and returns the helper node.
+   * Address: 0x00BFEC10 (FUN_00BFEC10, Moho::CUnitCommandSerializer::~CUnitCommandSerializer)
    */
-  [[maybe_unused]] gpg::SerHelperBase* construct_CUnitCommandConstruct_GenericStartupLeaf()
+  CUnitCommandSerializer::~CUnitCommandSerializer()
   {
-    InitializeHelperNode(gCUnitCommandConstruct);
-    gCUnitCommandConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CUnitCommandConstruct::Construct);
-    gCUnitCommandConstruct.mDeconstructCallback = &CUnitCommandConstruct::Deconstruct;
-    return HelperSelfNode(gCUnitCommandConstruct);
-  }
-
-  /**
-   * Address: 0x006E9290 (FUN_006E9290)
-   *
-   * What it does:
-   * Alternate startup leaf that initializes global serializer-helper links,
-   * binds deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_CUnitCommandSerializer_ClassStartupLeaf()
-  {
-    InitializeHelperNode(gCUnitCommandSerializer);
-    gCUnitCommandSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CUnitCommandSerializer::Deserialize);
-    gCUnitCommandSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CUnitCommandSerializer::Serialize);
-    return HelperSelfNode(gCUnitCommandSerializer);
-  }
-
-  /**
-   * Address: 0x006EA0B0 (FUN_006EA0B0)
-   *
-   * What it does:
-   * Alternate startup leaf that rebuilds global serializer-helper links,
-   * rewires deserialize/serialize callbacks, and returns the helper node.
-   */
-  [[maybe_unused]] gpg::SerHelperBase* construct_CUnitCommandSerializer_SaveLoadStartupLeaf()
-  {
-    InitializeHelperNode(gCUnitCommandSerializer);
-    gCUnitCommandSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CUnitCommandSerializer::Deserialize);
-    gCUnitCommandSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CUnitCommandSerializer::Serialize);
-    return HelperSelfNode(gCUnitCommandSerializer);
-  }
-
-  /**
-    * Alias of FUN_00BD8F50 (non-canonical helper lane).
-   *
-   * What it does:
-   * Initializes and registers the `CUnitCommand` construct helper.
-   */
-  void register_CUnitCommandConstruct()
-  {
-    (void)construct_CUnitCommandConstruct_GenericStartupLeaf();
-    gCUnitCommandConstruct.RegisterConstructFunction();
-    (void)std::atexit(&CleanupCUnitCommandConstructAtexit);
-  }
-
-  /**
-    * Alias of FUN_00BD8F90 (non-canonical helper lane).
-   *
-   * What it does:
-   * Initializes and registers the `CUnitCommand` serializer helper.
-   */
-  void register_CUnitCommandSerializer()
-  {
-    (void)construct_CUnitCommandSerializer_SaveLoadStartupLeaf();
-    (void)std::atexit(&CleanupCUnitCommandSerializerAtexit);
+    ResetLinks();
   }
 } // namespace moho
 
 namespace
 {
-  struct CUnitCommandSerHelpersBootstrap
-  {
-    CUnitCommandSerHelpersBootstrap()
-    {
-      moho::register_CUnitCommandConstruct();
-      moho::register_CUnitCommandSerializer();
-    }
-  };
+  // Address: 0x010B7FA8 -- process-global `CUnitCommandConstruct` singleton.
+  moho::CUnitCommandConstruct gCUnitCommandConstruct;
 
-  CUnitCommandSerHelpersBootstrap gCUnitCommandSerHelpersBootstrap;
+  // Address: 0x010B7F28 -- process-global `CUnitCommandSerializer` singleton.
+  moho::CUnitCommandSerializer gCUnitCommandSerializer;
 } // namespace

@@ -7,9 +7,26 @@
 
 namespace moho
 {
-  class CUnitCommandConstruct
+  class CUnitCommandConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8F50 (FUN_00BD8F50, register_CUnitCommandConstruct)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields.
+     */
+    CUnitCommandConstruct();
+
+    /**
+     * Address: 0x00BFEBE0 (FUN_00BFEBE0, Moho::CUnitCommandConstruct::~CUnitCommandConstruct)
+     *
+     * What it does:
+     * Unlinks the construct helper from the intrusive helper list.
+     */
+    ~CUnitCommandConstruct();
+
     /**
      * Address: 0x006E91B0 (FUN_006E91B0, Moho::CUnitCommandConstruct::Construct)
      *
@@ -33,24 +50,37 @@ namespace moho
      * What it does:
      * Binds `CUnitCommand` construct/delete callbacks into RTTI.
      */
-    virtual void RegisterConstructFunction();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeconstructCallback;
+    gpg::RType::construct_func_t mConstructCallback; // +0x0C
+    gpg::RType::delete_func_t mDeconstructCallback;   // +0x10
   };
 
-  static_assert(offsetof(CUnitCommandConstruct, mHelperNext) == 0x04, "CUnitCommandConstruct::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CUnitCommandConstruct, mHelperPrev) == 0x08, "CUnitCommandConstruct::mHelperPrev offset must be 0x08");
   static_assert(offsetof(CUnitCommandConstruct, mConstructCallback) == 0x0C, "CUnitCommandConstruct::mConstructCallback offset must be 0x0C");
   static_assert(offsetof(CUnitCommandConstruct, mDeconstructCallback) == 0x10, "CUnitCommandConstruct::mDeconstructCallback offset must be 0x10");
   static_assert(sizeof(CUnitCommandConstruct) == 0x14, "CUnitCommandConstruct size must be 0x14");
 
-  class CUnitCommandSerializer
+  class CUnitCommandSerializer : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BD8F90 (FUN_00BD8F90, register_CUnitCommandSerializer)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * load/save callback fields.
+     */
+    CUnitCommandSerializer();
+
+    /**
+     * Address: 0x00BFEC10 (FUN_00BFEC10, Moho::CUnitCommandSerializer::~CUnitCommandSerializer)
+     *
+     * What it does:
+     * Unlinks the serializer helper from the intrusive helper list.
+     */
+    ~CUnitCommandSerializer();
+
     /**
      * Address: 0x006E9250 (FUN_006E9250, Moho::CUnitCommandSerializer::Deserialize)
      *
@@ -74,51 +104,15 @@ namespace moho
      * Binds `CUnitCommand` load/save callbacks onto its reflected type
      * metadata; asserts neither slot is already claimed before installing them.
      */
-    virtual void RegisterSerializeFunctions();
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
-    gpg::RType::load_func_t mDeserialize;
-    gpg::RType::save_func_t mSerialize;
+    gpg::RType::load_func_t mDeserialize; // +0x0C
+    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
-  static_assert(offsetof(CUnitCommandSerializer, mHelperNext) == 0x04, "CUnitCommandSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CUnitCommandSerializer, mHelperPrev) == 0x08, "CUnitCommandSerializer::mHelperPrev offset must be 0x08");
   static_assert(offsetof(CUnitCommandSerializer, mDeserialize) == 0x0C, "CUnitCommandSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(CUnitCommandSerializer, mSerialize) == 0x10, "CUnitCommandSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(CUnitCommandSerializer) == 0x14, "CUnitCommandSerializer size must be 0x14");
-
-  /**
-   * Address: 0x00BFEBE0 (FUN_00BFEBE0, Moho::CUnitCommandConstruct::~CUnitCommandConstruct)
-   *
-   * What it does:
-   * Unlinks the construct helper from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandConstruct();
-
-  /**
-   * Address: 0x00BFEC10 (FUN_00BFEC10, Moho::CUnitCommandSerializer::~CUnitCommandSerializer)
-   *
-   * What it does:
-   * Unlinks the serializer helper from the intrusive helper list.
-   */
-  gpg::SerHelperBase* cleanup_CUnitCommandSerializer();
-
-  /**
-    * Alias of FUN_00BD8F50 (non-canonical helper lane).
-   *
-   * What it does:
-   * Initializes and registers the `CUnitCommand` construct helper.
-   */
-  void register_CUnitCommandConstruct();
-
-  /**
-    * Alias of FUN_00BD8F90 (non-canonical helper lane).
-   *
-   * What it does:
-   * Initializes and registers the `CUnitCommand` serializer helper.
-   */
-  void register_CUnitCommandSerializer();
 } // namespace moho
 
