@@ -4674,6 +4674,20 @@ namespace msvc8
          * `_Insert_n` reallocation path FUN_007030C0, which grows
          * `CArmyImpl::UnitCategorySets`)
          *
+         * sizeof(T) == 0x20 (32, `count > 0xFFFFFFFF/32` throws):
+         * Address: 0x008D6FC0 (FUN_008D6FC0, cross-container reuse -- NOT a
+         * vector, a single-node (`count` always 1 at every confirmed call
+         * site) allocation for the local `msvc8::rb_tree<moho::Resolution>`
+         * dedup tree in `SetupPrimaryAdapterSettings` (`StartupHelpers.cpp`;
+         * node layout `{left,parent,right,vtable,width,height,
+         * framesPerSecond,color,isNil}` = 0x20 bytes, cited on `buy_head`/
+         * `insert_at` in RbTree.h). RbTree.h's own dedicated `alloc_raw()` is
+         * parameterless with no overflow guard (always exactly one node at a
+         * compile-time-constant size); this address instead reuses this
+         * member's checked-count shape with `count=1`, confirmed from its
+         * own callers: `FUN_008D6280` (buy-node-with-value) and
+         * `FUN_008D6940` (`buy_head`), both already recovered.)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
