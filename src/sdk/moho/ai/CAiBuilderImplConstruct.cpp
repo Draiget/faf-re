@@ -19,24 +19,6 @@ namespace gpg
 
 namespace
 {
-  alignas(CAiBuilderImplConstruct) unsigned char gCAiBuilderImplConstructStorage[sizeof(CAiBuilderImplConstruct)] = {};
-  bool gCAiBuilderImplConstructConstructed = false;
-
-  [[nodiscard]] gpg::SerHelperBase* HelperNode(CAiBuilderImplConstruct& construct) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&construct.mHelperNext);
-  }
-
-  [[nodiscard]] CAiBuilderImplConstruct* AcquireCAiBuilderImplConstruct()
-  {
-    if (!gCAiBuilderImplConstructConstructed) {
-      new (gCAiBuilderImplConstructStorage) CAiBuilderImplConstruct();
-      gCAiBuilderImplConstructConstructed = true;
-    }
-
-    return reinterpret_cast<CAiBuilderImplConstruct*>(gCAiBuilderImplConstructStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCAiBuilderImplType()
   {
     gpg::RType* type = CAiBuilderImpl::sType;
@@ -77,34 +59,26 @@ namespace
     result->SetUnowned(MakeCAiBuilderImplRef(object), 0u);
   }
 
+  // Address: 0x010AE644 -- process-global `CAiBuilderImplConstruct` singleton.
+  // Constructing it runs CAiBuilderImplConstruct::CAiBuilderImplConstruct()
+  // (0x00BCC2E0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  CAiBuilderImplConstruct gCAiBuilderImplConstruct;
+
   /**
    * Address: 0x00BF6AC0 (FUN_00BF6AC0, cleanup_CAiBuilderImplConstruct)
    *
    * What it does:
-   * Unlinks recovered CAiBuilderImpl construct helper node from intrusive
-   * serializer chain.
+   * Unlinks the `CAiBuilderImplConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BCC2E0) as the
+   * global's `atexit` teardown.
    */
-  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiBuilderImplConstruct()
+  void CleanupCAiBuilderImplConstructStartup()
   {
-    if (!gCAiBuilderImplConstructConstructed) {
-      return nullptr;
-    }
-
-    CAiBuilderImplConstruct* const construct = AcquireCAiBuilderImplConstruct();
-    gpg::SerHelperBase* const self = HelperNode(*construct);
-    if (construct->mHelperNext != nullptr && construct->mHelperPrev != nullptr) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
-    construct->mHelperNext = self;
-    construct->mHelperPrev = self;
-    return self;
-  }
-
-  void cleanup_CAiBuilderImplConstruct_atexit()
-  {
-    (void)cleanup_CAiBuilderImplConstruct();
+    gCAiBuilderImplConstruct.ResetLinks();
   }
 } // namespace
 
@@ -134,48 +108,32 @@ void CAiBuilderImplConstruct::Deconstruct(void* const object)
 }
 
 /**
- * Address: 0x005A0650 (FUN_005A0650)
+ * Address: 0x00BCC2E0 (FUN_00BCC2E0, dynamic initializer for the global
+ * `CAiBuilderImplConstruct` singleton)
+ *
+ * What it does:
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+ * into `sNewHelpers`), binds the construct/delete callback fields, and
+ * registers process-exit cleanup.
+ */
+CAiBuilderImplConstruct::CAiBuilderImplConstruct()
+  : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiBuilderImplConstruct::Construct))
+  , mDeleteCallback(&CAiBuilderImplConstruct::Deconstruct)
+{
+  (void)std::atexit(&CleanupCAiBuilderImplConstructStartup);
+}
+
+/**
+ * Address: 0x005A0650 (FUN_005A0650, gpg::SerConstructHelper_CAiBuilderImpl::Init)
  *
  * What it does:
  * Lazily resolves CAiBuilderImpl RTTI and installs construct/delete callbacks
  * from this helper object into the type descriptor.
  */
-void CAiBuilderImplConstruct::RegisterConstructFunction()
+void CAiBuilderImplConstruct::Init()
 {
   gpg::RType* type = CachedCAiBuilderImplType();
   GPG_ASSERT(type->serConstructFunc_ == nullptr);
   type->serConstructFunc_ = mConstructCallback;
   type->deleteFunc_ = mDeleteCallback;
 }
-
-/**
- * Address: 0x00BCC2E0 (FUN_00BCC2E0)
- *
- * What it does:
- * Initializes the global CAiBuilderImpl construct helper callbacks and
- * installs process-exit cleanup.
- */
-int moho::register_CAiBuilderImplConstruct()
-{
-  CAiBuilderImplConstruct* const construct = AcquireCAiBuilderImplConstruct();
-  gpg::SerHelperBase* const self = HelperNode(*construct);
-  construct->mHelperNext = self;
-  construct->mHelperPrev = self;
-  construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiBuilderImplConstruct::Construct);
-  construct->mDeleteCallback = &CAiBuilderImplConstruct::Deconstruct;
-  construct->RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiBuilderImplConstruct_atexit);
-}
-
-namespace
-{
-  struct CAiBuilderImplConstructBootstrap
-  {
-    CAiBuilderImplConstructBootstrap()
-    {
-      (void)moho::register_CAiBuilderImplConstruct();
-    }
-  };
-
-  [[maybe_unused]] CAiBuilderImplConstructBootstrap gCAiBuilderImplConstructBootstrap;
-} // namespace
