@@ -7,7 +7,7 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallTeleport.h"
+#include "moho/unit/tasks/CUnitCallTeleport.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -17,35 +17,6 @@ namespace
 
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
-
-  struct CUnitTeleportTaskTypeInfoStartupHelperLinks
-  {
-    gpg::SerHelperBase* mNext;
-    gpg::SerHelperBase* mPrev;
-  };
-
-  CUnitTeleportTaskTypeInfoStartupHelperLinks gCUnitTeleportTaskTypeInfoStartupHelperLinks{};
-
-  [[nodiscard]] gpg::SerHelperBase* CUnitTeleportTaskTypeInfoStartupSelfNode() noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext);
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitTeleportTaskTypeInfoStartupHelperNode() noexcept
-  {
-    if (
-      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext != nullptr
-      && gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev != nullptr
-    ) {
-      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext->mPrev = gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev;
-      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev->mNext = gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext;
-    }
-
-    gpg::SerHelperBase* const self = CUnitTeleportTaskTypeInfoStartupSelfNode();
-    gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev = self;
-    gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext = self;
-    return self;
-  }
 
   struct CUnitTeleportTaskRuntimeView final : moho::CCommandTask
   {
@@ -103,18 +74,6 @@ namespace
 
     AcquireTypeInfo().~CUnitTeleportTaskTypeInfo();
     gTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x0060AA60 (FUN_0060AA60)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks one static helper-link node used by
-   * `CUnitTeleportTaskTypeInfo` bootstrap storage and restores self-links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CUnitTeleportTaskTypeInfoStartupThunkA() noexcept
-  {
-    return UnlinkCUnitTeleportTaskTypeInfoStartupHelperNode();
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
