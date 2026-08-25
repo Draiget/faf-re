@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -19,6 +20,8 @@ namespace LuaPlus
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -177,6 +180,24 @@ namespace moho
      */
     void SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categorySource);
 
+    /**
+     * Address: 0x0072B200 (FUN_0072B200, Moho::CSquad::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats` in binary
+     * archive order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0072B2E0 (FUN_0072B2E0, Moho::CSquad::MemberSerialize)
+     *
+     * What it does:
+     * Saves `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats` in binary
+     * archive order.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     Sim* mSim;                                                // +0x00
     std::uint32_t mPad_0x04;                                  // +0x04 (binary leaves this uninitialised; reserved/unused slot)
@@ -192,4 +213,21 @@ namespace moho
   static_assert(offsetof(CSquad, mName) == 0x34, "CSquad::mName offset must be 0x34");
   static_assert(offsetof(CSquad, mCats) == 0x50, "CSquad::mCats offset must be 0x50");
   static_assert(sizeof(CSquad) == 0x60, "CSquad size must be 0x60");
+
+  /**
+   * VFTABLE: 0x00E31B78
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CSquad>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CSquadSerializer`):
+   *    0x00BDAC20 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
+   *    0x0072A5C0)
+   *  - dtor: 0x00C00500 (`??1CSquadSerializer@Moho@@QAE@@Z`)
+   *  - Init(): 0x0072A5F0
+   *  - Deserialize(): 0x007249B0
+   *  - Serialize(): 0x007249C0
+   */
+  using CSquadSerializer = gpg::SerSaveLoadHelper<CSquad>;
 } // namespace moho

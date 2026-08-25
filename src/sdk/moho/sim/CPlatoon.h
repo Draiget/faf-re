@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
@@ -21,6 +22,8 @@ namespace gpg
 {
   class RRef;
   class RType;
+  class ReadArchive;
+  class WriteArchive;
   class SerConstructResult;
 } // namespace gpg
 
@@ -512,6 +515,24 @@ namespace moho
      */
     void RemoveUnit(Entity* unit);
 
+    /**
+     * Address: 0x0072B3C0 (FUN_0072B3C0, Moho::CPlatoon::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `CScriptObject` base state, sim/army pointers, squad list, name
+     * strings, and lifetime stat lanes, in binary archive order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0072B4D0 (FUN_0072B4D0, Moho::CPlatoon::MemberSerialize)
+     *
+     * What it does:
+     * Saves `CScriptObject` base state, sim/army pointers, squad list, name
+     * strings, and lifetime stat lanes, in binary archive order.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     Sim* mSim;                                  // +0x34
     IArmy* mArmy;                               // +0x38
@@ -546,6 +567,25 @@ namespace moho
   static_assert(offsetof(CPlatoon, mLuaUnitList) == 0xF4, "CPlatoon::mLuaUnitList offset must be 0xF4");
   static_assert(offsetof(CPlatoon, mHasLuaList) == 0x108, "CPlatoon::mHasLuaList offset must be 0x108");
   static_assert(sizeof(CPlatoon) == 0x110, "CPlatoon size must be 0x110");
+
+  /**
+   * VFTABLE: 0x00E31B98
+   *
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CPlatoon>
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see the
+   * template's class-level comment in Reflection.h for the general shape):
+   *  - ctor / compiler dynamic-initializer (`register_CPlatoonSerializer`):
+   *    0x00BDACC0 (__xc_a-reachable; dead zero-xref COMDAT duplicate:
+   *    0x0072A6E0)
+   *  - dtor: 0x00C005C0 (no recovered mangled name; body confirmed via raw
+   *    asm to just call `ResetLinks()`, same as every other instantiation's
+   *    real destructor)
+   *  - Init(): 0x0072A710
+   *  - Deserialize(): 0x0072A160
+   *  - Serialize(): 0x0072A170
+   */
+  using CPlatoonSerializer = gpg::SerSaveLoadHelper<CPlatoon>;
 
   /**
    * Address: 0x00BDAE70 (FUN_00BDAE70, register_CPlatoonCanConsiderFormingPlatoon_LuaFuncDef)
