@@ -4838,6 +4838,45 @@ namespace msvc8
          * the caller-evidence note on `push_back` `FUN_0064E120` above for
          * where that address actually fits (two hops further up, and
          * itself still uncalled).
+         *
+         * Address: 0x007D8620 (FUN_007D8620, sub_7D8620,
+         * msvc8::vector<moho::ClutterSurfaceElement>::insert for the 16-byte
+         * element with `count` folded to 1) -- `Moho::Clutter::Surface::
+         * mSeeds` (`Clutter.h`). Max_size guard against 0xFFFFFFF
+         * (`0xFFFFFFFF/16`, throw lane `FUN_007D88B0`); fast path
+         * (`capacity > size`): tail-shift branch moves the current last
+         * element into the new slot via the count=1 `uninit_move_n`
+         * specialization `FUN_007D95C0`, shifts the remaining tail right one
+         * slot via `FUN_007D9620` (cited below), then assigns the gap via
+         * the count=1 assign-fill specialization `FUN_007D95F0`; at-end
+         * branch (no tail) constructs directly through the `FUN_007D7F00`/
+         * `FUN_007D9970` adapter pair (cited above on `uninit_fill_n`).
+         * Reallocation path: checked-allocate via `FUN_007D9660`
+         * (`gpg/core/containers/CheckedArrayAllocationLanes.cpp`, already
+         * recovered as this instantiation's `allocate_slots_checked`),
+         * head-copy and tail-copy through the general range form
+         * `FUN_007D9B40` (`uninit_move_n`, called twice -- head then tail;
+         * pre-existing citation in `moho/sim/SimRecoveryRuntime.cpp` as
+         * `CopyClutterSeedRangeRuntime` uses a generic `ClutterSeedRuntime`
+         * reach-in lane rather than the typed element -- flagged as
+         * existing RULE ONE debt, not collapsed in this pass), gap-fill via
+         * `FUN_007D9970`, old-buffer teardown via `FUN_007D8600`
+         * (`moho/containers/LegacyContainerFillLanes.cpp`, already
+         * recovered). Reached from `AppendSurfaceSeed`'s (`Clutter.cpp`)
+         * `mSeeds.insert(mSeeds.end(), seed)` call on the capacity-exhausted
+         * path. DB-integrity fix: was fake-recovered (batch r14, zero real
+         * src/sdk citation).
+         *
+         * Address: 0x007D9620 (FUN_007D9620, sub_7D9620) -- the non-
+         * trivially-copyable tail-shift-by-one-slot loop this member's fast
+         * path takes when a live tail follows the insertion point:
+         * `for (i=tail-1; i>0; --i) insertAt[i] = std::move(insertAt[i-1]);`
+         * per-field copy (vtable/selectionWeight/uniformScale/meshBlueprint)
+         * since `ClutterSurfaceElement` has no move-aware type to dispatch
+         * to. DB-integrity fix: was blocked (owner_layout) citing a stale
+         * `CLobby.cpp` lead from earlier research that does not match this
+         * function's real body at all -- this and `FUN_007D8620` are
+         * `Moho::Clutter::Surface`'s seed vector, not lobby/networking code.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6293,6 +6332,33 @@ namespace msvc8
          * project's own `uninit_fill_n` core, not a throw lane; the
          * `__noreturn` tag both functions carry is the same spurious-tag
          * artifact called out above, not evidence of throw-only behavior.
+         *
+         * Address: 0x007D9970 (FUN_007D9970, sub_7D9970) --
+         * `msvc8::vector<moho::ClutterSurfaceElement>::uninit_fill_n` for the
+         * 16-byte element (`Moho::Clutter::Surface::mSeeds`, `Clutter.h`).
+         * Count-driven loop (`a3` register-carried) that per slot resets the
+         * element's vtable to `Moho::Clutter::Seed::`vftable'` and copies
+         * `selectionWeight`/`uniformScale`/`meshBlueprint` from the fixed
+         * `a2` source (never advances -- textbook fill, not a range copy),
+         * advancing the destination by 16. Called from `insert(pos,count,
+         * value)`'s (`FUN_007D8620`, cited below) reallocation-branch fill
+         * step, and via the `FUN_007D7F00` adapter immediately below from
+         * that same instantiation's fast-path at-end append. Previously
+         * recovered under the name `CopyClutterSeedRange` in Clutter.cpp (a
+         * bespoke per-type free function -- moved here per RULE ONE now that
+         * this pass touches the same instantiation's `insert`).
+         * Address: 0x007D7F00 (FUN_007D7F00, sub_7D7F00) -- the
+         * advance-returning `_Ufill` adapter around `FUN_007D9970` above,
+         * for the same `ClutterSurfaceElement` specialization: forwards its
+         * carried destination straight into `FUN_007D9970` with `count=1`
+         * and returns the advanced destination pointer, matching the
+         * `_Ufill` adapter shape already documented on `FUN_0064E360`/
+         * `FUN_0074DAC0`/`FUN_0092EA50` above. Called once from `insert`'s
+         * (`FUN_007D8620`) fast-path at-end sub-branch (no tail to shift) to
+         * construct the newly-inserted element and obtain the advanced end
+         * pointer. Previously recovered under the name
+         * `CopyClutterSeedValueRange` in Clutter.cpp -- moved here alongside
+         * its `uninit_fill_n` core for the same reason.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
