@@ -263,6 +263,25 @@ namespace msvc8
          * 0x00A52BF0, reached from `FUN_00A64110`'s sibling emission; same
          * classification.
          */
+        /**
+         * Address: 0x0094EE60 (FUN_0094EE60, sub_94EE60) -- `gpg::
+         * WriteArchive::mObjRefs`'s (`std::map<const void*,
+         * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
+         * leftmost descent, sibling of `rb_max`'s 0x0094F010 citation below.
+         * Walks `_Left` (node+0x00) while `!_Isnil` (node+0x25), matching
+         * this member exactly (confirmed against the `.asm`: `mov ecx,[eax]`
+         * / `cmp byte ptr [ecx+25h],0` loop, no other fields touched). Sole
+         * caller is this instantiation's `erase_node` (`FUN_00951A40`,
+         * cited above on that member) via `rb_min(fix)` when the erased
+         * node was `mObjRefs`'s leftmost -- same dead-in-practice branch as
+         * `FUN_00951A40` itself (`mObjRefs.clear()`, `WriteArchive.cpp:970`,
+         * always erases the full range and never reaches the per-node walk
+         * that would call this). Kept `recovered` rather than `skip`,
+         * matching the `rb_min`'s 0x0052D960 / `rb_max`'s 0x00536AA0
+         * precedent above: the sole caller's single-node path is compiled
+         * but not separately exercised, yet this member itself is exactly
+         * what the compiler emits at this address.
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -416,6 +435,22 @@ namespace msvc8
          * Address: 0x00A52D20 (FUN_00A52D20) -- byte-identical ICF twin of
          * 0x00A52BD0, reached from `FUN_00A64110`'s sibling emission; same
          * classification.
+         */
+        /**
+         * Address: 0x0094F010 (FUN_0094F010, sub_94F010) -- `gpg::
+         * WriteArchive::mObjRefs`'s (`std::map<const void*,
+         * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
+         * rightmost descent, sibling of `rb_min`'s 0x0094EE60 citation
+         * above. Walks `_Right` (node+0x08) while `!_Isnil` (node+0x25),
+         * matching this member exactly (confirmed against the `.asm`: `mov
+         * ecx,[eax+8]` / `cmp byte ptr [ecx+25h],0` loop). Sole caller is
+         * this instantiation's `erase_node` (`FUN_00951A40`, cited above on
+         * that member) via `rb_max(fix)` when the erased node was
+         * `mObjRefs`'s rightmost -- same dead-in-practice branch as
+         * `FUN_00951A40` itself (`mObjRefs.clear()`, `WriteArchive.cpp:970`,
+         * always erases the full range and never reaches the per-node walk
+         * that would call this). Kept `recovered` rather than `skip`, same
+         * precedent as `rb_min`'s 0x0094EE60 citation above.
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -4017,6 +4052,30 @@ namespace msvc8
              * citing `src/sdk/moho/misc/CrtRuntimeHelpers.cpp` (address not
              * present in that file, confirmed by a full-file grep); this
              * catalog is the real home.)
+             *
+             * Address: 0x004E31F0 (FUN_004E31F0, sub_4E31F0) --
+             * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::buy_node`
+             * -- the sound subsystem's `sSndParamsCache`
+             * (`moho/audio/SoundSubsystemBootstrap.cpp`). `__userpurge`
+             * with `this`=esi=hidden-left/parent/right triple (its caller
+             * passes `where`/`where`/`where` or `head_`/`where`/`head_`
+             * depending on branch, the same "compiler optimisation, not a
+             * different operation" pattern documented on the IdPool/
+             * CommandManager instantiations above) and a fourth argument
+             * pointing at the 8-byte `pair<CSndParams*, HSndEntityLoop*>`
+             * value to copy into the fresh node, then `isNil=0`/`color`
+             * (byte offsets +20/+21, matching this instantiation's 8-byte
+             * value_type). Reached from `insert_at`'s emission for this
+             * same instantiation (`FUN_004E22B0`, cited below). Neither is
+             * called from the recovered `EnsureSharedAmbientLoopMapEntry`
+             * (`CSndParams.cpp`, `FUN_004E1890`) -- that function's own
+             * note already documents why: its `msvc8::map<CSndParams*,
+             * HSndEntityLoop*>::_Insert` role is fulfilled by the modern
+             * `unordered_map` find/emplace path with RAII via
+             * `unique_ptr` instead, the same elision `TeardownSoundStructs`
+             * documents for this tree's erase/clear family. Re-homed here
+             * from the false `CrtRuntimeHelpers.cpp` DB-integrity
+             * contamination; this catalog is the real home.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -4375,6 +4434,31 @@ namespace msvc8
              * function in RRuleGameRules.cpp that recursed over a
              * `CategoryLookupNodeRuntimeView*` reach-in instead of calling
              * it.)
+             *
+             * Address: 0x004E45E0 (FUN_004E45E0, sub_4E45E0) -- `destroy_subtree`
+             * for one of the sound subsystem's three rb-tree caches
+             * (`sSndParamsCache` / `stru_10A9298` / `dword_10A92A4`,
+             * `moho/audio/SoundSubsystemBootstrap.cpp`; the exact one of the
+             * three is not pinned down in this pass). `void __stdcall(node)`
+             * recursing right (`sub_4E45E0(node->right)`) then walking left
+             * with `operator delete` per node, matching this member's
+             * recurse-right/iterate-left shape exactly; `isNil` tested at
+             * `+0x15` (matching `FUN_004E31F0`'s `buy_node` citation above,
+             * an 8-byte value_type). Reached from this instantiation's
+             * `erase_range`/`clear` emission (`FUN_004E2C80`) -- which
+             * `TeardownSoundStructs` (0x004DF0E0, `SoundSubsystemBootstrap.cpp`)
+             * already documents as provably a no-op at every real call site
+             * (the mirror trees are always empty; real cache inserts/erases
+             * go through the modern `EnsureSharedAmbientLoopMapEntry`/
+             * `unordered_map` path instead) -- elided there for that reason,
+             * same as `FUN_004E2C80` itself. Cited here so it is not mistaken
+             * for an orphan.
+             * Address: 0x004E4690 (FUN_004E4690, sub_4E4690) -- byte-distinct
+             * sibling emission of the same `destroy_subtree` shape (differs
+             * only in its own embedded self-recursive call target, so not an
+             * ICF twin) for a second one of the three sound-cache trees.
+             * Reached from `FUN_004E3020`, part of the same elided
+             * `TeardownSoundStructs` cluster.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -5107,6 +5191,30 @@ namespace msvc8
              * report, or note of any kind prior to this pass -- neither
              * proven false nor verifiable; this catalog entry is the first
              * real evidence trail for it.)
+             *
+             * Address: 0x004E22B0 (FUN_004E22B0, sub_4E22B0) --
+             * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::
+             * insert_at` for the sound subsystem's `sSndParamsCache`
+             * (`moho/audio/SoundSubsystemBootstrap.cpp`), sibling of
+             * `buy_node`'s `FUN_004E31F0` citation above (same 8-byte
+             * value_type). `(unsigned)size_ >= 0x1FFFFFFEu` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<CSndParams*, HSndEntityLoop*>` value_type, throwing
+             * `std::length_error("map/set<T> too long")` via the same
+             * `logic_error`-then-vftable-patch shape documented throughout
+             * this file. Calls `buy_node` (`FUN_004E31F0`) as a separate
+             * step rather than fusing it, links under the caller's
+             * `where`/`addLeft`, then repairs red-red violations via
+             * `sub_4E3140`/`sub_4E31A0` (`rotate_left`/`rotate_right`-shaped,
+             * not yet independently cited). Reached from `EnsureSharedAmbient
+             * LoopMapEntry` (`CSndParams.cpp`, `FUN_004E1890`) only in the
+             * sense that that function's own note documents: its real
+             * `_Insert` role is fulfilled by the modern `unordered_map`
+             * find/emplace path instead, so this binary helper is elided
+             * rather than called by name -- `FUN_004E1890`'s `depends_on`
+             * already lists this token for exactly that reason. Re-homed
+             * here from the false `CrtRuntimeHelpers.cpp` DB-integrity
+             * contamination; this catalog is the real home.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
@@ -5245,6 +5353,45 @@ namespace msvc8
                 fix->color = kRbBlack;
             }
 
+            /**
+             * `proxy_` (+0x00) matches the binary's `_Container_proxy*` debug/
+             * allocator word for layout purposes only. This project's build
+             * targets `_SECURE_SCL=1` (VS2005 default, see this file's opening
+             * comment and the `Dbg`/checked-iterator discussion on `~rb_tree()`
+             * above), under which the real Dinkumware `_Container_proxy` also
+             * anchors a doubly-linked list of every live `_Iterator_base12`
+             * pointing into the container (`_Myfirstiter`/`_Mynextiter`/
+             * `_Mycont`), walked to orphan (invalidate) those iterators when
+             * the container is cleared, destroyed, or reallocated. This
+             * template deliberately does not model that list -- `proxy_`
+             * stays `nullptr` for the object's whole lifetime (see the
+             * constructors below) -- for the same reason the checked-erase-
+             * per-node debug branch documented on `~rb_tree()` above is not
+             * modeled: nothing in this codebase holds a live iterator across
+             * a clear/destroy in a way whose behavior would differ, so not
+             * modeling it does not change observable behavior.
+             *
+             * Address: 0x004E3A30 (FUN_004E3A30, sub_4E3A30) -- the sound
+             * subsystem's `sSndParamsCache` (`moho/audio/
+             * SoundSubsystemBootstrap.cpp`) checked-iterator orphan-all step:
+             * walks `_Myfirstiter`'s linked list of live `_Iterator_base12`
+             * nodes via `sub_4E4530` then self-links the proxy's iterator
+             * list back to empty and clears `_Myhead`. Reached from this
+             * instantiation's `clear()`/dtor emission as the `_SECURE_SCL`
+             * checked-iterator side effect of destroying/clearing the tree --
+             * the same debug-only machinery this field's comment documents
+             * as deliberately unmodeled. `TeardownSoundStructs` (0x004DF0E0)
+             * already documents why the whole erase/clear family for this
+             * tree is elided at its call site (mirror trees are always
+             * empty). Cited here, not modeled as a member, so it is not
+             * mistaken for an orphan.
+             * Address: 0x004E3A80 (FUN_004E3A80, sub_4E3A80) -- the
+             * `_Iterator_base12` list-splice step `FUN_004E3A30` calls
+             * per-iterator (`sub_4E4530`'s inner loop): unlinks one
+             * `_Iterator_base12` node from the proxy's doubly-linked list of
+             * live iterators. Same deliberately-unmodeled `_SECURE_SCL`
+             * checked-iterator category as `FUN_004E3A30` immediately above.
+             */
             // ---- 12-byte payload (x86); field order is ABI ---------------------
             _Container_proxy* proxy_; // +0x00
             node_type* head_;         // +0x04
