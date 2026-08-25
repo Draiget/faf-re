@@ -16,40 +16,11 @@ namespace gpg
 
 namespace
 {
+  // Address: 0x010A7F88 -- process-global `CParticleTextureSaveConstruct`
+  // singleton (constructed by FUN_00BC5270, self-registering via `__xc_a`;
+  // see CParticleTextureSaveConstruct.h for the real-ctor/atexit-target
+  // evidence).
   moho::CParticleTextureSaveConstruct gCParticleTextureSaveConstruct;
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperNext = self;
-    helper.mHelperPrev = self;
-  }
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
-  {
-    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
-      helper.mHelperNext->mPrev = helper.mHelperPrev;
-      helper.mHelperPrev->mNext = helper.mHelperNext;
-    }
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mHelperPrev = self;
-    helper.mHelperNext = self;
-    return self;
-  }
-
-  void CleanupCParticleTextureSaveConstructAtexit()
-  {
-    (void)moho::cleanup_CParticleTextureSaveConstruct();
-  }
 } // namespace
 
 namespace moho
@@ -79,49 +50,26 @@ namespace moho
    * What it does:
    * Resolves `CParticleTexture` RTTI and installs save-construct-args callback.
    */
-  void CParticleTextureSaveConstruct::RegisterSaveConstructArgsFunction()
+  void CParticleTextureSaveConstruct::Init()
   {
     gpg::RType* const typeInfo = resource_reflection::ResolveCParticleTextureType();
     resource_reflection::RegisterSaveConstructArgsCallback(typeInfo, mSerSaveConstructArgsFunc);
   }
 
   /**
-   * Address: 0x00BEFDD0 (FUN_00BEFDD0, Moho::CParticleTextureSaveConstruct::~CParticleTextureSaveConstruct)
+   * Address: 0x00BC5270 (FUN_00BC5270, dynamic initializer for the global
+   * `CParticleTextureSaveConstruct` singleton)
    *
    * What it does:
-   * Unlinks the save-construct helper node from the intrusive helper list.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the
+   * save-construct-args callback field.
    */
-  gpg::SerHelperBase* cleanup_CParticleTextureSaveConstruct()
-  {
-    return UnlinkHelperNode(gCParticleTextureSaveConstruct);
-  }
+  CParticleTextureSaveConstruct::CParticleTextureSaveConstruct()
+    : mSerSaveConstructArgsFunc(reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CParticleTextureSaveConstruct::Construct))
+  {}
 
-  /**
-   * Address: 0x00BC5270 (FUN_00BC5270, register_CParticleTextureSaveConstruct)
-   *
-   * What it does:
-   * Initializes callback slots for the global save-construct helper and
-   * schedules teardown.
-   */
-  void register_CParticleTextureSaveConstruct()
+  CParticleTextureSaveConstruct::~CParticleTextureSaveConstruct()
   {
-    InitializeHelperNode(gCParticleTextureSaveConstruct);
-    gCParticleTextureSaveConstruct.mSerSaveConstructArgsFunc =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CParticleTextureSaveConstruct::Construct);
-    gCParticleTextureSaveConstruct.RegisterSaveConstructArgsFunction();
-    (void)std::atexit(&CleanupCParticleTextureSaveConstructAtexit);
+    ResetLinks();
   }
 } // namespace moho
-
-namespace
-{
-  struct CParticleTextureSaveConstructBootstrap
-  {
-    CParticleTextureSaveConstructBootstrap()
-    {
-      moho::register_CParticleTextureSaveConstruct();
-    }
-  };
-
-  CParticleTextureSaveConstructBootstrap gCParticleTextureSaveConstructBootstrap;
-} // namespace
