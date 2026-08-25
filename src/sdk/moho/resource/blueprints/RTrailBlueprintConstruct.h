@@ -15,33 +15,45 @@ namespace moho
   /**
    * VFTABLE: 0x00E0EC4C
    * COL: 0x00E680E4
+   *
+   * Demangled: gpg::SerConstructHelper<class Moho::RTrailBlueprint>
+   *
+   * What it does:
+   * Binds the construct/delete callbacks used to materialize
+   * `RTrailBlueprint` references during load. Base-class construction
+   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
+   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
+   * `Init()` on it.
    */
-  class RTrailBlueprintConstruct
+  class RTrailBlueprintConstruct : public gpg::SerHelperBase
   {
   public:
     /**
-     * Address: 0x00510700 (FUN_00510700, sub_510700)
-     * Slot: 0
+     * Address: 0x00BC8170 (FUN_00BC8170, dynamic initializer for the global
+     * `RTrailBlueprintConstruct` singleton)
      *
      * What it does:
-     * Binds construct/delete callbacks into RTrailBlueprint RTTI
-     * (`serConstructFunc_`, `deleteFunc_`).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
+     * and splices it into the process-global `sNewHelpers` pending list),
+     * binds the construct/delete callback fields, and registers process-exit
+     * cleanup.
      */
-    virtual void RegisterConstructFunction();
+    RTrailBlueprintConstruct();
+
+    /**
+     * Address: 0x00510700 (FUN_00510700, gpg::SerConstructHelper<Moho::RTrailBlueprint>::Init)
+     *
+     * What it does:
+     * Lazily resolves the `RTrailBlueprint` reflection descriptor, asserts
+     * the construct callback slot is empty, and publishes this helper's
+     * construct/delete callbacks to the descriptor.
+     */
+    void Init() override;
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
-
-  static_assert(
-    offsetof(RTrailBlueprintConstruct, mHelperNext) == 0x04, "RTrailBlueprintConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RTrailBlueprintConstruct, mHelperPrev) == 0x08, "RTrailBlueprintConstruct::mHelperPrev offset must be 0x08"
-  );
   static_assert(
     offsetof(RTrailBlueprintConstruct, mConstructCallback) == 0x0C,
     "RTrailBlueprintConstruct::mConstructCallback offset must be 0x0C"
@@ -73,12 +85,4 @@ namespace moho
    * Deletes one constructed `RTrailBlueprint`.
    */
   void Delete_RTrailBlueprint(void* objectPtr);
-
-  /**
-   * Address: 0x00BC8170 (FUN_00BC8170, sub_BC8170)
-   *
-   * What it does:
-   * Initializes and registers global construct helper for `RTrailBlueprint`.
-   */
-  int register_RTrailBlueprintConstruct();
 } // namespace moho
