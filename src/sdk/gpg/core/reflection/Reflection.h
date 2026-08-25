@@ -4771,6 +4771,14 @@ namespace gpg
    *     Serialize 0x00523BB0
    *   - T=Moho::EProjectileImpactEvent: ctor 0x00BD6350, atexit 0x00BFD550,
    *     Deserialize 0x0069EEC0, Serialize 0x0069EEE0
+   *   - T=Moho::EAiResult: ctor 0x00BD0530 (no dead duplicate found), atexit
+   *     0x00BF9AB0, Deserialize 0x0060BCD0, Serialize 0x0060BCF0, Init
+   *     0x0060B980 (found via vtable-slot xref search on
+   *     `??_7?$PrimitiveSerHelper@W4EAiResult@Moho@@H@gpg@@6B@`; body matches
+   *     this template's `Init()` exactly, including the shared `sCachedType`
+   *     caching -- IDA's decompiler displays that global as
+   *     `Moho::EAiResult::sType` but it is this template's own
+   *     per-instantiation static, not a member of the enum)
    * All of the above previously used a hand-rolled `{ mHelperNext,
    * mHelperPrev, mDeserialize/mLoadCallback, mSerialize/mSaveCallback }`
    * raw-struct mimic (sometimes via a per-file or per-cluster generic
