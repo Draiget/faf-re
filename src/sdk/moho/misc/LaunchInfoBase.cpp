@@ -1028,8 +1028,13 @@ namespace
     }
 
     // 0x00542D75 / 0x00542DC9: both grow lanes finish through the per-type
-    // uninitialized-copy emission (FUN_005444B0), which is not recovered yet;
-    // msvc8::vector copy-assign reaches the same final state.
+    // uninitialized-copy emission (FUN_005444B0 and its calling-convention
+    // siblings) -- now cited on `msvc8::vector<moho::ArmyLaunchInfo>::
+    // uninit_copy_n` (legacy/containers/Vector.h). This assignment is that
+    // citation's real source-level instantiation site: growing `destination`
+    // to `source`'s size placement-constructs the new tail via
+    // `ArmyLaunchInfo`'s compiler-synthesized copy constructor, matching the
+    // binary's per-element `BVIntSet` rebuild exactly.
     destination = source;
     return destination;
   }
@@ -1161,202 +1166,28 @@ namespace
     return begin;
   }
 
-  /**
-   * Address: 0x005454A0 (FUN_005454A0)
-   *
-   * What it does:
-   * Copy-constructs one contiguous `ArmyLaunchInfo` range from
-   * `[sourceBegin, sourceEnd)` into `destinationBegin`, rebuilding each
-   * `mUnitSources.mWords` lane from inline storage and rolling back partial
-   * construction on failure.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollback(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    const moho::ArmyLaunchInfo* sourceCursor = sourceBegin;
-    moho::ArmyLaunchInfo* destinationCursor = destinationBegin;
-
-    try {
-      while (sourceCursor != sourceEnd) {
-        if (destinationCursor != nullptr) {
-          destinationCursor->mUnitSources.mFirstWordIndex = sourceCursor->mUnitSources.mFirstWordIndex;
-          destinationCursor->mUnitSources.mWords.RebindInlineNoFree();
-          (void)gpg::core::legacy::CopyFrom(
-            destinationCursor->mUnitSources.mWords,
-            sourceCursor->mUnitSources.mWords,
-            destinationCursor->mUnitSources.mWords.originalVec_
-          );
-        }
-
-        ++sourceCursor;
-        ++destinationCursor;
-      }
-    } catch (...) {
-      if (destinationCursor != nullptr) {
-        destinationCursor->mUnitSources.mWords.ResetStorageToInline();
-      }
-      (void)ResetArmyLaunchInfoUnitSourcesRange(destinationBegin, destinationCursor);
-      throw;
-    }
-
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x00544C60 (FUN_00544C60)
-   * Address: 0x00545090 (FUN_00545090)
-   * Address: 0x00545580 (FUN_00545580)
-   *
-   * What it does:
-   * Bridges legacy register/EH-shaped wrapper lanes into the canonical
-   * `CopyConstructArmyLaunchInfoRangeRollback` helper.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackRegisterAdapter(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00545620 (FUN_00545620)
-   *
-   * What it does:
-   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
-   * `destination`, rebinding destination word storage to inline lanes first.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesRebindAndCopy(
-    const moho::ArmyLaunchInfo* const source,
-    moho::ArmyLaunchInfo* const destination
-  )
-  {
-    if (destination == nullptr) {
-      return destination;
-    }
-
-    destination->mUnitSources.mFirstWordIndex = source->mUnitSources.mFirstWordIndex;
-    (void)gpg::FastVectorN2RebindAndCopy<unsigned int>(
-      &destination->mUnitSources.mWords,
-      &source->mUnitSources.mWords
-    );
-    return destination;
-  }
-
-  /**
-   * Address: 0x00545270 (FUN_00545270)
-   *
-   * What it does:
-   * Thin adapter lane forwarding one `ArmyLaunchInfo` unit-source copy into
-   * the inline-rebind helper.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesRebindAndCopyAdapter(
-    const moho::ArmyLaunchInfo* const source,
-    moho::ArmyLaunchInfo* const destination
-  )
-  {
-    return CopyArmyLaunchInfoUnitSourcesRebindAndCopy(source, destination);
-  }
-
-  /**
-   * Address: 0x005457A0 (FUN_005457A0)
-   *
-   * What it does:
-   * Adapter lane that forwards ArmyLaunchInfo range copy-construction into the
-   * canonical rollback-capable helper.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackAdapterA(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00545880 (FUN_00545880)
-   *
-   * What it does:
-   * Alternate adapter lane that forwards ArmyLaunchInfo range copy-construction
-   * into the canonical rollback-capable helper.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackAdapterB(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00545200 (FUN_00545200)
-   *
-   * What it does:
-   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
-   * copy-construction call into `FUN_005457A0`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkA(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollbackAdapterA(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x005445E0 (FUN_005445E0)
-   *
-   * What it does:
-   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
-   * copy-construction call into `FUN_00545880`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkB(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00544E60 (FUN_00544E60)
-   *
-   * What it does:
-   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
-   * copy-construction call into `FUN_00545880`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkC(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00545550 (FUN_00545550)
-   *
-   * What it does:
-   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
-   * copy-construction call into `FUN_00545880`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkD(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
-  }
+  // RULE ONE cleanup (DB-integrity pass): 0x005454A0, 0x00544C60, 0x00545090,
+  // 0x00545580, 0x005457A0, 0x00545880, 0x00545200, 0x005445E0, 0x00544E60,
+  // 0x00545550, 0x00545620, 0x00545270 and the calling-convention bridge
+  // 0x005444B0 used to live here as thirteen hand-written per-type functions
+  // (a "CopyConstructArmyLaunchInfoRangeRollback" core plus RegisterAdapter/
+  // AdapterA/AdapterB/ThunkA-D siblings, and a "CopyArmyLaunchInfoUnitSources
+  // RebindAndCopy"/Adapter pair) that manually reached into `BVIntSet`'s
+  // `mFirstWordIndex`/`mWords` fields to reimplement copy-construction and
+  // single-slot copy-assignment. `moho::ArmyLaunchInfo` declares only a
+  // default constructor (LaunchInfoBase.h), so its copy constructor and
+  // copy-assignment operator are compiler-synthesized -- memberwise over the
+  // single `mUnitSources` (`BVIntSet`) field -- and
+  // `BVIntSet::BVIntSet(const BVIntSet&)` / `BVIntSet::operator=`
+  // (BVIntSet.cpp) already perform exactly the sequence those thirteen
+  // functions open-coded. All of them were `[[maybe_unused]]` orphans with
+  // zero real callers. Collapsed into
+  // `msvc8::vector<moho::ArmyLaunchInfo>::uninit_copy_n` /
+  // `copy_or_move_assign` (legacy/containers/Vector.h) per RULE ONE; see the
+  // Address: citations on those members for the full evidence chain. The
+  // real source-level instantiation site is this file's own
+  // `CopyAssignArmyLaunchInfoVector` grow lane (`destination = source;`,
+  // below).
 
   [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardCore(
     moho::ArmyLaunchInfo* destinationEnd,

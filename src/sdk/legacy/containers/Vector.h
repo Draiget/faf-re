@@ -5454,6 +5454,58 @@ namespace msvc8
          * sitting in stale fabricated-`blocked` state; corrected to `skip`
          * here alongside its three siblings for consistency.
          *
+         * Address: 0x005444B0 (FUN_005444B0, sub_5444B0) --
+         * `msvc8::vector<moho::ArmyLaunchInfo>::uninit_copy_n` calling-
+         * convention bridge for the 0x20-byte (`BVIntSet`-embedding)
+         * element: `sub_5444B0(a1,a2,a3,a4) { return sub_5454A0(a4,a2); }`
+         * drops two dead register args and forwards `(dst, src)` into the
+         * per-element body at 0x005454A0. `moho::ArmyLaunchInfo`
+         * (moho/misc/LaunchInfoBase.h) declares only a default constructor,
+         * so its copy constructor is compiler-synthesized -- memberwise over
+         * the single `mUnitSources` (`moho::BVIntSet`) field -- and
+         * `BVIntSet::BVIntSet(const BVIntSet&)` (moho/containers/
+         * BVIntSet.cpp) already performs exactly the sequence the binary's
+         * per-element body open-codes (`mFirstWordIndex` copy, then
+         * `mWords.ResetFrom(other.mWords)`). Reached from
+         * `moho::CopyAssignArmyLaunchInfoVector`'s grow lane
+         * (moho/misc/LaunchInfoBase.cpp) via `destination = source;`, which
+         * is this member's real source-level instantiation site for
+         * `T = moho::ArmyLaunchInfo`.
+         * Address: 0x005454A0 (FUN_005454A0, sub_5454A0) -- the per-element
+         * body itself: placement-constructs each destination slot from the
+         * matching source slot via `ArmyLaunchInfo`'s (compiler-synthesized)
+         * copy constructor, with construct/destroy-on-throw rollback
+         * matching this member's own generic `try`/`catch` shape above.
+         * Address: 0x00544C60 / 0x00545090 / 0x00545580 (FUN_00544C60,
+         * FUN_00545090, FUN_00545580) -- three more register/EH-shape
+         * calling conventions into the same 0x005454A0 body, one per caller
+         * site's register allocation.
+         * Address: 0x005457A0 / 0x00545880 (FUN_005457A0, FUN_00545880) --
+         * two more forwarding lanes into 0x005454A0.
+         * Address: 0x00545200 / 0x005445E0 / 0x00544E60 / 0x00545550
+         * (FUN_00545200, FUN_005445E0, FUN_00544E60, FUN_00545550) -- four
+         * further register-shape thunks over the two lanes immediately
+         * above, completing this specialization's calling-convention bridge
+         * family (thirteen addresses in total, including 0x005444B0 and
+         * 0x005454A0 above).
+         * Address: 0x00545620 / 0x00545270 (FUN_00545620, FUN_00545270) --
+         * a related single-element `BVIntSet` rebind-and-copy lane and its
+         * thin adapter, same 0x20-byte element; behaviourally redundant
+         * with `copy_or_move_assign`'s per-element `dst[i] = src[i]`
+         * (`ArmyLaunchInfo::operator=`, compiler-synthesized ->
+         * `BVIntSet::operator=`) for the same specialization. No
+         * discoverable caller of its own in the indexed binary; recorded
+         * as such rather than guessed.
+         * This whole family previously lived in moho/misc/LaunchInfoBase.cpp
+         * as thirteen hand-written per-type functions
+         * (`CopyConstructArmyLaunchInfoRangeRollback` and its Adapter/Thunk/
+         * RegisterAdapter siblings, plus `CopyArmyLaunchInfoUnitSources
+         * RebindAndCopy`/Adapter) that manually reached into `BVIntSet`'s
+         * fields instead of calling its own copy constructor/assignment
+         * operator -- the exact RULE ONE per-type reach-in shape, and all
+         * thirteen were `[[maybe_unused]]` orphans with zero real callers.
+         * Collapsed into this citation; the hand-rolled bodies are removed.
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
