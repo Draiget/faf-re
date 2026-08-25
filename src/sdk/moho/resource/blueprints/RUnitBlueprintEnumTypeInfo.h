@@ -365,15 +365,6 @@ namespace moho
   int register_ERuleBPUnitMovementTypeTypeInfo();
 
   /**
-   * Address: 0x00BC8930 (FUN_00BC8930, register_ERuleBPUnitMovementTypePrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `ERuleBPUnitMovementType`
-   * and installs process-exit helper unlink cleanup.
-   */
-  int register_ERuleBPUnitMovementTypePrimitiveSerializer();
-
-  /**
    * Address: 0x00BC8970 (FUN_00BC8970, register_ERuleBPUnitCommandCapsTypeInfo)
    *
    * What it does:
@@ -383,15 +374,6 @@ namespace moho
   int register_ERuleBPUnitCommandCapsTypeInfo();
 
   /**
-   * Address: 0x00BC8990 (FUN_00BC8990, register_ERuleBPUnitCommandCapsPrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `ERuleBPUnitCommandCaps`
-   * and installs process-exit helper unlink cleanup.
-   */
-  int register_ERuleBPUnitCommandCapsPrimitiveSerializer();
-
-  /**
    * Address: 0x00BC89D0 (FUN_00BC89D0, register_ERuleBPUnitToggleCapsTypeInfo)
    *
    * What it does:
@@ -399,15 +381,6 @@ namespace moho
    * process-exit cleanup.
    */
   int register_ERuleBPUnitToggleCapsTypeInfo();
-
-  /**
-   * Address: 0x00BC89F0 (FUN_00BC89F0, register_ERuleBPUnitToggleCapsPrimitiveSerializer)
-   *
-   * What it does:
-   * Initializes primitive serializer callbacks for `ERuleBPUnitToggleCaps`
-   * and installs process-exit helper unlink cleanup.
-   */
-  int register_ERuleBPUnitToggleCapsPrimitiveSerializer();
 
   /**
    * Address: 0x00BC8BD0 (FUN_00BC8BD0, register_UnitWeaponRangeCategoryTypeInfo)
