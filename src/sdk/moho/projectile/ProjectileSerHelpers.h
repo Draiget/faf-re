@@ -44,7 +44,12 @@ namespace moho
      *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_0069E3C0`/
+     * `FUN_0069E3F0` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAJ` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~ProjectileSaveConstruct();
 
@@ -109,7 +114,12 @@ namespace moho
      *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_0069E4A0`/
+     * `FUN_0069E4D0` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAK` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~ProjectileConstruct();
 
