@@ -9777,10 +9777,21 @@ MapInsertStatusRuntime* FindOrInsertMapNodeNil17Runtime(
  * exactly this shape: `rb_tree::~rb_tree()`'s `erase_range(leftmost(),
  * header())` (`FUN_007B3E00`, whole-tree fast path -> `destroy_subtree`
  * `FUN_007B4D10`) followed by `operator delete(head)`. Matches the same
- * explicit-destroy-and-reconstruct idiom as `ReleaseExportBindingPendingOrdinals`
- * (`RRuleGameRules.cpp`) for the sibling `msvc8::set<uint32_t>` instantiation
- * at `0x0052A390`/`0x0052D9C0`/`0x0052CCF0` -- same isNil@+0x11 node shape,
- * different owning field. The formerly-generic `TreeClearFn clearFn` runtime
+ * `erase_range`/`destroy_subtree`/`operator delete(head)` shape as the
+ * sibling `msvc8::set<uint32_t>` instantiation at `0x0052A390`/`0x0052D9C0`/
+ * `0x0052CCF0` (`RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`,
+ * RRuleGameRules.h) -- same isNil@+0x11 node shape, different owning field.
+ * NOTE: this function's trailing placement-new reconstruction step was
+ * originally modeled on that sibling's recovery (formerly
+ * `ReleaseExportBindingPendingOrdinals`, RRuleGameRules.cpp); that precedent
+ * has since been shown to be a mis-model -- `0x0052A390` is a plain
+ * destructor with no reconstruction step, and the reconstruct-after-destroy
+ * shape it was given was an artifact of a hand-rolled array owner that has
+ * since been migrated to a real `msvc8::vector<T>`. Not re-verified here
+ * whether `FUN_007B2940`'s own disassembly genuinely includes the
+ * reconstruction step independent of that precedent; this function is
+ * currently unwired regardless (see below), so it does not affect the
+ * compiled recovered binary today. The formerly-generic `TreeClearFn clearFn` runtime
  * indirection this superseded did not match the binary: the shipped body
  * hardcodes `call sub_7B3E00`, a compile-time-fixed direct call verified
  * directly against `.asm`, not a runtime-configurable one. The parameter is
@@ -13217,17 +13228,6 @@ int CopySnapshotAndReleaseBindingsRuntime(
   owner->cachedLane14 = payload->lane14;
   link->vtable->release(link, 1);
   return payload->vtable->release(payload, 1);
-}
-
-/**
- * Address: 0x00AB8E4C (FUN_00AB8E4C)
- *
- * What it does:
- * Returns whether the input lane is nonzero.
- */
-BOOL IsNonZeroBoolLaneRuntime(const int value) noexcept
-{
-  return (value != 0) ? TRUE : FALSE;
 }
 
 /**

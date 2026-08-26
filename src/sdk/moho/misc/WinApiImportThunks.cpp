@@ -84796,17 +84796,6 @@ namespace moho::runtime
   }
 
   /**
-   * Address: 0x00AB8E59 (FUN_00AB8E59)
-   *
-   * What it does:
-   * Returns TRUE when input is non-zero, otherwise FALSE.
-   */
-  BOOL LegacyIsInputNonZeroRuntimeLaneAlpha(const std::int32_t value)
-  {
-    return (value != 0) ? TRUE : FALSE;
-  }
-
-  /**
    * Address: 0x00ADC7F0 (FUN_00ADC7F0)
    *
    * What it does:
