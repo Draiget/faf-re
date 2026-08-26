@@ -1367,41 +1367,12 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x007189D0 (FUN_007189D0)
-   *
-   * What it does:
-   * Thunk lane that advances one `InfluenceGrid::entries` iterator and returns
-   * the same iterator-slot pointer.
-   */
-  InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkA(
-    const InfluenceEntryIterator end,
-    InfluenceEntryIterator* const iteratorSlot
-  ) noexcept
-  {
-    if (iteratorSlot != nullptr) {
-      AdvanceInfluenceEntryIterator(*iteratorSlot, end);
-    }
-    return iteratorSlot;
-  }
-
-  /**
-   * Address: 0x0071A0C0 (FUN_0071A0C0)
-   *
-   * What it does:
-   * Secondary thunk lane that advances one `InfluenceGrid::entries` iterator
-   * and returns the same iterator-slot pointer.
-   */
-  InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkB(
-    const InfluenceEntryIterator end,
-    InfluenceEntryIterator* const iteratorSlot
-  ) noexcept
-  {
-    if (iteratorSlot != nullptr) {
-      AdvanceInfluenceEntryIterator(*iteratorSlot, end);
-    }
-    return iteratorSlot;
-  }
+  // Addresses 0x007189D0/0x0071A0C0 (the "ThunkA"/"ThunkB" iterator-advance
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // AdvanceInfluenceEntryIterator above is the real body, used directly by
+  // EraseInfluenceEntryAndAdvance and DestroyInfluenceEntryRange below
+  // (both confirmed real via multiple binary callers).
 
   /**
    * Address: 0x00717EF0 (FUN_00717EF0, sub_717EF0)
@@ -1456,23 +1427,11 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x0071A060 (FUN_0071A060)
-   *
-   * What it does:
-   * Thunk lane that advances one `mBlipCells` iterator and returns the same
-   * iterator-slot pointer.
-   */
-  InfluenceMapCellIterator* AdvanceBlipCellIteratorThunkA(
-    const InfluenceMapCellIterator end,
-    InfluenceMapCellIterator* const iteratorSlot
-  ) noexcept
-  {
-    if (iteratorSlot != nullptr) {
-      AdvanceBlipCellIterator(*iteratorSlot, end);
-    }
-    return iteratorSlot;
-  }
+  // Address 0x0071A060 (the "ThunkA" iterator-advance duplicate formerly
+  // modeled here) is dead: zero data_refs/call_edges and no source-level
+  // caller anywhere in src/sdk/**. AdvanceBlipCellIterator above is the
+  // real body, used directly by EraseBlipCellRange below (confirmed real
+  // via multiple binary callers).
 
   /**
    * Address: 0x0071B420 (FUN_0071B420, sub_71B420)
