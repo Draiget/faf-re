@@ -1731,6 +1731,62 @@ namespace msvc8
          * codebase) -- a known linker-emitted bridge citing this body's own
          * evidence, not an independent function.
          *
+         * Address: 0x00740700 (FUN_00740700, msvc8::vector<moho::
+         * GeomCamera3>::~vector for the 0x2C8 (712)-byte element --
+         * destroys the live `[first_,last_)` run through `GeomCamera3::
+         * ~GeomCamera3` then frees the buffer, the same `destroy_all()` +
+         * `deallocate_all()` shape as this member's generic body, just not
+         * tail-calling it directly.
+         * Address: 0x0073F620 (FUN_0073F620, tail-forwarding `jmp` thunk
+         * into 0x00740700, not a distinct body.) Three real call sites, all
+         * already recovered: `Moho::SSyncFilter::~SSyncFilter`
+         * (`SSyncFilter.cpp` -- `geoCams`'s own compiler-generated member
+         * teardown; that destructor's own doc comment already calls out
+         * "the compiler-generated member teardown continues with
+         * `geoCams`"), `Moho::WLD_DoPlayingAction` (`CWldSession.cpp` --
+         * the local `const msvc8::vector<GeomCamera3> cameras` populated
+         * from `CAM_GetAllCameras()` and destroyed at the end of its `if`
+         * block), and `Moho::CAM_GetAllCameras` itself (`RCamManager.cpp`
+         * -- reached through the thunk per the raw xref at 0x00BA3DE3, the
+         * EH-unwind path for its local `result` on an exception from
+         * `push_back`/`CameraGetView` mid-loop). Formerly modeled as a
+         * standalone `LegacyGeomCameraVectorSlot` reach-in struct plus
+         * `DestroyLegacyGeomCameraVectorSlot`/
+         * `DestroyLegacyGeomCameraVectorSlotThunk` free functions in
+         * `moho/sim/SimDriver.cpp` with no source-level caller --
+         * `GeomCamera3` does not appear anywhere in `SSyncData`'s real
+         * declaration, so that prior siting was never correct -- collapsed
+         * into this template instantiation, RULE ONE.
+         *
+         * Address: 0x00740C00 (FUN_00740C00, msvc8::vector<Moho::
+         * SEntityVariableUpdateEntry>::~vector for the 0xD8 (216)-byte
+         * element -- destroys the live `[first_,last_)` run through
+         * `SSTIEntityVariableData::~SSTIEntityVariableData` on each
+         * record's `mVariableData` sub-field (the `mEntityId`/
+         * `mReserved04` header dwords are trivially destructible) then
+         * frees the buffer. IDA's own demangler mislabels this
+         * `??1fastvector_struct_SSTIEntitytVariableData@gpg@@QAE@@Z` (note
+         * the "Entityt" typo -- a synthesized, not a genuine mangled, name;
+         * there is no `gpg::fastvector_struct<T>` template anywhere in this
+         * codebase). The element shape/size (entity id + reserved dword +
+         * `SSTIEntityVariableData` payload) matches `SSyncData::
+         * mEntityUpdates` (`SimDriver.h`) exactly.
+         * Address: 0x00740400 (FUN_00740400, `j_` jump-thunk into
+         * 0x00740C00.) Two real call sites, both already recovered and both
+         * compiler-generated (no explicit source line names either):
+         * `Moho::SSyncData::~SSyncData` (`SimDriver.cpp`, normal-path
+         * member teardown -- direct `call` at 0x007400D2) and `Moho::
+         * SSyncData::SSyncData` (`SimDriver.cpp`, the `= default` ctor's
+         * EH-unwind funclet, reached through the thunk, in case a later
+         * member's constructor throws after `mEntityUpdates`
+         * default-constructs). Formerly modeled as a standalone
+         * `LegacySyncEntityVariableVectorSlot`/`LegacySyncEntityVariableEntry`
+         * (a duplicate of the header's real `SEntityVariableUpdateEntry`)
+         * reach-in struct pair plus a
+         * `DestroyLegacySyncEntityVariableVectorSlot` free function in
+         * `moho/sim/SimDriver.cpp` -- collapsed into this template
+         * instantiation, RULE ONE.
+         *
          * Destructor: destroy elements and free storage if allowed
          */
         ~vector() {
@@ -2241,25 +2297,6 @@ namespace msvc8
          * ("all-external-callees thunk"); every real callee is this
          * template's own engine code, not third-party runtime.
          *
-         * Address: 0x0074D2B0 (FUN_0074D2B0, IDA's own demangled name:
-         * `std::vector_SSTIArmyVariableData::reserve`) -- `msvc8::
-         * vector<Moho::SSTIArmyVariableData>::reserve` for the 352-byte
-         * (`0x160`) element, `SSyncData::mArmyUpdates` (`SimDriver.h`).
-         * `if (size() < newCap) { grow via insert(end(), newCap-size(),
-         * localCopy); }` -- logically the same guard as this member's
-         * `newCap <= capacity()` early return, checked from the opposite
-         * side. Growth path tail-calls `FUN_0074EB00` (this instantiation's
-         * `insert(pos, count, value)`, cited below), which the reserve
-         * call constructs a throwaway default-initialized element for and
-         * passes as the fill value (matches `SSTIArmyVariableData`'s own
-         * default ctor semantics). Reached from `Sim::Sync`'s (already
-         * recovered, `Sim.cpp`) `syncData.mArmyUpdates.reserve(
-         * sizes.mArmyData)` call by name. DB-integrity fix: was mis-tagged
-         * `external_dependency` ("STL template instantiation / codec
-         * helper - external") -- `SSTIArmyVariableData` is this project's
-         * own engine type (`moho/sim/SSTIArmyVariableData.h`), not generic/
-         * external.
-         *
          * Address: 0x005C6D10 (FUN_005C6D10, msvc8::vector<Moho::
          * SPerArmyReconInfo>::reserve for the 52-byte element) -- exact
          * shape of this member: early return when `newCap <= capacity()`
@@ -2527,6 +2564,30 @@ namespace msvc8
          * not external. Reached from `Sim.cpp:8498`'s
          * `outSyncData->mNewGrids.resize(armyCount)` call by name, already
          * recovered.)
+         *
+         * Address: 0x0074D2B0 (FUN_0074D2B0, `msvc8::vector<Moho::
+         * SSTIArmyVariableData>::resize` for `SSyncData::mArmyUpdates`
+         * (`SimDriver.h`), the 352-byte (`0x160`) sibling of the
+         * `SSTIArmyConstantData` instantiation directly above -- same
+         * two-branch shape: `if (size() < newSize) { insert(end(),
+         * newSize-size(), T()); }` tail-calling this instantiation's
+         * `insert(pos,count,value)` grow core (`FUN_0074EB00`, cited
+         * below), `else if (newSize < size()) { erase(begin()+newSize,
+         * end()); }` tail-calling this instantiation's `erase(iterator,
+         * iterator)` shrink core (`FUN_0074EAB0`, cited below). Reached
+         * from `Sim.cpp:8467`'s `outSyncData->mArmyUpdates.resize(
+         * armyCount)` call by name, already recovered. DB-integrity fix:
+         * this address was previously cited above on `reserve()` as
+         * `msvc8::vector<Moho::SSTIArmyVariableData>::reserve`, "Reached
+         * from Sim::Sync's syncData.mArmyUpdates.reserve(sizes.mArmyData)
+         * call by name" -- both claims were wrong. `.c`-confirmed this
+         * function reads `newSize` against `size()` (not `capacity()`,
+         * ruling out `reserve`) and calls the erase-shaped `FUN_0074EAB0`
+         * on the `newSize < size()` branch, which `reserve()` never does;
+         * the real `reserve(sizes.mArmyData)` call site reaches a
+         * different address entirely, `FUN_00560D60` (already correctly
+         * cited on `reserve()` above). Moved and corrected here to match
+         * its true `resize()` semantics and its true caller.)
          *
          * Address: 0x0092FC60 (FUN_0092FC60, sub_92FC60, IDA-named
          * `std::vector_MapNode::resize`) -- `msvc8::vector<iterator>::
@@ -3351,6 +3412,40 @@ namespace msvc8
          * it instead of the per-element one the binary actually emits --
          * this template needed no changes; the fix is the element type's own
          * special members, `moho/render/Clutter.h`/`.cpp`.)
+         *
+         * Address: 0x0074E720 (FUN_0074E720, msvc8::vector<Moho::
+         * SSTIArmyConstantData>::erase(iterator,iterator) for the 0x80
+         * (128)-byte element -- byte-for-byte this member's shape:
+         * tail-shift via per-element copy-assign (the non-trivially-
+         * copyable branch, `*writeCursor = *sourceCursor`),
+         * `destroy_range(last_-count, last_)` through `SSTIArmyConstantData::
+         * ~SSTIArmyConstantData` on the vacated tail, then `last_ -= count`,
+         * returning `first` through the VC8 hidden-return-slot ABI (2007
+         * MSVC's convention for this `thiscall`, not something the modern
+         * `T*` return needs to replicate -- same shape already documented on
+         * the `DXGI_MODE_DESC` entry above). Sole caller is `resize`'s
+         * shrink branch, `FUN_0074D190` (cited above on `resize`) --
+         * `SSyncData::mNewGrids.resize(armyCount)`, already recovered and
+         * wired by name at `Sim.cpp:8456`. Formerly modeled as a standalone
+         * `LegacyArmyConstantDataVectorSlot` reach-in struct plus a
+         * `CompactLegacyArmyConstantDataVectorTail` free function in
+         * `moho/sim/SimDriver.cpp` with no source-level caller of its own --
+         * collapsed into this template instantiation, RULE ONE.
+         * Address: 0x0074EAB0 (FUN_0074EAB0, msvc8::vector<Moho::
+         * SSTIArmyVariableData>::erase(iterator,iterator) for the 0x160
+         * (352)-byte element -- the same shape as the sibling
+         * `SSTIArmyConstantData` instantiation directly above: per-element
+         * copy-assign tail shift, `destroy_range` through
+         * `SSTIArmyVariableData::~SSTIArmyVariableData` on the vacated tail,
+         * `last_ -= count`, hidden-return-slot ABI. Sole caller is
+         * `resize`'s shrink branch, `FUN_0074D2B0` (cited above on
+         * `resize`, corrected from a prior mis-citation under `reserve()`)
+         * -- `SSyncData::mArmyUpdates.resize(armyCount)`, already recovered
+         * and wired by name at `Sim.cpp:8467`. Formerly modeled as a
+         * standalone `LegacyArmyVariableDataVectorSlot` reach-in struct plus
+         * a `CompactLegacyArmyVariableDataVectorTail` free function in
+         * `moho/sim/SimDriver.cpp` with no source-level caller of its own --
+         * collapsed into this template instantiation, RULE ONE.
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5654,6 +5749,50 @@ namespace msvc8
          * vector<T>`/smart-pointer members and their own automatic
          * destructors) -- collapsed into this template instantiation,
          * RULE ONE.
+         *
+         * Address: 0x00741F70 (FUN_00741F70, this member instantiated for
+         * `T = msvc8::vector<msvc8::string>` -- a 0x10-byte element that is
+         * itself a `msvc8::vector<msvc8::string>`) -- walks `[first,last)`
+         * and for each inner vector: destroys its live strings through
+         * `destroy_range<msvc8::string>` (`FUN_0040D540`, cited immediately
+         * below) then frees the inner buffer -- i.e. each element's own
+         * `~vector()` inlined into the outer range loop rather than called
+         * out per-element, the same "standard MSVC `_Destroy_range` codegen
+         * choice for a simple, non-virtual, non-throwing destructor"
+         * already documented on the `SDecalInfo` entry above. Two real call
+         * sites, both from `Moho::CSimDriver::DrawNetworkStats`
+         * (`SimDriver.cpp`, already recovered): once for the 8-slot
+         * `columns` table (`msvc8::vector<msvc8::vector<msvc8::string>>
+         * columns(kNumColumns)`) and once for the single-element range
+         * destroying `summary` (`msvc8::vector<msvc8::string> summary`) at
+         * scope exit. Formerly modeled as a standalone
+         * `LegacyStringVectorSlot` reach-in struct plus
+         * `DestroyLegacyStringVectorRange`/`DestroyLegacyStringPayloadRange`
+         * free functions in `moho/sim/SimDriver.cpp`, with
+         * `DrawNetworkStats` itself built on real `std::vector<std::
+         * vector<msvc8::string>>` locals instead of the binary-matching
+         * `msvc8::vector` type, so neither address had a live source-level
+         * invocation -- collapsed into this template instantiation and
+         * `DrawNetworkStats`'s `columns`/`summary` locals retyped to
+         * `msvc8::vector`, RULE ONE.
+         * Address: 0x0040D540 (FUN_0040D540, `func_DestroyStringsRange`,
+         * this member instantiated for `T = msvc8::string`) -- the single
+         * most widely reused instantiation of this template in the whole
+         * binary (85 distinct callers per `_callgraph_index.sqlite`); tears
+         * down each string via the same `.tidy(true,0)`-equivalent teardown
+         * as every other `msvc8::string` range-destroy already documented
+         * in this file (e.g. the `SDecalInfo::mTexName1`/`mTexName2` entry
+         * above). Not independently audited caller-by-caller this pass; two
+         * concrete, already-recovered examples directly relevant here are
+         * `DrawNetworkStats` above (destroying each inner `msvc8::string`
+         * of `columns`/`summary`) and `Moho::SSyncData::~SSyncData`
+         * (`SimDriver.cpp`, calls `FUN_0040D540` directly per
+         * `_callgraph_index.sqlite` -- its own `mPrintField`
+         * (`msvc8::vector<msvc8::string>`) member teardown, `SSyncData`'s
+         * only vector-of-string field). A byte-distinct sibling emission,
+         * `FUN_0040D5B0` (same IDA-inferred name), is already cited
+         * independently in `REntityBlueprintTypeInfo.cpp`/
+         * `LaunchInfoBase.cpp`.
          */
     public:
         static void destroy_range(T* first, T* last) noexcept {
