@@ -369,65 +369,6 @@ namespace
     return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
   }
 
-  using SerializerWord = std::uint32_t;
-
-  struct SerializerSlot36ByPointerVTable
-  {
-    void* reserved[9];
-    int(__thiscall* invoke)(void* self, SerializerWord* value);
-  };
-
-  struct SerializerSlot36ByValueVTable
-  {
-    void* reserved[9];
-    int(__thiscall* invoke)(void* self, SerializerWord value);
-  };
-
-  struct SerializerSlot36RuntimeByPointer
-  {
-    SerializerSlot36ByPointerVTable* vtable;
-  };
-
-  struct SerializerSlot36RuntimeByValue
-  {
-    SerializerSlot36ByValueVTable* vtable;
-  };
-
-  /**
-   * Address: 0x00719FB0 (FUN_00719FB0)
-   *
-   * What it does:
-   * Invokes serializer virtual slot `+0x24` with a by-reference temporary and
-   * writes the updated 32-bit value back to `valueSlot`.
-   */
-  int InvokePrimitiveSerializerWordByPointerLane(
-    void* const helperObject,
-    SerializerWord* const valueSlot
-  )
-  {
-    auto* const helper = static_cast<SerializerSlot36RuntimeByPointer*>(helperObject);
-    SerializerWord value = static_cast<SerializerWord>(reinterpret_cast<std::uintptr_t>(helperObject));
-    const int result = helper->vtable->invoke(helperObject, &value);
-    *valueSlot = value;
-    return result;
-  }
-
-  /**
-   * Address: 0x00719FD0 (FUN_00719FD0)
-   *
-   * What it does:
-   * Forwards one 32-bit primitive value lane through serializer virtual slot
-   * `+0x24`.
-   */
-  int InvokePrimitiveSerializerWordByValueLane(
-    void* const helperObject,
-    SerializerWord* const valueSlot
-  )
-  {
-    auto* const helper = static_cast<SerializerSlot36RuntimeByValue*>(helperObject);
-    return helper->vtable->invoke(helperObject, *valueSlot);
-  }
-
   [[nodiscard]] float DecayThreatLane(const float value, const float decay) noexcept
   {
     if (value <= 0.0f) {
