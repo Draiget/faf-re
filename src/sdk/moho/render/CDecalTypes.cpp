@@ -505,46 +505,18 @@ namespace
     return destinationBegin;
   }
 
-  void DestroySDecalInfoRange(moho::SDecalInfo* begin, moho::SDecalInfo* end)
-  {
-    while (begin != end) {
-      begin->~SDecalInfo();
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x00741420 (FUN_00741420, sub_741420)
-   *
-   * What it does:
-   * Thiscall adapter lane that forwards one reversed `(end, begin)` argument
-   * pair into the canonical half-open `SDecalInfo` range destroy helper.
-   */
-  [[maybe_unused]] void DestroySDecalInfoRangeThiscallAdapter(
-    moho::SDecalInfo* const end,
-    moho::SDecalInfo* const begin
-  )
-  {
-    DestroySDecalInfoRange(begin, end);
-  }
-
-  /**
-   * Address: 0x0077E2D0 (FUN_0077E2D0)
-   *
-   * What it does:
-   * Clears one `vector<SDecalInfo>` used range by destroying all live lanes
-   * and rewinding `_Mylast` to `_Myfirst` without releasing capacity.
-   */
-  void ClearSDecalInfoVectorUsedRange(msvc8::vector<moho::SDecalInfo>& storage)
-  {
-    // Destroy the live run and rewind mLast to mFirst without releasing
-    // capacity: clear(). The explicit destroy pass stays because the binary
-    // runs it itself before the lane update.
-    if (!storage.empty()) {
-      DestroySDecalInfoRange(storage.begin(), storage.end());
-      storage.clear();
-    }
-  }
+  // `DestroySDecalInfoRange`/`DestroySDecalInfoRangeThiscallAdapter`
+  // (0x00741420)/`ClearSDecalInfoVectorUsedRange` (0x0077E2D0) formerly
+  // lived here as free functions with no source-level caller anywhere in
+  // `src/sdk/**` (`DestroySDecalInfoRangeThiscallAdapter` was
+  // `[[maybe_unused]]`; `ClearSDecalInfoVectorUsedRange` was defined but
+  // never called at all) -- a RULE ONE per-type duplicate of the canonical
+  // `msvc8::vector<Moho::SDecalInfo>::destroy_range`/`clear` template
+  // instantiations. Removed in favor of the real citations on those
+  // template members in `legacy/containers/Vector.h`, the same fix already
+  // applied once in this exact file for the sibling `uninit_copy_n` adapter
+  // `FUN_0077DA50` ("previously mis-cited as having its canonical body in
+  // CDecalTypes.cpp").
 
 } // namespace
 
@@ -762,10 +734,11 @@ namespace moho
    * `Wm3::Vec3f` lanes are trivially destructible and need no teardown.
    *
    * The explicit definition reifies the compiler-synthesized destructor
-   * that lives at `0x00742360` in the shipped binary so that every typed
-   * `~SDecalInfo()` callsite in this TU (e.g. `DestroySDecalInfoRange` and
-   * the `msvc8::vector<SDecalInfo>` teardown path) binds to a named,
-   * address-annotated symbol rather than an implicit lane.
+   * that lives at `0x00742360` in the shipped binary so that the
+   * `msvc8::vector<SDecalInfo>` teardown path (`destroy_range<SDecalInfo>`,
+   * `legacy/containers/Vector.h`, address-cited 0x00742090 and siblings)
+   * binds to a named, address-annotated symbol rather than an implicit
+   * lane.
    */
   SDecalInfo::~SDecalInfo() = default;
 
