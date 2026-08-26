@@ -3149,8 +3149,18 @@ int Distance16ByteVectorIteratorsCheckedLaneA(
  *
  * What it does:
  * Resolves one checked element pointer for an 8-byte element vector by index.
+ *
+ * Orphan: zero callers (callgraph index + repo-wide search), and so is its
+ * sole callee `CheckedVectorElementAtIndex`. This sits in a larger dead
+ * neighborhood: the whole 8-byte/16-byte MSVC8 debug-checked-iterator
+ * cluster in this region (0x00A72140-0x00A72FE0 -- the `Distance*LaneA/B`
+ * and `Initialize*LaneA/B` siblings above/below) is likewise zero-caller.
+ * This is exactly the pre-existing `AsVectorRuntimeView`-shaped debt RULE
+ * ONE's "Existing debt" section already names for this file -- the correct
+ * fix is migrating it into `msvc8::vector<T>::at()`-shaped template members,
+ * not a per-call-site patch; out of scope for this orphan audit.
  */
-VectorElement8DwordPairLane* Resolve8ByteVectorElementAtChecked(
+[[maybe_unused]] VectorElement8DwordPairLane* Resolve8ByteVectorElementAtChecked(
   const VectorElementCountRuntimeView* const storage,
   const std::uint32_t index
 ) noexcept
@@ -3165,8 +3175,12 @@ VectorElement8DwordPairLane* Resolve8ByteVectorElementAtChecked(
  *
  * What it does:
  * Resolves one checked element pointer for a 16-byte element vector by index.
+ *
+ * Orphan: zero callers (callgraph index + repo-wide search), same dead
+ * cluster as `Resolve8ByteVectorElementAtChecked` immediately above -- see
+ * that function's note.
  */
-VectorElement16DwordQuadLane* Resolve16ByteVectorElementAtChecked(
+[[maybe_unused]] VectorElement16DwordQuadLane* Resolve16ByteVectorElementAtChecked(
   const VectorElementCountRuntimeView* const storage,
   const std::uint32_t index
 ) noexcept
