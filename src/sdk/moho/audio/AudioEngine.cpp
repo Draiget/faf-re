@@ -113,7 +113,7 @@ boost::shared_ptr<moho::AudioEngine>* ConstructSharedAudioEngineFromRaw(
   }
 
   for (moho::AudioEngineRef* entry = begin; entry != end; ++entry) {
-    auto* const control = static_cast<boost::detail::sp_counted_base*>(entry->mControl);
+    auto* const control = entry->mControl;
     if (control == nullptr) {
       continue;
     }
@@ -146,7 +146,7 @@ void FillAudioEngineRefRangeFromSingleSource(
     destination->mEngine = source != nullptr ? source->mEngine : nullptr;
     destination->mControl = source != nullptr ? source->mControl : nullptr;
 
-    auto* const control = static_cast<boost::detail::sp_counted_base*>(destination->mControl);
+    auto* const control = destination->mControl;
     if (control != nullptr) {
       control->add_ref_copy();
     }
@@ -2582,7 +2582,7 @@ namespace
   ) noexcept
   {
     outRef->mEngine = *engineLane;
-    outRef->mControl = *controlLane;
+    outRef->mControl = static_cast<boost::detail::sp_counted_base*>(*controlLane);
     return outRef;
   }
 
@@ -2599,7 +2599,7 @@ namespace
   ) noexcept
   {
     outRef->mEngine = *engineLane;
-    outRef->mControl = *controlLane;
+    outRef->mControl = static_cast<boost::detail::sp_counted_base*>(*controlLane);
     return outRef;
   }
 
@@ -2758,7 +2758,7 @@ namespace
     boost::shared_ptr<moho::AudioEngine> result;
     auto& view = *reinterpret_cast<boost::SharedPtrLayoutView<moho::AudioEngine>*>(&result);
     view.px = ref.mEngine;
-    view.pi = static_cast<boost::detail::sp_counted_base*>(ref.mControl);
+    view.pi = ref.mControl;
     if (view.pi != nullptr) {
       view.pi->add_ref_copy();
     }
@@ -2819,24 +2819,24 @@ namespace
         for (moho::AudioEngineRef* dst = refs.mFinish; dst != position; --dst) {
           moho::AudioEngineRef* const src = dst - 1;
           if (dst != refs.mFinish && dst->mControl != nullptr) {
-            static_cast<boost::detail::sp_counted_base*>(dst->mControl)->release();
+            dst->mControl->release();
           }
           dst->mEngine = src->mEngine;
           dst->mControl = src->mControl;
           if (dst->mControl != nullptr) {
-            static_cast<boost::detail::sp_counted_base*>(dst->mControl)->add_ref_copy();
+            dst->mControl->add_ref_copy();
           }
         }
 
         if (position->mControl != nullptr) {
-          static_cast<boost::detail::sp_counted_base*>(position->mControl)->release();
+          position->mControl->release();
         }
       }
 
       position->mEngine = static_cast<moho::AudioEngine*>(retained.value.px);
       position->mControl = retained.value.pi;
       if (position->mControl != nullptr) {
-        static_cast<boost::detail::sp_counted_base*>(position->mControl)->add_ref_copy();
+        position->mControl->add_ref_copy();
       }
       ++refs.mFinish;
       return;
@@ -2862,14 +2862,14 @@ namespace
       write->mEngine = refs.mStart[i].mEngine;
       write->mControl = refs.mStart[i].mControl;
       if (write->mControl != nullptr) {
-        static_cast<boost::detail::sp_counted_base*>(write->mControl)->add_ref_copy();
+        write->mControl->add_ref_copy();
       }
     }
 
     write->mEngine = static_cast<moho::AudioEngine*>(retained.value.px);
     write->mControl = retained.value.pi;
     if (write->mControl != nullptr) {
-      static_cast<boost::detail::sp_counted_base*>(write->mControl)->add_ref_copy();
+      write->mControl->add_ref_copy();
     }
     ++write;
 
@@ -2877,7 +2877,7 @@ namespace
       write->mEngine = refs.mStart[i].mEngine;
       write->mControl = refs.mStart[i].mControl;
       if (write->mControl != nullptr) {
-        static_cast<boost::detail::sp_counted_base*>(write->mControl)->add_ref_copy();
+        write->mControl->add_ref_copy();
       }
     }
 
@@ -3956,7 +3956,7 @@ namespace moho
 
     if (mEngines.mStart != nullptr) {
       for (AudioEngineRef* entry = mEngines.mStart; entry != mEngines.mFinish; ++entry) {
-        auto* const control = static_cast<boost::detail::sp_counted_base*>(entry->mControl);
+        auto* const control = entry->mControl;
         if (control != nullptr) {
           control->release();
         }

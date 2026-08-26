@@ -13,6 +13,11 @@ namespace boost
   struct SharedCountPair;
 }
 
+namespace boost::detail
+{
+  class sp_counted_base;
+}
+
 namespace moho
 {
   class AudioEngine;
@@ -274,8 +279,8 @@ namespace moho
 
   struct AudioEngineRef
   {
-    AudioEngine* mEngine; // +0x00
-    void* mControl;       // +0x04 (`boost::detail::sp_counted_base*`)
+    AudioEngine* mEngine;                     // +0x00
+    boost::detail::sp_counted_base* mControl; // +0x04
   };
 
   struct AudioEngineRefVector
