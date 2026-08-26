@@ -1519,12 +1519,26 @@ namespace msvc8
              * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
              * `msvc8::set<uint32_t>`. Erase-range via `sub_52D9C0`
              * (`erase_range`, cited below) then `operator delete` on the
-             * head, matching this body exactly. Recovered as
-             * `ReleaseExportBindingPendingOrdinals` in RRuleGameRules.cpp --
-             * that helper explicitly destroys and reconstructs the member
-             * in place rather than relying on `~RRuleGameRulesLuaExportBinding
-             * ()` alone, since the binary invokes this both from a live
-             * compaction site and from an SEH unwind funclet.)
+             * head, matching this body exactly -- a plain destructor, with
+             * *no* reconstruction step afterward. Previously recovered as a
+             * bespoke `ReleaseExportBindingPendingOrdinals` helper in
+             * RRuleGameRules.cpp that explicitly destroyed *and
+             * reconstructed* the member in place; that reconstruct step was
+             * an artifact of `RRuleGameRulesImpl::mMaps` being modeled as a
+             * hand-rolled `new RRuleGameRulesLuaExportBinding[N]{}` array at
+             * the time (every capacity slot had to remain a live object for
+             * the eventual `delete[]` to safely re-destroy it), not a real
+             * reflection of this address's own behavior. Now that `mMaps` is
+             * a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`
+             * (RRuleGameRules.h), this destructor is reached implicitly --
+             * `RRuleGameRulesLuaExportBinding`'s own (compiler-emitted,
+             * undeclared) destructor, invoked from `msvc8::vector<T>::
+             * insert`'s local-temporary EH-unwind cleanup and from
+             * `erase(iterator)`'s vacated-slot teardown, both already
+             * modeled generically in `legacy/containers/Vector.h` -- no
+             * bespoke per-element free function needed; see the address
+             * citations on `RRuleGameRulesLuaExportBinding`'s own
+             * declaration in RRuleGameRules.h.)
              * Address: 0x0052CF10 (FUN_0052CF10, the SEH-unwind-path duplicate
              * of the same `mPendingBlueprintOrdinals` teardown -- byte-for-byte
              * the same three steps (`erase_range(leftmost(), header())` via
@@ -5144,9 +5158,30 @@ namespace msvc8
              * `ClearTreeStorageLaneC21Runtime` (0x007B2940),
              * `ClearEmbeddedSecondaryTreeLaneRuntime` (0x007B2970) and
              * `ClearTreeStorageLaneD21Runtime` (0x007B36A0), each of which calls
-             * `.~set()` on its owner lane -- the same explicit-destroy-and-
-             * reconstruct idiom as `ReleaseExportBindingPendingOrdinals`
-             * (`RRuleGameRules.cpp`) uses for the sibling instantiation above.)
+             * `.~set()` then placement-news a fresh empty set on its owner
+             * lane. NOTE: this explicit-destroy-and-reconstruct idiom was
+             * originally modeled on `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals`'s sibling instantiation (formerly
+             * `ReleaseExportBindingPendingOrdinals`, RRuleGameRules.cpp) --
+             * that precedent turned out to be a mis-model: `FUN_0052A390`
+             * (the address it was based on) is a plain destructor with no
+             * reconstruction step, per its own citation above; the
+             * reconstruct-after-destroy shape was an artifact of a
+             * hand-rolled array owner that has since been migrated to a
+             * real `msvc8::vector<T>` (RRuleGameRules.h). These three
+             * `SimRecoveryRuntime.cpp` functions were not touched by that
+             * migration and still carry their own independent "verified
+             * directly against .asm" claim for the `erase_range`+
+             * `destroy_subtree`+`operator delete(head)` sequence -- but that
+             * claim was not re-checked here for whether the *subsequent*
+             * placement-new reconstruction is also genuinely present in
+             * `FUN_007B2940`/`FUN_007B2970`/`FUN_007B36A0`'s own
+             * disassembly, or was carried over from the now-discredited
+             * precedent. All three are currently unwired ("nothing in
+             * src/sdk/** calls this function yet" per their own doc
+             * comments), so this does not affect the compiled recovered
+             * binary today, but it is worth re-verifying before wiring them
+             * up.)
              */
             /**
              * Address: 0x00688030 (FUN_00688030, `msvc8::map<std::uint32_t,

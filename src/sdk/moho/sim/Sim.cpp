@@ -13677,8 +13677,13 @@ namespace
    * insert_unique` for the `msvc8::set<uint32_t>` embedded at
    * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` -- see the
    * citation block on `insert_unique` in RbTree.h) on `binding + 4` for
-   * every existing `[mMaps.mBegin, mMaps.mEnd)` binding, using the
+   * every existing `[mMaps.begin(), mMaps.end())` binding, using the
    * blueprint's `mBlueprintOrdinal` (+0x5C) as the key.
+   *
+   * `mMaps` is a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`
+   * (RRuleGameRules.h); this walk uses its own `begin()`/`end()` instead of
+   * the hand-rolled `mBegin`/`mEnd` pointer fields the now-removed
+   * `RRuleGameRulesLuaExportBindingArray` used to expose.
    */
   void RegisterBlueprintInCategoryMaps(RRuleGameRulesImpl& rules, void* const blueprintObject)
   {
@@ -13689,8 +13694,8 @@ namespace
     const auto* const blueprint = reinterpret_cast<const RBlueprint*>(blueprintObject);
     const auto ordinal = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
 
-    for (RRuleGameRulesLuaExportBinding* it = rules.mMaps.mBegin; it != rules.mMaps.mEnd; ++it) {
-      (void)it->mPendingBlueprintOrdinals.insert(ordinal);
+    for (RRuleGameRulesLuaExportBinding& binding : rules.mMaps) {
+      (void)binding.mPendingBlueprintOrdinals.insert(ordinal);
     }
   }
 
