@@ -46,34 +46,6 @@ namespace
     return begin;
   }
 
-  struct GlobalIntrusiveSentinelRuntimeView
-  {
-    GlobalIntrusiveSentinelRuntimeView* prev;
-    GlobalIntrusiveSentinelRuntimeView* next;
-
-    GlobalIntrusiveSentinelRuntimeView() noexcept
-      : prev(this)
-      , next(this)
-    {}
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(GlobalIntrusiveSentinelRuntimeView) == 0x08, "GlobalIntrusiveSentinelRuntimeView size must be 0x08");
-#endif
-
-  [[nodiscard]] std::uint32_t* ResetGlobalIntrusiveSentinel(GlobalIntrusiveSentinelRuntimeView& sentinel) noexcept
-  {
-    sentinel.prev->next = sentinel.next;
-    sentinel.next->prev = sentinel.prev;
-
-    auto* const self = &sentinel;
-    sentinel.prev = self;
-    sentinel.next = self;
-    return reinterpret_cast<std::uint32_t*>(&sentinel.prev);
-  }
-
-  GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneBK;
-  GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneBL;
-
   struct IntrusiveLinkRuntimeView
   {
     IntrusiveLinkRuntimeView** ownerSlot; // +0x00
@@ -3966,50 +3938,6 @@ namespace
   }
 
 
-
-  /**
-   * Address: 0x00772F50 (FUN_00772F50)
-   *
-   * What it does:
-   * Re-links one intrusive-list sentinel lane to singleton self-links.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKPrimary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBK);
-  }
-
-  /**
-   * Address: 0x00772F80 (FUN_00772F80)
-   *
-   * What it does:
-   * Alias lane of global intrusive-sentinel reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKAlias() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBK);
-  }
-
-  /**
-   * Address: 0x00775470 (FUN_00775470)
-   *
-   * What it does:
-   * Re-links one intrusive-list sentinel lane to singleton self-links.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLPrimary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBL);
-  }
-
-  /**
-   * Address: 0x007754A0 (FUN_007754A0)
-   *
-   * What it does:
-   * Alias lane of global intrusive-sentinel reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLAlias() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBL);
-  }
 
   struct LargeRuntimeWordAccessView
   {
