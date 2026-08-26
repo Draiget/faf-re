@@ -41,17 +41,6 @@ namespace
     "FastVectorInlineOriginHeaderRuntimeView::inlineOriginStorage offset must be 0x10"
   );
 
-  struct DeletingDestructorSlot8VTable
-  {
-    void* reserved0;
-    int(__thiscall* invoke)(void* self, unsigned int deleteFlag);
-  };
-
-  struct DeletingDestructorSlot8Runtime
-  {
-    DeletingDestructorSlot8VTable* vtable;
-  };
-
   /**
    * Address: 0x006D2800 (FUN_006D2800)
    *
@@ -63,23 +52,6 @@ namespace
   {
     std::memcpy(destination, source, 0x24u);
     return destination;
-  }
-
-  /**
-   * Address: 0x0072AC50 (FUN_0072AC50)
-   *
-   * What it does:
-   * Calls the deleting-destructor virtual lane (`+0x08`) when
-   * `objectStorage` is non-null.
-   */
-  void DeleteConstructedRuntimeObjectStorage(void* const objectStorage)
-  {
-    if (objectStorage == nullptr) {
-      return;
-    }
-
-    auto* const runtime = static_cast<DeletingDestructorSlot8Runtime*>(objectStorage);
-    (void)runtime->vtable->invoke(objectStorage, 1u);
   }
 
   [[nodiscard]] std::size_t ElementCount(const std::byte* begin, const std::byte* end, const std::size_t stride) noexcept
