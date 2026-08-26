@@ -281,6 +281,24 @@ namespace msvc8
          * pointing into the window: all three miss paths - empty window, no
          * lower bound in the window, and lower == upper - fall into the same
          * `mList._Myhead` store at 0x00933F28.
+         *
+         * Address: 0x009345F0 (FUN_009345F0, sub_9345F0) - the emission for the
+         *          cluster cache's subcluster-key table
+         *
+         * IDA signature:
+         * _DWORD *__thiscall sub_9345F0(_DWORD *self, _DWORD *ret, gpg::HaStar::SubclusterData *key);
+         *
+         * What it does:
+         * Same lower/upper forward-scan shape as the `OccupationCacheKey`
+         * emission above, instantiated for `SubclusterCacheKey`
+         * (`gpg/core/algorithms/Cluster.cpp`): the hash/bucket lookup opens
+         * with `SubclusterData::Hash` + the Park-Miller step inlined (matching
+         * `_Buckno` below) rather than a named callee, and both scan
+         * directions call `sub_931560` (the `SubclusterData` three-way
+         * comparator, `Cluster.cpp`) as the `Traits(a,b)` ordering predicate
+         * in place of the `OccupationCacheKey` emission's own comparator. Both
+         * branches funnel into the same `{mList._Myhead, mList._Myhead}` miss
+         * pair the template returns on an empty/degenerate window.
          */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& key)
         {
@@ -327,6 +345,28 @@ namespace msvc8
          * stopping at index 0). Only then is the node unlinked from the list,
          * released, and `mList._Mysize` decremented
          * (0x00933FBF..0x00933FD5).
+         *
+         * Address: 0x009346F0 (FUN_009346F0, sub_9346F0) - the emission for the
+         *          cluster cache's subcluster-key table
+         *
+         * IDA signature:
+         * _DWORD *__thiscall sub_9346F0(_DWORD *self, _DWORD *ret, char *where);
+         *
+         * What it does:
+         * Same bucket-retarget-then-unlink shape as the `OccupationCacheKey`
+         * emission above, instantiated for `SubclusterCacheKey`
+         * (`gpg/core/algorithms/Cluster.cpp`): the bucket index is recomputed
+         * from `SubclusterData::Hash(where->first)` + the inlined Park-Miller
+         * step (this instantiation's key does not carry a separately-stored
+         * bucket index, so `_Buckno` is re-derived here rather than read back),
+         * the retarget walk is the same "shift bucket-start entries down while
+         * they still name the erased node" loop, and the freed node's key --
+         * 16 embedded `gpg::HaStar::Cluster` handles -- is torn down through
+         * the compiler's `` `eh vector destructor iterator' `` before
+         * `operator delete`, which is `mList.erase(where)`'s own key
+         * destruction for this non-trivial `value_type` (the `msvc8::list<T>`
+         * instantiation that call lands in is `Vector.h`'s `list<T>`; not
+         * modeled from this header).
          */
         iterator erase(iterator where)
         {
@@ -352,6 +392,27 @@ namespace msvc8
          * element at a time with the successor latched before the node dies -
          * `erase(first++)`, matching the `mov eax, esi; mov esi, [esi]` pair
          * the binary emits ahead of the call at 0x009352BE.
+         *
+         * Address: 0x009352E0 (FUN_009352E0, sub_9352E0) - the emission for the
+         *          cluster cache's subcluster-key table
+         *
+         * IDA signature:
+         * _DWORD *__thiscall sub_9352E0(_DWORD *self, _DWORD *ret, _DWORD *first, _DWORD *last);
+         *
+         * What it does:
+         * Same whole-table-clear special case plus one-at-a-time fallback as
+         * the `OccupationCacheKey` emission above, instantiated for
+         * `SubclusterCacheKey`. The clear branch matches `clear()`'s own
+         * re-arm sequence exactly: `sub_933380` drops every live entry's
+         * cache backpointer (this instantiation's node value owns 16
+         * `Cluster` handles, so unlike the `OccupationCacheKey` table this
+         * walk has real per-entry work to do before the nodes are freed),
+         * `sub_9347C0(9, &bucketArray)` reseeds the bucket-index vector with
+         * `min_buckets + 1` fresh `end()` copies (`vector<iterator>::assign`,
+         * `Vector.h`), and `mMask`/`mMaxidx` are both written back to `1`
+         * (the `this + 8` / `this + 9` dword slots = `+0x20`/`+0x24`). The
+         * fallback loop tail-calls `erase(first++)` through `FUN_009346F0`
+         * (cited above), matching this member's own `while` loop precisely.
          */
         iterator erase(iterator first, iterator last)
         {
