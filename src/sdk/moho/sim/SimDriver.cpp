@@ -203,30 +203,6 @@ namespace
     "SyncAudioRequestQueueRuntimeView::mInlineStorage offset must be 0x10"
   );
 
-  struct SyncInlineVectorRuntimeView
-  {
-    void* mFirst;       // +0x00
-    void* mLast;        // +0x04
-    void* mEnd;         // +0x08
-    void* mInlineFirst; // +0x0C
-    std::byte mInlineStorage[0x10]; // +0x10
-
-    void ReleaseHeapAndResetInline() noexcept
-    {
-      if (mFirst != mInlineFirst) {
-        ::operator delete[](mFirst);
-        mFirst = mInlineFirst;
-        mEnd = *reinterpret_cast<void**>(mInlineFirst);
-      }
-      mLast = mFirst;
-    }
-  };
-  static_assert(sizeof(SyncInlineVectorRuntimeView) == 0x20, "SyncInlineVectorRuntimeView size must be 0x20");
-  static_assert(
-    offsetof(SyncInlineVectorRuntimeView, mInlineStorage) == 0x10,
-    "SyncInlineVectorRuntimeView::mInlineStorage offset must be 0x10"
-  );
-
   struct SyncPoseUpdateRuntimeView
   {
     std::uint32_t mKindOrEntity;    // +0x00
@@ -360,7 +336,7 @@ namespace
     boost::shared_ptr<void> mTerrainUpdate;                                  // +0x274
     boost::shared_ptr<void> mSimResources;                                   // +0x27C
     LegacyVectorSlot<msvc8::string> mPrintField;                             // +0x284
-    LegacyVectorSlot<SyncInlineVectorRuntimeView> mInlineScratchVectors;      // +0x294
+    LegacyVectorSlot<SExtraUnitData> mSyncExtraUnitData;                     // +0x294
     boost::shared_ptr<void> mTickDebugCanvas;                                // +0x2A4
     boost::shared_ptr<void> mBeatDebugCanvas;                                // +0x2AC
     std::uint8_t mPad02B4_02B8[0x04];                                        // +0x2B4
@@ -533,11 +509,9 @@ namespace
     });
   }
 
-  void DestroyLegacyInlineScratchVectorRange(LegacyVectorSlot<SyncInlineVectorRuntimeView>& slot)
+  void ReleaseExtraUnitDataRun(LegacyVectorSlot<SExtraUnitData>& slot)
   {
-    DestroyLegacyVectorElementsAndRelease(slot, [](SyncInlineVectorRuntimeView& scratch) {
-      scratch.ReleaseHeapAndResetInline();
-    });
+    DestroyLegacyVectorElementsAndRelease(slot);
   }
 
   /**
@@ -914,7 +888,7 @@ SSyncData::SSyncData()
   , mTerrainUpdate()
   , mSimResources()
   , mPrintField()
-  , mInlineScratchVectors()
+  , mSyncExtraUnitData()
   , mTickDebugCanvas()
   , mBeatDebugCanvas()
 {
@@ -942,7 +916,7 @@ SSyncData::~SSyncData()
 
   runtimeView.mBeatDebugCanvas.reset();
   runtimeView.mTickDebugCanvas.reset();
-  DestroyLegacyInlineScratchVectorRange(runtimeView.mInlineScratchVectors);
+  ReleaseExtraUnitDataRun(runtimeView.mSyncExtraUnitData);
   DestroyLegacyStringVectorSlot(runtimeView.mPrintField);
   runtimeView.mSimResources.reset();
   runtimeView.mTerrainUpdate.reset();

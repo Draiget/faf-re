@@ -96,6 +96,7 @@
 #include "moho/math/MathReflection.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/task/CTask.h"
@@ -15858,30 +15859,6 @@ namespace moho
       }
     }
 
-    /**
-     * Address: 0x00895214 -> FUN_007530C0 (inside FUN_00894530)
-     *
-     * What it does:
-     * Replaces the session's scratch run with the beat payload's, one element
-     * at a time. Each element owns a small inline buffer, so the run cannot be
-     * copied wholesale - the binary's vector assignment reaches the same
-     * per-element copy lane.
-     */
-    void AssignSyncInlineVectors(msvc8::vector<SyncInlineVector>& destination, const msvc8::vector<SyncInlineVector>& source)
-    {
-      destination.resize(source.size());
-
-      auto destinationIt = destination.begin();
-      for (const SyncInlineVector& run : source) {
-        destinationIt->clear();
-        destinationIt->Reserve(run.size());
-        for (const std::int32_t value : run) {
-          destinationIt->push_back(value);
-        }
-        ++destinationIt;
-      }
-    }
-
     [[nodiscard]] SSelectionSetUserEntity::Index OpenLiveWeakSetCursor(SSelectionSetUserEntity& set)
     {
       SSelectionNodeUserEntity* firstLive = nullptr;
@@ -16101,7 +16078,16 @@ namespace moho
     ren_FogOfWar = beat.mFogOfWar;
     terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
     ReseatSharedLane(mSimResources, beat.mSimResources);
-    AssignSyncInlineVectors(mSyncInlineVectors, beat.mInlineScratchVectors);
+
+    // `msvc8::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
+    // `legacy/containers/Vector.h`). Previously mis-wired through
+    // `AssignSyncInlineVectors` (a per-element `SyncInlineVector` scratch-run
+    // copy) at this exact call site -- `FUN_007530C0`'s callee chain
+    // (`FUN_00755DE0`/`FUN_00750A80`, `>>3` nested 8-byte-pair-vector copy at
+    // +0x00 plus one trailing scalar dword at +0x18) only matches
+    // `SExtraUnitData::pairs`/`unitEntityId`, never a flat `int32_t[4]`
+    // element; removed the wrong helper and call directly.
+    mSyncExtraUnitData = beat.mSyncExtraUnitData;
 
     for (const msvc8::string& printLine : beat.mPrintField) {
       CON_Printf("%s", printLine.c_str());
@@ -18822,21 +18808,23 @@ namespace moho
     msvc8::vector<Wm3::Vector3f> attackIconPositions{};
     msvc8::vector<Wm3::Vector3f> teleportIconPositions{};
 
-    // `mSyncInlineVectors` is the per-beat command-link scratch buffer
-    // `CWldSession::DoBeat`/`AssignSyncInlineVectors` populate every beat
+    // `mSyncExtraUnitData` is the per-beat extra-unit-data run
+    // `CWldSession::DoBeat` copies wholesale from `beat.mSyncExtraUnitData`
     // (see its declaration above) - this is that lane's reader. Each record
-    // is one source unit's queued command-link run: `inlineVec_[2]` holds
-    // the source `EntId`, and the `{begin(),end()}` range holds
-    // `(boneIndex, targetEntId)` int32 pairs (0x008518A4..0x0085189A).
-    for (const SyncInlineVector& record : mSyncInlineVectors) {
-      UserEntity* const source = LookupEntityId(record.inlineVec_[2]);
+    // is one source unit's queued command-link run: `unitEntityId` holds
+    // the source `EntId`, and `pairs` holds `(boneIndex, targetEntId)`
+    // records, one per weapon (`Unit::GetExtraData`'s `AiAttacker` branch)
+    // or teleport-beacon link (its `key == -1` sentinel branch, 0x006ACB20)
+    // (0x008518A4..0x0085189A).
+    for (const SExtraUnitData& record : mSyncExtraUnitData) {
+      UserEntity* const source = LookupEntityId(record.unitEntityId);
       if (source == nullptr) {
         continue;
       }
 
-      for (const std::int32_t* pair = record.begin(); pair + 1 < record.end(); pair += 2) {
-        const std::int32_t boneIndex = pair[0];
-        const EntId targetId = pair[1];
+      for (const SExtraUnitDataPair& pair : record.pairs) {
+        const std::int32_t boneIndex = pair.key;
+        const EntId targetId = pair.value;
 
         UserEntity* const target = LookupEntityId(targetId);
         if (target == nullptr) {
