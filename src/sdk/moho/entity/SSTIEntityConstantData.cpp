@@ -106,17 +106,12 @@ namespace
     gSSTIEntityConstantDataSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x005581A0 (FUN_005581A0, SerSaveLoadHelper<SSTIEntityConstantData>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `SSTIEntityConstantData` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkSSTIEntityConstantDataSerializerLaneB() noexcept
-  {
-    gSSTIEntityConstantDataSerializer.ResetLinks();
-  }
+  // Address 0x005581A0 (unlink "lane B", a duplicate of lane A above)
+  // formerly modeled here is dead: zero data_refs/call_edges and no
+  // source-level caller anywhere in src/sdk/**.
+  // UnlinkSSTIEntityConstantDataSerializerLaneA above is the real body --
+  // cleanup_SSTIEntityConstantDataSerializer_atexit below calls it directly,
+  // and that cleanup function is atexit-registered from the ctor.
 
   /**
    * Address: 0x00558110 (FUN_00558110, Moho::SSTIEntityConstantDataSerializer::Deserialize)
@@ -328,40 +323,12 @@ namespace moho
     archive->WriteUInt(mTickCreated);
   }
 
-  /**
-   * Address: 0x005592C0 (FUN_005592C0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards entity-constant save lanes into
-   * `SSTIEntityConstantData::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeSSTIEntityConstantDataThunkA(
-    const SSTIEntityConstantData* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x005596E0 (FUN_005596E0)
-   * Address: 0x00672500 (FUN_00672500)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards entity-constant save lanes into
-   * `SSTIEntityConstantData::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeSSTIEntityConstantDataThunkB(
-    const SSTIEntityConstantData* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberSerialize(archive);
-    }
-  }
+  // Addresses 0x005592C0 ("ThunkA") and 0x005596E0/0x00672500 ("ThunkB",
+  // two compiled addresses for the same body) formerly modeled here are
+  // dead: zero data_refs/call_edges for all three, and no source-level
+  // caller anywhere in src/sdk/**. `SSTIEntityConstantDataSerializer::
+  // Serialize` above already calls `SSTIEntityConstantData::MemberSerialize`
+  // directly.
 } // namespace moho
 
 namespace
