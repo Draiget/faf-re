@@ -438,35 +438,11 @@ namespace
     archive->Write(visibleToReconCategoryType, &object->mVisibleToReconCategory, ownerRef);
   }
 
-  /**
-   * Address: 0x005C98D0 (FUN_005C98D0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards recon-db save lanes into
-   * `SerializeCAiReconDBImplMembers`.
-   */
-  [[maybe_unused]] void SerializeCAiReconDBImplMembersThunkA(
-    const CAiReconDBImpl* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCAiReconDBImplMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005CB6C0 (FUN_005CB6C0)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards recon-db save lanes into
-   * `SerializeCAiReconDBImplMembers`.
-   */
-  [[maybe_unused]] void SerializeCAiReconDBImplMembersThunkB(
-    const CAiReconDBImpl* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCAiReconDBImplMembers(object, archive);
-  }
+  // Addresses 0x005C98D0/0x005CB6C0 (the "ThunkA"/"ThunkB" save-lane
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `CAiReconDBImplSerializer::Serialize` below already calls
+  // `SerializeCAiReconDBImplMembers` above directly.
 
   /**
    * Address: 0x00BF7960 (FUN_00BF7960, cleanup_SReconKeyTypeInfo)
@@ -479,53 +455,15 @@ namespace
     static_cast<gpg::RType*>(SReconKeyTypeInfoStorageRef())->~RType();
   }
 
-  /**
-   * Address: 0x005BFF20 (FUN_005BFF20)
-   *
-   * What it does:
-   * Startup helper-cleanup thunk for `SReconKeySerializer` that unlinks the
-   * intrusive node and restores self-links.
-   */
-  [[maybe_unused]] void cleanup_SReconKeySerializerStartupThunkA()
-  {
-    gSReconKeySerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005BFF50 (FUN_005BFF50)
-   *
-   * What it does:
-   * Secondary startup helper-cleanup thunk for `SReconKeySerializer` with
-   * identical unlink/self-link behavior.
-   */
-  [[maybe_unused]] void cleanup_SReconKeySerializerStartupThunkB()
-  {
-    gSReconKeySerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005C2960 (FUN_005C2960)
-   *
-   * What it does:
-   * Startup helper-cleanup thunk for `CAiReconDBImplSerializer` that unlinks
-   * the intrusive node and restores self-links.
-   */
-  [[maybe_unused]] void cleanup_CAiReconDBImplSerializerStartupThunkA()
-  {
-    gCAiReconDBImplSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005C2990 (FUN_005C2990)
-   *
-   * What it does:
-   * Secondary startup helper-cleanup thunk for `CAiReconDBImplSerializer` with
-   * identical unlink/self-link behavior.
-   */
-  [[maybe_unused]] void cleanup_CAiReconDBImplSerializerStartupThunkB()
-  {
-    gCAiReconDBImplSerializer.ResetLinks();
-  }
+  // Addresses 0x005BFF20/0x005BFF50 ("StartupThunkA"/"StartupThunkB" for
+  // `SReconKeySerializer`) and 0x005C2960/0x005C2990 (same pair for
+  // `CAiReconDBImplSerializer`) formerly modeled here are dead: zero
+  // data_refs/call_edges for all four, and no source-level caller anywhere
+  // in src/sdk/**. The real teardown paths are `SReconKeySerializer::
+  // ~SReconKeySerializer` / `CAiReconDBImplSerializer::
+  // ~CAiReconDBImplSerializer` below, both C++-guaranteed to run at
+  // static-duration teardown of their respective globals and both already
+  // calling `ResetLinks()` directly.
 
   struct CAiReconDBSerializerBootstrap
   {
