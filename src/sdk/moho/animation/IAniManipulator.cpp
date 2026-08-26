@@ -1232,64 +1232,14 @@ namespace
     archive->WriteFloat(object->mHalfLegSpan);
   }
 
-  /**
-   * Address: 0x0063A2A0 (FUN_0063A2A0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards to CFootPlantManipulator serialize body.
-   */
-  [[maybe_unused]] void SerializeCFootPlantManipulatorStateThunkAlias(
-    const moho::CFootPlantManipulator* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCFootPlantManipulatorState(object, archive);
-  }
-
-  /**
-   * Address: 0x0063A1C0 (FUN_0063A1C0)
-   *
-   * What it does:
-   * Additional tail-thunk alias that forwards CFootPlantManipulator save lanes
-   * into the shared serializer body.
-   */
-  [[maybe_unused]] void SerializeCFootPlantManipulatorStateThunkAliasB(
-    const moho::CFootPlantManipulator* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeCFootPlantManipulatorState(object, archive);
-  }
-
-  /**
-   * Address: 0x0063CDD0 (FUN_0063CDD0)
-   *
-   * What it does:
-   * First tail-thunk alias that forwards IAniManipulator save lanes into the
-   * shared serializer body.
-   */
-  [[maybe_unused]] void SerializeIAniManipulatorStateThunkAliasA(
-    const moho::IAniManipulator* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeIAniManipulatorState(object, archive);
-  }
-
-  /**
-   * Address: 0x0063D7F0 (FUN_0063D7F0)
-   *
-   * What it does:
-   * Second tail-thunk alias that forwards IAniManipulator save lanes into the
-   * shared serializer body.
-   */
-  [[maybe_unused]] void SerializeIAniManipulatorStateThunkAliasB(
-    const moho::IAniManipulator* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeIAniManipulatorState(object, archive);
-  }
+  // Addresses 0x0063A1C0/0x0063A2A0 (CFootPlantManipulator save "ThunkAlias"/
+  // "ThunkAliasB" pair) and 0x0063CDD0/0x0063D7F0 (IAniManipulator save
+  // "ThunkAliasA"/"ThunkAliasB" pair) formerly modeled here are dead: zero
+  // data_refs and zero call_edges in the callgraph index for all four, and no
+  // source-level caller anywhere in src/sdk/**. The real, wired bodies are
+  // `CFootPlantManipulator::MemberSerialize` / `IAniManipulator::MemberSerialize`
+  // below, which already forward directly into `SerializeCFootPlantManipulatorState`
+  // / `SerializeIAniManipulatorState` above.
 } // namespace
 
 namespace moho
