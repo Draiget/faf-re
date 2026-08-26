@@ -1202,7 +1202,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\net\CLobby.cpp">
       <!--
         boost::algorithm::string (dependencies/boost_1_34_1, 2006-era) needs
-        std::unary_function/std::binary_function -- removed from the standard
+        std::unary_function/std::binary_function, removed from the standard
         in C++17, kept by the MSVC STL only behind this opt-in macro. Same
         fix already used per-file below for the vendored boost.thread source
         (_HAS_AUTO_PTR_ETC gates both auto_ptr and the unary/binary_function
