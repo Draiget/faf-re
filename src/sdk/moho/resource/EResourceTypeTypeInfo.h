@@ -75,6 +75,16 @@ namespace moho
    * serialize/deserialize callbacks were never installed under any code
    * path at all. `SerHelperBase`'s own ctor now performs the real
    * self-registration onto the pending-helper list.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF41A0` (atexit target
+   * pushed by the real ctor at 0x00BC9610); `FUN_00545B70`/`FUN_00545BA0`
+   * are dead, zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneC` and its two reset thunks; removed in
+   * favor of this citation. See `gpg::PrimitiveSerHelper<T,IntType>`'s
+   * per-instantiation address list in `Reflection.h`.
    */
   using EResourceTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EResourceType, int>;
 

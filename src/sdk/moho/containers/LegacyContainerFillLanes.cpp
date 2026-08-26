@@ -71,7 +71,6 @@ namespace
     return reinterpret_cast<std::uint32_t*>(&sentinel.prev);
   }
 
-  GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneC;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneF;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneG;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneH;
@@ -3997,28 +3996,6 @@ namespace
   }
 
   /**
-   * Address: 0x00545B70 (FUN_00545B70)
-   *
-   * What it does:
-   * Re-links one intrusive-list sentinel lane to singleton self-links.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCPrimary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
-  }
-
-  /**
-   * Address: 0x00545BA0 (FUN_00545BA0)
-   *
-   * What it does:
-   * Alias lane of global intrusive-sentinel reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAliasSecondary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
-  }
-
-  /**
    * Address: 0x005524F0 (FUN_005524F0)
    *
    * What it does:
@@ -5371,17 +5348,6 @@ namespace
   std::uint32_t* InitializeFourLaneHeaderTail100(FourLaneHeaderTail100RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
-  }
-
-  /**
-   * Address: 0x0057EA70 (FUN_0057EA70)
-   *
-   * What it does:
-   * Alias lane of intrusive unlink-and-selflink reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAlias() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
   }
 
   struct DwordPairRuntimeView
