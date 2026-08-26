@@ -48,22 +48,6 @@ namespace
     return write;
   }
 
-  [[nodiscard]] std::uint32_t* FillDwordTripleRangeByEnd(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* const tripleValue
-  ) noexcept
-  {
-    std::uint32_t* write = begin;
-    while (write != end) {
-      write[0] = tripleValue[0];
-      write[1] = tripleValue[1];
-      write[2] = tripleValue[2];
-      write += 3;
-    }
-    return write;
-  }
-
   [[nodiscard]] std::uint32_t* CopyDwordPairRangeForward(
     std::uint32_t* destination,
     const std::uint32_t* sourceBegin,
@@ -227,12 +211,6 @@ namespace
     std::int32_t value; // +0x0C
   };
 
-  struct SetterAtOffset10RuntimeView
-  {
-    std::byte pad00_0F[0x10];
-    std::int32_t value; // +0x10
-  };
-
   struct SetterAtOffset7CRuntimeView
   {
     std::byte pad00_7B[0x7C];
@@ -265,7 +243,6 @@ namespace
     "FlagSetterAtOffset88RuntimeView::flag offset must be 0x88"
   );
   static_assert(offsetof(SetterAtOffset0CRuntimeView, value) == 0x0C, "SetterAtOffset0CRuntimeView::value offset must be 0x0C");
-  static_assert(offsetof(SetterAtOffset10RuntimeView, value) == 0x10, "SetterAtOffset10RuntimeView::value offset must be 0x10");
   static_assert(offsetof(SetterAtOffset7CRuntimeView, value) == 0x7C, "SetterAtOffset7CRuntimeView::value offset must be 0x7C");
   static_assert(
     offsetof(NestedValueAtOffset08RuntimeView, value) == 0x08,
@@ -340,72 +317,12 @@ namespace
 #endif
 
   /**
-   * Address: 0x008F9A50 (FUN_008F9A50)
-   *
-   * What it does:
-   * Fills one `[begin,end)` dword range from one repeated source value lane.
-   */
-  std::uint32_t* FillDwordRangeByEndLaneD(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordRangeByEnd(begin, end, valueSlot);
-  }
-
-  /**
-   * Address: 0x0092D130 (FUN_0092D130)
-   *
-   * What it does:
-   * Alias lane of `[begin,end)` repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordRangeByEndLaneE(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordRangeByEnd(begin, end, valueSlot);
-  }
-
-  /**
    * Address: 0x00932490 (FUN_00932490)
    *
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
   std::uint32_t* FillDwordRangeByEndLaneF(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordRangeByEnd(begin, end, valueSlot);
-  }
-
-  /**
-   * Address: 0x009324E0 (FUN_009324E0)
-   *
-   * What it does:
-   * Alias lane of `[begin,end)` repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordRangeByEndLaneG(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordRangeByEnd(begin, end, valueSlot);
-  }
-
-  /**
-   * Address: 0x00936050 (FUN_00936050)
-   *
-   * What it does:
-   * Alias lane of `[begin,end)` repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordRangeByEndLaneH(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -500,66 +417,6 @@ namespace
   }
 
   /**
-   * Address: 0x0094FE90 (FUN_0094FE90)
-   *
-   * What it does:
-   * Fills one dword-pair range `[begin,end)` from one repeated pair value.
-   */
-  std::uint32_t* FillDwordPairRangeLaneA(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* pairValue
-  ) noexcept
-  {
-    return FillDwordPairRangeByEnd(begin, end, pairValue);
-  }
-
-  /**
-   * Address: 0x008E9230 (FUN_008E9230)
-   *
-   * What it does:
-   * Fills one dword-triple range `[begin,end)` from one repeated triple value.
-   */
-  std::uint32_t* FillDwordTripleRangeLaneA(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* tripleValue
-  ) noexcept
-  {
-    return FillDwordTripleRangeByEnd(begin, end, tripleValue);
-  }
-
-  /**
-   * Address: 0x0092D0A0 (FUN_0092D0A0)
-   *
-   * What it does:
-   * Alias lane of dword-triple fill behavior.
-   */
-  std::uint32_t* FillDwordTripleRangeLaneB(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* tripleValue
-  ) noexcept
-  {
-    return FillDwordTripleRangeByEnd(begin, end, tripleValue);
-  }
-
-  /**
-   * Address: 0x0092D580 (FUN_0092D580)
-   *
-   * What it does:
-   * Alias lane of dword-triple fill behavior.
-   */
-  std::uint32_t* FillDwordTripleRangeLaneC(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* tripleValue
-  ) noexcept
-  {
-    return FillDwordTripleRangeByEnd(begin, end, tripleValue);
-  }
-
-  /**
    * Address: 0x008D9D10 (FUN_008D9D10)
    * Address: 0x008D9230 (FUN_008D9230, ICF twin -- identical function_sha256.
    *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
@@ -616,36 +473,6 @@ namespace
    * Writes one repeated dword value into `count` contiguous destination lanes.
    */
   std::uint32_t* FillDwordCountedLaneY(
-    std::uint32_t* destination,
-    const std::uint32_t count,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillCountedDwordSpan(destination, count, valueSlot);
-  }
-
-  /**
-   * Address: 0x008FA970 (FUN_008FA970)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordCountedLaneZ(
-    std::uint32_t* destination,
-    const std::uint32_t count,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillCountedDwordSpan(destination, count, valueSlot);
-  }
-
-  /**
-   * Address: 0x00936B00 (FUN_00936B00)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordCountedLaneAA(
     std::uint32_t* destination,
     const std::uint32_t count,
     const std::uint32_t* valueSlot
@@ -768,21 +595,6 @@ namespace
    */
   std::int32_t SetValueAtOffset0C(
     SetterAtOffset0CRuntimeView* const runtime,
-    const std::int32_t value
-  ) noexcept
-  {
-    runtime->value = value;
-    return value;
-  }
-
-  /**
-   * Address: 0x00A2E470 (FUN_00A2E470)
-   *
-   * What it does:
-   * Stores one caller dword at offset `+0x10` and returns that value.
-   */
-  std::int32_t SetValueAtOffset10(
-    SetterAtOffset10RuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
   {

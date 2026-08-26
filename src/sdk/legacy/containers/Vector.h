@@ -1622,6 +1622,39 @@ namespace msvc8
          * `[0x8F733B,0x8F7360)`) to recover `FUN_008F734A`'s own body and
          * settle which of `FUN_008F7020`/`FUN_008F7110` it is.)
          *
+         * Address: 0x00753020 (FUN_00753020, `msvc8::vector<moho::
+         * SExtraUnitData>::vector(const vector&)` for the 0x20-byte element
+         * -- SEH-guarded copy constructor, `.asm`-confirmed: `(mLast-mFirst)
+         * >> 5` element count, `if(n){ zero the triple; buy(n); uninit_copy;
+         * }` shape matching this constructor exactly. Its fused
+         * allocate-and-arm-the-triplet lane (the `reserve(n)` guard +
+         * `reallocate_to(n)` steps fused into one out-of-line body, called
+         * only from this constructor -- same pattern as `FUN_007E4370`/
+         * `FUN_008F69A0` above) is `FUN_0074DBA0`: guards `count >
+         * 0x7FFFFFF` (`max_size()` for this element) and throws through
+         * `throw_too_long` (`FUN_0074F680`, cited below), else calls the
+         * checked allocator `allocate_slots_checked` (`FUN_00751C40`, cited
+         * below) and arms `first_ = last_ = <new block>`. The uninitialized
+         * copy step is `uninit_copy_n`'s primary emission `FUN_00756A00`
+         * (cited below). Calls-into evidence is solid (both callees are
+         * independently reached from `Sim::AdvanceBeat`'s `push_back`/
+         * `insert` chain, cited above); however, exhaustive search
+         * (`FUN_00753020.xrefs.txt`: zero code/data xrefs;
+         * `_callgraph_index.sqlite` `call_edges`/`incoming_xrefs`: empty;
+         * `function_icf_twins`: no match; `reachable`: UNREACHED) found no
+         * caller for this specific address, direct or indirect. Recorded
+         * per the un-recovered-`FUN_008F7020` precedent above rather than
+         * forced -- the element shape, stride, and callee chain leave no
+         * plausible owner other than this instantiation, but a genuine
+         * source-level trigger (a `msvc8::vector<SExtraUnitData>` copied by
+         * value somewhere in `Sim.cpp`/`CWldSession::DoBeat`) has not yet
+         * been located. Re-examine if a caller surfaces during a future
+         * `DoBeat` recovery pass. Migrated off
+         * `CopyConstructInlineQwordVectorWithTagStorage` in
+         * `gpg/core/containers/FastVectorInsertLanes.cpp` (RULE ONE
+         * hand-rolled `msvc8::vector<T>` reimplementation, see `push_back`
+         * above for the full evidence chain).
+         *
          * Copy constructor (deep copy)
          */
         vector(const vector& other) : vector() {
@@ -2916,6 +2949,29 @@ namespace msvc8
          * citation -- `gpg::ReadArchive::TrackedPointerInfo` is an engine
          * type (`ArchiveSerialization.h:72`); both real binary callers
          * (`FUN_00953720`, `FUN_00953B30`) are already `recovered`.
+         *
+         * Address: 0x0074C160 (FUN_0074C160, `msvc8::vector<moho::
+         * SExtraUnitData>::push_back` for the 0x20-byte element -- `Moho::
+         * Sim::mSyncSerializeGroup2` (`Sim.h`, `+0x0A28`). `.asm`-confirmed
+         * exact match of this member's two-way split: `size()<capacity()`
+         * (`(mLast-mFirst)>>5` vs `(mEnd-mFirst)>>5`) fast path calls this
+         * instantiation's `uninit_fill_n` (`FUN_00753AF0`, cited below, with
+         * `n=1`) and advances `mLast` by `0x20` in place; the capacity-
+         * exhausted path tail-calls `insert(end(), value)` (`FUN_0074F3E0`,
+         * cited below on `insert`). Reached from `Sim::AdvanceBeat`
+         * (`FUN_00749F40`, already recovered, `Sim.cpp`) via
+         * `mSyncSerializeGroup2.push_back(SExtraUnitData())` in the
+         * sync-filter extra-data packing pass -- `AdvanceBeat`'s own call
+         * chain (a chunk at `0x0074A378`) calls this instantiation's
+         * `insert` and `uninit_fill_n` bodies directly, confirmed via
+         * `_callgraph_index.sqlite` `call_edges`. Migrated off a hand-rolled
+         * `msvc8::vector<T>` reimplementation
+         * (`gpg/core/containers/FastVectorInsertLanes.cpp`'s
+         * `InlineQwordVectorWithTag*` cluster, a RULE ONE violation --
+         * `moho::SExtraUnitData` and `msvc8::vector<moho::SExtraUnitData>
+         * mSyncSerializeGroup2` were already correctly typed in
+         * `Unit.h`/`Sim.h`, so the free-function cluster was pure duplicate
+         * debt over this template.)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -5015,7 +5071,12 @@ namespace msvc8
          * method's own `std::memmove` (trivially-copyable branch) and
          * `insertAt[i] = localValue` lines directly -- no separate template
          * member, the same treatment as the `SSTIArmyVariableData` entry's
-         * "own uninit-copy/shift helpers" above.
+         * "own uninit-copy/shift helpers" above. DB-integrity fix: `sub_92D130`
+         * (`FUN_0092D130`) was duplicated as a standalone `FillDwordRangeByEnd
+         * LaneE` orphan free function in `moho/containers/
+         * LegacyContainerFillLanesB.cpp` (anonymous-namespace, no
+         * source-level caller); removed from there since this member's own
+         * `insertAt[i] = localValue` loop is the complete recovery.
          *
          * Reached from `resize(n, val)`'s grow branch (`FUN_0092FC60`,
          * IDA-named `std::vector_MapNode::resize`, cited below on
@@ -5182,6 +5243,30 @@ namespace msvc8
          * the current last element into the newly-opened slot beyond the
          * old end. DB-integrity fix: was blocked citing a stale `CLobby.cpp`
          * lead -- real home is `CAiReconDBImpl.cpp`'s `SNewBlip` vector.
+         *
+         * Address: 0x0074F3E0 (FUN_0074F3E0, `msvc8::vector<moho::
+         * SExtraUnitData>::insert` core for the 0x20-byte element, `count`
+         * folded to 1 -- `Moho::Sim::mSyncSerializeGroup2`). Reached
+         * directly from `Sim::AdvanceBeat` (`FUN_00749F40`, already
+         * recovered) and from this instantiation's own `push_back`
+         * (`FUN_0074C160`, cited above). Reallocation branch calls
+         * `allocate_slots_checked` (`FUN_00751C40`, cited below) and
+         * `throw_too_long` (`FUN_0074F680`, cited below on that member) for
+         * the `max_size() - cur < count` guard; in-place branch's
+         * tail-shift-assign sub-step (element is not trivially copyable --
+         * `pairs` is `gpg::core::FastVectorN<SExtraUnitDataPair,1>`, so the
+         * compiler kept the reverse per-element assign loop out of line
+         * rather than inlining a memmove) is `FUN_00755A00`/`FUN_00751C10`/
+         * `FUN_00753E70` (three call-shape variants of the same backward
+         * `std::_Copy_backward`-style assign loop this method's `tail >=
+         * count` branch performs); the gap-fill-assign sub-step (`insertAt[i]
+         * = localValue` loop) is `FUN_00751BF0`. Migrated off
+         * `gpg/core/containers/FastVectorInsertLanes.cpp`'s
+         * `InsertInlineQwordVectorWithTagSlowPath`/
+         * `CopyAssignInlineQwordVectorWithTagRangeBackward`/
+         * `FillAssignInlineQwordVectorWithTagRange` -- a RULE ONE
+         * hand-rolled `msvc8::vector<T>` reimplementation, see `push_back`
+         * above for the full evidence chain.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6140,6 +6225,52 @@ namespace msvc8
          * elsewhere in this file); returns the one-past-the-end dst pointer.
          * Matches this method's non-trivial-T loop exactly.
          *
+         * Address: 0x00756A00 (FUN_00756A00, `msvc8::vector<moho::
+         * SExtraUnitData>::uninit_copy_n` primary emission for the 0x20-byte
+         * element, `Sim::mSyncSerializeGroup2`) -- range-form loop over
+         * `[sourceBegin, sourceEnd)`, placement-new copy-constructing each
+         * slot (default-init the `pairs` sub-vector to inline then assign
+         * source's content, copy the `unitEntityId` tag word -- the shape a
+         * compiler-generated `SExtraUnitData(const SExtraUnitData&)` member-
+         * wise copy ctor produces for `FastVectorN<SExtraUnitDataPair,1>
+         * pairs; EntId unitEntityId; int32 syncAuxWord1C;`, notably NOT
+         * copying `syncAuxWord1C` -- consistent with `Unit.h`'s existing
+         * note that field is "not written by `Sim::AdvanceBeat`"), with
+         * destroy-on-exception rollback of the already-constructed prefix.
+         * Reached from `vector(const vector&)` (`FUN_00753020`, cited
+         * above).
+         * Address: 0x007549A0 (FUN_007549A0, register-shape sibling of
+         * `FUN_00756A00`, same body)
+         * Address: 0x00755DB0 (FUN_00755DB0, second register-shape sibling
+         * of `FUN_00756A00`, same body)
+         * Address: 0x00756AB0 (FUN_00756AB0, thin wrapper that forwards
+         * into `FUN_00756A00` unchanged -- reached from `insert`'s
+         * (`FUN_0074F3E0`, cited above) in-place tail-shift branch to
+         * construct-copy the trailing element past the old end, `count=1`)
+         * Address: 0x00751BC0 (FUN_00751BC0, register-shape sibling of
+         * `FUN_00756AB0`)
+         * Address: 0x00753E00 (FUN_00753E00, second register-shape sibling
+         * of `FUN_00756AB0`)
+         * Address: 0x00754A00 (FUN_00754A00, third register-shape sibling of
+         * `FUN_00756AB0`)
+         * Address: 0x007559D0 (FUN_007559D0, fourth register-shape sibling
+         * of `FUN_00756AB0`)
+         * Address: 0x00755E10 (FUN_00755E10, fifth register-shape sibling of
+         * `FUN_00756AB0`)
+         * Address: 0x007506F0 (FUN_007506F0, single-element (`n=1`) T-copy-
+         * construct adapter -- default-inits the destination's `pairs` to
+         * inline then assigns source's `pairs` content, tag copied
+         * separately by the caller. Reached from `insert`'s slow path
+         * (`FUN_0074F3E0`, cited above) to construct the local "inserted
+         * value" scratch copy.)
+         * Address: 0x00755EF0 (FUN_00755EF0, sibling single-element
+         * T-copy-construct adapter that additionally copies the
+         * `unitEntityId` tag itself rather than leaving that to the caller
+         * -- calls `FUN_007506F0` above then copies the tag word. Reached
+         * from an adjacent, IDA-untokenized register-shape shim (a call
+         * site in the `0x00754BC0` area with no `functions`-table entry of
+         * its own); no further caller found beyond that shim.)
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -6918,6 +7049,87 @@ namespace msvc8
          * this instantiation's `_Insert_n` grow lane `FUN_008EF500` (cited
          * above); emitted via the same `BuildDeviceCapabilities`'s
          * `validFormats1.insert(end(),1,token)`.)
+         *
+         * Address: 0x008E9230 (FUN_008E9230, `msvc8::vector<gpg::gal::
+         * HeadAdapterMode>::uninit_fill_n` for the 12-byte `{width; height;
+         * refreshRate}` element -- `[begin,end)` pointer-pair fill loop
+         * (3-dword copy per iteration, no defensive null guard; verified
+         * against the `.asm`). Reached from the `_Insert_n` grow core
+         * `FUN_008EF010` (named within `FUN_008EFA50`'s citation above as
+         * the tail-called, count=1 reallocation half of `insert(iterator,
+         * const T&)`), itself reached from `push_back`'s capacity-full path
+         * via `AppendHeadAdapterMode` (D3D9Interfaces.cpp). DB-integrity fix:
+         * was duplicated as a standalone `FillDwordTripleRangeLaneA` free
+         * function in `moho/containers/LegacyContainerFillLanesB.cpp`
+         * (orphan -- anonymous-namespace, no source-level caller); removed
+         * from there in favor of this citation.)
+         * Address: 0x009324E0 (FUN_009324E0, `msvc8::vector<iterator>::
+         * uninit_fill_n` for the 4-byte `_Nodeptr`-wrapper element -- the
+         * HaStar cluster-cache bucket vector instantiation sibling to
+         * `FUN_0092F9E0`'s `OccupationCacheRuntimeMap` above, this one for
+         * `FUN_00933950` (cited above on `insert`). `[begin,end)`
+         * pointer-pair fill loop, verified against the `.asm`; reached from
+         * that `_Insert_n` core's in-place gap-fill branch. DB-integrity fix:
+         * was duplicated as `FillDwordRangeByEndLaneG` in
+         * `LegacyContainerFillLanesB.cpp` (orphan); removed from there.)
+         * Address: 0x00936050 (FUN_00936050, `msvc8::vector<gpg::
+         * ThreadCtxEntry*>::uninit_fill_n` for the 4-byte pointer element
+         * (`gpg::ThreadState::mEntries`, `Logging.h`/`Logging.cpp`) --
+         * `[begin,end)` pointer-pair fill loop, verified against the `.asm`;
+         * the in-place branch's direct gap-fill call. Reached from the
+         * `_Insert_n` core `FUN_00936FF0` (cited above on `insert`; itself
+         * `skip` since `tls->mEntries.push_back(entry)` in
+         * `gpg::PushThreadContext` is the whole family's programmer-written
+         * source line).)
+         * Address: 0x00936B00 (FUN_00936B00, the same `msvc8::vector<gpg::
+         * ThreadCtxEntry*>::uninit_fill_n` instantiation's second,
+         * byte-distinct emission -- `(dst, count, value)` counted-fill form
+         * matching this member's own signature directly (`retn 0Ch`, three
+         * stack args popped; verified against the `.asm`), used by
+         * `FUN_00936FF0`'s reallocation-branch tail fill. Both
+         * `FUN_00936050` and `FUN_00936B00` model this one member; recovered
+         * together. DB-integrity fix: both were duplicated as
+         * `FillDwordRangeByEndLaneH`/`FillDwordCountedLaneAA` in
+         * `LegacyContainerFillLanesB.cpp` (orphans, never reached from that
+         * file's own source); removed from there in favor of this citation.)
+         * Address: 0x008F9A50 (FUN_008F9A50, `msvc8::vector<void*>::
+         * uninit_fill_n` for the D3D10 backend swap-chain vector (`_Insert_n`
+         * core `FUN_008FE010`, cited above on `insert`) -- `[begin,end)`
+         * pointer-pair fill loop, verified against the `.asm`; the in-place
+         * branch's direct gap-fill call.)
+         * Address: 0x008FA970 (FUN_008FA970, the same D3D10 swap-chain
+         * `msvc8::vector<void*>::uninit_fill_n` instantiation's counted-fill
+         * sibling emission -- `(dst, count, value)` form, verified against
+         * the `.asm`; same relationship to `FUN_008F9A50` as `FUN_00936B00`
+         * has to `FUN_00936050` above. Reached from `FUN_008FE010`'s
+         * reallocation-branch tail fill. DB-integrity fix: both were
+         * duplicated as `FillDwordRangeByEndLaneD`/`FillDwordCountedLaneZ` in
+         * `LegacyContainerFillLanesB.cpp` (orphans); removed from there in
+         * favor of this citation.)
+         * Address: 0x0094FE90 (FUN_0094FE90, `msvc8::vector<gpg::
+         * TypeHandle>::uninit_fill_n` for the 8-byte `{type,version}`
+         * element -- `[begin,end)` pointer-pair fill loop (2-dword copy per
+         * iteration, no defensive null guard; verified against the `.asm`),
+         * the missing fill step for the `_Insert_n` core `FUN_00951F30`
+         * (cited above on `insert`) -- that entry's tail-shift is always
+         * empty since `gpg::AppendTypeHandle` only ever inserts at `mLast`,
+         * so this fill call is the entire visible effect of the grow path
+         * once the allocate/tail-shift steps (`FUN_0094F1B0`/`FUN_00950670`,
+         * cited there) are done. DB-integrity fix: was duplicated as
+         * `FillDwordPairRangeLaneA` in `LegacyContainerFillLanesB.cpp`
+         * (orphan); removed from there in favor of this citation.)
+         *
+         * Address: 0x00753AF0 (FUN_00753AF0, `msvc8::vector<moho::
+         * SExtraUnitData>::uninit_fill_n` for the 0x20-byte element,
+         * `Sim::mSyncSerializeGroup2`) -- placement-new copy-construct loop
+         * with destroy-on-exception rollback, matching this member exactly.
+         * Reached directly from `push_back` (`FUN_0074C160`, `n=1`) and
+         * `insert` (`FUN_0074F3E0`, cited above), both independently reached
+         * from `Sim::AdvanceBeat`.
+         * Address: 0x0074DBF0 (FUN_0074DBF0, register-shape adapter --
+         * forwards into `FUN_00753AF0` above)
+         * Address: 0x00751800 (FUN_00751800, sibling register-shape
+         * adapter, same forward)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -7588,6 +7800,19 @@ namespace msvc8
          * `copy_or_move_assign` on the pre-move tail, matching this
          * member's non-trivial branch exactly since the element owns a
          * refcounted handle and is not `is_trivially_copy_assignable_v`).
+         *
+         * Address: 0x00755DE0 (FUN_00755DE0, `msvc8::vector<moho::
+         * SExtraUnitData>::copy_or_move_assign` forward emission for the
+         * 0x20-byte element, `Sim::mSyncSerializeGroup2`) -- per-element
+         * forward assign loop over already-live destination slots (assigns
+         * the `pairs` sub-vector then the `unitEntityId` tag, matching the
+         * compiler-generated `SExtraUnitData::operator=` a non-trivially-
+         * copy-assignable element takes here). No confirmed direct caller
+         * in this cluster's traced closure (its sibling backward emission
+         * below is reached from `insert`'s slow path); recorded on shape
+         * and stride match alongside its confirmed siblings.
+         * Address: 0x007549D0 (FUN_007549D0, register-shape sibling of
+         * `FUN_00755DE0`, same body)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
