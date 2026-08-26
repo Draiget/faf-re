@@ -55,70 +55,16 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00637190 (FUN_00637190)
-   * Address: 0x00617AF0 (FUN_00617AF0)
-   * Address: 0x0064B360 (FUN_0064B360)
-   *
-   * What it does:
-   * Bridge thunk that forwards one builder-arm serializer deserialize lane to
-   * the canonical deserialize body.
-   */
-  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBodyThunkA(
-    moho::CBuilderArmManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    moho::CBuilderArmManipulator::MemberDeserialize(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00637300 (FUN_00637300)
-   * Address: 0x006354C0 (FUN_006354C0)
-   * Address: 0x0064B4D0 (FUN_0064B4D0)
-   *
-   * What it does:
-   * Mirrored bridge thunk that forwards one builder-arm serializer deserialize
-   * lane to the canonical deserialize body.
-   */
-  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBodyThunkB(
-    moho::CBuilderArmManipulator* const manipulator,
-    gpg::ReadArchive* const archive
-  )
-  {
-    moho::CBuilderArmManipulator::MemberDeserialize(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x006371A0 (FUN_006371A0)
-   *
-   * What it does:
-   * Jump-thunk adapter that forwards one builder-arm serializer save lane to
-   * `FUN_00637640`.
-   */
-  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBodyThunkA(
-    const moho::CBuilderArmManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    moho::CBuilderArmManipulator::MemberSerialize(manipulator, archive);
-  }
-
-  /**
-   * Address: 0x00637310 (FUN_00637310)
-   * Address: 0x00617B40 (FUN_00617B40)
-   *
-   * What it does:
-   * Mirrored jump-thunk adapter that forwards one builder-arm serializer save
-   * lane to `FUN_00637640`.
-   */
-  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBodyThunkB(
-    const moho::CBuilderArmManipulator* const manipulator,
-    gpg::WriteArchive* const archive
-  )
-  {
-    moho::CBuilderArmManipulator::MemberSerialize(manipulator, archive);
-  }
+  // Addresses 0x00637190/0x00617AF0/0x0064B360 (deserialize "ThunkA", three
+  // compiled addresses) and 0x00637300/0x006354C0/0x0064B4D0 (deserialize
+  // "ThunkB", three more) and 0x006371A0 (serialize "ThunkA") and
+  // 0x00637310/0x00617B40 (serialize "ThunkB") formerly modeled here are all
+  // dead: zero data_refs/call_edges for all nine, and no source-level caller
+  // anywhere in src/sdk/**. `CBuilderArmManipulatorSerializer::Deserialize`/
+  // `Serialize` (CBuilderArmManipulatorSerializer.cpp, wired via that
+  // class's ctor -- independently confirmed by the 2026-08-26
+  // ArchiveSerialization audit) already call `CBuilderArmManipulator::
+  // MemberDeserialize`/`MemberSerialize` directly.
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const ownerActor, const std::int32_t boneIndex) noexcept
   {
