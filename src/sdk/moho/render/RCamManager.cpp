@@ -4,8 +4,10 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
+#include <sstream>
 
 #include "moho/console/CConCommand.h"
+#include "moho/console/CConFunc.h"
 #include "moho/misc/EngineVectorHelpers.h"
 #include "moho/render/camera/CameraImpl.h"
 
@@ -216,6 +218,18 @@ namespace
   {
     moho::TeardownConCommandRegistration(gTConVar_cam_DefaultLOD);
   }
+
+  /// 0x00E00779 (the shared empty-string literal also used by
+  /// `ResolutionCommands.cpp`'s startup commands), the `.data` initializer
+  /// of `Moho::CConFunc_SC_CameraScaleLOD` (+0x08). No console-help text in
+  /// the binary.
+  constexpr const char* kConsoleStartupSCCameraScaleLODDescription = "";
+
+  // 0x00F5BE80. The registrar only patches the vftable and the
+  // `mHandlerOrValue` slot at +0x0C; the name and (empty) description
+  // lanes are `.data` initializers, matching the `SC_PrimaryAdapter`/
+  // `SC_ToggleCursorClip` pattern in ResolutionCommands.cpp.
+  moho::CConFunc gCConFunc_SC_CameraScaleLOD{};
 } // namespace
 
 namespace moho
@@ -492,6 +506,78 @@ namespace moho
     RCamManager* const manager = CAM_GetManager();
     manager->Frame(simDeltaSeconds, frameSeconds);
   }
+
+  /**
+   * Address: 0x008D3870 (FUN_008D3870, sub_8D3870)
+   *
+   * What it does:
+   * The `SC_CameraScaleLOD <index>` debug console command. Parses `index`
+   * from the single supplied argument (`atoi`, unchecked against the
+   * 3-entry table -- the binary itself has no bounds check here, preserved
+   * exactly), selects one of `{cam_LowLOD, cam_MediumLOD, cam_HighLOD}` by
+   * that index, then re-issues the selection as four executed console
+   * commands: `cam_DefaultLOD <value>`, `cam_SetLOD WorldCamera <value>`,
+   * `cam_SetLOD WorldCamera2 <value>`, `cam_SetLOD CameraHead2 <value>` --
+   * a one-shot "snap every LOD-scaled camera to this level" debug helper.
+   * `.asm`-confirmed: all four `std::ostringstream` blocks are built and
+   * executed identically in sequence with no further argument parsing
+   * between them; IDA's stack-slot naming diverges across the later three
+   * blocks (intervening `ostringstream`/`string` temporaries shift the
+   * frame), but no second value is ever loaded from a fresh source after
+   * the initial `atoi`-selected float, so all four commands carry the same
+   * selected LOD value.
+   */
+  void SC_CameraScaleLOD(void* const commandArgs)
+  {
+    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+    if (args.Count() != 2) {
+      return;
+    }
+
+    const int lodIndex = std::atoi(args.At(1)->c_str());
+    const float lodValues[3] = {cam_LowLOD, cam_MediumLOD, cam_HighLOD};
+    const float selectedLod = lodValues[lodIndex];
+
+    {
+      std::ostringstream stream;
+      stream << "cam_DefaultLOD " << selectedLod;
+      CON_Executef(stream.str().c_str());
+    }
+    {
+      std::ostringstream stream;
+      stream << "cam_SetLOD WorldCamera " << selectedLod;
+      CON_Executef(stream.str().c_str());
+    }
+    {
+      std::ostringstream stream;
+      stream << "cam_SetLOD WorldCamera2 " << selectedLod;
+      CON_Executef(stream.str().c_str());
+    }
+    {
+      std::ostringstream stream;
+      stream << "cam_SetLOD CameraHead2 " << selectedLod;
+      CON_Executef(stream.str().c_str());
+    }
+  }
+
+  void cleanup_CConFunc_SC_CameraScaleLOD()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_CameraScaleLOD);
+  }
+
+  /**
+   * Address: 0x00BE9540 (FUN_00BE9540, skip -- xc_a static initializer
+   * lane; patches the vftable + callback slot on the already-`.data`-
+   * initialized `gCConFunc_SC_CameraScaleLOD` and registers process-exit
+   * teardown)
+   */
+  void register_CConFunc_SC_CameraScaleLOD()
+  {
+    gCConFunc_SC_CameraScaleLOD.InitializeRecovered(
+      kConsoleStartupSCCameraScaleLODDescription, "SC_CameraScaleLOD", &moho::SC_CameraScaleLOD
+    );
+    (void)std::atexit(&cleanup_CConFunc_SC_CameraScaleLOD);
+  }
 } // namespace moho
 
 namespace
@@ -504,6 +590,7 @@ namespace
       moho::register_TConVar_cam_MediumLOD();
       moho::register_TConVar_cam_LowLOD();
       moho::register_TConVar_cam_DefaultLOD();
+      moho::register_CConFunc_SC_CameraScaleLOD();
     }
   };
 
