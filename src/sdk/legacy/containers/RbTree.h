@@ -2498,6 +2498,37 @@ namespace msvc8
              * hand-rolled tree it anchored). `IWldTerrainRes::GetEnvLookup`
              * now reaches this member directly as `mEnvLookup.find(key)`.
              */
+            /**
+             * Address: 0x00879240 (FUN_00879240, sub_879240) -- lower-bound-
+             * then-verify shape matching this member exactly (confirmed via
+             * `.asm`/decompiled `.c`: descend `parentOrRoot`/`left`/`right`
+             * comparing `key >= cursor.key`, then reject back to `header` if
+             * the candidate is the header itself or its key is greater than
+             * the search key), isNil@+0x15. `Moho::EntId`/`Moho::CmdId`-keyed
+             * maps of this shape sharing this exact `function_sha256` in this
+             * binary include `std::map<EntId, Entity>::find`,
+             * `std::map<EntId, UserEntity>::find`, and `std::map<CmdId,
+             * CommandIssueHelper>::find` (the value type does not affect
+             * `find`'s compiled body) -- zero `incoming_xrefs`/callers for
+             * this specific address in this sweep, so the exact instantiation
+             * isn't pinned down; kept here as the template's generic
+             * emission, not a per-type duplicate, matching the 0x0083AD60
+             * entry above.
+             *
+             * This was formerly mis-modeled in
+             * `moho/containers/LegacyContainerFillLanes.cpp` as
+             * `LowerBoundTreeNodeFlag15ToOutputRecoveryA`, calling only this
+             * file's `FindLowerBoundTreeNode` (this member's `lower_bound_
+             * node` half) with NO rejection check -- a real fidelity bug
+             * (would return a lower-bound match instead of "not found" for
+             * an absent key). That duplicate had zero source-level callers
+             * of its own and has been deleted rather than fixed in place,
+             * since the correct fix is this citation.
+             * Address: 0x00879570 (FUN_00879570, ICF twin -- identical
+             * function_sha256. Formerly duplicated in the same file as
+             * `LowerBoundTreeNodeFlag15ToOutputRecoveryB`, a thin forwarder
+             * to the address above; deleted too.)
+             */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
                 node_type* const found = lower_bound_node(k);

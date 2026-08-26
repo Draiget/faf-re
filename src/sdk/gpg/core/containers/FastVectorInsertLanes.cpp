@@ -1281,6 +1281,10 @@ namespace gpg::core::legacy
    * Address: 0x00540C00 (FUN_00540C00)
    * Address: 0x0054E170 (FUN_0054E170)
    * Address: 0x0075FD20 (FUN_0075FD20)
+   * Address: 0x00760020 (FUN_00760020, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+   *          as `FillWordPairRangeWithConstant760020` [two uint32_t words =
+   *          the same 8-byte element]; that duplicate has been deleted.)
    *
    * What it does:
    * Writes one repeated 8-byte source lane into destination slots in

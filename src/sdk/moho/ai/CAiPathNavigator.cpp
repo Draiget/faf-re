@@ -389,14 +389,24 @@ namespace
 
   /**
    * Address: 0x005AD130 (FUN_005AD130)
+   * Address: 0x006E30C0 (FUN_006E30C0, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+   *          as `AlignLane08ToLane04IfDifferent` over an anonymous
+   *          `DwordTripleRuntimeView` offset struct; that duplicate has been
+   *          deleted.)
    *
    * What it does:
    * Resets one nav-path span to empty content while preserving allocated
    * storage and base pointer ownership.
+   *
+   * Fidelity fix: the real body (FUN_005AD130.asm) is a single comparison --
+   * `if (finish != start) finish = start;` -- with no null check on `start`.
+   * The previous recovery added a `path.start != nullptr &&` guard that isn't
+   * in the binary; removed it.
    */
   void ResetPathContent(SNavPath& path) noexcept
   {
-    if (path.start != nullptr && path.finish != path.start) {
+    if (path.finish != path.start) {
       path.finish = path.start;
     }
   }
