@@ -71,8 +71,6 @@ namespace
     return reinterpret_cast<std::uint32_t*>(&sentinel.prev);
   }
 
-  GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneF;
-  GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneG;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneH;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneI;
   GlobalIntrusiveSentinelRuntimeView gGlobalIntrusiveSentinelLaneJ;
@@ -3995,49 +3993,6 @@ namespace
     return FillDwordSpanByEnd(begin, end, valueSlot);
   }
 
-  /**
-   * Address: 0x005524F0 (FUN_005524F0)
-   *
-   * What it does:
-   * Re-links one intrusive-list sentinel lane to singleton self-links.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneFPrimary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneF);
-  }
-
-  /**
-   * Address: 0x00552520 (FUN_00552520)
-   *
-   * What it does:
-   * Alias lane of global intrusive-sentinel reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneFAlias() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneF);
-  }
-
-  /**
-   * Address: 0x0055AF80 (FUN_0055AF80)
-   *
-   * What it does:
-   * Re-links one intrusive-list sentinel lane to singleton self-links.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneGPrimary() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneG);
-  }
-
-  /**
-   * Address: 0x0055AFB0 (FUN_0055AFB0)
-   *
-   * What it does:
-   * Alias lane of global intrusive-sentinel reset behavior.
-   */
-  std::uint32_t* ResetGlobalIntrusiveSentinelLaneGAlias() noexcept
-  {
-    return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneG);
-  }
 
   /**
    * Address: 0x0055B930 (FUN_0055B930)

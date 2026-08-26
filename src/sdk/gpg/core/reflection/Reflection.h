@@ -4938,7 +4938,10 @@ namespace gpg
      *   - T=Moho::EAlliance: 0x00BC7A30 (dead duplicate: 0x0050A600)
      *   - T=Moho::EEconResource: 0x00BCA810
      *   - T=Moho::EImpactType: 0x00BC7A90 (dead duplicate: 0x0050A6A0)
-     *   - T=Moho::ESTITargetType: 0x00BCA2B0 (no dead duplicate found)
+     *   - T=Moho::ESTITargetType: 0x00BCA2B0 (no dead duplicate found),
+     *     atexit 0x00BF50E0 (dead duplicates: 0x0055AF80, 0x0055AFB0 --
+     *     formerly `gGlobalIntrusiveSentinelLaneG` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed)
      *   - T=Moho::SWorldBeam::BlendMode: 0x00BC5300 (no dead duplicate found)
      *   - T=Moho::SWorldParticle::BlendMode: 0x00BC53C0 (no dead duplicate found)
      *   - T=Moho::SWorldParticle::ZMode: 0x00BC5420 (no dead duplicate found)
@@ -4968,7 +4971,10 @@ namespace gpg
      *     previously modeled as a standalone hand-rolled
      *     `EUnitCommandTypePrimitiveSerializer` raw-struct mimic in
      *     `moho/command/EUnitCommandTypeTypeInfo.h`, wrongly guessing this
-     *     instantiation belonged to `SerSaveLoadHelper<T>` instead
+     *     instantiation belonged to `SerSaveLoadHelper<T>` instead, atexit
+     *     0x00BF4960 (dead duplicates: 0x005524F0, 0x00552520 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneF` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed)
      *   - T=Moho::ESquadClass: 0x00BDAB80 (dead duplicate: 0x0072A4A0; a
      *     second, unrelated writer -- FUN_0072A9F0, demangled
      *     `SerSaveLoadHelper<Moho::ESquadClass>` -- shares this global's
