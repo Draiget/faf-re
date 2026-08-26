@@ -1313,9 +1313,76 @@ namespace moho
 {
   float ren_ClutterRadius = 0.0f;
 
+  /**
+   * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop of
+   * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+   * `legacy/containers/Vector.h`)
+   * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
+   * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
+   * Address: 0x007D7920 (unnamed 22-byte register-convention fragment --
+   * see the `erase(first,last)` citation in `Vector.h` for detail)
+   *
+   * What it does:
+   * Dispatches through the element's own "poisoned" vtable slot 0 with a
+   * delete-flag of 0. No source line calls this by name at any of the
+   * addresses above -- each is the compiler inlining this one-statement
+   * method (and the destructor that forwards to it, below) at its own call
+   * site. Reduces to a runtime no-op: every live element's `vtable` is set
+   * exactly once, via `ResetClutterSeedVtable`, to `SeedVtableResetToken()`,
+   * and `SeedVtableResetTag`'s destructor is defaulted with the delete flag
+   * skipping `operator delete` -- but the call itself is real and is part of
+   * the type's actual destructor, so it must happen for binary-exact
+   * fidelity.
+   */
   void ClutterSurfaceElement::DestroyInPlace()
   {
     vtable->destroy(this, 0);
+  }
+
+  /**
+   * The real destructor's body is exactly `DestroyInPlace()` above -- MSVC
+   * inlines a one-statement destructor at each call site rather than
+   * emitting a standalone symbol, so there is no separate address to cite
+   * beyond the ones already on `DestroyInPlace()`. Declaring this as a real
+   * (non-trivial) destructor, instead of leaving the type implicitly
+   * trivial, is what makes `msvc8::vector<ClutterSurfaceElement>`'s
+   * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
+   * (`Vector.h`) emit the per-element call `FUN_007D7E00` and `FUN_007D7EB0`
+   * both show -- previously the struct was (wrongly) trivially destructible
+   * and that machinery's `if constexpr (!is_trivially_destructible_v<T>)`
+   * guard silently skipped the call.
+   */
+  ClutterSurfaceElement::~ClutterSurfaceElement()
+  {
+    DestroyInPlace();
+  }
+
+  /**
+   * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
+   * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+   * `legacy/containers/Vector.h`)
+   *
+   * What it does:
+   * Copies the three payload fields (`selectionWeight`, `uniformScale`,
+   * `meshBlueprint`) from `rhs` and deliberately leaves `vtable` untouched.
+   * Every live element's `vtable` already holds the same
+   * `SeedVtableResetToken()` value (`ResetClutterSeedVtable` sets it once;
+   * it never changes for the life of the slot), so the original source
+   * skips re-copying it on every shift-assign during an erase. Declaring
+   * this explicitly (instead of leaving the implicit memberwise copy) is
+   * what makes `erase(first,last)`'s per-element
+   * `first[i] = std::move(last[i])` shift loop produce this exact 3-field
+   * copy instead of copying all four fields -- a user-declared destructor
+   * alone already routes `erase` into that loop (it makes the type
+   * non-trivially-copyable), but without this operator the loop would fall
+   * back to the implicit, all-4-field copy-assignment.
+   */
+  ClutterSurfaceElement& ClutterSurfaceElement::operator=(const ClutterSurfaceElement& rhs)
+  {
+    selectionWeight = rhs.selectionWeight;
+    uniformScale = rhs.uniformScale;
+    meshBlueprint = rhs.meshBlueprint;
+    return *this;
   }
 
   /**
@@ -1376,13 +1443,20 @@ namespace moho
    *
    * What it does:
    * Resets the vtable to the poison/reset token; `mSeeds` destroys its live
-   * elements and releases its buffer through its own destructor (matching
-   * the removed `DestroySurfacePayloadLane` helper's per-element
-   * `DestroyInPlace()` sweep + `operator delete`, which reduces to a no-op
-   * per element since `ClutterSurfaceElement`'s poisoned vtable resets to
+   * elements and releases its buffer through its own destructor. Confirmed
+   * against `FUN_007D7EB0`'s raw disassembly: an inline sweep calling each
+   * element's own vtable-slot-0 dispatch, then `operator delete` on the
+   * buffer, then zeroing `{first_,last_,end_}` (`myProxy_` deliberately left
+   * alone) -- exactly `ClutterSurfaceElement::~ClutterSurfaceElement()`
+   * (which forwards to `DestroyInPlace()`) run per live element by
+   * `msvc8::vector<ClutterSurfaceElement>`'s own `tidy()`-shaped teardown
+   * (`Vector.h`), which reduces to a runtime no-op per element since
+   * `ClutterSurfaceElement`'s poisoned vtable resets to
    * `SeedVtableResetTag`'s trivial defaulted destructor -- see
-   * `ResetClutterSeedVtable`/`SeedVtableResetToken` above). Reached via
-   * `Clutter::~Clutter` (`FUN_007D61E0`)'s compiler-emitted
+   * `ResetClutterSeedVtable`/`SeedVtableResetToken` above, and
+   * `ClutterSurfaceElement::DestroyInPlace`'s own citation (`Clutter.h`) for
+   * the full evidence chain. Reached via `Clutter::~Clutter`
+   * (`FUN_007D61E0`)'s compiler-emitted
    * `` `eh vector destructor iterator' `` teardown of `mSurfaces`, rather
    * than an explicit hand-written per-entry loop.
    */
@@ -2051,10 +2125,14 @@ namespace moho
     std::memset(mBuffer, 0, sizeof(mBuffer));
 
     for (ClutterSurfaceEntry& surface : mSurfaces) {
-      // Erasing the full live range [begin, end) is exactly `clear()`; the
-      // removed `ResetSurfaceEntryRange`/`CompactSurfaceElements` helpers
-      // handled the general mid-range erase shape, but this call site (the
-      // only one) always erased everything.
+      // Address: 0x007D7E00 (FUN_007D7E00, called at 0x007D6300 as
+      // `sub_7D7E00(&mSeeds, &scratchOut, mSeeds.first_, mSeeds.last_)` once
+      // per loop iteration -- i.e. `erase(begin(),end())`, exactly `clear()`.
+      // `msvc8::vector<ClutterSurfaceElement>::erase(first,last)`
+      // (`Vector.h`) already models this byte-for-byte; see that member's
+      // Doxygen citation for the full shape/evidence, including the second,
+      // unnamed call site and why `ClutterSurfaceElement` needed its own
+      // destructor/`operator=` (`Clutter.h`) rather than any change here.
       surface.mSeeds.clear();
     }
 
