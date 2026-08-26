@@ -20,17 +20,12 @@ namespace
   // binary's atexit registration.
   moho::CAiTargetSerializer gCAiTargetSerializer;
 
-  /**
-   * Address: 0x005E2E90 (FUN_005E2E90)
-   *
-   * What it does:
-   * Secondary unlink/reset thunk for the global `CAiTargetSerializer` helper
-   * node.
-   */
-  [[maybe_unused]] void cleanup_CAiTargetSerializerStartupThunkB()
-  {
-    gCAiTargetSerializer.ResetLinks();
-  }
+  // Address 0x005E2E90 (a secondary "ResetLinks()" unlink-thunk emission
+  // formerly modeled here) is dead: zero data_refs/call_edges and no
+  // source-level caller anywhere in src/sdk/**. The real teardown path is
+  // `CAiTargetSerializer::~CAiTargetSerializer` (0x005E2E60) below, which
+  // C++ guarantees runs at static-duration teardown of `gCAiTargetSerializer`
+  // and already calls the inherited `ResetLinks()` directly.
 
   [[nodiscard]] gpg::RType* CachedCAiTargetType()
   {
