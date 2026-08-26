@@ -23,6 +23,22 @@
  *
  * The driver's recursion picks the smaller partition to recurse into and loops
  * on the larger, which is what keeps stack depth logarithmic.
+ *
+ * A third instantiation, `gpg::RField` (20 bytes, `{const char* mName; ...}`,
+ * sorted by `mName` via `strcmp`), is what `gpg::RType::Finish()` (Reflection.cpp)
+ * uses to index reflected fields, and is the one that actually exercises the
+ * `_Median` ninther upgrade the `SBuildTemplateInfo` instantiation's own citation
+ * already flagged but this file didn't yet model (see `select_ninther` below):
+ *
+ *   0x008DD790  _Sort               introsort driver
+ *   0x008DAA00  _Unguarded_partition
+ *   0x008DA410  _Median              ninther dispatcher (plain `_Med3` <= 41
+ *                                    elements, else samples 9 points)
+ *   0x008D9EE0  _Med3                median-of-3
+ *   0x008D9E20  iter_swap            element swap, 20-byte stride
+ *   0x008DB430  _Insertion_sort      small-range fallback
+ *   0x008DB2A0  make_heap / 0x008DAF60 _Adjust_heap (sift-down half)
+ *   0x008DBF60  sort_heap  / 0x008DB080 _Adjust_heap (settle-upward half)
  */
 
 #include <cstddef>
@@ -37,12 +53,40 @@ namespace msvc8
         inline constexpr std::ptrdiff_t kInsertionSortMax = 32;
 
         /**
+         * Above this element count (checked against `(last - 1) - first`,
+         * i.e. at most 41 elements takes the plain-median3 path), `_Median`
+         * upgrades from a single `median3` call to the 9-point "ninther"
+         * sampled by `select_ninther` below. Threshold confirmed from
+         * `FUN_008DA410`'s `(a3 - a1) / 20 <= 40` guard (`gpg::RField`,
+         * 20-byte stride, `a3` passed in already as `last - 1`).
+         */
+        inline constexpr std::ptrdiff_t kNintherCountLimit = 40;
+
+        /**
          * Address: 0x0089C070 (FUN_0089C070, the swap for
          * `Moho::SBuildTemplateInfo` -- 0x2C bytes of
          * `{Wm3::Vector3f mPos; int mBuildOrder; msvc8::string mBlueprintId;}`.
          * The 0x2C stack temp it opens with is the `T temp = lhs` below; the
          * blueprint-id lane moves through `std::string::assign(str, 0, -1)`
          * three times, once per leg of the three-way exchange.)
+         */
+        /**
+         * Address: 0x008D9E20 (FUN_008D9E20, the swap for `gpg::RField` --
+         * 20 bytes, `{const char* mName; RType* mType; int mOffset; int v4;
+         * const char* mDesc;}`. Straight-line 5-dword three-way exchange
+         * (`temp=lhs; lhs=rhs; rhs=temp` on the raw dword lanes), matching
+         * this member exactly for a trivially-copyable element -- no
+         * per-field ctor/dtor calls, just raw dword moves. Reached from
+         * `_Med3`'s (`FUN_008D9EE0`, cited below) three `iter_swap` calls
+         * and from `_Unguarded_partition`'s (`FUN_008DAA00`, cited below)
+         * own partition-scan swaps. The real instantiation root is
+         * `gpg::RType::Finish()`'s `std::sort(first, last, comp)` over
+         * `fields_` (Reflection.cpp, `Address: 0x008DF4A0`). Previously
+         * modeled here as a bespoke `SwapFiveDwordLanes` free function in
+         * `LegacyContainerFillLanes.cpp` -- a RULE ONE violation once the
+         * real `_Sort<RField*>` instantiation chain was identified via
+         * `_callgraph_index.sqlite`; removed from there in favor of this
+         * citation.)
          */
         template <class T>
         void iter_swap_value(T& lhs, T& rhs)
@@ -66,6 +110,22 @@ namespace msvc8
          * fifteen times. Compares `[node+0x0C]` signed, which is
          * `mBuildOrder`.)
          */
+        /**
+         * Address: 0x008D9EE0 (FUN_008D9EE0, `_Med3` for the `gpg::RField`
+         * sort -- `strcmp(*a2,*a1)`/`strcmp(*a3,*a2)`/`strcmp(*a2,*a1)`
+         * against the three `mName` pointers, matching this member exactly
+         * (compares `*a`/`*b`/`*c` pairwise, swapping through `iter_swap`
+         * at 0x008D9E20 -- cited above -- to land the median in `*b`).
+         * Reached with `count <= 41` directly from `_Median`'s (`FUN_008DA410`,
+         * cited on `select_ninther` below) simple path, and always as the
+         * final "median of the three medians" step of the ninther itself.
+         * Previously mis-tagged `external_dependency` ("all-external-callees
+         * thunk... no engine references") -- `strcmp` is CRT, but the
+         * three-way compare-and-swap control flow orchestrating it is this
+         * project's own `_Med3` emission, reached from `gpg::RType::
+         * Finish()`'s `std::sort` (Reflection.cpp) -- not third-party
+         * runtime. DB-integrity fix, corrected to skip/cited-here.)
+         */
         template <class T, class Compare>
         void median3(T* const a, T* const b, T* const c, Compare comp)
         {
@@ -78,6 +138,42 @@ namespace msvc8
                     iter_swap_value(*a, *b);
                 }
             }
+        }
+
+        /**
+         * Address: 0x008DA410 (FUN_008DA410, `_Median` for the `gpg::RField`
+         * sort -- VC8's ninther dispatcher: `<= 41` elements (`(a3-a1)/20 <=
+         * 40` against `a3 = last - 1`) falls straight through to a single
+         * `median3(first, middle, last - 1, comp)`; above that it samples
+         * three medians-of-three spaced `count/8` elements apart from the
+         * start, middle, and end of the range, then takes the median of
+         * those three medians as the final pivot estimate. Hand-verified
+         * against the decompile: `v4 = (count - 1 + 1) / 8`, `_Med3` calls
+         * over `[first, first+v4, first+2v4]`, `[middle-v4, middle,
+         * middle+v4]`, and `[last-1-2v4, last-1-v4, last-1]`, then a final
+         * `_Med3` over the three results, writing the overall median into
+         * `*middle`. Reached from `_Unguarded_partition`'s (`FUN_008DAA00`,
+         * cited below) pivot-selection step. The `SBuildTemplateInfo`
+         * instantiation's own `_Median` (`FUN_0089BD10`, cited above on
+         * `median3`) exercises this exact ninther branch too (its citation
+         * already named the `40 < _Count` guard) but this template's
+         * `unguarded_partition` never modeled the upgrade until this pass --
+         * fixed here so every instantiation gets it, per RULE ONE. Was
+         * mis-tagged `external_dependency` for the same reason `FUN_008D9EE0`
+         * was; corrected.)
+         */
+        template <class T, class Compare>
+        void select_ninther(T* const first, T* const middle, T* const last, Compare comp)
+        {
+            const std::ptrdiff_t step = (last - first) / 8;
+            T* const lastIncl = last - 1;
+            T* const nearStart = first + step;
+            T* const nearEnd = lastIncl - step;
+
+            median3(first, nearStart, first + 2 * step, comp);
+            median3(middle - step, middle, middle + step, comp);
+            median3(lastIncl - 2 * step, nearEnd, lastIncl, comp);
+            median3(nearStart, middle, nearEnd, comp);
         }
 
         /**
@@ -96,6 +192,17 @@ namespace msvc8
          * Address: 0x0089BBA0 (FUN_0089BBA0, the 45-instruction outer guard
          * MSVC emitted separately, which range-checks and tail-calls the body
          * above)
+         */
+        /**
+         * Address: 0x008DB430 (FUN_008DB430, the `gpg::RField` instantiation
+         * -- walks forward from `a1+1`, comparing/sliding each `RField` back
+         * over the run of `mName`-greater predecessors via `strcmp`, with the
+         * multi-element rotate delegated to `FUN_008DA5D0` rather than
+         * inlined (this template folds that rotate into the loop below
+         * directly; same observable result). Reached from `_Sort`'s
+         * (`FUN_008DD790`, cited on `sort_impl` below) small-range fallback,
+         * `<= 32` elements. Was mis-tagged `blocked` (stale, pre-dates
+         * `no_block_guard.py`); corrected to skip/cited-here.)
          */
         template <class T, class Compare>
         void insertion_sort(T* const first, T* const last, Compare comp)
@@ -166,6 +273,14 @@ namespace msvc8
          * descending-population-count sort. Element stride confirmed from
          * `(a2 - a1) >> 3`; recurses into `sub_760720` for the child compare,
          * the same two-way split this template's `comp` calls encode.)
+         * Address: 0x008DAF60 (FUN_008DAF60, the `gpg::RField` sift-down
+         * half, called from `make_heap`'s `FUN_008DB2A0` -- cited below)
+         * Address: 0x008DB080 (FUN_008DB080, the `gpg::RField` settle-
+         * upward/pop-step half, called from `sort_heap`'s `FUN_008DBF60`
+         * -- cited below). Both were mis-tagged `external_dependency`
+         * ("all-external-callees thunk") -- neither has any third-party
+         * callee at all; corrected to skip/cited-here, same `_Adjust_heap`
+         * split-phase shape as `0x0089C170`/`0x0089C350` above.)
          */
         template <class T, class Compare>
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
@@ -204,6 +319,15 @@ namespace msvc8
          * Address: 0x0087E5B0 (FUN_0087E5B0, the `UserEntity*` instantiation
          * driving the fused sift at 0x0087E850; called from the `msvc8::sort`
          * heapsort fallback for `CDecalManager::EntitiesInView`/`PropsInView`.)
+         */
+        /**
+         * Address: 0x008DB2A0 (FUN_008DB2A0, the `gpg::RField` instantiation
+         * -- `for (hole = count/2; hole > 0;) adjust_heap(first, --hole,
+         * count, first[hole], comp)`, matching this member's loop exactly
+         * (drives the sift-down half at `FUN_008DAF60`, cited above).
+         * Reached from `_Sort`'s (`FUN_008DD790`, cited below) ideal-budget-
+         * exhausted heapsort fallback. Was mis-tagged `external_dependency`;
+         * corrected to skip/cited-here.)
          */
         template <class T, class Compare>
         void make_heap(T* const first, T* const last, Compare comp)
@@ -246,6 +370,16 @@ namespace msvc8
          * emissions of the exact three-line pop step in the loop below, with
          * no separate callers of their own in the shipped binary.)
          */
+        /**
+         * Address: 0x008DBF60 (FUN_008DBF60, the `gpg::RField` instantiation
+         * -- `for (count = (a2-a1)/20; count > 1; --count) { swap first[0]
+         * and first[count-1] into place; adjust_heap(...) }`, matching this
+         * member's loop exactly (drives the settle-upward half at
+         * `FUN_008DB080`, cited above). Reached from `_Sort`'s
+         * (`FUN_008DD790`, cited below) heapsort fallback, right after
+         * `make_heap`'s `FUN_008DB2A0`. Was mis-tagged `external_dependency`;
+         * corrected to skip/cited-here.)
+         */
         template <class T, class Compare>
         void sort_heap(T* const first, T* last, Compare comp)
         {
@@ -269,12 +403,29 @@ namespace msvc8
          * function: one pivot selection, then the two scan loops plus the
          * equal-run gathering at each end.)
          * driver can skip that whole block instead of re-sorting it.
+         *
+         * Address: 0x008DAA00 (FUN_008DAA00, the `gpg::RField` instantiation
+         * -- calls the ninther dispatcher at 0x008DA410 once (not a bare
+         * `median3`; this instantiation is the one whose real caller,
+         * `gpg::RType::Finish()`, sorts large-enough field lists to actually
+         * exercise the ninther branch), then runs the same two-scan-loop plus
+         * equal-run-gathering shape as `0x0089B9E0` above, with the raw swaps
+         * inlined rather than routed through a named `iter_swap` callee.
+         * Reached from `_Sort`'s (`FUN_008DD790`, cited below) partition
+         * step. Was mis-tagged `blocked` (stale, "no canonical Address:0x
+         * body in src/sdk for token" -- not a valid blocker per RULE ONE,
+         * compiler-emission glue is supposed to have no separate body);
+         * corrected to skip/cited-here.)
          */
         template <class T, class Compare>
         std::pair<T*, T*> unguarded_partition(T* const first, T* const last, Compare comp)
         {
             T* const middle = first + (last - first) / 2;
-            median3(first, middle, last - 1, comp);
+            if (last - 1 - first > kNintherCountLimit) {
+                select_ninther(first, middle, last, comp);
+            } else {
+                median3(first, middle, last - 1, comp);
+            }
 
             T pivot = *middle;
             T* pivotFirst = middle;
@@ -362,6 +513,30 @@ namespace msvc8
          * and sort_heap (0x0089BF70). That call set is what identifies it
          * as the introsort driver rather than any single phase.)
          */
+        /**
+         * Address: 0x008DD790 (FUN_008DD790, `std::_Sort<gpg::RField*>` --
+         * the `gpg::RField` introsort driver. Same recursive shape as
+         * `0x0089B540` above: `a3` (the ideal budget) decays by
+         * `a3/2/2 + a3/2` per loop, recurses into the smaller partition half
+         * and loops on the larger, falls to `insertion_sort` (`FUN_008DB430`)
+         * once the range is `<= 32`, and to `make_heap`+`sort_heap`
+         * (`FUN_008DB2A0`+`FUN_008DBF60`) once the ideal budget hits zero
+         * with a still-large range. Real instantiation root: `gpg::
+         * RType::Finish()`'s `std::sort(first, last, comp)` over `fields_`
+         * (Reflection.cpp, `Address: 0x008DF4A0`), sorting reflected field
+         * descriptors by `mName`. Correctly identified and marked `skip`
+         * ("the programmer-written source line that emits it already exists
+         * at the instantiating call site") by an earlier pass; this pass
+         * traced the rest of the family beneath it -- `FUN_008DAA00`/
+         * `FUN_008DA410`/`FUN_008D9EE0`/`FUN_008D9E20`/`FUN_008DB430`/
+         * `FUN_008DB2A0`/`FUN_008DBF60`/`FUN_008DAF60`/`FUN_008DB080` --
+         * which were mis-tagged `external_dependency`/`blocked` on the
+         * theory that a function whose only non-recursive callees are CRT
+         * `strcmp` calls or terminal-status siblings must itself be
+         * external. Wrong: the three-way-compare/partition/heap *control
+         * flow* is this project's own `_Sort<RField*>` emission: engine
+         * code that happens to call CRT primitives, not CRT code itself.)
+         */
         template <class T, class Compare>
         void sort_impl(T* first, T* last, std::ptrdiff_t ideal, Compare comp)
         {
@@ -399,6 +574,13 @@ namespace msvc8
      * inlined into its caller -- `CWldSession::GenerateBuildTemplates`
      * (0x00896AA0) calls the driver at 0x0089B540 directly. The whole
      * twelve-body instantiation is catalogued on the members above.
+     *
+     * For the `gpg::RField` instantiation, this entry point is also inlined
+     * into its caller, `gpg::RType::Finish()` (Reflection.cpp), which calls
+     * `msvc8::sort(first, last, comp)` directly on `fields_`. The whole
+     * nine-body instantiation (`_Sort`/`_Unguarded_partition`/`_Median`/
+     * `_Med3`/`iter_swap`/`_Insertion_sort`/`make_heap`/`sort_heap`/
+     * `_Adjust_heap` x2) is catalogued on the members above.
      */
     template <class T, class Compare>
     void sort(T* const first, T* const last, Compare comp)

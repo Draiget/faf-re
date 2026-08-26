@@ -1,5 +1,7 @@
 #include "Reflection.h"
 
+#include "legacy/algorithms/Sort.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstdint>
@@ -13706,6 +13708,22 @@ const REnumType* RType::IsEnumType() const
 
 void RType::Init() {}
 
+/**
+ * Address: 0x008DF4A0
+ * SLOT: 10
+ *
+ * What it does:
+ * Finalization: builds indices over 20-byte member records. Sorts `fields_`
+ * by `mName` using the binary's own MSVC8 introsort (`msvc8::sort`, not
+ * `std::sort` -- the 2007 implementation's tie-breaking/pivot-selection
+ * shape is observably different, see `legacy/algorithms/Sort.h`). This is
+ * the real instantiation root for that header's `gpg::RField` sort family:
+ * `_Sort` (0x008DD790), `_Unguarded_partition` (0x008DAA00), `_Median`
+ * (0x008DA410), `_Med3` (0x008D9EE0), `iter_swap` (0x008D9E20),
+ * `_Insertion_sort` (0x008DB430), `make_heap`/`_Adjust_heap`
+ * (0x008DB2A0/0x008DAF60), and `sort_heap`/`_Adjust_heap`
+ * (0x008DBF60/0x008DB080).
+ */
 void RType::Finish()
 {
   GPG_ASSERT(!initFinished_);
@@ -13720,7 +13738,7 @@ void RType::Finish()
     return;
   }
 
-  std::sort(first, last, [](const RField& a, const RField& b) {
+  msvc8::sort(first, last, [](const RField& a, const RField& b) {
     return std::strcmp(a.mName, b.mName) < 0;
   });
 }
