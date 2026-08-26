@@ -1628,17 +1628,21 @@ namespace msvc8
          * >> 5` element count, `if(n){ zero the triple; buy(n); uninit_copy;
          * }` shape matching this constructor exactly. Its fused
          * allocate-and-arm-the-triplet lane (the `reserve(n)` guard +
-         * `reallocate_to(n)` steps fused into one out-of-line body, called
-         * only from this constructor -- same pattern as `FUN_007E4370`/
-         * `FUN_008F69A0` above) is `FUN_0074DBA0`: guards `count >
-         * 0x7FFFFFF` (`max_size()` for this element) and throws through
-         * `throw_too_long` (`FUN_0074F680`, cited below), else calls the
-         * checked allocator `allocate_slots_checked` (`FUN_00751C40`, cited
+         * `reallocate_to(n)` steps fused into one out-of-line body, same
+         * pattern as `FUN_007E4370`/`FUN_008F69A0` above) is `FUN_0074DBA0`:
+         * guards `count > 0x7FFFFFF` (`max_size()` for this element) and
+         * throws through `throw_too_long` (`FUN_0074F680`, cited below),
+         * else calls the checked allocator `allocate_slots_checked`
+         * (`FUN_00751C40`, cited
          * below) and arms `first_ = last_ = <new block>`. The uninitialized
          * copy step is `uninit_copy_n`'s primary emission `FUN_00756A00`
-         * (cited below). Calls-into evidence is solid (both callees are
+         * (cited below). Calls-into evidence is solid -- `FUN_00756A00` is
          * independently reached from `Sim::AdvanceBeat`'s `push_back`/
-         * `insert` chain, cited above); however, exhaustive search
+         * `insert` chain (cited above), and `FUN_0074DBA0` is independently
+         * reached a second way, from `operator=`'s (`FUN_007530C0`, cited
+         * below) reallocation branch, itself confirmed via a real, direct
+         * `.xrefs.txt` code xref from `Moho::CWldSession::DoBeat`; however,
+         * exhaustive search
          * (`FUN_00753020.xrefs.txt`: zero code/data xrefs;
          * `_callgraph_index.sqlite` `call_edges`/`incoming_xrefs`: empty;
          * `function_icf_twins`: no match; `reachable`: UNREACHED) found no
@@ -1853,6 +1857,47 @@ namespace msvc8
          * `insert` never calls the separate `copy_or_move_assign` helper,
          * unlike `assign`/`operator=`, which is why `FUN_008EFCD0` is cited
          * on `insert` below rather than on `copy_or_move_assign`.)
+         *
+         * Address: 0x007530C0 (FUN_007530C0, `msvc8::vector<moho::
+         * SExtraUnitData>::operator=(const vector&)` for the 0x20-byte
+         * element, `Sim::mSyncSerializeGroup2`) -- `.c`-confirmed the full
+         * VC8 assign shape this member's `assign()` helper implements:
+         * self-check: `if (a1==a2) return a1;`; empty-source clear branch
+         * tail-calling `FUN_007536D0` (a small dedicated helper for this
+         * branch only: no-op when the destination is already empty, else
+         * assign-then-destroy-the-tail through `copy_or_move_assign`
+         * [`FUN_00755DE0`, `n=0`] + `destroy_range` [`FUN_00742170`], both
+         * cited elsewhere on this template); source-longer-than-
+         * capacity branch calling `copy_or_move_assign` over the retained
+         * prefix (`FUN_007549D0`), `destroy_range` on the excess dead tail
+         * (`FUN_00742170`, cited above), freeing the old block and rebuying
+         * through the fused buy helper (`FUN_0074DBA0`, cited below on the
+         * copy constructor -- this operator= is its SECOND confirmed
+         * caller, not "only from the constructor" as first thought) then
+         * `uninit_copy_n`'s alias emission (`FUN_00754A00`, cited above);
+         * source-fits-in-capacity branch assigns over the prefix
+         * (`FUN_00755DE0`) and rebases `last_`.
+         *
+         * Real, direct, `.xrefs.txt`-confirmed code xref: `call sub_7530C0`
+         * at `0x00895214`, inside `Moho::CWldSession::DoBeat`
+         * (`FUN_00894530`, already recovered, `CWldSession.cpp`). NOTE:
+         * `DoBeat`'s currently-committed source calls
+         * `AssignSyncInlineVectors(mSyncInlineVectors,
+         * beat.mInlineScratchVectors)` at that exact call site, citing this
+         * same address for `moho::SyncInlineVector`
+         * (`gpg::core::FastVectorN<int32_t,4>`, a plain 4-int32 inline
+         * vector with no separate tag field) instead -- a pre-existing
+         * citation-integrity bug: this address's own callees explicitly
+         * copy a `.valueTag`/`unitEntityId` word that only exists on
+         * `SExtraUnitData`'s layout (`gpg::core::FastVectorN<
+         * SExtraUnitDataPair,1> pairs; EntId unitEntityId; ...`), never on
+         * a bare `FastVectorN<int32_t,4>`. `DoBeat` almost certainly
+         * assigns `mSyncSerializeGroup2` from the beat payload somewhere in
+         * its own 4904-byte body and `mSyncInlineVectors` through a
+         * genuinely different, not-yet-individually-cited address; left
+         * for a dedicated `CWldSession.cpp`/`DoBeat` follow-up pass rather
+         * than corrected here (out of this pass's scope). Cited on shape,
+         * callee chain, and the confirmed real xref regardless.
          *
          * Copy assignment (strong exception safety)
          */
@@ -5565,6 +5610,19 @@ namespace msvc8
          * `moho/containers/LegacyContainerFillLanes.cpp` with no
          * source-level caller anywhere in `src/sdk/**` -- collapsed into
          * this template instantiation, RULE ONE.)
+         *
+         * Address: 0x00742170 (FUN_00742170, `msvc8::vector<moho::
+         * SExtraUnitData>::destroy_range` for the 0x20-byte element,
+         * `Sim::mSyncSerializeGroup2`) -- `.c`-confirmed: loops `[first,
+         * last)` on a 32-byte stride, and for each element whose `pairs`
+         * sub-vector has left its inline slot (`elem.pairs.start_ !=
+         * elem.pairs.originalVec_`) frees the heap block and restores the
+         * saved inline-capacity header, otherwise just rebases `end_` --
+         * the exact `gpg::core::ResetStorageToInline<SExtraUnitDataPair,1>`
+         * shape (cited on that free function in `FastVector.h`) inlined
+         * per-element rather than called out to a separate symbol. Reached
+         * from `operator=` (`FUN_007530C0`, cited below) on its
+         * capacity-reused and full-reallocation paths.
          */
     public:
         static void destroy_range(T* first, T* last) noexcept {
@@ -7807,12 +7865,16 @@ namespace msvc8
          * forward assign loop over already-live destination slots (assigns
          * the `pairs` sub-vector then the `unitEntityId` tag, matching the
          * compiler-generated `SExtraUnitData::operator=` a non-trivially-
-         * copy-assignable element takes here). No confirmed direct caller
-         * in this cluster's traced closure (its sibling backward emission
-         * below is reached from `insert`'s slow path); recorded on shape
-         * and stride match alongside its confirmed siblings.
+         * copy-assignable element takes here). Reached directly from
+         * `operator=` (`FUN_007530C0`, cited above, both its
+         * source-fits-in-capacity assign-over branch and, via its
+         * self-clear delegate `FUN_007536D0`, the empty-source branch),
+         * itself confirmed via a real, direct `.xrefs.txt` code xref from
+         * `Moho::CWldSession::DoBeat`.
          * Address: 0x007549D0 (FUN_007549D0, register-shape sibling of
-         * `FUN_00755DE0`, same body)
+         * `FUN_00755DE0` -- reached from `operator=`'s
+         * source-longer-than-capacity branch to assign over the retained
+         * prefix before uninit-copying the excess tail)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -8301,6 +8363,15 @@ namespace msvc8
          * invoking `std::exception(const char *&)` then overwriting the vtable
          * with `std::bad_alloc::`vftable'`, and routes through
          * `_CxxThrowException`.
+         *
+         * Address: 0x00751C40 (FUN_00751C40, `msvc8::vector<moho::
+         * SExtraUnitData>::allocate_slots_checked` for the 0x20-byte
+         * element, `Sim::mSyncSerializeGroup2`) -- `.c`-confirmed exact
+         * match of this member's guard/allocate shape. Reached directly
+         * from `insert`'s reallocation branch (`FUN_0074F3E0`, cited above,
+         * independently reached from `Sim::AdvanceBeat`) and from the fused
+         * buy helper `FUN_0074DBA0` (cited above on the copy constructor
+         * and `operator=`).
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {
@@ -8429,6 +8500,17 @@ namespace msvc8
          * `recovered` citing "Cited on the canonical throw_too_long member"
          * with no such citation anywhere in `src/sdk`; this is the real
          * recovery.)
+         *
+         * Address: 0x0074F680 (FUN_0074F680, `msvc8::vector<moho::
+         * SExtraUnitData>::throw_too_long` for the 0x20-byte element,
+         * `Sim::mSyncSerializeGroup2`) -- `.c`-confirmed exact match:
+         * builds `std::length_error("vector<T> too long")` the same way as
+         * this member's other emissions and routes through
+         * `_CxxThrowException`. Reached directly from `insert`'s `max_size()
+         * - cur < count` guard (`FUN_0074F3E0`, cited above, independently
+         * reached from `Sim::AdvanceBeat`) and from the fused buy helper
+         * `FUN_0074DBA0` (cited above on the copy constructor and
+         * `operator=`).
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

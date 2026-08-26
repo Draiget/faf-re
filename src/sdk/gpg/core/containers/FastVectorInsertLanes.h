@@ -795,16 +795,6 @@ namespace gpg::core::legacy
   ) noexcept;
 
   /**
-   * Address: 0x00750A80 (FUN_00750A80)
-   *
-   * What it does:
-   * Replaces destination 8-byte fastvector content with source content,
-   * reusing capacity when possible and growing when required.
-   */
-  FastVectorInsertRuntimeView&
-  Assign8ByteVectorRange(FastVectorInsertRuntimeView& destination, const FastVectorInsertRuntimeView& source);
-
-  /**
    * Address: 0x0082D030 (FUN_0082D030)
    *
    * What it does:

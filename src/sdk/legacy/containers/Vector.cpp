@@ -6237,11 +6237,20 @@ bool BuyVectorStorage16Byte(VectorVoidStorageView& storage, const std::uint32_t 
 /**
  * Address: 0x005433A0 (FUN_005433A0)
  * Address: 0x005EA4E0 (FUN_005EA4E0)
- * Address: 0x0074DBA0 (FUN_0074DBA0)
  *
  * What it does:
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 32-byte element vector
  * lane and initializes the logical range to empty.
+ *
+ * DB-integrity fix: `0x0074DBA0` was previously listed here as a third
+ * "32-byte width" instance of this generic, type-erased shape. It is
+ * `msvc8::vector<moho::SExtraUnitData>`'s own specific fused
+ * allocate-and-arm-the-triplet lane (`Sim::mSyncSerializeGroup2`),
+ * independently reached from that instantiation's copy constructor and
+ * `operator=` (both cited in `legacy/containers/Vector.h`, the latter with
+ * a confirmed direct code xref from `Moho::CWldSession::DoBeat`) -- a
+ * specific, caller-verified attribution supersedes the generic width-bucket
+ * grouping here, so the address was moved off this citation.
  */
 bool BuyVectorStorage32Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
