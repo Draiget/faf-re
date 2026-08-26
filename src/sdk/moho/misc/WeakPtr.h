@@ -82,6 +82,19 @@ namespace moho
      * constructs the staged insert value into the freshly copied buffer's
      * gap, and the in-place append-at-end branch fill-constructs it directly
      * at the old `_Mylast`.)
+     * Address: 0x008B39A0 (FUN_008B39A0, `WeakPtr<UserUnit>`-typed sibling
+     * emission -- `.c` decompile matches this body exactly, re-reading the
+     * fixed `source.ownerLinkSlot` storage fresh every iteration and never
+     * advancing the source pointer. Moved off the anonymous-namespace
+     * `CopyIntrusiveLinkRangeFromOwnerSlotLane` free function in
+     * `moho/containers/LegacyContainerFillLanes.cpp`, a RULE ONE reach-in
+     * duplicate over an `IntrusiveLinkRuntimeView***` triple pointer that
+     * modeled this exact same shape without naming `moho::WeakPtr<T>`.
+     * Reached from `msvc8::vector<WeakPtr<UserUnit>>::insert`'s in-place
+     * tail-shift branch -- `InsertWeakPtrVectorObjectAt` (`FUN_008B2770`)
+     * and `EnsureWeakPtrVectorCapacity` (`FUN_008B2B70`) above both already
+     * cite this address in their own evidence chains -- via the
+     * source-first adapter below.)
      *
      * IDA signature:
      * void *__fastcall sub_7A5FE0(WeakPtr<T> *destination@<eax>,
@@ -115,6 +128,31 @@ namespace moho
         }
       }
       return destination;
+    }
+
+    /**
+     * Address: 0x008B2E20 (FUN_008B2E20)
+     *
+     * IDA signature:
+     * void *__usercall sub_8B2E20@<eax>(void *destination@<ebx>,
+     *                                    WeakPtr<T> **ownerSlotLane@<edi>,
+     *                                    int count@<esi>);
+     *
+     * What it does:
+     * Source-first register-shape adapter: forwards to `FillConstructRange`
+     * above with `count` and `source` swapped back into canonical order,
+     * then returns the advanced destination cursor `destination + count`
+     * (the binary computes this as `&destination[2 * count]`, i.e. `count`
+     * `WeakPtr<T>` elements). Moved off the anonymous-namespace
+     * `CopyIntrusiveLinkRangeFromOwnerSlotLaneSourceFirstAdapterA` free
+     * function in `moho/containers/LegacyContainerFillLanes.cpp`.
+     */
+    static WeakPtr<T>* FillConstructSourceFirstAdapterA(
+      WeakPtr<T>* const destination, const WeakPtr<T>& source, const std::int32_t count
+    ) noexcept
+    {
+      (void)FillConstructRange(destination, count, source);
+      return destination + count;
     }
 
     /**

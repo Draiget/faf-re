@@ -66,6 +66,12 @@ namespace moho
 
     /**
      * Address: 0x006892E0 (FUN_006892E0)
+     * Address: 0x006877E0 (FUN_006877E0, confirmed pure tail-call trampoline
+     *          -- `.c` decompile is exactly `sub_6892E0(a1, a2)`, no other
+     *          logic of its own)
+     * Address: 0x00688D00 (FUN_00688D00, confirmed pure tail-call trampoline
+     *          -- `.c` decompile is exactly `sub_6892E0(a1, a2)`, no other
+     *          logic of its own)
      *
      * IDA signature:
      * void __usercall sub_6892E0(int a1@<edx>, int a2@<esi>);

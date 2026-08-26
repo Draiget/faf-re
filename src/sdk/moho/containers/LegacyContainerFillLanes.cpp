@@ -3692,9 +3692,37 @@ namespace
   /**
    * Address: 0x00623C50 (FUN_00623C50)
    * Address: 0x00674690 (FUN_00674690)
+   * Address: 0x0057D5B0 (FUN_0057D5B0, ICF twin -- identical
+   *          `function_sha256` to the two addresses above. Reached from 23+
+   *          already-recovered destructors across unrelated owning classes
+   *          (`CFactoryBuildTask::~CFactoryBuildTask` at FUN_005FA010 via
+   *          `mCommand.UnlinkFromOwnerChain()`, plus `CUnitGuardTask`,
+   *          `CUnitMoveTask`, `CUnitScriptTask`, `CUnitUnloadUnits`,
+   *          `CUnitCommand`, `CUnitCommandQueue` siblings) -- confirming
+   *          this shape is `moho::WeakPtr<T>`'s shared owner-chain unlink
+   *          primitive for many `T`, not a single-class helper. Formerly
+   *          duplicated as its own `UnlinkIntrusiveLinkNodeOwnerChainAlias`
+   *          wrapper here; that wrapper had no caller anywhere (in this
+   *          anonymous namespace or, per its linkage, outside it either),
+   *          so it is folded into this citation instead of kept as dead
+   *          code.)
    *
    * What it does:
    * Unlinks one intrusive link node from its owner-slot chain.
+   *
+   * Real identity: this is field-for-field `moho::WeakPtr<T>`
+   * (`moho/misc/WeakPtr.h`) -- `ownerSlot`/`next` are
+   * `WeakPtr<T>::ownerLinkSlot`/`nextInOwner`, and this walk-and-splice loop
+   * is the same algorithm `WeakPtr<T>::ReplaceInOwnerChain`/
+   * `UnlinkFromOwnerChain` already implement as a typed member (real callers
+   * confirmed in `CFactoryBuildTask.cpp`/`CUnitGuardTask.cpp` and siblings,
+   * which already call `.UnlinkFromOwnerChain()` by name). Kept here as the
+   * generic `IntrusiveLinkRuntimeView` shape only because
+   * `IntrusiveOwnerAt10RuntimeView` below (this file) still reaches into an
+   * unidentified owning class at `+0x10` through this same primitive --
+   * once that owner is identified and migrated onto a typed `WeakPtr<T>`
+   * member, this free-function pair becomes fully redundant with
+   * `WeakPtr.h` too and should be deleted.
    */
   IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNode(IntrusiveLinkRuntimeView* const node) noexcept
   {
@@ -3705,80 +3733,22 @@ namespace
     return ownerLink;
   }
 
-  /**
-   * Address: 0x0057D5B0 (FUN_0057D5B0)
-   *
-   * What it does:
-   * Unlinks one intrusive owner-link lane from its owning owner-slot chain.
-   */
-  IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNodeOwnerChainAlias(
-    IntrusiveLinkRuntimeView* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveLinkNode(node);
-  }
-
-  struct Stride20IntrusiveLinkElementRuntimeView
-  {
-    std::byte lane00_07[0x08]{};
-    IntrusiveLinkRuntimeView ownerLink; // +0x08
-    std::byte lane10_13[0x04]{};
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(Stride20IntrusiveLinkElementRuntimeView) == 0x14, "Stride20IntrusiveLinkElementRuntimeView size must be 0x14");
-  static_assert(
-    offsetof(Stride20IntrusiveLinkElementRuntimeView, ownerLink) == 0x08,
-    "Stride20IntrusiveLinkElementRuntimeView::ownerLink offset must be 0x08"
-  );
-#endif
-
-  /**
-   * Address: 0x006892E0 (FUN_006892E0)
-   *
-   * What it does:
-   * Walks one half-open stride-20 range and unlinks each embedded intrusive
-   * owner-link lane at offset `+0x08`.
-   */
-  void UnlinkIntrusiveLinkRangeStride20(
-    Stride20IntrusiveLinkElementRuntimeView* begin,
-    Stride20IntrusiveLinkElementRuntimeView* const end
-  ) noexcept
-  {
-    while (begin != end) {
-      (void)UnlinkIntrusiveLinkNode(&begin->ownerLink);
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x006877E0 (FUN_006877E0)
-   *
-   * What it does:
-   * Alternate entrypoint that forwards one stride-20 half-open range to the
-   * intrusive unlink walk helper.
-   */
-  void UnlinkIntrusiveLinkRangeStride20AliasA(
-    Stride20IntrusiveLinkElementRuntimeView* const begin,
-    Stride20IntrusiveLinkElementRuntimeView* const end
-  ) noexcept
-  {
-    UnlinkIntrusiveLinkRangeStride20(begin, end);
-  }
-
-  /**
-   * Address: 0x00688D00 (FUN_00688D00)
-   *
-   * What it does:
-   * Secondary entrypoint that forwards one stride-20 half-open range to the
-   * intrusive unlink walk helper.
-   */
-  void UnlinkIntrusiveLinkRangeStride20AliasB(
-    Stride20IntrusiveLinkElementRuntimeView* const begin,
-    Stride20IntrusiveLinkElementRuntimeView* const end
-  ) noexcept
-  {
-    UnlinkIntrusiveLinkRangeStride20(begin, end);
-  }
+  // NOTE (Stride20IntrusiveLinkElementRuntimeView / weak-observer queue node
+  // migration): this file used to duplicate a 20-byte
+  // `Stride20IntrusiveLinkElementRuntimeView` (8 bytes pad + one embedded
+  // `IntrusiveLinkRuntimeView` at +0x08 + 4 bytes pad) plus three free
+  // functions (`UnlinkIntrusiveLinkRangeStride20` and its two register-shape
+  // aliases, FUN_006892E0/FUN_006877E0/FUN_00688D00) that walked a raw range
+  // of that shape and unlinked each embedded link. The real object is
+  // `moho::CEntityDbBoundedPropQueueNode` (`moho/entity/EntityDb.cpp`:
+  // `mPriority`/`mBoundedTick`/`mOwnerLink`(`WeakPtr<Prop>`)/`mHandleId` at
+  // the same four offsets), whose own `UnlinkRange` static member is already
+  // the canonical recovery for FUN_006892E0 (cites the same address) --
+  // this was a stale leftover duplicate from before that migration deleted
+  // its caller, not an independent recovery. The two alias addresses are
+  // confirmed (`.c`-verified) pure tail-call trampolines into FUN_006892E0
+  // and are now cited on `CEntityDbBoundedPropQueueNode::UnlinkRange`
+  // directly instead.
 
   // NOTE: FUN_005C84D0 was formerly duplicated here as a bespoke
   // "CopyRefCountedFloatLaneRuntime" free function over an anonymous
@@ -7329,57 +7299,16 @@ namespace
     return outValue;
   }
 
-  /**
-   * Address: 0x008B39A0 (FUN_008B39A0)
-   *
-   * What it does:
-   * Initializes `count` contiguous intrusive-link lanes from one owner-slot
-   * source, stitching each new lane into that owner-slot chain.
-   */
-  IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLane(
-    IntrusiveLinkRuntimeView* outValue,
-    std::uint32_t count,
-    IntrusiveLinkRuntimeView*** const ownerSlotLane
-  ) noexcept
-  {
-    std::uintptr_t writeAddress = reinterpret_cast<std::uintptr_t>(outValue);
-    while (count > 0u) {
-      auto* const writeLink = reinterpret_cast<IntrusiveLinkRuntimeView*>(writeAddress);
-      if (writeLink != nullptr) {
-        IntrusiveLinkRuntimeView** const ownerSlot = *ownerSlotLane;
-        writeLink->ownerSlot = ownerSlot;
-        if (ownerSlot != nullptr) {
-          writeLink->next = *ownerSlot;
-          *ownerSlot = writeLink;
-        } else {
-          writeLink->next = nullptr;
-        }
-      }
-
-      --count;
-      writeAddress += sizeof(IntrusiveLinkRuntimeView);
-    }
-
-    return reinterpret_cast<IntrusiveLinkRuntimeView*>(writeAddress);
-  }
-
-  /**
-   * Address: 0x008B2E20 (FUN_008B2E20)
-   *
-   * What it does:
-   * Source-first register-shape adapter that forwards one intrusive-link range
-   * fill lane into `CopyIntrusiveLinkRangeFromOwnerSlotLane` and returns the
-   * advanced destination cursor.
-   */
-  IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLaneSourceFirstAdapterA(
-    IntrusiveLinkRuntimeView* const outValue,
-    IntrusiveLinkRuntimeView*** const ownerSlotLane,
-    const std::int32_t count
-  ) noexcept
-  {
-    (void)CopyIntrusiveLinkRangeFromOwnerSlotLane(outValue, static_cast<std::uint32_t>(count), ownerSlotLane);
-    return outValue + count;
-  }
+  // NOTE (WeakPtr<T>::FillConstructRange migration): this file used to
+  // duplicate FUN_008B39A0/FUN_008B2E20 here as
+  // `CopyIntrusiveLinkRangeFromOwnerSlotLane` and its source-first adapter,
+  // reaching into the same `IntrusiveLinkRuntimeView***` triple-pointer
+  // shape as the cluster above. `.c`-verified field-for-field identical to
+  // `moho::WeakPtr<T>::FillConstructRange` (already real, already typed,
+  // already citing two other T instantiations) in `moho/misc/WeakPtr.h` --
+  // FUN_008B39A0 is now a third cited instantiation there
+  // (`WeakPtr<UserUnit>`), and FUN_008B2E20 is now
+  // `WeakPtr<T>::FillConstructSourceFirstAdapterA` alongside it.
 
   /**
    * Address: 0x006DD1E0 (FUN_006DD1E0)
