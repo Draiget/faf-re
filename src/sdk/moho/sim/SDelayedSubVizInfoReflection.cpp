@@ -453,8 +453,22 @@ namespace
 
   /**
    * Address: 0x00508290 (FUN_00508290, intel-grid RTTI cache resolve)
+   *
+   * Orphan: zero xrefs at this address in the IDA export (xrefs_total: 0),
+   * zero callers in the callgraph index, and `moho::CIntelGrid` is not
+   * referenced anywhere else in this file -- `SDelayedSubVizInfo` (this
+   * file's own subject, `{mLastPos, mRadius, mTicksTilUpdate}`) has no
+   * `CIntelGrid`-typed field. A separate, real, actively-used
+   * `ResolveCIntelGridType()` exists in
+   * `moho/ai/CAiReconDBImplSerializer.cpp` (its own anonymous-namespace
+   * copy, called 9x serializing `CAiReconDBImpl`'s grid members) and
+   * `CIntelGrid.cpp` has its own third copy under the name
+   * `CachedIntelGridType()` (used by `RRef_CIntelGrid`/`MakeCIntelGridRef`)
+   * -- both are distinct, independently-evidenced functions at different
+   * addresses, not ODR conflicts with this one. No caller for this specific
+   * copy has been found.
    */
-  [[nodiscard]] gpg::RType* ResolveCIntelGridType()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCIntelGridType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
