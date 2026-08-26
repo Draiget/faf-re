@@ -5,7 +5,6 @@
 #include <intrin.h>
 #include <limits>
 #include <new>
-#include <stdexcept>
 
 namespace
 {
