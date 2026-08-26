@@ -87,29 +87,11 @@ namespace
     gIAiAttackerSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x005D5CA0 (FUN_005D5CA0)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the `IAiAttackerSerializer` helper
-   * links and restores self-links.
-   */
-  [[maybe_unused]] void cleanup_IAiAttackerSerializerStartupThunkA()
-  {
-    gIAiAttackerSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005D5CD0 (FUN_005D5CD0)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same `IAiAttackerSerializer`
-   * helper unlink/reset path.
-   */
-  [[maybe_unused]] void cleanup_IAiAttackerSerializerStartupThunkB()
-  {
-    gIAiAttackerSerializer.ResetLinks();
-  }
+  // Addresses 0x005D5CA0/0x005D5CD0 (the "StartupThunkA"/"StartupThunkB"
+  // unlink/reset duplicates formerly modeled here) are dead: zero
+  // data_refs/call_edges for both, and no source-level caller anywhere in
+  // src/sdk/**. `cleanup_IAiAttackerSerializer` above is the real,
+  // atexit-registered teardown (see the ctor below).
 } // namespace
 
 /**
