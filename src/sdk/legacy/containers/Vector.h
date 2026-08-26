@@ -4920,26 +4920,39 @@ namespace msvc8
          * during device-capability enumeration.
          *
          * Address: 0x005C6580 (FUN_005C6580, sub_5C6580) -- `insert(pos,
-         * count, value)` for the same unidentified 0x1C-byte WeakPtr-shaped
-         * element as `uninit_copy_n`'s `FUN_005CDEF0` above (3-dword header,
-         * tag byte@+0x0C, raw pointer@+0x10, `_InterlockedExchangeAdd`-
-         * bumped refcount-block pointer@+0x14, trailing byte@+0x18) -- one
-         * of that citation's five previously-unidentified candidate callers
+         * count, value)` for `Moho::SCreateUnitParams` (`SimDriver.h`,
+         * 0x1C-byte element: `SCreateEntityParams` 3-dword header, tag
+         * byte@+0x0C, raw pointer@+0x10, `_InterlockedExchangeAdd`-bumped
+         * `boost::shared_ptr<Stats<StatItem>>` control-block pointer@+0x14,
+         * trailing byte@+0x18) -- one of `uninit_copy_n`'s (`FUN_005CDEF0`
+         * above) five previously-unidentified candidate callers
          * (`0x005C6580`/`0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`),
-         * now confirmed by field-for-field match against the local-copy
+         * confirmed by field-for-field match against the local-copy
          * staging this member performs (`const T localValue(value)`'s
          * real emission here: copies the 3-dword header + tag into a local
          * buffer, `_InterlockedExchangeAdd`-bumps the refcount block if
-         * non-null, matching this member's self-aliasing guard exactly).
+         * non-null, matching this member's self-aliasing guard exactly),
+         * and independently confirmed by this element's real owner:
+         * `SSyncData::mNewUnits` (`SimDriver.h`, `msvc8::vector<
+         * SCreateUnitParams>`) -- its reallocation branch calls this
+         * template's own `destroy_range` (`FUN_005CC280`, cited below on
+         * that member) 3x on the old/partial buffers, matching this
+         * instantiation's 3 confirmed calls into that same address exactly.
          * IDA's own decompile carries a "bad/positive sp value... may be
          * wrong" disclaimer. Calls this instantiation's own `_Ufill`/tail-
          * shift helpers (`sub_5C9D60`/`sub_5C9DA0`/`sub_5CBCC0`) and the
          * `153391689`(=`0xFFFFFFFF/28`) `max_size` overflow guard, matching
-         * this member's shape. Owning element/class identity and this
-         * member's own real caller remain open -- the other four candidate
+         * this member's shape. Reached from `mNewUnits.push_back(params)`
+         * (`QueueCreateUnitParams`, `SimDriver.cpp`, already recovered) on
+         * its capacity-exhausted path (`push_back`'s generic `else
+         * insert(last_, value)` branch, `insert(pos,value)` tail-calling
+         * this count-based core with `count=1`, the same "MSVC8's
+         * push_back is insert(end(),1,value) when full" shape already
+         * established throughout this file). The other four candidate
          * addresses from the `uninit_copy_n` citation are still
-         * unidentified; this citation resolves one of five, not the whole
-         * cluster.
+         * unidentified thin calling-convention bridges into that same
+         * member (see the citation there); this entry resolves the element
+         * type for the whole cluster, not just this one address.
          *
          * Address: 0x0074EB00 (FUN_0074EB00, sub_74EB00) -- `msvc8::
          * vector<Moho::SSTIArmyVariableData>::insert(pos, count, value)`
@@ -5416,7 +5429,59 @@ namespace msvc8
          * (`DestroyVirtualRange136`, over a raw `VirtualDtor136RuntimeView`)
          * with no source-level caller anywhere in `src/sdk/**` -- collapsed
          * into this template instantiation, RULE ONE.)
+         * Address: 0x005CC280 (FUN_005CC280, `msvc8::vector<Moho::
+         * SCreateUnitParams>::destroy_range` for the 28-byte (`0x1C`)
+         * element -- `SCreateUnitParams : SCreateEntityParams`
+         * (`SimDriver.h`): base `SCreateEntityParams`'s 3 dwords
+         * (`mEntityId`/`mBlueprint`/`mTickCreated`) are trivially
+         * destructible and produce no code; the loop body reduces to
+         * exactly `mConstDat.mStatsRoot` (`boost::shared_ptr<Stats<
+         * StatItem>>`, `SCreateUnitConstantData` +0x04, i.e. this element
+         * +0x10)'s `~shared_ptr()` -- interlocked-decrement `use_count_` at
+         * control+4, vtable-slot-1 `dispose()` when it hits zero, then the
+         * same pattern on `weak_count_` at control+8 with vtable-slot-2
+         * `destroy()`, the same `sp_counted_base::release()` shape
+         * documented at `0x004229B0` (`BoostWrappers.h`) -- a distinct
+         * per-callsite emission at this address. `mConstDat.mBuildStateTag`
+         * (element +0x0C) and `mConstDat.mFake` (element +0x18) are trivial
+         * bytes either side of the control-block pointer (element +0x14)
+         * and need no teardown. This is the same 0x1C-byte "WeakPtr-shaped
+         * element" this file's `insert(pos, count, value)`/`uninit_copy_n`/
+         * `copy_or_move_assign` members previously carried as unidentified
+         * (`FUN_005C6580`/`FUN_005CDEF0`/`FUN_005CD100`, cited above/below)
+         * -- resolved by this address's own real callers. `Moho::
+         * SSyncData::~SSyncData()` (0x0073FC70, `SimDriver.cpp`, already
+         * recovered) calls this address directly on `mNewUnits`'s live
+         * range (decompiled with named fields: `a1->mNewUnits._Myfirst`/
+         * `_Mylast` at `SSyncData+0x13C`/`+0x140`, i.e. the vector head
+         * `msvc8::vector<SCreateUnitParams> mNewUnits` at `SSyncData+0x138`,
+         * `SimDriver.h`) before freeing the buffer -- once on the normal
+         * path (0x007400F3) and once more from an SEH-unwind funclet
+         * reached only if an earlier member's teardown throws
+         * (0x007403D0, `loc_7403C0`; the dispatch trampoline at 0x00BA42B0
+         * computes `esi = this+0x138` -- exactly `mNewUnits` -- before
+         * jumping there, and the funclet reads the begin/end pair at
+         * `esi+4`/`esi+8`, matching `msvc8::vector<T>`'s own `_Myfirst`/
+         * `_Mylast` slots -- compiler-generated exception-safety glue, not
+         * a distinct source line). The other 3 confirmed call sites are
+         * `insert(pos,count,value)`'s (`FUN_005C6580`, cited above) own
+         * reallocation branch -- this method's `destroy_n`/`destroy_range`
+         * old- and partial-buffer teardown calls above, all inlined at this
+         * address -- reached from `mNewUnits.push_back(params)`
+         * (`QueueCreateUnitParams`, `SimDriver.cpp`, already recovered) on
+         * its capacity-exhausted path. A further 3 raw call sites
+         * (0x005C85C9, 0x005CA1C9, 0x00740BD0) sit in address ranges IDA
+         * does not attribute to any function (no `.meta.json`/owner; each
+         * immediately follows an unrelated tiny leaf, e.g. the `max_size`
+         * constant-return body at 0x005C85B0) -- not independently cited
+         * here pending that attribution. Formerly modeled as a standalone
+         * `Stride28SharedOwnerElementRuntimeView`/
+         * `ReleaseSharedOwnerRangeStride28` pair in
+         * `moho/containers/LegacyContainerFillLanes.cpp` with no
+         * source-level caller anywhere in `src/sdk/**` -- collapsed into
+         * this template instantiation, RULE ONE.)
          */
+    public:
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
                 for (; first != last; ++first) first->~T();
@@ -5432,6 +5497,7 @@ namespace msvc8
             destroy_range(p, p + n);
         }
 
+    private:
         /**
          * Address: 0x0084C250 (FUN_0084C250, sub_84C250) -- a plain, no-refcount
          * 12-byte-element `uninit_copy_n` (3-dword-stride copy loop, no
@@ -5736,33 +5802,44 @@ namespace msvc8
          * template emission, its source-level call site is
          * `AddDiscoveredGame` itself, i.e. this method's `insert` call).
          *
-         * Address: 0x005CDEF0 (FUN_005CDEF0, `uninit_copy_n` for a 0x1C-byte
-         * element containing a leading 3-dword header, a 1-byte tag at
-         * +0x0C, a raw pointer at +0x10, and a `boost::shared_ptr`/
-         * `weak_ptr`-style `{rawPtr@+0x10, refCountBlockPtr@+0x14}` handle
+         * Address: 0x005CDEF0 (FUN_005CDEF0, `uninit_copy_n` for `Moho::
+         * SCreateUnitParams`'s 0x1C-byte element, `SimDriver.h`) --
+         * containing a leading 3-dword header (`SCreateEntityParams`'s
+         * `mEntityId`/`mBlueprint`/`mTickCreated`), a 1-byte tag at +0x0C
+         * (`mConstDat.mBuildStateTag`), a raw pointer at +0x10
+         * (`mConstDat.mStatsRoot.px`), and a `boost::shared_ptr<Stats<
+         * StatItem>>`-style `{rawPtr@+0x10, refCountBlockPtr@+0x14}` handle
          * pair whose block pointer is atomically refcount-bumped
          * (`lock xadd [block+4], 1`) when non-null, followed by a trailing
-         * byte at +0x18: per slot, the three header dwords, the tag byte,
-         * both handle-pair words and the trailing byte are all copied
-         * verbatim; the `test eax,eax` dst-null guard wraps only the copy
-         * body (same defensive-null shape as FUN_00549BC0/FUN_00832B80
-         * above) while all four cursors still advance by the 0x1C stride
-         * every iteration. Owning element type still not identified. One
-         * of the five candidate callers is now resolved: `0x005C6580` is
-         * this instantiation's own `insert(pos, count, value)` (cited
-         * below on that member) -- confirmed by field-for-field match of
-         * its local-copy staging against this element's exact layout. The
-         * other four are now resolved too, all thin calling-convention
-         * bridges: `0x005C9D60`/`0x005CBCA0`/`0x005CD0E0`/`0x005CD9E0`
-         * each tail-call straight into this member (`sub_5CDEF0`) with
-         * register/stack argument reshuffling and nothing else -- e.g.
-         * `sub_5CBCA0(edx@a1, a2, a3) { return sub_5CDEF0(a3, a2, a1); }`.
-         * `0x005C9DA0` is the one exception: it bridges to a DIFFERENT
-         * address, `FUN_005CD100` (this element's `copy_or_move_assign`
-         * emission, cited there, not this plain-copy one) -- `insert(pos,
-         * count, value)`'s `FUN_005C6580` above calls both this member and
-         * `copy_or_move_assign` for different parts of its shift/fill
-         * logic, and each has its own bridge.)
+         * byte at +0x18 (`mConstDat.mFake`): per slot, the three header
+         * dwords, the tag byte, both handle-pair words and the trailing
+         * byte are all copied verbatim; the `test eax,eax` dst-null guard
+         * wraps only the copy body (same defensive-null shape as
+         * FUN_00549BC0/FUN_00832B80 above) while all four cursors still
+         * advance by the 0x1C stride every iteration. Owning element type
+         * identified via this instantiation's `destroy_range` sibling
+         * (`FUN_005CC280`, cited on that member below): its real caller,
+         * `SSyncData::~SSyncData()` (`SimDriver.cpp`, already recovered),
+         * decompiles with named fields directly onto `mNewUnits`
+         * (`msvc8::vector<SCreateUnitParams>`, `SimDriver.h`), and this
+         * element's layout matches `SCreateUnitParams` field-for-field
+         * (base `SCreateEntityParams` header, `mConstDat.mBuildStateTag`/
+         * `mStatsRoot`/`mFake` at the exact tag/pointer-pair/trailing-byte
+         * offsets above). One of the five candidate callers is
+         * `0x005C6580`, this instantiation's own `insert(pos, count,
+         * value)` (cited below on that member) -- confirmed by
+         * field-for-field match of its local-copy staging against this
+         * element's exact layout. The other four are all thin
+         * calling-convention bridges: `0x005C9D60`/`0x005CBCA0`/
+         * `0x005CD0E0`/`0x005CD9E0` each tail-call straight into this
+         * member (`sub_5CDEF0`) with register/stack argument reshuffling
+         * and nothing else -- e.g. `sub_5CBCA0(edx@a1, a2, a3) { return
+         * sub_5CDEF0(a3, a2, a1); }`. `0x005C9DA0` is the one exception: it
+         * bridges to a DIFFERENT address, `FUN_005CD100` (this element's
+         * `copy_or_move_assign` emission, cited there, not this plain-copy
+         * one) -- `insert(pos, count, value)`'s `FUN_005C6580` above calls
+         * both this member and `copy_or_move_assign` for different parts
+         * of its shift/fill logic, and each has its own bridge.)
          *
          * Address: 0x00832BC0 (FUN_00832BC0, `msvc8::vector<void*>::
          * uninit_copy_n` for a 4-byte pointer element -- `[first@ecx,
@@ -7351,11 +7428,13 @@ namespace msvc8
          * instantiates it (UiRuntimeTypes.cpp).)
          *
          * Address: 0x005CD100 (FUN_005CD100, sub_5CD100) -- backward
-         * (`dst -= 28`/`src -= 28`) tail-shift-and-reassign loop for the
-         * same unidentified 0x1C-byte WeakPtr-shaped element cited on
-         * `uninit_copy_n`'s `FUN_005CDEF0`/`insert(pos,count,value)`'s
-         * `FUN_005C6580` above (3-dword header, tag byte, raw pointer +
-         * refcount-block-pointer handle pair, trailing byte). Unlike the
+         * (`dst -= 28`/`src -= 28`) tail-shift-and-reassign loop for
+         * `Moho::SCreateUnitParams`'s 0x1C-byte element (`SimDriver.h`),
+         * the same element identified on `uninit_copy_n`'s `FUN_005CDEF0`/
+         * `insert(pos,count,value)`'s `FUN_005C6580`/`destroy_range`'s
+         * `FUN_005CC280` above (3-dword header, tag byte, raw pointer +
+         * `mConstDat.mStatsRoot` refcount-block-pointer handle pair,
+         * trailing byte). Unlike the
          * plain-copy `uninit_copy_n` shape, this member does REAL
          * assignment semantics per slot: `_InterlockedExchangeAdd`-bumps
          * the incoming handle's refcount, and if the outgoing slot's own

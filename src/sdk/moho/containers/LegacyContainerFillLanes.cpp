@@ -3731,45 +3731,26 @@ namespace
   // copy constructors, invoked by the compiler-synthesized memberwise
   // copy, not hand-written here.
 
-  struct Stride28SharedOwnerElementRuntimeView
-  {
-    std::byte lane00_13[0x14]{};
-    boost::detail::sp_counted_base* owner = nullptr; // +0x14
-    std::byte lane18_1B[0x04]{};
-  };
-#if defined(_M_IX86)
-  static_assert(
-    sizeof(Stride28SharedOwnerElementRuntimeView) == 0x1C,
-    "Stride28SharedOwnerElementRuntimeView size must be 0x1C"
-  );
-  static_assert(
-    offsetof(Stride28SharedOwnerElementRuntimeView, owner) == 0x14,
-    "Stride28SharedOwnerElementRuntimeView::owner offset must be 0x14"
-  );
-#endif
-
-  /**
-   * Address: 0x005CC280 (FUN_005CC280)
-   *
-   * What it does:
-   * Walks one half-open stride-28 range and releases each shared-owner control
-   * block stored at lane `+0x14`.
-   */
-  std::intptr_t ReleaseSharedOwnerRangeStride28(
-    Stride28SharedOwnerElementRuntimeView* begin,
-    Stride28SharedOwnerElementRuntimeView* const end
-  ) noexcept
-  {
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(begin);
-    while (begin != end) {
-      if (begin->owner != nullptr) {
-        boost::ReleaseSharedCount(begin->owner);
-        result = reinterpret_cast<std::intptr_t>(begin->owner);
-      }
-      ++begin;
-    }
-    return result;
-  }
+  // NOTE (Stride28SharedOwnerElementRuntimeView migration): this file used to
+  // reach into a 28-byte shared-owner range via a raw offset struct
+  // (`Stride28SharedOwnerElementRuntimeView`, a `boost::detail::
+  // sp_counted_base*` lane at +0x14 with no typed owner) plus a free walk-
+  // and-release loop, `ReleaseSharedOwnerRangeStride28` -- both now removed.
+  // That loop had no source-level caller anywhere in `src/sdk/**` (RULE ONE
+  // orphan pattern). The address is `msvc8::vector<T>::destroy_range<T>`'s
+  // own instantiation for `T = Moho::SCreateUnitParams` (`SimDriver.h`,
+  // 0x1C-byte element; the raw struct's `owner` lane at +0x14 is
+  // `SCreateUnitParams::mConstDat.mStatsRoot`'s `boost::shared_ptr<Stats<
+  // StatItem>>` control-block pointer) -- already provided generically by
+  // `msvc8::vector<T>::destroy_range` (`legacy/containers/Vector.h`), which
+  // resolves to `SCreateUnitParams`'s own compiler-generated destructor.
+  // Reached from `SSyncData::~SSyncData()`'s (`SimDriver.cpp`, already
+  // recovered) direct teardown of `mNewUnits` and from `insert(pos,count,
+  // value)`'s reallocation branch on the same member (reached in turn from
+  // `QueueCreateUnitParams`'s `syncData->mNewUnits.push_back(params)`,
+  // `SimDriver.cpp`, already recovered). The address is now cited directly
+  // on that template; see `legacy/containers/Vector.h`'s `destroy_range`
+  // Doxygen block.
 
   /**
    * Address: 0x008D9D50 (FUN_008D9D50)
