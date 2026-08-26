@@ -17,7 +17,6 @@
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
-#include "moho/sim/SyncInlineVector.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/command/CommandManager.h"
 #include "moho/sim/WeakEntitySet.h"
@@ -39,6 +38,7 @@ namespace moho
   class UserUnit;
   class CWldSession;
   struct SSyncData;
+  struct SExtraUnitData;
   struct UserCommandIssueHelper;
   // The `Moho::UserTarget` command-target payload (UserUnit.h). Only used
   // as an incomplete by-const-ref parameter type here; ISSUE_SetCommandTarget's
@@ -1198,10 +1198,10 @@ namespace moho
      * selected units into a `BVIntSet`, and always publishes that set via
      * `ISTIDriver::SetSyncFilterMaskA` so the overlay can see sync data for
      * those armies even when Shift is not held. While Shift is held, walks
-     * `mSyncInlineVectors` (the per-beat command-link scratch runs written
-     * by `CWldSession::DoBeat`/`AssignSyncInlineVectors`, previously an
-     * unread lane) and, for each `(sourceEntityId, {boneIndex, targetId})`
-     * record, draws a thin beveled line quad from the source unit's
+     * `mSyncExtraUnitData` (the per-beat extra-unit-data run `CWldSession::
+     * DoBeat` copies wholesale from `beat.mSyncExtraUnitData`) and, for each
+     * `(sourceEntityId, {boneIndex, targetId})` record, draws a thin
+     * beveled line quad from the source unit's
      * position (direct interpolated position, or one bone's composite pose
      * position when `boneIndex >= 0`) to the target unit's position -
      * teleport-colored when both units share an army and the target is in
@@ -1476,11 +1476,29 @@ namespace moho
     int32_t FocusArmy;                                      // 0x0488
     uint8_t IsGameOver;                                     // 0x048C
     char pad_048D[3];                                       // 0x048D
-    /// Per-beat copy of `SSyncData::mInlineScratchVectors`. `CWldSession::DoBeat`
-    /// assigns the whole run over (0x00895214, the 32-byte-stride vector
-    /// assignment); it is the lane's only writer, and no reader has been
-    /// identified in the binary yet.
-    msvc8::vector<SyncInlineVector> mSyncInlineVectors;      // 0x0490
+    /// Per-beat copy of `SSyncData::mSyncExtraUnitData`, the client-side mirror
+    /// of `Sim::mSyncSerializeGroup2`'s element type (`moho::SExtraUnitData`,
+    /// `Unit.h`). `CWldSession::DoBeat` assigns the whole run over via
+    /// `msvc8::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
+    /// `.xrefs.txt`-confirmed sole code xref -- `legacy/containers/Vector.h`).
+    /// `DrawCommandSplats` (FUN_008515B0, 0x008518A4..0x0085189A) is the
+    /// lane's reader: `unitEntityId` is the source unit's `EntId`, `pairs`
+    /// holds `(boneIndex, targetEntId)` records per weapon/teleport-beacon
+    /// link (`Unit::GetExtraData`, 0x006ACB20).
+    ///
+    /// Previously mistyped/misnamed `mSyncInlineVectors` (element type
+    /// `moho::SyncInlineVector`) -- that hypothesis assumed the outer
+    /// vector-assign's per-element copy lane reached straight into a flat
+    /// `FastVectorN<int32_t,4>`. It does not: `FUN_007530C0`'s callee chain
+    /// (`FUN_00755DE0`/`FUN_00750A80`) copies a *nested* 8-byte-element
+    /// sub-vector (`>>3` capacity arithmetic, matching `SExtraUnitDataPair`,
+    /// never `int32_t`) followed by one trailing scalar dword at +0x18 --
+    /// exactly `SExtraUnitData::pairs` + `unitEntityId`, and never producible
+    /// from a bare `int32_t[4]` element. `SyncInlineVector`/
+    /// `AssignSyncInlineVectors` had zero other citations anywhere in
+    /// `src/sdk` and are removed; see `Vector.h`'s `FUN_007530C0` citation
+    /// for the full evidence chain.
+    msvc8::vector<SExtraUnitData> mSyncExtraUnitData;      // 0x0490
     SSelectionSetUserEntity mSelection;                     // 0x04A0
     /// These five members are one flattened `MouseInfo` - the cursor snapshot
     /// the session keeps. `FUN_00852C10` hands `this + 0x4B0` straight to

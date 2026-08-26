@@ -24,7 +24,6 @@
 #include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/net/Common.h"
-#include "moho/sim/SyncInlineVector.h"
 #include "platform/Platform.h"
 #include "SSyncFilter.h"
 
@@ -79,6 +78,7 @@ namespace moho
   struct SCamFollowParams;
   struct SDesyncInfo;
   class CAniPose;
+  struct SExtraUnitData;
 
   /**
    * One replicated pose hand-off: `CWldSession::DoBeat` looks the entity up
@@ -219,9 +219,13 @@ namespace moho
     boost::SharedPtrRaw<CHeightField> mTerrainUpdate;       // +0x274
     boost::SharedPtrRaw<CSimResources> mSimResources;       // +0x27C
     msvc8::vector<msvc8::string> mPrintField;               // +0x284
-    /// Copied wholesale onto `CWldSession::mSyncInlineVectors` by
-    /// `CWldSession::DoBeat` (0x00895214).
-    msvc8::vector<SyncInlineVector> mInlineScratchVectors;  // +0x294
+    /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
+    /// `CWldSession::DoBeat` via `msvc8::vector<SExtraUnitData>::operator=`
+    /// (0x00895214, FUN_007530C0, `legacy/containers/Vector.h`). Previously
+    /// mistyped `msvc8::vector<SyncInlineVector>`; see the field-level note
+    /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
+    /// citation-correction evidence.
+    msvc8::vector<SExtraUnitData> mSyncExtraUnitData;  // +0x294
     boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
     boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
     std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4

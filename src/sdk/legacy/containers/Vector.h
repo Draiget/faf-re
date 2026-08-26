@@ -1880,24 +1880,27 @@ namespace msvc8
          *
          * Real, direct, `.xrefs.txt`-confirmed code xref: `call sub_7530C0`
          * at `0x00895214`, inside `Moho::CWldSession::DoBeat`
-         * (`FUN_00894530`, already recovered, `CWldSession.cpp`). NOTE:
-         * `DoBeat`'s currently-committed source calls
-         * `AssignSyncInlineVectors(mSyncInlineVectors,
-         * beat.mInlineScratchVectors)` at that exact call site, citing this
-         * same address for `moho::SyncInlineVector`
-         * (`gpg::core::FastVectorN<int32_t,4>`, a plain 4-int32 inline
-         * vector with no separate tag field) instead -- a pre-existing
-         * citation-integrity bug: this address's own callees explicitly
-         * copy a `.valueTag`/`unitEntityId` word that only exists on
+         * (`FUN_00894530`, already recovered, `CWldSession.cpp`).
+         *
+         * Follow-up landed: `DoBeat`'s call site at 0x00895214 is now
+         * `mSyncExtraUnitData = beat.mSyncExtraUnitData;`
+         * (`CWldSession.cpp`), a real `msvc8::vector<SExtraUnitData>::
+         * operator=` invocation satisfying the source-level-invocation rule
+         * for this token. The prior `AssignSyncInlineVectors(
+         * mSyncInlineVectors, beat.mInlineScratchVectors)` wiring at that
+         * exact call site was a citation-integrity bug -- this address's own
+         * callees explicitly copy a nested 8-byte-element sub-vector
+         * (`FUN_00755DE0`/`FUN_00750A80`, `>>3` capacity arithmetic) plus
+         * one trailing scalar dword at +0x18, matching only
          * `SExtraUnitData`'s layout (`gpg::core::FastVectorN<
-         * SExtraUnitDataPair,1> pairs; EntId unitEntityId; ...`), never on
-         * a bare `FastVectorN<int32_t,4>`. `DoBeat` almost certainly
-         * assigns `mSyncSerializeGroup2` from the beat payload somewhere in
-         * its own 4904-byte body and `mSyncInlineVectors` through a
-         * genuinely different, not-yet-individually-cited address; left
-         * for a dedicated `CWldSession.cpp`/`DoBeat` follow-up pass rather
-         * than corrected here (out of this pass's scope). Cited on shape,
-         * callee chain, and the confirmed real xref regardless.
+         * SExtraUnitDataPair,1> pairs; EntId unitEntityId; ...`), never a
+         * bare `FastVectorN<int32_t,4>`. `moho::SyncInlineVector` and
+         * `AssignSyncInlineVectors` had zero other citations anywhere in
+         * `src/sdk` and were removed; `CWldSession::mSyncExtraUnitData` /
+         * `SSyncData::mSyncExtraUnitData` (`SimDriver.h`) and
+         * `CWldSession::DrawCommandSplats`'s reader (0x008515B0,
+         * 0x008518A4..0x0085189A) were retyped to match. Cited on shape,
+         * callee chain, and the confirmed real xref.
          *
          * Copy assignment (strong exception safety)
          */
