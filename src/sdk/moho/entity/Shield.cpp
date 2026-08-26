@@ -565,6 +565,10 @@ namespace moho
 
   /**
    * Address: 0x00C02590 (FUN_00C02590, dynamic-initializer atexit target)
+   *
+   * `FUN_00776700` and `FUN_00776730` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   ShieldSaveConstruct::~ShieldSaveConstruct()
   {
@@ -627,6 +631,10 @@ namespace moho
 
   /**
    * Address: 0x00C025C0 (FUN_00C025C0, dynamic-initializer atexit target)
+   *
+   * `FUN_007767E0` and `FUN_00776810` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   ShieldConstruct::~ShieldConstruct()
   {
