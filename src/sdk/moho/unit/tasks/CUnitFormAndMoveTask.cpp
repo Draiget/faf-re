@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
@@ -119,35 +120,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x006199D0 (FUN_006199D0)
-   *
-   * What it does:
-   * Forwards one form-move serializer load thunk lane to
-   * `CUnitFormAndMoveTask::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitFormAndMoveTaskMemberDeserializeThunk(
-    gpg::ReadArchive* const archive,
-    moho::CUnitFormAndMoveTask* const task
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x006199E0 (FUN_006199E0)
-   *
-   * What it does:
-   * Forwards one form-move serializer save thunk lane to
-   * `CUnitFormAndMoveTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitFormAndMoveTaskMemberSerializeThunk(
-    gpg::WriteArchive* const archive,
-    const moho::CUnitFormAndMoveTask* const task
-  )
-  {
-    task->MemberSerialize(archive);
-  }
 } // namespace
 
 namespace moho
@@ -491,6 +463,69 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * VFTABLE: 0x00E206F8 (`??_7CUnitFormAndMoveTaskSerializer@Moho@@6B@`)
+   *
+   * Demangled base: gpg::SerSaveLoadHelper<class Moho::CUnitFormAndMoveTask>
+   * (base VFTABLE: 0x00E20700, `??_7?$SerSaveLoadHelper@VCUnitFormAndMoveTask@Moho@@@gpg@@6B@`)
+   *
+   * Confirmed empty derived class -- NOT a `using` alias (same nuance as
+   * `CEfxTrailEmitterSerializer`, see `Reflection.h`). Both vtables carry
+   * the *same* Init() address (0x00619CE0): `CUnitFormAndMoveTaskSerializer`
+   * overrides nothing from the base template. The binary still emits two
+   * distinct vtable symbols 8 bytes apart in `.rdata` (0x00E206F8 and
+   * 0x00E20700), which only happens for two distinct C++ types -- a
+   * same-address `using CUnitFormAndMoveTaskSerializer =
+   * SerSaveLoadHelper<CUnitFormAndMoveTask>;` alias can only ever produce
+   * one vtable symbol, not two, so that shape does not fit this class.
+   *
+   * `CUnitFormAndMoveTask::MemberDeserialize(ReadArchive*)`/
+   * `MemberSerialize(WriteArchive*) const` are ordinary instance methods
+   * matching the template's expected shape exactly, so the base template's
+   * generic `Deserialize`/`Serialize` static methods apply unmodified.
+   *
+   * Per-instantiation addresses (T = CUnitFormAndMoveTask):
+   *  - ctor / compiler dynamic-initializer: 0x00BD10B0, global storage
+   *    0x010B1904. `vtable_writers` shows exactly one writer for the
+   *    0x00E206F8 vtable head (no dead-duplicate twin).
+   *  - dtor / atexit unlink target: 0x00BFA0D0 (standard `ResetLinks()`
+   *    unlink-then-self-link shape). The real ctor's tail is a plain
+   *    `return atexit(sub_BFA0D0);` -- the compiler's own registration for
+   *    this global's non-trivial destructor, inherited unchanged from
+   *    `SerSaveLoadHelper<T>::~SerSaveLoadHelper()` -- so no destructor is
+   *    declared here.
+   *  - Init(): 0x00619CE0 (shared with the base template, not overridden).
+   *  - Deserialize() thunk: 0x006199D0, tail-jumps into
+   *    `CUnitFormAndMoveTask::MemberDeserialize` at 0x0061A9C0. (Formerly
+   *    mis-modeled in this file as a standalone free function
+   *    `CUnitFormAndMoveTaskMemberDeserializeThunk`; it is actually this
+   *    template instantiation's own compiler-emitted `Deserialize` body.)
+   *  - Serialize() thunk: 0x006199E0, tail-calls
+   *    `CUnitFormAndMoveTask::MemberSerialize` at 0x0061AA30. (Same
+   *    correction as above, formerly `CUnitFormAndMoveTaskMemberSerializeThunk`.)
+   */
+  class CUnitFormAndMoveTaskSerializer : public gpg::SerSaveLoadHelper<CUnitFormAndMoveTask>
+  {
+  };
+  static_assert(
+    sizeof(CUnitFormAndMoveTaskSerializer) == 0x14, "CUnitFormAndMoveTaskSerializer size must be 0x14"
+  );
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1904 -- process-global `CUnitFormAndMoveTaskSerializer`
+  // singleton. Constructing it runs the compiler-emitted
+  // `register_CUnitFormAndMoveTaskSerializer`-equivalent dynamic initializer
+  // (0x00BD10B0), which splices this helper into
+  // `gpg::SerHelperBase::sNewHelpers`; `gpg::SerHelperBase::InitNewHelpers()`
+  // later dispatches `Init()` on it from within the first
+  // `ReadArchive`/`WriteArchive` construction.
+  moho::CUnitFormAndMoveTaskSerializer gCUnitFormAndMoveTaskSerializer;
+} // namespace
 
 namespace gpg
 {
