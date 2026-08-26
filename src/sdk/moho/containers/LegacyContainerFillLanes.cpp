@@ -3186,21 +3186,6 @@ namespace
   }
 
   /**
-   * Address: 0x00535620 (FUN_00535620)
-   *
-   * What it does:
-   * Writes one repeated dword value into `count` contiguous destination lanes.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneA(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
    * Address: 0x005356C0 (FUN_005356C0)
    * Address: 0x005356E0 (FUN_005356E0)
    * Address: 0x005356F0 (FUN_005356F0)
@@ -3293,102 +3278,12 @@ namespace
   }
 
   /**
-   * Address: 0x005C5F90 (FUN_005C5F90)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneC(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x005DC940 (FUN_005DC940)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneD(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x005DCAE0 (FUN_005DCAE0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneE(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
    * Address: 0x006522F0 (FUN_006522F0)
    *
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
   std::uint32_t* FillDwordSpanCountedLaneF(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0066A460 (FUN_0066A460)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneG(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0067CB80 (FUN_0067CB80)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneH(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x006F87A0 (FUN_006F87A0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneI(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3413,87 +3308,12 @@ namespace
   }
 
   /**
-   * Address: 0x0078A2A0 (FUN_0078A2A0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneK(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x007AF3B0 (FUN_007AF3B0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneL(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x007AF620 (FUN_007AF620)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneM(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
    * Address: 0x007DA1D0 (FUN_007DA1D0)
    *
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
   std::uint32_t* FillDwordSpanCountedLaneN(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x007E31E0 (FUN_007E31E0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneO(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0082D250 (FUN_0082D250)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneP(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3539,66 +3359,6 @@ namespace
    * Alias lane of counted repeated-dword fill behavior.
    */
   std::uint32_t* FillDwordSpanCountedLaneS(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x00879A80 (FUN_00879A80)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneT(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x00879ED0 (FUN_00879ED0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneU(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0087A310 (FUN_0087A310)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneV(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0088A2E0 (FUN_0088A2E0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneW(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3716,21 +3476,6 @@ namespace
   // Doxygen block.
 
   /**
-   * Address: 0x008D9D50 (FUN_008D9D50)
-   *
-   * What it does:
-   * Writes one repeated dword value into one `[begin,end)` destination range.
-   */
-  std::uint32_t* FillDwordSpanByEndLaneA(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordSpanByEnd(begin, end, valueSlot);
-  }
-
-  /**
    * Address: 0x008D9E20 (FUN_008D9E20)
    *
    * What it does:
@@ -3760,38 +3505,6 @@ namespace
     secondLane[4] = first4;
     return firstLane;
   }
-
-  /**
-   * Address: 0x008E9260 (FUN_008E9260)
-   *
-   * What it does:
-   * Alias lane of `[begin,end)` repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanByEndLaneB(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordSpanByEnd(begin, end, valueSlot);
-  }
-
-  /**
-   * Address: 0x008E9280 (FUN_008E9280)
-   *
-   * What it does:
-   * Alias lane of `[begin,end)` repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanByEndLaneC(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* valueSlot
-  ) noexcept
-  {
-    return FillDwordSpanByEnd(begin, end, valueSlot);
-  }
-
-
 
   struct LargeRuntimeWordAccessView
   {
