@@ -38,6 +38,10 @@ namespace moho
     , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&CIntel::SerializeSave))
   {}
 
+  /**
+   * Address: 0x00C01DF0 (FUN_00C01DF0, atexit target registered by the real
+   * ctor above)
+   */
   CIntelSerializer::~CIntelSerializer()
   {
     ResetLinks();

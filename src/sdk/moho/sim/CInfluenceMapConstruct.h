@@ -26,9 +26,17 @@ namespace moho
     CInfluenceMapConstruct();
 
     /**
+     * Address: 0x00BFFF10 (FUN_00BFFF10, atexit target registered by the
+     * real ctor above)
+     *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_00717600`/
+     * `FUN_00717630` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAZ` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~CInfluenceMapConstruct();
 

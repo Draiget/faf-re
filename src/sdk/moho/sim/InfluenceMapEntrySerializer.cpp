@@ -107,6 +107,10 @@ namespace moho
     , mSaveCallback(&SerializeInfluenceMapEntrySerializerBridge)
   {}
 
+  /**
+   * Address: 0x00BFFFD0 (FUN_00BFFFD0, atexit target registered by the real
+   * ctor above)
+   */
   InfluenceMapEntrySerializer::~InfluenceMapEntrySerializer()
   {
     ResetLinks();

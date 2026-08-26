@@ -26,9 +26,17 @@ namespace moho
     InfluenceGridSerializer();
 
     /**
+     * Address: 0x00C000F0 (FUN_00C000F0, atexit target registered by the
+     * real ctor above)
+     *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_00717D40`/
+     * `FUN_00717D70` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneBC` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~InfluenceGridSerializer();
 

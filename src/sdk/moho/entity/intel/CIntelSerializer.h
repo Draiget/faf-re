@@ -39,9 +39,18 @@ namespace moho
     CIntelSerializer();
 
     /**
+     * Address: 0x00C01DF0 (FUN_00C01DF0, atexit target registered by the
+     * real ctor above)
+     *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_0076E700`/
+     * `FUN_0076E730` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed; distinct from the ctor-side
+     * dead duplicate `FUN_0076E6D0` above), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneBH` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~CIntelSerializer();
 

@@ -92,6 +92,10 @@ namespace moho
     , mSaveCallback(&SerializeInfluenceGridSerializerBridge)
   {}
 
+  /**
+   * Address: 0x00C000F0 (FUN_00C000F0, atexit target registered by the real
+   * ctor above)
+   */
   InfluenceGridSerializer::~InfluenceGridSerializer()
   {
     ResetLinks();
