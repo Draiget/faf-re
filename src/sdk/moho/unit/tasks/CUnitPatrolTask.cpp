@@ -1358,7 +1358,10 @@ namespace
    * Unlinks `CUnitPatrolTaskConstruct` helper node from the intrusive
    * serializer-helper list and restores one self-linked node lane.
    * Registered by this helper's own constructor (0x00BD1300) as this
-   * global's `atexit` teardown.
+   * global's `atexit` teardown. `FUN_0061ACA0` and `FUN_0061ACD0` are
+   * duplicate-emission twins of this exact unlink/reset lane (same
+   * `ResetLinks()` shape, folded to separate addresses); they have no
+   * distinct source-level body of their own.
    */
   void UnlinkCUnitPatrolTaskConstructNode()
   {

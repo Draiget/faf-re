@@ -491,7 +491,10 @@ namespace moho
    *    `return atexit(sub_BFA640);` -- the compiler's own registration for
    *    this global's non-trivial destructor, inherited unchanged from
    *    `SerSaveLoadHelper<T>::~SerSaveLoadHelper()` -- so no destructor is
-   *    declared here.
+   *    declared here. `FUN_006262D0` and `FUN_00626300` are duplicate-emission
+   *    twins of that exact unlink/reset lane (same `ResetLinks()` shape,
+   *    folded to separate addresses); they have no distinct source-level
+   *    body of their own.
    *  - Init(): 0x00627050 (shared with the base template, not overridden).
    *  - Deserialize() thunk: 0x00626280, tail-calls
    *    `CUnitUnloadUnits::MemberDeserialize` at 0x00629880. (This address

@@ -834,6 +834,9 @@ namespace moho
     // class's own; the intermediate base-vtable write is elided by the
     // compiler since it is immediately overwritten) and registers the atexit
     // dtor (0x00BF9C60, ResetLinks()-shaped unlink-then-self-link body).
+    // `FUN_0060AA90` is a duplicate-emission twin of that exact unlink/reset
+    // lane (same `ResetLinks()` shape, folded to a separate address); it has
+    // no distinct source-level body of its own.
     CUnitTeleportTaskSerializer gCUnitTeleportTaskSerializer;
 
     struct CUnitTeleportTaskSerializerBootstrap
