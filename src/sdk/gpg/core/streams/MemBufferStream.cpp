@@ -509,6 +509,13 @@ bool MemBufferStream::VirtAtEnd()
 
 /**
  * Address: 0x008E5AD0 (FUN_008E5AD0)
+ * Address: 0x008E5A10 (FUN_008E5A10, ICF twin -- `.c`-identical body,
+ *          differing only in that this address's caller reads the
+ *          trailing `mWriteHead` value back out of EAX as a
+ *          `std::uint32_t` return instead of ignoring it. Formerly
+ *          duplicated in moho/containers/LegacyContainerFillLanes.cpp as
+ *          `UpdateMaxLane0CFromLane14BatchTau`; that duplicate has been
+ *          deleted.)
  *
  * What it does:
  * Promotes logical read-end to include pending writes.
