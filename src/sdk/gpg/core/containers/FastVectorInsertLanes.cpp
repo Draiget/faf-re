@@ -41,30 +41,6 @@ namespace
     "FastVectorInlineOriginHeaderRuntimeView::inlineOriginStorage offset must be 0x10"
   );
 
-  using SerializerWord = std::uint32_t;
-
-  struct SerializerSlot36ByPointerVTable
-  {
-    void* reserved[9];
-    int(__thiscall* invoke)(void* self, SerializerWord* value);
-  };
-
-  struct SerializerSlot36ByValueVTable
-  {
-    void* reserved[9];
-    int(__thiscall* invoke)(void* self, SerializerWord value);
-  };
-
-  struct SerializerSlot36RuntimeByPointer
-  {
-    SerializerSlot36ByPointerVTable* vtable;
-  };
-
-  struct SerializerSlot36RuntimeByValue
-  {
-    SerializerSlot36ByValueVTable* vtable;
-  };
-
   struct DeletingDestructorSlot8VTable
   {
     void* reserved0;
@@ -87,41 +63,6 @@ namespace
   {
     std::memcpy(destination, source, 0x24u);
     return destination;
-  }
-
-  /**
-   * Address: 0x0072A9B0 (FUN_0072A9B0)
-   *
-   * What it does:
-   * Invokes serializer virtual slot `+0x24` with a by-reference temporary and
-   * writes the updated 32-bit value back to `valueSlot`.
-   */
-  int InvokePrimitiveSerializerWordByPointerLane(
-    void* const helperObject,
-    SerializerWord* const valueSlot
-  )
-  {
-    auto* const helper = static_cast<SerializerSlot36RuntimeByPointer*>(helperObject);
-    SerializerWord value = static_cast<SerializerWord>(reinterpret_cast<std::uintptr_t>(helperObject));
-    const int result = helper->vtable->invoke(helperObject, &value);
-    *valueSlot = value;
-    return result;
-  }
-
-  /**
-   * Address: 0x0072A9D0 (FUN_0072A9D0)
-   *
-   * What it does:
-   * Forwards one 32-bit primitive value lane through serializer virtual slot
-   * `+0x24`.
-   */
-  int InvokePrimitiveSerializerWordByValueLane(
-    void* const helperObject,
-    SerializerWord* const valueSlot
-  )
-  {
-    auto* const helper = static_cast<SerializerSlot36RuntimeByValue*>(helperObject);
-    return helper->vtable->invoke(helperObject, *valueSlot);
   }
 
   /**
