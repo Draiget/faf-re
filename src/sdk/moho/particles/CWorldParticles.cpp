@@ -448,35 +448,16 @@ namespace
     return vector.end - 1;
   }
 
-  [[nodiscard]] const char* ResolveParticleTechniqueSuffix(
-    const std::int32_t blendMode,
-    const bool allowRefract,
-    const int assertLine
-  )
-  {
-    switch (blendMode) {
-      case 0:
-        return "_ALPHABLEND";
-      case 1:
-        return "_MODULATEINVERSE";
-      case 2:
-        return "_MODULATE2XINVERSE";
-      case 3:
-        return "_ADD";
-      case 4:
-        return "_PREMODALPHA";
-      case 5:
-        if (allowRefract) {
-          return "_REFRACT";
-        }
-        break;
-      default:
-        break;
-    }
-
-    gpg::HandleAssertFailure(kUnreachableAssertText, assertLine, kParticleRendererSourcePath);
-    return "_ALPHABLEND";
-  }
+  // A `ResolveParticleTechniqueSuffix(blendMode, allowRefract, assertLine)`
+  // free function previously lived here, byte-for-byte identical (same
+  // switch, same case strings) to moho/particles/BeamRenderHelpers.cpp's own
+  // `ResolveParticleTechniqueSuffix` (called for real there: BuildBeamTechniqueName
+  // and two selection-technique builders). This file has no
+  // blend-mode-to-technique-name construction of its own -- no caller, and no
+  // `Address:` citation tying it to a distinct compiled address in this TU
+  // -- so it was a speculative, unevidenced duplicate rather than a second
+  // real binary emission. Removed; BeamRenderHelpers.cpp's copy is the
+  // evidenced one.
 
   void BindParticleTextureShaderVar(
     moho::ShaderVar& shaderVar,
@@ -1238,8 +1219,13 @@ namespace
    *
    * What it does:
    * Duplicate candidate-or-head resolver thunk for particle-bucket lookup.
+   *
+   * ICF-style binary twin: a distinct compiled address whose body is a pure
+   * forward to the canonical `ResolveParticleBucketCandidateOrHead` (this
+   * file, called for real at 3 sites). Zero callers of its own (callgraph
+   * index + repo-wide search).
    */
-  moho::ParticleBucketTreeNodeRuntime** ResolveParticleBucketCandidateOrHeadDuplicate(
+  [[maybe_unused]] moho::ParticleBucketTreeNodeRuntime** ResolveParticleBucketCandidateOrHeadDuplicate(
     const moho::ParticleBucketKeyRuntime& key,
     moho::ParticleBucketTreeNodeRuntime** const outNode,
     const moho::ParticleBucketTreeRuntime& treeRuntime
@@ -1393,8 +1379,13 @@ namespace
    *
    * What it does:
    * Duplicate candidate-or-head resolver thunk for trail-bucket lookup.
+   *
+   * ICF-style binary twin: a distinct compiled address whose body is a pure
+   * forward to the canonical `ResolveTrailBucketCandidateOrHead` (this file,
+   * called for real at 1 site). Zero callers of its own (callgraph index +
+   * repo-wide search).
    */
-  moho::TrailBucketTreeNodeRuntime** ResolveTrailBucketCandidateOrHeadDuplicate(
+  [[maybe_unused]] moho::TrailBucketTreeNodeRuntime** ResolveTrailBucketCandidateOrHeadDuplicate(
     const moho::TrailBucketKeyRuntime& key,
     moho::TrailBucketTreeNodeRuntime** const outNode,
     const moho::TrailBucketTreeRuntime& treeRuntime
