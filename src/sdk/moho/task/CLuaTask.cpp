@@ -228,25 +228,21 @@ namespace
    *
    * What it does:
    * Thin wrapper that forwards archive + object lanes into
-   * `CLuaTask::MemberDeserialize`.
+   * `CLuaTask::MemberDeserialize`. Invoked from
+   * `CLuaTaskSerializer::Deserialize` below.
    */
-  [[maybe_unused]] void DeserializeCLuaTaskThunk(gpg::ReadArchive* const archive, CLuaTask* const task)
+  void DeserializeCLuaTaskThunk(gpg::ReadArchive* const archive, CLuaTask* const task)
   {
     GPG_ASSERT(task != nullptr);
     task->MemberDeserialize(archive);
   }
 
-  /**
-   * Address: 0x004CBD10 (FUN_004CBD10, CLuaTask member-deserialize thunk alias)
-   *
-   * What it does:
-   * Secondary wrapper lane forwarding archive + object pointers into
-   * `CLuaTask::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCLuaTaskThunkAlias(gpg::ReadArchive* const archive, CLuaTask* const task)
-  {
-    DeserializeCLuaTaskThunk(archive, task);
-  }
+  // Address 0x004CBD10 (the duplicate "ThunkAlias" one-line forward to
+  // DeserializeCLuaTaskThunk formerly modeled here) is dead: zero data_refs
+  // and zero call_edges in the callgraph index, and no source-level caller
+  // anywhere in src/sdk/**. DeserializeCLuaTaskThunk above already covers
+  // this address's behavior and is the one genuinely wired into
+  // CLuaTaskSerializer::Deserialize.
 
   /**
    * Address: 0x004CB750 (FUN_004CB750, CLuaTask member-serialize thunk)
@@ -256,9 +252,10 @@ namespace
    *
    * What it does:
    * Thin wrapper that forwards archive + object lanes into
-   * `CLuaTask::MemberSerialize`.
+   * `CLuaTask::MemberSerialize`. Invoked from `CLuaTaskSerializer::Serialize`
+   * below.
    */
-  [[maybe_unused]] void SerializeCLuaTaskThunk(gpg::WriteArchive* const archive, CLuaTask* const task)
+  void SerializeCLuaTaskThunk(gpg::WriteArchive* const archive, CLuaTask* const task)
   {
     GPG_ASSERT(task != nullptr);
     task->MemberSerialize(archive);
