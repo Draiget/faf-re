@@ -6999,7 +6999,7 @@ namespace msvc8
          * `CopyClutterSeedValueRange` in Clutter.cpp -- moved here alongside
          * its `uninit_fill_n` core for the same reason.
          *
-         * The following 19 addresses are `uninit_fill_n` instantiations for
+         * The following addresses are `uninit_fill_n` instantiations for
          * 4-byte trivially-copyable element types (mostly pointers, two
          * `int32_t`s) -- every one compiles to the same `for(i=0;i<n;++i)
          * dst[i]=value` store loop regardless of `T`'s identity, which is
@@ -7012,9 +7012,21 @@ namespace msvc8
          * method's body) -- a RULE ONE violation once each wrapper's real
          * `_Insert_n`/`push_back` caller and element `T` were identified via
          * `_callgraph_index.sqlite` `call_edges`; retired in favor of citing
-         * each address here directly, with `FillDwordSpanByCount`/
-         * `FillDwordSpanByEnd` kept alive for the file's remaining
-         * unidentified lettered lanes (`B`/`F`/`J`/`N`/`Q`/`R`/`S`/`X`).
+         * each address here directly. A follow-up sweep (full-population
+         * caller scan) resolved six more of the file's previously-
+         * unidentified lettered lanes -- `B` (0x0057F860), `F` (0x006522F0),
+         * `N` (0x007DA1D0), `Q` (0x0084EAD0), `R` (0x008558E0), and `S`
+         * (0x00869C80), all cited below -- plus `J` (0x00701FA0), cited
+         * inline on `detail::LegacyVectorDwordInsertN` in Vector.cpp instead
+         * since that instantiation's fill step is already expressed as part
+         * of that helper's own in-place/reallocation arms. `FillDwordSpanByCount`/
+         * `FillDwordSpanByEnd` are kept alive only for lane `X` (0x008B2FD0),
+         * the sole lettered lane still without a confirmed element `T`: its
+         * grow-path caller `FUN_008B31B0` has two genuine, non-padding call
+         * sites (0x008B29CA, 0x008B2F47, hand-verified against the raw PE
+         * bytes) that IDA's own function analysis never boxed into named
+         * functions, so the owning engine call site cannot yet be cited by
+         * name.
          * The `ByEnd`-lettered three below were expressed over a
          * `[begin,end)` pointer pair rather than a count at their call
          * sites; same `uninit_fill_n` semantics, alternate compiled form.
@@ -7025,6 +7037,18 @@ namespace msvc8
          * `FUN_00535D60` (cited above), whose `_Count` is folded to the
          * constant 1; emitted via `rules.mBlueprintsByOrdinal.push_back(...)`
          * in `moho::AppendBlueprintOrdinal`, Sim.cpp:14253.)
+         * Address: 0x0057F860 (FUN_0057F860, `msvc8::vector<Moho::
+         * Unit*>::uninit_fill_n` for the 4-byte pointer element. Reached
+         * from this instantiation's `insert(pos,value)` grow/shift helper
+         * `FUN_005809A0` (uncited -- compiler emission, no separate source;
+         * the general single-element insert-at-position body `push_back`
+         * tail-calls into on its grow path), itself reached from `msvc8::
+         * vector<Unit*>::push_back`'s `FUN_0057E6A0` (cited above) via
+         * `storedCargo.push_back(storedUnit)` in `Sim::TransferUnit`
+         * (Sim.cpp:11097) and `stdCandidates.push_back(unit)` in
+         * `moho::FindAvailableFactory` (CAiBrain.cpp). Previously duplicated
+         * here as lettered lane `B`, `FillDwordSpanCountedLaneB`; removed
+         * from `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x005C5F90 (FUN_005C5F90, `msvc8::vector<moho::
          * ReconBlip*>::uninit_fill_n` for the 4-byte pointer element, filled
          * with a `nullptr` placeholder. Reached from the already-recovered
@@ -7043,6 +7067,18 @@ namespace msvc8
          * `FUN_005DD570` (cited above); emitted via the recovered helper
          * `InsertNCopiesCAcquireTargetTaskPtrVector`'s
          * `storage.insert(begin()+offset, count, value)`, IAiAttacker.cpp.)
+         * Address: 0x006522F0 (FUN_006522F0, `msvc8::vector<const
+         * RDebugOverlayClass*>::uninit_fill_n` for the 4-byte pointer
+         * element. Reached from this instantiation's `insert(pos,value)`
+         * grow/shift helper `FUN_00652380` (uncited -- compiler emission,
+         * no separate source), itself reached from `push_back`'s grow path
+         * -- the per-T canonical-template-helper binding
+         * `PushBackDebugOverlayClassPtrVector`'s `destination.push_back(
+         * value)` (Sim.cpp), called from `CollectPrefixDebugOverlayTypes`'s
+         * `PushBackDebugOverlayClassPtrVector(outMatches, overlayClass)`.
+         * Previously duplicated here as lettered lane `F`,
+         * `FillDwordSpanCountedLaneF`; removed from
+         * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x0066A460 (FUN_0066A460, `msvc8::vector<moho::
          * WCurveEditorPanel*>::uninit_fill_n` for the 4-byte pointer
          * element -- already named on this instantiation's `push_back`
@@ -7085,6 +7121,17 @@ namespace msvc8
          * instantiation's `_Insert_n` grow lane `FUN_007B0340` (cited above,
          * folded to `_Count=1`); emitted via `Moho::CAM_GetAllRCamCameras`'s
          * (FUN_007AADE0, RCamManager.cpp) `result.push_back(cam)`.)
+         * Address: 0x007DA1D0 (FUN_007DA1D0, `msvc8::vector<
+         * MeshInstance*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `insert(pos,value)` grow/shift
+         * helper `FUN_007DA270` (uncited -- compiler emission, no separate
+         * source), reached in turn from `msvc8::vector<MeshInstance*>::
+         * push_back`'s `FUN_007D9FC0` grow path via `bucket->push_back(
+         * instance)` inside `Moho::MeshRenderer::Batch` (0x007DFA00,
+         * Mesh.cpp), which appends into the per-`MeshBatchKey`
+         * `MeshBatchInstanceVector` bucket. Previously duplicated here as
+         * lettered lane `N`, `FillDwordSpanCountedLaneN`; removed from
+         * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x007E31E0 (FUN_007E31E0, `msvc8::vector<Moho::
          * MeshLOD*>::uninit_fill_n` for the 4-byte pointer element. Reached
          * from this instantiation's `push_back` `FUN_007E3850` (cited
@@ -7096,6 +7143,46 @@ namespace msvc8
          * `LinkCommandGraphEdge`'s `bucket.push_back(edge)`
          * (CWldSession.cpp:14703) when the bucket's `mEdges` vector is at
          * capacity.)
+         * Address: 0x0084EAD0 (FUN_0084EAD0, `msvc8::vector<
+         * wxWindowBase*>::uninit_fill_n` for the 4-byte pointer element --
+         * the per-window saved pushed-event-handler inner vector built by
+         * `moho::SuspendInputWindowEventHandlersAndFlushQueue`
+         * (UiRuntimeTypes.cpp, `Address: 0x0084DA80`). Reached from this
+         * instantiation's `insert(pos,value)` grow/shift helper
+         * `FUN_0084F200` (uncited -- compiler emission, no separate
+         * source), itself reached from `push_back`'s grow path via
+         * `suspended[index].push_back(inputWindow->PopEventHandler(false))`
+         * -- every call takes the grow path since each per-window inner
+         * vector starts default-constructed at capacity 0. Previously
+         * duplicated here as lettered lane `Q`, `FillDwordSpanCountedLaneQ`;
+         * removed from `LegacyContainerFillLanes.cpp` in favor of this
+         * citation.)
+         * Address: 0x008558E0 (FUN_008558E0, `msvc8::vector<
+         * std::uint32_t>::uninit_fill_n` for the 4-byte dword element.
+         * Reached from this instantiation's `insert(pos,count,value)`
+         * grow/shift helper `FUN_008561D0` (uncited -- compiler emission,
+         * no separate source), itself reached from `AppendDwordLaneRuntime`
+         * (`Address: 0x00855150`, SimRecoveryRuntime.cpp) appending one
+         * dword lane to a reflection-runtime `LegacyVectorStorageRuntime<
+         * std::uint32_t>` on its capacity-exhausted path. Note:
+         * `AppendDwordLaneRuntime`'s current `ReserveTrivialVector` helper
+         * grows to exactly the requested size rather than this
+         * instantiation's real 1.5x `_Insert_n` growth policy -- a
+         * pre-existing simplification in that already-recovered caller, not
+         * introduced by this citation and not something this citation
+         * depends on being fixed. Previously duplicated here as lettered
+         * lane `R`, `FillDwordSpanCountedLaneR`; removed from
+         * `LegacyContainerFillLanes.cpp` in favor of this citation.)
+         * Address: 0x00869C80 (FUN_00869C80, `msvc8::vector<Moho::
+         * IWldTeardownCallback*>::uninit_fill_n` for the 4-byte pointer
+         * element (`WldTeardownCallbackVector`, CWldSession.h). Reached
+         * from this instantiation's `insert(pos,value)` grow/shift helper
+         * `FUN_00869D30` (uncited -- compiler emission, no separate
+         * source), itself reached from `push_back`'s grow path via
+         * `WLD_AddOnTeardownCallback`'s `callbacks->push_back(callback)`
+         * (CWldSession.cpp). Previously duplicated here as lettered lane
+         * `S`, `FillDwordSpanCountedLaneS`; removed from
+         * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x00879A80 (FUN_00879A80, `msvc8::vector<Moho::
          * CWldTerrainDecal*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mDecals` @+0x10). Reached from this
