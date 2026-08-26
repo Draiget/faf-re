@@ -8,6 +8,8 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  class RType;
   class WriteArchive;
 }
 
@@ -29,6 +31,8 @@ namespace moho
   class CEfxTrailEmitter : public CEffectImpl
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
      *
@@ -74,6 +78,23 @@ namespace moho
      * attachment target disappears/is destroy-queued.
      */
     [[nodiscard]] bool ProcessLifetime();
+
+    /**
+     * Address: 0x00672710 (FUN_00672710, Moho::CEfxTrailEmitter::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::CEfxTrailEmitter::MemberDeserialize(
+     *     Moho::CEfxTrailEmitter *this@<ecx>, gpg::ReadArchive *archive@<eax>);
+     *
+     * What it does:
+     * Inverse of `MemberSerialize`: reads base `CEffectImpl` state, trail
+     * blueprint pointer, trail timing lanes, one Vector3 payload lane, and
+     * visibility/update flags, in the exact field order `MemberSerialize`
+     * writes them (confirmed field-by-field against FUN_00672710's raw
+     * disassembly: offsets 0x190, 0x194, 0x198, 0x19C, 0x1A0, 0x1A4, 0x1B0,
+     * 0x1B1, 0x1B4).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00672820 (FUN_00672820, sub_672820)

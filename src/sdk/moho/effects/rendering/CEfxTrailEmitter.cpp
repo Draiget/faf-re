@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
@@ -92,28 +93,12 @@ namespace
 
     return ProjectViewportDepthRow1(camera->viewport, trailPosition) <= lodCutoff;
   }
-
-  /**
-   * Address: 0x00672040 (FUN_00672040)
-   *
-   * What it does:
-   * Register-lane thunk that forwards one `(emitter, archive)` pair into
-   * `CEfxTrailEmitter::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEfxTrailEmitterMemberThunkA(
-    const moho::CEfxTrailEmitter* const emitter,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (emitter == nullptr) {
-      return;
-    }
-    emitter->MemberSerialize(archive);
-  }
 } // namespace
 
 namespace moho
 {
+  gpg::RType* CEfxTrailEmitter::sType = nullptr;
+
   /**
    * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
    *
@@ -297,6 +282,41 @@ namespace moho
 
     mManager->DestroyEffect(this);
     return true;
+  }
+
+  /**
+   * Address: 0x00672710 (FUN_00672710, Moho::CEfxTrailEmitter::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall Moho::CEfxTrailEmitter::MemberDeserialize(
+   *     Moho::CEfxTrailEmitter *this@<ecx>, gpg::ReadArchive *archive@<eax>);
+   *
+   * What it does:
+   * Inverse of `MemberSerialize`: reads base `CEffectImpl` state, trail
+   * blueprint pointer, timing lanes, one Vector3 lane, and live flags, in
+   * the same field order `MemberSerialize` writes them. Every field/offset
+   * below is confirmed directly against FUN_00672710's raw disassembly
+   * (0x190, 0x194, 0x198, 0x19C, 0x1A0, 0x1A4, 0x1B0, 0x1B1, 0x1B4), not
+   * just pattern-matched from the write side.
+   */
+  void CEfxTrailEmitter::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Read(CEffectImpl::StaticGetClass(), static_cast<CEffectImpl*>(this), nullOwner);
+    (void)archive->ReadPointer_RTrailBlueprint(&mTrailBlueprint, &nullOwner);
+
+    archive->ReadInt(&mTrailLength);
+    archive->ReadFloat(&mTotalTicks);
+    archive->ReadFloat(&mLife);
+    archive->ReadFloat(&mLength);
+    archive->Read(CachedVector3fType(), &mSerializedTrailPosition, nullOwner);
+    archive->ReadBool(&mCreated);
+    archive->ReadBool(&mVisible);
+    archive->ReadUInt(&mLastUpdate);
   }
 
   /**
@@ -550,3 +570,56 @@ namespace moho
     mTotalTicks = mTotalTicks + 1.0f;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * VFTABLE: 0x00E2695C (`??_7CEfxTrailEmitterSerializer@Moho@@6B@`)
+   *
+   * Demangled base: gpg::SerSaveLoadHelper<class Moho::CEfxTrailEmitter>
+   * (base VFTABLE: 0x00E26964, `??_7?$SerSaveLoadHelper@VCEfxTrailEmitter@Moho@@@gpg@@6B@`)
+   *
+   * Confirmed empty derived class -- NOT a `using` alias. Both vtables carry
+   * the *same* Init() address (0x006722F0): `CEfxTrailEmitterSerializer`
+   * overrides nothing from the base template. The binary still emits two
+   * distinct vtable symbols 8 bytes apart in `.rdata` (0x00E2695C and
+   * 0x00E26964), which only happens for two distinct C++ types -- a
+   * same-address `using CEfxTrailEmitterSerializer =
+   * SerSaveLoadHelper<CEfxTrailEmitter>;` alias (the shape already used for
+   * `CAniPoseSerializer` et al. in `CAniPose.h`) can only ever produce one
+   * vtable symbol, not two, so that shape does not fit this class.
+   *
+   * Per-instantiation addresses (T = CEfxTrailEmitter):
+   *  - ctor / compiler dynamic-initializer (`register_CEfxTrailEmitterSerializer`):
+   *    0x00BD4970, global storage 0x010B40C4. `vtable_writers` shows exactly
+   *    one writer for the 0x00E2695C vtable head (no dead-duplicate twin).
+   *  - dtor / atexit unlink target: 0x00BFC250 (standard `ResetLinks()`
+   *    unlink-then-self-link shape). The real ctor's tail is a plain
+   *    `return atexit(sub_BFC250);` -- the compiler's own registration for
+   *    this global's non-trivial destructor, inherited unchanged from
+   *    `SerSaveLoadHelper<T>::~SerSaveLoadHelper()` -- so no destructor is
+   *    declared here.
+   *  - Init(): 0x006722F0 (shared with the base template, not overridden).
+   *  - Deserialize() thunk: 0x00672030, tail-jumps into
+   *    `CEfxTrailEmitter::MemberDeserialize` at 0x00672710.
+   *  - Serialize() thunk: 0x00672040, tail-calls
+   *    `CEfxTrailEmitter::MemberSerialize` at 0x00672820.
+   */
+  class CEfxTrailEmitterSerializer : public gpg::SerSaveLoadHelper<CEfxTrailEmitter>
+  {
+  };
+  static_assert(
+    sizeof(CEfxTrailEmitterSerializer) == 0x14, "CEfxTrailEmitterSerializer size must be 0x14"
+  );
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B40C4 -- process-global `CEfxTrailEmitterSerializer`
+  // singleton. Constructing it runs the compiler-emitted
+  // `register_CEfxTrailEmitterSerializer` dynamic initializer (0x00BD4970),
+  // which splices this helper into `gpg::SerHelperBase::sNewHelpers`;
+  // `gpg::SerHelperBase::InitNewHelpers()` later dispatches `Init()` on it
+  // from within the first `ReadArchive`/`WriteArchive` construction.
+  moho::CEfxTrailEmitterSerializer gCEfxTrailEmitterSerializer;
+} // namespace
