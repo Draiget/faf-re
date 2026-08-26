@@ -7209,6 +7209,13 @@ namespace moho
       STIMap* const stiMap = session->GetSTIMap();
       const auto* const cellPositions = reinterpret_cast<const SOCellPos*>(scratch.mWords.begin());
 
+      // This count-only constructor call is FUN_0082A46C's `call sub_7E3730`
+      // in the raw disassembly (Moho::DrawPathPreview is FUN_0082A380) --
+      // VC8's `vector(size_type)` materialises a default `Wm3::Vector3f()`
+      // temporary and forwards into the same allocate-then-fill path as
+      // `vector(count, value)` (FUN_007E3730 -> FUN_007E4370 -> FUN_007E6460,
+      // Vector.h). Every slot is overwritten by the loop immediately below,
+      // so the broadcast fill value never survives to be observed.
       msvc8::vector<Wm3::Vector3f> worldPts(cellCount);
       for (std::size_t i = 0; i < cellCount; ++i) {
         worldPts[i] = COORDS_ToWorldPos(

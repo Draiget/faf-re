@@ -1378,14 +1378,62 @@ namespace msvc8
         }
 
         /**
-         * Construct with count default-inserted elements
+         * Address: 0x007E3730 (FUN_007E3730, `msvc8::vector<Wm3::Vector3f>::
+         * vector(size_type)` for the 12-byte three-float element) -- VC8's
+         * real `vector(size_type _Count)` constructor does not
+         * value-construct each slot independently. It materialises one
+         * default-constructed `_Ty()` temporary on the caller's stack and
+         * forwards `(count, that temporary)` into the exact same
+         * allocate-then-fill path as `vector(count, value)` below --
+         * confirmed from this address's own raw disassembly: it zeroes
+         * `last_`/`end_` on entry (leaving the debug-proxy lane at `+0x0`
+         * alone), and when `count != 0` calls `FUN_007E4370` (cited just
+         * below) followed by `FUN_007E6460` (`uninit_fill_n`, cited above
+         * on that member) to broadcast-copy the temporary into the
+         * freshly-allocated slots, then commits `last_ = first_ + count`.
+         * Reached from three call sites: `Moho::DrawPathPreview`
+         * (`FUN_0082A380`, recovered, `moho/sim/CWldSession.cpp`) --
+         * constructs the `cellCount`-sized `worldPts` scratch buffer that
+         * the very next loop overwrites element-by-element via
+         * `COORDS_ToWorldPos`, so the broadcast fill value is provably dead
+         * before it would ever be observed -- `Moho::MeshRenderer::
+         * RenderSkeleton` (`FUN_007E2290`, still blocked on the
+         * `CD3DPrimBatcher` draw-call surface), and `sub_7E2FC0`
+         * (unrecovered). DB previously listed this token `blocked` citing
+         * only the `RenderSkeleton` caller and missing the already-
+         * recovered `DrawPathPreview` call site -- corrected here per the
+         * caller-chain rule (one recovered caller is sufficient even while
+         * a sibling caller is still open).
+         *
+         * Address: 0x007E4370 (FUN_007E4370) -- this instantiation's fused
+         * allocate-and-arm-the-triplet lane, called only from
+         * `FUN_007E3730` above. Takes `(unused register, output vector*,
+         * count)`; the first parameter is loaded but never read in the
+         * body. Guards `count > 0x15555555` (`max_size()` for a 12-byte
+         * element, `0xFFFFFFFF/12`) and throws through `throw_too_long`
+         * (`FUN_007E4CE0`, cited on that member) exactly like this
+         * template's own `max_size() - cur < count` guards elsewhere; when
+         * `count == 0` allocates via a bare `operator new(0)`, otherwise
+         * defers to the overflow-checked raw allocate `FUN_007E5650`
+         * (`allocate_slots_checked`, already cited above with this exact
+         * address for `sizeof(T)==12`) -- either way arming `first_ =
+         * last_ = <new block>`, `end_ = first_ + 12*count` in one fused
+         * step rather than the separate allocate-call-then-field-commit
+         * shape `insert()`'s reallocation path below uses; same net
+         * effect, just realised as one out-of-line body by the compiler
+         * for this instantiation. DB previously listed this token
+         * `blocked` ("blocked only on its caller chain") -- corrected here
+         * now that `FUN_007E3730`'s own caller chain is resolved.
+         *
+         * Construct with count default-inserted elements.
+         *
+         * VC8's own `vector(size_type)` does not independently
+         * value-construct each slot -- it forwards to `vector(count,
+         * value)` below with a default-constructed temporary (see the
+         * addresses above), so this delegates the same way rather than
+         * modelling a distinct value-construct-in-place mechanic.
          */
-        explicit vector(std::size_t count) : vector() {
-            if (count) {
-                reserve(count);
-                uninit_value_construct_n(first_, count);
-                last_ = first_ + count;
-            }
+        explicit vector(std::size_t count) : vector(count, T()) {
         }
 
         /**
@@ -4264,11 +4312,16 @@ namespace msvc8
          * uninit_fill_n` for the 12-byte three-float element -- the same
          * instantiation as the `_Insert_n` core `FUN_008523C0` cited on
          * `insert` above (`WavePattern`-adjacent `insert-and-rebase` lane).
-         * Reached both from `push_back`'s own fast path (`FUN_008522A0`,
-         * cited above on `push_back` -- confirmed as this token's real
-         * direct caller via the callgraph, filling this member's "no
-         * grow-core citation found" gap noted there) and from `_Insert_n`'s
-         * gap-construct branches.)
+         * Reached from `push_back`'s own fast path (`FUN_008522A0`, cited
+         * above on `push_back` -- confirmed as this token's real direct
+         * caller via the callgraph, filling this member's "no grow-core
+         * citation found" gap noted there), from `_Insert_n`'s
+         * gap-construct branches, and from `FUN_007E3730`'s
+         * `vector(size_type)`/`vector(size_type,const T&)` allocate-then-
+         * fill body (cited above on the count-only constructor) -- the
+         * broadcast-fill core is shared by every code path that constructs
+         * or grows this instantiation with a repeated value, regardless of
+         * which higher-level operation triggers it.)
          *
          * tail-shift sub-branch is a per-element copy-assign broadcast of
          * `localValue`, FUN_008576A0 -- both FUN_00857880 and FUN_008576A0
@@ -6956,19 +7009,6 @@ namespace msvc8
                     destroy_n(dst, i);
                     throw;
                 }
-            }
-        }
-
-        /**
-         * Uninitialized value-initialize N elements at dst
-         */
-        static void uninit_value_construct_n(T* dst, const std::size_t n) {
-            std::size_t i = 0;
-            try {
-                for (; i < n; ++i) ::new (static_cast<void*>(dst + i)) T();
-            } catch (...) {
-                destroy_n(dst, i);
-                throw;
             }
         }
 
