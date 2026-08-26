@@ -168,7 +168,17 @@ namespace
     return reinterpret_cast<RVectorTypeBool*>(gRecoveredRVectorTypeBoolStorage);
   }
 
-  [[nodiscard]] gpg::RType* ResolveBoolType()
+  /**
+   * Orphan: no caller anywhere in src/sdk and no `Address:` citation of its
+   * own. `CachedVectorBoolElementType()` right below does the same
+   * `LookupRType(typeid(bool))` lookup (minus the `REF_FindTypeNamed`
+   * fallback) and is the one with real, evidenced usage: it is called from
+   * `RVectorTypeBool::GetName()` (FUN_00641C20, address-cited below). No
+   * evidence ties this function's extra fallback branch to any call site, so
+   * it is left undisturbed rather than merged into the evidenced one on a
+   * guess.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveBoolType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
