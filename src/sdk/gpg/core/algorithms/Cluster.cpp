@@ -644,8 +644,15 @@ namespace
      *
      * What it does:
      * Returns the address of one 16-bit lane at `wordIndex`.
+     *
+     * Orphan: zero xrefs of any kind at this address per the IDA export
+     * (xrefs_total: 0), zero callers in the callgraph index, and `words`
+     * (the sole field of `WordTableRuntime`) is not referenced anywhere else
+     * in this file. Sits among this file's intrusive-ring-node/byte-cursor
+     * helper cluster (0x00954840-0x009548C0) but no caller for this specific
+     * lane has been found.
      */
-    [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
+    [[maybe_unused]] [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
       const WordTableRuntime* const table,
       const std::int32_t wordIndex
     ) noexcept
