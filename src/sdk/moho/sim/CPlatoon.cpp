@@ -1698,6 +1698,10 @@ namespace moho
 
   /**
    * Address: 0x00C004D0 (FUN_00C004D0, Moho::CSquadConstruct::~CSquadConstruct)
+   *
+   * `FUN_007248B0` and `FUN_007248E0` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CSquadConstruct::~CSquadConstruct()
   {
@@ -1752,6 +1756,10 @@ namespace moho
 
   /**
    * Address: 0x00C00590 (FUN_00C00590, Moho::CPlatoonConstruct::~CPlatoonConstruct)
+   *
+   * `FUN_0072A060` and `FUN_0072A090` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CPlatoonConstruct::~CPlatoonConstruct()
   {
