@@ -4987,6 +4987,21 @@ namespace gpg
      *     sibling-writer situation as ESquadClass above. A prior fabricated
      *     mimic in moho/sim/SThreatSerializer.cpp cited the dead duplicate
      *     address as if it were this real ctor; removed.)
+     *   - T=Moho::EJobType: 0x00BCA460 (no dead duplicate found), atexit
+     *     0x00BF51F0 (dead duplicates: 0x0055B930, 0x0055B960 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneH` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/unit/core/EJobTypeTypeInfo.h.
+     *   - T=Moho::EFireState: 0x00BCA4C0 (no dead duplicate found), atexit
+     *     0x00BF5230 (dead duplicates: 0x0055BAB0, 0x0055BAE0 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneI` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/unit/core/EFireStateTypeInfo.h.
+     *   - T=Moho::EUnitState: 0x00BCA520 (no dead duplicate found), atexit
+     *     0x00BF5270 (dead duplicates: 0x0055BFC0, 0x0055BFF0 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneJ` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/unit/core/EUnitStateTypeInfo.h.
      */
     PrimitiveSerHelper()
       : mLoadCallback(&PrimitiveSerHelper::Deserialize)
