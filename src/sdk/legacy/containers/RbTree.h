@@ -1455,10 +1455,72 @@ namespace msvc8
              * corrected here now that `BuildLobbyIgnoreNameList` genuinely
              * carries the separator set through.
              */
+            /**
+             * Address: 0x007B3500 (FUN_007B3500, sub_7B3500) -- the copy
+             * constructor for the same `msvc8::set<std::uint32_t>`
+             * instantiation cited throughout this file (isNil@+0x11) --
+             * `mapped_type` of `msvc8::map<std::uint32_t,
+             * msvc8::set<std::uint32_t>>` (`Map.h`'s `operator[]`,
+             * `FUN_007B27D0`). `this`/`other` both arrive as ordinary stack
+             * args, establishes its own SEH frame (`push offset
+             * SEH_7B3500`), buys the head sentinel (`call sub_7B4A50`,
+             * self-links, `isNil=1`, `size_=0` -- exactly `buy_head()`
+             * inlined), then calls `sub_7B3EC0` (this instantiation's
+             * `_Copy` driver -- currently misclassified `external_dependency`
+             * pending its own dedicated pass; not corrected here) to clone
+             * `other`'s contents into the freshly-bought head. Reached from
+             * `FUN_007B27D0`'s `value_type(k, mapped_type())` construction:
+             * `mapped_type()` materialises a bare temporary first (this
+             * instantiation's default constructor, inlined directly at that
+             * call site, not a separate symbol), then this address
+             * copy-constructs the pair's `.second` from it (C++03 has no
+             * move semantics; `pair(const key_type&, const mapped_type&)`
+             * binds the temporary by const reference and copies it).
+             *
+             * Has its own explicit exception handler -- a second, detached
+             * code chunk inside the same function range (0x007B356E-
+             * 0x007B357F) that the SEH dispatcher enters if `sub_7B3EC0`
+             * throws: it calls `FUN_007B36A0` (`this` in `eax`, the same
+             * unwind-funclet convention as 0x0052CF10/0x00684310/
+             * 0x007B2940/0x007B2970 above) then `_CxxThrowException(0, 0)`
+             * -- a bare rethrow. `head_` is a raw `node_type*` with no
+             * destructor of its own, so unlike this file's other
+             * compiler-generated EH funclets, the *language* cannot supply
+             * this cleanup automatically once the member-initialiser list
+             * has finished -- the source needs an explicit `catch` to
+             * release the just-bought head before rethrowing. That catch
+             * block's cleanup is `FUN_007B36A0`: `erase_range(leftmost(),
+             * header())` + `operator delete(head)` + zero `head_`/`size_` --
+             * this destructor's exact shape, reused for a
+             * partially-constructed object instead of a fully-alive one.
+             * Verified directly against `.asm`: identical `erase_range`/
+             * `operator delete` sequence to `~rb_tree()` above, entered via
+             * `eax` not `ecx`.
+             *
+             * `FUN_007B36A0` was previously modeled as the third of three
+             * bespoke "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneD21Runtime`), carrying the same
+             * fabricated placement-new step as `FUN_007B2940`/`FUN_007B2970`
+             * above; deleted along with the other two now that this citation
+             * and the `try`/`catch` below reproduce its real behavior.
+             * `FUN_007B3500` itself was separately DB-tracked as a bare
+             * "default-ctor emission" with a stale `CrtRuntimeHelpers.cpp`
+             * source path -- both wrong: it is the copy constructor, not the
+             * default constructor, and its real citation is this one.
+             */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
             {
-                copy_from(other);
+                try {
+                    copy_from(other);
+                } catch (...) {
+                    erase_range(leftmost(), header());
+                    free_raw(head_);
+                    head_ = nullptr;
+                    size_ = 0;
+                    throw;
+                }
             }
 
             /**
@@ -1550,6 +1612,54 @@ namespace msvc8
              * entry. No separate source line -- this is the compiler-generated
              * unwind-path clone of the same destructor, not a distinct
              * function.)
+             */
+            /**
+             * Address: 0x007B2940 (FUN_007B2940)  Address: 0x007B2970 (FUN_007B2970)
+             *
+             * Two more SEH-unwind-path duplicates of this same shape, for the
+             * *other* real instantiation of this exact node (isNil@+0x11,
+             * `msvc8::set<std::uint32_t>`): the `mapped_type` of `msvc8::map<
+             * std::uint32_t, msvc8::set<std::uint32_t>>::operator[]`
+             * (`FUN_007B27D0`, cited on `operator[]` in `Map.h`) --
+             * `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map. That
+             * member's `value_type(k, mapped_type())` construction
+             * materialises two stack temporaries of this type in sequence --
+             * the bare `mapped_type()` prvalue, then the pair's `.second`
+             * copy-constructed from it (`FUN_007B3500`, cited on
+             * `rb_tree(const rb_tree&)` below; C++03 has no move path, so
+             * `pair(const key_type&, const mapped_type&)` genuinely copies
+             * the temporary rather than eliding it). If anything downstream
+             * throws before both are consumed, each is torn down through its
+             * own funclet, `this` arriving in `eax` exactly like 0x0052CF10/
+             * 0x00684310 above, not the plain `ecx` thiscall entry.
+             * `FUN_007B2940` tears down the bare `mapped_type()` temporary
+             * directly. `FUN_007B2970` tears down the pair's embedded
+             * `.second`: it is entered with `eax` pointing at the pair's
+             * `key_type` slot (four bytes ahead of the `mapped_type`
+             * sub-object it actually operates on) and adds 4 to its own
+             * `owner` before touching `head_`/`size_` -- confirmed directly
+             * against `.asm` (`mov eax,[edi+8]` read *before* `add edi,4`,
+             * i.e. this instantiation's `head_`/`size_` live at `owner+8`/
+             * `owner+0xC` from the pair's base, not `+4`/`+8`). Neither has,
+             * or needs, a source-level call site of its own -- compiler-
+             * generated EH scaffolding with no corresponding source line,
+             * citation-only, same as 0x0052CF10/0x00684310.
+             *
+             * Both were previously modeled as two of three bespoke
+             * "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneC21Runtime`/
+             * `ClearEmbeddedSecondaryTreeLaneRuntime`), carrying a trailing
+             * placement-new reconstruction step copied from the same
+             * now-discredited `0x0052A390` precedent described above.
+             * Re-verified directly against each address's own `.asm`: both
+             * are `erase_range` (`call sub_7B3E00`) + `operator
+             * delete(head)` + `head_=nullptr`/`size_=0`, i.e. exactly this
+             * destructor's shape -- no `operator new` call and no
+             * reconstruction anywhere in either body. The two free functions
+             * were deleted; this citation (plus the matching one on the copy
+             * constructor below, for the third, `FUN_007B36A0`) is their
+             * replacement.
              */
             /**
              * Address: 0x006843B0 (FUN_006843B0, `Moho::EntityDB::~EntityDB` --
@@ -3510,25 +3620,32 @@ namespace msvc8
              * two-shape split: whole-tree fast path calls `sub_7B4D10`
              * (`destroy_subtree`) on the root when `first == begin() && last
              * == end()`; otherwise walks `erase(_First++)` via `sub_7B46A0`
-             * (`erase_node`). Reached from three explicit destroy-and-
-             * reconstruct helpers in `moho/sim/SimRecoveryRuntime.cpp`
-             * (`ClearTreeStorageLaneC21Runtime` 0x007B2940,
-             * `ClearEmbeddedSecondaryTreeLaneRuntime` 0x007B2970,
-             * `ClearTreeStorageLaneD21Runtime` 0x007B36A0), each calling
-             * `.~set()` on its owner lane, always with `[leftmost(),
+             * (`erase_node`). Reached from three call sites sharing this
+             * instantiation's `~rb_tree()` shape, always with `[leftmost(),
              * header())` (verified directly against each caller's `.asm` --
-             * `mov ecx,[eax]`/push header pair pushed as `first`/`last` before
-             * `call sub_7B3E00`) -- always the whole-tree fast path from
-             * those three callers, matching `FUN_0052A390`'s sibling shape.
+             * `mov ecx,[eax]`/push header pair pushed as `first`/`last`
+             * before `call sub_7B3E00`) -- always the whole-tree fast path:
+             * `FUN_007B2940`/`FUN_007B2970` (this member's own SEH-unwind
+             * funclets for `operator[]`'s two `value_type(k, mapped_type())`
+             * stack temporaries, cited on `~rb_tree()` above) and
+             * `FUN_007B36A0` (the copy constructor's exception-cleanup,
+             * cited on `rb_tree(const rb_tree&)` above), matching
+             * `FUN_0052A390`'s sibling shape. (Previously described as three
+             * bespoke "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`; corrected once their
+             * trailing placement-new step was found to be fabricated -- see
+             * the citations above.)
              * Also reached from the same tree's copy machinery on the
              * exception path: `_Copy`'s emission (`FUN_007B4980`) calls this
              * member's `destroy_subtree` half directly (not through
              * `erase_range`) to unwind a partially-copied subtree before
-             * rethrowing, and `FUN_007B3EC0` (the copy constructor) is
-             * `_Copy`'s only caller -- both currently misclassified
-             * `external_dependency` in `recovered_progress.json` pending a
-             * dedicated pass; not corrected here since neither is this
-             * batch's assigned token, flagged for whoever picks up
+             * rethrowing, and `FUN_007B3EC0` (`_Copy`'s driver, called from
+             * the copy constructor `FUN_007B3500` above) is `_Copy`'s only
+             * caller -- both currently misclassified `external_dependency`
+             * in `recovered_progress.json` pending a dedicated pass on
+             * `copy_from`'s own algorithm (see the note on `copy_from`
+             * below); not corrected here since neither is this batch's
+             * assigned token, flagged for whoever picks up
              * `FUN_007B4980`/`FUN_007B3EC0` next.)
              */
             /**
@@ -5152,36 +5269,38 @@ namespace msvc8
              * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` at the
              * unrelated address 0x0052CCF0 above); reached from `erase_range`'s
              * (`FUN_007B3E00`, cited below) whole-tree fast path, itself called
-             * directly (`call sub_7B3E00`, hardcoded) from three sibling
-             * `msvc8::set<std::uint32_t>` explicit destroy-and-reconstruct helpers
-             * in `moho/sim/SimRecoveryRuntime.cpp` --
-             * `ClearTreeStorageLaneC21Runtime` (0x007B2940),
-             * `ClearEmbeddedSecondaryTreeLaneRuntime` (0x007B2970) and
-             * `ClearTreeStorageLaneD21Runtime` (0x007B36A0), each of which calls
-             * `.~set()` then placement-news a fresh empty set on its owner
-             * lane. NOTE: this explicit-destroy-and-reconstruct idiom was
-             * originally modeled on `RRuleGameRulesLuaExportBinding::
-             * mPendingBlueprintOrdinals`'s sibling instantiation (formerly
-             * `ReleaseExportBindingPendingOrdinals`, RRuleGameRules.cpp) --
-             * that precedent turned out to be a mis-model: `FUN_0052A390`
-             * (the address it was based on) is a plain destructor with no
+             * directly (`call sub_7B3E00`, hardcoded) from three call sites
+             * sharing this instantiation's `~rb_tree()` shape --
+             * `FUN_007B2940`/`FUN_007B2970` (SEH-unwind funclets for
+             * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::
+             * operator[]`'s `value_type(k, mapped_type())` temporaries,
+             * cited on `~rb_tree()` above) and `FUN_007B36A0` (the copy
+             * constructor's exception-cleanup, cited on `rb_tree(const
+             * rb_tree&)` above).
+             *
+             * RESOLVED: these three were previously modeled as bespoke
+             * "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneC21Runtime`/
+             * `ClearEmbeddedSecondaryTreeLaneRuntime`/
+             * `ClearTreeStorageLaneD21Runtime`), each explicitly destroying
+             * then placement-new reconstructing its owner lane -- a shape
+             * copied from `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals`'s former `ReleaseExportBindingPendingOrdinals`
+             * (RRuleGameRules.cpp) precedent that turned out to be a
+             * mis-model (`FUN_0052A390` is a plain destructor with no
              * reconstruction step, per its own citation above; the
              * reconstruct-after-destroy shape was an artifact of a
-             * hand-rolled array owner that has since been migrated to a
-             * real `msvc8::vector<T>` (RRuleGameRules.h). These three
-             * `SimRecoveryRuntime.cpp` functions were not touched by that
-             * migration and still carry their own independent "verified
-             * directly against .asm" claim for the `erase_range`+
-             * `destroy_subtree`+`operator delete(head)` sequence -- but that
-             * claim was not re-checked here for whether the *subsequent*
-             * placement-new reconstruction is also genuinely present in
-             * `FUN_007B2940`/`FUN_007B2970`/`FUN_007B36A0`'s own
-             * disassembly, or was carried over from the now-discredited
-             * precedent. All three are currently unwired ("nothing in
-             * src/sdk/** calls this function yet" per their own doc
-             * comments), so this does not affect the compiled recovered
-             * binary today, but it is worth re-verifying before wiring them
-             * up.)
+             * hand-rolled array owner since migrated to a real
+             * `msvc8::vector<T>`). Re-verified directly against each of
+             * these three addresses' own `.asm`: all three are
+             * `erase_range`+`operator delete(head)`+zero-`head_`/`size_`
+             * only -- no `operator new` call, no reconstruction, in any of
+             * the three bodies. The three free functions were deleted; they
+             * are cited on `~rb_tree()`/`rb_tree(const rb_tree&)` above
+             * instead, which also documents their real callers
+             * (`FUN_007B27D0`'s `operator[]` and `FUN_007B3500`'s copy
+             * constructor respectively) -- they are no longer unwired.)
              */
             /**
              * Address: 0x00688030 (FUN_00688030, `msvc8::map<std::uint32_t,
@@ -5572,6 +5691,27 @@ namespace msvc8
              * on `_Rootnode->_Left`/`_Rootnode->_Right` in turn, wiring the
              * results into the new node's `_Left`/`_Right`. Sole caller is
              * `FUN_007CC3B0` above (plus its own two self-recursive calls).
+             */
+            /**
+             * FLAGGED, not fixed in this pass: this member's real binary
+             * shape (multiple instantiations -- `FUN_00530EE0`/`FUN_007CC3B0`/
+             * `FUN_007B3EC0` above, each driving a recursive `_Copy(node,
+             * parent)` clone -- `FUN_00531B30`/`FUN_007CC470`/`FUN_007B4980`
+             * -- that allocates and copies each node in one recursive pass,
+             * then re-derives `leftmost()`/`rightmost()` from the cloned
+             * root) does not match the walk-and-`insert_unique` loop below.
+             * The two are behaviorally close (same final elements) but not
+             * identical: `insert_unique` re-runs full compare-and-rebalance
+             * per element instead of cloning the source's exact shape, and
+             * doesn't call through `_Copy` at all, so this body cannot be
+             * cited as a match for any of the three `_Copy`-driven addresses
+             * above. Found while wiring `FUN_007B36A0`'s copy-constructor
+             * caller (`rb_tree(const rb_tree&)` above) into real callers;
+             * out of scope for that task since fixing it properly means
+             * re-verifying `_Copy`'s recursive-clone shape against multiple
+             * separate instantiations first. Left as-is rather than guessed
+             * at; flagged for whoever picks up `FUN_00530EE0`/`FUN_007CC3B0`/
+             * `FUN_007B4980` next.
              */
             void copy_from(const rb_tree& other)
             {
