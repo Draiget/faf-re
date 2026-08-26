@@ -1278,6 +1278,23 @@ namespace
    * What it does:
    * Resolves one adapter-mode tree insertion anchor by lower-bound lookup on
    * `(width,height,refresh)` and writes the chosen node lane to `*outNode`.
+   *
+   * Real callers, confirmed but not wired: the callgraph index cites this
+   * address's two callers as `func_SetupPrimaryAdapterSettings`
+   * (FUN_008D21E0) and `func_SetupSecondaryAdapterSettings` (FUN_008D26D0) --
+   * i.e. this IS the binary's real `msvc8::rb_tree<moho::Resolution>::
+   * lower_bound`-based insertion-anchor step for the sorted adapter-mode
+   * dedup tree, exactly as legacy/containers/RbTree.h's
+   * `insert_at`/`buy_node`-with-value catalog entry (~line 6200) already
+   * documents. That entry also explains why this isn't wired here: the
+   * currently recovered `SetupPrimaryAdapterSettings`/
+   * `SetupSecondaryAdapterSettings` (`CollectAdapterModes`/`HasMode` in this
+   * file) dedup via an O(n) linear scan instead of this sorted tree --
+   * same resulting set, different observable UI order -- and migrating to
+   * the real tree requires recovering the rest of the
+   * `T=Resolution` instantiation (`insert_at`, buy-node-with-value,
+   * rotations) first. See RbTree.h for the full analysis; not attempted in
+   * this pass.
    */
   [[maybe_unused]] AdapterModeSortTreeNodeRuntimeView** ResolveAdapterModeSortInsertionAnchor(
     const AdapterModeSortKeyRuntimeView& key,
