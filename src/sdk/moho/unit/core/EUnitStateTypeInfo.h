@@ -56,6 +56,15 @@ namespace moho
    * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
    * `Deserialize`/`Serialize` at 0x0055D450/0x0055D470 already matched this
    * template's generic bodies exactly (no fabricated null-check).
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF5270` (atexit target
+   * pushed by the real ctor above); `FUN_0055BFC0`/`FUN_0055BFF0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneJ` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using EUnitStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EUnitState, int>;
 
