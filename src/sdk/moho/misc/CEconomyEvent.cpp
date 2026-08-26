@@ -1061,39 +1061,13 @@ namespace moho
     archive->Read(econValueType, &mGranted, nullOwner);
   }
 
-  /**
-   * Address: 0x00774450 (FUN_00774450)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards economy-request load lanes into
-   * `CEconRequest::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEconRequestThunkA(
-    CEconRequest* const request,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (request != nullptr) {
-      request->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00774550 (FUN_00774550)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards economy-request load lanes into
-   * `CEconRequest::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEconRequestThunkB(
-    CEconRequest* const request,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (request != nullptr) {
-      request->MemberDeserialize(archive);
-    }
-  }
+  // Addresses 0x00774450/0x00774550 (the "ThunkA"/"ThunkB" load-lane
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `DeserializeCEconRequestSerializerCallback` above
+  // (`CEconRequestSerializer::Deserialize`, 0x00773A00) already forwards
+  // into `CEconRequest::MemberDeserialize` and is the real, wired body --
+  // confirmed by 3 real incoming xrefs incl. the CEconRequestSerializer ctor.
 
   /**
    * Address: 0x00774AE0 (FUN_00774AE0, Moho::CEconRequest::MemberSerialize)
