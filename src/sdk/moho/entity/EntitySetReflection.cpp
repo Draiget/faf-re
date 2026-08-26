@@ -125,16 +125,11 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x006947E0 (FUN_006947E0)
-   *
-   * What it does:
-   * Secondary duplicated RTTI-resolve lane for `fastvector<Entity*>`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveFastVectorEntityPointerTypeVariantB()
-  {
-    return ResolveFastVectorEntityPointerType();
-  }
+  // Address 0x006947E0 (the duplicate RTTI-resolve "VariantB" lane formerly
+  // modeled here) is dead: zero data_refs and zero call_edges in the
+  // callgraph index, and no source-level caller anywhere in src/sdk/**.
+  // ResolveFastVectorEntityPointerType above is the real, heavily-used
+  // resolver and already covers this address's behavior.
 
   [[nodiscard]] gpg::RRef MakeEntitySetBaseRef(moho::EntitySetBase* object)
   {
@@ -316,35 +311,11 @@ namespace
     archive->Read(ResolveFastVectorEntityPointerType(), &object->mVec, owner);
   }
 
-  /**
-   * Address: 0x00694160 (FUN_00694160)
-   *
-   * What it does:
-   * Bridge thunk that forwards one `EntitySetBase` deserialize lane to the
-   * canonical serializer body.
-   */
-  [[maybe_unused]] void DeserializeEntitySetBaseSerializerBodyThunkA(
-    moho::EntitySetBase* const object,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeEntitySetBaseSerializerBody(object, archive);
-  }
-
-  /**
-   * Address: 0x00694490 (FUN_00694490)
-   *
-   * What it does:
-   * Mirrored bridge thunk that forwards one `EntitySetBase` deserialize lane
-   * to the canonical serializer body.
-   */
-  [[maybe_unused]] void DeserializeEntitySetBaseSerializerBodyThunkB(
-    moho::EntitySetBase* const object,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeEntitySetBaseSerializerBody(object, archive);
-  }
+  // Addresses 0x00694160/0x00694490 (the "ThunkA"/"ThunkB" bridge duplicates
+  // formerly modeled here) are dead: zero data_refs and zero call_edges in
+  // the callgraph index for both, and no source-level caller anywhere in
+  // src/sdk/**. `EntitySetBaseSerializer::Deserialize` below already calls
+  // `DeserializeEntitySetBaseSerializerBody` above directly.
 
   /**
    * Address: 0x00694640 (FUN_00694640)
@@ -366,35 +337,11 @@ namespace
     archive->Write(ResolveFastVectorEntityPointerType(), &object->mVec, owner);
   }
 
-  /**
-   * Address: 0x00694170 (FUN_00694170)
-   *
-   * What it does:
-   * Register-shape serializer thunk forwarding to the canonical
-   * `EntitySetBase` save body.
-   */
-  [[maybe_unused]] void SerializeEntitySetBaseSerializerBodyThunkA(
-    const moho::EntitySetBase* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeEntitySetBaseSerializerBody(object, archive);
-  }
-
-  /**
-   * Address: 0x006944A0 (FUN_006944A0)
-   *
-   * What it does:
-   * Secondary register-shape serializer thunk forwarding to the canonical
-   * `EntitySetBase` save body.
-   */
-  [[maybe_unused]] void SerializeEntitySetBaseSerializerBodyThunkB(
-    const moho::EntitySetBase* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    SerializeEntitySetBaseSerializerBody(object, archive);
-  }
+  // Addresses 0x00694170/0x006944A0 (the "ThunkA"/"ThunkB" register-shape
+  // duplicates formerly modeled here) are dead: zero data_refs and zero
+  // call_edges in the callgraph index for both, and no source-level caller
+  // anywhere in src/sdk/**. `EntitySetBaseSerializer::Serialize` below
+  // already calls `SerializeEntitySetBaseSerializerBody` above directly.
 
   /**
    * Address: 0x006946B0 (FUN_006946B0)
