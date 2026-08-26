@@ -4595,6 +4595,93 @@ namespace gpg
    * a same-address `using` alias cannot produce -- check `vtable_writers`
    * for a distinct `XSerializer@Namespace` vtable head before assuming the
    * simpler alias shape applies to any given remaining T.
+   *
+   * `Moho::CUnitFormAndMoveTaskSerializer` (`moho/unit/tasks/
+   * CUnitFormAndMoveTask.cpp`, VFTABLE 0x00E206F8 / base VFTABLE 0x00E20700)
+   * and `Moho::CUnitUnloadUnitsSerializer` (`moho/unit/tasks/
+   * CUnitUnloadUnits.cpp`, VFTABLE 0x00E20EB8 / base VFTABLE 0x00E20EC0) hit
+   * the exact same CEfxTrailEmitter nuance -- both need the empty-derived-
+   * class shape, confirmed via the same two-distinct-adjacent-vtables test.
+   * Both also surfaced a related trap worth watching for across the ~41
+   * remaining conversions: an earlier pass at each of these two files had
+   * already recovered the template's own per-T `Deserialize`/`Serialize`
+   * bodies (e.g. 0x006199D0/0x006199E0 for `CUnitFormAndMoveTask`), but
+   * mis-modeled them as hand-written standalone free-function thunks
+   * (`CUnitFormAndMoveTaskMemberDeserializeThunk` and friends) instead of
+   * recognizing them as this template's own compiler-emitted
+   * `Deserialize`/`Serialize` for that T. The tell is the same tail-jump
+   * shape documented above for CEfxTrailEmitter's Deserialize/Serialize
+   * thunks (`mov eax, [esp+arg_0]; mov ecx, [esp+arg_4]; jmp
+   * T::MemberDeserialize`) -- when a "thunk" free function found near a
+   * `MemberDeserialize`/`MemberSerialize` pair has exactly that shape and
+   * its address is what a `SerSaveLoadHelper<T>`-shaped ctor writes into
+   * `mLoadCallback`/`mSaveCallback`, it is this template's own per-T method,
+   * not a separately hand-written forwarder -- delete the standalone
+   * free-function modeling and cite the address on the derived class instead
+   * (see either file for the corrected shape).
+   *
+   * `Moho::CUnitAssistMoveTaskSerializer` (`moho/unit/tasks/
+   * CUnitAssistMoveTask.cpp`) looks superficially like the same pattern
+   * (RTTI also lists `SerSaveLoadHelper<CUnitAssistMoveTask>` as a base) but
+   * is NOT a template instantiation of any shape: `CUnitAssistMoveTask::
+   * MemberDeserialize`/`MemberSerialize` are STATIC 4-argument forwarders
+   * (`archive, task, version, ownerRef`), not the instance-method,
+   * single-`archive`-argument shape `Deserialize`/`Serialize` below call
+   * (`object->MemberDeserialize(archive)`) -- that shape cannot be
+   * instantiated for this T with the template as currently written, so it
+   * stays a concrete `SerHelperBase`-derived class instead (matching
+   * `CUnitCarrierRetrieveSerializerHelper`/`CUnitReclaimTaskSerializer`).
+   * Confirm the real `MemberDeserialize`/`MemberSerialize` parameter count
+   * from the class header before assuming any given remaining T fits the
+   * template at all, not just which derived-class shape it needs.
+   *
+   * `Moho::CUnitTeleportTaskSerializer` and `Moho::CUnitFireAtTaskSerializer`
+   * (both `moho/unit/tasks/CUnitCallTeleport.{h,cpp}` /
+   * `moho/unit/tasks/CUnitFireAtTask.{h,cpp}` -- note `CUnitTeleportTask` is
+   * the SECOND, unrelated class declared in the `CUnitCallTeleport.*` pair;
+   * `Moho::CUnitCallTeleport` itself has its own separate, non-template
+   * serializer in `moho/serialization/CUnitCallTeleportSerializer.*` and is
+   * untouched by this instantiation) hit the exact same CEfxTrailEmitter
+   * empty-derived-class nuance -- both need a real (if empty) derived class,
+   * confirmed via the same two-distinct-adjacent-vtables test:
+   *  - T=Moho::CUnitTeleportTask: VFTABLE 0x00E20348 / base VFTABLE
+   *    0x00E20350, ctor 0x00BD0650 (no dead duplicate found), atexit
+   *    0x00BF9C60, Init 0x0060BBA0, Deserialize 0x0060AA10 (tail-calls
+   *    `MemberDeserialize` at 0x0060D270), Serialize 0x0060AA20 (tail-calls
+   *    `MemberSerialize` at 0x0060D350). Also hit the CUnitFormAndMoveTask
+   *    mis-modeling trap: an earlier pass had already recovered 0x0060AA10/
+   *    0x0060AA20 as hand-written 2-argument free functions
+   *    (`CUnitTeleportTaskSerializerLoad`/`Save`) plus `volatile`
+   *    function-pointer anchors to keep them ODR-used -- wrong signature
+   *    (the real slot is `RType::load_func_t`/`save_func_t`, 4 arguments)
+   *    and never actually invoked by anything; deleted in favor of this
+   *    template instantiation, which supplies the equivalent bodies itself.
+   *  - T=Moho::CUnitFireAtTask: VFTABLE 0x00E20394 / base VFTABLE
+   *    0x00E2039C, ctor 0x00BD06B0 (no dead duplicate found), atexit
+   *    0x00BF9CF0, Init 0x0060BC60, Deserialize 0x0060B100 (tail-jmp shape,
+   *    archive in EAX / objectPtr in ECX, into `MemberDeserialize` at
+   *    0x0060D430), Serialize 0x0060B110 (tail-calls `MemberSerialize` at
+   *    0x0060D510). This T additionally required recovering
+   *    `MemberDeserialize`/`MemberSerialize` from scratch (previously
+   *    missing entirely): `mDispatch` (`IAiCommandDispatchImpl*` at +0x30)
+   *    reflects through the `CCommandTask` base type via
+   *    `ReadPointer_CCommandTask`/`RRef_CCommandTask`+`WriteRawPointer`,
+   *    exactly the established `CUnitPatrolTask`/`CFactoryBuildTask`/
+   *    `CUnitAssistMoveTask` idiom for an `IAiCommandDispatchImpl`-typed
+   *    dispatch-task field; `mTarget` (`CAiTarget` at +0x34) is a plain
+   *    reflected-value field, same as `CUnitTeleportTask::mTarget` above and
+   *    `CUnitAttackTargetTask::mTarget`; `mWeapon` (`UnitWeapon*` at +0x54)
+   *    is a tracked pointer via `ReadPointer_UnitWeapon`/`RRef_UnitWeapon`,
+   *    exact match to `CUnitAttackTargetTask::mWeapon`; `mIsNuclear`
+   *    (`std::int32_t` at +0x58) is read/written through the `ESiloType`
+   *    reflected type (RTTI typeinfo `??_R0?AW4ESiloType@Moho@@@8`) rather
+   *    than as a raw int -- confirmed by raw asm on both the load and save
+   *    sides, and consistent with every other use of this field being an
+   *    `ESiloType` (`static_cast<ESiloType>(mIsNuclear)` in `Execute()`).
+   *    The field's own declared C++ type is left as `std::int32_t` (an
+   *    `ESiloType` retype would ripple into the ctor/`Create()` signatures,
+   *    which are out of scope here); only the archive lane's reflected type
+   *    changed to match the binary.
    */
   template <class T>
   class SerSaveLoadHelper : public SerHelperBase

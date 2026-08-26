@@ -4,7 +4,10 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -17,6 +20,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 
@@ -57,6 +61,40 @@ namespace
       moho::CUnitFireAtTask::sType = type;
     }
     return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAiTargetType()
+  {
+    gpg::RType* type = moho::CAiTarget::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CAiTarget));
+      moho::CAiTarget::sType = type;
+    }
+    return type;
+  }
+
+  // Mirrors the file-local `CachedESiloTypeType()` helper already established
+  // in CAiSiloBuildImplTypeInfo.cpp: `ESiloType` is an enum, so it cannot
+  // host its own `sType` static member the way class/struct reflected types
+  // do -- IDA's decompiler displays the underlying global as
+  // `Moho::ESiloType::sType`, but that is a plain per-TU cache, not a member.
+  [[nodiscard]] gpg::RType* CachedESiloTypeType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::ESiloType));
+    }
+    return cached;
   }
 
   template <class TObject>
@@ -336,6 +374,115 @@ namespace moho
       );
       return -1;
     }
+  }
+
+  /**
+   * Address: 0x0060D430 (FUN_0060D430, Moho::CUnitFireAtTask::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall sub_60D430(Moho::CUnitFireAtTask *this@<ecx>, gpg::ReadArchive *archive@<eax>);
+   *
+   * What it does:
+   * Loads fire-at-task state from an archive in binary lane order:
+   *   1. base `CCommandTask` subobject (by reflected type).
+   *   2. `mDispatch` at +0x30, read as a tracked `CCommandTask*` pointer
+   *      (`IAiCommandDispatchImpl` derives from `CCommandTask`).
+   *   3. `mTarget` at +0x34 (by reflected type).
+   *   4. `mWeapon` at +0x54, read as a tracked pointer.
+   *   5. `mIsNuclear` at +0x58, read through the `ESiloType` reflected type.
+   */
+  void CUnitFireAtTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    CCommandTask* dispatchAsCommandTask = nullptr;
+    archive->ReadPointer_CCommandTask(&dispatchAsCommandTask, &ownerRef);
+    mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchAsCommandTask);
+
+    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->ReadPointer_UnitWeapon(&mWeapon, &ownerRef);
+    archive->Read(CachedESiloTypeType(), &mIsNuclear, ownerRef);
+  }
+
+  /**
+   * Address: 0x0060D510 (FUN_0060D510, Moho::CUnitFireAtTask::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall sub_60D510(Moho::CUnitFireAtTask *this@<eax>, gpg::WriteArchive *archive@<edi>);
+   *
+   * What it does:
+   * Writes fire-at-task state to an archive in the same binary lane order as
+   * `MemberDeserialize`: base `CCommandTask` subobject, `mDispatch` (as an
+   * unowned tracked `CCommandTask*` pointer), `mTarget` (by reflected type),
+   * `mWeapon` (as an unowned tracked pointer), then `mIsNuclear` (through the
+   * `ESiloType` reflected type).
+   */
+  void CUnitFireAtTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+
+    gpg::RRef dispatchRef{};
+    (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
+    gpg::WriteRawPointer(archive, dispatchRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+
+    gpg::RRef weaponRef{};
+    (void)gpg::RRef_UnitWeapon(&weaponRef, mWeapon);
+    gpg::WriteRawPointer(archive, weaponRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedESiloTypeType(), &mIsNuclear, ownerRef);
+  }
+
+  namespace
+  {
+    // Address: 0x00BD06B0 (FUN_00BD06B0, register_CUnitFireAtTaskSerializer)
+    // -- MSVC's own compiler-generated dynamic initializer for this global
+    // runs the real `gpg::SerSaveLoadHelper<CUnitFireAtTask>` ctor chain
+    // (self-links into `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback`
+    // to the template's `Deserialize`/`Serialize` -- the real compiled
+    // bodies at 0x0060B100/0x0060B110, which tail-call
+    // `CUnitFireAtTask::MemberDeserialize`/`MemberSerialize` above -- then
+    // installs first the base template's vtable, then this derived class's
+    // own; the intermediate base-vtable write is elided by the compiler
+    // since it is immediately overwritten) and registers the atexit dtor
+    // (0x00BF9CF0, ResetLinks()-shaped unlink-then-self-link body).
+    CUnitFireAtTaskSerializer gCUnitFireAtTaskSerializer;
+
+    struct CUnitFireAtTaskSerializerBootstrap
+    {
+      CUnitFireAtTaskSerializerBootstrap()
+      {
+        register_CUnitFireAtTaskSerializer();
+      }
+    };
+
+    CUnitFireAtTaskSerializerBootstrap gCUnitFireAtTaskSerializerBootstrap;
+  } // namespace
+
+  /**
+   * Address: 0x00BD06B0 (FUN_00BD06B0, register_CUnitFireAtTaskSerializer)
+   *
+   * What it does:
+   * Forces this translation unit's global `CUnitFireAtTaskSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (CUnitFireAtTask.h) and on
+   * `gCUnitFireAtTaskSerializer` above for why this function's body has no
+   * field-setting logic of its own.
+   */
+  void register_CUnitFireAtTaskSerializer()
+  {
+    (void)gCUnitFireAtTaskSerializer;
   }
 } // namespace moho
 
