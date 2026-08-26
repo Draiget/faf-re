@@ -845,8 +845,12 @@ namespace
    * What it does:
    * Returns owner base pointer (`backRef - 0x4`) for one linked node, or
    * null when node is unlinked.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, and no inline `backRef - 4`-shaped duplicate of this
+   * computation was found elsewhere in this file to redirect instead.
    */
-  BackLinkOwnerLaneView* ResolveBackLinkNodeOwner(const BackLinkNodeRuntime* const node) noexcept
+  [[maybe_unused]] BackLinkOwnerLaneView* ResolveBackLinkNodeOwner(const BackLinkNodeRuntime* const node) noexcept
   {
     BackLinkNodeRuntime** const backRef = node->backRef;
     if (backRef == nullptr) {
@@ -1180,8 +1184,16 @@ namespace
    *
    * What it does:
    * Resolves and caches RTTI for one `EntityDB` object lane.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, and `gLegacyEntityDbType` (its only writer) is never read
+   * anywhere else in this file. Unlike its two siblings below
+   * (`ResolveLegacyEntityDbIdPoolMapType`/`ResolveLegacyEntityDbEntityListType`,
+   * now wired into `CEntityDb::MemberSerialize`/`MemberDeserialize`), no
+   * caller needing `CEntityDb`'s own reflected type (as opposed to a member's)
+   * was found in this file.
    */
-  [[nodiscard]] gpg::RType* ResolveLegacyEntityDbType()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityDbType()
   {
     gpg::RType* type = gLegacyEntityDbType;
     if (!type) {
