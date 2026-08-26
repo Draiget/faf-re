@@ -9082,105 +9082,41 @@ namespace
 } // namespace
 namespace
 {
-  constexpr const char* kSerializationHeaderPath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
-  struct SerSaveLoadHelperInitView
-  {
-    void* vtable = nullptr;                     // +0x00
-    gpg::SerHelperBase* helperNext = nullptr;  // +0x04
-    gpg::SerHelperBase* helperPrev = nullptr;  // +0x08
-    gpg::RType::load_func_t loadCallback = nullptr;
-    gpg::RType::save_func_t saveCallback = nullptr;
-  };
-  static_assert(offsetof(SerSaveLoadHelperInitView, helperNext) == 0x04,
-    "SerSaveLoadHelperInitView::helperNext offset must be 0x04");
-  static_assert(offsetof(SerSaveLoadHelperInitView, helperPrev) == 0x08,
-    "SerSaveLoadHelperInitView::helperPrev offset must be 0x08");
-  static_assert(offsetof(SerSaveLoadHelperInitView, loadCallback) == 0x0C,
-    "SerSaveLoadHelperInitView::loadCallback offset must be 0x0C");
-  static_assert(offsetof(SerSaveLoadHelperInitView, saveCallback) == 0x10,
-    "SerSaveLoadHelperInitView::saveCallback offset must be 0x10");
-  static_assert(sizeof(SerSaveLoadHelperInitView) == 0x14,
-    "SerSaveLoadHelperInitView size must be 0x14");
-
-  using SerializerWord = std::uint32_t;
-
   /**
-   * INVESTIGATION FLAG (2026-08-25): this function has no `Address:` citation
-   * of its own -- every caller below supplies one, but none of the ones this
-   * pass checked hold up. Raw `.asm` reads at 9 of the ~127 cited addresses
-   * (`Wm3::AxisAlignedBox3f` 0x004ED140, `Moho::Vector4f` 0x004ED460,
-   * `Moho::VTransform` 0x004F0840, `Moho::HPathCell` 0x007632D0,
-   * `Moho::NavPath` 0x00763370, `Moho::PathQueue` 0x00767080,
-   * `Moho::CUnitCarrierRetrieve` 0x00607730, `Moho::CUnitCarrierLaunch`
-   * 0x006078B0, plus this function's own would-be address which turned out to
-   * be a duplicate citation of the unrelated, already-correctly-recovered
-   * `WriteSharedRawPointerFromLaunchInfoBaseSlotLane2` at 0x00884E70) show
-   * every one is actually a per-type `Init()` override on a distinct
-   * `gpg::SerHelperBase`-derived class (IDA's own demangled name:
-   * `gpg::SerSaveLoadHelper<T>::Init`), using a cached-static +
-   * `gpg::LookupRType(typeid(T))` lookup -- never `gpg::REF_FindTypeNamed`
-   * by string, which is what this shared helper does. 9/9 sampled addresses
-   * were wrong.
+   * `InstallSerSaveLoadHelperCallbacksByTypeName` -- the shared dispatcher
+   * behind every `InstallMoho<X>SerializerCallbacks`/
+   * `InstallWm3<X>SerializerCallbacks` wrapper in this file -- along with its
+   * `SerSaveLoadHelperInitView` raw offset-reach-in parameter struct, the
+   * `kSerializationHeaderPath` constant it used for its two
+   * `gpg::HandleAssertFailure` call sites, and the never-referenced
+   * `SerializerWord` alias, are removed here (2026-08-26 ArchiveSerialization
+   * audit, closing pass).
    *
-   * Follow-up pass (same day): the whole `Moho::*Serializer::Init` family in
-   * `moho/math/MathReflection.{h,cpp}` (`AxisAlignedBox3fSerializer`,
-   * `Vector2iSerializer`, `Vector3iSerializer`, `Vector2fSerializer`,
-   * `Vector3fSerializer`, `Vector4fSerializer`, `QuaternionfSerializer`,
-   * `VEulers3Serializer`, `VAxes3Serializer`) turned out to be the SAME
-   * raw-`SerHelperBase`-mimic anti-pattern being purged project-wide this
-   * session, independently of this file. Recovering it properly required
-   * claiming the exact 9 addresses this comment already flagged as
-   * disproven for `Wm3::AxisAlignedBox3f`/`Moho::Vector4f` plus 7 more in the
-   * same family this pass additionally confirmed wrong by the identical raw
-   * `.asm` read (`Wm3::Vector2i`/`Wm3::Vector3i`/`Wm3::Vector2f`/
-   * `Wm3::Vector3f`/`Wm3::Quaternion<float>`/`Moho::VEulers3`/`Moho::VAxes3`
-   * at 0x004ED1E0/0x004ED280/0x004ED320/0x004ED3C0/0x004ED500/0x004ED5A0/
-   * 0x004ED640). All 9 `InstallXxxSerializerCallbacks` wrappers below for
-   * these types are removed (see the removal-note comments left in their
-   * place); the real bodies now live as `Init()` overrides on their real
-   * `gpg::SerHelperBase`-derived classes in `MathReflection.cpp`, matching
-   * the ctor/dtor/ctor-atexit evidence already fully researched there.
-   *
-   * Six are fixed as of this pass (HPathCell/PathQueue in
-   * `moho/ai/HPathCellSerializer.*` and `moho/path/PathTables.cpp`; the two
-   * CUnitCarrier* citations were plain duplicates of already-correct
-   * recoveries and were deleted outright; all 9 math types above moved to
-   * `MathReflection.cpp`). `Moho::VTransform` (0x004F0840) is still
-   * disproven-but-unfixed -- same shape, own ctor/Deserialize/Serialize
-   * research not yet done. The remaining ~110 callers below are UNVERIFIED,
-   * not confirmed-correct -- treat every one as a lead to re-check against
-   * its own raw `.asm`, not as settled. See
+   * This dispatcher had no `Address:` citation of its own -- it modeled a
+   * `gpg::REF_FindTypeNamed`-by-string-name lookup mechanism that ground-
+   * truth `.c` disassembly never once confirmed. Every one of its originally
+   * ~114 `InstallMoho<X>SerializerCallbacks`-family callers, checked one by
+   * one against its own raw asm across this and earlier sessions, turned out
+   * to be a disproven duplicate citation of the ordinary typeid-cached
+   * `gpg::LookupRType` + direct-assignment `Init()` shape (either
+   * `gpg::SerSaveLoadHelper<T>::Init()` or `gpg::PrimitiveSerHelper<T,int>::
+   * Init()`), already correctly recovered elsewhere in the SDK tree as a
+   * named `Init()` override on the owning type's real `gpg::SerHelperBase`-
+   * derived serializer class. See the individual removal notes throughout
+   * this file and
    * decomp/recovery/reports/by-source/src/sdk/gpg/core/containers/ArchiveSerialization.cpp.reconstruction.md
-   * for the full methodology and findings.
+   * for the per-type evidence.
+   *
+   * `InstallMohoETriggerOperatorSerializerCallbacks` and
+   * `InstallMohoEScrollTypeSerializerCallbacks` (removed further below) were
+   * this dispatcher's last two live callers in this file; with those gone it
+   * has zero remaining callers anywhere in `src/sdk/**`, so it -- and its
+   * now-equally-dead supporting struct/constant/alias -- are removed as dead
+   * scaffolding rather than left as an orphan. This closes out the
+   * `InstallMoho<X>SerializerCallbacks` dead-duplicate cleanup campaign for
+   * this file: zero live `InstallSerSaveLoadHelperCallbacksByTypeName(helper,`
+   * call sites remain.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallSerSaveLoadHelperCallbacksByTypeName(
-    SerSaveLoadHelperInitView* const helper,
-    const char* const reflectedTypeName
-  )
-  {
-    GPG_ASSERT(helper != nullptr);
-    GPG_ASSERT(reflectedTypeName != nullptr);
-
-    gpg::RType* const type = gpg::REF_FindTypeNamed(reflectedTypeName);
-    GPG_ASSERT(type != nullptr);
-
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
-    }
-
-    const bool saveWasNull = type->serSaveFunc_ == nullptr;
-    const gpg::RType::load_func_t loadCallback = helper->loadCallback;
-    type->serLoadFunc_ = loadCallback;
-
-    if (!saveWasNull) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
-    }
-
-    type->serSaveFunc_ = helper->saveCallback;
-    return loadCallback;
-  }
 
   /**
    * `InstallWm3AxisAlignedBox3fSerializerCallbacks` removed here (2026-08-25
@@ -9653,17 +9589,15 @@ namespace
    */
 
   /**
-   * Address: 0x005F1A70 (FUN_005F1A70)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitAssistMoveTask`.
+   * `InstallMohoCUnitAssistMoveTaskSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x005F1A70`
+   * citation was disproven -- ground-truth `.c` disassembly shows the
+   * standard direct-assignment `Init()` shape (`type->serLoadFunc_ = ...` /
+   * `->mSerLoadFunc = ...`), not the generic by-name lookup this file
+   * modeled, and had zero callers in this file. Real body is
+   * `moho::CUnitAssistMoveTaskSerializer::Init()` in
+   * moho/unit/tasks/CUnitAssistMoveTask.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitAssistMoveTaskSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitAssistMoveTask");
-  }
 
   /**
    * `InstallMohoCUnitAttackTargetTaskSerializerCallbacks` removed here
@@ -9809,30 +9743,34 @@ namespace
 {
 
   /**
-   * Address: 0x0060BBA0 (FUN_0060BBA0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitTeleportTask`.
+   * `InstallMohoCUnitTeleportTaskSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x0060BBA0`
+   * citation was disproven -- ground-truth `.c` disassembly shows the
+   * standard direct-assignment `Init()` shape (`type->serLoadFunc_ = ...` /
+   * `->mSerLoadFunc = ...`), not the generic by-name lookup this file
+   * modeled, and had zero callers in this file. Real body is
+   * `gpg::SerSaveLoadHelper<CUnitTeleportTask>::Init()`, inherited unchanged
+   * by `moho::CUnitTeleportTaskSerializer` in
+   * moho/unit/tasks/CUnitCallTeleport.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitTeleportTaskSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitTeleportTask");
-  }
 
   /**
-   * Address: 0x0060BC60 (FUN_0060BC60)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitFireAtTask`.
+   * `InstallMohoCUnitFireAtTaskSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0060BC60` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Re-checked deliberately against this session's own
+   * earlier recollection of `CUnitFireAtTask`'s callback addresses as
+   * 0x0060D430/0x0060D510 before removing: those two addresses are
+   * `CUnitFireAtTask::MemberDeserialize`/`MemberSerialize` (the load/save
+   * callback bodies `Init()` installs), a *different* pair of functions from
+   * `Init()` itself -- not a conflicting citation. Real body is
+   * `gpg::SerSaveLoadHelper<CUnitFireAtTask>::Init()`, inherited unchanged by
+   * `moho::CUnitFireAtTaskSerializer` in moho/unit/tasks/CUnitFireAtTask.h,
+   * which already separately and correctly cites 0x0060BC60 for `Init()` and
+   * 0x0060D430/0x0060D510 for the two member (de)serialize bodies.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitFireAtTaskSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitFireAtTask");
-  }
 
   /**
    * `InstallMohoCUnitFerryTaskSerializerCallbacks` removed here (2026-08-26
@@ -9875,17 +9813,16 @@ namespace
    */
 
   /**
-   * Address: 0x00619CE0 (FUN_00619CE0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitFormAndMoveTask`.
+   * `InstallMohoCUnitFormAndMoveTaskSerializerCallbacks` removed here
+   * (2026-08-26 ArchiveSerialization audit): its `Address: 0x00619CE0`
+   * citation was disproven -- ground-truth `.c` disassembly shows the
+   * standard direct-assignment `Init()` shape (`type->serLoadFunc_ = ...` /
+   * `->mSerLoadFunc = ...`), not the generic by-name lookup this file
+   * modeled, and had zero callers in this file. Real body is
+   * `gpg::SerSaveLoadHelper<CUnitFormAndMoveTask>::Init()`, inherited
+   * unchanged by `moho::CUnitFormAndMoveTaskSerializer` in
+   * moho/unit/tasks/CUnitFormAndMoveTask.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitFormAndMoveTaskSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitFormAndMoveTask");
-  }
 
   /**
    * `InstallMohoCUnitPatrolTaskSerializerCallbacks` removed here (2026-08-26
@@ -9949,17 +9886,16 @@ namespace
    */
 
   /**
-   * Address: 0x00627050 (FUN_00627050)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CUnitUnloadUnits`.
+   * `InstallMohoCUnitUnloadUnitsSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x00627050` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * `gpg::SerSaveLoadHelper<CUnitUnloadUnits>::Init()`, inherited unchanged
+   * by `moho::CUnitUnloadUnitsSerializer` in
+   * moho/unit/tasks/CUnitUnloadUnits.cpp.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCUnitUnloadUnitsSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CUnitUnloadUnits");
-  }
 
   /**
    * `InstallMohoEPathPointStateSerializerCallbacks` removed here (2026-08-26
@@ -10219,17 +10155,17 @@ namespace
    */
 
   /**
-   * Address: 0x0070E510 (FUN_0070E510)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::ETriggerOperator`.
+   * `InstallMohoETriggerOperatorSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x0070E510` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * `gpg::PrimitiveSerHelper<Moho::ETriggerOperator,int>::Init()`,
+   * instantiated in moho/sim/SConditionTriggerReflection.cpp (see also the
+   * per-instantiation note on `PrimitiveSerHelper` in
+   * gpg/core/reflection/Reflection.h).
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoETriggerOperatorSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::ETriggerOperator");
-  }
 
   /**
    * `InstallMohoSConditionSerializerCallbacks` removed here (2026-08-26
@@ -10347,17 +10283,19 @@ namespace
    */
 
   /**
-   * Address: 0x00777E20 (FUN_00777E20)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::EScrollType`.
+   * `InstallMohoEScrollTypeSerializerCallbacks` removed here (2026-08-26
+   * ArchiveSerialization audit): its `Address: 0x00777E20` citation was
+   * disproven -- ground-truth `.c` disassembly shows the standard direct-
+   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
+   * ...`), not the generic by-name lookup this file modeled, and had zero
+   * callers in this file. Real body is
+   * `gpg::PrimitiveSerHelper<Moho::EScrollType,int>::Init()`, instantiated in
+   * moho/ui/EScrollTypeTypeInfo.h (see also the per-instantiation note on
+   * `PrimitiveSerHelper` in gpg/core/reflection/Reflection.h). This was the
+   * last live `InstallSerSaveLoadHelperCallbacksByTypeName` caller in this
+   * file; see the removal note left at that dispatcher's former location
+   * for the closing summary of this cleanup campaign.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoEScrollTypeSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EScrollType");
-  }
 
   /**
    * `InstallMohoSScrollerSerializerCallbacks` removed here (2026-08-26
