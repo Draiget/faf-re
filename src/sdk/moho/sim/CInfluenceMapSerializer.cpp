@@ -132,6 +132,10 @@ namespace moho
     , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&Serialize_CInfluenceMapThunk))
   {}
 
+  /**
+   * Address: 0x00BFFF40 (FUN_00BFFF40, atexit target registered by the real
+   * ctor above)
+   */
   CInfluenceMapSerializer::~CInfluenceMapSerializer()
   {
     ResetLinks();

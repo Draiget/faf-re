@@ -76,6 +76,10 @@ namespace moho
     , mDeleteCallback(&Delete_CInfluenceMap)
   {}
 
+  /**
+   * Address: 0x00BFFF10 (FUN_00BFFF10, atexit target registered by the real
+   * ctor above)
+   */
   CInfluenceMapConstruct::~CInfluenceMapConstruct()
   {
     ResetLinks();
