@@ -1345,6 +1345,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\condition.cpp">
       <ObjectFileName>$(IntDir)boost_thread_condition.obj</ObjectFileName>
       <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- condition_impl::condition_impl() calls the UNICODE-sensitive CreateSemaphore/CreateMutex
+           macros; the real binary (0x00AC2190) resolves them to CreateSemaphoreA/CreateMutexA.
+           Undefine UNICODE/_UNICODE here (matches the WxUrl.cpp precedent above) so this TU's
+           project-wide Unicode charset doesn't flip them to the W-suffixed entry points. -->
+      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\exceptions.cpp">
       <ObjectFileName>$(IntDir)boost_thread_exceptions.obj</ObjectFileName>
