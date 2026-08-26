@@ -311,6 +311,7 @@ namespace
 namespace moho
 {
   gpg::RType* CUnitCallTeleport::sType = nullptr;
+  gpg::RType* CUnitTeleportTask::sType = nullptr;
 
   /**
    * Address: 0x005E2340 (FUN_005E2340, CUnitCallTeleport::BuildGroundTeleportTarget)
@@ -820,57 +821,46 @@ namespace moho
     CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
   }
 
+  namespace
+  {
+    // Address: 0x00BD0650 (FUN_00BD0650, register_CUnitTeleportTaskSerializer)
+    // -- MSVC's own compiler-generated dynamic initializer for this global
+    // runs the real `gpg::SerSaveLoadHelper<CUnitTeleportTask>` ctor chain
+    // (self-links into `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback`
+    // to the template's `Deserialize`/`Serialize` -- the real compiled
+    // bodies at 0x0060AA10/0x0060AA20 that supersede the previous
+    // hand-written `CUnitTeleportTaskSerializerLoad`/`Save` mis-attribution
+    // -- then installs first the base template's vtable, then this derived
+    // class's own; the intermediate base-vtable write is elided by the
+    // compiler since it is immediately overwritten) and registers the atexit
+    // dtor (0x00BF9C60, ResetLinks()-shaped unlink-then-self-link body).
+    CUnitTeleportTaskSerializer gCUnitTeleportTaskSerializer;
+
+    struct CUnitTeleportTaskSerializerBootstrap
+    {
+      CUnitTeleportTaskSerializerBootstrap()
+      {
+        register_CUnitTeleportTaskSerializer();
+      }
+    };
+
+    CUnitTeleportTaskSerializerBootstrap gCUnitTeleportTaskSerializerBootstrap;
+  } // namespace
+
   /**
-   * Address: 0x0060AA10 (FUN_0060AA10, COMDAT/thunk into FUN_0060D270)
-   * Address: 0x0060C570 (FUN_0060C570, COMDAT/jmp alias)
-   * Address: 0x0060C990 (FUN_0060C990, COMDAT/jmp alias)
+   * Address: 0x00BD0650 (FUN_00BD0650, register_CUnitTeleportTaskSerializer)
    *
    * What it does:
-   * Serializer-load callback forwarding into
-   * `CUnitTeleportTask::MemberDeserialize` (FUN_0060D270 body).
+   * Forces this translation unit's global `CUnitTeleportTaskSerializer`
+   * instance to link into the reflection bootstrap sequence. See the Doxygen
+   * comment on the declaration (CUnitCallTeleport.h) and on
+   * `gCUnitTeleportTaskSerializer` above for why this function's body has no
+   * field-setting logic of its own.
    */
-  void CUnitTeleportTaskSerializerLoad(
-    gpg::ReadArchive* const archive,
-    CUnitTeleportTask* const task
-  )
+  void register_CUnitTeleportTaskSerializer()
   {
-    if (task != nullptr) {
-      task->MemberDeserialize(archive);
-    }
+    (void)gCUnitTeleportTaskSerializer;
   }
-
-  /**
-   * Address: 0x0060AA20 (FUN_0060AA20, COMDAT/thunk into FUN_0060D350)
-   * Address: 0x0060C580 (FUN_0060C580, COMDAT/jmp alias)
-   * Address: 0x0060C9A0 (FUN_0060C9A0, COMDAT/jmp alias)
-   *
-   * What it does:
-   * Serializer-save callback forwarding into
-   * `CUnitTeleportTask::MemberSerialize` (FUN_0060D350 body).
-   */
-  void CUnitTeleportTaskSerializerSave(
-    gpg::WriteArchive* const archive,
-    const CUnitTeleportTask* const task
-  )
-  {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
-    }
-  }
-
-  using CUnitTeleportTaskSerializerLoadFn =
-    void (*)(gpg::ReadArchive*, CUnitTeleportTask*);
-  using CUnitTeleportTaskSerializerSaveFn =
-    void (*)(gpg::WriteArchive*, const CUnitTeleportTask*);
-
-  // ODR-used function-pointer anchors for the teleport-task serializer
-  // callbacks so link resolution preserves the symbols. The original binary
-  // registers these callbacks via the reflected `Moho::CUnitTeleportTask`
-  // serializer helper chain.
-  CUnitTeleportTaskSerializerLoadFn volatile gCUnitTeleportTaskSerializerLoadCallback =
-    &CUnitTeleportTaskSerializerLoad;
-  CUnitTeleportTaskSerializerSaveFn volatile gCUnitTeleportTaskSerializerSaveCallback =
-    &CUnitTeleportTaskSerializerSave;
 } // namespace moho
 
 namespace gpg

@@ -108,6 +108,8 @@ namespace moho
   class CUnitTeleportTask : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0060AB20 (FUN_0060AB20, Moho::CUnitTeleportTask::CUnitTeleportTask)
      *
@@ -189,6 +191,72 @@ namespace moho
     offsetof(CUnitTeleportTask, mOrientation) == 0x58,
     "CUnitTeleportTask::mOrientation offset must be 0x58"
   );
+
+  /**
+   * VFTABLE: 0x00E20348 (`??_7CUnitTeleportTaskSerializer@Moho@@6B@`)
+   *
+   * Demangled: Moho::CUnitTeleportTaskSerializer
+   *
+   * Confirmed via RTTI (`dumps/rtti_dump_all.hpp`) as a genuinely distinct,
+   * single-inheritance derived class of `gpg::SerSaveLoadHelper<CUnitTeleportTask>`
+   * (`HierarchyAttribs: 0x0`, `mdisp=0`) -- not a bare template instantiation.
+   * IDA's data-xref scan independently shows two adjacent RTTI-backed vtables
+   * sharing the same `Init()` install (see below), which is the ordinary MSVC
+   * shape for a derived class that adds no members and overrides nothing: the
+   * base subobject's own vtable pointer is written first, then immediately
+   * overwritten by this derived level's vtable pointer -- so only the final
+   * (derived) write survives as a visible store in the ctor.
+   *
+   * Per-instantiation addresses (one compiler-emitted body per `T`; see
+   * `gpg::SerSaveLoadHelper<T>`'s class-level comment in Reflection.h for the
+   * template's general shape):
+   *  - VFTABLE (own, most-derived): 0x00E20348
+   *    (`??_7CUnitTeleportTaskSerializer@Moho@@6B@`)
+   *  - VFTABLE (base `SerSaveLoadHelper<CUnitTeleportTask>`, adjacent; its
+   *    write is elided in the ctor below since it is immediately
+   *    overwritten): 0x00E20350
+   *    (`??_7?$SerSaveLoadHelper@VCUnitTeleportTask@Moho@@@gpg@@6B@`)
+   *  - ctor / compiler dynamic-initializer (`register_CUnitTeleportTaskSerializer`):
+   *    0x00BD0650 (`__xc_a`-reachable; no dead zero-xref COMDAT duplicate found)
+   *  - dtor / atexit target (ResetLinks()-shaped unlink-then-self-link body,
+   *    no separately recovered mangled symbol): 0x00BF9C60
+   *  - Init(): 0x0060BBA0 (shared vtable-slot-0 body for both vtables above;
+   *    raw IDA decompile matches the template's generic `Init()` exactly --
+   *    lazy `CUnitTeleportTask::sType` lookup, then the two `GPG_ASSERT`-
+   *    guarded `serLoadFunc_`/`serSaveFunc_` assignments from `this+0x0C`/
+   *    `this+0x10`)
+   *  - Deserialize(): 0x0060AA10 (confirmed via raw asm: `objectPtr` in EAX,
+   *    `archive` in EDI, tail-calls `CUnitTeleportTask::MemberDeserialize`'s
+   *    custom-ABI body at 0x0060D270 -- matches the template's
+   *    `reinterpret_cast<T*>(objectPtr)->MemberDeserialize(archive)` exactly)
+   *  - Serialize(): 0x0060AA20 (same shape, tail-calls
+   *    `CUnitTeleportTask::MemberSerialize` at 0x0060D350)
+   *
+   * The pre-existing free functions this instantiation supersedes
+   * (`CUnitTeleportTaskSerializerLoad`/`CUnitTeleportTaskSerializerSave` and
+   * their `g...Callback` volatile-pointer anchors, previously in
+   * CUnitCallTeleport.cpp) mis-attributed addresses 0x0060AA10/0x0060AA20 to
+   * a hand-written 2-argument shape; the real compiled signature there is the
+   * template's 4-argument `RType::load_func_t`/`save_func_t`, confirmed by
+   * the real ctor (0x00BD0650) storing those two addresses directly into
+   * `mLoadCallback`/`mSaveCallback`.
+   */
+  class CUnitTeleportTaskSerializer final : public gpg::SerSaveLoadHelper<CUnitTeleportTask>
+  {
+  };
+
+  /**
+   * Address: 0x00BD0650 (FUN_00BD0650, register_CUnitTeleportTaskSerializer)
+   *
+   * What it does:
+   * Forces this translation unit's global `CUnitTeleportTaskSerializer`
+   * instance to link into the reflection bootstrap sequence. The
+   * ctor/vtable-install/atexit-dtor-registration sequence this address
+   * decompiles to is MSVC's own compiler-generated dynamic initializer for
+   * that global, not hand-written source -- see `gpg::SerSaveLoadHelper<T>`
+   * in Reflection.h.
+   */
+  void register_CUnitTeleportTaskSerializer();
 } // namespace moho
 
 namespace gpg
