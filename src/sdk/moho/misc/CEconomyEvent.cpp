@@ -171,53 +171,47 @@ namespace
 
   CEconRequestSerializer gCEconRequestSerializerHelper;
 
-  /**
-   * Address: 0x00773920 (FUN_00773920)
-   *
-   * What it does:
-   * Unlinks startup `CEconRequestConstruct` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] void UnlinkCEconRequestConstructNodeVariantA() noexcept
-  {
-    gCEconRequestConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00773950 (FUN_00773950)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `CEconRequestConstruct` helper
-   * links.
-   */
-  [[maybe_unused]] void UnlinkCEconRequestConstructNodeVariantB() noexcept
-  {
-    gCEconRequestConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00773A50 (FUN_00773A50)
-   *
-   * What it does:
-   * Unlinks startup `CEconRequestSerializer` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] void UnlinkCEconRequestSerializerNodeVariantA() noexcept
-  {
-    gCEconRequestSerializerHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00773A80 (FUN_00773A80)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `CEconRequestSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] void UnlinkCEconRequestSerializerNodeVariantB() noexcept
-  {
-    gCEconRequestSerializerHelper.ResetLinks();
-  }
+  // Addresses 0x00773920/0x00773950 (CEconRequestConstruct) and
+  // 0x00773A50/0x00773A80 (CEconRequestSerializer) are dead: each pair is a
+  // byte-identical ICF twin (sha256 80d8e9ee.../4a492a2a... respectively) that
+  // fully inlines the SerHelperBase unlink-and-self-link sequence with the
+  // owning global's address baked in as an immediate -- exactly the shape of
+  // a compiler-synthesized "dynamic atexit destructor for 'gCEconRequest
+  // ...Helper'" thunk (atexit() only accepts a zero-argument function
+  // pointer, so MSVC cannot register a generic member call and must
+  // specialize one). All four have zero xrefs of any kind (code, data, or
+  // static-init-table) anywhere in the indexed binary, and so does neither
+  // real ctor (0x007738F0 / 0x00773A20).
+  //
+  // Direct disassembly of both real ctors confirms why: each is exactly
+  // "call SerHelperBase::SerHelperBase(this); write two callback fields;
+  // write vftable; retn" -- no atexit call anywhere in either function's
+  // bounds. Neither CEconRequestConstruct nor CEconRequestSerializer (nor
+  // their common base, gpg::SerHelperBase, nor ITS base TDatListItem<T,U>)
+  // declares a destructor anywhere in this codebase; SerHelperBase's own
+  // vtable slot 0 is `Init()`, not a destructor, confirming SerHelperBase
+  // has no virtual destructor. With no user-declared destructor at any level
+  // and no non-trivial member, both derived classes' implicit destructors
+  // are genuinely trivial, so the compiler correctly elided the one call
+  // site (the atexit registration) that would ever have referenced these
+  // thunk bodies -- reproduced independently by compiling an equivalent
+  // "abstract base with a pure-virtual non-dtor method, no explicit dtor
+  // anywhere in the chain" class shape with MSVC: the global's dynamic
+  // initializer comes out byte-for-byte the same shape (ctor call, field
+  // writes, retn, no atexit) with no destructor thunk referenced.
+  //
+  // This is the "compiler-emitted glue... corresponds to no source line
+  // whatsoever" case from this repo's own recovery rules (member-destructor
+  // chaining that the source body says nothing about): the 2007 source wrote
+  // no destructor for either class, so there is nothing here for recovered
+  // source to call. Modeling these four bodies as free functions (as a
+  // prior pass did) or fabricating an explicit `~CEconRequestConstruct()`/
+  // `~CEconRequestSerializer()` to invoke them would both recover the
+  // compiler's output instead of the programmer's input. See
+  // decomp/recovery/reports/by-source/src/sdk/moho/misc/CEconomyEvent.cpp.reconstruction.md
+  // for the full evidence trail (xrefs.txt + callgraph SQLite cross-checks
+  // across call_edges/data_refs/incoming_xrefs/vtable_writers, plus the
+  // isolated compiler experiment).
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
