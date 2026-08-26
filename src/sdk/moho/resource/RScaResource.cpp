@@ -206,6 +206,10 @@ namespace
 
   /**
    * Address: 0x00BF3D70 (FUN_00BF3D70, Moho::RScaResourceConstruct::~RScaResourceConstruct)
+   *
+   * `FUN_0053A860` and `FUN_0053A890` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   RScaResourceConstruct::~RScaResourceConstruct()
   {
@@ -261,7 +265,9 @@ namespace
  *
  * What it does:
  * Unlinks `RScaResource` save-construct helper links and restores the node
- * to self-linked sentinel state.
+ * to self-linked sentinel state. `FUN_0053A740` is a duplicate-emission twin
+ * of this exact unlink/reset lane (same `ResetLinks()` shape, folded to a
+ * separate address); it has no distinct source-level body of its own.
  */
 [[maybe_unused]] void CleanupRScaResourceSaveConstructHelperPrimary() noexcept
 {

@@ -33,7 +33,10 @@ namespace
    * Unlinks the `CSimSoundManagerConstruct` helper node from whatever
    * intrusive list it currently sits in and restores a self-linked sentinel
    * state. Registered by the real dynamic initializer (0x00BDC550) as the
-   * global's `atexit` teardown.
+   * global's `atexit` teardown. `FUN_007611E0` and `FUN_00761210` are
+   * duplicate-emission twins of this exact unlink/reset lane (same
+   * `ResetLinks()` shape, folded to separate addresses); they have no
+   * distinct source-level body of their own.
    */
   void CleanupCSimSoundManagerConstruct()
   {

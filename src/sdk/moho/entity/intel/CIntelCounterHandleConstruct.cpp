@@ -31,7 +31,10 @@ namespace
    * Unlinks the `CIntelCounterHandleConstruct` helper node from whatever
    * intrusive list it currently sits in and restores a self-linked sentinel
    * state. Registered by the real dynamic initializer (0x00BDCD50) as the
-   * global's `atexit` teardown.
+   * global's `atexit` teardown. `FUN_0076F8A0` and `FUN_0076F8D0` are
+   * duplicate-emission twins of this exact unlink/reset lane (same
+   * `ResetLinks()` shape, folded to separate addresses); they have no
+   * distinct source-level body of their own.
    */
   void CleanupCIntelCounterHandleConstruct()
   {

@@ -83,7 +83,10 @@ namespace
    * Unlinks the `CAiNavigatorLandConstruct` helper node from whatever
    * intrusive list it currently sits in and restores a self-linked sentinel
    * state. Registered by the real dynamic initializer (0x00BCC7A0) as the
-   * global's `atexit` teardown.
+   * global's `atexit` teardown. `FUN_005A46D0` and `FUN_005A4700` are
+   * duplicate-emission twins of this exact unlink/reset lane (same
+   * `ResetLinks()` shape, folded to separate addresses); they have no
+   * distinct source-level body of their own.
    */
   void CleanupCAiNavigatorLandConstructStartup()
   {
