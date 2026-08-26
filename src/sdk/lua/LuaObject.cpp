@@ -7846,6 +7846,24 @@ namespace
 		LuaLoadElementArray(reinterpret_cast<char*>(proto->lineinfo), loadState, count, 4);
 	}
 
+	/**
+	 * Address: 0x00928540 (FUN_00928540, LoadByte)
+	 *
+	 * What it does:
+	 * Reads one byte from the chunk stream via the `zgetc` fast path
+	 * (`ReadZioByte`); raises "unexpected end of file in %s" when the
+	 * stream is exhausted (EOZ, -1). Matches real Lua 5.0.2 lundump.c's
+	 * `LoadByte(LoadState*)`.
+	 *
+	 * This address sat in an untokenized gap (0x00928512-0x009285C0,
+	 * between the end of FUN_009284D0 and FUN_009285C0/LoadBlock) that
+	 * IDA never carved into its own function - no .asm/.c export exists
+	 * for it. Identified by manual Capstone disassembly against
+	 * bin/2025.7.1/ForgedAlliance.exe (validated against a known-good
+	 * tokenized function first) and cross-checked instruction-for-
+	 * instruction against this pre-existing recovered body, which
+	 * already matched exactly.
+	 */
 	[[nodiscard]] int LuaReadChunkByteOrThrow(LuaLoadStateRuntimeView* const loadState)
 	{
 		const int byteValue = ReadZioByte(loadState->stream);
