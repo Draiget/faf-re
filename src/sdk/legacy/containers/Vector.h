@@ -3127,6 +3127,31 @@ namespace msvc8
          * the returned iterator is discarded, the same self-clear-via-
          * `erase(begin(),end())` idiom as the `InfluenceGrid` instantiation
          * above.)
+         * Address: 0x007D7E00 (FUN_007D7E00, `msvc8::vector<moho::
+         * ClutterSurfaceElement>::erase(iterator,iterator)` for the 16-byte
+         * polymorphic-teardown element -- byte-for-byte this member's shape:
+         * `count==0` early return, tail-shift via `FUN_007D94B0` (cited on
+         * `ClutterSurfaceElement::operator=`, `moho/render/Clutter.h` --
+         * copies the 3 payload fields and deliberately skips `vtable`, the
+         * per-slot-invariant field), `destroy_range(last_-count,last_)`
+         * through each element's own vtable-slot-0 dispatch (cited on
+         * `ClutterSurfaceElement::~ClutterSurfaceElement`/`DestroyInPlace`,
+         * same header), then `last_ -= count`. Two real call sites, both
+         * erase-to-end (`tail==0`, so `FUN_007D94B0`'s shift loop never
+         * actually executes at either): `Moho::Clutter::Shutdown`
+         * (`FUN_007D62C0`, `moho/render/Clutter.cpp`) erasing
+         * `[begin(),end())` of every `mSurfaces[i].mSeeds` once per loop
+         * iteration -- i.e. `clear()`, cited there directly -- and a second,
+         * unnamed 22-byte register-convention fragment at 0x007D7920
+         * (padding-delimited both sides, `a1` passed in `eax` rather than on
+         * the stack, same `erase(vec->first_, vec->last_)` shape; its own
+         * caller was not found this pass). Before this pass,
+         * `ClutterSurfaceElement` had no user-declared destructor or
+         * `operator=`, so this member's `is_trivially_destructible_v`/
+         * `is_trivially_copyable_v` guards took the no-op/memmove branch for
+         * it instead of the per-element one the binary actually emits --
+         * this template needed no changes; the fix is the element type's own
+         * special members, `moho/render/Clutter.h`/`.cpp`.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);

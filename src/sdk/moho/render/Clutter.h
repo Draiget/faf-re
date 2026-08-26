@@ -44,7 +44,67 @@ namespace moho
     float uniformScale; // +0x08
     RMeshBlueprint* meshBlueprint; // +0x0C
 
+    /**
+     * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop
+     * of `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+     * `legacy/containers/Vector.h`)
+     * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
+     * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
+     * Address: 0x007D7920 (unnamed 22-byte register-convention fragment --
+     * see the `erase(first,last)` citation in `Vector.h` for detail)
+     *
+     * What it does:
+     * Dispatches through the element's own "poisoned" vtable slot 0 with a
+     * delete-flag of 0 (`vtable->destroy(this, 0)`). No source line calls
+     * this by name at any of the addresses above -- each is the compiler
+     * inlining this one-statement method (and the destructor that forwards
+     * to it, below) at its own call site. Reduces to a runtime no-op: every
+     * live element's `vtable` is set exactly once, via
+     * `ResetClutterSeedVtable`, to `SeedVtableResetToken()`, and
+     * `SeedVtableResetTag`'s destructor is defaulted with the delete flag
+     * skipping `operator delete` -- but the call itself is real and is part
+     * of the type's actual destructor, so it must happen for binary-exact
+     * fidelity.
+     */
     void DestroyInPlace();
+
+    /**
+     * The real destructor's body is exactly `DestroyInPlace()` above -- MSVC
+     * inlines a one-statement destructor at each call site rather than
+     * emitting a standalone symbol, so there is no separate address to cite
+     * here beyond the ones already on `DestroyInPlace()`. Declaring this as
+     * a real (non-trivial) destructor, instead of leaving the type
+     * implicitly trivial, is what makes `msvc8::vector<ClutterSurfaceElement>`'s
+     * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
+     * (`Vector.h`) emit the per-element call `FUN_007D7E00` and
+     * `FUN_007D7EB0` both show -- previously the struct was (wrongly)
+     * trivially destructible and that machinery's
+     * `if constexpr (!is_trivially_destructible_v<T>)` guard silently
+     * skipped the call.
+     */
+    ~ClutterSurfaceElement();
+
+    /**
+     * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
+     * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+     * `legacy/containers/Vector.h`)
+     *
+     * What it does:
+     * Copies the three payload fields (`selectionWeight`, `uniformScale`,
+     * `meshBlueprint`) from `rhs` and deliberately leaves `vtable`
+     * untouched. Every live element's `vtable` already holds the same
+     * `SeedVtableResetToken()` value (`ResetClutterSeedVtable` sets it once;
+     * it never changes for the life of the slot), so the original source
+     * skips re-copying it on every shift-assign during an erase. Declaring
+     * this explicitly (instead of leaving the implicit memberwise copy) is
+     * what makes `erase(first,last)`'s per-element
+     * `first[i] = std::move(last[i])` shift loop produce this exact 3-field
+     * copy instead of copying all four fields -- a user-declared destructor
+     * alone already routes `erase` into that loop (it makes the type
+     * non-trivially-copyable), but without this operator the loop would
+     * fall back to the implicit, all-4-field copy-assignment.
+     */
+    ClutterSurfaceElement& operator=(const ClutterSurfaceElement& rhs);
   };
   static_assert(sizeof(ClutterSurfaceElement) == 0x10, "ClutterSurfaceElement size must be 0x10");
   static_assert(
