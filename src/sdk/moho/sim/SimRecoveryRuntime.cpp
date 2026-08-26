@@ -4677,8 +4677,16 @@ std::int32_t* AppendLegacyIntVectorLaneRuntime(
  * What it does:
  * Resolves one owner-backed string-array index, advances by one lane, and
  * returns the mapped value when in range.
+ *
+ * Orphan: no caller found via the callgraph index (0 call edges, 0 incoming
+ * xrefs at either cited address) or a repo-wide search for its name.
+ * `WxLookupOwnerRuntime` (this file, `owner->arrayLane` at object+0x24) is
+ * not referenced anywhere else in src/sdk either. The `+36`/wide-string-array
+ * shape suggests a wxWidgets client-data or choice/listbox lookup, but no
+ * concrete binary caller has been located; recovering one is a separate task
+ * from this orphan audit.
  */
-std::uint32_t* ResolveWxOwnerArrayValueRuntime(
+[[maybe_unused]] std::uint32_t* ResolveWxOwnerArrayValueRuntime(
   std::uint32_t* const outValue,
   const std::uint32_t* const objectHandleWord
 )
@@ -7275,8 +7283,21 @@ std::int32_t CountElement12VectorRuntimeC(
  * What it does:
  * Resolves one owner pointer from an assisting-unit owner-slot lane
  * (`ownerLinkSlot - 8`), returning null when no slot is linked.
+ *
+ * Real caller, not yet wired: the callgraph index cites this address's sole
+ * caller as `cfunc_GetAssistingUnitsListL` (FUN_008BC820, recovered at
+ * moho/sim/Sim.cpp). The currently recovered `cfunc_GetAssistingUnitsListL`
+ * answers "who assists sourceUnit" with an O(n) scan of every entity in the
+ * session's entity map, testing `ResolveAssistTargetUnit(candidate) ==
+ * sourceUnit` per entity - a different, unrelated field
+ * (`UserUnit+0x3C0`/`assistTargetLink`) from this function's
+ * `ownerLinkSlot - 8`, which reads as an intrusive "list of units currently
+ * assisting me" walk instead. The real binary likely walks that intrusive
+ * list directly rather than scanning every session entity; recovering that
+ * list's head/iteration shape (and rewriting `cfunc_GetAssistingUnitsListL`
+ * to use it) is a separate, standalone recovery from this orphan audit.
  */
-void* ResolveAssistingUnitOwnerRuntime(
+[[maybe_unused]] void* ResolveAssistingUnitOwnerRuntime(
   const AssistingUnitListOwnerRuntime* const owner
 ) noexcept
 {
@@ -9729,44 +9750,22 @@ MapInsertStatusRuntime* FindOrInsertMapNodeNil17Runtime(
   return FindOrInsertMapNodeByKey(map, key, outResult);
 }
 
-namespace
-{
-  struct OwnerSlotNodeRuntime
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    std::uint32_t lane08;
-    std::uint32_t lane0C;
-    void* ownerLinkSlot; // +0x10
-  };
-
-  struct OwnerSlotIndexRuntime
-  {
-    std::uint32_t lane00;
-    OwnerSlotNodeRuntime* node; // +0x04
-  };
-
-  static_assert(offsetof(OwnerSlotNodeRuntime, ownerLinkSlot) == 0x10, "OwnerSlotNodeRuntime::ownerLinkSlot offset must be 0x10");
-  static_assert(offsetof(OwnerSlotIndexRuntime, node) == 0x04, "OwnerSlotIndexRuntime::node offset must be 0x04");
-}
-
-/**
- * Address: 0x007B2920 (FUN_007B2920)
- *
- * What it does:
- * Resolves one owner pointer from an index node's weak-owner slot lane
- * (`ownerLinkSlot - 8`), returning null when no owner slot is linked.
- */
-void* ResolveOwnerFromIndexWeakSlotRuntime(
-  const OwnerSlotIndexRuntime* const index
-) noexcept
-{
-  if (index == nullptr || index->node == nullptr || index->node->ownerLinkSlot == nullptr) {
-    return nullptr;
-  }
-
-  return static_cast<void*>(reinterpret_cast<std::byte*>(index->node->ownerLinkSlot) - 8u);
-}
+// Address: 0x007B2920 (FUN_007B2920) -- `WeakSet<UserEntity>::FindResult`-shaped
+// duplicate of `moho::ResolveWeakSetOwnerEntity` (moho/ui/UiRuntimeTypes.cpp):
+// `index->node->ownerLinkSlot - 8` is the same computation as
+// `reinterpret_cast<UserEntity*>(raw - offsetof(UserEntity, mIUnitChainHead))`
+// (offset 0x08 either way), just spelled through a raw
+// `{lane00, node}` / `{lane00..0C, ownerLinkSlot@+0x10}` pair instead of the
+// named `WeakEntitySetUserEntity::FindResult{mSet@+0x00, mRes@+0x04}` /
+// `SSelectionNodeUserEntity{...@+0x00-0x0C, mEnt@+0x10}` types (confirmed
+// byte-for-byte against WeakEntitySet.h). `Moho::CUIWorldView::HandleEvent`
+// (0x008704B0) is FUN_007B2920's sole caller, at 0x00871077 -- and the
+// recovered `HandleEvent` (UiRuntimeTypes.cpp) already calls
+// `ResolveWeakSetOwnerEntity(cursor.mRes->mEnt)` at that exact walk (the
+// shift+ctrl right-release "remove command from every unit under cursor"
+// loop), so the real caller already invokes the canonical, typed form.
+// No standalone recovery of this raw-offset duplicate belongs here per
+// RULE ONE.
 
 /**
  * Address: 0x007B2940 (FUN_007B2940)
@@ -12172,8 +12171,13 @@ std::uint8_t SetOwnerByteAt1DIfChangedRuntime(
  * What it does:
  * Walks one linked list and resolves the payload pointer at an expanded index
  * where each node contributes `extraCount + 1` slots.
+ *
+ * Real caller, not yet wired: the callgraph index cites this address's sole
+ * caller as FUN_00A07C80, which is not yet recovered/named in src/sdk (no
+ * `recovered` source references it). Wiring this in requires recovering that
+ * caller first; out of scope for this orphan audit.
  */
-ExpandedStridePayloadRuntime* ResolveExpandedStrideNodeByIndexRuntime(
+[[maybe_unused]] ExpandedStridePayloadRuntime* ResolveExpandedStrideNodeByIndexRuntime(
   const ExpandedStrideOwnerRuntime* const owner,
   std::int32_t index
 ) noexcept
@@ -12206,8 +12210,13 @@ ExpandedStridePayloadRuntime* ResolveExpandedStrideNodeByIndexRuntime(
  * What it does:
  * Resolves one selection node from packed 16-bit coordinates and updates the
  * active selection lane through the owner apply-selection slot.
+ *
+ * Real caller, not yet wired: the callgraph index cites this address's sole
+ * caller as FUN_00A082F0, which is not yet recovered/named in src/sdk (no
+ * `recovered` source references it). Wiring this in requires recovering that
+ * caller first; out of scope for this orphan audit.
  */
-int ResolveAndApplyPackedSelectionRuntime(
+[[maybe_unused]] int ResolveAndApplyPackedSelectionRuntime(
   SelectionOwnerRuntime* const owner,
   const std::int32_t /*unused*/,
   const std::int32_t packedCoords
