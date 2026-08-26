@@ -862,39 +862,12 @@ void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   mFactoryQueueDirty = 1u;
 }
 
-/**
- * Address: 0x005A1CE0 (FUN_005A1CE0)
- *
- * What it does:
- * Tail-thunk alias that forwards one builder serializer-load lane into
- * `CAiBuilderImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void DeserializeCAiBuilderImplMemberThunkA(
-  CAiBuilderImpl* const object,
-  gpg::ReadArchive* const archive
-)
-{
-  if (object != nullptr) {
-    object->MemberDeserialize(archive);
-  }
-}
-
-/**
- * Address: 0x005A21E0 (FUN_005A21E0)
- *
- * What it does:
- * Secondary tail-thunk alias that forwards one builder serializer-load lane
- * into `CAiBuilderImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void DeserializeCAiBuilderImplMemberThunkB(
-  CAiBuilderImpl* const object,
-  gpg::ReadArchive* const archive
-)
-{
-  if (object != nullptr) {
-    object->MemberDeserialize(archive);
-  }
-}
+// Addresses 0x005A1CE0/0x005A21E0 (the "ThunkA"/"ThunkB" serializer-load
+// duplicates formerly modeled here) are dead: zero data_refs/call_edges for
+// both, and no source-level caller anywhere in src/sdk/**.
+// `CAiBuilderImplSerializer::Deserialize` (CAiBuilderImplSerializer.cpp,
+// wired via that class's ctor) already calls
+// `CAiBuilderImpl::MemberDeserialize` directly.
 
 /**
  * Address: 0x005A2550 (FUN_005A2550, Moho::CAiBuilderImpl::MemberSerialize)
