@@ -3795,6 +3795,32 @@ static std::pair<TypeInfoMap::iterator, bool> InsertRTypePreregisteredNode(
  * addresses; this comment is the source-side citation that was
  * previously missing (neither address had an inline citation anywhere in
  * `src/sdk` before this pass).
+ *
+ * Address: 0x008DD520 (FUN_008DD520, std::map<...>::insert(hint, value))
+ * Address: 0x008DCE80 (FUN_008DCE80, std::_Tree<...> full-descent insert
+ *   fallback)
+ *
+ * Same `TypeInfoMap` instantiation, reached from a *different* real
+ * `std::map` entry point: `std::map_type_info::operator[]`
+ * (0x008DF330, itself reached from `GetRTypeMap()[name] = this` at
+ * `RType::RegisterType`, Reflection.cpp:13762 below) calls the *hint*-based
+ * `insert(_Iterator, const value_type&)` overload (0x008DD520) rather
+ * than the plain `insert(value_type)` used by `InsertRTypePreregisteredNode`
+ * above. `operator[]`'s hint-insert tries a handful of fast-path
+ * neighbor checks around the hint position (`func_StringGreater`,
+ * 0x008D8590, compares two nodes' `typeinfo->name()` strings -- the
+ * `TypeInfoLess`-equivalent ordering degraded to a raw `strcmp` once
+ * inlined into the RB-tree body) and falls back to 0x008DCE80 -- a full
+ * top-down descent from `_Myhead->_Parent` (the tree root) comparing
+ * against each node's `_Myval.typeinfo` via `strcmp` -- when none of the
+ * hint fast-paths apply. Both then call the same `_Insert`
+ * (0x008DB5B0, cited above) to splice in the new node. Confirmed by
+ * reading both `.c` files: 0x008DD520's `LABEL_22` path calls
+ * `sub_8DCE80(this, ..., v7)` directly, and 0x008DCE80's body performs
+ * the described descent then calls `Tree::_Insert`. Same generic
+ * Dinkumware `std::_Tree` internals, same real (not `msvc8::`) `std::map`
+ * instantiation, same reasoning as `_Insert`/`_Buynode` above --
+ * `external_dependency`, no project-owned template to cite them against.
  */
 
 /**
