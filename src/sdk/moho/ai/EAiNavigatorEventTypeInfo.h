@@ -69,6 +69,11 @@ namespace moho
    * unmangled `FUN_00BF6CD0` (bare unlink-then-self-link shape, matching
    * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
+   * `FUN_005A3130`/`FUN_005A3160` are dead, zero-xref duplicate-emission
+   * twins of that exact `FUN_00BF6CD0` body (function_sha256-confirmed),
+   * formerly modeled in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneN` and its two reset thunks; removed in
+   * favor of this citation.
    *
    * The previous recovery modeled this as a hand-rolled raw-struct mimic of
    * `SerHelperBase` plus a fabricated `register_EAiNavigatorEventPrimitiveSerializer()`
