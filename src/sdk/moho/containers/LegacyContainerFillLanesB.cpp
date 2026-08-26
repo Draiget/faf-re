@@ -561,6 +561,11 @@ namespace
 
   /**
    * Address: 0x008D9D10 (FUN_008D9D10)
+   * Address: 0x008D9230 (FUN_008D9230, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+   *          as `FillWordPairRangeWithConstantBatchSigma`; that duplicate
+   *          (and its now-orphaned `FillWordPairRangeWithConstant` local
+   *          helper) has been deleted.)
    *
    * What it does:
    * Alias lane of dword-pair fill behavior.
