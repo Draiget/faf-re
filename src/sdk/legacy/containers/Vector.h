@@ -3082,6 +3082,23 @@ namespace msvc8
          * `Unit.h`/`Sim.h`, so the free-function cluster was pure duplicate
          * debt over this template.)
          *
+         * Address: 0x0077A0A0 (FUN_0077A0A0, `msvc8::vector<Moho::
+         * SDecalInfo>::push_back` for the 0x90-byte element,
+         * `Moho::CDecalBuffer::mVisibleDecals`) -- `.asm`-confirmed (IDA's
+         * decompiled `.c` renders the fast-path and slow-path branches as
+         * if sequential/unconditional; the raw `.asm` shows they are
+         * mutually exclusive with an early `retn` ending the fast path --
+         * do not trust the `.c` view for this token). Fast path
+         * (`size() < capacity()`): `uninit_fill_n(last_, 1u, value)` via
+         * direct call to `sub_77E720` (cited below), then `++last_`. Slow
+         * path: tail-calls `insert(last_, value)` via `sub_77ACC0` (cited
+         * above). Reached from `AppendVisibleDecal` (same address,
+         * already recovered, `CDecalBuffer.cpp`) as
+         * `visibleDecals.push_back(decalInfo)`, called from
+         * `Moho::CDecalBuffer::CleanupTick` (0x00779710, already
+         * recovered) once per handle transitioning into focus-army
+         * visibility.
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
@@ -4425,6 +4442,28 @@ namespace msvc8
          * `gpg::ReadArchive::TrackedPointerInfo` is an engine type
          * (`ArchiveSerialization.h:72`), not third-party library code.
          *
+         * Address: 0x0077ACC0 (FUN_0077ACC0, `msvc8::vector<Moho::
+         * SDecalInfo>::insert(pos,value)` for the 0x90-byte element,
+         * `Moho::CDecalBuffer::mVisibleDecals`) -- same "capture offset up
+         * front, tail-call the count=1 core, rebuild the iterator from the
+         * offset afterwards" shape: `.asm`-confirmed `esi = (ebx-[edi+4])/
+         * 144` (offset, guarded by `[edi+4] && ...` mirroring `size()==0`)
+         * computed before the call, tail-calls the count=1 core
+         * `sub_77B990` (cited below on the 3-arg `insert`). Direct caller
+         * (`.asm`-confirmed, `sub_77A0A0(this=eax, value=ecx)` at
+         * 0x0077A121): `msvc8::vector<SDecalInfo>::push_back` (`sub_77A0A0`,
+         * cited below) on its capacity-exhausted branch, matching this
+         * member's own `else { insert(last_, value); }` branch exactly.
+         * DB-integrity fix: was `skip`-tagged ("Bulk: __noreturn
+         * 1-statement tail-call typed throw shim") -- wrong on both counts:
+         * IDA's decompiler mis-tags this `__noreturn` (it has a normal
+         * `retn` epilogue reached through its tail-call), and its `.c`
+         * pseudocode genuinely is one statement (`sub_77B990(a4,a1,a3);`)
+         * but that statement is a real tail-call into a ~700-byte `insert`
+         * core, not a throw shim -- the "1-statement" heuristic a bulk
+         * pass used to classify this as dead conflated brevity with
+         * triviality. Corrected to `recovered` in this pass.
+         *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
          * the iterator rebuilt from it afterwards, which is the only way the
@@ -5410,6 +5449,51 @@ namespace msvc8
          * `FillAssignInlineQwordVectorWithTagRange` -- a RULE ONE
          * hand-rolled `msvc8::vector<T>` reimplementation, see `push_back`
          * above for the full evidence chain.
+         *
+         * Address: 0x0077B990 (FUN_0077B990, `msvc8::vector<Moho::
+         * SDecalInfo>::insert` core for the 0x90-byte element, `count`
+         * folded to 1 -- `Moho::CDecalBuffer::mVisibleDecals`,
+         * `CDecalBuffer.h`) -- `.asm`-confirmed (IDA's decompiler mis-tags
+         * this function `__noreturn`; it has a normal `retn 8` epilogue,
+         * the same decompiler failure already seen and worked around on
+         * this element's `insert(pos,value)` wrapper below and its
+         * `push_back` root, both cited here). Max_size guard against
+         * 0x1C71C71B (`0xFFFFFFFF/144`, throw lane `sub_74EEA0`).
+         * Reallocation path (the only one exercised by this element's real
+         * caller, below): growth is 1.5x floored at `cur+count` via
+         * `sub_77ACA0` (already recovered, `CDecalTypes.cpp`,
+         * `msvc8::vector<SDecalInfo>::size()`-shaped used-count helper),
+         * checked-allocate via `sub_751A50` (already recovered,
+         * `Vector.cpp`, this element's `allocate_slots_checked`
+         * instantiation), head-copy and tail-copy through the general
+         * range form `sub_77F560` (already recovered/cited below on
+         * `uninit_copy_n`, called twice -- head then tail), gap-fill
+         * (`count`=1) via `sub_77E720` (`uninit_fill_n`, cited below),
+         * old-buffer teardown via `sub_742090` (`destroy_range`, cited
+         * above, called once on the success path immediately before
+         * `operator delete`, twice more in the head/tail
+         * copy-construction exception-cleanup funclets via the
+         * `sub_741420` thiscall adapter -- also cited above -- destroying
+         * the partially-constructed new buffer before rethrowing). In-place
+         * branch (unreached by this element's only known caller, since
+         * `push_back`'s slow path only calls `insert` once capacity is
+         * already exhausted, but still real, compiled, address-bearing
+         * code): tail-shift via `sub_77DA50` (`uninit_move_n` adapter,
+         * cited below) then gap-fill via `sub_77AD30` (`uninit_fill_n`
+         * adapter, cited below). Reached from `insert(pos,value)`'s
+         * (`sub_77ACC0`, cited above on that overload) tail-call, itself
+         * reached from `push_back`'s (`sub_77A0A0`, cited above)
+         * capacity-exhausted branch -- `Moho::CDecalBuffer::CleanupTick`'s
+         * (0x00779710, already recovered) `AppendVisibleDecal(mVisibleDecals,
+         * handle->mInfo)` -> `visibleDecals.push_back(decalInfo)`.
+         * DB-integrity fix: was `blocked` ("stale codex-main in_progress
+         * claim cleanup") citing three dependencies that were themselves
+         * either already recovered (`sub_741420`, `sub_742090`) or
+         * similarly mis-tagged (`sub_77AD30` was `blocked` citing this
+         * very function as its own unresolved dependency -- a cycle;
+         * `sub_77DA50` was already correctly `recovered` in this file;
+         * `sub_77E720` was already correctly `recovered` but uncited --
+         * all four corrected in this same pass.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5732,23 +5816,112 @@ namespace msvc8
          * that destructor's body inlined into the range loop rather than
          * called out per-element (the standard MSVC `_Destroy_range`
          * codegen choice for a simple, non-virtual, non-throwing
-         * destructor). `.xrefs.txt`-confirmed 10 real callers: two from
-         * `Moho::SSyncData::~SSyncData` (0x0073FF4B, 0x007404E0 --
-         * normal-path and EH-unwind-funclet copies of the same
-         * `mAddDecals` teardown; `SSyncData::mAddDecals` is `msvc8::
-         * vector<SDecalInfo>`, `SimDriver.h`, so this is that member's own
-         * automatic destructor reaching this instantiation), one from
-         * `Moho::CDecalBuffer::~CDecalBuffer` (0x00779270, its own decal
-         * vector, not yet recovered), and 6 more not investigated this
-         * pass (0x00740D60, 0x0074142A, 0x00741B1A, 0x0077BB44,
-         * 0x0077E17B, 0x0077E2F1, 0x0077E32B). Formerly modeled as a
-         * standalone `DestroyLegacyDecalInfoRangeForSyncPayload` free
-         * function in `moho/sim/SimDriver.cpp` (its only source-level
-         * caller was a hand-written `SSyncData::~SSyncData()` teardown
-         * walk that has since been replaced by real owning `msvc8::
-         * vector<T>`/smart-pointer members and their own automatic
-         * destructors) -- collapsed into this template instantiation,
-         * RULE ONE.
+         * destructor). `.xrefs.txt`-confirmed 10 real callers, all
+         * accounted for as of this pass:
+         *   - 0x0073FF4B, 0x007404E0: `Moho::SSyncData::~SSyncData`
+         *     (normal-path and EH-unwind-funclet copies of the same
+         *     `mAddDecals` teardown; `SSyncData::mAddDecals` is `msvc8::
+         *     vector<SDecalInfo>`, `SimDriver.h`, so this is that member's
+         *     own automatic destructor reaching this instantiation).
+         *   - 0x007792FF (owner 0x00779270, `Moho::CDecalBuffer::
+         *     ~CDecalBuffer`, already recovered, `CDecalBuffer.cpp`): same
+         *     shape -- `mVisibleDecals` (`msvc8::vector<SDecalInfo>`,
+         *     `CDecalBuffer.h` +0x0CCC) is declared before
+         *     `mPendingHideObjectIds` and destroyed automatically by the
+         *     compiler-generated member teardown; no explicit call needed
+         *     in the recovered destructor body.
+         *   - 0x0077BB44 (owner 0x0077B990, `insert(const_iterator,
+         *     std::size_t, const T&)` below, this element's instantiation):
+         *     destroys the old `[first_,last_)` run immediately before
+         *     `operator delete`-ing the old buffer on the reallocation
+         *     path, cited in full on that method's own entry below.
+         *   - 0x00740D60 (owner 0x00740D50,
+         *     `DestroySDecalInfoRangeOwnerRuntime`, already recovered,
+         *     `moho/sim/SimRecoveryRuntime.cpp`): a
+         *     `RangeOwnerRuntime<SDecalInfo>`-shaped reset-and-free helper.
+         *     `.xrefs.txt`/`_callgraph_index.sqlite` show its only caller is
+         *     `sub_77E040`'s SEH-unwind funclet (0x0077E0E3) -- and
+         *     `sub_77E040` (0x0077E040) itself has zero callers anywhere:
+         *     empty in the callgraph index, zero direct `call`/`jmp rel32`
+         *     hits across the whole `.text` section (scan validated by
+         *     confirming it finds all 10 real callers of this member
+         *     exactly), and zero occurrences of its address as a raw
+         *     `DWORD` anywhere in the PE image (rules out a vtable slot or
+         *     a function-pointer table entry too). Already `skip`-tagged
+         *     ("prior pass already exhaustively byte-verified ZERO
+         *     references of any kind") before this pass; independently
+         *     re-verified here with the same method. `DestroySDecalInfoRangeOwnerRuntime`
+         *     is therefore reachable from this instantiation but not
+         *     (currently) from any live binary caller -- pre-existing
+         *     state, left as-is rather than inventing a caller for it.
+         *   - 0x0074142A (owner 0x00741420, thiscall-convention adapter for
+         *     this same body -- `ecx`=last, one stack arg=first, reordered
+         *     into this member's `a1@<eax>`=first/`a2`=last calling
+         *     convention): reached from `operator=`'s (0x0077E100, cited
+         *     below) reallocation branch as its old-buffer `_Tidy`-shaped
+         *     teardown step, and again from this element's own `insert`
+         *     (0x0077B990 below) on two EH-unwind cleanup funclets that
+         *     destroy a partially-filled new buffer before rethrowing.
+         *     Formerly modeled as an orphaned `[[maybe_unused]]`
+         *     `DestroySDecalInfoRangeThiscallAdapter` free function in
+         *     `moho/render/CDecalTypes.cpp` with no source-level caller
+         *     anywhere in `src/sdk/**` -- the same "mis-cited standalone
+         *     body" bug already fixed once in this file for this exact
+         *     element's `uninit_copy_n` adapter (`FUN_0077DA50`, cited
+         *     below: "previously mis-cited as having its canonical body in
+         *     CDecalTypes.cpp") -- collapsed into this citation, RULE ONE.
+         *   - 0x00741B1A (owner `<none>` per IDA): a real, coherent
+         *     18-byte thunk at 0x00741B10-0x00741B22 (`push ecx; mov
+         *     eax,[esp]; push eax; mov eax,[esp+0Ch]; push ecx; call
+         *     sub_742090; add esp,0Ch; ret`, 16-byte-aligned between two
+         *     other IDA-unattributed sibling thunks at 0x00741AF0 and
+         *     0x00741B30) that marshals `(ecx=last, stack-arg=first)` into
+         *     this member's `(eax=first, stack-arg=last)` convention --
+         *     not misclassified padding (real `int3` filler brackets it on
+         *     both sides at the expected 16-byte alignment boundaries).
+         *     Exhaustively searched for a caller: empty in
+         *     `_callgraph_index.sqlite` (`incoming_xrefs`/`data_refs`/
+         *     `call_edges` all empty for 0x00741B00-0x00741B30), zero
+         *     direct `call`/`jmp rel32` hits across the whole `.text`
+         *     section (same scan, validated against this member's own 10
+         *     known callers, which it finds exactly), and zero occurrences
+         *     of 0x00741B10 as a raw `DWORD` anywhere in the complete PE
+         *     image (rules out a vtable slot, a jump table, or a
+         *     function-pointer table entry). Not given a source-level home
+         *     in `src/sdk/**` pending real caller evidence -- recorded
+         *     here rather than guessed at.
+         *   - 0x0077E17B (owner 0x0077E100, `operator=(const vector&)`,
+         *     cited below, this element's instantiation): the
+         *     "source is longer but fits in capacity" branch's
+         *     excess-tail teardown -- `sub_77E8E0`
+         *     (`CopyAssignSDecalInfoRangeForward`, `CDecalTypes.cpp`)
+         *     assign-copies over the retained prefix and returns one past
+         *     the last assigned slot, and this call destroys `[thatSlot,
+         *     oldLast)`, the remainder left over when the source is
+         *     shorter than the previous destination length.
+         *   - 0x0077E2F1 (owner 0x0077E2D0, `clear()`, cited above this
+         *     member): destroys the live `[first_,last_)` run before
+         *     rebasing `last_` to `first_`.
+         *   - 0x0077E32B (owner 0x0077E300): a real, coherent
+         *     15-instruction function (`.c`-confirmed: `if (a3 != a4) {
+         *     v4 = sub_77E8E0(a3); sub_742090(v4, *(a1+8)); *(a1+8) = v4;
+         *     } *a2 = a3; return a2;` -- another assign/erase-shaped
+         *     forwarding lane for this element) with the same
+         *     "zero callers anywhere" profile as `sub_77E040` above: empty
+         *     in the callgraph index, zero direct call/jmp hits in
+         *     `.text`, zero raw-`DWORD` occurrences anywhere in the PE
+         *     image. Was mis-tagged `external_dependency` ("all-external
+         *     callees") despite calling this engine-internal member and
+         *     `sub_77E8E0` (also engine, `CDecalTypes.cpp`) -- corrected to
+         *     `skip` (real engine code, but genuinely unreferenced, same
+         *     bucket as `sub_77E040` above) as part of this pass.
+         * Formerly modeled as a standalone
+         * `DestroyLegacyDecalInfoRangeForSyncPayload` free function in
+         * `moho/sim/SimDriver.cpp` (its only source-level caller was a
+         * hand-written `SSyncData::~SSyncData()` teardown walk that has
+         * since been replaced by real owning `msvc8::vector<T>`/smart-
+         * pointer members and their own automatic destructors) --
+         * collapsed into this template instantiation, RULE ONE.
          *
          * Address: 0x00741F70 (FUN_00741F70, this member instantiated for
          * `T = msvc8::vector<msvc8::string>` -- a 0x10-byte element that is
@@ -7445,6 +7618,28 @@ namespace msvc8
          * forwards into `FUN_00753AF0` above)
          * Address: 0x00751800 (FUN_00751800, sibling register-shape
          * adapter, same forward)
+         *
+         * Address: 0x0077E720 (FUN_0077E720, `msvc8::vector<Moho::
+         * SDecalInfo>::uninit_fill_n` for the 0x90-byte element,
+         * `Moho::CDecalBuffer::mVisibleDecals`) -- `.c`-confirmed:
+         * placement-new copy-construct loop (`SDecalInfo::SDecalInfo(dst,
+         * value)` copy ctor per slot) with destroy-on-exception rollback
+         * (destroys `[dst0, dst)` through `SDecalInfo::~SDecalInfo`,
+         * 0x00742360, then rethrows via `_CxxThrowException`), matching
+         * this member exactly. Reached directly from `push_back`
+         * (`sub_77A0A0`, cited above, `n=1`) fast path, and from `insert`
+         * (`sub_77B990`, cited above) reallocation-path gap-fill (`n=1`
+         * there too -- both call sites fold `count` to the literal 1 this
+         * element's only real caller ever uses).
+         * Address: 0x0077AD30 (FUN_0077AD30, thiscall-shape adapter --
+         * `.c`-confirmed one-statement tail-call, `LOBYTE(a1)=0;
+         * sub_77E720(a2,a3,a1);`, forwarding into `FUN_0077E720` above with
+         * a zeroed low byte on the reused register slot). Reached from
+         * `insert`'s (`sub_77B990`, cited above) in-place branch gap-fill
+         * step. DB-integrity fix: was `blocked` ("noreturn wrapper depends
+         * on unresolved FUN_0077E720") -- `FUN_0077E720` was not actually
+         * unresolved (see above); the dependency was already satisfied,
+         * just uncited. Corrected to `recovered` in this pass.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
