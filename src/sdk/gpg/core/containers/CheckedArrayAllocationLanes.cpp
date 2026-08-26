@@ -256,6 +256,9 @@ namespace gpg::core::legacy
   /**
    * Address: 0x00931B60 (FUN_00931B60, sub_931B60)
    * Address: 0x00935D50 (FUN_00935D50, sub_935D50)
+   * Address: 0x0088FFC0 (FUN_0088FFC0) - the NoteDisconnect boost::bind
+   *          heap-clone lane's `list1<value<std::string>>` node allocator
+   *          (moho/ui/UiRuntimeTypes.cpp's FUN_0088FA30/FUN_0088FE40)
    *
    * What it does:
    * Allocates a contiguous lane of 32-byte elements and applies the legacy

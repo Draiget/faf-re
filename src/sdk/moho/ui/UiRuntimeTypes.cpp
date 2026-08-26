@@ -27229,6 +27229,24 @@ namespace
  * Address: 0x0088F500 (FUN_0088F500) - functor-non-empty relay, checked
  *          unconditionally on every assign (not just the guarded first-init
  *          path) to decide whether `*arg0` gets the vtable pointer or null
+ * Address: 0x0088F7A0 (FUN_0088F7A0) - the heap-clone branch FUN_0088F500
+ *          calls when the bound string does not fit the function_buffer's
+ *          SSO slot: copies the string into a local buffer and forwards to
+ *          the node allocator below
+ * Address: 0x0088FA30 (FUN_0088FA30) - allocates the heap node (checked
+ *          32-byte `operator new`, `AllocateChecked32ByteLane` /
+ *          FUN_0088FFC0), constructs it (FUN_00890010), and frees the
+ *          function_buffer's previous heap block if it held one
+ * Address: 0x0088FFC0 (FUN_0088FFC0) - checked 32-byte array-allocation
+ *          helper, already recovered generically as
+ *          `gpg::core::legacy::AllocateChecked32ByteLane` in
+ *          `CheckedArrayAllocationLanes.cpp`; shared by FUN_0088FA30's and
+ *          FUN_0088FE40's clone paths
+ * Address: 0x00890010 (FUN_00890010) - `list1<value<std::string>>` node
+ *          constructor: copy-constructs the bound string into the new heap
+ *          node, shared by FUN_0088FA30's and FUN_0088FE40's clone paths
+ *          (same "real vendored boost header emits it" shape as the
+ *          already-cited `list2<>` node ctor FUN_0088F040 below)
  * Address: 0x0088F700 (FUN_0088F700) - writes {manager=FUN_0088FBD0,
  *          invoker=FUN_0088FBA0} into the static vtable pair
  *          (dword_1104130 / dword_1104134)
@@ -27236,6 +27254,14 @@ namespace
  *          confirmed via the embedded `bind_t<void,void(__cdecl*)(gpg::StrArg),
  *          list1<value<std::string>>>` type descriptor returned for
  *          `get_functor_type_tag`)
+ * Address: 0x0088FE40 (FUN_0088FE40) - functor_manager<F,A>::manager's
+ *          heap-allocated-functor overload (mpl::false_), tail-called by
+ *          FUN_0088FBD0 for clone/destroy/check_functor_type_tag -- the
+ *          NoteDisconnect-side sibling of ReceiveChat's FUN_0088FEC0 below.
+ *          `clone_functor_tag` allocates+constructs via FUN_0088FFC0 /
+ *          FUN_00890010, `destroy_functor_tag` frees the bound string and
+ *          the node, `check_functor_type_tag` compares against the same
+ *          `bind_t<>` RTTI descriptor FUN_0088FBD0 returns
  * Address: 0x0088FBA0 (FUN_0088FBA0) - basic_vtable<F>::invoker: SSO-aware
  *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr)` against the
  *          bound string
@@ -27248,6 +27274,18 @@ namespace
  * free-function bind storing a real `std::string` copy, per the manager RTTI)
  * rather than a closure object -- expressed here the same way so this call
  * site is the one that actually instantiates the cited manager/invoker pair.
+ *
+ * FUN_0088F9F0 sits a few bytes below this chain and stamps the identical
+ * {manager=FUN_0088FBD0, invoker=FUN_0088FBA0} pair FUN_0088F700 installs,
+ * but it is not cited here: it has zero incoming references anywhere --
+ * empty in the IDA-exported xrefs for both analyzed databases, empty in the
+ * enriched callgraph index's call_edges/incoming_xrefs tables, and a raw
+ * CALL/JMP-rel32 plus absolute-address byte scan of both
+ * `bin/2025.7.1/ForgedAlliance.exe` and `bin/external/ForgedAlliance.exe`
+ * finds no reference of any kind to 0x0088F9F0. Left `skip`, matching the
+ * `FUN_0088FDC0` precedent a few bytes further down (already byte-verified
+ * unreferenced the same way) rather than folded into this call site without
+ * evidence.
  */
 void moho::UI_NoteDisconnect(const IClient* const client)
 {
@@ -27292,6 +27330,24 @@ void moho::UI_NoteDisconnect(const IClient* const client)
  * Address: 0x0088F600 (FUN_0088F600) - functor-non-empty relay, checked
  *          unconditionally on every assign (not just the guarded first-init
  *          path) to decide whether `*arg0` gets the vtable pointer or null
+ * Address: 0x0088F8E0 (FUN_0088F8E0) - the heap-clone branch FUN_0088F600
+ *          calls when the bound string+MemBuffer node does not fit the
+ *          function_buffer's SSO slot: copies the node via FUN_0088EE00
+ *          (already recovered as `wxCopySharedRefStringAndMemBufferRuntime`
+ *          in `WxRuntimeTypes.cpp`) and forwards to the node allocator below
+ * Address: 0x0088FAE0 (FUN_0088FAE0) - allocates the heap node (checked
+ *          48-byte `operator new`, already recovered generically as
+ *          `gpg::core::legacy::AllocateChecked48ByteLane` / FUN_00890080),
+ *          constructs it (FUN_008900D0), and releases the caller's
+ *          temporary via the same two-phase `FUN_0088BAB0` release used
+ *          elsewhere in this chain
+ * Address: 0x008900D0 (FUN_008900D0) - `list2<value<std::string>,
+ *          value<gpg::MemBuffer<char const>>>` node constructor for the
+ *          heap-clone path: copies the manager/vtable-tag field, then
+ *          copies the string+MemBuffer element via FUN_0088EE00
+ *          (`wxCopySharedRefStringAndMemBufferRuntime`) -- the heap-clone
+ *          counterpart to the already-cited construction-path node ctor
+ *          FUN_0088F040 above
  * Address: 0x0088F860 (FUN_0088F860) - writes {manager=FUN_0088FC70,
  *          invoker=FUN_0088FC40} into the static vtable pair (stru_1104128)
  * Address: 0x0088FC70 (FUN_0088FC70) - basic_vtable<F>::manager (RTTI-
@@ -27335,6 +27391,17 @@ void moho::UI_NoteDisconnect(const IClient* const client)
  * than a closure object -- expressed here the same way so this call site is
  * the one that actually instantiates the cited manager/invoker pair. The
  * MemBuffer's shared payload is kept alive by the bind_t's own copy.
+ *
+ * FUN_0088FAA0 sits a few bytes below this chain and stamps the identical
+ * stru_1104128 = {manager=FUN_0088FC70, invoker=FUN_0088FC40} pair
+ * FUN_0088F860 installs, then tears down a local buffer via FUN_0088BAB0 the
+ * same way the rest of this chain does -- but like FUN_0088F9F0 on
+ * NoteDisconnect above, it is not cited here: it has zero incoming
+ * references anywhere (empty IDA-exported xrefs, empty callgraph-index
+ * call_edges/incoming_xrefs, and no hit from a raw CALL/JMP-rel32 plus
+ * absolute-address byte scan of both `bin/2025.7.1/ForgedAlliance.exe` and
+ * `bin/external/ForgedAlliance.exe`). Left `skip` rather than folded into
+ * this call site without evidence.
  */
 void moho::UI_ReceiveChat(const IClient* const sender, const gpg::MemBuffer<const char> data)
 {
