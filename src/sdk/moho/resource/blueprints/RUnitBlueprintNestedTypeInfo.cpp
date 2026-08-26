@@ -89,101 +89,17 @@ namespace
     return reinterpret_cast<float*>(destinationAddress);
   }
 
-  /**
-   * Address: 0x00525FA0 (FUN_00525FA0)
-   *
-   * What it does:
-   * Stdcall thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __stdcall CopyFloatRangeNullableStdcallThunkA(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00527190 (FUN_00527190)
-   *
-   * What it does:
-   * Cdecl thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __cdecl CopyFloatRangeNullableCdeclThunkA(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005275C0 (FUN_005275C0)
-   *
-   * What it does:
-   * Stdcall thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __stdcall CopyFloatRangeNullableStdcallThunkB(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005279C0 (FUN_005279C0)
-   *
-   * What it does:
-   * Cdecl thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __cdecl CopyFloatRangeNullableCdeclThunkB(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00527B10 (FUN_00527B10)
-   *
-   * What it does:
-   * Cdecl thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __cdecl CopyFloatRangeNullableCdeclThunkC(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00527C20 (FUN_00527C20)
-   *
-   * What it does:
-   * Cdecl thunk lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `CopyFloatRangeNullable`.
-   */
-  [[maybe_unused]] float* __cdecl CopyFloatRangeNullableCdeclThunkD(
-    const float* sourceBegin,
-    const float* sourceEnd,
-    float* destination
-  ) noexcept
-  {
-    return CopyFloatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
+  // Addresses 0x00525FA0 (StdcallThunkA), 0x00527190 (CdeclThunkA),
+  // 0x005275C0 (StdcallThunkB), 0x005279C0 (CdeclThunkB), 0x00527B10
+  // (CdeclThunkC), and 0x00527C20 (CdeclThunkD) -- six calling-convention
+  // variant thunks formerly modeled here, all one-line forwards into
+  // CopyFloatRangeNullable -- are dead: zero data_refs and zero *incoming*
+  // call_edges for all six, and no source-level caller anywhere in
+  // src/sdk/**. CopyFloatRangeNullable itself is confirmed real and
+  // heavily used: its two compiled addresses (0x00527EE0/0x00527CD0) carry
+  // 8 real incoming call_edges total, two of which are NOT any of these six
+  // thunks -- FUN_005240D0 (recovered further below in this file) and
+  // Moho::CopyOccupyRects (0x005267A0, 8 real callers of its own).
 
   class VectorFloatReflectionType final : public gpg::RType, public gpg::RIndexed
   {
