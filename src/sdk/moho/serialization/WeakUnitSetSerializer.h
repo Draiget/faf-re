@@ -31,7 +31,12 @@ namespace moho
      *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_006D2D00`/
+     * `FUN_006D2D30` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAN` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~WeakUnitSetSerializer();
 
