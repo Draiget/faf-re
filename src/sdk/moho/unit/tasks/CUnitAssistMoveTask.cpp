@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -92,33 +93,44 @@ namespace
   }
 
   /**
-   * Address: 0x005F0B00 (FUN_005F0B00)
+   * Address: 0x005F0B00 (FUN_005F0B00, CUnitAssistMoveTaskSerializer load callback)
    *
    * What it does:
-   * Forwards one assist-move serializer load thunk lane to
-   * `CUnitAssistMoveTask::MemberDeserialize`.
+   * Adapts the reflection load-callback's 4-argument `__cdecl` stack call
+   * into `CUnitAssistMoveTask::MemberDeserialize`'s entry convention. Raw
+   * asm (`mov eax, [esp+arg_0]; mov ecx, [esp+arg_4]; jmp FUN_005F1F30`)
+   * confirms this is a genuine tail-jump passthrough: `version`/`ownerRef`
+   * are never touched here, they simply stay on the stack for
+   * `MemberDeserialize` to read verbatim, which forwarding them (rather
+   * than synthesizing constants) preserves exactly.
    */
-  [[maybe_unused]] void CUnitAssistMoveTaskMemberDeserializeThunk(
+  void CUnitAssistMoveTaskMemberDeserializeThunk(
     gpg::ReadArchive* const archive,
-    moho::CUnitAssistMoveTask* const task
+    moho::CUnitAssistMoveTask* const task,
+    const int version,
+    gpg::RRef* const ownerRef
   )
   {
-    moho::CUnitAssistMoveTask::MemberDeserialize(archive, task, 0, nullptr);
+    moho::CUnitAssistMoveTask::MemberDeserialize(archive, task, version, ownerRef);
   }
 
   /**
-   * Address: 0x005F0B10 (FUN_005F0B10)
+   * Address: 0x005F0B10 (FUN_005F0B10, CUnitAssistMoveTaskSerializer save callback)
    *
    * What it does:
-   * Forwards one assist-move serializer save thunk lane to
-   * `CUnitAssistMoveTask::MemberSerialize`.
+   * Adapts the reflection save-callback's 4-argument `__cdecl` stack call
+   * into `CUnitAssistMoveTask::MemberSerialize`'s entry convention (same
+   * tail-jump-passthrough shape as the load callback above, into
+   * FUN_005F2010).
    */
-  [[maybe_unused]] void CUnitAssistMoveTaskMemberSerializeThunk(
+  void CUnitAssistMoveTaskMemberSerializeThunk(
     gpg::WriteArchive* const archive,
-    const moho::CUnitAssistMoveTask* const task
+    const moho::CUnitAssistMoveTask* const task,
+    const int version,
+    gpg::RRef* const ownerRef
   )
   {
-    moho::CUnitAssistMoveTask::MemberSerialize(archive, task, 0, nullptr);
+    moho::CUnitAssistMoveTask::MemberSerialize(archive, task, version, ownerRef);
   }
 
   void ReadBoolIntoByteLane(gpg::ReadArchive* const archive, std::uint8_t& lane) noexcept
@@ -653,6 +665,112 @@ namespace moho
     CUnitAssistMoveTask::MemberSerialize(archive, task, version, ownerRef);
   }
 } // namespace moho
+
+namespace
+{
+  void cleanup_CUnitAssistMoveTaskSerializer_atexit();
+} // namespace
+
+namespace moho
+{
+  /**
+   * VFTABLE: 0x00E1F538 (`??_7CUnitAssistMoveTaskSerializer@Moho@@6B@`)
+   *
+   * RTTI's Class Hierarchy Descriptor also lists
+   * `.?AU?$SerSaveLoadHelper@VCUnitAssistMoveTask@Moho@@@gpg@@` as a base
+   * (that template instantiation has its own, separately compiled vtable in
+   * the binary too, with `Init()` resolving to this SAME 0x005F1A70 body).
+   * Unlike the empty-derived-class shape used for `CEfxTrailEmitterSerializer`
+   * (`gpg/core/reflection/Reflection.h`), this class cannot actually derive
+   * from `gpg::SerSaveLoadHelper<CUnitAssistMoveTask>`:
+   * `CUnitAssistMoveTask::MemberDeserialize`/`MemberSerialize` are STATIC
+   * 4-argument forwarders (`archive, task, version, ownerRef`), not the
+   * instance-method, single-`archive`-argument shape the template's
+   * `Deserialize`/`Serialize` static methods call
+   * (`object->MemberDeserialize(archive)`). It binds straight to
+   * `gpg::SerHelperBase` instead, matching the
+   * `CUnitCarrierRetrieveSerializerHelper` / `CUnitReclaimTaskSerializer`
+   * precedent shape.
+   *
+   * Per-instantiation addresses:
+   *  - ctor / compiler dynamic-initializer: 0x00BCF270, global storage
+   *    0x010B0984.
+   *  - dtor / atexit unlink target: 0x00BF8FF0 (standard `ResetLinks()`
+   *    unlink-then-self-link shape).
+   *  - Init(): 0x005F1A70.
+   *  - load callback: 0x005F0B00 (`CUnitAssistMoveTaskMemberDeserializeThunk`).
+   *  - save callback: 0x005F0B10 (`CUnitAssistMoveTaskMemberSerializeThunk`).
+   */
+  class CUnitAssistMoveTaskSerializer final : public gpg::SerHelperBase
+  {
+  public:
+    CUnitAssistMoveTaskSerializer()
+      : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&CUnitAssistMoveTaskMemberDeserializeThunk))
+      , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&CUnitAssistMoveTaskMemberSerializeThunk))
+    {
+      (void)std::atexit(&cleanup_CUnitAssistMoveTaskSerializer_atexit);
+    }
+
+    ~CUnitAssistMoveTaskSerializer()
+    {
+      ResetLinks();
+    }
+
+    /**
+     * Address: 0x005F1A70 (FUN_005F1A70, vtable slot 0 dispatch target)
+     *
+     * What it does:
+     * Binds this helper's load/save callbacks onto `CUnitAssistMoveTask`'s
+     * reflected type descriptor.
+     */
+    void Init() override
+    {
+      gpg::RType* const type = CachedCUnitAssistMoveTaskType();
+      GPG_ASSERT(type != nullptr);
+      GPG_ASSERT(type->serLoadFunc_ == nullptr);
+      type->serLoadFunc_ = mLoadCallback;
+      GPG_ASSERT(type->serSaveFunc_ == nullptr);
+      type->serSaveFunc_ = mSaveCallback;
+    }
+
+  public:
+    gpg::RType::load_func_t mLoadCallback; // +0x0C
+    gpg::RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  static_assert(
+    offsetof(CUnitAssistMoveTaskSerializer, mLoadCallback) == 0x0C,
+    "CUnitAssistMoveTaskSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitAssistMoveTaskSerializer, mSaveCallback) == 0x10,
+    "CUnitAssistMoveTaskSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CUnitAssistMoveTaskSerializer) == 0x14, "CUnitAssistMoveTaskSerializer size must be 0x14");
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0984 -- process-global `CUnitAssistMoveTaskSerializer`
+  // singleton. Constructing it runs the compiler-emitted dynamic
+  // initializer (0x00BCF270), which splices this helper into
+  // `gpg::SerHelperBase::sNewHelpers`; `gpg::SerHelperBase::InitNewHelpers()`
+  // later dispatches `Init()` on it from within the first
+  // `ReadArchive`/`WriteArchive` construction.
+  moho::CUnitAssistMoveTaskSerializer gCUnitAssistMoveTaskSerializer;
+
+  /**
+   * Address: 0x00BF8FF0 (FUN_00BF8FF0, atexit unlink target)
+   *
+   * What it does:
+   * Unlinks `CUnitAssistMoveTaskSerializer` from the intrusive
+   * serializer-helper list and restores its self-linked node lane.
+   */
+  void cleanup_CUnitAssistMoveTaskSerializer_atexit()
+  {
+    gCUnitAssistMoveTaskSerializer.ResetLinks();
+  }
+} // namespace
 
 namespace gpg
 {
