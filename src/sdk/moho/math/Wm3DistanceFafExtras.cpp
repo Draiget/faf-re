@@ -6465,64 +6465,23 @@ namespace Wm3
   }
 
   /**
-   * Address: 0x00A6D2D0 (FUN_00A6D2D0)
-   *
-   * What it does:
-   * Returns one row-relative payload pointer lane computed as
-   * `rowBaseTable[rowIndex] + elementIndex * 4`.
+   * `ResolveRuntimeRowStride4AddressLane`/`ResolveRuntimeRowStride8AddressLane`
+   * removed here (2026-08-26): their `Address: 0x00A6D2D0`/`0x00A6EDC0`
+   * citations were an earlier, pre-`GaussPointsFit3` recovery pass's raw
+   * offset-view reach-in for what both addresses actually are --
+   * `Wm3::Eigen<float>::operator()(int,int)` and
+   * `Wm3::Eigen<double>::operator()(int,int)` respectively (the vendored
+   * WildMagic eigendecomposition helper's matrix-element accessor,
+   * `return m_kMat[iRow][iCol];` -- `dependencies/WildMagic3p8/Foundation/
+   * Numerics/Wm3Eigen.cpp`). Both were genuinely orphaned in `src/sdk/**`
+   * (zero callers anywhere in this tree) -- their real binary callers are
+   * `Wm3::GaussPointsFit3<double>` (`0x00A514D0`, confirmed 9 call sites)
+   * and its `<float>` sibling, both WildMagic-side code that now calls the
+   * real, typed `operator()` directly rather than through this free-function
+   * proxy. Per RULE ONE, the canonical recovery is the vendored template's
+   * own member, not a per-instantiation free function reaching into a raw
+   * `{reserved,rowBaseTable}` view.
    */
-  std::uintptr_t ResolveRuntimeRowStride4AddressLane(
-    const void* const runtimeOwner,
-    const std::int32_t rowIndex,
-    const std::int32_t elementIndex
-  ) noexcept
-  {
-    struct RuntimeRowPointerArrayOwnerView
-    {
-      std::uint8_t reserved00_13[0x14]{};
-      std::uintptr_t rowBaseTable = 0; // +0x14
-    };
-    static_assert(
-      offsetof(RuntimeRowPointerArrayOwnerView, rowBaseTable) == 0x14,
-      "RuntimeRowPointerArrayOwnerView::rowBaseTable offset must be 0x14"
-    );
-
-    const auto* const owner = static_cast<const RuntimeRowPointerArrayOwnerView*>(runtimeOwner);
-    const auto* const rowBaseTable = reinterpret_cast<const std::uintptr_t*>(owner->rowBaseTable);
-    const std::uintptr_t rowBase = rowBaseTable[rowIndex];
-    const std::intptr_t elementByteOffset = static_cast<std::intptr_t>(elementIndex) * static_cast<std::intptr_t>(4);
-    return static_cast<std::uintptr_t>(static_cast<std::intptr_t>(rowBase) + elementByteOffset);
-  }
-
-  /**
-   * Address: 0x00A6EDC0 (FUN_00A6EDC0)
-   *
-   * What it does:
-   * Returns one row-relative payload pointer lane computed as
-   * `rowBaseTable[rowIndex] + elementIndex * 8`.
-   */
-  std::uintptr_t ResolveRuntimeRowStride8AddressLane(
-    const void* const runtimeOwner,
-    const std::int32_t rowIndex,
-    const std::int32_t elementIndex
-  ) noexcept
-  {
-    struct RuntimeRowPointerArrayOwnerView
-    {
-      std::uint8_t reserved00_13[0x14]{};
-      std::uintptr_t rowBaseTable = 0; // +0x14
-    };
-    static_assert(
-      offsetof(RuntimeRowPointerArrayOwnerView, rowBaseTable) == 0x14,
-      "RuntimeRowPointerArrayOwnerView::rowBaseTable offset must be 0x14"
-    );
-
-    const auto* const owner = static_cast<const RuntimeRowPointerArrayOwnerView*>(runtimeOwner);
-    const auto* const rowBaseTable = reinterpret_cast<const std::uintptr_t*>(owner->rowBaseTable);
-    const std::uintptr_t rowBase = rowBaseTable[rowIndex];
-    const std::intptr_t elementByteOffset = static_cast<std::intptr_t>(elementIndex) * static_cast<std::intptr_t>(8);
-    return static_cast<std::uintptr_t>(static_cast<std::intptr_t>(rowBase) + elementByteOffset);
-  }
 
   /**
    * Address: 0x00A51EC0 (FUN_00A51EC0)
