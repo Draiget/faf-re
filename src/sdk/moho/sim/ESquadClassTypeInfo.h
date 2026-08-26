@@ -64,7 +64,12 @@ namespace moho
    * The real ctor's tail pushes plain, unmangled `FUN_00C00440` as its
    * `atexit` target (bare unlink-then-self-link shape, matching
    * `SerHelperBase::ResetLinks()`) -- modeled by the template's own real
-   * destructor, no explicit `atexit` call needed.
+   * destructor, no explicit `atexit` call needed. `FUN_00723C60`/
+   * `FUN_00723C90` are dead, zero-xref duplicate-emission twins of that
+   * exact `FUN_00C00440` body (function_sha256-confirmed), formerly modeled
+   * in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneBD` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using ESquadClassPrimitiveSerializer = gpg::PrimitiveSerHelper<ESquadClass, int>;
 } // namespace moho

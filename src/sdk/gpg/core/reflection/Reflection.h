@@ -5010,6 +5010,15 @@ namespace gpg
      *     `gGlobalIntrusiveSentinelLaneI` in
      *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
      *     moho/unit/core/EFireStateTypeInfo.h.
+     *   - T=Moho::ECommandEvent: 0x00BD8EF0 (dead duplicate: 0x006E9730;
+     *     a second, unrelated writer -- FUN_006EA770, demangled
+     *     `SerSaveLoadHelper<Moho::ECommandEvent>` -- shares this global's
+     *     storage address but is itself zero-xref/unreachable too, same
+     *     sibling-writer situation as ESquadClass/EThreatType), atexit
+     *     0x00BFEB50 (dead duplicates: 0x006E7E30, 0x006E7E60 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneAQ` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/unit/ECommandEventTypeInfo.h.
      *   - T=Moho::EUnitState: 0x00BCA520 (no dead duplicate found), atexit
      *     0x00BF5270 (dead duplicates: 0x0055BFC0, 0x0055BFF0 -- formerly
      *     `gGlobalIntrusiveSentinelLaneJ` in

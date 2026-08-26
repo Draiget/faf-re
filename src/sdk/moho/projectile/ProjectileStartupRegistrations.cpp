@@ -576,7 +576,12 @@ namespace
    * `PrimitiveSerHelper<EProjectileImpactEvent,int>` vtable, and pushes
    * plain unmangled `FUN_00BFD550` (bare unlink-then-self-link shape,
    * matching `SerHelperBase::ResetLinks()`) as its `atexit` target -- no
-   * eager `Init()` call exists in the real ctor.
+   * eager `Init()` call exists in the real ctor. `FUN_0069A7F0`/
+   * `FUN_0069A820` are dead, zero-xref duplicate-emission twins of that
+   * exact `FUN_00BFD550` body (function_sha256-confirmed), formerly modeled
+   * in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneAI` and its two reset thunks; removed in
+   * favor of this citation.
    *
    * Previously modeled via a hand-rolled generic `PrimitiveEnumSerializer
    * <TEnum>` template mimicking `SerHelperBase` with a raw
