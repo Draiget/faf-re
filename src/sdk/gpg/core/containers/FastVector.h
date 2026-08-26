@@ -1731,6 +1731,28 @@ namespace gpg::core
  * assigning copy at 0x00577450.)
  *
  * Reached only from `ResetFrom` (0x00576F10).
+     *
+     * Address: 0x00750A80 (FUN_00750A80, `gpg::core::FastVectorN<
+     * moho::SExtraUnitDataPair, 1>::CopyFromRaw_` -- `pairs` sub-vector of
+     * `moho::SExtraUnitData`, the element of `Sim::mSyncSerializeGroup2`.
+     * Observed only ever called on a destination that was just reset to
+     * inline (`ResetInline_`-equivalent, i.e. `count`/`capacity` start at
+     * 0/1), under which condition its real 4-branch "reuse-or-grow assign"
+     * shape (`destinationCount>=sourceCount` no-op-grow / `sourceCount>
+     * destinationCapacity` grow-to-exactly-`sourceCount` / copy) collapses
+     * to exactly this method's 2-branch "fits inline vs. `new T[count]`"
+     * shape: `.c`-confirmed count<=1 assigns directly into the existing
+     * (inline) `start_`, else calls `sub_74DBA0` to buy an exact
+     * `count`-element block (`allocate_slots_checked`-guarded, matching
+     * `new T[count]`) and copies into it. Reached from `msvc8::vector<
+     * moho::SExtraUnitData>::vector(const vector&)` (`FUN_00753020`) and
+     * its `uninit_fill_n`/`uninit_copy_n` element-construction emissions
+     * (`FUN_00753AF0`, `FUN_00756A00` and siblings, `legacy/containers/
+     * Vector.h`) via `SExtraUnitData`'s compiler-generated copy
+     * constructor. Migrated off `Assign8ByteVectorRange` in
+     * `gpg/core/containers/FastVectorInsertLanes.cpp` -- a RULE ONE
+     * hand-rolled duplicate under a generic-looking name; see `Vector.h`'s
+     * `push_back` citation for the full evidence chain.)
      */
     void CopyFromRaw_(const T* src, size_t count)
     {
@@ -1847,6 +1869,22 @@ namespace gpg::core
     /**
      * Address: 0x004021F0 (FUN_004021F0)
      * Address: 0x004022A0 (FUN_004022A0)
+     * Address: 0x007423F0 (FUN_007423F0, `gpg::core::FastVectorN<
+     * moho::SExtraUnitDataPair, 1>::ResetStorageToInline` -- `pairs`
+     * sub-vector of `moho::SExtraUnitData` (`Unit.h`), the element of
+     * `Sim::mSyncSerializeGroup2`. Byte-for-byte match: `if (start ==
+     * originalVec_) { end_ = start_; return; } operator delete[](start_);
+     * start_ = originalVec_; capacity_ = *reinterpret_cast<T**>(start_);
+     * end_ = start_;` -- exactly this free function's body. Called per
+     * element, inlined into a range loop, by `msvc8::vector<
+     * moho::SExtraUnitData>::destroy_range` (`FUN_00742170`,
+     * `legacy/containers/Vector.h`) when the outer vector destroys or
+     * reallocates its elements. Migrated off
+     * `ResetInlineQwordVectorStorage` in
+     * `gpg/core/containers/FastVectorInsertLanes.cpp` -- a RULE ONE
+     * hand-rolled duplicate of this exact free function under a raw-offset
+     * `InlineQwordVectorWithTagRuntimeView` struct name; see
+     * `Vector.h`'s `push_back` citation for the full evidence chain.)
      *
      * What it does:
      * Releases heap-backed storage (if any) and restores inline storage pointers.

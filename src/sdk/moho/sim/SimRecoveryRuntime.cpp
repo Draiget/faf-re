@@ -3870,7 +3870,18 @@ std::uint32_t* AssignRebuiltOpaqueLaneRuntimeA(
 }
 
 /**
- * Address: 0x007536D0 (FUN_007536D0)
+ * Address: unresolved -- DB-integrity fix: this body was previously cited
+ * at `0x007536D0`. That address's real `.c` decompilation is
+ * `sub_7536D0(int a1, _DWORD* a2, int a3, int a4)`, an empty-source-clear
+ * helper for `msvc8::vector<moho::SExtraUnitData>::operator=` that calls
+ * `sub_755DE0`/`sub_742170` (both `msvc8::vector<SExtraUnitData>` members,
+ * cited in `legacy/containers/Vector.h`) on a `[begin,end)` pointer range
+ * -- it does not match this function's `(context, outValue, requestedLane,
+ * currentLane)` scalar-lane shape at all. Reassigned to
+ * `legacy/containers/Vector.h`'s `assign()`/`operator=` citation; the
+ * address that actually corresponds to this shape (paired with the
+ * `AssignRebuiltOpaqueLaneRuntimeA` sibling above, `FUN_00753630`) was not
+ * re-derived in this pass and remains an open lead.
  *
  * What it does:
  * Rebuilds one opaque pointer lane with zero-initialized replacement storage

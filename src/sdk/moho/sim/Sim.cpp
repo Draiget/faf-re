@@ -6446,48 +6446,6 @@ namespace
     return node;
   }
 
-  struct InlineArrayLaneRuntimeView
-  {
-    void* begin;               // +0x00
-    void* current;             // +0x04
-    void* end;                 // +0x08
-    void** inlineStorage;      // +0x0C
-    std::uint8_t reserved10[0x10];
-  };
-  static_assert(sizeof(InlineArrayLaneRuntimeView) == 0x20, "InlineArrayLaneRuntimeView size must be 0x20");
-  static_assert(offsetof(InlineArrayLaneRuntimeView, begin) == 0x00, "InlineArrayLaneRuntimeView::begin offset must be 0x00");
-  static_assert(
-    offsetof(InlineArrayLaneRuntimeView, inlineStorage) == 0x0C,
-    "InlineArrayLaneRuntimeView::inlineStorage offset must be 0x0C"
-  );
-
-  /**
-   * Address: 0x00742170 (FUN_00742170, sub_742170)
-   *
-   * What it does:
-   * For each 0x20-byte lane in `[first,last)`, frees heap storage when
-   * `begin != inlineStorage`, resets `begin/end` to inline storage lanes, and
-   * normalizes `current=begin`.
-   */
-  [[maybe_unused]] void* ResetInlineArrayLaneRange(
-    InlineArrayLaneRuntimeView* const first,
-    InlineArrayLaneRuntimeView* const last
-  ) noexcept
-  {
-    void* result = first;
-    for (InlineArrayLaneRuntimeView* lane = first; lane != last; ++lane) {
-      result = lane->begin;
-      if (lane->begin != static_cast<void*>(lane->inlineStorage)) {
-        ::operator delete[](lane->begin);
-        lane->begin = lane->inlineStorage;
-        result = *(lane->inlineStorage);
-        lane->end = result;
-      }
-      lane->current = lane->begin;
-    }
-    return result;
-  }
-
   [[nodiscard]] gpg::RType* ResolveRect2iRType()
   {
     gpg::RType* rectType = gpg::Rect2i::sType;
@@ -13223,9 +13181,13 @@ void Sim::AdvanceBeat(const int amt)
     }
 
     // Sync-filter extra-data packing pass. Every id in the outgoing sync
-    // filter that still resolves to a live unit contributes one record; the
-    // record is appended first and then filled in place, so its inline pair
-    // storage is anchored inside the vector element rather than a temporary.
+    // filter that still resolves to a live unit contributes one record.
+    // `push_back(SExtraUnitData())` is `msvc8::vector<SExtraUnitData>::
+    // push_back` (FUN_0074C160, Vector.h) -- the `.asm`-confirmed shape:
+    // the record is copy-constructed in (default `pairs`, zero tag) and
+    // then filled in place through the returned `back()` reference, so its
+    // inline pair storage is anchored inside the vector element rather
+    // than aliasing a temporary that could be relocated by a later grow.
     mSyncFilter.maskA.ForEachValue([this](const unsigned int entityId) {
       Entity* const entity = mEntityDB->FindEntityById(entityId);
       if (entity == nullptr) {
@@ -13237,7 +13199,8 @@ void Sim::AdvanceBeat(const int amt)
         return;
       }
 
-      SExtraUnitData& record = mSyncSerializeGroup2.emplace_back();
+      mSyncSerializeGroup2.push_back(SExtraUnitData());
+      SExtraUnitData& record = mSyncSerializeGroup2.back();
       record.unitEntityId = kUnsetExtraUnitDataOwnerId;
       unit->GetExtraData(&record);
     });
