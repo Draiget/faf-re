@@ -245,6 +245,11 @@ namespace
    * What it does:
    * Returns one debug-grid distance lane by selector:
    * `0 -> 75.0f`, `1 -> 500.0f`, otherwise `+inf`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callers in
+   * the callgraph index, and no other reference to it in src/sdk. No sibling
+   * inline use of the `75.0f`/`500.0f` selector pair was found elsewhere in
+   * this file to redirect to instead.
    */
   [[maybe_unused]] float ResolveRDebugGridDistanceBySelector(const int selector) noexcept
   {
