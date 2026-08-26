@@ -6778,6 +6778,146 @@ namespace msvc8
          * pointer. Previously recovered under the name
          * `CopyClutterSeedValueRange` in Clutter.cpp -- moved here alongside
          * its `uninit_fill_n` core for the same reason.
+         *
+         * The following 19 addresses are `uninit_fill_n` instantiations for
+         * 4-byte trivially-copyable element types (mostly pointers, two
+         * `int32_t`s) -- every one compiles to the same `for(i=0;i<n;++i)
+         * dst[i]=value` store loop regardless of `T`'s identity, which is
+         * why MSVC8 emitted them as separate per-instantiation bodies but
+         * they read as near-identical `.c` exports. Previously duplicated in
+         * `LegacyContainerFillLanes.cpp` as 16 lettered
+         * `FillDwordSpanCountedLane*`/3 `FillDwordSpanByEndLane*` thin
+         * wrappers over a shared generic `FillDwordSpanByCount`/
+         * `FillDwordSpanByEnd` implementation (itself byte-identical to this
+         * method's body) -- a RULE ONE violation once each wrapper's real
+         * `_Insert_n`/`push_back` caller and element `T` were identified via
+         * `_callgraph_index.sqlite` `call_edges`; retired in favor of citing
+         * each address here directly, with `FillDwordSpanByCount`/
+         * `FillDwordSpanByEnd` kept alive for the file's remaining
+         * unidentified lettered lanes (`B`/`F`/`J`/`N`/`Q`/`R`/`S`/`X`).
+         * The `ByEnd`-lettered three below were expressed over a
+         * `[begin,end)` pointer pair rather than a count at their call
+         * sites; same `uninit_fill_n` semantics, alternate compiled form.
+         *
+         * Address: 0x00535620 (FUN_00535620, `msvc8::vector<Moho::
+         * RBlueprint*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_00535D60` (cited above), whose `_Count` is folded to the
+         * constant 1; emitted via `rules.mBlueprintsByOrdinal.push_back(...)`
+         * in `moho::AppendBlueprintOrdinal`, Sim.cpp:14253.)
+         * Address: 0x005C5F90 (FUN_005C5F90, `msvc8::vector<moho::
+         * ReconBlip*>::uninit_fill_n` for the 4-byte pointer element, filled
+         * with a `nullptr` placeholder. Reached from the already-recovered
+         * `GrowBlipPointerVector` (CAiReconDBImpl.cpp:964), which invokes
+         * `values.resize(values.size()+appendCount, nullptr)` by name --
+         * this address is `resize`'s own grow-and-fill step for this `T`.)
+         * Address: 0x005DC940 (FUN_005DC940, `msvc8::vector<Moho::
+         * UnitWeapon*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_005DD120` (cited above, `CAiAttackerImpl::mWeapons`); emitted
+         * via `view->mWeapons.push_back(weapon)` in
+         * `CAiAttackerImpl::CreateWeapon`, CAiAttackerImpl.cpp:973.)
+         * Address: 0x005DCAE0 (FUN_005DCAE0, `msvc8::vector<moho::
+         * CAcquireTargetTask*>::uninit_fill_n` for the 4-byte pointer
+         * element. Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_005DD570` (cited above); emitted via the recovered helper
+         * `InsertNCopiesCAcquireTargetTaskPtrVector`'s
+         * `storage.insert(begin()+offset, count, value)`, IAiAttacker.cpp.)
+         * Address: 0x0066A460 (FUN_0066A460, `msvc8::vector<moho::
+         * WCurveEditorPanel*>::uninit_fill_n` for the 4-byte pointer
+         * element -- already named on this instantiation's `push_back`
+         * entry above (`FUN_0066A860`) as "constructs the new element
+         * through FUN_0066A460 (uninit_fill_n)"; cited here directly too.
+         * Reached from `msvc8::vector<T*>::push_back`'s capacity-full path
+         * and directly from `Moho::WEmitterWx::WEmitterWx`'s
+         * `mCurvePanels.push_back(curvePanel)`, WEmitterWx.cpp.)
+         * Address: 0x0067CB80 (FUN_0067CB80, `msvc8::vector<Moho::
+         * Entity*>::uninit_fill_n` for the 4-byte pointer element
+         * (`Moho::Entity::mAttachedEntities` @+0x17C). Reached from this
+         * instantiation's `_Insert_n` grow lane `FUN_0067DB40` (cited
+         * above); emitted via the recovered helper
+         * `InsertNCopiesEntityPtrVector`'s `storage.insert(begin()+offset,
+         * count, value)` (Entity.cpp), and via `AppendAttachedEntity` on
+         * `Moho::Entity::AttachTo`'s (FUN_00679550) capacity-full path.)
+         * Address: 0x006F87A0 (FUN_006F87A0, `msvc8::vector<
+         * CUnitCommand*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_006F88D0` (cited above); emitted via
+         * `cfunc_CoordinateAttacksL`'s `commands.push_back(command)`,
+         * CCommandLuaFunctionRegistrations.cpp.)
+         * Address: 0x0078A2A0 (FUN_0078A2A0, `msvc8::vector<moho::
+         * CMauiControl*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `insert(end(),1,value)` grow-core
+         * `FUN_0078A330` (cited above); emitted via `RebuildRenderedChildrenLane`'s
+         * `mRenderedChildren.push_back(controlCursor)` (UiRuntimeTypes.cpp),
+         * reached from `Moho::CMauiControl::Render` (0x00786FA0).)
+         * Address: 0x007AF3B0 (FUN_007AF3B0, `msvc8::vector<Moho::
+         * CameraImpl*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from the recovered `InsertNCopiesCameraImplPtrVector`
+         * (EngineVectorHelpers.cpp:74, `msvc8::vector<CameraImpl*>::
+         * _Insert_n` per-T binding for `FUN_007AFD10`), which forwards to
+         * `storage.insert(pos, count, fillValue)` by name.)
+         * Address: 0x007AF620 (FUN_007AF620, `msvc8::vector<Moho::
+         * RCamCamera*>::uninit_fill_n` for the same 4-byte pointer element
+         * as the entry immediately above (`RCamCamera` is the public alias
+         * of `CameraImpl`) -- a second, distinct `_Insert_n` emission for
+         * this `T` reached via a different call shape. Reached from this
+         * instantiation's `_Insert_n` grow lane `FUN_007B0340` (cited above,
+         * folded to `_Count=1`); emitted via `Moho::CAM_GetAllRCamCameras`'s
+         * (FUN_007AADE0, RCamManager.cpp) `result.push_back(cam)`.)
+         * Address: 0x007E31E0 (FUN_007E31E0, `msvc8::vector<Moho::
+         * MeshLOD*>::uninit_fill_n` for the 4-byte pointer element. Reached
+         * from this instantiation's `push_back` `FUN_007E3850` (cited
+         * above); emitted via `Mesh::CreateLOD`'s `lods.push_back(lod)`.)
+         * Address: 0x0082D250 (FUN_0082D250, `msvc8::vector<
+         * UICommandGraph::CommandGraphEdge*>::uninit_fill_n` for the 4-byte
+         * pointer element. Reached from this instantiation's `insert`
+         * grow-core `FUN_0082E950` (cited above); emitted via
+         * `LinkCommandGraphEdge`'s `bucket.push_back(edge)`
+         * (CWldSession.cpp:14703) when the bucket's `mEdges` vector is at
+         * capacity.)
+         * Address: 0x00879A80 (FUN_00879A80, `msvc8::vector<Moho::
+         * CWldTerrainDecal*>::uninit_fill_n` for the 4-byte pointer element
+         * (`Moho::CDecalManager::mDecals` @+0x10). Reached from this
+         * instantiation's `_Insert_n` grow lane `FUN_0087A830` (cited
+         * above); emitted via the recovered helper
+         * `InsertNCopiesCWldTerrainDecalPtrVector` (CWldSplat.cpp) and via
+         * `AppendDecal` on `CDecalManager::LoadDecal`/`NewSplat`'s
+         * capacity-full path.)
+         * Address: 0x00879ED0 (FUN_00879ED0, `msvc8::vector<Moho::
+         * CDecalGroup*>::uninit_fill_n` for the 4-byte pointer element
+         * (`Moho::CDecalManager::mDecalGroups`). Reached from this
+         * instantiation's `_Insert_n` grow lane `FUN_0087B1C0` (cited above
+         * on `uninit_move_n`).)
+         * Address: 0x0087A310 (FUN_0087A310, `msvc8::vector<Moho::
+         * CWldSplat*>::uninit_fill_n` for the 4-byte pointer element
+         * (`Moho::CDecalManager::mSplats` @+0x48). Reached from this
+         * instantiation's `_Insert_n` grow lane `FUN_0087BB40` (cited
+         * above); emitted via the recovered helper
+         * `InsertNCopiesCWldSplatPtrVector` (CWldSplat.cpp) and via
+         * `AppendSplat` on `CDecalManager::NewSplat`'s capacity-full path.)
+         * Address: 0x0088A2E0 (FUN_0088A2E0, `msvc8::vector<Moho::
+         * WaveGenerator*>::uninit_fill_n` for the 4-byte pointer element.
+         * Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_0088A7B0` (cited above on `uninit_move_n`), WaveSystem.cpp.)
+         * Address: 0x008D9D50 (FUN_008D9D50, `msvc8::vector<gpg::
+         * RType*>::uninit_fill_n` for the 4-byte pointer element, expressed
+         * over a `[begin,end)` pointer pair rather than a count at this call
+         * site. Reached from this instantiation's `_Insert_n` grow lane
+         * `FUN_008DD050` (cited above, the global reflection `TypeVec`);
+         * emitted via `gpg::RType::RegisterType`'s `insert(end(), 1, this)`.)
+         * Address: 0x008E9260 (FUN_008E9260, `msvc8::vector<
+         * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats2`
+         * @+0x60, expressed over a `[begin,end)` pointer pair. Reached from
+         * this instantiation's `_Insert_n` grow lane `FUN_008EF2B0` (cited
+         * above); emitted via `gpg::gal::DeviceD3D9::BuildDeviceCapabilities`'s
+         * `validFormats2.insert(end(),1,token)`, D3D9Interfaces.cpp.)
+         * Address: 0x008E9280 (FUN_008E9280, `msvc8::vector<
+         * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats1`
+         * @+0x70, the sibling of the entry immediately above. Reached from
+         * this instantiation's `_Insert_n` grow lane `FUN_008EF500` (cited
+         * above); emitted via the same `BuildDeviceCapabilities`'s
+         * `validFormats1.insert(end(),1,token)`.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
