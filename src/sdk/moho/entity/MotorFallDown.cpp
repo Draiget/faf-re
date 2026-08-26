@@ -651,6 +651,10 @@ namespace moho
     , mDeleteCallback(&DeleteConstructedMotorFallDown)
   {}
 
+  /**
+   * Address: 0x00BFD190 (FUN_00BFD190, atexit target registered by the real
+   * ctor above)
+   */
   MotorFallDownConstruct::~MotorFallDownConstruct()
   {
     ResetLinks();
