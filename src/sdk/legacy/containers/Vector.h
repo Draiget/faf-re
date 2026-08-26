@@ -3840,7 +3840,20 @@ namespace msvc8
          * reallocates, copy-constructs the head/tail ranges through
          * `uninit_copy_n`/the class's copy constructor (FUN_0088AB00), places
          * the inserted value, and releases the old storage, matching this
-         * method's own reallocation-branch shape.)
+         * method's own reallocation-branch shape. The old range is destroyed
+         * by FUN_0088A3E0 (`msvc8::vector<Moho::WaveParameters>::
+         * destroy_range`, cited below) before the buffer is freed -- called
+         * 3x: once on the success path (0x0088A5A5, destroying the old
+         * buffer's live range immediately before `operator delete`), twice
+         * more in the head/tail copy-construction exception-cleanup funclets
+         * (0x0088A5E2, 0x0088A687), destroying the partially-constructed new
+         * buffer before rethrowing. IDA's own decompile of this function
+         * (`FUN_0088A400.c`) omits all three calls entirely -- the same
+         * "bad/positive sp value" decompiler failure already documented for
+         * the sibling `AdapterD3D9`/`FUN_008F1890` pair (`destroy_range`,
+         * cited below) -- and mis-marks the function `__noreturn`, even
+         * though the primary path returns normally through `retn 8`;
+         * confirmed only against the raw `.asm`.)
          *
          * Address: 0x007F0790 (FUN_007F0790, `msvc8::vector<moho::
          * SRangeRenderProfile>::insert(iterator, const T&)` for the 136-byte
@@ -5095,8 +5108,17 @@ namespace msvc8
          * reach-in lane rather than the typed element -- flagged as
          * existing RULE ONE debt, not collapsed in this pass), gap-fill via
          * `FUN_007D9970`, old-buffer teardown via `FUN_007D8600`
-         * (`moho/containers/LegacyContainerFillLanes.cpp`, already
-         * recovered). Reached from `AppendSurfaceSeed`'s (`Clutter.cpp`)
+         * (`msvc8::vector<moho::ClutterSurfaceElement>::destroy_range`,
+         * cited below -- called 3x: once on the success path destroying the
+         * old buffer's live range immediately before `operator delete`,
+         * twice more in the head/tail copy-construction exception-cleanup
+         * funclets destroying the partially-constructed new buffer before
+         * rethrowing; formerly modeled as a standalone free function in
+         * `moho/containers/LegacyContainerFillLanes.cpp` with no
+         * source-level caller anywhere in `src/sdk/**` -- collapsed into
+         * this template's own generic `destroy_range<T>`, which already
+         * resolves to `ClutterSurfaceElement`'s own destructor). Reached
+         * from `AppendSurfaceSeed`'s (`Clutter.cpp`)
          * `mSeeds.insert(mSeeds.end(), seed)` call on the capacity-exhausted
          * path. DB-integrity fix: was fake-recovered (batch r14, zero real
          * src/sdk citation).
@@ -5344,6 +5366,56 @@ namespace msvc8
          * the `.c` decompile for `FUN_008F1890` doesn't show these calls at
          * all (its own "bad/positive sp value" disclaimer), only the raw
          * `.asm` does; confirmed against that directly.)
+         * Address: 0x007D8600 (FUN_007D8600, `msvc8::vector<moho::
+         * ClutterSurfaceElement>::destroy_range` for the 16-byte element --
+         * the same vtbl-slot-0 dispatch loop shape as the sibling
+         * `AdapterModeD3D9` entry above, `flag=0`, but through
+         * `ClutterSurfaceElement`'s own hand-rolled `ClutterSurfaceElementVTable`
+         * (a raw one-slot function-pointer struct, not a real C++ `virtual`)
+         * rather than a compiler-generated vtable -- see `DestroyInPlace()`
+         * (`Clutter.h`), which documents this exact `vtable->destroy(this, 0)`
+         * dispatch and already cites three other inlined call sites of the
+         * same one-element operation; `ClutterSurfaceElement`'s explicit
+         * destructor (declared exactly to be that same `DestroyInPlace()`
+         * body) is what routes this generic `destroy_range<T>` instantiation
+         * through it. Reached from `insert`'s (`FUN_007D8620`, cited above)
+         * reallocation branch, called 3x: once destroying the old buffer's
+         * live range immediately before `operator delete` frees it
+         * (0x007D87A7), twice more in the head/tail copy-construction
+         * exception-cleanup funclets (0x007D87EC, 0x007D885C), destroying
+         * the partially-constructed new buffer before rethrowing.
+         * `Moho::Clutter::Surface::mSeeds`'s reallocation teardown step.
+         * Formerly modeled as a standalone free function in
+         * `moho/containers/LegacyContainerFillLanes.cpp`
+         * (`DestroyVirtualRange16`, over a raw `VirtualDtor16RuntimeView`)
+         * with no source-level caller anywhere in `src/sdk/**` -- collapsed
+         * into this template instantiation, RULE ONE.)
+         * Address: 0x0088A3E0 (FUN_0088A3E0, `msvc8::vector<Moho::
+         * WaveParameters>::destroy_range` for the 136-byte (`0x88`)
+         * polymorphic element -- the same vtbl-slot-0 virtual-dtor loop
+         * shape as the sibling `AdapterD3D10`/`AdapterModeD3D9`/`AdapterD3D9`
+         * entries above, `flag=0`, dispatching through `WaveParameters`'s
+         * own single-slot vtable (its real, compiler-generated `virtual
+         * ~WaveParameters()`, vtable-slot-0 scalar deleting destructor
+         * FUN_00886D80, already cited in `WaveSystem.h`; independently
+         * confirmed via RTTI -- `dumps/rtti_dump_all.hpp`'s
+         * `Moho::WaveParameters` vftable has exactly one slot,
+         * `sub_886D80`). Reached from `_Insert_n`'s (`FUN_0088A400`, cited
+         * above on `insert`) reallocation branch, called 3x: once
+         * destroying the old buffer's live range immediately before
+         * `operator delete` frees it (0x0088A5A5), twice more in the
+         * head/tail copy-construction exception-cleanup funclets
+         * (0x0088A5E2, 0x0088A687), destroying the partially-constructed new
+         * buffer before rethrowing -- the same "bad/positive sp value"
+         * decompiler failure as the sibling `AdapterD3D9`/`FUN_008F1890`
+         * entry above hides all three calls from `FUN_0088A400`'s own `.c`
+         * decompile; only the raw `.asm` shows them.
+         * `WavePattern::mWaves`'s reallocation teardown step. Formerly
+         * modeled as a standalone free function in
+         * `moho/containers/LegacyContainerFillLanes.cpp`
+         * (`DestroyVirtualRange136`, over a raw `VirtualDtor136RuntimeView`)
+         * with no source-level caller anywhere in `src/sdk/**` -- collapsed
+         * into this template instantiation, RULE ONE.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
