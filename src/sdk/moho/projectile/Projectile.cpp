@@ -870,8 +870,19 @@ namespace moho
        * 0x0069BD56-0x0069BD8E.
        * When Display.CameraFollowsProjectile != 0 the binary pushes a 12-byte lane
        * {this->id_, <sim field @ +0x68>, Display.CameraFollowTimeout} into
-       * SimulationRef->mSyncSerializeGroup1 (Sim+0x9B8) via sub_69E6D0. The only
-       * recovered expression of this push is the offset-magic helper
+       * SimulationRef->mSyncSerializeGroup0 (Sim+0x9B8, `.asm`-confirmed: `add
+       * eax, 9B8h` at 0x0069BD7B on the `sim` parameter) via sub_69E6D0.
+       * Citation fix: previously labeled `mSyncSerializeGroup1` here, but
+       * Sim.h declares `mSyncSerializeGroup0` immediately before
+       * `mSyncSerializeGroup1` immediately before `mAllyUpgradeNotifications`
+       * (confirmed 0x9D8) -- two 0x10-byte `msvc8::vector` slots back from a
+       * confirmed anchor puts `mSyncSerializeGroup0` at 0x9B8 and
+       * `mSyncSerializeGroup1` at 0x9C8, not the reverse. Separately,
+       * `mSyncSerializeGroup0` is still declared `msvc8::vector<void*>` in
+       * Sim.h, which cannot hold this 12-byte `Element12Runtime` lane -- the
+       * same wrong-element-shape pattern already found and fixed on
+       * `mSyncSerializeGroup2` (see `CWldSession.h`), not yet re-derived here.
+       * The only recovered expression of this push is the offset-magic helper
        * AppendProjectileLaneFromOwnerOffsetRuntime in SimRecoveryRuntime.cpp, which
        * is outside this task's editable file set, and the lane's middle field
        * (read as [ecx+0x68]) is not yet identified. Omitted rather than fabricating
