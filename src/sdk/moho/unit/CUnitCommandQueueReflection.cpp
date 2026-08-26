@@ -131,6 +131,10 @@ namespace moho
 
   /**
    * Address: 0x00BFEF10 (FUN_00BFEF10, sub_BFEF10)
+   *
+   * `FUN_006EE910` and `FUN_006EE940` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CUnitCommandQueueSaveConstruct::~CUnitCommandQueueSaveConstruct()
   {

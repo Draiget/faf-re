@@ -95,6 +95,10 @@ namespace moho
   /**
    * Address: 0x00BFE9A0 (FUN_00BFE9A0, plain unlink thunk pushed as this
    * class's atexit target)
+   *
+   * `FUN_006E1090` and `FUN_006E10C0` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CCommandDBSaveConstruct::~CCommandDBSaveConstruct()
   {
@@ -155,6 +159,10 @@ namespace moho
   /**
    * Address: 0x00BFE9D0 (FUN_00BFE9D0, plain unlink thunk pushed as this
    * class's atexit target)
+   *
+   * `FUN_006E11C0` and `FUN_006E11F0` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CCommandDBConstruct::~CCommandDBConstruct()
   {

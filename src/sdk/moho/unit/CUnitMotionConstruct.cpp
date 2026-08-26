@@ -35,6 +35,10 @@ namespace moho
 
   /**
    * Address: 0x00BFE070 (FUN_00BFE070, cleanup_CUnitMotionConstruct)
+   *
+   * `FUN_006BA210` and `FUN_006BA240` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   CUnitMotionConstruct::~CUnitMotionConstruct()
   {
