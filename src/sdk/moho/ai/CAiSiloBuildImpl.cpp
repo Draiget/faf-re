@@ -535,39 +535,12 @@ void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(econValueType, &mSegmentSpent, owner);
 }
 
-/**
- * Address: 0x005D08E0 (FUN_005D08E0)
- *
- * What it does:
- * Thin serializer-save thunk lane forwarding one silo-build object/archive
- * pair into `CAiSiloBuildImpl::MemberSerialize`.
- */
-[[maybe_unused]] void CAiSiloBuildImplMemberSerializeThunkA(
-  const CAiSiloBuildImpl* const object,
-  gpg::WriteArchive* const archive
-)
-{
-  if (object != nullptr) {
-    object->MemberSerialize(archive);
-  }
-}
-
-/**
- * Address: 0x005D1030 (FUN_005D1030)
- *
- * What it does:
- * Secondary serializer-save thunk lane forwarding one silo-build
- * object/archive pair into `CAiSiloBuildImpl::MemberSerialize`.
- */
-[[maybe_unused]] void CAiSiloBuildImplMemberSerializeThunkB(
-  const CAiSiloBuildImpl* const object,
-  gpg::WriteArchive* const archive
-)
-{
-  if (object != nullptr) {
-    object->MemberSerialize(archive);
-  }
-}
+// Addresses 0x005D08E0/0x005D1030 (the "ThunkA"/"ThunkB" serializer-save
+// duplicates formerly modeled here) are dead: zero data_refs/call_edges for
+// both, and no source-level caller anywhere in src/sdk/**.
+// `CAiSiloBuildImplSerializer::Serialize` (CAiSiloBuildImplSerializer.cpp,
+// wired via that class's atexit-registered ctor) already calls
+// `CAiSiloBuildImpl::MemberSerialize` directly.
 
 /**
  * Address: 0x005CEE40 (FUN_005CEE40, ?SiloUpdateProjectileBlueprint@CAiSiloBuildImpl@Moho@@UAEXXZ)
