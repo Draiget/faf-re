@@ -10065,17 +10065,17 @@ namespace
    */
 
   /**
-   * Address: 0x006722F0 (FUN_006722F0)
-   *
-   * What it does:
-   * Installs serializer load/save callbacks for reflected type `Moho::CEfxTrailEmitter`.
+   * `InstallMohoCEfxTrailEmitterSerializerCallbacks` removed here (2026-08-26
+   * follow-up): its `Address: 0x006722F0` citation was disproven -- ground-
+   * truth `.c` disassembly shows the standard direct-assignment `Init()`
+   * shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc = ...`), not the
+   * generic by-name lookup this file modeled, and had zero callers in this
+   * file. The real body is `Moho::CEfxTrailEmitterSerializer::Init()` (a
+   * real, empty `gpg::SerSaveLoadHelper<CEfxTrailEmitter>`-derived class --
+   * two distinct adjacent vtable symbols, 0x00E2695C/0x00E26964, prove a
+   * derived class rather than a `using` alias) in
+   * moho/effects/rendering/CEfxTrailEmitter.cpp/.h.
    */
-  [[nodiscard]] gpg::RType::load_func_t InstallMohoCEfxTrailEmitterSerializerCallbacks(
-    SerSaveLoadHelperInitView* const helper
-  )
-  {
-    return InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::CEfxTrailEmitter");
-  }
 
   /**
    * `InstallMohoEntitySetBaseSerializerCallbacks` removed here (2026-08-26
