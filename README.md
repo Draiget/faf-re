@@ -8,22 +8,22 @@ Progress snapshot:
 
 - Total FAF functions: `67,170`
   - *IDA index, exported*
-- Progress coverage:  **`99.20%`**
+- Progress coverage:  **`99.25%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `66,634`*
+  - *Total amount of completed tokens: `66,666`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,744` (79.15%)
-- `skip`: `8,158` (12.24%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `52,744` (79.12%)
+- `skip`: `8,190` (12.29%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,732` (8.60%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `643` (0.96%)**
+- **`blocked`: `611` (0.91%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `646`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `646`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `614`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `614`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
@@ -42,16 +42,16 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (646 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (614 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `9` | 1.39% |
-| Vtable-anchored (recover with the owning class) | `106` | 16.41% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `9` | 1.47% |
+| Vtable-anchored (recover with the owning class) | `106` | 17.26% |
 | Framework dispatch (wx/EH/Lua/reflection) | `0` | 0.00% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `225` | 34.83% |
-| No indexed callsite evidence (needs investigation/evidence) | `305` | 47.21% |
-| Unclassified data xref (manual review) | `1` | 0.15% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `193` | 31.43% |
+| No indexed callsite evidence (needs investigation/evidence) | `305` | 49.67% |
+| Unclassified data xref (manual review) | `1` | 0.16% |
 | RTTI-only | `0` | 0.00% |
 
 *Set `FAF_README_SKIP_VERDICTS=1` to skip this block during tight worker loops.*
