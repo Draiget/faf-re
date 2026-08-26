@@ -307,17 +307,26 @@ namespace msvc8
          * `[node+0x1D]` (29 decimal, this instantiation's outer 32-byte
          * node) updating the candidate only on left turns (`lower_bound`'s
          * shape, not `insert_unique`'s unconditional descend). On a miss,
-         * builds the `value_type(k, mapped_type())` temporary --
-         * `sub_7B4A50` (already-cited `alloc_raw()`, RbTree.h) plus an
-         * inlined empty-set head-ify at byte offset 0x11 (the *inner*
-         * `msvc8::set<std::uint32_t>`'s isNil offset) for the raw node, then
-         * `sub_7B3500` (a full `msvc8::set<std::uint32_t>` default-ctor
-         * emission) for the `mapped_type()` temporary proper -- then
-         * `sub_7B2DF0` (`insert_hint`, RbTree.h, matched by its empty/
-         * leftmost/rightmost/predecessor-successor branch structure and its
-         * isNil check at the *outer* offset) inserts it, and `sub_7B3E00`
-         * (already-cited `erase_range` for `msvc8::set<std::uint32_t>`)
-         * tears down the scratch temporaries in reverse construction order.
+         * builds the `value_type(k, mapped_type())` temporary -- the bare
+         * `mapped_type()` sub-expression first (`sub_7B4A50`, already-cited
+         * `alloc_raw()`, RbTree.h, plus an inlined self-link/`isNil=1`/
+         * `size_=0` at byte offset 0x11 -- the *inner*
+         * `msvc8::set<std::uint32_t>`'s isNil offset -- exactly
+         * `buy_head()` inlined, not a separate call), then `sub_7B3500`
+         * (this same instantiation's *copy* constructor, RbTree.h -- not a
+         * default ctor: it copy-constructs the pair's `.second` from the
+         * just-built bare temporary, since C++03 `pair(const key_type&,
+         * const mapped_type&)` has no move path) for the `mapped_type()`
+         * temporary proper -- then `sub_7B2DF0` (`insert_hint`, RbTree.h,
+         * matched by its empty/leftmost/rightmost/predecessor-successor
+         * branch structure and its isNil check at the *outer* offset)
+         * inserts it, and `sub_7B3E00` (already-cited `erase_range` for
+         * `msvc8::set<std::uint32_t>`) tears down the scratch temporaries in
+         * reverse construction order -- `FUN_007B2940`/`FUN_007B2970`/
+         * `FUN_007B36A0` are this teardown's three real-binary addresses
+         * (two SEH-unwind funclets for the two temporaries, one the copy
+         * constructor's own exception-cleanup); full citations on
+         * `~rb_tree()`/`rb_tree(const rb_tree&)` in RbTree.h.
          * Builds `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map, keyed
          * by parent-bone-pointer, each entry holding the set of that
          * parent's already-visited child-bone pointers -- `dedupTree[

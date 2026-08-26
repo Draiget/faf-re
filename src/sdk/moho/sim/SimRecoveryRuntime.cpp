@@ -9767,106 +9767,29 @@ MapInsertStatusRuntime* FindOrInsertMapNodeNil17Runtime(
 // No standalone recovery of this raw-offset duplicate belongs here per
 // RULE ONE.
 
-/**
- * Address: 0x007B2940 (FUN_007B2940)
- *
- * What it does:
- * Explicitly destroys and reconstructs one `msvc8::set<std::uint32_t>` lane
- * in place -- `owner`'s `{proxy, head, size}` layout is byte-identical to
- * `msvc8::set<T>` (`legacy/containers/Set.h`), so `.~set()` compiles to
- * exactly this shape: `rb_tree::~rb_tree()`'s `erase_range(leftmost(),
- * header())` (`FUN_007B3E00`, whole-tree fast path -> `destroy_subtree`
- * `FUN_007B4D10`) followed by `operator delete(head)`. Matches the same
- * `erase_range`/`destroy_subtree`/`operator delete(head)` shape as the
- * sibling `msvc8::set<uint32_t>` instantiation at `0x0052A390`/`0x0052D9C0`/
- * `0x0052CCF0` (`RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`,
- * RRuleGameRules.h) -- same isNil@+0x11 node shape, different owning field.
- * NOTE: this function's trailing placement-new reconstruction step was
- * originally modeled on that sibling's recovery (formerly
- * `ReleaseExportBindingPendingOrdinals`, RRuleGameRules.cpp); that precedent
- * has since been shown to be a mis-model -- `0x0052A390` is a plain
- * destructor with no reconstruction step, and the reconstruct-after-destroy
- * shape it was given was an artifact of a hand-rolled array owner that has
- * since been migrated to a real `msvc8::vector<T>`. Not re-verified here
- * whether `FUN_007B2940`'s own disassembly genuinely includes the
- * reconstruction step independent of that precedent; this function is
- * currently unwired regardless (see below), so it does not affect the
- * compiled recovered binary today. The formerly-generic `TreeClearFn clearFn` runtime
- * indirection this superseded did not match the binary: the shipped body
- * hardcodes `call sub_7B3E00`, a compile-time-fixed direct call verified
- * directly against `.asm`, not a runtime-configurable one. The parameter is
- * kept for signature stability (nothing in `src/sdk/**` calls this function
- * yet) but is no longer used.
- */
-int ClearTreeStorageLaneC21Runtime(
-  TreeStorageOwnerRuntime* const owner,
-  const TreeClearFn clearFn
-)
-{
-  if (owner == nullptr) {
-    return 0;
-  }
-
-  (void)clearFn;
-  reinterpret_cast<msvc8::set<std::uint32_t>*>(owner)->~set();
-  ::new (static_cast<void*>(owner)) msvc8::set<std::uint32_t>();
-  return 0;
-}
-
-/**
- * Address: 0x007B2970 (FUN_007B2970)
- *
- * What it does:
- * Explicitly destroys and reconstructs one embedded `msvc8::set<std::uint32_t>`
- * lane at owner offset `+0x04` in place -- same `.~set()` compiles-to-
- * `~rb_tree()` shape as `ClearTreeStorageLaneC21Runtime` above (`erase_range`
- * `FUN_007B3E00` whole-tree fast path -> `destroy_subtree` `FUN_007B4D10`,
- * then `operator delete(head)`), verified directly against `.asm`
- * (`call sub_7B3E00`, hardcoded, not runtime-configurable). The `clearFn`
- * parameter is kept for signature stability but is no longer used.
- */
-int ClearEmbeddedSecondaryTreeLaneRuntime(
-  std::byte* const ownerBytes,
-  const TreeClearFn clearFn
-)
-{
-  if (ownerBytes == nullptr) {
-    return 0;
-  }
-
-  auto* const embeddedOwner = reinterpret_cast<TreeStorageOwnerRuntime*>(ownerBytes + 4u);
-  (void)clearFn;
-  reinterpret_cast<msvc8::set<std::uint32_t>*>(embeddedOwner)->~set();
-  ::new (static_cast<void*>(embeddedOwner)) msvc8::set<std::uint32_t>();
-  return 0;
-}
-
-/**
- * Address: 0x007B36A0 (FUN_007B36A0)
- *
- * What it does:
- * Explicitly destroys and reconstructs one `msvc8::set<std::uint32_t>` lane
- * in place -- sibling emission of `ClearTreeStorageLaneC21Runtime` above for
- * a different owning field (same `.~set()` -> `~rb_tree()` -> `erase_range`
- * `FUN_007B3E00` whole-tree fast path -> `destroy_subtree` `FUN_007B4D10` ->
- * `operator delete(head)` shape, verified directly against `.asm`: `call
- * sub_7B3E00`, hardcoded, not runtime-configurable). The `clearFn` parameter
- * is kept for signature stability but is no longer used.
- */
-int ClearTreeStorageLaneD21Runtime(
-  TreeStorageOwnerRuntime* const owner,
-  const TreeClearFn clearFn
-)
-{
-  if (owner == nullptr) {
-    return 0;
-  }
-
-  (void)clearFn;
-  reinterpret_cast<msvc8::set<std::uint32_t>*>(owner)->~set();
-  ::new (static_cast<void*>(owner)) msvc8::set<std::uint32_t>();
-  return 0;
-}
+// Address: 0x007B2940 (FUN_007B2940) / 0x007B2970 (FUN_007B2970) /
+// 0x007B36A0 (FUN_007B36A0) -- previously modeled here as three bespoke
+// "destroy and placement-new reconstruct" free functions
+// (`ClearTreeStorageLaneC21Runtime`/`ClearEmbeddedSecondaryTreeLaneRuntime`/
+// `ClearTreeStorageLaneD21Runtime`). That shape was copied from a
+// now-discredited precedent (`RRuleGameRulesLuaExportBinding::
+// mPendingBlueprintOrdinals`'s former `ReleaseExportBindingPendingOrdinals`,
+// RRuleGameRules.cpp/.h) and was never independently re-verified against
+// these three addresses' own `.asm`. Re-verified directly: all three are
+// `erase_range(leftmost(), header())` + `operator delete(head)` +
+// `head_=nullptr`/`size_=0` -- exactly `msvc8::detail::rb_tree<uint32_t>::
+// ~rb_tree()`'s shape (legacy/containers/RbTree.h), with no `operator new`
+// call and no reconstruction anywhere in any of the three bodies. All three
+// are compiler-generated EH cleanup for the `msvc8::set<std::uint32_t>`
+// (isNil@+0x11) `mapped_type` of `msvc8::map<std::uint32_t,
+// msvc8::set<std::uint32_t>>::operator[]` (`FUN_007B27D0`, Map.h) --
+// `FUN_007B2940`/`FUN_007B2970` are SEH-unwind funclets for that
+// `operator[]`'s two `value_type(k, mapped_type())` stack temporaries, and
+// `FUN_007B36A0` is the exception-cleanup this instantiation's copy
+// constructor (`FUN_007B3500`) calls from its own catch handler before
+// rethrowing. None has, or needs, a source-level call site of its own; full
+// citations live on `rb_tree::~rb_tree()` and `rb_tree(const rb_tree&)` in
+// RbTree.h. No standalone recovery of these three belongs here per RULE ONE.
 
 /**
  * Address: 0x007B3760 (FUN_007B3760)
