@@ -17,7 +17,7 @@
 #include "moho/path/RDebugNavPath.h"
 #include "moho/path/RDebugNavPathTypeInfo.h"
 #include "moho/unit/core/RDebugWeapons.h"
-#include "moho/unit/core/RDebugWeaponsTypeInfo.h"
+#include "moho/unit/core/RDebugWeaponsTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -201,65 +201,13 @@ namespace moho
     bases_ = {};
   }
 
-  /**
-   * Address: 0x0064C4C0 (FUN_0064C4C0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one overlay-class destroy lane into the
-   * canonical non-deleting destructor body.
-   */
-  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkA(RDebugOverlayClass* const overlayClass)
-  {
-    overlayClass->~RDebugOverlayClass();
-  }
-
-  /**
-   * Address: 0x0064D170 (FUN_0064D170)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one overlay-class destroy lane into the
-   * canonical non-deleting destructor body.
-   */
-  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkB(RDebugOverlayClass* const overlayClass)
-  {
-    overlayClass->~RDebugOverlayClass();
-  }
-
-  /**
-   * Address: 0x0064D9D0 (FUN_0064D9D0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one overlay-class destroy lane into the
-   * canonical non-deleting destructor body.
-   */
-  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkC(RDebugOverlayClass* const overlayClass)
-  {
-    overlayClass->~RDebugOverlayClass();
-  }
-
-  /**
-   * Address: 0x00650670 (FUN_00650670)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one overlay-class destroy lane into the
-   * canonical non-deleting destructor body.
-   */
-  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkD(RDebugOverlayClass* const overlayClass)
-  {
-    overlayClass->~RDebugOverlayClass();
-  }
-
-  /**
-   * Address: 0x00650880 (FUN_00650880)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards one overlay-class destroy lane into the
-   * canonical non-deleting destructor body.
-   */
-  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkE(RDebugOverlayClass* const overlayClass)
-  {
-    overlayClass->~RDebugOverlayClass();
-  }
+  // Addresses 0x0064C4C0/0x0064D170/0x0064D9D0/0x00650670/0x00650880
+  // ("ThunkA" through "ThunkE", five compiled duplicates of the same
+  // one-line dtor-call formerly modeled here) are dead: zero data_refs/
+  // call_edges for all five, and no source-level caller anywhere in
+  // src/sdk/**. RDebugOverlayClass::~RDebugOverlayClass above (0x0064C400,
+  // with a separate scalar-deleting-destructor bridge at 0x0064C4D0, not
+  // one of these five) is the real, C++-guaranteed destructor.
 
   /**
    * Address: 0x00651920 (FUN_00651920)
