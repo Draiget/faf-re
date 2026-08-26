@@ -126,35 +126,13 @@ namespace
     return CopyBackwardSConditionRange(sourceCurrent, sourceBegin, destinationCurrent);
   }
 
-  /**
-   * Address: 0x00712840 (FUN_00712840)
-   *
-   * What it does:
-   * Thin jump-thunk alias to the `FUN_007138C0` backward-copy lane.
-   */
-  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeThunkA(
-    moho::SCondition* sourceCurrent,
-    const moho::SCondition* const sourceBegin,
-    moho::SCondition* destinationCurrent
-  )
-  {
-    return CopyBackwardSConditionRangeLaneA(sourceCurrent, sourceBegin, destinationCurrent);
-  }
-
-  /**
-   * Address: 0x00712870 (FUN_00712870)
-   *
-   * What it does:
-   * Thin jump-thunk alias to the `FUN_00713950` backward-copy lane.
-   */
-  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeThunkB(
-    moho::SCondition* sourceCurrent,
-    const moho::SCondition* const sourceBegin,
-    moho::SCondition* destinationCurrent
-  )
-  {
-    return CopyBackwardSConditionRange(sourceCurrent, sourceBegin, destinationCurrent);
-  }
+  // Addresses 0x00712840 ("ThunkA") and 0x00712870 ("ThunkB") -- jump-thunk
+  // aliases formerly modeled here -- are dead: zero incoming call_edges for
+  // both, and no source-level caller anywhere in src/sdk/**. Unlike these
+  // two, CopyBackwardSConditionRangeLaneA and CopyBackwardSConditionRange
+  // above are NOT dead: both have a real, confirmed caller (FUN_0070FAD0,
+  // itself reachable) via two direct call_edges each -- so both are kept
+  // as-is.
 } // namespace
 
 namespace moho
