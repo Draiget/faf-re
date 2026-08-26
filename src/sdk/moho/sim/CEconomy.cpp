@@ -589,35 +589,11 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     DeserializeRequests(archive);
   }
 
-  /**
-   * Address: 0x007742F0 (FUN_007742F0)
-   *
-   * What it does:
-   * Jump-thunk lane that forwards archive/object registers into
-   * `CEconomy::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEconomyMemberThunkA(
-    gpg::ReadArchive* const archive,
-    CEconomy* const economy
-  )
-  {
-    economy->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00774510 (FUN_00774510)
-   *
-   * What it does:
-   * Secondary jump-thunk lane forwarding directly to
-   * `CEconomy::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEconomyMemberThunkB(
-    gpg::ReadArchive* const archive,
-    CEconomy* const economy
-  )
-  {
-    economy->MemberDeserialize(archive);
-  }
+  // Addresses 0x007742F0/0x00774510 (the "ThunkA"/"ThunkB" jump-thunk
+  // duplicates formerly modeled here) are dead: zero data_refs and zero
+  // call_edges in the callgraph index for both, and no source-level caller
+  // anywhere in src/sdk/**. `CEconomySerializer::Deserialize` below already
+  // calls `CEconomy::MemberDeserialize` directly.
 
   /**
    * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
