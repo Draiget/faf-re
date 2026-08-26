@@ -223,6 +223,18 @@ namespace moho
 
     /**
      * Address: 0x005F42C0 (FUN_005F42C0, CUnitMeleeAttackTargetTask::RelinkAiAttackerListener)
+     * Address: 0x00651EF0 (FUN_00651EF0, ICF twin -- identical function_sha256.
+     *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+     *          as `RelinkOwnerNodeOffset04BeforeAnchor`; that duplicate has
+     *          been deleted.)
+     * Address: 0x005E9D50 (FUN_005E9D50, ICF twin -- identical function_sha256.
+     *          Formerly duplicated in the same file as `RelinkOwnerNodeBeforeAnchor`;
+     *          that duplicate has been deleted too.)
+     * Address: 0x005F4310 (FUN_005F4310, ICF twin -- identical function_sha256,
+     *          zero callers/xrefs of its own. Formerly mis-cited in
+     *          Broadcaster.cpp's fabricated `BroadcasterOwnerNodeOffset4RuntimeView`
+     *          cluster alongside the wrong claim on 0x005F42C0 itself; that
+     *          whole cluster has been deleted, see Broadcaster.cpp's removal note.)
      *
      * What it does:
      * Unlinks this task's attacker-listener node from its current intrusive
