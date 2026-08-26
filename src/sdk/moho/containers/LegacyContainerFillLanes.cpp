@@ -7660,8 +7660,12 @@ namespace
    * What it does:
    * Returns owner base address for one intrusive node slot at offset `0x68`,
    * or null when the node slot is null.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers. Its only source-level caller is `...Alias` immediately below,
+   * which is itself zero-callers -- the pair is a fully unreachable chain.
    */
-  void* ResolveOwnerBaseFromNodeSlotOffset68Primary(
+  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset68Primary(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -7677,8 +7681,12 @@ namespace
    *
    * What it does:
    * Alias lane for owner-base recovery from one offset-`0x68` node slot.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers -- distinct compiled address from `...Primary` above (a real
+   * forwarding call, not an ICF fold), but nothing calls this one either.
    */
-  void* ResolveOwnerBaseFromNodeSlotOffset68Alias(
+  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset68Alias(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -7691,8 +7699,11 @@ namespace
    * What it does:
    * Returns owner base address for one intrusive node slot at offset `0x48`,
    * or null when the node slot is null.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  void* ResolveOwnerBaseFromNodeSlotOffset48(
+  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset48(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -8048,8 +8059,11 @@ namespace
    * What it does:
    * Returns owner base pointer from one intrusive node pointer (`node - 4`)
    * and propagates null for null input.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  IntrusiveOwnerNodeSlotRuntimeView* ResolveOwnerBaseFromNodeMinus4(
+  [[maybe_unused]] IntrusiveOwnerNodeSlotRuntimeView* ResolveOwnerBaseFromNodeMinus4(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -10795,8 +10809,14 @@ namespace
    * What it does:
    * Returns inline storage address at `+0x74` when length `+0x88 < 16`,
    * otherwise returns heap-pointer lane `+0x74`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers. Shape matches `msvc8::string::raw_data_unsafe()`'s SSO dispatch
+   * (16-byte inline threshold) applied to a struct with an embedded string
+   * at offset `+0x74` -- three more per-offset copies of the same shape
+   * follow in this file (`At90`/`At44`/`At38`), all likewise zero-caller.
    */
-  std::uint32_t ResolveStoragePointerAt74(const InlineStorageAt74RuntimeView* const source) noexcept
+  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt74(const InlineStorageAt74RuntimeView* const source) noexcept
   {
     if (source->length88 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane74));
@@ -10810,8 +10830,13 @@ namespace
    * What it does:
    * Returns inline storage address at `+0x90` when length `+0xA4 < 16`,
    * otherwise returns heap-pointer lane `+0x90`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers. Same `raw_data_unsafe()`-shaped SSO dispatch as
+   * `ResolveStoragePointerAt74` above, for a struct with the embedded string
+   * at `+0x90`.
    */
-  std::uint32_t ResolveStoragePointerAt90(const InlineStorageAt90RuntimeView* const source) noexcept
+  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt90(const InlineStorageAt90RuntimeView* const source) noexcept
   {
     if (source->lengthA4 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane90));
@@ -12175,8 +12200,13 @@ namespace
    * What it does:
    * Returns inline storage address at `+0x44` when length `+0x58 < 16`,
    * otherwise returns heap-pointer lane `+0x44`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers. Same `raw_data_unsafe()`-shaped SSO dispatch as
+   * `ResolveStoragePointerAt74` above, for a struct with the embedded string
+   * at `+0x44`.
    */
-  std::uint32_t ResolveStoragePointerAt44(const InlineStorageAt44RuntimeView* const source) noexcept
+  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt44(const InlineStorageAt44RuntimeView* const source) noexcept
   {
     if (source->length58 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane44));
@@ -13312,8 +13342,13 @@ namespace
    * What it does:
    * Returns inline-storage address `+0x38` when length `+0x4C < 16`,
    * otherwise returns heap pointer lane `+0x38`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers. Same `raw_data_unsafe()`-shaped SSO dispatch as
+   * `ResolveStoragePointerAt74` above, for a struct with the embedded string
+   * at `+0x38`.
    */
-  std::uint32_t ResolveStoragePointerAt38(
+  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt38(
     const InlineStorageAt38RuntimeView* const source
   ) noexcept
   {
@@ -15363,8 +15398,11 @@ namespace
    * What it does:
    * Resolves one 2D cell address from table descriptor lane `(base,stride)`
    * stored at descriptor index `lane*3 + 6`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  std::uintptr_t ResolveTableCellAddressFromDescriptorLane(
+  [[maybe_unused]] std::uintptr_t ResolveTableCellAddressFromDescriptorLane(
     const std::int32_t lane,
     const std::uint32_t* const descriptorWords,
     const std::int32_t x,
@@ -15731,8 +15769,11 @@ namespace
    * What it does:
    * Returns owner base address from one intrusive node slot at `+0x04`
    * (`node - 0x34`), or null when slot is null.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  void* ResolveOwnerBaseFromNodeSlotAt04Minus52(
+  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotAt04Minus52(
     const IntrusiveOwnerNodeSlotRuntimeView* const ownerSlot
   ) noexcept
   {
@@ -15793,8 +15834,11 @@ namespace
    * What it does:
    * Returns owner base address from one intrusive node slot at `+0x00`
    * (`node - 0x34`), or null when slot is null.
+   *
+   * Orphan: zero xrefs at both cited addresses in the IDA export, zero
+   * callgraph callers for either, no other reference in src/sdk.
    */
-  void* ResolveOwnerBaseFromNodeSlotAt00Minus52(
+  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotAt00Minus52(
     const IntrusiveNodeSlotAt00RuntimeView* const nodeSlot
   ) noexcept
   {
@@ -17800,8 +17844,11 @@ namespace
    * What it does:
    * Resolves one payload pointer lane as `headerAt+0x04 - 8` when header is
    * present; otherwise returns zero.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  std::uint32_t ResolvePayloadAddressFromHeaderMinus8(
+  [[maybe_unused]] std::uint32_t ResolvePayloadAddressFromHeaderMinus8(
     const BaseAddressAt4RuntimeView* const source
   ) noexcept
   {
@@ -26759,8 +26806,11 @@ namespace
    *
    * What it does:
    * Returns one byte pointer lane at `this + 0x24`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  std::byte* ResolveOffset24PointerBatchPhi(void* const self) noexcept
+  [[maybe_unused]] std::byte* ResolveOffset24PointerBatchPhi(void* const self) noexcept
   {
     return static_cast<std::byte*>(self) + 0x24;
   }
@@ -26797,8 +26847,11 @@ namespace
    *
    * What it does:
    * Returns one byte pointer lane at `this + 0x2C`.
+   *
+   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
+   * callers, no other reference in src/sdk.
    */
-  std::byte* ResolveOffset2CPointerBatchPhi(void* const self) noexcept
+  [[maybe_unused]] std::byte* ResolveOffset2CPointerBatchPhi(void* const self) noexcept
   {
     return static_cast<std::byte*>(self) + 0x2C;
   }
