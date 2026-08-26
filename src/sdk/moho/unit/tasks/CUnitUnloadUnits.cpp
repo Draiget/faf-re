@@ -80,65 +80,18 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00628880 (FUN_00628880)
-   *
-   * What it does:
-   * Jump-thunk mirror for one unload-units serializer load lane into
-   * `CUnitUnloadUnits::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunkB(
-    gpg::ReadArchive* const archive,
-    moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00628070 (FUN_00628070, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one unload-units serializer-load thunk alias into
-   * `CUnitUnloadUnits::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunkJumpAlias(
-    gpg::ReadArchive* const archive,
-    moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00628080 (FUN_00628080, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one unload-units serializer-save thunk alias into
-   * `CUnitUnloadUnits::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunkJumpAlias(
-    gpg::WriteArchive* const archive,
-    const moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00628890 (FUN_00628890)
-   *
-   * What it does:
-   * Jump-thunk mirror for one unload-units serializer-save lane into
-   * `CUnitUnloadUnits::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunkB(
-    gpg::WriteArchive* const archive,
-    const moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberSerialize(archive);
-  }
+  // Addresses 0x00628880 ("ThunkB"), 0x00628070 ("ThunkJumpAlias") for
+  // deserialize, and 0x00628080 ("ThunkJumpAlias"), 0x00628890 ("ThunkB")
+  // for serialize, formerly modeled here as free functions, are dead: zero
+  // data_refs/call_edges for all four, and no source-level caller anywhere
+  // in src/sdk/**. A prior pass left these untouched pending separate
+  // evidence (see the CUnitUnloadUnitsSerializer class comment below); that
+  // evidence is now in: the real, wired bodies are
+  // `gpg::SerSaveLoadHelper<CUnitUnloadUnits>::Deserialize`/`::Serialize`
+  // (0x00626280/0x00626290), confirmed by 3 real incoming xrefs each
+  // (including gCUnitUnloadUnitsSerializer's ctor), which already forward
+  // into `CUnitUnloadUnits::MemberDeserialize`/`MemberSerialize` via the
+  // template body.
 
   [[nodiscard]]
   moho::BVSet<moho::EntId, moho::EntIdUniverse> BuildSelectedEntitySetFromUnits(
@@ -545,15 +498,16 @@ namespace moho
    *    was previously modeled in this file as a standalone free function
    *    `CUnitUnloadUnitsMemberDeserializeThunk`; it is actually this
    *    template instantiation's own compiler-emitted `Deserialize` body --
-   *    corrected here. The sibling thunks `CUnitUnloadUnitsMemberDeserializeThunkB`
+   *    corrected here. Confirmed by 3 real incoming xrefs incl. this ctor.
+   *    The sibling thunks `CUnitUnloadUnitsMemberDeserializeThunkB`
    *    (0x00628880) and `CUnitUnloadUnitsMemberDeserializeThunkJumpAlias`
-   *    (0x00628070) are untouched: this ctor's raw asm does not cite them,
-   *    so they are left for whatever separate evidence justified them.)
+   *    (0x00628070) were later confirmed zero-data_refs/zero-call_edges
+   *    dead duplicates and removed.)
    *  - Serialize() thunk: 0x00626290, tail-calls
    *    `CUnitUnloadUnits::MemberSerialize` at 0x00629950. (Same correction
    *    as above, formerly `CUnitUnloadUnitsMemberSerializeThunk`; siblings
-   *    `CUnitUnloadUnitsMemberSerializeThunkB`/`ThunkJumpAlias` untouched
-   *    for the same reason.)
+   *    `CUnitUnloadUnitsMemberSerializeThunkB`/`ThunkJumpAlias`
+   *    (0x00628890/0x00628080) were likewise confirmed dead and removed.)
    */
   class CUnitUnloadUnitsSerializer : public gpg::SerSaveLoadHelper<CUnitUnloadUnits>
   {
