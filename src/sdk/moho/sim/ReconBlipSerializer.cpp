@@ -130,53 +130,12 @@ namespace
     archive->Write(ResolvePerArmyReconInfoVectorType(), &object->mReconDat, ownerRef);
   }
 
-  /**
-   * Address: 0x005C90D0 (FUN_005C90D0)
-   *
-   * What it does:
-   * Forwarding thunk into canonical ReconBlip-member deserialize helper.
-   */
-  [[maybe_unused]] void DeserializeReconBlipMembersThunkA(moho::ReconBlip* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeReconBlipMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005C90E0 (FUN_005C90E0)
-   *
-   * What it does:
-   * Forwarding thunk into canonical ReconBlip-member serialize helper.
-   */
-  [[maybe_unused]] void SerializeReconBlipMembersThunkA(
-    const moho::ReconBlip* const object, gpg::WriteArchive* const archive
-  )
-  {
-    SerializeReconBlipMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005CAF90 (FUN_005CAF90)
-   *
-   * What it does:
-   * Duplicate forwarding thunk into canonical ReconBlip-member deserialize helper.
-   */
-  [[maybe_unused]] void DeserializeReconBlipMembersThunkB(moho::ReconBlip* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeReconBlipMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005CAFA0 (FUN_005CAFA0)
-   *
-   * What it does:
-   * Duplicate forwarding thunk into canonical ReconBlip-member serialize helper.
-   */
-  [[maybe_unused]] void SerializeReconBlipMembersThunkB(
-    const moho::ReconBlip* const object, gpg::WriteArchive* const archive
-  )
-  {
-    SerializeReconBlipMembers(object, archive);
-  }
+  // Addresses 0x005C90D0/0x005CAF90 (deserialize "ThunkA"/"ThunkB" pair) and
+  // 0x005C90E0/0x005CAFA0 (serialize "ThunkA"/"ThunkB" pair) formerly modeled
+  // here are dead: zero data_refs and zero call_edges in the callgraph index
+  // for all four, and no source-level caller anywhere in src/sdk/**.
+  // `ReconBlipSerializer::Deserialize`/`Serialize` below already call
+  // `DeserializeReconBlipMembers`/`SerializeReconBlipMembers` above directly.
 
   /**
    * Address: 0x00BF7930 (FUN_00BF7930, cleanup_ReconBlipSerializer)
