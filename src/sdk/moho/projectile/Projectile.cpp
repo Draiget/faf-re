@@ -2007,16 +2007,11 @@ namespace moho
     archive->WriteBool(view.mIsChildProjectile);
   }
 
-  /**
-   * Address: 0x0069F8F0 (FUN_0069F8F0)
-   *
-   * What it does:
-   * Thin serialization thunk that forwards to `Projectile::MemberSerialize`.
-   */
-  [[maybe_unused]] void ProjectileMemberSerializeThunkA(Projectile* const projectile, gpg::WriteArchive* const archive)
-  {
-    projectile->MemberSerialize(archive);
-  }
+  // Addresses 0x0069F8F0/0x006A0060 (the "ThunkA"/"ThunkB" serialization
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `ProjectileSerializer::Serialize` (ProjectileSerHelpers.cpp, wired via
+  // that class's ctor) already calls `Projectile::MemberSerialize` directly.
 
   /**
    * Address: 0x006A0050 (FUN_006A0050)
@@ -2030,15 +2025,4 @@ namespace moho
     projectile->MemberDeserialize(archive);
   }
 
-  /**
-   * Address: 0x006A0060 (FUN_006A0060)
-   *
-   * What it does:
-   * Thin serialization thunk alias that forwards to
-   * `Projectile::MemberSerialize`.
-   */
-  [[maybe_unused]] void ProjectileMemberSerializeThunkB(Projectile* const projectile, gpg::WriteArchive* const archive)
-  {
-    projectile->MemberSerialize(archive);
-  }
 } // namespace moho
