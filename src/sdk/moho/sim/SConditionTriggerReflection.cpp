@@ -99,7 +99,12 @@ namespace
    * pushes plain unmangled `FUN_00BFF580` (bare unlink-then-self-link shape,
    * matching `SerHelperBase::ResetLinks()`) as its `atexit` target --
    * modeled by the template's own real destructor, no explicit `atexit`
-   * call needed.
+   * call needed. `FUN_0070AF50`/`FUN_0070AF80` are dead, zero-xref
+   * duplicate-emission twins of that exact `FUN_00BFF580` body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneAU` and its two reset thunks; removed in
+   * favor of this citation.
    *
    * `FUN_0070F8E0`/`FUN_0070F900` decompile byte-identically to this
    * template's own generic `Deserialize`/`Serialize` (archive->ReadInt /

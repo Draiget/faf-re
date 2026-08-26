@@ -99,6 +99,13 @@ namespace moho
    * second `Init()`-based binder here would double-register. That free
    * function has zero real callers (see above) -- it never ran. This
    * self-registering template instantiation is the actual, live wiring.
+   *
+   * `FUN_007772D0`/`FUN_00777300` are dead, zero-xref duplicate-emission
+   * twins of the real `FUN_00C02650` atexit body above
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneBO` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using EScrollTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EScrollType, int>;
 

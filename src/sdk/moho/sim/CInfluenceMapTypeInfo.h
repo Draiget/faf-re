@@ -119,7 +119,12 @@ namespace moho
    * The real ctor's tail pushes plain, unmangled `FUN_00BFFCA0` as its
    * `atexit` target (bare unlink-then-self-link shape, matching
    * `SerHelperBase::ResetLinks()`) -- modeled by the template's own real
-   * destructor, no explicit `atexit` call needed.
+   * destructor, no explicit `atexit` call needed. `FUN_007156F0`/
+   * `FUN_00715720` are dead, zero-xref duplicate-emission twins of that
+   * exact `FUN_00BFFCA0` body (function_sha256-confirmed), formerly modeled
+   * in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneAY` and its two reset thunks; removed in
+   * favor of this citation.
    *
    * Previously a hand-rolled `{ void* mVtable; SerHelperBase*, SerHelperBase*;
    * ...}` mimic named `EThreatTypeSerializerHelperStorage` lived in
