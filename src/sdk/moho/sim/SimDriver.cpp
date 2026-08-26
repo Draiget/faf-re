@@ -164,279 +164,6 @@ namespace
     return inOutDriver;
   }
 
-  struct LegacyGeomCameraVectorSlot
-  {
-    std::uint32_t mProxyLane; // +0x00
-    GeomCamera3* mFirst; // +0x04
-    GeomCamera3* mLast; // +0x08
-    GeomCamera3* mEnd; // +0x0C
-  };
-  static_assert(sizeof(LegacyGeomCameraVectorSlot) == 0x10, "LegacyGeomCameraVectorSlot size must be 0x10");
-  static_assert(offsetof(LegacyGeomCameraVectorSlot, mFirst) == 0x04, "LegacyGeomCameraVectorSlot::mFirst offset must be 0x04");
-  static_assert(offsetof(LegacyGeomCameraVectorSlot, mLast) == 0x08, "LegacyGeomCameraVectorSlot::mLast offset must be 0x08");
-  static_assert(offsetof(LegacyGeomCameraVectorSlot, mEnd) == 0x0C, "LegacyGeomCameraVectorSlot::mEnd offset must be 0x0C");
-
-  struct LegacyStringVectorSlot
-  {
-    std::uint32_t mProxyLane; // +0x00
-    msvc8::string* mFirst; // +0x04
-    msvc8::string* mLast; // +0x08
-    msvc8::string* mEnd; // +0x0C
-  };
-  static_assert(sizeof(LegacyStringVectorSlot) == 0x10, "LegacyStringVectorSlot size must be 0x10");
-  static_assert(offsetof(LegacyStringVectorSlot, mFirst) == 0x04, "LegacyStringVectorSlot::mFirst offset must be 0x04");
-  static_assert(offsetof(LegacyStringVectorSlot, mLast) == 0x08, "LegacyStringVectorSlot::mLast offset must be 0x08");
-  static_assert(offsetof(LegacyStringVectorSlot, mEnd) == 0x0C, "LegacyStringVectorSlot::mEnd offset must be 0x0C");
-
-  struct LegacySyncEntityVariableEntry
-  {
-    EntId mEntityId;                          // +0x00
-    std::uint32_t mReserved04;                // +0x04
-    SSTIEntityVariableData mVariableData;     // +0x08
-  };
-  static_assert(sizeof(LegacySyncEntityVariableEntry) == 0xD8, "LegacySyncEntityVariableEntry size must be 0xD8");
-  static_assert(
-    offsetof(LegacySyncEntityVariableEntry, mVariableData) == 0x08,
-    "LegacySyncEntityVariableEntry::mVariableData offset must be 0x08"
-  );
-
-  struct LegacySyncEntityVariableVectorSlot
-  {
-    std::uint32_t mProxyLane;                     // +0x00
-    LegacySyncEntityVariableEntry* mFirst;        // +0x04
-    LegacySyncEntityVariableEntry* mLast;         // +0x08
-    LegacySyncEntityVariableEntry* mEnd;          // +0x0C
-  };
-  static_assert(
-    sizeof(LegacySyncEntityVariableVectorSlot) == 0x10,
-    "LegacySyncEntityVariableVectorSlot size must be 0x10"
-  );
-  static_assert(
-    offsetof(LegacySyncEntityVariableVectorSlot, mFirst) == 0x04,
-    "LegacySyncEntityVariableVectorSlot::mFirst offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacySyncEntityVariableVectorSlot, mLast) == 0x08,
-    "LegacySyncEntityVariableVectorSlot::mLast offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacySyncEntityVariableVectorSlot, mEnd) == 0x0C,
-    "LegacySyncEntityVariableVectorSlot::mEnd offset must be 0x0C"
-  );
-
-  struct LegacyArmyConstantDataVectorSlot
-  {
-    std::uint32_t mProxyLane;        // +0x00
-    SSTIArmyConstantData* mFirst;    // +0x04
-    SSTIArmyConstantData* mLast;     // +0x08
-    SSTIArmyConstantData* mEnd;      // +0x0C
-  };
-  static_assert(sizeof(LegacyArmyConstantDataVectorSlot) == 0x10, "LegacyArmyConstantDataVectorSlot size must be 0x10");
-  static_assert(
-    offsetof(LegacyArmyConstantDataVectorSlot, mFirst) == 0x04,
-    "LegacyArmyConstantDataVectorSlot::mFirst offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyArmyConstantDataVectorSlot, mLast) == 0x08,
-    "LegacyArmyConstantDataVectorSlot::mLast offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacyArmyConstantDataVectorSlot, mEnd) == 0x0C,
-    "LegacyArmyConstantDataVectorSlot::mEnd offset must be 0x0C"
-  );
-
-  struct LegacyArmyVariableDataVectorSlot
-  {
-    std::uint32_t mProxyLane;        // +0x00
-    SSTIArmyVariableData* mFirst;    // +0x04
-    SSTIArmyVariableData* mLast;     // +0x08
-    SSTIArmyVariableData* mEnd;      // +0x0C
-  };
-  static_assert(sizeof(LegacyArmyVariableDataVectorSlot) == 0x10, "LegacyArmyVariableDataVectorSlot size must be 0x10");
-  static_assert(
-    offsetof(LegacyArmyVariableDataVectorSlot, mFirst) == 0x04,
-    "LegacyArmyVariableDataVectorSlot::mFirst offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyArmyVariableDataVectorSlot, mLast) == 0x08,
-    "LegacyArmyVariableDataVectorSlot::mLast offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacyArmyVariableDataVectorSlot, mEnd) == 0x0C,
-    "LegacyArmyVariableDataVectorSlot::mEnd offset must be 0x0C"
-  );
-
-  /**
-   * Address: 0x00740C00 (FUN_00740C00, ??1fastvector_struct_SSTIEntitytVariableData@gpg@@QAE@@Z)
-   *
-   * What it does:
-   * Destroys one legacy vector lane of `(EntId, SSTIEntityVariableData)` pairs,
-   * releases element storage, and clears range pointers.
-   */
-  [[maybe_unused]] void DestroyLegacySyncEntityVariableVectorSlot(
-    LegacySyncEntityVariableVectorSlot* const slot
-  )
-  {
-    if (slot == nullptr) {
-      return;
-    }
-
-    LegacySyncEntityVariableEntry* cursor = slot->mFirst;
-    if (cursor != nullptr) {
-      while (cursor != slot->mLast) {
-        cursor->mVariableData.~SSTIEntityVariableData();
-        ++cursor;
-      }
-      ::operator delete(slot->mFirst);
-    }
-
-    slot->mFirst = nullptr;
-    slot->mLast = nullptr;
-    slot->mEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x0074E720 (FUN_0074E720, sub_74E720)
-   *
-   * What it does:
-   * Compacts one `SSTIArmyConstantData` vector lane by assignment-copying the
-   * half-open source tail `[sourceBegin, slot->mLast)` into `destinationBegin`,
-   * destroys now-dead trailing elements, updates `mLast`, and returns
-   * `destinationBegin` via the output pointer.
-   */
-  [[maybe_unused]] SSTIArmyConstantData** CompactLegacyArmyConstantDataVectorTail(
-    LegacyArmyConstantDataVectorSlot* const slot,
-    SSTIArmyConstantData** const outResult,
-    SSTIArmyConstantData* const destinationBegin,
-    SSTIArmyConstantData* const sourceBegin
-  )
-  {
-    SSTIArmyConstantData* destinationResult = destinationBegin;
-    if (destinationBegin != sourceBegin) {
-      SSTIArmyConstantData* writeCursor = destinationBegin;
-      for (SSTIArmyConstantData* sourceCursor = sourceBegin; sourceCursor != slot->mLast; ++sourceCursor, ++writeCursor) {
-        *writeCursor = *sourceCursor;
-      }
-
-      for (SSTIArmyConstantData* destroyCursor = writeCursor; destroyCursor != slot->mLast; ++destroyCursor) {
-        destroyCursor->~SSTIArmyConstantData();
-      }
-
-      slot->mLast = writeCursor;
-    }
-
-    *outResult = destinationResult;
-    return outResult;
-  }
-
-  /**
-   * Address: 0x0074EAB0 (FUN_0074EAB0, sub_74EAB0)
-   *
-   * What it does:
-   * Compacts one `SSTIArmyVariableData` vector lane by assignment-copying the
-   * half-open source tail `[sourceBegin, slot->mLast)` into `destinationBegin`,
-   * destroys now-dead trailing elements, updates `mLast`, and returns
-   * `destinationBegin` via the output pointer.
-   */
-  [[maybe_unused]] SSTIArmyVariableData** CompactLegacyArmyVariableDataVectorTail(
-    LegacyArmyVariableDataVectorSlot* const slot,
-    SSTIArmyVariableData** const outResult,
-    SSTIArmyVariableData* const destinationBegin,
-    SSTIArmyVariableData* const sourceBegin
-  )
-  {
-    SSTIArmyVariableData* destinationResult = destinationBegin;
-    if (destinationBegin != sourceBegin) {
-      SSTIArmyVariableData* writeCursor = destinationBegin;
-      for (SSTIArmyVariableData* sourceCursor = sourceBegin; sourceCursor != slot->mLast; ++sourceCursor, ++writeCursor) {
-        *writeCursor = *sourceCursor;
-      }
-
-      for (SSTIArmyVariableData* destroyCursor = writeCursor; destroyCursor != slot->mLast; ++destroyCursor) {
-        destroyCursor->~SSTIArmyVariableData();
-      }
-
-      slot->mLast = writeCursor;
-    }
-
-    *outResult = destinationResult;
-    return outResult;
-  }
-
-  void DestroyLegacyStringPayloadRange(msvc8::string* begin, msvc8::string* end)
-  {
-    while (begin != end) {
-      begin->tidy(true, 0u);
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x00740700 (FUN_00740700, sub_740700)
-   *
-   * What it does:
-   * Destroys one legacy `GeomCamera3` vector lane and releases its backing
-   * heap storage, preserving the leading proxy lane.
-   */
-  [[maybe_unused]] void DestroyLegacyGeomCameraVectorSlot(LegacyGeomCameraVectorSlot* const slot)
-  {
-    if (slot == nullptr) {
-      return;
-    }
-
-    GeomCamera3* cursor = slot->mFirst;
-    if (cursor != nullptr) {
-      while (cursor != slot->mLast) {
-        cursor->~GeomCamera3();
-        ++cursor;
-      }
-      ::operator delete(slot->mFirst);
-    }
-
-    slot->mFirst = nullptr;
-    slot->mLast = nullptr;
-    slot->mEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x0073F620 (FUN_0073F620)
-   *
-   * What it does:
-   * Tail-forwards one legacy `GeomCamera3` vector teardown thunk lane into the
-   * canonical slot destroy helper.
-   */
-  [[maybe_unused]] void DestroyLegacyGeomCameraVectorSlotThunk(
-    LegacyGeomCameraVectorSlot* const slot
-  )
-  {
-    DestroyLegacyGeomCameraVectorSlot(slot);
-  }
-
-  /**
-   * Address: 0x00741F70 (FUN_00741F70, sub_741F70)
-   *
-   * What it does:
-   * Destroys each legacy string-vector lane in `[begin,end)`, releases each
-   * lane's element storage, and clears the three range pointers.
-   */
-  [[maybe_unused]] void DestroyLegacyStringVectorRange(
-    LegacyStringVectorSlot* begin,
-    LegacyStringVectorSlot* const end
-  )
-  {
-    while (begin != end) {
-      if (begin->mFirst != nullptr) {
-        DestroyLegacyStringPayloadRange(begin->mFirst, begin->mLast);
-        ::operator delete(begin->mFirst);
-      }
-
-      begin->mFirst = nullptr;
-      begin->mLast = nullptr;
-      begin->mEnd = nullptr;
-      ++begin;
-    }
-  }
-
   boost::mutex& DriverMutexRef(SDriverMutex& lockCell)
   {
     if (lockCell.lock == nullptr) {
@@ -2108,7 +1835,7 @@ void CSimDriver::DrawNetworkStats(
 
   // ---- Table columns: 8 inner string vectors. 0x0073E052..0x0073E681.
   constexpr int kNumColumns = 8;
-  std::vector<std::vector<msvc8::string>> columns(kNumColumns);
+  msvc8::vector<msvc8::vector<msvc8::string>> columns(kNumColumns);
 
   // Header row (0x0073E098..0x0073E28F).
   columns[0].push_back(msvc8::string(""));        // 0x0073E098 index header (empty)
@@ -2191,7 +1918,7 @@ void CSimDriver::DrawNetworkStats(
   }
 
   // ---- Summary block: 4 lines (0x0073E687..0x0073E876).
-  std::vector<msvc8::string> summary;
+  msvc8::vector<msvc8::string> summary;
 
   {
     int availableBeat = 0;
@@ -2323,7 +2050,7 @@ void CSimDriver::DrawNetworkStats(
   for (std::size_t row = 0; row < tableRowCount; ++row) {
     float cellX = rectLeft + 3.0f; // running X base, reset per row (0x0073EF22..0x0073EF44)
     for (int c = 0; c < kNumColumns; ++c) {
-      const std::vector<msvc8::string>& column = columns[static_cast<std::size_t>(c)];
+      const msvc8::vector<msvc8::string>& column = columns[static_cast<std::size_t>(c)];
       // The retail grid is rectangular (all data columns carry one row per
       // client); shorter columns simply contribute an empty cell for the tail
       // rows rather than reading past their storage.
