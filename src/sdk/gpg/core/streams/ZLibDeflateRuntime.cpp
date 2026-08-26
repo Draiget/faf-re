@@ -1151,8 +1151,12 @@ extern "C" int __cdecl longest_match_fast(
  * What it does:
  * Returns zlib's legacy upper bound for compressed output bytes from one
  * source byte count.
+ *
+ * Called by: deflateBound (0x0095AC40, src/sdk/zlib/ZLibDeflateRuntime.cpp)
+ * at 0x0095AC72 when the stream is running the library's default window/hash
+ * geometry (w_bits == 15 && hash_bits == 15).
  */
-[[maybe_unused]] unsigned int compressBoundRuntime(const unsigned int sourceLength)
+unsigned int compressBoundRuntime(const unsigned int sourceLength)
 {
   return sourceLength + (sourceLength >> 12u) + (sourceLength >> 14u) + 11u;
 }

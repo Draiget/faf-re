@@ -43,6 +43,11 @@ extern "C" void  zcfree(void* opaque, void* ptr);
 // bottom of this TU); forward-declare so the mem-error path can reach it.
 extern "C" int deflateEnd(zlib::ZStream* strm);
 
+// compressBound's legacy formula lives in the sibling gpg/core/streams TU
+// (0x0095DF20); deflateBound below calls it exactly as the binary does at
+// 0x0095AC72. Plain C++ linkage (not extern "C"), matching its real definition.
+unsigned int compressBoundRuntime(unsigned int sourceLength);
+
 namespace {
 
 using zlib::CtData;
@@ -2157,4 +2162,161 @@ extern "C" int deflateEnd(ZStream* strm)
   strm->state = nullptr;
 
   return (status == kDeflateBusyState) ? kZDataError : kZOk;
+}
+
+// -----------------------------------------------------------------------------
+// Extended tuning API: deflateSetHeader / deflatePrime / deflateTune /
+// deflateBound. IDA never carved these into function boundaries (they sit in
+// the untokenized 0x0095AB90-0x0095AC7A run between deflateSetDictionary's end
+// (0x0095AB8E) and putShortMSB's start (0x0095AC80), each separated by int3
+// padding); recovered here from a direct pefile+Capstone read of
+// bin/2025.7.1/ForgedAlliance.exe, cross-checked line-for-line against the
+// real zlib 1.2.3 deflate.c (madler/zlib tag v1.2.3, byte-identical to this
+// project's vendored zlib.h).
+//
+// Caller search: an exhaustive scan of every section of
+// bin/2025.7.1/ForgedAlliance.exe (relative CALL/JMP targets, and raw
+// little-endian DWORD occurrences for address-taken/function-pointer-table
+// use) found zero references to any of 0x0095AB90/0x0095ABC0/0x0095AC00
+// anywhere in the image; the binary has no export table either, so these are
+// not reachable via GetProcAddress. These three are genuine, byte-verified
+// zlib public-API bodies that shipped in the binary but are never exercised
+// by this build of the engine. deflateBound (0x0095AC40) is the same
+// situation for its own address, but its body does reach an already-recovered
+// helper (compressBoundRuntime) by real call, so recovering it gives that
+// helper a live source-level caller.
+// -----------------------------------------------------------------------------
+
+/**
+ * Address: 0x0095AB90 (FUN_0095AB90)
+ * Mangled: deflateSetHeader
+ *
+ * IDA signature:
+ * int __cdecl deflateSetHeader(z_streamp strm, gz_headerp head);
+ *
+ * Installs a caller-owned gzip header descriptor for the next deflate() call
+ * to emit. The stream must already be in gzip mode (deflate_state::wrap == 2,
+ * set by deflateInit2_ when windowBits > 15); returns Z_STREAM_ERROR for a
+ * null stream/state or a non-gzip wrap, otherwise stores `head` into
+ * deflate_state::gzhead and returns Z_OK. No source/binary side effect beyond
+ * the single pointer store: deflate() itself reads gzhead later when it
+ * writes the gzip header bytes.
+ */
+extern "C" int deflateSetHeader(ZStream* strm, GzHeaderW* head)
+{
+  using namespace zlib;
+
+  if (strm == nullptr || strm->state == nullptr)
+  {
+    return kZStreamError;
+  }
+
+  auto* const s = static_cast<DeflateState*>(strm->state);
+  if (s->wrap != 2)
+  {
+    return kZStreamError;
+  }
+
+  s->gzhead = head;
+  return kZOk;
+}
+
+/**
+ * Address: 0x0095ABC0 (FUN_0095ABC0)
+ * Mangled: deflatePrime
+ *
+ * IDA signature:
+ * int __cdecl deflatePrime(z_streamp strm, int bits, int value);
+ *
+ * Seeds the deflate bit accumulator with the low `bits` bits of `value` ahead
+ * of the next deflate() call (used to inject out-of-band bits, e.g. a raw
+ * deflate stream's leading bit alignment). Returns Z_STREAM_ERROR for a null
+ * stream/state, otherwise sets deflate_state::bi_valid = bits and
+ * deflate_state::bi_buf = (bits-masked) value, and returns Z_OK.
+ */
+extern "C" int deflatePrime(ZStream* strm, int bits, int value)
+{
+  using namespace zlib;
+
+  if (strm == nullptr || strm->state == nullptr)
+  {
+    return kZStreamError;
+  }
+
+  auto* const s = static_cast<DeflateState*>(strm->state);
+  s->bi_valid = bits;
+  s->bi_buf = static_cast<std::uint16_t>(value & ((1 << bits) - 1));
+  return kZOk;
+}
+
+/**
+ * Address: 0x0095AC00 (FUN_0095AC00)
+ * Mangled: deflateTune
+ *
+ * IDA signature:
+ * int __cdecl deflateTune(z_streamp strm, int good_length, int max_lazy,
+ *                          int nice_length, int max_chain);
+ *
+ * Overrides the four match-finder tuning parameters that LmInit derived from
+ * the compression level (kConfigurationTable), for testing/experimentation.
+ * Returns Z_STREAM_ERROR for a null stream/state, otherwise writes
+ * good_match/max_lazy_match/nice_match/max_chain_length in that order and
+ * returns Z_OK.
+ */
+extern "C" int deflateTune(ZStream* strm, int good_length, int max_lazy, int nice_length, int max_chain)
+{
+  using namespace zlib;
+
+  if (strm == nullptr || strm->state == nullptr)
+  {
+    return kZStreamError;
+  }
+
+  auto* const s = static_cast<DeflateState*>(strm->state);
+  s->good_match = static_cast<std::uint32_t>(good_length);
+  s->max_lazy_match = static_cast<std::uint32_t>(max_lazy);
+  s->nice_match = nice_length;
+  s->max_chain_length = static_cast<std::uint32_t>(max_chain);
+  return kZOk;
+}
+
+/**
+ * Address: 0x0095AC40 (FUN_0095AC40)
+ * Mangled: deflateBound
+ *
+ * IDA signature:
+ * unsigned long __cdecl deflateBound(z_streamp strm, unsigned long sourceLen);
+ *
+ * Upper-bounds the compressed size of a `sourceLen`-byte input for output
+ * buffer sizing. Computes zlib's conservative worst-case bound unconditionally
+ * first (sourceLen plus its 1/8 and 1/64 shares plus 11 header/trailer bytes);
+ * if the stream/state is unavailable, or the state is not running the
+ * library's default window/hash geometry (w_bits != 15 or hash_bits != 15),
+ * returns that conservative bound as-is. Otherwise defers to the tighter
+ * compressBound() formula, which only holds for the default-parameters case.
+ * Matches the binary exactly, including the call to compressBound at
+ * 0x0095AC72 (recovered as compressBoundRuntime, 0x0095DF20).
+ */
+extern "C" unsigned long deflateBound(ZStream* strm, unsigned long sourceLen)
+{
+  using namespace zlib;
+
+  // Conservative upper bound, computed unconditionally.
+  const unsigned long destLen = sourceLen + ((sourceLen + 7) >> 3) + ((sourceLen + 63) >> 6) + 11u;
+
+  // If can't get parameters, return the conservative bound.
+  if (strm == nullptr || strm->state == nullptr)
+  {
+    return destLen;
+  }
+
+  // If not the default parameters, return the conservative bound.
+  auto* const s = static_cast<DeflateState*>(strm->state);
+  if (s->w_bits != 15 || s->hash_bits != 8 + 7)
+  {
+    return destLen;
+  }
+
+  // Default settings: return the tight bound for that case.
+  return compressBoundRuntime(static_cast<unsigned int>(sourceLen));
 }
