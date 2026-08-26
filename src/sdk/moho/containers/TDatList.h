@@ -84,6 +84,18 @@ namespace moho
      * Address: 0x00765B70 (FUN_00765B70)
      * Address: 0x00786A80 (FUN_00786A80)
      * Address: 0x00779220 (FUN_00779220)
+     * Address: 0x0057EA70 (FUN_0057EA70, typed-instantiation lane -- takes
+     *   `this` in EAX per IDA's `__usercall ... @<eax>` convention rather
+     *   than the usual `__thiscall` ECX; zero incoming xrefs, same
+     *   unlink-then-self-link shape as every other address in this list.
+     *   Formerly mis-modeled in moho/containers/LegacyContainerFillLanes.cpp
+     *   as `ResetGlobalIntrusiveSentinelLaneCAlias()`, a hardcoded call to
+     *   `ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC)` --
+     *   wrong: this body reads/writes purely through its `this` argument,
+     *   not any hardcoded lane-C address (function_sha256 does not match
+     *   Lane C's real atexit target `FUN_00BF41A0`, unlike Lane C's other
+     *   two thunks which do), so it cannot be lane-C-specific. It is this
+     *   generic template method, not a per-instantiation wrapper.)
      *
      * What it does:
      * Unlinks this node from its current ring and returns this node after

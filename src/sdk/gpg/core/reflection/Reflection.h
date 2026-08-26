@@ -4956,7 +4956,12 @@ namespace gpg
      *     was wrongly tagged `external_dependency` in progress tracking
      *     before this recovery -- it is the same
      *     SerHelperBase-ctor/field-set/vtable-install/atexit shape as every
-     *     other confirmed instantiation, not an OS/CRT/library import)
+     *     other confirmed instantiation, not an OS/CRT/library import),
+     *     atexit 0x00BF41A0 (dead duplicates: 0x00545B70, 0x00545BA0 --
+     *     formerly modeled in moho/containers/LegacyContainerFillLanes.cpp
+     *     as `gGlobalIntrusiveSentinelLaneC`/`ResetGlobalIntrusiveSentinelLane
+     *     CPrimary`/`...LaneCAliasSecondary`, a raw offset-reach-in over this
+     *     same global's storage with no identity of its own; removed)
      *   - T=Moho::EUnitCommandType: 0x00BC9C40 (no dead duplicate found;
      *     confirmed via `vtable_writers` class_name
      *     `?$PrimitiveSerHelper@W4EUnitCommandType@Moho@@H@gpg`) -- was
