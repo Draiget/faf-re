@@ -17,31 +17,24 @@ namespace
   gpg::RType* gListenerNavPathType = nullptr;
 
   /**
-   * Address: 0x005B0380 (FUN_005B0380)
-   *
-   * What it does:
-   * Wires the allocation callbacks used by `CAiPathNavigatorTypeInfo`.
-   */
-  [[maybe_unused]] void BindCAiPathNavigatorTypeInfoConstructionCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
-  {
-    typeInfo.newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
-    typeInfo.ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
-  }
-
-  /**
-   * Address: 0x005B0390 (FUN_005B0390)
-   *
-   * What it does:
-   * Wires the destruction callbacks used by `CAiPathNavigatorTypeInfo`.
-   */
-  [[maybe_unused]] void BindCAiPathNavigatorTypeInfoDestructionCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
-  {
-    typeInfo.deleteFunc_ = &CAiPathNavigatorTypeInfo::Delete;
-    typeInfo.dtrFunc_ = &CAiPathNavigatorTypeInfo::Destruct;
-  }
-
-  /**
    * Address: 0x005B00E0 (FUN_005B00E0)
+   * Also emitted at: 0x005B0380 (FUN_005B0380, sub_5B0380) -- `mov
+   * [eax+48h],NewRef; mov [eax+54h],CtrRef; retn`, the `newRefFunc_`/
+   * `ctorRefFunc_` half of this same store sequence.
+   * Also emitted at: 0x005B0390 (FUN_005B0390, sub_5B0390) -- `mov
+   * [eax+50h],Delete; mov [eax+5Ch],Destruct; retn`, the `deleteFunc_`/
+   * `dtrFunc_` half of this same store sequence.
+   *
+   * Both partial-store addresses have zero callsite evidence anywhere in
+   * the binary (no code caller, no data/vtable xref, unreachable per the
+   * enriched callgraph index). They are not called BY this function either
+   * -- `CAiPathNavigatorTypeInfo::Init()` (0x005AFAD0) calls this
+   * full-4-field version directly, and this body inlines all four `mov`
+   * stores itself rather than delegating to the two half-functions. No
+   * other registration path exists in this translation unit (or anywhere
+   * else) that would need only half the callback set. Left unrecovered as
+   * dedicated standalone functions per the no-orphan-helper rule (RULE ONE)
+   * -- their entire effect is already covered by the typed stores below.
    *
    * What it does:
    * Wires the full callback set used by `CAiPathNavigatorTypeInfo`.

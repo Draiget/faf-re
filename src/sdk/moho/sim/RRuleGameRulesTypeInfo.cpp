@@ -4,7 +4,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -58,17 +58,22 @@ namespace moho
     return sType;
   }
 
-  /**
-   * Address: 0x0052B490 (FUN_0052B490)
-   *
-   * What it does:
-   * Returns one reflected-type destructor callback lane (`RType::dtrFunc_`)
-   * from the active descriptor object.
-   */
-  [[maybe_unused]] gpg::RType::dtr_func_t QueryReflectedTypeDestructorLane(gpg::RType* const reflectedType) noexcept
-  {
-    return reflectedType->dtrFunc_;
-  }
+  // Address: 0x0052B490 (FUN_0052B490, sub_52B490) -- tiny 2-instruction
+  // `mov eax,[ecx+0x5Ch]; retn` accessor. Byte-identical to (ICF twin of)
+  // FUN_005281C0 (`gpg::RType::dtr_func_t`'s own offset, +0x5C, happens to
+  // match this canonical twin's unrelated field): the canonical body is
+  // already recovered as `ReadAuxiliaryRuntimeWord` in
+  // `src/sdk/lua/LuaObject.cpp` (`AuxiliaryWordRuntimeView::mAuxiliaryWord`,
+  // a Lua userdata runtime lane, not `gpg::RType::dtrFunc_`). This address
+  // has zero callsite evidence of its own anywhere in the binary (no code
+  // caller, no data/vtable xref, unreachable per the enriched callgraph
+  // index) -- the real "read dtrFunc_ back and invoke it" mechanism is
+  // already recovered and wired at `LuaObject.cpp:16870`
+  // (`type->dtrFunc_(...)`), which compiles to a different instruction
+  // shape (a call through the slot, not a bare load-and-return). No
+  // registration or dispatch site anywhere in `src/sdk/**` needs a
+  // dedicated named getter for `dtrFunc_` -- so this address intentionally
+  // has no dedicated recovered function here.
 
   /**
    * Address: 0x0052B4A0 (FUN_0052B4A0, Moho::RRuleGameRulesTypeInfo::RRuleGameRulesTypeInfo)

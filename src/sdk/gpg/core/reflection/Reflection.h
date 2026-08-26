@@ -4103,6 +4103,7 @@ namespace gpg
      * Address: 0x00571FC0 (FUN_00571FC0, RType teardown COMDAT clone)
      * Address: 0x00572020 (FUN_00572020, RType teardown COMDAT clone)
      * Address: 0x005777E0 (FUN_005777E0, RType teardown COMDAT clone)
+     * Address: 0x005A8470 (FUN_005A8470, RType teardown COMDAT clone)
      * Address: 0x005A84D0 (FUN_005A84D0, RType teardown COMDAT clone)
      * Address: 0x005DFB90 (FUN_005DFB90, RType teardown COMDAT clone)
      * Address: 0x005DFBF0 (FUN_005DFBF0, RType teardown COMDAT clone)
