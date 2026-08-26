@@ -3324,6 +3324,12 @@ namespace moho
 
   /**
    * Address: 0x0071D470 (FUN_0071D470)
+   * Address: 0x0071E970 (FUN_0071E970, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in `LegacyContainerFillLanes.cpp` as
+   *          `FillPayload56Range` over an anonymous `Payload56RuntimeView`
+   *          [0x38-byte] offset struct; `SThreat` is field-for-field the
+   *          same 14-float/0x38-byte shape and this function is the real
+   *          recovery. That duplicate has been deleted.)
    *
    * What it does:
    * Fills one `[destinationBegin, destinationEnd)` threat range from one
@@ -3344,9 +3350,18 @@ namespace moho
 
   /**
    * Address: 0x0071D490 (FUN_0071D490)
+   * Address: 0x0071E9B0 (FUN_0071E9B0, ICF twin -- identical function_sha256)
+   * Address: 0x0071F530 (FUN_0071F530, ICF twin -- identical function_sha256)
    *
    * What it does:
    * Copies one threat range backward into destination storage.
+   *
+   * The two twin addresses above were formerly duplicated in
+   * `LegacyContainerFillLanes.cpp` as `CopyPayload56RangeBackward` and its
+   * `CopyPayload56RangeBackwardAliasA` forwarding wrapper, over the same
+   * anonymous `Payload56RuntimeView` [0x38-byte] offset struct described
+   * above. Both duplicates have been deleted; this function is their real
+   * recovery.
    */
   SThreat* CopySThreatRangeBackward(
     SThreat* destinationEnd,

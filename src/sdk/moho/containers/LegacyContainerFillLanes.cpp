@@ -9445,45 +9445,14 @@ namespace
     return left;
   }
 
-  /**
-   * Address: 0x0071E970 (FUN_0071E970)
-   *
-   * What it does:
-   * Fills one 56-byte payload range `[begin, end)` with one template payload.
-   */
-  Payload56RuntimeView* FillPayload56Range(
-    Payload56RuntimeView* begin,
-    Payload56RuntimeView* end,
-    const Payload56RuntimeView* const value
-  ) noexcept
-  {
-    while (begin != end) {
-      *begin = *value;
-      ++begin;
-    }
-    return begin;
-  }
-
-  /**
-   * Address: 0x0071E9B0 (FUN_0071E9B0)
-   *
-   * What it does:
-   * Backward-copies one 56-byte payload range from `[sourceBegin, sourceEnd)`
-   * into destination ending at `destEnd`.
-   */
-  Payload56RuntimeView* CopyPayload56RangeBackward(
-    Payload56RuntimeView* destEnd,
-    Payload56RuntimeView* sourceEnd,
-    Payload56RuntimeView* sourceBegin
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destEnd;
-      *destEnd = *sourceEnd;
-    }
-    return destEnd;
-  }
+  // NOTE (FillPayload56Range / CopyPayload56RangeBackward removal -- fully
+  // resolved): Address: 0x0071E970 (FUN_0071E970) and Address: 0x0071E9B0
+  // (FUN_0071E9B0) were `function_sha256`-identical to `moho::SThreat`
+  // (14 floats, 0x38 bytes, `CInfluenceMap.h`) helpers `FillSThreatRange`/
+  // `CopySThreatRangeBackward` (`CInfluenceMap.cpp`), both real callees of
+  // `msvc8::vector<moho::SThreat>::_Insert_n` (FUN_0071AF90, cited in
+  // `Vector.h`). See those functions' own Doxygen blocks for the full
+  // evidence trail; they are these two addresses' recovery.
 
   /**
    * Address: 0x0071EB70 (FUN_0071EB70)
@@ -9504,25 +9473,12 @@ namespace
     return begin;
   }
 
-  /**
-   * Address: 0x0071EC30 (FUN_0071EC30)
-   *
-   * What it does:
-   * Forward-copies one 56-byte payload range `[sourceBegin, sourceEnd)` to destination.
-   */
-  Payload56RuntimeView* CopyPayload56RangeForward(
-    Payload56RuntimeView* destBegin,
-    Payload56RuntimeView* sourceBegin,
-    Payload56RuntimeView* sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      *destBegin = *sourceBegin;
-      ++sourceBegin;
-      ++destBegin;
-    }
-    return destBegin;
-  }
+  // NOTE (CopyPayload56RangeForward removal -- fully resolved):
+  // Address: 0x0071EC30 (FUN_0071EC30) was `function_sha256`-identical to
+  // `gpg::core::legacy::CopyForward56ByteLaneSourceFirst`
+  // (`FastVectorInsertLanes.cpp`), which already cites this exact address
+  // alongside its other twins. See that function's own Doxygen block for
+  // the full evidence trail.
 
   /**
    * Address: 0x0071EC60 (FUN_0071EC60)
@@ -10991,20 +10947,10 @@ namespace
     return CopyFloat4LaneIfOutputPresent(outValue, source);
   }
 
-  /**
-   * Address: 0x0071F530 (FUN_0071F530)
-   *
-   * What it does:
-   * Alias lane for backward-copying one 56-byte payload range.
-   */
-  Payload56RuntimeView* CopyPayload56RangeBackwardAliasA(
-    Payload56RuntimeView* destEnd,
-    Payload56RuntimeView* sourceEnd,
-    Payload56RuntimeView* sourceBegin
-  ) noexcept
-  {
-    return CopyPayload56RangeBackward(destEnd, sourceEnd, sourceBegin);
-  }
+  // NOTE (CopyPayload56RangeBackwardAliasA removal -- fully resolved):
+  // Address: 0x0071F530 (FUN_0071F530) -- see `moho::SThreat`'s
+  // `CopySThreatRangeBackward` (`CInfluenceMap.cpp`), which already cites
+  // this exact address as an ICF twin.
 
   /**
    * Address: 0x0071F660 (FUN_0071F660)

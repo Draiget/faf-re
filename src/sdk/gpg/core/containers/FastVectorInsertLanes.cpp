@@ -3045,6 +3045,11 @@ namespace gpg::core::legacy
    * Address: 0x0071E950 (FUN_0071E950)
    * Address: 0x0071F510 (FUN_0071F510)
    * Address: 0x0071F6D0 (FUN_0071F6D0)
+   * Address: 0x0071EC30 (FUN_0071EC30, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in `LegacyContainerFillLanes.cpp` as
+   *          `CopyPayload56RangeForward` over an anonymous
+   *          `Payload56RuntimeView` [0x38-byte] offset struct; that
+   *          duplicate has been deleted.)
    *
    * What it does:
    * Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination`
