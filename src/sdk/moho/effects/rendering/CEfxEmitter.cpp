@@ -715,61 +715,14 @@ namespace moho
     return false;
   }
 
-  /**
-   * Address: 0x0065FA10 (FUN_0065FA10)
-   *
-   * What it does:
-   * Thunk lane that forwards into `CEfxEmitter::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEfxEmitterMemberThunkA(
-    CEfxEmitter* const emitter,
-    gpg::WriteArchive* const archive
-  )
-  {
-    emitter->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0065FCE0 (FUN_0065FCE0)
-   *
-   * What it does:
-   * Duplicate thunk lane that forwards into `CEfxEmitter::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEfxEmitterMemberThunkB(
-    CEfxEmitter* const emitter,
-    gpg::WriteArchive* const archive
-  )
-  {
-    emitter->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0065FA00 (FUN_0065FA00)
-   *
-   * What it does:
-   * Thunk lane that forwards into `CEfxEmitter::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEfxEmitterMemberThunkA(
-    CEfxEmitter* const emitter,
-    gpg::ReadArchive* const archive
-  )
-  {
-    emitter->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0065FCD0 (FUN_0065FCD0)
-   *
-   * What it does:
-   * Duplicate thunk lane that forwards into `CEfxEmitter::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEfxEmitterMemberThunkB(
-    CEfxEmitter* const emitter,
-    gpg::ReadArchive* const archive
-  )
-  {
-    emitter->MemberDeserialize(archive);
-  }
+  // Addresses 0x0065FA00/0x0065FA10/0x0065FCD0/0x0065FCE0 (the A/B
+  // Serialize/Deserialize thunk quartet formerly modeled here) are dead,
+  // never-registered duplicate emissions superseded by the real, properly
+  // wired `Moho::CEfxEmitterSerializer` (Deserialize/Serialize at
+  // 0x0065E140/0x0065E150 -- see CEfxEmitterSerializer.h/.cpp). Confirmed
+  // dead: zero data_refs and zero call_edges in the callgraph index for all
+  // four addresses, and all four were `[[maybe_unused]]` with no caller
+  // anywhere in src/sdk/**.
 
   /**
    * Address: 0x006600D0 (FUN_006600D0, Moho::CEfxEmitter::MemberDeserialize)
