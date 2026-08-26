@@ -345,6 +345,20 @@ namespace
   //                  storage via `LegacyAllocateTssAdapterFunctionBuffer`,
   //                  `kQueryDestroy` deletes it, `kQueryCompareType` compares
   //                  against the `tss_adapter<STimeBarThreadInfo>` RTTI.
+  //   FUN_004E7430 — the "F" in `boost::function1<void, STimeBarThreadInfo*>
+  //                  ::function1(F&)`: TSS-slot deleter callback
+  //                  (`LegacyDeleteTimeBarThreadInfoTssPayload`) that
+  //                  unlinks the payload from its intrusive ring
+  //                  (`TDatListItem<STimeBarThreadInfo, void>::
+  //                  ListUnlinkSelf()`) then releases it. Address-taken by
+  //                  `FUN_004E7130` and passed into `FUN_004E7B40`; not a
+  //                  member of the internal chain diagram below (it is the
+  //                  payload the chain carries, not a link in it). Formerly
+  //                  mis-recovered as a hand-rolled `IntrusiveListNode
+  //                  RuntimeView`/`FreeIntrusiveListNodeRuntime` pair in
+  //                  `gpg/core/containers/FastVectorInsertLanes.cpp` (wrong
+  //                  subsystem, wrong field order, zero real xrefs there) --
+  //                  removed; this is the corrected home.
   //
   // Source-level invocation: the modern equivalent of the top-of-chain ctor
   // (`boost::thread_specific_ptr<STimeBarThreadInfo>::ctor`, FUN_004E7130) is
@@ -512,6 +526,55 @@ namespace
 
     LegacyDispatchTssAdapterLifecycleQueryEntry(queryToken, sourceLane, destinationLane);
     return queryLane;
+  }
+
+  /**
+   * Address: 0x004E7430 (FUN_004E7430)
+   *
+   * IDA signature:
+   * void __cdecl sub_4E7430(_DWORD *a1);
+   *
+   * What it does:
+   * TSS-slot deleter callback for `boost::thread_specific_ptr<
+   * Moho::STimeBarThreadInfo>`. `FUN_004E7130` (the ctor -- modern
+   * equivalent is the `thread_local TimeBarThreadSlot gThreadSlot;`
+   * declaration in `moho/misc/TimeBar.cpp`) takes this function's address
+   * (`sub_4E7B40((int)sub_4E7430, v4)`) and threads it through the
+   * `LegacyConstructTimeBarFunction1Slot` chain below as the "F" in
+   * `boost::function1<void, STimeBarThreadInfo*>::function1(F&)`; at thread
+   * exit boost's TSS machinery invokes the published functor with the
+   * thread's `STimeBarThreadInfo*` payload, landing here.
+   *
+   * The body unlinks the payload from its intrusive ring before releasing
+   * it. Verified instruction-for-instruction against the binary
+   * (0x004E7430..0x004E7455): field `+0x00` is read/written as the
+   * prev-node pointer and `+0x04` as the next-node pointer -- the same
+   * store order and operand shape as `moho::TDatListItem<T,
+   * U>::ListUnlinkSelf()` (moho/containers/TDatList.h), which is exactly
+   * `STimeBarThreadInfo`'s declared base
+   * (`STimeBarThreadInfo : TDatListItem<STimeBarThreadInfo, void>`,
+   * TimeBar.h). Behaviorally identical to `ReleaseThreadInfo`/
+   * `UnlinkThreadInfoNoLock` in `moho/misc/TimeBar.cpp`, which perform the
+   * same unlink-then-delete on the modern `thread_local` path -- this is
+   * the binary's compiler-fused version of the same operation (no separate
+   * destructor call: `STimeBarThreadInfo` has no other resources, so MSVC
+   * folded the inherited unlink directly into the deleting-callback body).
+   *
+   * `[[maybe_unused]]`: like `LegacyConstructTimeBarFunction1Slot` below,
+   * this helper's only real caller (`FUN_004E7130`) was replaced at the
+   * source level by `thread_local`, so nothing in recovered source takes
+   * its address; the relationship is documented rather than re-wired
+   * through fabricated stack-frame plumbing.
+   */
+  [[maybe_unused]] void __cdecl LegacyDeleteTimeBarThreadInfoTssPayload(void* const value)
+  {
+    if (value == nullptr) {
+      return;
+    }
+
+    auto* const info = static_cast<moho::STimeBarThreadInfo*>(value);
+    info->ListUnlinkSelf();
+    ::operator delete(info);
   }
 
   /**

@@ -31,14 +31,6 @@ namespace
   using GrowInsertFn =
     std::byte* (*)(FastVectorInsertRuntimeView&, std::size_t, const std::byte*, const std::byte*, std::byte*);
 
-  struct IntrusiveListNodeRuntimeView
-  {
-    IntrusiveListNodeRuntimeView* next = nullptr; // +0x00
-    IntrusiveListNodeRuntimeView* prev = nullptr; // +0x04
-  };
-  static_assert(offsetof(IntrusiveListNodeRuntimeView, next) == 0x00, "IntrusiveListNodeRuntimeView::next offset must be 0x00");
-  static_assert(offsetof(IntrusiveListNodeRuntimeView, prev) == 0x04, "IntrusiveListNodeRuntimeView::prev offset must be 0x04");
-
   struct FastVectorInlineOriginHeaderRuntimeView
   {
     FastVectorInsertRuntimeView view;       // +0x00
@@ -147,26 +139,6 @@ namespace
 
     auto* const runtime = static_cast<DeletingDestructorSlot8Runtime*>(objectStorage);
     (void)runtime->vtable->invoke(objectStorage, 1u);
-  }
-
-  /**
-   * Address: 0x004E7430 (FUN_004E7430)
-   *
-   * What it does:
-   * Unlinks one intrusive list node from its current ring and releases the
-   * node storage.
-   */
-  void FreeIntrusiveListNodeRuntime(IntrusiveListNodeRuntimeView* const node) noexcept
-  {
-    if (node == nullptr) {
-      return;
-    }
-
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-    node->prev = node;
-    node->next = node;
-    ::operator delete(node);
   }
 
   [[nodiscard]] std::size_t ElementCount(const std::byte* begin, const std::byte* end, const std::size_t stride) noexcept
