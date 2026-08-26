@@ -14611,6 +14611,43 @@ moho::CMauiHistogram::CMauiHistogram(LuaPlus::LuaObject* const luaObject, CMauiC
   histogramView->mDataCapacity = nullptr;
 }
 
+namespace
+{
+  /**
+   * Address: 0x00798D10 (FUN_00798D10, sub_798D10)
+   *
+   * What it does:
+   * Walks one half-open `SHistogramColumn` span and releases each column's
+   * owned value buffer (`mValues`), then resets that column's value-span
+   * lanes to the empty state. Shared teardown step reached from
+   * `CMauiHistogram::~CMauiHistogram` (0x00797840) and from six more not-yet
+   * -recovered `CMauiHistogram` column-storage methods (0x00798150,
+   * 0x00798360, 0x00798400, 0x00798490, 0x007984B0, 0x00798AD0) that manage
+   * `mDataStart`/`mDataEnd`/`mDataCapacity` growth/shrink -- confirmed via
+   * `_callgraph_index.sqlite` `call_edges` (7 real callers total). Previously
+   * duplicated in `LegacyContainerFillLanes.cpp` as
+   * `DestroyOwnedPointerTripletsInStride20Range` over an anonymous
+   * `Stride20OwnedPointerTripletRuntimeView` (a RULE ONE offset-struct
+   * reach-in); `SHistogramColumn` already names these exact fields, so that
+   * duplicate is retired in favor of this named helper. Not a container-lane
+   * operation: `SHistogramColumn`'s owning storage is a bare hand-rolled
+   * begin/end/capacity triple with no proxy word (see the Doxygen comment on
+   * `SHistogramColumn` above), deliberately not an MSVC8 vector.
+   */
+  void ReleaseHistogramColumnValueBuffers(moho::SHistogramColumn* column, moho::SHistogramColumn* const columnsEnd) noexcept
+  {
+    while (column != columnsEnd) {
+      if (column->mValues != nullptr) {
+        ::operator delete(column->mValues);
+      }
+      column->mValues = nullptr;
+      column->mValuesEnd = nullptr;
+      column->mValuesCapacity = nullptr;
+      ++column;
+    }
+  }
+} // namespace
+
 /**
  * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
  *
@@ -14618,9 +14655,10 @@ moho::CMauiHistogram::CMauiHistogram(LuaPlus::LuaObject* const luaObject, CMauiC
  * _DWORD* __usercall ~CMauiHistogram@<eax>(CMauiHistogram* this@<esi>);
  *
  * What it does:
- * Destroys the histogram column array: scalar-deletes each column's owned
- * value buffer, frees the column array storage, and clears the column-array
- * lanes. Base `CMauiControl` teardown is emitted implicitly by the compiler.
+ * Destroys the histogram column array: releases each column's owned value
+ * buffer via `ReleaseHistogramColumnValueBuffers` (0x00798D10), frees the
+ * column array storage, and clears the column-array lanes. Base
+ * `CMauiControl` teardown is emitted implicitly by the compiler.
  */
 moho::CMauiHistogram::~CMauiHistogram()
 {
@@ -14628,14 +14666,7 @@ moho::CMauiHistogram::~CMauiHistogram()
 
   SHistogramColumn* const columns = histogramView->mDataStart;
   if (columns != nullptr) {
-    for (SHistogramColumn* column = columns; column != histogramView->mDataEnd; ++column) {
-      if (column->mValues != nullptr) {
-        ::operator delete(column->mValues);
-      }
-      column->mValues = nullptr;
-      column->mValuesEnd = nullptr;
-      column->mValuesCapacity = nullptr;
-    }
+    ReleaseHistogramColumnValueBuffers(columns, histogramView->mDataEnd);
     ::operator delete(columns);
   }
 

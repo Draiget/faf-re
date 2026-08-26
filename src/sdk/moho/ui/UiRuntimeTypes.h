@@ -4462,9 +4462,8 @@ namespace moho
   /**
    * One histogram data series ("column"). Layout: 0x14 bytes. Only the value
    * buffer at +0x08 owns heap storage; it is released (and the whole column
-   * array freed) when the owning CMauiHistogram is destroyed. Matches the
-   * generic stride-20 owned-pointer-triplet teardown at
-   * `DestroyOwnedPointerTripletsInStride20Range` (FUN_00798D10).
+   * array freed) when the owning CMauiHistogram is destroyed, via
+   * `ReleaseHistogramColumnValueBuffers` (FUN_00798D10, UiRuntimeTypes.cpp).
    */
   struct SHistogramColumn
   {
