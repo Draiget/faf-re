@@ -436,39 +436,13 @@ namespace moho
     archive->Write(econValueType, &mAmt, nullOwner);
   }
 
-  /**
-   * Address: 0x007743D0 (FUN_007743D0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards econ-storage save lanes into
-   * `CEconStorage::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEconStorageThunkA(
-    CEconStorage* const storage,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (storage != nullptr) {
-      storage->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00774540 (FUN_00774540)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards econ-storage save lanes into
-   * `CEconStorage::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEconStorageThunkB(
-    CEconStorage* const storage,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (storage != nullptr) {
-      storage->MemberSerialize(archive);
-    }
-  }
+  // Addresses 0x007743D0/0x00774540 (the "ThunkA"/"ThunkB" save-lane
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `SerializeCEconStorageSerializerCallback` above (`CEconStorageSerializer
+  // ::Serialize`, confirmed by 3 real incoming xrefs incl.
+  // InitializeCEconStorageSerializerHelperStorage) already calls
+  // `CEconStorage::MemberSerialize` directly.
 } // namespace moho
 
 namespace
