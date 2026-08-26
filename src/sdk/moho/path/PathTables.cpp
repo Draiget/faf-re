@@ -2377,7 +2377,15 @@ namespace moho
    * Address: 0x0076BA40 (FUN_0076BA40, ??0Impl@PathTables@Moho@@QAE@@Z)
    *
    * What it does:
-   * Resets impl vector lanes (`mSources`, `mMaps`) to empty null ranges.
+   * Resets impl vector lanes (`mSources`, `mMaps`) to empty null ranges,
+   * then constructs the cluster-cache smart pointer lane (`mClusterCache`)
+   * via `gpg::HaStar::InitializeClusterCache()` -- `FUN_00935580`
+   * (allocates and default-constructs one `ClusterCacheImpl`) followed by
+   * `FUN_009356E0`
+   * (`boost::shared_ptr_HaStar_ClusterCache_Impl::shared_ptr_HaStar_ClusterCache_Impl`,
+   * the shared-count control block wrap), which this function calls
+   * directly (confirmed via `FUN_0076BA40`'s own callee list: it calls
+   * `FUN_009356E0` and nothing else cluster-related).
    */
   PathTablesImpl::PathTablesImpl()
   {
@@ -2388,6 +2396,8 @@ namespace moho
     mMaps.mFirst = nullptr;
     mMaps.mLast = nullptr;
     mMaps.mEnd = nullptr;
+
+    gpg::HaStar::InitializeClusterCache(mClusterCache);
   }
 
   /**

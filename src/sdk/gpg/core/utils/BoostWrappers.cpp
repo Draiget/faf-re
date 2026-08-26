@@ -2495,6 +2495,37 @@ namespace boost
       static RecoveredSpCountedBaseVtableProbe probe;
       return *reinterpret_cast<void**>(&probe);
     }
+
+    /**
+     * Dedicated (non-shared) vtable probe for `sp_counted_impl_p<gpg::HaStar::
+     * ClusterCache::Impl>`. Unlike `RecoveredSpCountedBaseVtableProbe` above
+     * -- whose `dispose()` is a no-op shared by every other `<T>`/`<void>`
+     * instantiation in this file -- this probe's `dispose()` genuinely
+     * dispatches to `SpCountedImplPDisposeClusterCacheImpl`, so that
+     * `Cluster.cpp`'s local `ReleaseSharedCount(void*)` (which drives
+     * `dispose()` through a real `vtable[1]` indirect call, not a by-name
+     * call) actually frees the `ClusterCacheImpl` pointee instead of
+     * silently no-oping.
+     */
+    class RecoveredSpCountedBaseVtableProbeClusterCacheImpl final : public detail::sp_counted_base
+    {
+    public:
+      void dispose() noexcept override
+      {
+        SpCountedImplPDisposeClusterCacheImpl(reinterpret_cast<SpCountedImplStorage<void>*>(this));
+      }
+
+      void* get_deleter(detail::sp_typeinfo const& requestedType) noexcept override
+      {
+        return SpCountedImplPGetDeleterNullClusterCacheImpl(requestedType);
+      }
+    };
+
+    [[nodiscard]] void* RecoveredSpCountedImplPVtableClusterCacheImpl() noexcept
+    {
+      static RecoveredSpCountedBaseVtableProbeClusterCacheImpl probe;
+      return *reinterpret_cast<void**>(&probe);
+    }
   } // namespace
 
   /**
@@ -3281,7 +3312,14 @@ namespace boost
    *
    * What it does:
    * Initializes one recovered shared-count control block for one owned
-   * `ClusterCache::Impl` lane.
+   * `ClusterCache::Impl` lane. Unlike every other `SpCountedImplPConstruct*`
+   * in this file, this one is wired to `RecoveredSpCountedImplPVtableClusterCacheImpl()`
+   * (a dedicated, genuinely-dispatching vtable) rather than the shared
+   * `RecoveredSpCountedImplPVtable()` stub: `gpg::HaStar::ClusterCache`'s own
+   * `~ClusterCache()`/`MakeClusterCache()` (`Cluster.cpp`) release the
+   * control block through a real `vtable[1]` indirect call
+   * (`ReleaseSharedCount`), not a by-name call, so `dispose()` has to
+   * actually be reachable through the vtable for this one instantiation.
    */
   SpCountedImplStorage<void>* SpCountedImplPConstructClusterCacheImpl(
     SpCountedImplStorage<void>* const countedImpl,
@@ -3292,7 +3330,7 @@ namespace boost
       return nullptr;
     }
 
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
+    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtableClusterCacheImpl(), ownedPointee);
   }
 
   /**
@@ -4896,6 +4934,31 @@ namespace boost
 
     auto* const typedStorage = reinterpret_cast<SpCountedImplStorage<StdStringstreamChar>*>(countedImpl);
     DisposeSpCountedImplPointee(typedStorage);
+  }
+
+  /**
+   * Address: 0x00935520 (FUN_00935520, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::dispose)
+   *
+   * What it does:
+   * Deletes one owned `ClusterCache::Impl` pointee bound to this
+   * shared-count control lane when present. `ClusterCacheImpl` stays
+   * opaque here (only complete in `Cluster.cpp`), so the actual
+   * destruction is delegated to `gpg::HaStar::DestroyClusterCacheImplPointee`
+   * rather than the generic `DisposeSpCountedImplPointee<T>` the other
+   * `<void>`-typed instantiation above uses -- that generic path needs a
+   * complete `TPointee` to instantiate `delete px`, which is only true in
+   * `Cluster.cpp`'s translation unit.
+   */
+  void SpCountedImplPDisposeClusterCacheImpl(
+    SpCountedImplStorage<void>* const countedImpl
+  ) noexcept
+  {
+    if (countedImpl == nullptr || countedImpl->px == nullptr) {
+      return;
+    }
+
+    gpg::HaStar::DestroyClusterCacheImplPointee(countedImpl->px);
+    countedImpl->px = nullptr;
   }
 
   /**
