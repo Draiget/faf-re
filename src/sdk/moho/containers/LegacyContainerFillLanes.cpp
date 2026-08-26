@@ -147,71 +147,34 @@ namespace
     return destinationWord;
   }
 
-  struct SmallBufferArrayRuntimeView
-  {
-    std::uint32_t lane00;                    // +0x00
-    boost::detail::sp_counted_base* owner;   // +0x04
-    std::byte pad08_27[0x20];
-    void* begin;                // +0x28
-    void* cursor;               // +0x2C
-    void* end;                  // +0x30
-    void** inlineStorageCursor; // +0x34
-  };
-#if defined(_M_IX86)
-  static_assert(offsetof(SmallBufferArrayRuntimeView, owner) == 0x04, "SmallBufferArrayRuntimeView::owner offset must be 0x04");
-  static_assert(offsetof(SmallBufferArrayRuntimeView, begin) == 0x28, "SmallBufferArrayRuntimeView::begin offset must be 0x28");
-  static_assert(offsetof(SmallBufferArrayRuntimeView, cursor) == 0x2C, "SmallBufferArrayRuntimeView::cursor offset must be 0x2C");
-  static_assert(offsetof(SmallBufferArrayRuntimeView, end) == 0x30, "SmallBufferArrayRuntimeView::end offset must be 0x30");
-  static_assert(
-    offsetof(SmallBufferArrayRuntimeView, inlineStorageCursor) == 0x34,
-    "SmallBufferArrayRuntimeView::inlineStorageCursor offset must be 0x34"
-  );
-#endif
-
-  /**
-   * Address: 0x0054DBE0 (FUN_0054DBE0, SmallBufferArray reset + owner release)
-   *
-   * IDA signature:
-   * void *__usercall sub_54DBE0@<eax>(_DWORD *self@<eax>);
-   *
-   * What it does:
-   * Rebinds the heap storage of a small-buffer array back to its inline
-   * cursor (releasing heap with `operator delete[]`), zeroes the cursor, and
-   * then decrements the shared owner control block's refcount, invoking the
-   * owner's scalar-deleting destructor if it reaches zero.
-   */
-  [[nodiscard]] std::intptr_t ResetSmallBufferArrayAndReleaseOwner(SmallBufferArrayRuntimeView& array) noexcept
-  {
-    if (array.begin != static_cast<void*>(array.inlineStorageCursor)) {
-      operator delete[](array.begin);
-      array.begin = array.inlineStorageCursor;
-      array.end = *array.inlineStorageCursor;
-    }
-
-    array.cursor = array.begin;
-    boost::ReleaseSharedCount(array.owner);
-    return reinterpret_cast<std::intptr_t>(array.cursor);
-  }
-
-  /**
-   * Address: 0x0054DBC0 (FUN_0054DBC0)
-   *
-   * What it does:
-   * Runs scalar-delete destruction for one small-buffer array owner lane.
-   * It resets heap-backed storage to inline storage and releases the shared owner.
-   */
-  SmallBufferArrayRuntimeView* DestroySmallBufferArrayOwnerScalar(
-    SmallBufferArrayRuntimeView* const self,
-    const std::uint8_t deleteFlag
-  ) noexcept
-  {
-    // Inlined block from FUN_0054DBE0.
-    ResetSmallBufferArrayAndReleaseOwner(*self);
-    if ((deleteFlag & 1u) != 0u) {
-      operator delete(self);
-    }
-    return self;
-  }
+  // NOTE (SmallBufferArrayRuntimeView migration): this file used to reach
+  // into `moho::CAniPose`'s layout via a local `SmallBufferArrayRuntimeView`
+  // (raw `{sharedPtrRawWord, sp_counted_base* owner}` pair at +0x00/+0x04,
+  // 0x20 bytes of unlabeled padding covering `mScale`+`mLocalTransform`, then
+  // `mBones`'s begin/end/capacity/original pointer quad at +0x28..+0x34) --
+  // a RULE ONE offset-struct reach-in over a real, nameable class already
+  // recovered in `CAniPose.h/.cpp`. `ResetSmallBufferArrayAndReleaseOwner`
+  // (FUN_0054DBE0) is `Moho::CAniPose::~CAniPose` itself: two real callers,
+  // `CAniPoseTypeInfo::Delete` (`delete static_cast<CAniPose*>(...)`) and
+  // `CAniPoseTypeInfo::Destruct` (`->~CAniPose()`), both already recovered
+  // in `CAniPoseTypeInfo.cpp` and both confirmed via `call_edges` to reach
+  // this exact address. `~CAniPose()` was `= default` -- since
+  // `CAniPoseBoneArray` (`mBones`) had no destructor of its own, the pose's
+  // heap-grown bone storage leaked on every destroy; this migration is also
+  // the fix for that leak. See `CAniPose::~CAniPose` (CAniPose.cpp) for the
+  // real body, expressed on `mBones`'s named fields instead of the raw
+  // offset view.
+  //
+  // `DestroySmallBufferArrayOwnerScalar` (FUN_0054DBC0) was the sibling
+  // `(this, deleteFlag)`-shaped "scalar deleting destructor" MSVC8 emits
+  // defensively alongside a class's real destructor. IDA's own xrefs export
+  // for this address lists zero callers (xrefs_total=0), and neither
+  // `_callgraph_index.sqlite` nor the RTTI/vtable dumps show any reference
+  // to it -- `CAniPose` is not polymorphic, and both real deletion paths
+  // above call `~CAniPose()` directly rather than through this indirection.
+  // Per RULE ONE's "compiler-emitted glue is not source at all": no 2007
+  // source line produced this address, so it stays `skip`, not recovered
+  // into `src/sdk/**`.
 
   struct DwordTripleLaneRuntimeView
   {
