@@ -290,33 +290,12 @@ namespace
     return 0;
   }
 
-  /**
-   * Address: 0x007F3C80 (FUN_007F3C80, sub_7F3C80)
-   *
-   * What it does:
-   * Thunk lane that forwards one range-profile reset call into
-   * `FUN_007EE860` behavior.
-   */
-  [[maybe_unused]] std::int32_t ResetRangeRenderProfileTransientStateThunkA(
-    moho::SRangeRenderProfile* const profile
-  ) noexcept
-  {
-    return ResetRangeRenderProfileTransientState(profile);
-  }
-
-  /**
-   * Address: 0x007F3DC0 (FUN_007F3DC0, sub_7F3DC0)
-   *
-   * What it does:
-   * Secondary thunk lane forwarding into `FUN_007EE860` profile-reset
-   * behavior.
-   */
-  [[maybe_unused]] std::int32_t ResetRangeRenderProfileTransientStateThunkB(
-    moho::SRangeRenderProfile* const profile
-  ) noexcept
-  {
-    return ResetRangeRenderProfileTransientState(profile);
-  }
+  // Addresses 0x007F3C80/0x007F3DC0 (the "ThunkA"/"ThunkB" profile-reset
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // ResetRangeRenderProfileTransientState above is the real body -- it is
+  // called from DestroyRangeRenderProfileTransientStateRange below, which
+  // itself has 9 real callers in the binary.
 
   /**
    * Address: 0x007F39E0 (FUN_007F39E0, sub_7F39E0)
