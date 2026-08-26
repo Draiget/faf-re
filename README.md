@@ -6,7 +6,7 @@ Reconstruction/disassembly project for the old **Supreme Commander: Forged Allia
 
 Progress snapshot:
 
-- Total FAF functions: `67,167`
+- Total FAF functions: `67,170`
   - *IDA index, exported*
 - Progress coverage:  **`99.19%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
