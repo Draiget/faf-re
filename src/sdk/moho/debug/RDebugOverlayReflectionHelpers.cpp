@@ -8,33 +8,34 @@ namespace
   [[nodiscard]] gpg::RType* CachedRDebugOverlayType()
   {
     static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::RDebugOverlay));
-    }
-    return sType;
+    return moho::debug_reflection::ResolveCachedType(sType, typeid(moho::RDebugOverlay));
   }
 
   [[nodiscard]] gpg::RType* CachedRTypeType()
   {
     static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(gpg::RType));
-    }
-    return sType;
+    return moho::debug_reflection::ResolveCachedType(sType, typeid(gpg::RType));
   }
 
   [[nodiscard]] gpg::RType* CachedRObjectType()
   {
     static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return sType;
+    return moho::debug_reflection::ResolveCachedType(sType, typeid(gpg::RObject));
   }
 } // namespace
 
 namespace moho::debug_reflection
 {
+  /**
+   * What it does:
+   * Shared lazy-cache-on-first-use resolver for a reflected `gpg::RType*`
+   * lane: mirrors the identical hand-rolled `if (!sType) { sType =
+   * gpg::LookupRType(typeInfo); }` shape used throughout this subsystem's
+   * `*ReflectionHelpers.cpp` files (e.g. `AudioReflectionHelpers.cpp`'s own
+   * internal-linkage copy of this same helper). `CachedRDebugOverlayType`/
+   * `CachedRTypeType`/`CachedRObjectType` above now call this instead of
+   * duplicating the check inline.
+   */
   gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
   {
     if (cachedType == nullptr) {
