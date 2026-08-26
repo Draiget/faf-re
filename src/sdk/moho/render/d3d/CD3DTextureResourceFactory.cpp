@@ -8,6 +8,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/ResourceManager.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 
@@ -161,11 +162,7 @@ namespace moho
    */
   void register_PrefetchType_d3d_textures()
   {
-    gpg::RType* textureType = RD3DTextureResource::sType;
-    if (textureType == nullptr) {
-      textureType = gpg::LookupRType(typeid(RD3DTextureResource));
-      RD3DTextureResource::sType = textureType;
-    }
+    gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
     RES_RegisterPrefetchType("d3d_textures", textureType);
   }
 
@@ -214,20 +211,8 @@ namespace moho
    */
   void CD3DTextureResourceFactory::Init()
   {
-    gpg::RType* prefetchType = PrefetchData::sType;
-    if (prefetchType == nullptr) {
-      prefetchType = gpg::LookupRType(typeid(PrefetchData));
-      PrefetchData::sType = prefetchType;
-    }
-
-    gpg::RType* resourceType = RD3DTextureResource::sType;
-    if (resourceType == nullptr) {
-      resourceType = gpg::LookupRType(typeid(RD3DTextureResource));
-      RD3DTextureResource::sType = resourceType;
-    }
-
-    mResourceType = resourceType;
-    mPrefetchType = prefetchType;
+    mResourceType = resource_reflection::ResolveRD3DTextureResourceType();
+    mPrefetchType = resource_reflection::ResolveMemBufferConstType();
   }
 
   /**
