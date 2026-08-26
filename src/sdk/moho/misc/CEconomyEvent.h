@@ -224,17 +224,48 @@ namespace moho
    *
    * Demangled: gpg::SerConstructHelper<class Moho::CEconomyEvent>
    *
-   * NOTE: no global singleton instance of this class exists anywhere in the
-   * codebase (verified across all of src/sdk) - Init() is currently
-   * unreachable at runtime, matching this class's pre-existing (already
-   * unreferenced) state. That gap predates this structural fix and is not
-   * resolved here: fabricating a singleton ctor with no independent binary
-   * citation would be a new recovery, not a re-expression of already-cited
-   * behavior.
+   * Real ctor confirmed via the callgraph index (`incoming_xrefs`/
+   * `reachable`): `FUN_00BDD360` is `__xc_a`-reachable at depth 0 (direct
+   * data xref from the CRT static-initializer table at 0x00C0FA60) and
+   * constructs a real global at 0x010BB9A8, installing the
+   * `Moho::CEconomyEventConstruct::vftable` and registering
+   * `atexit(FUN_00C024B0)`. A prior recovery pass in this file had claimed
+   * "no global singleton instance of this class exists anywhere in the
+   * codebase" -- that claim was never checked against this ctor's own
+   * reachability and is superseded by this citation; see the constructor
+   * and destructor below.
    */
   class CEconomyEventConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BDD360 (FUN_00BDD360, dynamic initializer for the global
+     * `CEconomyEventConstruct` singleton)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base and binds the
+     * construct/delete callback fields to the already-recovered
+     * `ConstructCEconomyEventSerializerThunk`/`DeleteEconomyEventIfPresent`
+     * (previously `[[maybe_unused]]`/file-local with no source-level
+     * caller; this constructor is that caller).
+     */
+    CEconomyEventConstruct();
+
+    /**
+     * Address: 0x00C024B0 (FUN_00C024B0, atexit target registered by the
+     * real ctor above)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. `FUN_00775470`/
+     * `FUN_007754A0` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneBL` and its two reset thunks; removed in
+     * favor of this citation.
+     */
+    ~CEconomyEventConstruct();
+
     /**
      * Address: 0x00775C40 (FUN_00775C40, sub_775C40)
      *
@@ -244,9 +275,18 @@ namespace moho
     void Init() override;
 
   public:
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
+    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
+    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
+
+  static_assert(
+    offsetof(CEconomyEventConstruct, mSerConstructFunc) == 0x0C,
+    "CEconomyEventConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CEconomyEventConstruct, mDeleteFunc) == 0x10, "CEconomyEventConstruct::mDeleteFunc offset must be 0x10"
+  );
+  static_assert(sizeof(CEconomyEventConstruct) == 0x14, "CEconomyEventConstruct size must be 0x14");
 
   /**
    * VFTABLE: 0x00E36FF4

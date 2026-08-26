@@ -353,15 +353,40 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00772F20 (FUN_00772F20, dynamic initializer for the global
+     * Address: 0x00BDD0D0 (FUN_00BDD0D0, dynamic initializer for the global
      * `CEconomyConstruct` singleton)
      *
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields. Like `CEconomySerializer`, this
-     * constructor does NOT register an atexit cleanup.
+     * construct/delete callback fields, then registers `atexit(FUN_00C02250)`.
+     * `FUN_00772F20` decompiles to the identical field-write shape (same
+     * `gpg::SerHelperBase` ctor call, same `mConstructCallback`/
+     * `mDeleteCallback` values, same vtable install) but its tail returns
+     * `&dword_10BB894` directly instead of calling `atexit` -- confirmed via
+     * the callgraph index to have zero incoming xrefs (unlike `FUN_00BDD0D0`,
+     * which is `__xc_a`-reachable via a data xref from the CRT static-
+     * initializer table at 0x00C0FA60). It is a dead, unreachable
+     * duplicate-emission twin of this real ctor, not a competing
+     * initializer; a prior recovery pass had mistakenly cited it as "the"
+     * ctor and concluded (based on that wrong body) that no atexit cleanup
+     * was ever registered.
      */
     CEconomyConstruct();
+
+    /**
+     * Address: 0x00C02250 (FUN_00C02250, atexit target registered by the
+     * real ctor above)
+     *
+     * What it does:
+     * Unlinks this helper node from whatever intrusive list it currently
+     * sits in and restores a self-linked sentinel state. `FUN_00772F50`/
+     * `FUN_00772F80` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneBK` and its two reset thunks; removed in
+     * favor of this citation.
+     */
+    ~CEconomyConstruct();
 
     /**
      * Address: 0x00773C80 (FUN_00773C80, Moho::CEconomyConstruct::Init)

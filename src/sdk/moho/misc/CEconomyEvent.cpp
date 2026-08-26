@@ -1293,6 +1293,24 @@ LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Create(Lu
 }
 
 /**
+ * Address: 0x00BDD360 (FUN_00BDD360, dynamic initializer for the global
+ * `CEconomyEventConstruct` singleton)
+ */
+moho::CEconomyEventConstruct::CEconomyEventConstruct()
+  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconomyEventSerializerThunk))
+  , mDeleteFunc(&DeleteEconomyEventIfPresent)
+{}
+
+/**
+ * Address: 0x00C024B0 (FUN_00C024B0, atexit target registered by the real
+ * ctor above)
+ */
+moho::CEconomyEventConstruct::~CEconomyEventConstruct()
+{
+  ResetLinks();
+}
+
+/**
  * Address: 0x00775C40 (FUN_00775C40, sub_775C40)
  */
 void moho::CEconomyEventConstruct::Init()
@@ -1302,6 +1320,17 @@ void moho::CEconomyEventConstruct::Init()
   type->serConstructFunc_ = mSerConstructFunc;
   type->deleteFunc_ = mDeleteFunc;
 }
+
+namespace
+{
+  // Address: 0x010BB9A8 -- process-global `CEconomyEventConstruct` singleton.
+  // Constructing it runs CEconomyEventConstruct::CEconomyEventConstruct()
+  // (0x00BDD360), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches Init() on it from within the first ReadArchive/
+  // WriteArchive construction.
+  moho::CEconomyEventConstruct gCEconomyEventConstruct;
+} // namespace
 
 /**
  * Address: 0x00775CC0 (FUN_00775CC0, sub_775CC0)

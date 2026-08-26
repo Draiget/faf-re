@@ -88,7 +88,9 @@ namespace
   moho::CEconomySerializer gCEconomySerializer;
 
   // Address: 0x010BB894 -- process-global `CEconomyConstruct` singleton.
-  // Same no-atexit shape as gCEconomySerializer above.
+  // Unlike gCEconomySerializer above, this real ctor (FUN_00BDD0D0) DOES
+  // register an atexit cleanup (FUN_00C02250) -- see CEconomyConstruct's
+  // own Doxygen block for the dead-duplicate-ctor evidence.
   moho::CEconomyConstruct gCEconomyConstruct;
 
   template <class TObject>
@@ -710,18 +712,30 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
   }
 
   /**
-   * Address: 0x00772F20 (FUN_00772F20, dynamic initializer for the global
+   * Address: 0x00BDD0D0 (FUN_00BDD0D0, dynamic initializer for the global
    * `CEconomyConstruct` singleton)
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields. Like `CEconomySerializer`, no atexit
-   * cleanup is registered, so this class declares no destructor.
+   * construct/delete callback fields, then registers `atexit(FUN_00C02250)`.
+   * Unlike `CEconomySerializer`, this real ctor DOES register an atexit
+   * cleanup -- see the destructor below and the class-level Doxygen block
+   * in CEconomy.h for the dead-duplicate evidence (`FUN_00772F20`) that
+   * previously led this citation astray.
    */
   CEconomyConstruct::CEconomyConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconomySerializerThunk))
     , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&ClearCEconomyIfPresent))
   {}
+
+  /**
+   * Address: 0x00C02250 (FUN_00C02250, atexit target registered by the real
+   * ctor above)
+   */
+  CEconomyConstruct::~CEconomyConstruct()
+  {
+    ResetLinks();
+  }
 
   /**
    * Address: 0x00773C80 (FUN_00773C80, Moho::CEconomyConstruct::Init)
