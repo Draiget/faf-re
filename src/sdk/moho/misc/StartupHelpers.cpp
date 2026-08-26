@@ -4711,29 +4711,12 @@ namespace
     return cursor;
   }
 
-  /**
-   * Address: 0x004604A0 (FUN_004604A0)
-   *
-   * What it does:
-   * Tail-thunk adapter that forwards one reverse path-component advance lane
-   * into `FUN_004610D0`.
-   */
-  [[maybe_unused]] [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursorThunkA(PathComponentCursor& cursor)
-  {
-    return AdvanceReversePathComponentCursor(cursor);
-  }
-
-  /**
-   * Address: 0x00460610 (FUN_00460610)
-   *
-   * What it does:
-   * Secondary tail-thunk adapter that forwards one reverse path-component
-   * advance lane into `FUN_004610D0`.
-   */
-  [[maybe_unused]] [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursorThunkB(PathComponentCursor& cursor)
-  {
-    return AdvanceReversePathComponentCursor(cursor);
-  }
+  // Addresses 0x004604A0/0x00460610 (the "ThunkA"/"ThunkB" tail-thunk
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // AdvanceReversePathComponentCursor above is the real body, with three
+  // real source-level callers in this file (PostIncrementReversePath
+  // ComponentCursor and the two calls further below).
 
   /**
    * Address: 0x0045F670 (FUN_0045F670, PostIncrementReversePathComponentCursor)
