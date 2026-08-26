@@ -16,6 +16,7 @@
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/FastVectorInsertLanes.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/HashMap.h"
 #include "legacy/containers/Vector.h"
@@ -4621,6 +4622,42 @@ ClusterCache::~ClusterCache()
     }
     mCacheRefs = nullptr;
     mCacheTree = nullptr;
+}
+
+/**
+ * Address: 0x00935520 (FUN_00935520, boost::detail::sp_counted_impl_p<ClusterCacheImpl>::dispose)
+ *
+ * What it does:
+ * Bridge target for `boost::SpCountedImplPDisposeClusterCacheImpl`
+ * (`gpg/core/utils/BoostWrappers.h`/`.cpp`): `ClusterCacheImpl` is only a
+ * complete type in this translation unit, so the pointee's real
+ * destruction has to happen here. `delete` on the complete type runs
+ * `~ClusterCacheImpl()`'s ordinary reverse-declaration-order member
+ * destruction -- `mSubclusterData` then `mOccupationData` -- exactly
+ * matching the binary's explicit `sub_934500(this+44)` then
+ * `sub_933DE0(this)` pair before `operator delete`.
+ */
+void DestroyClusterCacheImplPointee(void* const p)
+{
+    delete static_cast<ClusterCacheImpl*>(p);
+}
+
+/**
+ * Address: 0x00935580 (FUN_00935580) + 0x009356E0 (FUN_009356E0), see the
+ * Doxygen block on the declaration (`Cluster.h`) for the full evidence
+ * trail.
+ */
+void InitializeClusterCache(ClusterCache& outCache)
+{
+    ClusterCacheImpl* const impl = new ClusterCacheImpl();
+
+    auto* const control = static_cast<boost::SpCountedImplStorage<void>*>(
+        ::operator new(sizeof(boost::SpCountedImplStorage<void>))
+    );
+    boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
+
+    outCache.mCacheTree = impl;
+    outCache.mCacheRefs = control;
 }
 
 /**

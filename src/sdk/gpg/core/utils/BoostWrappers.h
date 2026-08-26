@@ -70,6 +70,25 @@ namespace gpg::gal
     class EffectVariableD3D10;
 }
 
+namespace gpg::HaStar
+{
+    /**
+     * Address: 0x00935520 (FUN_00935520) -- bridge target for
+     * `SpCountedImplPDisposeClusterCacheImpl` below. Defined in
+     * `gpg/core/algorithms/Cluster.cpp`, the only translation unit where
+     * `gpg::HaStar::ClusterCacheImpl` is a complete type (it is
+     * intentionally TU-local -- see that class's own Doxygen block).
+     *
+     * What it does:
+     * `delete static_cast<ClusterCacheImpl*>(p)`, invoking
+     * `~ClusterCacheImpl()`'s ordinary reverse-declaration-order member
+     * destruction (`mSubclusterData` then `mOccupationData`, the binary's
+     * `sub_934500(this+44)` / `sub_933DE0(this)` pair) before freeing the
+     * block.
+     */
+    void DestroyClusterCacheImplPointee(void* p);
+}
+
 namespace boost
 {
     class bad_ptr_container_operation;
@@ -2575,6 +2594,20 @@ namespace boost
      * this shared-count control lane when present.
      */
     void SpCountedImplPDisposeStdStringstreamChar(
+        SpCountedImplStorage<void>* countedImpl
+    ) noexcept;
+
+    /**
+     * Address: 0x00935520 (FUN_00935520, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::dispose)
+     *
+     * What it does:
+     * Deletes one owned `ClusterCache::Impl` pointee bound to this
+     * shared-count control lane when present. `ClusterCacheImpl` is
+     * TU-local to `Cluster.cpp`, so the actual destruction runs through
+     * `gpg::HaStar::DestroyClusterCacheImplPointee` (declared above),
+     * defined where the type is complete.
+     */
+    void SpCountedImplPDisposeClusterCacheImpl(
         SpCountedImplStorage<void>* countedImpl
     ) noexcept;
 
