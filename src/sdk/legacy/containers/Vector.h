@@ -2901,6 +2901,21 @@ namespace msvc8
          * caller, `Moho::CInfluenceMap`'s threat-accumulation path
          * (`FUN_00716140`, `CInfluenceMap.cpp`, already `recovered`), is
          * real engine code, not third-party library code.
+         * Address: 0x00953610 (FUN_00953610, msvc8::vector<gpg::ReadArchive::
+         * TrackedPointerInfo>::push_back for the 0x14-byte element,
+         * `ReadArchive.h`'s `mTrackedPtrs` member). Same two-way split:
+         * `size()<capacity()` fast path calls `sub_950EA0` (this element's
+         * `uninit_fill_n`, `n=1`) then advances `_Mylast` by 0x14 in place
+         * (`.c`-confirmed: `sub_950EA0(finish,1,a2); this->_Mylast=
+         * finish+1;`); the capacity-exhausted path tail-calls the
+         * single-element `insert(end(), value)` wrapper `FUN_00952DD0`
+         * (cited above on `insert`) with `pos=this->_Mylast`. Confirmed
+         * `.c`-exact match against this member's own two-branch shape.
+         * DB-integrity fix: was mis-tagged `external_dependency` ("STL
+         * template instantiation / codec helper - external") with no
+         * citation -- `gpg::ReadArchive::TrackedPointerInfo` is an engine
+         * type (`ArchiveSerialization.h:72`); both real binary callers
+         * (`FUN_00953720`, `FUN_00953B30`) are already `recovered`.
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -4175,6 +4190,28 @@ namespace msvc8
          * from `FUN_0071A6F0` (also `recovered`). DB-integrity fix: was
          * `blocked` with no citation anywhere in `src/sdk`; `Moho::SThreat`
          * is an engine type, not third-party library code.
+         *
+         * Address: 0x00952DD0 (FUN_00952DD0, msvc8::vector<gpg::ReadArchive::
+         * TrackedPointerInfo>::insert(pos,value) for the 0x14-byte element,
+         * `ReadArchive.h`'s `mTrackedPtrs` member) -- same "capture offset
+         * up front, tail-call the count=1 core, rebuild the iterator from
+         * the offset afterwards" shape: `.c`-confirmed `v6 = (a3-v5)/20`
+         * (offset, guarded by `v5 && (_Myend-v5)/20` mirroring `size()==0`)
+         * computed before the call, tail-calls the count=1 `_Insert_n` core
+         * `FUN_00952770` (already `skip`-tagged as this instantiation's
+         * `_Insert_n`, cited above on `allocate_slots_checked` alongside
+         * this same element's `reserve`/`_Insert_n` siblings), then
+         * rebuilds `*a2 = _Myfirst + 20*v6` from the post-reallocation
+         * `_Myfirst`. Direct caller (`.c`-confirmed, `sub_952DD0(this,&a2,
+         * (int)this->_Mylast,(int)a2)`): `msvc8::vector<TrackedPointerInfo>
+         * ::push_back` (`FUN_00953610`, cited below) on its
+         * capacity-exhausted path, matching this member's own `else {
+         * insert(last_, value); }` branch exactly. That push_back is
+         * reached from `FUN_00953720`/`FUN_00953B30` (both `recovered`,
+         * `ArchiveSerialization.cpp`/`ReadArchive.cpp`). DB-integrity fix:
+         * was `blocked` with no citation anywhere in `src/sdk`;
+         * `gpg::ReadArchive::TrackedPointerInfo` is an engine type
+         * (`ArchiveSerialization.h:72`), not third-party library code.
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
