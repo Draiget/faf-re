@@ -94,21 +94,11 @@ namespace moho
    */
   [[nodiscard]] void* ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone);
 
-  /**
-   * Address: 0x005EE820 (FUN_005EE820, sub_5EE820)
-   *
-   * What it does:
-   * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
-   */
-  [[nodiscard]] void* ResetReservedTransportBoneEntryThunkA(SAiReservedTransportBone& bone);
-
-  /**
-   * Address: 0x005EF8B0 (FUN_005EF8B0, sub_5EF8B0)
-   *
-   * What it does:
-   * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
-   */
-  [[nodiscard]] void* ResetReservedTransportBoneEntryThunkB(SAiReservedTransportBone& bone);
+  // Addresses 0x005EE820/0x005EF8B0 (the "ThunkA"/"ThunkB" jump-only alias
+  // lanes formerly declared here) are dead duplicate forwards to
+  // ResetReservedTransportBoneEntry above -- zero data_refs/call_edges, no
+  // source-level caller anywhere in src/sdk/**. See
+  // SAiReservedTransportBoneSerializer.cpp.
 
   /**
    * Address: 0x005EA550 (FUN_005EA550, std::vector_SAiReservedTransportBone::reset_storage)

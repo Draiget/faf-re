@@ -79,27 +79,12 @@ void* moho::ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone)
   return result;
 }
 
-/**
- * Address: 0x005EE820 (FUN_005EE820, sub_5EE820)
- *
- * What it does:
- * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
- */
-void* moho::ResetReservedTransportBoneEntryThunkA(SAiReservedTransportBone& bone)
-{
-  return ResetReservedTransportBoneEntry(bone);
-}
-
-/**
- * Address: 0x005EF8B0 (FUN_005EF8B0, sub_5EF8B0)
- *
- * What it does:
- * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
- */
-void* moho::ResetReservedTransportBoneEntryThunkB(SAiReservedTransportBone& bone)
-{
-  return ResetReservedTransportBoneEntry(bone);
-}
+// Addresses 0x005EE820/0x005EF8B0 (the "ThunkA"/"ThunkB" jump-only alias
+// lanes formerly modeled here) are dead: zero data_refs and zero incoming
+// call_edges in the callgraph index for both, and no source-level caller
+// anywhere in src/sdk/**. ResetReservedTransportBoneEntry above is the real
+// body -- it has 11 real callers in the binary (DestroyReservedTransportBoneRange
+// below among them) and is already invoked directly from source.
 
 /**
  * Address: 0x005EA550 (FUN_005EA550, std::vector_SAiReservedTransportBone::reset_storage)
