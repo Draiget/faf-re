@@ -4003,14 +4003,56 @@ gpg::SerHelperBase::SerHelperBase()
 moho::TDatList<gpg::SerHelperBase, void>* gpg::SerHelperBase::sNewHelpers = nullptr;
 
 /**
- * Address: 0x004027D0 (FUN_004027D0, duplicate helper body)
+ * Address: 0x004027D0 (FUN_004027D0)
+ * Address: 0x009063A0 (FUN_009063A0, ICF twin -- identical function_sha256)
+ * Address: 0x00906410 (FUN_00906410, ICF twin -- identical function_sha256)
+ * Address: 0x009064B0 (FUN_009064B0, ICF twin -- identical function_sha256)
+ * Address: 0x009359B0 (FUN_009359B0, ICF twin -- identical function_sha256)
+ * Address: 0x00935E10 (FUN_00935E10, ICF twin -- identical function_sha256)
+ * Address: 0x00936200 (FUN_00936200, ICF twin -- identical function_sha256)
+ * Address: 0x00936220 (FUN_00936220, ICF twin -- identical function_sha256)
+ * Address: 0x00954850 (FUN_00954850, ICF twin -- identical function_sha256)
+ * Address: 0x009548C0 (FUN_009548C0, ICF twin -- identical function_sha256)
+ * Address: 0x00954960 (FUN_00954960, ICF twin -- identical function_sha256)
+ * Address: 0x00954980 (FUN_00954980, ICF twin -- identical function_sha256)
+ * Address: 0x00956430 (FUN_00956430, ICF twin -- identical function_sha256)
+ * Address: 0x009564B0 (FUN_009564B0, ICF twin -- identical function_sha256)
+ * Address: 0x00956560 (FUN_00956560, ICF twin -- identical function_sha256)
+ * Address: 0x00956590 (FUN_00956590, ICF twin -- identical function_sha256)
+ * Address: 0x009064E0 (FUN_009064E0, ICF twin -- identical function_sha256.
+ *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+ *          as `UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi`, which
+ *          wrongly called this file's `UnlinkIntrusiveNodeAndSelfLink` (the
+ *          "return self" shape) -- a real bug: the actual compiled body
+ *          captures and returns the ORIGINAL `mNext` pointer before
+ *          resetting self-links, matching `ListUnlink()`, not
+ *          `ListUnlinkSelf()`. That duplicate has been deleted.)
+ *
+ * All addresses above are non-inlined-call-free emissions of this method:
+ * `ResetLinks()` has 90+ real call sites across src/sdk/** (every
+ * `g*Serializer`/`g*Construct` global's registration path) but zero
+ * `call ResetLinks` instructions anywhere -- each call site force-inlines
+ * this one-line body directly, so each surviving distinct address here is
+ * a separate inlined instantiation of the same source line.
  *
  * What it does:
- * Unlinks this helper node from current intrusive links, then self-links it.
+ * Unlinks this helper node from its current intrusive list and restores
+ * singleton self-links, returning (and discarding) the node that used to
+ * follow it.
+ *
+ * Fidelity fix: this previously called `ListUnlinkSelf()` (returns `this`).
+ * The real compiled body (confirmed via decompiled `.c`: captures `mNext`
+ * into a register BEFORE the prev/next fixup, then returns that captured
+ * value) is `ListUnlink()` (returns the original `mNext`). Behaviorally
+ * identical here since the return value is discarded either way, but the
+ * previous citation didn't match the binary. Also fixes a pre-existing
+ * TDatList.h bug: `ListUnlink()`'s own Doxygen block had wrongly listed 12
+ * addresses that are actually `ListUnlinkSelf()`'s (moved there; see that
+ * method's block).
  */
 void gpg::SerHelperBase::ResetLinks() noexcept
 {
-  ListUnlinkSelf();
+  ListUnlink();
 }
 
 /**

@@ -23764,23 +23764,17 @@ namespace
     return StoreWordAtOutput(outValue, source->lane04);
   }
 
-  /**
-   * Address: 0x008E5A10 (FUN_008E5A10)
-   *
-   * What it does:
-   * Returns lane `+0x14` and updates lane `+0x0C` when lane `+0x14` is
-   * non-zero and greater.
-   */
-  std::uint32_t UpdateMaxLane0CFromLane14BatchTau(
-    WordLanesAt0CAnd14RuntimeView* const valueLanes
-  ) noexcept
-  {
-    const std::uint32_t value = valueLanes->lane14;
-    if (value != 0u && value > valueLanes->lane0C) {
-      valueLanes->lane0C = value;
-    }
-    return value;
-  }
+  // NOTE (UpdateMaxLane0CFromLane14BatchTau removal -- fully resolved):
+  // Address: 0x008E5A10 (FUN_008E5A10) is `.c`-identical (`if (mWriteHead)
+  // if (mWriteHead > mReadEnd) mReadEnd = mWriteHead;`) to
+  // `gpg::MemBufferStream::VirtFlush` (FUN_008E5AD0), which force-inlines
+  // `SyncReadEndWithWriteHead()`'s body -- real callers confirmed via 4
+  // in-class call sites (VirtAtEnd, VirtFlush, GetLength, and Write's
+  // trailing sync). `VirtFlush` is declared `void` and its caller ignores
+  // EAX, but this address's `std::uint32_t` return of `mWriteHead`/`value`
+  // is the same trailing register value either way -- same distinction as
+  // the accepted FUN_007B5040 variant on `MouseInfo::~MouseInfo`. Folded
+  // there rather than kept as a duplicate.
 
   /**
    * Address: 0x008E5A20 (FUN_008E5A20)
@@ -24450,19 +24444,16 @@ namespace
     return node;
   }
 
-  /**
-   * Address: 0x009064E0 (FUN_009064E0)
-   *
-   * What it does:
-   * Unlinks one intrusive node from its ring and restores singleton
-   * self-links.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi(
-    IntrusiveNodeRuntimeView* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi removal -- fully
+  // resolved, real bug found): Address: 0x009064E0 (FUN_009064E0). This
+  // function's body called `UnlinkIntrusiveNodeAndSelfLink` (the "return
+  // self" shape) -- wrong: the real compiled body captures and returns the
+  // ORIGINAL `mNext` pointer before resetting self-links, i.e. it's
+  // `TDatListItem<T>::ListUnlink()`'s shape (moho/containers/TDatList.h),
+  // not `ListUnlinkSelf()`'s. See `gpg::SerHelperBase::ResetLinks()`
+  // (Reflection.cpp) for the full ICF-twin evidence trail and a matching
+  // fidelity fix found on that method itself. Deleted rather than patched
+  // in place: this function had zero source-level callers.
 
   /**
    * Address: 0x00906500 (FUN_00906500)

@@ -46,18 +46,21 @@ namespace moho
     }
 
     /**
-     * Address: 0x00443A50 (FUN_00443A50)
-     * Address: 0x00443AA0 (FUN_00443AA0)
-     * Address: 0x00443AC0 (FUN_00443AC0)
-     * Address: 0x00443AE0 (FUN_00443AE0)
-     * Address: 0x00443B00 (FUN_00443B00)
-     * Address: 0x00443B60 (FUN_00443B60)
-     * Address: 0x0047C260 (FUN_0047C260, typed-instantiation lane)
-     * Address: 0x0047C540 (FUN_0047C540, typed-instantiation lane)
-     * Address: 0x0047CA00 (FUN_0047CA00, typed-instantiation lane)
-     * Address: 0x0047CA60 (FUN_0047CA60, typed-instantiation lane)
-     * Address: 0x0047FA20 (FUN_0047FA20, typed-instantiation lane)
-     * Address: 0x00480910 (FUN_00480910, typed-instantiation lane)
+     * CORRECTED (this sweep): this block previously listed 0x00443A50,
+     * 0x00443AA0, 0x00443AC0, 0x00443AE0, 0x00443B00, 0x00443B60,
+     * 0x0047C260, 0x0047C540, 0x0047CA00, 0x0047CA60, 0x0047FA20, and
+     * 0x00480910 -- all twelve are actually `function_sha256`-identical to
+     * `ListUnlinkSelf()` below (the "return `this`" shape), not this
+     * method (confirmed via decompiled `.c`: none of them capture/return
+     * the original `mNext`). Moved to `ListUnlinkSelf()`'s block. The
+     * addresses actually verified for THIS method (captures `mNext` before
+     * the prev/next fixup, returns the captured value) are cited on
+     * `gpg::SerHelperBase::ResetLinks()` instead (Reflection.cpp/.h),
+     * which force-inlines this exact body at 90+ real call sites --
+     * see that method's own Doxygen block for the full twin list,
+     * including 0x009064E0 (formerly duplicated in
+     * moho/containers/LegacyContainerFillLanes.cpp as
+     * `UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi`, deleted).
      *
      * What it does:
      * Unlinks this node from its current ring and resets it to singleton state.
@@ -73,6 +76,25 @@ namespace moho
 
     /**
      * Address: 0x00632BC0 (FUN_00632BC0)
+     * Address: 0x00443A50 (FUN_00443A50, relocated from `ListUnlink()`'s
+     *   block above -- see the CORRECTED note there)
+     * Address: 0x00443AA0 (FUN_00443AA0, relocated, same correction)
+     * Address: 0x00443AC0 (FUN_00443AC0, relocated, same correction)
+     * Address: 0x00443AE0 (FUN_00443AE0, relocated, same correction)
+     * Address: 0x00443B00 (FUN_00443B00, relocated, same correction)
+     * Address: 0x00443B60 (FUN_00443B60, relocated, same correction)
+     * Address: 0x0047C260 (FUN_0047C260, typed-instantiation lane, relocated,
+     *   same correction)
+     * Address: 0x0047C540 (FUN_0047C540, typed-instantiation lane, relocated,
+     *   same correction)
+     * Address: 0x0047CA00 (FUN_0047CA00, typed-instantiation lane, relocated,
+     *   same correction)
+     * Address: 0x0047CA60 (FUN_0047CA60, typed-instantiation lane, relocated,
+     *   same correction)
+     * Address: 0x0047FA20 (FUN_0047FA20, typed-instantiation lane, relocated,
+     *   same correction)
+     * Address: 0x00480910 (FUN_00480910, typed-instantiation lane, relocated,
+     *   same correction)
      * Address: 0x00565CE0 (FUN_00565CE0)
      * Address: 0x00565D00 (FUN_00565D00)
      * Address: 0x005A2D70 (FUN_005A2D70)

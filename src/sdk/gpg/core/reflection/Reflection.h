@@ -304,7 +304,10 @@ namespace gpg
     virtual void Init() = 0;
 
     /**
-     * Address: 0x004027D0 (FUN_004027D0, duplicate self-link helper)
+     * Address: 0x004027D0 (FUN_004027D0) -- 16+ further ICF twins across
+     * this binary's 90+ inlined call sites; see the definition's own
+     * Doxygen block (Reflection.cpp) for the full list and a fidelity fix
+     * (this calls `ListUnlink()`, not `ListUnlinkSelf()`).
      *
      * What it does:
      * Unlinks this helper node from its current intrusive list and restores
