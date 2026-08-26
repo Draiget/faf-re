@@ -55,20 +55,22 @@ namespace
   static_assert(sizeof(IntrusiveLinkRuntimeView) == 0x08, "IntrusiveLinkRuntimeView size must be 0x08");
 #endif
 
-  [[nodiscard]] IntrusiveLinkRuntimeView** LocateIntrusiveNodeOwnerLink(
-    IntrusiveLinkRuntimeView* const node
-  ) noexcept
-  {
-    IntrusiveLinkRuntimeView** cursor = node->ownerSlot;
-    if (cursor == nullptr) {
-      return nullptr;
-    }
-
-    while (*cursor != node) {
-      cursor = &((*cursor)->next);
-    }
-    return cursor;
-  }
+  // NOTE (LocateIntrusiveNodeOwnerLink / UnlinkIntrusiveLinkNode removal):
+  // this file used to keep a local walk-and-splice pair (`LocateIntrusiveNode
+  // OwnerLink` + `UnlinkIntrusiveLinkNode`) over `IntrusiveLinkRuntimeView`
+  // solely to back `IntrusiveOwnerAt10RuntimeView`'s `owner+0x10` unlink
+  // (FUN_007B3DB0/FUN_007B4E30/FUN_007B50A0/FUN_007B5040). That owner is now
+  // identified as `Moho::MouseInfo` (`UICursorInfo`, `CWldSession.h`) --
+  // `mUnitHover` sits at the class's own +0x10, and all four addresses are
+  // confirmed (three by identical `function_sha256`, the fourth by direct
+  // `.c` comparison) duplicate emissions of `MouseInfo::~MouseInfo`
+  // (FUN_00893140, `CWldSession.cpp`), which already performs this exact
+  // unlink via `UnlinkCursorInfoWeakOwnerRef`. With `IntrusiveOwnerAt10
+  // RuntimeView` and its four wrappers deleted, this pair had no remaining
+  // source-level caller anywhere in `src/sdk/**`, so it is removed rather
+  // than kept as an orphan. `IntrusiveLinkRuntimeView` itself stays: it is
+  // still the real embedded shape for `IntrusiveLinkWithPayloadRuntimeView`
+  // below.
 
   using ScalarDeletingDtorCall = std::intptr_t(__thiscall*)(void* self, std::int32_t deleteFlag);
 
@@ -3382,49 +3384,35 @@ namespace
     return FillDwordSpanByCount(valueSlot, destination, count);
   }
 
-  /**
-   * Address: 0x00623C50 (FUN_00623C50)
-   * Address: 0x00674690 (FUN_00674690)
-   * Address: 0x0057D5B0 (FUN_0057D5B0, ICF twin -- identical
-   *          `function_sha256` to the two addresses above. Reached from 23+
-   *          already-recovered destructors across unrelated owning classes
-   *          (`CFactoryBuildTask::~CFactoryBuildTask` at FUN_005FA010 via
-   *          `mCommand.UnlinkFromOwnerChain()`, plus `CUnitGuardTask`,
-   *          `CUnitMoveTask`, `CUnitScriptTask`, `CUnitUnloadUnits`,
-   *          `CUnitCommand`, `CUnitCommandQueue` siblings) -- confirming
-   *          this shape is `moho::WeakPtr<T>`'s shared owner-chain unlink
-   *          primitive for many `T`, not a single-class helper. Formerly
-   *          duplicated as its own `UnlinkIntrusiveLinkNodeOwnerChainAlias`
-   *          wrapper here; that wrapper had no caller anywhere (in this
-   *          anonymous namespace or, per its linkage, outside it either),
-   *          so it is folded into this citation instead of kept as dead
-   *          code.)
-   *
-   * What it does:
-   * Unlinks one intrusive link node from its owner-slot chain.
-   *
-   * Real identity: this is field-for-field `moho::WeakPtr<T>`
-   * (`moho/misc/WeakPtr.h`) -- `ownerSlot`/`next` are
-   * `WeakPtr<T>::ownerLinkSlot`/`nextInOwner`, and this walk-and-splice loop
-   * is the same algorithm `WeakPtr<T>::ReplaceInOwnerChain`/
-   * `UnlinkFromOwnerChain` already implement as a typed member (real callers
-   * confirmed in `CFactoryBuildTask.cpp`/`CUnitGuardTask.cpp` and siblings,
-   * which already call `.UnlinkFromOwnerChain()` by name). Kept here as the
-   * generic `IntrusiveLinkRuntimeView` shape only because
-   * `IntrusiveOwnerAt10RuntimeView` below (this file) still reaches into an
-   * unidentified owning class at `+0x10` through this same primitive --
-   * once that owner is identified and migrated onto a typed `WeakPtr<T>`
-   * member, this free-function pair becomes fully redundant with
-   * `WeakPtr.h` too and should be deleted.
-   */
-  IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNode(IntrusiveLinkRuntimeView* const node) noexcept
-  {
-    IntrusiveLinkRuntimeView** const ownerLink = LocateIntrusiveNodeOwnerLink(node);
-    if (ownerLink != nullptr) {
-      *ownerLink = node->next;
-    }
-    return ownerLink;
-  }
+  // NOTE (UnlinkIntrusiveLinkNode removal -- fully resolved):
+  // Address: 0x00623C50 (FUN_00623C50)
+  // Address: 0x00674690 (FUN_00674690)
+  // Address: 0x0057D5B0 (FUN_0057D5B0, ICF twin -- identical function_sha256
+  //          to the two addresses above)
+  //
+  // This file used to keep a local `UnlinkIntrusiveLinkNode` free function
+  // over `IntrusiveLinkRuntimeView` citing the three addresses above.
+  // Real identity: field-for-field `moho::WeakPtr<T>` (`moho/misc/WeakPtr.h`)
+  // -- `ownerSlot`/`next` are `WeakPtr<T>::ownerLinkSlot`/`nextInOwner`, and
+  // the walk-and-splice loop is the same algorithm `WeakPtr<T>::
+  // ReplaceInOwnerChain`/`UnlinkFromOwnerChain` already implement as a typed
+  // member. Reached from 23+ already-recovered destructors across unrelated
+  // owning classes (`CFactoryBuildTask::~CFactoryBuildTask` at FUN_005FA010
+  // via `mCommand.UnlinkFromOwnerChain()`, plus `CUnitGuardTask`,
+  // `CUnitMoveTask`, `CUnitScriptTask`, `CUnitUnloadUnits`, `CUnitCommand`,
+  // `CUnitCommandQueue` siblings), all of which already call
+  // `.UnlinkFromOwnerChain()` by name -- those real callers are this
+  // function's actual recovery.
+  //
+  // It was kept here only because `IntrusiveOwnerAt10RuntimeView` (below,
+  // now also removed) still reached into its owning class at `+0x10` through
+  // this same primitive. That owner is now identified as `Moho::MouseInfo`
+  // (`UICursorInfo`, `CWldSession.h`/`.cpp`) -- see `MouseInfo::~MouseInfo`'s
+  // own citation for the four twin addresses this resolved
+  // (FUN_007B3DB0/FUN_007B4E30/FUN_007B50A0/FUN_007B5040). With that
+  // dependency gone, `UnlinkIntrusiveLinkNode` (and its sole callee,
+  // `LocateIntrusiveNodeOwnerLink`) had no remaining source-level caller in
+  // `src/sdk/**` and have been deleted rather than kept as orphans.
 
   // NOTE (Stride20IntrusiveLinkElementRuntimeView / weak-observer queue node
   // migration): this file used to duplicate a 20-byte
@@ -15713,15 +15701,6 @@ namespace
     const std::uint32_t* const* slotAt04; // +0x04
   };
 
-  struct IntrusiveOwnerAt10RuntimeView
-  {
-    std::byte pad00_0F[0x10];
-    IntrusiveLinkRuntimeView link; // +0x10
-  };
-#if defined(_M_IX86)
-  static_assert(offsetof(IntrusiveOwnerAt10RuntimeView, link) == 0x10, "IntrusiveOwnerAt10RuntimeView::link offset must be 0x10");
-#endif
-
   struct FourDwordAndTwoByteInitRuntimeView
   {
     std::uint32_t lane00; // +0x00
@@ -15757,13 +15736,6 @@ namespace
       *outValue = *source;
     }
     return outValue;
-  }
-
-  [[nodiscard]] IntrusiveLinkRuntimeView** UnlinkOwnerNodeAtOffset10(
-    IntrusiveOwnerAt10RuntimeView* const owner
-  ) noexcept
-  {
-    return UnlinkIntrusiveLinkNode(&owner->link);
   }
 
   [[nodiscard]] std::uint8_t* FillHalfwordCountWithValue(
@@ -15899,18 +15871,11 @@ namespace
     return source->baseAddress != 0u && source->baseAddress != 8u;
   }
 
-  /**
-   * Address: 0x007B3DB0 (FUN_007B3DB0)
-   *
-   * What it does:
-   * Unlinks one intrusive owner-node stored at `owner+0x10`.
-   */
-  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10A(
-    IntrusiveOwnerAt10RuntimeView* const owner
-  ) noexcept
-  {
-    return UnlinkOwnerNodeAtOffset10(owner);
-  }
+  // NOTE (UnlinkIntrusiveOwnerNodeAt10A removal -- fully resolved):
+  // Address: 0x007B3DB0 (FUN_007B3DB0) was `.c`-identical to `IntrusiveOwnerAt10RuntimeView`'s
+  // `owner+0x10` unlink shape (`function_sha256` match to `Moho::MouseInfo::
+  // ~MouseInfo`, FUN_00893140, `CWldSession.cpp`). See that destructor's own
+  // Doxygen block for the full evidence trail; it is this address's recovery.
 
   /**
    * Address: 0x007B4520 (FUN_007B4520)
@@ -16032,18 +15997,9 @@ namespace
     return CopyWordIfDestinationPresent(outValue, source);
   }
 
-  /**
-   * Address: 0x007B4E30 (FUN_007B4E30)
-   *
-   * What it does:
-   * Unlinks one intrusive owner-node stored at `owner+0x10`.
-   */
-  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10B(
-    IntrusiveOwnerAt10RuntimeView* const owner
-  ) noexcept
-  {
-    return UnlinkOwnerNodeAtOffset10(owner);
-  }
+  // NOTE (UnlinkIntrusiveOwnerNodeAt10B removal -- fully resolved):
+  // Address: 0x007B4E30 (FUN_007B4E30) -- see `Moho::MouseInfo::~MouseInfo`
+  // (FUN_00893140, `CWldSession.cpp`); same resolution as FUN_007B3DB0 above.
 
   /**
    * Address: 0x007B4F80 (FUN_007B4F80)
@@ -16087,32 +16043,17 @@ namespace
     return CopyWordIfDestinationPresent(outValue, source);
   }
 
-  /**
-   * Address: 0x007B5040 (FUN_007B5040)
-   *
-   * What it does:
-   * Unlinks one intrusive owner-node stored at `owner+0x10` and returns owner.
-   */
-  IntrusiveOwnerAt10RuntimeView* UnlinkIntrusiveOwnerNodeAt10AndReturnOwner(
-    IntrusiveOwnerAt10RuntimeView* const owner
-  ) noexcept
-  {
-    (void)UnlinkOwnerNodeAtOffset10(owner);
-    return owner;
-  }
+  // NOTE (UnlinkIntrusiveOwnerNodeAt10AndReturnOwner removal -- fully resolved):
+  // Address: 0x007B5040 (FUN_007B5040) -- `.c`-verified same walk-and-splice
+  // algorithm over `this+0x10` as `Moho::MouseInfo::~MouseInfo`
+  // (FUN_00893140, `CWldSession.cpp`), just preserving/returning the
+  // original `this` pointer in `eax` instead of the unlink cursor (hence a
+  // distinct `function_sha256` from the other three twins). See that
+  // destructor's own Doxygen block for the full evidence trail.
 
-  /**
-   * Address: 0x007B50A0 (FUN_007B50A0)
-   *
-   * What it does:
-   * Alias lane for unlinking one intrusive owner-node at `owner+0x10`.
-   */
-  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10C(
-    IntrusiveOwnerAt10RuntimeView* const owner
-  ) noexcept
-  {
-    return UnlinkOwnerNodeAtOffset10(owner);
-  }
+  // NOTE (UnlinkIntrusiveOwnerNodeAt10C removal -- fully resolved):
+  // Address: 0x007B50A0 (FUN_007B50A0) -- see `Moho::MouseInfo::~MouseInfo`
+  // (FUN_00893140, `CWldSession.cpp`); same resolution as FUN_007B3DB0 above.
 
   /**
    * Address: 0x007B5140 (FUN_007B5140)

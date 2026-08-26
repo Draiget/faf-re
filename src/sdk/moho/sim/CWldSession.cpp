@@ -748,9 +748,32 @@ namespace moho
 
   /**
    * Address: 0x00893140 (FUN_00893140, ??1UICursorInfo@Moho@@QAE@@Z)
+   * Address: 0x007B3DB0 (FUN_007B3DB0, ICF twin -- identical function_sha256
+   *          to the canonical address above)
+   * Address: 0x007B4E30 (FUN_007B4E30, ICF twin -- identical function_sha256)
+   * Address: 0x007B50A0 (FUN_007B50A0, ICF twin -- identical function_sha256)
+   * Address: 0x007B5040 (FUN_007B5040, `.c`-verified same walk-and-splice
+   *          algorithm over the same `this+0x10` slot; distinct
+   *          function_sha256 only because this emission preserves and
+   *          returns the original `this` pointer in `eax` instead of the
+   *          unlink cursor -- the `UnlinkIntrusiveOwnerNodeAt10AndReturnOwner`
+   *          calling-convention lane)
    *
    * What it does:
    * Unlinks this cursor info from the hovered-unit weak-owner chain.
+   *
+   * All four twin addresses above were formerly duplicated in
+   * `LegacyContainerFillLanes.cpp` as a standalone `IntrusiveOwnerAt10RuntimeView`
+   * offset struct (`{pad[0x10], IntrusiveLinkRuntimeView link}`) plus four
+   * near-identical wrapper functions reaching into "an unidentified owning
+   * class at +0x10" -- that file's own `IntrusiveLinkRuntimeView` citation
+   * flagged this as the last unresolved dependency blocking its cleanup.
+   * `function_sha256` ties three of the four directly to this destructor;
+   * the fourth matches by direct `.c` comparison. `mUnitHover` sits at
+   * `MouseInfo`'s own +0x10 (`static_assert`-confirmed in `CWldSession.h`),
+   * matching the offset both there and here exactly. The four duplicate
+   * wrappers have been deleted; this destructor (via
+   * `UnlinkCursorInfoWeakOwnerRef`) is their sole recovery.
    */
   MouseInfo::~MouseInfo()
   {
