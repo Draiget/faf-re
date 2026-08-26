@@ -141,4 +141,21 @@ namespace moho
    * Returns a copy of all runtime camera implementation pointers.
    */
   [[nodiscard]] msvc8::vector<CameraImpl*> CAM_GetAllRCamCameras();
+
+  /**
+   * Address: 0x008D3870 (FUN_008D3870, sub_8D3870)
+   *
+   * What it does:
+   * The `SC_CameraScaleLOD <index>` debug console command. See definition.
+   */
+  void SC_CameraScaleLOD(void* commandArgs);
+
+  /**
+   * Address: 0x00BE9540 (FUN_00BE9540, skip -- xc_a static initializer lane)
+   *
+   * What it does:
+   * Registers the `SC_CameraScaleLOD` console command and schedules
+   * process-exit teardown.
+   */
+  void register_CConFunc_SC_CameraScaleLOD();
 } // namespace moho
