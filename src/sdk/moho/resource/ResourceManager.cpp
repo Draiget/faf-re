@@ -153,6 +153,10 @@ namespace
 
   /**
    * Address: 0x004A9B10 (FUN_004A9B10)
+   * Address: 0x00796DA0 (FUN_00796DA0, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+   *          as `ReleaseWeakOwnerFromPairLane` over the same concrete
+   *          `boost::SharedCountPair` type; that duplicate has been deleted.)
    *
    * What it does:
    * Releases one weak control-block lane (`pi`) from a `(px,pi)` pair.

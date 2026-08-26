@@ -1684,20 +1684,17 @@ namespace
     return ComputeStride12ByteOffset(outValue, base, index);
   }
 
-  /**
-   * Address: 0x00760020 (FUN_00760020)
-   *
-   * What it does:
-   * Fills `[begin,end)` pair lanes with one constant two-word source payload.
-   */
-  std::uint32_t* FillWordPairRangeWithConstant760020(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* const sourcePair
-  ) noexcept
-  {
-    return FillWordPairRangeWithConstant(begin, end, sourcePair);
-  }
+  // NOTE (FillWordPairRangeWithConstant760020 removal -- fully resolved):
+  // Address: 0x00760020 (FUN_00760020) is function_sha256-identical to
+  // `gpg::core::legacy::Fill8ByteLaneRangeFromSingleAndReturnEnd`
+  // (gpg/core/containers/FastVectorInsertLanes.h), the properly-homed
+  // byte-generic fill-from-single-source primitive for any 8-byte element
+  // (already carrying 3 real ICF twins). This file's own two-word framing
+  // is the same shape (a two-word element is an 8-byte element); folded
+  // there rather than kept as a fourth local duplicate. This file's
+  // `FillWordPairRangeWithConstant` local helper stays: it still backs a
+  // second call site (`FillWordPairRangeWithConstantBatchSigma`,
+  // FUN_008D9230) elsewhere in this file.
 
   /**
    * Address: 0x00760470 (FUN_00760470)
@@ -7254,18 +7251,13 @@ namespace
     return left;
   }
 
-  /**
-   * Address: 0x006E30C0 (FUN_006E30C0)
-   *
-   * What it does:
-   * Rewinds lane `+0x08` to lane `+0x04` when they differ.
-   */
-  void AlignLane08ToLane04IfDifferent(DwordTripleRuntimeView* const lane) noexcept
-  {
-    if (lane->lane04 != lane->lane08) {
-      lane->lane08 = lane->lane04;
-    }
-  }
+  // NOTE (AlignLane08ToLane04IfDifferent removal -- fully resolved):
+  // Address: 0x006E30C0 (FUN_006E30C0) -- see `moho::SNavPath::
+  // ResetPathContent` (FUN_005AD130, CAiPathNavigator.cpp), an ICF twin
+  // with a real caller chain (CAiPathNavigator::ResetPathState and
+  // siblings). That citation also documents a fidelity fix: the real body
+  // has no null check, unlike this file's decompiler-shaped naming might
+  // suggest.
 
   /**
    * Address: 0x006E3540 (FUN_006E3540)
@@ -13992,24 +13984,12 @@ namespace
     return ClearDwordPairLane6D7890(outValue);
   }
 
-  /**
-   * Address: 0x00796DA0 (FUN_00796DA0)
-   *
-   * What it does:
-   * Releases weak owner control block at lane `+0x04`.
-   */
-  std::intptr_t ReleaseWeakOwnerFromPairLane(
-    const boost::SharedCountPair* const pair
-  ) noexcept
-  {
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(pair);
-    boost::detail::sp_counted_base* const owner = pair->pi;
-    if (owner != nullptr) {
-      owner->weak_release();
-      result = reinterpret_cast<std::intptr_t>(owner);
-    }
-    return result;
-  }
+  // NOTE (ReleaseWeakOwnerFromPairLane removal -- fully resolved):
+  // Address: 0x00796DA0 (FUN_00796DA0) is function_sha256-identical to
+  // `ReleaseWeakControlFromPair` (FUN_004A9B10, ResourceManager.cpp), which
+  // operates on the exact same concrete type -- ResourceManager.cpp's
+  // `WeakSharedPair` is a type alias for `boost::SharedCountPair`, not just
+  // a same-size lookalike. Folded there rather than kept as a duplicate.
 
   // NOTE: FUN_00796DC0 (`CopySharedOwnerPairWithUseRetain`) used to live
   // here as a thin forward to the deleted `CopySharedOwnerPairAndRetain`.
@@ -21552,21 +21532,16 @@ namespace
     return StoreScalarDwordLane(outValue, source->lane04);
   }
 
-  /**
-   * Address: 0x00879240 (FUN_00879240)
-   *
-   * What it does:
-   * Computes lower-bound node for one key in a tree with sentinel flag at `+0x15`.
-   */
-  TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryA(
-    TreeNodeFlagAt15RuntimeView** const outNode,
-    const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    *outNode = FindLowerBoundTreeNode(tree->header, *key);
-    return outNode;
-  }
+  // NOTE (LowerBoundTreeNodeFlag15ToOutputRecoveryA removal -- fully
+  // resolved, real bug found): Address: 0x00879240 (FUN_00879240). This
+  // function's body called only `FindLowerBoundTreeNode` (a pure lower-
+  // bound walk) -- but the real compiled body additionally rejects the
+  // result back to `header` when the candidate is the header itself or its
+  // key is greater than the search key. That's `legacy::RbTree<...>::
+  // find_node`'s exact shape, not `lower_bound_node`'s -- see that method's
+  // Doxygen block (RbTree.h) for the full evidence trail, including the
+  // fidelity-bug note. Deleted rather than patched in place: this pair had
+  // zero source-level callers, so there was no real call site to fix.
 
   /**
    * Address: 0x00879340 (FUN_00879340)
@@ -21610,20 +21585,11 @@ namespace
     return StoreScalarDwordLane(outValue, source->lane04);
   }
 
-  /**
-   * Address: 0x00879570 (FUN_00879570)
-   *
-   * What it does:
-   * Alias lane for lower-bound search in tree with sentinel flag at `+0x15`.
-   */
-  TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryB(
-    TreeNodeFlagAt15RuntimeView** const outNode,
-    const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return LowerBoundTreeNodeFlag15ToOutputRecoveryA(outNode, tree, key);
-  }
+  // NOTE (LowerBoundTreeNodeFlag15ToOutputRecoveryB removal -- fully
+  // resolved): Address: 0x00879570 (FUN_00879570) -- see `legacy::
+  // RbTree<...>::find_node` (RbTree.h); same resolution as
+  // LowerBoundTreeNodeFlag15ToOutputRecoveryA above (its only in-file
+  // caller).
 
   /**
    * Address: 0x00879670 (FUN_00879670)
