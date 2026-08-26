@@ -9,6 +9,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
@@ -80,21 +81,6 @@ namespace
   }
 
   /**
-   * Address: 0x00626280 (FUN_00626280)
-   *
-   * What it does:
-   * Forwards one unload-units serializer load thunk lane to
-   * `CUnitUnloadUnits::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunk(
-    gpg::ReadArchive* const archive,
-    moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
    * Address: 0x00628880 (FUN_00628880)
    *
    * What it does:
@@ -132,21 +118,6 @@ namespace
    * `CUnitUnloadUnits::MemberSerialize`.
    */
   [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunkJumpAlias(
-    gpg::WriteArchive* const archive,
-    const moho::CUnitUnloadUnits* const task
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00626290 (FUN_00626290)
-   *
-   * What it does:
-   * Forwards one unload-units serializer-save callback lane into
-   * `CUnitUnloadUnits::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunk(
     gpg::WriteArchive* const archive,
     const moho::CUnitUnloadUnits* const task
   )
@@ -534,3 +505,69 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * VFTABLE: 0x00E20EB8 (`??_7CUnitUnloadUnitsSerializer@Moho@@6B@`)
+   *
+   * Demangled base: gpg::SerSaveLoadHelper<class Moho::CUnitUnloadUnits>
+   * (base VFTABLE: 0x00E20EC0, `??_7?$SerSaveLoadHelper@VCUnitUnloadUnits@Moho@@@gpg@@6B@`)
+   *
+   * Confirmed empty derived class -- NOT a `using` alias (same nuance as
+   * `CEfxTrailEmitterSerializer`, see `Reflection.h`). Both vtables carry
+   * the *same* Init() address (0x00627050): `CUnitUnloadUnitsSerializer`
+   * overrides nothing from the base template. The binary still emits two
+   * distinct vtable symbols 8 bytes apart in `.rdata` (0x00E20EB8 and
+   * 0x00E20EC0), which only happens for two distinct C++ types -- a
+   * same-address `using CUnitUnloadUnitsSerializer =
+   * SerSaveLoadHelper<CUnitUnloadUnits>;` alias can only ever produce one
+   * vtable symbol, not two, so that shape does not fit this class.
+   *
+   * `CUnitUnloadUnits::MemberDeserialize(ReadArchive*)`/
+   * `MemberSerialize(WriteArchive*) const` are ordinary instance methods
+   * matching the template's expected shape exactly, so the base template's
+   * generic `Deserialize`/`Serialize` static methods apply unmodified.
+   *
+   * Per-instantiation addresses (T = CUnitUnloadUnits):
+   *  - ctor / compiler dynamic-initializer: 0x00BD1D10, global storage
+   *    0x010B1EA4. `vtable_writers` shows exactly one writer for the
+   *    0x00E20EB8 vtable head (no dead-duplicate twin).
+   *  - dtor / atexit unlink target: 0x00BFA640 (standard `ResetLinks()`
+   *    unlink-then-self-link shape). The real ctor's tail is a plain
+   *    `return atexit(sub_BFA640);` -- the compiler's own registration for
+   *    this global's non-trivial destructor, inherited unchanged from
+   *    `SerSaveLoadHelper<T>::~SerSaveLoadHelper()` -- so no destructor is
+   *    declared here.
+   *  - Init(): 0x00627050 (shared with the base template, not overridden).
+   *  - Deserialize() thunk: 0x00626280, tail-calls
+   *    `CUnitUnloadUnits::MemberDeserialize` at 0x00629880. (This address
+   *    was previously modeled in this file as a standalone free function
+   *    `CUnitUnloadUnitsMemberDeserializeThunk`; it is actually this
+   *    template instantiation's own compiler-emitted `Deserialize` body --
+   *    corrected here. The sibling thunks `CUnitUnloadUnitsMemberDeserializeThunkB`
+   *    (0x00628880) and `CUnitUnloadUnitsMemberDeserializeThunkJumpAlias`
+   *    (0x00628070) are untouched: this ctor's raw asm does not cite them,
+   *    so they are left for whatever separate evidence justified them.)
+   *  - Serialize() thunk: 0x00626290, tail-calls
+   *    `CUnitUnloadUnits::MemberSerialize` at 0x00629950. (Same correction
+   *    as above, formerly `CUnitUnloadUnitsMemberSerializeThunk`; siblings
+   *    `CUnitUnloadUnitsMemberSerializeThunkB`/`ThunkJumpAlias` untouched
+   *    for the same reason.)
+   */
+  class CUnitUnloadUnitsSerializer : public gpg::SerSaveLoadHelper<CUnitUnloadUnits>
+  {
+  };
+  static_assert(sizeof(CUnitUnloadUnitsSerializer) == 0x14, "CUnitUnloadUnitsSerializer size must be 0x14");
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1EA4 -- process-global `CUnitUnloadUnitsSerializer`
+  // singleton. Constructing it runs the compiler-emitted dynamic
+  // initializer (0x00BD1D10), which splices this helper into
+  // `gpg::SerHelperBase::sNewHelpers`; `gpg::SerHelperBase::InitNewHelpers()`
+  // later dispatches `Init()` on it from within the first
+  // `ReadArchive`/`WriteArchive` construction.
+  moho::CUnitUnloadUnitsSerializer gCUnitUnloadUnitsSerializer;
+} // namespace
