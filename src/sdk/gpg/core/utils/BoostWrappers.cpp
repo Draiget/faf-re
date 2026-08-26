@@ -151,60 +151,18 @@ namespace boost
     return outHandlePair;
   }
 
-  namespace detail
-  {
-#if defined(BOOST_HAS_WINTHREADS)
-    /**
-     * Address: 0x00AC2190 (FUN_00AC2190, boost::detail::condition_impl::condition_impl)
-     *
-     * What it does:
-     * Initializes Win32 semaphore/mutex primitives for one condition
-     * implementation lane and throws `boost::thread_resource_error` when any
-     * primitive allocation fails.
-     */
-    condition_impl::condition_impl() : m_gate(nullptr), m_queue(nullptr), m_mutex(nullptr), m_gone(0), m_blocked(0), m_waiting(0)
-    {
-      m_gate = ::CreateSemaphoreA(nullptr, 1, 1, nullptr);
-      m_queue = ::CreateSemaphoreA(nullptr, 0, 0x7FFFFFFF, nullptr);
-      m_mutex = ::CreateMutexA(nullptr, FALSE, nullptr);
-
-      if (m_gate != nullptr && m_queue != nullptr && m_mutex != nullptr) {
-        return;
-      }
-
-      if (m_gate != nullptr) {
-        ::CloseHandle(static_cast<HANDLE>(m_gate));
-        m_gate = nullptr;
-      }
-      if (m_queue != nullptr) {
-        ::CloseHandle(static_cast<HANDLE>(m_queue));
-        m_queue = nullptr;
-      }
-      if (m_mutex != nullptr) {
-        ::CloseHandle(static_cast<HANDLE>(m_mutex));
-        m_mutex = nullptr;
-      }
-
-      throw boost::thread_resource_error();
-    }
-#endif
-  } // namespace detail
-
-#if defined(BOOST_HAS_WINTHREADS)
-  /**
-   * Address: 0x00AC2760 (FUN_00AC2760, boost::thread::~thread)
-   *
-   * What it does:
-   * Closes one native thread handle when this thread lane is still marked
-   * joinable.
-   */
-  thread::~thread()
-  {
-    if (m_joinable) {
-      ::CloseHandle(static_cast<HANDLE>(m_thread));
-    }
-  }
-#endif
+  // boost::detail::condition_impl::condition_impl()/~condition_impl() and
+  // boost::thread::~thread() are NOT defined in this TU: the vendored
+  // dependencies/boost_1_34_1/libs/thread/src/condition.cpp and thread.cpp
+  // are compiled directly into this project (main.vcxproj ->
+  // boost_thread_condition.obj / boost_thread_thread.obj) and already
+  // provide these symbols. A hand-written duplicate here would be an ODR
+  // violation masked only by this project's /FORCE link setting (see
+  // project_force_hides_declonly_bridges memory note) -- real address
+  // citations for these two now live on the vendored definitions themselves
+  // (0x00AC2190/0x00AC2760), with an explanatory note on condition_impl's
+  // ctor about the UNICODE/ANSI CreateSemaphore/CreateMutex divergence that
+  // main.vcxproj's condition.cpp ClCompile entry now corrects for.
 
   /**
    * Address: 0x00935E30 (FUN_00935E30)
