@@ -5521,8 +5521,30 @@ namespace Wm3
    *
    * What it does:
    * Resolves one packed query-word cursor into a dword lane pointer.
+   *
+   * Orphan audit (2026-08-26): genuinely uncallable, and not a WildMagic
+   * duplicate. Checked `dependencies/WildMagic3p8/**` for a matching
+   * chunked/paged accessor (Box3, Sphere3, Intersector, GVector, tree/BSP
+   * node arrays) -- no match; this shape (`wordChunkBases[uint32_t**]` +
+   * `chunkBaseIndex` windowing) is not a WildMagic pattern at all, which
+   * agrees with the prior pass recorded in
+   * `project_querytree_lane_cluster_wm3distancefafextras`: the whole
+   * `QueryWordCursorView`/`QueryWordChunkOwnerView` family was already
+   * flagged "likely a bitset/word-chunk allocator, different concern
+   * entirely, zero callers found even after deep tracing". Independently
+   * reconfirmed here: `_callgraph_index.sqlite` shows zero `call_edges`,
+   * zero `incoming_xrefs`, zero `data_refs`, and the token is absent from
+   * `reachable`. An exhaustive raw byte scan of `bin/external/
+   * ForgedAlliance.exe` (abs little-endian dword + E8/E9 rel32 + 0F8x
+   * rel32 + EB/7x rel8, across all 7 PE sections, scanner validated first
+   * against 3 known-referenced addresses -- 238 and 13/13 hits found, as
+   * expected) found zero references of any kind to `0x00A52AD0`.
+   * `InitializeQueryWordCursorLaneA` (`0x00A52E70`, the cursor's own
+   * constructor) is equally uncalled, so the entire abstraction is dead in
+   * this shipped binary, not just this one accessor. Per RULE TWO this is
+   * left in place rather than deleted or marked blocked.
    */
-  std::uint32_t* ResolveQueryWordCursorElementLaneA(
+  [[maybe_unused]] std::uint32_t* ResolveQueryWordCursorElementLaneA(
     const QueryWordCursorView* const cursor
   ) noexcept
   {
@@ -5534,8 +5556,14 @@ namespace Wm3
    *
    * What it does:
    * Alternate lane of packed query-word cursor element resolution.
+   *
+   * Orphan audit (2026-08-26): same finding as
+   * `ResolveQueryWordCursorElementLaneA` immediately above -- genuinely
+   * uncallable (zero SQLite callgraph edges, zero PE byte-scan hits across
+   * all reference-encoding forms), not a WildMagic duplicate. See that
+   * function's comment for the full evidence trail.
    */
-  std::uint32_t* ResolveQueryWordCursorElementLaneB(
+  [[maybe_unused]] std::uint32_t* ResolveQueryWordCursorElementLaneB(
     const QueryWordCursorView* const cursor
   ) noexcept
   {
@@ -6282,8 +6310,50 @@ namespace Wm3
    *
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x28 + index*0x18`.
+   *
+   * Real identity (orphan audit, 2026-08-26): byte-for-byte matches
+   * `Wm3::IntrSegment3Box3<double>::GetPoint(int) const` --
+   * `dependencies/WildMagic3p8/Foundation/Intersection/
+   * Wm3IntrSegment3Box3.cpp:113-116` (`return m_akPoint[i];`; a
+   * reference-returning accessor compiles in Release to exactly "compute
+   * `&m_akPoint[i]`, return the pointer in eax", which is what this
+   * function does). Confirmed by independent layout math, not shape alone:
+   * `Intersector<double,Vector3<double>>` base is `{vtable(4), pad(4),
+   * m_fContactTime(8, 8-byte aligned), m_iIntersectionType(4)}` = 0x14
+   * (this codebase's actual double-alignment behavior is cross-checked
+   * against `Distance2dRuntimeView` a few hundred lines below, which shows
+   * the identical vtable+pad+double pattern for a sibling `<Real,TVector>`
+   * base). `IntrSegment3Box3<Real>` then adds `m_rkSegment&`(4) +
+   * `m_rkBox&`(4) + `m_bSolid`(1, +3 pad) + `m_iQuantity`(4) = 0x28, and
+   * `m_akPoint[2]` (`Vector3<double>`, 8-byte aligned, no further pad
+   * needed) starts at +0x28 with stride `sizeof(Vector3<double>)` = 0x18 --
+   * an exact match for `RuntimeStride24From40OwnerView` /
+   * `RuntimeStride24EntryView`.
+   *
+   * `FUN_00A46380` and `FUN_00A4FD80`
+   * (`ResolveRuntimeEntryOffset40Stride24LaneB` below) share the same
+   * `function_sha256` -- byte-identical, non-ICF-folded duplicate
+   * emissions of this same instantiation.
+   *
+   * Despite the confirmed identity, NO caller exists anywhere in the
+   * shipped binary for either address: `_callgraph_index.sqlite` shows
+   * zero `call_edges`, zero `incoming_xrefs`, zero `data_refs`, absent
+   * from `reachable`; an exhaustive raw byte scan of `bin/external/
+   * ForgedAlliance.exe` (abs LE dword + E8/E9 rel32 + 0F8x rel32 + EB/7x
+   * rel8, all 7 PE sections, scanner pre-validated against 3 known-
+   * referenced addresses) found zero references to either address.
+   * `grep -rn IntrSegment3Box3 src/sdk/` finds only the *float* free-
+   * function API (`IntrSegment3Box3fFind`, called from
+   * `EntityCollisionUpdater.cpp:597`, which writes into a caller-owned
+   * output array and never touches `Real=double` or `.GetPoint()`); no
+   * engine code anywhere constructs the double intersector or reaches its
+   * `Find()`/`GetPoint()`. This confirms a real template match but not a
+   * real caller -- it does not clear the bar the `Eigen<Real>::operator()`
+   * fix (commit `7d552017`) used for relocation, so per RULE TWO / RULE ONE
+   * this stays here rather than being deleted or moved, marked
+   * `[[maybe_unused]]`.
    */
-  RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneA(
+  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneA(
     RuntimeStride24From40OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -6322,8 +6392,40 @@ namespace Wm3
    *
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x30 + index*0x18`.
+   *
+   * Real identity (orphan audit, 2026-08-26): byte-for-byte matches
+   * `Wm3::IntrSegment3Sphere3<double>::GetPoint(int) const` --
+   * `dependencies/WildMagic3p8/Foundation/Intersection/
+   * Wm3IntrSegment3Sphere3.cpp:229-232` (`return m_akPoint[i];`). Confirmed
+   * by layout math: `Intersector<double,Vector3<double>>` base = 0x14
+   * (`{vtable(4), pad(4), m_fContactTime(8), m_iIntersectionType(4)}`, same
+   * double-alignment behavior cross-checked against `Distance2dRuntimeView`
+   * below). `IntrSegment3Sphere3<Real>` declares `Real ZeroThreshold;`
+   * *before* its private section, so MSVC8 lays it out before the private
+   * members (access specifiers don't create separate layout regions here):
+   * `ZeroThreshold`(8, 8-aligned, +4 pad from 0x14) @0x18-0x20, then
+   * `m_rkSegment&`(4) + `m_rkSphere&`(4) + `m_iQuantity`(4) = 0x2C, then
+   * `m_akPoint[2]` (`Vector3<double>`, 8-byte aligned, +4 pad from 0x2C)
+   * starts at +0x30 with stride `sizeof(Vector3<double>)` = 0x18 -- an
+   * exact match for `RuntimeStride24From48OwnerView` /
+   * `RuntimeStride24EntryView`.
+   *
+   * Despite the confirmed identity, NO caller exists anywhere in the
+   * shipped binary: `_callgraph_index.sqlite` shows zero `call_edges`,
+   * zero `incoming_xrefs`, zero `data_refs`, absent from `reachable`; the
+   * same exhaustive 4-form PE byte scan used for the sibling
+   * `Stride24From40`/`Stride12From24` accessors (see those functions'
+   * comments) found zero references to `0x00A46990`. `grep -rn
+   * IntrSegment3Sphere3 src/sdk/` finds only the *float* free-function API
+   * (`IntrSegment3Sphere3fFind`, called from
+   * `EntityCollisionUpdater.cpp:778`, which writes into a caller-owned
+   * output array); no engine code constructs the double intersector or
+   * reaches its `Find()`/`GetPoint()`. Real match, no real caller -- does
+   * not clear the `Eigen<Real>::operator()` relocation bar (commit
+   * `7d552017`), so per RULE TWO / RULE ONE this stays here rather than
+   * being deleted or moved, marked `[[maybe_unused]]`.
    */
-  RuntimeStride24EntryView* ResolveRuntimeEntryOffset48Stride24LaneA(
+  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset48Stride24LaneA(
     RuntimeStride24From48OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -6440,8 +6542,37 @@ namespace Wm3
    *
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x18 + index*0x0C`.
+   *
+   * Real identity (orphan audit, 2026-08-26): byte-for-byte matches
+   * `Wm3::IntrLine3Box3<float>::GetPoint(int) const` --
+   * `dependencies/WildMagic3p8/Foundation/Intersection/
+   * Wm3IntrLine3Box3.cpp:88-91` (`return m_akPoint[i];`). Confirmed by
+   * layout math: `Intersector<float,Vector3<float>>` base is
+   * `{vtable(4), m_fContactTime(4), m_iIntersectionType(4)}` = 0x0C (no
+   * alignment padding needed -- every field is already 4-byte aligned for
+   * `Real=float`). `IntrLine3Box3<Real>` then adds `m_rkLine&`(4) +
+   * `m_rkBox&`(4) + `m_iQuantity`(4) = 0x18, and `m_akPoint[2]`
+   * (`Vector3<float>`) starts at +0x18 with stride `sizeof(Vector3<float>)`
+   * = 0x0C -- an exact match for `RuntimeStride12From24OwnerView` /
+   * `RuntimeStride12EntryView`.
+   *
+   * Despite the confirmed identity, NO caller exists anywhere in the
+   * shipped binary: `_callgraph_index.sqlite` shows zero `call_edges`,
+   * zero `incoming_xrefs`, zero `data_refs`, absent from `reachable`; the
+   * same exhaustive 4-form PE byte scan used for the sibling
+   * `Stride24From40`/`Stride24From48` accessors (see
+   * `ResolveRuntimeEntryOffset40Stride24LaneA`'s comment above for the
+   * scanner methodology) found zero references to `0x00A4FCB0`. The one
+   * live `IntrLine3Box3f` construction site in the recovered tree
+   * (`UiRuntimeTypes.cpp:22661`, the tight-zoom oriented-mesh pick test)
+   * only calls `.Test()` -- never `.Find()`, so `m_akPoint` is never
+   * populated and `.GetPoint()` is never reached from there either. Real
+   * match, no real caller -- does not clear the `Eigen<Real>::operator()`
+   * relocation bar (commit `7d552017`), so per RULE TWO / RULE ONE this
+   * stays here rather than being deleted or moved, marked
+   * `[[maybe_unused]]`.
    */
-  RuntimeStride12EntryView* ResolveRuntimeEntryOffset24Stride12LaneA(
+  [[maybe_unused]] RuntimeStride12EntryView* ResolveRuntimeEntryOffset24Stride12LaneA(
     RuntimeStride12From24OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -6455,8 +6586,17 @@ namespace Wm3
    * What it does:
    * Alternate lane that returns one indexed runtime entry at
    * `this + 0x28 + index*0x18`.
+   *
+   * Orphan audit (2026-08-26): byte-identical (`function_sha256` match) to
+   * `ResolveRuntimeEntryOffset40Stride24LaneA` (`0x00A46380`) -- the same
+   * non-ICF-folded duplicate emission of
+   * `Wm3::IntrSegment3Box3<double>::GetPoint(int) const`. See that
+   * function's comment (a few dozen lines above) for the full layout-math
+   * proof and the exhaustive no-caller evidence, which was checked
+   * separately for this address too (zero SQLite callgraph edges, zero PE
+   * byte-scan hits for `0x00A4FD80` specifically).
    */
-  RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneB(
+  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneB(
     RuntimeStride24From40OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
