@@ -42,117 +42,10 @@ namespace
     return moho::SEconValue::sType;
   }
 
-  struct SerHelperNodeRuntime
-  {
-    void* mVtable = nullptr;
-    gpg::SerHelperBase* mNext = nullptr;
-    gpg::SerHelperBase* mPrev = nullptr;
-    gpg::RType::construct_func_t mConstructCallback = nullptr;
-    gpg::RType::delete_func_t mDeleteCallback = nullptr;
-  };
-  static_assert(offsetof(SerHelperNodeRuntime, mNext) == 0x04, "SerHelperNodeRuntime::mNext offset must be 0x04");
-  static_assert(offsetof(SerHelperNodeRuntime, mPrev) == 0x08, "SerHelperNodeRuntime::mPrev offset must be 0x08");
-  static_assert(sizeof(SerHelperNodeRuntime) == 0x14, "SerHelperNodeRuntime size must be 0x14");
-
   constexpr const char* kSerializationSourcePath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
   constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
   constexpr int kSerializationConstructLine = 231;
-
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(SerHelperNodeRuntime& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  void InitializeHelperNode(SerHelperNodeRuntime& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
-
-  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(SerHelperNodeRuntime& helper) noexcept
-  {
-    helper.mNext->mPrev = helper.mPrev;
-    helper.mPrev->mNext = helper.mNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mPrev = self;
-    helper.mNext = self;
-    return self;
-  }
-
-  SerHelperNodeRuntime gCEconStorageConstructHelper{};
-  SerHelperNodeRuntime gCEconStorageSerializerHelper{};
-
-  /**
-   * Address: 0x00773490 (FUN_00773490)
-   *
-   * What it does:
-   * Unlinks startup `CEconStorageConstruct` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageConstructNodeVariantA() noexcept
-  {
-    return UnlinkHelperNode(gCEconStorageConstructHelper);
-  }
-
-  /**
-   * Address: 0x007734C0 (FUN_007734C0)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `CEconStorageConstruct` helper
-   * links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageConstructNodeVariantB() noexcept
-  {
-    return UnlinkHelperNode(gCEconStorageConstructHelper);
-  }
-
-  /**
-   * Address: 0x007735B0 (FUN_007735B0)
-   *
-   * What it does:
-   * Unlinks startup `CEconStorageSerializer` helper links and rewires the node
-   * into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageSerializerNodeVariantA() noexcept
-  {
-    return UnlinkHelperNode(gCEconStorageSerializerHelper);
-  }
-
-  /**
-   * Address: 0x007735E0 (FUN_007735E0)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for startup `CEconStorageSerializer` helper
-   * links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageSerializerNodeVariantB() noexcept
-  {
-    return UnlinkHelperNode(gCEconStorageSerializerHelper);
-  }
-
-  /**
-   * Address: 0x00773DA0 (FUN_00773DA0, Moho::CEconStorageConstruct::RegisterConstructFunction)
-   *
-   * What it does:
-   * Resolves `CEconStorage` RTTI and installs startup construct/delete
-   * callbacks from one construct-helper node.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType::construct_func_t RegisterCEconStorageConstructCallbacks(
-    SerHelperNodeRuntime* const helper
-  )
-  {
-    gpg::RType* const type = CachedCEconStorageType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-
-    type->serConstructFunc_ = helper->mConstructCallback;
-    type->deleteFunc_ = helper->mDeleteCallback;
-    return helper->mConstructCallback;
-  }
 
   /**
    * Address: 0x007734F0 (FUN_007734F0, Moho::CEconStorageConstruct::Construct)
@@ -230,38 +123,187 @@ namespace
   }
 
   /**
-   * Address: 0x00773460 (FUN_00773460)
+   * Demangled: gpg::SerConstructHelper<class Moho::CEconStorage>
    *
-   * What it does:
-   * Initializes startup `CEconStorageConstruct` helper links and binds
-   * construct/deconstruct callback lanes.
+   * Address context for this pair of classes: 0x00773490/0x007734C0
+   * (CEconStorageConstruct) and 0x007735B0/0x007735E0 (CEconStorageSerializer)
+   * -- formerly modeled here as "UnlinkCEconStorage{Construct,Serializer}
+   * NodeVariantA/B" free functions -- are each a byte-identical ICF twin
+   * (sha256 d0a84e4f.../9939ed1b... respectively) of these classes' own real
+   * destructors (0x00C02310/0x00C02340, cited below). They are not separate
+   * functions needing their own source-level caller; they *are* the
+   * destructor bodies, and are removed as standalone free functions.
+   *
+   * Similarly, 0x00773460/0x00773580 (formerly modeled here as
+   * `InitializeCEconStorageConstructHelperStorage` /
+   * `InitializeCEconStorageSerializerHelperStorage`) are dead-duplicate
+   * compiled bodies of these classes' own real constructors (0x00BDD170 /
+   * 0x00BDD1B0, cited below) -- same field-write shape, but missing the
+   * atexit registration and with zero incoming references of any kind
+   * anywhere in the indexed binary. The real, `__xc_a`-registered
+   * constructors are modeled directly below instead.
    */
-  [[nodiscard]] SerHelperNodeRuntime* InitializeCEconStorageConstructHelperStorage() noexcept
+  class CEconStorageConstruct : public gpg::SerHelperBase
   {
-    InitializeHelperNode(gCEconStorageConstructHelper);
-    gCEconStorageConstructHelper.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconStorageSerializerCallback);
-    gCEconStorageConstructHelper.mDeleteCallback =
-      reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconStorageSerializerCallback);
-    return &gCEconStorageConstructHelper;
+  public:
+    /**
+     * Address: 0x00BDD170 (FUN_00BDD170, register_CEconStorageConstruct;
+     * dynamic initializer for the global `CEconStorageConstruct` singleton)
+     *
+     * What it does:
+     * Binds construct/deconstruct callback lanes for `CEconStorage`.
+     * Base-class construction (`gpg::SerHelperBase::SerHelperBase`)
+     * self-links this node and splices it into the pending `sNewHelpers`
+     * list. The real dynamic initializer also registers this class's
+     * destructor (0x00C02310) via `atexit` -- reproduced here simply by
+     * giving the class a real destructor below and defining
+     * `gCEconStorageConstructHelper` as a plain global: the compiler emits
+     * the equivalent atexit registration automatically for any static
+     * object whose destructor is non-trivial, with no explicit
+     * `std::atexit` call needed in this constructor's own body.
+     */
+    CEconStorageConstruct();
+
+    /**
+     * Address: 0x00C02310 (FUN_00C02310, Moho::CEconStorageConstruct::
+     * ~CEconStorageConstruct)
+     *
+     * What it does:
+     * Unlinks this helper node from the pending `sNewHelpers` list (or
+     * restores its self-linked sentinel state if already drained).
+     * Registered via `atexit` from the real constructor (0x00BDD170).
+     */
+    ~CEconStorageConstruct();
+
+    /**
+     * Address: 0x00773DA0 (FUN_00773DA0, Moho::CEconStorageConstruct::
+     * RegisterConstructFunction)
+     *
+     * What it does:
+     * Resolves `CEconStorage` RTTI and installs this helper's
+     * construct/delete callbacks.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(CEconStorageConstruct, mConstructCallback) == 0x0C,
+    "CEconStorageConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CEconStorageConstruct, mDeleteCallback) == 0x10,
+    "CEconStorageConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CEconStorageConstruct) == 0x14, "CEconStorageConstruct size must be 0x14");
+
+  CEconStorageConstruct::CEconStorageConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconStorageSerializerCallback))
+    , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconStorageSerializerCallback))
+  {}
+
+  CEconStorageConstruct::~CEconStorageConstruct()
+  {
+    ResetLinks();
   }
 
-  /**
-   * Address: 0x00773580 (FUN_00773580)
-   *
-   * What it does:
-   * Initializes startup `CEconStorageSerializer` helper links and binds
-   * deserialize/serialize callback lanes.
-   */
-  [[nodiscard]] SerHelperNodeRuntime* InitializeCEconStorageSerializerHelperStorage() noexcept
+  void CEconStorageConstruct::Init()
   {
-    InitializeHelperNode(gCEconStorageSerializerHelper);
-    gCEconStorageSerializerHelper.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&DeserializeCEconStorageSerializerCallback);
-    gCEconStorageSerializerHelper.mDeleteCallback =
-      reinterpret_cast<gpg::RType::delete_func_t>(&SerializeCEconStorageSerializerCallback);
-    return &gCEconStorageSerializerHelper;
+    gpg::RType* const type = CachedCEconStorageType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+
+    type->serConstructFunc_ = mConstructCallback;
+    type->deleteFunc_ = mDeleteCallback;
   }
+
+  CEconStorageConstruct gCEconStorageConstructHelper;
+
+  /**
+   * Demangled: gpg::SerSaveLoadHelper<class Moho::CEconStorage> (RTTI shows
+   * `CEconStorageSerializer`'s vtable is literally
+   * `??_7?$SerSaveLoadHelper@VCEconStorage@Moho@@@gpg@@6B@`, but per the
+   * established prior art for this exact shape -- `gpg::SerSaveLoadHelper<T>`'s
+   * own Doxygen block in gpg/core/reflection/Reflection.h, citing
+   * `Rect2iSerializer` / `Moho::CEconRequestSerializer` -- it stays modeled
+   * as a concrete `SerHelperBase`-derived class rather than converted to
+   * inherit the template directly: this constructor points
+   * `mLoadCallback`/`mSaveCallback` at CEconStorageSerializer's OWN static
+   * methods below, not the template's, so collapsing the intermediate level
+   * would be a source-shape change with no binary-behavior difference.)
+   */
+  class CEconStorageSerializer : public gpg::SerHelperBase
+  {
+  public:
+    /**
+     * Address: 0x00BDD1B0 (FUN_00BDD1B0, register_CEconStorageSerializer;
+     * dynamic initializer for the global `CEconStorageSerializer` singleton)
+     *
+     * What it does:
+     * Binds deserialize/serialize callback lanes for `CEconStorage`.
+     * Base-class construction self-links this node and splices it into the
+     * pending `sNewHelpers` list; the real destructor (0x00C02340) is
+     * registered via `atexit` the same way described on
+     * `CEconStorageConstruct::CEconStorageConstruct` above.
+     */
+    CEconStorageSerializer();
+
+    /**
+     * Address: 0x00C02340 (FUN_00C02340, Moho::CEconStorageSerializer::
+     * ~CEconStorageSerializer)
+     *
+     * What it does:
+     * Unlinks this helper node from the pending `sNewHelpers` list (or
+     * restores its self-linked sentinel state if already drained).
+     * Registered via `atexit` from the real constructor (0x00BDD1B0).
+     */
+    ~CEconStorageSerializer();
+
+    /**
+     * Address: 0x00773E20 (FUN_00773E20; VTABLE_CONFIRMED via a direct data
+     * xref from `??_7CEconStorageSerializer@Moho@@6B@` vtable slot 0)
+     *
+     * What it does:
+     * Resolves `CEconStorage` RTTI and installs this helper's load/save
+     * callbacks.
+     */
+    void Init() override;
+
+  public:
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+  static_assert(
+    offsetof(CEconStorageSerializer, mLoadCallback) == 0x0C, "CEconStorageSerializer::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CEconStorageSerializer, mSaveCallback) == 0x10, "CEconStorageSerializer::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CEconStorageSerializer) == 0x14, "CEconStorageSerializer size must be 0x14");
+
+  CEconStorageSerializer::CEconStorageSerializer()
+    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCEconStorageSerializerCallback))
+    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeCEconStorageSerializerCallback))
+  {}
+
+  CEconStorageSerializer::~CEconStorageSerializer()
+  {
+    ResetLinks();
+  }
+
+  void CEconStorageSerializer::Init()
+  {
+    gpg::RType* const type = CachedCEconStorageType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    type->serLoadFunc_ = mLoadCallback;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    type->serSaveFunc_ = mSaveCallback;
+  }
+
+  CEconStorageSerializer gCEconStorageSerializerHelper;
 
   /**
    * Address: 0x00774B80 (FUN_00774B80)
@@ -440,21 +482,24 @@ namespace moho
   // duplicates formerly modeled here) are dead: zero data_refs/call_edges
   // for both, and no source-level caller anywhere in src/sdk/**.
   // `SerializeCEconStorageSerializerCallback` above (`CEconStorageSerializer
-  // ::Serialize`, confirmed by 3 real incoming xrefs incl.
-  // InitializeCEconStorageSerializerHelperStorage) already calls
-  // `CEconStorage::MemberSerialize` directly.
+  // ::Serialize`, confirmed by 3 real incoming xrefs incl. the real
+  // `CEconStorageSerializer::CEconStorageSerializer` constructor at
+  // 0x00BDD1B0) already calls `CEconStorage::MemberSerialize` directly.
 } // namespace moho
 
-namespace
-{
-  struct CEconStorageHelperBootstrap
-  {
-    CEconStorageHelperBootstrap()
-    {
-      (void)InitializeCEconStorageConstructHelperStorage();
-      (void)InitializeCEconStorageSerializerHelperStorage();
-    }
-  };
-
-  [[maybe_unused]] CEconStorageHelperBootstrap gCEconStorageHelperBootstrap;
-} // namespace
+// No bootstrap object is needed to force construction of
+// `gCEconStorageConstructHelper` / `gCEconStorageSerializerHelper`: both are
+// now plain globals of real `gpg::SerHelperBase`-derived types (see above),
+// so the compiler already emits their dynamic initializers unconditionally,
+// exactly matching the real binary's `__xc_a`-registered constructors
+// (0x00BDD170 / 0x00BDD1B0). A prior pass modeled these two helpers as a
+// hand-rolled `SerHelperNodeRuntime` aggregate (raw `void* mVtable` field,
+// manual `InitializeHelperNode` splicing) that never actually joined
+// `gpg::SerHelperBase::sNewHelpers` -- meaning `gpg::SerHelperBase::
+// InitNewHelpers` could never have dispatched `Init()` on either helper, so
+// `CEconStorage`'s `serConstructFunc_`/`deleteFunc_`/`serLoadFunc_`/
+// `serSaveFunc_` would never have been installed at runtime. That bug is
+// fixed by this real-class conversion, which also matches the
+// already-established prior art for this exact anti-pattern (see
+// moho/render/EmitterTypeTypeInfo.h's `EmitterTypePrimitiveSerializer`
+// conversion note).
