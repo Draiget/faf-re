@@ -3388,36 +3388,25 @@ namespace
   // on that template; see `legacy/containers/Vector.h`'s `destroy_range`
   // Doxygen block.
 
-  /**
-   * Address: 0x008D9E20 (FUN_008D9E20)
-   *
-   * What it does:
-   * Swaps two 5-dword lanes in place and returns the first lane pointer.
-   */
-  std::int32_t* SwapFiveDwordLanes(
-    std::int32_t* const firstLane,
-    std::int32_t* const secondLane
-  ) noexcept
-  {
-    const std::int32_t first0 = firstLane[0];
-    const std::int32_t first1 = firstLane[1];
-    const std::int32_t first2 = firstLane[2];
-    const std::int32_t first3 = firstLane[3];
-    const std::int32_t first4 = firstLane[4];
-
-    firstLane[0] = secondLane[0];
-    firstLane[1] = secondLane[1];
-    firstLane[2] = secondLane[2];
-    firstLane[3] = secondLane[3];
-    firstLane[4] = secondLane[4];
-
-    secondLane[0] = first0;
-    secondLane[1] = first1;
-    secondLane[2] = first2;
-    secondLane[3] = first3;
-    secondLane[4] = first4;
-    return firstLane;
-  }
+  // NOTE (SwapFiveDwordLanes removal -- fully resolved):
+  // Address: 0x008D9E20 (FUN_008D9E20)
+  //
+  // This file used to model this address as a bespoke `SwapFiveDwordLanes`
+  // free function over a raw `{int32,int32,int32,int32,int32}` pointer pair
+  // -- a RULE ONE violation once the real instantiation was identified. Its
+  // caller chain (median-of-3 `FUN_008D9EE0`, ninther `FUN_008DA410`,
+  // partition `FUN_008DAA00`) traces to `std::_Sort<gpg::RField*>`
+  // (`FUN_008DD790`) -- MSVC8's introsort emitted for `gpg::RType::
+  // Finish()`'s `std::sort(fields_.begin(), fields_.end(), ...)`
+  // (Reflection.cpp): 20-byte `RField` elements (5 dwords), compared by
+  // `mName` via `strcmp`. Real identity: `msvc8::detail::iter_swap_value<
+  // gpg::RField>` (`legacy/algorithms/Sort.h`), the templated element-swap
+  // this project's `msvc8::sort<T,Compare>` already provides generically.
+  // See that template's own citation for the full evidence chain --
+  // `FUN_008D9EE0`/`FUN_008DA410`/`FUN_008DAA00`/`FUN_008DB430`/
+  // `FUN_008DB2A0`/`FUN_008DBF60`/`FUN_008DAF60`/`FUN_008DB080` were also
+  // corrected from stale `blocked`/mis-tagged `external_dependency` states
+  // as part of this same pass.
 
   struct LargeRuntimeWordAccessView
   {
