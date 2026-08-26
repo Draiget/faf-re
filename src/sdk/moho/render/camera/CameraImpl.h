@@ -246,7 +246,10 @@ namespace moho
      * `UserEntity` owners and releases any heap-grown storage. Clears the
      * intrusive target-entity weak list (`mTargetEntities`) and frees its head
      * sentinel. Destroys both heap-allocated `CameraTimeSourceRuntime` slots
-     * via the EH vector-destructor iterator. Releases the embedded
+     * via the EH vector-destructor iterator, whose per-element delete
+     * callback is `FUN_007AE630` (`ReleaseOwnedRuntimePointerSlotWithDeleteFlag`,
+     * WinApiImportThunks.cpp) -- see the .cpp definition's doc comment for
+     * the full citation. Releases the embedded
      * `GeomCamera3` solid-frustum heap storage, tears down the `mName`
      * `msvc8::string` SSO buffer, runs the `CScriptEvent` sub-object teardown,
      * and finally chains into `RCamCamera::~RCamCamera` which forgets this

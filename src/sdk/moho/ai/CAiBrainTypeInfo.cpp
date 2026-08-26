@@ -66,38 +66,24 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00581890 (FUN_00581890)
-   *
-   * What it does:
-   * Generic, type-erased "delete this reflected object" callback: reads the
-   * object's own vtable slot 2 (`+0x08`) and calls it with the scalar-delete
-   * flag hardcoded to 1 -- `gpg::RObject::~RObject()` sits at exactly that
-   * slot (VFTable SLOT: 2, per its declaration in Reflection.h), so this is
-   * the same generic dispatch every `RObject`-derived class's own
-   * compiler-generated scalar deleting destructor performs, just invoked
-   * through a `void*` rather than a statically-typed pointer. Suitable as a
-   * `gpg::RType::delete_func_t` callback for reflected types that don't
-   * need (or don't yet have) their own typed specialization, matching how
-   * `moho::CAiBrainConstruct::mDeleteCallback` uses a typed
-   * `DeleteConstructedCAiBrain` instead for that specific registration
-   * (CAiBrainConstruct.cpp) -- both compile to the same real dispatch when
-   * the concrete type has a virtual destructor at this slot.
-   *
-   * DB-integrity fix: this previously cast to `gpg::RType*` (a reflection
-   * type *descriptor*, unrelated to the objects being reflected) instead of
-   * `gpg::RObject*` (the actual base every reflected object derives from,
-   * whose own destructor is confirmed at this exact vtable slot) -- the cast
-   * target didn't match the binary's `[vtable+8]` dispatch at all.
-   */
-  [[maybe_unused]] void DeleteReflectedObjectViaVirtualDtor(void* const object)
-  {
-    if (object == nullptr) {
-      return;
-    }
-
-    delete static_cast<gpg::RObject*>(object);
-  }
+  // Address: 0x00581890 (FUN_00581890, sub_581890) -- generic, type-erased
+  // "delete this reflected object" callback: reads the object's own vtable
+  // slot 2 (`+0x08`) and calls it with the scalar-delete flag hardcoded to
+  // 1. One of a 36-way ICF-identical `delete_func_t` thunk family
+  // (canonical twin `FUN_00510AA0`). This exact address's own real
+  // registration site (`moho::CAiBrainConstruct::mDeleteCallback`,
+  // instruction 0x00BCB409 in CAiBrainConstruct.cpp) is already served by
+  // the typed `DeleteConstructedCAiBrain` specialization there -- see its
+  // doc comment for the vtable-slot equivalence proof
+  // (`CAiBrain::~CAiBrain()`'s own scalar-deleting-destructor thunk,
+  // `FUN_00579F30`, sits at the identical slot 2 of `CAiBrain`'s vtable).
+  // No registration site anywhere in this binary needs the raw generic
+  // dispatcher as its own named function: recovering it as
+  // `delete static_cast<gpg::RObject*>(object)` behind a `void*` parameter
+  // would be exactly the raw vtable-slot-magic this project's
+  // reconstruction-fidelity contract forbids, and nothing in `src/sdk/**`
+  // has a source-level call to it (RULE ONE / no-orphan-helper rule) --
+  // so this address intentionally has no dedicated recovered function here.
 
   void cleanup_CAiBrainTypeInfoStartup()
   {
