@@ -54,6 +54,15 @@ namespace moho
    * `FUN_00BC9C40` (real, `__xc_a`-reachable; no dead duplicate found for
    * this instantiation). See the per-instantiation address list on
    * `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF4960` (atexit target
+   * pushed by the real ctor above); `FUN_005524F0`/`FUN_00552520` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneF` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using EUnitCommandTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EUnitCommandType, int>;
 

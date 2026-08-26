@@ -85,6 +85,15 @@ namespace moho
    * `sub_55B310`/`sub_55B330` (this instantiation's Deserialize/Serialize)
    * as callback fields, the same shape as every other confirmed real ctor
    * in this family.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF50E0` (atexit target
+   * pushed by the real ctor above); `FUN_0055AF80`/`FUN_0055AFB0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneG` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using ESTITargetTypePrimitiveSerializer = gpg::PrimitiveSerHelper<ESTITargetType, int>;
 
