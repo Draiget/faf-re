@@ -1535,7 +1535,36 @@ namespace moho
    * Address: 0x008B2770 (FUN_008B2770, msvc8::vector<Moho::WeakPtr<UserUnit>>
    * ::push_back's fast-path append -- the sibling emission of the grow lane
    * described above (FUN_008B2B70); AddArmyAvatar's InsertWeakPtrVectorObjectAt
-   * call below covers this address's index==size() behavior byte-for-byte.)
+   * call below covers this address's index==size() behavior byte-for-byte.
+   *
+   * Re-verified directly from FUN_008B2770.asm and FUN_008B2B70.asm (its
+   * general insert(pos,1,value), in-place/capacity-sufficient branch at
+   * loc_8B2D40) to resolve a divergence a prior pass flagged but did not fix:
+   *   - append (pos==end): both FUN_008B2770's fast path and FUN_008B2B70's
+   *     own tailCount==0 fallback construct the slot via FUN_008B39A0 -- an
+   *     unconditional 2-word write, no read of the slot's prior contents.
+   *   - mid-insert (pos!=end, tailCount>=1): FUN_008B3630 -> FUN_008B3D30
+   *     fill-*constructs* the freshly-grown tail slot begin[size] from
+   *     begin[size-1] (same no-read-before-write shape as FUN_008B39A0;
+   *     confirmed from FUN_008B3D30.asm -- `mov ecx,[edx]; mov [eax],ecx`
+   *     writes the destination unconditionally and never reads
+   *     [eax]/[eax+4] first). FUN_008B3660 -> FUN_008B3B90 then
+   *     back-shift-*assigns* [pos,size-1) into [pos+1,size) --
+   *     FUN_008B3B90.asm DOES read [eax-8] before decrementing/overwriting,
+   *     matching `AssignWeakPtrRangeBackward`'s detach-before-relink shape,
+   *     correctly, since those destinations are live elements, not raw
+   *     storage. FUN_008B3910 finally assigns the new value into the
+   *     vacated gap at pos, matching `AssignFillRange`'s single-element
+   *     read-before-write shape.
+   *
+   * The manual shift loop below used to run the read-before-write
+   * `ResetFromOwnerLinkSlot` on the newly-grown tail slot too (loop
+   * iteration i==size), and the final assign-into-clampedIndex line ran
+   * unconditionally even for the append case, where clampedIndex names that
+   * same uninitialized tail slot. Both are now split out as
+   * `FillConstructRange` calls to match FUN_008B39A0/FUN_008B3D30; the
+   * middle-shift loop and the mid-insert gap-assign already matched
+   * FUN_008B3B90/FUN_008B3910's read-before-write shape and are unchanged.
    */
   template <class T>
   void InsertWeakPtrVectorObjectAt(
@@ -1548,12 +1577,31 @@ namespace moho
 
     EnsureWeakPtrVectorCapacity(weakVector, size + 1u);
 
-    for (std::size_t i = size; i > clampedIndex; --i) {
-      view.begin[i].ResetFromOwnerLinkSlot(view.begin[i - 1].ownerLinkSlot);
-      view.begin[i - 1].ResetFromObject(nullptr);
+    if (clampedIndex < size) {
+      // begin[size] is freshly-grown capacity, not a live element yet:
+      // fill-construct it from the current last element first (FUN_008B3D30
+      // shape), then back-shift-assign the rest into place (FUN_008B3B90
+      // shape, unchanged).
+      (void)WeakPtr<T>::FillConstructRange(view.begin + size, 1, view.begin[size - 1]);
+
+      for (std::size_t i = size - 1; i > clampedIndex; --i) {
+        view.begin[i].ResetFromOwnerLinkSlot(view.begin[i - 1].ownerLinkSlot);
+        view.begin[i - 1].ResetFromObject(nullptr);
+      }
+
+      // The vacated gap at clampedIndex is still a live (if logically
+      // superseded) element, so the new value is assigned into it,
+      // detaching whatever it was previously holding (FUN_008B3910 shape).
+      view.begin[clampedIndex].ResetFromObject(object);
+    } else {
+      // Appending at the end: begin[clampedIndex] (== begin[size]) is
+      // uninitialized capacity, so the new value is constructed directly,
+      // matching FUN_008B2770's fast path and FUN_008B2B70's own
+      // tailCount==0 fallback (both call FUN_008B39A0).
+      const WeakPtr<T> stagedValue(WeakPtr<T>::EncodeOwnerLinkSlot(object), nullptr);
+      (void)WeakPtr<T>::FillConstructRange(view.begin + clampedIndex, 1, stagedValue);
     }
 
-    view.begin[clampedIndex].ResetFromObject(object);
     view.end = view.begin + size + 1u;
   }
 
