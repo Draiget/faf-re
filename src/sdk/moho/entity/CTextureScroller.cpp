@@ -779,39 +779,13 @@ namespace moho
     archive->ReadInt(&mSpeed[1]);
   }
 
-  /**
-   * Address: 0x00778320 (FUN_00778320)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards texture-scroller load lanes into
-   * `CTextureScroller::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCTextureScrollerThunkA(
-    CTextureScroller* const object,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x007783F0 (FUN_007783F0)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards texture-scroller load lanes into
-   * `CTextureScroller::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCTextureScrollerThunkB(
-    CTextureScroller* const object,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberDeserialize(archive);
-    }
-  }
+  // Addresses 0x00778320/0x007783F0 (the "ThunkA"/"ThunkB" load-lane
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `DeserializeCTextureScrollerSerializerCallback` below (wired into
+  // `CTextureScrollerSerializer`'s ctor) already forwards into
+  // `CTextureScroller::MemberDeserialize` and is the real, atexit-registered
+  // body.
 
   /**
    * Address: 0x00778510 (FUN_00778510, Moho::CTextureScroller::MemberSerialize)
@@ -840,39 +814,13 @@ namespace moho
     archive->WriteInt(mSpeed[1]);
   }
 
-  /**
-   * Address: 0x00778330 (FUN_00778330)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards texture-scroller save lanes into
-   * `CTextureScroller::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCTextureScrollerThunkA(
-    const CTextureScroller* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00778400 (FUN_00778400)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards texture-scroller save lanes into
-   * `CTextureScroller::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCTextureScrollerThunkB(
-    const CTextureScroller* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberSerialize(archive);
-    }
-  }
+  // Addresses 0x00778330/0x00778400 (the "ThunkA"/"ThunkB" save-lane
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `SerializeCTextureScrollerSerializerCallback` below (wired into
+  // `CTextureScrollerSerializer`'s ctor) already forwards into
+  // `CTextureScroller::MemberSerialize` and is the real, atexit-registered
+  // body.
 } // namespace moho
 
 namespace
