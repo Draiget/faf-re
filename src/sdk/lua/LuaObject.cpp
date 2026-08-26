@@ -2224,6 +2224,31 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090CA40 (FUN_0090CA40, lua_toboolean)
+	 *
+	 * What it does:
+	 * Reads one stack slot and reports whether it is "truthy" - anything
+	 * except nil and the boolean `false` counts as true. An out-of-range
+	 * positive index (at or past the stack top) short-circuits to false
+	 * without consulting the tag at all.
+	 */
+	int lua_toboolean(lua_State* const state, const int idx)
+	{
+		TObject* object = nullptr;
+		if (idx <= 0) {
+			object = negindex(state, idx);
+		} else {
+			object = &state->base[idx - 1];
+			if (object >= state->top) {
+				return 0;
+			}
+		}
+
+		return (object != nullptr && object->tt != LUA_TNIL &&
+			(object->tt != LUA_TBOOLEAN || object->value.b != 0)) ? 1 : 0;
+	}
+
+	/**
 	 * Address: 0x0090CC90 (FUN_0090CC90, lua_topointer)
 	 *
 	 * What it does:
