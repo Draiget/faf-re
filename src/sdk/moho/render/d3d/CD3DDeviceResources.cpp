@@ -27,6 +27,7 @@
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/resource/ResourceManager.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
 namespace moho
@@ -46,9 +47,7 @@ namespace moho
 
     void EnsureTextureTypeRegistered()
     {
-      if (RD3DTextureResource::sType == nullptr) {
-        RD3DTextureResource::sType = gpg::LookupRType(typeid(RD3DTextureResource));
-      }
+      (void)resource_reflection::ResolveRD3DTextureResourceType();
     }
 
     /**
@@ -60,11 +59,7 @@ namespace moho
      */
     void RegisterTexturePrefetchType()
     {
-      gpg::RType* textureType = RD3DTextureResource::sType;
-      if (textureType == nullptr) {
-        textureType = gpg::LookupRType(typeid(RD3DTextureResource));
-        RD3DTextureResource::sType = textureType;
-      }
+      gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
       RES_RegisterPrefetchType("d3d_textures", textureType);
     }
 
@@ -114,11 +109,7 @@ namespace moho
       CResourceWatcher* const resourceWatcher
     )
     {
-      gpg::RType* resourceType = RD3DTextureResource::sType;
-      if (resourceType == nullptr) {
-        resourceType = gpg::LookupRType(typeid(RD3DTextureResource));
-        RD3DTextureResource::sType = resourceType;
-      }
+      gpg::RType* const resourceType = resource_reflection::ResolveRD3DTextureResourceType();
 
       boost::weak_ptr<RD3DTextureResource> weakResource{};
       (void)RES_GetResource(&weakResource, path != nullptr ? path : "", resourceWatcher, resourceType);

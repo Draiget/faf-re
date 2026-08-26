@@ -79,8 +79,7 @@ namespace moho::resource_reflection
 
   gpg::RType* ResolveMemBufferConstType()
   {
-    static gpg::RType* sType = nullptr;
-    return ResolveCachedType(sType, typeid(gpg::MemBuffer<const char>));
+    return ResolveCachedType(gpg::MemBuffer<const char>::sType, typeid(gpg::MemBuffer<const char>));
   }
 
   void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType)
