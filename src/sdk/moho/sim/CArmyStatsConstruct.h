@@ -31,9 +31,17 @@ namespace moho
     CArmyStatsConstruct();
 
     /**
+     * Address: 0x00BFF820 (FUN_00BFF820, atexit target registered by the
+     * real ctor above)
+     *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_0070E0E0`/
+     * `FUN_0070E110` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAX` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~CArmyStatsConstruct();
 
