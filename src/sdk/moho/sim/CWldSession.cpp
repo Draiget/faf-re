@@ -2250,12 +2250,12 @@ namespace moho
     /**
      * Not a distinct binary function - the post-order (right subtree, this
      * node, left subtree) node-destroy walk that 0x00824B50 (`DestroyTree`)
-     * inlines in the binary (0x0082CDE0 is that copy; a second copy at
-     * 0x00826000/`sub_826000` feeds the same release step into a
-     * rebuild-reset path that is not yet recovered - see
-     * `decomp/recovery/reports/by-source/src/sdk/moho/sim/CWldSession.cpp.reconstruction.md`).
-     * Lifted into one shared helper here per the intent-first helper
-     * contract instead of duplicating the walk.
+     * inlines in the binary (0x0082CDE0 is that copy). A second binary copy
+     * at 0x00826000 (`PrepareForRebuild`, see below) inlines the identical
+     * walk for its rebuild-reset path - both are now recovered against this
+     * one shared helper, so the bucket-resource release runs on every node
+     * from both call sites. Lifted into one shared helper here per the
+     * intent-first helper contract instead of duplicating the walk.
      */
     static void DestroyCommandGraphTreeSubtree(CommandGraphTreeNode* sentinelHead, CommandGraphTreeNode* node);
 
