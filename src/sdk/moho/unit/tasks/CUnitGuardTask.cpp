@@ -141,10 +141,12 @@ namespace
    * Performs the same intrusive-list unlink/self-link sequence for
    * `CUnitGuardTaskSerializer` helper storage.
    */
-  [[maybe_unused]] void UnlinkCUnitGuardTaskSerializerNodeSecondary()
-  {
-    gCUnitGuardTaskSerializer.ResetLinks();
-  }
+  // Address 0x006110C0 (the "Secondary" unlink/self-link duplicate formerly
+  // modeled here) is dead: zero data_refs/call_edges and no source-level
+  // caller anywhere in src/sdk/**. UnlinkCUnitGuardTaskSerializerNodePrimary
+  // above is the real body -- cleanup_CUnitGuardTaskSerializer_atexit below
+  // calls it directly, and that cleanup function is atexit-registered from
+  // the ctor.
 
   void cleanup_CUnitGuardTaskSerializer_atexit()
   {
@@ -491,39 +493,13 @@ namespace moho
     archive->Write(CachedSNavGoalType(), &mGuardGoal, ownerRef);
   }
 
-  /**
-   * Address: 0x00614B40 (FUN_00614B40)
-   *
-   * What it does:
-   * Serializer-save thunk lane forwarding one `(task, archive)` pair into
-   * `CUnitGuardTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitGuardTaskMemberSerializeThunkA(
-    const CUnitGuardTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00614B90 (FUN_00614B90)
-   *
-   * What it does:
-   * Secondary serializer-save thunk lane forwarding one `(task, archive)`
-   * pair into `CUnitGuardTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitGuardTaskMemberSerializeThunkB(
-    const CUnitGuardTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
-    }
-  }
+  // Addresses 0x00614B40/0x00614B90 (the "ThunkA"/"ThunkB" serializer-save
+  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
+  // for both, and no source-level caller anywhere in src/sdk/**.
+  // `SerializeCUnitGuardTaskSerializerCallback` above (wired into
+  // `CUnitGuardTaskSerializerHelper`'s ctor) already forwards into
+  // `CUnitGuardTask::MemberSerialize` and is the real, atexit-registered
+  // body.
 
   /**
    * Address: 0x006110F0 (FUN_006110F0, Moho::CUnitGuardTask::CUnitGuardTask)
