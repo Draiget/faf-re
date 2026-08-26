@@ -5626,6 +5626,34 @@ namespace msvc8
          * per-element rather than called out to a separate symbol. Reached
          * from `operator=` (`FUN_007530C0`, cited below) on its
          * capacity-reused and full-reallocation paths.
+         *
+         * Address: 0x00742090 (FUN_00742090, `msvc8::vector<Moho::
+         * SDecalInfo>::destroy_range` for the 0x90-byte element) --
+         * `.c`-confirmed: loops `[first,last)` resetting the trailing
+         * `mType` string (freeing its heap buffer when `myRes >= 0x10`)
+         * then tearing down `mTexName1`/`mTexName2` via `.tidy(true,0)`,
+         * per element -- the same behavior `SDecalInfo::~SDecalInfo()`
+         * (0x00742360, already recovered, `CDecalTypes.h`) documents, with
+         * that destructor's body inlined into the range loop rather than
+         * called out per-element (the standard MSVC `_Destroy_range`
+         * codegen choice for a simple, non-virtual, non-throwing
+         * destructor). `.xrefs.txt`-confirmed 10 real callers: two from
+         * `Moho::SSyncData::~SSyncData` (0x0073FF4B, 0x007404E0 --
+         * normal-path and EH-unwind-funclet copies of the same
+         * `mAddDecals` teardown; `SSyncData::mAddDecals` is `msvc8::
+         * vector<SDecalInfo>`, `SimDriver.h`, so this is that member's own
+         * automatic destructor reaching this instantiation), one from
+         * `Moho::CDecalBuffer::~CDecalBuffer` (0x00779270, its own decal
+         * vector, not yet recovered), and 6 more not investigated this
+         * pass (0x00740D60, 0x0074142A, 0x00741B1A, 0x0077BB44,
+         * 0x0077E17B, 0x0077E2F1, 0x0077E32B). Formerly modeled as a
+         * standalone `DestroyLegacyDecalInfoRangeForSyncPayload` free
+         * function in `moho/sim/SimDriver.cpp` (its only source-level
+         * caller was a hand-written `SSyncData::~SSyncData()` teardown
+         * walk that has since been replaced by real owning `msvc8::
+         * vector<T>`/smart-pointer members and their own automatic
+         * destructors) -- collapsed into this template instantiation,
+         * RULE ONE.
          */
     public:
         static void destroy_range(T* first, T* last) noexcept {
