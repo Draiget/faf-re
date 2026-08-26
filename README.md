@@ -10,48 +10,48 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`99.13%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `66,585`*
+  - *Total amount of completed tokens: `66,586`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,938` (79.50%)
-- `skip`: `7,889` (11.85%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,758` (8.65%) — proven third-party/import-boundary code
+- `recovered`: `52,932` (79.49%)
+- `skip`: `7,895` (11.86%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,759` (8.65%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `687` (1.02%)**
+- **`blocked`: `686` (1.02%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `690`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `690`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `689`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `689`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,938 functions) — binary caller context
+### Recovered (52,932 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `17,117` | 32.33% |
+| **Recovered caller token exists** (source edge still requires verification) | `17,117` | 32.34% |
 | Vtable-anchored (virtual override of a recovered class) | `5,888` | 11.12% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,596` | 10.57% |
 | No recovered caller token yet (orphan risk) | `1,681` | 3.18% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,436` | 42.38% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,430` | 42.38% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (690 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (689 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
 | **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `10` | 1.45% |
-| Vtable-anchored (recover with the owning class) | `108` | 15.65% |
+| Vtable-anchored (recover with the owning class) | `108` | 15.67% |
 | Framework dispatch (wx/EH/Lua/reflection) | `0` | 0.00% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `260` | 37.68% |
-| No indexed callsite evidence (needs investigation/evidence) | `311` | 45.07% |
-| Unclassified data xref (manual review) | `1` | 0.14% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `259` | 37.59% |
+| No indexed callsite evidence (needs investigation/evidence) | `311` | 45.14% |
+| Unclassified data xref (manual review) | `1` | 0.15% |
 | RTTI-only | `0` | 0.00% |
 
 *Set `FAF_README_SKIP_VERDICTS=1` to skip this block during tight worker loops.*
