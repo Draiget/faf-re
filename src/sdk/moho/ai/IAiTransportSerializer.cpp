@@ -90,29 +90,11 @@ namespace
     gIAiTransportSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x005E48D0 (FUN_005E48D0)
-   *
-   * What it does:
-   * Alias startup-lane thunk that unlinks the `IAiTransportSerializer`
-   * helper links and restores self-links.
-   */
-  [[maybe_unused]] void cleanup_IAiTransportSerializerStartupThunkA()
-  {
-    gIAiTransportSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x005E4900 (FUN_005E4900)
-   *
-   * What it does:
-   * Secondary alias startup-lane thunk for the same
-   * `IAiTransportSerializer` helper unlink/reset path.
-   */
-  [[maybe_unused]] void cleanup_IAiTransportSerializerStartupThunkB()
-  {
-    gIAiTransportSerializer.ResetLinks();
-  }
+  // Addresses 0x005E48D0/0x005E4900 (the "StartupThunkA"/"StartupThunkB"
+  // unlink/reset duplicates formerly modeled here) are dead: zero
+  // data_refs/call_edges for both, and no source-level caller anywhere in
+  // src/sdk/**. `cleanup_IAiTransportSerializer` above is the real,
+  // atexit-registered teardown (see the ctor below).
 } // namespace
 
 /**
