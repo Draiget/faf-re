@@ -1642,6 +1642,16 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
  * 0x00E3C474 and its `CScriptEvent` / `CScriptObject` sub-object vtable
  * thunks. The wrapper is invoked at runtime via `delete camera` from
  * `RCamManager::~RCamManager` (0x007AA930).
+ *
+ * The `mTimeSources` cleanup loop below is the typed recovery of
+ * `FUN_007AE630` (`ReleaseOwnedRuntimePointerSlotWithDeleteFlag`,
+ * WinApiImportThunks.cpp): the binary passes `&sub_7AE630` as the
+ * per-element destructor callback into the compiler's
+ * `_eh_vector_destructor_iterator`-style helper (0x00A83AAC, `count=2,
+ * elementSize=4`) at instruction 0x007A800D. `sub_7AE630` reads one owned
+ * pointer from the slot and dispatches its own vtable slot 1 with delete
+ * flag 1 -- exactly what `delete source` below compiles to for a
+ * `CameraTimeSourceRuntime*` slot.
  */
 moho::CameraImpl::~CameraImpl()
 {
@@ -1661,7 +1671,9 @@ moho::CameraImpl::~CameraImpl()
   // Release both heap-owned `CameraTimeSourceRuntime` slots via their virtual
   // scalar-deleting destructor (vtable slot 1). Only indices 0 and 1 are
   // populated (`SystemTimeSource` and `GameTimeSource`); index 2 is unused.
-  // The binary uses an `eh vector destructor iterator` over the two slots.
+  // The binary uses an `eh vector destructor iterator` over the two slots,
+  // with `FUN_007AE630` as the per-element delete callback (see this
+  // function's own doc comment above for the full citation).
   for (auto*& source : std::span{runtime->mTimeSources, 2}) {
     delete source;
     source = nullptr;

@@ -29,6 +29,17 @@ namespace moho
      * previously-recovered body here (an eager `RegisterConstructFunction()`
      * call, plus a hand-rolled self-link that bypassed the real
      * `SerHelperBase` base ctor entirely) did not match this evidence.
+     *
+     * `mDeleteCallback` is bound to `&DeleteConstructedCAiBrain`
+     * (CAiBrainConstruct.cpp) -- the typed specialization of the shared
+     * generic `delete_func_t` thunk the binary literally stores at this
+     * field (`&sub_581890`, instruction 0x00BCB409); see
+     * `DeleteConstructedCAiBrain`'s own doc comment for the full vtable-slot
+     * equivalence proof. The binary also contains two byte-verified
+     * DUPLICATE, UNREACHABLE emissions of this entire constructor
+     * (0x00579C60, 0x0057E3B0) -- see the `gCAiBrainConstructStartupHelper`
+     * global's doc comment in the .cpp for the evidence; neither needs a
+     * separate recovery.
      */
     CAiBrainConstruct();
 

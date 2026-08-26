@@ -66518,37 +66518,30 @@ namespace moho::runtime
     return static_cast<BOOL>(leftValue != rightValue);
   }
 
-  /**
-   * Address: 0x007AE630 (FUN_007AE630)
-   *
-   * What it does:
-   * Reads one owned runtime pointer from lane `+0x00` and dispatches the
-   * pointed object's vtable slot `+0x04` with delete flag `1` when populated.
-   */
-  [[maybe_unused]] void ReleaseOwnedRuntimePointerSlotWithDeleteFlag(
-    void* const ownerRuntime
-  ) noexcept
-  {
-    struct DeleteWithFlagVTableRuntimeView
-    {
-      void* slot00 = nullptr;
-      void(__thiscall* deleteWithFlag)(void* self, int deleteFlag) = nullptr; // +0x04
-    };
-
-    struct OwnedPointerSlotRuntimeView
-    {
-      void* ownedRuntime = nullptr; // +0x00
-    };
-
-    auto* const owner = static_cast<OwnedPointerSlotRuntimeView*>(ownerRuntime);
-    void* const owned = owner->ownedRuntime;
-    if (owned == nullptr) {
-      return;
-    }
-
-    auto* const vtable = *reinterpret_cast<DeleteWithFlagVTableRuntimeView**>(owned);
-    vtable->deleteWithFlag(owned, 1);
-  }
+  // Address: 0x007AE630 (FUN_007AE630, sub_7AE630) -- compiler-emitted
+  // per-element callback for the `_eh_vector_destructor_iterator`-style
+  // walk MSVC generates over `Moho::CameraImpl::mTimeSources[2]`
+  // (`CameraTimeSourceRuntime*[2]`, CameraImpl.cpp): reads one owned
+  // runtime pointer from the array slot passed as `this` and dispatches
+  // the pointed object's own vtable slot `+0x04` (its scalar-deleting
+  // destructor) with delete flag `1`. Real xrefs: `push offset sub_7AE630`
+  // at 0x007A7A4A/0x00BB01D8 (`CameraImpl::CameraImpl`, ctor + its cold
+  // chunk) and 0x007A800D (`CameraImpl::~CameraImpl`), each immediately
+  // followed by a call into the compiler's array (con/de)structor-iterator
+  // helper (0x00A83FC5 / 0x00A83AAC) with `count=2, elementSize=4`. The
+  // recovered `CameraImpl::~CameraImpl` (0x007A7F00) already models this
+  // exact operation in typed form -- `for (auto*& source :
+  // std::span{runtime->mTimeSources, 2}) { delete source; source =
+  // nullptr; }` -- since `CameraTimeSourceRuntime` has a virtual
+  // destructor at the identical vtable slot this thunk dispatches through,
+  // `delete source` compiles to the same dispatch. No registration site
+  // needs the raw generic thunk as its own named function: recovering it
+  // behind reinterpret_cast-based `DeleteWithFlagVTableRuntimeView`/
+  // `OwnedPointerSlotRuntimeView` runtime-view structs would be exactly
+  // the raw vtable-slot magic this project's reconstruction-fidelity
+  // contract forbids, and nothing in `src/sdk/**` has a source-level call
+  // to it (RULE ONE / no-orphan-helper rule) -- so this address
+  // intentionally has no dedicated recovered function here.
 
   /**
    * Address: 0x007B3B80 (FUN_007B3B80)
