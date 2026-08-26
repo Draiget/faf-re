@@ -15,8 +15,8 @@ Progress snapshot:
 Progress DB status breakdown:
 
 - `recovered`: `52,768` (79.20%)
-- `skip`: `8,115` (12.18%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,742` (8.62%) — proven third-party/import-boundary code
+- `skip`: `8,117` (12.18%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,740` (8.62%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `0` (0.00%)
