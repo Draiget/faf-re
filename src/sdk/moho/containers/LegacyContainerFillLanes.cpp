@@ -14590,41 +14590,19 @@ namespace
     return static_cast<std::int32_t>(byteDelta / 20);
   }
 
-  struct Stride20OwnedPointerTripletRuntimeView
-  {
-    std::byte lane00_07[0x08]{};   // +0x00
-    void* ownedPointer = nullptr;  // +0x08
-    std::uint32_t lane0C = 0u;     // +0x0C
-    std::uint32_t lane10 = 0u;     // +0x10
-  };
-  static_assert(
-    offsetof(Stride20OwnedPointerTripletRuntimeView, ownedPointer) == 0x08,
-    "Stride20OwnedPointerTripletRuntimeView::ownedPointer offset must be 0x08"
-  );
-  static_assert(sizeof(Stride20OwnedPointerTripletRuntimeView) == 0x14, "Stride20OwnedPointerTripletRuntimeView size must be 0x14");
-
-  /**
-   * Address: 0x00798D10 (FUN_00798D10, sub_798D10)
-   *
-   * What it does:
-   * Walks one half-open stride-20 range and scalar-deletes each optional owned
-   * pointer lane at `+0x08`, then clears trailing dword lanes `+0x0C/+0x10`.
-   */
-  void DestroyOwnedPointerTripletsInStride20Range(
-    Stride20OwnedPointerTripletRuntimeView* begin,
-    Stride20OwnedPointerTripletRuntimeView* const end
-  ) noexcept
-  {
-    while (begin != end) {
-      if (begin->ownedPointer != nullptr) {
-        ::operator delete(begin->ownedPointer);
-      }
-      begin->ownedPointer = nullptr;
-      begin->lane0C = 0u;
-      begin->lane10 = 0u;
-      ++begin;
-    }
-  }
+  // NOTE (Stride20OwnedPointerTripletRuntimeView migration): this file used
+  // to reach into `moho::SHistogramColumn` (UiRuntimeTypes.h) via a local
+  // `Stride20OwnedPointerTripletRuntimeView` (anonymous 8-byte prefix, owned
+  // pointer at +0x08, two trailing dword lanes at +0x0C/+0x10) -- a RULE ONE
+  // offset-struct reach-in over a real, already-named element type.
+  // `DestroyOwnedPointerTripletsInStride20Range` (FUN_00798D10) is
+  // `moho::ReleaseHistogramColumnValueBuffers` (UiRuntimeTypes.cpp): 7 real
+  // callers confirmed via `call_edges` (`Moho::CMauiHistogram::~CMauiHistogram`,
+  // 0x00797840, already recovered and now wired to it by name; six more
+  // `CMauiHistogram` column-storage methods -- 0x00798150/360/400/490/
+  // 7984B0/AD0 -- not yet individually recovered). See
+  // `ReleaseHistogramColumnValueBuffers`'s Doxygen block for the full
+  // caller/evidence roster.
 
   /**
    * Address: 0x00798870 (FUN_00798870)
