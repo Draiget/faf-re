@@ -7570,16 +7570,6 @@ namespace
 	};
 
 	/**
-	 * Publishes the recovered `flib` file-method table so the registration lane
-	 * stays addressable from this TU, mirroring how the binary's `liolib`
-	 * open path hands the array to `luaL_openlib`.
-	 */
-	[[nodiscard]] const luaL_reg* ResolveLuaFileMethodRegistrations() noexcept
-	{
-		return kLuaFileMethods;
-	}
-
-	/**
 	 * The `iolib` registration table, head at 0x00D45C20.
 	 *
 	 * Order is the binary's. `dir` is this engine's own addition - stock Lua
@@ -19690,8 +19680,20 @@ std::uint32_t ReadAuxiliaryRuntimeWord(const AuxiliaryWordRuntimeView* const vie
  * What it does:
  * Returns inline string storage for short payloads and heap storage for long
  * payloads.
+ *
+ * Orphan: zero callers anywhere (callgraph index and repo-wide search).
+ * `InlineOrHeapStringView` (12-byte opaque prefix + a 16-byte inline/heap
+ * union + a 4-byte capacity/flags lane + a 4-byte length, 0x24 total) is
+ * shaped like some type's *embedded* `msvc8::string` (`msvc8::string`
+ * itself is a 28-byte `{_Bx[16], _Mysize, _Myres}` layout per
+ * legacy/containers/String.h) preceded by a 12-byte prefix, and the
+ * `mLength < 0x10u` check this function open-codes is exactly
+ * `msvc8::string::raw_data_unsafe()`'s SSO dispatch. No caller or owning
+ * struct has been identified with enough confidence to redirect this to a
+ * `raw_data_unsafe()` call, so it is left documented rather than rewired on
+ * a guess.
  */
-const char* ResolveInlineOrHeapStringData(const InlineOrHeapStringView* const view)
+[[maybe_unused]] const char* ResolveInlineOrHeapStringData(const InlineOrHeapStringView* const view)
 {
 	if (view->mLength < 0x10u) {
 		return view->mStorage.mInlineData;
