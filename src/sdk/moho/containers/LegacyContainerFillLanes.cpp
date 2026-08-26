@@ -3251,110 +3251,48 @@ namespace
     return left;
   }
 
-  /**
-   * Address: 0x0057F860 (FUN_0057F860)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneB(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x006522F0 (FUN_006522F0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneF(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x00701FA0 (FUN_00701FA0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneJ(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x007DA1D0 (FUN_007DA1D0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneN(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x0084EAD0 (FUN_0084EAD0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneQ(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x008558E0 (FUN_008558E0)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneR(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
-
-  /**
-   * Address: 0x00869C80 (FUN_00869C80)
-   *
-   * What it does:
-   * Alias lane of counted repeated-dword fill behavior.
-   */
-  std::uint32_t* FillDwordSpanCountedLaneS(
-    const std::uint32_t* valueSlot,
-    std::uint32_t* destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return FillDwordSpanByCount(valueSlot, destination, count);
-  }
+  // NOTE (FillDwordSpanCountedLane B/F/J/N/Q/R/S migration -- resolved):
+  // Addresses 0x0057F860 (FUN_0057F860, lane B), 0x006522F0 (FUN_006522F0,
+  // lane F), 0x00701FA0 (FUN_00701FA0, lane J), 0x007DA1D0 (FUN_007DA1D0,
+  // lane N), 0x0084EAD0 (FUN_0084EAD0, lane Q), 0x008558E0 (FUN_008558E0,
+  // lane R), and 0x00869C80 (FUN_00869C80, lane S) used to be seven
+  // identical thin wrappers here, each forwarding to the shared
+  // `FillDwordSpanByCount` -- byte-identical to `msvc8::vector<T>::
+  // uninit_fill_n`'s own body for any 4-byte trivially-copyable `T`, hence
+  // the ICF-style address multiplicity (30 total addresses share this exact
+  // machine code; see `Vector.h`'s `uninit_fill_n` Doxygen block). A
+  // full-population caller scan (`_callgraph_index.sqlite` `call_edges`)
+  // identified each lane's real `insert(pos,value)`/`insert(pos,count,
+  // value)` grow-path caller and, from there, the concrete engine `T` and
+  // real `push_back`/`insert` call site:
+  //   - B = `msvc8::vector<Moho::Unit*>`, via `Sim::TransferUnit`'s
+  //     `storedCargo.push_back(storedUnit)` / `moho::FindAvailableFactory`'s
+  //     `stdCandidates.push_back(unit)`.
+  //   - F = `msvc8::vector<const RDebugOverlayClass*>`, via
+  //     `CollectPrefixDebugOverlayTypes`'s
+  //     `PushBackDebugOverlayClassPtrVector(outMatches, overlayClass)`.
+  //   - J = `msvc8::vector<T>` for any 4-byte `T` reached through
+  //     `_Insert_n`'s general slow path -- cited inline on
+  //     `detail::LegacyVectorDwordInsertN` in Vector.cpp/.h instead (its
+  //     `// Inline equivalent of FillDwordSpanCountedLaneJ` comment), since
+  //     that helper already models the same fill step generically rather
+  //     than as a template-member citation.
+  //   - N = `msvc8::vector<MeshInstance*>`, via `Moho::MeshRenderer::Batch`'s
+  //     `bucket->push_back(instance)` (Mesh.cpp).
+  //   - Q = `msvc8::vector<wxWindowBase*>`, via `moho::
+  //     SuspendInputWindowEventHandlersAndFlushQueue`'s per-window
+  //     `suspended[index].push_back(inputWindow->PopEventHandler(false))`
+  //     (UiRuntimeTypes.cpp).
+  //   - R = `msvc8::vector<std::uint32_t>`, via `AppendDwordLaneRuntime`
+  //     (SimRecoveryRuntime.cpp) appending one reflection-runtime dword lane.
+  //   - S = `msvc8::vector<Moho::IWldTeardownCallback*>`, via
+  //     `WLD_AddOnTeardownCallback`'s `callbacks->push_back(callback)`
+  //     (CWldSession.cpp).
+  // All seven addresses are now cited directly on `msvc8::vector<T>::
+  // uninit_fill_n` in `Vector.h` per RULE ONE; the per-lane wrapper bodies
+  // are removed. `FillDwordSpanByCount` stays alive below for lane `X`
+  // (0x008B2FD0), the one lettered lane whose real engine call site is not
+  // yet identifiable by name -- see that lane's own citation for why.
 
   /**
    * Address: 0x008B2FD0 (FUN_008B2FD0)
