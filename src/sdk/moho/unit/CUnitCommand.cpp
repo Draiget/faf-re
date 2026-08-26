@@ -1054,6 +1054,11 @@ namespace
 
   /**
    * Address: 0x006E9650 (FUN_006E9650)
+   * Address: 0x0089E550 (FUN_0089E550, ICF twin -- identical function_sha256.
+   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
+   *          as `AssignIntrusiveRefCountedWord` over inlined refcount
+   *          arithmetic instead of typed ReleaseReference()/AddReference()
+   *          calls; that duplicate has been deleted.)
    *
    * What it does:
    * Rebinds one intrusive counted formation pointer slot, releasing previous

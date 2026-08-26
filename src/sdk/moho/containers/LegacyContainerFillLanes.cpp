@@ -1349,19 +1349,13 @@ namespace
     return outValue;
   }
 
-  [[nodiscard]] std::uint32_t* FillWordPairRangeWithConstant(
-    std::uint32_t* begin,
-    std::uint32_t* end,
-    const std::uint32_t* const sourcePair
-  ) noexcept
-  {
-    while (begin != end) {
-      begin[0] = sourcePair[0];
-      begin[1] = sourcePair[1];
-      begin += 2;
-    }
-    return begin;
-  }
+  // NOTE (FillWordPairRangeWithConstant removal): this file-local helper
+  // had no address of its own -- it only ever backed
+  // FillWordPairRangeWithConstant760020 (0x00760020, folded onto
+  // gpg::core::legacy::Fill8ByteLaneRangeFromSingleAndReturnEnd above) and
+  // FillWordPairRangeWithConstantBatchSigma (0x008D9230, folded onto
+  // FillDwordPairRangeLaneB above). With both callers gone, this had zero
+  // remaining callers and has been deleted rather than kept as an orphan.
 
   /**
    * Address: 0x007517D0 (FUN_007517D0)
@@ -1692,9 +1686,10 @@ namespace
   // (already carrying 3 real ICF twins). This file's own two-word framing
   // is the same shape (a two-word element is an 8-byte element); folded
   // there rather than kept as a fourth local duplicate. This file's
-  // `FillWordPairRangeWithConstant` local helper stays: it still backs a
-  // second call site (`FillWordPairRangeWithConstantBatchSigma`,
-  // FUN_008D9230) elsewhere in this file.
+  // `FillWordPairRangeWithConstant` local helper had one other call site
+  // (`FillWordPairRangeWithConstantBatchSigma`, FUN_008D9230) -- also
+  // resolved in this same pass (folded onto `FillDwordPairRangeLaneB`
+  // below) -- so the helper itself has since been deleted too.
 
   /**
    * Address: 0x00760470 (FUN_00760470)
@@ -15011,20 +15006,12 @@ namespace
     return outValue;
   }
 
-  /**
-   * Address: 0x0089E550 (FUN_0089E550)
-   *
-   * What it does:
-   * Rebinds one intrusive refcounted-object word and applies release/retain
-   * semantics (`--refCount` then virtual slot-0 delete with flag `1` on zero).
-   */
-  std::uint32_t* AssignIntrusiveRefCountedWord(
-    std::uint32_t* const destinationWord,
-    const std::uint32_t incomingWord
-  ) noexcept
-  {
-    return AssignIntrusiveRefCountedObjectWord(destinationWord, incomingWord);
-  }
+  // NOTE (AssignIntrusiveRefCountedWord removal -- fully resolved):
+  // Address: 0x0089E550 (FUN_0089E550) is function_sha256-identical to
+  // `Moho::AssignFormationInstanceRef` (FUN_006E9650, CUnitCommand.cpp),
+  // which already expresses the same release-then-retain rebind through
+  // typed `ReleaseReference()`/`AddReference()` calls instead of inlined
+  // refcount arithmetic. Folded there rather than kept as a duplicate.
 
   /**
    * Address: 0x0089E580 (FUN_0089E580)
@@ -23607,20 +23594,16 @@ namespace
     return CopyWordIfDestinationPresent(outValue, sourceWord);
   }
 
-  /**
-   * Address: 0x008D9230 (FUN_008D9230)
-   *
-   * What it does:
-   * Fills one `[begin,end)` range of dword pairs from one source pair lane.
-   */
-  std::uint32_t* FillWordPairRangeWithConstantBatchSigma(
-    std::uint32_t* const begin,
-    std::uint32_t* const end,
-    const std::uint32_t* const sourcePair
-  ) noexcept
-  {
-    return FillWordPairRangeWithConstant(begin, end, sourcePair);
-  }
+  // NOTE (FillWordPairRangeWithConstantBatchSigma removal -- fully
+  // resolved): Address: 0x008D9230 (FUN_008D9230) is function_sha256-
+  // identical to `FillDwordPairRangeLaneB` (FUN_008D9D10,
+  // moho/containers/LegacyContainerFillLanesB.cpp -- a real, callered
+  // address, confirmed via the callgraph index), a sibling wrapper over
+  // that file's own `FillDwordPairRangeByEnd` local helper. Folded there
+  // rather than kept as a third copy of the same dword-pair fill shape.
+  // This file's `FillWordPairRangeWithConstant` local helper (this
+  // function's only other caller besides FillWordPairRangeWithConstant760020,
+  // also resolved above) has since been deleted too: zero remaining callers.
 
   struct WordLanesAt0CAnd14RuntimeView
   {
