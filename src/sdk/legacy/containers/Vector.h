@@ -2882,6 +2882,25 @@ namespace msvc8
          * already names as "the single-append adapter FUN_005C86B0" reached
          * "from resize (FUN_005C5460)" -- this is its other reach, from
          * `push_back`'s capacity-exhausted branch.
+         * Address: 0x007182A0 (FUN_007182A0, msvc8::vector<Moho::SThreat>::
+         * push_back for the 0x38-byte element, `CInfluenceMap.h`'s
+         * `threats` member). Same two-way split: `size()<capacity()` fast
+         * path constructs at `_Mylast` through `func_VectorCpy_SThreat`
+         * (`FUN_0071E760`, already recovered as `CopySThreatValueRange`,
+         * `CInfluenceMap.h:111`, `n=1`) then advances `_Mylast` by 0x38 in
+         * place (`.c`-confirmed: `func_VectorCpy_SThreat(finish,1,entry);
+         * v2->_Mylast=finish+1;`); the capacity-exhausted path tail-calls
+         * the single-element `insert(end(), value)` wrapper `FUN_007198E0`
+         * (cited on `insert` below) with `pos=v2->_Mylast`. Confirmed
+         * `.c`-exact match against this member's own `if
+         * (size()<capacity()) { construct-in-place } else { insert(end(),
+         * value); }` shape. DB-integrity fix: was mis-tagged
+         * `external_dependency` ("STL template instantiation / codec
+         * helper - external") with no citation anywhere in `src/sdk` --
+         * `Moho::SThreat` is an engine type (`CInfluenceMap.h`) and this
+         * caller, `Moho::CInfluenceMap`'s threat-accumulation path
+         * (`FUN_00716140`, `CInfluenceMap.cpp`, already `recovered`), is
+         * real engine code, not third-party library code.
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -4136,6 +4155,26 @@ namespace msvc8
          * anywhere in `src/sdk` before this pass, and this shape is a
          * distinct, real, uncollapsed emission, not something any other
          * recovered function already models).
+         *
+         * Address: 0x007198E0 (FUN_007198E0, msvc8::vector<Moho::SThreat>::
+         * insert(pos,value) for the 0x38-byte element) -- same
+         * "capture offset up front, tail-call the count=1 core, rebuild the
+         * iterator from the offset afterwards" shape: `.c`-confirmed
+         * `v6 = a3 - v5` (offset, guarded by `v5 && (_Mylast-_Myfirst)/56`
+         * mirroring `size()==0`) computed before the call, tail-calls the
+         * count=1 `_Insert_n` core `FUN_0071AF90` (`msvc8::vector<
+         * moho::SThreat>::_Insert_n`, cited above on `resize`/`insert(pos,
+         * count,value)`), then rebuilds `*a2 = _Myfirst + 56*v6` from the
+         * post-reallocation `_Myfirst`. Direct caller (`.c`-confirmed,
+         * `sub_7198E0((int)v2,a2,&v6,v2->_Mylast,entry)`):
+         * `msvc8::vector<Moho::SThreat>::push_back` (`FUN_007182A0`, cited
+         * above) on its capacity-exhausted path, matching this member's own
+         * `else { insert(last_, value); }` branch exactly. That push_back is
+         * reached from `Moho::CInfluenceMap`'s threat-accumulation path
+         * (`FUN_00716140`, `CInfluenceMap.cpp`, already `recovered`) and
+         * from `FUN_0071A6F0` (also `recovered`). DB-integrity fix: was
+         * `blocked` with no citation anywhere in `src/sdk`; `Moho::SThreat`
+         * is an engine type, not third-party library code.
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
