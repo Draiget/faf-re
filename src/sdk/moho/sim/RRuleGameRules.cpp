@@ -360,22 +360,6 @@ namespace moho
       return outValue;
     }
 
-    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingBeginLane(
-      RRuleGameRulesLuaExportBinding** const outBinding,
-      const RRuleGameRulesLuaExportBindingArray* const bindingArray
-    ) noexcept
-    {
-      return StoreAdapterLane(outBinding, bindingArray->mBegin);
-    }
-
-    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingEndLane(
-      RRuleGameRulesLuaExportBinding** const outBinding,
-      const RRuleGameRulesLuaExportBindingArray* const bindingArray
-    ) noexcept
-    {
-      return StoreAdapterLane(outBinding, bindingArray->mEnd);
-    }
-
     [[nodiscard]] void** StoreOpaquePointerLane(void** const outValue, void* const value) noexcept
     {
       return StoreAdapterLane(outValue, value);
@@ -390,35 +374,6 @@ namespace moho
     [[nodiscard]] void** StoreOpaquePointerLaneA(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052BE20 (FUN_0052BE20)
-     *
-     * What it does:
-     * Stores one Lua-export binding-array begin lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingBeginLaneAdapter(
-      RRuleGameRulesLuaExportBinding** const outBinding,
-      const RRuleGameRulesLuaExportBindingArray* const bindingArray
-    ) noexcept
-    {
-      return StoreLuaExportBindingBeginLane(outBinding, bindingArray);
-    }
-
-    /**
-     * Address: 0x0052BE30 (FUN_0052BE30)
-     *
-     * What it does:
-     * Stores one Lua-export binding-array end lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingEndLaneAdapter(
-      RRuleGameRulesLuaExportBinding** const outBinding,
-      const RRuleGameRulesLuaExportBindingArray* const bindingArray
-    ) noexcept
-    {
-      return StoreLuaExportBindingEndLane(outBinding, bindingArray);
     }
 
     /**
@@ -479,32 +434,6 @@ namespace moho
       anchor->next = node;
       node->next->prev = node;
       return node;
-    }
-
-    [[nodiscard]] int ComputeLuaExportBindingCapacityLane(
-      const RRuleGameRulesLuaExportBindingArray* const bindingArray
-    ) noexcept
-    {
-      const std::intptr_t beginRaw = reinterpret_cast<std::intptr_t>(bindingArray->mBegin);
-      if (beginRaw == 0) {
-        return 0;
-      }
-
-      const std::intptr_t capacityRaw = reinterpret_cast<std::intptr_t>(bindingArray->mCapacityEnd);
-      const std::intptr_t elementSize = static_cast<std::intptr_t>(sizeof(RRuleGameRulesLuaExportBinding));
-      return static_cast<int>((capacityRaw - beginRaw) / elementSize);
-    }
-
-    /**
-     * Address: 0x0052CFB0 (FUN_0052CFB0)
-     *
-     * What it does:
-     * Returns one Lua-export binding-array capacity count lane measured in
-     * 16-byte binding elements.
-     */
-    int GetLuaExportBindingCapacityLane(const RRuleGameRulesLuaExportBindingArray* const bindingArray)
-    {
-      return ComputeLuaExportBindingCapacityLane(bindingArray);
     }
 
     /**
@@ -737,31 +666,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0052D590 (FUN_0052D590)
-     *
-     * What it does:
-     * Releases one Lua-export binding array allocation and zeros its
-     * begin/end/capacity pointer lanes.
-     *
-     * Uses `delete[]`, not a raw `operator delete`: each element owns a
-     * `msvc8::set<uint32_t>` (`mPendingBlueprintOrdinals`) with a real
-     * destructor now that the embedded field is correctly modeled (see the
-     * `RRuleGameRulesLuaExportBinding` layout note in RRuleGameRules.h), and
-     * the array was allocated with `new RRuleGameRulesLuaExportBinding[N]{}`
-     * in `ReserveExportBindingCapacity` -- the two must pair or every
-     * live binding's header node leaks.
-     */
-    void ReleaseLuaExportBindingArray(
-      RRuleGameRulesLuaExportBindingArray* const storage
-    ) noexcept
-    {
-      delete[] storage->mBegin;
-      storage->mBegin = nullptr;
-      storage->mEnd = nullptr;
-      storage->mCapacityEnd = nullptr;
-    }
-
-    /**
      * Address: 0x0052DBA0 (FUN_0052DBA0)
      *
      * What it does:
@@ -772,46 +676,55 @@ namespace moho
       ::operator delete(storage);
     }
 
+    /**
+     * Returns the live export-binding count. Trivial forwarding wrapper kept
+     * as a named helper (rather than inlining `.size()` at each call site)
+     * because `AddOrGetExportBinding` and `ReserveExportBindingCapacity`
+     * both already spelled it out this way before the `mMaps` migration --
+     * no address of its own; the binary computes this inline at each of its
+     * own call sites rather than as a separate out-of-line symbol.
+     */
     [[nodiscard]] std::size_t ExportBindingCount(const RRuleGameRulesImpl& rules) noexcept
     {
-      if (!rules.mMaps.mBegin || !rules.mMaps.mEnd || rules.mMaps.mEnd < rules.mMaps.mBegin) {
-        return 0u;
-      }
-      return static_cast<std::size_t>(rules.mMaps.mEnd - rules.mMaps.mBegin);
+      return rules.mMaps.size();
     }
 
+    /**
+     * Grows `mMaps` to at least `requestedCapacity` live-binding slots.
+     *
+     * No address of its own (the binary inlines this as part of
+     * `ExportToLuaState`'s own capacity check ahead of its `insert` call,
+     * cited in full on `legacy/containers/Vector.h`'s `insert(pos, count,
+     * value)` member as `FUN_0052DBE0`). Delegates entirely to
+     * `msvc8::vector<T>::reserve()`, which is the fix for a genuine
+     * behavioral divergence the previous hand-rolled body had: it allocated
+     * via `new RRuleGameRulesLuaExportBinding[requestedCapacity]{}`
+     * (default-constructing every slot up to the full new capacity, not
+     * just the live prefix) and *assigned* the live elements into those
+     * already-live slots, whereas the real binary's growth path -- and this
+     * member's own `reserve()`/`reallocate_to()` -- allocates raw,
+     * unconstructed memory and only *constructs* exactly the live prefix
+     * into it (see the divergence note on `RRuleGameRulesImpl::mMaps`,
+     * RRuleGameRules.h, for the full evidence trail: `FUN_0052D590`'s and
+     * `FUN_00536DF0`'s raw disassembly both show a scalar `operator
+     * delete`, never `delete[]`, which only pairs with a real vector's
+     * raw-allocate/exact-construct shape).
+     */
     void ReserveExportBindingCapacity(RRuleGameRulesImpl& rules, const std::size_t requestedCapacity)
     {
-      const std::size_t currentCount = ExportBindingCount(rules);
-      const std::size_t currentCapacity = (rules.mMaps.mBegin && rules.mMaps.mCapacityEnd)
-        ? static_cast<std::size_t>(rules.mMaps.mCapacityEnd - rules.mMaps.mBegin)
-        : 0u;
-      if (currentCapacity >= requestedCapacity) {
-        return;
-      }
-
-      RRuleGameRulesLuaExportBinding* const oldBegin = rules.mMaps.mBegin;
-      auto* const newBegin = new RRuleGameRulesLuaExportBinding[requestedCapacity]{};
-      for (std::size_t i = 0; i < currentCount; ++i) {
-        newBegin[i] = oldBegin[i];
-      }
-
-      delete[] oldBegin;
-      rules.mMaps.mBegin = newBegin;
-      rules.mMaps.mEnd = newBegin + currentCount;
-      rules.mMaps.mCapacityEnd = newBegin + requestedCapacity;
+      rules.mMaps.reserve(requestedCapacity);
     }
 
     [[nodiscard]] RRuleGameRulesLuaExportBinding*
     FindExportBinding(RRuleGameRulesImpl& rules, LuaPlus::LuaState* const rootState) noexcept
     {
-      if (!rootState || !rules.mMaps.mBegin || !rules.mMaps.mEnd) {
+      if (!rootState) {
         return nullptr;
       }
 
-      for (auto* it = rules.mMaps.mBegin; it != rules.mMaps.mEnd; ++it) {
-        if (it->mRootState == rootState) {
-          return it;
+      for (auto& binding : rules.mMaps) {
+        if (binding.mRootState == rootState) {
+          return &binding;
         }
       }
       return nullptr;
@@ -823,6 +736,19 @@ namespace moho
       return FindExportBinding(const_cast<RRuleGameRulesImpl&>(rules), rootState);
     }
 
+    /**
+     * Address: 0x0052DBE0 (FUN_0052DBE0, `msvc8::vector<
+     * RRuleGameRulesLuaExportBinding>::insert(pos, count, value)`, cited in
+     * full on that member in `legacy/containers/Vector.h`) -- the "not
+     * found" path below now calls this method by name instead of hand-
+     * rolling the append (bump `mEnd`, write fields, `.clear()` the
+     * already-live default-constructed set). That hand-rolled shape only
+     * worked because the previous `RRuleGameRulesLuaExportBindingArray`
+     * model over-constructed its spare capacity; `insert(end(), 1, value)`
+     * is the real API and the real binary's own call, confirmed reachable
+     * from `RRuleGameRulesImpl::ExportToLuaState` (`FUN_00529F70`) at `call
+     * sub_52DBE0`, 0x0052A31D.
+     */
     [[nodiscard]] RRuleGameRulesLuaExportBinding*
     AddOrGetExportBinding(RRuleGameRulesImpl& rules, LuaPlus::LuaState* const rootState)
     {
@@ -834,107 +760,42 @@ namespace moho
         return existing;
       }
 
-      const std::size_t count = ExportBindingCount(rules);
-      const std::size_t capacity = (rules.mMaps.mBegin && rules.mMaps.mCapacityEnd)
-        ? static_cast<std::size_t>(rules.mMaps.mCapacityEnd - rules.mMaps.mBegin)
-        : 0u;
-      if (count >= capacity) {
-        ReserveExportBindingCapacity(rules, capacity > 0u ? (capacity * 2u) : 4u);
-      }
+      RRuleGameRulesLuaExportBinding freshBinding{};
+      freshBinding.mRootState = rootState;
+      // `mPendingBlueprintOrdinals` is already a freshly default-constructed
+      // empty `msvc8::set<uint32_t>` via `RRuleGameRulesLuaExportBinding{}`'s
+      // member init -- no separate `.clear()` needed.
 
-      if (!rules.mMaps.mBegin || !rules.mMaps.mEnd) {
-        return nullptr;
-      }
-
-      RRuleGameRulesLuaExportBinding* const slot = rules.mMaps.mEnd++;
-      slot->mRootState = rootState;
-      // The slot is already a live, default-constructed
-      // `RRuleGameRulesLuaExportBinding` (the array was allocated with
-      // `new RRuleGameRulesLuaExportBinding[N]{}` in
-      // `ReserveExportBindingCapacity`) -- `clear()` is a no-op on a fresh
-      // slot and correctly empties one left over from `EraseExportBinding`
-      // compaction either way, so no separate sentinel/header construction
-      // is needed here.
-      slot->mPendingBlueprintOrdinals.clear();
-      return slot;
+      // `insert`'s own internal `cur+count <= capacity()` check subsumes the
+      // old hand-rolled "count >= capacity, so reserve" guard; growth (when
+      // needed) goes through `recommended_capacity()`'s real 1.5x policy
+      // instead of the previous hand-rolled `capacity*2` guess.
+      return rules.mMaps.insert(rules.mMaps.end(), 1, freshBinding);
     }
 
     /**
-     * Address: 0x0052A390 (FUN_0052A390)
-     *
-     * IDA signature:
-     * int __usercall sub_52A390@<eax>(int binding@<eax>);
-     *
-     * What it does:
-     * Runs the in-place dtor lane for one `RRuleGameRulesLuaExportBinding`
-     * entry's pending-blueprint-ordinal set: erases every node
-     * (`FUN_0052D9C0` = `msvc8::detail::rb_tree<...>::erase_range`, not a
-     * list erase -- see the `RRuleGameRulesLuaExportBinding` layout note in
-     * RRuleGameRules.h for why the earlier "Lua task list" reading of this
-     * memory was wrong), releases the header node with `operator delete`,
-     * then nulls/zeroes the header/size lanes -- exactly
-     * `msvc8::detail::rb_tree<...>::~rb_tree()` (RbTree.h). Reconstructing a
-     * fresh empty set immediately after keeps the slot a valid C++ object
-     * until the array itself is freed or the slot is reused (which
-     * `AddOrGetExportBinding` re-clears regardless).
-     *
-     * The binary references this function both from
-     * `RRuleGameRulesImpl::ExportToLuaState`'s SEH unwind table (rolling
-     * back a partially-constructed local binding on `new`/OOM -- the
-     * compiler's own unwind cleanup for that stack-local RAII object, which
-     * the modernized `ExportToLuaState` gets for free from real object
-     * lifetime and therefore has no equivalent call for) and from the
-     * vector-erase compaction lane mirrored by `EraseExportBinding` below,
-     * where a live binding is being dropped.
-     */
-    void ReleaseExportBindingPendingOrdinals(RRuleGameRulesLuaExportBinding& binding) noexcept
-    {
-      binding.mPendingBlueprintOrdinals.~set();
-      ::new (static_cast<void*>(&binding.mPendingBlueprintOrdinals)) msvc8::set<std::uint32_t>();
-    }
-
-    /**
-     * Address: 0x0052BEE0 (FUN_0052BEE0, the per-slot shift-assign step of
-     * this method's loop -- `sub_536DA0`/`sub_536DF0` are two calls into the
-     * shared `erase_range` (FUN_0052D9C0, RbTree.h) tearing down the
-     * destination slot's old `mPendingBlueprintOrdinals` tree before the
-     * source slot's tree is deep-cloned in over it, matching
-     * `RRuleGameRulesLuaExportBinding::operator=`'s divergence class already
-     * documented on `FUN_00537420` in Vector.h. `*(a2+8) -= 16` decrements
-     * the owning vector's `end` by one 16-byte element after the shift
-     * loop completes. The loop below already reproduces this exactly via
-     * `*it = *(it + 1)`, which resolves to this same compiled operator=.)
-     * Address: 0x00536DA0 (FUN_00536DA0, sub_536DA0) -- the
-     * `RRuleGameRulesLuaExportBinding::operator=` emission itself,
-     * called from `FUN_0052BEE0` above. Per destination slot: raw-copies
-     * `mRootState` (offset +0x00), then -- matching `FUN_00537420`'s
-     * documented shape in Vector.h exactly -- erases the destination's
-     * live `mPendingBlueprintOrdinals` tree via `sub_52D9C0` (the shared
-     * `erase_range`, RbTree.h) and deep-clones the source tree in via
-     * `sub_530EE0` (`copy_from`, RbTree.h), guarded by `if (this !=
-     * &other)`. Sibling emission of `FUN_00537420` -- same compiled
-     * operator=, different register allocation from being inlined at a
-     * different call site (`insert`'s tail-shift there, this loop's
-     * forward shift here) -- so `/OPT:ICF` left them as separate symbols.
-     * Two real callers: `FUN_0052BEE0` above and `FUN_005333B0`
-     * (unrecovered, out of scope here).
+     * Address: 0x0052BEE0 (FUN_0052BEE0) + 0x00536DA0 (FUN_00536DA0) --
+     * `msvc8::vector<RRuleGameRulesLuaExportBinding>::erase(iterator)`'s
+     * real emission for this element type, cited in full on that method in
+     * `legacy/containers/Vector.h`. The binary keeps this method's shift
+     * LOOP inlined directly into `RRuleGameRulesImpl::CancelExport`
+     * (`FUN_0052AA20`) rather than as a separate out-of-line `erase`
+     * symbol -- `FUN_0052BEE0` is the per-slot shift-assign step that loop
+     * calls, not the whole method -- but the source-level operation
+     * `CancelExport` performs is unambiguously "erase this one binding",
+     * which this method already models exactly (shift the tail down via
+     * `RRuleGameRulesLuaExportBinding`'s implicit `operator=`, decrement
+     * `last_`, destroy the vacated slot via its implicit destructor -- see
+     * the address citations on that struct's declaration in
+     * RRuleGameRules.h).
      */
     void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
     {
-      if (!binding || !rules.mMaps.mBegin || !rules.mMaps.mEnd) {
+      if (!binding) {
         return;
       }
 
-      for (auto* it = binding; (it + 1) < rules.mMaps.mEnd; ++it) {
-        *it = *(it + 1);
-      }
-
-      // The slot vacated at `mEnd - 1` is no longer reachable through
-      // [mBegin, mEnd) after the shift; release its pending-ordinal set's
-      // header node now rather than leaving it allocated until the whole
-      // array is eventually freed.
-      ReleaseExportBindingPendingOrdinals(*(rules.mMaps.mEnd - 1));
-      --rules.mMaps.mEnd;
+      rules.mMaps.erase(binding);
     }
 
     [[nodiscard]] LuaReloadRequestNode* ReloadQueueSentinel(RRuleGameRulesImpl& rules) noexcept
@@ -1349,10 +1210,10 @@ namespace moho
 
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
 
-    mMaps.mProxy = nullptr;
-    mMaps.mBegin = nullptr;
-    mMaps.mEnd = nullptr;
-    mMaps.mCapacityEnd = nullptr;
+    // `mMaps{}` in the member-init list above already default-constructs a
+    // real, empty `msvc8::vector<RRuleGameRulesLuaExportBinding>` (null
+    // proxy/first_/last_/end_) -- no separate field-by-field reset needed
+    // now that it is a real vector rather than a hand-rolled pointer quad.
 
     mFootprints.mAllocProxy = nullptr;
     mFootprints.mHead = AllocateFootprintSentinelNode();
@@ -1500,18 +1361,18 @@ namespace moho
     DestroyBlueprintObjectsFromMap(mEmitterBlueprints);
     DestroyBlueprintObjectsFromMap(mTrailBlueprints);
 
-    // `delete[]` now runs each element's real destructor -- including
-    // `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`'s
-    // (`msvc8::set<uint32_t>::~set`, matching `FUN_0052A390`'s
-    // erase-range-then-delete-header shape) -- so no manual per-binding
-    // teardown loop is needed here anymore; the array was allocated with
-    // `new RRuleGameRulesLuaExportBinding[N]{}` (see
-    // `ReserveExportBindingCapacity`), which pairs with `delete[]`.
-    delete[] mMaps.mBegin;
-    mMaps.mBegin = nullptr;
-    mMaps.mEnd = nullptr;
-    mMaps.mCapacityEnd = nullptr;
-
+    // No manual teardown here: `mMaps` (now a real `msvc8::vector<
+    // RRuleGameRulesLuaExportBinding>`) is destroyed by ordinary implicit
+    // member destruction after this body returns, exactly matching
+    // `FUN_00529700`'s own instruction sequence -- its recorded evidence
+    // ("FUN_00529700 dtor direct mMaps teardown at 0x00529A9B-0x00529ABF...
+    // call FUN_00536DF0(mBegin,mEnd), delete mBegin" -- scalar, not
+    // `delete[]`) is the per-element destroy loop (`FUN_00536DF0`,
+    // `skip`-classified as compiler-emitted glue) followed by a raw
+    // `operator delete` on the buffer, which is precisely what
+    // `msvc8::vector<T>::~vector()` (`destroy_range` + `operator delete`,
+    // `legacy/containers/Vector.h`) already does. Same pattern already used
+    // just below for the seven blueprint maps.
     EnsureReloadQueueSentinelInitialized(*this);
     LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(*this);
     LuaReloadRequestNode* node = sentinel->next;

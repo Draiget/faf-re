@@ -1854,6 +1854,22 @@ namespace msvc8
          * Address: 0x0054C170 (FUN_0054C170,
          * msvc8::vector<Moho::SAniSkelBoneNameIndex>::begin -- the out-pointer
          * form MSVC emits when the result is returned through a caller slot)
+         * Address: 0x0052BE20 (FUN_0052BE20, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::begin` for the 16-byte
+         * element, `RRuleGameRulesImpl::mMaps` -- same out-pointer form as
+         * `FUN_0054C170` above (`*outBinding = bindingArray->first_; return
+         * outBinding;`). Previously modeled in RRuleGameRules.cpp as a
+         * bespoke pair of wrapper functions
+         * (`StoreLuaExportBindingBeginLane`/`...Adapter`) reaching into a
+         * hand-rolled `RRuleGameRulesLuaExportBindingArray` struct's raw
+         * `mBegin` field -- removed once that field became a real
+         * `msvc8::vector<T>` and this member's own `begin()` covers it
+         * directly. Zero recorded callers in `_callgraph_index.sqlite`
+         * (same as several of this member's other per-instantiation
+         * emissions above); reached transitively once real code calls
+         * `mMaps.begin()`, which the migrated `FindExportBinding`/
+         * `RegisterBlueprintInCategoryMaps` (RRuleGameRules.cpp, Sim.cpp)
+         * now do by name.)
          *
          * What it does:
          * Returns the first element pointer lane (`first_`).
@@ -1867,6 +1883,13 @@ namespace msvc8
          * Address: 0x0054C180 (FUN_0054C180,
          * msvc8::vector<Moho::SAniSkelBoneNameIndex>::end -- same out-pointer
          * form as FUN_0054C170)
+         * Address: 0x0052BE30 (FUN_0052BE30, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::end` sibling of
+         * `FUN_0052BE20` above -- same out-pointer form, same removed
+         * `StoreLuaExportBindingEndLane`/`...Adapter` wrapper pair. Reached
+         * transitively once real code calls `mMaps.end()`, which
+         * `FindExportBinding`/`ExportBindingCount`/
+         * `RegisterBlueprintInCategoryMaps` now do by name.)
          *
          * What it does:
          * Returns the one-past-end pointer lane (`last_`).
@@ -1936,6 +1959,22 @@ namespace msvc8
          * ClusterSearchOpenHeapEntryRuntime>::capacity` for the sibling
          * 12-byte open-heap-entry instantiation -- same shape, reached from
          * that element's own `_Insert_n` growth check `FUN_0092F240`.)
+         * Address: 0x0052CFB0 (FUN_0052CFB0, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::capacity` for the 16-byte
+         * element, `RRuleGameRulesImpl::mMaps` -- `beginRaw == 0 ? 0 :
+         * (capacityRaw - beginRaw) / 16`, the same null-guarded
+         * `(end_-first_)/sizeof(T)` fold as `FUN_008F5D90`/`FUN_0092BCA0`
+         * above, just computed in raw byte terms via `reinterpret_cast`
+         * rather than `T*` pointer subtraction. Previously modeled in
+         * RRuleGameRules.cpp as `ComputeLuaExportBindingCapacityLane`/
+         * `GetLuaExportBindingCapacityLane`, reaching into the hand-rolled
+         * `RRuleGameRulesLuaExportBindingArray`'s raw `mBegin`/
+         * `mCapacityEnd` fields -- removed once that field became a real
+         * `msvc8::vector<T>` and this member's own `capacity()` covers it
+         * directly; reached transitively once real code calls
+         * `mMaps.capacity()`, which the migrated `AddOrGetExportBinding`
+         * (RRuleGameRules.cpp, via `reserve()`/`insert()`'s own internal
+         * capacity check) now does.)
          *
          * Returns reserved element capacity from retained `[first_, end_)` range.
          */
@@ -3041,6 +3080,28 @@ namespace msvc8
          * Address: 0x00443EA0 (FUN_00443EA0)
          * Address: 0x00444000 (FUN_00444000)
          * Address: 0x00444360 (FUN_00444360)
+         * Address: 0x0052BEE0 (FUN_0052BEE0, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::erase(iterator)`'s
+         * per-slot shift-assign step for the 16-byte element,
+         * `RRuleGameRulesImpl::mMaps` -- reached only from
+         * `RRuleGameRulesImpl::CancelExport` (`FUN_0052AA20`), which keeps
+         * this method's own shift LOOP inlined into its own body (calling
+         * `FUN_0052BEE0` once per shifted slot) rather than as a separate
+         * out-of-line `erase` symbol; `*(a2+8) -= 16` after the loop is
+         * this method's own `--last_`. Per slot the shift-assign is
+         * `RRuleGameRulesLuaExportBinding`'s implicit `operator=`
+         * (`FUN_00536DA0`, cited in full on that struct's declaration,
+         * RRuleGameRules.h), and the trailing vacated-slot teardown is
+         * `FUN_00536DF0` (the range-destroy loop `skip`-classified there,
+         * called with a one-element range) -- matching this method's own
+         * assign-then-decrement-then-destroy-last-slot shape exactly, just
+         * with the loop body and the tail-destroy step kept as separate
+         * out-of-line calls instead of being inlined together. Previously
+         * modeled as a bespoke `EraseExportBinding` free function
+         * hand-rolling the same shift loop against
+         * `RRuleGameRulesLuaExportBindingArray`'s raw fields -- removed
+         * once `mMaps` became a real `msvc8::vector<T>`; `CancelExport` now
+         * calls this method by name (`mMaps.erase(binding)`).)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -7239,6 +7300,27 @@ namespace msvc8
          * Address: 0x0082DBF0 (FUN_0082DBF0, the MapC sibling of the above --
          * byte-identical shape, reached from `FUN_0082F680` (`assign`'s
          * MapC emission, cited above) the same way.)
+         * Address: 0x0052D590 (FUN_0052D590, `msvc8::vector<
+         * Moho::RRuleGameRulesLuaExportBinding>::deallocate_all` for the
+         * 16-byte element, `RRuleGameRulesImpl::mMaps` -- byte-identical
+         * `if (*(a1+4)) operator delete(*(a1+4)); *(a1+4)=*(a1+8)=*(a1+12)=
+         * 0;` shape to `FUN_00848BD0`/`FUN_0082D8D0` above, confirming this
+         * element type's buffer is freed with a plain scalar `operator
+         * delete` and never `delete[]` -- the load-bearing evidence that
+         * the previous hand-rolled `RRuleGameRulesLuaExportBindingArray`
+         * model (`new T[N]{}` / `delete[]`, RRuleGameRules.cpp before this
+         * migration) was a genuine behavioral divergence, not just a style
+         * mismatch: `delete[]`-pairing is only correct when every slot up
+         * to capacity is a live constructed object, which this address
+         * proves the real binary never has. Zero recorded direct callers in
+         * `_callgraph_index.sqlite` (`RRuleGameRulesImpl::~RRuleGameRulesImpl`,
+         * `FUN_00529700`, instead shows its per-element destroy loop
+         * `FUN_00536DF0` followed by an inlined `operator delete` call at
+         * its own call site rather than calling out to this address) --
+         * reached transitively once real code destroys/reallocates
+         * `mMaps`, which now happens through this member's ordinary
+         * `~vector()`/`reserve()` machinery instead of the removed
+         * `ReleaseLuaExportBindingArray` free function.)
          *
          * What it does:
          * Frees retained heap storage and clears all pointer lanes.

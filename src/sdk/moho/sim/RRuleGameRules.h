@@ -278,7 +278,7 @@ namespace moho
    *     pointers with `_Isnil=1` at `[node+0x11]` -- byte-for-byte
    *     `msvc8::detail::rb_tree<...>::buy_head()` (RbTree.h).
    *   - `func_Add__blueprints` (0x00529B30) walks every existing binding
-   *     ([`mMaps.mBegin`, `mMaps.mEnd`)) and calls `func_MapInsert` /
+   *     ([`mMaps.begin()`, `mMaps.end()`)) and calls `func_MapInsert` /
    *     `FUN_0052BC60` on `binding + 4` for each newly registered
    *     blueprint's ordinal -- `FUN_0052BC60` is
    *     `msvc8::detail::rb_tree<uint32_t...>::insert_unique` byte-for-byte
@@ -307,6 +307,37 @@ namespace moho
    * 0x0052CD30 / 0x0052DAB0 / 0x0052DB00 / 0x0052DB50 that this binding's
    * set is actually built from. Corrected here; see RRuleGameRules.cpp for
    * the replacement wiring.
+   *
+   * No explicit destructor or copy-assignment operator declared -- both are
+   * compiler-emitted (RULE ONE: "member destructors... the source body says
+   * nothing; MSVC emits it") and both are confirmed real, distinct binary
+   * emissions rather than assumptions:
+   *   - Implicit destructor = `FUN_0052A390` (`_callgraph_index.sqlite`
+   *     confirms its only two real callers are `FUN_00529F70`
+   *     (`ExportToLuaState`) and `FUN_0052DBE0` (`msvc8::vector<
+   *     RRuleGameRulesLuaExportBinding>::insert`) -- both are the EH-unwind
+   *     cleanup for a local `RRuleGameRulesLuaExportBinding` temporary
+   *     (`ExportToLuaState`'s freshly-built binding value, `insert`'s own
+   *     `const T localValue(value)`) being torn down on a mid-construction
+   *     throw. `msvc8::detail::rb_tree<uint32_t>::~rb_tree()` (RbTree.h)
+   *     supplies `mPendingBlueprintOrdinals`'s half; `mRootState` is
+   *     trivially destructible.
+   *   - Implicit copy-assignment operator = `FUN_00536DA0` and
+   *     `FUN_00537420` -- two non-ICF-folded emissions of the identical
+   *     compiled body (different register allocation from being inlined at
+   *     two different call sites: `msvc8::vector<...>::erase(iterator)`'s
+   *     tail-shift loop and `insert(pos,count,value)`'s in-place tail-shift
+   *     branch, respectively), both cited in full on `legacy/containers/
+   *     Vector.h`'s `erase(iterator)` and `insert(pos,count,value)`
+   *     members. Per slot: raw-copies `mRootState`, then runs
+   *     `mPendingBlueprintOrdinals`'s own `rb_tree::operator=` (erase the
+   *     destination's live tree via `erase_range`, deep-clone the source
+   *     tree via `copy_from`), guarded by the compiler-inserted `this !=
+   *     &other` self-assignment check.
+   * Both are reached automatically once real code invokes
+   * `msvc8::vector<RRuleGameRulesLuaExportBinding>`'s own erase/insert/
+   * destructor -- no bespoke per-element free function is needed or
+   * written for either.
    */
   struct RRuleGameRulesLuaExportBinding
   {
@@ -320,21 +351,19 @@ namespace moho
     "RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals offset must be 0x04"
   );
 
-  struct RRuleGameRulesLuaExportBindingArray
-  {
-    void* mProxy;                                 // +0x00
-    RRuleGameRulesLuaExportBinding* mBegin;       // +0x04
-    RRuleGameRulesLuaExportBinding* mEnd;         // +0x08
-    RRuleGameRulesLuaExportBinding* mCapacityEnd; // +0x0C
-  };
-
-  static_assert(
-    sizeof(RRuleGameRulesLuaExportBindingArray) == 0x10, "RRuleGameRulesLuaExportBindingArray size must be 0x10"
-  );
-  static_assert(
-    offsetof(RRuleGameRulesLuaExportBindingArray, mBegin) == 0x04,
-    "RRuleGameRulesLuaExportBindingArray::mBegin offset must be 0x04"
-  );
+  // `RRuleGameRulesLuaExportBindingArray` used to duplicate `msvc8::vector<T>`'s
+  // own private layout here ({proxy, begin, end, capacityEnd}, byte-for-byte
+  // identical to Vector.h's `myProxy_@0/first_@4/last_@8/end_@0xC`) as a
+  // hand-rolled struct with hand-rolled pointer-triplet accessors in
+  // RRuleGameRules.cpp -- exactly the CLAUDE.md "Duplicate layout contract"
+  // violation ("Do not keep duplicated class/struct layouts that model the
+  // same binary object in multiple headers"). `RRuleGameRulesImpl::mMaps`
+  // below is now a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`; see
+  // that field's own doc comment for the growth/allocation divergence this
+  // migration fixed (the hand-rolled model over-constructed its spare
+  // capacity and paired it with `delete[]`, which the real binary's
+  // `operator delete`-based teardown -- confirmed independently from
+  // `FUN_0052D590`'s and `FUN_00536DF0`'s raw disassembly -- never did).
 
   /**
    * VFTABLE: 0x00E1610C
@@ -680,14 +709,46 @@ namespace moho
     std::uint8_t mLockStorage[0x08];                  // +0x38
     LuaPlus::LuaState* mLuaState;                     // +0x40
     /**
-     * Array of per-target-LuaState export bindings. Real field name per
+     * Vector of per-target-LuaState export bindings. Real field name per
      * IDA's own decompilation of `ExportToLuaState` (`this->mMaps`,
      * 0x00529F70) and `func_Add__blueprints`'s `rules->mMaps` walk
      * (0x00529B30) -- see `RRuleGameRulesLuaExportBinding` above for the
      * per-element layout evidence. Previously modeled under the name
      * `mLuaExports`; renamed here to match the binary-recovered name.
+     *
+     * Real `msvc8::vector<RRuleGameRulesLuaExportBinding>`, not a
+     * hand-rolled pointer-triplet struct (see the removed
+     * `RRuleGameRulesLuaExportBindingArray` note above). Migrating this
+     * field surfaced a genuine behavioral divergence in the growth path
+     * that was hand-rolled around it (`ReserveExportBindingCapacity`,
+     * RRuleGameRules.cpp, now fixed to call `reserve()`):
+     *   - The old code allocated with `new RRuleGameRulesLuaExportBinding[
+     *     requestedCapacity]{}`, which default-*constructs* every slot up
+     *     to the full new capacity (not just the live prefix), then
+     *     *assigned* (`newBegin[i] = oldBegin[i]`) the live elements into
+     *     those already-live slots, and freed the old buffer with
+     *     `delete[]`.
+     *   - The real binary never does this. `FUN_0052D590`'s raw
+     *     disassembly (`if (*(a1+4)) operator delete(*(a1+4)); *(a1+4) =
+     *     *(a1+8) = *(a1+12) = 0;`) and `FUN_00536DF0`'s recorded evidence
+     *     ("FUN_00529700 dtor direct mMaps teardown ... call
+     *     FUN_00536DF0(mBegin,mEnd), delete mBegin" -- singular, scalar
+     *     `operator delete`, never `delete[]`) both confirm the real
+     *     vector allocates raw, unconstructed memory via `operator new`
+     *     and only *constructs* (copy, since MSVC8/VS2005 predates move
+     *     semantics) exactly the live element count into it -- exactly
+     *     `legacy/containers/Vector.h`'s already-existing `reallocate_to`/
+     *     `reserve()` shape. `[size(), capacity())` is genuinely raw
+     *     memory in the real object, never a run of live default-
+     *     constructed elements. The hand-rolled growth policy
+     *     (`capacity>0 ? capacity*2 : 4`, in the removed
+     *     `AddOrGetExportBinding`) was also wrong on its own terms --
+     *     `msvc8::vector<T>::recommended_capacity()` grows 1.5x
+     *     (`cur + cur/2`), not 2x. Both divergences are fixed by routing
+     *     growth through the real `reserve()`/`insert()` API instead of
+     *     hand-rolling it.
      */
-    RRuleGameRulesLuaExportBindingArray mMaps;        // +0x44
+    msvc8::vector<RRuleGameRulesLuaExportBinding> mMaps; // +0x44
     SRuleFootprintsBlueprint mFootprints;             // +0x54
     RRuleGameRulesBlueprintMap mUnitBlueprints;       // +0x60
     RRuleGameRulesBlueprintMap mProjectileBlueprints; // +0x6C
@@ -724,6 +785,10 @@ namespace moho
   static_assert(offsetof(RRuleGameRulesImpl, mLuaState) == 0x40, "RRuleGameRulesImpl::mLuaState offset must be 0x40");
   static_assert(
     offsetof(RRuleGameRulesImpl, mMaps) == 0x44, "RRuleGameRulesImpl::mMaps offset must be 0x44"
+  );
+  static_assert(
+    sizeof(msvc8::vector<RRuleGameRulesLuaExportBinding>) == 0x10,
+    "msvc8::vector<RRuleGameRulesLuaExportBinding> size must be 0x10"
   );
   static_assert(
     offsetof(RRuleGameRulesImpl, mFootprints) == 0x54, "RRuleGameRulesImpl::mFootprints offset must be 0x54"
