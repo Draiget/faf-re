@@ -78,53 +78,23 @@ namespace
     return destroy(object, 0);
   }
 
-  struct VirtualDtor16RuntimeView
-  {
-    void** vtable;          // +0x00
-    std::uint32_t lane04;   // +0x04
-    std::uint32_t lane08;   // +0x08
-    std::uint32_t lane0C;   // +0x0C
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(VirtualDtor16RuntimeView) == 0x10, "VirtualDtor16RuntimeView size must be 0x10");
-#endif
-
-  struct VirtualDtor136RuntimeView
-  {
-    void** vtable;          // +0x00
-    std::byte payload[0x84]; // +0x04
-  };
-#if defined(_M_IX86)
-  static_assert(sizeof(VirtualDtor136RuntimeView) == 0x88, "VirtualDtor136RuntimeView size must be 0x88");
-#endif
-
-  [[nodiscard]] std::intptr_t DestroyVirtualRangeStride16(
-    VirtualDtor16RuntimeView* begin,
-    VirtualDtor16RuntimeView* end
-  ) noexcept
-  {
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(begin);
-    for (VirtualDtor16RuntimeView* item = begin; item != end; ++item) {
-      result = InvokeScalarDeletingDtorSlot0(item, item->vtable);
-    }
-    return result;
-  }
-
-  [[nodiscard]] std::intptr_t DestroyVirtualRangeStride136(
-    VirtualDtor136RuntimeView* begin,
-    VirtualDtor136RuntimeView* end
-  ) noexcept
-  {
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(begin);
-    std::byte* itemBytes = reinterpret_cast<std::byte*>(begin);
-    const std::byte* const endBytes = reinterpret_cast<const std::byte*>(end);
-    while (itemBytes != endBytes) {
-      auto* const item = reinterpret_cast<VirtualDtor136RuntimeView*>(itemBytes);
-      result = InvokeScalarDeletingDtorSlot0(item, item->vtable);
-      itemBytes += sizeof(VirtualDtor136RuntimeView);
-    }
-    return result;
-  }
+  // NOTE (VirtualDtor16RuntimeView/VirtualDtor136RuntimeView migration): this
+  // file used to reach into two polymorphic-element ranges via raw
+  // `void** vtable` slot-0 dispatch structs (`VirtualDtor16RuntimeView`/
+  // `VirtualDtor136RuntimeView`) plus generic stride loops
+  // (`DestroyVirtualRangeStride16`/`136`), reached only through two
+  // address-tagged wrappers, `DestroyVirtualRange16` (0x007D8600) and
+  // `DestroyVirtualRange136` (0x0088A3E0) -- both now removed. Neither
+  // wrapper had any source-level caller anywhere in `src/sdk/**` (RULE ONE
+  // orphan pattern). Both addresses are `msvc8::vector<T>::destroy_range<T>`'s
+  // own reallocation-cleanup instantiation -- for `T = moho::
+  // ClutterSurfaceElement` (16-byte, `Clutter.h`) and `T = Moho::
+  // WaveParameters` (136-byte, `WaveSystem.h`) respectively -- already
+  // provided generically by `msvc8::vector<T>::destroy_range`
+  // (`legacy/containers/Vector.h`), which resolves to each type's own (real,
+  // already-recovered) destructor. Both addresses are now cited directly on
+  // that template; see `legacy/containers/Vector.h`'s `destroy_range`
+  // Doxygen block.
 
   // NOTE (boost shared_ptr / sp_counted_base migration): this file used to
   // reach into `boost::detail::sp_counted_base`'s real layout via a local
@@ -3799,36 +3769,6 @@ namespace
       ++begin;
     }
     return result;
-  }
-
-  /**
-   * Address: 0x007D8600 (FUN_007D8600)
-   *
-   * What it does:
-   * Calls scalar-deleting-destructor slot 0 for each 16-byte object in one
-   * half-open range.
-   */
-  std::intptr_t DestroyVirtualRange16(
-    VirtualDtor16RuntimeView* begin,
-    VirtualDtor16RuntimeView* end
-  ) noexcept
-  {
-    return DestroyVirtualRangeStride16(begin, end);
-  }
-
-  /**
-   * Address: 0x0088A3E0 (FUN_0088A3E0)
-   *
-   * What it does:
-   * Calls scalar-deleting-destructor slot 0 for each 136-byte object in one
-   * half-open range.
-   */
-  std::intptr_t DestroyVirtualRange136(
-    VirtualDtor136RuntimeView* begin,
-    VirtualDtor136RuntimeView* end
-  ) noexcept
-  {
-    return DestroyVirtualRangeStride136(begin, end);
   }
 
   /**
