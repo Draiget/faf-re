@@ -9445,6 +9445,19 @@ namespace msvc8
             return _Mysize;
         }
 
+        /**
+         * The VC8 `list<T>::max_size()` lane: `0xFFFFFFFF / sizeof(value_type)`
+         * for the 32-bit target, folded to a compile-time constant the same
+         * way `vector<T>::max_size()` is (above). See `_Incsize`'s
+         * `Address:` block (below) for the binary evidence this formula is
+         * keyed on `sizeof(value_type)` and not a fixed bound shared by
+         * every instantiation.
+         */
+        [[nodiscard]] static constexpr size_type max_size() noexcept
+        {
+            return static_cast<size_type>(0xFFFFFFFFu) / sizeof(value_type);
+        }
+
         iterator begin()
         {
             return iterator(_Myhead->_Next);
@@ -9567,57 +9580,172 @@ namespace msvc8
          * the same shape as FUN_004E3310/FUN_004E3490/sub_AC3140 above.
          * Called immediately after the node buy in sub_8C1220.)
          *
+         * Address: 0x00932FD0 (FUN_00932FD0, sub_932FD0, `_Buynode` below)
+         * / 0x009333D0 (FUN_009333D0, `_Incsize` below) -- the 0x50-byte-
+         * node (0x48-byte `value_type`) instantiation for `msvc8::list<
+         * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+         * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table). This
+         * instantiation is the one that shows `max_size()` really is
+         * `0xFFFFFFFF / sizeof(value_type)` per element width rather than a
+         * shared fixed bound: its cap folds to `0xFFFFFFFF / 0x48 =
+         * 0x038E8FE3` (59652323), not `0x3FFFFFFF` -- see `_Incsize`'s own
+         * `Address:` block for the full derivation. Reached from
+         * `insert(pos, first, last)`'s copy loop, below. Previously
+         * DB-marked `recovered` with a plausible-looking caller-chain note
+         * but zero actual `src/sdk` citation anywhere in the tree; this is
+         * the real citation.
+         *
          * What it does:
          * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
          * node through the checked 12-byte-element lane (`AllocateChecked12ByteLane`,
          * FUN_004E4F70, folded onto many other 12-byte instantiations) and writes
          * `_Next`/`_Prev`/`_Value` directly into the fresh block; the recovered
-         * form expresses the same net state via placement-new followed by the
-         * explicit link reassignment below. FUN_004E3310 checks `_Mysize` against
-         * the Dinkumware-generic `0x3FFFFFFF` cap (the same fixed bound used by
-         * this file's `sizeof(T)==4` vector `max_size()`, unrelated to the
-         * 12-byte node size) and throws `std::length_error("list<T> too long")`
-         * before incrementing; the binary performs the node buy *before* this
-         * check, so the node is not freed on the overflow path -- preserved here
-         * for fidelity.
+         * form expresses the same net state via placement-new (`_Buynode`) followed
+         * by the explicit link reassignment below. FUN_004E3310 checks `_Mysize`
+         * against what looked like a Dinkumware-generic `0x3FFFFFFF` cap before the
+         * SubclusterCacheKey instantiation above proved it is really `max_size()` --
+         * `0xFFFFFFFF / sizeof(value_type)`, which happens to fold to the same
+         * `0x3FFFFFFF` immediate for every 4-byte-pointer/scalar `T` cited above --
+         * and throws `std::length_error("list<T> too long")` before incrementing;
+         * the binary performs the node buy *before* this check, so the node is not
+         * freed on the overflow path -- preserved here for fidelity.
          */
         iterator insert(const_iterator pos, const value_type& v)
         {
-            _Node_alloc_type al;
-            _Node* node = al.allocate(1);
-            new (node) _Node(v);
-
-            if (_Mysize == static_cast<size_type>(0x3FFFFFFF)) {
-                throw std::length_error("list<T> too long");
-            }
-            ++_Mysize;
-
             _Nodeptr where = pos._Ptr;
             _Nodeptr prev = where->_Prev;
+            _Nodeptr node = _Buynode(where, prev, v);
 
-            node->_Next = where;
-            node->_Prev = prev;
+            _Incsize(1);
+
             prev->_Next = node;
             where->_Prev = node;
 
             return iterator(node);
         }
 
+        /**
+         * Address: 0x00933CF0 (FUN_00933CF0, sub_933CF0) -- `msvc8::list<
+         * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>::
+         * insert(const_iterator, InputIt, InputIt)` (`gpg/core/algorithms/
+         * Cluster.cpp`'s subcluster-key table). Copies `[first, last)` node
+         * by node ahead of `pos`, buying each node through the same lane as
+         * the single-value `insert` above (`_Buynode`, FUN_00932FD0) and
+         * growing `_Mysize` one element at a time (`_Incsize`, FUN_009333D0)
+         * rather than reserving up front. Wrapped in an SEH frame
+         * (`SEH_933CF0` / `stru_EA6FAC`): if copy-constructing an element
+         * throws partway through, the catch handler walks the nodes it had
+         * already linked in and erases each one -- `FUN_009334E0`, cited on
+         * `erase` below, once per already-inserted node -- before a bare
+         * rethrow (`_CxxThrowException(0, 0)`, annotated `***DO NOT MARK AS
+         * __noreturn***` in the binary because IDA's own analysis of this
+         * function mis-inferred it).
+         *
+         * Reached through a thin, calling-convention-only forwarding stub
+         * at PE address 0x00934370-0x00934389 (`mov`/`push` argument
+         * reshuffle then `call sub_933CF0` / `ret 0Ch`) that IDA's batch
+         * export did not classify as its own function -- confirmed by
+         * disassembling the raw PE bytes directly (capstone, against
+         * `bin/external/ForgedAlliance.exe`) rather than trusting the
+         * callgraph index, which has no token for that address. The stub
+         * sits in the same run of `hash_map<SubclusterCacheKey, ...>`
+         * calling-convention thunks as the already-tokenized/`skip`-marked
+         * `FUN_009344B0` (`jmp FUN_00934300`) two slots later, and
+         * immediately follows the already-recovered bucket-vector resize
+         * lane `FUN_00934250`. No further caller of the stub itself is
+         * indexed (checked: `functions`, `call_edges`, `incoming_xrefs`,
+         * `data_refs` in `_callgraph_index.sqlite`), most likely because
+         * IDA never chunked it as a function head, so incoming references
+         * to it were never tied to a token. Recovered in the same pass as
+         * `erase` (paired bottom-up, RULE TWO) since the two share one
+         * exception-safety contract and neither is legible without the
+         * other.
+         *
+         * What it does:
+         * VC8 `std::list<T>::insert(const_iterator pos, InputIt first,
+         * InputIt last)`, strong exception guarantee: elements already
+         * linked in when a later copy-construction throws are rolled back
+         * via `erase()` before the original exception propagates. The
+         * first element is inserted unprotected (nothing to roll back if
+         * its own construction is what throws), matching the binary's own
+         * zero-iterations-rolled-back behaviour on a first-element failure.
+         */
+        template <class InputIt>
+        iterator insert(const_iterator pos, InputIt first, InputIt last)
+        {
+            if (first == last) {
+                return iterator(pos._Ptr);
+            }
+
+            const _Nodeptr where = pos._Ptr;
+            const iterator firstInserted = insert(pos, *first);
+            ++first;
+
+            try {
+                for (; first != last; ++first) {
+                    insert(pos, *first);
+                }
+            } catch (...) {
+                for (_Nodeptr n = firstInserted._Ptr; n != where; ) {
+                    const _Nodeptr next = n->_Next;
+                    erase(const_iterator(n));
+                    n = next;
+                }
+                throw;
+            }
+
+            return firstInserted;
+        }
+
+        /**
+         * Address: 0x009334E0 (FUN_009334E0, sub_9334E0) -- `msvc8::list<
+         * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>::
+         * erase(iterator)` (`gpg/core/algorithms/Cluster.cpp`'s
+         * subcluster-key table). Standalone out-of-line body: captures
+         * `node->_Next` as the return value up front, then -- guarded by
+         * `node != _Myhead` -- unlinks `prev`/`next`, tears the value down
+         * via `` `eh vector destructor iterator'(&node->_Value, 4, 16,
+         * gpg::HaStar::Cluster::~Cluster) `` (the key's sixteen embedded
+         * `Cluster` handles), `operator delete`s the node, and decrements
+         * `_Mysize`. Reached from the exception-rollback handler of
+         * `insert(pos, first, last)` (`FUN_00933CF0`, cited above) -- one
+         * call per already-linked node being unwound.
+         *
+         * The `node != _Myhead` guard is real MSVC8 `<list>` shape, not a
+         * defensive addition invented during recovery: `FUN_009346F0`
+         * (`hash_map<SubclusterCacheKey, ...>::erase(iterator)`,
+         * `legacy/containers/HashMap.h`) inlines this *exact* sequence --
+         * same guard, same unlink order, same `eh vector destructor
+         * iterator(ptr, 4, 16, Cluster::~Cluster)` call -- directly into
+         * its own body instead of calling out to this address; both are
+         * the same template method compiled for the same element type, one
+         * out-of-line and one inlined at its call site.
+         *
+         * What it does:
+         * VC8 `std::list<T>::erase(const_iterator)`. No-ops (beyond
+         * returning the head sentinel itself) when handed the end()
+         * sentinel; otherwise unlinks the node, destroys its value, frees
+         * it, and decrements size.
+         */
         iterator erase(const_iterator pos)
         {
             _Nodeptr node = pos._Ptr;
             _Nodeptr next = node->_Next;
-            _Nodeptr prev = node->_Prev;
 
-            prev->_Next = next;
-            next->_Prev = prev;
+            if (node != _Myhead) {
+                _Nodeptr prev = node->_Prev;
 
-            _Node_alloc_type al;
-            _Node* ptr = static_cast<_Node*>(node);
-            ptr->~_Node();
-            al.deallocate(ptr, 1);
+                prev->_Next = next;
+                next->_Prev = prev;
 
-            --_Mysize;
+                _Node_alloc_type al;
+                _Node* ptr = static_cast<_Node*>(node);
+                ptr->~_Node();
+                al.deallocate(ptr, 1);
+
+                --_Mysize;
+            }
+
             return iterator(next);
         }
 
@@ -9658,6 +9786,71 @@ namespace msvc8
         }
 
     private:
+        /**
+         * Address: 0x00932FD0 (FUN_00932FD0, sub_932FD0) -- the node-buy
+         * lane instantiated for `msvc8::list<std::pair<const
+         * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+         * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table).
+         *
+         * IDA signature:
+         * int *__stdcall sub_932FD0(int next, int prev, _DWORD *valueSrc);
+         *
+         * What it does:
+         * `operator new(sizeof(_Node))`, then writes `_Next = next; _Prev =
+         * prev;` directly into the fresh block, then copy-constructs
+         * `_Value` from `*valueSrc` via the pair's own copy constructor
+         * (`FUN_009329A0`, already cited elsewhere as the subcluster map
+         * value_type's implicit copy ctor) -- the same net effect as
+         * `insert(pos, v)`'s placement-new-then-explicit-link-write, just
+         * factored by the compiler into a standalone lane shared between
+         * the single-value insert and the range-insert copy loop
+         * (`FUN_00933CF0`, cited on `insert(pos, first, last)`).
+         */
+        _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
+        {
+            _Node_alloc_type al;
+            _Node* node = al.allocate(1);
+            new (node) _Node(v);
+            node->_Next = next;
+            node->_Prev = prev;
+            return node;
+        }
+
+        /**
+         * Address: 0x009333D0 (FUN_009333D0, sub_9333D0) -- the checked
+         * size-increment lane instantiated for `msvc8::list<std::pair<const
+         * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+         * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table),
+         * called from `insert(pos, first, last)`'s copy loop
+         * (`FUN_00933CF0`, cited there) once per element bought.
+         *
+         * IDA signature:
+         * int __thiscall sub_9333D0(_DWORD *this, unsigned int a2);
+         *
+         * What it does:
+         * `if (max_size() - _Mysize < count) throw
+         * length_error("list<T> too long"); _Mysize += count;`. This
+         * instantiation's `pair<const SubclusterCacheKey, gpg::HaStar::
+         * Cluster::Data*>` `value_type` is 0x48 (72) bytes --
+         * `SubclusterCacheKey`'s sixteen embedded 4-byte `gpg::HaStar::
+         * Cluster` handles plus the 4-byte `Data*` -- so `max_size()` folds
+         * to `0xFFFFFFFF / 0x48 = 0x038E8FE3` (59652323 decimal), exactly
+         * the constant this address compares `_Mysize` against. Confirms
+         * `max_size()` is `0xFFFFFFFF / sizeof(value_type)` for every
+         * instantiation -- the same formula `vector<T>::max_size()` uses
+         * (`legacy/containers/Vector.h`, above) -- and that `insert(pos,
+         * v)`'s `0x3FFFFFFF` single-element cap is this same formula
+         * evaluated at `sizeof(value_type) == 4` (a raw pointer/scalar
+         * `T`), not an independent fixed bound as previously documented.
+         */
+        void _Incsize(size_type count)
+        {
+            if (max_size() - _Mysize < count) {
+                throw std::length_error("list<T> too long");
+            }
+            _Mysize += count;
+        }
+
         void _Init()
         {
             _Alloc_proxy();
