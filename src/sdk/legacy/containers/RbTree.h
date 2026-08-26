@@ -3087,6 +3087,37 @@ namespace msvc8
              * in this pass) that never called this member at all -- the
              * RULE-ONE violation this citation, and the migration of
              * `mEnvLookup` onto this template, resolves.
+             *
+             * Address: 0x00861510 (FUN_00861510, sub_861510) -- `msvc8::
+             * map<std::int32_t, Moho::ProjectileArcTrack>::insert_hint` --
+             * `ProjectileArcTable& ArcTable()`'s function-local static
+             * (`moho/render/ProjectileArcRenderer.cpp`), isNil@3145 decimal
+             * (same instantiation cited on `erase(const_iterator)`,
+             * `FUN_00860FB0`, and `erase_range`, `FUN_008619F0`, elsewhere
+             * in this file). The key lands at `node+16` (`a4[4]`) rather
+             * than `node+12`: `ProjectileArcTrack` is `alignas(8)`, so the
+             * embedded `pair<const int32_t, ProjectileArcTrack>` pads the
+             * 12-byte link header out to the next 8-aligned offset before
+             * the key starts. Matches this member's full branch structure:
+             * empty-tree fast path (`!dword_10C431C`) straight to
+             * `insert_at` (`sub_861AA0`); `hint == leftmost()`
+             * (`a4 == *dword_10C4318`) check; `hint == head_`
+             * (`a4 == dword_10C4318`) check; predecessor straddle calling
+             * `sub_861FA0` (`rb_decrement`) then the `isNil`-at-3145 test on
+             * the candidate's right child to pick `insert_at(true, ...)` vs
+             * `insert_at(false, ...)`; successor straddle calling
+             * `sub_861D10` (`rb_increment`) then the same test; final
+             * fallback to `insert_unique` (`sub_861930`) taking its return
+             * value. Reached from `FUN_00860E20` -- a much larger function
+             * (per-projectile sampling pass, `RenderProjectileArcs`'s pass
+             * one) that calls `sub_861C70` (`lower_bound_node`-shaped) then
+             * this member with that result as the hint, the same "fill the
+             * gap we just located" `operator[]` idiom as every other
+             * instantiation cited on this member; the recovered source
+             * expresses the same net effect via `arcTable.find(key)` then
+             * a separate `arcTable[key]` (`ProjectileArcRenderer.cpp`,
+             * `Map.h`'s `operator[]`), matching this member's own
+             * documented "same net state, different formulation" precedent.
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -4263,6 +4294,44 @@ namespace msvc8
              * reverse); `IWldTerrainRes::ClearEnvLookup` now calls
              * `mEnvLookup.clear()` directly rather than routing through
              * this member.
+             *
+             * Address: 0x008619F0 (FUN_008619F0, sub_8619F0) -- `msvc8::
+             * map<std::int32_t, Moho::ProjectileArcTrack>::erase_range` --
+             * `ProjectileArcTable& ArcTable()`'s function-local static
+             * (`moho/render/ProjectileArcRenderer.cpp`), isNil@+3145
+             * (0xC38 header+key+0xC30 value, 8-aligned; same instantiation
+             * cited on `erase(const_iterator)`, `FUN_00860FB0`, elsewhere in
+             * this file). Whole-tree fast path (`a2==*(int*)dword_10C4318 &&
+             * a3==dword_10C4318`) calls `sub_861D80` (`clear()`) and returns
+             * the header, matching this member's `first==leftmost() &&
+             * last==header()` branch; the slow path loops `sub_861D10`
+             * (`rb_increment`, advancing the cursor before the node dies)
+             * then `sub_860FB0` (`erase_node`, this same instantiation's
+             * single-node erase) -- matches `while (cursor != stop)
+             * erase_node((cursor++).node())` field for field. `ArcTable()`
+             * reads/writes the tree through fixed globals
+             * (`dword_10C4318`/`dword_10C431C`) because it is a function-
+             * local `static moho::ProjectileArcTable table;`, not a
+             * `this`-relative member.
+             *
+             * Reached automatically: `ArcTable()`'s `static` local has a
+             * non-trivial destructor, so the compiler registers a real
+             * teardown call for it (the magic-static guard's atexit path),
+             * which is exactly this member's own shape
+             * (`erase_range(leftmost(), header())` + `operator
+             * delete(head)` + zero head/size -- the same "no corresponding
+             * source line, citation-only" compiler-generated pattern
+             * already documented on `~rb_tree()`'s own EH-funclet clones
+             * above). Confirmed by disassembling the raw PE bytes directly
+             * (capstone, `bin/external/ForgedAlliance.exe`) since none of
+             * this pattern's three call sites -- 0x008600A0, 0x00860F50,
+             * 0x00861760, byte-identical to each other, differing only in
+             * the encoded rel32 displacement to this address -- were
+             * classified as functions by IDA's batch export (the same
+             * `/OPT:ICF`-left-unfolded phenomenon already documented on the
+             * `FUN_00947E00`/`FUN_00947E90`/`FUN_00947F20` trio above); none
+             * has any entry in `_callgraph_index.sqlite`'s `functions`,
+             * `call_edges`, or `incoming_xrefs` tables.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
