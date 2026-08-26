@@ -368,6 +368,56 @@ namespace msvc8
          * per RULE ONE its recovery is this member's own call sites in
          * `Unit.cpp`, not a hand-rolled free function or an external tag
          * (DB-integrity fix).
+         *
+         * Address: 0x008A7C80 (FUN_008A7C80, sub_8A7C80) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::operator[]`
+         * -- `Moho::CWldTerrainRes::mEnvLookup` (`TerrainRuntimeView`/
+         * `TerrainVisualResourceRuntimeView` in `moho/sim/CWldMap.cpp`),
+         * isNil@+0x4D (0x50-byte node: 12-byte link triplet + 28-byte
+         * `msvc8::string` key + 0x24-byte `TerrainEnvironmentLookupEntry`
+         * value + color/isNil). IDA's own inferred listing name for this
+         * address is `std::map_string_shared_ptr_RD3DTextureResource::
+         * find` -- WRONG on two counts, the same misnomer already
+         * documented on `FUN_006ADBF0` above: `find()` never mutates, but
+         * this emission's lower-bound-miss path default-constructs a fresh
+         * `TerrainEnvironmentLookupEntry` and calls the hinted-insert
+         * internal (`insert_hint`'s emission for this instantiation,
+         * `FUN_008A8590`, cited in `RbTree.h`); and the mapped type IDA's
+         * heuristic inferred (`shared_ptr<RD3DTextureResource>`) is only
+         * one field of the real 0x24-byte `TerrainEnvironmentLookupEntry`
+         * value (`{msvc8::string mEnvironmentName; boost::shared_ptr<
+         * RD3DTextureResource> mTexture;}`), confirmed by this emission's
+         * own default-value construction (`v8.mName` empty-SSO-init,
+         * `v8.mTex.obj`/`.count.pi_` zeroed) and by its caller overwriting
+         * both `v9->mName` and `v9->mTex` fields unconditionally. Matches
+         * this member's find-then-conditional-insert-then-return-reference
+         * shape exactly: `where = lower_bound(k)` (`FUN_008A8FE0`, cited in
+         * `RbTree.h`), `where == end() || comp(k, where->first)` miss test,
+         * `insert(hint, value_type(k, mapped_type()))` on a miss
+         * (`FUN_008A8590`), `return where->second`. Sole real caller is
+         * `IWldTerrainRes::AddEnvLookup` (0x008A1380, `CWldMap.cpp`):
+         * `mEnvLookup[environmentKey] = TerrainEnvironmentLookupEntry(
+         * texturePath, texture)`, which always resolves the D3D texture
+         * handle first (0x008A1323-0x008A1331) then reaches this member to
+         * get-or-default-construct the slot before overwriting both its
+         * fields -- exactly this member's role, on both the cache-hit and
+         * cache-miss paths alike. `Moho::CWldTerrainRes::Reset`
+         * (FUN_008A6220) is a second real caller (per this token's own
+         * `.xrefs.txt`), reinstating the single `<default>` environment
+         * entry after `ClearEnvLookup`; the current recovery performs that
+         * same assignment via `view->mEnvLookup[defaultEnvironmentKey] =
+         * defaultEnvironment;` in `CWldTerrainRes::Reset`'s body.
+         *
+         * Prior to this pass, `AddEnvLookup`'s recovered source reached
+         * `mEnvLookup` through a bespoke, fully duplicated hand-rolled
+         * red-black tree (`InsertTerrainEnvironmentNode` and ~20 sibling
+         * free functions in `CWldMap.cpp`, deleted here) that never called
+         * this member, or any other real binary function on this call
+         * chain, at all -- functionally equivalent (both are find-or-
+         * default-insert-then-overwrite), but zero of `FUN_008A7C80`,
+         * `FUN_008A8590`, and their own callee chain had any citation
+         * anywhere in `src/sdk`. This entry, and `mEnvLookup`'s migration
+         * onto this template, is that recovery.
          */
         mapped_type& operator[](const key_type& k)
         {
