@@ -74,7 +74,10 @@ namespace
    * Unlinks the `CAiBuilderImplConstruct` helper node from whatever
    * intrusive list it currently sits in and restores a self-linked sentinel
    * state. Registered by the real dynamic initializer (0x00BCC2E0) as the
-   * global's `atexit` teardown.
+   * global's `atexit` teardown. `FUN_0059FD20` and `FUN_0059FD50` are
+   * duplicate-emission twins of this exact unlink/reset lane (same
+   * `ResetLinks()` shape, folded to separate addresses); they have no
+   * distinct source-level body of their own.
    */
   void CleanupCAiBuilderImplConstructStartup()
   {

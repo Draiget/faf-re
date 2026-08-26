@@ -81,7 +81,10 @@ namespace
    * What it does:
    * Process-exit cleanup that unlinks the `CEffectManagerImplConstruct`
    * helper node. The real ctor pushes this plain free function (not a
-   * mangled destructor) as its atexit target.
+   * mangled destructor) as its atexit target. `FUN_0066BAE0` and
+   * `FUN_0066BB10` are duplicate-emission twins of this exact unlink/reset
+   * lane (same `ResetLinks()` shape, folded to separate addresses); they
+   * have no distinct source-level body of their own.
    */
   void cleanup_CEffectManagerImplConstruct()
   {
