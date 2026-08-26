@@ -6030,21 +6030,6 @@ namespace
   void NoOpHelperThunkBK() noexcept {}
 
   /**
-   * Address: 0x0049F860 (FUN_0049F860, sub_49F860)
-   *
-   * What it does:
-   * Calling-convention bridge thunk for nullable dword-pair range copy.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkA(
-    DwordPairRuntime* destination,
-    const DwordPairRuntime* sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x0049F880 (FUN_0049F880, sub_49F880)
    *
    * What it does:
@@ -6162,21 +6147,6 @@ namespace
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkBL() noexcept {}
-
-  /**
-   * Address: 0x0049F960 (FUN_0049F960, sub_49F960)
-   *
-   * What it does:
-   * Duplicate nullable dword-pair range copy bridge thunk.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkB(
-    DwordPairRuntime* destination,
-    const DwordPairRuntime* sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x0049F980 (FUN_0049F980, sub_49F980)
@@ -6902,22 +6872,6 @@ namespace
   }
 
   /**
-   * Address: 0x004A0460 (FUN_004A0460, sub_4A0460)
-   *
-   * What it does:
-   * Duplicate calling-convention bridge thunk for nullable dword-pair range
-   * copy.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateC(
-    DwordPairRuntime* const destination,
-    const DwordPairRuntime* const sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x004A0480 (FUN_004A0480, sub_4A0480)
    *
    * What it does:
@@ -6960,22 +6914,6 @@ namespace
   ) noexcept
   {
     return MoveDwordRangeByCountAndReturnDestinationLocal(source, dwordCount, destination);
-  }
-
-  /**
-   * Address: 0x004A04F0 (FUN_004A04F0, sub_4A04F0)
-   *
-   * What it does:
-   * Duplicate calling-convention bridge thunk for nullable dword-pair range
-   * copy.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateD(
-    DwordPairRuntime* const destination,
-    const DwordPairRuntime* const sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
   }
 
   /**
@@ -7612,38 +7550,6 @@ namespace
   }
 
   /**
-   * Address: 0x004A0AB0 (FUN_004A0AB0, sub_4A0AB0)
-   *
-   * What it does:
-   * Duplicate calling-convention bridge thunk for nullable dword-pair range
-   * copy.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateE(
-    DwordPairRuntime* const destination,
-    const DwordPairRuntime* const sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x004A0AD0 (FUN_004A0AD0, sub_4A0AD0)
-   *
-   * What it does:
-   * Duplicate calling-convention bridge thunk for nullable dword-pair range
-   * copy.
-   */
-  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateF(
-    DwordPairRuntime* const destination,
-    const DwordPairRuntime* const sourceEnd,
-    const DwordPairRuntime* const sourceBegin
-  ) noexcept
-  {
-    return CopyDwordPairRangeWithNullableDestinationAndReturnEndLocal(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x004A0AF0 (FUN_004A0AF0, sub_4A0AF0)
    *
    * What it does:
@@ -7876,7 +7782,16 @@ namespace
    * Address: 0x004A0E00 (FUN_004A0E00, sub_4A0E00)
    *
    * What it does:
-   * Copies one nullable dword-pair range and returns destination end.
+   * Copies one nullable dword-pair range and returns destination end. This is
+   * the canonical, live implementation for the "nullable dword-pair range
+   * copy" job in this translation unit -- confirmed via FUN_004A0E00.xrefs.txt:
+   * 6 call sites from 5 distinct callers, reachable from the CWorldParticles
+   * vftable at depth 6. Three callers were this file's own calling-convention
+   * bridge thunks (former *ThunkA / *DuplicateC / *DuplicateE tokens, all
+   * zero-xref dead code, folded away); the remaining two distinct callers are
+   * interval insert-and-grow helpers in ParticleRenderBuckets.cpp
+   * (FUN_0049ADA0, FUN_0049E820), which independently reimplement this same
+   * loop shape for their own element type in that translation unit.
    */
   DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreA(
     DwordPairRuntime* const destination,
@@ -7891,7 +7806,17 @@ namespace
    * Address: 0x004A0E20 (FUN_004A0E20, sub_4A0E20)
    *
    * What it does:
-   * Duplicate nullable dword-pair range copy helper.
+   * Copies one nullable dword-pair range and returns destination end.
+   * Byte-identical machine code to FUN_004A0E00 (same function_sha256 in the
+   * callgraph index) but linked as a genuinely separate, independently
+   * called leaf -- confirmed via FUN_004A0E20.xrefs.txt: 6 call sites from 5
+   * distinct callers, reachable from the CWorldParticles vftable at depth 6.
+   * Two callers were this file's own calling-convention bridge thunks
+   * (former *ThunkB / *DuplicateD / *DuplicateF tokens, all zero-xref dead
+   * code, folded away); the remaining two distinct callers are interval/trail
+   * insert-and-grow helpers in ParticleRenderBuckets.cpp (FUN_0049B450,
+   * FUN_0049E9B0), which independently reimplement this same loop shape for
+   * their own element type in that translation unit.
    */
   DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreB(
     DwordPairRuntime* const destination,
@@ -7899,7 +7824,17 @@ namespace
     const DwordPairRuntime* const sourceEnd
   ) noexcept
   {
-    return CopyDwordPairRangeNullableAndReturnEndCoreA(destination, sourceBegin, sourceEnd);
+    // Not a call to CoreA: FUN_004A0E20's disassembly is a standalone leaf
+    // loop identical to FUN_004A0E00's (same function_sha256), with no
+    // outgoing call of its own. Inlined verbatim here to match that shape.
+    DwordPairRuntime* cursor = destination;
+    for (const DwordPairRuntime* src = sourceBegin; src != sourceEnd; ++src, ++cursor) {
+      if (cursor != nullptr) {
+        cursor->value0 = src->value0;
+        cursor->value1 = src->value1;
+      }
+    }
+    return cursor;
   }
 
   /**
