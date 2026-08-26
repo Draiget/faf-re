@@ -915,6 +915,39 @@ namespace moho
   }
 
   /**
+   * Address: 0x0054DBE0 (FUN_0054DBE0, Moho::CAniPose::~CAniPose)
+   *
+   * IDA signature:
+   * void *__usercall sub_54DBE0@<eax>(_DWORD *a1@<eax>);
+   *
+   * What it does:
+   * Releases `mBones`' heap storage when it has grown past its single
+   * inline bone slot (`mBegin != mOriginal`): frees the heap buffer,
+   * rebinds `begin`/`capacity` back to inline storage, and restores the
+   * pre-grow capacity value that was stashed in the inline slot's header
+   * word. `end` is then rebased to `begin` unconditionally. `mSkeleton`'s
+   * shared skeleton handle is released immediately afterward -- that is
+   * `boost::shared_ptr<const CAniSkel>`'s own destructor, which the
+   * compiler runs automatically right after this body and folds into the
+   * same out-of-line function (the trailing interlocked-decrement /
+   * `dispose()` / `weak_release()`-`destroy()` sequence the binary emits
+   * here). `~CAniPose() = default` previously left both steps to implicit
+   * member destruction, but `CAniPoseBoneArray` (`mBones`) has no
+   * destructor of its own, so the heap buffer leaked on every pose with
+   * more than one bone -- this body is that missing cleanup, not new
+   * behavior.
+   */
+  CAniPose::~CAniPose()
+  {
+    if (mBones.mBegin != mBones.mOriginal) {
+      delete[] mBones.mBegin;
+      mBones.mBegin = mBones.mOriginal;
+      mBones.mCapacity = mBones.InlineCapacityFromHeader();
+    }
+    mBones.mEnd = mBones.mBegin;
+  }
+
+  /**
    * Address: 0x0054B330 (FUN_0054B330, ?OverwritePose@CAniPose@Moho@@QAEXABV12@@Z)
    *
    * What it does:

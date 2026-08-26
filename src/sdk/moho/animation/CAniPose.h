@@ -177,6 +177,22 @@ namespace moho
       return mEnd;
     }
 
+    /**
+     * Reads back the capacity pointer stashed in the first pointer-sized
+     * slot of `mInlineStorage` the last time this array grew past inline
+     * storage. `mOriginal` always points at `mInlineStorage`, so once the
+     * array is rebound to heap storage (`mBegin != mOriginal`), that inline
+     * slot is dead space the grow path repurposes to remember the capacity
+     * it had before growing -- the same small-buffer-optimization idiom
+     * already named `InlineCapacityFromHeader_`/`SaveInlineCapacity_` on
+     * `gpg::core::FastVectorN<T,N>` (`gpg/core/containers/FastVector.h`),
+     * applied here to this hand-rolled single-inline-element array.
+     */
+    [[nodiscard]] CAniPoseBone* InlineCapacityFromHeader() const noexcept
+    {
+      return *reinterpret_cast<CAniPoseBone* const*>(mOriginal);
+    }
+
   public:
     CAniPoseBone* mBegin;         // +0x00
     CAniPoseBone* mEnd;           // +0x04
@@ -207,7 +223,17 @@ namespace moho
      */
     CAniPose(const CAniPose& copy);
 
-    ~CAniPose() = default;
+    /**
+     * Address: 0x0054DBE0 (FUN_0054DBE0, Moho::CAniPose::~CAniPose)
+     *
+     * What it does:
+     * Releases `mBones`' heap storage when the pose has grown past its
+     * single inline bone slot, rebinding begin/end/capacity back to inline
+     * storage; `mSkeleton`'s shared skeleton handle is then released by its
+     * own `boost::shared_ptr` destructor, which runs automatically
+     * immediately afterward.
+     */
+    ~CAniPose();
 
     /**
      * Address: 0x0054B330 (FUN_0054B330, ?OverwritePose@CAniPose@Moho@@QAEXABV12@@Z)
