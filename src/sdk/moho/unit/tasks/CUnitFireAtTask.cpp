@@ -457,6 +457,9 @@ namespace moho
     // own; the intermediate base-vtable write is elided by the compiler
     // since it is immediately overwritten) and registers the atexit dtor
     // (0x00BF9CF0, ResetLinks()-shaped unlink-then-self-link body).
+    // `FUN_0060B150` and `FUN_0060B180` are duplicate-emission twins of that
+    // exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+    // addresses); they have no distinct source-level body of their own.
     CUnitFireAtTaskSerializer gCUnitFireAtTaskSerializer;
 
     struct CUnitFireAtTaskSerializerBootstrap
