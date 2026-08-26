@@ -324,50 +324,12 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
   archive->Write(reportingType, &view->mReportingState, ownerRef);
 }
 
-/**
- * Address: 0x005DEBB0 (FUN_005DEBB0)
- *
- * What it does:
- * Tail-thunk alias that forwards attacker-load callback lanes into
- * `CAiAttackerImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void DeserializeCAiAttackerImplMemberThunkA(
-  CAiAttackerImpl* const object,
-  gpg::ReadArchive* const archive
-)
-{
-  CAiAttackerImpl::MemberDeserialize(object, archive);
-}
-
-/**
- * Address: 0x005DEBC0 (FUN_005DEBC0)
- *
- * What it does:
- * Tail-thunk alias that forwards attacker-save callback lanes into
- * `CAiAttackerImpl::MemberSerialize`.
- */
-[[maybe_unused]] void SerializeCAiAttackerImplMemberThunkA(
-  const CAiAttackerImpl* const object,
-  gpg::WriteArchive* const archive
-)
-{
-  CAiAttackerImpl::MemberSerialize(object, archive);
-}
-
-/**
- * Address: 0x005E04B0 (FUN_005E04B0)
- *
- * What it does:
- * Secondary tail-thunk alias that forwards attacker-load callback lanes into
- * `CAiAttackerImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void DeserializeCAiAttackerImplMemberThunkB(
-  CAiAttackerImpl* const object,
-  gpg::ReadArchive* const archive
-)
-{
-  CAiAttackerImpl::MemberDeserialize(object, archive);
-}
+// Addresses 0x005DEBB0/0x005E04B0 (deserialize "ThunkA"/"ThunkB" pair) and
+// 0x005DEBC0 (serialize "ThunkA") formerly modeled here are dead: zero
+// data_refs and zero call_edges in the callgraph index for all three, and no
+// source-level caller anywhere in src/sdk/**. `CAiAttackerImplSerializer::
+// Deserialize`/`Serialize` below already call `CAiAttackerImpl::
+// MemberDeserialize`/`MemberSerialize` directly.
 
 /**
  * Address: 0x005D8430 (FUN_005D8430, Moho::CAiAttackerImplSerializer::Deserialize)
