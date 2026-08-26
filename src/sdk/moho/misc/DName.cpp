@@ -120,6 +120,14 @@ static_assert(
  * What it does:
  * Returns one undecorator token spelling lane and optionally strips the
  * leading `__` prefix when parse-flag bit 0 is enabled.
+ *
+ * Real callers, not yet wired: the callgraph index cites three real,
+ * mangled-named callers -- `UnDecorator::getCallingConvention`
+ * (FUN_00AB1E47), `UnDecorator::getBasedType` (FUN_00AB3B31), and
+ * `UnDecorator::getDataIndirectType` (FUN_00AB4EE2) -- none of which are
+ * recovered in src/sdk yet. Recovering any of them (a substantial,
+ * standalone undecorator-method recovery) would wire this in; out of scope
+ * for this orphan audit.
  */
 [[maybe_unused]] const char* ResolveUndecoratorTokenSpelling(const std::uint32_t token) noexcept
 {
