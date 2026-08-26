@@ -96,6 +96,37 @@ namespace moho
      *   Lane C's real atexit target `FUN_00BF41A0`, unlike Lane C's other
      *   two thunks which do), so it cannot be lane-C-specific. It is this
      *   generic template method, not a per-instantiation wrapper.)
+     * Address: 0x005D0AC0 (FUN_005D0AC0, formerly
+     *   UnlinkIntrusiveNodeSelfAlpha in LegacyContainerFillLanes.cpp)
+     * Address: 0x005D0AE0 (FUN_005D0AE0, formerly
+     *   UnlinkIntrusiveNodeSelfBeta in LegacyContainerFillLanes.cpp)
+     * Address: 0x005D0CA0 (FUN_005D0CA0, formerly
+     *   UnlinkIntrusiveNodeSelfGamma in LegacyContainerFillLanes.cpp)
+     * Address: 0x005D57C0 (FUN_005D57C0, formerly
+     *   UnlinkIntrusiveNodeSelfDelta in LegacyContainerFillLanes.cpp)
+     * Address: 0x005E8B40 (FUN_005E8B40, formerly
+     *   UnlinkIntrusiveNodeSelfEpsilon in LegacyContainerFillLanes.cpp)
+     * Address: 0x005E3CB0 (FUN_005E3CB0, formerly
+     *   UnlinkIntrusiveNodeSelfEta in LegacyContainerFillLanes.cpp)
+     * Address: 0x005E9DB0 (FUN_005E9DB0, formerly
+     *   UnlinkIntrusiveNodeSelfZeta in LegacyContainerFillLanes.cpp)
+     * Address: 0x0067B950 (FUN_0067B950, formerly
+     *   UnlinkIntrusiveNodeSelfTheta in LegacyContainerFillLanes.cpp)
+     * Address: 0x006AF040 (FUN_006AF040, formerly
+     *   UnlinkIntrusiveNodeSelfLambda in LegacyContainerFillLanes.cpp)
+     * Address: 0x00789ED0 (FUN_00789ED0, formerly
+     *   UnlinkIntrusiveNodeSelfMu in LegacyContainerFillLanes.cpp)
+     * Address: 0x00886800 (FUN_00886800, formerly
+     *   UnlinkIntrusiveNodeSelf86A in LegacyContainerFillLanes.cpp)
+     * Address: 0x00772DC0 (FUN_00772DC0, formerly
+     *   UnlinkAndSelfLinkForwardNode in LegacyContainerFillLanes.cpp --
+     *   modeled through a `next`/`ownerSlot` (Node**) pair instead of
+     *   `prev`/`next` [Node*]; bit-identical for a node whose `next` field
+     *   sits at its struct's own +0x00, so `*ownerSlot = next` and
+     *   `prev->next = next` compile to the same store)
+     * Address: 0x00773B30 (FUN_00773B30, formerly
+     *   UnlinkAndSelfLinkForwardNode773B30 in LegacyContainerFillLanes.cpp,
+     *   a thin wrapper around the address directly above)
      *
      * What it does:
      * Unlinks this node from its current ring and returns this node after

@@ -2089,19 +2089,19 @@ namespace
     return InsertForwardNodeAtSlot(node, slot);
   }
 
-  /**
-   * Address: 0x00772DC0 (FUN_00772DC0)
-   *
-   * What it does:
-   * Unlinks one forward-link node and restores self-links.
-   */
-  ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode(
-    ForwardLinkNodeRuntimeView* const node
-  ) noexcept
-  {
-    (void)UnlinkForwardLinkNode(node);
-    return SelfLinkForwardNode(node);
-  }
+  // NOTE (UnlinkAndSelfLinkForwardNode removal -- fully resolved):
+  // Address: 0x00772DC0 (FUN_00772DC0) is function_sha256-identical to
+  // `TDatListItem<T>::ListUnlinkSelf()` (moho/containers/TDatList.h) and
+  // this file's own `UnlinkIntrusiveNodeAndSelfLink` twin family (see
+  // UnlinkIntrusiveNodeSelfAlpha above). This one was modeled through
+  // `ForwardLinkNodeRuntimeView`'s `next`/`ownerSlot` (Node**) pair instead
+  // of a plain `prev`/`next` (Node*) pair, but since `next` sits at that
+  // struct's own +0x00, a middle node's `ownerSlot` is bit-identical to
+  // `(Node**)prevNode` -- `*node->ownerSlot = node->next` and
+  // `node->prev->next = node->next` compile to the same store either way.
+  // `UnlinkForwardLinkNode`/`SelfLinkForwardNode` themselves stay: they
+  // still back the real `RelinkForwardNodeToOwnerOffset58`/
+  // `RelinkForwardNodeAtExternalSlot` lanes elsewhere in this file.
 
   /**
    * Address: 0x00773230 (FUN_00773230)
@@ -2197,15 +2197,10 @@ namespace
     return InsertForwardNodeAtSlot(node, slot);
   }
 
-  /**
-   * Address: 0x00773B30 (FUN_00773B30)
-   */
-  ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode773B30(
-    ForwardLinkNodeRuntimeView* const node
-  ) noexcept
-  {
-    return UnlinkAndSelfLinkForwardNode(node);
-  }
+  // NOTE (UnlinkAndSelfLinkForwardNode773B30 removal -- fully resolved):
+  // Address: 0x00773B30 (FUN_00773B30) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkAndSelfLinkForwardNode above (its only in-file caller).
 
   /**
    * Address: 0x00773B50 (FUN_00773B50)
@@ -4941,38 +4936,19 @@ namespace
     return headSlot;
   }
 
-  /**
-   * Address: 0x005D0AC0 (FUN_005D0AC0)
-   *
-   * What it does:
-   * Unlinks one intrusive node from its ring and restores singleton self-links.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfAlpha(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
-
-  /**
-   * Address: 0x005D0AE0 (FUN_005D0AE0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfBeta(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
-
-  /**
-   * Address: 0x005D0CA0 (FUN_005D0CA0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfGamma(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfAlpha/Beta/Gamma removal -- fully resolved):
+  // Address: 0x005D0AC0 (FUN_005D0AC0)
+  // Address: 0x005D0AE0 (FUN_005D0AE0)
+  // Address: 0x005D0CA0 (FUN_005D0CA0)
+  //
+  // All three were `function_sha256`-identical thin wrappers around this
+  // file's own `UnlinkIntrusiveNodeAndSelfLink`, which is itself byte-for-
+  // byte `TDatListItem<T>::ListUnlinkSelf()` (moho/containers/TDatList.h) --
+  // the shared unlink-and-self-link primitive already cited there with real
+  // callers across many owning classes (also already carrying sibling twins
+  // FUN_00632BC0/FUN_00786A80/FUN_00779220 and others). See that method's
+  // own Doxygen block for the full evidence trail; it is these three
+  // addresses' recovery.
 
   /**
    * Address: 0x005D1F50 (FUN_005D1F50)
@@ -5167,16 +5143,10 @@ namespace
     return runtime->profileWord;
   }
 
-  /**
-   * Address: 0x005D57C0 (FUN_005D57C0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfDelta(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfDelta removal -- fully resolved):
+  // Address: 0x005D57C0 (FUN_005D57C0) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x005D58B0 (FUN_005D58B0)
@@ -5621,20 +5591,14 @@ namespace
     return InitializeTwoWordSelfLink(linkWords);
   }
 
-  /**
-   * Address: 0x00651EF0 (FUN_00651EF0)
-   *
-   * What it does:
-   * Unlinks one owner node at `owner+0x04`, restores singleton self-links, and
-   * inserts it directly before `anchor`.
-   */
-  IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset04BeforeAnchor(
-    void* const ownerBase,
-    IntrusiveNodeRuntimeView* const anchor
-  ) noexcept
-  {
-    return RelinkOwnerNodeAtOffsetBeforeAnchor(ownerBase, anchor, 0x04u);
-  }
+  // NOTE (RelinkOwnerNodeOffset04BeforeAnchor removal -- fully resolved):
+  // Address: 0x00651EF0 (FUN_00651EF0) is function_sha256-identical to
+  // `Moho::CUnitMeleeAttackTargetTask::RelinkAiAttackerListener`
+  // (FUN_005F42C0, CUnitMeleeAttackTargetTask.cpp) -- confirmed by its sole
+  // real caller, `CUnitMeleeAttackTargetTask::TaskTick`
+  // (`case TASKSTATE_Starting: RelinkAiAttackerListener(
+  // AiAttackerListenerHead(attacker));`). See that method's own Doxygen
+  // block for the full evidence trail; it is this address's recovery.
 
   /**
    * Address: 0x00651F50 (FUN_00651F50)
@@ -5795,27 +5759,11 @@ namespace
     return InitializeTwoWordSelfLink(linkWords);
   }
 
-  /**
-   * Address: 0x005E8B40 (FUN_005E8B40)
-   *
-   * What it does:
-   * Unlinks one intrusive node from its ring and restores singleton self-links.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEpsilon(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
-
-  /**
-   * Address: 0x005E3CB0 (FUN_005E3CB0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEta(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfEpsilon/Eta removal -- fully resolved):
+  // Address: 0x005E8B40 (FUN_005E8B40)
+  // Address: 0x005E3CB0 (FUN_005E3CB0)
+  // -- see `TDatListItem<T>::ListUnlinkSelf()` (moho/containers/TDatList.h);
+  // same resolution as UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x005E95F0 (FUN_005E95F0)
@@ -5984,25 +5932,11 @@ namespace
     return StoreWordAtOutput(outValue, source->lane04);
   }
 
-  /**
-   * Address: 0x005E9D50 (FUN_005E9D50)
-   *
-   * What it does:
-   * Unlinks one intrusive owner-node lane at `+0x04`, restores singleton
-   * self-links, then relinks that node directly before `anchor`.
-   */
-  IntrusiveNodeRuntimeView* RelinkOwnerNodeBeforeAnchor(
-    IntrusiveOwnerNodeSlotRuntimeView* const owner,
-    IntrusiveNodeRuntimeView* const anchor
-  ) noexcept
-  {
-    IntrusiveNodeRuntimeView* const node = UnlinkIntrusiveNodeAndSelfLink(owner->node);
-    node->prev = anchor->prev;
-    node->next = anchor;
-    anchor->prev = node;
-    node->prev->next = node;
-    return node;
-  }
+  // NOTE (RelinkOwnerNodeBeforeAnchor removal -- fully resolved):
+  // Address: 0x005E9D50 (FUN_005E9D50) -- see `Moho::
+  // CUnitMeleeAttackTargetTask::RelinkAiAttackerListener` (FUN_005F42C0,
+  // CUnitMeleeAttackTargetTask.cpp); same resolution as
+  // RelinkOwnerNodeOffset04BeforeAnchor above.
 
   /**
    * Address: 0x005E9D80 (FUN_005E9D80)
@@ -6096,16 +6030,10 @@ namespace
     return InitializeTwoWordSelfLink(linkWords);
   }
 
-  /**
-   * Address: 0x005E9DB0 (FUN_005E9DB0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfZeta(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfZeta removal -- fully resolved):
+  // Address: 0x005E9DB0 (FUN_005E9DB0) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x005EA870 (FUN_005EA870)
@@ -6622,16 +6550,10 @@ namespace
     return static_cast<std::uint32_t>(callback(runtime, deleteFlag));
   }
 
-  /**
-   * Address: 0x0067B950 (FUN_0067B950)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfTheta(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfTheta removal -- fully resolved):
+  // Address: 0x0067B950 (FUN_0067B950) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x0067C420 (FUN_0067C420)
@@ -11599,19 +11521,10 @@ namespace
     return InitializeTwoWordSelfLink(linkWords);
   }
 
-  /**
-   * Address: 0x006AF040 (FUN_006AF040)
-   *
-   * What it does:
-   * Unlinks one intrusive node from its ring and restores singleton
-   * self-links.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfLambda(
-    IntrusiveNodeRuntimeView* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfLambda removal -- fully resolved):
+  // Address: 0x006AF040 (FUN_006AF040) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x006AF060 (FUN_006AF060)
@@ -13634,16 +13547,10 @@ namespace
     return InitializeTwoWordSelfLink(linkWords);
   }
 
-  /**
-   * Address: 0x00789ED0 (FUN_00789ED0)
-   *
-   * What it does:
-   * Alias lane for intrusive unlink-and-selflink reset behavior.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfMu(IntrusiveNodeRuntimeView* const node) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelfMu removal -- fully resolved):
+  // Address: 0x00789ED0 (FUN_00789ED0) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   /**
    * Address: 0x00789F10 (FUN_00789F10)
@@ -22275,19 +22182,10 @@ namespace
     return TakeAndClearWordLane(lane);
   }
 
-  /**
-   * Address: 0x00886800 (FUN_00886800)
-   *
-   * What it does:
-   * Unlinks one intrusive two-link node from its ring and restores
-   * singleton self-links.
-   */
-  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelf86A(
-    IntrusiveNodeRuntimeView* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveNodeAndSelfLink(node);
-  }
+  // NOTE (UnlinkIntrusiveNodeSelf86A removal -- fully resolved):
+  // Address: 0x00886800 (FUN_00886800) -- see `TDatListItem<T>::
+  // ListUnlinkSelf()` (moho/containers/TDatList.h); same resolution as
+  // UnlinkIntrusiveNodeSelfAlpha above.
 
   using ScenarioLoadEntryRuntimeFn = void (*)(void* scenario, void** waitSet);
 
