@@ -7654,15 +7654,15 @@ namespace msvc8
          *
          * sizeof(T) == 0x50 (80, `count > 0xFFFFFFFF/80` throws):
          * Address: 0x008A9C60 (FUN_008A9C60, another cross-container reuse
-         * with `count=1` -- the single-node allocator for
-         * `TerrainEnvironmentLookupNodeRuntimeView`'s `msvc8::Tree<>`
-         * instantiation in `CWldMap.cpp` (0x50-byte node: 3 link fields +
-         * `pair<msvc8::string, boost::shared_ptr<RD3DTextureResource>>` +
-         * color/isNil). Called directly with a literal `1` from
-         * `FUN_008A9490` (`sub_8A9490() { return sub_8A9C60(1); }`), that
-         * tree's parameterless `alloc_raw`, already cited on
-         * `TerrainEnvironmentLookupNodeRuntimeView`'s constructor in
-         * CWldMap.cpp.)
+         * with `count=1` -- the single-node allocator for `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>`'s node
+         * (`CWldTerrainRes`'s `mEnvLookup`, `TerrainRuntimeView` /
+         * `TerrainVisualResourceRuntimeView` in `CWldMap.cpp`; 0x50-byte
+         * node: 3 link fields + `pair<msvc8::string,
+         * TerrainEnvironmentLookupEntry>` (0x1C + 0x24 = 0x40) + color/isNil,
+         * padded to 0x50). Called directly with a literal `1` from
+         * `FUN_008A9490` (`sub_8A9490() { return sub_8A9C60(1); }`), this
+         * instantiation's `alloc_raw()`, cited on that member in `RbTree.h`.)
          *
          * sizeof(T) == 0x38 (56, `pair<msvc8::string, msvc8::string>`,
          * `count > 0xFFFFFFFF/56` throws, confirmed `cmp eax,38h` against

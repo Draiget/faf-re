@@ -220,6 +220,20 @@ namespace moho
   struct TerrainEnvironmentLookupEntry
   {
     /**
+     * Address: 0x008A7C80 (FUN_008A7C80, `msvc8::map<msvc8::string,
+     * TerrainEnvironmentLookupEntry>::operator[]` -- inlined default-value
+     * construction on the lower-bound-miss path, before the fresh slot is
+     * handed to `insert_hint`)
+     *
+     * What it does:
+     * Default-constructs an empty environment-lookup slot: an empty SSO
+     * environment name and a null texture handle. This is the value
+     * `operator[]` inserts the first time a given environment key is seen;
+     * `IWldTerrainRes::AddEnvLookup` immediately overwrites both fields.
+     */
+    TerrainEnvironmentLookupEntry() = default;
+
+    /**
      * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)
      *
      * What it does:

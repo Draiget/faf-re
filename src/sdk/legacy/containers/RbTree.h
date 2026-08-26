@@ -322,6 +322,20 @@ namespace msvc8
          * `0x006880F0`/`0x0094EE60` precedents above. Sibling `rb_max` for
          * this instantiation is `FUN_007CB110` (already `skip`, walks
          * `_Right`/offset+8).
+         *
+         * Address: 0x008A87E0 (FUN_008A87E0, sub_8A87E0) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::rb_min` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+         * instantiation cited on `insert_hint` above). Walks `->left` from
+         * a candidate node until the nil sentinel, matching this member
+         * exactly. Two real (now-superseded) callers in the deleted
+         * hand-rolled `CWldMap.cpp` implementation: the two-children branch
+         * of the node-erase step (matching `erase_node`'s own `rb_min
+         * (erased->right)` replacement-search below) and a post-erase
+         * `head->left`/`head->right` extrema recompute walking from
+         * `head->parent` -- both now folded into this member's callers
+         * (`erase_node`, `~rb_tree()`) rather than a bespoke
+         * `RecomputeTerrainEnvironmentExtrema` free function.
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -498,6 +512,13 @@ namespace msvc8
          * 0x009523F0, `WriteRawPointer` 0x00953320) is `RRef`-keyed. Not
          * corrected here; this member's `_Right`/isNil offsets are
          * independently confirmed and unaffected.
+         *
+         * Address: 0x008A87C0 (FUN_008A87C0, sub_8A87C0) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::rb_max` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+         * instantiation cited on `rb_min` above; see that citation for the
+         * two now-superseded callers this sibling shared in the deleted
+         * hand-rolled `CWldMap.cpp` implementation).
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -784,6 +805,22 @@ namespace msvc8
          * (`sub_A3E9C0`/`sub_A40060`) that each carry a local instance of
          * this same tree as scratch storage -- owning engine class not yet
          * pinned down beyond that.
+         *
+         * Address: 0x008A9090 (FUN_008A9090, IDA-inferred name
+         * `std::map_string_Env::Iterator::inc`) -- `msvc8::map<msvc8::string,
+         * moho::TerrainEnvironmentLookupEntry>::rb_increment` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same instantiation
+         * cited on `insert_hint` above). Two real callers: `insert_hint`'s
+         * emission for this instantiation (`FUN_008A8590`, cited above) at
+         * its successor-straddle branch (`std::map_string_Env::Iterator::
+         * inc((std::map_string_Env::_Node**)&a4)`), and
+         * `IWldTerrainRes::EnumerateEnvLookup`/`Save`'s in-order walk
+         * (`CWldMap.cpp`), now expressed as `for (const auto& [key, value]
+         * : mEnvLookup)` over this member's own `iterator::operator++`. Was
+         * re-derived from `insert_hint`'s own callee list during this pass
+         * rather than carried from a stale per-type citation -- the deleted
+         * hand-rolled `IncrementTerrainEnvironmentNode` free function in
+         * `CWldMap.cpp` had no Address: annotation of its own.
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1011,6 +1048,18 @@ namespace msvc8
          * currently declares it void*-keyed) -- not corrected in this pass.
          * This member's own offsets are independently confirmed against the
          * `.asm` and are unaffected.
+         *
+         * Address: 0x008A9720 (FUN_008A9720, sub_8A9720) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+         * rb_decrement` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+         * (same instantiation cited on `insert_hint`/`rb_increment` above).
+         * Sole real caller is `insert_hint`'s emission for this
+         * instantiation (`FUN_008A8590`, cited above) at its predecessor-
+         * straddle branch, called with no visible return-value capture in
+         * the decompile (the register-held result feeds directly into the
+         * following `sub_423A00`/`isNil@77` checks, the same argument/
+         * return elision seen throughout this emission family) -- matches
+         * this member's `before = rb_decrement(at)` straddle check exactly.
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -1959,6 +2008,24 @@ namespace msvc8
              * Storage` free function in `Unit.cpp` that walked a
              * `SArmorMultiplierMap&`/`SArmorMultiplierMapNode*` reach-in
              * instead of relying on the member's own destruction.
+             *
+             * Address: 0x008A7700 (FUN_008A7700, sub_8A7700) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * ~rb_tree()` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint` above). Frees every
+             * node reachable from the sentinel head then the head itself,
+             * matching this member's architectural role; not independently
+             * re-verified in this pass against whether its raw instruction
+             * sequence takes this member's recursive `destroy_subtree`
+             * shape or a flat in-order-increment walk (the deleted
+             * hand-rolled `DestroyTerrainEnvironmentLookupMapStorage`/
+             * `DestroyTerrainEnvironmentIteratorRange` pair in `CWldMap.cpp`
+             * used the latter shape; both are behaviorally identical --
+             * every node freed exactly once, head freed last). Reached
+             * automatically via `Moho::CWldTerrainRes::~CWldTerrainRes`'s
+             * (`DestroyTerrainResFields`, `CWldMap.cpp`) implicit member
+             * destruction now that `mEnvLookup` is a real typed
+             * `msvc8::map` member (`view.mEnvLookup.~TerrainEnvironmentLookupMap();`).
              */
             ~rb_tree()
             {
@@ -2166,6 +2233,27 @@ namespace msvc8
              * (deleted: zero callers anywhere in `src/sdk`, confirmed by a
              * full-tree grep -- an orphan duplicate, not a second real
              * instantiation).
+             *
+             * Address: 0x008A8FE0 (FUN_008A8FE0, sub_8A8FE0) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * lower_bound_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/
+             * `insert_unique` above). Plain descent loop comparing the
+             * candidate's key lane against the sought key, updating the
+             * candidate on non-less turns -- matches this member's shape
+             * exactly (no explicit args rendered in the decompile at its
+             * call site; the tree pointer was already live in the caller's
+             * register set, the same elision seen elsewhere in this
+             * emission family). Sole real caller is `operator[]`'s emission
+             * for this instantiation (`FUN_008A7C80`, cited on `Map.h`'s
+             * `operator[]()`) as its first statement, `iterator where =
+             * lower_bound(k);`. Re-homed here from a hand-rolled
+             * `FindTerrainEnvironmentLowerBound` free function in
+             * `moho/sim/CWldMap.cpp` that walked a duplicate
+             * `TerrainEnvironmentLookupMapRuntimeView`/
+             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair over the
+             * same node shape instead of calling this member (deleted along
+             * with the whole hand-rolled tree it anchored).
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -2386,6 +2474,29 @@ namespace msvc8
              * Address: 0x00A5D8A0 (FUN_00A5D8A0) -- byte-identical ICF twin
              * of 0x00A5D810, reached from `FUN_00A66C00`'s sibling emission
              * (`ConvexHull3<double>::Update`) -- same classification.
+             *
+             * Address: 0x008A8150 (FUN_008A8150, sub_8A8150) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * find_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint`/`lower_bound_node`
+             * above). Calls `lower_bound_node`'s emission for this
+             * instantiation (`FUN_008A8FE0`, cited above), then the same
+             * nil-or-key-less rejection this member performs, matching field
+             * for field. `FUN_008A80F0` is a thin wrapper over this same
+             * address with no logic of its own (`return sub_8A8150(map,
+             * key);`) -- `IWldTerrainRes::RemoveEnvLookup`'s real erase path
+             * (`CWldMap.cpp`) reaches the map through that wrapper before
+             * erasing the located node. Re-homed here from hand-rolled
+             * `FindTerrainEnvironmentNodeOrHead`/
+             * `FindTerrainEnvironmentNodeOrHeadForErase` free functions in
+             * `moho/sim/CWldMap.cpp` (the second a body-identical forwarder
+             * to the first, matching `FUN_008A80F0`/`FUN_008A8150`'s own
+             * wrapper relationship) that walked a duplicate
+             * `TerrainEnvironmentLookupMapRuntimeView`/
+             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair instead
+             * of calling this member (deleted along with the whole
+             * hand-rolled tree it anchored). `IWldTerrainRes::GetEnvLookup`
+             * now reaches this member directly as `mEnvLookup.find(key)`.
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -2696,6 +2807,16 @@ namespace msvc8
              * source line can currently be produced" after a DB-integrity
              * revert -- corrected here now that the real source can be
              * produced.
+             *
+             * Address: 0x008A8C30 (FUN_008A8C30, sub_8A8C30) --
+             * `msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>
+             * ::insert_unique` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint` above). Sole
+             * real caller is `insert_hint`'s emission for this instantiation
+             * (`FUN_008A8590`, cited above) as its final fallback (`*a3 =
+             * *(_DWORD*)sub_8A8C30(a2,a1); return a3;` -- takes `.first` via
+             * the hidden-return-slot convention, matching `insert_unique(v)
+             * .first`).
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -2889,6 +3010,52 @@ namespace msvc8
              * `blocked` ("owner_layout", additional evidence needed); this
              * pass supplies the full instantiation, calling-convention, and
              * caller evidence.
+             *
+             * Address: 0x008A8590 (FUN_008A8590, sub_8A8590) --
+             * `msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>
+             * ::insert_hint` -- `Moho::CWldTerrainRes::mEnvLookup`
+             * (`TerrainRuntimeView`/`TerrainVisualResourceRuntimeView` in
+             * `moho/sim/CWldMap.cpp`), isNil@+0x4D (0x50-byte node: 12-byte
+             * link triplet + 28-byte `msvc8::string` key + 0x24-byte
+             * `TerrainEnvironmentLookupEntry` value + color/isNil).
+             * `a1@<eax>`=`&v` (the pair being inserted, read through its
+             * first-member-aliases-key-at-offset-0 shape for every
+             * `sub_423A00` compare -- `this->comp()`), `a2@<ecx>`=the tree,
+             * `a3@<esi>`=hidden return slot, `a4`=hint node. Matches this
+             * member's full branch structure field for field: empty-tree
+             * fast path (`!*(a2+8)`, i.e. `size_==0`) straight to
+             * `insert_at` (`sub_8A8E30`, cited on `insert_at` below);
+             * `hint == leftmost()` check (`a4 == *(a2+4)`'s dereferenced
+             * head-left, i.e. `a4 == head_->left`); `hint == head_` check
+             * (`(_DWORD*)a4 == v7` where `v7 = head_`, matching
+             * `rb_is_nil(at)` since head_ is its own nil sentinel); a
+             * predecessor straddle check calling `rb_decrement`
+             * (`sub_8A9720`, cited on `rb_decrement` above) then testing
+             * `rb_is_nil(before->right)` at byte offset 77 (0x4D, this
+             * instantiation's `isNil` offset) to pick `insert_at(false,
+             * before, v)` vs `insert_at(true, at, v)`; a successor straddle
+             * check calling `std::map_string_Env::Iterator::inc`
+             * (`sub_8A9090`, this instantiation's `rb_increment`, cited
+             * above) then the same `isNil`-at-77 test to pick `insert_at
+             * (false, at, v)` vs `insert_at(true, after, v)`; and a final
+             * fallback to `insert_unique` (`sub_8A8C30`, cited on
+             * `insert_unique` above) taking `.first` (`*a3 =
+             * *(_DWORD*)sub_8A8C30(a2,a1)`). Sole real caller is
+             * `operator[]`'s emission for this instantiation (`FUN_008A7C80`,
+             * cited on `Map.h`'s `operator[]()`) passing its own
+             * `lower_bound` result as the hint -- the same "fill the gap we
+             * just located" usage this member's doc comment above describes,
+             * confirmed via `IWldTerrainRes::AddEnvLookup`'s
+             * `mEnvLookup[environmentKey] = TerrainEnvironmentLookupEntry(
+             * texturePath, texture)` (`CWldMap.cpp`). Previously uncited --
+             * IDA's decompile rendered this as an anonymous `sub_8A8590`
+             * with no recognized STL shape; `AddEnvLookup`'s existing
+             * recovery instead reached this map through a bespoke, fully
+             * duplicated hand-rolled red-black tree (`InsertTerrainEnvironment
+             * Node` and ~20 sibling free functions in `CWldMap.cpp`, deleted
+             * in this pass) that never called this member at all -- the
+             * RULE-ONE violation this citation, and the migration of
+             * `mEnvLookup` onto this template, resolves.
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -3474,6 +3641,23 @@ namespace msvc8
              * `FUN_007CAC80`/`FUN_00A3E450` precedents immediately above),
              * this member is kept `recovered` as a genuine compiled emission
              * of real template code.
+             *
+             * Address: 0x008A7DE0 (FUN_008A7DE0, sub_8A7DE0) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * erase_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint`/`rb_min`/`rb_max`
+             * above). Captures the in-order successor via `rb_increment`
+             * (`FUN_008A9090`, cited above), the classic CLRS transplant with
+             * a `rb_min(erased->right)` replacement search for the
+             * two-children case (`FUN_008A87E0`, cited above), rebalances
+             * when the physically-removed node's original colour was black,
+             * frees the node and decrements size -- matches this member
+             * field for field. Real caller (superseded) was the deleted
+             * hand-rolled `EraseTerrainEnvironmentNode` free function's own
+             * two call sites in `CWldMap.cpp`: the single-node erase path
+             * (now `mEnvLookup.erase(key)`, `RemoveEnvLookup`) and the
+             * whole/partial-range erase walk (now `erase_range`'s slow path
+             * below).
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -4028,6 +4212,26 @@ namespace msvc8
              * function emitted", confidence 0.35); corrected to
              * `recovered` after confirming the destructor does perform a
              * real, distinct out-of-line call here.
+             *
+             * Address: 0x008A8D40 (FUN_008A8D40, sub_8A8D40) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * erase_range` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/`erase_node`
+             * above). Whole-tree fast path (`eraseFirst==leftmost() &&
+             * eraseLast==head`) sweeps via `destroy_subtree`
+             * (`FUN_008A8720`, cited below) and rebinds the sentinel to the
+             * empty state; the slow path steps `eraseFirst` toward
+             * `eraseLast` one in-order successor at a time, destroying one
+             * node per iteration through `erase_node` (`FUN_008A7DE0`,
+             * cited above) -- matches this member field for field. Real
+             * caller (superseded) was the deleted hand-rolled
+             * `EraseTerrainEnvironmentNodeRange` free function in
+             * `CWldMap.cpp` -- the `mEnvLookup` map-range erase this member
+             * models had no live `src/sdk` caller before this pass. Note
+             * this member's own fast path calls `clear()` below (not the
+             * reverse); `IWldTerrainRes::ClearEnvLookup` now calls
+             * `mEnvLookup.clear()` directly rather than routing through
+             * this member.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -4219,6 +4423,25 @@ namespace msvc8
              * as dead code -- it is behaviorally inert (the tree is already
              * empty) but genuinely present in the binary's instruction
              * stream.
+             *
+             * Address: 0x008A1640 (FUN_008A1640,
+             * ?ClearEnvLookup@CWldTerrainRes@Moho@@UAEXXZ) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::clear`
+             * -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+             * instantiation cited on `insert_hint`/`destroy_subtree` above).
+             * `destroy_subtree(head->parent)` then the three-way
+             * self-link-plus-zero-size reset -- matches this member exactly,
+             * field for field, with no fused/inlined variation. Real
+             * callers: `IWldTerrainRes::ClearEnvLookup` itself (public API,
+             * `moho/sim/CWldMap.cpp`, now `mEnvLookup.clear();` verbatim)
+             * and `Moho::CWldTerrainRes::Reset` (FUN_008A6220), which the
+             * existing `CWldMap.cpp` recovery already documents as
+             * statically inlining this same address rather than emitting a
+             * virtual dispatch. Re-homed here from a hand-rolled
+             * `ClearEnvLookup` body that open-coded this exact sequence
+             * against the deleted `TerrainEnvironmentLookupMapRuntimeView`/
+             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair instead
+             * of calling this member.
              */
             void clear() noexcept
             {
@@ -4380,6 +4603,30 @@ namespace msvc8
              * constructor (`FUN_007CD990`, which performs the self-link/
              * `isNil=1` fixup itself, the same split-instantiation pattern
              * already documented above).
+             *
+             * Address: 0x008A9490 (FUN_008A9490, sub_8A9490) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * alloc_raw` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint` above). A thin
+             * one-line forwarder, `sub_8A9490() { return sub_8A9C60(1); }`,
+             * to this instantiation's shared checked-single-node allocator
+             * (`FUN_008A9C60`, `msvc8::vector<T>::allocate_slots_checked`
+             * for `sizeof(node_type)==0x50` reused with `count=1` -- cited
+             * in full on `allocate_slots_checked` in `Vector.h`, the same
+             * cross-container-reuse shape already documented there for the
+             * `SetupPrimaryAdapterSettings` dedup tree). Reached from this
+             * instantiation's `buy_head()` (below) via the C++20 source's
+             * `new (&view.mEnvLookup) TerrainEnvironmentLookupMap();`
+             * placement-construction in the terrain-resource constructor
+             * (`ConstructTerrainResFields`, `CWldMap.cpp`) -- the binary
+             * instead calls `FUN_008A9490` directly at that call site and
+             * performs the self-link/`isNil=1` promotion inline rather than
+             * through a separate `buy_head`-shaped symbol (the same
+             * "checked node-allocate-and-default-init, caller promotes
+             * isNil and self-links" shape already documented on
+             * `gpg::WriteArchive`'s ctor and `CAiFormationInstance.cpp`'s
+             * default formation-lane entry), which this template's shared
+             * `buy_head()` now performs uniformly instead.
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -5593,6 +5840,23 @@ namespace msvc8
              * compiles to for a `shared_ptr` value. Sole caller is
              * `erase_range`'s fast whole-tree path for this instantiation
              * (`FUN_008564E0`, cited above).
+             *
+             * Address: 0x008A8720 (FUN_008A8720, sub_8A8720) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * destroy_subtree` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/`erase_range`
+             * above). Recursive right-then-iterate-left post-order sweep,
+             * one plain `delete` per node (the `TerrainEnvironmentLookupEntry`
+             * value's `boost::shared_ptr<RD3DTextureResource>` release runs
+             * through the node's implicit destructor, matching this
+             * member's `n->value.~value_type()`/`free_node`) -- matches
+             * field for field. Two real callers (superseded): the deleted
+             * hand-rolled `DeleteTerrainEnvironmentSubtreePostOrder`'s own
+             * two call sites -- `ClearEnvLookup`'s whole-subtree sweep (now
+             * `mEnvLookup.clear()`, which calls this member directly, see
+             * `clear()` below) and `EraseTerrainEnvironmentNodeRange`'s
+             * fast whole-tree path (now `erase_range`'s fast path above,
+             * which reaches this member indirectly through `clear()`).
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {

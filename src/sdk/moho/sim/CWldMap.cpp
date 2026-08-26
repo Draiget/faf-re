@@ -22,6 +22,7 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -168,83 +169,22 @@ namespace
   };
   static_assert(sizeof(TerrainNormalEncodeBlock) == 0x20, "TerrainNormalEncodeBlock size must be 0x20");
 
-  struct TerrainEnvironmentLookupNodeRuntimeView : msvc8::Tree<TerrainEnvironmentLookupNodeRuntimeView>
-  {
-    /**
-     * Address: 0x008A9490 (FUN_008A9490)
-     *
-     * IDA signature:
-     * void *__cdecl sub_8A9490(void);
-     *
-     * What it does:
-     * Checked node allocator for this map's node type: buys one 0x50-byte
-     * node, then defensively zero-initializes the left/parent/right
-     * intrusive-tree pointers one at a time (each write guarded against the
-     * allocation having landed at the very top of the address space, where
-     * the pointer-plus-offset could itself read as -4/-8 and fault) before
-     * setting color=1/isNil=0. The caller then self-links the three
-     * pointers to itself and promotes isNil to 1 to turn the fresh node
-     * into the empty-tree head sentinel -- the same "checked
-     * node-allocate-and-default-init, caller promotes isNil and self-links"
-     * shape already documented on `gpg::WriteArchive`'s ctor
-     * (`WriteArchive.cpp`, FUN_00950540) and `CAiFormationInstance.cpp`'s
-     * default formation-lane entry. Reached from the terrain-resource ctor
-     * (0x008A0AD0, `ConstructTerrainResFields` below) via `v1 =
-     * sub_8A9490(); mEnvLookup.mHead = v1; v1->isNil = 1; ...` self-links;
-     * collapsed here into this one constructor since it performs both the
-     * allocate-and-init and the promote-and-self-link steps together.
-     */
-    TerrainEnvironmentLookupNodeRuntimeView()
-      : mKey()
-      , mValue(msvc8::string(), boost::shared_ptr<moho::RD3DTextureResource>{})
-      , mColor(1)
-      , mIsNil(1)
-      , mPad4E_4F{0, 0}
-    {
-      left = this;
-      parent = this;
-      right = this;
-    }
-
-    msvc8::string mKey;                        // +0x0C
-    moho::TerrainEnvironmentLookupEntry mValue; // +0x28
-    std::uint8_t mColor;                       // +0x4C
-    std::uint8_t mIsNil;                       // +0x4D
-    std::uint8_t mPad4E_4F[0x02]{};            // +0x4E
-  };
-  static_assert(
-    offsetof(TerrainEnvironmentLookupNodeRuntimeView, mKey) == 0x0C,
-    "TerrainEnvironmentLookupNodeRuntimeView::mKey offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(TerrainEnvironmentLookupNodeRuntimeView, mValue) == 0x28,
-    "TerrainEnvironmentLookupNodeRuntimeView::mValue offset must be 0x28"
-  );
-  static_assert(
-    offsetof(TerrainEnvironmentLookupNodeRuntimeView, mColor) == 0x4C,
-    "TerrainEnvironmentLookupNodeRuntimeView::mColor offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(TerrainEnvironmentLookupNodeRuntimeView, mIsNil) == 0x4D,
-    "TerrainEnvironmentLookupNodeRuntimeView::mIsNil offset must be 0x4D"
-  );
-  static_assert(sizeof(TerrainEnvironmentLookupNodeRuntimeView) == 0x50, "TerrainEnvironmentLookupNodeRuntimeView size must be 0x50");
-
-  struct TerrainEnvironmentLookupMapRuntimeView
-  {
-    std::uint32_t mUnknown00;                            // +0x00
-    TerrainEnvironmentLookupNodeRuntimeView* mHead;      // +0x04
-    std::uint32_t mSize;                                 // +0x08
-  };
-  static_assert(sizeof(TerrainEnvironmentLookupMapRuntimeView) == 0x0C, "TerrainEnvironmentLookupMapRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(TerrainEnvironmentLookupMapRuntimeView, mHead) == 0x04,
-    "TerrainEnvironmentLookupMapRuntimeView::mHead offset must be 0x04"
-  );
-  static_assert(
-    offsetof(TerrainEnvironmentLookupMapRuntimeView, mSize) == 0x08,
-    "TerrainEnvironmentLookupMapRuntimeView::mSize offset must be 0x08"
-  );
+  /**
+   * `CWldTerrainRes`'s environment-lookup cache: a genuine `std::map<
+   * std::string, TerrainEnvironmentLookupEntry>` in the shipped binary (not
+   * a `msvc8::`-namespace-shaped one at the source level), modeled here with
+   * this project's ABI-matching `msvc8::map` so the 12-byte map header and
+   * 0x50-byte node stay bit-for-bit where `TerrainVisualResourceRuntimeView`/
+   * `TerrainRuntimeView` (below) need them at fixed offset +0x9A4. All of the
+   * tree mechanics (lower-bound search, hinted insert, erase, in-order
+   * increment) are `msvc8::map`'s own canonical, address-cited template
+   * members (`legacy/containers/RbTree.h`/`Map.h`) for this `<msvc8::string,
+   * moho::TerrainEnvironmentLookupEntry>` instantiation -- see the
+   * instantiation-specific citations added there (isNil@+0x4D, value_type
+   * 0x24 bytes) -- rather than a bespoke per-field reimplementation.
+   */
+  using TerrainEnvironmentLookupMap = msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>;
+  static_assert(sizeof(TerrainEnvironmentLookupMap) == 0x0C, "TerrainEnvironmentLookupMap size must be 0x0C");
 
   struct TerrainVisualResourceRuntimeView
   {
@@ -253,7 +193,7 @@ namespace
     moho::ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
     msvc8::string mSkycubeFile;                                 // +0x980
     moho::ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
-    TerrainEnvironmentLookupMapRuntimeView mEnvLookup;          // +0x9A4
+    TerrainEnvironmentLookupMap mEnvLookup;                     // +0x9A4
     TerrainEditWordBufferRuntimeView mEditWordBuffer;           // +0x9B0
     boost::shared_ptr<moho::CD3DDynamicTextureSheet> mWaterMapTexture; // +0x9C0
     std::uint8_t* mWaterFoam;                                   // +0x9C8
@@ -446,7 +386,7 @@ namespace
     moho::ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
     msvc8::string mSkycubeFile;                                     // +0x980
     moho::ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
-    TerrainEnvironmentLookupMapRuntimeView mEnvLookup;              // +0x9A4
+    TerrainEnvironmentLookupMap mEnvLookup;                         // +0x9A4
     TerrainEditWordBufferRuntimeView mEditWordBuffer;               // +0x9B0
     moho::ID3DDeviceResources::TextureResourceHandle mWaterMapTexture;    // +0x9C0
     std::uint8_t* mWaterFoam;                                       // +0x9C8
@@ -618,638 +558,6 @@ namespace
     out.Min.y = minY;
     out.Max.y = maxY;
     return out;
-  }
-
-  [[nodiscard]] bool IsTerrainEnvironmentLookupNil(const TerrainEnvironmentLookupNodeRuntimeView* const node) noexcept
-  {
-    return node == nullptr || node->mIsNil != 0;
-  }
-
-  [[nodiscard]] int CompareTerrainEnvironmentLookupKeys(
-    const msvc8::string& lhs, const msvc8::string& rhs
-  ) noexcept
-  {
-    return lhs.compare(0u, lhs.size(), rhs.c_str(), rhs.size());
-  }
-
-  [[nodiscard]] int CompareTerrainEnvironmentNodeKeyWithQuery(
-    const TerrainEnvironmentLookupNodeRuntimeView& node, const msvc8::string& query
-  ) noexcept
-  {
-    return node.mKey.compare(0u, node.mKey.size(), query.c_str(), query.size());
-  }
-
-  /**
-   * Address: 0x008A98F0 (FUN_008A98F0, sub_8A98F0)
-   *
-   * What it does:
-   * Copy-constructs one environment lookup `(key,value)` pair from two
-   * temporary string lanes and returns the destination pair pointer.
-   */
-  [[maybe_unused]] moho::TerrainEnvironmentLookupPair* ConstructTerrainEnvironmentLookupPair(
-    moho::TerrainEnvironmentLookupPair* const destination,
-    msvc8::string key,
-    msvc8::string value
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    new (destination) moho::TerrainEnvironmentLookupPair(key, value);
-    return destination;
-  }
-
-  /**
-   * Address: 0x008A8FE0 (FUN_008A8FE0)
-   *
-   * What it does:
-   * Returns lower-bound node for one environment key in the terrain lookup map.
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* FindTerrainEnvironmentLowerBound(
-    TerrainEnvironmentLookupMapRuntimeView& map, const msvc8::string& key
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    TerrainEnvironmentLookupNodeRuntimeView* cursor = head->parent;
-    TerrainEnvironmentLookupNodeRuntimeView* candidate = head;
-    while (!IsTerrainEnvironmentLookupNil(cursor)) {
-      if (CompareTerrainEnvironmentNodeKeyWithQuery(*cursor, key) >= 0) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-    return candidate;
-  }
-
-  /**
-   * Address: 0x008A8150 (FUN_008A8150)
-   *
-   * What it does:
-   * Returns exact-match node for one key, or map head when no match exists.
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* FindTerrainEnvironmentNodeOrHead(
-    TerrainEnvironmentLookupMapRuntimeView& map, const msvc8::string& key
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    TerrainEnvironmentLookupNodeRuntimeView* const candidate = FindTerrainEnvironmentLowerBound(map, key);
-    if (candidate == nullptr || candidate == head) {
-      return head;
-    }
-
-    if (CompareTerrainEnvironmentLookupKeys(key, candidate->mKey) < 0) {
-      return head;
-    }
-    return candidate;
-  }
-
-  /**
-   * Address: 0x008A80F0 (FUN_008A80F0)
-   *
-   * What it does:
-   * Removes lane-specific exact-match lookup used by erase path.
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* FindTerrainEnvironmentNodeOrHeadForErase(
-    TerrainEnvironmentLookupMapRuntimeView& map, const msvc8::string& key
-  ) noexcept
-  {
-    return FindTerrainEnvironmentNodeOrHead(map, key);
-  }
-
-  /**
-   * Address: 0x008A87E0 (FUN_008A87E0, sub_8A87E0)
-   *
-   * What it does:
-   * Walks left links from one candidate node until the sentinel/nil lane and
-   * returns the leftmost concrete node (or head fallback).
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* TerrainEnvironmentTreeMin(
-    TerrainEnvironmentLookupNodeRuntimeView* node, TerrainEnvironmentLookupNodeRuntimeView* head
-  ) noexcept
-  {
-    while (!IsTerrainEnvironmentLookupNil(node) && !IsTerrainEnvironmentLookupNil(node->left)) {
-      node = node->left;
-    }
-    return node != nullptr ? node : head;
-  }
-
-  /**
-   * Address: 0x008A87C0 (FUN_008A87C0, sub_8A87C0)
-   *
-   * What it does:
-   * Walks right links from one candidate node until the sentinel/nil lane and
-   * returns the rightmost concrete node (or head fallback).
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* TerrainEnvironmentTreeMax(
-    TerrainEnvironmentLookupNodeRuntimeView* node, TerrainEnvironmentLookupNodeRuntimeView* head
-  ) noexcept
-  {
-    while (!IsTerrainEnvironmentLookupNil(node) && !IsTerrainEnvironmentLookupNil(node->right)) {
-      node = node->right;
-    }
-    return node != nullptr ? node : head;
-  }
-
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* IncrementTerrainEnvironmentNode(
-    TerrainEnvironmentLookupNodeRuntimeView* node, TerrainEnvironmentLookupNodeRuntimeView* head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-
-    if (node == head) {
-      return head->right;
-    }
-
-    if (!IsTerrainEnvironmentLookupNil(node->right)) {
-      node = node->right;
-      while (!IsTerrainEnvironmentLookupNil(node->left)) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    TerrainEnvironmentLookupNodeRuntimeView* parent = node->parent;
-    while (node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    if (node->right != parent) {
-      node = parent;
-    }
-    return node;
-  }
-
-  void RotateTerrainEnvironmentLeft(
-    TerrainEnvironmentLookupMapRuntimeView& map, TerrainEnvironmentLookupNodeRuntimeView* const pivot
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const right = pivot->right;
-    pivot->right = right->left;
-    if (!IsTerrainEnvironmentLookupNil(right->left)) {
-      right->left->parent = pivot;
-    }
-
-    right->parent = pivot->parent;
-    if (pivot == map.mHead->parent) {
-      map.mHead->parent = right;
-    } else if (pivot == pivot->parent->left) {
-      pivot->parent->left = right;
-    } else {
-      pivot->parent->right = right;
-    }
-
-    right->left = pivot;
-    pivot->parent = right;
-  }
-
-  void RotateTerrainEnvironmentRight(
-    TerrainEnvironmentLookupMapRuntimeView& map, TerrainEnvironmentLookupNodeRuntimeView* const pivot
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const left = pivot->left;
-    pivot->left = left->right;
-    if (!IsTerrainEnvironmentLookupNil(left->right)) {
-      left->right->parent = pivot;
-    }
-
-    left->parent = pivot->parent;
-    if (pivot == map.mHead->parent) {
-      map.mHead->parent = left;
-    } else if (pivot == pivot->parent->right) {
-      pivot->parent->right = left;
-    } else {
-      pivot->parent->left = left;
-    }
-
-    left->right = pivot;
-    pivot->parent = left;
-  }
-
-  void FixAfterTerrainEnvironmentInsert(
-    TerrainEnvironmentLookupMapRuntimeView& map, TerrainEnvironmentLookupNodeRuntimeView* node
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    while (node->parent->mColor == 0) {
-      TerrainEnvironmentLookupNodeRuntimeView* const grandparent = node->parent->parent;
-      if (node->parent == grandparent->left) {
-        TerrainEnvironmentLookupNodeRuntimeView* uncle = grandparent->right;
-        if (!IsTerrainEnvironmentLookupNil(uncle) && uncle->mColor == 0) {
-          node->parent->mColor = 1;
-          uncle->mColor = 1;
-          grandparent->mColor = 0;
-          node = grandparent;
-        } else {
-          if (node == node->parent->right) {
-            node = node->parent;
-            RotateTerrainEnvironmentLeft(map, node);
-          }
-          node->parent->mColor = 1;
-          grandparent->mColor = 0;
-          RotateTerrainEnvironmentRight(map, grandparent);
-        }
-      } else {
-        TerrainEnvironmentLookupNodeRuntimeView* uncle = grandparent->left;
-        if (!IsTerrainEnvironmentLookupNil(uncle) && uncle->mColor == 0) {
-          node->parent->mColor = 1;
-          uncle->mColor = 1;
-          grandparent->mColor = 0;
-          node = grandparent;
-        } else {
-          if (node == node->parent->left) {
-            node = node->parent;
-            RotateTerrainEnvironmentRight(map, node);
-          }
-          node->parent->mColor = 1;
-          grandparent->mColor = 0;
-          RotateTerrainEnvironmentLeft(map, grandparent);
-        }
-      }
-
-      if (node == head->parent) {
-        break;
-      }
-    }
-    head->parent->mColor = 1;
-  }
-
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* InsertTerrainEnvironmentNode(
-    TerrainEnvironmentLookupMapRuntimeView& map, const msvc8::string& key
-  )
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    TerrainEnvironmentLookupNodeRuntimeView* parent = head;
-    TerrainEnvironmentLookupNodeRuntimeView* cursor = head->parent;
-    bool linkLeft = true;
-    while (!IsTerrainEnvironmentLookupNil(cursor)) {
-      parent = cursor;
-      const int cmp = CompareTerrainEnvironmentLookupKeys(key, cursor->mKey);
-      if (cmp < 0) {
-        linkLeft = true;
-        cursor = cursor->left;
-      } else if (cmp > 0) {
-        linkLeft = false;
-        cursor = cursor->right;
-      } else {
-        return cursor;
-      }
-    }
-
-    auto* const inserted = new TerrainEnvironmentLookupNodeRuntimeView{};
-    inserted->left = head;
-    inserted->right = head;
-    inserted->parent = parent;
-    inserted->mColor = 0;
-    inserted->mIsNil = 0;
-    inserted->mKey.assign_owned(key.view());
-    inserted->mValue.mEnvironmentName.clear();
-    inserted->mValue.mTexture.reset();
-
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-    } else if (linkLeft) {
-      parent->left = inserted;
-      if (parent == head->left) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (parent == head->right) {
-        head->right = inserted;
-      }
-    }
-
-    ++map.mSize;
-    FixAfterTerrainEnvironmentInsert(map, inserted);
-    return inserted;
-  }
-
-  void RecomputeTerrainEnvironmentExtrema(TerrainEnvironmentLookupMapRuntimeView& map) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    if (IsTerrainEnvironmentLookupNil(head->parent)) {
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = TerrainEnvironmentTreeMin(head->parent, head);
-    head->right = TerrainEnvironmentTreeMax(head->parent, head);
-  }
-
-  void TransplantTerrainEnvironmentNode(
-    TerrainEnvironmentLookupMapRuntimeView& map,
-    TerrainEnvironmentLookupNodeRuntimeView* const source,
-    TerrainEnvironmentLookupNodeRuntimeView* const replacement
-  ) noexcept
-  {
-    if (source->parent->mIsNil != 0) {
-      map.mHead->parent = replacement;
-    } else if (source == source->parent->left) {
-      source->parent->left = replacement;
-    } else {
-      source->parent->right = replacement;
-    }
-
-    if (!IsTerrainEnvironmentLookupNil(replacement)) {
-      replacement->parent = source->parent;
-    }
-  }
-
-  void FixAfterTerrainEnvironmentErase(
-    TerrainEnvironmentLookupMapRuntimeView& map,
-    TerrainEnvironmentLookupNodeRuntimeView* current,
-    TerrainEnvironmentLookupNodeRuntimeView* parent
-  ) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    while (current != head->parent && (current == nullptr || current->mColor == 1)) {
-      if (current == parent->left) {
-        TerrainEnvironmentLookupNodeRuntimeView* sibling = parent->right;
-        if (sibling->mColor == 0) {
-          sibling->mColor = 1;
-          parent->mColor = 0;
-          RotateTerrainEnvironmentLeft(map, parent);
-          sibling = parent->right;
-        }
-
-        if (sibling->left->mColor == 1 && sibling->right->mColor == 1) {
-          sibling->mColor = 0;
-          current = parent;
-          parent = current->parent;
-        } else {
-          if (sibling->right->mColor == 1) {
-            sibling->left->mColor = 1;
-            sibling->mColor = 0;
-            RotateTerrainEnvironmentRight(map, sibling);
-            sibling = parent->right;
-          }
-
-          sibling->mColor = parent->mColor;
-          parent->mColor = 1;
-          sibling->right->mColor = 1;
-          RotateTerrainEnvironmentLeft(map, parent);
-          current = head->parent;
-        }
-      } else {
-        TerrainEnvironmentLookupNodeRuntimeView* sibling = parent->left;
-        if (sibling->mColor == 0) {
-          sibling->mColor = 1;
-          parent->mColor = 0;
-          RotateTerrainEnvironmentRight(map, parent);
-          sibling = parent->left;
-        }
-
-        if (sibling->right->mColor == 1 && sibling->left->mColor == 1) {
-          sibling->mColor = 0;
-          current = parent;
-          parent = current->parent;
-        } else {
-          if (sibling->left->mColor == 1) {
-            sibling->right->mColor = 1;
-            sibling->mColor = 0;
-            RotateTerrainEnvironmentLeft(map, sibling);
-            sibling = parent->left;
-          }
-
-          sibling->mColor = parent->mColor;
-          parent->mColor = 1;
-          sibling->left->mColor = 1;
-          RotateTerrainEnvironmentRight(map, parent);
-          current = head->parent;
-        }
-      }
-    }
-
-    if (current != nullptr) {
-      current->mColor = 1;
-    }
-  }
-
-  /**
-   * Address: 0x008A7DE0 (FUN_008A7DE0)
-   *
-   * What it does:
-   * Erases one node from terrain environment-lookup RB-tree and returns the
-   * next in-order node.
-   */
-  [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* EraseTerrainEnvironmentNode(
-    TerrainEnvironmentLookupMapRuntimeView& map, TerrainEnvironmentLookupNodeRuntimeView* const eraseNode
-  )
-  {
-    if (eraseNode == nullptr || map.mHead == nullptr) {
-      return map.mHead;
-    }
-    if (eraseNode->mIsNil != 0) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    TerrainEnvironmentLookupNodeRuntimeView* const next = IncrementTerrainEnvironmentNode(eraseNode, map.mHead);
-
-    TerrainEnvironmentLookupNodeRuntimeView* moved = eraseNode;
-    std::uint8_t movedOriginalColor = moved->mColor;
-    TerrainEnvironmentLookupNodeRuntimeView* child = map.mHead;
-    TerrainEnvironmentLookupNodeRuntimeView* childParent = map.mHead;
-
-    if (IsTerrainEnvironmentLookupNil(eraseNode->left)) {
-      child = eraseNode->right;
-      childParent = eraseNode->parent;
-      TransplantTerrainEnvironmentNode(map, eraseNode, eraseNode->right);
-    } else if (IsTerrainEnvironmentLookupNil(eraseNode->right)) {
-      child = eraseNode->left;
-      childParent = eraseNode->parent;
-      TransplantTerrainEnvironmentNode(map, eraseNode, eraseNode->left);
-    } else {
-      moved = TerrainEnvironmentTreeMin(eraseNode->right, map.mHead);
-      movedOriginalColor = moved->mColor;
-      child = moved->right;
-      if (moved->parent == eraseNode) {
-        childParent = moved;
-        if (!IsTerrainEnvironmentLookupNil(child)) {
-          child->parent = moved;
-        }
-      } else {
-        childParent = moved->parent;
-        TransplantTerrainEnvironmentNode(map, moved, moved->right);
-        moved->right = eraseNode->right;
-        moved->right->parent = moved;
-      }
-
-      TransplantTerrainEnvironmentNode(map, eraseNode, moved);
-      moved->left = eraseNode->left;
-      moved->left->parent = moved;
-      moved->mColor = eraseNode->mColor;
-    }
-
-    if (movedOriginalColor == 1) {
-      FixAfterTerrainEnvironmentErase(map, child, childParent);
-    }
-
-    delete eraseNode;
-    if (map.mSize != 0u) {
-      --map.mSize;
-    }
-    RecomputeTerrainEnvironmentExtrema(map);
-    return next;
-  }
-
-  /**
-   * Address: 0x008A8720 (FUN_008A8720, sub_8A8720)
-   *
-   * What it does:
-   * Clears one terrain environment-lookup subtree by recursively deleting right
-   * branches, then deleting the left chain in post-order.
-   */
-  void DeleteTerrainEnvironmentSubtreePostOrder(TerrainEnvironmentLookupNodeRuntimeView* node) noexcept
-  {
-    while (!IsTerrainEnvironmentLookupNil(node)) {
-      DeleteTerrainEnvironmentSubtreePostOrder(node->right);
-      TerrainEnvironmentLookupNodeRuntimeView* const left = node->left;
-      delete node;
-      node = left;
-    }
-  }
-
-  void DestroyTerrainEnvironmentIteratorRange(
-    TerrainEnvironmentLookupNodeRuntimeView* node,
-    TerrainEnvironmentLookupNodeRuntimeView* const head
-  ) noexcept
-  {
-    while (!IsTerrainEnvironmentLookupNil(node)) {
-      TerrainEnvironmentLookupNodeRuntimeView* const eraseNode = node;
-      node = IncrementTerrainEnvironmentNode(node, head);
-      delete eraseNode;
-    }
-  }
-
-  /**
-   * Address: 0x008A8D40 (FUN_008A8D40, sub_8A8D40)
-   *
-   * IDA signature:
-   * int *__userpurge sub_8A8D40@<eax>(int a1@<edi>, int *a2, int a4, int arg8);
-   *
-   * What it does:
-   * Erases the half-open node range `[eraseFirst, eraseLast)` from one
-   * `TerrainEnvironmentLookup` red-black tree. When the range covers the
-   * entire tree (matches `[head->left, head]`), the fast path clears the
-   * whole tree in one `DeleteTerrainEnvironmentSubtreePostOrder` sweep,
-   * rebinds the sentinel to an empty state, and writes the zero-size
-   * iterator pair back into `*outIter`. The slow path steps from
-   * `eraseFirst` toward `eraseLast`, resolving each predecessor/successor
-   * via in-order walk and destroying one node per iteration through
-   * `EraseTerrainEnvironmentNode` (FUN_008A7DE0). The final cursor is
-   * published into `outIter` for the caller's iterator chain.
-   */
-  TerrainEnvironmentLookupNodeRuntimeView** EraseTerrainEnvironmentNodeRange(
-    TerrainEnvironmentLookupMapRuntimeView& map,
-    TerrainEnvironmentLookupNodeRuntimeView** const outIter,
-    TerrainEnvironmentLookupNodeRuntimeView* eraseFirst,
-    TerrainEnvironmentLookupNodeRuntimeView* const eraseLast
-  )
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      *outIter = nullptr;
-      return outIter;
-    }
-
-    // Fast path: whole-tree clear when `eraseFirst == head->left` (leftmost
-    // in-order node) and `eraseLast == head` (end sentinel).
-    if (eraseFirst == head->left && eraseLast == head) {
-      DeleteTerrainEnvironmentSubtreePostOrder(head->parent);
-      head->left = head;
-      map.mSize = 0u;
-      head->parent = head;
-      head->right = head;
-      *outIter = head->left;
-      return outIter;
-    }
-
-    // Slow path: step through the range, destroying one node per iteration.
-    // Walk toward the successor using the same in-order traversal the binary
-    // emits inline (successor if a right subtree exists, otherwise climb
-    // parents until we leave a right-branch ancestor).
-    while (eraseFirst != eraseLast) {
-      TerrainEnvironmentLookupNodeRuntimeView* cursor = eraseFirst;
-      if (!IsTerrainEnvironmentLookupNil(cursor)) {
-        TerrainEnvironmentLookupNodeRuntimeView* const rightChild = cursor->right;
-        if (!IsTerrainEnvironmentLookupNil(rightChild)) {
-          TerrainEnvironmentLookupNodeRuntimeView* leftmost = cursor->left;
-          if (IsTerrainEnvironmentLookupNil(leftmost)) {
-            // Walk left children from the right subtree looking for next.
-            for (leftmost = cursor->right;
-                 !IsTerrainEnvironmentLookupNil(leftmost) && leftmost != cursor->right;
-                 leftmost = leftmost->left) {
-              cursor = leftmost;
-            }
-            cursor = leftmost;
-          } else {
-            // Traverse predecessors until we leave a right-branch ancestor.
-            TerrainEnvironmentLookupNodeRuntimeView* predecessor = leftmost;
-            while (!IsTerrainEnvironmentLookupNil(predecessor)) {
-              TerrainEnvironmentLookupNodeRuntimeView* const parentLink = predecessor->right;
-              if (IsTerrainEnvironmentLookupNil(parentLink)) {
-                break;
-              }
-              if (cursor != parentLink->left) {
-                break;
-              }
-              cursor = predecessor;
-              predecessor = predecessor->right;
-            }
-            cursor = predecessor;
-          }
-        }
-      }
-
-      (void)EraseTerrainEnvironmentNode(map, eraseFirst);
-      eraseFirst = cursor;
-    }
-
-    *outIter = eraseFirst;
-    return outIter;
-  }
-
-  /**
-   * Address: 0x008A7700 (FUN_008A7700, sub_8A7700)
-   *
-   * What it does:
-   * Destroys all terrain environment-lookup nodes from one sentinel map head,
-   * releases the sentinel storage, and clears map head/size lanes.
-   */
-  void DestroyTerrainEnvironmentLookupMapStorage(TerrainEnvironmentLookupMapRuntimeView& map) noexcept
-  {
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-    if (head != nullptr) {
-      DestroyTerrainEnvironmentIteratorRange(head->left, head);
-      delete head;
-    }
-
-    map.mHead = nullptr;
-    map.mSize = 0u;
   }
 
   /**
@@ -2095,12 +1403,12 @@ namespace
     new (&view.mSkycubeFile) msvc8::string();
     new (&view.mSkycubeTexture) moho::ID3DDeviceResources::TextureResourceHandle();
 
-    // Env-lookup red-black map: allocate the self-linked, nil sentinel head
-    // (sub_8A9490 == node-new that self-links parent/left/right + sets
-    // mIsNil=1, exactly what the node ctor above does). The +0x00 allocator
-    // proxy lane is left untouched (MSVC8 EBO allocator), matching the binary.
-    view.mEnvLookup.mHead = new TerrainEnvironmentLookupNodeRuntimeView();
-    view.mEnvLookup.mSize = 0u;
+    // Env-lookup map: `msvc8::map`'s own default ctor allocates the
+    // self-linked, nil sentinel head (`buy_head()`, `legacy/containers/
+    // RbTree.h`; this instantiation's allocator half is FUN_008A9490,
+    // cited there) -- the same allocate-and-self-link the binary performs
+    // inline in this constructor.
+    new (&view.mEnvLookup) TerrainEnvironmentLookupMap();
 
     view.mEditWordBuffer.begin = nullptr;
     view.mEditWordBuffer.end = nullptr;
@@ -2193,7 +1501,7 @@ namespace
     view.mEditWordBuffer.end = nullptr;
     view.mEditWordBuffer.capacityEnd = nullptr;
 
-    DestroyTerrainEnvironmentLookupMapStorage(view.mEnvLookup);
+    view.mEnvLookup.~TerrainEnvironmentLookupMap();
 
     view.mSkycubeTexture.~shared_ptr();
     view.mSkycubeFile.~string();
@@ -3300,8 +2608,23 @@ namespace moho
    * (FUN_008A1300, ?AddEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0@Z)
    *
    * What it does:
-   * Resolves one environment texture path and upserts it into terrain
-   * environment lookup storage under the provided environment key.
+   * Resolves one environment texture path, then upserts it into terrain
+   * environment-lookup storage under the provided environment key: the
+   * real binary always resolves the D3D texture handle first (0x008A1323-
+   * 0x008A1331), then reaches the map slot for `environmentKey` through
+   * `msvc8::map<msvc8::string, TerrainEnvironmentLookupEntry>::operator[]`
+   * (0x008A1380, FUN_008A7C80, cited on that member in `Map.h` -- IDA's own
+   * inferred name for this address is `find`, which is wrong the same way
+   * it is for the sibling `Unit::ArmorMultipliers`/`operator[]` emission:
+   * `find()` never mutates, but this emission's lower-bound-miss path
+   * default-constructs a fresh `TerrainEnvironmentLookupEntry` and calls
+   * `insert_hint` -- FUN_008A8590, cited on `insert_hint` in `RbTree.h` --
+   * before returning a reference to the (possibly just-inserted) slot),
+   * then unconditionally overwrites both fields of that slot
+   * (0x008A138E-0x008A13BD: `std::string::assign` for the name, a
+   * shared_ptr ref-count swap for the texture) -- exactly a plain
+   * `map[key] = value` assignment, on both the cache-hit and cache-miss
+   * paths alike.
    */
   void IWldTerrainRes::AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath)
   {
@@ -3312,16 +2635,8 @@ namespace moho
       }
     }
 
-    const TerrainEnvironmentLookupEntry lookup(texturePath, texture);
-
-    TerrainEnvironmentLookupMapRuntimeView& map = AsTerrainRuntimeView(this)->mEnvLookup;
-    TerrainEnvironmentLookupNodeRuntimeView* const node = InsertTerrainEnvironmentNode(map, environmentKey);
-    if (node == nullptr) {
-      return;
-    }
-
-    node->mValue.mEnvironmentName.assign_owned(lookup.mEnvironmentName.view());
-    node->mValue.mTexture = lookup.mTexture;
+    TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    map[environmentKey] = moho::TerrainEnvironmentLookupEntry(texturePath, texture);
   }
 
   /**
@@ -3333,13 +2648,8 @@ namespace moho
    */
   void IWldTerrainRes::RemoveEnvLookup(const msvc8::string& environmentKey)
   {
-    TerrainEnvironmentLookupMapRuntimeView& map = AsTerrainRuntimeView(this)->mEnvLookup;
-    TerrainEnvironmentLookupNodeRuntimeView* const node = FindTerrainEnvironmentNodeOrHeadForErase(map, environmentKey);
-    if (node == map.mHead) {
-      return;
-    }
-
-    (void)EraseTerrainEnvironmentNode(map, node);
+    TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    (void)map.erase(environmentKey);
   }
 
   /**
@@ -3351,19 +2661,17 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetEnvLookup(const msvc8::string& environmentKey) const
   {
-    TerrainEnvironmentLookupMapRuntimeView& map =
-      const_cast<TerrainEnvironmentLookupMapRuntimeView&>(AsTerrainRuntimeView(this)->mEnvLookup);
+    const TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
 
-    TerrainEnvironmentLookupNodeRuntimeView* node = FindTerrainEnvironmentNodeOrHead(map, environmentKey);
-    if (node == map.mHead) {
-      const msvc8::string defaultKey("<default>");
-      node = FindTerrainEnvironmentNodeOrHead(map, defaultKey);
+    TerrainEnvironmentLookupMap::const_iterator entry = map.find(environmentKey);
+    if (entry == map.end()) {
+      entry = map.find(msvc8::string("<default>"));
     }
 
-    if (node == nullptr || node == map.mHead) {
+    if (entry == map.end()) {
       return {};
     }
-    return boost::static_pointer_cast<ID3DTextureSheet>(node->mValue.mTexture);
+    return boost::static_pointer_cast<ID3DTextureSheet>(entry->second.mTexture);
   }
 
   /**
@@ -3395,15 +2703,9 @@ namespace moho
     moho::TerrainEnvironmentLookupPair* eraseResult = nullptr;
     (void)EraseTerrainEnvironmentLookupPairRange(outPairs, &eraseResult, outPairs.begin(), outPairs.end());
 
-    TerrainEnvironmentLookupMapRuntimeView& map =
-      const_cast<TerrainEnvironmentLookupMapRuntimeView&>(AsTerrainRuntimeView(this)->mEnvLookup);
-    TerrainEnvironmentLookupNodeRuntimeView* node = map.mHead != nullptr ? map.mHead->left : nullptr;
-    while (node != nullptr && node != map.mHead) {
-      (void)AppendEnvironmentLookupPair(
-        outPairs,
-        moho::TerrainEnvironmentLookupPair{node->mKey, node->mValue.mEnvironmentName}
-      );
-      node = IncrementTerrainEnvironmentNode(node, map.mHead);
+    const TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    for (const auto& [key, value] : map) {
+      (void)AppendEnvironmentLookupPair(outPairs, moho::TerrainEnvironmentLookupPair{key, value.mEnvironmentName});
     }
   }
 
@@ -3417,15 +2719,7 @@ namespace moho
    */
   void IWldTerrainRes::ClearEnvLookup()
   {
-    TerrainEnvironmentLookupMapRuntimeView& map = AsTerrainRuntimeView(this)->mEnvLookup;
-    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
-
-    DeleteTerrainEnvironmentSubtreePostOrder(head->parent);
-
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    map.mSize = 0;
+    AsTerrainRuntimeView(this)->mEnvLookup.clear();
   }
 
   /**
@@ -3778,13 +3072,7 @@ namespace moho
       );
 
       const TerrainEnvironmentLookupEntry defaultEnvironment(defaultEnvironmentName, defaultEnvironmentTexture);
-
-      TerrainEnvironmentLookupNodeRuntimeView* const node =
-        InsertTerrainEnvironmentNode(view->mEnvLookup, defaultEnvironmentKey);
-      if (node != nullptr) {
-        node->mValue.mEnvironmentName.assign(defaultEnvironment.mEnvironmentName, 0u, 0xFFFFFFFFu);
-        node->mValue.mTexture = defaultEnvironment.mTexture;
-      }
+      view->mEnvLookup[defaultEnvironmentKey] = defaultEnvironment;
     }
 
     // 0x008A6589-0x008A6598
@@ -5025,13 +4313,10 @@ namespace moho
 
     // 0x008A324C-0x008A3344: entry count, then key/environment-name pairs in
     // in-order tree traversal.
-    writer.Write(view.mEnvLookup.mSize);
-    TerrainEnvironmentLookupNodeRuntimeView* const envHead = view.mEnvLookup.mHead;
-    TerrainEnvironmentLookupNodeRuntimeView* envNode = envHead != nullptr ? envHead->left : nullptr;
-    while (envNode != nullptr && envNode != envHead) {
-      writer.WriteString(envNode->mKey);
-      writer.WriteString(envNode->mValue.mEnvironmentName);
-      envNode = IncrementTerrainEnvironmentNode(envNode, envHead);
+    writer.Write(static_cast<std::uint32_t>(view.mEnvLookup.size()));
+    for (const auto& [key, value] : view.mEnvLookup) {
+      writer.WriteString(key);
+      writer.WriteString(value.mEnvironmentName);
     }
 
     writer.Write(view.mLightingMultiplier);
