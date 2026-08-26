@@ -113,6 +113,10 @@ namespace moho
     , mDeleteCallback(&DeleteConstructedProp)
   {}
 
+  /**
+   * Address: 0x00BFF200 (FUN_00BFF200, atexit target registered by the real
+   * ctor above)
+   */
   PropConstruct::~PropConstruct()
   {
     ResetLinks();

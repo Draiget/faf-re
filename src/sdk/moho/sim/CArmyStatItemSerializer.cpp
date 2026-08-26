@@ -74,6 +74,10 @@ namespace moho
     , mSaveCallback(&CArmyStatItemSerializer::Serialize)
   {}
 
+  /**
+   * Address: 0x00BFF730 (FUN_00BFF730, atexit target registered by the real
+   * ctor above)
+   */
   CArmyStatItemSerializer::~CArmyStatItemSerializer()
   {
     ResetLinks();

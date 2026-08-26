@@ -89,6 +89,10 @@ namespace moho
     , mDeleteCallback(&Delete_CArmyStats)
   {}
 
+  /**
+   * Address: 0x00BFF820 (FUN_00BFF820, atexit target registered by the real
+   * ctor above)
+   */
   CArmyStatsConstruct::~CArmyStatsConstruct()
   {
     ResetLinks();

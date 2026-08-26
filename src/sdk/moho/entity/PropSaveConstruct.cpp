@@ -68,6 +68,10 @@ namespace moho
     : mSaveConstructArgsCallback(reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_Prop))
   {}
 
+  /**
+   * Address: 0x00BFF1D0 (FUN_00BFF1D0, atexit target registered by the real
+   * ctor above)
+   */
   PropSaveConstruct::~PropSaveConstruct()
   {
     ResetLinks();

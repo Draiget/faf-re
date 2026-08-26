@@ -27,9 +27,17 @@ namespace moho
     PropConstruct();
 
     /**
+     * Address: 0x00BFF200 (FUN_00BFF200, atexit target registered by the
+     * real ctor above)
+     *
      * What it does:
      * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
+     * sits in and restores a self-linked sentinel state. `FUN_006FA630`/
+     * `FUN_006FA660` are dead, zero-xref duplicate-emission twins of this
+     * exact body (function_sha256-confirmed), formerly modeled in
+     * `moho/containers/LegacyContainerFillLanes.cpp` as
+     * `gGlobalIntrusiveSentinelLaneAT` and its two reset thunks; removed in
+     * favor of this citation.
      */
     ~PropConstruct();
 
