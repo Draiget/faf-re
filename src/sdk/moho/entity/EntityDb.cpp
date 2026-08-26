@@ -3967,9 +3967,13 @@ namespace moho
     // runtime allocator-side cache (see `DoReserveId`/`ReleaseId`) kept in
     // sync from the now-authoritative `mIdPoolTree` values; it is not part
     // of the binary's own serialize path.
-    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
-          {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
-        )) {
+    //
+    // The binary resolves the map's RType via one direct cached `typeid`
+    // lookup (`std::map_IdPool::sType` in the FUN_00689760 decompilation),
+    // not a multi-candidate name search -- that is exactly
+    // `ResolveLegacyEntityDbIdPoolMapType()`, so call it by name here instead
+    // of the generic by-name fallback.
+    if (gpg::RType* const idPoolMapType = ResolveLegacyEntityDbIdPoolMapType()) {
       archive->Read(idPoolMapType, &mIdPoolTree, NullOwnerRef());
 
       FamilyPoolMap& runtimePools = gRuntimePools[this];
@@ -3986,7 +3990,9 @@ namespace moho
 
     SerSets(archive);
 
-    if (gpg::RType* const entityListType = ResolveTypeByAnyName({"std::list<Moho::Entity *>"})) {
+    // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
+    // use the dedicated resolver rather than the by-name fallback.
+    if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
       std::list<Entity*> serializedEntities;
       archive->Read(entityListType, &serializedEntities, NullOwnerRef());
 
@@ -4016,9 +4022,13 @@ namespace moho
     // (`DoReserveId`/`ReleaseId`), so it is folded back into `mIdPoolTree`
     // via the map's own `operator[]` before writing, keeping the persisted
     // map authoritative without introducing a second serialization path.
-    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
-          {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
-        )) {
+    //
+    // The binary resolves the map's RType via one direct cached `typeid`
+    // lookup (`std::map_IdPool::sType` in the FUN_006897F0 decompilation),
+    // not a multi-candidate name search -- that is exactly
+    // `ResolveLegacyEntityDbIdPoolMapType()`, so call it by name here instead
+    // of the generic by-name fallback.
+    if (gpg::RType* const idPoolMapType = ResolveLegacyEntityDbIdPoolMapType()) {
       const auto poolsIt = gRuntimePools.find(this);
       if (poolsIt != gRuntimePools.end()) {
         for (const auto& [familySourceBits, runtimePool] : poolsIt->second) {
@@ -4033,7 +4043,9 @@ namespace moho
 
     SerSets(archive);
 
-    if (gpg::RType* const entityListType = ResolveTypeByAnyName({"std::list<Moho::Entity *>"})) {
+    // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
+    // use the dedicated resolver rather than the by-name fallback.
+    if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
       std::list<Entity*> serializedEntities;
       for (Entity* const entity : Entities()) {
         if (!entity) {
