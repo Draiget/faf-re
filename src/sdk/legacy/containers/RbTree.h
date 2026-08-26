@@ -6405,6 +6405,29 @@ namespace msvc8
              * Reached from `insert_at`'s fixup loop for this instantiation
              * (`FUN_009478E0`'s `erase_node` citation above).
              *
+             * Address: 0x0094FC80 (FUN_0094FC80, sub_94FC80) --
+             * `std::map<const gpg::RType*, int>::tree_`'s right rotate
+             * (`WriteArchive::mRefCounts`, `WriteArchive.h`), isNil@+0x15,
+             * byte-identical shape to `FUN_00946590` above -- a sibling
+             * instantiation, not the same map: node allocation is cited at
+             * 0x00950540 (24 bytes, isNil@+0x15, `WriteArchive.cpp`'s ctor
+             * comment) matching this offset exactly, distinct from the
+             * *other* "24-byte value_type" map's isNil@+0x25 rotates
+             * (FUN_0094FA60/FUN_0094FAB0, cited on `rotate_left` above --
+             * same total node size, different key/value split, confirmed
+             * by the differing isNil offset, not the same instantiation).
+             * Reached from `_Insert`'s (`std::map_RType_int::_Insert`,
+             * 0x009515A0) rebalance fixup loop, itself reached from
+             * `insert`/`insert_0` (0x009525A0/0x00952180), reached from
+             * the real, recovered, source-invoked
+             * `WriteArchive::WriteRefCounts`'s `mRefCounts.insert(...)`
+             * call (`WriteArchive.cpp`). All three insert-path functions
+             * were wrongly marked `external_dependency` ("STL template
+             * instantiation / codec helper - external") -- corrected to
+             * `recovered`; `RType*` is an engine type, so this
+             * engine-instantiated `std::map` body stays in this binary
+             * per CLAUDE.md's non-external-STL-for-engine-types rule.
+             *
              * Address: 0x008D6230 (FUN_008D6230, sub_8D6230) -- the local
              * `msvc8::rb_tree<moho::Resolution>` dedup tree's right rotate
              * (isNil@+29). Reached from both `insert_at`'s fixup loop and
