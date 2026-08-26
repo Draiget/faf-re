@@ -97,6 +97,30 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x00A73B30 (FUN_00A73B30, `_Insertion_sort` for an 8-byte
+         * `{float x, y;}` pair -- reached from `_Sort`'s (`FUN_00A740D0`,
+         * cited on `sort_impl` below) small-range fallback, `<= 32` elements)
+         * Address: 0x00A73BD0 (FUN_00A73BD0, the `double` (8-byte scalar)
+         * instantiation, reached from `_Sort`'s (`FUN_00A741A0`, cited below)
+         * small-range fallback)
+         */
+        /**
+         * Address: 0x00A72D40 (FUN_00A72D40, `make_heap` for the float-pair
+         * instantiation, reached from `_Sort`'s (`FUN_00A740D0`) ideal-budget-
+         * exhausted heapsort fallback)
+         * Address: 0x00A72E20 (FUN_00A72E20, the `double` instantiation's
+         * `make_heap`, reached from `_Sort`'s (`FUN_00A741A0`) same fallback)
+         */
+        /**
+         * Address: 0x00A73E20 (FUN_00A73E20, `sort_heap` for the float-pair
+         * instantiation, called right after `make_heap` (`FUN_00A72D40`) in
+         * `_Sort`'s (`FUN_00A740D0`) heapsort fallback)
+         * Address: 0x00A73E70 (FUN_00A73E70, the `double` instantiation's
+         * `sort_heap`, called after `FUN_00A72E20` in `_Sort`'s
+         * (`FUN_00A741A0`) same fallback)
+         */
+
+        /**
          * Address: 0x00595AC0 (the `_Med3` lane called first from
          *          `_Unguarded_partition`)
          *
@@ -416,6 +440,33 @@ namespace msvc8
          * body in src/sdk for token" -- not a valid blocker per RULE ONE,
          * compiler-emission glue is supposed to have no separate body);
          * corrected to skip/cited-here.)
+         *
+         * Address: 0x00A730D0 (FUN_00A730D0, the 8-byte `{float x, y;}` pair
+         * instantiation -- pivot pick at `sub_A72CB0` (a bare `median3`, not
+         * the ninther: this instantiation's own driver, `FUN_00A740D0` cited
+         * on `sort_impl` below, never exercises `select_ninther`'s branch in
+         * the surviving call sites), then the same two-scan-loop-plus-
+         * equal-run-gathering shape as the instantiations above, with raw
+         * 2-dword swaps inlined at each `iter_swap` point.)
+         * Address: 0x00A73500 (FUN_00A73500, the `double` (8-byte scalar)
+         * instantiation -- same shape as `0x00A730D0`, pivot pick at
+         * `sub_A72D90`, swaps widened to 4-dword lanes to move a `double`.)
+         * Address: 0x00733D10 (FUN_00733D10, a second 8-byte `{float x, y;}`
+         * pair instantiation at a different call site -- pivot pick at
+         * `sub_7340C0`, otherwise byte-for-byte the same partition shape as
+         * `0x00A730D0`. Distinct instantiation root (different translation
+         * unit / comparator capture), same template.)
+         * Address: 0x007CD570 (FUN_007CD570, the `LuaPlus::LuaObject`-keyed
+         * 24-byte-element instantiation -- pivot pick at `sub_7CE3A0`; unlike
+         * the trivially-copyable instantiations above, every `iter_swap`
+         * point is a real three-way `LuaObject(temp, lhs); lhs = rhs; rhs =
+         * temp;` sequence (explicit ctor/copy-assign/dtor calls, matching
+         * this template's generic `iter_swap_value` exactly for a
+         * non-trivial `T` rather than the raw-dword swap the trivial
+         * instantiations fold it down to). Comparator is inlined 3-way
+         * dword compares on the leading key field rather than a named
+         * callee -- same algorithm, comparator capture just didn't survive
+         * as a separate symbol.)
          */
         template <class T, class Compare>
         std::pair<T*, T*> unguarded_partition(T* const first, T* const last, Compare comp)
@@ -536,6 +587,25 @@ namespace msvc8
          * external. Wrong: the three-way-compare/partition/heap *control
          * flow* is this project's own `_Sort<RField*>` emission: engine
          * code that happens to call CRT primitives, not CRT code itself.)
+         *
+         * Address: 0x00A740D0 (FUN_00A740D0, the 8-byte `{float x, y;}` pair
+         * instantiation. Element stride confirmed from `((char*)a2-(char*)a1)
+         * >> 3`; ideal budget decays via the same `a3/2/2 + a3/2` "three
+         * quarters" step; partitions through `FUN_00A730D0` (cited on
+         * `unguarded_partition` above), falls to `FUN_00A73B30`
+         * (`insertion_sort`) under 32 elements, and to `FUN_00A72D40` +
+         * `FUN_00A73E20` (`make_heap` + `sort_heap`) once the budget is
+         * exhausted -- recurses into whichever partition half is smaller and
+         * loops on the larger, same bounded-stack-depth shape as this
+         * template. Calls itself recursively at both `sub_A740D0(v9, v4,
+         * a3)` and `sub_A740D0(v3, v8, a3)`, the same "call set" signature
+         * the `SBuildTemplateInfo`/`gpg::RField` instantiations above were
+         * identified by.)
+         * Address: 0x00A741A0 (FUN_00A741A0, the `double` (8-byte scalar)
+         * instantiation -- same shape as `0x00A740D0` one dword-width wider
+         * throughout (`>> 4` stride, `0xFFFFFFF0` masks), partitions through
+         * `FUN_00A73500`, falls to `FUN_00A73BD0` / `FUN_00A72E20` +
+         * `FUN_00A73E70`.)
          */
         template <class T, class Compare>
         void sort_impl(T* first, T* last, std::ptrdiff_t ideal, Compare comp)
