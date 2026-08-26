@@ -4580,6 +4580,21 @@ namespace gpg
    * template: `moho::BVIntSetSerializer`, `Moho::CAniPoseSerializer`,
    * `Moho::CAniPoseBoneSerializer`, `Moho::CIntelGridSerializer`. ~41 real
    * instantiations remain to convert.
+   *
+   * `Moho::CEfxTrailEmitterSerializer` (`moho/effects/rendering/
+   * CEfxTrailEmitter.cpp`) is a fresh direct instantiation (the class had no
+   * prior hand-rolled serializer at all), not a conversion -- but it flags a
+   * nuance worth checking for any of the ~41 remaining: unlike the pilot
+   * conversions above, RTTI/`vtable_writers` show it needs a real (if empty)
+   * derived class, `class CEfxTrailEmitterSerializer : public
+   * SerSaveLoadHelper<CEfxTrailEmitter> {};`, NOT a `using` alias. The
+   * binary carries two distinct adjacent vtable symbols
+   * (`??_7CEfxTrailEmitterSerializer@Moho@@6B@` at 0x00E2695C and
+   * `??_7?$SerSaveLoadHelper@VCEfxTrailEmitter@Moho@@@gpg@@6B@` at
+   * 0x00E26964, both resolving `Init()` to the same 0x006722F0 body), which
+   * a same-address `using` alias cannot produce -- check `vtable_writers`
+   * for a distinct `XSerializer@Namespace` vtable head before assuming the
+   * simpler alias shape applies to any given remaining T.
    */
   template <class T>
   class SerSaveLoadHelper : public SerHelperBase
@@ -4779,6 +4794,41 @@ namespace gpg
    *     caching -- IDA's decompiler displays that global as
    *     `Moho::EAiResult::sType` but it is this template's own
    *     per-instantiation static, not a member of the enum)
+   *   - T=Moho::EScrollType: ctor 0x00BDD690 (no dead duplicate found; global
+   *     storage 0x010BBB6C), atexit 0x00C02650, Deserialize 0x00777FF0,
+   *     Serialize 0x00778010, Init 0x00777E20 (vtable-slot-0 target shared by
+   *     BOTH the real `??_7?$PrimitiveSerHelper@W4EScrollType@Moho@@H@gpg@@6B@`
+   *     and the dead, zero-writer `??_7?$SerSaveLoadHelper@W4EScrollType@
+   *     Moho@@@gpg@@6B@` sibling vtable -- same shared-body pattern as
+   *     ESquadClass/EThreatType above. `gpg::ArchiveSerialization.cpp`'s
+   *     `InstallMohoEScrollTypeSerializerCallbacks` previously modeled this
+   *     same address as a generic `InstallSerSaveLoadHelperCallbacksByTypeName`
+   *     by-type-name dispatch; ground-truth asm shows the standard direct-
+   *     assignment `Init()` shape instead (thiscall, reads `this+0x0C`/
+   *     `this+0x10`, writes `EScrollType`'s `RType::serLoadFunc_`/
+   *     `serSaveFunc_` with the usual `"!type->mSerLoadFunc"`/
+   *     `"!type->mSerSaveFunc"` asserts) -- same mismodeling already caught
+   *     for ESTITargetType/EResourceType above. That free function itself has
+   *     zero source-level callers (2026-08-26 ArchiveSerialization dead-
+   *     duplicate audit) and is left as-is, out of scope for this pass.)
+   *   - T=Moho::ETriggerOperator: ctor 0x00BDA000 (no dead duplicate found;
+   *     global storage 0x010B8F78), atexit 0x00BFF580, Deserialize
+   *     0x0070F8E0, Serialize 0x0070F900, Init 0x0070E510 (vtable-slot-0
+   *     target shared by both the real `??_7?$PrimitiveSerHelper@
+   *     W4ETriggerOperator@Moho@@H@gpg@@6B@` and the dead, zero-writer
+   *     `??_7?$SerSaveLoadHelper@W4ETriggerOperator@Moho@@@gpg@@6B@` sibling
+   *     vtable -- same shared-body pattern as EScrollType above). The prior
+   *     recovery in `moho/sim/SConditionTriggerReflection.cpp` modeled the
+   *     ctor address (0x00BDA000) as a fabricated eager free function --
+   *     `LookupRType(typeid(ETriggerOperator))` then a direct
+   *     `type->serLoadFunc_ = ...`/`serSaveFunc_ = ...` store -- called from
+   *     a file-local bootstrap struct's constructor; ground-truth asm at
+   *     that address has no `LookupRType` call and no direct field store at
+   *     all, only the standard `SerHelperBase`-derived ctor shape. A
+   *     separate 2026-08-26 ArchiveSerialization.cpp audit independently
+   *     flagged 0x0070E510 as a second, seemingly-competing candidate; it is
+   *     not a competitor, it is this same ctor's `Init()` method (same
+   *     relationship as EScrollType's 0x00777E20 above).
    * All of the above previously used a hand-rolled `{ mHelperNext,
    * mHelperPrev, mDeserialize/mLoadCallback, mSerialize/mSaveCallback }`
    * raw-struct mimic (sometimes via a per-file or per-cluster generic
