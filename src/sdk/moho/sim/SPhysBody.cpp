@@ -875,6 +875,10 @@ namespace moho
 
   /**
    * Address: 0x00BFD330 (FUN_00BFD330, Moho::SPhysBodySaveConstruct::~SPhysBodySaveConstruct)
+   *
+   * `FUN_00698060` and `FUN_00698090` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   SPhysBodySaveConstruct::~SPhysBodySaveConstruct()
   {
@@ -910,6 +914,10 @@ namespace moho
 
   /**
    * Address: 0x00BFD360 (FUN_00BFD360, Moho::SPhysBodyConstruct::~SPhysBodyConstruct)
+   *
+   * `FUN_00698150` and `FUN_00698180` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   SPhysBodyConstruct::~SPhysBodyConstruct()
   {

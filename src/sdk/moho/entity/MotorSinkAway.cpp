@@ -36,7 +36,10 @@ namespace
   // `Deserialize`/`Serialize`, installs the vtable) and registers the real
   // destructor (0x00BFD2A0, no recovered mangled name; body confirmed via
   // raw asm to just call `ResetLinks()`) via `atexit`. Dead zero-xref COMDAT
-  // duplicate ctor: 0x00696CB0.
+  // duplicate ctor: 0x00696CB0. `FUN_006968E0` and `FUN_00696910` are
+  // duplicate-emission twins of this exact unlink/reset lane (same
+  // `ResetLinks()` shape, folded to separate addresses); they have no
+  // distinct source-level body of their own.
   moho::MotorSinkAwaySerializer gMotorSinkAwaySerializer;
   // Address: 0x010B528C -- process-global `MotorSinkAwayConstruct` singleton.
   moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct;
@@ -479,6 +482,10 @@ namespace moho
 
   /**
    * Address: 0x00BFD270 (FUN_00BFD270, Moho::MotorSinkAwayConstruct::~MotorSinkAwayConstruct)
+   *
+   * `FUN_00696780` and `FUN_006967B0` are duplicate-emission twins of this
+   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * addresses); they have no distinct source-level body of their own.
    */
   MotorSinkAwayConstruct::~MotorSinkAwayConstruct()
   {
