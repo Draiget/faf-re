@@ -32,16 +32,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x00723BC0 (FUN_00723BC0, REnumType dtor thunk for ESquadClass block)
-   */
-  [[maybe_unused]] void ThunkREnumTypeDestructorVariant1(gpg::REnumType* const typeInfo)
-  {
-    if (typeInfo) {
-      typeInfo->gpg::REnumType::~REnumType();
-    }
-  }
-
   // Address: 0x010B9804 -- process-global `PrimitiveSerHelper<ESquadClass,int>`
   // singleton (constructed by FUN_00BDAB80; see ESquadClassTypeInfo.h for the
   // dead-duplicate-ctor and dead-sibling-writer evidence).
@@ -51,7 +41,21 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00723BA0 (FUN_00723BA0, Moho::ESquadClassTypeInfo::dtr)
+   * Address: 0x00723BA0 (FUN_00723BA0, Moho::ESquadClassTypeInfo::dtr, scalar
+   * deleting destructor -- calls `gpg::REnumType::~REnumType()` then
+   * conditionally `operator delete`s `this`)
+   * Also emitted at: 0x00723BC0 (FUN_00723BC0, complete-object destructor --
+   * `ESquadClassTypeInfo` adds no members of its own beyond `REnumType`, so
+   * this non-deleting variant is a bare 5-byte `jmp gpg::REnumType::~REnumType`
+   * tail-call, not a distinct body. It has zero callsite evidence anywhere in
+   * the binary (no code caller, no data/vtable xref, unreachable per the
+   * enriched callgraph index) -- unlike its `EAllianceTypeInfo`/
+   * `EImpactTypeTypeInfo` siblings, `ESquadClassTypeInfo` has no
+   * `cleanup_*`/`atexit` teardown registered at all (see
+   * `ConstructESquadClassTypeInfo` above), so there is no plausible explicit
+   * `->~ESquadClassTypeInfo()` call site in this binary in the first place.
+   * Compiler-emitted glue for the `= default` destructor below, corresponding
+   * to no source line of its own -- RULE ONE.
    */
   ESquadClassTypeInfo::~ESquadClassTypeInfo() = default;
 

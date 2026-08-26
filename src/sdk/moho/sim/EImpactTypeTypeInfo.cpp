@@ -30,16 +30,6 @@ namespace
    */
   moho::EImpactTypePrimitiveSerializer gEImpactTypePrimitiveSerializer;
 
-  /**
-   * Address: 0x00509F80 (FUN_00509F80, REnumType dtor thunk for EImpactType block)
-   */
-  [[maybe_unused]] void ThunkREnumTypeDestructorVariant2(gpg::REnumType* const typeInfo)
-  {
-    if (typeInfo) {
-      typeInfo->gpg::REnumType::~REnumType();
-    }
-  }
-
   [[nodiscard]] moho::EImpactTypeTypeInfo* AcquireEImpactTypeTypeInfo()
   {
     if (!gEImpactTypeTypeInfoConstructed) {
@@ -170,7 +160,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x00509F60 (FUN_00509F60, Moho::EImpactTypeTypeInfo::dtr)
+   * Address: 0x00509F60 (FUN_00509F60, Moho::EImpactTypeTypeInfo::dtr, scalar
+   * deleting destructor -- calls `gpg::REnumType::~REnumType()` then
+   * conditionally `operator delete`s `this`)
+   * Also emitted at: 0x00509F80 (FUN_00509F80, complete-object destructor --
+   * `EImpactTypeTypeInfo` adds no members of its own beyond `REnumType`, so
+   * this non-deleting variant is a bare 5-byte `jmp gpg::REnumType::~REnumType`
+   * tail-call, not a distinct body. It has zero callsite evidence anywhere
+   * in the binary (no code caller, no data/vtable xref, unreachable per the
+   * enriched callgraph index): the one plausible caller,
+   * `cleanup_EImpactTypeTypeInfo` (0x00BF1F50), was independently verified
+   * to itself `jmp` directly into `gpg::REnumType::~REnumType`
+   * (`mov ecx, offset gEImpactTypeTypeInfoStorage; jmp ??1REnumType@gpg@@QAE@@Z`),
+   * bypassing this address entirely. Compiler-emitted glue for the
+   * `= default` destructor below, corresponding to no source line of its
+   * own -- RULE ONE.
    */
   EImpactTypeTypeInfo::~EImpactTypeTypeInfo() = default;
 

@@ -16,7 +16,7 @@
 #include "moho/ai/CAiNavigatorAir.h"
 #include "moho/ai/CAiNavigatorImpl.h"
 #include "moho/ai/CAiNavigatorLand.h"
-#include "moho/misc/Listener.h"
+#include "moho/misc/Listener.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -342,81 +342,28 @@ namespace
     return type;
   }
 
-  struct NavigatorTypeDestructorRuntimeView
-  {
-    void* vftable;                       // +0x00
-    std::uint8_t pad04_2B[0x28]{};       // +0x04
-    void* storage2C;                     // +0x2C
-    void* storage30;                     // +0x30
-    void* storage34;                     // +0x34
-    std::uint8_t pad38_3B[0x4]{};        // +0x38
-    void* storage3C;                     // +0x3C
-    void* storage40;                     // +0x40
-    void* storage44;                     // +0x44
-  };
-  static_assert(
-    offsetof(NavigatorTypeDestructorRuntimeView, storage2C) == 0x2C,
-    "NavigatorTypeDestructorRuntimeView::storage2C offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(NavigatorTypeDestructorRuntimeView, storage3C) == 0x3C,
-    "NavigatorTypeDestructorRuntimeView::storage3C offset must be 0x3C"
-  );
-
-  class RObjectVtableProbe final : public gpg::RObject
-  {
-  public:
-    [[nodiscard]] gpg::RType* GetClass() const override
-    {
-      return nullptr;
-    }
-
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override
-    {
-      return gpg::RRef{};
-    }
-
-    ~RObjectVtableProbe() override = default;
-  };
-
-  [[nodiscard]] void* RecoverRObjectVtable() noexcept
-  {
-    static RObjectVtableProbe probe;
-    return *reinterpret_cast<void**>(&probe);
-  }
-
-  /**
-   * Address: 0x005A8470 (FUN_005A8470)
-   *
-   * What it does:
-   * Releases two owned heap-storage triplets, rebinds the base vtable lane to
-   * `gpg::RObject`, and conditionally deletes the owning object.
-   */
-  [[maybe_unused]] [[nodiscard]] NavigatorTypeDestructorRuntimeView* DestroyNavigatorTypeStorageLane(
-    NavigatorTypeDestructorRuntimeView* const object,
-    const char deleteFlags
-  ) noexcept
-  {
-    if (object->storage3C != nullptr) {
-      ::operator delete(object->storage3C);
-    }
-    object->storage3C = nullptr;
-    object->storage40 = nullptr;
-    object->storage44 = nullptr;
-
-    if (object->storage2C != nullptr) {
-      ::operator delete(object->storage2C);
-    }
-    object->storage2C = nullptr;
-    object->storage30 = nullptr;
-    object->storage34 = nullptr;
-
-    object->vftable = RecoverRObjectVtable();
-    if ((deleteFlags & 1) != 0) {
-      ::operator delete(object);
-    }
-    return object;
-  }
+  // Address: 0x005A8470 (FUN_005A8470, sub_5A8470) -- vtable-slot-2 scalar
+  // deleting destructor for `Moho::RBroadcasterRType<Moho::EAiNavigatorEvent>`
+  // (VTABLE_CONFIRMED: data xref from
+  // `??_7?$RBroadcasterRType@W4EAiNavigatorEvent@Moho@@@Moho@@6B@` +0x8, the
+  // dtor slot inherited from `gpg::RObject`'s vtable shape). The body frees
+  // `gpg::RType`'s own `bases_`/`fields_` vector storage (`_Myfirst` @ +0x2C
+  // / +0x3C) and resets the vftable lane to `gpg::RObject`'s -- byte-identical
+  // to `gpg::RType::~RType()`'s own teardown, because
+  // `RBroadcasterRType_EAiNavigatorEvent` adds no data members of its own, so
+  // the compiler emitted a fresh COMDAT clone of the base teardown for this
+  // class's vtable slot instead of sharing one out-of-line symbol. This is
+  // the same "RType teardown COMDAT clone" family already cataloged on
+  // `gpg::RType::~RType()` (Reflection.h/.cpp), which already cites the
+  // sibling `RListenerRType_EAiNavigatorEvent` clone (FUN_005A84D0) from this
+  // same file. Cited FUN_005A8470 there too instead of keeping a second,
+  // `NavigatorTypeDestructorRuntimeView`-shaped raw-offset reach-in copy of
+  // the same logic around (RULE ONE / no-orphan-helper rule): no
+  // registration or dispatch site anywhere in `src/sdk/**` needs a dedicated
+  // named function here, since `RBroadcasterRType_EAiNavigatorEvent`'s
+  // implicit (compiler-generated) destructor already delegates to
+  // `gpg::RType::~RType()`, which already frees `bases_`/`fields_` in typed
+  // form.
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplTypeForUpcast()
   {
