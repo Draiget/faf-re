@@ -4832,7 +4832,10 @@ namespace gpg
    * unlink body -> Deserialize -> Serialize addresses follow):
    *   - T=Moho::EAiAttackerEvent: ctor 0x00BCE770, atexit 0x00BF8250,
    *     Deserialize 0x005DC390, Serialize 0x005DC3B0
-   *   - T=Moho::EAiNavigatorEvent: ctor 0x00BCC660, atexit 0x00BF6CD0,
+   *   - T=Moho::EAiNavigatorEvent: ctor 0x00BCC660, atexit 0x00BF6CD0
+   *     (dead duplicates: 0x005A3130, 0x005A3160 -- formerly
+   *     `gGlobalIntrusiveSentinelLaneN` in
+   *     moho/containers/LegacyContainerFillLanes.cpp; removed),
    *     Deserialize 0x005A7720, Serialize 0x005A7740
    *   - T=Moho::EAiNavigatorStatus: ctor 0x00BCC600, atexit 0x00BF6C90,
    *     Deserialize 0x005A76B0, Serialize 0x005A76D0
@@ -4861,8 +4864,10 @@ namespace gpg
    *     0x00598400, Serialize 0x00598420
    *   - T=Moho::EPathPointState: ctor 0x00BD20E0 (dead duplicate
    *     0x0062F840; dead sibling-writer `SerSaveLoadHelper<EPathPointState>`
-   *     at 0x0062F9C0), atexit 0x00BFA7F0, Deserialize 0x0062F980,
-   *     Serialize 0x0062F9A0
+   *     at 0x0062F9C0), atexit 0x00BFA7F0 (dead duplicates: 0x0062F5F0,
+   *     0x0062F620 -- formerly `gGlobalIntrusiveSentinelLaneW` in
+   *     moho/containers/LegacyContainerFillLanes.cpp; removed), Deserialize
+   *     0x0062F980, Serialize 0x0062F9A0
    *   - T=Moho::ERuleBPUnitMovementType: ctor 0x00BC8930, atexit 0x00BF31E0
    *     (dead twins 0x0051FC20, 0x0051FC50), Deserialize 0x00523AB0,
    *     Serialize 0x00523AD0
@@ -4936,7 +4941,11 @@ namespace gpg
      * ctor per `T`; see the class-level comment above for the dead-low-vs-
      * real-high-address pattern each one follows):
      *   - T=Moho::EAlliance: 0x00BC7A30 (dead duplicate: 0x0050A600)
-     *   - T=Moho::EEconResource: 0x00BCA810
+     *   - T=Moho::EEconResource: 0x00BCA810, atexit 0x00BF5630 (dead
+     *     duplicates: 0x00563AB0, 0x00563AE0 -- formerly
+     *     `gGlobalIntrusiveSentinelLaneK` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/ai/EEconResourceTypeInfo.h.
      *   - T=Moho::EImpactType: 0x00BC7A90 (dead duplicate: 0x0050A6A0)
      *   - T=Moho::ESTITargetType: 0x00BCA2B0 (no dead duplicate found),
      *     atexit 0x00BF50E0 (dead duplicates: 0x0055AF80, 0x0055AFB0 --
@@ -4954,7 +4963,11 @@ namespace gpg
      *     situation at FUN_0050AA40, also zero-xref/unreachable)
      *   - T=Moho::EStatType: 0x00BC3600 (no dead duplicate found)
      *   - T=Moho::EPulseMode: 0x00BC3660 (no dead duplicate found)
-     *   - T=Moho::EmitterType: 0x00BD42B0 (no dead duplicate found)
+     *   - T=Moho::EmitterType: 0x00BD42B0 (no dead duplicate found),
+     *     atexit 0x00BFBD20 (dead duplicates: 0x0065DF80, 0x0065DFB0 --
+     *     formerly `gGlobalIntrusiveSentinelLaneX` in
+     *     moho/containers/LegacyContainerFillLanes.cpp; removed). See
+     *     moho/render/EmitterTypeTypeInfo.h.
      *   - T=Moho::EResourceType: 0x00BC9610 (dead duplicate: 0x00547380;
      *     was wrongly tagged `external_dependency` in progress tracking
      *     before this recovery -- it is the same

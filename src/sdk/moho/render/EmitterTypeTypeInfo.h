@@ -50,6 +50,15 @@ namespace moho
    * bootstrap call -- none of which the real binary does; `SerHelperBase`'s
    * own ctor performs the real self-registration onto the pending-helper
    * list.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BFBD20` (atexit target
+   * pushed by the real ctor above); `FUN_0065DF80`/`FUN_0065DFB0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneX` and its two reset thunks; removed in
+   * favor of this citation.
    */
   using EmitterTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EmitterType, int>;
 

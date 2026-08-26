@@ -517,6 +517,13 @@ namespace moho
    * registers `atexit(&sub_BFA7F0)` -- confirmed bare unlink-then-self-link
    * shape matching `SerHelperBase::ResetLinks()` -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
+   * `FUN_0062F5F0`/`FUN_0062F620` are dead, zero-xref duplicate-emission
+   * twins of that exact `FUN_00BFA7F0` atexit body (function_sha256-
+   * confirmed; distinct from the ctor-side dead duplicates `FUN_0062F840`/
+   * `FUN_0062F9C0` above), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneW` and its two reset thunks; removed in
+   * favor of this citation.
    *
    * Previously modeled as its own hand-rolled `SerHelperBase`-derived class
    * (correctly identifying the real ctor/vtable, but not actually reusing
