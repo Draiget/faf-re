@@ -79,6 +79,7 @@
 #include "moho/path/IPathTraveler.h"
 #include "moho/path/PathTables.h"
 #include "moho/particles/SParticleBuffer.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/CDecalBuffer.h"
