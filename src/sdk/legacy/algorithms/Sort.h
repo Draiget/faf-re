@@ -227,6 +227,28 @@ namespace msvc8
          * (`FUN_008DD790`, cited on `sort_impl` below) small-range fallback,
          * `<= 32` elements. Was mis-tagged `blocked` (stale, pre-dates
          * `no_block_guard.py`); corrected to skip/cited-here.)
+         *
+         * Address: 0x008DA5D0 (FUN_008DA5D0, sub_8DA5D0) -- the multi-element
+         * rotate `FUN_008DB430` calls out to for this instantiation's `<= 32`
+         * shift (0x14-byte `gpg::RField` stride, `(a2-a1)/20` confirms the
+         * element count). `.c`-confirmed classic GCD-cycle ("juggling")
+         * rotate: computes `gcd(range length, rotation amount)` via Euclid's
+         * algorithm, then walks that many independent element cycles,
+         * copying through a fixed-size (20-byte) stack temp per cycle step.
+         * This template's `insertion_sort` above reproduces the exact same
+         * observable shift behavior via the simpler `for (hole = cursor;
+         * hole != first; --hole) *hole = *(hole-1);` loop -- a full GCD-
+         * cycle rotate and a plain backward-shift loop are behaviorally
+         * identical for the "shift a contiguous run by one slot" case
+         * `insertion_sort` uses it for (rotation amount always 1 here), so
+         * no separate call is needed to reproduce the binary's observable
+         * effect; the compiler's choice to keep `FUN_008DA5D0` as a
+         * standalone out-of-line general-purpose rotate is a codegen
+         * artifact of the shared VC8 STL `_Rotate`/`std::rotate` machinery,
+         * not a distinct algorithmic step this instantiation's source needs
+         * to name separately. Two of its four real callers
+         * (0x008DB073/0x008DB33B) sit in address ranges IDA did not box
+         * into named functions -- not chased further this pass.
          */
         template <class T, class Compare>
         void insertion_sort(T* const first, T* const last, Compare comp)
