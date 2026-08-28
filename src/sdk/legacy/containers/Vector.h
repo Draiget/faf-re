@@ -3099,6 +3099,32 @@ namespace msvc8
          * recovered) once per handle transitioning into focus-army
          * visibility.
          *
+         * Address: 0x0069E6D0 (FUN_0069E6D0, sub_69E6D0, `msvc8::vector<
+         * moho::SCamFollowParams>::push_back` for the 0x0C-byte element,
+         * `Moho::Sim::mSyncSerializeGroup0`, `Sim.h` `+0x09B8`) --
+         * `.c`-confirmed two-way split matching this member's own shape
+         * exactly: `size()==(last-first)/12` compared against
+         * `capacity()==(end-first)/12`; capacity-available fast path calls
+         * `sub_6A0080` (element construct-in-place) then advances the
+         * cursor by `0x0C`; capacity-exhausted (or empty-vector) slow path
+         * tail-calls this instantiation's growth core `sub_69ED40` (cited
+         * below). Real, direct callsite: `Moho::Projectile::Projectile`
+         * (`FUN_0069AFE0`, already recovered, `Projectile.cpp`), `.asm`-
+         * confirmed at `0x0069BD8E`, as
+         * `SimulationRef->mSyncSerializeGroup0.push_back(SCamFollowParams{
+         * ...})` when the projectile's blueprint sets
+         * `Display.CameraFollowsProjectile`. Migrated off a RULE ONE
+         * offset-magic cluster in `SimRecoveryRuntime.cpp`
+         * (`AppendProjectileLaneRuntime` at this same address,
+         * `InsertElement12LaneAndRebaseCursorRuntime` at `0x0069ED40`
+         * cited below, and a third adapter `AppendProjectileLaneFromOwnerOffsetRuntime`
+         * at `0x0069A490` that reached into `ownerBase + 0x9B8` -- that
+         * third address has zero real xrefs anywhere in the binary,
+         * confirmed dead, `skip`'d rather than migrated) that duplicated
+         * this template member over a generic `Element12Runtime` shape
+         * instead of the real `moho::SCamFollowParams` type already
+         * declared in `CameraImpl.h`.
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
@@ -4463,6 +4489,22 @@ namespace msvc8
          * core, not a throw shim -- the "1-statement" heuristic a bulk
          * pass used to classify this as dead conflated brevity with
          * triviality. Corrected to `recovered` in this pass.
+         *
+         * Address: 0x0069ED40 (FUN_0069ED40, sub_69ED40, `msvc8::vector<
+         * moho::SCamFollowParams>::insert(pos,value)` for the 0x0C-byte
+         * element, `Moho::Sim::mSyncSerializeGroup0`) -- same "capture
+         * offset up front, tail-call the count=1 core, rebuild the
+         * iterator from the offset afterwards" shape as the `SDecalInfo`
+         * instantiation above: `.c`-confirmed `v5=(a3-v4)/12` offset
+         * capture guarded by `v4 && ...` (mirroring `size()==0`), tail-
+         * calls the count=1 core `sub_69F040` (already `skip`'d elsewhere
+         * as a RULE ONE compiler/template emission, `vector<T>::_Insert_n`
+         * shape), rebuilds `*a2 = begin + 12*v5`. Direct caller (`.c`-
+         * confirmed): this instantiation's own `push_back` (`FUN_0069E6D0`,
+         * cited above) on its capacity-exhausted branch. Migrated off the
+         * same `SimRecoveryRuntime.cpp` RULE ONE cluster documented on
+         * `push_back` above (`InsertElement12LaneAndRebaseCursorRuntime`
+         * at this address).
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and

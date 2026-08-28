@@ -65,6 +65,10 @@ namespace moho
   struct SEntitySetTemplateUnit;
   struct RUnitBlueprint;
   class CScrLuaInitForm;
+  // Full definition lives in moho/render/camera/CameraImpl.h; only used here
+  // as the element type of a msvc8::vector<T> member (SimDriver.h forward-
+  // declares it the same way for SSyncData::mFollowCameras).
+  struct SCamFollowParams;
 
   /**
    * Address: 0x007538C0 (FUN_007538C0, boost::shared_ptr_SParticleBuffer::shared_ptr_SParticleBuffer)
@@ -1467,7 +1471,22 @@ namespace moho
     CDecalBuffer* mDecalBuffer;
     TDatList<RDebugOverlay, void> mDebugOverlays;
     msvc8::vector<CSimConVarInstanceBase*> mSimVars;
-    msvc8::vector<void*> mSyncSerializeGroup0;
+    /// Queued camera-follow-transition records: one per constructed
+    /// projectile whose blueprint sets `Display.CameraFollowsProjectile`
+    /// (`Moho::Projectile::Projectile`, FUN_0069AFE0, asm
+    /// 0x0069BD56-0x0069BD8E, `.asm`-confirmed `add eax, 9B8h` at
+    /// 0x0069BD7B on `this->SimulationRef`). The element is
+    /// `moho::SCamFollowParams` (`CameraImpl.h`, 0x0C bytes) -- not a
+    /// pointer, the same wrong-element-shape defect already found and
+    /// fixed on `mSyncSerializeGroup2` below. Each pushed record is
+    /// `{sourceEntity->id_, this projectile's id_, Display.
+    /// CameraFollowTimeout}`; `CWldSession::DoBeat` already replays the
+    /// per-beat mirror (`SSyncData::mFollowCameras`, `SimDriver.h`,
+    /// +0x0200) through `CameraImpl::CameraFollow`, which reads
+    /// `mCurrentEntityId`/`mTargetEntityId`/`mTargetTimeLeft` in that same
+    /// order -- the beat-copy site that drains this lane into
+    /// `mFollowCameras` is not yet recovered.
+    msvc8::vector<SCamFollowParams> mSyncSerializeGroup0; // 0x09B8
     msvc8::vector<void*> mSyncSerializeGroup1;
     msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // 0x9D8 (was mSyncSerializeGroup3)
     msvc8::vector<SPendingPoseCopy> mPendingPoseCopies; // 0x9E8 (was mSyncSerializeGroup4)
@@ -7190,6 +7209,7 @@ namespace moho
   static_assert(offsetof(Sim, mFormationDB) == 0x0980, "Sim::mFormationDB offset must be 0x0980");
   static_assert(offsetof(Sim, mEntityDB) == 0x0984, "Sim::mEntityDB offset must be 0x0984");
   static_assert(offsetof(Sim, mCommandDB) == 0x0988, "Sim::mCommandDB offset must be 0x0988");
+  static_assert(offsetof(Sim, mSyncSerializeGroup0) == 0x09B8, "Sim::mSyncSerializeGroup0 offset must be 0x09B8");
   static_assert(sizeof(Sim) == 0xAF8, "Sim size must be 0xAF8");
 #endif
 } // namespace moho

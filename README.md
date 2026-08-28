@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`26/08/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`28/08/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
@@ -14,8 +14,8 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `52,750` (79.09%)
-- `skip`: `8,203` (12.30%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `52,749` (79.09%)
+- `skip`: `8,204` (12.30%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,744` (8.61%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
@@ -30,7 +30,7 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,750 functions) — binary caller context
+### Recovered (52,749 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
@@ -38,7 +38,7 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Vtable-anchored (virtual override of a recovered class) | `5,888` | 11.16% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,601` | 10.62% |
 | No recovered caller token yet (orphan risk) | `1,677` | 3.18% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,194` | 42.07% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,193` | 42.07% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
