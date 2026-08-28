@@ -70337,11 +70337,20 @@ void wxTreeCtrlSetItemTextAndSyncEditControlRuntime(
 
 /**
  * Address: 0x00A009F0 (FUN_00A009F0)
- * Address: 0x009CDBB0 (FUN_009CDBB0)
  *
  * What it does:
  * Thunk adapter that preserves `wxTreeCtrlAssignItemDataRuntime(...)`
  * argument/return lanes.
+ *
+ * `0x009CDBB0` (FUN_009CDBB0) was previously co-cited here as an alleged
+ * ICF twin; verified false (2026-08-28): 0x00A009F0 is `__thiscall
+ * sub_A009F0(wxTreeCtrl* this, int* a2, int a3) { return sub_A00910(this,
+ * a2, a3); }`, while 0x009CDBB0 is `__cdecl sub_9CDBB0(int* a1, int a2,
+ * int a3) { return sub_9CDAD0(a1, a2, a3); }` -- different calling
+ * convention, different first-parameter type, different forward target.
+ * They only look alike as single-line thunk shapes. FUN_009CDBB0 remains
+ * genuinely uncited (see FUN_009CDAD0's blocker note, an STL sentry/facet-
+ * family cluster needing its own pass).
  */
 int wxTreeCtrlAssignItemDataRuntimeThunk(
   void* const treeCtrlRuntime,
