@@ -3596,12 +3596,31 @@ namespace moho
   }
 
   /**
-   * Mirrors the swap-and-relink algorithm already canonically recovered at
-   * 0x00687530 (`SwapPriorityQueueEntries` in `moho/sim/SimRecoveryRuntime.cpp`).
-   * That recovery's `PriorityQueue20Runtime` parameter type lives in an
-   * anonymous namespace private to that translation unit, so it cannot be
-   * called from here; this is a second, address-uncited expression of the
-   * same binary operation against this type.
+   * Address: 0x00687530 (FUN_00687530, sub_687530)
+   *
+   * IDA signature:
+   * void __stdcall sub_687530(gpg::PriorityQueue *queue, int lhs, int rhs);
+   *
+   * What it does:
+   * Exchanges two heap slots and keeps everything that refers to them
+   * correct. `.asm`-confirmed: the entry array sits at `[queue+4]` and the
+   * position map at `[queue+0x14]` (`mov eax,[eax+4]` / `mov edx,[eax+14h]`
+   * -- the `_Myfirst` of two `msvc8::vector`s at `+0x00`/`+0x10`). Each
+   * 0x14-byte slot is `{priority, boundedTick, WeakPtr-shaped owner link
+   * (backLinkSlot/nextInChain), id}` -- the owner-link pair is the same
+   * 20-byte shape as `PrefixedWeakPtrDwordPayloadLane`
+   * (`moho/misc/WeakPtr.h`), so the swap's owner-chain relink (`mov
+   * edx,[eax]` / `mov [eax],ecx` at 0x0068756B) reuses the already-recovered
+   * `CopyPrefixedWeakPtrDwordPayloadLane` (0x00687A70) semantics via
+   * `std::swap` on the node. The position map is then rewritten for both
+   * slots (`map[id] = heapIndex` at 0x006875A0-0x006875B4) -- the step a
+   * plain byte swap would miss.
+   *
+   * Was previously modeled as a second, address-uncited expression of this
+   * same operation (`SwapPriorityQueueEntries` against a private
+   * `PriorityQueue20Runtime` type in `moho/sim/SimRecoveryRuntime.cpp`,
+   * unreachable from here) -- collapsed onto this method, the real
+   * source-level invocation `SiftUp`/`SiftDown` already call by name.
    */
   void CEntityDbBoundedPropQueueRuntime::Swap(const std::int32_t lhs, const std::int32_t rhs) noexcept
   {
@@ -3618,10 +3637,23 @@ namespace moho
   }
 
   /**
-   * Mirrors the handle-acquire-or-reuse algorithm already canonically
-   * recovered at 0x00686790 (`AcquireOrReusePriorityHandleRuntime` in
-   * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
-   * same reason as `Swap`.
+   * Address: 0x00686790 (FUN_00686790, sub_686790)
+   *
+   * What it does:
+   * Acquires one handle slot from the free-list lane (`lastHandle`) when
+   * available; otherwise appends one new handle slot and returns its index.
+   * `.c`-confirmed two-way split matches this method exactly. The
+   * capacity-exhausted append path reaches `msvc8::vector<std::int32_t>::
+   * push_back`/`insert` (0x00686E80/0x00687B40, ICF-shared with
+   * `ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, cited on
+   * `legacy/containers/Vector.h`) through `handleSlots.push_back(payload)`.
+   *
+   * Was previously modeled as a second, address-uncited expression of this
+   * same operation (`AcquireOrReusePriorityHandleRuntime` in
+   * `moho/sim/SimRecoveryRuntime.cpp`, taking a raw `LegacyVectorStorageRuntime<
+   * std::int32_t>*` reach-in instead of the real typed `handleSlots` member,
+   * unreachable from here) -- collapsed onto this method, the real
+   * source-level invocation `Insert` already calls by name.
    */
   std::int32_t CEntityDbBoundedPropQueueRuntime::AcquireHandle(const std::int32_t payload) noexcept
   {
@@ -3639,10 +3671,19 @@ namespace moho
   }
 
   /**
-   * Mirrors the sift-up algorithm already canonically recovered at
-   * 0x00686740 (`SiftPriorityQueueEntryUpRuntime` in
-   * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
-   * same reason as `Swap`.
+   * Address: 0x00686740 (FUN_00686740, sub_686740)
+   *
+   * What it does:
+   * Sifts one priority-queue entry up toward the root using
+   * `(priority, boundedTick)` ordering and returns the final index. Takes
+   * the queue rather than a bare entry pointer because the exchange has to
+   * rewrite the position map too -- one of the three real callers of the
+   * swap at 0x00687530.
+   *
+   * Was previously modeled as a second, address-uncited expression of this
+   * same operation (`SiftPriorityQueueEntryUpRuntime` in
+   * `moho/sim/SimRecoveryRuntime.cpp`, unreachable from here) -- collapsed
+   * onto this method, reached by name from `Insert`.
    */
   std::int32_t CEntityDbBoundedPropQueueRuntime::SiftUp(std::int32_t index) noexcept
   {
@@ -3667,6 +3708,13 @@ namespace moho
    * `(priority, boundedTick)` ordering -- at each level, swaps with
    * whichever child sorts lower -- until the heap invariant is restored or a
    * leaf is reached. `count` is the current node count.
+   *
+   * Was also duplicated as `SiftPriorityQueueEntryDownRuntime` in
+   * `moho/sim/SimRecoveryRuntime.cpp` under the same private
+   * `PriorityQueue20Runtime` type as `Swap`/`AcquireHandle`/`SiftUp` above
+   * -- that copy carried this same address but had no real caller
+   * anywhere in `src/sdk/**`; removed rather than left as a citation
+   * duplicate.
    */
   void CEntityDbBoundedPropQueueRuntime::SiftDown(std::int32_t index, const std::int32_t count) noexcept
   {
