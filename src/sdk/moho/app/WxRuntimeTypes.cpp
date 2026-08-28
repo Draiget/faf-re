@@ -65410,8 +65410,7 @@ namespace
     boost::shared_ptr<moho::ID3DRenderTarget> mPrimaryTargetLocks[2];   // +0x2164
     boost::shared_ptr<moho::ID3DRenderTarget> mSecondaryTargetLocks[2]; // +0x2174
     boost::shared_ptr<moho::ID3DDepthStencil> mDepthStencilTargets[2];  // +0x2184
-    std::uint8_t mUnknown2194_227F[0xEC];
-    moho::CRenFrame mTerrainNormalFrame;                                // +0x2280
+    std::uint8_t mUnknown2194_21A7[0x21A8 - 0x2194];
   };
 
   struct WRenViewportDestroyRuntimeView final
@@ -65845,10 +65844,7 @@ namespace
     offsetof(WRenViewportRenderPassRuntime, mDepthStencilTargets) == 0x2184,
     "WRenViewportRenderPassRuntime::mDepthStencilTargets offset must be 0x2184"
   );
-  static_assert(
-    offsetof(WRenViewportRenderPassRuntime, mTerrainNormalFrame) == 0x2280,
-    "WRenViewportRenderPassRuntime::mTerrainNormalFrame offset must be 0x2280"
-  );
+  static_assert(sizeof(WRenViewportRenderPassRuntime) == 0x21A8, "WRenViewportRenderPassRuntime size must be 0x21A8");
 
   struct WRenViewportReflectionPassView final
   {
@@ -69929,6 +69925,24 @@ void moho::WRenViewport::RenderTerrainNormals(TerrainCommon* const terrain)
  * What it does:
  * Builds and renders the terrain-normal basis frame (`TCreateBasis`) for the
  * active head when terrain rendering is enabled.
+ *
+ * Uses the single shared scratch `CRenFrame` at `WRenViewportDestroyRuntimeView
+ * ::mFrame` (+0x280) -- the same object `WRenViewport::Render`'s opaque-pass
+ * step relabels `"TOpaque"` a few hundred lines up in this file. This function
+ * previously read/wrote a fabricated `WRenViewportRenderPassRuntime::
+ * mTerrainNormalFrame` field at +0x2280, exactly 0x2000 bytes past the real
+ * one -- the identical off-by-0x2000 defect class already documented on
+ * WRenViewportRenderView's field comment above (UpdateRenderViewportCoordinates
+ * evidence) -- which also read/wrote past the end of the real 0x21A8-byte
+ * WRenViewport allocation (CreateGameViewportRuntime's kRenViewportRuntimeSize).
+ * That field was never constructed by ConstructRenViewportRuntime nor
+ * destroyed by DestroyRenViewportNoDeleteRuntime, so `mVertexSheet` held
+ * whatever heap bytes happened to sit past the allocation on first use,
+ * faulting inside CRenFrame::InitTransformedVerts on the first painted frame.
+ * Live-verified: main.exe /map SCMP_009 crashed here every run before this
+ * fix (dbgrun, EXCEPTION_ACCESS_VIOLATION reading near-null through the
+ * garbage mVertexSheet), and reaches the normal skirmish AI/session setup
+ * past this point after it.
  */
 void moho::WRenViewport::TransformTerrainNormals()
 {
@@ -69938,6 +69952,7 @@ void moho::WRenViewport::TransformTerrainNormals()
 
   WRenViewportRenderView* const runtime = AsRenderView(this);
   WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+  auto* const destroyView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   if (gpg::gal::DeviceD3D9* const d3dDevice = device->GetDeviceD3D9(); d3dDevice != nullptr) {
     (void)d3dDevice->ClearTextures();
@@ -69955,10 +69970,10 @@ void moho::WRenViewport::TransformTerrainNormals()
 
   const int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
   const int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
-  passView->mTerrainNormalFrame.mName = "TCreateBasis";
-  passView->mTerrainNormalFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
-  passView->mTerrainNormalFrame.SetTexture(0u, passView->mSecondaryTargetLocks[head]);
-  passView->mTerrainNormalFrame.Render(headWidth, headHeight);
+  destroyView->mFrame.mName = "TCreateBasis";
+  destroyView->mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
+  destroyView->mFrame.SetTexture(0u, passView->mSecondaryTargetLocks[head]);
+  destroyView->mFrame.Render(headWidth, headHeight);
 }
 
 /**
