@@ -407,12 +407,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BE2F70 (FUN_00BE2F70, register_ShaderVarTerrainHeightScale)
+   * Cleanup: 0x00C056A0 (registered via atexit)
+   *
    * What it does:
-   * Runs the terrain `TerrainHeightScale` shader-var destructor at process
-   * exit. Registrar thunk address not independently traced (reached only
-   * through the CRT static-init/atexit chain); the slot address and
-   * "TerrainHeightScale" registration name are confirmed directly from
-   * HighFidelityTerrain::Func3's disassembly (0x00800550-0x0080056E).
+   * Runs the terrain height-scale shader-var destructor at process exit.
+   * The registrar's own disassembly (0x00BE2F70) confirms the registration
+   * key is the bare effect-parameter name `"HeightScale"`, not
+   * `"TerrainHeightScale"` -- the earlier note conflated IDA's own label for
+   * the global slot (`shaderVarTerrainHeightScale`, referenced by address in
+   * HighFidelityTerrain::Func3 at 0x00800550) with the runtime lookup string,
+   * which is a different thing entirely. `terrain.fx` (effects.nx2) declares
+   * the parameter as `float HeightScale;` with no prefix, confirming this by
+   * the shipped asset too. The stale key made `ShaderVar::Exists()` throw
+   * uncaught on every terrain render (`EffectD3D9::SetMatrix`/
+   * `GetParameterByName` finds nothing and calls `ThrowGalError`), crashing
+   * the process on the first painted frame.
    */
   void cleanup_ShaderVarTerrainHeightScale()
   {
@@ -422,15 +432,19 @@ namespace moho
   void register_ShaderVarTerrainHeightScale()
   {
     ShaderVar& slot = AccessShaderVarSlot<0x010C0630u>();
-    RegisterShaderVar("TerrainHeightScale", &slot, "terrain");
+    RegisterShaderVar("HeightScale", &slot, "terrain");
     (void)std::atexit(&cleanup_ShaderVarTerrainHeightScale);
   }
 
   /**
+   * Address: 0x00BE2FB0 (FUN_00BE2FB0, register_ShaderVarTerrainTime)
+   * Cleanup: 0x00C056C0 (registered via atexit)
+   *
    * What it does:
-   * Runs the terrain `TerrainTime` shader-var destructor at process exit.
-   * Same evidence basis as `cleanup_ShaderVarTerrainHeightScale`, confirmed
-   * at 0x0080057D-0x0080059F.
+   * Runs the terrain time shader-var destructor at process exit. Same
+   * mislabeled-evidence bug as `cleanup_ShaderVarTerrainHeightScale`: the
+   * registrar's own disassembly (0x00BE2FB0) shows the registration key is
+   * `"Time"`, matching `terrain.fx`'s `float Time;` -- not `"TerrainTime"`.
    */
   void cleanup_ShaderVarTerrainTime()
   {
@@ -440,7 +454,7 @@ namespace moho
   void register_ShaderVarTerrainTime()
   {
     ShaderVar& slot = AccessShaderVarSlot<0x010C02D0u>();
-    RegisterShaderVar("TerrainTime", &slot, "terrain");
+    RegisterShaderVar("Time", &slot, "terrain");
     (void)std::atexit(&cleanup_ShaderVarTerrainTime);
   }
 
