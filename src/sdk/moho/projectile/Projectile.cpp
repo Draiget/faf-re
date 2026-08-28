@@ -23,6 +23,7 @@
 #include "moho/misc/WeakObject.h"
 #include "moho/projectile/CProjectileAttributes.h"
 #include "moho/projectile/ProjectileStartupRegistrations.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -558,8 +559,10 @@ namespace moho
    * quaternion forward vector scaled by a random initial speed), writes the
    * current / previous / pending transforms, links into the Sim coord list,
    * selects the initial layer (Air / below-water), fires OnPreCreate /
-   * OnLayerChange / OnCreate scripts, applies the mesh, and self-destructs when
-   * spawned below water with mDestroyOnWater set.
+   * OnLayerChange / OnCreate scripts, applies the mesh, self-destructs when
+   * spawned below water with mDestroyOnWater set, and (when the blueprint
+   * requests it) queues a camera-follow-transition record onto the sim's
+   * sync-serialize lane.
    */
   Projectile::Projectile(
     const RProjectileBlueprint* const blueprint,
@@ -866,28 +869,48 @@ namespace moho
         this->RunScriptWithBool("OnCreate", view.mBelowWater);
       }
 
-      /* UNRESOLVED (2 of 2 remaining): camera-follow sync-vector push, asm
-       * 0x0069BD56-0x0069BD8E.
-       * When Display.CameraFollowsProjectile != 0 the binary pushes a 12-byte lane
-       * {this->id_, <sim field @ +0x68>, Display.CameraFollowTimeout} into
-       * SimulationRef->mSyncSerializeGroup0 (Sim+0x9B8, `.asm`-confirmed: `add
-       * eax, 9B8h` at 0x0069BD7B on the `sim` parameter) via sub_69E6D0.
-       * Citation fix: previously labeled `mSyncSerializeGroup1` here, but
-       * Sim.h declares `mSyncSerializeGroup0` immediately before
-       * `mSyncSerializeGroup1` immediately before `mAllyUpgradeNotifications`
-       * (confirmed 0x9D8) -- two 0x10-byte `msvc8::vector` slots back from a
-       * confirmed anchor puts `mSyncSerializeGroup0` at 0x9B8 and
-       * `mSyncSerializeGroup1` at 0x9C8, not the reverse. Separately,
-       * `mSyncSerializeGroup0` is still declared `msvc8::vector<void*>` in
-       * Sim.h, which cannot hold this 12-byte `Element12Runtime` lane -- the
-       * same wrong-element-shape pattern already found and fixed on
-       * `mSyncSerializeGroup2` (see `CWldSession.h`), not yet re-derived here.
-       * The only recovered expression of this push is the offset-magic helper
-       * AppendProjectileLaneFromOwnerOffsetRuntime in SimRecoveryRuntime.cpp, which
-       * is outside this task's editable file set, and the lane's middle field
-       * (read as [ecx+0x68]) is not yet identified. Omitted rather than fabricating
-       * raw offset arithmetic; wire to the recovered Sim sync-push helper in a
-       * follow-up pass. */
+      // Camera-follow sync-vector push (asm 0x0069BD56-0x0069BD8E). When the
+      // blueprint marks this projectile as camera-followed, queue one
+      // follow-transition record: {previously-followed source entity id,
+      // this projectile's own id, follow timeout}. Element type resolved as
+      // `moho::SCamFollowParams` (`CameraImpl.h`, 0x0C bytes) -- `Moho::
+      // CWldSession::DoBeat` already replays `SSyncData::mFollowCameras`
+      // through `CameraImpl::CameraFollow`, which reads exactly these three
+      // fields in this same order (`mCurrentEntityId`, `mTargetEntityId`,
+      // `mTargetTimeLeft`) and gates on `mCurrentEntityId` still matching the
+      // client's live camera target before switching to `mTargetEntityId`.
+      //
+      // The previously-unidentified middle field (asm `[ecx+0x68]`) is
+      // `sourceEntity->id_`: `ecx` is reloaded from this constructor's own
+      // `sourceEntity` incoming argument, re-read from its stable stack slot
+      // (entry_esp+0x10, `.asm`-confirmed via three consistent reads at
+      // 0x0069B06C / 0x0069B4C9 / 0x0069BA66 -- distinct from the dead
+      // `army` argument slot at entry_esp+0xC that the earlier random
+      // scale-velocity computation recycles for scratch, which raw-byte
+      // tracing initially and incorrectly suggested this read aliased).
+      // `+0x68` is `Entity::id_`, the same field/offset already confirmed
+      // two lines above on `this->id_` (asm `[ebp+68h]`) -- both reads share
+      // one field because `sourceEntity` is itself an `Entity`.
+      //
+      // The binary dereferences `sourceEntity` unconditionally here (no null
+      // check before `[ecx+0x68]`), even though `sourceEntity` is nullable
+      // and checked earlier in this constructor for `mLauncherWeak`.
+      // Preserved as-is per binary fidelity: every shipped blueprint that
+      // sets `CameraFollowsProjectile` is a unit-fired special weapon, so a
+      // null `sourceEntity` with this flag set never occurs in practice.
+      //
+      // Previously modeled via the RULE ONE offset-magic helper
+      // `AppendProjectileLaneFromOwnerOffsetRuntime` (SimRecoveryRuntime.cpp,
+      // reach-in through `ownerBase + 0x9B8`) -- collapsed onto
+      // `msvc8::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
+      // that citation for the full fast/slow-path evidence chain.
+      if (blueprint->Display.CameraFollowsProjectile != 0) {
+        SimulationRef->mSyncSerializeGroup0.push_back(SCamFollowParams{
+          sourceEntity->id_,                      // mCurrentEntityId
+          id_,                                     // mTargetEntityId
+          blueprint->Display.CameraFollowTimeout,  // mTargetTimeLeft
+        });
+      }
     }
   }
 

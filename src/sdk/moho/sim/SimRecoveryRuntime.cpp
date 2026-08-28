@@ -3111,35 +3111,6 @@ Float7Runtime* CopyFloat7RangeBackwardRuntime(
 }
 
 /**
- * Address: 0x0069ED40 (FUN_0069ED40)
- *
- * What it does:
- * Inserts one 12-byte lane into an element12 vector and writes the rebased
- * cursor lane to `outCursor`.
- */
-std::uint32_t* InsertElement12LaneAndRebaseCursorRuntime(
-  LegacyVectorStorageRuntime<Element12Runtime>* const vector,
-  std::uint32_t* const outCursor,
-  Element12Runtime* const insertPosition,
-  const Element12Runtime* const value
-)
-{
-  if (outCursor == nullptr || vector == nullptr) {
-    return outCursor;
-  }
-
-  std::size_t index = 0u;
-  if (vector->begin != nullptr && vector->end != nullptr && vector->end > vector->begin && insertPosition != nullptr) {
-    index = static_cast<std::size_t>(insertPosition - vector->begin);
-  }
-
-  const Element12Runtime copy = value != nullptr ? *value : Element12Runtime{};
-  (void)InsertTrivialValueAtPosition(vector, insertPosition, copy);
-  *outCursor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(vector->begin + index));
-  return outCursor;
-}
-
-/**
  * Address: 0x0069EDB0 (FUN_0069EDB0)
  *
  * What it does:
@@ -3339,38 +3310,6 @@ moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
     destination->PushSnapshot(AsIdPoolSnapshot(source->mData[index]));
   }
   return destination;
-}
-
-/**
- * Address: 0x0069E6D0 (FUN_0069E6D0)
- *
- * What it does:
- * Appends one 12-byte projectile lane into a legacy growth vector with
- * automatic capacity expansion.
- */
-Element12Runtime* AppendProjectileLaneRuntime(
-  const Element12Runtime* const value,
-  LegacyVectorStorageRuntime<Element12Runtime>* const vector
-)
-{
-  const Element12Runtime copy = value != nullptr ? *value : Element12Runtime{};
-  return AppendTrivialValue(vector, copy);
-}
-
-/**
- * Address: 0x0069A490 (FUN_0069A490)
- *
- * What it does:
- * Adapter lane that appends one projectile lane into the owner vector stored
- * at offset `+0x9B8`.
- */
-Element12Runtime* AppendProjectileLaneFromOwnerOffsetRuntime(
-  std::byte* const ownerBase,
-  const Element12Runtime* const value
-)
-{
-  auto* const vector = reinterpret_cast<LegacyVectorStorageRuntime<Element12Runtime>*>(ownerBase + 0x9B8);
-  return AppendProjectileLaneRuntime(value, vector);
 }
 
 /**
