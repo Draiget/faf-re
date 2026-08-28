@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <new>
 
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
@@ -215,6 +216,33 @@ namespace moho
    * What it does:
    * Ensures this shader-var is attached to one loaded effect, resolves the
    * effect-variable lane on first attach, and reports availability.
+   *
+   * Fidelity note: the binary's own lookup (`EffectD3D9::SetMatrix`, really
+   * a by-name parameter resolver -- FUN_00941D70) unconditionally throws
+   * `gpg::gal::Error` when the named parameter is absent from the bound
+   * effect (confirmed from its raw .asm: `cmp edi, ebx` / `jnz` on the
+   * returned handle, no null-tolerant path). `ShaderVar::Exists()` itself
+   * sets up no catch of its own -- its SEH frame (`SEH_437ED0`) only unwinds
+   * the two local `boost::shared_ptr`s, matching the plain non-exceptional
+   * return paths already in this function's decompile. Live testing against
+   * the currently-installed FAForever asset set (effects.nx2) shows real
+   * effect files that genuinely lack parameters this engine code expects
+   * -- e.g. `water2.fx` here has none of WaterColor/WaterLerp/FresnelBias/
+   * FresnelPower/UnitReflectionAmount/SkyReflectionAmount/NormalRepeatRate/
+   * Normal1-4Movement/SunShininess/SunReflectionAmount/SunDirection, byte-
+   * verified absent from its source text (not merely dead-stripped by the
+   * effect compiler) -- so the literal 2007 throw-on-miss behavior crashes
+   * the whole process on the very first water-rendering frame
+   * (HighFidelityWater::RenderWaterSurface -> SetShaderVarMem -> here), and
+   * the same defect already crashed terrain rendering once (fixed in
+   * 6823547b / b65f910b) before this water instance surfaced. `Exists()`'s
+   * own name and every calling convention across this codebase (terrain,
+   * water, and the GetTexture() below) already assume a safe, non-throwing
+   * bool check -- that split-brain (safe contract wrapping an unsafe
+   * primitive) is the actual bug. Catching here, at the one choke point
+   * every caller already funnels through, keeps every other call site
+   * exactly as recovered and matches the documented design intent instead
+   * of the letter of one binary snapshot tested against different content.
    */
   bool ShaderVar::Exists()
   {
@@ -236,7 +264,11 @@ namespace moho
     }
 
     boost::shared_ptr<gpg::gal::EffectD3D9> baseEffect = effect->GetBaseEffect();
-    mEffectVariable = baseEffect->SetMatrix(mVariableName.c_str());
+    try {
+      mEffectVariable = baseEffect->SetMatrix(mVariableName.c_str());
+    } catch (const gpg::gal::Error&) {
+      return false;
+    }
     return mEffectVariable.get() != nullptr;
   }
 
