@@ -127,21 +127,21 @@ namespace moho
 
   private:
     /**
-     * Mirrors the handle-acquire-or-reuse algorithm already canonically
-     * recovered at 0x00686790 (`AcquireOrReusePriorityHandleRuntime` in
-     * `moho/sim/SimRecoveryRuntime.cpp`) -- that recovery's
-     * `PriorityQueue20Runtime` parameter type lives in an anonymous
-     * namespace private to that translation unit and is not reachable from
-     * here, so this is a second, address-uncited expression of the same
-     * binary operation against this type.
+     * Address: 0x00686790 (FUN_00686790, sub_686790)
+     *
+     * What it does:
+     * Acquires one handle slot from the free-list lane when available;
+     * otherwise appends one new handle slot via `handleSlots.push_back` and
+     * returns its index. See definition for full evidence.
      */
     [[nodiscard]] std::int32_t AcquireHandle(std::int32_t payload) noexcept;
 
     /**
-     * Mirrors the sift-up algorithm already canonically recovered at
-     * 0x00686740 (`SiftPriorityQueueEntryUpRuntime` in
-     * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
-     * same reason as `AcquireHandle`.
+     * Address: 0x00686740 (FUN_00686740, sub_686740)
+     *
+     * What it does:
+     * Sifts one priority-queue entry up toward the root using
+     * `(priority, boundedTick)` ordering. See definition for full evidence.
      */
     [[nodiscard]] std::int32_t SiftUp(std::int32_t index) noexcept;
 
@@ -157,10 +157,11 @@ namespace moho
     void SiftDown(std::int32_t index, std::int32_t count) noexcept;
 
     /**
-     * Mirrors the swap-and-relink algorithm already canonically recovered
-     * at 0x00687530 (`SwapPriorityQueueEntries` in
-     * `moho/sim/SimRecoveryRuntime.cpp`) -- not reachable from here for the
-     * same reason as `AcquireHandle`.
+     * Address: 0x00687530 (FUN_00687530, sub_687530)
+     *
+     * What it does:
+     * Exchanges two heap slots (owner-chain relink + position-map rewrite
+     * for both). See definition for full evidence.
      */
     void Swap(std::int32_t lhs, std::int32_t rhs) noexcept;
   };
