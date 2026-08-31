@@ -21,6 +21,8 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/SEntAttachInfo.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CMersenneTwister.h"
 #include "moho/sim/CRandomStream.h"
@@ -1464,6 +1466,11 @@ bool CAiTransportImpl::TransportIsUnitAssignedForPickup(Unit* const unit) const
 
 /**
  * Address: 0x005E66B0 (FUN_005E66B0)
+ *
+ * Ground truth (`FUN_005E66B0.c`) rotates via `Moho::MultQuadVec(&v13, &v12,
+ * &this->mRes.mOri)`, not the generic `Quaternion::Rotate` (upstream
+ * WildMagic, `.w`-scalar `ToMat3()`) this replaces -- `mPickupInfo.mOri` is
+ * always this engine's `.x`-scalar convention.
  */
 SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(Unit* const unit) const
 {
@@ -1475,7 +1482,8 @@ SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(Unit* const unit) const
   Wm3::Vec3f worldPos = mPickupInfo.mPos;
   if (mAttachpoints != 1) {
     const VTransform localTransform = mUnit->GetBoneLocalTransform(static_cast<int>(reservedBone->transportBoneIndex));
-    const Wm3::Vec3f rotated = mPickupInfo.mOri.Rotate(localTransform.pos_);
+    Wm3::Vec3f rotated{};
+    MultQuadVec(&rotated, &localTransform.pos_, &mPickupInfo.mOri);
     worldPos.x += rotated.x * 2.0f;
     worldPos.z += rotated.z * 2.0f;
   }
@@ -2252,6 +2260,10 @@ int CAiTransportImpl::TransportGetAttachBone(Unit* const unit) const
 
 /**
  * Address: 0x005E77F0 (FUN_005E77F0)
+ *
+ * Ground truth (`FUN_005E77F0.c`) rotates via `Moho::MultQuadVec(&v17, &v16,
+ * v7)`, not the generic `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar
+ * `ToMat3()`) this replaces.
  */
 SOCellPos CAiTransportImpl::TransportGetAttachPosition(Unit* const unit) const
 {
@@ -2261,7 +2273,9 @@ SOCellPos CAiTransportImpl::TransportGetAttachPosition(Unit* const unit) const
   }
 
   const VTransform localTransform = mUnit->GetBoneLocalTransform(static_cast<int>(reserved->transportBoneIndex));
-  const Wm3::Vec3f rotated = mUnit->GetTransform().orient_.Rotate(localTransform.pos_);
+  const Wm3::Quaternionf unitOrientation = mUnit->GetTransform().orient_;
+  Wm3::Vec3f rotated{};
+  MultQuadVec(&rotated, &localTransform.pos_, &unitOrientation);
   Wm3::Vec3f world = mUnit->GetPosition();
   world.x += rotated.x;
   world.z += rotated.z;
@@ -2270,6 +2284,10 @@ SOCellPos CAiTransportImpl::TransportGetAttachPosition(Unit* const unit) const
 
 /**
  * Address: 0x005E7950 (FUN_005E7950)
+ *
+ * Ground truth (`FUN_005E7950.c`) rotates via `Moho::MultQuadVec(&v14, &v13,
+ * v7)`, not the generic `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar
+ * `ToMat3()`) this replaces.
  */
 Wm3::Vec3f CAiTransportImpl::TransportGetAttachBonePosition(Unit* const unit) const
 {
@@ -2279,7 +2297,9 @@ Wm3::Vec3f CAiTransportImpl::TransportGetAttachBonePosition(Unit* const unit) co
   }
 
   const VTransform localTransform = mUnit->GetBoneLocalTransform(static_cast<int>(reserved->transportBoneIndex));
-  const Wm3::Vec3f rotated = mUnit->GetTransform().orient_.Rotate(localTransform.pos_);
+  const Wm3::Quaternionf unitOrientation = mUnit->GetTransform().orient_;
+  Wm3::Vec3f rotated{};
+  MultQuadVec(&rotated, &localTransform.pos_, &unitOrientation);
   const Wm3::Vec3f base = mUnit->GetPosition();
   return Wm3::Vec3f(base.x + rotated.x, base.y + rotated.y, base.z + rotated.z);
 }
@@ -2298,6 +2318,16 @@ VTransform CAiTransportImpl::TransportGetAttachBoneTransform(Unit* const unit) c
 
 /**
  * Address: 0x005E7AD0 (FUN_005E7AD0)
+ *
+ * Ground truth (`FUN_005E7AD0.c`) builds the local-bone forward via
+ * `Moho::VAxes3::VAxes3(&result, &a2)` and reads its `vZ` member -- NOT the
+ * generic `Quaternion::Rotate((0,0,1))` (upstream WildMagic, `.w`-scalar
+ * `ToMat3()`), and also not equivalent to `Moho::MultQuadVec` against
+ * `(0,0,1)`: `VAxes3::vZ` is a specific permuted-and-partially-negated
+ * readout of the `.x`-scalar rotation matrix's row 0 (`vZ = (M[0][2],
+ * M[0][1], -M[0][0])`, verified numerically), not its column 2. The second
+ * rotation (local-to-world) then genuinely does call `Moho::MultQuadVec(&v10,
+ * &v9, v7)` against the unit's own transform.
  */
 Wm3::Vec3f CAiTransportImpl::TransportGetAttachFacing(Unit* const unit) const
 {
@@ -2307,9 +2337,12 @@ Wm3::Vec3f CAiTransportImpl::TransportGetAttachFacing(Unit* const unit) const
   }
 
   const VTransform localBone = mUnit->GetBoneLocalTransform(static_cast<int>(reserved->transportBoneIndex));
-  Wm3::Vec3f localForward = localBone.orient_.Rotate(Wm3::Vec3f(0.0f, 0.0f, 1.0f));
+  const moho::VAxes3 localBoneAxes(localBone.orient_);
+  Wm3::Vec3f localForward = localBoneAxes.vZ;
   localForward.y = 0.0f;
-  const Wm3::Vec3f worldForward = mUnit->GetTransform().orient_.Rotate(localForward);
+  const Wm3::Quaternionf unitOrientation = mUnit->GetTransform().orient_;
+  Wm3::Vec3f worldForward{};
+  MultQuadVec(&worldForward, &localForward, &unitOrientation);
   return Wm3::Vec3f::NormalizeOrZero(worldForward);
 }
 
