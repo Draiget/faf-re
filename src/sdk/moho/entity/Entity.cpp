@@ -791,10 +791,18 @@ namespace
     return direction;
   }
 
+  // Ground truth (`FUN_0068A6F0.c`, `cfunc_EntityCreateProjectileAtBoneL`'s
+  // only caller of this helper) rotates via the engine's .x-scalar rotation
+  // matrix, not the generic `Quaternion::Rotate` (upstream WildMagic,
+  // `.w`-scalar `ToMat3()`) this replaces -- same convention mismatch as
+  // `cfunc_EntityGetBoneDirectionL` below, whose own ground truth
+  // (`FUN_0068B3F0.c`) confirms the identical "forward = MultQuadVec(quat,
+  // (0,0,1))" operation unambiguously via a directly-typed call.
   [[nodiscard]] Wm3::Vector3f ResolveBoneForwardVector(const moho::VTransform& transform) noexcept
   {
     const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-    Wm3::Vector3f out = transform.orient_.Rotate(forwardAxis);
+    Wm3::Vector3f out{};
+    moho::MultQuadVec(&out, &forwardAxis, &transform.orient_);
     NormalizeInPlace(out);
     return out;
   }
@@ -5933,6 +5941,11 @@ namespace moho
    *
    * What it does:
    * Resolves one bone transform and returns its forward direction vector.
+   *
+   * Ground truth (`FUN_0068B3F0.c`) rotates via `Moho::MultQuadVec(&n, &obj,
+   * (Wm3::Quaternionf*)&v10)`, not the generic `Quaternion::Rotate` (upstream
+   * WildMagic, `.w`-scalar `ToMat3()`) this replaces -- `boneTransform.
+   * orient_` is always this engine's `.x`-scalar convention.
    */
   int cfunc_EntityGetBoneDirectionL(LuaPlus::LuaState* const state)
   {
@@ -5950,7 +5963,8 @@ namespace moho
     const VTransform boneTransform = entity->GetBoneWorldTransform(boneIndex);
 
     const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-    const Wm3::Vector3f direction = boneTransform.orient_.Rotate(forwardAxis);
+    Wm3::Vector3f direction{};
+    MultQuadVec(&direction, &forwardAxis, &boneTransform.orient_);
 
     lua_pushnumber(rawState, direction.x);
     lua_pushnumber(rawState, direction.y);
@@ -8542,6 +8556,13 @@ namespace moho
    * tilts the entity's current orientation so its local up-axis aligns to the
    * pushed normal (shortest-arc pre-multiply), then commits the result as a
    * pending transform.
+   *
+   * Ground truth (`FUN_006FCB00.c`) re-derived term-by-term: the final
+   * compose is `tran.orient = tiltDelta * o` (delta left/first, existing
+   * orientation right/second) using `tiltDelta.w` as the delta's scalar lane
+   * -- matching `BuildTiltShortestArcDelta`'s corrected labelling above, not
+   * the generic `Wm3::Quaternionf::Multiply` (`.w`-scalar on both operands),
+   * which produced a wrong composite once `tiltDelta` was mislabelled.
    */
   int cfunc_EntityPushOverL(LuaPlus::LuaState* const state)
   {
@@ -8608,7 +8629,7 @@ namespace moho
       Wm3::Quaternionf tiltDelta{};
       BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
 
-      tran.orient_ = Wm3::Quaternionf::Multiply(tiltDelta, o);
+      tran.orient_ = ComposeWScalarDeltaOntoOrientation(tiltDelta, o);
       NormalizeQuatInPlace(&tran.orient_);
       entity->SetPendingTransform(tran, 1.0f);
     }
@@ -8927,6 +8948,22 @@ namespace moho
    * What it does:
    * Builds the shortest-arc tilt delta from `currentUp` toward `targetNormal`,
    * including the anti-parallel fallback axis selection used by COORDS_Tilt.
+   *
+   * Ground truth (`FUN_0050CB50.c`) writes the dot-product scalar term to
+   * raw offset 0 of the output quaternion and the three cross-product/
+   * fallback-axis terms to offsets 4/8/12 in that order. This engine's
+   * `Wm3::Quaternion` stores `.w` at offset 0 and `.x/.y/.z` at offsets
+   * 4/8/12 (`Wm3Quaternion.h`'s declared union order) -- so this
+   * construction is one of the rare cases (like `RotateQuatByAngle`) that
+   * genuinely produces a native `.w`-scalar result, unlike the `.x`-scalar
+   * convention every *engine orientation* quaternion uses. The previous body
+   * here wrote the scalar to `.x` and cyclically shifted the three
+   * cross-product terms onto `.y/.z/.w`, silently relabelling the same
+   * correct value set onto the wrong fields (the exact failure mode RULE ONE
+   * warns about) -- confirmed by cross-checking both callers' `Wm3::
+   * Quaternionf::Multiply(tiltDelta, orientation)` sites against their own
+   * ground truth (`FUN_006FCB00.c`, `FUN_0050B820.c`), both of which only
+   * balance term-by-term once `tiltDelta.w` (not `.x`) holds the scalar.
    */
   [[nodiscard]] static Wm3::Quaternionf*
   BuildTiltShortestArcDelta(const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp)
@@ -8943,27 +8980,27 @@ namespace moho
     (void)Wm3::Vector3f::Normalize(&halfAxis);
 
     const float scalar = (currentUp.x * halfAxis.x) + (currentUp.y * halfAxis.y) + (currentUp.z * halfAxis.z);
-    outDelta->x = scalar;
+    outDelta->w = scalar;
     if (scalar == 0.0f) {
       const double upAbsX = CoordsAbsFloat(currentUp.x);
       const double upAbsY = CoordsAbsFloat(currentUp.y);
       if (upAbsX < upAbsY) {
         const double inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
-        outDelta->y = 0.0f;
-        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
-        outDelta->w = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
+        outDelta->x = 0.0f;
+        outDelta->y = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
+        outDelta->z = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
       } else {
         const double inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
-        outDelta->z = 0.0f;
-        outDelta->y = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
-        outDelta->w = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
+        outDelta->y = 0.0f;
+        outDelta->x = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
+        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
       }
       return outDelta;
     }
 
-    outDelta->y = (currentUp.y * halfAxis.z) - (currentUp.z * halfAxis.y);
-    outDelta->z = (currentUp.z * halfAxis.x) - (currentUp.x * halfAxis.z);
-    outDelta->w = (currentUp.x * halfAxis.y) - (currentUp.y * halfAxis.x);
+    outDelta->x = (currentUp.y * halfAxis.z) - (currentUp.z * halfAxis.y);
+    outDelta->y = (currentUp.z * halfAxis.x) - (currentUp.x * halfAxis.z);
+    outDelta->z = (currentUp.x * halfAxis.y) - (currentUp.y * halfAxis.x);
     return outDelta;
   }
 
@@ -8973,6 +9010,14 @@ namespace moho
    * What it does:
    * Tilts one orientation so its local up-axis aligns to `surfaceNormal`,
    * preserving heading by pre-multiplying one shortest-arc delta quaternion.
+   *
+   * Ground truth (`FUN_0050B820.c`) re-derived term-by-term: the final
+   * compose is `*orientation = tiltDelta * oldOrientation` (delta left/
+   * first, existing orientation right/second) using `tiltDelta.w` as the
+   * delta's scalar lane -- matching `BuildTiltShortestArcDelta`'s corrected
+   * labelling, not the generic `Wm3::Quaternionf::Multiply` (`.w`-scalar on
+   * both operands). Same pattern as `cfunc_EntityPushOverL`, which shares
+   * this helper.
    */
   void COORDS_Tilt(Wm3::Quaternionf* const orientation, Wm3::Vector3f surfaceNormal) noexcept
   {
@@ -8993,7 +9038,7 @@ namespace moho
 
     Wm3::Quaternionf tiltDelta{};
     (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
-    *orientation = Wm3::Quaternionf::Multiply(tiltDelta, oldOrientation);
+    *orientation = ComposeWScalarDeltaOntoOrientation(tiltDelta, oldOrientation);
   }
 
   /**
