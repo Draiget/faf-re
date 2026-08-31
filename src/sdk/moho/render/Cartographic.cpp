@@ -924,10 +924,16 @@ namespace moho
   /**
    * The active world session (`Moho::sWldSession`, 0x010A6470).
    * `Cartographic::Render` caches it at 0x007D1832 and gates the range-ring,
-   * fog-of-war, boundary and UI passes on it being non-null. The global has no
-   * owning header in this tree yet, so it is declared here where it is used.
+   * fog-of-war, boundary and UI passes on it being non-null.
+   *
+   * This storage is `gActiveWldSession` in CWldSession.cpp - a `moho`-scoped
+   * anonymous-namespace static, so it has internal linkage and no other TU
+   * can name it directly. `WLD_GetActiveSession()` is the real cross-TU
+   * accessor for the same slot; a plain `extern CWldSession* sWldSession;`
+   * here compiles but can never link (no external symbol of that name is
+   * ever defined), and only surfaces as an unresolved external because
+   * `/FORCE` lets the build finish anyway.
    */
-  extern CWldSession* sWldSession;
 
   /**
    * Address: 0x007FA730 (FUN_007FA730, Moho::REN_DebugStuff)
@@ -2296,7 +2302,7 @@ namespace moho
     gpg::gal::OutputContext& headOutputContext = CartographicHeadOutputContext(*device, headIndex);
     (void)device->ClearTextures();
 
-    CWldSession* const session = sWldSession;
+    CWldSession* const session = WLD_GetActiveSession();
     CameraImpl* const camera = worldView->GetCamera();
     const GeomCamera3& cameraView = *worldView->GetCameraView();
 
