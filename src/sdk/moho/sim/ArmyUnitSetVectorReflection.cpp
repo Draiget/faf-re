@@ -114,6 +114,20 @@ namespace
     gEntitySetVectorTypeConstructed = false;
   }
 
+  msvc8::string gEntitySetTemplateUnitVectorTypeName;
+
+  /**
+   * Address: 0x00BFF440 (FUN_00BFF440, vector<EntitySetTemplate<Unit>> name-cache cleanup)
+   *
+   * What it does:
+   * Releases the cached lexical name for `vector<EntitySetTemplate<Unit>>`
+   * during process teardown.
+   */
+  void cleanup_EntitySetTemplateUnitVectorTypeName()
+  {
+    gEntitySetTemplateUnitVectorTypeName = msvc8::string{};
+  }
+
   struct EntitySetTemplateUnitVectorTypeBootstrap
   {
     EntitySetTemplateUnitVectorTypeBootstrap()
@@ -179,15 +193,24 @@ gpg::RType* gpg::ResolveEntitySetTemplateUnitVectorType()
  */
 gpg::RVectorType<moho::SEntitySetTemplateUnit>::~RVectorType() = default;
 
+/**
+ * Address: 0x00701680 (FUN_00701680, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetName)
+ *
+ * What it does:
+ * Lazily resolves the reflected `EntitySetTemplate<Unit>` element type name
+ * through the shared `EntitySetTemplate<Unit>::sType` cache, formats
+ * "vector<%s>", caches the result, and registers its teardown with
+ * `atexit` -- all under one once-guard, matching the binary's static-init
+ * guard byte.
+ */
 const char* gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveEntitySetTemplateUnitType();
-    const char* const elementName = elementType ? elementType->GetName() : "EntitySetTemplate<Unit>";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "EntitySetTemplate<Unit>");
+  if (gEntitySetTemplateUnitVectorTypeName.empty()) {
+    gEntitySetTemplateUnitVectorTypeName =
+      gpg::STR_Printf("vector<%s>", CachedEntitySetTemplateUnitReflType()->GetName());
+    (void)std::atexit(&cleanup_EntitySetTemplateUnitVectorTypeName);
   }
-  return sName.c_str();
+  return gEntitySetTemplateUnitVectorTypeName.c_str();
 }
 
 msvc8::string gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetLexical(const gpg::RRef& ref) const

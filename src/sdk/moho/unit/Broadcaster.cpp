@@ -77,6 +77,49 @@ namespace
     return value;
   }
 
+  gpg::RType* gEUnitCommandQueueStatusTypeCache = nullptr;
+
+  // Shared reflected-type cache for the bare `EUnitCommandQueueStatus` enum,
+  // read/written by both GetName() overrides below (confirmed against
+  // FUN_006F8170 and FUN_006F8230's disassembly: both reference the same
+  // binary global slot, unlike the ECommandEvent pair above which resolves
+  // through a two-tier primary/REF_FindTypeNamed fallback -- no such fallback
+  // is present here, so this stays single-tier to match.
+  [[nodiscard]] gpg::RType* CachedEUnitCommandQueueStatusType()
+  {
+    if (!gEUnitCommandQueueStatusTypeCache) {
+      gEUnitCommandQueueStatusTypeCache = gpg::LookupRType(typeid(moho::EUnitCommandQueueStatus));
+    }
+    return gEUnitCommandQueueStatusTypeCache;
+  }
+
+  msvc8::string gRBroadcasterEUnitCommandQueueStatusName;
+  msvc8::string gRListenerEUnitCommandQueueStatusName;
+
+  /**
+   * Address: 0x00BFEFD0 (FUN_00BFEFD0, RBroadcasterRType_EUnitCommandQueueStatus name-cache cleanup)
+   *
+   * What it does:
+   * Releases the cached lexical name for `Broadcaster<EUnitCommandQueueStatus>`
+   * during process teardown.
+   */
+  void cleanup_RBroadcasterRType_EUnitCommandQueueStatus_Name()
+  {
+    gRBroadcasterEUnitCommandQueueStatusName = msvc8::string{};
+  }
+
+  /**
+   * Address: 0x00BFEFA0 (FUN_00BFEFA0, RListenerRType_EUnitCommandQueueStatus name-cache cleanup)
+   *
+   * What it does:
+   * Releases the cached lexical name for `Listener<EUnitCommandQueueStatus>`
+   * during process teardown.
+   */
+  void cleanup_RListenerRType_EUnitCommandQueueStatus_Name()
+  {
+    gRListenerEUnitCommandQueueStatusName = msvc8::string{};
+  }
+
   class RBroadcasterRType_ECommandEvent final : public gpg::RType
   {
   public:
@@ -158,9 +201,21 @@ namespace
      */
     ~RBroadcasterRType_EUnitCommandQueueStatus() override;
 
+    /**
+     * Address: 0x006F8170 (FUN_006F8170, Moho::RBroadcasterRType_EUnitCommandQueueStatus::GetName)
+     *
+     * What it does:
+     * Lazily resolves the reflected `EUnitCommandQueueStatus` type name,
+     * formats the broadcaster wrapper name, and caches the result for reuse.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "Broadcaster<EUnitCommandQueueStatus>";
+      if (gRBroadcasterEUnitCommandQueueStatusName.empty()) {
+        gRBroadcasterEUnitCommandQueueStatusName =
+          gpg::STR_Printf("Broadcaster<%s>", CachedEUnitCommandQueueStatusType()->GetName());
+        (void)std::atexit(&cleanup_RBroadcasterRType_EUnitCommandQueueStatus_Name);
+      }
+      return gRBroadcasterEUnitCommandQueueStatusName.c_str();
     }
 
     /**
@@ -212,9 +267,21 @@ namespace
      */
     ~RListenerRType_EUnitCommandQueueStatus() override;
 
+    /**
+     * Address: 0x006F8230 (FUN_006F8230, Moho::RListenerRType_EUnitCommandQueueStatus::GetName)
+     *
+     * What it does:
+     * Lazily resolves the reflected `EUnitCommandQueueStatus` type name,
+     * formats the listener wrapper name, and caches the result for reuse.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "Listener<EUnitCommandQueueStatus>";
+      if (gRListenerEUnitCommandQueueStatusName.empty()) {
+        gRListenerEUnitCommandQueueStatusName =
+          gpg::STR_Printf("Listener<%s>", CachedEUnitCommandQueueStatusType()->GetName());
+        (void)std::atexit(&cleanup_RListenerRType_EUnitCommandQueueStatus_Name);
+      }
+      return gRListenerEUnitCommandQueueStatusName.c_str();
     }
 
     void Init() override
@@ -364,23 +431,38 @@ namespace
     return node;
   }
 
-  // NOTE (BroadcasterOwnerNodeOffset4RuntimeView cluster removal):
-  // This file used to keep three [[maybe_unused]] helpers reaching into an
-  // anonymous `BroadcasterOwnerNodeOffset4RuntimeView` (owner+0x04) offset
-  // struct: `RelinkOwnerOffset4NodeDispatchToCanonicalRelink` (0x005F4560),
-  // `UnlinkOwnerOffset4BroadcasterNodeAndReturnNode` (0x005F42F0/0x005F4340),
-  // and `RelinkOwnerOffset4BroadcasterNodeBeforeAnchor` (0x005F42C0/0x005F4310).
-  // None had a source-level or binary caller: all six addresses show zero
-  // callers_count/incoming_xrefs_count in the callgraph index, and
-  // 0x005F4560 has no ICF twins at all. Worse, 0x005F42C0 is provably NOT
-  // Broadcaster-related -- its sole real caller (confirmed via the
-  // callgraph `call_edges`/`incoming_xrefs` tables) is
-  // `Moho::CUnitMeleeAttackTargetTask::TaskTick`, and the address is the
-  // real `CUnitMeleeAttackTargetTask::RelinkAiAttackerListener`
-  // (CUnitMeleeAttackTargetTask.cpp). This whole cluster was an unverified/
-  // fabricated citation (CLAUDE.md callsite-evidence-before-recovery); all
-  // three functions and the offset struct have been removed rather than
-  // kept as unfounded orphans.
+  struct BroadcasterOwnerNodeOffset4RuntimeView
+  {
+    std::uint32_t ownerWord; // +0x00
+    moho::Broadcaster node;  // +0x04
+  };
+  static_assert(
+    offsetof(BroadcasterOwnerNodeOffset4RuntimeView, node) == 0x04,
+    "BroadcasterOwnerNodeOffset4RuntimeView::node offset must be 0x04"
+  );
+  static_assert(
+    sizeof(BroadcasterOwnerNodeOffset4RuntimeView) == 0x0C,
+    "BroadcasterOwnerNodeOffset4RuntimeView size must be 0x0C"
+  );
+
+  /**
+   * Address: 0x005F4560 (FUN_005F4560)
+   *
+   * What it does:
+   * Adjusts one owner pointer to its embedded broadcaster node at `+0x04`
+   * and dispatches to the canonical intrusive relink lane.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4NodeDispatchToCanonicalRelink(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    moho::Broadcaster* node = nullptr;
+    if (owner != nullptr) {
+      node = &owner->node;
+    }
+    return RelinkBroadcasterNodeBeforeAnchor(node, anchor);
+  }
 
   /**
    * Address: 0x005F4360 (FUN_005F4360)
@@ -424,6 +506,52 @@ namespace
     moho::Broadcaster* const anchor
   ) noexcept
   {
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F42F0 (FUN_005F42F0)
+   * Address: 0x005F4340 (FUN_005F4340)
+   *
+   * What it does:
+   * Unlinks the owner node at offset `+0x04` and returns that node lane after
+   * singleton self-link reset.
+   */
+  [[maybe_unused]] moho::Broadcaster* UnlinkOwnerOffset4BroadcasterNodeAndReturnNode(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner
+  ) noexcept
+  {
+    moho::Broadcaster* const node = &owner->node;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F42C0 (FUN_005F42C0)
+   * Address: 0x005F4310 (FUN_005F4310)
+   *
+   * What it does:
+   * Unlinks the owner node at offset `+0x04`, resets it to singleton links,
+   * and relinks it directly before `anchor`.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4BroadcasterNodeBeforeAnchor(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    moho::Broadcaster* const node = &owner->node;
     node->mNext->mPrev = node->mPrev;
     node->mPrev->mNext = node->mNext;
     node->mPrev = node;
