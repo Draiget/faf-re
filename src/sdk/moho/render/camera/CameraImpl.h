@@ -6,6 +6,8 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/Vector2f.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/script/CScriptEvent.h"
+#include "moho/unit/Broadcaster.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector3.h"
 
@@ -19,11 +21,11 @@ namespace LuaPlus
 namespace gpg
 {
   class RRef;
+  class RType;
 }
 
 namespace moho
 {
-  class Broadcaster;
   class CScrLuaInitForm;
   class STIMap;
   class UserEntity;
@@ -210,19 +212,72 @@ namespace moho
   /**
    * Byte size of a live `CameraImpl`.
    *
-   * The class is declared thin - `sizeof(CameraImpl)` is one pointer, the
-   * vtable - while its state is reached through the runtime views in
-   * `CameraImpl.cpp` (base broadcaster at +0x04, `CScriptEvent` at +0x0C,
-   * frustum lanes at +0x460..+0x850). Anything allocating a camera must use
-   * this size, not `sizeof(CameraImpl)`: `RCamManager::CreateCamera`
-   * (0x007AA9C0) calls `operator new(0x858u)`, and the constructor writes the
-   * whole block.
+   * `CameraImpl` derives from `RCamCamera` (vtable + self-linked broadcaster
+   * node, +0x00..+0x0C) and `CScriptEvent` (+0x0C..+0x460), but almost all of
+   * its own state -- everything past the two real base subobjects -- is
+   * reached through the runtime views in `CameraImpl.cpp` (frustum lanes at
+   * +0x460..+0x850) rather than declared as ordinary members. Anything
+   * allocating a camera must use this size, not `sizeof(CameraImpl)`:
+   * `RCamManager::CreateCamera` (0x007AA9C0) calls `operator new(0x858u)`,
+   * and the constructor writes the whole block.
    */
   inline constexpr std::size_t kCameraImplRuntimeSize = 0x858u;
 
-  class CameraImpl
+  /**
+   * Address: 0x007AAC60 (FUN_007AAC60, ??1RCamCamera@Moho@@UAE@XZ,
+   * Moho::RCamCamera::~RCamCamera)
+   *
+   * What it does:
+   * The polymorphic camera-manager base `CameraImpl` derives from. Adds
+   * nothing but a vtable (destructor slot 0) over the plain, non-virtual
+   * `Broadcaster` self-linked ring node it wraps; the reflected base-lane
+   * registration in `CameraImplTypeInfo.cpp` (`AddCScriptEventBaseToCameraImplType`,
+   * offset `+0x0C`) is what places `CScriptEvent` immediately after this
+   * 0x0C-byte base in every `CameraImpl` instance. The real name is proven by
+   * the mangled return type of `RCamManager::CreateCamera`/`GetCamera`
+   * (`?...@Moho@@QAEPAVRCamCamera@2@...`) and `ForgetCamera`'s parameter
+   * (`PBVRCamCamera@2@`) -- MSVC name mangling never encodes a typedef, only
+   * a real, distinct class.
+   *
+   * The destructor's own body (removing this camera from `RCamManager`
+   * ownership and restoring the broadcaster ring node to its self-linked
+   * idle state) lives in `CameraImpl.cpp` and runs automatically, chained
+   * after `CameraImpl::~CameraImpl`'s body, via ordinary C++ base-destructor
+   * chaining -- it is never called explicitly.
+   */
+  class RCamCamera : public Broadcaster
   {
   public:
+    virtual ~RCamCamera();
+
+  protected:
+    RCamCamera() = default;
+  };
+
+  class CameraImpl : public RCamCamera, public CScriptEvent
+  {
+  public:
+    /// Cached reflection descriptor for `CameraImpl`, lazily resolved by
+    /// `StaticGetClass()`/`GetClass()`. Proven a real static member (not a
+    /// free-function-local cache) by the disassembly of
+    /// `SCR_FromLua_CameraImpl` (0x007B0E90), which reads/writes
+    /// `Moho::CameraImpl::sType` directly.
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x007A6990 (FUN_007A6990, ?StaticGetClass@CameraImpl@Moho@@SAPAVRType@gpg@@XZ)
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x007A69B0 (FUN_007A69B0, ?GetClass@CameraImpl@Moho@@UBEPAVRType@gpg@@XZ)
+     *
+     * What it does:
+     * Overrides `CScriptEvent::GetClass` (which would otherwise report the
+     * `CScriptEvent` base's own reflected type) to report `CameraImpl`'s.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
     /**
      * Address: 0x007A7950 (FUN_007A7950, ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z)
      * Mangled: ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z
@@ -261,17 +316,19 @@ namespace moho
      * the `CameraImpl` vtable (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474) and
      * its `CScriptEvent` / `CScriptObject` sub-object vtable thunks.
      */
-    ~CameraImpl();
+    ~CameraImpl() override;
 
     /**
      * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
      * Mangled: ?GetDerivedObjectRef@CameraImpl@Moho@@UAE?AVRRef@gpg@@XZ
      *
      * What it does:
-     * Packs `{scriptSubobject, scriptSubobject->GetClass()}` as a reflected
-     * object reference.
+     * Overrides `CScriptEvent::GetDerivedObjectRef` to pack `{this, GetClass()}`
+     * (the complete `CameraImpl` object, not just the `CScriptEvent` sub-object
+     * `CScriptEvent::GetDerivedObjectRef` would report) as a reflected object
+     * reference.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x007A9030 (FUN_007A9030, Moho::CameraImpl::Frame)
@@ -920,15 +977,6 @@ namespace moho
      */
     [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
   };
-
-  /**
-   * Address: 0x007AAC60 (FUN_007AAC60, Moho::RCamCamera::~RCamCamera)
-   *
-   * What it does:
-   * Removes one runtime camera from manager ownership and restores the base
-   * broadcaster node to a self-linked idle state.
-   */
-  [[nodiscard]] Broadcaster* DetachRuntimeCameraBase(CameraImpl* camera);
 
   /**
    * The camera's own broadcaster ring node, at `camera+0x04` - the lane every
@@ -1623,7 +1671,15 @@ namespace moho
    */
   int cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* state);
 
-  static_assert(sizeof(CameraImpl) == sizeof(void*), "CameraImpl size must be pointer-sized");
+  static_assert(sizeof(RCamCamera) == 0x0Cu, "RCamCamera size must be 0x0C (vtable + Broadcaster prev/next)");
+  static_assert(
+    sizeof(CameraImpl) == 0x0Cu + sizeof(CScriptEvent),
+    "CameraImpl must be exactly its two real bases, RCamCamera then CScriptEvent, back to back with no padding"
+  );
+  static_assert(
+    sizeof(CameraImpl) <= kCameraImplRuntimeSize,
+    "CameraImpl's real base subobjects must fit inside the 0x858-byte block RCamManager::CreateCamera allocates"
+  );
 
   /**
    * Address: 0x00871640 (FUN_00871640, func_SetWorldCamera)
