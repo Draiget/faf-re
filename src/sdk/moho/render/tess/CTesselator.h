@@ -200,9 +200,21 @@ namespace moho
      * What it does:
      * Recursively subdivides one tier cell while frustum/error tests request
      * splitting, and appends the leaf rect indices into `outIndices`.
+     *
+     * `outIndices` is typed as the concrete `FastVectorN<uint16_t, 25>` (not
+     * the type-erased `gpg::fastvector<uint16_t>` base) because every real
+     * caller (`TesselateLeafCell`'s four edge chains, `TesselateData`'s
+     * `edgeIndices`) passes one. `PushBack`/`Reserve` are non-virtual and
+     * `FastVectorN` overrides them specifically to avoid freeing its own
+     * inline buffer (see FastVector.h) - erasing to the base pointer here
+     * silently rebinds every call in this recursion to the base class's
+     * unconditional `delete[] start_`, which crashes the instant a chain
+     * collects past its 25-slot inline capacity (first reachable once the
+     * camera frustum fix let the root tile actually get accepted/split
+     * instead of rejected outright).
      */
     std::uint16_t* CollectDataInRect(
-      gpg::fastvector<std::uint16_t>* outIndices,
+      gpg::fastvector_n<std::uint16_t, 25>* outIndices,
       std::int32_t tier,
       std::uint32_t* activePlaneMask,
       std::int32_t x,

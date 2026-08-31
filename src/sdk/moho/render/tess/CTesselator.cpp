@@ -1257,7 +1257,7 @@ namespace moho
    * appends leaf index ids into `outIndices`.
    */
   std::uint16_t* CTesselator::CollectDataInRect(
-    gpg::fastvector<std::uint16_t>* const outIndices,
+    gpg::fastvector_n<std::uint16_t, 25>* const outIndices,
     const std::int32_t tier,
     std::uint32_t* const activePlaneMask,
     const std::int32_t x,
