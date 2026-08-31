@@ -129,7 +129,31 @@ namespace
 
   [[nodiscard]] Wm3::Plane3f BuildNormalizedPlane(const moho::Vector4f& clipPlane, const moho::VMatrix4& matrix) noexcept
   {
-    const moho::Vector4f transformed = clipPlane * matrix;
+    // Extracts one world-space clipping plane from a combined view/projection
+    // matrix (the standard Gribb/Hartmann technique). `operator*(vRow, M)`
+    // computes `out[j] = sum_i vRow[i] * M.r[i][j]` - correct for transforming
+    // a *point* under this engine's row-vector convention (`pointRow * M`),
+    // but plane extraction needs the transpose of that: for each output
+    // component i, the dot product of clip-space row i with `clipPlane`
+    // (`out[i] = sum_j M.r[i][j] * clipPlane[j]`), i.e. treating `clipPlane`
+    // as a column and applying `matrix` on the left. Using the point-transform
+    // operator here silently combined matrix *columns* instead of rows, so
+    // every plane except the single-component near plane collapsed toward the
+    // matrix's (large-magnitude, translation-derived) last row and produced
+    // near-duplicate, wrongly-oriented planes - confirmed live: left/right
+    // both normalized to ~(0.363, 0.845, -0.393) instead of being mirrored in
+    // x, which made the tesselator's root-tile frustum test reject the whole
+    // terrain every frame.
+    const moho::Vector4f transformed{
+      (matrix.r[0].x * clipPlane.x) + (matrix.r[0].y * clipPlane.y) + (matrix.r[0].z * clipPlane.z)
+        + (matrix.r[0].w * clipPlane.w),
+      (matrix.r[1].x * clipPlane.x) + (matrix.r[1].y * clipPlane.y) + (matrix.r[1].z * clipPlane.z)
+        + (matrix.r[1].w * clipPlane.w),
+      (matrix.r[2].x * clipPlane.x) + (matrix.r[2].y * clipPlane.y) + (matrix.r[2].z * clipPlane.z)
+        + (matrix.r[2].w * clipPlane.w),
+      (matrix.r[3].x * clipPlane.x) + (matrix.r[3].y * clipPlane.y) + (matrix.r[3].z * clipPlane.z)
+        + (matrix.r[3].w * clipPlane.w),
+    };
     const float reciprocalLength =
       1.0f / std::sqrt((transformed.x * transformed.x) + (transformed.y * transformed.y) + (transformed.z * transformed.z));
     return {
