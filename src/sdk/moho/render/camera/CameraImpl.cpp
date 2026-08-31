@@ -1,5 +1,7 @@
 #include "moho/render/camera/CameraImpl.h"
 
+#include <Windows.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -10,8 +12,10 @@
 #include <new>
 #include <span>
 #include <stdexcept>
+#include <typeinfo>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 #include "moho/collision/CColPrimitiveBox3f.h"
 #include "moho/entity/Entity.h"
@@ -1451,32 +1455,37 @@ namespace moho
   }
 } // namespace moho
 
-/**
- * Address: 0x007AAC60 (FUN_007AAC60, Moho::RCamCamera::~RCamCamera)
- *
- * What it does:
- * Removes one runtime camera from manager ownership and restores the base
- * broadcaster node to its self-linked idle state.
- */
 [[nodiscard]] moho::Broadcaster* moho::CameraBroadcasterLink(moho::CameraImpl* const camera) noexcept
 {
   return &AsRuntimeCameraBaseView(camera)->mBroadcaster;
 }
 
-[[nodiscard]] moho::Broadcaster* moho::DetachRuntimeCameraBase(moho::CameraImpl* const camera)
+/**
+ * Address: 0x007AAC60 (FUN_007AAC60, ??1RCamCamera@Moho@@UAE@XZ,
+ * Moho::RCamCamera::~RCamCamera)
+ *
+ * What it does:
+ * Removes this camera from `RCamManager` ownership and restores the
+ * self-linked broadcaster ring node to its idle state. Every live
+ * `RCamCamera` subobject is the first base of a `CameraImpl` complete
+ * object (see the class doc comment in CameraImpl.h), so `this` safely
+ * converts back to the owning camera with zero pointer adjustment. Runs
+ * automatically, chained after `CameraImpl::~CameraImpl`'s body, via
+ * ordinary C++ base-destructor chaining.
+ */
+moho::RCamCamera::~RCamCamera()
 {
-  RuntimeCameraBaseView* const base = AsRuntimeCameraBaseView(camera);
+  auto* const camera = static_cast<moho::CameraImpl*>(this);
 
   if (RCamManager* const manager = CAM_GetManager(); manager != nullptr) {
     manager->ForgetCamera(camera);
   }
 
-  moho::Broadcaster& broadcaster = base->mBroadcaster;
+  moho::Broadcaster& broadcaster = *CameraBroadcasterLink(camera);
   broadcaster.mNext->mPrev = broadcaster.mPrev;
   broadcaster.mPrev->mNext = broadcaster.mNext;
   broadcaster.mPrev = &broadcaster;
   broadcaster.mNext = &broadcaster;
-  return &broadcaster;
 }
 
 /**
@@ -1506,16 +1515,38 @@ namespace moho
  * Sole caller: `RCamManager::CreateCamera` (0x007AA9C0, recovered in
  * src/sdk/moho/render/RCamManager.cpp), which placement-constructs this object.
  */
-moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const state)
-{
-  // Self-link the inherited `RCamCamera` broadcaster base node (+0x04/+0x08).
-  // The primary/CScriptObject-view vtable pointers are installed by the C++
-  // ctor prologue; only the intrusive broadcaster sentinel needs seeding.
-  (void)InitializeRuntimeCameraBaseLane(AsRuntimeCameraBaseView(this));
+gpg::RType* moho::CameraImpl::sType = nullptr;
 
-  // Construct the `CScriptEvent` sub-object at +0x0C (it in turn constructs its
-  // `CScriptObject` sub-object at +0x1C, which the Lua publish below targets).
-  auto* const scriptEvent = ::new (reinterpret_cast<std::uint8_t*>(this) + 0x0C) moho::CScriptEvent();
+/**
+ * Address: 0x007A6990 (FUN_007A6990, ?StaticGetClass@CameraImpl@Moho@@SAPAVRType@gpg@@XZ)
+ */
+gpg::RType* moho::CameraImpl::StaticGetClass()
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CameraImpl));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x007A69B0 (FUN_007A69B0, ?GetClass@CameraImpl@Moho@@UBEPAVRType@gpg@@XZ)
+ */
+gpg::RType* moho::CameraImpl::GetClass() const
+{
+  return StaticGetClass();
+}
+
+moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const state)
+  : RCamCamera()
+  , CScriptEvent()
+{
+  // `RCamCamera` (vtable + broadcaster node, +0x00..+0x0C) and `CScriptEvent`
+  // (+0x0C..+0x460, which in turn constructs its `CScriptObject` sub-object
+  // further in, the one the Lua publish below targets) are both real C++
+  // bases now and already fully constructed by the initializer list above.
+  // Only the intrusive broadcaster sentinel still needs explicit seeding --
+  // `Broadcaster`'s own default state does not self-link.
+  (void)InitializeRuntimeCameraBaseLane(AsRuntimeCameraBaseView(this));
 
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
 
@@ -1598,14 +1629,23 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
 
   // Publish the camera's script-side Lua object. The binary constructs three
   // empty Lua argument objects plus the cached `CameraImpl` metatable, then
-  // hands them to the `CScriptObject` sub-object's `CreateLuaObject`.
+  // hands them to the `CScriptObject` sub-object's `CreateLuaObject`, called
+  // through `this` (the complete `CameraImpl` object) so the `CScriptObject*`
+  // `SetLuaObject` publishes as `_c_object` -- and every downstream
+  // `typeid(*object)` reflection lookup that reads it back, e.g.
+  // `gpg::RRef_CScriptObject` -- resolves the object's dynamic type as
+  // `CameraImpl`, not merely the `CScriptEvent` base subobject. Publishing
+  // through a detached, non-base `CScriptEvent` (as an earlier, non-inheriting
+  // recovery of this class did) reports the narrower dynamic type instead,
+  // and every `SCR_FromLua_CameraImpl` upcast for that camera fails with
+  // "Incorrect type of game object."
   {
     LuaPlus::LuaObject luaArg3{};
     LuaPlus::LuaObject luaArg2{};
     LuaPlus::LuaObject luaArg1{};
     LuaPlus::LuaObject luaMetatable{};
     func_CreateLuaCameraImpl(&luaMetatable, state);
-    static_cast<moho::CScriptObject*>(scriptEvent)
+    static_cast<moho::CScriptObject*>(this)
       ->CreateLuaObject(luaMetatable, luaArg1, luaArg2, luaArg3);
   }
 
@@ -1693,15 +1733,10 @@ moho::CameraImpl::~CameraImpl()
   runtime->mCam.~GeomCamera3();
   runtime->mName.tidy(true, 0U);
 
-  // Sub-object teardown for the `CScriptEvent` vbase at +0x0C and the
-  // `RCamCamera` base lane at +0x00 (the latter forgets this camera from the
-  // global manager and rejoins the broadcaster sentinel).
-  auto* const scriptEventSubobject = reinterpret_cast<moho::CScriptEvent*>(
-    reinterpret_cast<std::uint8_t*>(this) + 0x0C
-  );
-  scriptEventSubobject->~CScriptEvent();
-
-  (void)moho::DetachRuntimeCameraBase(this);
+  // `CScriptEvent` (+0x0C) and `RCamCamera` (+0x00, forgetting this camera
+  // from the global manager and rejoining the broadcaster sentinel -- see
+  // `RCamCamera::~RCamCamera`) are both real bases now and tear down
+  // automatically, in reverse construction order, once this body returns.
 }
 
 /**
@@ -1973,17 +2008,22 @@ void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
 
 /**
  * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
+ * Mangled: ?GetDerivedObjectRef@CameraImpl@Moho@@UAE?AVRRef@gpg@@XZ
  *
  * What it does:
- * Packs `{scriptSubobject, scriptSubobject->GetClass()}` as a reflected
- * object reference.
+ * Overrides `CScriptEvent::GetDerivedObjectRef` (which packs only the
+ * `CScriptEvent` sub-object) to pack `{this, GetClass()}` for the complete
+ * `CameraImpl` object instead. Dispatched through the `CScriptObject`
+ * sub-object's vtable slot, so callers holding only a `CScriptObject*`/
+ * `CScriptEvent*` view still reach this override; the compiler-generated
+ * this-adjustor thunk for that slot corrects `this` back to the `CameraImpl`
+ * base before entering this body, so no manual offset math is needed here.
  */
 gpg::RRef moho::CameraImpl::GetDerivedObjectRef()
 {
-  auto* const scriptSubobject = reinterpret_cast<moho::CScriptObject*>(reinterpret_cast<std::uint8_t*>(this) - 0x1Cu);
   gpg::RRef objectRef{};
-  objectRef.mObj = scriptSubobject;
-  objectRef.mType = scriptSubobject->GetClass();
+  objectRef.mObj = this;
+  objectRef.mType = GetClass();
   return objectRef;
 }
 
