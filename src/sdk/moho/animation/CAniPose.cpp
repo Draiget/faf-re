@@ -707,10 +707,19 @@ namespace moho
    * What it does:
    * Applies one local-space quaternion delta to this bone orientation and
    * marks the owning pose lane dirty for composite rebuild.
+   *
+   * Ground truth (`FUN_0054BC00.c`) re-derived term-by-term: every output
+   * lane matches the engine's `.x`-scalar Hamilton product exactly (the same
+   * formula already confirmed in `VTransform::Compose`), with `rotation` as
+   * the left/first operand and the existing `mLocalTransform.orient_` as the
+   * right/second operand -- not the generic `Wm3::Quaternionf::Multiply`,
+   * which assumes textbook `.w`-scalar layout and silently produces a
+   * different rotation for every caller of this method (every `bone->
+   * Rotate(quat)` call site in the animation/AI manipulators).
    */
   void CAniPoseBone::Rotate(const Wm3::Quaternionf& rotation)
   {
-    mLocalTransform.orient_ = Wm3::Quaternionf::Multiply(rotation, mLocalTransform.orient_);
+    mLocalTransform.orient_ = MultiplyQuatXScalar(rotation, mLocalTransform.orient_);
     if (mPose != nullptr) {
       mPose->MarkBoneDirty(mIdx);
     }
