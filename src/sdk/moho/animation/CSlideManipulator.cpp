@@ -25,6 +25,11 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
+
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
@@ -563,6 +568,11 @@ moho::CSlideManipulator::CSlideManipulator(moho::Sim* const sim, moho::CAniActor
  * What it does:
  * Advances one step toward goal, updates pose-space translation of the watched
  * bone, and marks completion when the destination is reached.
+ *
+ * Ground truth (`FUN_00647300.c`) rotates via
+ * `Moho::MultQuadVec(&v15, v8, (Wm3::Quaternionf*)(v11+32))` -- the bone's own
+ * `orient_` field -- not the generic `Wm3::MultiplyQuaternionVector`, same
+ * `.x`-scalar-vs-`.w`-scalar mismatch as the other `orient_`-consuming sites.
  */
 bool moho::CSlideManipulator::ManipulatorUpdate()
 {
@@ -619,7 +629,7 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
   }
 
   Wm3::Vector3f rotatedOffset{};
-  Wm3::MultiplyQuaternionVector(&rotatedOffset, mCurrentPosition, watchedBone->mLocalTransform.orient_);
+  MultQuadVec(&rotatedOffset, &mCurrentPosition, &watchedBone->mLocalTransform.orient_);
   watchedBone->mLocalTransform.pos_.x += rotatedOffset.x;
   watchedBone->mLocalTransform.pos_.y += rotatedOffset.y;
   watchedBone->mLocalTransform.pos_.z += rotatedOffset.z;
