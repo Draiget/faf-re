@@ -551,25 +551,32 @@ namespace moho
    * a reference vector, applies a partial rotation via RotateQuatByAngle, then
    * pre-multiplies the delta into the source quaternion in-place.
    * Used by Moho::Projectile::MotionTick and UpdateTracking.
+   *
+   * Both the column-extraction and the final Hamilton product were re-derived
+   * term-by-term from `FUN_0069AA50.c` after the previous body here was found
+   * to read `quat` (this function's own running orientation, `.x`-scalar
+   * convention like every other `VMatrix4::Set`-family quaternion in this
+   * engine) as textbook `.w`-scalar. `delta` (the `QuatCrossAdd` output, as
+   * rebuilt by `RotateQuatByAngle`) genuinely IS `.w`-scalar at the point of
+   * the final product -- `RotateQuatByAngle` always writes `cos`/`sin` in
+   * that layout regardless of what convention fed it -- so the two operands
+   * of this specific product are in two different conventions; the terms
+   * below read each field by its literal ground-truth name/position rather
+   * than assuming either operand's convention, which reproduces the
+   * binary's mixed-convention result exactly.
    */
   void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads)
   {
     const Wm3::Vector3f refVec{refAxis->x, refAxis->y, refAxis->z};
 
-    // Extract the z-axis column of the rotation matrix from the quaternion.
-    // For quaternion q = (w, x, y, z):
-    //   col2.x = 2*(x*z + w*y)
-    //   col2.y = 2*(y*z - w*x)
-    //   col2.z = 1 - 2*(x*x + y*y)
-    const float qx = quat->x;
-    const float qy = quat->y;
-    const float qz = quat->z;
-    const float qw = quat->w;
-
+    // Extract the z-axis (forward) column of the rotation matrix. This
+    // engine's quat is .x-scalar, so the standard q=(w,x,y,z) column-3
+    // formula applies with quat->x playing w's role and quat->y/.z/.w
+    // playing the standard x/y/z roles (matching VMatrix4::Set).
     Wm3::Vector3f forwardAxis;
-    forwardAxis.x = ((qx * qz) + (qw * qy)) * 2.0f;
-    forwardAxis.y = ((qy * qz) - (qw * qx)) * 2.0f;
-    forwardAxis.z = 1.0f - ((qx * qx) + (qy * qy)) * 2.0f;
+    forwardAxis.x = ((quat->x * quat->z) + (quat->w * quat->y)) * 2.0f;
+    forwardAxis.y = ((quat->w * quat->z) - (quat->x * quat->y)) * 2.0f;
+    forwardAxis.z = 1.0f - ((quat->z * quat->z) + (quat->y * quat->y)) * 2.0f;
 
     // Build a delta quaternion that rotates forwardAxis toward refVec
     Wm3::Quaternionf delta;
@@ -578,21 +585,20 @@ namespace moho
     // Apply partial rotation to the delta quaternion
     RotateQuatByAngle(&delta, rads);
 
-    // Pre-multiply: quat_new = delta * quat (Hamilton product)
-    const float dw = delta.w;
     const float dx = delta.x;
     const float dy = delta.y;
     const float dz = delta.z;
+    const float dw = delta.w;
 
-    const float ow = quat->w;
     const float ox = quat->x;
     const float oy = quat->y;
     const float oz = quat->z;
+    const float ow = quat->w;
 
-    quat->w = (ow * dw) - (ox * dx) - (oy * dy) - (oz * dz);
-    quat->x = (dw * ox) + (dx * ow) + (dy * oz) - (dz * oy);
-    quat->y = (dw * oy) - (dx * oz) + (dy * ow) + (dz * ox);
-    quat->z = (dw * oz) + (dx * oy) - (dy * ox) + (dz * ow);
+    quat->x = (ox * dx) - (oy * dy) - (oz * dz) - (ow * dw);
+    quat->y = (ow * dz) + (oy * dx) + (ox * dy) - (oz * dw);
+    quat->z = (ox * dz) + (oy * dw) + (oz * dx) - (ow * dy);
+    quat->w = (ox * dw) + (ow * dx) + (oz * dy) - (oy * dz);
   }
 
   /**
