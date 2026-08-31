@@ -243,11 +243,28 @@ namespace moho
    * every caller already funnels through, keeps every other call site
    * exactly as recovered and matches the documented design intent instead
    * of the letter of one binary snapshot tested against different content.
+   *
+   * Second-order fallout from that same catch, found live via
+   * HighFidelityWater::RenderWaterSurface -> SetShaderVarMem crashing on
+   * frame 2: the fast path below (`owner effect linked -> return true`) is
+   * the binary's own early-out, and in 2007 it was sound -- every parameter
+   * referenced by engine code shipped in its effect file, so "linked" and
+   * "mEffectVariable resolved" were the same fact. The catch above breaks
+   * that invariant: the first Exists() call for a missing parameter links
+   * the owner effect via RelinkShaderVarEffect() *before* the failing
+   * SetMatrix(), catches, and returns false with mEffectVariable still
+   * empty. Every later call for that same shader-var (every subsequent
+   * frame, for a per-frame water write) then hits this fast path, finds the
+   * effect already linked, and returned `true` unconditionally -- handing
+   * SetShaderVarMem/GetTexture/etc. a still-empty mEffectVariable to
+   * dereference. Requiring the cached variable too, not just the link,
+   * keeps the fast path's intent (skip a re-resolve once we know the
+   * answer) while making the cached answer match what was actually cached.
    */
   bool ShaderVar::Exists()
   {
     if (ResolveOwnerEffect(*this) != nullptr) {
-      return true;
+      return mEffectVariable.get() != nullptr;
     }
 
     if (!mEffectFileName.empty()) {

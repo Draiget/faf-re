@@ -73,6 +73,14 @@ namespace moho
   bool ren_ShowBandwidthUsage = false;    // 0x010A6432, zero-fill
   bool UI_ShowControlUnderMouse = false;  // 0x010A6423, zero-fill
 
+  // Save/restore triple read and cleared by WRenViewport::RenderPreviewImage
+  // (0x007F7590-0x007F75FB) around the strategic-map preview render pass,
+  // alongside the ren_Ui/ren_Fx/fog_DistanceFog/ren_Shadows toggles above.
+  // All three carry an initialized byte in the shipped image.
+  bool ren_WorldBorder = true;            // 0x00F57E48 = 0x01
+  bool ren_Select = true;                 // 0x00F57E4C = 0x01
+  bool ren_fog = true;                    // 0x00F57E4D = 0x01
+
   int ren_BloomBlurCount = 2;             // 0x00F57E7C = 2
   float ren_BandwidthDisplaySeconds = 10.0f; // 0x00F57E84 = 10.0f
   float ren_BandwidthDisplayKernel = 1.0f;   // 0x00F57E88 = 1.0f

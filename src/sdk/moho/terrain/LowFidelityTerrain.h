@@ -185,7 +185,7 @@ namespace moho
      * slot (0x00805F10), which uses it as the `CD3DPrimBatcher` the debug
      * overlay quads are queued on.
      */
-    virtual void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher);
+    void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher) override;
 
     /**
      * Address: 0x00808590 (FUN_00808590, Moho::LowFidelityTerrain::Destroy)
