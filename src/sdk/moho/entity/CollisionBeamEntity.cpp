@@ -68,6 +68,17 @@ namespace
     (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
   }
 
+  // NOTE: this braced init is NOT the .x-scalar-vs-.w-scalar convention bug
+  // found throughout the rest of the engine's quaternion code (see
+  // QuaternionMath.h's MultiplyQuatXScalar/ConjugateQuatXScalar). The
+  // 4-arg Quaternion ctor is (fW, fX, fY, fZ), so this positionally maps
+  // entity.Orientation's engine-.x-scalar lanes onto native w/x/y/z: native
+  // .w gets the true scalar (entity.Orientation.x), and native .x/.y/.z get
+  // the imaginary triple in the same cyclic order it already had. That is a
+  // correct, if easy-to-misread, .x-scalar -> native-.w-scalar conversion:
+  // verified numerically (MultQuadVec on the original quaternion vs.
+  // orientation.Rotate() below agree to machine precision for arbitrary
+  // axis-angle inputs). Do not "fix" this to MultQuadVec directly.
   [[nodiscard]] Wm3::Box3f BuildCollisionBeamDebugBox(const moho::CollisionBeamEntity& entity)
   {
     const Wm3::Quaternionf orientation{
