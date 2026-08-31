@@ -21867,18 +21867,25 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   ERuleBPUnitCommandCaps selectionCommandCaps = RULEUCC_None;
   {
     SSelectionSetUserEntity& selection = wldSession->mSelection;
-    SSelectionNodeUserEntity* node = selection.mHead->mLeft;
-    node = SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != selection.mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-      (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
-      if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
-        selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
-          selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
-        );
-      }
-      SSelectionSetUserEntity::Iterator_inc(&node);
+    // `mHead` is null for an empty/not-yet-populated selection (e.g. the very
+    // first mouse-move event, before the player has selected anything) --
+    // see the identical guard on the same field in the sibling
+    // SelectionContainsTeleportationUnit above. An empty selection simply
+    // contributes no caps.
+    if (selection.mHead != nullptr) {
+      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
       node = SSelectionSetUserEntity::find(&selection, node, &node);
+      while (node != selection.mHead) {
+        UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+        (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
+        if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
+          selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
+            selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
+          );
+        }
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
     }
   }
 
