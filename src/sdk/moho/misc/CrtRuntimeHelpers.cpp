@@ -1311,8 +1311,21 @@ extern "C" double __cdecl RuntimeAtofForward(const char* text)
  * What it does:
  * Forwards decimal parsing to the CRT `strtod` lane, preserving the
  * null-input invalid-parameter path used by the binary wrapper.
+ *
+ * Named off the reserved CRT symbol despite that - not `strtod` - for the
+ * same reason as `EngineSetNewMode` above: `std::strtod` is simply
+ * `using ::strtod;` in this toolchain's <cstring>-family headers, so a
+ * global `strtod` defined here does not forward to the real CRT
+ * implementation, it calls itself, unconditionally, on every invocation.
+ * That is a guaranteed stack overflow the instant anything - this file's
+ * own `RuntimeStrtodScaledByPowerOfTen` below, or any of Lua's numeric
+ * parsing, or PNG chunk parsing - calls `strtod`/`std::strtod` anywhere in
+ * the program. Keeping the disassembled wrapper under a non-colliding name
+ * preserves the recovery; not colliding lets `std::strtod` resolve to the
+ * real implementation everywhere else, as every one of those call sites
+ * already assumes.
  */
-extern "C" double __cdecl strtod(const char* text, char** endPtr)
+extern "C" double __cdecl EngineStrtod(const char* text, char** endPtr)
 {
   if (endPtr != nullptr) {
     *endPtr = const_cast<char*>(text);
@@ -1432,7 +1445,7 @@ double RuntimeStrtodScaledByPowerOfTen(
   const int callerErrno = *_errno();
   *_errno() = 0;
 
-  double parsedValue = strtod(text, endPtr);
+  double parsedValue = EngineStrtod(text, endPtr);
   const int parseErrno = *_errno();
   if (outParseErrno != nullptr) {
     *outParseErrno = parseErrno;
@@ -3569,9 +3582,24 @@ namespace
  *
  * What it does:
  * Stores one CRT new-allocation mode lane when the process heap is active;
- * invalid inputs trigger `errno=EINVAL` and invalid-parameter semantics.
+ * invalid inputs (including newMode == 0) trigger `errno=EINVAL` and
+ * invalid-parameter semantics, matching the disassembly exactly.
+ *
+ * Named off the reserved CRT symbol despite that - not `_set_new_mode` -
+ * deliberately: this function has zero xrefs in the shipped binary (its
+ * VS2005 static CRT never called it; nothing in this engine's own recovered
+ * source does either), so there is no observed 2007 behavior this identity
+ * preserves. Under the modern VS2022 toolchain this project builds with,
+ * giving it that exact external name instead hijacks a real bootstrap step:
+ * `pre_cpp_initialization` (genuine, unmodified vcstartup source) calls the
+ * real `_set_new_mode(_newmode)` as part of CRT init with `_newmode`
+ * defaulting to 0, and our all-zero-rejecting body took over that call
+ * before `main` ever runs, hard-crashing the process at startup. Keeping
+ * the disassembled logic under a non-colliding name preserves the
+ * recovery; not colliding lets the linker's own, correct implementation
+ * handle the real bootstrap call as intended.
  */
-extern "C" int __cdecl _set_new_mode(const int newMode)
+extern "C" int __cdecl EngineSetNewMode(const int newMode)
 {
   if (newMode != 0 && _crtheap != nullptr) {
     gRuntimeNewMode = newMode;
@@ -3589,8 +3617,13 @@ extern "C" int __cdecl _set_new_mode(const int newMode)
  * What it does:
  * Returns the active CRT new-allocation mode lane through `outNewMode`;
  * null outputs or missing process heap route through invalid-parameter flow.
+ *
+ * Renamed for the same reason as `EngineSetNewMode` above (zero xrefs in
+ * the shipped binary, zero callers in recovered source, and the real
+ * `_query_new_mode` name is load-bearing for the modern toolchain's own
+ * CRT internals).
  */
-extern "C" int __cdecl _query_new_mode(int* const outNewMode)
+extern "C" int __cdecl EngineQueryNewMode(int* const outNewMode)
 {
   if (outNewMode != nullptr && _crtheap != nullptr) {
     *outNewMode = gRuntimeNewMode;
@@ -11487,8 +11520,20 @@ namespace moho::runtime
    * What it does:
    * Returns the first occurrence of `value` in `text`, or `nullptr` when no
    * matching byte is present before the NUL terminator.
+   *
+   * Named off the reserved CRT symbol despite that - not `strchr` - for the
+   * same reason as `EngineSetNewMode`/`EngineStrtod` above: this toolchain's
+   * <cstring> spells `std::strchr` as `using ::strchr;`, so a global
+   * `strchr` defined here does not forward to the real implementation, it
+   * calls itself - an unconditional, guaranteed stack overflow the instant
+   * anything calls `strchr` anywhere in the program (which is constantly:
+   * Lua's parser, path handling, logging, and dozens of other recovered
+   * call sites throughout src/sdk all call `std::strchr`/`strchr` expecting
+   * the real one). Keeping the disassembled body under a non-colliding name
+   * preserves the recovery; not colliding lets every one of those callers
+   * resolve to the real CRT implementation as they already assume.
    */
-  extern "C" char* __cdecl strchr(const char* const text, const int value)
+  extern "C" char* __cdecl EngineStrchr(const char* const text, const int value)
   {
     return const_cast<char*>(std::strchr(text, value));
   }
