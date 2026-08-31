@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <cstdint>
@@ -1129,6 +1130,9 @@ namespace
   constexpr const char* kCMauiControlGetAlphaHelpText = "float GetAlpha()";
   constexpr const char* kCMauiControlGetRenderPassHelpText = "int GetRenderPass()";
   constexpr const char* kCMauiControlSetRenderPassHelpText = "int SetRenderPass()";
+  // FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+  constexpr const char* kCMauiControlSetCustomRenderHelpText = "SetCustomRender(bool enabled)";
+  constexpr const char* kCMauiControlGetCustomRenderHelpText = "bool GetCustomRender()";
   constexpr const char* kCMauiControlGetNameHelpText = "string GetName()";
   constexpr const char* kCMauiControlSetNameHelpText = "SetName(string)";
   constexpr const char* kCMauiControlDumpHelpText = "Dump";
@@ -2383,29 +2387,6 @@ namespace
     }
   };
 
-  struct CRenderWorldViewRuntimeHandle
-  {
-    CRenderWorldViewRuntimeView* mPtr = nullptr; // +0x00
-
-    [[nodiscard]] CameraZoomRuntimeView* GetCamera() const
-    {
-      return mPtr != nullptr ? mPtr->GetCamera() : nullptr;
-    }
-
-    void SetOrthographic(const bool orthographicEnabled) const
-    {
-      if (mPtr != nullptr) {
-        mPtr->SetOrthographic(orthographicEnabled);
-      }
-    }
-
-    [[nodiscard]] bool IsOrthographic() const
-    {
-      return mPtr != nullptr && mPtr->IsOrthographic();
-    }
-  };
-
-  static_assert(sizeof(CRenderWorldViewRuntimeHandle) == 0x04);
 
   struct CUIWorldViewRuntimeView
   {
@@ -2417,7 +2398,16 @@ namespace
     moho::CScriptLazyVar_float mViewRight{};  // +0x98
     moho::CScriptLazyVar_float mViewBottom{}; // +0xAC
     std::uint8_t mUnknownC0To11B[0x5C]{};
-    CRenderWorldViewRuntimeHandle mRenderWorldView{};
+    // +0x11C is not a stored pointer to a separately-allocated CRenderWorldView --
+    // it is the vtable slot of the real, in-place `IRenderWorldView`/`CRenderWorldView`
+    // base subobject CUIWorldView's constructor placement-constructs there (see
+    // CUIWorldViewCtorRuntimeView::mRenderVftable and the ctor's own doc comment).
+    // Reading these 4 bytes as a pointer and dereferencing it, as an earlier
+    // recovery of this struct did via `CRenderWorldViewRuntimeHandle`, misreads
+    // the vtable address itself as an object pointer and corrupts/crashes on the
+    // first write through it. `RenderWorldView()` below reinterprets `this + 0x11C`
+    // directly instead, matching every other `AsXxxView`-style helper in this file.
+    std::uint8_t mRenderWorldViewVftable[0x04]{};
     CRenderWorldViewViewportRuntimeView* mViewportCallback = nullptr; // +0x120
     float mCachedViewLeft = 0.0f;   // +0x124
     float mCachedViewTop = 0.0f;    // +0x128
@@ -2443,11 +2433,16 @@ namespace
     {
       return reinterpret_cast<CUIWorldViewRuntimeView*>(worldView);
     }
+
+    [[nodiscard]] CRenderWorldViewRuntimeView* RenderWorldView() noexcept
+    {
+      return reinterpret_cast<CRenderWorldViewRuntimeView*>(mRenderWorldViewVftable);
+    }
   };
 
   static_assert(
-    offsetof(CUIWorldViewRuntimeView, mRenderWorldView) == 0x11C,
-    "CUIWorldViewRuntimeView::mRenderWorldView offset must be 0x11C"
+    offsetof(CUIWorldViewRuntimeView, mRenderWorldViewVftable) == 0x11C,
+    "CUIWorldViewRuntimeView::mRenderWorldViewVftable offset must be 0x11C"
   );
   static_assert(offsetof(CUIWorldViewRuntimeView, mViewLeft) == 0x48, "CUIWorldViewRuntimeView::mViewLeft offset must be 0x48");
   static_assert(offsetof(CUIWorldViewRuntimeView, mViewTop) == 0x70, "CUIWorldViewRuntimeView::mViewTop offset must be 0x70");
@@ -8437,6 +8432,84 @@ int moho::cfunc_CMauiControlSetRenderPassL(LuaPlus::LuaState* const state)
 
   control->SetRenderPass(static_cast<std::int32_t>(lua_tonumber(state->m_state, 2)));
   lua_settop(state->m_state, 1);
+  return 1;
+}
+
+// --- FAF community binary-patch addition: CMauiControl:SetCustomRender/
+// GetCustomRender. No `Address:` block on any function in this section --
+// this method never existed in the original 2007 binary; it ships only via
+// FAForever's own binary patches (see CMauiControl::SetCustomRender's
+// declaration comment for the PR references). Modeled on the same
+// cfunc_CMauiControlSetRenderPass/cfunc_CMauiControlGetRenderPass shape as
+// every other CMauiControl accessor pair in this file.
+
+int moho::cfunc_CMauiControlSetCustomRender(lua_State* const luaContext)
+{
+  return cfunc_CMauiControlSetCustomRenderL(ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_CMauiControlSetCustomRender_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetCustomRender",
+    &moho::cfunc_CMauiControlSetCustomRender,
+    &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+    "CMauiControl",
+    kCMauiControlSetCustomRenderHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_CMauiControlSetCustomRenderL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiControlSetCustomRenderHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
+  CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
+
+  LuaPlus::LuaStackObject enabledArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TBOOLEAN) {
+    enabledArg.TypeError("boolean");
+  }
+
+  control->SetCustomRender(lua_toboolean(state->m_state, 2) != 0);
+  lua_settop(state->m_state, 1);
+  return 1;
+}
+
+int moho::cfunc_CMauiControlGetCustomRender(lua_State* const luaContext)
+{
+  return cfunc_CMauiControlGetCustomRenderL(ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_CMauiControlGetCustomRender_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetCustomRender",
+    &moho::cfunc_CMauiControlGetCustomRender,
+    &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+    "CMauiControl",
+    kCMauiControlGetCustomRenderHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_CMauiControlGetCustomRenderL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiControlGetCustomRenderHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
+  CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
+
+  lua_pushboolean(state->m_state, control->GetCustomRender() ? 1 : 0);
   return 1;
 }
 
@@ -19943,7 +20016,7 @@ int moho::cfunc_CUIWorldViewSetCartographicL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   LuaPlus::LuaStackObject cartographicArg(state, 2);
-  CUIWorldViewRuntimeView::FromWorldView(worldView)->mRenderWorldView.SetOrthographic(cartographicArg.GetBoolean());
+  CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->SetOrthographic(cartographicArg.GetBoolean());
   return 0;
 }
 
@@ -19993,7 +20066,7 @@ int moho::cfunc_CUIWorldViewIsCartographicL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  lua_pushboolean(state->m_state, CUIWorldViewRuntimeView::FromWorldView(worldView)->mRenderWorldView.IsOrthographic());
+  lua_pushboolean(state->m_state, CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->IsOrthographic());
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -20165,7 +20238,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (CameraZoomRuntimeView* const camera = worldViewView->mRenderWorldView.GetCamera(); camera != nullptr) {
+  if (CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
     LuaPlus::LuaStackObject yArg(state, 3);
     if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&yArg, "number");
@@ -20179,7 +20252,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(LuaPlus::LuaState* const state)
     float zoomAnchor[2] = {static_cast<float>(lua_tonumber(state->m_state, 2)), y};
     camera->SetZoomAnchor(zoomAnchor);
 
-    CameraZoomRuntimeView* const wheelCamera = worldViewView->mRenderWorldView.GetCamera();
+    CameraZoomRuntimeView* const wheelCamera = worldViewView->RenderWorldView()->GetCamera();
     LuaPlus::LuaStackObject wheelDeltaArg(state, 5);
     if (lua_type(state->m_state, 5) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&wheelDeltaArg, "number");
@@ -20243,7 +20316,7 @@ int moho::cfunc_UnProjectL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  CameraZoomRuntimeView* const camera = CUIWorldViewRuntimeView::FromWorldView(worldView)->mRenderWorldView.GetCamera();
+  CameraZoomRuntimeView* const camera = CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->GetCamera();
 
   const LuaPlus::LuaObject screenPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector2f screenPoint = SCR_FromLuaCopy<Wm3::Vector2f>(screenPointObject);
@@ -20302,7 +20375,7 @@ int moho::cfunc_CUIWorldViewProjectL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  CameraZoomRuntimeView* const camera = worldViewView->mRenderWorldView.GetCamera();
+  CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera();
   if (camera == nullptr) {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
@@ -20674,7 +20747,7 @@ int moho::cfunc_CUIWorldViewCameraResetL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (CameraZoomRuntimeView* const camera = worldViewView->mRenderWorldView.GetCamera(); camera != nullptr) {
+  if (CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
     camera->Reset();
   }
 
@@ -23504,7 +23577,7 @@ int moho::cfunc_CUIWorldViewGetScreenPosL(LuaPlus::LuaState* const state)
   const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  CameraZoomRuntimeView* const camera = worldViewView->mRenderWorldView.GetCamera();
+  CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera();
 
   const UserUnitScreenPosRuntimeView* const userUnitView = UserUnitScreenPosRuntimeView::FromUserUnit(userUnit);
   MeshInstance* const meshInstance = userUnitView->mMeshInstance;
@@ -23933,6 +24006,37 @@ void moho::CMauiControl::SetRenderPass(const std::int32_t renderPass)
 std::int32_t moho::CMauiControl::GetRenderPass()
 {
   return CMauiControlExtendedRuntimeView::FromControl(this)->mRenderPass;
+}
+
+namespace
+{
+  // FAF community binary-patch addition (see CMauiControl::SetCustomRender):
+  // a side table keyed by control identity, deliberately kept OUTSIDE the
+  // binary-layout-matching runtime-view structs above so it cannot disturb
+  // any recovered offset or size assertion. Controls are never destroyed
+  // from more than one thread at a time in this engine, matching every
+  // other MAUI runtime-view lookup in this file.
+  std::map<const moho::CMauiControl*, bool>& CustomRenderEnabledMap()
+  {
+    static std::map<const moho::CMauiControl*, bool> map;
+    return map;
+  }
+} // namespace
+
+void moho::CMauiControl::SetCustomRender(const bool enabled)
+{
+  if (enabled) {
+    CustomRenderEnabledMap()[this] = true;
+  } else {
+    CustomRenderEnabledMap().erase(this);
+  }
+}
+
+bool moho::CMauiControl::GetCustomRender() const
+{
+  const auto& map = CustomRenderEnabledMap();
+  const auto it = map.find(this);
+  return it != map.end() && it->second;
 }
 
 /**
@@ -24455,6 +24559,15 @@ bool moho::CMauiControl::HandleEvent(const SMauiEventData& eventData)
 void moho::CMauiControl::Frame(const float deltaSeconds)
 {
   reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+
+  // FAF community binary-patch addition, not part of the original 2007
+  // body at 0x00787420 -- see CMauiControl::SetCustomRender. Drives the
+  // WorldViewShapeComponent's OnRenderWorld(delta) callback contract
+  // (gamedata/lua/ui/controls/components/worldviewshapecomponent.lua)
+  // once per frame for any control that opted in.
+  if (GetCustomRender()) {
+    reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnRenderWorld", deltaSeconds);
+  }
 }
 
 /**
@@ -30656,6 +30769,10 @@ namespace
       (void)::moho::func_CMauiControlIsHidden_LuaFuncDef();
       (void)::moho::func_CMauiControlGetRenderPass_LuaFuncDef();
       (void)::moho::func_CMauiControlSetRenderPass_LuaFuncDef();
+      // FAF community binary-patch additions, not part of the original 2007
+      // registration sequence -- see CMauiControl::SetCustomRender.
+      (void)::moho::func_CMauiControlSetCustomRender_LuaFuncDef();
+      (void)::moho::func_CMauiControlGetCustomRender_LuaFuncDef();
       (void)::moho::func_CMauiControlGetName_LuaFuncDef();
       (void)::moho::func_CMauiControlSetName_LuaFuncDef();
       (void)::moho::func_CMauiControlDump_LuaFuncDef();
