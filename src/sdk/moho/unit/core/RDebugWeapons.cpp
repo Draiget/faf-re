@@ -16,6 +16,11 @@
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
+
 namespace
 {
   constexpr std::uint32_t kWeaponCirclePrecision = 0x20u;
@@ -31,6 +36,11 @@ namespace
     return (raw & kWeaponDepthMask) | kWeaponDepthAlpha;
   }
 
+  // Ground truth (FUN_00652E00.c, Moho::RDebugWeapons::OnTick) builds this
+  // quaternion as `v36.x = cos(-kWeaponLabelPitch's magnitude); v36.y = sin(...);
+  // v36.z = 0; v36.w = 0` (scalar in `.x`, matching `QuatToMatrix`/`MultQuadVec`),
+  // not `.w = cos` / `.x = sin`, and rotates via `Moho::MultQuadVec(&v47, &v41,
+  // &v36)`, not `Wm3::MultiplyQuaternionVector`.
   [[nodiscard]] Wm3::Vector3f BuildWeaponLabelOffset(const float angle, const float radius) noexcept
   {
     Wm3::Vector3f orbitOffset{};
@@ -39,13 +49,13 @@ namespace
     orbitOffset.z = 0.0f;
 
     Wm3::Quaternionf labelPitch{};
-    labelPitch.w = std::cos(kWeaponLabelPitch);
-    labelPitch.x = std::sin(kWeaponLabelPitch);
-    labelPitch.y = 0.0f;
+    labelPitch.x = std::cos(kWeaponLabelPitch);
+    labelPitch.y = std::sin(kWeaponLabelPitch);
     labelPitch.z = 0.0f;
+    labelPitch.w = 0.0f;
 
     Wm3::Vector3f out{};
-    Wm3::MultiplyQuaternionVector(&out, orbitOffset, labelPitch);
+    moho::MultQuadVec(&out, &orbitOffset, &labelPitch);
     return out;
   }
 
