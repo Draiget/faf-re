@@ -512,6 +512,11 @@ namespace moho
    * What it does:
    * Rotates `mWorldImpulse` into local space using the orientation conjugate and
    * scales each axis by `mInvInertiaTensor`.
+   *
+   * Ground truth (`FUN_00697F80.c`) keeps `.x` unchanged and negates
+   * `.y`/`.z`/`.w` -- the engine `.x`-scalar conjugate confirmed throughout
+   * this file, not the `.w`-kept/`.x,.y,.z`-negated conjugate the previous
+   * body here built (upstream WildMagic convention).
    */
   [[maybe_unused]] Wm3::Vec3f* ComputeWorldImpulseFromInertiaTensor(const SPhysBody* const body, Wm3::Vec3f* const out)
   {
@@ -519,11 +524,7 @@ namespace moho
       return out;
     }
 
-    Wm3::Quaternionf inverseOrientation{};
-    inverseOrientation.w = body->mOrientation.w;
-    inverseOrientation.x = -body->mOrientation.x;
-    inverseOrientation.y = -body->mOrientation.y;
-    inverseOrientation.z = -body->mOrientation.z;
+    const Wm3::Quaternionf inverseOrientation = ConjugateQuatXScalar(body->mOrientation);
 
     Wm3::Vec3f localImpulse{};
     moho::MultQuadVec(&localImpulse, &body->mWorldImpulse, &inverseOrientation);
@@ -540,6 +541,12 @@ namespace moho
    * What it does:
    * Projects `mWorldImpulse` onto orientation basis vectors, scales by
    * inverse-inertia tensor lanes, then reconstructs world-space impulse.
+   *
+   * Ground truth (`FUN_00697E70.c`) builds the basis via `Moho::VAxes3::
+   * VAxes3(&result, &mOrientation)`; `MultQuadVec` against the three standard
+   * basis vectors expands the same `.x`-scalar rotation matrix and produces
+   * numerically identical columns, unlike the previous `Quaternion::Rotate`
+   * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
    */
   Wm3::Vec3f* SPhysBody::GetImpulse(Wm3::Vec3f* const out) const
   {
@@ -547,9 +554,15 @@ namespace moho
       return nullptr;
     }
 
-    const Wm3::Vec3f basisX = mOrientation.Rotate(Wm3::Vec3f(1.0f, 0.0f, 0.0f));
-    const Wm3::Vec3f basisY = mOrientation.Rotate(Wm3::Vec3f(0.0f, 1.0f, 0.0f));
-    const Wm3::Vec3f basisZ = mOrientation.Rotate(Wm3::Vec3f(0.0f, 0.0f, 1.0f));
+    const Wm3::Vec3f unitX{1.0f, 0.0f, 0.0f};
+    const Wm3::Vec3f unitY{0.0f, 1.0f, 0.0f};
+    const Wm3::Vec3f unitZ{0.0f, 0.0f, 1.0f};
+    Wm3::Vec3f basisX{};
+    Wm3::Vec3f basisY{};
+    Wm3::Vec3f basisZ{};
+    MultQuadVec(&basisX, &unitX, &mOrientation);
+    MultQuadVec(&basisY, &unitY, &mOrientation);
+    MultQuadVec(&basisZ, &unitZ, &mOrientation);
 
     const float impulseX = mInvInertiaTensor.x * Wm3::Vec3f::Dot(mWorldImpulse, basisX);
     const float impulseY = mInvInertiaTensor.y * Wm3::Vec3f::Dot(mWorldImpulse, basisY);
@@ -669,6 +682,17 @@ namespace moho
    * `mInvInertiaTensor`, converts the result to a delta rotation via
    * `QuatFromAxisAngleVector`, left-multiplies it onto `mOrientation`, and
    * renormalizes in place.
+   *
+   * Ground truth (`FUN_006978D0.c`) independently confirms both halves of the
+   * engine `.x`-scalar convention this file already established elsewhere:
+   * the conjugate keeps `.x` and negates `.y/.z/.w` (manually built, then fed
+   * to `Moho::MultQuadVec`) -- not `Quaternion::Conjugate().Rotate()`
+   * (upstream WildMagic, keeps `.w`/negates `.x/.y/.z`, `.w`-scalar `ToMat3`)
+   * -- and the final compose is the same `.x`-scalar Hamilton product as
+   * `CAniPoseBone::Rotate`/`VTransform::Compose`, with `deltaOrientation` as
+   * the left/first operand and the existing `mOrientation` as the
+   * right/second operand -- not `operator*` (same upstream `.w`-scalar
+   * formula as `Multiply`).
    */
   void SPhysBody::IntegrateAngularImpulse(const Wm3::Vec3f& angularImpulse, const float dt)
   {
@@ -684,7 +708,9 @@ namespace moho
       (mWorldImpulse.z + oldWorldImpulse.z) * halfDt
     };
 
-    const Wm3::Vec3f localImpulse = mOrientation.Conjugate().Rotate(avgWorldImpulse);
+    const Wm3::Quaternionf conjugateOrientation = ConjugateQuatXScalar(mOrientation);
+    Wm3::Vec3f localImpulse{};
+    MultQuadVec(&localImpulse, &avgWorldImpulse, &conjugateOrientation);
     const Wm3::Vec3f scaledImpulse{
       mInvInertiaTensor.x * localImpulse.x,
       mInvInertiaTensor.y * localImpulse.y,
@@ -694,7 +720,7 @@ namespace moho
     Wm3::Quaternionf deltaOrientation{};
     QuatFromAxisAngleVector(&deltaOrientation, scaledImpulse);
 
-    mOrientation = deltaOrientation * mOrientation;
+    mOrientation = MultiplyQuatXScalar(deltaOrientation, mOrientation);
     NormalizeQuatInPlace(&mOrientation);
   }
 
