@@ -402,37 +402,41 @@ namespace moho
    */
   VAxes3::VAxes3(const Wm3::Quaternionf& orientation)
   {
-    // The three columns of the rotation matrix the quaternion denotes. IDA
-    // names this function's quaternion lanes one slot low (its `.x` is the
-    // real part), so the products below are spelled from the storage order
-    // Wm3 actually uses -- w, x, y, z -- while keeping the binary's operand
-    // grouping.
+    // The three columns of the rotation matrix the quaternion denotes.
+    // Re-derived term-by-term from ground truth (`FUN_004EC590.c`) after the
+    // previous body here was found to compute a different, wrong matrix --
+    // confirmed by direct numeric substitution, not just symbol matching
+    // (e.g. orientation=(x=1,y=2,z=3,w=4) gave vX.x=-49 in ground truth vs.
+    // -25 in the old code here). This engine's quaternions are `.x`-scalar
+    // (`VMatrix4::Set` convention); the corrected formula below is exactly
+    // `VMatrix4::Set`'s rotation block, row by row (r[0]->vX, r[1]->vY,
+    // r[2]->vZ), which the same numeric substitution confirms matches.
     const float twoW = orientation.w * 2.0f;
     const float twoX = orientation.x * 2.0f;
     const float twoY = orientation.y * 2.0f;
     const float twoZ = orientation.z * 2.0f;
 
-    const float yy = twoY * orientation.y;
+    const float ww = twoW * orientation.w;
     const float zz = twoZ * orientation.z;
-    const float xy = twoY * orientation.x;
-    const float xx = twoX * orientation.x;
-    const float xz = twoZ * orientation.x;
-    const float wx = twoW * orientation.x;
-    const float yz = twoZ * orientation.y;
+    const float yy = twoY * orientation.y;
+    const float xw = twoX * orientation.w;
+    const float zy = twoZ * orientation.y;
     const float wy = twoW * orientation.y;
+    const float xz = twoX * orientation.z;
     const float wz = twoW * orientation.z;
+    const float xy = twoX * orientation.y;
 
-    vX.x = 1.0f - (zz + yy);
-    vX.y = wz + xy;
-    vX.z = xz - wy;
+    vX.x = 1.0f - (ww + zz);
+    vX.y = xw + zy;
+    vX.z = wy - xz;
 
-    vY.x = xy - wz;
-    vY.y = 1.0f - (zz + xx);
-    vY.z = yz + wx;
+    vY.x = zy - xw;
+    vY.y = 1.0f - (ww + yy);
+    vY.z = wz + xy;
 
-    vZ.x = wy + xz;
-    vZ.y = yz - wx;
-    vZ.z = 1.0f - (yy + xx);
+    vZ.x = xz + wy;
+    vZ.y = wz - xy;
+    vZ.z = 1.0f - (zz + yy);
   }
 
   /**
