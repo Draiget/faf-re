@@ -1820,12 +1820,27 @@ namespace
    * What it does:
    * Stable-sorts the rendered-child lane by each control's resolved depth.
    *
-   * The binary's own `std::stable_sort` internals (merge-sort recursion
-   * setup + buffer-size calc `FUN_0078AEE0`, its merge-step callee
-   * `FUN_0078B470`) are satisfied by the `std::stable_sort` call below,
-   * same pattern as this session's other STL-algorithm citations
-   * (`std::sort`/`std::nth_element` in CCommandLuaFunctionRegistrations.cpp/
-   * CWldSplat.cpp) -- CRT/STL-internal, not engine code.
+   * The binary's own `std::stable_sort` internals -- merge-sort recursion
+   * setup + buffer-size calc (`FUN_0078AEE0`), its merge-step callee
+   * (`FUN_0078B470`), the recursive divide/merge driver (`FUN_0078B7C0`),
+   * the unbuffered-merge fallback (`FUN_0078BE00`), and the buffered-merge
+   * thunk (`FUN_0078BD20`, forwarding to the comparator leaf recovered as
+   * `wxMergeAscendingPointerRangesByFloatLaneD4A` in WxRuntimeTypes.cpp) --
+   * are all satisfied by the `std::stable_sort` call below.
+   *
+   * Unlike `std::sort` (unstable, so a different valid implementation can
+   * legally produce a different tie-break order for equal elements -- see
+   * `legacy/algorithms/Sort.h`'s `msvc8::sort`, which therefore *is*
+   * byte-faithfully reimplemented), `std::stable_sort`'s output order is
+   * fully pinned by the standard's stability guarantee: for any input and
+   * comparator, every conforming implementation -- MSVC8's 2007 one and a
+   * modern one alike -- must produce the identical relative ordering of
+   * equal elements. There is no algorithm-shape discrepancy a bespoke
+   * reimplementation could fix, so the modern call below is a complete,
+   * faithful equivalent, same pattern as this project's other STL-algorithm
+   * citations (`std::sort`/`std::nth_element` in
+   * CCommandLuaFunctionRegistrations.cpp/CWldSplat.cpp) -- CRT/STL-internal,
+   * not engine code.
    */
   void SortRenderedChildrenByDepth(msvc8::vector<moho::CMauiControl*>& renderedChildren)
   {
