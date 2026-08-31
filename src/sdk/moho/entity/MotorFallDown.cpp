@@ -13,6 +13,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
@@ -442,6 +443,13 @@ namespace moho
 
   /**
    * Address: 0x00695180 (FUN_00695180, update lane)
+   *
+   * Ground truth (`FUN_00695180.c`) confirms `delta` (whose own scalar lane
+   * is `.w`, per `BuildRotationDeltaFromAxes`'s `Quaternion(1+dot, cross.x,
+   * cross.y, cross.z)` construction) is composed onto the existing `.x`-
+   * scalar `pendingTransform.orient_` via the same mixed-convention product
+   * as `Entity.cpp`'s tilt-delta sites (`ComposeWScalarDeltaOntoOrientation`),
+   * not the generic `Wm3::Quatf::Multiply` (`.w`-scalar on both operands).
    */
   void MotorFallDown::Update(Entity* const entity)
   {
@@ -510,7 +518,7 @@ namespace moho
       }
     }
 
-    pendingTransform.orient_ = Wm3::Quatf::Multiply(delta, pendingTransform.orient_);
+    pendingTransform.orient_ = ComposeWScalarDeltaOntoOrientation(delta, pendingTransform.orient_);
     pendingTransform.orient_.Normalize();
     entity->SetPendingTransform(pendingTransform, 1.0f);
   }

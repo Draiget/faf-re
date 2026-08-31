@@ -516,6 +516,22 @@ namespace
     return probe;
   }
 
+  /**
+   * Invoked from `UnitWeapon::TargetSolutionStatusGun` (0x006D5B40,
+   * `FUN_006D5B40`), which itself calls this via `UnitWeapon::TargetIsTooClose`
+   * (0x006D5D80) / `TargetSolutionStatusGun`'s own public overload.
+   *
+   * Ground truth (`FUN_006D5B40.c`) resolves the unit heading via
+   * `Wm3::Quaternion::ToAngle(&this->mUnit->mVarDat.mCurTransform.orient)`
+   * (a distinct, not-yet-recovered function) rather than rotating a forward
+   * vector and taking `atan2` of it -- but `ToAngle`'s own formula,
+   * `atan2(2*(w*y+x*z), 1-2*(z*z+y*y))`, is exactly `atan2(forward.x,
+   * forward.z)` for `forward = Rotate((0,0,1))` under this engine's
+   * `.x`-scalar convention, algebraically fused into one function. The
+   * `.Rotate()`-based computation below matched ground truth in *shape* but
+   * used the wrong (`.w`-scalar, upstream WildMagic) convention; fixed to
+   * `Moho::MultQuadVec`, which makes it numerically identical to `ToAngle`.
+   */
   [[nodiscard]] moho::ESolutionStatus EvaluateTargetSolutionStatusGun(
     moho::UnitWeapon* const weapon,
     const Wm3::Vec3f& targetPosition,
@@ -568,7 +584,10 @@ namespace
       }
 
       const float targetHeading = std::atan2(targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z);
-      const Wm3::Vec3f forward = weapon->mUnit->GetTransform().orient_.Rotate(Wm3::Vec3f{0.0f, 0.0f, 1.0f});
+      const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
+      const Wm3::Vec3f forwardAxis{0.0f, 0.0f, 1.0f};
+      Wm3::Vec3f forward{};
+      moho::MultQuadVec(&forward, &forwardAxis, &unitOrientation);
       const float unitHeading = std::atan2(forward.x, forward.z);
 
       constexpr float kDegreesToRadians = 0.017453292f;
@@ -3294,6 +3313,11 @@ namespace moho
    * What it does:
    * Evaluates one weapon-owner fire gate lane (state, movement, water level,
    * bomb-drop release timing, and heading constraints) for one target payload.
+   *
+   * Ground truth (`FUN_006D4C80.c`) re-derived term-by-term: the forward-axis
+   * extraction (`dir.x/y/z`) matches the engine `.x`-scalar rotation matrix
+   * exactly (`Moho::MultQuadVec`), not the generic `Quaternion::Rotate`
+   * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
    */
   bool UnitWeapon::CanFire(UnitWeapon* const weapon, CAiTarget* const targetData)
   {
@@ -3395,7 +3419,10 @@ namespace moho
       return weapon->mCanFire != 0u;
     }
 
-    const Wm3::Vec3f forward = ownerUnit->GetTransform().orient_.Rotate(Wm3::Vec3f{0.0f, 0.0f, 1.0f});
+    const Wm3::Quaternionf ownerOrientation = ownerUnit->GetTransform().orient_;
+    const Wm3::Vec3f forwardAxis{0.0f, 0.0f, 1.0f};
+    Wm3::Vec3f forward{};
+    MultQuadVec(&forward, &forwardAxis, &ownerOrientation);
     const float releaseDot = ((bombDropPosition.z - unitPosition.z) * forward.z) + ((bombDropPosition.x - unitPosition.x) * forward.x);
     if (releaseDot > 0.0f) {
       return false;
@@ -4119,6 +4146,13 @@ namespace moho
    * What it does:
    * Spawns one projectile from the requested muzzle bone and applies launch
    * orientation/randomness, damage payload, velocity, and lifetime lanes.
+   *
+   * Ground truth (`FUN_006D64E0.c`) re-derived term-by-term for the jitter
+   * compose: `jitterOrientation` (from `COORDS_Orient`, already `.x`-scalar)
+   * composed with `launchTransform.orient_` matches the engine `.x`-scalar
+   * Hamilton product exactly, jitter left/first and the existing orientation
+   * right/second -- not the generic `Wm3::Quaternionf::Multiply` (`.w`-scalar
+   * on both operands).
    */
   Projectile* UnitWeapon::CreateProjectile(const std::int32_t muzzleBoneIndex)
   {
@@ -4152,7 +4186,7 @@ namespace moho
       const float pitchJitter = mSim->mRngState->FRandGaussian() * mFiringRandomness * kDegreesToRadians;
       const float headingJitter = mSim->mRngState->FRandGaussian() * mFiringRandomness * kDegreesToRadians;
       const Wm3::Quaternionf jitterOrientation = COORDS_Orient(headingJitter, pitchJitter);
-      launchTransform.orient_ = Wm3::Quaternionf::Multiply(jitterOrientation, launchTransform.orient_);
+      launchTransform.orient_ = MultiplyQuatXScalar(jitterOrientation, launchTransform.orient_);
     }
 
     const float damageRadius =
