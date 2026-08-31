@@ -5905,6 +5905,14 @@ namespace moho
     meshSpatialDb.ResizeStorageForMap(width, height);
   }
 
+  /**
+   * Address: 0x007E5280 (FUN_007E5280,
+   * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+   *
+   * What it does:
+   * Looks up an existing cached mesh by (blueprint, material) key; on a miss,
+   * constructs a new Mesh and inserts it into the cache tree.
+   */
   boost::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
     const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg
   )
