@@ -433,13 +433,19 @@ namespace
     weakLink.ClearLinkState();
   }
 
+  // Ground truth (`FUN_005B2FF0.c`, `Moho::CAiPathSpline::Generate`, this
+  // helper's sole caller) matches the engine `.x`-scalar rotation matrix
+  // term-by-term, not the generic `Quaternion::Rotate` (upstream WildMagic,
+  // `.w`-scalar `ToMat3()`) this replaces.
   [[nodiscard]] Wm3::Vector3f UnitForwardXZ(const Unit* unit) noexcept
   {
     if (!unit) {
       return {0.0f, 0.0f, 1.0f};
     }
 
-    const Wm3::Vector3f forward = unit->GetTransform().orient_.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
+    const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
+    Wm3::Vector3f forward{};
+    MultQuadVec(&forward, &forwardAxis, &unit->GetTransform().orient_);
     Wm3::Vector3f flat{forward.x, 0.0f, forward.z};
     const Wm3::Vector3f normalized = Wm3::Vector3f::NormalizeOrZero(flat);
     if (Wm3::Vector3f::LengthSq(normalized) <= 1.0e-6f) {
@@ -1176,6 +1182,11 @@ const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
  * binary is only ever reached with 3 or 4.
  *
  * Returns the number of nodes produced.
+ *
+ * Ground truth (`FUN_005B26C0.c`) matches the engine `.x`-scalar rotation
+ * matrix term-by-term for the initial forward sample, not the generic
+ * `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) the
+ * previous body here used.
  */
 int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 {
@@ -1187,8 +1198,9 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 
   // The hull's facing, straight from the orientation - not flattened and not
   // renormalised, so a pitched or rolled hull contributes its real heading.
-  const Wm3::Vector3f forward =
-    unit->GetTransform().orient_.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
+  const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
+  Wm3::Vector3f forward{};
+  MultQuadVec(&forward, &forwardAxis, &unit->GetTransform().orient_);
 
   CPathPoint point{};
   point.mPosition = unit->GetPosition();
