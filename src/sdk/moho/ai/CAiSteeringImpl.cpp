@@ -15,6 +15,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector2f.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -105,9 +106,19 @@ namespace
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
 
+  // Ground truth (`FUN_00596F30.c`, `func_ResolvePossibleCollision`, the sole
+  // reachability path for every caller of this helper) computes the
+  // collision-unit forward vector via the engine `.x`-scalar rotation matrix
+  // (confirmed term-by-term: `2*(w*z-x*y)`, `2*(x*z+w*y)`, `1-2*(z*z+y*y)`
+  // match `Moho::QuatToMatrix`'s column exactly), not the generic
+  // `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) this
+  // replaces. The owner-side forward vector this helper also computes uses
+  // the identical operation on a different unit within the same function.
   [[nodiscard]] Wm3::Vector3f FlattenedForward(const Unit& unit) noexcept
   {
-    Wm3::Vector3f forward = unit.GetTransform().orient_.Rotate({0.0f, 0.0f, 1.0f});
+    const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
+    Wm3::Vector3f forward{};
+    MultQuadVec(&forward, &forwardAxis, &unit.GetTransform().orient_);
     forward.y = 0.0f;
     return Wm3::Vector3f::NormalizeOrZero(forward);
   }
