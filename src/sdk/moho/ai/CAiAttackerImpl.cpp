@@ -7,6 +7,7 @@
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/CollisionBeamEntity.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/misc/Listener.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
@@ -272,6 +273,14 @@ namespace
     return normalized - kPi;
   }
 
+  // NOTE: this free helper duplicates moho::EvaluateTargetSolutionStatusGun
+  // (UnitWeapon.cpp), which is the one genuinely reachable from ground truth
+  // (UnitWeapon::TargetSolutionStatusGun, FUN_006D5B40) -- see that
+  // function's own doc comment for the full ground-truth citation
+  // (FUN_006D5B40.c calls Wm3::Quaternion::ToAngle, algebraically identical
+  // to atan2(MultQuadVec(quat,(0,0,1)).x, .z) under this engine's .x-scalar
+  // convention). This copy's own reachability is a separate, pre-existing
+  // concern; the quaternion fix below is the same either way.
   [[nodiscard]] WeaponTargetRangeStatus EvaluateWeaponTargetSolutionStatusGun(
     UnitWeapon* const weapon, const Wm3::Vector3f& targetPos, float* const inOutDistanceSq
   )
@@ -321,7 +330,10 @@ namespace
       }
 
       const float targetHeading = std::atan2(targetPos.x - muzzlePos.x, targetPos.z - muzzlePos.z);
-      const Wm3::Vector3f unitForward = weapon->mUnit->GetTransform().orient_.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
+      const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
+      const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
+      Wm3::Vector3f unitForward{};
+      MultQuadVec(&unitForward, &forwardAxis, &unitOrientation);
       const float unitHeading = std::atan2(unitForward.x, unitForward.z);
       const float arcCenterRadians = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       const float arcRangeRadians = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
