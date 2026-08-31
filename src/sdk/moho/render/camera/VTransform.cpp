@@ -277,6 +277,11 @@ namespace moho
    * What it does:
    * Rotates one input vector by orientation, adds translation, and writes
    * the transformed point to caller output.
+   *
+   * Ground truth (`FUN_00491200.c`) rotates via `Moho::MultQuadVec(&v5, a2,
+   * &a1->orient)`, not the generic `Wm3::MultiplyQuaternionVector` -- same
+   * `.x`-is-scalar-vs-`.w`-is-scalar convention mismatch as `Inverse()`
+   * above (`orient_` is always `VMatrix4::Set`-convention here).
    */
   Wm3::Vec3f* VTransform::Apply(const Wm3::Vec3f& source, Wm3::Vec3f* const outPoint) const noexcept
   {
@@ -285,7 +290,7 @@ namespace moho
     }
 
     Wm3::Vec3f rotated{};
-    Wm3::MultiplyQuaternionVector(&rotated, source, orient_);
+    MultQuadVec(&rotated, &source, &orient_);
     outPoint->x = pos_.x + rotated.x;
     outPoint->y = pos_.y + rotated.y;
     outPoint->z = pos_.z + rotated.z;
@@ -299,6 +304,19 @@ namespace moho
    *
    * What it does:
    * Composes transforms in the same order and quaternion algebra as FA binary.
+   *
+   * Both halves of this function were re-derived term-by-term from
+   * `FUN_00549C20.c` after the previous body here was found to use the
+   * same wrong convention as `Inverse()`/`Apply()` above: the quaternion
+   * product below was computed treating `.w` as the scalar lane (textbook
+   * convention), but the real disassembly's four output terms are this
+   * exact same term set with every lane cyclically relabelled `.x` (real
+   * scalar lane) `-> .y -> .z -> .w -> .x`, i.e. the binary treats `.x` as
+   * scalar throughout, matching `VMatrix4::Set`/`QuatToMatrix`. The
+   * position rotation had the same `Wm3::MultiplyQuaternionVector` (WildMagic
+   * native `.w`-scalar `ToMat3`) vs. `Moho::MultQuadVec` (engine `.x`-scalar)
+   * mismatch as `Apply()`; ground truth calls
+   * `Moho::MultQuadVec(&v16, &t1->pos, &t2->orient)`.
    */
   VTransform VTransform::Compose(const VTransform& lhs, const VTransform& rhs) noexcept
   {
@@ -306,13 +324,13 @@ namespace moho
 
     const Wm3::Quatf& a = lhs.orient_;
     const Wm3::Quatf& b = rhs.orient_;
-    out.orient_.w = (a.w * b.w) - (a.x * b.x) - (a.y * b.y) - (a.z * b.z);
-    out.orient_.x = (a.z * b.y) + (b.x * a.w) + (a.x * b.w) - (b.z * a.y);
-    out.orient_.y = (b.z * a.x) + (b.y * a.w) + (a.y * b.w) - (a.z * b.x);
-    out.orient_.z = (a.y * b.x) + (b.z * a.w) + (a.z * b.w) - (b.y * a.x);
+    out.orient_.x = (a.x * b.x) - (a.y * b.y) - (a.z * b.z) - (a.w * b.w);
+    out.orient_.y = (a.w * b.z) + (a.x * b.y) + (a.y * b.x) - (a.z * b.w);
+    out.orient_.z = (a.y * b.w) + (a.x * b.z) + (a.z * b.x) - (a.w * b.y);
+    out.orient_.w = (a.z * b.y) + (a.x * b.w) + (a.w * b.x) - (a.y * b.z);
 
     Wm3::Vec3f rotatedPosition{};
-    Wm3::MultiplyQuaternionVector(&rotatedPosition, lhs.pos_, rhs.orient_);
+    MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);
     out.pos_.x = rhs.pos_.x + rotatedPosition.x;
     out.pos_.y = rhs.pos_.y + rotatedPosition.y;
     out.pos_.z = rhs.pos_.z + rotatedPosition.z;
