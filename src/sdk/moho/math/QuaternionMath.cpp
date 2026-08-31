@@ -35,6 +35,44 @@ namespace moho
     return dest;
   }
 
+  Wm3::Quaternionf MultiplyQuatXScalar(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
+  {
+    // NOTE: deliberately NOT `Wm3::Quaternionf{...}` -- that brace-init form
+    // resolves to the upstream `Quaternion(fW, fX, fY, fZ)` constructor
+    // (first arg -> .w), which would silently scramble these `.x`-first
+    // engine-convention terms. Named-field assignment avoids that trap.
+    Wm3::Quaternionf result{};
+    result.x = (a.x * b.x) - (a.y * b.y) - (a.z * b.z) - (a.w * b.w);
+    result.y = (a.w * b.z) + (a.x * b.y) + (a.y * b.x) - (a.z * b.w);
+    result.z = (a.y * b.w) + (a.x * b.z) + (a.z * b.x) - (a.w * b.y);
+    result.w = (a.z * b.y) + (a.x * b.w) + (a.w * b.x) - (a.y * b.z);
+    return result;
+  }
+
+  Wm3::Quaternionf ConjugateQuatXScalar(const Wm3::Quaternionf& q) noexcept
+  {
+    Wm3::Quaternionf result{};
+    result.x = q.x;
+    result.y = -q.y;
+    result.z = -q.z;
+    result.w = -q.w;
+    return result;
+  }
+
+  Wm3::Quaternionf ComposeWScalarDeltaOntoOrientation(
+    const Wm3::Quaternionf& delta, const Wm3::Quaternionf& orientation
+  ) noexcept
+  {
+    const Wm3::Quaternionf& d = delta;
+    const Wm3::Quaternionf& o = orientation;
+    Wm3::Quaternionf result{};
+    result.x = (d.w * o.x) - (d.x * o.y) - (d.y * o.z) - (d.z * o.w);
+    result.y = (d.w * o.y) + (d.x * o.x) + (d.y * o.w) - (d.z * o.z);
+    result.z = (d.w * o.z) + (d.y * o.x) + (d.z * o.y) - (d.x * o.w);
+    result.w = (d.w * o.w) + (d.x * o.z) + (d.z * o.x) - (d.y * o.y);
+    return result;
+  }
+
   namespace
   {
     /**

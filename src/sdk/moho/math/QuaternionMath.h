@@ -236,4 +236,55 @@ namespace moho
     Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat
   );
 
+  /**
+   * Not a single-address recovery -- this is the shared engine-convention
+   * (`.x`-scalar, matching `VMatrix4::Set`/`QuatToMatrix`) quaternion Hamilton
+   * product, independently re-derived term-by-term from four separate ground
+   * truth sites that each inline the identical formula: `FUN_0054BC00`
+   * (`Moho::CAniPoseBone::Rotate`), `FUN_00549C20` (`VTransform::Compose`,
+   * already recovered inline there), `FUN_006978D0`
+   * (`Moho::SPhysBody::IntegrateAngularImpulse`), `FUN_006BE6B0`
+   * (`Moho::CUnitMotion::ComputeAirControl`), and `FUN_006D64E0`
+   * (`Moho::UnitWeapon::CreateProjectile`). All five sites confirm the same
+   * per-lane formula with `a` the left/first operand and `b` the right/second
+   * operand, matching the binary's argument order exactly (never commuted).
+   * NOT equivalent to `Wm3::Quaternion<float>::Multiply`/`operator*`, which
+   * assume textbook `.w`-scalar layout and produce a materially different
+   * rotation when fed this engine's `.x`-scalar quaternions.
+   */
+  Wm3::Quaternionf MultiplyQuatXScalar(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept;
+
+  /**
+   * Not a single-address recovery -- this is the shared engine-convention
+   * (`.x`-scalar) quaternion conjugate: keeps `.x` (the real/scalar lane)
+   * unchanged and negates `.y`/`.z`/`.w` (the imaginary lanes). Independently
+   * re-derived from `FUN_0046FBF0` (`VTransform::Inverse`, already recovered
+   * inline there), `FUN_006978D0` (`Moho::SPhysBody::IntegrateAngularImpulse`,
+   * which manually builds this exact conjugate before its `MultQuadVec` call),
+   * and `FUN_006BE6B0` (`Moho::CUnitMotion::ComputeAirControl`, same pattern
+   * twice). NOT equivalent to `Wm3::Quaternion<float>::Conjugate`, which keeps
+   * `.w` and negates `.x`/`.y`/`.z` -- correct for textbook `.w`-scalar
+   * quaternions, wrong for this engine's `.x`-scalar convention.
+   */
+  Wm3::Quaternionf ConjugateQuatXScalar(const Wm3::Quaternionf& q) noexcept;
+
+  /**
+   * Not a single-address recovery -- this is the shared mixed-convention
+   * compose used where one operand is a freshly-built shortest-arc delta
+   * quaternion whose OWN scalar lane is `.w` (matching a plain
+   * `Quaternion(1+dot, cross.x, cross.y, cross.z)` construction, e.g.
+   * `MotorFallDown::BuildRotationDeltaFromAxes`), composed onto a genuine
+   * `.x`-scalar engine orientation. Independently re-derived term-by-term
+   * from three ground truth sites: `FUN_006FCB00` (`cfunc_EntityPushOverL`),
+   * `FUN_0050B820` (`Moho::COORDS_Tilt`), and `FUN_00695180`
+   * (`Moho::MotorFallDown::Update`) -- all three confirm the identical
+   * formula with `delta` (the `.w`-scalar operand) always left/first and
+   * `orientation` (the `.x`-scalar operand) always right/second, matching
+   * each binary call site's argument order. The result is written back in
+   * the engine's `.x`-scalar convention, matching `orientation`'s layout.
+   */
+  Wm3::Quaternionf ComposeWScalarDeltaOntoOrientation(
+    const Wm3::Quaternionf& delta, const Wm3::Quaternionf& orientation
+  ) noexcept;
+
 } // namespace moho
