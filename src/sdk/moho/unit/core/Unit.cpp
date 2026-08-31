@@ -7834,6 +7834,12 @@ CScrLuaInitForm* moho::func_UnitGetNumBuildOrders_LuaFuncDef()
  * What it does:
  * Rotates one relative vector by unit orientation and offsets it by the
  * unit world position.
+ *
+ * Ground truth (`FUN_006C74F0.c`) rotates via
+ * `Moho::MultQuadVec(&v13, &v15, v3)` (`v3` is the unit's transform, reread
+ * as a `Wm3::Quaternionf*` since `orient` is its first member), not the
+ * generic `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+ * mismatch as the other `orient_`-consuming sites.
  */
 int moho::cfunc_UnitCalculateWorldPositionFromRelativeL(LuaPlus::LuaState* const state)
 {
@@ -7856,7 +7862,7 @@ int moho::cfunc_UnitCalculateWorldPositionFromRelativeL(LuaPlus::LuaState* const
   const Wm3::Vector3f relativePos = SCR_FromLuaCopy<Wm3::Vector3f>(relativePosObject);
 
   Wm3::Vector3f rotatedRelativePos{};
-  (void)Wm3::MultiplyQuaternionVector(&rotatedRelativePos, relativePos, unit->GetTransform().orient_);
+  (void)moho::MultQuadVec(&rotatedRelativePos, &relativePos, &unit->GetTransform().orient_);
 
   const Wm3::Vector3f unitPosition = unit->GetPosition();
   const Wm3::Vector3f worldPosition{
@@ -14700,6 +14706,14 @@ bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
  * What it does:
  * Predicts near-future XZ stop position by repeatedly rotating velocity with
  * impulse-derived roll and integrating over `precision * 10` ticks.
+ *
+ * Ground truth (`FUN_0062CD40.c`) builds `rollRotation` via
+ * `Moho::EulerRollToQuat(&v15, &v17.x, a2a.y * 0.1)`, not
+ * `Wm3::Quaternionf::MakeFromAxisAngle` (numerically identical for this
+ * axis+angle, but not the function the binary actually calls), and rotates
+ * via `Moho::MultQuadVec(&a2a, &v14, &v17)` each iteration, not the generic
+ * `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+ * mismatch as the other `MultQuadVec` consumers in this bug class.
  */
 Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision) const
 {
@@ -14735,12 +14749,13 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
 
   Wm3::Vec3f velocity = Entity::GetVelocity();
   const Wm3::Vec3f upAxis(0.0f, 1.0f, 0.0f);
-  const Wm3::Quaternionf rollRotation = Wm3::Quaternionf::MakeFromAxisAngle(upAxis, impulse.y * 0.1f);
+  Wm3::Quaternionf rollRotation{};
+  (void)EulerRollToQuat(&upAxis, &rollRotation, impulse.y * 0.1f);
 
   float stepsRemaining = precision * 10.0f;
   while (stepsRemaining > 0.0f) {
     Wm3::Vec3f rotatedVelocity = Wm3::Vec3f::Zero();
-    Wm3::MultiplyQuaternionVector(&rotatedVelocity, velocity, rollRotation);
+    MultQuadVec(&rotatedVelocity, &velocity, &rollRotation);
     velocity = rotatedVelocity;
 
     float stepX = rotatedVelocity.x;
