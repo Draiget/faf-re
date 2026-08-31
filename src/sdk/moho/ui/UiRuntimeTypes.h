@@ -2032,6 +2032,29 @@ namespace moho
     [[nodiscard]] std::int32_t GetRenderPass();
 
     /**
+     * FAF community binary-patch addition, not part of the original 2007
+     * binary (no `Address:` -- there is no shipped-1.5-era body to cite).
+     * See `FAForever/FA-Binary-Patches` PRs #47/#111/#112, and
+     * `gamedata/lua/ui/controls/components/worldviewshapecomponent.lua`
+     * (`AddShape`/`RemoveShape`/`OnRenderWorld`), which is what this exists
+     * to support. Enables or disables the per-frame `OnRenderWorld(delta)`
+     * script callback for this control while it is being drawn.
+     *
+     * What it does:
+     * Sets whether this control receives a custom per-frame render callback.
+     */
+    void SetCustomRender(bool enabled);
+
+    /**
+     * FAF community binary-patch addition (see `SetCustomRender`).
+     *
+     * What it does:
+     * Returns whether this control's custom per-frame render callback is
+     * currently enabled.
+     */
+    [[nodiscard]] bool GetCustomRender() const;
+
+    /**
      * Address: 0x00786480 (FUN_00786480, Moho::CMauiControl::NeedsFrameUpdate)
      *
      * What it does:
@@ -5355,6 +5378,59 @@ namespace moho
    * stores it into the control runtime view.
    */
   int cfunc_CMauiControlSetRenderPassL(LuaPlus::LuaState* state);
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender)
+   * -- no `Address:`, not part of the original 2007 binary.
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CMauiControlSetCustomRenderL`.
+   */
+  int cfunc_CMauiControlSetCustomRender(lua_State* luaContext);
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   *
+   * What it does:
+   * Publishes the `CMauiControl:SetCustomRender(enabled)` Lua binder.
+   */
+  CScrLuaInitForm* func_CMauiControlSetCustomRender_LuaFuncDef();
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   *
+   * What it does:
+   * Reads one `CMauiControl` plus a boolean from Lua and stores it into the
+   * custom-render side table.
+   */
+  int cfunc_CMauiControlSetCustomRenderL(LuaPlus::LuaState* state);
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender)
+   * -- no `Address:`, not part of the original 2007 binary.
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CMauiControlGetCustomRenderL`.
+   */
+  int cfunc_CMauiControlGetCustomRender(lua_State* luaContext);
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   *
+   * What it does:
+   * Publishes the `CMauiControl:GetCustomRender()` Lua binder.
+   */
+  CScrLuaInitForm* func_CMauiControlGetCustomRender_LuaFuncDef();
+
+  /**
+   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   *
+   * What it does:
+   * Reads one `CMauiControl` and pushes its custom-render flag to Lua.
+   */
+  int cfunc_CMauiControlGetCustomRenderL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00788B90 (FUN_00788B90, cfunc_CMauiControlGetName)
