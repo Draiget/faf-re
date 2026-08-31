@@ -8834,6 +8834,18 @@ void CDebugCanvas::AddWorldText(const SDebugWorldText& text)
  *
  * What it does:
  * Builds a quaternion that rotates normalized `v1` toward normalized `v2`.
+ *
+ * Re-derived term-by-term from `FUN_0044F880.c`: the previous body here put
+ * the dot-product (scalar) term in `.w` and the three cross-product terms in
+ * `.x/.y/.z` -- textbook `.w`-scalar convention. The real disassembly writes
+ * the dot product to `.x` and the cross-product terms to `.y/.z/.w`, matching
+ * this engine's actual `.x`-is-scalar convention (`VMatrix4::Set`,
+ * `QuatToMatrix`, `Moho::MultQuadVec`) -- confirmed load-bearing since every
+ * caller of this function feeds the result straight into `MultQuadVec`
+ * (e.g. `CDebugCanvas::AddWireCircle` below, `CD3DPrimBatcher::DRAW_Circle`).
+ * The zero-length-sum fallback had the same lane shift: ground truth writes
+ * the antiparallel-axis fallback as `.x = 0` (scalar half of a 180-degree
+ * rotation) and `{.y,.z,.w} = v1`, not `.w = 0` / `{.x,.y,.z} = v1`.
  */
 Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2)
 {
@@ -8852,17 +8864,17 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
 
   if (Wm3::Vector3f::Normalize(&add) <= 0.0f) {
     Wm3::Vector3f::Normalize(&v1);
-    dest->w = 0.0f;
-    dest->x = v1.x;
-    dest->y = v1.y;
-    dest->z = v1.z;
+    dest->x = 0.0f;
+    dest->y = v1.x;
+    dest->z = v1.y;
+    dest->w = v1.z;
     return dest;
   }
 
-  dest->w = (add.x * v1.x) + (add.y * v1.y) + (add.z * v1.z);
-  dest->x = (add.z * v1.y) - (v1.z * add.y);
-  dest->y = (v1.z * add.x) - (add.z * v1.x);
-  dest->z = (add.y * v1.x) - (v1.y * add.x);
+  dest->x = (add.x * v1.x) + (add.y * v1.y) + (add.z * v1.z);
+  dest->y = (add.z * v1.y) - (v1.z * add.y);
+  dest->z = (v1.z * add.x) - (add.z * v1.x);
+  dest->w = (add.y * v1.x) - (v1.y * add.x);
   return dest;
 }
 
