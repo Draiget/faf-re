@@ -18453,6 +18453,407 @@ void* wxScrollHelperReleaseOwnedLane20AndMarkRuntime(
   return scrollHelperRuntime;
 }
 
+namespace
+{
+  // Shared field layout for the wxScrollHelper lanes `AdjustScrollbars` and
+  // `CalcScrollInc` below both read/write. Matches the layout already
+  // established by `wxScrollHelperApplyRuntimeScrollPositions`/
+  // `wxScrollHelperHandleScrollWindowEventRuntime` above (`m_win` +0x08,
+  // `m_targetWindow` +0x0C, `m_rectToScroll` +0x10, `m_timerAutoScroll`
+  // +0x20, per-axis pixels-per-line +0x24/+0x28, scroll position
+  // +0x2C/+0x30, scroll-line count +0x34/+0x38), plus two lanes those
+  // functions didn't need: lines-per-page +0x3C/+0x40
+  // (`wxScrollHelper::GetScrollPageSize`/`SetScrollPageSize`, i.e.
+  // `FUN_009F1080`/`FUN_009F10A0` -- both already recovered generically as
+  // `SelectDualCachedValue`/`SetDualCachedValue` in
+  // `LegacyContainerFillLanesB.cpp`, but that translation unit's anonymous
+  // namespace gives them internal linkage, so they cannot be named from
+  // here; each of their two-line bodies is reproduced inline at its call
+  // site below instead of faking a cross-TU call), and the per-axis
+  // scrolling-enabled flags +0x44/+0x45.
+  struct WxScrollHelperAxisStateRuntimeView
+  {
+    std::uint8_t reserved00_07[0x08]{};
+    void* window = nullptr;               // +0x08 m_win
+    void* targetWindow = nullptr;         // +0x0C m_targetWindow
+    std::int32_t rectX = 0;               // +0x10 m_rectToScroll.x
+    std::int32_t rectY = 0;               // +0x14 m_rectToScroll.y
+    std::int32_t rectWidth = 0;           // +0x18 m_rectToScroll.width
+    std::int32_t rectHeight = 0;          // +0x1C m_rectToScroll.height
+    std::uint8_t reserved20_23[0x04]{};   // +0x20 m_timerAutoScroll
+    std::int32_t xPixelsPerUnit = 0;      // +0x24
+    std::int32_t yPixelsPerUnit = 0;      // +0x28
+    std::int32_t xScrollPosition = 0;     // +0x2C
+    std::int32_t yScrollPosition = 0;     // +0x30
+    std::int32_t xScrollLines = 0;        // +0x34
+    std::int32_t yScrollLines = 0;        // +0x38
+    std::int32_t xScrollLinesPerPage = 0; // +0x3C
+    std::int32_t yScrollLinesPerPage = 0; // +0x40
+    std::uint8_t xScrollingEnabled = 0;   // +0x44
+    std::uint8_t yScrollingEnabled = 0;   // +0x45
+  };
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, window) == 0x08, "WxScrollHelperAxisStateRuntimeView::window offset must be 0x08");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, targetWindow) == 0x0C, "WxScrollHelperAxisStateRuntimeView::targetWindow offset must be 0x0C");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, rectX) == 0x10, "WxScrollHelperAxisStateRuntimeView::rectX offset must be 0x10");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, rectWidth) == 0x18, "WxScrollHelperAxisStateRuntimeView::rectWidth offset must be 0x18");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, xPixelsPerUnit) == 0x24, "WxScrollHelperAxisStateRuntimeView::xPixelsPerUnit offset must be 0x24");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, yPixelsPerUnit) == 0x28, "WxScrollHelperAxisStateRuntimeView::yPixelsPerUnit offset must be 0x28");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, xScrollPosition) == 0x2C, "WxScrollHelperAxisStateRuntimeView::xScrollPosition offset must be 0x2C");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, yScrollPosition) == 0x30, "WxScrollHelperAxisStateRuntimeView::yScrollPosition offset must be 0x30");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, xScrollLines) == 0x34, "WxScrollHelperAxisStateRuntimeView::xScrollLines offset must be 0x34");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, yScrollLines) == 0x38, "WxScrollHelperAxisStateRuntimeView::yScrollLines offset must be 0x38");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, xScrollLinesPerPage) == 0x3C, "WxScrollHelperAxisStateRuntimeView::xScrollLinesPerPage offset must be 0x3C");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, yScrollLinesPerPage) == 0x40, "WxScrollHelperAxisStateRuntimeView::yScrollLinesPerPage offset must be 0x40");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, xScrollingEnabled) == 0x44, "WxScrollHelperAxisStateRuntimeView::xScrollingEnabled offset must be 0x44");
+  static_assert(offsetof(WxScrollHelperAxisStateRuntimeView, yScrollingEnabled) == 0x45, "WxScrollHelperAxisStateRuntimeView::yScrollingEnabled offset must be 0x45");
+  static_assert(sizeof(WxScrollHelperAxisStateRuntimeView) == 0x48, "WxScrollHelperAxisStateRuntimeView size must be 0x48");
+
+  // `m_rectToScroll.width != 0 ? &m_rectToScroll : NULL` -- the same
+  // `GetRect()` pattern `wxScrollHelperApplyRuntimeScrollPositions` and
+  // `wxScrollHelperHandleScrollWindowEventRuntime` above each open-code
+  // once; `AdjustScrollbars` alone repeats it four times, so it earns a
+  // helper here.
+  const void* GetScrollHelperRectPointerOrNull(const WxScrollHelperAxisStateRuntimeView* const runtime) noexcept
+  {
+    return runtime->rectWidth != 0 ? &runtime->rectX : nullptr;
+  }
+}
+
+/**
+ * Address: 0x009F1C10 (FUN_009F1C10, wxScrollHelper::AdjustScrollbars)
+ *
+ * IDA signature:
+ * void __thiscall wxScrollHelper::AdjustScrollbars(wxScrollHelper *this);
+ *
+ * What it does:
+ * Recomputes both scrollbars from the target window's current size. For
+ * each axis with a non-zero pixels-per-line rate, re-derives the scroll
+ * range from the target's virtual extent (queried through the target
+ * window's own +0x74 vtable slot, which yields both dimensions through one
+ * out pointer -- confirmed against the disassembly at 0x009F1CBF-0x009F1CCA
+ * and 0x009F1DB6-0x009F1DC4: each call site passes `&pair[0]` but the
+ * vertical one reads back `pair[1]`, proving the callee writes both words
+ * from a single pointer rather than returning one scalar), clamps the
+ * current scroll position into range, and pushes the updated range to the
+ * native scrollbar via `wxWindow::SetScrollbar` (the target's own +0x124
+ * slot). Loops until the target size settles -- showing or hiding a
+ * scrollbar can change the client area the next `GetTargetSize` call sees --
+ * then scrolls or refreshes the target window by the net delta accumulated
+ * across the whole recalculation. Re-entrant calls (this function's own
+ * `SetScrollbar`/`ScrollWindow` calls can trigger a resize that re-enters
+ * it) return immediately via the binary's flat re-entrancy byte at
+ * 0x00FB6790.
+ */
+void wxScrollHelperAdjustScrollbarsRuntime(
+  void* const scrollHelperRuntime
+)
+{
+  // Binary-observed re-entrancy latch (0x00FB6790): every exit path in the
+  // disassembly clears it unconditionally, including the early "already
+  // running" return, which leaves it untouched because that path returns
+  // before ever setting it. A scope-exit reset reproduces exactly that
+  // without duplicating the clear at each of the function's several return
+  // points.
+  static bool sAdjustScrollbarsRunning = false;
+  if (sAdjustScrollbarsRunning) {
+    return;
+  }
+  sAdjustScrollbarsRunning = true;
+  struct ReentrancyLatch
+  {
+    ~ReentrancyLatch() noexcept { sAdjustScrollbarsRunning = false; }
+  } const releaseLatchOnExit;
+
+  using WindowSetScrollbarFn =
+    void(__thiscall*)(void*, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t);
+  using TargetVirtualExtentFn = void(__thiscall*)(void*, std::int32_t*);
+  using TargetScrollWindowFn = std::int32_t(__thiscall*)(void*, std::int32_t, std::int32_t, const void*);
+  using TargetRefreshFn = std::int32_t(__thiscall*)(void*, std::int32_t, const void*);
+
+  auto* const runtime = static_cast<WxScrollHelperAxisStateRuntimeView*>(scrollHelperRuntime);
+  const std::int32_t startXPosition = runtime->xScrollPosition;
+  const std::int32_t startYPosition = runtime->yScrollPosition;
+
+  std::int32_t targetSizeX[2]{};
+  std::int32_t targetSizeY[2]{};
+  for (;;) {
+    // ----- horizontal -----
+    (void)wxResolveCachedSizePairOrQueryFallbackRuntime(scrollHelperRuntime, targetSizeX);
+
+    if (runtime->xPixelsPerUnit == 0) {
+      runtime->xScrollLines = 0;
+      runtime->xScrollPosition = 0;
+      auto** const windowVtable = *reinterpret_cast<void***>(runtime->window);
+      reinterpret_cast<WindowSetScrollbarFn>(windowVtable[73])(runtime->window, 4, 0, 0, 0, 0);
+    } else {
+      std::int32_t virtualExtent[2]{};
+      auto** const targetVtableX = *reinterpret_cast<void***>(runtime->targetWindow);
+      reinterpret_cast<TargetVirtualExtentFn>(targetVtableX[29])(runtime->targetWindow, virtualExtent);
+
+      const std::int32_t xPixelsPerUnit = runtime->xPixelsPerUnit;
+      runtime->xScrollLines = virtualExtent[0] / xPixelsPerUnit;
+
+      std::int32_t pageUnitsX = static_cast<std::int32_t>(
+        static_cast<double>(targetSizeX[0]) / static_cast<double>(xPixelsPerUnit) + 0.5
+      );
+      if (pageUnitsX < 1) {
+        pageUnitsX = 1;
+      }
+      if (pageUnitsX > runtime->xScrollLines) {
+        pageUnitsX = runtime->xScrollLines;
+      }
+
+      std::int32_t newXPosition = runtime->xScrollLines - pageUnitsX;
+      if (newXPosition >= runtime->xScrollPosition) {
+        newXPosition = runtime->xScrollPosition;
+      }
+      if (newXPosition < 0) {
+        newXPosition = 0;
+      }
+      runtime->xScrollPosition = newXPosition;
+
+      auto** const windowVtableX = *reinterpret_cast<void***>(runtime->window);
+      reinterpret_cast<WindowSetScrollbarFn>(windowVtableX[73])(
+        runtime->window, 4, newXPosition, pageUnitsX, runtime->xScrollLines, 1
+      );
+
+      // wxScrollHelper::SetScrollPageSize(wxHORIZONTAL, pageUnitsX) at
+      // 0x009F10A0 -- see the axis-state view comment above for why this is
+      // a plain field write instead of a call.
+      runtime->xScrollLinesPerPage = pageUnitsX;
+    }
+
+    // ----- vertical -----
+    (void)wxResolveCachedSizePairOrQueryFallbackRuntime(scrollHelperRuntime, targetSizeY);
+
+    if (runtime->yPixelsPerUnit == 0) {
+      runtime->yScrollLines = 0;
+      runtime->yScrollPosition = 0;
+      auto** const windowVtableY0 = *reinterpret_cast<void***>(runtime->window);
+      reinterpret_cast<WindowSetScrollbarFn>(windowVtableY0[73])(runtime->window, 8, 0, 0, 0, 0);
+    } else {
+      std::int32_t virtualExtent[2]{};
+      auto** const targetVtableY = *reinterpret_cast<void***>(runtime->targetWindow);
+      reinterpret_cast<TargetVirtualExtentFn>(targetVtableY[29])(runtime->targetWindow, virtualExtent);
+
+      const std::int32_t yPixelsPerUnit = runtime->yPixelsPerUnit;
+      runtime->yScrollLines = virtualExtent[1] / yPixelsPerUnit;
+
+      std::int32_t pageUnitsY = static_cast<std::int32_t>(
+        static_cast<double>(targetSizeY[1]) / static_cast<double>(yPixelsPerUnit) + 0.5
+      );
+      if (pageUnitsY < 1) {
+        pageUnitsY = 1;
+      }
+      if (pageUnitsY > runtime->yScrollLines) {
+        pageUnitsY = runtime->yScrollLines;
+      }
+
+      std::int32_t newYPosition = runtime->yScrollLines - pageUnitsY;
+      if (newYPosition >= runtime->yScrollPosition) {
+        newYPosition = runtime->yScrollPosition;
+      }
+      if (newYPosition < 0) {
+        newYPosition = 0;
+      }
+      runtime->yScrollPosition = newYPosition;
+
+      auto** const windowVtableY = *reinterpret_cast<void***>(runtime->window);
+      reinterpret_cast<WindowSetScrollbarFn>(windowVtableY[73])(
+        runtime->window, 8, newYPosition, pageUnitsY, runtime->yScrollLines, 1
+      );
+
+      runtime->yScrollLinesPerPage = pageUnitsY;
+    }
+
+    // ----- stability check: loop again if the target size just changed -----
+    std::int32_t targetSizeCheck[2]{};
+    (void)wxResolveCachedSizePairOrQueryFallbackRuntime(scrollHelperRuntime, targetSizeCheck);
+    if (targetSizeCheck[0] == targetSizeX[0] && targetSizeCheck[1] == targetSizeY[1]) {
+      break;
+    }
+  }
+
+  // ----- apply the net horizontal delta accumulated across the loop -----
+  const std::int32_t finalXPosition = runtime->xScrollPosition;
+  if (startXPosition != finalXPosition) {
+    const void* const scrollRect = GetScrollHelperRectPointerOrNull(runtime);
+    auto** const targetVtable = *reinterpret_cast<void***>(runtime->targetWindow);
+    if (runtime->xScrollingEnabled != 0u) {
+      reinterpret_cast<TargetScrollWindowFn>(targetVtable[78])(
+        runtime->targetWindow, runtime->xPixelsPerUnit * (startXPosition - finalXPosition), 0, scrollRect
+      );
+    } else {
+      reinterpret_cast<TargetRefreshFn>(targetVtable[60])(runtime->targetWindow, 1, scrollRect);
+    }
+  }
+
+  // ----- apply the net vertical delta accumulated across the loop -----
+  const std::int32_t finalYPosition = runtime->yScrollPosition;
+  if (startYPosition == finalYPosition) {
+    return;
+  }
+  const void* const scrollRect = GetScrollHelperRectPointerOrNull(runtime);
+  auto** const targetVtable = *reinterpret_cast<void***>(runtime->targetWindow);
+  if (runtime->yScrollingEnabled == 0u) {
+    reinterpret_cast<TargetRefreshFn>(targetVtable[60])(runtime->targetWindow, 1, scrollRect);
+    return;
+  }
+  reinterpret_cast<TargetScrollWindowFn>(targetVtable[78])(
+    runtime->targetWindow, 0, runtime->yPixelsPerUnit * (startYPosition - finalYPosition), scrollRect
+  );
+}
+
+/**
+ * Address: 0x009F1A40 (FUN_009F1A40, wxScrollHelper::CalcScrollInc)
+ *
+ * IDA signature:
+ * int __thiscall wxScrollHelper::CalcScrollInc(
+ *     wxScrollHelper *this, wxScrollWinEvent *event);
+ *
+ * What it does:
+ * Turns one native scroll-window event into a signed scroll-unit delta for
+ * the event's axis (`wxHORIZONTAL` when `mExtraLong == 4`, else vertical):
+ * TOP/BOTTOM jump to an extreme, LINEUP/LINEDOWN step by one unit,
+ * PAGEUP/PAGEDOWN step by the cached page size
+ * (`wxScrollHelper::GetScrollPageSize`, `FUN_009F1080` -- see the
+ * axis-state view above for why its body is inlined rather than called),
+ * and THUMBTRACK/THUMBRELEASE jump to the event's absolute position
+ * (`mCommandInt`). Every comparison is against this build's
+ * runtime-assigned `wxEVT_SCROLLWIN_*` event type (`EnsureWxEvt
+ * ScrollWin*RuntimeType()`), not a compile-time literal -- the same
+ * `wxNewEventType()` scheme `wxWindowMswRuntime::MSWOnScroll` uses to raise
+ * these events. When the axis is actually scrollable (pixels-per-line > 0),
+ * clamps that delta so the resulting position cannot leave
+ * `[0, maxPosition]`, where `maxPosition` comes from the target's virtual
+ * extent (`GetTargetSize`, `FUN_009F0A60`, already recovered as
+ * `wxResolveCachedSizePairOrQueryFallbackRuntime`). When the axis is not
+ * scrollable, refreshes the target window instead and returns the
+ * unclamped delta.
+ */
+std::int32_t wxScrollHelperCalcScrollIncRuntime(
+  void* const scrollHelperRuntime,
+  const WxScrollWinEventFactoryRuntime& event
+)
+{
+  using TargetRefreshFn = std::int32_t(__thiscall*)(void*, std::int32_t, const void*);
+
+  // wxHORIZONTAL, the value `wxWindowMswRuntime::MSWOnScroll` also compares
+  // orientation against.
+  constexpr std::int32_t kScrollOrientationHorizontal = 4;
+
+  auto* const runtime = static_cast<WxScrollHelperAxisStateRuntimeView*>(scrollHelperRuntime);
+  const std::int32_t position = event.mCommandInt;
+  const bool isHorizontal = (event.mExtraLong == kScrollOrientationHorizontal);
+  const std::int32_t eventType = event.mEventType;
+
+  std::int32_t scrollInc = 0;
+  if (eventType == EnsureWxEvtScrollWinTopRuntimeType()) {
+    scrollInc = isHorizontal ? -runtime->xScrollPosition : -runtime->yScrollPosition;
+  } else if (eventType == EnsureWxEvtScrollWinBottomRuntimeType()) {
+    scrollInc = isHorizontal
+      ? (runtime->xScrollLines - runtime->xScrollPosition)
+      : (runtime->yScrollLines - runtime->yScrollPosition);
+  } else if (eventType == EnsureWxEvtScrollWinLineUpRuntimeType()) {
+    scrollInc = -1;
+  } else if (eventType == EnsureWxEvtScrollWinLineDownRuntimeType()) {
+    scrollInc = 1;
+  } else if (eventType == EnsureWxEvtScrollWinPageUpRuntimeType()) {
+    // wxScrollHelper::GetScrollPageSize(orient) at 0x009F1080 -- a plain
+    // field read; see the axis-state view comment above for why it's
+    // inlined rather than called.
+    scrollInc = isHorizontal ? -runtime->xScrollLinesPerPage : -runtime->yScrollLinesPerPage;
+  } else if (eventType == EnsureWxEvtScrollWinPageDownRuntimeType()) {
+    scrollInc = isHorizontal ? runtime->xScrollLinesPerPage : runtime->yScrollLinesPerPage;
+  } else if (
+    eventType == EnsureWxEvtScrollWinThumbTrackRuntimeType()
+    || eventType == EnsureWxEvtScrollWinThumbReleaseRuntimeType()
+  ) {
+    scrollInc = isHorizontal ? (position - runtime->xScrollPosition) : (position - runtime->yScrollPosition);
+  }
+
+  const std::int32_t pixelsPerUnit = isHorizontal ? runtime->xPixelsPerUnit : runtime->yPixelsPerUnit;
+  if (pixelsPerUnit <= 0) {
+    const void* const scrollRect = GetScrollHelperRectPointerOrNull(runtime);
+    auto** const targetVtable = *reinterpret_cast<void***>(runtime->targetWindow);
+    reinterpret_cast<TargetRefreshFn>(targetVtable[60])(runtime->targetWindow, 1, scrollRect);
+    return scrollInc;
+  }
+
+  std::int32_t targetSize[2]{};
+  (void)wxResolveCachedSizePairOrQueryFallbackRuntime(scrollHelperRuntime, targetSize);
+
+  const std::int32_t scrollLines = isHorizontal ? runtime->xScrollLines : runtime->yScrollLines;
+  const std::int32_t targetExtent = isHorizontal ? targetSize[0] : targetSize[1];
+
+  std::int32_t maxPosition = static_cast<std::int32_t>(
+    static_cast<double>(scrollLines * pixelsPerUnit - targetExtent) / static_cast<double>(pixelsPerUnit) + 0.5
+  );
+  if (maxPosition < 0) {
+    maxPosition = 0;
+  }
+
+  const std::int32_t currentPosition = isHorizontal ? runtime->xScrollPosition : runtime->yScrollPosition;
+  const std::int32_t newPosition = currentPosition + scrollInc;
+  if (newPosition < 0) {
+    return -currentPosition;
+  }
+  if (newPosition > maxPosition) {
+    return maxPosition - currentPosition;
+  }
+  return scrollInc;
+}
+
+namespace
+{
+  // Minimal proof-of-construction interface for `wxScrollHelper::
+  // AdjustScrollbars`/`CalcScrollInc`, following the same pattern as
+  // `WxScrollHelperScrollDispatchRuntime` above for `Scroll` (real binary
+  // evidence: the same four vtable slots -- `wxGenericScrolledWindow`,
+  // `wxScrolledWindow`, `wxTreeListMainWindow`, and `wxScrollHelper`'s own
+  // sub-object vtable, this time at `+0x20`/`+0x24` -- resolve to these two
+  // functions). A separate interface rather than extending
+  // `WxScrollHelperScrollDispatchRuntime` because that shim sits above both
+  // functions in this file and above `wxResolveCachedSizePairOrQueryFallback
+  // Runtime`/the axis-state view they need; a second proof interface here
+  // avoids a forward declaration for no benefit -- neither shim's slot
+  // layout has to match the real `wxScrollHelper` vtable depth (see the
+  // comment on `WxScrollHelperScrollDispatchRuntime` for why).
+  //
+  // Unlike `Scroll`'s target, neither `wxScrollHelperAdjustScrollbarsRuntime`
+  // nor `wxScrollHelperCalcScrollIncRuntime` null-checks its `this` pointer
+  // -- the binary doesn't either (confirmed against the disassembly: the
+  // first instruction after `AdjustScrollbars`'s re-entrancy check
+  // dereferences `this` directly), so adding a defensive check here would be
+  // a fidelity deviation, not a safety improvement. Both overrides below are
+  // consequently unsafe to call and are never called: like every stub slot
+  // in `wxDCBase` above, they exist purely so the compiler emits a real,
+  // address-taken vtable entry for the recovered function.
+  class WxScrollHelperLayoutDispatchRuntime
+  {
+  public:
+    virtual ~WxScrollHelperLayoutDispatchRuntime() = default;
+    virtual void AdjustScrollbars() = 0;
+    virtual std::int32_t CalcScrollInc(const WxScrollWinEventFactoryRuntime& event) = 0;
+  };
+
+  class WxScrollHelperLayoutRuntime final : public WxScrollHelperLayoutDispatchRuntime
+  {
+  public:
+    void AdjustScrollbars() override
+    {
+      wxScrollHelperAdjustScrollbarsRuntime(nullptr);
+    }
+
+    std::int32_t CalcScrollInc(const WxScrollWinEventFactoryRuntime& event) override
+    {
+      return wxScrollHelperCalcScrollIncRuntime(nullptr, event);
+    }
+  };
+
+  const WxScrollHelperLayoutRuntime gWxScrollHelperLayoutRuntime{};
+}
+
 /**
  * Address: 0x009690F0 (FUN_009690F0, wxWindow::HandleActivate)
  *
