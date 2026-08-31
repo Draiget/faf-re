@@ -3317,6 +3317,19 @@ namespace moho
    * Mangled: ?ComputeAirControl@CUnitMotion@Moho@@AAEXABUSPhysBody@2@ABV?$Vector3@M@Wm3@@111PAUSControlOutput@2@AAVCAiTarget@2@@Z
    *
    * What it does: see header.
+   *
+   * Ground truth (`FUN_006BE6B0.c`) re-derived term-by-term for the
+   * relative-orientation block: `desiredOrientation * body.mOrientation.
+   * Conjugate()` used upstream WildMagic's `operator*`/`Conjugate()` (both
+   * `.w`-scalar), not the engine's `.x`-scalar `MultiplyQuatXScalar`/
+   * `ConjugateQuatXScalar` -- same convention mismatch as the rest of this
+   * bug class. The shortest-arc hemisphere check also read the wrong lane:
+   * ground truth tests the value about to be written into the *first*
+   * (`.x`, the real/scalar lane in this engine's convention) output lane,
+   * not `.w`. The `bodyLocalImpulse` rotation had the matching
+   * `Conjugate().Rotate()` bug (upstream `.w`-scalar `ToMat3`), fixed to
+   * `ConjugateQuatXScalar` + `MultQuadVec` to match `SPhysBody::
+   * IntegrateAngularImpulse`'s already-fixed identical pattern.
    */
   void CUnitMotion::ComputeAirControl(
     const SPhysBody& body,
@@ -3380,8 +3393,8 @@ namespace moho
     Wm3::Quaternionf desiredOrientation{};
     MatrixColumnsToQuatCanonical(&axes.vX, &desiredOrientation);
 
-    Wm3::Quaternionf relativeOrientation = desiredOrientation * body.mOrientation.Conjugate();
-    if (relativeOrientation.w < 0.0f) {
+    Wm3::Quaternionf relativeOrientation = MultiplyQuatXScalar(desiredOrientation, ConjugateQuatXScalar(body.mOrientation));
+    if (relativeOrientation.x < 0.0f) {
       relativeOrientation = relativeOrientation * -1.0f;
     }
 
@@ -3394,7 +3407,9 @@ namespace moho
 
     const Wm3::Vector3f velocityError{-body.mVelocity.x, -body.mVelocity.y, -body.mVelocity.z};
 
-    const Wm3::Vector3f bodyLocalImpulse = body.mOrientation.Conjugate().Rotate(body.mWorldImpulse);
+    const Wm3::Quaternionf bodyConjugateOrientation = ConjugateQuatXScalar(body.mOrientation);
+    Wm3::Vector3f bodyLocalImpulse{};
+    MultQuadVec(&bodyLocalImpulse, &body.mWorldImpulse, &bodyConjugateOrientation);
     const Wm3::Vector3f dampingTerm{
       -(body.mInvInertiaTensor.x * bodyLocalImpulse.x),
       -(body.mInvInertiaTensor.y * bodyLocalImpulse.y),
