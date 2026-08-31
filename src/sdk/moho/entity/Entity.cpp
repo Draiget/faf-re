@@ -1361,7 +1361,13 @@ namespace
     // Entity orientation is packed as (w,x,y,z) in Vector4f::x/y/z/w slots.
     const Wm3::Quatf quaternion{q.x, q.y, q.z, q.w};
     Wm3::Vector3f out{};
-    Wm3::MultiplyQuaternionVector(&out, v, quaternion);
+    // Ground truth (FUN_00679CE0.c) rotates via
+    // Moho::MultQuadVec(&v13, &v12, &this->mVarDat.mCurTransform.orient), not
+    // the generic Wm3::MultiplyQuaternionVector -- same .x-scalar-vs-.w-scalar
+    // mismatch as the other orient_-consuming sites (`quaternion` above is a
+    // byte-exact repack of the entity's own VTransform::orient_, which is
+    // always in VMatrix4::Set's convention).
+    moho::MultQuadVec(&out, &v, &quaternion);
     return out;
   }
 
@@ -1877,6 +1883,17 @@ namespace
    * What it does:
    * Solves owner-world transform from child-bone local transform and already
    * composed parent-bone world transform.
+   *
+   * Ground truth (`FUN_00676850.c`) reads `a1->orient.x` (child) UNNEGATED and
+   * negates `.y/.z/.w` -- the real `.x`-scalar conjugate (matching
+   * `VTransform::Inverse`), not the previous body's "negate x/y/z, keep w"
+   * textbook conjugate. The whole quaternion-product formula was re-derived
+   * term-by-term from ground truth and cross-checked by substituting
+   * `a=conjugate(child), b=parent` into `VTransform::Compose`'s
+   * already-fixed formula -- both methods agree exactly. The position rotate
+   * uses `Moho::MultQuadVec(&v21, &v20, &a2->orient)`, not
+   * `Wm3::MultiplyQuaternionVector`, same convention mismatch as the other
+   * `orient_`-consuming sites.
    */
   [[nodiscard]] moho::VTransform SolveAttachedWorldTransformFromChildLocal(
     const moho::VTransform& childLocalTransform,
@@ -1884,39 +1901,33 @@ namespace
   ) noexcept
   {
     moho::VTransform out{};
-    out.orient_.w = 1.0f;
-    out.orient_.x = 0.0f;
+    out.orient_.x = 1.0f;
     out.orient_.y = 0.0f;
     out.orient_.z = 0.0f;
+    out.orient_.w = 0.0f;
     out.pos_.x = 0.0f;
     out.pos_.y = 0.0f;
     out.pos_.z = 0.0f;
 
-    const float parentW = parentComposedTransform.orient_.w;
     const float parentX = parentComposedTransform.orient_.x;
     const float parentY = parentComposedTransform.orient_.y;
     const float parentZ = parentComposedTransform.orient_.z;
+    const float parentW = parentComposedTransform.orient_.w;
 
-    const float negChildX = -childLocalTransform.orient_.x;
-    const float negChildY = -childLocalTransform.orient_.y;
-    const float negChildZ = -childLocalTransform.orient_.z;
+    const float childX = childLocalTransform.orient_.x;
+    const float childY = childLocalTransform.orient_.y;
+    const float childZ = childLocalTransform.orient_.z;
+    const float childW = childLocalTransform.orient_.w;
 
-    const float outW = (((parentW * childLocalTransform.orient_.w) - (parentX * negChildX)) - (parentY * negChildY)) -
-                       (parentZ * negChildZ);
-    const float outX =
-      (((parentY * negChildZ) + (parentW * negChildX)) + (parentX * childLocalTransform.orient_.w)) -
-      (parentZ * negChildY);
-    const float outY =
-      (((parentZ * negChildX) + (parentW * negChildY)) + (parentY * childLocalTransform.orient_.w)) -
-      (parentX * negChildZ);
-    const float outZ =
-      (((parentX * negChildY) + (parentW * negChildZ)) + (parentZ * childLocalTransform.orient_.w)) -
-      (parentY * negChildX);
+    const float outX = (parentX * childX) + (parentY * childY) + (parentZ * childZ) + (parentW * childW);
+    const float outY = (parentY * childX) - (parentX * childY) + (parentW * childZ) - (parentZ * childW);
+    const float outZ = (parentZ * childX) - (parentW * childY) + (parentY * childW) - (parentX * childZ);
+    const float outW = (parentW * childX) + (parentZ * childY) - (parentY * childZ) - (parentX * childW);
 
-    out.orient_.w = outW;
     out.orient_.x = outX;
     out.orient_.y = outY;
     out.orient_.z = outZ;
+    out.orient_.w = outW;
 
     const Wm3::Vector3f negChildPos{
       -childLocalTransform.pos_.x,
@@ -1925,7 +1936,7 @@ namespace
     };
 
     Wm3::Vector3f rotatedNegChildPos{};
-    Wm3::MultiplyQuaternionVector(&rotatedNegChildPos, negChildPos, out.orient_);
+    moho::MultQuadVec(&rotatedNegChildPos, &negChildPos, &out.orient_);
     out.pos_.x = rotatedNegChildPos.x + parentComposedTransform.pos_.x;
     out.pos_.y = rotatedNegChildPos.y + parentComposedTransform.pos_.y;
     out.pos_.z = rotatedNegChildPos.z + parentComposedTransform.pos_.z;
@@ -7563,8 +7574,17 @@ namespace moho
    * Address: 0x00690160 (FUN_00690160, cfunc_EntityAddLocalImpulseL)
    *
    * What it does:
-   * Converts local impulse+point into world space and applies it to entity
-   * physics body state when present.
+   * Forwards local impulse+point to entity physics body state when present.
+   *
+   * Ground truth (`FUN_00690160.c`) does not inline any local-to-world
+   * conversion here at all -- it parses the 7 Lua args and calls
+   * `Moho::SPhysBody::AddLocalImpulse(mPhysBody, &a2, &a3)` directly, the same
+   * method `Entity::AddLocalImpulse` and `Unit::AddLocalImpulse` already
+   * delegate to. The previous body reimplemented that conversion inline via
+   * `Wm3::MultiplyQuaternionVector` (the `.x`-scalar-vs-`.w`-scalar mismatch
+   * shared with every other `mOrientation`/`orient_`-consuming site) and, on
+   * top of that, never applied `mCollisionOffset` at all -- a second,
+   * independent divergence from `SPhysBody::AddLocalImpulse`'s real behavior.
    */
   int cfunc_EntityAddLocalImpulseL(LuaPlus::LuaState* const state)
   {
@@ -7589,15 +7609,7 @@ namespace moho
         ReadLuaNumberArgument(state, 7),
       };
 
-      Wm3::Vector3f worldPoint{};
-      Wm3::MultiplyQuaternionVector(&worldPoint, localPoint, body->mOrientation);
-      worldPoint.x += body->mPos.x;
-      worldPoint.y += body->mPos.y;
-      worldPoint.z += body->mPos.z;
-
-      Wm3::Vector3f worldImpulse{};
-      Wm3::MultiplyQuaternionVector(&worldImpulse, localImpulse, body->mOrientation);
-      ApplyWorldImpulseToBody(*body, worldImpulse, worldPoint);
+      body->AddLocalImpulse(localImpulse, localPoint);
     }
 
     return 0;
