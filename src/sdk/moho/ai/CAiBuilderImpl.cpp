@@ -20,6 +20,7 @@
 #include "moho/containers/BVSet.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
@@ -917,6 +918,11 @@ void CAiBuilderImpl::BuilderSetIsFactory(const bool isFactory)
 
 /**
  * Address: 0x0059EEF0 (FUN_0059EEF0)
+ *
+ * Ground truth (`FUN_0059EEF0.c`, `Moho::CAiBuilderImpl::IssueRallyPoint`)
+ * re-derived term-by-term: the rotation matches the engine `.x`-scalar
+ * `Moho::QuatToMatrix` formula exactly, not the generic `Quaternion::Rotate`
+ * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
  */
 void CAiBuilderImpl::BuilderSetUpInitialRally()
 {
@@ -931,7 +937,9 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
 
   const VTransform& transform = mOwnerUnit->GetTransform();
   const Wm3::Vector3f localRally{blueprint->Economy.InitialRallyX, 0.0f, blueprint->Economy.InitialRallyZ};
-  const Wm3::Vector3f rallyWorldPos = transform.pos_ + transform.orient_.Rotate(localRally);
+  Wm3::Vector3f rotatedRally{};
+  MultQuadVec(&rotatedRally, &localRally, &transform.orient_);
+  const Wm3::Vector3f rallyWorldPos = transform.pos_ + rotatedRally;
 
   BVSet<EntId, EntIdUniverse> factorySet{};
   (void)factorySet.mBits.Add(static_cast<unsigned int>(mOwnerUnit->id_));
