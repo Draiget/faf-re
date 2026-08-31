@@ -606,7 +606,14 @@ namespace moho
     [[nodiscard]] bool Equals(const MeshKey& rhs) const noexcept;
 
     /**
-     * Address: 0x007E5B20 (FUN_007E5B20)
+     * No standalone binary address: this trivial two-field comparison is
+     * compiler-inlined at every call site. `0x007E5B20` (FUN_007E5B20) was
+     * previously cited here in error -- that address is actually an RB-tree
+     * lower-bound/insertion-point traversal (distinct from the already-typed
+     * `MeshCacheTreeLowerBound` at 0x007E6050) that happens to inline this
+     * same two-field comparison internally; see
+     * `decomp/recovery/reports/by-source/src/sdk/moho/mesh/Mesh.cpp.reconstruction.md`
+     * for the traced evidence.
      *
      * What it does:
      * Orders keys lexicographically by (blueprint pointer, material object pointer).
