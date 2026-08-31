@@ -154,26 +154,6 @@ namespace moho
      */
     static const VMatrix4 sIdentity;
 
-    /**
-     * Set from unit quaternion (x,y,z,w) and translation (tx,ty,tz).
-     */
-    static VMatrix4 FromQuatPos(const Vector4f& qXyzw, float tx, float ty, float tz)
-    {
-      VMatrix4 out{};
-      const float x = qXyzw.x, y = qXyzw.y, z = qXyzw.z, w = qXyzw.w;
-
-      const float xx = x + x, yy = y + y, zz = z + z;
-      const float xx2 = x * xx, yy2 = y * yy, zz2 = z * zz;
-      const float xy = x * yy, xz = x * zz, yz = y * zz;
-      const float wx = w * xx, wy = w * yy, wz = w * zz;
-
-      out.r[0] = {1.0f - (yy2 + zz2), xy - wz, xz + wy, 0.0f};
-      out.r[1] = {xy + wz, 1.0f - (xx2 + zz2), yz - wx, 0.0f};
-      out.r[2] = {xz - wy, yz + wx, 1.0f - (xx2 + yy2), 0.0f};
-      out.r[3] = {tx, ty, tz, 1.0f};
-      return out;
-    }
-
     /** Set translation (last row). */
     void SetTranslation(float tx, float ty, float tz)
     {

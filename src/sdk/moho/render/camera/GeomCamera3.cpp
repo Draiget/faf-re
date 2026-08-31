@@ -32,16 +32,24 @@ namespace
     moho::Vector4f{0.0f, 0.0f, 1.0f, -1.0f},
   };
 
-  [[nodiscard]] moho::Vector4f QuaternionToXyzw(const Wm3::Quatf& quaternion) noexcept
-  {
-    return {quaternion.x, quaternion.y, quaternion.z, quaternion.w};
-  }
-
+  /**
+   * Builds a `GeomCamera3` derived matrix (`view`/`inverseView`) from a
+   * `VTransform`. Delegates to the real, address-cited `VMatrix4::Set`
+   * (0x004EE980, `MathReflection.cpp`) rather than a textbook quaternion-to-
+   * matrix formula: `Set`'s binary combines `quat.x` in the role a standard
+   * formula reserves for the scalar term and `(quat.y, quat.z, quat.w)` as
+   * the three imaginary lanes, under transposed cross-term signs. A
+   * previous pass here called an uncited, textbook-formula stand-in instead
+   * (`FromQuatPos`), whose row 2 is provably pitch-invariant in y for every
+   * heading/pitch pair - the mechanical cause of `CTesselator::Rebuild`'s
+   * root-tile frustum test rejecting the entire terrain every frame, since
+   * the camera's view/viewProjection matrices never tilted with pitch.
+   */
   [[nodiscard]] moho::VMatrix4 BuildMatrixFromTransform(const moho::VTransform& transform) noexcept
   {
-    return moho::VMatrix4::FromQuatPos(
-      QuaternionToXyzw(transform.orient_), transform.pos_.x, transform.pos_.y, transform.pos_.z
-    );
+    moho::VMatrix4 matrix{};
+    matrix.Set(transform.orient_, transform.pos_);
+    return matrix;
   }
 
   [[nodiscard]] bool InvertMatrixGeneral(const moho::VMatrix4& matrix, moho::VMatrix4* const outInverse) noexcept
