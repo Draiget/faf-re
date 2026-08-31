@@ -275,6 +275,12 @@ namespace moho
    * What it does:
    * Writes one `VTransform` view from body state by copying orientation and
    * backing out world position from rotated collision-offset.
+   *
+   * Ground truth (`FUN_00697750.c`) rotates via
+   * `Moho::MultQuadVec(&v7, &a2->mCollisionOffset, &a2->mOrientation)`, not
+   * the generic `Wm3::MultiplyQuaternionVector`. `mOrientation` is always in
+   * this engine's `.x`-scalar convention (it is copied byte-for-byte to/from
+   * `VTransform::orient_` both here and in `SetTransform`, below).
    */
   VTransform* BuildTransformFromSPhysBody(VTransform* const outTransform, const SPhysBody* const body)
   {
@@ -283,7 +289,7 @@ namespace moho
     }
 
     Wm3::Vec3f rotatedOffset{};
-    Wm3::MultiplyQuaternionVector(&rotatedOffset, body->mCollisionOffset, body->mOrientation);
+    MultQuadVec(&rotatedOffset, &body->mCollisionOffset, &body->mOrientation);
 
     outTransform->orient_ = body->mOrientation;
     outTransform->pos_.x = body->mPos.x - rotatedOffset.x;
@@ -482,13 +488,18 @@ namespace moho
    * Copies incoming orientation, rotates the local collision offset into world
    * orientation space, then stores world position as offset plus transform
    * translation lanes.
+   *
+   * Ground truth (`FUN_006976E0.c`) rotates via
+   * `Moho::MultQuadVec(&v5, &a2->mCollisionOffset, &a1->orient)`, not the
+   * generic `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+   * mismatch as `BuildTransformFromSPhysBody`, above.
    */
   void SPhysBody::SetTransform(const VTransform& transform)
   {
     mOrientation = transform.orient_;
 
     Wm3::Vec3f rotatedOffset{};
-    Wm3::MultiplyQuaternionVector(&rotatedOffset, mCollisionOffset, transform.orient_);
+    MultQuadVec(&rotatedOffset, &mCollisionOffset, &transform.orient_);
 
     mPos.x = rotatedOffset.x + transform.pos_.x;
     mPos.y = rotatedOffset.y + transform.pos_.y;
@@ -558,7 +569,7 @@ namespace moho
    * updating linear velocity (inverse-mass scale, `FLT_MAX` for zero mass) and
    * accumulating angular world impulse via `cross(lever, impulse)`.
    */
-  [[maybe_unused]] SPhysBody* ApplyWorldImpulseAtWorldPoint(
+  SPhysBody* ApplyWorldImpulseAtWorldPoint(
     SPhysBody* const body,
     const Wm3::Vec3f& worldImpulse,
     const Wm3::Vec3f& worldPoint
@@ -588,24 +599,32 @@ namespace moho
    * What it does:
    * Applies one local-space impulse at one local-space point to this body's
    * linear velocity and accumulated world angular impulse.
+   *
+   * Ground truth (`FUN_00697D10.c`) builds the body's world transform via
+   * `sub_697750(&v30, a1)` (`BuildTransformFromSPhysBody`, above) and rotates
+   * both the point and the impulse via two `Moho::MultQuadVec` calls against
+   * that transform's `orient` -- not `Quaternion::Rotate` (upstream WildMagic,
+   * same `.w`-scalar `ToMat3()` formula as `Wm3::MultiplyQuaternionVector`).
+   * `mOrientation` is always in this engine's `.x`-scalar convention (see
+   * `BuildTransformFromSPhysBody`/`SetTransform`, above), so the previous
+   * `.Rotate()`-based body also silently dropped the collision-offset term
+   * that `BuildTransformFromSPhysBody` folds into its transform's position.
    */
   void SPhysBody::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
   {
-    const Wm3::Vec3f rotatedCollisionOffset = mOrientation.Rotate(mCollisionOffset);
-    const Wm3::Vec3f transformOrigin{
-      mPos.x - rotatedCollisionOffset.x,
-      mPos.y - rotatedCollisionOffset.y,
-      mPos.z - rotatedCollisionOffset.z
-    };
+    VTransform transform{};
+    BuildTransformFromSPhysBody(&transform, this);
 
-    const Wm3::Vec3f rotatedPoint = mOrientation.Rotate(localPoint);
+    Wm3::Vec3f rotatedPoint{};
+    MultQuadVec(&rotatedPoint, &localPoint, &transform.orient_);
     const Wm3::Vec3f worldPoint{
-      rotatedPoint.x + transformOrigin.x,
-      rotatedPoint.y + transformOrigin.y,
-      rotatedPoint.z + transformOrigin.z
+      rotatedPoint.x + transform.pos_.x,
+      rotatedPoint.y + transform.pos_.y,
+      rotatedPoint.z + transform.pos_.z
     };
 
-    const Wm3::Vec3f worldImpulse = mOrientation.Rotate(localImpulse);
+    Wm3::Vec3f worldImpulse{};
+    MultQuadVec(&worldImpulse, &localImpulse, &transform.orient_);
     (void)ApplyWorldImpulseAtWorldPoint(this, worldImpulse, worldPoint);
   }
 
