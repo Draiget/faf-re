@@ -34,6 +34,11 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
+
 bool moho::dbg_Ballistics = false;
 gpg::RType* moho::CAimManipulator::sType = nullptr;
 moho::CScrLuaMetatableFactory<moho::CAimManipulator>
@@ -1383,6 +1388,15 @@ void moho::CAimManipulator::SetFiringArc(const CAimFiringArc arc)
  * What it does:
  * Computes one heading/pitch tracking step against one watched pose bone,
  * clamps slew and arc lanes, and returns tracking-state bit flags.
+ *
+ * Ground truth (`FUN_006309F0.c`) conjugates `orient_` by keeping `.x` fixed
+ * and negating `.y/.z/.w` (this engine's real `.x`-scalar conjugate, same as
+ * `VTransform::Inverse`), not textbook "keep `.w`, negate `.x/.y/.z`", and
+ * rotates via `Moho::MultQuadVec`, not `Wm3::MultiplyQuaternionVector`. The
+ * local pitch-basis quaternion below has the identical convention bug at
+ * construction time: ground truth writes `.x = cos(halfCenter)`,
+ * `.y = sin(halfCenter)`, `.z = 0`, `.w = 0` (scalar in `.x`, matching
+ * `QuatToMatrix`/`MultQuadVec`), not `.w = cos`, `.x = sin`, `.y = 0`, `.z = 0`.
  */
 std::uint8_t moho::CAimManipulator::CheckTracking(
   const Wm3::Vector3f& targetDirection,
@@ -1404,13 +1418,13 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
     const VTransform& compositeTransform = watchBone->GetCompositeTransform();
     Wm3::Quaternionf inverseOrientation{};
-    inverseOrientation.w = compositeTransform.orient_.w;
-    inverseOrientation.x = -compositeTransform.orient_.x;
+    inverseOrientation.x = compositeTransform.orient_.x;
     inverseOrientation.y = -compositeTransform.orient_.y;
     inverseOrientation.z = -compositeTransform.orient_.z;
+    inverseOrientation.w = -compositeTransform.orient_.w;
 
     const Wm3::Vector3f sourceTarget = targetDirection;
-    Wm3::MultiplyQuaternionVector(&transformedTarget, sourceTarget, inverseOrientation);
+    MultQuadVec(&transformedTarget, &sourceTarget, &inverseOrientation);
   }
 
   float desiredAngle = 0.0f;
@@ -1421,13 +1435,13 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   } else {
     const float halfCenter = minAngleCenter * kHalfScale;
     Wm3::Quaternionf pitchBasis{};
-    pitchBasis.w = std::cos(halfCenter);
-    pitchBasis.x = std::sin(halfCenter);
-    pitchBasis.y = 0.0f;
+    pitchBasis.x = std::cos(halfCenter);
+    pitchBasis.y = std::sin(halfCenter);
     pitchBasis.z = 0.0f;
+    pitchBasis.w = 0.0f;
 
     Wm3::Vector3f pitchSpaceTarget{};
-    Wm3::MultiplyQuaternionVector(&pitchSpaceTarget, transformedTarget, pitchBasis);
+    MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
     currentAngleLane = &runtimeView->mPitch;
     desiredAngle = minAngleCenter - ComputePitchRadians(pitchSpaceTarget);
   }
