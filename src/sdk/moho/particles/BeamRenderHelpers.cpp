@@ -29,6 +29,7 @@
 namespace moho
 {
   extern bool ren_Beams;
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 }
 
 namespace
@@ -103,7 +104,15 @@ namespace
   ) noexcept
   {
     Wm3::Vector3<float> out{};
-    Wm3::MultiplyQuaternionVector(&out, vector, orientation);
+    // Ground truth (FUN_00491760.c, EmitInterpolatedBeamQuadVertices) rotates
+    // via Moho::MultQuadVec, not the generic Wm3::MultiplyQuaternionVector --
+    // same .x-scalar-vs-.w-scalar mismatch as the other orient_-consuming
+    // sites. `orientation` here is a Wm3::Quaternion::Nlerp of two orient_
+    // fields; Nlerp treats all four lanes symmetrically (component-wise lerp
+    // + Dot-based hemisphere check + normalize), so it preserves whatever
+    // convention its inputs were in, and orient_ is always in
+    // VMatrix4::Set's convention.
+    moho::MultQuadVec(&out, &vector, &orientation);
     return out;
   }
 
