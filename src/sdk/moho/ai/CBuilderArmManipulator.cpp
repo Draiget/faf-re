@@ -395,6 +395,15 @@ namespace moho
    * What it does:
    * Updates one heading/pitch tracking lane against one watched bone and
    * returns tracking-state bits (`outside-tolerance`, `heading-moving`).
+   *
+   * Same .x-scalar-vs-.w-scalar mismatch as `CAimManipulator::CheckTracking`
+   * (identical structure): ground truth (`FUN_00636220.c`) conjugates
+   * `orient_` keeping `.x` fixed and negating `.y/.z/.w`, and rotates via
+   * `Moho::MultQuadVec`, not `Wm3::MultiplyQuaternionVector`. The local
+   * pitch-basis quaternion's raw stack-offset construction (`FUN_00636220.asm`
+   * -- Hex-Rays falls back to unnamed stack slots here) resolves to
+   * `.x = cos(halfCenter)`, `.y = sin(halfCenter)`, `.z = 0`, `.w = 0` once
+   * traced by physical offset from its `lea`-established base address.
    */
   std::uint8_t CBuilderArmManipulator::UpdateTrackingAxis(
     const Wm3::Vector3f& targetDirection,
@@ -413,11 +422,11 @@ namespace moho
     if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
       const VTransform& compositeTransform = watchBone->GetCompositeTransform();
       Wm3::Quaternionf inverseOrientation{};
-      inverseOrientation.w = compositeTransform.orient_.w;
-      inverseOrientation.x = -compositeTransform.orient_.x;
+      inverseOrientation.x = compositeTransform.orient_.x;
       inverseOrientation.y = -compositeTransform.orient_.y;
       inverseOrientation.z = -compositeTransform.orient_.z;
-      Wm3::MultiplyQuaternionVector(&transformedTarget, targetDirection, inverseOrientation);
+      inverseOrientation.w = -compositeTransform.orient_.w;
+      MultQuadVec(&transformedTarget, &targetDirection, &inverseOrientation);
     }
 
     float desiredAngle = 0.0f;
@@ -428,13 +437,13 @@ namespace moho
     } else {
       const float halfCenter = angleCenter * kHalfScale;
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.w = std::cos(halfCenter);
-      pitchBasis.x = std::sin(halfCenter);
-      pitchBasis.y = 0.0f;
+      pitchBasis.x = std::cos(halfCenter);
+      pitchBasis.y = std::sin(halfCenter);
       pitchBasis.z = 0.0f;
+      pitchBasis.w = 0.0f;
 
       Wm3::Vector3f pitchSpaceTarget{};
-      Wm3::MultiplyQuaternionVector(&pitchSpaceTarget, transformedTarget, pitchBasis);
+      MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
       currentAngleLane = &mPitch;
       desiredAngle = angleCenter - ComputePitchRadians(pitchSpaceTarget);
     }
