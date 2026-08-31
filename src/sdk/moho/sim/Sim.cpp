@@ -5967,10 +5967,19 @@ namespace
     return nullptr;
   }
 
+  // Ground truth (`FUN_00748AA0`, `Sim::CreateUnit`'s inlined call to this
+  // helper; confirmed from the .asm's literal `call Moho__EulerRollToQuat`)
+  // builds the spawn orientation via `Moho::EulerRollToQuat`, which writes
+  // this engine's `.x`-scalar convention directly -- not
+  // `Wm3::Quatf::MakeFromAxisAngle` (a FAF-added WildMagic-style helper that
+  // writes cos(half) into the native `.w` lane), which produced a
+  // `.w`-scalar-tagged-as-`.x` quaternion for every spawned unit's initial
+  // heading. Same pattern as `Unit::PredictAheadBomb`'s earlier fix.
   VTransform BuildUnitSpawnTransform(const SCoordsVec2& pos, const float heading)
   {
     const Wm3::Vec3f headingAxis{0.0f, 1.0f, 0.0f};
-    const Wm3::Quatf orientation = Wm3::Quatf::MakeFromAxisAngle(headingAxis, heading);
+    Wm3::Quatf orientation{};
+    (void)EulerRollToQuat(&headingAxis, &orientation, heading);
     const Wm3::Vec3f worldPosition{pos.x, 0.0f, pos.z};
     return VTransform(worldPosition, orientation);
   }
