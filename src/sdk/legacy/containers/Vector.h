@@ -8866,6 +8866,17 @@ namespace msvc8
          * independently reached from `Sim::AdvanceBeat`) and from the fused
          * buy helper `FUN_0074DBA0` (cited above on the copy constructor
          * and `operator=`).
+         *
+         * Address: 0x007E56B0 (FUN_007E56B0, `msvc8::vector<T>::
+         * allocate_slots_checked` for the 0x28-byte (40-byte) RB-tree node
+         * element used by the mesh-key cache map, `RefCountedCache<
+         * MeshKey, Mesh>` -- Mesh.cpp/Mesh.h) -- `.c`-confirmed: `if
+         * (0xFFFFFFFF / a1 < 0x28) throw std::bad_alloc; return
+         * operator new(40 * a1);`, the same guard/allocate shape
+         * specialized to a 40-byte element. Reached from the node
+         * allocator `sub_7E6090` (see `Mesh.cpp`'s `MeshCacheTreeInsert`-
+         * area doc comments), itself called from the tree
+         * insert-and-rebalance helper `sub_7E5DF0`.
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {
