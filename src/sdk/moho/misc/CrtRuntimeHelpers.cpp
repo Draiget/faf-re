@@ -323,8 +323,14 @@ extern "C" int __cdecl _SFUO_Destroy()
  */
 // Container/runtime helpers invoked from both the CRT prelude and the
 // moho::runtime block; defined at file scope so unqualified calls in either
-// region resolve to this single definition.
-[[noreturn]] void RuntimeThrowContainerTooLong(const char* const message)
+// region resolve to this single definition. The parameter must be spelled
+// `const char*`, not `const char* const` - MSVC's 32-bit decorated name
+// encodes top-level const on a by-value pointer parameter (PBD vs QBD),
+// so the two forms are different link symbols even though they're the same
+// C++ overload. Unit.cpp/CWldSession.cpp/PathTables.cpp's forward
+// declarations all use the plain form; this must match or every one of
+// them is a permanently-unresolved external.
+[[noreturn]] void RuntimeThrowContainerTooLong(const char* message)
 {
   throw std::length_error(message);
 }
@@ -13981,7 +13987,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       return nullptr;
     }
 
-    LPCH const ansiBlock = ::GetEnvironmentStrings();
+    LPCH const ansiBlock = ::GetEnvironmentStringsA();
     if (ansiBlock == nullptr) {
       return nullptr;
     }
