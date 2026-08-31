@@ -8,6 +8,8 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
+#include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/render/CDecalBuffer.h"
 #include "moho/render/CDecalHandle.h"
 #include "moho/render/camera/VTransform.h"
@@ -192,6 +194,15 @@ namespace
    * What it does:
    * Converts transform/size inputs into `SDecalInfo`, computes start tick + yaw,
    * and creates one tracked decal handle via the sim decal buffer.
+   *
+   * Ground truth (`FUN_0066D360.c`) builds `forwardXZ`/`rightXZ` from
+   * `Moho::VAxes3::VAxes3(&v40, &transform.orient)`'s `.vZ`/`.vX` members,
+   * NOT the generic `Quaternion::Rotate((0,0,1))`/`Rotate((1,0,0))` (upstream
+   * WildMagic, `.w`-scalar `ToMat3()`) the previous body here used, and also
+   * not equivalent to `Moho::MultQuadVec` against those axes: `VAxes3`'s
+   * members are a permuted/partially-negated readout of the `.x`-scalar
+   * rotation matrix's rows (`vZ` from row 0, `vX` from row 2), not its
+   * columns (verified numerically; see `SPhysBody::GetImpulse`'s history).
    */
   [[nodiscard]] moho::CDecalHandle* CreateDecalFromTransform(
     const moho::VTransform& transform,
@@ -213,8 +224,9 @@ namespace
 
     const std::uint32_t startTick = ComputeDecalStartTick(sim, duration);
 
-    const Wm3::Vec3f forwardXZ = NormalizeXZ(transform.orient_.Rotate({0.0f, 0.0f, 1.0f}));
-    const Wm3::Vec3f rightXZ = NormalizeXZ(transform.orient_.Rotate({1.0f, 0.0f, 0.0f}));
+    const moho::VAxes3 orientAxes(transform.orient_);
+    const Wm3::Vec3f forwardXZ = NormalizeXZ(orientAxes.vZ);
+    const Wm3::Vec3f rightXZ = NormalizeXZ(orientAxes.vX);
 
     Wm3::Vec3f position{};
     position.x = transform.pos_.x - ((rightXZ.x * size.x) * 0.5f) - ((forwardXZ.x * size.z) * 0.5f);
@@ -2764,7 +2776,12 @@ namespace moho
     const int armyIndex = ARMY_IndexFromLuaState(state, armyObject);
 
     VTransform transform = entity->GetBoneWorldTransform(boneIndex);
-    const Wm3::Vec3f worldOffset = transform.orient_.Rotate(localOffset);
+    // Ground truth (`FUN_0066F220`, .c skipped by the decompiler; confirmed
+    // from the .asm's `call Moho__MultQuadVec`) rotates via Moho::MultQuadVec,
+    // not the generic Quaternion::Rotate (upstream WildMagic, .w-scalar
+    // ToMat3()) this replaces.
+    Wm3::Vec3f worldOffset{};
+    MultQuadVec(&worldOffset, &localOffset, &transform.orient_);
     transform.pos_.x += worldOffset.x;
     transform.pos_.y += worldOffset.y;
     transform.pos_.z += worldOffset.z;
