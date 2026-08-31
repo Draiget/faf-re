@@ -1129,6 +1129,12 @@ namespace moho
    *
    * What it does:
    * Rebuilds per-bone min/max bounds from SCM sample mapping data.
+   *
+   * Ground truth (`FUN_0054A540.c`) rotates via
+   * `Moho::MultQuadVec(&v31, v11, &v12->ori)`, not the generic
+   * `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+   * convention mismatch as the other `orient_`-consuming sites (this bone
+   * transform's quaternion is always in `VMatrix4::Set`'s convention).
    */
   void CAniSkel::UpdateBoneBounds()
   {
@@ -1176,7 +1182,7 @@ namespace moho
       SAniSkelBone& bone = boneStart[boneIndex];
       const Wm3::Vec3f localPosition{sample.mLocalPositionX, sample.mLocalPositionY, sample.mLocalPositionZ};
       Wm3::Vec3f rotatedPosition{};
-      Wm3::MultiplyQuaternionVector(&rotatedPosition, localPosition, bone.mBoneTransform.orient_);
+      MultQuadVec(&rotatedPosition, &localPosition, &bone.mBoneTransform.orient_);
 
       const float mappedX = bone.mBoneTransform.pos_.x + rotatedPosition.x;
       const float mappedY = bone.mBoneTransform.pos_.y + rotatedPosition.y;
