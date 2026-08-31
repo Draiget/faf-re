@@ -500,7 +500,13 @@ namespace moho
       Wm3::Quaternionf rotation{};
       (void)EulerRollToQuat(&yawAxis, &rotation, signedRadians);
       Wm3::Vector3f rotated{};
-      Wm3::MultiplyQuaternionVector(&rotated, normalizedTarget, rotation);
+      // Ground truth for this call site's enclosing function
+      // (0x006C1E20, CalcMoveCommon, FUN_006C1E20.c) rotates via
+      // Moho::MultQuadVec(&v87, &v86, &a2), not Wm3::MultiplyQuaternionVector,
+      // even though `rotation` (EulerRollToQuat's own output) is genuinely
+      // .w-scalar -- the engine's rotate-vector call site doesn't care what
+      // convention produced its quaternion argument.
+      MultQuadVec(&rotated, &normalizedTarget, &rotation);
       return Wm3::Vector3f{
         unitPosition.x + rotated.x,
         unitPosition.y + rotated.y,
@@ -519,13 +525,17 @@ namespace moho
       return begin != nullptr && begin != end && begin->HasValue();
     }
 
+    // Ground truth for this helper's callers (0x006BD7B0 CalcWingedOrientation,
+    // FUN_006BD7B0.c; 0x006C1610 SnapToGround, FUN_006C1610.c) all rotate via
+    // Moho::MultQuadVec, not the generic Wm3::MultiplyQuaternionVector -- same
+    // .x-scalar-vs-.w-scalar mismatch as the other orient_-consuming sites.
     [[nodiscard]] Wm3::Vector3f RotateByQuaternion(
       const Wm3::Vector3f& vector,
       const Wm3::Quaternionf& quaternion
     ) noexcept
     {
       Wm3::Vector3f out{};
-      Wm3::MultiplyQuaternionVector(&out, vector, quaternion);
+      MultQuadVec(&out, &vector, &quaternion);
       return out;
     }
 
@@ -1533,7 +1543,11 @@ namespace moho
         random->FRand(-zRange, zRange) / body->mInvInertiaTensor.z,
       };
 
-      Wm3::MultiplyQuaternionVector(&mVector108, localAngularImpulse, body->mOrientation);
+      // Ground truth (FUN_006B8AC0.c) rotates via
+      // Moho::MultQuadVec(&v42, &v41, &v6->mOrientation), not the generic
+      // Wm3::MultiplyQuaternionVector -- same .x-scalar-vs-.w-scalar mismatch
+      // as the other mOrientation/orient_-consuming sites.
+      MultQuadVec(&mVector108, &localAngularImpulse, &body->mOrientation);
 
       unit->SetCurrentLayer(LAYER_Air);
       SetMotionState(kUnitMotionStateBallistic);
