@@ -195,16 +195,28 @@ namespace moho
           instanceScale,
         };
 
-        // Hamilton product `composite.orient_ * restRotation`, written in the
-        // binary's exact grouping - float addition does not associate, so the
-        // parenthesisation is part of the behaviour.
+        // Hamilton product `composite.orient_ * restRotation`, re-derived
+        // term-by-term from ground truth (inlined into `HardwareMeshBatch::
+        // Func9`/`FillBatch`, 0x007E7EA0, the four `v68.x/.y/.z/.w` writes
+        // around 0x007E8730). The previous body here used the textbook
+        // `.w`-scalar Hamilton product formula; `composite.orient_` is a
+        // `VTransform`-family quaternion (always `VMatrix4::Set`'s `.x`-scalar
+        // convention, same as `VTransform::Compose`), and `restRotation` is
+        // read in the binary as four raw floats straight off
+        // `SAniSkelBone::mBoneTransform.orient_`'s memory layout (`(w,x,y,z)`
+        // storage order, `VTransform.h`), which is why `b.w` pairs with `c.x`
+        // below rather than `b.x` - confirmed against ground truth with a
+        // concrete numeric substitution (`c=(1,2,3,4)`, `b=(6,7,8,5)` in
+        // `x,y,z,w`), not just symbol matching. Float addition does not
+        // associate, so the parenthesisation below mirrors the binary's exact
+        // grouping.
         const Wm3::Quatf& c = composite.orient_;
         const Wm3::Quatf& b = restRotation;
         Wm3::Quatf composed{
-          ((c.w * b.w - c.x * b.x) - c.y * b.y) - c.z * b.z,
-          ((b.x * c.w + c.y * b.z) + c.x * b.w) - c.z * b.y,
-          ((b.y * c.w + c.z * b.x) + c.y * b.w) - c.x * b.z,
-          ((c.x * b.y + b.z * c.w) + c.z * b.w) - c.y * b.x,
+          ((c.y * b.y + c.x * b.z) + c.w * b.w) - c.z * b.x,
+          ((c.x * b.w - c.y * b.x) - c.z * b.y) - c.w * b.z,
+          ((c.x * b.x + c.z * b.z) + c.y * b.w) - c.w * b.y,
+          ((c.x * b.y + c.w * b.x) + c.z * b.w) - c.y * b.z,
         };
         NormalizeQuatInPlace(&composed);
 
