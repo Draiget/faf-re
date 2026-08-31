@@ -252,7 +252,31 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\algorithms\Cluster.cpp" />
     <ClCompile Include="gpg\core\algorithms\MD5.cpp" />
     <ClCompile Include="gpg\core\containers\ArchiveSerialization.cpp" />
-    <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp" />
+    <!-- Excluded: the file compiles cleanly alone, but linking it in pulls
+         its recovered __CxxFrameHandler3/strchr/strtod/_set_new_mode et al.
+         into the real link under their reserved CRT names. Those are
+         load-bearing symbols the *modern* VS2022 toolchain's own compiler-
+         generated code (exception unwind tables, CRT startup, and every
+         std::strchr/std::strtod call site across src/sdk) expects to bind
+         to the real implementation, not a 2007-binary-faithful one - the
+         two ABIs are not interchangeable. strchr/strtod/_set_new_mode were
+         found and fixed by renaming (EngineStrchr/EngineStrtod/
+         EngineSetNewMode) after each produced a live, reproducible crash
+         (self-recursive stack overflow x2, startup invalid_parameter
+         abort). __CxxFrameHandler3 crashed the same way (bad indirect call
+         through zeroed __initialmbcinfo, live via dbgrun) but is far
+         higher-risk to rename piecemeal: it is the exception dispatcher
+         for every throw/catch in the entire program, and other reserved
+         EH-ABI symbols this file also redefines under their real names
+         (_CallCatchBlock2, _UnwindNestedFrames, __FrameUnwindToState,
+         __CreateFrameInfo, _GetRangeOfTrysToCheck, _XcptFilter, and more)
+         are very likely the same trap, unaudited. Re-enabling needs a
+         dedicated pass that renames the whole EH-handler cluster (or
+         proves each one safe) before flipping this back on - not another
+         one-crash-at-a-time cycle. -->
+    <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="moho\misc\WxCrtBridge.cpp" />
     <ClCompile Include="moho\misc\RuntimeTuningGlobals.cpp" />
     <ClCompile Include="moho\misc\DName.cpp" />
