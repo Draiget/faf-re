@@ -2975,11 +2975,6 @@ namespace
     return node == nullptr || node->isSentinel == kRbNodeSentinel;
   }
 
-  [[nodiscard]] bool IsMeshBatchSentinelNode(const moho::MeshBatchBucketNode* const node) noexcept
-  {
-    return node == nullptr || node->isSentinel == kRbNodeSentinel;
-  }
-
   [[nodiscard]] moho::MeshRendererMeshCacheNode* CreateMeshCacheNode(
     const moho::MeshKey& key,
     const boost::shared_ptr<moho::Mesh>& mesh,
@@ -3338,172 +3333,15 @@ namespace
     tree.proxy = nullptr;
   }
 
-  [[nodiscard]] moho::MeshBatchBucketNode* CreateMeshBatchTreeSentinel()
-  {
-    auto* const head = new moho::MeshBatchBucketNode{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->color = kRbNodeBlack;
-    head->isSentinel = kRbNodeSentinel;
-    head->bucket.instances.proxy = nullptr;
-    head->bucket.instances.first = nullptr;
-    head->bucket.instances.last = nullptr;
-    head->bucket.instances.end = nullptr;
-    return head;
-  }
-
-  /**
-   * Address: 0x007E2C30 (FUN_007E2C30)
-   *
-   * What it does:
-   * Initializes one mesh-batch RB-tree storage lane with a fresh self-linked
-   * sentinel head and zero size.
-   */
-  [[maybe_unused]] moho::MeshBatchBucketTree* InitializeMeshBatchTreeStorageAdapter(
-    moho::MeshBatchBucketTree* const tree
-  )
-  {
-    tree->head = CreateMeshBatchTreeSentinel();
-    tree->size = 0u;
-    return tree;
-  }
-
-  void ReleaseMeshBatchInstanceVector(moho::MeshBatchInstanceVector& vector) noexcept
-  {
-    if (vector.first) {
-      ::operator delete(vector.first);
-    }
-
-    vector.proxy = nullptr;
-    vector.first = nullptr;
-    vector.last = nullptr;
-    vector.end = nullptr;
-  }
-
-  /**
-   * Address: 0x007D9FC0 (FUN_007D9FC0, std::vector<Moho::MeshInstance*>::push_back)
-   * Grow path: 0x007DA270 (FUN_007DA270, std::vector<Moho::MeshInstance*>::_Insert_n)
-   *
-   * What it does:
-   * Appends one `MeshInstance*` to the raw pointer-triplet render bucket. When
-   * spare capacity exists (`last != end`) it writes the slot and bumps `last`;
-   * otherwise it reallocates to `max(size + size/2, size + 1)` elements
-   * (the MSVC8 1.5x growth policy), copies the existing range, then appends.
-   */
-  void MeshBatchInstanceVectorPushBack(moho::MeshBatchInstanceVector& vector, moho::MeshInstance* const value)
-  {
-    if (vector.last != nullptr && vector.last != vector.end) {
-      *vector.last = value;
-      ++vector.last;
-      return;
-    }
-
-    constexpr std::size_t kMaxElements = 0x3FFFFFFFu;
-    const std::size_t oldSize =
-      vector.first != nullptr ? static_cast<std::size_t>(vector.last - vector.first) : 0u;
-    if (oldSize == kMaxElements) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    std::size_t newCapacity = oldSize + (oldSize >> 1);
-    if (newCapacity < oldSize + 1u) {
-      newCapacity = oldSize + 1u;
-    }
-    if (newCapacity > kMaxElements) {
-      newCapacity = kMaxElements;
-    }
-
-    auto* const reallocated = static_cast<moho::MeshInstance**>(
-      ::operator new(sizeof(moho::MeshInstance*) * newCapacity)
-    );
-    if (oldSize != 0u) {
-      std::copy(vector.first, vector.last, reallocated);
-    }
-    reallocated[oldSize] = value;
-
-    if (vector.first != nullptr) {
-      ::operator delete(vector.first);
-    }
-
-    vector.first = reallocated;
-    vector.last = reallocated + oldSize + 1u;
-    vector.end = reallocated + newCapacity;
-  }
-
-  void ClearMeshBatchTreeNodes(moho::MeshBatchBucketNode* const node, moho::MeshBatchBucketNode* const head) noexcept
-  {
-    if (!node || node == head || IsMeshBatchSentinelNode(node)) {
-      return;
-    }
-
-    ClearMeshBatchTreeNodes(node->left, head);
-    ClearMeshBatchTreeNodes(node->right, head);
-    ReleaseMeshBatchInstanceVector(node->bucket.instances);
-    delete node;
-  }
-
-  void ResetMeshBatchTree(moho::MeshBatchBucketTree& tree) noexcept
-  {
-    if (!tree.head) {
-      tree.size = 0;
-      return;
-    }
-
-    ClearMeshBatchTreeNodes(tree.head->parent, tree.head);
-    tree.head->parent = tree.head;
-    tree.head->left = tree.head;
-    tree.head->right = tree.head;
-    tree.size = 0;
-  }
-
-  /**
-   * Address: 0x007E2D90 (FUN_007E2D90)
-   *
-   * What it does:
-   * Clears one mesh-batch RB-tree payload lane and restores empty sentinel
-   * head-links; returns the tree head lane.
-   */
-  [[maybe_unused]] moho::MeshBatchBucketNode* ResetMeshBatchTreeAndReturnHead(
-    moho::MeshBatchBucketTree* const tree
-  ) noexcept
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return nullptr;
-    }
-
-    ResetMeshBatchTree(*tree);
-    return tree->head;
-  }
-
-  /**
-   * Address: 0x007E2B20 (FUN_007E2B20, sub_7E2B20)
-   *
-   * What it does:
-   * Releases one mesh-batch RB-tree storage lane by erasing all entries,
-   * deleting the head sentinel, and zeroing `{head,size}`.
-   */
-  std::int32_t ReleaseMeshBatchTreeStorage(moho::MeshBatchBucketTree* const tree) noexcept
-  {
-    if (tree == nullptr) {
-      return 0;
-    }
-
-    if (tree->head != nullptr) {
-      ResetMeshBatchTree(*tree);
-      delete tree->head;
-    }
-
-    tree->head = nullptr;
-    tree->size = 0u;
-    return 0;
-  }
-
-  void DestroyMeshBatchTree(moho::MeshBatchBucketTree& tree) noexcept
-  {
-    (void)ReleaseMeshBatchTreeStorage(&tree);
-    tree.proxy = nullptr;
-  }
+  // The mesh-batch bucket tree is `msvc8::map<MeshBatchKey,
+  // msvc8::vector<MeshInstance*>, MeshBatchKeyLess>` (MeshBatchKey.h). Its
+  // storage lifecycle - header sentinel allocation (0x007E2C30), the recursive
+  // payload teardown plus header relink (0x007E2D90) and the full tidy that
+  // frees the header too (0x007E2B20) - is the container's own ctor / `clear()`
+  // / dtor, and `msvc8::vector` owns the bucket payload's growth and release.
+  // The hand-rolled copies that used to live here re-implemented all of that a
+  // second time over the same nodes, so they are gone; call sites use the
+  // container operations directly.
 
   void ResetLodBatchesForInstanceLinkList(moho::MeshInstance::ListLink& head) noexcept
   {
@@ -5952,11 +5790,12 @@ namespace moho
     , instanceListSize(0)
     , deltaFrame(0.0f)
     , instanceListStateFlags(0)
-    , meshes{nullptr, nullptr, 0}
+    , meshes()
     , meshSpatialDb{}
   {
     meshCacheTree.head = CreateMeshCacheTreeSentinel();
-    meshes.head = CreateMeshBatchTreeSentinel();
+    // `meshes` stands its own header sentinel up in the map constructor, which
+    // is the 0x007E2C30 `_Tree::_Tree` emission the binary's ctor inlines here.
     (void)UnlinkMeshInstanceListLink(&instanceListHead);
 
     // The binary's constructor ends by constructing this member:
@@ -5977,7 +5816,8 @@ namespace moho
   {
     Reset();
     meshSpatialDb.ClearRegistration();
-    DestroyMeshBatchTree(meshes);
+    // `meshes` frees its nodes and its header sentinel in the map destructor -
+    // the 0x007E2B20 tidy the binary calls at this point in the sequence.
     (void)UnlinkMeshInstanceListLink(&instanceListHead);
     DestroyMeshCacheTree(meshCacheTree);
     if (gMeshRendererInstance == this) {
@@ -6034,7 +5874,7 @@ namespace moho
     anisotropiclookupTex.reset();
     insectlookupTex.reset();
     ResetLodBatchesForInstanceLinkList(instanceListHead);
-    ResetMeshBatchTree(meshes);
+    meshes.clear();
   }
 
   /**
@@ -6051,7 +5891,7 @@ namespace moho
     insectlookupTex.reset();
     ResetLodBatchesForInstanceLinkList(instanceListHead);
     RemoveLinkFromList(&instanceListHead);
-    ResetMeshBatchTree(meshes);
+    meshes.clear();
   }
 
   /**
@@ -6804,73 +6644,27 @@ namespace moho
   namespace
   {
     /**
-     * Address: 0x007E42F0 (FUN_007E42F0, sub_7E42F0)
-     *
-     * What it does:
-     * Advances one batch-bucket RB-tree iterator to its in-order successor —
-     * the standard red-black tree increment. When the node has a real right
-     * child, the successor is the leftmost node of that right subtree; otherwise
-     * it is the nearest ancestor for which the node lies in the left subtree.
-     * The tree's sentinel/header node terminates both descents (its
-     * `isSentinel` byte is set), and returning it marks end-of-iteration.
-     */
-    [[nodiscard]] MeshBatchBucketNode* MeshBatchTreeSuccessor(MeshBatchBucketNode* node)
-    {
-      if (node->isSentinel) {
-        return node;
-      }
-
-      if (!node->right->isSentinel) {
-        // Successor is the leftmost node of the right subtree.
-        MeshBatchBucketNode* candidate = node->right;
-        while (!candidate->left->isSentinel) {
-          candidate = candidate->left;
-        }
-        return candidate;
-      }
-
-      // No right child: climb parents while `node` is a right child.
-      MeshBatchBucketNode* ancestor = node->parent;
-      while (!ancestor->isSentinel && node == ancestor->right) {
-        node = ancestor;
-        ancestor = ancestor->parent;
-      }
-      return ancestor;
-    }
-
-    /**
-     * Resolves the MeshLOD associated with one batch-bucket node.
+     * Resolves the MeshLOD associated with one batch bucket.
      *
      * The batch key's `mLodIndexKey` lane (`MeshBatchKey` +0x08) stores the
      * owning `MeshLOD*` directly (the binary reads `key.lod`); centralizing the
      * typed reinterpretation here keeps the render loops free of offset casts.
      */
-    [[nodiscard]] MeshLOD* MeshBatchEntryLod(const MeshBatchBucketNode* node) noexcept
+    [[nodiscard]] MeshLOD* MeshBatchEntryLod(const MeshBatchBucket& bucket) noexcept
     {
-      return reinterpret_cast<MeshLOD*>(static_cast<std::intptr_t>(node->bucket.key.mLodIndexKey));
+      return reinterpret_cast<MeshLOD*>(static_cast<std::intptr_t>(bucket.first.mLodIndexKey));
     }
 
     /**
-     * True when a batch-bucket entry holds skinned (static-pose) instances.
+     * True when a batch bucket holds skinned (static-pose) instances.
      *
      * The batch key's `mIsStaticPose` byte (`MeshBatchKey` +0x04) selects the
-     * skinned batch path when non-zero (the binary reads `*(node + 0x10)`).
+     * skinned batch path when non-zero (the binary reads `*(node + 0x10)`,
+     * i.e. the key byte inside the node payload at +0x0C).
      */
-    [[nodiscard]] bool MeshBatchEntryIsSkinned(const MeshBatchBucketNode* node) noexcept
+    [[nodiscard]] bool MeshBatchEntryIsSkinned(const MeshBatchBucket& bucket) noexcept
     {
-      return node->bucket.key.mIsStaticPose != 0;
-    }
-
-    /**
-     * Typed view of one batch bucket's instance vector as the container type
-     * `MeshBatch::Render` consumes. `MeshBatchInstanceVector` and
-     * `msvc8::vector<MeshInstance*>` share the identical
-     * `{proxy, first, last, end}` 0x10-byte layout, so this is a typed
-     * reinterpretation of the same storage, not raw offset arithmetic.
-     */
-    [[nodiscard]] const msvc8::vector<MeshInstance*>& MeshBatchEntryInstances(const MeshBatchBucketNode* node) noexcept
-    {
-      return reinterpret_cast<const msvc8::vector<MeshInstance*>&>(node->bucket.instances);
+      return bucket.first.mIsStaticPose != 0;
     }
 
     /**
@@ -6927,7 +6721,7 @@ namespace moho
   )
   {
     // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
-    if (meshMap.size == 0) {
+    if (meshMap.empty()) {
       return;
     }
 
@@ -6985,10 +6779,11 @@ namespace moho
 
     MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
 
-    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
-    MeshBatchBucketNode* const headNode = meshMap.head;
-    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
-      MeshLOD* const lod = MeshBatchEntryLod(node);
+    // Walk the batch-bucket map in key order. The binary's `begin()` is
+    // `head->left` and its `end()` is the header itself, stepped by `_Inc`
+    // (0x007E42F0) - which is what `msvc8::map`'s iterator does.
+    for (const MeshBatchBucket& bucket : meshMap) {
+      MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
       // Lazily resolve + cache this material's cartographic technique the first
@@ -7020,13 +6815,13 @@ namespace moho
         // cartographic pass always draws un-mirrored (binary pushes 0,
         // 0x007E030C).
         boost::shared_ptr<MeshBatch> batchHandle;
-        if (MeshBatchEntryIsSkinned(node)) {
+        if (MeshBatchEntryIsSkinned(bucket)) {
           lod->GetSkinnedBatch(batchHandle);
         } else {
           lod->GetStaticBatch(batchHandle);
         }
         if (batchHandle) {
-          batchHandle->Render(MeshBatchEntryInstances(node), false);
+          batchHandle->Render(bucket.second, false);
         }
       }
     }
@@ -7071,7 +6866,6 @@ namespace moho
     device->SelectFxFile("mesh");
 
     MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
-    MeshBatchBucketNode* const headNode = meshes.head;
 
     // The two passes walk the same tree but gate on different per-LOD bytes
     // (0x007E0913 reads MeshLOD+0xAD, 0x007E0A93 reads +0xAE), so a mesh can
@@ -7079,9 +6873,8 @@ namespace moho
     const auto drawPass =
       [&](const char* const technique, std::uint8_t MeshLOD::* const gate) {
         device->SelectTechnique(technique);
-        for (MeshBatchBucketNode* node = headNode->left; node != headNode;
-             node = MeshBatchTreeSuccessor(node)) {
-          MeshLOD* const lod = MeshBatchEntryLod(node);
+        for (const MeshBatchBucket& bucket : meshes) {
+          MeshLOD* const lod = MeshBatchEntryLod(bucket);
           if (!(lod->*gate)) {
             continue;
           }
@@ -7089,13 +6882,13 @@ namespace moho
           tv.albedoTexture.GetTexture(lod->mat.mAlbedoSheet);
 
           boost::shared_ptr<MeshBatch> batchHandle;
-          if (MeshBatchEntryIsSkinned(node)) {
+          if (MeshBatchEntryIsSkinned(bucket)) {
             lod->GetSkinnedBatch(batchHandle);
           } else {
             lod->GetStaticBatch(batchHandle);
           }
           if (batchHandle) {
-            batchHandle->Render(MeshBatchEntryInstances(node), false);
+            batchHandle->Render(bucket.second, false);
           }
         }
       };
@@ -7127,7 +6920,7 @@ namespace moho
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
   {
     // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
-    if (meshMap.size == 0) {
+    if (meshMap.empty()) {
       return;
     }
 
@@ -7173,10 +6966,10 @@ namespace moho
 
     MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
 
-    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
-    MeshBatchBucketNode* const headNode = meshMap.head;
-    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
-      MeshLOD* const lod = MeshBatchEntryLod(node);
+    // Walk the batch-bucket map in key order (binary: begin = head->left,
+    // end = header, stepped by `_Inc` at 0x007E42F0).
+    for (const MeshBatchBucket& bucket : meshMap) {
+      MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
       // Resolve + cache the material render stage on first use.
@@ -7211,13 +7004,13 @@ namespace moho
         // shared_ptr handle keeps the batch retained for the draw call; the
         // depth pass always draws un-mirrored (binary passes 0).
         boost::shared_ptr<MeshBatch> batchHandle;
-        if (MeshBatchEntryIsSkinned(node)) {
+        if (MeshBatchEntryIsSkinned(bucket)) {
           lod->GetSkinnedBatch(batchHandle);
         } else {
           lod->GetStaticBatch(batchHandle);
         }
         if (batchHandle) {
-          batchHandle->Render(MeshBatchEntryInstances(node), false);
+          batchHandle->Render(bucket.second, false);
         }
       }
     }
@@ -7253,7 +7046,7 @@ namespace moho
   )
   {
     // Nothing to draw when the batch tree is empty (binary: `if (map->_Mysize)`).
-    if (meshMap.size == 0) {
+    if (meshMap.empty()) {
       return;
     }
 
@@ -7276,10 +7069,10 @@ namespace moho
 
     MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
 
-    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
-    MeshBatchBucketNode* const headNode = meshMap.head;
-    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
-      MeshLOD* const lod = MeshBatchEntryLod(node);
+    // Walk the batch-bucket map in key order (binary: begin = head->left,
+    // end = header, stepped by `_Inc` at 0x007E42F0).
+    for (const MeshBatchBucket& bucket : meshMap) {
+      MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
       // Resolve + cache the material render stage on first use.
@@ -7329,13 +7122,13 @@ namespace moho
       // batch (skinned for static-pose buckets, static otherwise). The
       // shared_ptr handle keeps the batch retained for the draw call.
       boost::shared_ptr<MeshBatch> batchHandle;
-      if (MeshBatchEntryIsSkinned(node)) {
+      if (MeshBatchEntryIsSkinned(bucket)) {
         lod->GetSkinnedBatch(batchHandle);
       } else {
         lod->GetStaticBatch(batchHandle);
       }
       if (batchHandle) {
-        batchHandle->Render(MeshBatchEntryInstances(node), mirrored);
+        batchHandle->Render(bucket.second, mirrored);
       }
     }
   }
@@ -7532,7 +7325,7 @@ namespace moho
   )
   {
     // Clear last frame's buckets and reset the renderer frame lanes.
-    ResetMeshBatchTree(meshes);
+    meshes.clear();
     // Binary stores `gameTick` (param0) into +0x94 and clears the batched-count
     // lane at +0x9C; both are reused by this pass as frame-scoped scratch.
     instanceListSize = gameTick;
@@ -7627,7 +7420,9 @@ namespace moho
 
       MeshBatchInstanceVector* const bucket = MeshBatchBucketTreeFindOrCreateInstances(key, meshes);
       if (bucket != nullptr) {
-        MeshBatchInstanceVectorPushBack(*bucket, instance);
+        // `std::vector<MeshInstance*>::push_back` (0x007D9FC0, growing through
+        // `_Insert_n` at 0x007DA270) - the container's own append.
+        bucket->push_back(instance);
         ++instanceListStateFlags;
       }
     }

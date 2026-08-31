@@ -3,17 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Map.h"
+#include "legacy/containers/RbTree.h"
+#include "legacy/containers/Vector.h"
+
 namespace moho
 {
   class MeshInstance;
-
-  struct MeshBatchInstanceVector
-  {
-    void* proxy;          // +0x00
-    MeshInstance** first; // +0x04
-    MeshInstance** last;  // +0x08
-    MeshInstance** end;   // +0x0C
-  };
 
   class MeshBatchKey
   {
@@ -21,10 +17,18 @@ namespace moho
     /**
      * Address: 0x007DB060 (FUN_007DB060)
      *
+     * IDA signature:
+     * void __thiscall MeshBatchKey(MeshBatchKey *this@<ecx>);
+     *
      * What it does:
-     * Initializes RTTI/vtable identity for one mesh-batch key object.
+     * Publishes the RTTI/vtable identity for one mesh-batch key object and
+     * leaves the three payload lanes uninitialised, exactly as the shipped
+     * body does (`mov [ecx], offset ??_7MeshBatchKey@Moho@@6B@ / retn`).
      */
     MeshBatchKey();
+
+    MeshBatchKey(const MeshBatchKey&) = default;
+    MeshBatchKey& operator=(const MeshBatchKey&) = default;
 
     /**
      * Address: 0x007DB0B0 (FUN_007DB0B0)
@@ -41,85 +45,113 @@ namespace moho
     float mSortKey;            // +0x0C
   };
 
-  struct MeshBatchBucket
-  {
-    /**
-     * Local source compatibility constructor for default-constructed bucket lanes.
-     */
-    MeshBatchBucket();
-
-    /**
-     * Address: 0x007E36C0 (FUN_007E36C0, ??0MeshBatchBucket@Moho@@QAE@ABU01@@Z)
-     *
-     * What it does:
-     * Copy-constructs one mesh-batch bucket by cloning key lanes and
-     * duplicating the owned instance-pointer vector payload.
-     */
-    MeshBatchBucket(const MeshBatchBucket& other);
-
-    MeshBatchKey key;                  // +0x00
-    MeshBatchInstanceVector instances; // +0x10
-  };
-
-  struct MeshBatchBucketNode
-  {
-    MeshBatchBucketNode* left;   // +0x00
-    MeshBatchBucketNode* parent; // +0x04
-    MeshBatchBucketNode* right;  // +0x08
-    MeshBatchBucket bucket;      // +0x0C
-    std::uint8_t color;          // +0x2C (RB-tree color)
-    std::uint8_t isSentinel;     // +0x2D (nil/header marker)
-    std::uint8_t pad_2E_2F[0x02];
-  };
-
-  struct MeshBatchBucketLookupResult
-  {
-    MeshBatchBucketNode* node; // +0x00
-    std::uint8_t inserted;     // +0x04
-    std::uint8_t pad_05_07[0x03];
-  };
-
-  struct MeshBatchBucketTree
-  {
-    void* proxy;               // +0x00
-    MeshBatchBucketNode* head; // +0x04 (RB-tree sentinel/header node)
-    std::uint32_t size;        // +0x08
-  };
-
   /**
    * Address: 0x007E35B0 (FUN_007E35B0)
    *
-   * What it does:
-   * Returns whether `second` compares less than `first` in mesh-batch key order.
-   */
-  [[nodiscard]] bool MeshBatchKeyIsSecondLessThanFirst(const MeshBatchKey& first, const MeshBatchKey& second);
-
-  [[nodiscard]] bool MeshBatchKeyLess(const MeshBatchKey& lhs, const MeshBatchKey& rhs);
-  [[nodiscard]] bool MeshBatchKeyHasHigherPriority(const MeshBatchKey& lhs, const MeshBatchKey& rhs);
-
-  /**
-   * Address: 0x007E40C0 (FUN_007E40C0)
+   * IDA signature:
+   * char __usercall less@<al>(const MeshBatchKey *lhs@<esi>, const MeshBatchKey *rhs@<edx>);
    *
    * What it does:
-   * Returns the first node not ordered before `key` in the batch-bucket RB-tree.
+   * `std::less<MeshBatchKey>` - the key comparator the batch-bucket map is
+   * instantiated with. Orders by `mSortKey`, then by the static-pose flag
+   * (unset before set), then by the LOD-key lane.
+   *
+   * Two details are read straight off the shipped body and are load bearing:
+   *   - the operand order is `lhs < rhs` with `lhs` in `esi` and `rhs` in
+   *     `edx` (0x007E35B0 `movss xmm0,[esi+0Ch]` / `movss xmm1,[edx+0Ch]`,
+   *     then `comiss xmm1,xmm0 / jbe -> false` at 0x007E35E2);
+   *   - the LOD-key lane is compared **unsigned** (`setb` at 0x007E35D3, and
+   *     again in the two inlined copies at 0x007E40F2 and 0x007E2CB7). That
+   *     lane carries a pointer value, so the unsigned form is the correct one.
+   *
+   * The comparator is stateless, which is what keeps the owning map at the
+   * shipped 12-byte `{proxy, _Myhead, _Mysize}` footprint through the
+   * empty-base optimisation in `msvc8::detail::rb_compare_carrier`.
    */
-  [[nodiscard]] MeshBatchBucketNode*
-  MeshBatchBucketTreeLowerBound(const MeshBatchBucketTree& tree, const MeshBatchKey& key);
+  struct MeshBatchKeyLess
+  {
+    [[nodiscard]] bool operator()(const MeshBatchKey& lhs, const MeshBatchKey& rhs) const noexcept;
+  };
 
   /**
-   * Address: 0x007E3CF0 (FUN_007E3CF0)
+   * `std::vector<Moho::MeshInstance*>` - the batch map's mapped type.
    *
-   * What it does:
-   * Inserts one unique key bucket into the RB-tree and reports whether insertion happened.
+   * Confirmed from the demangled `MeshRenderer::RenderCartographic` /
+   * `RenderDepth` signatures (Mesh.h), whose map parameter spells the mapped
+   * type `std::vector<Moho::MeshInstance*, std::allocator<...>>`, and from the
+   * shipped `{proxy, _Myfirst, _Mylast, _Myend}` 0x10-byte footprint that
+   * `msvc8::vector` already models. `MeshBatch::Render` consumes exactly this
+   * type, so the render loops hand a bucket's mapped value straight to it with
+   * no cast.
    */
-  [[nodiscard]] MeshBatchBucketLookupResult
-  MeshBatchBucketTreeInsertUnique(MeshBatchBucketTree& tree, const MeshBatchBucket& bucket);
+  using MeshBatchInstanceVector = msvc8::vector<MeshInstance*>;
 
   /**
-   * Address: 0x007E2C60 (FUN_007E2C60)
+   * `std::map<Moho::MeshBatchKey, std::vector<Moho::MeshInstance*>>`.
+   *
+   * All red-black mechanics - `_Lbound` (0x007E40C0), `_Buynode` (0x007E4BC0),
+   * `_Insert` (0x007E3F10), `_Lrotate` (0x007E4AC0), `_Rrotate` (0x007E4B30),
+   * `_Inc` (0x007E42F0), `_Dec` (0x007E4FA0), `insert` (0x007E3CF0),
+   * hinted `insert` (0x007E3340) and `operator[]` (0x007E2C60) - live in
+   * `msvc8::detail::rb_tree` / `msvc8::map`, which is the single owner of
+   * those addresses. This header no longer re-implements any of them.
+   */
+  using MeshBatchBucketTree = msvc8::map<MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>;
+
+  /**
+   * One stored element: `std::pair<const MeshBatchKey, std::vector<MeshInstance*>>`.
+   *
+   * Address: 0x007E36C0 (FUN_007E36C0, pair(const MeshBatchKey&, const mapped_type&))
+   * Address: 0x007E5070 (FUN_007E5070, pair(const pair&))
+   *
+   * Both are compiler-generated `std::pair` constructors, so they have no
+   * hand-written body; they are emitted from the two call sites that build a
+   * `value_type`:
+   *   - 0x007E36C0 (`retn 0Ch`, three stack args: dest, key, mapped) is the
+   *     `value_type(k, mapped_type())` temporary inside `map::operator[]` -
+   *     `push &temp_vector / push key / push &dest / call sub_7E36C0` at
+   *     0x007E2CCE..0x007E2CD9;
+   *   - 0x007E5070 (`retn 8`, two stack args: dest, source pair) is the
+   *     placement copy `_Buynode` performs into the fresh node's payload -
+   *     `lea ecx,[esi+0Ch] / push ecx / call sub_7E5070` at
+   *     0x007E4C15..0x007E4C1C.
+   * Both copy the key inline (vptr + the three lanes) and then call the
+   * `std::vector<MeshInstance*>` copy constructor at 0x007E41A0 on the
+   * payload at +0x10, which is what pins `first` at +0x00 and `second` at
+   * +0x10 in the 0x20-byte value type.
+   */
+  using MeshBatchBucket = MeshBatchBucketTree::value_type;
+
+  /**
+   * One MSVC8 `_Tree::_Node` for the batch-bucket map.
+   *
+   * Confirmed field-for-field against `_Buynode` at 0x007E4BC0:
+   * `[esi] = arg_0` (left), `[esi+4] = arg_4` (parent), `[esi+8] = arg_8`
+   * (right), `lea ecx,[esi+0Ch]` for the payload copy, `[esi+2Ch] = 0`
+   * (`_Color` = red) and `[esi+2Dh] = 0` (`_Isnil`); the node allocator at
+   * 0x007E5740 sizes each node `ecx * 0x30` (`lea edx,[ecx+ecx*2] / shl edx,4`)
+   * and rejects counts at or above `0xFFFFFFFF / 0x30`.
+   *
+   * Retained as a named alias so those size/offset guarantees stay asserted
+   * here; recovered behaviour code reaches elements through the container's
+   * iterators, never through this type.
+   */
+  using MeshBatchBucketNode = msvc8::detail::rb_node<MeshBatchBucket>;
+
+  /**
+   * Address: 0x007E2C60 (FUN_007E2C60, `std::map<MeshBatchKey, vector<MeshInstance*>>::operator[]`)
    *
    * What it does:
-   * Finds or creates the instance-vector bucket associated with one mesh-batch key.
+   * Returns the instance vector bucketed under `key`, default-constructing an
+   * empty one at the located gap when the key is absent. The body is
+   * `msvc8::map::operator[]` (Map.h), which owns the address: it takes the
+   * `lower_bound` cursor (`call sub_7E40C0` at 0x007E2C84) and feeds it back
+   * as the insert hint (`push edi` at 0x007E2CDE, then
+   * `call sub_7E3340`), so the located gap is filled without a second descent.
+   *
+   * This wrapper exists only to keep the call shape the binary uses - key in
+   * `ecx`, tree on the stack - readable at the one engine call site in
+   * `MeshRenderer::CollectVisibleInstances`.
    */
   [[nodiscard]] MeshBatchInstanceVector*
   MeshBatchBucketTreeFindOrCreateInstances(const MeshBatchKey& key, MeshBatchBucketTree& tree);
@@ -129,34 +161,23 @@ namespace moho
   static_assert(offsetof(MeshBatchKey, mSortKey) == 0x0C, "MeshBatchKey::mSortKey offset must be 0x0C");
   static_assert(sizeof(MeshBatchKey) == 0x10, "MeshBatchKey size must be 0x10");
 
-  static_assert(offsetof(MeshBatchBucket, key) == 0x00, "MeshBatchBucket::key offset must be 0x00");
-  static_assert(offsetof(MeshBatchBucket, instances) == 0x10, "MeshBatchBucket::instances offset must be 0x10");
-  static_assert(sizeof(MeshBatchBucket) == 0x20, "MeshBatchBucket size must be 0x20");
-
-  static_assert(offsetof(MeshBatchInstanceVector, proxy) == 0x00, "MeshBatchInstanceVector::proxy offset must be 0x00");
-  static_assert(offsetof(MeshBatchInstanceVector, first) == 0x04, "MeshBatchInstanceVector::first offset must be 0x04");
-  static_assert(offsetof(MeshBatchInstanceVector, last) == 0x08, "MeshBatchInstanceVector::last offset must be 0x08");
-  static_assert(offsetof(MeshBatchInstanceVector, end) == 0x0C, "MeshBatchInstanceVector::end offset must be 0x0C");
   static_assert(sizeof(MeshBatchInstanceVector) == 0x10, "MeshBatchInstanceVector size must be 0x10");
 
+  // Payload +0x00/+0x10 and total 0x20: 0x007E36C0/0x007E5070 copy the key
+  // lanes at +0x00..+0x0F and call the vector copy ctor on +0x10.
+  static_assert(offsetof(MeshBatchBucket, first) == 0x00, "MeshBatchBucket::first offset must be 0x00");
+  static_assert(offsetof(MeshBatchBucket, second) == 0x10, "MeshBatchBucket::second offset must be 0x10");
+  static_assert(sizeof(MeshBatchBucket) == 0x20, "MeshBatchBucket size must be 0x20");
+
+  // Node lanes, all read directly off _Buynode (0x007E4BC0) and _Lbound
+  // (0x007E40C0, which tests `[ecx+2Dh]` for the nil byte).
   static_assert(offsetof(MeshBatchBucketNode, left) == 0x00, "MeshBatchBucketNode::left offset must be 0x00");
-  static_assert(offsetof(MeshBatchBucketNode, bucket) == 0x0C, "MeshBatchBucketNode::bucket offset must be 0x0C");
+  static_assert(offsetof(MeshBatchBucketNode, parent) == 0x04, "MeshBatchBucketNode::parent offset must be 0x04");
+  static_assert(offsetof(MeshBatchBucketNode, right) == 0x08, "MeshBatchBucketNode::right offset must be 0x08");
+  static_assert(offsetof(MeshBatchBucketNode, value) == 0x0C, "MeshBatchBucketNode::value offset must be 0x0C");
   static_assert(offsetof(MeshBatchBucketNode, color) == 0x2C, "MeshBatchBucketNode::color offset must be 0x2C");
-  static_assert(
-    offsetof(MeshBatchBucketNode, isSentinel) == 0x2D, "MeshBatchBucketNode::isSentinel offset must be 0x2D"
-  );
+  static_assert(offsetof(MeshBatchBucketNode, isNil) == 0x2D, "MeshBatchBucketNode::isNil offset must be 0x2D");
   static_assert(sizeof(MeshBatchBucketNode) == 0x30, "MeshBatchBucketNode size must be 0x30");
 
-  static_assert(
-    offsetof(MeshBatchBucketLookupResult, node) == 0x00, "MeshBatchBucketLookupResult::node offset must be 0x00"
-  );
-  static_assert(
-    offsetof(MeshBatchBucketLookupResult, inserted) == 0x04, "MeshBatchBucketLookupResult::inserted offset must be 0x04"
-  );
-  static_assert(sizeof(MeshBatchBucketLookupResult) == 0x08, "MeshBatchBucketLookupResult size must be 0x08");
-
-  static_assert(offsetof(MeshBatchBucketTree, proxy) == 0x00, "MeshBatchBucketTree::proxy offset must be 0x00");
-  static_assert(offsetof(MeshBatchBucketTree, head) == 0x04, "MeshBatchBucketTree::head offset must be 0x04");
-  static_assert(offsetof(MeshBatchBucketTree, size) == 0x08, "MeshBatchBucketTree::size offset must be 0x08");
   static_assert(sizeof(MeshBatchBucketTree) == 0x0C, "MeshBatchBucketTree size must be 0x0C");
 } // namespace moho
