@@ -69497,7 +69497,23 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       continue;
     }
 
-    runtime->mCam = reinterpret_cast<moho::GeomCamera3*>(worldView->view->GetCamera());
+    // `IRenderWorldView::GetCamera()` returns a `CameraImpl*` (see
+    // IRenderWorldView.h slot 3) - a whole camera-control object, not the
+    // embedded GeomCamera3 transform/projection state itself. The prior
+    // reinterpret_cast straight to `GeomCamera3*` treated CameraImpl's own
+    // layout (RCamCamera broadcaster fields, the CScriptEvent sub-object,
+    // mName, mTerrainMap, ...) as if it were GeomCamera3, so every read
+    // through `mCam` below (view/projection matrices, transform) pulled
+    // unrelated CameraImpl bytes instead - confirmed live via dbgrun: the
+    // resulting "position" was nonsense (~31219 on two axes) even though
+    // CameraImpl's own CameraGetView()/UpdateCoords() computed a perfectly
+    // sane transform. CameraGetView() is the real, correctly-offset
+    // accessor for the embedded GeomCamera3 (CameraImpl.cpp:2007-2010:
+    // `return AsRuntimeView(this)->mCam;`).
+    moho::CameraImpl* const cameraImpl = worldView->view->GetCamera();
+    runtime->mCam = cameraImpl != nullptr
+      ? const_cast<moho::GeomCamera3*>(&cameraImpl->CameraGetView())
+      : nullptr;
     if (runtime->mCam == nullptr) {
       continue;
     }
