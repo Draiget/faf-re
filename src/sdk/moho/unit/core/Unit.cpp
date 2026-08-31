@@ -51,6 +51,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/RResId.h"
+#include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/entity/EntityDb.h"
@@ -2033,9 +2034,19 @@ namespace
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
 
+  // Ground truth for both reachable callers (`FUN_0062EAC0.c`,
+  // `func_UnitMoreInLineToOther`; `FUN_006A8C20.c`, `Unit::GetFormationVector`)
+  // builds the forward vector via `Moho::VAxes3::VAxes3(&result, &orient)`
+  // and reads its `.vZ` member -- NOT the generic `Quaternion::Rotate((0,0,
+  // 1))` (upstream WildMagic, `.w`-scalar `ToMat3()`) the previous body used,
+  // and also not equivalent to `Moho::MultQuadVec` against `(0,0,1)`:
+  // `VAxes3::vZ` is a permuted/partially-negated readout of the `.x`-scalar
+  // rotation matrix's row 0, not its column 2 (see `SPhysBody::GetImpulse`'s
+  // history for the numeric verification of this distinction).
   [[nodiscard]] Wm3::Vector3f ForwardXZ(const Unit& unit) noexcept
   {
-    Wm3::Vector3f forward = unit.GetTransform().orient_.Rotate({0.0f, 0.0f, 1.0f});
+    const moho::VAxes3 axes(unit.GetTransform().orient_);
+    Wm3::Vector3f forward = axes.vZ;
     forward.y = 0.0f;
     return Wm3::Vector3f::NormalizeOrZero(forward);
   }
