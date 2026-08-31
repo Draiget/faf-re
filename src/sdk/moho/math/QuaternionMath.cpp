@@ -832,36 +832,46 @@ namespace moho
    * Moho::VMatrix3* func_QuatToMatrix(Wm3::Quaternionf* this, Moho::VMatrix3* a2);
    *
    * What it does:
-   * Expands a unit quaternion into a row-major 3x3 rotation matrix. The engine
-   * stores quaternions scalar-first (`.w` = real part, `.x/.y/.z` = imaginary),
-   * so this is the standard `R = I - 2*[q]x^2 - 2*w*[q]x` expansion; `outMatrix`
-   * is three consecutive `Wm3::Vector3f` rows. Intermediate products preserve the
-   * binary's exact evaluation order.
+   * Expands a unit quaternion into a row-major 3x3 rotation matrix. Re-derived
+   * term-by-term from FUN_00452FD0.c after the previous body here (which
+   * assumed textbook scalar-first `.w` storage) was found not to match the
+   * disassembly at all past one coincidental term. The real binary pairs
+   * `.w` with `.z` (row 0) and with `.y` (row 1), and pairs `.z` with `.y`
+   * alone (row 2, no `.w`/`.x` term) - i.e. `.x` never appears in any
+   * diagonal term, which is the signature of `.x` being the scalar lane and
+   * `(.y, .z, .w)` the imaginary lanes, not `.w`. This is the exact
+   * transpose of `VMatrix4::Set` (0x004EE980) applied to the same four
+   * fields with no relabelling, which is why `MultQuadVec`'s row-of-matrix
+   * dot vec produces `vec * VMatrix4::Set(quat)` under this engine's
+   * row-vector convention. Cross-confirmed against `VTransform::Inverse`
+   * (0x0046FBF0) and `SelectionDragger3D::BuildSelectionSolid`
+   * (0x00864670), both of which conjugate by keeping `.x` and negating
+   * `.y/.z/.w`.
    */
   Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* const quat, Wm3::Vector3f* const outMatrix) noexcept
   {
-    const float ix = quat->x;
-    const float iy = quat->y;
-    const float twoZ = quat->z * 2.0f;
-    const float wx = quat->w * (ix * 2.0f);
-    const float wz = quat->w * twoZ;
-    const float wy = quat->w * (iy * 2.0f);
-    const float zz = quat->z * twoZ;
-    const float xx = ix * (ix * 2.0f);
-    const float xy = ix * (iy * 2.0f);
-    const float xz = ix * twoZ;
-    const float yy = iy * (iy * 2.0f);
-    const float yz = iy * twoZ;
+    const float x = quat->x;
+    const float y = quat->y;
+    const float twoW = quat->w * 2.0f;
+    const float xy = x * (y * 2.0f);
+    const float xw = x * twoW;
+    const float xz = x * (quat->z * 2.0f);
+    const float ww = quat->w * twoW;
+    const float yy = y * (y * 2.0f);
+    const float yz = y * (quat->z * 2.0f);
+    const float yw = y * twoW;
+    const float zz = quat->z * (quat->z * 2.0f);
+    const float zw = quat->z * twoW;
 
-    outMatrix[0].x = static_cast<float>(1.0 - (zz + yy));
-    outMatrix[0].y = xy - wz;
-    outMatrix[0].z = xz + wy;
-    outMatrix[1].x = xy + wz;
-    outMatrix[1].y = static_cast<float>(1.0 - (zz + xx));
-    outMatrix[1].z = yz - wx;
-    outMatrix[2].x = xz - wy;
-    outMatrix[2].y = yz + wx;
-    outMatrix[2].z = static_cast<float>(1.0 - (yy + xx));
+    outMatrix[0].x = static_cast<float>(1.0 - (ww + zz));
+    outMatrix[0].y = yz - xw;
+    outMatrix[0].z = yw + xz;
+    outMatrix[1].x = yz + xw;
+    outMatrix[1].y = static_cast<float>(1.0 - (ww + yy));
+    outMatrix[1].z = zw - xy;
+    outMatrix[2].x = yw - xz;
+    outMatrix[2].y = zw + xy;
+    outMatrix[2].z = static_cast<float>(1.0 - (zz + yy));
     return outMatrix;
   }
 } // namespace moho

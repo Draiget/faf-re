@@ -11,6 +11,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/math/VMatrix4.h"
 #include "Wm3Vector3.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -234,22 +235,37 @@ namespace moho
    * Address: 0x0046FBF0 (FUN_0046FBF0)
    *
    * What it does:
-   * Returns rigid-transform inverse using quaternion conjugate + rotated negated translation.
+   * Returns the rigid-transform inverse: quaternion conjugate, then the
+   * negated translation rotated by that conjugate. Re-derived term-by-term
+   * from FUN_0046FBF0.c after the previous body here (conjugate keeping
+   * `.w` fixed and negating `.x/.y/.z`, translation rotated via
+   * `Wm3::MultiplyQuaternionVector`) was found not to match the
+   * disassembly: the binary's conjugate keeps `.x` fixed and negates
+   * `.y/.z/.w`, and rotates the translation via `Moho::MultQuadVec`
+   * (0x00452D40) - the real, address-cited engine rotation helper, whose
+   * `QuatToMatrix` (0x00452FD0) treats `.x` as the scalar lane. Using the
+   * generic `Wm3::MultiplyQuaternionVector` (uncited textbook `.w`-scalar
+   * helper) left `inverted.pos_` wrong by hundreds of world units whenever
+   * `orient_` came from a `VMatrix4::Set`-convention quaternion (e.g. the
+   * camera's `viewTransform`) - the eye's own world position no longer
+   * mapped back to the view-space origin under the resulting `view` matrix,
+   * which was the mechanical cause of `CTesselator::Rebuild`'s frustum
+   * rejecting the entire terrain every frame.
    */
   VTransform VTransform::Inverse() const noexcept
   {
     VTransform inverted{};
-    inverted.orient_.w = orient_.w;
-    inverted.orient_.x = -orient_.x;
+    inverted.orient_.x = orient_.x;
     inverted.orient_.y = -orient_.y;
     inverted.orient_.z = -orient_.z;
+    inverted.orient_.w = -orient_.w;
 
     const Wm3::Vec3f negatedPosition{
       -pos_.x,
       -pos_.y,
       -pos_.z,
     };
-    Wm3::MultiplyQuaternionVector(&inverted.pos_, negatedPosition, inverted.orient_);
+    MultQuadVec(&inverted.pos_, &negatedPosition, &inverted.orient_);
     return inverted;
   }
 
