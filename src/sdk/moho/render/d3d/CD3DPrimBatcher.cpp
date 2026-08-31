@@ -27,6 +27,14 @@
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
 
+// Forward declaration of QuatCrossAdd (defined in Sim.cpp at global scope).
+Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
+
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
+
 namespace
 {
   constexpr float kTau = 6.28318530717958647692f;
@@ -89,38 +97,20 @@ namespace
     primBatcher->DrawLine(startVertex, endVertex);
   }
 
-  [[nodiscard]] Wm3::Quaternionf QuatCrossAdd(
-    Wm3::Vector3f lhsNormalized, Wm3::Vector3f rhsNormalized
-  ) noexcept
-  {
-    Wm3::Vector3f::Normalize(&lhsNormalized);
-    Wm3::Vector3f::Normalize(&rhsNormalized);
-
-    Wm3::Vector3f sum{
-      lhsNormalized.x + rhsNormalized.x,
-      lhsNormalized.y + rhsNormalized.y,
-      lhsNormalized.z + rhsNormalized.z,
-    };
-
-    if (Wm3::Vector3f::Normalize(&sum) <= 0.0f) {
-      Wm3::Vector3f::Normalize(&lhsNormalized);
-      return {0.0f, lhsNormalized.x, lhsNormalized.y, lhsNormalized.z};
-    }
-
-    return {
-      (sum.x * lhsNormalized.x) + (sum.y * lhsNormalized.y) + (sum.z * lhsNormalized.z),
-      (sum.z * lhsNormalized.y) - (lhsNormalized.z * sum.y),
-      (lhsNormalized.z * sum.x) - (sum.z * lhsNormalized.x),
-      (sum.y * lhsNormalized.x) - (lhsNormalized.y * sum.x),
-    };
-  }
+  // `QuatCrossAdd` used to be duplicated here with the textbook `.w`-scalar
+  // field layout (dot product in `.w`, cross terms in `.x/.y/.z`). Ground
+  // truth for every caller of this quaternion (`FUN_00453ED0.c` /
+  // `Moho::DRAW_WireCircle`, and `Moho::DRAW_Circle`'s own doc comment below)
+  // calls the real, already-fixed `Moho::QuatCrossAdd` (0x0044F880, defined
+  // in Sim.cpp) directly, so the local duplicate is removed in favor of that
+  // canonical definition -- see its doc comment for the `.x`-scalar layout.
 
   [[nodiscard]] moho::Vector3f RotateByQuaternion(
     const moho::Vector3f& vector, const Wm3::Quaternionf& orientation
   ) noexcept
   {
     moho::Vector3f rotated{};
-    Wm3::MultiplyQuaternionVector(&rotated, vector, orientation);
+    moho::MultQuadVec(&rotated, &vector, &orientation);
     return rotated;
   }
 
@@ -1337,6 +1327,11 @@ namespace moho
    *
    * What it does:
    * Builds tangent oval axes from `normal` and delegates to `DRAW_WireOval`.
+   *
+   * Ground truth (`FUN_00453ED0.c`) calls the real `Moho::QuatCrossAdd`
+   * (0x0044F880) with the hardcoded +Z axis, then rotates both tangent axes
+   * via `Moho::MultQuadVec` against that quaternion -- same `.x`-scalar
+   * convention as every other `MultQuadVec` consumer in this bug class.
    */
   void DRAW_WireCircle(
     CD3DPrimBatcher* const primBatcher,
@@ -1347,7 +1342,8 @@ namespace moho
     const std::uint32_t precision
   )
   {
-    const Wm3::Quaternionf orientation = QuatCrossAdd({0.0f, 0.0f, 1.0f}, normal);
+    Wm3::Quaternionf orientation{};
+    ::QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal);
 
     const Vector3f axisSin = RotateByQuaternion({0.0f, radius, 0.0f}, orientation);
     const Vector3f axisCos = RotateByQuaternion({radius, 0.0f, 0.0f}, orientation);
@@ -1646,10 +1642,11 @@ namespace moho
    * disassembly never reads them. They are kept in the signature, in mangled-name order,
    * for ABI/name fidelity, and are `[[maybe_unused]]` rather than given invented names.
    *
-   * `normal` is rotated with a hardcoded +Z axis (0,0,1) via `QuatCrossAdd`, then four
-   * points at `radius` +/- `kOvalBandHalfWidth` along the local X/Y axes are rotated by
-   * that quaternion (`RotateByQuaternion`, i.e. `MultQuadVec` in the binary) to form the
-   * inner/outer cosine/sine axes handed to `DRAW_Oval`.
+   * `normal` is rotated with a hardcoded +Z axis (0,0,1) via the real
+   * `Moho::QuatCrossAdd` (0x0044F880, Sim.cpp), then four points at `radius`
+   * +/- `kOvalBandHalfWidth` along the local X/Y axes are rotated by that
+   * quaternion via `RotateByQuaternion`, i.e. `Moho::MultQuadVec` in the
+   * binary, to form the inner/outer cosine/sine axes handed to `DRAW_Oval`.
    */
   void DRAW_Circle(
     CD3DPrimBatcher* const primBatcher,
@@ -1668,7 +1665,8 @@ namespace moho
       return;
     }
 
-    const Wm3::Quaternionf orientation = QuatCrossAdd({0.0f, 0.0f, 1.0f}, normal);
+    Wm3::Quaternionf orientation{};
+    ::QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal);
 
     const float innerRadius = radius - kOvalBandHalfWidth;
     const float outerRadius = radius + kOvalBandHalfWidth;
