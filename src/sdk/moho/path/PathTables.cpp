@@ -1521,6 +1521,14 @@ namespace moho
   static_assert(offsetof(PathTablesImpl, mClusterCache) == 0x28, "PathTablesImpl::mClusterCache offset must be 0x28");
 } // namespace moho
 
+// Defined at file scope (global namespace, external linkage) in
+// CrtRuntimeHelpers.cpp - shared by every legacy VC8 "<container> too long"
+// throw lane. Forward-declared here (not inside the anonymous namespace
+// below) so this TU's unqualified calls bind to that same external symbol
+// instead of silently declaring a second, anonymous-namespace-local,
+// never-defined one of the same name.
+[[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
+
 namespace
 {
   bool gGenPathWarmupPending = true;
@@ -1640,8 +1648,6 @@ namespace
     sizeof(OccupationDataRuntimeView) == sizeof(gpg::HaStar::OccupationData),
     "OccupationDataRuntimeView size must match OccupationData"
   );
-
-  [[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
 
   /**
    * Address: 0x0076CBA0 (FUN_0076CBA0)
