@@ -1337,6 +1337,10 @@ namespace moho
     );
 
   public:
+    /**
+     * Address: 0x007E5280 (FUN_007E5280,
+     * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+     */
     [[nodiscard]] boost::shared_ptr<Mesh>
     FindOrCreateMesh(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
 
