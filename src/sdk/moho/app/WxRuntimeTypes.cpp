@@ -68153,32 +68153,26 @@ void moho::REN_RenderViewportUI(WRenViewport* const viewport, const void* const 
 
   moho::CD3DPrimBatcher* const primBatcher = uiRuntime->mPrimBatcher.get();
 
-  // 0x007F88FF..0x007F8927: dispatch every world-view info entry's UI-render
-  // callback with the shared prim batcher. Each entry is a 0x14-byte
-  // SWorldViewInfo record (== WRenViewportWorldViewParamRuntime); the callback
-  // object lives at record offset +0x0C and is invoked through its vtable slot
-  // +0x38 (14) with the batcher as the sole argument.
+  // 0x007F88FF..0x007F8927: dispatch every world-view entry's terrain through
+  // TerrainCommon vtable slot 14 (DrawDirtyTerrain) with the shared prim
+  // batcher. Each entry is the same 0x14-byte WRenViewportWorldViewParamRuntime
+  // record every other pass in this file uses - record offset +0x0C is the
+  // real per-view `boost::shared_ptr<TerrainCommon>`, not a separate
+  // "UI callback" object; `mov edx,[eax+38h]` / `call edx` at
+  // 0x007F8917-0x007F891C is a direct slot-14 dispatch on that same pointer.
   //
   // The binary iterates the argument vector from its second pointer field
-  // ([base+4]) up to its third ([base+8]), stepping one SWorldViewInfo per
-  // iteration (asm 0x007F88FF `mov esi,[ebx+4]` .. 0x007F8927). Modeled through
-  // the same {mFirst,mLast,mEnd} 3-pointer vector view used elsewhere in this
-  // file; the traversal preserves the binary's exact [mLast, mEnd) bounds.
-  struct SWorldViewInfoUICallback
-  {
-    virtual void RenderUI(moho::CD3DPrimBatcher* batcher) = 0; // vtable slot +0x38 (14)
-  };
+  // ([base+4]) up to its third ([base+8]), stepping one entry per iteration
+  // (asm 0x007F88FF `mov esi,[ebx+4]` .. 0x007F8927). Modeled through the same
+  // {mFirst,mLast,mEnd} 3-pointer vector view used elsewhere in this file; the
+  // traversal preserves the binary's exact [mLast, mEnd) bounds.
   const auto& worldViewVector =
     *static_cast<const WRenViewportWorldViewVectorRuntime*>(worldViewInfoVector);
   for (const WRenViewportWorldViewParamRuntime* entry = worldViewVector.mLast;
        entry != worldViewVector.mEnd;
        ++entry) {
-    // Record offset +0x0C is the render-callback object; dispatched through its
-    // own vtable (aliases the `terrain` shared_ptr slot of the embedded-param
-    // layout, which for this external callback vector holds the callback object).
-    auto* const callback = reinterpret_cast<SWorldViewInfoUICallback*>(entry->terrain.get());
-    if (callback != nullptr) {
-      callback->RenderUI(primBatcher);
+    if (moho::TerrainCommon* const terrain = entry->terrain.get(); terrain != nullptr) {
+      terrain->DrawDirtyTerrain(primBatcher);
     }
   }
 

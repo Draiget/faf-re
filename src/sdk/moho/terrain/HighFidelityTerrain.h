@@ -336,7 +336,7 @@ namespace moho
      * list that overlaps - or is fully contained by - the terrain footprint
      * of the camera frustum.
      */
-    virtual void DrawDirtyTerrain(CD3DPrimBatcher* batcher);
+    void DrawDirtyTerrain(CD3DPrimBatcher* batcher) override;
 
     /**
      * Address: 0x008131D0 (FUN_008131D0, Moho::HighFidelityTerrain::DrawShoreline)

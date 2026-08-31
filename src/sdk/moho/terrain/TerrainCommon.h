@@ -12,6 +12,7 @@ namespace moho
   struct GeomCamera3;
   class ID3DRenderTarget;
   struct TerrainShadowContext;
+  class CD3DPrimBatcher;
 
   /**
    * VFTABLE: 0x00E419D4
@@ -52,7 +53,9 @@ namespace moho
    * here - a slot declared on the base but unimplemented in one derived class
    * would force a stub, which this project forbids. The remaining slots stay
    * on the derived classes until their bodies are recovered, at which point
-   * they move up in the order above.
+   * they move up in the order above. Slot 14 (DrawDirtyTerrain) is now
+   * recovered on all three (HighFidelityTerrain.cpp, MediumFidelityTerrain.cpp,
+   * LowFidelityTerrain.cpp) and is declared here.
    */
   class TerrainCommon
   {
@@ -185,6 +188,26 @@ namespace moho
       boost::shared_ptr<ID3DRenderTarget> reflectionTexture) = 0;
 
     virtual void DrawTerrainSkirt() = 0;
+
+    /**
+     * Primary vtable slot 14.
+     *
+     * What it does:
+     * Debug overlay, gated on the fidelity-specific "show dirty terrain"
+     * toggle. Draws one height-conforming quad over every entry of the
+     * terrain resource's debug dirty-rectangle list that overlaps - or is
+     * fully contained by - the terrain footprint of the camera frustum.
+     *
+     * Dispatched from `REN_RenderViewportUI` (0x007F88D0), once per
+     * registered world-view entry, immediately after the per-view UI head is
+     * bound: `mov edx, [eax+38h]` / `call edx` on the entry's own terrain
+     * pointer at 0x007F8917-0x007F891C. NOT a separate "UI callback" -
+     * `WRenViewportWorldViewParamRuntime::terrain` genuinely holds the same
+     * per-view `TerrainCommon`-derived object `WRenViewport::Render` uses for
+     * every other terrain pass; slot 14 is simply the one slot this
+     * particular call site dispatches.
+     */
+    virtual void DrawDirtyTerrain(CD3DPrimBatcher* batcher) = 0;
 
     boost::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04
   };

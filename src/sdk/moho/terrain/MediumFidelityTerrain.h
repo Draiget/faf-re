@@ -465,7 +465,7 @@ namespace moho
      * texture, then draws one terrain-hugging quad per debug dirty rectangle
      * that the camera footprint overlaps or fully covers.
      */
-    virtual void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher);
+    void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher) override;
 
   private:
     /**
