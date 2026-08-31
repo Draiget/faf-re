@@ -1240,7 +1240,9 @@ namespace moho
   {
     ScopedLocalUnitSet selectionGuard;
     WeakUnitSetUserUnit& selection = selectionGuard.get();
-    sWldSession->GetSelectionUnits(selection);
+    // 0x007B22FD/0x007B2308: reads the global session and calls straight
+    // through with no null check - reproduced as-is.
+    WLD_GetActiveSession()->GetSelectionUnits(selection);
 
     UserEntity* selectedEntity = nullptr;
     if (!selection.IsEmptyAfterPrune()) {
