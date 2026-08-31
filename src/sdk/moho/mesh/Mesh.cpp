@@ -7386,13 +7386,20 @@ namespace moho
       instance->UpdateInterpolatedFields();
 
       // View-depth distance = plane dot of the interpolated world position with
-      // the camera transform's orientation tuple treated as (a,b,c,d).
+      // the camera transform's orientation quaternion treated as (a,b,c,d).
+      // Ground truth (FUN_007DFA00.c) reads the NAMED fields
+      // (orient.z/orient.y/orient.x/orient.w) - the previous body here used
+      // operator[] (0/1/2/3) instead, which indexes the union's raw
+      // m_afTuple storage in ITS declared memory order (w,x,y,z; see
+      // Wm3Quaternion.h's "FAF MOD" union), not name order - so orient_[0]
+      // silently read .w, [1] read .x, [2] read .y and [3] read .z, putting
+      // every term one field off from what the binary actually computes.
       const Wm3::Vec3f& worldPos = instance->interpolatedPosition;
       const float distance =
-        worldPos.z * camera.tranform.orient_[2]
-        + worldPos.y * camera.tranform.orient_[1]
-        + camera.tranform.orient_[0] * worldPos.x
-        + camera.tranform.orient_[3];
+        worldPos.z * camera.tranform.orient_.z
+        + worldPos.y * camera.tranform.orient_.y
+        + camera.tranform.orient_.x * worldPos.x
+        + camera.tranform.orient_.w;
 
       const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
