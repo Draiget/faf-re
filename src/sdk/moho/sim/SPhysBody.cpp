@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -543,10 +544,18 @@ namespace moho
    * inverse-inertia tensor lanes, then reconstructs world-space impulse.
    *
    * Ground truth (`FUN_00697E70.c`) builds the basis via `Moho::VAxes3::
-   * VAxes3(&result, &mOrientation)`; `MultQuadVec` against the three standard
-   * basis vectors expands the same `.x`-scalar rotation matrix and produces
-   * numerically identical columns, unlike the previous `Quaternion::Rotate`
-   * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
+   * VAxes3(&result, &mOrientation)` and uses its `vX`/`vY`/`vZ` members
+   * directly -- NOT the previous `Quaternion::Rotate` (upstream WildMagic,
+   * `.w`-scalar `ToMat3()`), but also NOT simply `MultQuadVec` against the
+   * three standard basis vectors: `VAxes3`'s `vX`/`vY`/`vZ` are a specific
+   * permuted-and-partially-negated readout of the `.x`-scalar rotation
+   * matrix (`vX = (M[2][2], M[2][1], -M[2][0])`, `vY = (-M[1][2], -M[1][1],
+   * M[1][0])`, `vZ = (M[0][2], M[0][1], -M[0][0])`, verified numerically),
+   * not the plain columns `MultQuadVec` would produce -- confirmed to
+   * disagree numerically with a first attempt at this fix that assumed the
+   * two were interchangeable. Each `mInvInertiaTensor` lane is tied to
+   * `VAxes3`'s specific basis (the body's real principal axes), so the
+   * `VAxes3` call itself must be used, not a substitute.
    */
   Wm3::Vec3f* SPhysBody::GetImpulse(Wm3::Vec3f* const out) const
   {
@@ -554,15 +563,10 @@ namespace moho
       return nullptr;
     }
 
-    const Wm3::Vec3f unitX{1.0f, 0.0f, 0.0f};
-    const Wm3::Vec3f unitY{0.0f, 1.0f, 0.0f};
-    const Wm3::Vec3f unitZ{0.0f, 0.0f, 1.0f};
-    Wm3::Vec3f basisX{};
-    Wm3::Vec3f basisY{};
-    Wm3::Vec3f basisZ{};
-    MultQuadVec(&basisX, &unitX, &mOrientation);
-    MultQuadVec(&basisY, &unitY, &mOrientation);
-    MultQuadVec(&basisZ, &unitZ, &mOrientation);
+    const moho::VAxes3 axes(mOrientation);
+    const Wm3::Vec3f& basisX = axes.vX;
+    const Wm3::Vec3f& basisY = axes.vY;
+    const Wm3::Vec3f& basisZ = axes.vZ;
 
     const float impulseX = mInvInertiaTensor.x * Wm3::Vec3f::Dot(mWorldImpulse, basisX);
     const float impulseY = mInvInertiaTensor.y * Wm3::Vec3f::Dot(mWorldImpulse, basisY);
