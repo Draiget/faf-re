@@ -135,33 +135,51 @@ namespace
     return true;
   }
 
+  /**
+   * `out[i] = dot(matrix.r[i], columnVector)` - applies `matrix` on the left
+   * to `columnVector` treated as a column, i.e. the transpose of this
+   * engine's point-transform convention (`operator*(Vector4f, VMatrix4)`,
+   * which instead combines `matrix`'s COLUMNS: `out[j] = sum_i vRow[i] *
+   * M.r[i][j]`, correct for transforming a *point*, `pointRow * M`). Needed
+   * anywhere a 4-vector is a covector/plane/interpolant-row rather than a
+   * point - using the point-transform operator there silently swaps rows for
+   * columns. Two real bugs already came from exactly that mixup:
+   * `BuildNormalizedPlane` below (see its own history, commit `69b7ac6f`) and
+   * `GeomCamera3::Init`'s `viewport.r[0]` build (the `widthSlope`/
+   * `widthIntercept` LOD interpolant row - verified term-for-term against
+   * `FUN_004700A0.c` lines 224-240, which read `mView.d[K].d[2]`/`.d[3]` for
+   * each output row K, i.e. `view`'s Z/W COLUMN dotted per-row, not `view`'s
+   * own row 2/row 3 blended by the point-transform operator).
+   */
+  [[nodiscard]] moho::Vector4f DotMatrixRows(const moho::VMatrix4& matrix, const moho::Vector4f& columnVector) noexcept
+  {
+    return {
+      (matrix.r[0].x * columnVector.x) + (matrix.r[0].y * columnVector.y) + (matrix.r[0].z * columnVector.z)
+        + (matrix.r[0].w * columnVector.w),
+      (matrix.r[1].x * columnVector.x) + (matrix.r[1].y * columnVector.y) + (matrix.r[1].z * columnVector.z)
+        + (matrix.r[1].w * columnVector.w),
+      (matrix.r[2].x * columnVector.x) + (matrix.r[2].y * columnVector.y) + (matrix.r[2].z * columnVector.z)
+        + (matrix.r[2].w * columnVector.w),
+      (matrix.r[3].x * columnVector.x) + (matrix.r[3].y * columnVector.y) + (matrix.r[3].z * columnVector.z)
+        + (matrix.r[3].w * columnVector.w),
+    };
+  }
+
   [[nodiscard]] Wm3::Plane3f BuildNormalizedPlane(const moho::Vector4f& clipPlane, const moho::VMatrix4& matrix) noexcept
   {
     // Extracts one world-space clipping plane from a combined view/projection
-    // matrix (the standard Gribb/Hartmann technique). `operator*(vRow, M)`
-    // computes `out[j] = sum_i vRow[i] * M.r[i][j]` - correct for transforming
-    // a *point* under this engine's row-vector convention (`pointRow * M`),
-    // but plane extraction needs the transpose of that: for each output
-    // component i, the dot product of clip-space row i with `clipPlane`
-    // (`out[i] = sum_j M.r[i][j] * clipPlane[j]`), i.e. treating `clipPlane`
-    // as a column and applying `matrix` on the left. Using the point-transform
-    // operator here silently combined matrix *columns* instead of rows, so
-    // every plane except the single-component near plane collapsed toward the
-    // matrix's (large-magnitude, translation-derived) last row and produced
-    // near-duplicate, wrongly-oriented planes - confirmed live: left/right
-    // both normalized to ~(0.363, 0.845, -0.393) instead of being mirrored in
-    // x, which made the tesselator's root-tile frustum test reject the whole
-    // terrain every frame.
-    const moho::Vector4f transformed{
-      (matrix.r[0].x * clipPlane.x) + (matrix.r[0].y * clipPlane.y) + (matrix.r[0].z * clipPlane.z)
-        + (matrix.r[0].w * clipPlane.w),
-      (matrix.r[1].x * clipPlane.x) + (matrix.r[1].y * clipPlane.y) + (matrix.r[1].z * clipPlane.z)
-        + (matrix.r[1].w * clipPlane.w),
-      (matrix.r[2].x * clipPlane.x) + (matrix.r[2].y * clipPlane.y) + (matrix.r[2].z * clipPlane.z)
-        + (matrix.r[2].w * clipPlane.w),
-      (matrix.r[3].x * clipPlane.x) + (matrix.r[3].y * clipPlane.y) + (matrix.r[3].z * clipPlane.z)
-        + (matrix.r[3].w * clipPlane.w),
-    };
+    // matrix (the standard Gribb/Hartmann technique). Plane extraction needs
+    // `matrix` applied on the left to `clipPlane` as a column (`DotMatrixRows`,
+    // above) - `operator*(vRow, M)`, this engine's point-transform convention,
+    // is a DIFFERENT operation and silently combines matrix columns instead
+    // of rows: confirmed live, using it here collapsed every plane except the
+    // single-component near plane toward the matrix's (large-magnitude,
+    // translation-derived) last row and produced near-duplicate,
+    // wrongly-oriented planes - left/right both normalized to
+    // ~(0.363, 0.845, -0.393) instead of being mirrored in x, which made the
+    // tesselator's root-tile frustum test reject the whole terrain every
+    // frame.
+    const moho::Vector4f transformed = DotMatrixRows(matrix, clipPlane);
     const float reciprocalLength =
       1.0f / std::sqrt((transformed.x * transformed.x) + (transformed.y * transformed.y) + (transformed.z * transformed.z));
     return {
@@ -962,8 +980,27 @@ namespace moho
     const float widthSlope = (farWidth - nearWidth) / (leftFar.z - leftNear.z);
     const float widthIntercept = nearWidth - (leftNear.z * widthSlope);
 
+    // `viewportRowSource` is a covector (an interpolant row, like a plane),
+    // not a point - `DotMatrixRows` (matrix-applied-on-the-left) is required
+    // here, matching `FUN_004700A0.c` lines 224-240 exactly (each output row
+    // K reads `mView.d[K].d[2]`/`.d[3]`, i.e. `view`'s Z/W COLUMN dotted
+    // per-row). `operator*(vRow, M)` looks superficially plausible here (it
+    // is the "obvious" way to combine a Vector4f with a VMatrix4) but is the
+    // point-transform convention and produces a different vector: it blends
+    // `view`'s ROW 2/ROW 3 directly, which makes `widthIntercept`'s
+    // near-zero magnitude (a real, near-clip-scale constant) swallow
+    // `view.row3` - the camera's own world-space translation - instead of
+    // combining with `view`'s Z-column the way `viewSpaceZ(worldPoint)`
+    // actually does. The bug was invisible near the world origin (both
+    // conventions agree when `view.row2 == view`'s Z-column, which happens
+    // only when `view`'s rotation block is symmetric) and only shows up once
+    // the camera sits far from `(0,0,0)`, exactly this map's situation
+    // (world span 0-1024, camera around world Z~950): `GetIntersectionResult`
+    // (`CTesselator.cpp`) never returned `kAccept` because the resulting
+    // `viewport.r[1]`-based depth estimate was structurally blind to the
+    // camera's actual distance from scene content, not just from the origin.
     const Vector4f viewportRowSource{0.0f, 0.0f, widthSlope, widthIntercept};
-    viewport.r[0] = viewportRowSource * view;
+    viewport.r[0] = DotMatrixRows(view, viewportRowSource);
 
     const float reciprocalViewportDepth = 1.0f / viewport.r[3].z;
     viewport.r[2] = viewport.r[0];
