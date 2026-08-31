@@ -2325,55 +2325,6 @@ namespace
     "CRenderWorldViewRuntimeView::mIsMiniMap offset must be 0x19"
   );
 
-  struct CRenderWorldViewViewportRuntimeView
-  {
-    void* vftable = nullptr;
-
-    [[nodiscard]] const char* CameraName() const
-    {
-      using CameraNameFn = const char*(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<CameraNameFn>(table[1]);
-      return fn(this);
-    }
-
-    void SetViewRect(const Wm3::Vector2f& minPoint, const Wm3::Vector2f& maxPoint)
-    {
-      using SetViewRectFn = void(__thiscall*)(
-        CRenderWorldViewViewportRuntimeView*,
-        const Wm3::Vector2f*,
-        const Wm3::Vector2f*
-      );
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<SetViewRectFn>(table[3]);
-      fn(this, &minPoint, &maxPoint);
-    }
-
-    [[nodiscard]] const Wm3::Vec3f& CameraGetOffset() const
-    {
-      using CameraGetOffsetFn = const Wm3::Vec3f&(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<CameraGetOffsetFn>(table[18]);
-      return fn(this);
-    }
-
-    [[nodiscard]] float CameraGetTargetZoom() const
-    {
-      using CameraGetTargetZoomFn = float(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<CameraGetTargetZoomFn>(table[19]);
-      return fn(this);
-    }
-
-    [[nodiscard]] float LODMetric(const Wm3::Vec3f& cursorWorldPosition) const
-    {
-      using LODMetricFn = float(__thiscall*)(const CRenderWorldViewViewportRuntimeView*, const Wm3::Vec3f&);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<LODMetricFn>(table[35]);
-      return fn(this, cursorWorldPosition);
-    }
-  };
-
   struct CUIWorldViewOverlayRuntimeView
   {
     void* vftable = nullptr;
@@ -2408,7 +2359,20 @@ namespace
     // first write through it. `RenderWorldView()` below reinterprets `this + 0x11C`
     // directly instead, matching every other `AsXxxView`-style helper in this file.
     std::uint8_t mRenderWorldViewVftable[0x04]{};
-    CRenderWorldViewViewportRuntimeView* mViewportCallback = nullptr; // +0x120
+    // Was modeled as `CRenderWorldViewViewportRuntimeView* mViewportCallback`,
+    // a stored pointer dispatched through a fabricated vtable shape
+    // (CameraName/SetViewRect/CameraGetOffset/CameraGetTargetZoom/LODMetric
+    // at slots 1/3/18/19/35). Proven wrong two ways: (1) this offset's real
+    // vtable, per `dumps/rtti_dump_all.hpp`'s RTTI for `CUIWorldView`
+    // ("Secondary vftable at subobject offset 284", i.e. 0x11C), has slot 3
+    // = 0x0086EBF0 = the already-recovered `CRenderWorldView::GetCamera`, not
+    // a SetViewRect-shaped setter; (2) a sibling call site 30 lines below
+    // this struct in the binary (`NewSelectionDragger`'s doc comment) reads
+    // this exact +0x120 field and states outright that it is "the raw
+    // pointer value ... stored verbatim into SelectionDragger::mCam with no
+    // dereference in between" -- i.e. a plain `CameraImpl*`. Matches
+    // `CUIWorldViewCtorRuntimeView::mCamera` at the same offset exactly.
+    moho::CameraImpl* mCamera = nullptr; // +0x120
     float mCachedViewLeft = 0.0f;   // +0x124
     float mCachedViewTop = 0.0f;    // +0x128
     float mCachedViewRight = 0.0f;  // +0x12C
@@ -2452,8 +2416,8 @@ namespace
     "CUIWorldViewRuntimeView::mViewBottom offset must be 0xAC"
   );
   static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewportCallback) == 0x120,
-    "CUIWorldViewRuntimeView::mViewportCallback offset must be 0x120"
+    offsetof(CUIWorldViewRuntimeView, mCamera) == 0x120,
+    "CUIWorldViewRuntimeView::mCamera offset must be 0x120"
   );
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mCachedViewLeft) == 0x124,
@@ -2676,7 +2640,7 @@ namespace
   }
 
   void StoreCursorLodAndFocusStats(
-    CRenderWorldViewViewportRuntimeView& viewport,
+    moho::CameraImpl& camera,
     const Wm3::Vec3f& cursorWorldPosition,
     moho::StatItem*& lodStat,
     const char* const lodStatPath,
@@ -2684,11 +2648,11 @@ namespace
     const char* const focusStatPath
   )
   {
-    StoreEngineFloatStat(lodStat, lodStatPath, viewport.LODMetric(cursorWorldPosition));
+    StoreEngineFloatStat(lodStat, lodStatPath, camera.LODMetric(cursorWorldPosition));
 
-    const float targetZoom = viewport.CameraGetTargetZoom();
-    const Wm3::Vec3f& offsetBefore = viewport.CameraGetOffset();
-    const float focusDistance = std::fabs((offsetBefore.y + targetZoom) - viewport.CameraGetOffset().y);
+    const float targetZoom = camera.CameraGetTargetZoom();
+    const Wm3::Vec3f& offsetBefore = camera.CameraGetOffset();
+    const float focusDistance = std::fabs((offsetBefore.y + targetZoom) - camera.CameraGetOffset().y);
     StoreEngineFloatStat(focusStat, focusStatPath, focusDistance);
   }
 
@@ -11498,7 +11462,7 @@ static void func_NewCommandDragger(
  * then binds the returned dragger into the view's weak overlay link.
  * The disassembly at 0x00870E0C-0x00870E23 resolves the
  * call's arguments from the world view's own fields: `camera` from
- * `CUIWorldViewRuntimeView::mViewportCallback` (+0x120, the raw pointer
+ * `CUIWorldViewRuntimeView::mCamera` (+0x120, the raw pointer
  * value the constructor chain stores verbatim into `SelectionDragger::mCam`
  * with no dereference in between), `session` from
  * `CUIWorldViewRuntimeView::mSession` (+0x208), and `originFrame` from
@@ -22532,9 +22496,9 @@ void moho::UIWorldViewUpdateCursorEngineStats(
 )
 {
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  CRenderWorldViewViewportRuntimeView* const viewport = worldViewView->mViewportCallback;
+  moho::CameraImpl* const camera = worldViewView->mCamera;
 
-  if (_stricmp(viewport->CameraName(), "WorldCamera") == 0) {
+  if (_stricmp(camera->CameraGetName(), "WorldCamera") == 0) {
     const msvc8::string positionText = gpg::STR_Printf(
       "x=%.2f,y=%.2f,z=%.2f",
       cursorWorldPosition.x,
@@ -22555,7 +22519,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
     EnsureEngineStringStat(gCameraCursorOCellStat, "Camera_Cursor_OCell")->SetValue(cellText);
 
     StoreCursorLodAndFocusStats(
-      *viewport,
+      *camera,
       cursorWorldPosition,
       gCameraCursorLodMetricStat,
       "Camera_Cursor_LODMetric",
@@ -22564,9 +22528,9 @@ void moho::UIWorldViewUpdateCursorEngineStats(
     );
   }
 
-  if (_stricmp(viewport->CameraName(), "MiniMap") == 0) {
+  if (_stricmp(camera->CameraGetName(), "MiniMap") == 0) {
     StoreCursorLodAndFocusStats(
-      *viewport,
+      *camera,
       cursorWorldPosition,
       gMinimapCursorLodMetricStat,
       "Minimap_Cursor_LODMetric",
@@ -22629,11 +22593,17 @@ void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std:
       worldViewView->mCachedViewRight = right;
       worldViewView->mCachedViewBottom = bottom;
 
-      CRenderWorldViewViewportRuntimeView* const viewport = worldViewView->mViewportCallback;
-      if (viewport != nullptr) {
-        const Wm3::Vector2f minPoint{left, top};
-        const Wm3::Vector2f maxPoint{right, bottom};
-        viewport->SetViewRect(minPoint, maxPoint);
+      // `mCamera` (+0x120) is the world view's own CameraImpl* -- see the
+      // field's doc comment. This is the one and only place that pushes the
+      // Lua-driven on-screen rect (worldview.lua resizes mViewLeft/Top/
+      // Right/Bottom as part of its own layout pass) down to the camera;
+      // without it the camera keeps the {0,0}/{1,1} unit placeholder its own
+      // constructor seeds, so its frustum never covers real screen space and
+      // nothing is ever collected to render (confirmed live via dbgrun:
+      // MeshRenderer::Batch's frustum-volume query returned zero instances
+      // every frame with the camera stuck at viewport width=1).
+      if (moho::CameraImpl* const camera = worldViewView->mCamera; camera != nullptr) {
+        camera->CameraSetViewport(Wm3::Vector2f(left, top), Wm3::Vector2f(right - left, bottom - top));
       }
     }
     return;
