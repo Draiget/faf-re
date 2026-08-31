@@ -68458,8 +68458,9 @@ unsigned int moho::REN_RenderCartographic(
   BoundaryRenderer* const boundaryRenderer =
     (moho::ren_PlayableBoundary && terrainMapView->mMap != nullptr) ? &destroyView->mBoundaryRenderer : nullptr;
 
+  moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   VisionRenderer* const visionRenderer =
-    (moho::ren_FogOfWar && moho::sWldSession != nullptr && moho::sWldSession->FocusArmy != -1)
+    (moho::ren_FogOfWar && activeSession != nullptr && activeSession->FocusArmy != -1)
       ? &destroyView->mVisionRenderer
       : nullptr;
 
