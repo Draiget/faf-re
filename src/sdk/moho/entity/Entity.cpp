@@ -8715,6 +8715,31 @@ namespace moho
    * What it does:
    * Builds a heading/pitch orientation quaternion from half-angle sine/cosine
    * products, preserving the original lane order used by camera/weapon code.
+   *
+   * Field assignment verified term-by-term against the raw decompile
+   * (FUN_0050B300.c): the binary composes a pitch-then-heading quaternion
+   * product with an identity third factor (roll=0, folded away at compile
+   * time - the `* cos(0.0)` / `* sin(0.0)` terms throughout are exactly
+   * `*1.0` / `*0.0`), and assigns the four resulting terms by NAME to
+   * dest->x/y/z/w in that order:
+   *   dest->x = cosHeading*cosPitch
+   *   dest->y = sinPitch*cosHeading
+   *   dest->z = sinHeading*cosPitch
+   *   dest->w = -(sinHeading*sinPitch)
+   * A prior recovery pass assigned these same four products to
+   * w/x/y/z instead of x/y/z/w - a one-position cyclic shift of which
+   * named component receives which value. That mislabeled quaternion is
+   * consumed downstream by GeomCamera3::Init (via CameraImpl::UpdateCoords)
+   * to rebuild the camera's view/frustum planes every frame; confirmed live
+   * via dbgrun that the resulting camera.solid2 frustum was validly shaped
+   * (6 real planes, symmetric left/right pair) but did not enclose the
+   * camera's own position - MeshRenderer::Batch's CollectAllInVolume query
+   * against it returned 0 instances every frame regardless of a populated
+   * spatial DB, a correctly-sized viewport, and a correct camera position,
+   * which is the direct, mechanical cause of the persistently black 3D
+   * viewport this session's whole investigation chased. This function is
+   * also called from weapon/projectile/AI aim code (13 call sites across
+   * src/sdk), so the same mislabeling likely affected those consumers too.
    */
   Wm3::Quaternionf COORDS_Orient(const float heading, const float pitch) noexcept
   {
@@ -8727,10 +8752,10 @@ namespace moho
     const float sinPitch = std::sin(halfPitch);
 
     Wm3::Quaternionf orientation{};
-    orientation.w = cosHeading * cosPitch;
-    orientation.x = cosHeading * sinPitch;
-    orientation.y = sinHeading * cosPitch;
-    orientation.z = -(sinHeading * sinPitch);
+    orientation.x = cosHeading * cosPitch;
+    orientation.y = sinPitch * cosHeading;
+    orientation.z = sinHeading * cosPitch;
+    orientation.w = -(sinHeading * sinPitch);
     return orientation;
   }
 
