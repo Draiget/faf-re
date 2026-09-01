@@ -2772,25 +2772,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007E6920 (FUN_007E6920, boost::detail::sp_counted_impl_p<Moho::RMeshBlueprintLOD>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for
-   * `RMeshBlueprintLOD`.
-   */
-  SpCountedImplStorage<moho::RMeshBlueprintLOD>* SpCountedImplPConstructRMeshBlueprintLOD(
-    SpCountedImplStorage<moho::RMeshBlueprintLOD>* const countedImpl,
-    moho::RMeshBlueprintLOD* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
    * Address: 0x007E6970 (FUN_007E6970, boost::detail::sp_counted_impl_p<Moho::MeshBatch>::sp_counted_impl_p)
    *
    * What it does:
