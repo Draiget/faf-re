@@ -7204,3 +7204,508 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsSim2 gConsoleStartupRegistrationsSim2;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupCamDefaultMiniLODDescription = "Default LOD for mini-map";
+  constexpr const char* kConsoleStartupCamEntityBoxExpandDescription = "How much to expand the entity box when targetting entity";
+  constexpr const char* kConsoleStartupCamFarFOVDescription = "FOV to use for perspective camera at farthest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamFarPitchDescription = "Pitch of camera at farthest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamFreeDescription = "Allow the camera to remain rotated";
+  constexpr const char* kConsoleStartupCamMinSpinPitchDescription = "The min pitch resulting from a spin";
+  constexpr const char* kConsoleStartupCamNearFOVDescription = "FOV to use for perspective camera at nearest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamNearPitchDescription = "Pitch of camera at nearest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamNearZoomDescription = "Closest mouse can zoom in to terrain";
+  constexpr const char* kConsoleStartupCamPanSpeedDescription = "How fast the camera pans.";
+  constexpr const char* kConsoleStartupCamShakeMultDescription = "How much camera shake to allow.";
+  constexpr const char* kConsoleStartupCamSpinSpeedDescription = "How fast mouse spins camera, in degrees across screen size";
+  constexpr const char* kConsoleStartupCamTrackProjectileTimeoutDescription = "Delay after tracking a projectile.";
+  constexpr const char* kConsoleStartupCamZoomAmountDescription = "How far to zoom in response to the mouse wheel.";
+  constexpr const char* kConsoleStartupCamZoomSpeedLargeDescription = "How fast the camera actually moves in response to a large zoom.";
+  constexpr const char* kConsoleStartupCamZoomSpeedSmallDescription = "How fast the camera actually moves in response to a small zoom.";
+} // namespace
+
+// New console-tunable storage with no other subsystem owner (default read from the
+// binary's .data image at the registrar's value-pointer field).
+float moho::cam_TrackProjectileTimeout = 6.0f;
+
+namespace moho
+{
+  extern float cam_DefaultMiniLOD;
+  extern float cam_EntityBoxExpand;
+  extern float cam_FarFOV;
+  extern float cam_FarPitch;
+  extern bool cam_Free;
+  extern float cam_MinSpinPitch;
+  extern float cam_NearFOV;
+  extern float cam_NearPitch;
+  extern float cam_NearZoom;
+  extern float cam_PanSpeed;
+  extern float cam_ShakeMult;
+  extern float cam_SpinSpeed;
+  extern float cam_ZoomAmount;
+  extern float cam_ZoomSpeedLarge;
+  extern float cam_ZoomSpeedSmall;
+
+  TConVar<float> gTConVar_cam_DefaultMiniLOD(
+    "cam_DefaultMiniLOD",
+    kConsoleStartupCamDefaultMiniLODDescription,
+    &moho::cam_DefaultMiniLOD
+  );
+  TConVar<float> gTConVar_cam_EntityBoxExpand(
+    "cam_EntityBoxExpand",
+    kConsoleStartupCamEntityBoxExpandDescription,
+    &moho::cam_EntityBoxExpand
+  );
+  TConVar<float> gTConVar_cam_FarFOV(
+    "cam_FarFOV",
+    kConsoleStartupCamFarFOVDescription,
+    &moho::cam_FarFOV
+  );
+  TConVar<float> gTConVar_cam_FarPitch(
+    "cam_FarPitch",
+    kConsoleStartupCamFarPitchDescription,
+    &moho::cam_FarPitch
+  );
+  TConVar<bool> gTConVar_cam_Free(
+    "cam_Free",
+    kConsoleStartupCamFreeDescription,
+    &moho::cam_Free
+  );
+  TConVar<float> gTConVar_cam_MinSpinPitch(
+    "cam_MinSpinPitch",
+    kConsoleStartupCamMinSpinPitchDescription,
+    &moho::cam_MinSpinPitch
+  );
+  TConVar<float> gTConVar_cam_NearFOV(
+    "cam_NearFOV",
+    kConsoleStartupCamNearFOVDescription,
+    &moho::cam_NearFOV
+  );
+  TConVar<float> gTConVar_cam_NearPitch(
+    "cam_NearPitch",
+    kConsoleStartupCamNearPitchDescription,
+    &moho::cam_NearPitch
+  );
+  TConVar<float> gTConVar_cam_NearZoom(
+    "cam_NearZoom",
+    kConsoleStartupCamNearZoomDescription,
+    &moho::cam_NearZoom
+  );
+  TConVar<float> gTConVar_cam_PanSpeed(
+    "cam_PanSpeed",
+    kConsoleStartupCamPanSpeedDescription,
+    &moho::cam_PanSpeed
+  );
+  TConVar<float> gTConVar_cam_ShakeMult(
+    "cam_ShakeMult",
+    kConsoleStartupCamShakeMultDescription,
+    &moho::cam_ShakeMult
+  );
+  TConVar<float> gTConVar_cam_SpinSpeed(
+    "cam_SpinSpeed",
+    kConsoleStartupCamSpinSpeedDescription,
+    &moho::cam_SpinSpeed
+  );
+  TConVar<float> gTConVar_cam_TrackProjectileTimeout(
+    "cam_TrackProjectileTimeout",
+    kConsoleStartupCamTrackProjectileTimeoutDescription,
+    &moho::cam_TrackProjectileTimeout
+  );
+  TConVar<float> gTConVar_cam_ZoomAmount(
+    "cam_ZoomAmount",
+    kConsoleStartupCamZoomAmountDescription,
+    &moho::cam_ZoomAmount
+  );
+  TConVar<float> gTConVar_cam_ZoomSpeedLarge(
+    "cam_ZoomSpeedLarge",
+    kConsoleStartupCamZoomSpeedLargeDescription,
+    &moho::cam_ZoomSpeedLarge
+  );
+  TConVar<float> gTConVar_cam_ZoomSpeedSmall(
+    "cam_ZoomSpeedSmall",
+    kConsoleStartupCamZoomSpeedSmallDescription,
+    &moho::cam_ZoomSpeedSmall
+  );
+
+  /**
+   * Address: 0x00C077E0 (FUN_00C077E0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_DefaultMiniLOD`.
+   */
+  void cleanup_TConVar_cam_DefaultMiniLOD()
+  {
+    CleanupStartupConCommand(gTConVar_cam_DefaultMiniLOD);
+  }
+
+  /**
+   * Address: 0x00BE66E0 (FUN_00BE66E0, register_TConVar_cam_DefaultMiniLOD)
+   *
+   * What it does:
+   * Registers startup convar for `cam_DefaultMiniLOD`.
+   */
+  void register_TConVar_cam_DefaultMiniLOD()
+  {
+    RegisterStartupConVar(gTConVar_cam_DefaultMiniLOD, &cleanup_TConVar_cam_DefaultMiniLOD);
+  }
+
+  /**
+   * Address: 0x00C03550 (FUN_00C03550, ??1TConVar_cam_EntityBoxExpand@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_EntityBoxExpand`.
+   */
+  void cleanup_TConVar_cam_EntityBoxExpand()
+  {
+    CleanupStartupConCommand(gTConVar_cam_EntityBoxExpand);
+  }
+
+  /**
+   * Address: 0x00BDF540 (FUN_00BDF540, register_TConVar_cam_EntityBoxExpand)
+   *
+   * What it does:
+   * Registers startup convar for `cam_EntityBoxExpand`.
+   */
+  void register_TConVar_cam_EntityBoxExpand()
+  {
+    RegisterStartupConVar(gTConVar_cam_EntityBoxExpand, &cleanup_TConVar_cam_EntityBoxExpand);
+  }
+
+  /**
+   * Address: 0x00C03370 (FUN_00C03370, ??1TConVar_cam_FarFOV@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_FarFOV`.
+   */
+  void cleanup_TConVar_cam_FarFOV()
+  {
+    CleanupStartupConCommand(gTConVar_cam_FarFOV);
+  }
+
+  /**
+   * Address: 0x00BDF2C0 (FUN_00BDF2C0, register_TConVar_cam_FarFOV)
+   *
+   * What it does:
+   * Registers startup convar for `cam_FarFOV`.
+   */
+  void register_TConVar_cam_FarFOV()
+  {
+    RegisterStartupConVar(gTConVar_cam_FarFOV, &cleanup_TConVar_cam_FarFOV);
+  }
+
+  /**
+   * Address: 0x00C033D0 (FUN_00C033D0, ??1TConVar_cam_FarPitch@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_FarPitch`.
+   */
+  void cleanup_TConVar_cam_FarPitch()
+  {
+    CleanupStartupConCommand(gTConVar_cam_FarPitch);
+  }
+
+  /**
+   * Address: 0x00BDF340 (FUN_00BDF340, register_TConVar_cam_FarPitch)
+   *
+   * What it does:
+   * Registers startup convar for `cam_FarPitch`.
+   */
+  void register_TConVar_cam_FarPitch()
+  {
+    RegisterStartupConVar(gTConVar_cam_FarPitch, &cleanup_TConVar_cam_FarPitch);
+  }
+
+  /**
+   * Address: 0x00C077B0 (FUN_00C077B0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_Free`.
+   */
+  void cleanup_TConVar_cam_Free()
+  {
+    CleanupStartupConCommand(gTConVar_cam_Free);
+  }
+
+  /**
+   * Address: 0x00BE66A0 (FUN_00BE66A0, register_TConVar_cam_Free)
+   *
+   * What it does:
+   * Registers startup convar for `cam_Free`.
+   */
+  void register_TConVar_cam_Free()
+  {
+    RegisterStartupConVar(gTConVar_cam_Free, &cleanup_TConVar_cam_Free);
+  }
+
+  /**
+   * Address: 0x00C03580 (FUN_00C03580, ??1TConVar_cam_MinSpinPitch@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_MinSpinPitch`.
+   */
+  void cleanup_TConVar_cam_MinSpinPitch()
+  {
+    CleanupStartupConCommand(gTConVar_cam_MinSpinPitch);
+  }
+
+  /**
+   * Address: 0x00BDF580 (FUN_00BDF580, register_TConVar_cam_MinSpinPitch)
+   *
+   * What it does:
+   * Registers startup convar for `cam_MinSpinPitch`.
+   */
+  void register_TConVar_cam_MinSpinPitch()
+  {
+    RegisterStartupConVar(gTConVar_cam_MinSpinPitch, &cleanup_TConVar_cam_MinSpinPitch);
+  }
+
+  /**
+   * Address: 0x00C03340 (FUN_00C03340, ??1TConVar_cam_NearFOV@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_NearFOV`.
+   */
+  void cleanup_TConVar_cam_NearFOV()
+  {
+    CleanupStartupConCommand(gTConVar_cam_NearFOV);
+  }
+
+  /**
+   * Address: 0x00BDF280 (FUN_00BDF280, register_TConVar_cam_NearFOV)
+   *
+   * What it does:
+   * Registers startup convar for `cam_NearFOV`.
+   */
+  void register_TConVar_cam_NearFOV()
+  {
+    RegisterStartupConVar(gTConVar_cam_NearFOV, &cleanup_TConVar_cam_NearFOV);
+  }
+
+  /**
+   * Address: 0x00C033A0 (FUN_00C033A0, ??1TConVar_cam_NearPitch@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_NearPitch`.
+   */
+  void cleanup_TConVar_cam_NearPitch()
+  {
+    CleanupStartupConCommand(gTConVar_cam_NearPitch);
+  }
+
+  /**
+   * Address: 0x00BDF300 (FUN_00BDF300, register_TConVar_cam_NearPitch)
+   *
+   * What it does:
+   * Registers startup convar for `cam_NearPitch`.
+   */
+  void register_TConVar_cam_NearPitch()
+  {
+    RegisterStartupConVar(gTConVar_cam_NearPitch, &cleanup_TConVar_cam_NearPitch);
+  }
+
+  /**
+   * Address: 0x00C03310 (FUN_00C03310, ??1TConVar_cam_NearZoom@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_NearZoom`.
+   */
+  void cleanup_TConVar_cam_NearZoom()
+  {
+    CleanupStartupConCommand(gTConVar_cam_NearZoom);
+  }
+
+  /**
+   * Address: 0x00BDF240 (FUN_00BDF240, register_TConVar_cam_NearZoom)
+   *
+   * What it does:
+   * Registers startup convar for `cam_NearZoom`.
+   */
+  void register_TConVar_cam_NearZoom()
+  {
+    RegisterStartupConVar(gTConVar_cam_NearZoom, &cleanup_TConVar_cam_NearZoom);
+  }
+
+  /**
+   * Address: 0x00C034F0 (FUN_00C034F0, ??1TConVar_cam_PanSpeed@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_PanSpeed`.
+   */
+  void cleanup_TConVar_cam_PanSpeed()
+  {
+    CleanupStartupConCommand(gTConVar_cam_PanSpeed);
+  }
+
+  /**
+   * Address: 0x00BDF4C0 (FUN_00BDF4C0, register_TConVar_cam_PanSpeed)
+   *
+   * What it does:
+   * Registers startup convar for `cam_PanSpeed`.
+   */
+  void register_TConVar_cam_PanSpeed()
+  {
+    RegisterStartupConVar(gTConVar_cam_PanSpeed, &cleanup_TConVar_cam_PanSpeed);
+  }
+
+  /**
+   * Address: 0x00C03520 (FUN_00C03520, ??1TConVar_cam_ShakeMult@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_ShakeMult`.
+   */
+  void cleanup_TConVar_cam_ShakeMult()
+  {
+    CleanupStartupConCommand(gTConVar_cam_ShakeMult);
+  }
+
+  /**
+   * Address: 0x00BDF500 (FUN_00BDF500, register_TConVar_cam_ShakeMult)
+   *
+   * What it does:
+   * Registers startup convar for `cam_ShakeMult`.
+   */
+  void register_TConVar_cam_ShakeMult()
+  {
+    RegisterStartupConVar(gTConVar_cam_ShakeMult, &cleanup_TConVar_cam_ShakeMult);
+  }
+
+  /**
+   * Address: 0x00C034C0 (FUN_00C034C0, ??1TConVar_cam_SpinSpeed@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_SpinSpeed`.
+   */
+  void cleanup_TConVar_cam_SpinSpeed()
+  {
+    CleanupStartupConCommand(gTConVar_cam_SpinSpeed);
+  }
+
+  /**
+   * Address: 0x00BDF480 (FUN_00BDF480, register_TConVar_cam_SpinSpeed)
+   *
+   * What it does:
+   * Registers startup convar for `cam_SpinSpeed`.
+   */
+  void register_TConVar_cam_SpinSpeed()
+  {
+    RegisterStartupConVar(gTConVar_cam_SpinSpeed, &cleanup_TConVar_cam_SpinSpeed);
+  }
+
+  /**
+   * Address: 0x00C03490 (FUN_00C03490, ??1TConVar_cam_TrackProjectileTimeout@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_TrackProjectileTimeout`.
+   */
+  void cleanup_TConVar_cam_TrackProjectileTimeout()
+  {
+    CleanupStartupConCommand(gTConVar_cam_TrackProjectileTimeout);
+  }
+
+  /**
+   * Address: 0x00BDF440 (FUN_00BDF440, register_TConVar_cam_TrackProjectileTimeout)
+   *
+   * What it does:
+   * Registers startup convar for `cam_TrackProjectileTimeout`.
+   */
+  void register_TConVar_cam_TrackProjectileTimeout()
+  {
+    RegisterStartupConVar(gTConVar_cam_TrackProjectileTimeout, &cleanup_TConVar_cam_TrackProjectileTimeout);
+  }
+
+  /**
+   * Address: 0x00C03400 (FUN_00C03400, ??1TConVar_cam_ZoomAmount@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_ZoomAmount`.
+   */
+  void cleanup_TConVar_cam_ZoomAmount()
+  {
+    CleanupStartupConCommand(gTConVar_cam_ZoomAmount);
+  }
+
+  /**
+   * Address: 0x00BDF380 (FUN_00BDF380, register_TConVar_cam_ZoomAmount)
+   *
+   * What it does:
+   * Registers startup convar for `cam_ZoomAmount`.
+   */
+  void register_TConVar_cam_ZoomAmount()
+  {
+    RegisterStartupConVar(gTConVar_cam_ZoomAmount, &cleanup_TConVar_cam_ZoomAmount);
+  }
+
+  /**
+   * Address: 0x00C03460 (FUN_00C03460, ??1TConVar_cam_ZoomSpeedLarge@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_ZoomSpeedLarge`.
+   */
+  void cleanup_TConVar_cam_ZoomSpeedLarge()
+  {
+    CleanupStartupConCommand(gTConVar_cam_ZoomSpeedLarge);
+  }
+
+  /**
+   * Address: 0x00BDF400 (FUN_00BDF400, register_TConVar_cam_ZoomSpeedLarge)
+   *
+   * What it does:
+   * Registers startup convar for `cam_ZoomSpeedLarge`.
+   */
+  void register_TConVar_cam_ZoomSpeedLarge()
+  {
+    RegisterStartupConVar(gTConVar_cam_ZoomSpeedLarge, &cleanup_TConVar_cam_ZoomSpeedLarge);
+  }
+
+  /**
+   * Address: 0x00C03430 (FUN_00C03430, ??1TConVar_cam_ZoomSpeedSmall@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `cam_ZoomSpeedSmall`.
+   */
+  void cleanup_TConVar_cam_ZoomSpeedSmall()
+  {
+    CleanupStartupConCommand(gTConVar_cam_ZoomSpeedSmall);
+  }
+
+  /**
+   * Address: 0x00BDF3C0 (FUN_00BDF3C0, register_TConVar_cam_ZoomSpeedSmall)
+   *
+   * What it does:
+   * Registers startup convar for `cam_ZoomSpeedSmall`.
+   */
+  void register_TConVar_cam_ZoomSpeedSmall()
+  {
+    RegisterStartupConVar(gTConVar_cam_ZoomSpeedSmall, &cleanup_TConVar_cam_ZoomSpeedSmall);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsCam
+  {
+    ConsoleStartupRegistrationsCam()
+    {
+      moho::register_TConVar_cam_DefaultMiniLOD();
+      moho::register_TConVar_cam_EntityBoxExpand();
+      moho::register_TConVar_cam_FarFOV();
+      moho::register_TConVar_cam_FarPitch();
+      moho::register_TConVar_cam_Free();
+      moho::register_TConVar_cam_MinSpinPitch();
+      moho::register_TConVar_cam_NearFOV();
+      moho::register_TConVar_cam_NearPitch();
+      moho::register_TConVar_cam_NearZoom();
+      moho::register_TConVar_cam_PanSpeed();
+      moho::register_TConVar_cam_ShakeMult();
+      moho::register_TConVar_cam_SpinSpeed();
+      moho::register_TConVar_cam_TrackProjectileTimeout();
+      moho::register_TConVar_cam_ZoomAmount();
+      moho::register_TConVar_cam_ZoomSpeedLarge();
+      moho::register_TConVar_cam_ZoomSpeedSmall();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsCam gConsoleStartupRegistrationsCam;
+} // namespace
