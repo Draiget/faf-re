@@ -1393,6 +1393,215 @@ extern "C" void png_read_start_row(png_structp png_ptr)
 }
 
 /**
+ * Address: 0x009E3915 (FUN_009E3915)
+ * Mangled: png_read_transform_info
+ *
+ * What it does:
+ * Folds png_ptr's accumulated read-transformation state into `info_ptr` so
+ * the info struct reflects what the transform pipeline actually produces.
+ * Byte-for-byte match against dependencies/wxWindows-2.4.2/src/png/pngrtran.c
+ * png_read_transform_info, restricted to the #ifdef blocks this build
+ * compiled in (confirmed from the field-width tests in the raw .asm):
+ * EXPAND, BACKGROUND, GAMMA (float + fixed-point), 16_TO_8, DITHER, PACK,
+ * GRAY_TO_RGB, RGB_TO_GRAY, STRIP_ALPHA, FILLER (channel-count bump only,
+ * matching the vendored source's own `#if 0`-disabled alpha-flag branch),
+ * USER_TRANSFORM.
+ */
+extern "C" std::uint32_t png_read_transform_info(png_structp png_ptr, png_infop info_ptr)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t transformations = Transformations(png_ptr);
+
+  if ((transformations & 0x1000) != 0) {  // PNG_EXPAND
+    if (info_ptr->color_type == 3) {      // PNG_COLOR_TYPE_PALETTE
+      info_ptr->color_type = (NumTrans(png_ptr) != 0) ? 6 : 2;  // RGB_ALPHA : RGB
+      info_ptr->bit_depth = 8;
+    } else {
+      if (NumTrans(png_ptr) != 0) {
+        info_ptr->color_type |= 4;  // PNG_COLOR_MASK_ALPHA
+      }
+      if (info_ptr->bit_depth < 8) {
+        info_ptr->bit_depth = 8;
+      }
+    }
+    info_ptr->num_trans = 0;
+  }
+
+  if ((transformations & 0x80) != 0) {  // PNG_BACKGROUND
+    info_ptr->color_type &= ~4;         // clear PNG_COLOR_MASK_ALPHA
+    info_ptr->num_trans = 0;
+    std::memcpy(info_ptr->background, Background(png_ptr), sizeof(info_ptr->background));
+  }
+
+  if ((transformations & 0x2000) != 0) {  // PNG_GAMMA
+    info_ptr->gamma = Gamma(png_ptr);
+    info_ptr->int_gamma = IntGamma(png_ptr);
+  }
+
+  if ((transformations & 0x400) != 0 && info_ptr->bit_depth == 16) {  // PNG_16_TO_8
+    info_ptr->bit_depth = 8;
+  }
+
+  if ((transformations & 0x40) != 0) {  // PNG_DITHER
+    if ((info_ptr->color_type == 2 || info_ptr->color_type == 6) &&  // RGB / RGB_ALPHA
+        PaletteLookup(png_ptr) != nullptr && info_ptr->bit_depth == 8) {
+      info_ptr->color_type = 3;  // PNG_COLOR_TYPE_PALETTE
+    }
+  }
+
+  if ((transformations & 0x4) != 0 && info_ptr->bit_depth < 8) {  // PNG_PACK
+    info_ptr->bit_depth = 8;
+  }
+
+  if ((transformations & 0x4000) != 0) {  // PNG_GRAY_TO_RGB
+    info_ptr->color_type |= 2;            // PNG_COLOR_MASK_COLOR
+  }
+
+  if ((transformations & 0x600000) != 0) {  // PNG_RGB_TO_GRAY (ERR|WARN bits)
+    info_ptr->color_type &= ~2;             // clear PNG_COLOR_MASK_COLOR
+  }
+
+  if (info_ptr->color_type == 3) {  // PNG_COLOR_TYPE_PALETTE
+    info_ptr->channels = 1;
+  } else if ((info_ptr->color_type & 2) != 0) {  // has PNG_COLOR_MASK_COLOR
+    info_ptr->channels = 3;
+  } else {
+    info_ptr->channels = 1;
+  }
+
+  if ((transformations & 0x40000) != 0) {  // PNG_STRIP_ALPHA
+    info_ptr->color_type &= ~4;            // clear PNG_COLOR_MASK_ALPHA
+  }
+
+  if ((info_ptr->color_type & 4) != 0) {  // has PNG_COLOR_MASK_ALPHA
+    ++info_ptr->channels;
+  }
+
+  if ((transformations & 0x8000) != 0 &&                             // PNG_FILLER
+      (info_ptr->color_type == 2 || info_ptr->color_type == 0)) {    // RGB / GRAY
+    ++info_ptr->channels;
+  }
+
+  if ((transformations & 0x100000) != 0) {  // PNG_USER_TRANSFORM
+    if (info_ptr->bit_depth < UserTransformDepth(png_ptr)) {
+      info_ptr->bit_depth = UserTransformDepth(png_ptr);
+    }
+    if (info_ptr->channels < UserTransformChannels(png_ptr)) {
+      info_ptr->channels = UserTransformChannels(png_ptr);
+    }
+  }
+
+  info_ptr->pixel_depth = static_cast<std::uint8_t>(info_ptr->channels * info_ptr->bit_depth);
+  info_ptr->rowbytes = (info_ptr->width * info_ptr->pixel_depth + 7) >> 3;
+  return info_ptr->rowbytes;
+}
+
+/**
+ * Address: 0x009E1343 (FUN_009E1343)
+ * Mangled: png_read_update_info
+ *
+ * What it does:
+ * Optional application call between png_read_info and the first png_read_row:
+ * starts the row-reading machinery (png_read_start_row) unless it has already
+ * run once (PNG_FLAG_ROW_INIT already set, in which case it just warns), then
+ * folds the resolved transformation state into `info_ptr` via
+ * png_read_transform_info.
+ */
+extern "C" void png_read_update_info(png_structp png_ptr, png_infop info_ptr)
+{
+  using namespace libpng_layout;
+
+  if ((Flags(png_ptr) & 0x40u) != 0) {  // PNG_FLAG_ROW_INIT
+    png_warning(png_ptr, "Ignoring extra png_read_update_info() call; row buffer not reallocated");
+  } else {
+    png_read_start_row(png_ptr);
+  }
+
+  png_read_transform_info(png_ptr, info_ptr);
+}
+
+/**
+ * Address: 0x009E1E95 (function boundary not detected by IDA; recovered from
+ * the raw .asm at that address, bounded by the neighboring recovered
+ * functions FUN_009E1E86 above and png_create_read_struct at 0x009E1FED
+ * below -- see the reconstruction report for the full instruction trace)
+ * Mangled: png_read_png
+ *
+ * What it does:
+ * libpng's PNG_INFO_IMAGE_SUPPORTED "read the whole image in one call"
+ * convenience API (dependencies/wxWindows-2.4.2/src/png/pngread.c
+ * png_read_png), the read-side twin of the already-recovered png_write_png
+ * (PngWriteRuntime.cpp). This is the real caller of png_read_update_info
+ * and png_get_sBIT (both otherwise-orphaned in the disassembly), and the
+ * one place png_get_rowbytes is called during a read. `params` is accepted
+ * for API compatibility but never read by this build, matching its write
+ * counterpart.
+ */
+extern "C" void png_read_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params)
+{
+  using namespace libpng_layout;
+
+  (void)params;  // accepted for libpng API compatibility; never read by this build
+
+  if ((transforms & 0x0400) != 0) {  // PNG_TRANSFORM_INVERT_ALPHA
+    png_set_invert_alpha(png_ptr);
+  }
+  if ((transforms & 0x0001) != 0) {  // PNG_TRANSFORM_STRIP_16
+    png_set_strip_16(png_ptr);
+  }
+  if ((transforms & 0x0002) != 0) {  // PNG_TRANSFORM_STRIP_ALPHA
+    png_set_strip_alpha(png_ptr);
+  }
+  if ((transforms & 0x0008) != 0) {  // PNG_TRANSFORM_PACKSWAP
+    png_set_packswap(png_ptr);
+  }
+  if ((transforms & 0x0010) != 0 &&  // PNG_TRANSFORM_EXPAND
+      (BitDepth(png_ptr) < 8 || ColorType(png_ptr) == 3 ||
+       png_get_valid(png_ptr, info_ptr, 0x0010) != 0)) {  // PNG_INFO_tRNS
+    png_set_expand(png_ptr);
+  }
+  if ((transforms & 0x0020) != 0) {  // PNG_TRANSFORM_INVERT_MONO
+    png_set_invert_mono(png_ptr);
+  }
+  if ((transforms & 0x0040) != 0 &&  // PNG_TRANSFORM_SHIFT
+      png_get_valid(png_ptr, info_ptr, 0x0002) != 0) {  // PNG_INFO_sBIT
+    std::uint8_t* sig_bit = nullptr;
+    png_get_sBIT(png_ptr, info_ptr, &sig_bit);
+    png_set_shift(png_ptr, sig_bit);
+  }
+  if ((transforms & 0x0080) != 0) {  // PNG_TRANSFORM_BGR
+    png_set_bgr(png_ptr);
+  }
+  if ((transforms & 0x0100) != 0) {  // PNG_TRANSFORM_SWAP_ALPHA
+    png_set_swap_alpha(png_ptr);
+  }
+  if ((transforms & 0x0200) != 0) {  // PNG_TRANSFORM_SWAP_ENDIAN
+    png_set_swap(png_ptr);
+  }
+
+  png_read_update_info(png_ptr, info_ptr);
+
+  png_free_data(png_ptr, info_ptr, 0x0040u, 0);  // PNG_FREE_ROWS
+
+  if (info_ptr->row_pointers == nullptr) {
+    info_ptr->row_pointers =
+        static_cast<std::uint8_t**>(png_malloc(png_ptr, info_ptr->height * sizeof(std::uint8_t*)));
+    info_ptr->free_me |= 0x0040u;  // PNG_FREE_ROWS
+    for (std::uint32_t row = 0; row < info_ptr->height; ++row) {
+      info_ptr->row_pointers[row] =
+          static_cast<std::uint8_t*>(png_malloc(png_ptr, png_get_rowbytes(png_ptr, info_ptr)));
+    }
+  }
+
+  png_read_image(png_ptr, info_ptr->row_pointers);
+
+  info_ptr->valid |= 0x8000u;  // PNG_INFO_IDAT
+
+  png_read_end(png_ptr, info_ptr);
+}
+
+/**
  * Address: 0x00A2186D (FUN_00A2186D)
  * Mangled: png_do_read_interlace
  *

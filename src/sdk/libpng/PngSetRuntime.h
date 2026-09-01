@@ -646,8 +646,9 @@ extern "C" void png_set_invert_mono(png_structp png_ptr);
 extern "C" void png_do_invert(png_row_infop row_info, std::uint8_t* row);
 
 // PNG transformation flag bits set by the png_set_* helpers below.
-constexpr std::uint32_t kPngTransform16To8  = 0x00000400;  // PNG_16_TO_8
-constexpr std::uint32_t kPngTransformExpand = 0x00001000;  // PNG_EXPAND
+constexpr std::uint32_t kPngTransform16To8    = 0x00000400;  // PNG_16_TO_8
+constexpr std::uint32_t kPngTransformExpand   = 0x00001000;  // PNG_EXPAND
+constexpr std::uint32_t kPngTransformStripAlpha = 0x00040000;  // PNG_STRIP_ALPHA
 
 // png_struct::transformations field offset (libpng 1.2.x).
 // Evidence: png_set_strip_16 (0x009E3078) and png_set_expand (0x009E381A):
@@ -679,3 +680,17 @@ extern "C" png_structp png_set_strip_16(png_structp png_ptr);
  * png_do_expand_palette / png_do_expand. Returns the unmodified png_ptr.
  */
 extern "C" png_structp png_set_expand(png_structp png_ptr);
+
+/**
+ * Address: 0x009E3084 (FUN_009E3084)
+ *
+ * IDA signature:
+ * png_structp __cdecl png_set_strip_alpha(png_structp png_ptr);
+ *
+ * What it does:
+ * Sets the PNG_STRIP_ALPHA transformation bit on the png_struct so that the
+ * read pipeline drops the alpha channel from RGBA/GA rows. Returns the
+ * unmodified png_ptr, matching this build's png_set_strip_16/png_set_expand
+ * siblings above.
+ */
+extern "C" png_structp png_set_strip_alpha(png_structp png_ptr);
