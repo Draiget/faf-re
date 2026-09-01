@@ -1,22 +1,18 @@
 #pragma once
 
+#include "moho/vision/VisionDB.h"
+
 namespace moho
 {
-  class VisionDb
-  {
-    // Primary vftable (1 entries)
-  public:
-    virtual ~VisionDb() = default; // 0x81AEB0 (slot 0)
-
-    class Pool
-    {
-      // Primary vftable (1 entries)
-    public:
-      virtual ~Pool() = default; // 0x81AD00 (slot 0)
-
-      char pad_0004[24];
-    } pool; // 0x0004
-
-    char pad_0020[4]; // 0x0020
-  };
+  /**
+   * Compatibility alias. This header used to carry a second, generated
+   * skeleton of the same 0x24-byte binary object that `moho::VisionDB`
+   * (moho/vision/VisionDB.h) models properly. Keeping both meant
+   * `CWldSession::mVisionDb` was declared with the skeleton, whose trivial
+   * constructor never ran `VisionDB::Pool::Pool` (0x0081ACA0) and so never
+   * allocated the pool's self-linked list sentinels - every consumer that
+   * reinterpreted the member as a real `VisionDB` then found a null
+   * `mEntriesHead`. The recovered definition is the single owner now.
+   */
+  using VisionDb = VisionDB;
 } // namespace moho

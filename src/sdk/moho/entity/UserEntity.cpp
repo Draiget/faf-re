@@ -213,16 +213,6 @@ namespace
     return (variableData.mIntelAttributes.vision & kIntelEnabledBit) != 0u;
   }
 
-  struct SessionVisionRuntimeView
-  {
-    std::uint8_t pad_0000_03C8[0x3C8];
-    moho::VisionDB visionDb; // +0x3C8
-  };
-  static_assert(
-    offsetof(SessionVisionRuntimeView, visionDb) == 0x3C8,
-    "SessionVisionRuntimeView::visionDb offset must be 0x3C8"
-  );
-
   struct SessionEntityMapNodeRuntimeView
   {
     SessionEntityMapNodeRuntimeView* mLeft;   // +0x00
@@ -640,8 +630,7 @@ namespace moho
     const std::uint32_t visionRange = GetVisionRange(mVariableData);
     if (visionRange != 0u && mVisionHandle == nullptr) {
       const Wm3::Vector2f zero(0.0f, 0.0f);
-      auto* const sessionView = reinterpret_cast<SessionVisionRuntimeView*>(mSession);
-      mVisionHandle = sessionView->visionDb.NewHandle(zero, zero);
+      mVisionHandle = mSession->mVisionDb.NewHandle(zero, zero);
     }
 
     if (mVisionHandle == nullptr || IsUserUnit() != nullptr) {

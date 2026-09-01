@@ -13,7 +13,7 @@
 #include "legacy/containers/Vector.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "lua/LuaObject.h"
-#include "moho/misc/VisionDb.h"
+#include "moho/vision/VisionDB.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
@@ -1436,7 +1436,12 @@ namespace moho
     SBuildTemplateBuffer mBuildTemplates;                   // 0x00F0 (inline-buffer vector-style storage)
     float mBuildTemplateArg1;                               // 0x03C0
     float mBuildTemplateArg2;                               // 0x03C4
-    VisionDb mVisionDb;                                     // 0x03C8
+    /// The real recovered type, not the generated skeleton. Declaring the
+    /// placeholder here meant `VisionDB::Pool::Pool` (0x0081ACA0) never ran, so
+    /// the pool's zone/free-node list sentinels were never allocated and every
+    /// consumer that reinterpreted this member as `VisionDB` found a null
+    /// `mEntriesHead`. Both types model the same 0x24-byte binary object.
+    VisionDB mVisionDb;                                     // 0x03C8
     msvc8::vector<UserArmy*> userArmies;                    // 0x03EC
     /// The session-wide command manager. `DoBeat`, the right-click dispatcher
     /// and `UserUnit`'s manager resync all reach its `mCommands` map through
