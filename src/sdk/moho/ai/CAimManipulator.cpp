@@ -783,18 +783,9 @@ moho::CAimManipulator::CAimManipulator(
   const std::int32_t boneB,
   const std::int32_t boneMuzzle
 )
+  : IAniManipulator(sim, weapon->mUnit->AniActor, 0)
 {
   Unit* const ownerUnit = weapon->mUnit;
-
-  // Construct the IAniManipulator base subobject in place (this class is modeled
-  // as a runtime view with no C++ base), anchored to the weapon owner's actor,
-  // then plant the primary + CScriptObject-subobject vtable tags.
-  (void)new (static_cast<void*>(this)) moho::IAniManipulator(sim, ownerUnit->AniActor, 0);
-
-  static std::uint8_t sCAimManipulatorPrimaryVTableTag = 0;
-  static std::uint8_t sCAimManipulatorScriptObjectVTableTag = 0;
-  *reinterpret_cast<void**>(this) = &sCAimManipulatorPrimaryVTableTag;
-  *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(this) + 0x10) = &sCAimManipulatorScriptObjectVTableTag;
 
   auto* const runtimeView = AimManipulatorRuntimeView(this);
 
@@ -847,9 +838,7 @@ moho::CAimManipulator::CAimManipulator(
     LuaPlus::LuaObject scriptContext1{};
     LuaPlus::LuaObject metatableObject{};
     (void)func_CreateLuaAimManipulatorObject(&metatableObject, sim != nullptr ? sim->mLuaState : nullptr);
-
-    auto* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-    scriptObject->CreateLuaObject(metatableObject, scriptContext1, scriptContext2, scriptContext3);
+    this->CreateLuaObject(metatableObject, scriptContext1, scriptContext2, scriptContext3);
   }
 
   // Resolve the projectile physics sub-blueprint from the weapon's projectile
@@ -864,9 +853,8 @@ moho::CAimManipulator::CAimManipulator(
 
   // Register the two watched aim bones, then pick the muzzle bone (muzzle, then
   // barrel, then turret in priority order).
-  auto* const baseManipulator = reinterpret_cast<moho::IAniManipulator*>(this);
-  (void)baseManipulator->AddWatchBone(static_cast<int>(boneA));
-  (void)baseManipulator->AddWatchBone(boneB);
+  (void)this->AddWatchBone(static_cast<int>(boneA));
+  (void)this->AddWatchBone(boneB);
 
   std::int32_t muzzleBone = boneMuzzle;
   if (boneMuzzle < 0) {
@@ -958,8 +946,9 @@ moho::CAimManipulator::~CAimManipulator()
   runtimeView->mWeapon.UnlinkFromOwnerChain();
   runtimeView->mUnit.UnlinkFromOwnerChain();
 
-  IAniManipulator* const baseManipulator = reinterpret_cast<IAniManipulator*>(this);
-  baseManipulator->IAniManipulator::~IAniManipulator();
+  // IAniManipulator is now a real base, so its destructor runs automatically
+  // via ordinary base-destructor chaining after this body returns - calling
+  // it explicitly here would destroy it twice.
 }
 
 /**

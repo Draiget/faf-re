@@ -1145,7 +1145,7 @@ namespace moho
     CAimManipulator* const manipulator =
       new (storage) CAimManipulator(weapon, weapon->mSim, label, turretBone, barrelBone, muzzleBoneArg);
 
-    reinterpret_cast<CScriptObject*>(manipulator)->mLuaObj.PushStack(state);
+    manipulator->mLuaObj.PushStack(state);
     return 1;
   }
 
