@@ -7,7 +7,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
-#include "moho/unit/ECommandEvent.h"
+#include "moho/unit/ECommandEvent.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -73,6 +73,18 @@ namespace moho
       sType = gpg::LookupRType(typeid(CUnitCommand));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x006E7CF0 (FUN_006E7CF0, Moho::CUnitCommand::GetClass)
+   *
+   * What it does:
+   * Returns the cached reflection descriptor for this `CUnitCommand`
+   * instance (vtable slot 0).
+   */
+  gpg::RType* CUnitCommand::GetClass() const
+  {
+    return StaticGetClass();
   }
 
   namespace
