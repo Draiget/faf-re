@@ -151,8 +151,8 @@ namespace moho
       const std::uint8_t paletteBase
     )
     {
-      SkinPaletteEntry* const transPalette = GetMeshShaderVarTransPalette().mPalette.mBegin;
-      SkinPaletteEntry* const rotPalette = GetMeshShaderVarRotPalette().mPalette.mBegin;
+      SkinPaletteEntry* const transPalette = GetMeshShaderVarTransPalette().mPalette.begin();
+      SkinPaletteEntry* const rotPalette = GetMeshShaderVarRotPalette().mPalette.begin();
 
       const auto poseBoneCount = static_cast<std::uint32_t>(pose.mBones.end() - pose.mBones.begin());
       const float instanceScale = meshInstance.scale.x;
@@ -564,8 +564,8 @@ namespace moho
   {
     MeshShaderPaletteVar& transPaletteVar = GetMeshShaderVarTransPalette();
     MeshShaderPaletteVar& rotPaletteVar = GetMeshShaderVarRotPalette();
-    SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.mBegin;
-    SkinPaletteEntry* const rotPalette = rotPaletteVar.mPalette.mBegin;
+    SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.begin();
+    SkinPaletteEntry* const rotPalette = rotPaletteVar.mPalette.begin();
 
     gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
 
@@ -673,14 +673,14 @@ namespace moho
 
     if (transPaletteVar.Exists()) {
       transPaletteVar.mEffectVariable->SetPtr(
-        transPaletteVar.mPalette.mBegin,
-        transPaletteVar.mPalette.Count() * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+        transPaletteVar.mPalette.begin(),
+        static_cast<std::uint32_t>(transPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
       );
     }
     if (rotPaletteVar.Exists()) {
       rotPaletteVar.mEffectVariable->SetPtr(
-        rotPaletteVar.mPalette.mBegin,
-        rotPaletteVar.mPalette.Count() * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+        rotPaletteVar.mPalette.begin(),
+        static_cast<std::uint32_t>(rotPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
       );
     }
 

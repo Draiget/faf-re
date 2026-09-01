@@ -1001,22 +1001,18 @@ namespace moho
    * `kPaletteCapacity` (80) zeroed entries; the buffer is grown/relocated by the
    * reserve helpers (0x007E9130 / 0x007E96A0).
    */
-  struct MeshShaderPaletteBuffer
+  /**
+   * Layout-identical to `msvc8::vector<SkinPaletteEntry>` (`myProxy_@+0x00`,
+   * `first_@+0x04`, `last_@+0x08`, `end_@+0x0C`) -- not a bespoke type. What
+   * looked like an unused leading "reserved header" word is the vector's own
+   * debug-proxy slot (`HasDebugProxy=true`, the template default), inert in
+   * this release build but real ABI, matching every other default-args
+   * `msvc8::vector<T>` in this codebase.
+   */
+  struct MeshShaderPaletteBuffer : msvc8::vector<SkinPaletteEntry>
   {
     /// Max bone count the skinning palette is reserved to (0x50 entries).
     static constexpr std::uint32_t kPaletteCapacity = 0x50;
-
-    std::uint32_t mReservedHeader; // +0x00 (unused by palette reserve path)
-    SkinPaletteEntry* mBegin;      // +0x04
-    SkinPaletteEntry* mEnd;        // +0x08
-    SkinPaletteEntry* mCapacity;   // +0x0C
-
-    [[nodiscard]] std::uint32_t Count() const noexcept
-    {
-      return mBegin != nullptr
-               ? static_cast<std::uint32_t>(mEnd - mBegin)
-               : 0U;
-    }
 
     /**
      * Address: 0x007E9130 (FUN_007E9130, sub_7E9130)
@@ -1026,10 +1022,15 @@ namespace moho
      *
      * What it does:
      * Reserve/resize dispatch that forces the palette to exactly
-     * `kPaletteCapacity` entries: when currently shorter (or empty) it appends
-     * default-constructed entries at the tail; when currently longer it drops the
-     * trailing surplus so the end pointer lands `kPaletteCapacity` entries past
-     * `begin`. Invoked at registration time from `register_MeshShaderVar`.
+     * `kPaletteCapacity` entries: when currently shorter (or empty) it grows
+     * via `insert(end(), n, value)`; when currently longer it drops the
+     * trailing surplus via `erase(begin()+kPaletteCapacity, end())` (the
+     * binary's own shape here degenerates to a relocation call over an empty
+     * range, i.e. a bare end-pointer reposition, since `SkinPaletteEntry` is
+     * trivially destructible -- the same "erase-of-a-tail-range collapses to
+     * a pointer move" shape already documented on this template's other
+     * `resize()` citations). Invoked at registration time from
+     * `register_MeshShaderVar`.
      */
     void ReserveToPaletteCapacity();
   };
@@ -1105,12 +1106,11 @@ namespace moho
   [[nodiscard]] MeshShaderPaletteVar& GetMeshShaderVarRotPalette();
 
   static_assert(sizeof(SkinPaletteEntry) == 0x10, "SkinPaletteEntry size must be 0x10");
-  static_assert(offsetof(MeshShaderPaletteBuffer, mBegin) == 0x04, "MeshShaderPaletteBuffer::mBegin offset must be 0x04");
-  static_assert(offsetof(MeshShaderPaletteBuffer, mEnd) == 0x08, "MeshShaderPaletteBuffer::mEnd offset must be 0x08");
-  static_assert(
-    offsetof(MeshShaderPaletteBuffer, mCapacity) == 0x0C, "MeshShaderPaletteBuffer::mCapacity offset must be 0x0C"
-  );
   static_assert(sizeof(MeshShaderPaletteBuffer) == 0x10, "MeshShaderPaletteBuffer size must be 0x10");
+  static_assert(
+    sizeof(MeshShaderPaletteBuffer) == sizeof(msvc8::vector<SkinPaletteEntry>),
+    "MeshShaderPaletteBuffer must add no state beyond msvc8::vector<SkinPaletteEntry>"
+  );
   static_assert(offsetof(MeshShaderPaletteVar, mPalette) == 0x48, "MeshShaderPaletteVar::mPalette offset must be 0x48");
   static_assert(sizeof(MeshShaderPaletteVar) == 0x58, "MeshShaderPaletteVar size must be 0x58");
 
