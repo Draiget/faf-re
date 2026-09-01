@@ -8659,11 +8659,13 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 
       if (!mCheaters.empty()) {
         LuaPlus::LuaObject cheaters(mLuaState);
-        cheaters.AssignNewTable(mLuaState, static_cast<int>(mCheaters.size()), 0u);
+        cheaters.AssignNewTable(mLuaState, 0, 0u);
         std::int32_t luaIndex = 1;
         for (auto it = mCheaters.begin(); it != mCheaters.end(); ++it, ++luaIndex) {
           cheaters.SetInteger(luaIndex, *it + 1);
         }
+        // The flag rides on the same table as the cheater run, not on `Sync`.
+        cheaters.SetBoolean("CheatsEnabled", mCheatsEnabled);
         syncTable.SetObject("Cheaters", cheaters);
         mCheaters.clear();
       }
