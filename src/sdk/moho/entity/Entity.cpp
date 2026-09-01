@@ -798,6 +798,16 @@ namespace
   // `cfunc_EntityGetBoneDirectionL` below, whose own ground truth
   // (`FUN_0068B3F0.c`) confirms the identical "forward = MultQuadVec(quat,
   // (0,0,1))" operation unambiguously via a directly-typed call.
+  //
+  // `FUN_0068A6F0.c` itself reads as `v29.orient.x`/`v29.pos.x/.y/.z` (a
+  // `struct_VecQuat` IDA split at the wrong byte boundary -- 4 bytes into the
+  // 16-byte `orient_`, not at its real 16-byte end), so those four reads are
+  // actually `orient_.w/.x/.y/.z` in that order, not `orient_.x` plus a real
+  // position. Once corrected for that split, all three of `v22.x/.y/.z`'s
+  // terms match `MultQuadVec(out, {0,0,1}, orient_)`'s expected row-2-dotted
+  // form exactly (`2*(wy+xz)`, `2*(wz-xy)`, `1-2*(z^2+y^2)`) -- full 3/3
+  // term match, not just the 2/3 an earlier pass here reported before
+  // resolving the split.
   [[nodiscard]] Wm3::Vector3f ResolveBoneForwardVector(const moho::VTransform& transform) noexcept
   {
     const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
