@@ -1061,6 +1061,29 @@ namespace msvc8
          * return elision seen throughout this emission family) -- matches
          * this member's `before = rb_decrement(at)` straddle check exactly.
          */
+        /**
+         * Address: 0x007E60F0 (FUN_007E60F0, sub_7E60F0) -- `msvc8::map<
+         * MeshKey, boost::weak_ptr<Mesh>>::rb_decrement` for `moho::
+         * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`, isNil@+0x25,
+         * same instantiation cited on `alloc_raw`/`buy_node`/`insert_
+         * unique`/`insert_at` above). Byte-for-byte match of this member:
+         * nil-case (`*(v2+37)` set) returns `v2->right` (`v2[2]`,
+         * offset+8); has-left-subtree case (`*(*v2+37)` clear, i.e.
+         * `v2->left` is not nil) inlines the `rb_max(n->left)` walk
+         * directly (the `for (result=*(v4+8); ...)` loop over `right`
+         * pointers); no-left-subtree case climbs `parent` (offset+4) while
+         * the tracked node is its ancestor's `left` child, keeping the
+         * walked-to node when the climb falls off the front -- matches
+         * this member's `rb_is_nil(n) ? n : ancestor` guard exactly. Sole
+         * caller is `insert_unique`'s emission for this instantiation
+         * (0x007E5B20, cited above), via its `probe = rb_decrement(where)`
+         * non-leftmost branch. `Mesh.cpp` does not yet have a recovered
+         * counterpart for this member -- `MeshCacheTreeInsertUnique`'s
+         * current search algorithm short-circuits on an exact match during
+         * descent instead of confirming uniqueness against the in-order
+         * predecessor afterward, so this member is never reached from
+         * recovered source yet. Not yet routed through this template.
+         */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -2848,6 +2871,37 @@ namespace msvc8
              * *(_DWORD*)sub_8A8C30(a2,a1); return a3;` -- takes `.first` via
              * the hidden-return-slot convention, matching `insert_unique(v)
              * .first`).
+             */
+            /**
+             * Address: 0x007E5B20 (FUN_007E5B20, sub_7E5B20) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::insert_unique` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`), isNil@+0x25
+             * (same instantiation cited on `alloc_raw`/`buy_node` above).
+             * Descend loop performs exactly one comparison per level
+             * (`MeshKey`'s field-lexicographic `blueprint` then
+             * `meshMaterial`-pointer-identity ordering, read directly at
+             * node+0x10/node+0x14 rather than through a named comparator
+             * call) and tracks only the last branch taken (`addLeft`) --
+             * matches this member's single-`comp()`-call descent exactly,
+             * not a three-way (less/greater/equal) compare at every level.
+             * `where == leftmost()` fast path (`v5 == **(a2+4)`, i.e.
+             * `where == head->left`) tail-calls `insert_at` directly with
+             * `addLeft=true`; otherwise confirms uniqueness against the
+             * in-order predecessor via `sub_7E60F0` (`rb_decrement`, cited
+             * below) before the final `comp()(key(probe), key(v))` compare
+             * that decides insert-vs-return-existing. Matches this member
+             * field for field. Sole caller not yet identified by direct
+             * xref (mesh-cache lookups are reached through `FindOrCreateMesh`
+             * (0x007E5280) via a level of indirection this pass has not
+             * traced to its literal call site); `Mesh.cpp`'s
+             * `MeshCacheTreeInsertUnique` is the current recovered source
+             * for this shape and needs its search-phase algorithm brought
+             * in line with this member (it currently uses an early-exit
+             * three-way compare per level instead of this member's
+             * single-compare-then-predecessor-check shape -- output-
+             * equivalent for a tree with no pre-existing duplicate keys,
+             * but not a faithful structural match). Not yet routed through
+             * this template.
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -4727,6 +4781,22 @@ namespace msvc8
              * `gpg::WriteArchive`'s ctor and `CAiFormationInstance.cpp`'s
              * default formation-lane entry), which this template's shared
              * `buy_head()` now performs uniformly instead.
+             *
+             * Address: 0x007E56B0 (FUN_007E56B0) -- `msvc8::map<MeshKey,
+             * boost::weak_ptr<Mesh>>::alloc_raw` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`), node 0x28
+             * (`0x0C` link header + `sizeof(MeshRendererMeshCacheEntry)`
+             * ==0x18), isNil@+0x25 -- cited in full on `allocate_slots_
+             * checked` in `Vector.h` (`msvc8::vector<T>::
+             * allocate_slots_checked` for this same 40-byte element, the
+             * shared cross-container-reuse shape already documented there
+             * and on `AllocateChecked40ByteElements` in `Vector.cpp`, which
+             * lists this address among eight ICF-identical instantiations).
+             * `Mesh.cpp`'s `CreateMeshCacheNode` does not yet call through
+             * either shared symbol -- like this member, it uses a plain
+             * `::operator new(sizeof(node))` for its single-node buy, the
+             * same behaviorally-equivalent-for-count==1 simplification this
+             * member itself makes.
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -5053,6 +5123,45 @@ namespace msvc8
              * caller `FUN_00930C00` names the field `mHashMap`, independent
              * confirmation this is a genuine hash_map container field, not
              * CRT scaffolding).
+             *
+             * Address: 0x007E4770 (FUN_007E4770, sub_7E4770) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::buy_head`'s raw-alloc-plus-
+             * flags half for `moho::MeshRendererMeshCacheTree` (`Mesh.h`/
+             * `Mesh.cpp`, isNil@+0x25, same instantiation cited on `alloc_
+             * raw`/`buy_node` above). Allocates via `sub_7E56B0` (this
+             * instantiation's `alloc_raw`), zeroes the three link dwords
+             * (same "null tests after each derived pointer are compiler
+             * artifacts" guards seen elsewhere in this file), sets
+             * `color=1`(black)/`isNil=0` -- NOT self-linked, the same
+             * "binary splits buy_head's work across the call site" family
+             * as `FUN_00556DE0`/`FUN_0083C220`/`FUN_006B01C0` above.
+             * Address: 0x007E2B50 (FUN_007E2B50, sub_7E2B50) -- this split's
+             * self-link-plus-`isNil=1`-promotion half: calls `sub_7E4770`,
+             * stores the result into `tree.head` (`[esi+4]`), overwrites
+             * `isNil` to `1` (`mov byte ptr [eax+25h],1`), self-links
+             * `left`/`parent`/`right` to the head pointer, then zeroes
+             * `tree.size` (`[esi+8]=0`) and tail-calls `sub_7E2B74`
+             * (unrecovered; likely a proxy/allocator hookup finisher, not
+             * part of this member's own shape). Matches this member's
+             * fused single-call shape in final observable state (head ends
+             * up self-linked with `isNil=1`), just split across two real
+             * binary functions instead of fused into one -- the same
+             * "same final state, split across the call site" note already
+             * documented throughout this file (e.g. `FUN_006B01C0` above).
+             * `Mesh.cpp`'s `CreateMeshCacheTreeSentinel` (calling
+             * `CreateMeshCacheNode(sentinelKey, emptyMesh, nullptr,
+             * nullptr, nullptr, kRbNodeBlack, kRbNodeSentinel)` then self-
+             * linking) already recovers this member's fused end state
+             * faithfully and already cites 0x007E4770. 0x007E2B50's own
+             * split-shape counterpart is also already recovered,
+             * `InitializeMeshCacheTreeStorageAdapter` (`Mesh.cpp`, already
+             * cited there) -- currently `[[maybe_unused]]`, since its
+             * owning caller (a second, not-yet-identified
+             * `MeshRendererMeshCacheTree` instance -- `MeshRenderer::
+             * MeshRenderer`'s own tree init at 0x007DF150 builds its
+             * sentinel inline via `CreateMeshCacheTreeSentinel` directly,
+             * confirmed not to route through this function) has not been
+             * traced yet.
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -5460,6 +5569,39 @@ namespace msvc8
              * `color=0`(red)/`isNil=0` at +16/+17. Matches this member
              * exactly. Sole caller is `insert_at`'s emission for this
              * instantiation (`FUN_00710030`, cited below).
+             *
+             * Address: 0x007E6090 (FUN_007E6090) -- `msvc8::map<MeshKey,
+             * boost::weak_ptr<Mesh>>::buy_node` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`; the same
+             * instantiation whose `~value_type()` is cited 0x007E5850 on
+             * `free_node` above). Allocates via `alloc_raw()`'s sibling
+             * emission (`sub_7E56B0`, cited above on `alloc_raw`), then
+             * writes Left/Parent/Right directly to the caller-supplied
+             * `head`/`where` values (`a1`/`a2`/`a3`, all three passed in by
+             * its sole caller rather than defaulted to `head_` here -- the
+             * "binary fuses the placeholder link-init with `link_and_
+             * rebalance`'s later overwrite" optimisation is not present in
+             * this emission; final observable state is identical either
+             * way, matching `FUN_006B0200`'s note above for the same
+             * family of variants), copy-constructs the `MeshRendererMesh
+             * CacheEntry` value in place (`sub_7E6180`, matches this
+             * member's `::new (...) value_type(args...)` when `Args` is a
+             * single `const value_type&` -- see `MeshKey::MeshKey(const
+             * MeshKey&)`/`boost::weak_ptr<Mesh>`'s own copy ctors, which
+             * this emission's manual field-copy-plus-refcount-bump fuses
+             * into one out-of-line body instead of calling out to either),
+             * then sets `color=0`(red)/`isNil=0` at +0x24/+0x25. Matches
+             * this member exactly. Sole caller is this instantiation's
+             * `insert_at`/`link_and_rebalance` emission (0x007E5DF0, cited
+             * below), called once from the descent orchestrator
+             * (0x007E5B20, cited on `insert_unique` below).
+             * `Mesh.cpp`'s `CreateMeshCacheNode` is the current recovered
+             * source for this shape -- generalised over this member's own
+             * split-vs-fused difference by taking `left`/`parent`/`right`
+             * and `color`/`isSentinel` as explicit parameters, so the same
+             * function also covers the sentinel-node emission (0x007E4770,
+             * cited on `buy_head` below) rather than needing a second
+             * concrete copy. Not yet routed through this template.
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -6881,6 +7023,40 @@ namespace msvc8
              * `note`/`source_paths` -- a DB-integrity gap (blank metadata,
              * not a false attribution), corrected here with a real
              * citation.
+             *
+             * Address: 0x007E5DF0 (FUN_007E5DF0, sub_7E5DF0) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::insert_at`/`link_and_
+             * rebalance` for `moho::MeshRendererMeshCacheTree`
+             * (`Mesh.h`/`Mesh.cpp`, same instantiation cited on `alloc_
+             * raw`/`buy_node`/`insert_unique` above). `*(a2+8) >=
+             * 0xAAAAAA9` guard matches `max_size() - 1u <= size_` for this
+             * 40-byte node (`0xFFFFFFFF/40` rounds to this threshold),
+             * throwing `std::length_error("map/set<T> too long")` via the
+             * standard shape. Buys the node through `sub_7E6090` (`buy_
+             * node`, cited above) passing `head`/`where`/`head` as the
+             * fresh node's own initial Left/Parent/Right (this
+             * instantiation does not use this member's `head_`-placeholder-
+             * then-overwrite fusion -- see the note on `buy_node`'s
+             * 0x007E6090 citation), links it under the caller-supplied
+             * `where`/`addLeft` (`a1 == head` / `a4` branches, matching
+             * this member's `where == head_` / `addLeft` branches field for
+             * field, including the `head->left`/`head->right` leftmost/
+             * rightmost promotion checks), then repairs red-red violations
+             * calling `sub_7E4E10`/`sub_7E4EA0` (this instantiation's
+             * `rotate_left`/`rotate_right` emissions) and finishes by
+             * force-painting the root black (`*(head->parent + 0x24) = 1`),
+             * matching this member's trailing `root()->color = kRbBlack`
+             * exactly. Sole caller is `insert_unique`'s emission for this
+             * instantiation (0x007E5B20, cited above), on both its accepted
+             * branches -- the same `insert_at(addLeft, where, v)` calls this
+             * member's own C++ source performs. `Mesh.cpp`'s
+             * `MeshCacheTreeInsertUnique` already recovers this member's
+             * link-and-rebalance portion faithfully (`CreateMeshCacheNode`
+             * + the `parent == head` / `insertLeft` linking branches +
+             * `RebalanceMeshCacheAfterInsert`); only the caller-side
+             * search/uniqueness phase (cited on `insert_unique` above)
+             * still needs its algorithm brought in line. Not yet routed
+             * through this template.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
