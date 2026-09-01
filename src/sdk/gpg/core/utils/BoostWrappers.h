@@ -208,6 +208,35 @@ namespace boost
             }
         }
 
+        /**
+         * Reseats this lane onto `source`'s owner, which is what MSVC inlines
+         * for `shared_ptr::operator=` and what the binary open-codes at every
+         * such assignment: take the pointer, add a reference to the incoming
+         * control block, then release the outgoing one -- in that order, so a
+         * self-assignment cannot drop the last reference. The identical-block
+         * early-out is also the binary's (`v10 = v92 == ...pn.pi_`).
+         *
+         * Deliberately NOT spelled `operator=`: this struct is a raw layout
+         * mirror and much existing code copies it memberwise on purpose, so
+         * giving it a refcounting assignment operator would silently change
+         * behaviour at every one of those sites.
+         */
+        template <class TSource>
+        void reset_from(const TSource& source) noexcept {
+            px = source.px;
+            if (pi == source.pi) {
+                return;
+            }
+            if (source.pi != nullptr) {
+                source.pi->add_ref_copy();
+            }
+            detail::sp_counted_base* const previous = pi;
+            pi = source.pi;
+            if (previous != nullptr) {
+                previous->release();
+            }
+        }
+
         [[nodiscard]] bool add_ref_lock() const noexcept {
             return pi != nullptr && pi->add_ref_lock();
         }

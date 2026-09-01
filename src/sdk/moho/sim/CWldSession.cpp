@@ -15841,24 +15841,6 @@ namespace moho
      * when it actually changes, taking the new reference before dropping the
      * old one so a self-assignment cannot free what it is about to keep.
      */
-    template <typename TLane, typename TSource>
-    void ReseatSharedLane(boost::SharedPtrRaw<TLane>& lane, const boost::SharedPtrRaw<TSource>& source)
-    {
-      lane.px = source.px;
-      if (lane.pi == source.pi) {
-        return;
-      }
-
-      if (source.pi != nullptr) {
-        source.pi->add_ref_copy();
-      }
-      boost::detail::sp_counted_base* const previous = lane.pi;
-      lane.pi = source.pi;
-      if (previous != nullptr) {
-        previous->release();
-      }
-    }
-
     [[nodiscard]] SSelectionSetUserEntity::Index OpenLiveWeakSetCursor(SSelectionSetUserEntity& set)
     {
       SSelectionNodeUserEntity* firstLive = nullptr;
@@ -16075,11 +16057,11 @@ namespace moho
     (void)SCR_LuaDoString("OnSync()", mState);
 
     mSessionPauseStateA = static_cast<std::uint8_t>(beat.mPausedBy != -1);
-    ReseatSharedLane(mDebugCanvas, beat.mTickDebugCanvas);
-    ReseatSharedLane(mBeatDebugCanvas, beat.mBeatDebugCanvas);
+    mDebugCanvas.reset_from(beat.mTickDebugCanvas);
+    mBeatDebugCanvas.reset_from(beat.mBeatDebugCanvas);
     ren_FogOfWar = beat.mFogOfWar;
     terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
-    ReseatSharedLane(mSimResources, beat.mSimResources);
+    mSimResources.reset_from(beat.mSimResources);
 
     // `msvc8::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
     // `legacy/containers/Vector.h`). Previously mis-wired through
