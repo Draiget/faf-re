@@ -854,55 +854,20 @@ namespace gpg
     SaveContiguousArchiveVectorPayload(archive, view, CachedCompatRType<moho::UnitWeaponInfo>(), ownerRef ? *ownerRef : gpg::RRef{});
   }
 
-  /**
-   * Address: 0x0056DF80 (FUN_0056DF80)
-   *
-   * What it does:
-   * Writes one contiguous `SOffsetInfo` payload by saving the element count
-   * and each reflected lane in order.
-   */
-  void SaveFastVectorSOffsetInfo(
-    gpg::WriteArchive* const archive,
-    int objectPtr,
-    int /*version*/,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SUnitOffsetInfo>(
-      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr))
-    );
-    SaveContiguousArchiveVectorPayload(archive, view, CachedSOffsetInfoType(), ownerRef ? *ownerRef : gpg::RRef{});
-  }
-
-  /**
-   * Address: 0x0056E0A0 (FUN_0056E0A0)
-   *
-   * What it does:
-   * Writes one contiguous `SAssignedLocInfo` payload by saving the element
-   * count and each reflected lane in order.
-   */
-  void SaveFastVectorSAssignedLocInfo(
-    gpg::WriteArchive* const archive,
-    int objectPtr,
-    int /*version*/,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SFormationOccupiedSlot>(
-      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr))
-    );
-    SaveContiguousArchiveVectorPayload(
-      archive, view, CachedSAssignedLocInfoType(), ownerRef ? *ownerRef : gpg::RRef{}
-    );
-  }
+  // DB-integrity fix: this file previously carried two more unwired
+  // duplicates here, `SaveFastVectorSOffsetInfo` (wrongly claiming Address:
+  // 0x0056DF80, and using `moho::SUnitOffsetInfo` -- the wrong element type)
+  // and `SaveFastVectorSAssignedLocInfo` (wrongly claiming Address:
+  // 0x0056E0A0, and using `moho::SFormationOccupiedSlot` -- also the wrong
+  // element type). Both real bodies are `moho::SaveFastVectorSOffsetInfo`/
+  // `moho::SaveFastVectorSAssignedLocInfo` in CAiFormationInstance.cpp (using
+  // the correctly-named `moho::SOffsetInfo`/`moho::SAssignedLocInfo`), which
+  // are also the ones actually wired into `FastVectorUIntReflection.cpp`'s
+  // `serSaveFunc_ = &moho::SaveFastVectorSOffsetInfo` / `&moho::
+  // SaveFastVectorSAssignedLocInfo` (`RFastVectorType<...>::Init()`). Both
+  // orphan copies here had zero header declaration and zero callers anywhere
+  // in src/sdk -- removed rather than left as dead, address-misattributed
+  // code, matching the `SaveFastVectorCPathPoint` resolution just below.
 
   // DB-integrity fix: this file previously carried a second, unwired
   // `SaveFastVectorCPathPoint` here, wrongly claiming Address: 0x005B4FF0.
