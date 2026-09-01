@@ -18434,22 +18434,6 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
 
   const UserArmyAvatarVectorRuntimeView& avatarRefs = ResolveArmyAvatarVectorView(focusArmy);
 
-  {
-    // TEMPORARY PROBE (remove before commit). gamemain.lua's OnFirstUpdate only
-    // forks StartupSequence (camera zoom onto the commander + select it) when
-    // GetArmyAvatars returns a non-empty table whose [1] is in category
-    // COMMAND. An empty return here silently skips the whole sequence.
-    char probeBuf[192];
-    sprintf_s(
-      probeBuf, "[ZOOMDIAG] GetArmyAvatars: focusArmy=%p begin=%p end=%p count=%d\n",
-      static_cast<const void*>(focusArmy),
-      static_cast<const void*>(avatarRefs.begin), static_cast<const void*>(avatarRefs.end),
-      (avatarRefs.begin && avatarRefs.end && avatarRefs.end > avatarRefs.begin)
-        ? static_cast<int>(avatarRefs.end - avatarRefs.begin) : 0
-    );
-    ::OutputDebugStringA(probeBuf);
-  }
-
   if (avatarRefs.begin == nullptr || avatarRefs.end == nullptr || avatarRefs.end <= avatarRefs.begin) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
