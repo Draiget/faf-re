@@ -4678,16 +4678,34 @@ namespace moho
     CleanupStartupConCommand(gCConFunc_exit);
   }
 
+  /**
+   * Address: 0x00BF18E0 (FUN_00BF18E0, ??1CConFunc_WIN_ToggleLogDialog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WIN_ToggleLogDialog`.
+   */
   void cleanup_CConFunc_WIN_ToggleLogDialog()
   {
     CleanupStartupConCommand(gCConFunc_WIN_ToggleLogDialog);
   }
 
+  /**
+   * Address: 0x00BF1910 (FUN_00BF1910, ??1CConFunc_WIN_ShowLogDialog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WIN_ShowLogDialog`.
+   */
   void cleanup_CConFunc_WIN_ShowLogDialog()
   {
     CleanupStartupConCommand(gCConFunc_WIN_ShowLogDialog);
   }
 
+  /**
+   * Address: 0x00BF1960 (FUN_00BF1960, ??1CConFunc_WxInputBox@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WxInputBox`.
+   */
   void cleanup_CConFunc_WxInputBox()
   {
     CleanupStartupConCommand(gCConFunc_WxInputBox);
@@ -5041,9 +5059,12 @@ namespace moho
     );
   }
 
-  // Compiler-generated global cleanup lane for FUN_00C06760. The owning
-  // source construct is the typed CConFunc object registered below; no
-  // standalone engine behavior is attached to that artifact address.
+  /**
+   * Address: 0x00C06760 (FUN_00C06760, ??1CConFunc_IN_BindKey@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `IN_BindKey`.
+   */
   void cleanup_CConFunc_IN_BindKey()
   {
     CleanupStartupConCommand(gCConFunc_IN_BindKey);
@@ -5067,10 +5088,13 @@ namespace moho
     );
   }
 
-  // Compiler-generated global cleanup lane for FUN_00BE48D0's atexit callee.
-  // The owning source construct is the typed CConFunc object registered
-  // below; no standalone engine behavior is attached to that artifact
-  // address.
+  /**
+   * Address: 0x00C067C0 (FUN_00C067C0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `IN_SetKeyName`.
+   */
   void cleanup_CConFunc_IN_SetKeyName()
   {
     CleanupStartupConCommand(gCConFunc_IN_SetKeyName);
@@ -5653,7 +5677,7 @@ namespace moho
   }
 
   /**
-   * Address: <synthetic teardown lane for gCConFunc_StartCommandMode>
+   * Address: 0x00C06160 (FUN_00C06160, ??1CConFunc_StartCommandMode@Moho@@QAE@@Z)
    *
    * What it does:
    * Unregisters startup command storage for `StartCommandMode`.
