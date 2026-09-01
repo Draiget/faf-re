@@ -5504,9 +5504,11 @@ namespace msvc8
              *     `boost::shared_ptr<Mesh>`, which would compile to a two-step
              *     use_count_-then-weak_count_ release (the shape `~MeshKey`
              *     itself shows below) -- this emission proves the shipped field is
-             *     `boost::weak_ptr<Mesh>` instead. `Mesh.h`/`Mesh.cpp` are under
-             *     concurrent edit by another recovery pass as of this citation, so
-             *     the field is not retyped here; this note is the handoff.
+             *     `boost::weak_ptr<Mesh>` instead. Retyped
+             *     (`MeshRendererMeshCacheEntry::mesh`, `Mesh.h`); `FindOrCreateMesh`
+             *     (0x007E5280) now locks the weak entry on a cache hit and falls
+             *     through to construct-and-refresh on a miss or an expired lock,
+             *     matching FUN_007E5900's real behavior.
              *   - second, the first-declared member (`MeshKey`) is released
              *     in-line with the exact same vtable-restore-plus-shared_ptr-
              *     release body as `Moho::MeshKey::~MeshKey` (0x007DAF60):
