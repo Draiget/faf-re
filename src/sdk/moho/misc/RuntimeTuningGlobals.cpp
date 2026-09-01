@@ -125,5 +125,17 @@ namespace moho
   float ren_DecalNormalLodCutoff = 1.0f;
   float ren_DecalFlatTol = 0.01f;
   float ren_DecalFadeFraction = 0.75f;
-  float ren_maxViewError = 1.0f;
+  // 0x00F57DB0. Read straight out of the shipped binary's .data (file offset
+  // 0xB57DB0) as 0.003f, not the 1.0f placeholder this previously carried.
+  // This is the screen-error threshold `CTesselator::GetIntersectionResult`
+  // scales the view-space depth by:
+  //     maxAllowedError = shoreErrorCoeff * projectedDepth * ren_maxViewError
+  //     return (tierMaxError < maxAllowedError) ? kAccept : kSplit;
+  // With 1.0f and a camera ~900 units from the terrain the threshold came out
+  // around 900, which no real tier error ever exceeds, so EVERY quadtree node
+  // returned kAccept and the entire map tessellated to a single quad -
+  // `mSkirtStartIndex == 6`, i.e. 2 triangles, measured live. The terrain draw
+  // then "succeeded" (DrawNormals returned true) while emitting nothing, which
+  // is why the 3D viewport rendered empty while the HUD drew normally.
+  float ren_maxViewError = 0.003f;
 } // namespace moho
