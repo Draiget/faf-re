@@ -449,41 +449,17 @@ namespace
     return userDataObject.GetUserData();
   }
 
-  [[nodiscard]] moho::CSndParams* ResolveSoundParamsFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    static gpg::RType* sSoundParamsType = nullptr;
-    if (!sSoundParamsType) {
-      sSoundParamsType = gpg::LookupRType(typeid(moho::CSndParams));
-    }
-
-    if (sSoundParamsType) {
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, sSoundParamsType);
-      if (upcast.mObj != nullptr) {
-        return static_cast<moho::CSndParams*>(upcast.mObj);
-      }
-    }
-
-    const char* const typeName = userDataRef.GetTypeName();
-    if (typeName != nullptr && std::strstr(typeName, "CSndParams") != nullptr) {
-      return static_cast<moho::CSndParams*>(userDataRef.mObj);
-    }
-
-    return nullptr;
-  }
+  /**
+   * The `Sound{}` userdata holds a `CSndParams*`, so the reflection upcast
+   * yields the *slot*, not the object - `func_GetCObj_CSndParams` (0x004E4B40)
+   * is typed `CSndParams**` for that reason and ground truth dereferences it
+   * (`v8 = *CObj_CSndParams` in cfunc_UnitWeaponPlaySoundL, 0x006D7C50).
+   *
+   * A local copy of this resolver used to upcast to the *object* type and
+   * return `upcast.mObj` undereferenced, handing back the address of the
+   * pointer variable inside the Lua userdata block. Use the canonical
+   * accessor rather than a second copy of it.
+   */
 
   [[nodiscard]] bool IsFiniteVector3(const Wm3::Vec3f& value) noexcept
   {
@@ -985,7 +961,7 @@ namespace moho
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
 
     const LuaPlus::LuaObject paramsObject(LuaPlus::LuaStackObject(state, 2));
-    CSndParams* const params = ResolveSoundParamsFromLuaObject(paramsObject);
+    CSndParams* const params = *func_GetCObj_CSndParams(paramsObject);
 
     if (sim && sim->mSoundManager) {
       Entity* const entity = weapon->mUnit ? static_cast<Entity*>(weapon->mUnit) : nullptr;

@@ -1002,41 +1002,19 @@ namespace
     return userDataObject.GetUserData();
   }
 
-  [[nodiscard]] moho::CSndParams* ResolveSoundParamsFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    static gpg::RType* sSoundParamsType = nullptr;
-    if (!sSoundParamsType) {
-      sSoundParamsType = gpg::LookupRType(typeid(moho::CSndParams));
-    }
-
-    if (sSoundParamsType) {
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, sSoundParamsType);
-      if (upcast.mObj != nullptr) {
-        return static_cast<moho::CSndParams*>(upcast.mObj);
-      }
-    }
-
-    const char* const typeName = userDataRef.GetTypeName();
-    if (typeName != nullptr && std::strstr(typeName, "CSndParams") != nullptr) {
-      return static_cast<moho::CSndParams*>(userDataRef.mObj);
-    }
-
-    return nullptr;
-  }
+  /**
+   * The `Sound{}` userdata holds a `CSndParams*`, so what the reflection
+   * upcast yields is the *slot*, not the object - `func_GetCObj_CSndParams`
+   * (0x004E4B40) is typed `CSndParams**` for exactly that reason, and every
+   * ground-truth caller dereferences it (`v8 = *CObj_CSndParams` in
+   * cfunc_EntityPlaySoundL 0x0068CCB0, cfunc_EntitySetAmbientSoundL
+   * 0x0068CE40, cfunc_UnitWeaponPlaySoundL 0x006D7C50).
+   *
+   * A local resolver here used to upcast to the *object* type and hand back
+   * `upcast.mObj` undereferenced, so callers received the address of the
+   * pointer variable inside the Lua userdata block and read that block as if
+   * it were a CSndParams. Use the canonical accessor instead.
+   */
 
   /**
    * Address: 0x0067F100 (FUN_0067F100, func_CastRPropBlueprint)
@@ -6490,7 +6468,7 @@ namespace moho
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
     const LuaPlus::LuaObject paramsObject(LuaPlus::LuaStackObject(state, 2));
-    CSndParams* const params = ResolveSoundParamsFromLuaObject(paramsObject);
+    CSndParams* const params = *func_GetCObj_CSndParams(paramsObject);
 
     if (sim && sim->mSoundManager) {
       sim->mSoundManager->AddEntitySound(entity, params);
@@ -6550,13 +6528,13 @@ namespace moho
     CSndParams* ambientSound = nullptr;
     if (lua_type(rawState, 2) != LUA_TNIL) {
       const LuaPlus::LuaObject ambientObject(LuaPlus::LuaStackObject(state, 2));
-      ambientSound = ResolveSoundParamsFromLuaObject(ambientObject);
+      ambientSound = *func_GetCObj_CSndParams(ambientObject);
     }
 
     CSndParams* rumbleSound = nullptr;
     if (lua_type(rawState, 3) != LUA_TNIL) {
       const LuaPlus::LuaObject rumbleObject(LuaPlus::LuaStackObject(state, 3));
-      rumbleSound = ResolveSoundParamsFromLuaObject(rumbleObject);
+      rumbleSound = *func_GetCObj_CSndParams(rumbleObject);
     }
 
     entity->mAmbientSound = ambientSound;
