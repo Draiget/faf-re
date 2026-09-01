@@ -302,7 +302,12 @@ namespace gpg
         friend void WriteRawPointer(WriteArchive* archive, const RRef& objectRef, TrackedPointerState state, const RRef& ownerRef);
     };
 
-    static_assert(sizeof(WriteArchive) == 0x20, "WriteArchive size must be 0x20");
+    // NO size assert here on purpose. The binary's base is 0x20 (see
+    // field_0x1C above), but this class holds two std::maps and their size
+    // depends on the toolchain's iterator-debugging level, which differs
+    // between the isolated-TU check and the full Debug build. An exact sizeof
+    // gate on a std::map-bearing class therefore cannot hold in both, so the
+    // layout is documented on the members rather than asserted.
 
     /**
      * Address: import thunk used at 0x008812DC callsite
