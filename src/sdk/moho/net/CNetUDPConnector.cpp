@@ -91,8 +91,13 @@ CNetUDPConnector::~CNetUDPConnector()
   // Drain packet free-list.
   while (mPacketList.mNext != &mPacketList) {
     if (auto* n = mPacketList.mNext) {
-      // Unlink from intrusive list and free
-      delete n->ListUnlink();
+      // Unlink from intrusive list and free. ListUnlink() (not used here)
+      // returns the OLD mNext -- the node after n, which stays fully linked
+      // into the ring. Deleting that would free a still-linked live node and
+      // leak n itself (orphaned via ListResetLinks(), never freed). The
+      // binary (FUN_00489BC0) frees the captured front node itself;
+      // ListUnlinkSelf() is the variant that returns `this`.
+      delete n->ListUnlinkSelf();
     }
   }
 

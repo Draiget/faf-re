@@ -1608,8 +1608,11 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
  */
 bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
 {
-  // Ensure the node is detached
-  const auto node = packet->ListUnlink();
+  // Ensure the node is detached. ListUnlink() (not used here) returns the
+  // OLD mNext -- some other node entirely, not packet itself -- so using its
+  // return value here spliced whatever packet used to point to into
+  // mEarlyPackets instead of packet. ListUnlinkSelf() returns `this`.
+  const auto node = packet->ListUnlinkSelf();
 
   // Walk list to find insertion point (first element with seq > p->seq)
   for (auto* cur : mEarlyPackets.owners()) {
@@ -1637,13 +1640,13 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
  */
 SNetPacket* CNetUDPConnection::EarlyPopFront()
 {
-  if (mEarlyPackets.empty()) {
-    return nullptr;
-  }
-
-  const auto node = mEarlyPackets.ListUnlink();
-  auto* p = static_cast<SNetPacket*>(node);
-  return p;
+  // mEarlyPackets.ListUnlink() (not used here) unlinks the SENTINEL itself
+  // from the ring -- it returns the front element (correct value), but also
+  // splices the sentinel out, leaving any remaining queued packets linked to
+  // each other but unreachable from mEarlyPackets. pop_front() unlinks the
+  // front element instead, which is what this needs.
+  auto* const node = mEarlyPackets.pop_front();
+  return static_cast<SNetPacket*>(node);
 }
 
 /**
@@ -1738,7 +1741,9 @@ void CNetUDPConnection::UnlinkFromConnectorList() noexcept
  */
 void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet)
 {
-  const auto node = packet->ListUnlink();
+  // See InsertEarlySorted's comment: ListUnlinkSelf() returns `this`
+  // (packet), not the OLD mNext ListUnlink() would return.
+  const auto node = packet->ListUnlinkSelf();
 
   for (auto* cur : mUnAckedPayloads.owners()) {
     if (packet->mSentTime < cur->mSentTime) {
