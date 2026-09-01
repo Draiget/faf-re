@@ -65,6 +65,17 @@ struct Node
 	Node* next;             // Collision chain link.
 };
 
+// `luaH_mainposition` (0x00926F70) indexes the node array as
+//     lea eax, [eax+eax*4]     ; index * 5
+//     lea eax, [ecx+eax*4]     ; node + index * 20
+// so a Node is exactly 20 bytes, which also pins TObject at 8 (see
+// LuaPrimitives.h). The same function reads `lsizenode` at [esi+9] and `node`
+// at [esi+14h], both already asserted on Table below.
+static_assert(offsetof(Node, i_key) == 0x00, "Node::i_key must be at +0x00");
+static_assert(offsetof(Node, i_val) == 0x08, "Node::i_val must be at +0x08");
+static_assert(offsetof(Node, next) == 0x10, "Node::next must be at +0x10");
+static_assert(sizeof(Node) == 0x14, "Node size must be 0x14");
+
 struct Table
 {
 	GCObject* next;          // +0x00
