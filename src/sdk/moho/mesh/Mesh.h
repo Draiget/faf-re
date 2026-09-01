@@ -1516,4 +1516,33 @@ namespace moho
   void ConstructSharedMeshBlueprintLODFromRaw(
     boost::shared_ptr<RMeshBlueprintLOD>& out,
     RMeshBlueprintLOD* raw);
+
+  /**
+   * Address: 0x007E69B0 (FUN_007E69B0, boost::detail::sp_counted_impl_pd<
+   * Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::
+   * sp_counted_impl_pd)
+   * Address: 0x007E6A80 (FUN_007E6A80, that control block's own scalar
+   * deleting destructor -- vftable slot 0)
+   * Address: 0x007E69E0 (FUN_007E69E0, `dispose()` -- vftable slot 1: erases
+   * the cache-tree entry, then deletes the `Mesh` through its own vtable)
+   * Address: 0x0042ABE0 (FUN_0042ABE0, generic type-erased `destroy()` --
+   * vftable slot 2)
+   * Address: 0x007E6A10 (FUN_007E6A10, `get_deleter()` -- vftable slot 3)
+   *
+   * What it does:
+   * Per-(T,Deleter) named helper binding the engine-instantiated
+   * `boost::shared_ptr<Mesh>::shared_ptr(Mesh*, Deleter)` ctor body -- the
+   * custom-deleter control block that erases `key` from `*tree` the moment
+   * the mesh's last strong reference drops, matching the four vftable slots
+   * above. Uses the real `boost::shared_ptr::reset(Y*, D)` overload instead
+   * of a hand-rolled `sp_counted_impl_pd` reimplementation, so the compiler
+   * generates (and this call site instantiates) the same control-block
+   * shape the binary shows, rather than a second, separately-maintained
+   * copy of boost's own internals.
+   */
+  void ConstructSharedMeshWithCacheEvictingDeleter(
+    boost::shared_ptr<Mesh>& out,
+    Mesh* raw,
+    MeshRendererMeshCacheTree& tree,
+    const MeshKey& key);
 } // namespace moho

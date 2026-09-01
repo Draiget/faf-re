@@ -2403,26 +2403,6 @@ namespace boost
       "SpCountedImplPdRuntimeView::deleterStorage offset must be 0x10"
     );
 
-    template <class TPointee>
-    struct SpCountedImplPdMeshCacheRuntimeView
-    {
-      void* vftable;
-      std::int32_t useCount;
-      std::int32_t weakCount;
-      TPointee* px;
-      std::uint32_t deleterWord0;
-      std::uint32_t deleterWord1;
-    };
-
-    static_assert(
-      offsetof(SpCountedImplPdMeshCacheRuntimeView<void>, deleterWord0) == 0x10,
-      "SpCountedImplPdMeshCacheRuntimeView::deleterWord0 offset must be 0x10"
-    );
-    static_assert(
-      offsetof(SpCountedImplPdMeshCacheRuntimeView<void>, deleterWord1) == 0x14,
-      "SpCountedImplPdMeshCacheRuntimeView::deleterWord1 offset must be 0x14"
-    );
-
     [[nodiscard]] bool SpTypeInfoMatchesRawName(
       const boost::detail::sp_typeinfo& requestedType,
       const char* const expectedRawName
@@ -2437,25 +2417,6 @@ namespace boost
 
       const char* const name = requestedType.name();
       return name != nullptr && std::strcmp(name, expectedRawName) == 0;
-    }
-
-    [[nodiscard]] bool IsMeshRefCountedCacheDeleterType(
-      const boost::detail::sp_typeinfo& requestedType
-    ) noexcept
-    {
-      constexpr const char* kMeshCacheDeleterRawName =
-        ".?AUDeleter@?$RefCountedCache@VMeshKey@Moho@@VMesh@2@@Moho@@";
-
-      if (SpTypeInfoMatchesRawName(requestedType, kMeshCacheDeleterRawName)) {
-        return true;
-      }
-
-      const char* const name = requestedType.name();
-      return name != nullptr &&
-        std::strstr(name, "RefCountedCache") != nullptr &&
-        std::strstr(name, "MeshKey") != nullptr &&
-        std::strstr(name, "Mesh") != nullptr &&
-        std::strstr(name, "Deleter") != nullptr;
     }
 
     template <class TPointee>
@@ -2845,31 +2806,6 @@ namespace boost
     }
 
     return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x007E69B0 (FUN_007E69B0, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::sp_counted_impl_pd)
-   *
-   * What it does:
-   * Initializes one recovered mesh-cache `sp_counted_impl_pd` control block
-   * and stores one 8-byte deleter payload at `+0x10`.
-   */
-  SpCountedImplStorage<moho::Mesh>* SpCountedImplPdConstructMeshRefCountedCache(
-    SpCountedImplStorage<moho::Mesh>* const countedImpl,
-    moho::Mesh* const ownedPointee,
-    const std::uint32_t deleterWord0,
-    const std::uint32_t deleterWord1
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-    auto* const runtime = reinterpret_cast<SpCountedImplPdMeshCacheRuntimeView<moho::Mesh>*>(countedImpl);
-    runtime->deleterWord0 = deleterWord0;
-    runtime->deleterWord1 = deleterWord1;
-    return countedImpl;
   }
 
   /**
@@ -3839,20 +3775,6 @@ namespace boost
    * `MeshBatch` control-block init path.
    */
   detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshBatch(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
-
-  /**
-   * Address: 0x007E6AC0 (FUN_007E6AC0)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * mesh-cache `sp_counted_impl_pd` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshRefCountedCache(
     detail::sp_counted_base* const control
   ) noexcept
   {
@@ -5246,21 +5168,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007E6A80 (FUN_007E6A80, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::Mesh>* SpCountedImplPdDeletingDtorMeshRefCountedCache(
-    SpCountedImplStorage<moho::Mesh>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
    * Address: 0x007FBE80 (FUN_007FBE80, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dtr)
    *
    * What it does:
@@ -5558,24 +5465,6 @@ namespace boost
   ) noexcept
   {
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x007E6A10 (FUN_007E6A10, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::get_deleter)
-   *
-   * What it does:
-   * Returns one mesh-cache deleter lane at offset `+0x10` when the queried
-   * `type_info` matches the cache-deleter type.
-   */
-  void* SpCountedImplPdGetDeleterMeshRefCountedCache(
-    SpCountedImplStorage<moho::Mesh>* const countedImpl,
-    const detail::sp_typeinfo& requestedType
-  ) noexcept
-  {
-    if (!IsMeshRefCountedCacheDeleterType(requestedType)) {
-      return nullptr;
-    }
-    return GetSpCountedImplPdDeleterStorage(countedImpl);
   }
 
   /**
