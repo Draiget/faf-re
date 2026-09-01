@@ -5548,12 +5548,14 @@ namespace msvc8
          * `throw_too_long`). For this instantiation MSVC factors BOTH the
          * in-place branch's trivial-scalar mechanics out into their own
          * out-of-line bodies rather than inlining `std::memmove`/the
-         * plain assignment loop: the `tail >= count` backward tail-shift is
-         * `sub_7E9890` (cited below on `uninit_move_n` -- despite the
-         * name-adjacent placement this is actually this member's own inline
-         * `memmove`-equivalent step, not a call to that member; modeled
-         * here as the same `std::copy_backward`-shaped loop) via the
-         * register-shape adapter `sub_7E9730`, and the final
+         * plain assignment loop: the `tail >= count` backward tail-shift
+         * (this member's own inline `memmove`-equivalent step, modeled here
+         * as the same `std::copy_backward`-shaped loop -- NOT a call to
+         * `uninit_move_n`, despite the superficial similarity) is
+         * `sub_7E9890` via the register-shape adapter `sub_7E9730`
+         * (addresses cited directly on this member, not on `uninit_move_n`,
+         * since the operation lives inline in `insert` for every other
+         * instantiation too), and the final
          * `insertAt[i]=localValue` gap-fill assignment loop (both branches)
          * is `sub_7E9700`. `.asm`-confirmed register-level, not just
          * `.c`: `sub_7E9700`'s `[eax_entry-8, edx)` fill target and
