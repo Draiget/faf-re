@@ -5601,7 +5601,8 @@ namespace moho
       }
     }
 
-    boost::shared_ptr<Mesh> mesh(new Mesh(blueprint, materialArg));
+    boost::shared_ptr<Mesh> mesh;
+    ConstructSharedMeshWithCacheEvictingDeleter(mesh, new Mesh(blueprint, materialArg), meshCacheTree, key);
     const std::pair<MeshRendererMeshCacheTree::iterator, bool> result =
       meshCacheTree.insert({key, boost::weak_ptr<Mesh>(mesh)});
 
@@ -7139,5 +7140,39 @@ namespace moho
     RMeshBlueprintLOD* const raw)
   {
     out.reset(raw);
+  }
+
+  namespace
+  {
+    /**
+     * `Moho::RefCountedCache<MeshKey,Mesh>::Deleter` (address block on
+     * `ConstructSharedMeshWithCacheEvictingDeleter`, Mesh.h). Erases the
+     * mesh's cache-tree entry the moment its last strong reference drops,
+     * then destroys the mesh itself through its own virtual destructor --
+     * matching `dispose()`'s real two-step body (`sub_7E69E0`): `erase_node`
+     * on the tree, then `Mesh`'s own scalar deleting destructor.
+     */
+    struct MeshCacheEvictingDeleter
+    {
+      MeshRendererMeshCacheTree* tree;
+      MeshKey key;
+
+      void operator()(Mesh* const mesh) const
+      {
+        if (tree != nullptr) {
+          tree->erase(key);
+        }
+        delete mesh;
+      }
+    };
+  } // namespace
+
+  void ConstructSharedMeshWithCacheEvictingDeleter(
+    boost::shared_ptr<Mesh>& out,
+    Mesh* const raw,
+    MeshRendererMeshCacheTree& tree,
+    const MeshKey& key)
+  {
+    out.reset(raw, MeshCacheEvictingDeleter{&tree, key});
   }
 } // namespace moho

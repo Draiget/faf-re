@@ -1061,20 +1061,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007E69B0 (FUN_007E69B0, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::sp_counted_impl_pd)
-     *
-     * What it does:
-     * Initializes one recovered mesh-cache `sp_counted_impl_pd` control block
-     * and stores one 8-byte deleter payload at `+0x10`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::Mesh>* SpCountedImplPdConstructMeshRefCountedCache(
-        SpCountedImplStorage<moho::Mesh>* countedImpl,
-        moho::Mesh* ownedPointee,
-        std::uint32_t deleterWord0,
-        std::uint32_t deleterWord1
-    ) noexcept;
-
-    /**
      * Address: 0x008E8990 (FUN_008E8990, boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::sp_counted_impl_p)
      *
      * What it does:
@@ -1637,17 +1623,6 @@ namespace boost
      * `MeshBatch` control-block init path.
      */
     [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshBatch(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x007E6AC0 (FUN_007E6AC0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * mesh-cache `sp_counted_impl_pd` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshRefCountedCache(
         detail::sp_counted_base* control
     ) noexcept;
 
@@ -3057,18 +3032,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007E6A80 (FUN_007E6A80, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for one
-     * `sp_counted_impl_pd<Mesh*,MeshCacheDeleter>` lane.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::Mesh>* SpCountedImplPdDeletingDtorMeshRefCountedCache(
-        SpCountedImplStorage<moho::Mesh>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
      * Address: 0x007FBE80 (FUN_007FBE80, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dtr)
      *
      * What it does:
@@ -3287,18 +3250,6 @@ namespace boost
     [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectD3D10>* SpCountedImplPDeletingDtorEffectD3D10(
         SpCountedImplStorage<gpg::gal::EffectD3D10>* countedImpl,
         unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x007E6A10 (FUN_007E6A10, boost::detail::sp_counted_impl_pd<Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::get_deleter)
-     *
-     * What it does:
-     * Returns the mesh-cache deleter lane at `+0x10` when the requested
-     * `type_info` matches the cache deleter type.
-     */
-    [[nodiscard]] void* SpCountedImplPdGetDeleterMeshRefCountedCache(
-        SpCountedImplStorage<moho::Mesh>* countedImpl,
-        detail::sp_typeinfo const& requestedType
     ) noexcept;
 
     /**
