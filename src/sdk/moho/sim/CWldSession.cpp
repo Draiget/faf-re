@@ -14496,6 +14496,28 @@ namespace moho
       }
     }
 
+    // 0x00893160 line ~301-304: size the session's own entity spatial
+    // database from the same height field, immediately after VisionDB. The
+    // ctor is Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance(height,
+    // this, width) - already recovered as ResizeStorageForMap(width, height)
+    // (Mesh.cpp:4161, address 0x00501F50, confirmed via that function's own
+    // parameter names in its ground-truth signature). Ground truth's single
+    // call here never touches SpatialShardData, so this one call is the
+    // complete, faithful construction - matching the memset above, which is
+    // what a fresh, never-before-sized SpatialDB_MeshInstance's storage
+    // already looks like going in. Without this, every spatial query
+    // (CollectInBox/CollectInSphere/CollectInView/CollectAllInVolume, used by
+    // area-effect weapons, unit-selection-by-area, AI target-finding) reads
+    // an object that was only memset to zero, never actually built.
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) {
+      if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
+        if (const CHeightField* const heightField = stiMap->mHeightField.get(); heightField != nullptr) {
+          static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())
+            ->ResizeStorageForMap(heightField->Width() - 1, heightField->Height() - 1);
+        }
+      }
+    }
+
     gActiveWldSession = this;
   }
 
