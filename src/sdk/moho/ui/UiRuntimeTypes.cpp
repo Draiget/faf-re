@@ -5194,6 +5194,7 @@ moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
 gpg::RType* moho::CMauiMesh::sType = nullptr;
+gpg::RType* moho::CMauiCursor::sType = nullptr;
 gpg::RType* moho::CMauiBitmap::sType = nullptr;
 gpg::RType* moho::CMauiFrame::sType = nullptr;
 gpg::RType* moho::CMauiEdit::sType = nullptr;
@@ -6113,6 +6114,7 @@ moho::CMauiCursor* moho::CMauiCursorLink::GetCursor() const noexcept
  * back-reference.
  */
 moho::CMauiCursor::CMauiCursor(LuaPlus::LuaObject* const luaObject)
+  : CScriptObject()
 {
   struct SharedPtrRuntimeStorage final
   {
@@ -6120,11 +6122,6 @@ moho::CMauiCursor::CMauiCursor(LuaPlus::LuaObject* const luaObject)
     void* count = nullptr;
   };
   static_assert(sizeof(SharedPtrRuntimeStorage) == sizeof(boost::shared_ptr<RD3DTextureResource>));
-
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-  static_cast<WeakObject*>(scriptObject)->weakLinkHead_ = 0;
-  new (&scriptObject->cObject) LuaPlus::LuaObject();
-  new (&scriptObject->mLuaObj) LuaPlus::LuaObject();
 
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
   *reinterpret_cast<SharedPtrRuntimeStorage*>(&cursorView->mTexture) = SharedPtrRuntimeStorage{};
@@ -6137,7 +6134,7 @@ moho::CMauiCursor::CMauiCursor(LuaPlus::LuaObject* const luaObject)
   cursorView->mIsShowing = true;
 
   if (luaObject != nullptr) {
-    scriptObject->SetLuaObject(*luaObject);
+    SetLuaObject(*luaObject);
   }
 }
 
@@ -6153,13 +6150,39 @@ moho::CMauiCursor::~CMauiCursor()
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
   cursorView->mTexture.reset();
   cursorView->mDefaultTexture.reset();
-  // Qualified so the call is NOT virtually dispatched. ~CScriptObject is
-  // virtual, and this class does not derive from CScriptObject - it overlays
-  // one - so an unqualified `->~CScriptObject()` dispatches through this
-  // object's own vptr and lands on an unrelated slot. CScriptObject's
-  // cObject/mLuaObj then never destruct, stay linked in the Lua used-object
-  // list, and operator delete hands the still-linked nodes back to the heap.
-  reinterpret_cast<CScriptObject*>(this)->CScriptObject::~CScriptObject();
+  // ~CScriptObject() now runs automatically after this body - CMauiCursor is
+  // a real CScriptObject base (see the mCursorStateStorage comment on the
+  // class in UiRuntimeTypes.h), so the compiler chains the base destructor
+  // here without an explicit qualified call.
+}
+
+/**
+ * Address: 0x0078C9A0 (FUN_0078C9A0, Moho::CMauiCursor::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiCursor`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiCursor::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiCursor));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0078C9C0 (FUN_0078C9C0, Moho::CMauiCursor::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiCursor::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
 }
 
 /**
@@ -26751,10 +26774,12 @@ void moho::CMauiFrame::Frame(const float deltaSeconds)
         const msvc8::string name = cursor->GetDebugName();
         char line[224];
         sprintf_s(line, sizeof(line),
-                  "[TREEDUMP] %02d name=%.60s alpha=%d/1000 hidden=%d invis=%d depth=%d needsFrame=%d\n",
-                  dumped, name.c_str(), static_cast<int>(view->mAlpha * 1000.0f),
+                  "[TREEDUMP] %02d name=%.50s pass=%d alpha=%d/1000 hidden=%d invis=%d depth=%d rendered=%d\n",
+                  dumped, name.c_str(), view->mRenderPass,
+                  static_cast<int>(view->mAlpha * 1000.0f),
                   view->mIsHidden ? 1 : 0, view->mInvisible ? 1 : 0,
-                  static_cast<int>(view->mDepth), view->mNeedsFrameUpdate ? 1 : 0);
+                  static_cast<int>(view->mDepth),
+                  static_cast<int>(view->mRenderedChildren.end() - view->mRenderedChildren.begin()));
         ::OutputDebugStringA(line);
         ++dumped;
       }

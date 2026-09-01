@@ -1569,7 +1569,7 @@ namespace moho
     "moho::CMauiCursorLink::nextInOwnerChain offset must be 0x4"
   );
 
-  class CMauiCursor
+  class CMauiCursor : public CScriptObject
   {
   public:
     /**
@@ -1580,6 +1580,28 @@ namespace moho
      * back-reference.
      */
     explicit CMauiCursor(LuaPlus::LuaObject* luaObject);
+
+    /**
+     * Address: 0x0078C9A0 (FUN_0078C9A0, Moho::CMauiCursor::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiCursor`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0078C9C0 (FUN_0078C9C0, Moho::CMauiCursor::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x0078CCA0 (FUN_0078CCA0, Moho::CMauiCursor::SetTexture)
@@ -1618,7 +1640,24 @@ namespace moho
      * the embedded script object runtime base.
      */
     virtual ~CMauiCursor();
+
+  private:
+    /**
+     * The cursor's own state block, +0x34 (right after the inherited
+     * CScriptObject sub-object) through +0x57. Every field in it is reached
+     * through the typed `CMauiCursorTextureRuntimeView` overlay
+     * (mTexture/mDefaultTexture at +0x34/+0x3C, hotspot lanes through
+     * +0x57) - reserved here rather than re-declared, matching
+     * `CMauiControl::mControlStateStorage`. `AllocateZeroedUiObject<
+     * CMauiCursor>(0x58u)` at the construction site sizes the allocation
+     * explicitly, independent of `sizeof(CMauiCursor)`, but this storage
+     * keeps that size assert honest and protects any future construction
+     * path that relies on `sizeof(CMauiCursor)`/`operator new` directly.
+     */
+    std::uint8_t mCursorStateStorage[0x24];
   };
+
+  static_assert(sizeof(CMauiCursor) == 0x58, "moho::CMauiCursor size must be 0x58");
 
   struct CMauiCursorRuntimeView
   {
