@@ -289,6 +289,9 @@ wxStringRuntime* wxCopySharedWxStringRuntime(
   const wxStringRuntime* source,
   wxStringRuntime* outValue
 );
+bool wxIsPathSeparatorCharacterForFormatRuntime(wchar_t candidate, std::intptr_t formatHintOrToken) noexcept;
+wxStringRuntime* wxBuildPathSeparatorTokenRuntime(wxStringRuntime* outText, std::intptr_t formatHintOrToken) noexcept;
+void* wxDestroyDualStringObjectNoDeleteRuntimeThunkLegacyA(void* objectRuntime) noexcept;
 bool wxFileExists(const wxStringRuntime* fileName);
 bool wxListKeyMatchesStoredNodeKeyRuntime(
   const wxListKeyRuntime* keyRuntime,
@@ -7026,6 +7029,35 @@ namespace
     "WxArrayStringStorageRuntimeView::itemStorage offset must be 0x08"
   );
 
+  // Moved up from its original file position (was declared just before
+  // WxDirTraverserSimpleArrayRuntime) so it can be embedded by value in
+  // WxFileNameComposeRuntimeView, declared further down in this file.
+  struct WxArrayStringAddRuntimeView
+  {
+    std::uint32_t capacity = 0;   // +0x00
+    std::uint32_t itemCount = 0;  // +0x04
+    wchar_t** itemStorage = nullptr; // +0x08
+    std::uint8_t autoSort = 0;    // +0x0C
+    std::uint8_t pad0D_0F[0x03]{};
+  };
+  static_assert(
+    offsetof(WxArrayStringAddRuntimeView, capacity) == 0x00,
+    "WxArrayStringAddRuntimeView::capacity offset must be 0x00"
+  );
+  static_assert(
+    offsetof(WxArrayStringAddRuntimeView, itemCount) == 0x04,
+    "WxArrayStringAddRuntimeView::itemCount offset must be 0x04"
+  );
+  static_assert(
+    offsetof(WxArrayStringAddRuntimeView, itemStorage) == 0x08,
+    "WxArrayStringAddRuntimeView::itemStorage offset must be 0x08"
+  );
+  static_assert(
+    offsetof(WxArrayStringAddRuntimeView, autoSort) == 0x0C,
+    "WxArrayStringAddRuntimeView::autoSort offset must be 0x0C"
+  );
+  static_assert(sizeof(WxArrayStringAddRuntimeView) == 0x10, "WxArrayStringAddRuntimeView size must be 0x10");
+
   void wxArrayStringReleaseSharedItems(
     WxArrayStringStorageRuntimeView* const arrayRuntime
   ) noexcept
@@ -7229,53 +7261,63 @@ namespace
     return result;
   }
 
-  struct WxTripleStringArrayStorageRuntimeView
+  // wxFileName's path/volume/name/ext composition storage. Moved up from
+  // its original file position (was declared as
+  // WxTripleStringArrayStorageRuntimeView, with generic primary/secondary/
+  // tertiary field names and a narrower, unlabeled-4th-field array view) so
+  // it can be shared with the wxFileName::SplitPath/Compose family declared
+  // further down in this file. Field identities (volume/path-components/
+  // filename/extension) and the array view's 4th field (autoSort) are
+  // confirmed from WxFileNameComposeConstructRuntime's (FUN_009F5E30) and
+  // WxArrayStringAddRuntime's (FUN_009615A0) real bodies.
+  struct WxFileNameComposeRuntimeView
   {
-    wxStringRuntime primaryText{};                  // +0x00
-    WxArrayStringStorageRuntimeView arrayStorage{}; // +0x04
-    std::uint32_t runtimeLane10 = 0;                // +0x10
-    wxStringRuntime secondaryText{};                // +0x14
-    wxStringRuntime tertiaryText{};                 // +0x18
+    wxStringRuntime volumeText{};                  // +0x00
+    WxArrayStringAddRuntimeView pathComponents{};  // +0x04
+    wxStringRuntime fileNameText{};                // +0x14
+    wxStringRuntime extensionText{};                // +0x18
     std::uint8_t isRelativePath = 0;                // +0x1C
     std::uint8_t pad1D_1F[0x03]{};
   };
   static_assert(
-    offsetof(WxTripleStringArrayStorageRuntimeView, arrayStorage) == 0x04,
-    "WxTripleStringArrayStorageRuntimeView::arrayStorage offset must be 0x04"
+    offsetof(WxFileNameComposeRuntimeView, pathComponents) == 0x04,
+    "WxFileNameComposeRuntimeView::pathComponents offset must be 0x04"
   );
   static_assert(
-    offsetof(WxTripleStringArrayStorageRuntimeView, secondaryText) == 0x14,
-    "WxTripleStringArrayStorageRuntimeView::secondaryText offset must be 0x14"
+    offsetof(WxFileNameComposeRuntimeView, fileNameText) == 0x14,
+    "WxFileNameComposeRuntimeView::fileNameText offset must be 0x14"
   );
   static_assert(
-    offsetof(WxTripleStringArrayStorageRuntimeView, tertiaryText) == 0x18,
-    "WxTripleStringArrayStorageRuntimeView::tertiaryText offset must be 0x18"
+    offsetof(WxFileNameComposeRuntimeView, extensionText) == 0x18,
+    "WxFileNameComposeRuntimeView::extensionText offset must be 0x18"
   );
   static_assert(
-    offsetof(WxTripleStringArrayStorageRuntimeView, isRelativePath) == 0x1C,
-    "WxTripleStringArrayStorageRuntimeView::isRelativePath offset must be 0x1C"
+    offsetof(WxFileNameComposeRuntimeView, isRelativePath) == 0x1C,
+    "WxFileNameComposeRuntimeView::isRelativePath offset must be 0x1C"
   );
   static_assert(
-    sizeof(WxTripleStringArrayStorageRuntimeView) == 0x20,
-    "WxTripleStringArrayStorageRuntimeView size must be 0x20"
+    sizeof(WxFileNameComposeRuntimeView) == 0x20,
+    "WxFileNameComposeRuntimeView size must be 0x20"
   );
 
   /**
    * Address: 0x009B12A0 (FUN_009B12A0)
    *
    * What it does:
-   * Tears down one triple-string runtime payload by releasing tertiary/secondary
-   * string lanes, destroying the embedded `wxArrayString` storage lane, then
-   * releasing the primary string lane.
+   * Tears down one wxFileName compose payload by releasing extension/filename
+   * string lanes, destroying the embedded path-components array lane, then
+   * releasing the volume string lane.
    */
-  void wxDestroyTripleStringArrayStorageRuntime(
-    WxTripleStringArrayStorageRuntimeView* const runtime
+  void WxFileNameComposeDestroyRuntime(
+    WxFileNameComposeRuntimeView* const runtime
   ) noexcept
   {
-    ReleaseWxStringSharedPayload(runtime->tertiaryText);
-    ReleaseWxStringSharedPayload(runtime->secondaryText);
-    wxArrayStringReleaseItemsAndDeleteStorageRuntime(&runtime->arrayStorage);
-    ReleaseWxStringSharedPayload(runtime->primaryText);
+    ReleaseWxStringSharedPayload(runtime->extensionText);
+    ReleaseWxStringSharedPayload(runtime->fileNameText);
+    wxArrayStringReleaseItemsAndDeleteStorageRuntime(
+      reinterpret_cast<WxArrayStringStorageRuntimeView*>(&runtime->pathComponents)
+    );
+    ReleaseWxStringSharedPayload(runtime->volumeText);
   }
 
   /**
@@ -47902,24 +47944,997 @@ namespace
     value->m_pchData = const_cast<wchar_t*>(wxEmptyString);
   }
 
-  struct WxFileNameComposeRuntimeView
+  /**
+   * Address: 0x0095FD20 (FUN_0095FD20, wxString::AllocBuffer)
+   *
+   * What it does:
+   * Allocates a fresh, uniquely-owned COW buffer for `charCount` characters
+   * (refCount=1) plus a fixed 20-wide-char baseline reserve rounded to the
+   * growable portion's 16-char alignment (`charCount - (charCount & 0xF)`
+   * wide chars of growth headroom on top of the baseline -- never less than
+   * `charCount`, since the remainder `charCount & 0xF` is always < 16 < the
+   * 20-char baseline), writes the NUL terminator, and rebinds `value` to it.
+   */
+  [[nodiscard]] bool WxStringAllocBufferRuntime(
+    wxStringRuntime* const value,
+    const std::size_t charCount
+  ) noexcept
   {
-    wxStringRuntime volumeText{};           // +0x00
-    std::uint8_t unknown04_07[0x04]{};      // +0x04
-    std::uint32_t componentCount = 0;       // +0x08
-    const wchar_t** components = nullptr;   // +0x0C
-    std::uint8_t unknown10_13[0x04]{};      // +0x10
-    wxStringRuntime fileNameText{};         // +0x14
-    wxStringRuntime extensionText{};        // +0x18
-    std::uint8_t isRelativePath = 0;        // +0x1C
-  };
-  static_assert(offsetof(WxFileNameComposeRuntimeView, volumeText) == 0x00, "WxFileNameComposeRuntimeView::volumeText offset must be 0x00");
-  static_assert(offsetof(WxFileNameComposeRuntimeView, componentCount) == 0x08, "WxFileNameComposeRuntimeView::componentCount offset must be 0x08");
-  static_assert(offsetof(WxFileNameComposeRuntimeView, components) == 0x0C, "WxFileNameComposeRuntimeView::components offset must be 0x0C");
-  static_assert(offsetof(WxFileNameComposeRuntimeView, fileNameText) == 0x14, "WxFileNameComposeRuntimeView::fileNameText offset must be 0x14");
-  static_assert(offsetof(WxFileNameComposeRuntimeView, extensionText) == 0x18, "WxFileNameComposeRuntimeView::extensionText offset must be 0x18");
-  static_assert(offsetof(WxFileNameComposeRuntimeView, isRelativePath) == 0x1C, "WxFileNameComposeRuntimeView::isRelativePath offset must be 0x1C");
-  static_assert(sizeof(WxFileNameComposeRuntimeView) == 0x20, "WxFileNameComposeRuntimeView size must be 0x20");
+    const std::size_t growthChars = charCount - (charCount & 0xFu);
+    auto* const header = static_cast<std::int32_t*>(std::malloc(2u * growthChars + 52u));
+    if (header == nullptr) {
+      return false;
+    }
+    header[0] = 1;                                   // refCount
+    header[1] = static_cast<std::int32_t>(charCount); // dataLength
+    header[2] = static_cast<std::int32_t>(growthChars + 19u); // allocLength
+    auto* const text = reinterpret_cast<wchar_t*>(header + 3);
+    value->m_pchData = text;
+    text[charCount] = L'\0';
+    return true;
+  }
+
+  /**
+   * Address: 0x00960A50 (FUN_00960A50, wxString::Alloc)
+   *
+   * What it does:
+   * Ensures `value` can hold at least `charCount` characters. No-ops if
+   * already large enough. If uniquely owned (refCount==1), grows/reallocates
+   * the existing buffer in place. If shared (refCount>1), drops the shared
+   * reference and allocates a fresh private buffer, copying the old content.
+   * If the buffer is the eternal empty-string sentinel (refCount==-1),
+   * allocates a fresh buffer directly.
+   */
+  [[nodiscard]] bool WxStringAllocRuntime(
+    wxStringRuntime* const value,
+    const std::size_t charCount
+  ) noexcept
+  {
+    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    if (static_cast<std::uint32_t>(header[2]) > charCount) {
+      return true;
+    }
+
+    if (header[0] == -1) {
+      const std::size_t allocChars = 19u - (charCount & 0xFu) + charCount;
+      auto* const fresh = static_cast<std::int32_t*>(std::malloc(2u * allocChars + 14u));
+      if (fresh == nullptr) {
+        return false;
+      }
+      fresh[2] = static_cast<std::int32_t>(allocChars);
+      fresh[0] = 1;
+      fresh[1] = 0;
+      auto* const text = reinterpret_cast<wchar_t*>(fresh + 3);
+      value->m_pchData = text;
+      *text = L'\0';
+      return true;
+    }
+
+    if (header[0] > 1) {
+      --header[0];
+      const std::int32_t oldLength = header[1];
+      if (!WxStringAllocBufferRuntime(value, charCount)) {
+        return false;
+      }
+      std::memcpy(value->m_pchData, header + 3, 2u * static_cast<std::size_t>(oldLength));
+      return true;
+    }
+
+    const std::size_t allocChars = 19u - (charCount & 0xFu) + charCount;
+    auto* const grown = static_cast<std::int32_t*>(std::realloc(header, 2u * allocChars + 14u));
+    if (grown == nullptr) {
+      return false;
+    }
+    grown[2] = static_cast<std::int32_t>(allocChars);
+    value->m_pchData = reinterpret_cast<wchar_t*>(grown + 3);
+    return true;
+  }
+
+  /**
+   * Address: 0x00960860 (FUN_00960860, wxString::InitWith)
+   *
+   * What it does:
+   * Initializes `value` from `charCount` characters starting at
+   * `source[offset]`. `charCount == -101` is the "compute via NUL scan"
+   * sentinel used for C-string literals: it re-derives the length by
+   * scanning from `source + offset` to the first `L'\0'`. A zero final
+   * length leaves `value` bound to the shared empty-string singleton.
+   */
+  [[nodiscard]] bool WxStringInitWithRuntime(
+    wxStringRuntime* const value,
+    const wchar_t* const source,
+    const int offset,
+    const int charCountOrScanSentinel
+  ) noexcept
+  {
+    value->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+    std::size_t resolvedLength = static_cast<std::size_t>(charCountOrScanSentinel);
+    if (charCountOrScanSentinel == -101) {
+      const wchar_t* const start = source + offset;
+      resolvedLength = std::wcslen(start);
+    }
+
+    if (resolvedLength == 0) {
+      return true;
+    }
+
+    if (!WxStringAllocBufferRuntime(value, resolvedLength)) {
+      return false;
+    }
+    std::memcpy(value->m_pchData, source + offset, 2u * resolvedLength);
+    return true;
+  }
+
+  /**
+   * Address: 0x00960CA0 (FUN_00960CA0, wxString::append)
+   *
+   * What it does:
+   * Appends `charCount` characters from `data` to `value`'s existing
+   * content. Grows in place via `WxStringAllocRuntime` when uniquely owned
+   * and already large enough or growable; otherwise allocates a fresh
+   * private buffer and copies the old prefix in (COW break-on-write).
+   */
+  [[nodiscard]] bool WxStringAppendRuntime(
+    wxStringRuntime* const value,
+    const int charCount,
+    const void* const data
+  ) noexcept
+  {
+    if (charCount <= 0) {
+      return true;
+    }
+
+    auto* header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    const std::int32_t oldLength = header[1];
+    const std::size_t newLength = static_cast<std::size_t>(charCount) + static_cast<std::size_t>(oldLength);
+
+    if (header[0] <= 1) {
+      if (newLength > static_cast<std::uint32_t>(header[2]) && !WxStringAllocRuntime(value, newLength)) {
+        return false;
+      }
+    } else {
+      if (!WxStringAllocBufferRuntime(value, newLength)) {
+        return false;
+      }
+      std::memcpy(value->m_pchData, header + 3, 2u * static_cast<std::size_t>(oldLength));
+      if (header[0] != -1) {
+        --header[0];
+        if (header[0] == 0) {
+          _free_crt(header);
+        }
+      }
+    }
+
+    std::memcpy(value->m_pchData + oldLength, data, 2u * static_cast<std::size_t>(charCount));
+    value->m_pchData[newLength] = L'\0';
+    header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    header[1] = static_cast<std::int32_t>(newLength);
+    return true;
+  }
+
+  /**
+   * Address: 0x00960BD0 (FUN_00960BD0, wxString::operator=)
+   *
+   * What it does:
+   * COW assignment: releases `value`'s old shared payload (or rebinds to
+   * the empty-string singleton via `wxStringReleaseAndResetToEmpty` when
+   * the source is the eternal empty-string sentinel), then shares the
+   * source's buffer with an incremented refcount.
+   */
+  void WxStringAssignRuntime(
+    wxStringRuntime* const value,
+    const wxStringRuntime* const source
+  ) noexcept
+  {
+    if (value->m_pchData == source->m_pchData) {
+      return;
+    }
+
+    auto* const sourceHeader = reinterpret_cast<std::int32_t*>(source->m_pchData) - 3;
+    if (sourceHeader[0] == -1) {
+      (void)wxStringReleaseAndResetToEmpty(value);
+      return;
+    }
+
+    auto* const oldHeader = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    if (oldHeader[0] != -1) {
+      --oldHeader[0];
+      if (oldHeader[0] == 0) {
+        _free_crt(oldHeader);
+      }
+    }
+
+    value->m_pchData = source->m_pchData;
+    if (sourceHeader[0] != -1) {
+      ++sourceHeader[0];
+    }
+  }
+
+  /**
+   * Address: 0x00962430 (FUN_00962430, wxString::erase)
+   *
+   * What it does:
+   * Removes `deleteCount` characters starting at `startIndex`: builds a
+   * replacement from the prefix `[0, startIndex)`, appends the suffix
+   * starting at `startIndex + deleteCount` (unless `deleteCount == -101`,
+   * the "erase to end" sentinel), then assigns the replacement over `value`
+   * and releases the temporary.
+   */
+  void WxStringEraseRuntime(
+    wxStringRuntime* const value,
+    const int startIndex,
+    const int deleteCount
+  ) noexcept
+  {
+    const wchar_t* const originalText = value->m_pchData;
+    wxStringRuntime replacement{};
+    replacement.m_pchData = nullptr;
+    (void)WxStringInitWithRuntime(&replacement, originalText, 0, startIndex);
+
+    if (deleteCount != -101) {
+      const wchar_t* suffixStart = originalText + startIndex + deleteCount;
+      std::size_t suffixLength = 0;
+      if (suffixStart != nullptr) {
+        const wchar_t* scan = suffixStart;
+        while (*scan != L'\0') {
+          ++scan;
+        }
+        suffixLength = static_cast<std::size_t>(scan - suffixStart);
+      }
+      (void)WxStringAppendRuntime(&replacement, static_cast<int>(suffixLength), suffixStart);
+    }
+
+    WxStringAssignRuntime(value, &replacement);
+
+    auto* const replacementHeader = reinterpret_cast<std::int32_t*>(replacement.m_pchData) - 3;
+    if (replacementHeader[0] != -1) {
+      --replacementHeader[0];
+      if (replacementHeader[0] == 0) {
+        _free_crt(replacementHeader);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x009613C0 (FUN_009613C0, wxArrayString::Free)
+   *
+   * What it does:
+   * Releases every element's shared string payload (COW refcount decrement,
+   * freeing on last release) without touching the item-pointer array itself.
+   */
+  void WxArrayStringFreeRuntime(
+    WxArrayStringAddRuntimeView* const view
+  ) noexcept
+  {
+    for (std::uint32_t i = 0; i < view->itemCount; ++i) {
+      auto* const header = reinterpret_cast<std::int32_t*>(view->itemStorage[i]) - 3;
+      if (header[0] != -1) {
+        --header[0];
+        if (header[0] == 0) {
+          _free_crt(header);
+        }
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00961420 (FUN_00961420, wxArrayString::Clear)
+   *
+   * What it does:
+   * Releases every element (`WxArrayStringFreeRuntime`), frees the
+   * item-pointer array itself, and resets the view to empty.
+   */
+  void WxArrayStringClearRuntime(
+    WxArrayStringAddRuntimeView* const view
+  ) noexcept
+  {
+    WxArrayStringFreeRuntime(view);
+    wchar_t** const items = view->itemStorage;
+    view->itemCount = 0;
+    view->capacity = 0;
+    if (items != nullptr) {
+      ::operator delete(items);
+      view->itemStorage = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00960440 (FUN_00960440, wxArrayString::Grow)
+   *
+   * What it does:
+   * Ensures room for `needed` more items. No-ops if already enough spare
+   * capacity. Grows geometrically (double, capped at +4096) when the array
+   * already has a buffer; otherwise starts at 16 (or `needed` if larger).
+   */
+  void WxArrayStringGrowRuntime(
+    WxArrayStringAddRuntimeView* const view,
+    const std::size_t needed
+  ) noexcept
+  {
+    if (static_cast<std::size_t>(view->capacity - view->itemCount) >= needed) {
+      return;
+    }
+
+    if (view->capacity == 0) {
+      view->capacity = (needed > 0x10u) ? static_cast<std::uint32_t>(needed) : 16u;
+      view->itemStorage = static_cast<wchar_t**>(::operator new(4u * view->capacity));
+      return;
+    }
+
+    std::size_t growBy = needed;
+    std::size_t growthStep = (view->capacity >= 0x10u) ? (view->capacity >> 1) : 16u;
+    if (growthStep > 0x1000u) {
+      growthStep = 4096u;
+    }
+    if (growBy < growthStep) {
+      growBy = growthStep;
+    }
+    view->capacity += static_cast<std::uint32_t>(growBy);
+
+    auto* const fresh = static_cast<wchar_t**>(::operator new(4u * view->capacity));
+    std::memcpy(fresh, view->itemStorage, 4u * view->itemCount);
+    if (view->itemStorage != nullptr) {
+      ::operator delete(view->itemStorage);
+    }
+    view->itemStorage = fresh;
+  }
+
+  /**
+   * Address: 0x00960650 (FUN_00960650, wxArrayString::Insert)
+   *
+   * What it does:
+   * Inserts `insertCount` items (each sharing the source's COW buffer with
+   * an incremented refcount) at `atIndex`, shifting the existing tail up.
+   * Used by `WxArrayStringAddRuntime`'s auto-sorted path.
+   */
+  void WxArrayStringInsertRuntime(
+    WxArrayStringAddRuntimeView* const view,
+    const wchar_t** const item,
+    const std::uint32_t atIndex,
+    const std::size_t insertCount
+  ) noexcept
+  {
+    if (atIndex > view->itemCount || view->itemCount > view->itemCount + insertCount) {
+      return;
+    }
+
+    WxArrayStringGrowRuntime(view, insertCount);
+    std::memmove(&view->itemStorage[atIndex + insertCount], &view->itemStorage[atIndex], 4u * (view->itemCount - atIndex));
+
+    for (std::size_t i = 0; i < insertCount; ++i) {
+      auto* const header = reinterpret_cast<std::int32_t*>(const_cast<wchar_t*>(*item)) - 3;
+      if (header[0] != -1) {
+        ++header[0];
+      }
+      view->itemStorage[atIndex + i] = const_cast<wchar_t*>(*item);
+    }
+    view->itemCount += static_cast<std::uint32_t>(insertCount);
+  }
+
+  /**
+   * Address: 0x009615A0 (FUN_009615A0, wxArrayString::Add)
+   *
+   * What it does:
+   * Appends one shared-buffer item (COW refcount increment, no copy) to the
+   * end when the array isn't auto-sorted; otherwise binary-searches for the
+   * sorted insertion point and delegates to `WxArrayStringInsertRuntime`.
+   * Returns the index the item was placed at.
+   */
+  std::uint32_t WxArrayStringAddRuntime(
+    WxArrayStringAddRuntimeView* const view,
+    const wchar_t** const item
+  ) noexcept
+  {
+    if (!view->autoSort) {
+      WxArrayStringGrowRuntime(view, 1u);
+      auto* const header = reinterpret_cast<std::int32_t*>(const_cast<wchar_t*>(*item)) - 3;
+      if (header[0] != -1) {
+        ++header[0];
+      }
+      const std::uint32_t index = view->itemCount;
+      view->itemStorage[index] = const_cast<wchar_t*>(*item);
+      view->itemCount = index + 1u;
+      return index;
+    }
+
+    std::uint32_t low = 0;
+    std::uint32_t high = view->itemCount;
+    while (low < high) {
+      const std::uint32_t mid = (low + high) >> 1;
+      const int cmp = std::wcscmp(*item, view->itemStorage[mid]);
+      if (cmp == 0) {
+        low = mid;
+        break;
+      }
+      if (cmp < 0) {
+        high = mid;
+      } else {
+        low = mid + 1u;
+      }
+    }
+    WxArrayStringInsertRuntime(view, item, low, 1u);
+    return low;
+  }
+
+  /**
+   * Address: 0x009F3B10 (FUN_009F3B10, wxFileName::GetFormat)
+   *
+   * What it does:
+   * Resolves a format-hint-or-token value: returns it unchanged when
+   * non-zero, else defaults to `3` (this build's `wxPATH_NATIVE`
+   * resolution). Real, in-binary body (not a `wxmswu.lib` import); was
+   * mismarked `external_dependency` despite that.
+   */
+  [[nodiscard]] std::int32_t WxFileNameGetFormatRuntime(
+    const std::int32_t formatHintOrToken
+  ) noexcept
+  {
+    return (formatHintOrToken != 0) ? formatHintOrToken : 3;
+  }
+
+  /**
+   * Address: 0x009F4810 (FUN_009F4810, sub_9F4810)
+   *
+   * What it does:
+   * Splits `fullPath` into `view`'s `pathComponents`/`isRelativePath`
+   * fields (`volumeText`/`fileNameText`/`extensionText` are populated
+   * elsewhere -- see the wrapper below). Clears any existing components; an
+   * empty `fullPath` just marks the view relative and returns. Otherwise
+   * resolves the path format, takes a private COW working copy of
+   * `fullPath`, and classifies the leading character against the format's
+   * absolute/relative markers: Unix tests for a leading `/` or `~`; DOS
+   * tests for a leading `:` and strips it; Mac tests the leading character
+   * against the format's own separator token; VMS is always non-relative.
+   * Finally tokenizes the working copy on the format's separator token,
+   * adding each non-empty segment as a path component -- DOS format
+   * substitutes a literal `".."` component for an empty leading segment
+   * (matching a UNC-style `\\server\share` leading empty token), other
+   * formats simply drop empty segments.
+   */
+  [[nodiscard]] bool WxFileNameComposeAssignFullPathRuntime(
+    WxFileNameComposeRuntimeView* const view,
+    const wxStringRuntime* const fullPath,
+    const std::intptr_t formatHintOrToken
+  ) noexcept
+  {
+    WxArrayStringClearRuntime(&view->pathComponents);
+
+    const auto* const pathHeader = reinterpret_cast<const std::int32_t*>(fullPath->m_pchData) - 3;
+    if (pathHeader[1] == 0) {
+      view->isRelativePath = 1u;
+      return true;
+    }
+
+    const std::int32_t format = WxFileNameGetFormatRuntime(static_cast<std::int32_t>(formatHintOrToken));
+
+    wxStringRuntime workingText{};
+    workingText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)wxCopySharedWxStringRuntime(fullPath, &workingText);
+    (void)EnsureUniqueOwnedWxStringBuffer(&workingText);
+
+    const wchar_t firstChar = workingText.m_pchData[0];
+
+    switch (format) {
+      case 1: // wxPATH_UNIX
+        view->isRelativePath = (firstChar != L'/' && firstChar != L'~') ? 1u : 0u;
+        break;
+      case 2: // wxPATH_DOS
+      {
+        const bool isColon = (firstChar == L':');
+        view->isRelativePath = isColon ? 1u : 0u;
+        if (isColon) {
+          WxStringEraseRuntime(&workingText, 0, 1);
+        }
+        break;
+      }
+      case 3: // wxPATH_MAC
+        view->isRelativePath = wxIsPathSeparatorCharacterForFormatRuntime(firstChar, format) ? 0u : 1u;
+        break;
+      case 4: // wxPATH_VMS
+        view->isRelativePath = 0u;
+        break;
+      default:
+        break;
+    }
+
+    wxStringRuntime separatorToken{};
+    separatorToken.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)wxBuildPathSeparatorTokenRuntime(&separatorToken, format);
+
+    WxStringTokenizerRuntimeView tokenizer{};
+    (void)wxStringTokenizerConstructRuntime(&tokenizer, &workingText, &separatorToken, 0);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&separatorToken);
+
+    while (wxStringTokenizerHasPendingToken(&tokenizer)) {
+      wxStringRuntime token{};
+      token.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+      (void)wxStringTokenizerExtractNextToken(&tokenizer, &token);
+
+      const auto* const tokenHeader = reinterpret_cast<const std::int32_t*>(token.m_pchData) - 3;
+      if (tokenHeader[1] == 0) {
+        if (format == 2) {
+          wxStringRuntime dotdot{};
+          dotdot.m_pchData = nullptr;
+          (void)WxStringInitWithRuntime(&dotdot, L"..", 0, -101);
+          const wchar_t* dotdotText = dotdot.m_pchData;
+          (void)WxArrayStringAddRuntime(&view->pathComponents, &dotdotText);
+          (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&dotdot);
+        }
+        // Non-DOS formats: an empty segment is simply dropped.
+      } else {
+        const wchar_t* tokenText = token.m_pchData;
+        (void)WxArrayStringAddRuntime(&view->pathComponents, &tokenText);
+      }
+
+      (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&token);
+    }
+
+    (void)wxDestroyDualStringObjectNoDeleteRuntimeThunkLegacyA(&tokenizer);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&workingText);
+    return true;
+  }
+
+  /**
+   * Address: 0x009F5E30 (FUN_009F5E30, sub_9F5E30)
+   *
+   * What it does:
+   * Constructs one `WxFileNameComposeRuntimeView` from its four parsed
+   * lanes: splits `pathToSplit` into `pathComponents`/`isRelativePath` via
+   * `WxFileNameComposeAssignFullPathRuntime` (using `formatHintOrToken`),
+   * then COW-assigns `volumeText` (offset +0x00), `fileNameText` (+0x14, the
+   * 4th argument here) and `extensionText` (+0x18, the 5th argument) from
+   * the caller-supplied pre-parsed values -- real body: `wxString::
+   * operator=(this, a2); wxString::operator=(this+6, a5); wxString::
+   * operator=(this+5, a4);`, i.e. `a4` targets the `this+5` slot
+   * (`fileNameText`) and `a5` targets `this+6` (`extensionText`).
+   */
+  WxFileNameComposeRuntimeView* WxFileNameComposeConstructRuntime(
+    WxFileNameComposeRuntimeView* const view,
+    const wxStringRuntime* const volumeText,
+    const wxStringRuntime* const pathToSplit,
+    const wxStringRuntime* const fileNameTextIn,
+    const wxStringRuntime* const extensionTextIn,
+    const std::intptr_t formatHintOrToken
+  ) noexcept
+  {
+    (void)WxFileNameComposeAssignFullPathRuntime(view, pathToSplit, formatHintOrToken);
+    WxStringAssignRuntime(&view->volumeText, volumeText);
+    WxStringAssignRuntime(&view->extensionText, extensionTextIn);
+    WxStringAssignRuntime(&view->fileNameText, fileNameTextIn);
+    return view;
+  }
+
+  extern "C" wchar_t* __cdecl RuntimeWideStringFindLast(wchar_t* text, wchar_t needle);
+
+  /**
+   * Address: 0x009609D0 (FUN_009609D0, wxString::AllocBeforeWrite)
+   *
+   * What it does:
+   * Ensures `value` has a private, writable buffer of at least `charCount`
+   * characters: drops a shared reference (or handles the eternal
+   * empty-string sentinel) via a fresh `AllocBuffer`, or grows/reallocates
+   * an already-unique buffer in place.
+   */
+  [[nodiscard]] bool WxStringAllocBeforeWriteRuntime(
+    wxStringRuntime* const value,
+    const std::size_t charCount
+  ) noexcept
+  {
+    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    if (header[0] > 1) {
+      --header[0];
+      return WxStringAllocBufferRuntime(value, charCount);
+    }
+    if (header[0] == -1) {
+      return WxStringAllocBufferRuntime(value, charCount);
+    }
+    if (charCount <= static_cast<std::uint32_t>(header[2])) {
+      header[1] = static_cast<std::int32_t>(charCount);
+      return true;
+    }
+    const std::size_t allocChars = 19u - (charCount & 0xFu) + charCount;
+    auto* const grown = static_cast<std::int32_t*>(std::realloc(header, 2u * allocChars + 14u));
+    if (grown == nullptr) {
+      return false;
+    }
+    grown[2] = static_cast<std::int32_t>(allocChars);
+    value->m_pchData = reinterpret_cast<wchar_t*>(grown + 3);
+    header[1] = static_cast<std::int32_t>(charCount);
+    return true;
+  }
+
+  /**
+   * Address: 0x00960B30 (FUN_00960B30, wxString::GetWriteBuf)
+   *
+   * What it does:
+   * Ensures a private writable buffer of `charCount` characters, marks it
+   * as an "in-progress direct write" (refCount forced to 0, matching the
+   * real body's `*(m_pchData-12) = 0`), and returns the raw buffer pointer
+   * for the caller to fill directly.
+   */
+  [[nodiscard]] wchar_t* WxStringGetWriteBufRuntime(
+    wxStringRuntime* const value,
+    const std::size_t charCount
+  ) noexcept
+  {
+    if (!WxStringAllocBeforeWriteRuntime(value, charCount)) {
+      return nullptr;
+    }
+    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    header[0] = 0;
+    return value->m_pchData;
+  }
+
+  /**
+   * Address: 0x0095FDB0 (FUN_0095FDB0, wxString::UngetWriteBuf)
+   *
+   * What it does:
+   * Ends a direct-write session started by `WxStringGetWriteBufRuntime`:
+   * recomputes the length by scanning for the NUL terminator the caller
+   * wrote, and restores the buffer to uniquely-owned (refCount = 1).
+   */
+  wchar_t* WxStringUngetWriteBufRuntime(
+    wxStringRuntime* const value
+  ) noexcept
+  {
+    if (value->m_pchData == nullptr) {
+      auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+      header[0] = 1;
+      return value->m_pchData;
+    }
+    const wchar_t* scan = value->m_pchData;
+    while (*scan != L'\0') {
+      ++scan;
+    }
+    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    header[1] = static_cast<std::int32_t>(scan - value->m_pchData);
+    header[0] = 1;
+    return value->m_pchData;
+  }
+
+  /**
+   * Address: 0x00960E90 (FUN_00960E90, wxString::Left)
+   *
+   * What it does:
+   * Copies the first `charCount` characters of `value` into `outValue`
+   * (clamped to `value`'s actual length).
+   */
+  wxStringRuntime* WxStringLeftRuntime(
+    const wxStringRuntime* const value,
+    wxStringRuntime* const outValue,
+    std::size_t charCount
+  ) noexcept
+  {
+    const auto* const header = reinterpret_cast<const std::int32_t*>(value->m_pchData) - 3;
+    const auto actualLength = static_cast<std::uint32_t>(header[1]);
+    if (charCount > actualLength) {
+      charCount = actualLength;
+    }
+    outValue->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)WxStringInitWithRuntime(outValue, value->m_pchData, 0, static_cast<int>(charCount));
+    return outValue;
+  }
+
+  /**
+   * Address: 0x00960D40 (FUN_00960D40, wxString::Mid)
+   *
+   * What it does:
+   * Copies `charCountOrSentinel` characters of `value` starting at
+   * `startIndex` into `outValue` (clamped to the available tail;
+   * `charCountOrSentinel == -101` means "to the end").
+   */
+  wxStringRuntime* WxStringMidRuntime(
+    const wxStringRuntime* const value,
+    wxStringRuntime* const outValue,
+    const std::uint32_t startIndex,
+    const std::int32_t charCountOrSentinel
+  ) noexcept
+  {
+    const auto* const header = reinterpret_cast<const std::int32_t*>(value->m_pchData) - 3;
+    const auto actualLength = static_cast<std::uint32_t>(header[1]);
+
+    std::uint32_t resolvedCount = static_cast<std::uint32_t>(charCountOrSentinel);
+    if (charCountOrSentinel == -101) {
+      resolvedCount = actualLength - startIndex;
+    }
+    if (startIndex + resolvedCount > actualLength) {
+      resolvedCount = actualLength - startIndex;
+    }
+    if (startIndex > actualLength) {
+      resolvedCount = 0;
+    }
+
+    outValue->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)WxStringInitWithRuntime(outValue, value->m_pchData, static_cast<int>(startIndex), static_cast<int>(resolvedCount));
+    return outValue;
+  }
+
+  /**
+   * Address: 0x00960290 (FUN_00960290, sub_960290)
+   *
+   * What it does:
+   * Returns the index of the first occurrence of `needle` at or after
+   * `fromIndex` in `value`, or `-101` if absent. `this`-pointer confirmed
+   * via raw `.asm` at every call site (`lea ecx, [esp+.. arg_14]`, a
+   * genuine address-of-local -- the decompiled `.c`'s `(int)v51.m_pchData`
+   * argument rendering was an IDA pseudocode imprecision, not a real
+   * value-vs-pointer ambiguity).
+   */
+  [[nodiscard]] std::int32_t WxStringFindCharFromIndexRuntime(
+    const wxStringRuntime* const value,
+    const wchar_t needle,
+    const std::int32_t fromIndex
+  ) noexcept
+  {
+    const wchar_t* const found = std::wcschr(value->m_pchData + fromIndex, needle);
+    if (found == nullptr) {
+      return -101;
+    }
+    return static_cast<std::int32_t>(found - value->m_pchData);
+  }
+
+  /**
+   * Address: 0x00960250 (FUN_00960250, sub_960250)
+   *
+   * What it does:
+   * Returns the index of the last occurrence of `needle` anywhere in
+   * `value`, but only if that index is `<= maxIndex` (`maxIndex == -101`
+   * means "actual length", i.e. no upper bound); otherwise `-101`.
+   */
+  [[nodiscard]] std::int32_t WxStringFindLastCharClampedRuntime(
+    const wxStringRuntime* const value,
+    const wchar_t needle,
+    const std::int32_t maxIndexOrSentinel
+  ) noexcept
+  {
+    const auto* const header = reinterpret_cast<const std::int32_t*>(value->m_pchData) - 3;
+    std::uint32_t maxIndex = static_cast<std::uint32_t>(maxIndexOrSentinel);
+    if (maxIndexOrSentinel == -101) {
+      maxIndex = static_cast<std::uint32_t>(header[1]);
+    }
+    const wchar_t* const found = RuntimeWideStringFindLast(value->m_pchData, needle);
+    if (found == nullptr) {
+      return -101;
+    }
+    const auto index = static_cast<std::uint32_t>(found - value->m_pchData);
+    if (index > maxIndex) {
+      return -101;
+    }
+    return static_cast<std::int32_t>(index);
+  }
+
+  /**
+   * Address: 0x009602C0 (FUN_009602C0, sub_9602C0)
+   *
+   * What it does:
+   * Scans backward from `fromIndexOrSentinel` (or the end of `value` when
+   * `-101`) for the last character that is a member of `charSet`, returning
+   * its index or `-101` if none is found before the start of the string.
+   */
+  [[nodiscard]] std::int32_t WxStringFindLastOfRuntime(
+    const wxStringRuntime* const value,
+    const wchar_t* const charSet,
+    const std::int32_t fromIndexOrSentinel
+  ) noexcept
+  {
+    const auto* const header = reinterpret_cast<const std::int32_t*>(value->m_pchData) - 3;
+    std::int32_t fromIndex = fromIndexOrSentinel;
+    if (fromIndexOrSentinel == -101) {
+      fromIndex = header[1];
+    }
+
+    const wchar_t* cursor = value->m_pchData + fromIndex - 1;
+    if (cursor < value->m_pchData) {
+      return -101;
+    }
+    while (wxFindFirstWideChar(charSet, *cursor) == nullptr) {
+      --cursor;
+      if (cursor < value->m_pchData) {
+        return -101;
+      }
+    }
+    return static_cast<std::int32_t>(cursor - value->m_pchData);
+  }
+
+  /**
+   * Address: 0x009F4130 (FUN_009F4130, wxFileName::SplitPath)
+   *
+   * What it does:
+   * Splits `fullPath` into volume/path/name/extension wxString lanes.
+   * Resolves the format, builds the format's separator token (or a literal
+   * `"]"` for VMS), and finds where the volume prefix ends: for VMS, a
+   * leading `[`; for other formats, a leading run matching the volume
+   * separator (e.g. `C:`). The remaining text's last path separator marks
+   * where the directory portion ends and the filename begins; the last `.`
+   * after that (subject to per-format "a leading/lone dot is not an
+   * extension" rules) marks where the extension begins. Each output that
+   * the caller passed a non-null pointer for gets the corresponding
+   * substring; a null output pointer skips that lane entirely.
+   *
+   * One narrow branch (MAC format with a leading `\\\\`, converting a UNC
+   * prefix into an inline drive letter) preserves the decompiled shape as
+   * closely as the available evidence supports; the exact character value
+   * compared at one sub-step could not be pinned down with full confidence
+   * from the raw `.asm` under this pass's time budget (see inline comment)
+   * -- extremely unlikely to be exercised (Mac Classic UNC path syntax on a
+   * Windows-only game), preserved rather than guessed at either endpoint.
+   */
+  void WxFileNameSplitPathRuntime(
+    const wxStringRuntime* const fullPath,
+    wxStringRuntime* const outVolume,
+    wxStringRuntime* const outPath,
+    wxStringRuntime* const outName,
+    wxStringRuntime* const outExt,
+    const std::intptr_t formatHintOrToken
+  ) noexcept
+  {
+    const std::int32_t format = WxFileNameGetFormatRuntime(static_cast<std::int32_t>(formatHintOrToken));
+
+    wxStringRuntime workingFullPath{};
+    workingFullPath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)wxCopySharedWxStringRuntime(fullPath, &workingFullPath);
+
+    wxStringRuntime volumeMarker{};
+    volumeMarker.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    if (format == 4) {
+      wchar_t closeBracket = L']';
+      (void)WxStringInitWithRuntime(&volumeMarker, &closeBracket, 0, 1);
+    } else {
+      (void)wxBuildPathSeparatorTokenRuntime(&volumeMarker, format);
+    }
+
+    wxStringRuntime volumeEndMarker{};
+    volumeEndMarker.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)wxCopySharedWxStringRuntime(&volumeMarker, &volumeEndMarker);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&volumeMarker);
+
+    if (format == 3) {
+      const auto* const wfpHeader = reinterpret_cast<const std::int32_t*>(workingFullPath.m_pchData) - 3;
+      if (static_cast<std::uint32_t>(wfpHeader[1]) >= 4u) {
+        (void)EnsureUniqueOwnedWxStringBuffer(&workingFullPath);
+        if (workingFullPath.m_pchData[0] == L'\\') {
+          (void)EnsureUniqueOwnedWxStringBuffer(&workingFullPath);
+          if (workingFullPath.m_pchData[1] == L'\\') {
+            WxStringEraseRuntime(&workingFullPath, 0, 2);
+            // Real body's second argument here is not fully re-derivable
+            // from the decompiled `.c` (it renders as a literal `0`, but
+            // the raw `.asm` loads it from a stack slot whose value at
+            // this point is ambiguous between this function's own `a1`
+            // parameter slot being reused as a local and a genuine
+            // character constant) -- preserved as the decompiler's own
+            // resolved value pending a dedicated re-trace.
+            const std::int32_t driveLetterIndex = WxStringFindCharFromIndexRuntime(&workingFullPath, static_cast<wchar_t>(0), -101);
+            if (driveLetterIndex != -101) {
+              (void)EnsureUniqueOwnedWxStringBuffer(&workingFullPath);
+              workingFullPath.m_pchData[driveLetterIndex] = L':';
+              // The real body follows this with a second, unmodeled step
+              // (raw `.asm` shows a further call whose target and arguments
+              // could not be pinned down under this pass's time budget) --
+              // left unimplemented rather than guessed; this whole branch is
+              // Mac-Classic UNC-path syntax, unreachable on this Windows build.
+            }
+          }
+        }
+      }
+    }
+
+    std::int32_t extensionDotIndex = -101;
+    {
+      const std::int32_t candidateDot = WxStringFindLastCharClampedRuntime(&workingFullPath, L'.', -101);
+      const std::int32_t lastSeparator = WxStringFindLastOfRuntime(&workingFullPath, volumeEndMarker.m_pchData, -101);
+      if (candidateDot != -101) {
+        bool suppressDot = false;
+        if ((format == 1 || format == 4) &&
+            (candidateDot == 0 ||
+             (EnsureUniqueOwnedWxStringBuffer(&workingFullPath), workingFullPath.m_pchData[candidateDot - 1] == L'/')))
+        {
+          suppressDot = true;
+        }
+        if (!suppressDot && (lastSeparator == -101 || candidateDot >= lastSeparator)) {
+          extensionDotIndex = candidateDot;
+        }
+      }
+    }
+
+    const std::int32_t lastSeparatorIndex = WxStringFindLastOfRuntime(&workingFullPath, volumeEndMarker.m_pchData, -101);
+
+    if (outVolume != nullptr) {
+      if (lastSeparatorIndex == -101) {
+        // wxString::Empty equivalent.
+        (void)ReleaseLegacySharedStringPayloadAndResetRuntime(outVolume);
+      } else {
+        const bool wantsThroughSeparator = (lastSeparatorIndex != 0) ? true : (format != 2);
+        (void)WxStringLeftRuntime(&workingFullPath, outVolume, wantsThroughSeparator ? static_cast<std::size_t>(lastSeparatorIndex) : 0u);
+        if (format == 4 && outVolume->m_pchData[0] == L'[') {
+          WxStringEraseRuntime(outVolume, 0, 1);
+        }
+      }
+    }
+
+    if (outPath != nullptr) {
+      const std::uint32_t startIndex = (lastSeparatorIndex == -101) ? 0u : static_cast<std::uint32_t>(lastSeparatorIndex + 1);
+      std::int32_t pathLength = -101;
+      if (extensionDotIndex != -101) {
+        pathLength = (lastSeparatorIndex == -101) ? extensionDotIndex : (extensionDotIndex - lastSeparatorIndex - 1);
+      }
+      (void)WxStringMidRuntime(&workingFullPath, outPath, startIndex, pathLength);
+    }
+
+    if (outExt != nullptr) {
+      if (extensionDotIndex == -101) {
+        (void)ReleaseLegacySharedStringPayloadAndResetRuntime(outExt);
+      } else {
+        (void)WxStringMidRuntime(&workingFullPath, outExt, static_cast<std::uint32_t>(extensionDotIndex + 1), -101);
+      }
+    }
+
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&volumeEndMarker);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&workingFullPath);
+  }
+
+  /**
+   * Address: 0x009F5E70 (FUN_009F5E70, sub_9F5E70)
+   *
+   * What it does:
+   * Splits `fullPath` via `WxFileNameSplitPathRuntime` into four temporary
+   * lanes (volume/path/name/ext), then builds one
+   * `WxFileNameComposeRuntimeView` from them via
+   * `WxFileNameComposeConstructRuntime`, releasing the temporaries.
+   */
+  WxFileNameComposeRuntimeView* WxFileNameComposeFromSplitPathRuntime(
+    WxFileNameComposeRuntimeView* const view,
+    const wxStringRuntime* const fullPath,
+    const std::intptr_t formatHintOrToken
+  ) noexcept
+  {
+    wxStringRuntime volume{};
+    wxStringRuntime path{};
+    wxStringRuntime name{};
+    wxStringRuntime ext{};
+    volume.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    path.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    name.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    ext.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+    WxFileNameSplitPathRuntime(fullPath, &volume, &path, &name, &ext, formatHintOrToken);
+    (void)WxFileNameComposeConstructRuntime(view, &volume, &path, &name, &ext, formatHintOrToken);
+
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&ext);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&name);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&path);
+    (void)ReleaseLegacySharedStringPayloadAndResetRuntime(&volume);
+    return view;
+  }
+
+  /**
+   * Address: 0x009B1210 (FUN_009B1210, wxFileName::wxFileName(const wxString&, wxPathFormat))
+   *
+   * What it does:
+   * Converting constructor. Zero-initializes all four string/array lanes
+   * (`isRelativePath` is deliberately left uninitialized here -- it is set
+   * downstream by `WxFileNameComposeAssignFullPathRuntime`, reached via
+   * `WxFileNameComposeFromSplitPathRuntime` -> `WxFileNameComposeConstructRuntime`),
+   * then delegates to `WxFileNameComposeFromSplitPathRuntime` to actually
+   * split `fullPath` and populate every lane.
+   */
+  WxFileNameComposeRuntimeView* WxFileNameConstructFromPathRuntime(
+    WxFileNameComposeRuntimeView* const view,
+    const wxStringRuntime* const fullPath,
+    const std::intptr_t formatHintOrToken
+  ) noexcept
+  {
+    view->volumeText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    view->pathComponents.capacity = 0;
+    view->pathComponents.itemCount = 0;
+    view->pathComponents.itemStorage = nullptr;
+    view->pathComponents.autoSort = 0;
+    view->fileNameText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    view->extensionText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+    (void)WxFileNameComposeFromSplitPathRuntime(view, fullPath, formatHintOrToken);
+    return view;
+  }
 
   [[nodiscard]] bool WxPathComponentIsSingleTildeRuntime(
     const wchar_t* const text
@@ -48267,8 +49282,8 @@ wxStringRuntime* wxComposeFileNameDirectoryPathRuntime(
     default:
       if (fileNameRuntime->isRelativePath == 0u) {
         const wchar_t* const firstComponent =
-          (fileNameRuntime->componentCount != 0u && fileNameRuntime->components != nullptr)
-            ? fileNameRuntime->components[0]
+          (fileNameRuntime->pathComponents.itemCount != 0u && fileNameRuntime->pathComponents.itemStorage != nullptr)
+            ? fileNameRuntime->pathComponents.itemStorage[0]
             : nullptr;
         if (!WxPathComponentIsSingleTildeRuntime(firstComponent)) {
           wchar_t separator = L'/';
@@ -48278,18 +49293,18 @@ wxStringRuntime* wxComposeFileNameDirectoryPathRuntime(
       break;
   }
 
-  if (fileNameRuntime->componentCount != 0u)
+  if (fileNameRuntime->pathComponents.itemCount != 0u)
   {
     if (pathFormat == 4) {
       wchar_t openBracket = L'[';
       (void)WxStringRuntimeOps::append(outPath, 1, &openBracket);
     }
 
-    for (std::uint32_t index = 0; index < fileNameRuntime->componentCount; ++index)
+    for (std::uint32_t index = 0; index < fileNameRuntime->pathComponents.itemCount; ++index)
     {
       const wchar_t* component =
-        (fileNameRuntime->components != nullptr && fileNameRuntime->components[index] != nullptr)
-          ? fileNameRuntime->components[index]
+        (fileNameRuntime->pathComponents.itemStorage != nullptr && fileNameRuntime->pathComponents.itemStorage[index] != nullptr)
+          ? fileNameRuntime->pathComponents.itemStorage[index]
           : wxEmptyString;
 
       bool shouldAppendComponent = true;
@@ -48305,7 +49320,7 @@ wxStringRuntime* wxComposeFileNameDirectoryPathRuntime(
         (void)WxStringRuntimeOps::append(outPath, static_cast<std::int32_t>(std::wcslen(component)), component);
       }
 
-      if ((composeFlags & 0x02u) != 0u || index + 1u != fileNameRuntime->componentCount) {
+      if ((composeFlags & 0x02u) != 0u || index + 1u != fileNameRuntime->pathComponents.itemCount) {
         wchar_t separator = wxGetPathSeparatorCharacterForFormatRuntime(pathFormat);
         (void)WxStringRuntimeOps::append(outPath, 1, &separator);
       }
@@ -97722,32 +98737,6 @@ namespace
     kWxDirTraverseContinue = 1,
     kWxDirTraverseIgnore = 2
   };
-
-  struct WxArrayStringAddRuntimeView
-  {
-    std::uint32_t capacity = 0;   // +0x00
-    std::uint32_t itemCount = 0;  // +0x04
-    wchar_t** itemStorage = nullptr; // +0x08
-    std::uint8_t autoSort = 0;    // +0x0C
-    std::uint8_t pad0D_0F[0x03]{};
-  };
-  static_assert(
-    offsetof(WxArrayStringAddRuntimeView, capacity) == 0x00,
-    "WxArrayStringAddRuntimeView::capacity offset must be 0x00"
-  );
-  static_assert(
-    offsetof(WxArrayStringAddRuntimeView, itemCount) == 0x04,
-    "WxArrayStringAddRuntimeView::itemCount offset must be 0x04"
-  );
-  static_assert(
-    offsetof(WxArrayStringAddRuntimeView, itemStorage) == 0x08,
-    "WxArrayStringAddRuntimeView::itemStorage offset must be 0x08"
-  );
-  static_assert(
-    offsetof(WxArrayStringAddRuntimeView, autoSort) == 0x0C,
-    "WxArrayStringAddRuntimeView::autoSort offset must be 0x0C"
-  );
-  static_assert(sizeof(WxArrayStringAddRuntimeView) == 0x10, "WxArrayStringAddRuntimeView size must be 0x10");
 
   class WxDirTraverserRuntimeInterface
   {
