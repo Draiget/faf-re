@@ -5194,6 +5194,16 @@ moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
 gpg::RType* moho::CMauiMesh::sType = nullptr;
+gpg::RType* moho::CMauiBitmap::sType = nullptr;
+gpg::RType* moho::CMauiFrame::sType = nullptr;
+gpg::RType* moho::CMauiEdit::sType = nullptr;
+gpg::RType* moho::CMauiGroup::sType = nullptr;
+gpg::RType* moho::CMauiHistogram::sType = nullptr;
+gpg::RType* moho::CMauiMovie::sType = nullptr;
+gpg::RType* moho::CMauiScrollbar::sType = nullptr;
+gpg::RType* moho::CMauiText::sType = nullptr;
+gpg::RType* moho::CMauiItemList::sType = nullptr;
+gpg::RType* moho::CUIMapPreview::sType = nullptr;
 moho::CMauiCurrentFocusControlRuntimeView moho::Maui_CurrentFocusControl{};
 bool moho::Maui_ControlHasFocus = false;
 
@@ -21258,7 +21268,10 @@ void moho::CLuaWldUIProvider::UpdateLoadingDialog(const float deltaSeconds)
  */
 void moho::CLuaWldUIProvider::StopLoadingDialog()
 {
+  // TEMPORARY PROBE (do not commit).
+  ::OutputDebugStringA("[FRAMEDIAG] StopLoadingDialog: before RunScript\n");
   (void)static_cast<CScriptObject*>(this)->RunScript("StopLoadingDialog");
+  ::OutputDebugStringA("[FRAMEDIAG] StopLoadingDialog: after RunScript\n");
 }
 
 /**
@@ -23668,11 +23681,8 @@ moho::CMauiControl::CMauiControl(
   CMauiControl* const parent,
   msvc8::string controlKind
 )
+  : CScriptObject()
 {
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-  new (&scriptObject->cObject) LuaPlus::LuaObject();
-  new (&scriptObject->mLuaObj) LuaPlus::LuaObject();
-
   CMauiControlHierarchyRuntimeView* const hierarchyView = CMauiControlHierarchyRuntimeView::FromControl(this);
   CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
 
@@ -23704,7 +23714,7 @@ moho::CMauiControl::CMauiControl(
   extendedView->mDebugName = controlKind;
 
   if (luaObject != nullptr) {
-    scriptObject->SetLuaObject(*luaObject);
+    SetLuaObject(*luaObject);
   }
 
 
@@ -23718,7 +23728,7 @@ moho::CMauiControl::CMauiControl(
     extendedView->mRootFrame = parentExtendedView->mRootFrame;
   }
 
-  LuaPlus::LuaObject& controlLuaObject = scriptObject->mLuaObj;
+  LuaPlus::LuaObject& controlLuaObject = mLuaObj;
   controlLuaObject.SetObject("Left", &AsLazyVarObject(hierarchyView->mLeftLV));
   controlLuaObject.SetObject("Right", &AsLazyVarObject(hierarchyView->mRightLV));
   controlLuaObject.SetObject("Top", &AsLazyVarObject(hierarchyView->mTopLV));
@@ -23829,13 +23839,10 @@ moho::CMauiControl::~CMauiControl()
   CMauiControlListNode* const parentListNode = &hierarchyView->mParentList;
   parentListNode->ListUnlink();
 
-  // Qualified so the call is NOT virtually dispatched. ~CScriptObject is
-  // virtual, and this class does not derive from CScriptObject - it overlays
-  // one - so an unqualified `->~CScriptObject()` dispatches through this
-  // object's own vptr and lands on an unrelated slot. CScriptObject's
-  // cObject/mLuaObj then never destruct, stay linked in the Lua used-object
-  // list, and operator delete hands the still-linked nodes back to the heap.
-  reinterpret_cast<CScriptObject*>(this)->CScriptObject::~CScriptObject();
+  // ~CScriptObject() now runs automatically after this body - CMauiControl is
+  // a real CScriptObject base (see the mControlStateStorage comment on the
+  // class in UiRuntimeTypes.h), so the compiler chains the base destructor
+  // here without an explicit qualified call.
 }
 
 /**
@@ -24093,7 +24100,7 @@ void moho::CMauiControl::SetParent(CMauiControl* const newParent)
  */
 void moho::CMauiControl::DoInit()
 {
-  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnInit");
+  (void)RunScript("OnInit");
 }
 
 /**
@@ -24124,7 +24131,7 @@ void moho::CMauiControl::Destroy()
     controlView->mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&rootFrameView->mDeletedControlList));
   }
 
-  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnDestroy");
+  (void)RunScript("OnDestroy");
   ClearChildren();
 }
 
@@ -24269,7 +24276,7 @@ void moho::CMauiControl::SetHidden(const bool hidden)
  */
 bool moho::CMauiControl::OnHide(const bool& hidden)
 {
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  CScriptObject* const scriptObject = this;
   ScriptCallbackWeakGuard weakGuard(scriptObject);
 
   LuaPlus::LuaObject callbackObject{};
@@ -24311,8 +24318,8 @@ bool moho::CMauiControl::IsScrollable(const EMauiScrollAxis axis)
  */
 bool moho::CMauiControl::GetIsScrollable(const char* const axisLexical)
 {
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-  WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<WeakObject*>(scriptObject));
+  CScriptObject* const scriptObject = this;
+  WeakObject::ScopedWeakLinkGuard weakGuard(scriptObject);
 
   LuaPlus::LuaObject callbackObject{};
   scriptObject->FindScript(&callbackObject, "IsScrollable");
@@ -24421,7 +24428,7 @@ void moho::CMauiControl::ScrollLines(const EMauiScrollAxis axis, const float amo
   gpg::RRef axisRef{};
   gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
-  reinterpret_cast<CScriptObject*>(this)->RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
+  RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
 
 /**
@@ -24437,7 +24444,7 @@ void moho::CMauiControl::ScrollPages(const EMauiScrollAxis axis, const float amo
   gpg::RRef axisRef{};
   gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
-  reinterpret_cast<CScriptObject*>(this)->RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
+  RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
 
 /**
@@ -24452,7 +24459,7 @@ void moho::CMauiControl::ScrollSetTop(const EMauiScrollAxis axis, const float am
   gpg::RRef axisRef{};
   gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
-  reinterpret_cast<CScriptObject*>(this)->RunScriptStringNum("ScrollSetTop", axisLexical.c_str(), amount);
+  RunScriptStringNum("ScrollSetTop", axisLexical.c_str(), amount);
 }
 
 /**
@@ -24547,7 +24554,7 @@ bool moho::CMauiControl::HandleEvent(const SMauiEventData& eventData)
  */
 void moho::CMauiControl::Frame(const float deltaSeconds)
 {
-  reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+  RunScriptNum("OnFrame", deltaSeconds);
 
   // FAF community binary-patch addition, not part of the original 2007
   // body at 0x00787420 -- see CMauiControl::SetCustomRender. Drives the
@@ -24555,7 +24562,7 @@ void moho::CMauiControl::Frame(const float deltaSeconds)
   // (gamedata/lua/ui/controls/components/worldviewshapecomponent.lua)
   // once per frame for any control that opted in.
   if (GetCustomRender()) {
-    reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnRenderWorld", deltaSeconds);
+    RunScriptNum("OnRenderWorld", deltaSeconds);
   }
 }
 
@@ -24567,7 +24574,7 @@ void moho::CMauiControl::Frame(const float deltaSeconds)
  */
 void moho::CMauiControl::LosingKeyboardFocus()
 {
-  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnLoseKeyboardFocus");
+  (void)RunScript("OnLoseKeyboardFocus");
 }
 
 /**
@@ -24578,7 +24585,7 @@ void moho::CMauiControl::LosingKeyboardFocus()
  */
 void moho::CMauiControl::OnKeyboardFocusChange()
 {
-  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnKeyboardFocusChange");
+  (void)RunScript("OnKeyboardFocusChange");
 }
 
 /**
@@ -24616,7 +24623,7 @@ void moho::CMauiControl::AbandonKeyboardFocus()
 moho::SMauiScrollValues moho::CMauiControl::GetScrollValues(const EMauiScrollAxis axis)
 {
   SMauiScrollValues values{};
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  CScriptObject* const scriptObject = this;
   LuaPlus::LuaState* const activeState = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
   if (scriptObject == nullptr || activeState == nullptr || activeState->m_state == nullptr) {
     return values;
@@ -26696,15 +26703,73 @@ void moho::CMauiFrame::Frame(const float deltaSeconds)
   // cannot tear down the root while they're still iterating.
   boost::shared_ptr<CMauiFrame> selfLock(frameView->mSelfWeak);
 
+  // TEMPORARY PROBE (do not commit). Does any control actually get ticked?
+  // The faction loading overlay fades itself out from `OnFrame`, so if this
+  // walk never dispatches, that bitmap covers the viewport forever.
+  static int sProbeCalls = 0;
+  static int sProbeBudget = 0;
+  int probeVisited = 0;
+  int probeTicked = 0;
+  int probeInvisible = 0;
+
   CMauiControl* nextControl = DepthFirstSuccessor(this);
   while (nextControl != nullptr) {
     CMauiControl* const currentControl = nextControl;
     nextControl = currentControl->DepthFirstSuccessor(this);
 
     auto* const controlView = reinterpret_cast<CMauiControlExtendedRuntimeView*>(currentControl);
+    ++probeVisited;
+    if (controlView->mInvisible) {
+      ++probeInvisible;
+    }
     if (!controlView->mInvisible && controlView->mNeedsFrameUpdate) {
+      ++probeTicked;
       currentControl->Frame(deltaSeconds);
     }
+  }
+
+  // Report the peak tree size seen since the last report too, so a large
+  // in-game UI on a sibling frame cannot hide behind sampling aliasing.
+  static int sProbePeakVisited = 0;
+  if (probeVisited > sProbePeakVisited) {
+    sProbePeakVisited = probeVisited;
+  }
+
+  // TEMPORARY PROBE (do not commit). Once the in-game tree exists, dump what
+  // is actually in it -- name, alpha, hidden, invisible, depth -- so we can see
+  // whether the faction loading bitmap is still parked on top at alpha 1 or
+  // whether the whole HUD simply is not drawing.
+  if (probeVisited > 100) {
+    static bool sDumpedTree = false;
+    if (!sDumpedTree) {
+      sDumpedTree = true;
+      int dumped = 0;
+      for (CMauiControl* cursor = DepthFirstSuccessor(this);
+           cursor != nullptr && dumped < 40;
+           cursor = cursor->DepthFirstSuccessor(this)) {
+        auto* const view = reinterpret_cast<CMauiControlExtendedRuntimeView*>(cursor);
+        const msvc8::string name = cursor->GetDebugName();
+        char line[224];
+        sprintf_s(line, sizeof(line),
+                  "[TREEDUMP] %02d name=%.60s alpha=%d/1000 hidden=%d invis=%d depth=%d needsFrame=%d\n",
+                  dumped, name.c_str(), static_cast<int>(view->mAlpha * 1000.0f),
+                  view->mIsHidden ? 1 : 0, view->mInvisible ? 1 : 0,
+                  static_cast<int>(view->mDepth), view->mNeedsFrameUpdate ? 1 : 0);
+        ::OutputDebugStringA(line);
+        ++dumped;
+      }
+    }
+  }
+
+  if ((++sProbeCalls % 601) == 0 && sProbeBudget < 60) {
+    ++sProbeBudget;
+    char probeBuf[224];
+    sprintf_s(probeBuf, sizeof(probeBuf),
+              "[FRAMEDIAG] call=%d frame=%p visited=%d peak=%d ticked=%d invisible=%d delta=%d us\n",
+              sProbeCalls, static_cast<const void*>(this), probeVisited,
+              sProbePeakVisited, probeTicked, probeInvisible,
+              static_cast<int>(deltaSeconds * 1000000.0f));
+    ::OutputDebugStringA(probeBuf);
   }
 
   PurgeDeleted();
@@ -26836,6 +26901,296 @@ gpg::RType* moho::CMauiMesh::GetClass() const
  * binary's `*out = this; out[1] = this->GetClass()`).
  */
 gpg::RRef moho::CMauiMesh::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0077F7A0 (FUN_0077F7A0, Moho::CMauiBitmap::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiBitmap`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiBitmap::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiBitmap));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0077F7C0 (FUN_0077F7C0, Moho::CMauiBitmap::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiBitmap::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x00796000 (FUN_00796000, Moho::CMauiFrame::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiFrame`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiFrame::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiFrame));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x00796020 (FUN_00796020, Moho::CMauiFrame::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiFrame::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0078EC80 (FUN_0078EC80, Moho::CMauiEdit::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiEdit`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiEdit::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiEdit));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0078ECA0 (FUN_0078ECA0, Moho::CMauiEdit::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiEdit::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x007970F0 (FUN_007970F0, Moho::CMauiGroup::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiGroup`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiGroup::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiGroup));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x00797110 (FUN_00797110, Moho::CMauiGroup::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiGroup::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x007975F0 (FUN_007975F0, Moho::CMauiHistogram::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiHistogram`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiHistogram::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiHistogram));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x00797610 (FUN_00797610, Moho::CMauiHistogram::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiHistogram::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0079EC90 (FUN_0079EC90, Moho::CMauiMovie::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiMovie`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiMovie::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiMovie));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0079ECB0 (FUN_0079ECB0, Moho::CMauiMovie::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiMovie::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x007A0310 (FUN_007A0310, Moho::CMauiScrollbar::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiScrollbar`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiScrollbar::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiScrollbar));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x007A0330 (FUN_007A0330, Moho::CMauiScrollbar::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiScrollbar::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x007A29D0 (FUN_007A29D0, Moho::CMauiText::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiText`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiText::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiText));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x007A29F0 (FUN_007A29F0, Moho::CMauiText::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiText::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x00799050 (FUN_00799050, Moho::CMauiItemList::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiItemList`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CMauiItemList::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiItemList));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x00799070 (FUN_00799070, Moho::CMauiItemList::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiItemList::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x008505E0 (FUN_008505E0, Moho::CUIMapPreview::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CUIMapPreview`, resolved via
+ * RTTI on first use.
+ */
+gpg::RType* moho::CUIMapPreview::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CUIMapPreview));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x00850600 (FUN_00850600, Moho::CUIMapPreview::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CUIMapPreview::GetDerivedObjectRef()
 {
   gpg::RRef ref{};
   ref.mObj = this;
