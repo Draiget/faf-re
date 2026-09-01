@@ -1565,6 +1565,9 @@ namespace moho
   static_assert(
     offsetof(CWldSession, mReplayIsPaused) == 0x46C, "CWldSession::mReplayIsPaused offset must be 0x46C"
   );
+  // FUN_00897220 allocates this with `operator new(0x508u)`. The offset asserts
+  // above pin the interior; this pins the end.
+  static_assert(sizeof(CWldSession) == 0x508, "CWldSession size must be 0x508");
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
   static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");
   static_assert(
