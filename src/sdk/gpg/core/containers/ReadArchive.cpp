@@ -1952,19 +1952,12 @@ namespace
     return type;
   }
 
-  [[noreturn]] void ThrowReadFailure(std::FILE* const file)
-  {
-    if (file != nullptr && std::feof(file) != 0) {
-      ThrowSerializationError("eof");
-    }
-    ThrowSerializationError("noread");
-  }
-
   class BinaryReadArchive final : public gpg::ReadArchive
   {
   public:
     explicit BinaryReadArchive(const boost::shared_ptr<std::FILE>& file)
       : mFile(file)
+      , mCachedFile(file.get())
     {
     }
 
@@ -1986,21 +1979,29 @@ namespace
      */
     void ReadBytes(char* const bytes, const size_t byteCount) override
     {
-      if (!bytes && byteCount != 0) {
-        ThrowSerializationError("noread");
-      }
-
-      std::FILE* const file = mFile.get();
-      if (!file) {
-        ThrowSerializationError("noread");
-      }
-
-      if (byteCount == 0) {
+      // Ground truth is exactly this shape, and the details matter:
+      //
+      //   if (fread(a2, a3, 1u, this->str) != 1) {
+      //     if (feof(this->str))  throw runtime_error("eof");
+      //     if (ferror(this->str)) throw runtime_error("noread");
+      //   }
+      //
+      // A short read with NEITHER flag set falls out of the branch and
+      // returns normally - it is not an error. A zero-length read is not
+      // special-cased either: `fread(p, 0, 1, f)` returns 0, so at EOF a
+      // 0-byte read throws "eof" here. Both behaviours were lost to an
+      // earlier defensive rewrite (null guards, an early return on
+      // `byteCount == 0`, and an unconditional throw) that this restores.
+      if (std::fread(bytes, byteCount, 1, mCachedFile) == 1) {
         return;
       }
 
-      if (std::fread(bytes, byteCount, 1, file) != 1) {
-        ThrowReadFailure(file);
+      if (std::feof(mCachedFile) != 0) {
+        ThrowSerializationError("eof");
+      }
+
+      if (std::ferror(mCachedFile) != 0) {
+        ThrowSerializationError("noread");
       }
     }
 
@@ -2206,7 +2207,7 @@ namespace
      */
     void ReadBool2(void* const outValue)
     {
-      std::FILE* const file = mFile.get();
+      std::FILE* const file = mCachedFile;
       if (std::fread(outValue, 1u, 1u, file) != 1) {
         if (std::feof(file) != 0) {
           ThrowSerializationError("eof");
@@ -2272,7 +2273,7 @@ namespace
      */
     void ReadUInt2(void* const outValue)
     {
-      std::FILE* const file = mFile.get();
+      std::FILE* const file = mCachedFile;
       if (std::fread(outValue, 4u, 1u, file) != 1) {
         if (std::feof(file) != 0) {
           ThrowSerializationError("eof");
@@ -2350,8 +2351,18 @@ namespace
       ReadBytes(reinterpret_cast<char*>(outValue), sizeof(float));
     }
 
-    boost::shared_ptr<std::FILE> mFile;
+    // `gpg::CreateBinaryReadArchive` (0x009048B0) allocates 0x44 and sets
+    // three members in this order: the shared owner's `px` at +0x38 and
+    // `pn.pi_` at +0x3C, then a plain duplicate of the same handle at +0x40.
+    // Every read slot dereferences that duplicate rather than the smart
+    // pointer -- `BinaryReadArchive::ReadBytes` (0x00904960) is
+    // `fread(..., this->str)`, and its `feof`/`ferror` retries use it too.
+    // Keeping it is what makes this class 0x44 rather than 0x40.
+    boost::shared_ptr<std::FILE> mFile;   // +0x38
+    std::FILE* mCachedFile = nullptr;     // +0x40
   };
+
+  static_assert(sizeof(BinaryReadArchive) == 0x44, "BinaryReadArchive size must be 0x44");
 
   /**
    * Address: 0x00904890 (FUN_00904890)
