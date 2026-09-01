@@ -2629,17 +2629,6 @@ namespace
     }
   }
 
-  void PurgeTrackedEntities(msvc8::list<moho::Entity*>& entities)
-  {
-    for (auto it = entities.begin(); it != entities.end();) {
-      moho::Entity* const entity = *it;
-      it = entities.erase(it);
-      if (entity != nullptr) {
-        delete entity;
-      }
-    }
-  }
-
   void AdvanceRuntimeIdPools(moho::CEntityDb& entityDb)
   {
     auto poolsIt = gRuntimePools.find(&entityDb);
@@ -3363,12 +3352,51 @@ namespace moho
   {
     PurgeRegisteredEntitySets(*this);
 
-    msvc8::list<Entity*>& entities = Entities();
-    PurgeTrackedEntities(entities);
+    // Ground truth (0x00684560, lines 54-74 of its pseudocode) drains the
+    // pending-destroy queue and nothing else:
+    //
+    //     Next = mEntList._Myhead->_Next;
+    //     while (Next != _Myhead) {
+    //       Myval = Next->_Myval;
+    //       v11   = Next->_Next;
+    //       Next->_Prev->_Next = v11;          // unlink
+    //       Next->_Next->_Prev = Next->_Prev;
+    //       operator delete(Next);             // free the node
+    //       --mEntList._Mysize;
+    //       Next = v11;                        // advance BEFORE destroying
+    //       if (Myval) Myval->dtr_Entity(Myval, 1);
+    //     }
+    //
+    // The value and the successor are both read out of the node before the
+    // node is freed, and the entity is destroyed only after the walk has
+    // moved on - `~Entity` releases the entity's id, which reaches back into
+    // this DB, so it must not run while the cursor still points at a node
+    // that call could touch.
+    //
+    // This previously destroyed every entity in the `Entities()` tracking
+    // list instead, which was wrong twice over. It destroyed live entities
+    // the binary keeps (only queued ones are meant to die), and it deleted
+    // them while iterating the very list `~Entity` -> `ReleaseId` ->
+    // `RemoveTrackedEntityById` erases from, so the loop's own iterator could
+    // be freed underneath it. The node lane was then separately released
+    // through `ClearEntityListNodes`, leaking or double-freeing depending on
+    // which list an entity was in.
+    if (CEntityDbListHead* const head = mEntityList.head; head != nullptr) {
+      for (CEntityDbListHead* node = head->next; node != head;) {
+        auto* const entry = reinterpret_cast<CEntityDbEntityListNode*>(node);
+        Entity* const queuedEntity = entry->entity;
+        CEntityDbListHead* const next = node->next;
 
-    if (mEntityList.head) {
-      ClearEntityListNodes(mEntityList.head);
-      mEntityList.size = 0u;
+        node->prev->next = next;
+        next->prev = node->prev;
+        ::operator delete(node);
+        if (mEntityList.size != 0u) {
+          --mEntityList.size;
+        }
+
+        node = next;
+        delete queuedEntity;
+      }
     }
 
     AdvanceRuntimeIdPools(*this);
