@@ -1337,6 +1337,17 @@ namespace moho
   [[nodiscard]] int IN_FindKeyNameIndexCi(const msvc8::string& needle);
 
   /**
+   * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
+   *
+   * What it does:
+   * The `IN_DumpKeyNames` console command ("Shows all the key names."):
+   * prints every slot of `in_keyNames[0..255]` as `"%04d = %s"`. Takes no
+   * command arguments (the incoming pointer is unused, matching the
+   * binary's `CConFunc::Callback` shape).
+   */
+  void IN_DumpKeyNames(void* commandArgs);
+
+  /**
    * Address: 0x00838C70 (FUN_00838C70, Moho::IN_InitKeyHandler)
    *
    * What it does:
