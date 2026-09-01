@@ -126,5 +126,9 @@ namespace moho
 
   static_assert(std::is_polymorphic<ISimResources>::value, "ISimResources must remain polymorphic");
   static_assert(offsetof(CSimResources, deposits_) == 0x0C, "CSimResources::deposits_ offset must be 0x0C");
+  // The sim constructor (FUN_00744060) allocates this with `operator new(0x1Cu)`
+  // and inlines the body: vftable, then `boost::mutex::mutex(&mLock)`, then the
+  // three deposit-vector pointers.
+  static_assert(sizeof(CSimResources) == 0x1C, "CSimResources size must be 0x1C");
   ABI_SIZE_MUST_BE(CSimResources, 0x1C);
 } // namespace moho
