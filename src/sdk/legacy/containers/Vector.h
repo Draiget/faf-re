@@ -5536,6 +5536,51 @@ namespace msvc8
          * `sub_77DA50` was already correctly `recovered` in this file;
          * `sub_77E720` was already correctly `recovered` but uncited --
          * all four corrected in this same pass.)
+         *
+         * Address: 0x007E9280 (FUN_007E9280, sub_7E9280) --
+         * `msvc8::vector<Moho::SkinPaletteEntry>::insert(iterator, size_type,
+         * const T&)` (`_Insert_n`) for the 16-byte (4-float) element
+         * (`Moho::MeshShaderPaletteBuffer`, `Mesh.h`/`Mesh.cpp`'s GPU
+         * skinning-palette buffers). Copies `value` onto the stack first
+         * (this member's own `const T localValue(value);` alias-safety
+         * comment above), max_size folds to 0x0FFFFFFF
+         * (`0xFFFFFFFF/16`, throw lane `sub_7E94E0`, cited below on
+         * `throw_too_long`). For this instantiation MSVC factors BOTH the
+         * in-place branch's trivial-scalar mechanics out into their own
+         * out-of-line bodies rather than inlining `std::memmove`/the
+         * plain assignment loop: the `tail >= count` backward tail-shift is
+         * `sub_7E9890` (cited below on `uninit_move_n` -- despite the
+         * name-adjacent placement this is actually this member's own inline
+         * `memmove`-equivalent step, not a call to that member; modeled
+         * here as the same `std::copy_backward`-shaped loop) via the
+         * register-shape adapter `sub_7E9730`, and the final
+         * `insertAt[i]=localValue` gap-fill assignment loop (both branches)
+         * is `sub_7E9700`. `.asm`-confirmed register-level, not just
+         * `.c`: `sub_7E9700`'s `[eax_entry-8, edx)` fill target and
+         * `sub_7E9890`'s `copy_backward(esi=first, ecx=last, eax=destEnd)`
+         * roles were traced instruction-by-instruction, not inferred from
+         * the decompiler. Reallocation branch: growth is 1.5x *current
+         * capacity* (not `size()`) via this member's own `recommended_capacity`
+         * shape, checked-allocate via `allocate_slots_checked`
+         * (`sub_7E9760`, cited below), head/tail move via `uninit_move_n`
+         * (`sub_7E99D0`, called directly here; also reached through the
+         * `sub_7E96D0` register-shape adapter from the in-place branches'
+         * own move steps), gap-fill via `uninit_fill_n` (`sub_7E98D0`,
+         * called directly here; also reached through the `sub_7E95C0`
+         * register-shape adapter from the in-place `tail < count`
+         * sub-branch). `sub_7E99D0`/`sub_7E98D0` additionally support a
+         * `dest == nullptr` count-only dry-run path (an early-return-less
+         * guarded write inside the loop) that no call site here ever
+         * exercises -- real, compiler-emitted, unreachable in practice.
+         * Reached from `MeshShaderPaletteBuffer::ReserveToPaletteCapacity`
+         * (`sub_7E9130`, cited on that method, `Mesh.h`) with `pos =
+         * end()`, always on an empty buffer -- the only currently-known
+         * caller, so the mid-range-insert (`pos != end()`) arms are real,
+         * compiled, address-bearing code that is not exercised by any
+         * known call path, same status as this member's `SDecalInfo`
+         * instantiation's in-place branch above. DB-integrity fix: was
+         * `blocked` (`owner_layout`) with a stale note -- the graph shows
+         * zero open callees and a recovered caller; not a layout gap.
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7682,6 +7727,22 @@ namespace msvc8
          * on unresolved FUN_0077E720") -- `FUN_0077E720` was not actually
          * unresolved (see above); the dependency was already satisfied,
          * just uncited. Corrected to `recovered` in this pass.
+         *
+         * Address: 0x007E98D0 (FUN_007E98D0, sub_7E98D0) --
+         * `msvc8::vector<Moho::SkinPaletteEntry>::uninit_fill_n` for the
+         * 16-byte (4-float) element (`MeshShaderPaletteBuffer`, cited above
+         * on `insert(pos,count,value)`). `.asm`-confirmed count-down loop
+         * copying the same 16-byte `*value` into `count` consecutive slots
+         * starting at `dst`, supporting a `dst==nullptr` count-only dry-run
+         * this codebase's real callers never exercise. Called directly
+         * from this instantiation's `insert` reallocation-branch gap-fill.
+         * Address: 0x007E95C0 (FUN_007E95C0, sub_7E95C0) -- register-shape
+         * adapter reforming `(value, count, dest)` onto stack args before
+         * tail-calling `sub_7E98D0` above and returning `dest +
+         * count*sizeof(T)`; `edx` (the source value pointer) is a pure
+         * passthrough from its own caller. Called once from this
+         * instantiation's `insert` in-place `tail<count` sub-branch (fills
+         * the trailing gap beyond the relocated short tail).
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -8210,6 +8271,26 @@ namespace msvc8
          * ("1-statement tail-call thunk (compiler-emitted ABI shim)") with
          * no element-type identification; corrected to a real,
          * address-cited adapter.
+         *
+         * Address: 0x007E99D0 (FUN_007E99D0, sub_7E99D0) --
+         * `msvc8::vector<Moho::SkinPaletteEntry>::uninit_move_n` for the
+         * 16-byte (4-float) element (`MeshShaderPaletteBuffer`, cited above
+         * on `insert(pos,count,value)`). `.asm`-confirmed forward
+         * per-float copy loop (not `memcpy`) supporting a `dst==nullptr`
+         * count-only dry-run this codebase's real callers never exercise.
+         * Called directly, twice, from this instantiation's `insert`
+         * reallocation branch (head-copy, tail-copy).
+         * Address: 0x007E96D0 (FUN_007E96D0, sub_7E96D0) -- register-shape
+         * adapter reforming `(srcBegin, srcEnd, dest)` onto stack args
+         * before tail-calling `sub_7E99D0` above; `edx` (srcEnd) is a pure
+         * passthrough from its own caller, never set in its own body.
+         * Called twice from this instantiation's `insert` in-place
+         * branches (the `tail>=count` trailing-`count`-elements move, and
+         * the `tail<count` whole-short-tail move) -- was the stale-blocker
+         * (`owner_layout`) token this whole `sub_7E9280` cluster recovery
+         * started from; the graph showed zero open callees and a
+         * recovered caller, and the note predated `sub_7E9280`'s own
+         * recovery.
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8877,6 +8958,17 @@ namespace msvc8
          * allocator `sub_7E6090` (see `Mesh.cpp`'s `MeshCacheTreeInsert`-
          * area doc comments), itself called from the tree
          * insert-and-rebalance helper `sub_7E5DF0`.
+         *
+         * Address: 0x007E9760 (FUN_007E9760, sub_7E9760) --
+         * `msvc8::vector<Moho::SkinPaletteEntry>::allocate_slots_checked`
+         * for the 0x10-byte (16-byte, 4-float) element
+         * (`MeshShaderPaletteBuffer`, cited above on
+         * `insert(pos,count,value)`). `.asm`-confirmed: `0xFFFFFFFF /
+         * count < 16 ? throw std::bad_alloc : operator new(16 * count)` --
+         * the same guard/allocate shape phrased as a division instead of
+         * this member's multiplication-based check, algebraically
+         * equivalent. Reached from this instantiation's `insert`
+         * reallocation branch.
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {
@@ -9016,6 +9108,15 @@ namespace msvc8
          * reached from `Sim::AdvanceBeat`) and from the fused buy helper
          * `FUN_0074DBA0` (cited above on the copy constructor and
          * `operator=`).
+         *
+         * Address: 0x007E94E0 (FUN_007E94E0, sub_7E94E0) --
+         * `msvc8::vector<Moho::SkinPaletteEntry>::throw_too_long` for the
+         * 0x10-byte (16-byte, 4-float) element (`MeshShaderPaletteBuffer`,
+         * cited above on `insert(pos,count,value)`). `.asm`-confirmed exact
+         * match: builds `std::length_error("vector<T> too long")` the same
+         * way as this member's other emissions and routes through
+         * `_CxxThrowException`. Reached from this instantiation's `insert`
+         * `max_size() - oldCount < count` guard.
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

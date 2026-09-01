@@ -5807,69 +5807,10 @@ namespace moho
   // reserved to 80 (`kPaletteCapacity`) 16-byte entries at registration time.
   // ---------------------------------------------------------------------------
 
-  namespace
-  {
-    /**
-     * Address: 0x007E9280 (FUN_007E9280, sub_7E9280) — palette-relevant subset.
-     *
-     * Appends `count` value-initialized (zeroed) entries to the palette buffer,
-     * reallocating the backing storage when needed and relocating the existing
-     * entries with `RelocatePaletteEntries` (0x007E96A0). This is the typed
-     * reconstruction of the generic vector `_Insert_n` grow path as the palette
-     * reserve exercises it: at registration the buffer is empty, so this allocates
-     * `count` (== 80) zeroed entries. The full generic helper additionally handles
-     * mid-range inserts and the in-capacity shift cases (sub_7E96D0 / sub_7E9700 /
-     * sub_7E9730 / sub_7E95C0), which the palette reserve never reaches.
-     *
-     * UNRESOLVED: generic mid-range insert / in-place-shift arms of sub_7E9280
-     * (asm 0x007E943F..0x007E94BF) are out of scope for the palette cluster and
-     * are not reconstructed here; only the empty/append-at-end arm is modeled.
-     */
-    void AppendDefaultPaletteEntries(MeshShaderPaletteBuffer& buffer, const std::uint32_t count)
-    {
-      if (count == 0U) {
-        return;
-      }
-
-      const std::uint32_t oldCount = buffer.Count();
-      const std::uint32_t newCount = oldCount + count;
-
-      // Fast path: spare capacity already available — value-init in place.
-      const auto capacityEntries = buffer.mBegin != nullptr
-                                     ? static_cast<std::uint32_t>(buffer.mCapacity - buffer.mBegin)
-                                     : 0U;
-      if (newCount <= capacityEntries) {
-        for (std::uint32_t i = 0; i < count; ++i) {
-          buffer.mEnd[i] = SkinPaletteEntry{};
-        }
-        buffer.mEnd += count;
-        return;
-      }
-
-      // Reallocate. The binary grows by max(oldCount * 3/2, newCount).
-      std::uint32_t grownCapacity = oldCount + (oldCount >> 1);
-      if (grownCapacity < newCount) {
-        grownCapacity = newCount;
-      }
-
-      auto* const storage = static_cast<SkinPaletteEntry*>(
-        ::operator new(static_cast<std::size_t>(grownCapacity) * sizeof(SkinPaletteEntry))
-      );
-
-      SkinPaletteEntry* writeCursor = RelocatePaletteEntries(storage, buffer.mBegin, buffer.mEnd);
-      for (std::uint32_t i = 0; i < count; ++i) {
-        writeCursor[i] = SkinPaletteEntry{};
-      }
-
-      if (buffer.mBegin != nullptr) {
-        ::operator delete(buffer.mBegin);
-      }
-
-      buffer.mBegin = storage;
-      buffer.mEnd = storage + newCount;
-      buffer.mCapacity = storage + grownCapacity;
-    }
-  } // namespace
+  // AppendDefaultPaletteEntries removed: MeshShaderPaletteBuffer is
+  // msvc8::vector<SkinPaletteEntry> (see Mesh.h), so its 0x007E9280 body is
+  // this template's own insert(pos,count,value) member for the 16-byte
+  // element -- see the Address: citations added there.
 
   /**
    * Address: 0x007E96A0 (FUN_007E96A0, sub_7E96A0)
@@ -5896,32 +5837,13 @@ namespace moho
     return dest;
   }
 
-  /**
-   * Address: 0x007E9130 (FUN_007E9130, sub_7E9130)
-   *
-   * What it does:
-   * Forces the palette to exactly `kPaletteCapacity` entries. When shorter (or
-   * empty) it appends default entries; when longer it drops the trailing surplus
-   * by moving the end pointer back to `begin + kPaletteCapacity`.
-   */
   void MeshShaderPaletteBuffer::ReserveToPaletteCapacity()
   {
-    if (mBegin == nullptr) {
-      AppendDefaultPaletteEntries(*this, kPaletteCapacity);
-      return;
-    }
-
-    const std::uint32_t count = static_cast<std::uint32_t>(mEnd - mBegin);
+    const std::size_t count = size();
     if (count < kPaletteCapacity) {
-      AppendDefaultPaletteEntries(*this, kPaletteCapacity - count);
-      return;
-    }
-
-    if (count > kPaletteCapacity) {
-      // Shrink to exactly kPaletteCapacity entries. The binary invokes the
-      // relocation helper with `first == last` here, so the move body never runs
-      // and the effect reduces to repositioning the end pointer (0x007E9172).
-      mEnd = mBegin + kPaletteCapacity;
+      insert(end(), kPaletteCapacity - count, SkinPaletteEntry{});
+    } else if (count > kPaletteCapacity) {
+      erase(begin() + kPaletteCapacity, end());
     }
   }
 
@@ -5941,10 +5863,9 @@ namespace moho
   {
     RegisterShaderVar(name, paletteVar, "mesh");
 
-    paletteVar->mPalette.mBegin = nullptr;
-    paletteVar->mPalette.mEnd = nullptr;
-    paletteVar->mPalette.mCapacity = nullptr;
-
+    // No explicit triplet reset needed: mPalette is a real
+    // msvc8::vector<SkinPaletteEntry> here, already empty from
+    // MeshShaderPaletteVar's own (implicit) default construction.
     paletteVar->mPalette.ReserveToPaletteCapacity();
     return paletteVar;
   }
@@ -5999,13 +5920,9 @@ namespace moho
       }
 
       moho::MeshShaderPaletteVar& paletteVar = AccessMeshPaletteVarSlot<GlobalAddress>();
-      if (paletteVar.mPalette.mBegin != nullptr) {
-        ::operator delete(paletteVar.mPalette.mBegin);
-      }
-      paletteVar.mPalette.mBegin = nullptr;
-      paletteVar.mPalette.mEnd = nullptr;
-      paletteVar.mPalette.mCapacity = nullptr;
-
+      // The destructor below already tears mPalette down (real
+      // msvc8::vector<SkinPaletteEntry> destructor: destroy_all() +
+      // deallocate_all()), so no separate manual free/reset is needed here.
       paletteVar.~MeshShaderPaletteVar();
       MeshPaletteVarSlot<GlobalAddress>::constructed = false;
     }
