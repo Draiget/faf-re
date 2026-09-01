@@ -3942,6 +3942,13 @@ void SiftUpHeapElement72ByKeyWithDisplacedPartialLane(
   destination.lane1C = lane1C;
   destination.lane20 = lane20;
   destination.lane28 = lane28;
+  // destination is a live, pre-existing heap-array slot (heapBase[writeIndex]),
+  // not a freshly-constructed element -- its lane30 may already hold heap
+  // storage from before this sift-up call. FastVectorN2RebindAndCopy
+  // unconditionally rebinds to inline storage with no free-check (see the
+  // same leak fixed in HeapElement72PartialSnapshot::operator=); reset first
+  // so a heap-backed lane30 here doesn't leak its buffer.
+  destination.lane30.ResetStorageToInline();
   (void)gpg::FastVectorN2RebindAndCopy(&destination.lane30, &lane30);
 }
 
