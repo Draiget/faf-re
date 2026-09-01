@@ -1937,7 +1937,7 @@ namespace moho
       SimLuaInitSet(),
       "SetBeamParam",
       &cfunc_IEffectSetBeamParam,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectSetBeamParamHelpText
     );
@@ -1987,7 +1987,7 @@ namespace moho
       SimLuaInitSet(),
       "SetEmitterParam",
       &cfunc_IEffectSetEmitterParam,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectSetEmitterParamHelpText
     );
@@ -2300,7 +2300,7 @@ namespace moho
       SimLuaInitSet(),
       "ScaleEmitter",
       &cfunc_IEffectScaleEmitter,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectScaleEmitterHelpText
     );
@@ -2320,7 +2320,7 @@ namespace moho
       SimLuaInitSet(),
       "ResizeEmitterCurve",
       &cfunc_IEffectResizeEmitterCurve,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectResizeEmitterCurveHelpText
     );
@@ -2340,7 +2340,7 @@ namespace moho
       SimLuaInitSet(),
       "SetEmitterCurveParam",
       &cfunc_IEffectSetEmitterCurveParam,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectSetEmitterCurveParamHelpText
     );
@@ -2360,7 +2360,7 @@ namespace moho
       SimLuaInitSet(),
       "OffsetEmitter",
       &cfunc_IEffectOffsetEmitter,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectOffsetEmitterHelpText
     );
@@ -2380,7 +2380,7 @@ namespace moho
       SimLuaInitSet(),
       "Destroy",
       &cfunc_IEffectDestroy,
-      nullptr,
+      &CScrLuaMetatableFactory<IEffect>::Instance(),
       "IEffect",
       kIEffectDestroyHelpText
     );
