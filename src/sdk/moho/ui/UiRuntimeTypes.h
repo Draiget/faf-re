@@ -1703,7 +1703,7 @@ namespace moho
     "CMauiCursorTextureRuntimeView size must be 0x58"
   );
 
-  class CMauiControl
+  class CMauiControl : public CScriptObject
   {
   public:
     static gpg::RType* sType;
@@ -2165,21 +2165,29 @@ namespace moho
 
   protected:
     /**
-     * The control's own state block, 0x00 (past the vtable pointer) through
-     * 0x11B. Every field in it is reached through the typed
-     * `CMauiControl*RuntimeView` overlays - `CMauiControlScriptObjectRuntimeView`
-     * for the script-object head (weak-link chain at +0x04, `cObject` at +0x0C,
-     * `mLuaObj` at +0x20), `CMauiControlHierarchyRuntimeView` for the parent /
-     * children lists and layout lazy-vars, and `CMauiControlExtendedRuntimeView`
-     * for the render lanes - so it is reserved here rather than re-declared.
+     * The control's own state block, +0x34 (right after the inherited
+     * CScriptObject sub-object) through +0x11B. Every field in it is reached
+     * through the typed `CMauiControl*RuntimeView` overlays -
+     * `CMauiControlRuntimeView`/`CMauiControlHierarchyRuntimeView` for the
+     * parent/children lists and layout lazy-vars (starting at +0x34, right
+     * where this storage begins), and `CMauiControlExtendedRuntimeView` for
+     * the render lanes - so it is reserved here rather than re-declared.
      *
-     * Reserving it is not cosmetic. Without it the class is 4 bytes wide, and a
-     * derived class that adds a second base gets that base at +0x04, straight on
-     * top of the weak-reference chain head: `CMauiScrollbar`'s `IMauiDragger`
-     * vptr landed there and every scrollbar destroyed afterwards walked a vtable
+     * Ground truth (`FUN_007867B0.c`) opens with
+     * `Moho::CScriptObject::CScriptObject(this)` before touching any of these
+     * fields, and `dumps/rtti_dump_all.hpp` lists CScriptObject as
+     * CMauiControl's first real base (mdisp=0) - this storage's own
+     * "+0x00..+0x33 unknown" prefix, before this class inherited
+     * CScriptObject for real, was that exact sub-object modelled as raw
+     * bytes instead of a base.
+     *
+     * Reserving it is not cosmetic. Without it a derived class that adds a
+     * second base gets that base immediately after CScriptObject, straight on
+     * top of the parent-list link: `CMauiScrollbar`'s `IMauiDragger` vptr
+     * landed there and every scrollbar destroyed afterwards walked a vtable
      * address as if it were a weak-link node and faulted writing to .rdata.
      */
-    std::uint8_t mControlStateStorage[0x118];
+    std::uint8_t mControlStateStorage[0xE8];
   };
 
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
@@ -2199,6 +2207,28 @@ namespace moho
      * default edit/font/caret state.
      */
     CMauiEdit(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x0078EC80 (FUN_0078EC80, Moho::CMauiEdit::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiEdit`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0078ECA0 (FUN_0078ECA0, Moho::CMauiEdit::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x0078F720 (FUN_0078F720, Moho::CMauiEdit::Frame)
@@ -2531,6 +2561,28 @@ namespace moho
     CMauiFrame(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x00796000 (FUN_00796000, Moho::CMauiFrame::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiFrame`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00796020 (FUN_00796020, Moho::CMauiFrame::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
+
+    /**
      * Address: 0x00796460 (FUN_00796460, ??1CMauiFrame@Moho@@UAE@XZ)
      * Deleting thunk: 0x00796440 (FUN_00796440, Moho::CMauiFrame::dtr)
      *
@@ -2662,6 +2714,28 @@ namespace moho
      * initializes bitmap lazy-var/render state.
      */
     CMauiBitmap(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x0077F7A0 (FUN_0077F7A0, Moho::CMauiBitmap::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiBitmap`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0077F7C0 (FUN_0077F7C0, Moho::CMauiBitmap::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x00780270 (FUN_00780270, Moho::CMauiBitmap::Frame)
@@ -2816,6 +2890,28 @@ namespace moho
     CMauiGroup(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x007970F0 (FUN_007970F0, Moho::CMauiGroup::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiGroup`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00797110 (FUN_00797110, Moho::CMauiGroup::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
+
+    /**
      * Address: 0x007972D0 (FUN_007972D0, Moho::CMauiGroup::dtr)
      *
      * What it does:
@@ -2848,6 +2944,28 @@ namespace moho
      * initializes histogram graph/state defaults.
      */
     CMauiHistogram(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x007975F0 (FUN_007975F0, Moho::CMauiHistogram::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiHistogram`, resolved
+     * via RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00797610 (FUN_00797610, Moho::CMauiHistogram::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
@@ -2893,6 +3011,28 @@ namespace moho
      * initializes default palette/selection/font state.
      */
     CMauiItemList(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x00799050 (FUN_00799050, Moho::CMauiItemList::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiItemList`, resolved
+     * via RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00799070 (FUN_00799070, Moho::CMauiItemList::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x00799610 (FUN_00799610, Moho::CMauiItemList::SetFont)
@@ -3174,6 +3314,28 @@ namespace moho
     CMauiMovie(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x0079EC90 (FUN_0079EC90, Moho::CMauiMovie::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiMovie`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0079ECB0 (FUN_0079ECB0, Moho::CMauiMovie::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
+
+    /**
      * Address: 0x0079EFE0 (FUN_0079EFE0, Moho::CMauiMovie::LoadFile)
      *
      * What it does:
@@ -3293,6 +3455,28 @@ namespace moho
     CMauiScrollbar(LuaPlus::LuaObject* luaObject, CMauiControl* parent, EMauiScrollAxis axis);
 
     /**
+     * Address: 0x007A0310 (FUN_007A0310, Moho::CMauiScrollbar::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiScrollbar`, resolved
+     * via RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x007A0330 (FUN_007A0330, Moho::CMauiScrollbar::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
+
+    /**
      * Address: 0x007A0740 (FUN_007A0740, Moho::CMauiScrollbar::SetTextures)
      *
      * What it does:
@@ -3388,6 +3572,28 @@ namespace moho
      * text/font rendering state defaults.
      */
     CMauiText(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x007A29D0 (FUN_007A29D0, Moho::CMauiText::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CMauiText`, resolved via
+     * RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x007A29F0 (FUN_007A29F0, Moho::CMauiText::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x007A2EA0 (FUN_007A2EA0, Moho::CMauiText::SetNewFont)
@@ -3541,6 +3747,28 @@ namespace moho
      * initializes preview texture state.
      */
     CUIMapPreview(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x008505E0 (FUN_008505E0, Moho::CUIMapPreview::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CUIMapPreview`, resolved
+     * via RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00850600 (FUN_00850600, Moho::CUIMapPreview::GetDerivedObjectRef)
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
 
     /**
      * Address: 0x008507F0 (FUN_008507F0, Moho::CUIMapPreview::~CUIMapPreview)
