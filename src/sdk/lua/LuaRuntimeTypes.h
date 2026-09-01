@@ -233,6 +233,31 @@ struct Proto
 	static gpg::RType* sType;
 };
 
+// Proto's head is pinned by two functions in the binary that walk it field by
+// field, so these are read off the disassembly rather than assumed from stock
+// Lua 5.0 -- which matters, because this Lua is a fork.
+//
+// `traverseproto` (0x009154A0) marks the whole object:
+//     mov eax,[esi+20h]                 source
+//     cmp [esi+28h], eax / mov ecx,[esi+8]  / [ecx+eax*8]   sizek / k, 8-byte TObject
+//     cmp [esi+24h], eax / mov ecx,[esi+1Ch]/ [ecx+eax*4]   sizeupvalues / upvalues
+//     cmp [esi+34h], edi / mov edx,[esi+10h]/ [edx+edi*4]   sizep / p
+//     cmp [esi+38h], ecx                                     sizelocvars
+//
+// `singlevaraux` (0x0091AFB0) resolves a local through the same object:
+//     mov ecx,[ebx]  / mov edi,[ecx+18h]   fs->f, then f->locvars
+//     lea ecx,[ecx+ecx*2] / [edi+ecx*4]    12-byte LocVar stride
+static_assert(offsetof(Proto, k) == 0x08, "Proto::k offset must be 0x08");
+static_assert(offsetof(Proto, p) == 0x10, "Proto::p offset must be 0x10");
+static_assert(offsetof(Proto, locvars) == 0x18, "Proto::locvars offset must be 0x18");
+static_assert(offsetof(Proto, upvalues) == 0x1C, "Proto::upvalues offset must be 0x1C");
+static_assert(offsetof(Proto, source) == 0x20, "Proto::source offset must be 0x20");
+static_assert(offsetof(Proto, sizeupvalues) == 0x24, "Proto::sizeupvalues offset must be 0x24");
+static_assert(offsetof(Proto, sizek) == 0x28, "Proto::sizek offset must be 0x28");
+static_assert(offsetof(Proto, sizep) == 0x34, "Proto::sizep offset must be 0x34");
+static_assert(offsetof(Proto, sizelocvars) == 0x38, "Proto::sizelocvars offset must be 0x38");
+static_assert(sizeof(LocVar) == 0x0C, "LocVar size must be 0x0C");
+
 struct UpVal
 {
 	GCObject* next;
