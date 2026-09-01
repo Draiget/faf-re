@@ -732,12 +732,28 @@ CAiAttackerImpl::~CAiAttackerImpl()
   // and empty), the teardown is a structural reset.
   std::destroy_at(&view->mStage);
 
-  // Base CScriptObject subobject at +0x0C — direct destructor call.
-  // The binary additionally re-writes the +0x0C vtable slot to
-  // `IAiAttacker` before this call; we skip the rewrite because the
-  // recovered class doesn't model the multi-base vftable thunk slot.
+  // The CScriptObject subobject at +0x0C is deliberately NOT destroyed here.
+  //
+  // This used to call `reinterpret_cast<CScriptObject*>(bytes + 0x0C)->
+  // ~CScriptObject()`, which crashed every time a unit was destroyed:
+  // `~CScriptObject` is virtual (CScriptObject.h:85), so the call dispatches
+  // through the vtable pointer at +0x0C -- and the constructor in this same
+  // file states plainly that it leaves that pointer null, because
+  // CScriptObject is abstract and the recovered CAiAttackerImpl deliberately
+  // does not inherit it. Loading a null vptr and reading a slot from it is the
+  // access violation at address 0x00000008 seen in
+  // Unit::~Unit -> ClearUnitOwnedSidecars -> DeleteAndNull<CAiAttackerImpl>.
+  //
+  // The constructor's premise -- "nothing dispatches a virtual through it" --
+  // was simply false, contradicted by this line 55 lines below it.
+  //
+  // Destroying it is also wrong on its own terms: nothing ever constructs it,
+  // so there is no paired construction to undo. The binary's construct and
+  // destruct are both part of the multi-base layout this class does not model,
+  // and modelling only the destroy half is what produced the crash. The
+  // subobject's lanes are zeroed by the constructor's memset and inert, so
+  // there is nothing to release.
   auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
-  reinterpret_cast<CScriptObject*>(bytes + 0x0C)->~CScriptObject();
 
   // Unlink the IAiAttacker subobject's intrusive-listener list at
   // +0x04 (head.next) and +0x08 (head.prev). The binary unconditionally
