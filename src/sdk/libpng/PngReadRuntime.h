@@ -338,6 +338,67 @@ extern "C" void png_read_info(png_structp png_ptr, png_infop info_ptr);
 extern "C" void png_read_end(png_structp png_ptr, png_infop info_ptr);
 
 /**
+ * Address: 0x009E3915 (FUN_009E3915)
+ * Mangled: png_read_transform_info
+ *
+ * IDA signature:
+ * png_uint_32 __cdecl png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * Folds png_ptr's accumulated read-transformation state into `info_ptr` so
+ * the info struct reflects what png_read_update_info actually produces:
+ * expand (palette-to-RGB/RGBA or sub-8-bit widening, clearing num_trans),
+ * background compositing (clears the alpha mask, copies png_ptr's own
+ * background record and resets num_trans), gamma (copies the float gamma),
+ * 16-to-8 truncation, dither-to-palette, pack (bit_depth floor of 8),
+ * gray-to-rgb / rgb-to-gray (toggle the color mask bit), then recomputes
+ * channels from the final color_type, strip-alpha, filler, and finally
+ * user-transform depth/channel floors -- ending with pixel_depth and
+ * rowbytes recomputed from the resolved channels/bit_depth/width. Returns
+ * the recomputed rowbytes (mirroring the binary's `eax` return value; the
+ * real png_read_transform_info is `void` in stock libpng, but this build's
+ * compiled body leaves rowbytes in eax at the natural fall-through, so the
+ * caller-visible value is preserved here rather than fabricating `void`).
+ */
+extern "C" std::uint32_t png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
+
+/**
+ * Address: 0x009E1343 (FUN_009E1343)
+ * Mangled: png_read_update_info
+ *
+ * IDA signature:
+ * void __cdecl png_read_update_info(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * Optional application call between png_read_info and the first png_read_row:
+ * starts the row-reading machinery (png_read_start_row) unless it has already
+ * run once (png_ptr->flags & PNG_FLAG_ROW_INIT, in which case it just warns
+ * "Ignoring extra png_read_update_info() call..."), then folds the resolved
+ * transformation state into `info_ptr` via png_read_transform_info so the
+ * caller can query the post-transform row layout before reading pixels.
+ */
+extern "C" void png_read_update_info(png_structp png_ptr, png_infop info_ptr);
+
+/**
+ * Address: 0x009E1E95 (function boundary not detected by IDA -- see
+ * PngReadRuntime.cpp for the raw-`.asm`-derived recovery)
+ * Mangled: png_read_png
+ *
+ * IDA signature:
+ * void __cdecl png_read_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params);
+ *
+ * What it does:
+ * libpng's PNG_INFO_IMAGE_SUPPORTED "read the whole image in one call"
+ * convenience API (dependencies/wxWindows-2.4.2/src/png/pngread.c
+ * png_read_png), the read-side twin of the already-recovered png_write_png
+ * (PngWriteRuntime.cpp). Applies every requested PNG_TRANSFORM_* bit,
+ * calls png_read_update_info to resolve the final row layout, allocates
+ * info_ptr->row_pointers when the caller hasn't already attached one, reads
+ * the image via png_read_image, and finishes with png_read_end.
+ */
+extern "C" void png_read_png(png_structp png_ptr, png_infop info_ptr, int transforms, void* params);
+
+/**
  * Address: 0x009E1C4A (FUN_009E1C4A)
  * Mangled: png_read_destroy
  *

@@ -1017,3 +1017,20 @@ extern "C" png_structp png_set_expand(png_structp png_ptr)
   Transformations(png_ptr) |= kPngTransformExpand;
   return png_ptr;
 }
+
+/**
+ * Address: 0x009E3084 (FUN_009E3084)
+ *
+ * IDA signature:
+ * png_structp __cdecl png_set_strip_alpha(png_structp png_ptr);
+ *
+ * What it does:
+ * Sets the PNG_STRIP_ALPHA transformation bit on the png_struct so that the
+ * read pipeline drops the alpha channel from RGBA/GA rows. Returns the
+ * unmodified png_ptr.
+ */
+extern "C" png_structp png_set_strip_alpha(png_structp png_ptr)
+{
+  Transformations(png_ptr) |= kPngTransformStripAlpha;
+  return png_ptr;
+}

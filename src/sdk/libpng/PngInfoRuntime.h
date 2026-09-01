@@ -81,6 +81,31 @@ extern "C" void png_info_destroy(png_structp png_ptr, png_infop info_ptr);
 extern "C" std::uint32_t png_get_valid(png_structp png_ptr, png_infop info_ptr, std::uint32_t flag);
 
 /**
+ * Address: 0x009E25FD (FUN_009E25FD)
+ *
+ * IDA signature:
+ * png_uint_32 __cdecl png_get_rowbytes(png_structp png_ptr, png_infop info_ptr);
+ *
+ * What it does:
+ * Returns info_ptr->rowbytes (the byte width of one decoded/encoded row).
+ * Returns 0 if either pointer is null.
+ */
+extern "C" std::uint32_t png_get_rowbytes(png_structp png_ptr, png_infop info_ptr);
+
+/**
+ * Address: 0x009E2DAC (FUN_009E2DAC)
+ *
+ * IDA signature:
+ * png_uint_32 __cdecl png_get_sBIT(png_structp png_ptr, png_infop info_ptr, png_color_8p *sig_bit);
+ *
+ * What it does:
+ * When info_ptr->valid has PNG_INFO_sBIT set, points `*sig_bit` at
+ * info_ptr->sig_bit and returns PNG_INFO_sBIT. Returns 0 (leaving `*sig_bit`
+ * untouched) if any pointer is null or the sBIT chunk was never read/set.
+ */
+extern "C" std::uint32_t png_get_sBIT(png_structp png_ptr, png_infop info_ptr, std::uint8_t** sig_bit);
+
+/**
  * Address: 0x009E25C1 (FUN_009E25C1)
  *
  * IDA signature:

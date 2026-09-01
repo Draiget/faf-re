@@ -226,6 +226,26 @@ template <typename T>
 [[nodiscard]] inline std::uint32_t& FlushDist(png_structp p) noexcept   { return Field<std::uint32_t>(p, kOffFlushDist); }
 [[nodiscard]] inline std::uint32_t& FlushRows(png_structp p) noexcept   { return Field<std::uint32_t>(p, kOffFlushRows); }
 
+// Fields used by png_read_transform_info (FUN_009E3915) / png_read_update_info
+// (FUN_009E1343): the transform pass that folds png_ptr's accumulated
+// transformation state into one png_info_struct snapshot.
+[[nodiscard]] inline std::uint16_t& NumTrans(png_structp p) noexcept { return Field<std::uint16_t>(p, kOffNumTrans); }
+[[nodiscard]] inline std::uint8_t&  UserTransformDepth(png_structp p) noexcept {
+  return *(RawBase(p) + kOffUserTransformDepth);
+}
+[[nodiscard]] inline std::uint8_t&  UserTransformChannels(png_structp p) noexcept {
+  return *(RawBase(p) + kOffUserTransformChannels);
+}
+[[nodiscard]] inline float& Gamma(png_structp p) noexcept { return Field<float>(p, kOffGamma); }
+[[nodiscard]] inline std::int32_t& IntGamma(png_structp p) noexcept { return Field<std::int32_t>(p, kOffIntGamma); }
+[[nodiscard]] inline std::uint8_t*& PaletteLookup(png_structp p) noexcept {
+  return Field<std::uint8_t*>(p, kOffPaletteLookup);
+}
+// The 10-byte png_color_16 background record (index/red/green/blue/gray),
+// returned as a raw pointer to mirror png_info_struct::background's own
+// raw-array modeling (PngSetRuntime.h) for a straight byte-range copy.
+[[nodiscard]] inline std::uint8_t* Background(png_structp p) noexcept { return RawBase(p) + kOffBackground; }
+
 // ----------------------------------------------------------------------------
 // libpng transformation flag constants used by recovered helpers
 // ----------------------------------------------------------------------------
