@@ -1562,27 +1562,6 @@ namespace
     std::uint8_t isNil;
   };
 
-  struct PairNodeMeshKeyPayloadRuntime
-  {
-    void* vtable = nullptr;                                   // +0x00
-    std::uint32_t lane04 = 0;                                 // +0x04
-    void* sharedObjectLane08 = nullptr;                       // +0x08
-    boost::detail::sp_counted_base* sharedControlLane0C = nullptr; // +0x0C
-    void* weakObjectLane10 = nullptr;                         // +0x10
-    boost::detail::sp_counted_base* weakControlLane14 = nullptr; // +0x14
-  };
-  static_assert(
-    offsetof(PairNodeMeshKeyPayloadRuntime, sharedControlLane0C) == 0x0C,
-    "PairNodeMeshKeyPayloadRuntime::sharedControlLane0C offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(PairNodeMeshKeyPayloadRuntime, weakControlLane14) == 0x14,
-    "PairNodeMeshKeyPayloadRuntime::weakControlLane14 offset must be 0x14"
-  );
-  static_assert(sizeof(PairNodeMeshKeyPayloadRuntime) == 0x18, "PairNodeMeshKeyPayloadRuntime size must be 0x18");
-
-  std::uint8_t gPairNodeMeshKeyPayloadRuntimeVTableTag = 0u;
-
   struct IntrusiveListNodeRuntime
   {
     IntrusiveListNodeRuntime* next;
@@ -1809,8 +1788,6 @@ namespace
   using EnableSharedFromThisFn = void (*)(SharedRefInitRuntime* outRef, void* sharedOwner, void* rawObject);
   using PairMapInsertNodeFn = PairKeyNodeNil37Runtime* (*)(PairKeyNodeNil37Runtime** parentSlot, std::uint8_t insertLeft, const PairKeyRuntime* key);
   using PairMapFixupFn = void (*)(PairKeyNodeNil37Runtime** parentSlot);
-  using PairNodeAllocFn = PairNodeRuntime* (*)(std::uint32_t count);
-  using PairNodePayloadInitFn = void (*)(void* payloadStorage, std::int32_t sourceWord);
   using ObjectPreDeleteFn = void (*)(void* object);
   using ListClearFn = void (*)(IntrusiveListRuntime* list);
   using ListSpliceFn = void (*)(IntrusiveListRuntime* destination, IntrusiveListNodeRuntime* destinationPosition, IntrusiveListNodeRuntime* first, IntrusiveListNodeRuntime* last, IntrusiveListNodeRuntime* sourceNext);
@@ -9805,82 +9782,6 @@ void AssignSharedRefWithEnableRuntime(
   destination->object = object;
   destination->counter = temporary.counter;
   ReleaseSharedCounterRuntime(previousCounter);
-}
-
-/**
- * Address: 0x007E6090 (FUN_007E6090)
- *
- * What it does:
- * Allocates one pair-key map node lane, writes keys/payload, and clears
- * color/nil state bytes.
- */
-PairNodeRuntime* AllocatePairNodeRuntime(
-  const std::int32_t keyHigh,
-  const std::int32_t keyLow,
-  const std::int32_t keyExtra,
-  const std::int32_t payloadSource,
-  const PairNodeAllocFn allocFn,
-  const PairNodePayloadInitFn initPayloadFn
-)
-{
-  if (allocFn == nullptr) {
-    return nullptr;
-  }
-
-  PairNodeRuntime* const node = allocFn(1u);
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->lane00 = keyHigh;
-  node->lane04 = keyLow;
-  node->lane08 = keyExtra;
-  if (initPayloadFn != nullptr) {
-    initPayloadFn(node->payload0C, payloadSource);
-  }
-  node->color = 0u;
-  node->isNil = 0u;
-  return node;
-}
-
-/**
- * Address: 0x007E6180 (FUN_007E6180)
- *
- * What it does:
- * Copy-constructs one 24-byte pair-node payload lane with MeshKey-shaped
- * storage and retains shared/weak control counters for copied owner lanes.
- */
-PairNodeMeshKeyPayloadRuntime* CopyPairNodeMeshKeyPayloadWithRetainedOwnersRuntime(
-  PairNodeMeshKeyPayloadRuntime* const destination,
-  const PairNodeMeshKeyPayloadRuntime* const source
-) noexcept
-{
-  if (destination == nullptr || source == nullptr) {
-    return destination;
-  }
-
-  destination->vtable = &gPairNodeMeshKeyPayloadRuntimeVTableTag;
-  destination->lane04 = source->lane04;
-  destination->sharedObjectLane08 = source->sharedObjectLane08;
-
-  destination->sharedControlLane0C = source->sharedControlLane0C;
-  if (destination->sharedControlLane0C != nullptr) {
-    (void)::InterlockedExchangeAdd(
-      reinterpret_cast<volatile LONG*>(reinterpret_cast<std::uint8_t*>(destination->sharedControlLane0C) + 4u),
-      1
-    );
-  }
-
-  destination->weakObjectLane10 = source->weakObjectLane10;
-  destination->weakControlLane14 = source->weakControlLane14;
-  if (destination->weakControlLane14 != nullptr) {
-    (void)::InterlockedExchangeAdd(
-      reinterpret_cast<volatile LONG*>(reinterpret_cast<std::uint8_t*>(destination->weakControlLane14) + 8u),
-      1
-    );
-  }
-
-  return destination;
 }
 
 /**
