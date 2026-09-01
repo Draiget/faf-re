@@ -888,6 +888,39 @@ namespace moho
   }
 
   /**
+   * Class-binder record at 0x00F59B50 (`.rdata`), the same table region as the
+   * other already-recovered class binders (e.g. `"moho.AimManipulator"` at
+   * 0x00F59A20). Its fields read:
+   *
+   *     name  0x00E22004 -> "moho.AnimationManipulator"
+   *     group 0x00E21FEC -> "CAnimationManipulator"
+   *     help  0x00E00779 -> ""
+   *
+   * What it does:
+   * Publishes `CScrLuaMetatableFactory<CAnimationManipulator>`'s method table
+   * as `moho.AnimationManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches
+   * it and flattens in the `moho.manipulator_methods` base (matching the
+   * already-recovered `register_CAnimationManipulatorLuaBaseClass` right
+   * below, which declares the same class as deriving from `IAniManipulator`
+   * for that same flattening pass).
+   *
+   * Without this, `moho.AnimationManipulator` never names that table and every
+   * `moho.AnimationManipulator.<Method>` lookup reads nil --
+   * `sim/units/cybran/CAirFactoryUnit.lua:35` captures `PlayAnim` into an
+   * upvalue at module load, matching the same failure shape as the
+   * `moho.IEffect` gap this session already found and fixed (`f36336a0`).
+   */
+  CScrLuaInitForm* register_moho_AnimationManipulator_ClassBinder()
+  {
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.AnimationManipulator", &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
+      "CAnimationManipulator", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Address: 0x00BD2D70 (FUN_00BD2D70, sub_BD2D70) -- record at 0x00F59B64
    *
    * What it does:
@@ -1214,6 +1247,7 @@ namespace
       (void)moho::register_CScrLuaMetatableFactory_CFootPlantManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant9();
       (void)moho::register_sim_SimInits_mForms_off_F59B34_mFactory();
+      (void)moho::register_moho_AnimationManipulator_ClassBinder();
       (void)moho::register_CAnimationManipulatorLuaBaseClass();
       (void)moho::register_RVectorType_bool();
       (void)moho::register_CScrLuaMetatableFactory_CAnimationManipulator_Index();
