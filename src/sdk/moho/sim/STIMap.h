@@ -936,12 +936,34 @@ namespace moho
     float mWaterElevation;                        // +0x1538
     float mWaterElevationDeep;                    // +0x153C
     float mWaterElevationAbyss;                   // +0x1540
+
+    /**
+     * One 4-byte slot at +0x1544 that nothing in the binary initializes or
+     * reads. Its existence is certain even so:
+     *
+     *  - two independent sites allocate this class with `operator new(0x1548u)`
+     *    and call `STIMap::STIMap` on the result -- FUN_0088C000 (the world
+     *    session bringing up the sim terrain map) and FUN_008A6220 -- so the
+     *    allocation is of this exact type, not a derived one;
+     *  - the highest offset either constructor (0x00577890, 0x005779C0) or the
+     *    destructor (0x00577AD0) touches is +0x1540, so the recovered members
+     *    account for everything up to 0x1544;
+     *  - a corpus-wide scan for `+1544h]` finds only `gpg::RRef_SPickUpInfo`'s
+     *    magic-static guard, at an unrelated base -- nothing reads this field.
+     *
+     * Trailing padding cannot explain it: the class's widest alignment is 4
+     * (`LuaPlus::LuaObject` is 0x14, so it is not 8-aligned either), and a
+     * 4-aligned type is not rounded up from 0x1544 to 0x1548. Named by the
+     * offset convention because the layout is proven and the purpose is not.
+     */
+    std::uint32_t field_0x1544 = 0;               // +0x1544
   };
 
   static_assert(offsetof(STIMap, mTerrainType) == 0x1428, "STIMap::mTerrainType offset must be 0x1428");
   static_assert(offsetof(STIMap, mBlocking) == 0x1434, "STIMap::mBlocking offset must be 0x1434");
   static_assert(offsetof(STIMap, mWaterEnabled) == 0x1534, "STIMap::mWaterEnabled offset must be 0x1534");
-  static_assert(sizeof(STIMap) == 0x1544, "STIMap size must be 0x1544");
+  static_assert(offsetof(STIMap, mWaterElevationAbyss) == 0x1540, "STIMap::mWaterElevationAbyss offset must be 0x1540");
+  static_assert(sizeof(STIMap) == 0x1548, "STIMap size must be 0x1548");
 
   /**
    * Address: 0x00564AB0 (FUN_00564AB0, ?OCCUPY_MobileCheck@Moho@@YA?AW4ELayer@1@ABUSFootprint@1@ABUSOCellPos@1@PBVSTIMap@1@@Z)
