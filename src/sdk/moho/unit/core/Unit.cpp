@@ -12733,21 +12733,38 @@ SSTIUnitVariableData::SSTIUnitVariableData()
  */
 static void ClearWeaponInfoVectorAndRebindInline(moho::SSTIUnitWeaponInfoVector& vec) noexcept
 {
-  // Run UnitWeaponInfo destructors for every live element so the shared
-  // texture / blueprint references each weapon snapshot holds are released
-  // before the backing storage is freed. The stride is sizeof(UnitWeaponInfo)
-  // = 0x98 exactly as the binary's `add edi, 98h` cursor.
-  for (moho::UnitWeaponInfo* cursor = vec.start_; cursor != vec.end_; ++cursor) {
-    cursor->~UnitWeaponInfo();
-  }
-
   // If lanes currently reference heap storage (start_ differs from the
   // inline-buffer header stored in originalVec_), release that heap block and
   // restore pointer lanes to the inline buffer using the saved capacity
   // header that was written into the first slot of inline storage at the
   // most recent grow/init event.
+  //
+  // The deallocation MUST be the `delete[]` expression, not a direct
+  // `::operator delete[](start_)` call. `FastVectorN::GrowToCapacity` allocates
+  // this buffer with `new T[newCap]`, and `UnitWeaponInfo` has a non-trivial
+  // destructor, so the allocation carries a 4-byte array cookie and `start_`
+  // points at base+4. `delete[] p` subtracts that cookie before calling the
+  // deallocation function; calling `::operator delete[]` directly does not, so
+  // it handed the allocator a pointer 4 bytes past a real block. Caught live:
+  //
+  //   [BADFREE] ptr=5C665804 base=5C661000 kind=25 blockSize=768 delta=18436
+  //     operator delete[] <- ClearWeaponInfoVectorAndRebindInline
+  //     <- ~SSTIUnitVariableData <- ~SUnitVariableUpdateEntry
+  //     <- msvc8::vector<SUnitVariableUpdateEntry,1>::destroy_range
+  //
+  // (18436 == 24 * 768 + 4.) `GetPageOwner` still resolves that interior
+  // pointer, so the allocator linked base+4 onto a free lane and later handed
+  // it out as a block overlapping the real one - two owners, one buffer.
+  //
+  // `delete[]` also runs `~UnitWeaponInfo` for every element the matching
+  // `new T[newCap]` constructed, which is what releases the shared texture /
+  // blueprint references each weapon snapshot holds. The previous explicit
+  // `[start_, end_)` destructor loop is therefore redundant here (and would
+  // now double-destruct the live range), so it is gone: allocation and
+  // deallocation forms match, and the slots between end_ and capacity_ are no
+  // longer left undestructed.
   if (vec.start_ != vec.originalVec_) {
-    ::operator delete[](vec.start_);
+    delete[] vec.start_;
     vec.start_ = vec.originalVec_;
     vec.capacity_ = *reinterpret_cast<moho::UnitWeaponInfo**>(vec.start_);
     vec.end_ = vec.start_;
