@@ -388,6 +388,12 @@ namespace moho
   class CThrustManipulator : public IAniManipulator
   {
   public:
+    CThrustManipulator() = default;
+
+    CThrustManipulator(Sim* const sim, CAniActor* const ownerActor, const int precedence)
+      : IAniManipulator(sim, ownerActor, precedence)
+    {}
+
     /**
      * Address: 0x0064B6E0 (FUN_0064B6E0, Moho::CThrustManipulator::MemberDeserialize)
      *
@@ -493,12 +499,7 @@ namespace moho
       return nullptr;
     }
 
-    (void)new (static_cast<void*>(runtime)) moho::IAniManipulator();
-
-    static std::uint8_t sCThrustManipulatorPrimaryVTableTag = 0;
-    static std::uint8_t sCThrustManipulatorScriptObjectVTableTag = 0;
-    *reinterpret_cast<void**>(runtime) = &sCThrustManipulatorPrimaryVTableTag;
-    *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(runtime) + 0x10) = &sCThrustManipulatorScriptObjectVTableTag;
+    (void)new (static_cast<void*>(runtime)) CThrustManipulator();
 
     (void)new (static_cast<void*>(&runtime->mUnit)) moho::WeakPtr<moho::Unit>();
     (void)new (static_cast<void*>(&runtime->mLabel)) msvc8::string();
@@ -540,12 +541,7 @@ namespace moho
       return runtime;
     }
 
-    (void)new (static_cast<void*>(runtime)) moho::IAniManipulator(unit->SimulationRef, unit->AniActor, 0);
-
-    static std::uint8_t sCThrustManipulatorPrimaryVTableTag = 0;
-    static std::uint8_t sCThrustManipulatorScriptObjectVTableTag = 0;
-    *reinterpret_cast<void**>(runtime) = &sCThrustManipulatorPrimaryVTableTag;
-    *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(runtime) + 0x10) = &sCThrustManipulatorScriptObjectVTableTag;
+    (void)new (static_cast<void*>(runtime)) CThrustManipulator(unit->SimulationRef, unit->AniActor, 0);
 
     (void)new (static_cast<void*>(&runtime->mUnit)) moho::WeakPtr<moho::Unit>();
     runtime->mUnit.ResetFromObject(unit);

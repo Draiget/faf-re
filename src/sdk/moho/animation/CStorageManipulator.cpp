@@ -72,37 +72,6 @@ namespace
   );
   static_assert(sizeof(CStorageManipulatorRuntimeView) == 0xB0, "CStorageManipulatorRuntimeView size must be 0xB0");
 
-  /**
-   * Address: 0x00648FC0 (FUN_00648FC0, ??0CStorageManipulator@Moho@@QAE@@Z_0)
-   *
-   * What it does:
-   * Builds one default `CStorageManipulator` lane on top of
-   * `IAniManipulator`, installs storage-manipulator vtable lanes, clears
-   * tracked min/max/current vectors, and defaults resource type to energy.
-   */
-  CStorageManipulatorRuntimeView* InitializeCStorageManipulatorDefaultRuntime(
-    CStorageManipulatorRuntimeView* const runtime
-  ) noexcept
-  {
-    if (runtime == nullptr) {
-      return nullptr;
-    }
-
-    (void)new (static_cast<void*>(runtime)) moho::IAniManipulator();
-
-    static std::uint8_t sCStorageManipulatorPrimaryVTableTag = 0;
-    static std::uint8_t sCStorageManipulatorScriptObjectVTableTag = 0;
-    runtime->mPrimaryVTable = &sCStorageManipulatorPrimaryVTableTag;
-    runtime->mScriptObjectVTable = &sCStorageManipulatorScriptObjectVTableTag;
-
-    runtime->mUnit = nullptr;
-    runtime->mMax = CStorageManipulatorVector3RuntimeView{};
-    runtime->mMin = CStorageManipulatorVector3RuntimeView{};
-    runtime->mCur = CStorageManipulatorVector3RuntimeView{};
-    runtime->mResourceType = moho::ECON_ENERGY;
-    return runtime;
-  }
-
   gpg::RType* gCStorageManipulatorCachedType = nullptr;
 
   using ScalarDeletingDtorFn = int(__thiscall*)(void* self, int deleteFlag);
@@ -178,6 +147,12 @@ namespace moho
   class CStorageManipulator : public IAniManipulator
   {
   public:
+    CStorageManipulator() = default;
+
+    CStorageManipulator(Sim* const sim, CAniActor* const ownerActor, const int precedence)
+      : IAniManipulator(sim, ownerActor, precedence)
+    {}
+
     /**
      * Address: 0x00649DB0 (FUN_00649DB0, Moho::CStorageManipulator::MemberDeserialize)
      *
@@ -198,6 +173,32 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
+
+  /**
+   * Address: 0x00648FC0 (FUN_00648FC0, ??0CStorageManipulator@Moho@@QAE@@Z_0)
+   *
+   * What it does:
+   * Builds one default `CStorageManipulator` lane on top of
+   * `IAniManipulator`, installs storage-manipulator vtable lanes, clears
+   * tracked min/max/current vectors, and defaults resource type to energy.
+   */
+  CStorageManipulatorRuntimeView* InitializeCStorageManipulatorDefaultRuntime(
+    CStorageManipulatorRuntimeView* const runtime
+  ) noexcept
+  {
+    if (runtime == nullptr) {
+      return nullptr;
+    }
+
+    (void)new (static_cast<void*>(runtime)) CStorageManipulator();
+
+    runtime->mUnit = nullptr;
+    runtime->mMax = CStorageManipulatorVector3RuntimeView{};
+    runtime->mMin = CStorageManipulatorVector3RuntimeView{};
+    runtime->mCur = CStorageManipulatorVector3RuntimeView{};
+    runtime->mResourceType = moho::ECON_ENERGY;
+    return runtime;
+  }
 
   /**
    * VFTABLE: 0x00E230B4
@@ -281,12 +282,7 @@ namespace moho
       return runtime;
     }
 
-    (void)new (static_cast<void*>(runtime)) moho::IAniManipulator(unit->SimulationRef, unit->AniActor, 0);
-
-    static std::uint8_t sCStorageManipulatorPrimaryVTableTag = 0;
-    static std::uint8_t sCStorageManipulatorScriptObjectVTableTag = 0;
-    runtime->mPrimaryVTable = &sCStorageManipulatorPrimaryVTableTag;
-    runtime->mScriptObjectVTable = &sCStorageManipulatorScriptObjectVTableTag;
+    (void)new (static_cast<void*>(runtime)) CStorageManipulator(unit->SimulationRef, unit->AniActor, 0);
 
     runtime->mUnit = unit;
     runtime->mMax = ToStorageVectorRuntime(*maxOffset);
