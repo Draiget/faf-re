@@ -5,6 +5,7 @@
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -580,6 +581,7 @@ namespace moho
   CScrLuaInitForm* func_IEffectSetBeamParam_LuaFuncDef();
   CScrLuaInitForm* func_IEffectSetEmitterParam_LuaFuncDef();
   CScrLuaInitForm* func_IEffectScaleEmitter_LuaFuncDef();
+  CScrLuaInitForm* register_moho_IEffect_ClassBinder();
   CScrLuaInitForm* func_IEffectResizeEmitterCurve_LuaFuncDef();
   CScrLuaInitForm* func_IEffectSetEmitterCurveParam_LuaFuncDef();
   CScrLuaInitForm* func_IEffectOffsetEmitter_LuaFuncDef();
@@ -1050,6 +1052,36 @@ namespace moho
       nullptr,
       "<global>",
       kAttachBeamToEntityHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Class-binder record at 0x00F59EE8 (`.rdata`), the same table region as the
+   * already-recovered class binders. Its fields read:
+   *
+   *     name  0x00E25EF4 -> "moho.IEffect"
+   *     group 0x00E25EEC -> "IEffect"
+   *     help  0x00E00779 -> ""
+   *
+   * What it does:
+   * Publishes `CScrLuaMetatableFactory<IEffect>`'s method table as
+   * `moho.IEffect`, which is what makes the seven `IEffect` method binders in
+   * this file reachable from Lua. `CScrLuaClassBinder::Run` walks the dotted
+   * name, creating `moho` if needed, and assigns `mClassFactory->Get(state)`
+   * at the last segment -- so the class table and the binders' target table
+   * are the same object, by construction.
+   *
+   * Without this, `moho.IEffect` never names that table and every
+   * `moho.IEffect.<Method>` lookup reads nil. `defaultexplosions.lua:665`
+   * captures four of them into upvalues at module load, and the first call at
+   * line 706 then killed `InitializeArmies` mid-way through creating the map's
+   * wreckage -- which is why no commander spawned.
+   */
+  CScrLuaInitForm* register_moho_IEffect_ClassBinder()
+  {
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.IEffect", &CScrLuaMetatableFactory<IEffect>::Instance(), "IEffect", ""
     );
     return &binder;
   }
@@ -3516,6 +3548,7 @@ namespace
       (void)::moho::func_CreateBeamEntityToEntity_LuaFuncDef();
       (void)::moho::func_AttachBeamEntityToEntity_LuaFuncDef();
       (void)::moho::func_AttachBeamToEntity_LuaFuncDef();
+      (void)::moho::register_moho_IEffect_ClassBinder();
     }
   };
 
