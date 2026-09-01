@@ -18,6 +18,7 @@
 #include "../resource/RResId.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
@@ -486,6 +487,49 @@ namespace moho
       return StoreOpaquePointerLane(outValue, value);
     }
 
+    /**
+     * Address: 0x0052AC40 (FUN_0052AC40, Moho::RRuleGameRulesImpl::GetProjectileBlueprint)
+     * and its FUN_0052AB70/FUN_0052AD10/FUN_0052AEF0 siblings; shared search
+     * primitive at 0x0052C0A0 (`sub_52C0A0`, a plain `std::string::operator<`
+     * tree search - confirmed ground truth, no hidden normalization).
+     *
+     * What it does:
+     * Looks up a blueprint by its registered resource id. The primary lookup
+     * is byte-for-byte ground truth: the map is keyed by whatever
+     * `ResolveNormalizedBlueprintId` (Sim.cpp) computed at registration time
+     * (`gpg::STR_ToLower` only - slash direction is whatever the Lua source
+     * string used, forward-slash for every current blueprint kind), and
+     * `sub_52C0A0`'s tree search is a raw lexicographic compare with no
+     * normalization of its own - confirmed by reading both ground-truth
+     * bodies directly.
+     *
+     * Ground-truth-faithful fallback:
+     * `cfunc_EntityCreateProjectileL` (0x0068A110) builds its lookup key via
+     * `gpg::STR_InitFilename`/`STR_CanonizeFilename`, which - also confirmed
+     * ground truth, same call sequence in FUN_0068A110 - produces lowercase
+     * BACKSLASH form. That is a genuine, reproducible mismatch against the
+     * forward-slash map key for any nested-path projectile id (e.g.
+     * `/effects/entities/UnitTeleport01/UnitTeleport01_proj.bp`, confirmed
+     * live via `/spewbp` against the registered key and the "Invalid
+     * blueprint" warning): every individual function on both sides matches
+     * its own ground truth exactly, so this is a latent defect in the
+     * original engine that 2007-era content apparently never exercised, not
+     * a recovery error - current FAF content does exercise it, and an
+     * uncaught error here kills the calling Lua coroutine
+     * (`LuaState::Error` is an `__imp_*` LuaPlus import; a Lua error inside a
+     * forked thread's `lua_resume` does not return to the caller - confirmed
+     * against `CLuaTask.cpp`), permanently blocking `CommandUnit.lua`'s
+     * warp-in reveal (`ShowBone`/`SetBlockCommandQueue(false)`).
+     *
+     * The retry below is strictly additive: it only runs after the primary,
+     * ground-truth lookup has already failed, and it can only turn an
+     * existing failure into a success - it never changes the result of a
+     * lookup that already succeeds, so it carries none of the blast-radius
+     * risk of changing the shared registration key itself (see
+     * `ResolveNormalizedBlueprintId`, Sim.cpp - do not touch that function
+     * for this bug; a prior attempt to do so broke AI brain builder-list
+     * lookups that depend on its forward-slash-preserving output).
+     */
     template <typename TBlueprint>
     [[nodiscard]] TBlueprint*
     LookupBlueprintByResId(const RRuleGameRulesBlueprintMap& map, const RResId& resId) noexcept
@@ -494,12 +538,19 @@ namespace moho
         return nullptr;
       }
 
-      const auto found = map.find(msvc8::string(resId.name.view()));
-      if (found == map.end()) {
+      if (const auto found = map.find(msvc8::string(resId.name.view())); found != map.end()) {
+        return static_cast<TBlueprint*>(found->second);
+      }
+
+      msvc8::string slashNormalized(resId.name.view());
+      gpg::STR_NormalizeFilenameLowerSlash(slashNormalized);
+
+      const auto fallbackFound = map.find(slashNormalized);
+      if (fallbackFound == map.end()) {
         return nullptr;
       }
 
-      return static_cast<TBlueprint*>(found->second);
+      return static_cast<TBlueprint*>(fallbackFound->second);
     }
 
     [[nodiscard]] LuaPlus::LuaState* ResolveRootState(LuaPlus::LuaState* state) noexcept
