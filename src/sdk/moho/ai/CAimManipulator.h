@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/animation/IAniManipulator.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "Wm3Vector3.h"
@@ -57,8 +58,20 @@ namespace moho
   /**
    * VFTABLE: 0x00E213C0
    * COL:  0x00E7AC30
+   *
+   * Real inheritance from `IAniManipulator` (which itself derives from
+   * `CScriptEvent` -> `CScriptObject`) - this class was previously recovered
+   * as a "thin view" that placement-new'd a standalone `IAniManipulator` into
+   * its own storage and then overwrote the vtable pointer that ctor had just
+   * set with the address of a bare static byte, faking a vtable. That made
+   * every `typeid`/RTTI operation on a live `CAimManipulator*` (reached via
+   * `IAniManipulator:SetPrecedence` and friends, which resolve `self` through
+   * `SCR_FromLua_IAniManipulator` -> `gpg::REF_UpcastPtr` -> real C++ RTTI)
+   * read through that fake one-byte "vtable", crashing. Same root cause and
+   * fix shape as `CameraImpl`'s `RCamCamera`/`CScriptEvent` conversion
+   * (commit 34dfd4af).
    */
-  class CAimManipulator
+  class CAimManipulator : public IAniManipulator
   {
   public:
     static gpg::RType* sType;
