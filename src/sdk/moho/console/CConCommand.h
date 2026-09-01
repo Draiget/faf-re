@@ -87,6 +87,36 @@ namespace moho
   extern float ai_InitialEnergyCurrencyMax;
   extern float ai_InitialMassCurrencyMax;
 
+  // Console-tunable globals with no other subsystem owner (no consumer reads
+  // them yet; storage lives in CConCommand.cpp alongside the rest of this
+  // "no other home" bucket).
+  extern float cam_TrackProjectileTimeout;
+  extern bool dbg_MonitorAddressSpace;
+  extern float dump_Rate;
+  extern float efx_WaveCutoff;
+  extern float sc_FrameTimeClamp;
+  extern bool sc_SkipIntro;
+  extern bool ren_Clutter;
+  extern int ren_FogIntensity;
+  extern bool ren_HideSecondary;
+  extern bool ren_NewFogUpdate;
+  extern bool ren_NewPipeline;
+  extern bool ren_Refraction;
+  extern bool ren_RegenShore;
+  extern bool ren_ShowBoneNames;
+  extern bool ren_TTerrainGlow;
+  extern int ren_TeamColorLookupCount;
+  extern bool ren_Trees;
+  extern float ren_ViewError;
+  extern bool sim_DebugCheats;
+  extern int sim_DebugDelay;
+  extern bool sim_Interlocked;
+  extern int sim_LogSize;
+  extern bool sim_ReportCheats;
+  extern float ui_BuildPlaceTarmacAlpha;
+  extern float ui_CommandClickScale;
+  extern float ui_fuelbarHeight;
+
   /**
    * Address: 0x0041E390 (FUN_0041E390)
    *

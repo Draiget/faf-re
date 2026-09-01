@@ -6940,3 +6940,267 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsNet gConsoleStartupRegistrationsNet;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupSimDebugCheatsDescription = "Log a backtrace when we detect a cheat.";
+  constexpr const char* kConsoleStartupSimDebugDelayDescription = "Milliseconds to delay each sim tick to simulate a slow sim.";
+  constexpr const char* kConsoleStartupSimInterlockedDescription = "If true, force the sim and UI threads to run interlocked.";
+  constexpr const char* kConsoleStartupSimIssueThreadDebugLevelDescription = "How much debug spam to spew from the issue thread.";
+  constexpr const char* kConsoleStartupSimKeepAllLogFilesDescription = "If true, keep all long files instead of just the ones for beats that appear out-of-sync.";
+  constexpr const char* kConsoleStartupSimLogSizeDescription = "How many ticks to log before flushing files.";
+  constexpr const char* kConsoleStartupSimReportCheatsDescription = "Report cheating when cheats are enabled.";
+  constexpr const char* kConsoleStartupSimShowDamageDescription = "Show debug damage info";
+} // namespace
+
+// New console-tunable storage with no other subsystem owner (default read from the
+// binary's .data image at the registrar's value-pointer field).
+bool moho::sim_DebugCheats = false;
+int moho::sim_DebugDelay = 0;
+bool moho::sim_Interlocked = true;
+int moho::sim_LogSize = 10;
+bool moho::sim_ReportCheats = false;
+
+namespace moho
+{
+  extern bool sim_KeepAllLogFiles;
+  extern bool sim_ShowDamage;
+
+  TConVar<bool> gTConVar_sim_DebugCheats(
+    "sim_DebugCheats",
+    kConsoleStartupSimDebugCheatsDescription,
+    &moho::sim_DebugCheats
+  );
+  TConVar<int> gTConVar_sim_DebugDelay(
+    "sim_DebugDelay",
+    kConsoleStartupSimDebugDelayDescription,
+    &moho::sim_DebugDelay
+  );
+  TConVar<bool> gTConVar_sim_Interlocked(
+    "sim_Interlocked",
+    kConsoleStartupSimInterlockedDescription,
+    &moho::sim_Interlocked
+  );
+  TConVar<int> gTConVar_sim_IssueThreadDebugLevel(
+    "sim_IssueThreadDebugLevel",
+    kConsoleStartupSimIssueThreadDebugLevelDescription,
+    &moho::sim_IssueThreadDebugLevel
+  );
+  TConVar<bool> gTConVar_sim_KeepAllLogFiles(
+    "sim_KeepAllLogFiles",
+    kConsoleStartupSimKeepAllLogFilesDescription,
+    &moho::sim_KeepAllLogFiles
+  );
+  TConVar<int> gTConVar_sim_LogSize(
+    "sim_LogSize",
+    kConsoleStartupSimLogSizeDescription,
+    &moho::sim_LogSize
+  );
+  TConVar<bool> gTConVar_sim_ReportCheats(
+    "sim_ReportCheats",
+    kConsoleStartupSimReportCheatsDescription,
+    &moho::sim_ReportCheats
+  );
+  TConVar<bool> gTConVar_sim_ShowDamage(
+    "sim_ShowDamage",
+    kConsoleStartupSimShowDamageDescription,
+    &moho::sim_ShowDamage
+  );
+
+  /**
+   * Address: 0x00C00CE0 (FUN_00C00CE0, ??1TConVar_sim_DebugCheats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_DebugCheats`.
+   */
+  void cleanup_TConVar_sim_DebugCheats()
+  {
+    CleanupStartupConCommand(gTConVar_sim_DebugCheats);
+  }
+
+  /**
+   * Address: 0x00BDBA50 (FUN_00BDBA50, register_TConVar_sim_DebugCheats)
+   *
+   * What it does:
+   * Registers startup convar for `sim_DebugCheats`.
+   */
+  void register_TConVar_sim_DebugCheats()
+  {
+    RegisterStartupConVar(gTConVar_sim_DebugCheats, &cleanup_TConVar_sim_DebugCheats);
+  }
+
+  /**
+   * Address: 0x00C00C30 (FUN_00C00C30, ??1TConVar_sim_DebugDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_DebugDelay`.
+   */
+  void cleanup_TConVar_sim_DebugDelay()
+  {
+    CleanupStartupConCommand(gTConVar_sim_DebugDelay);
+  }
+
+  /**
+   * Address: 0x00BDB920 (FUN_00BDB920, register_TConVar_sim_DebugDelay)
+   *
+   * What it does:
+   * Registers startup convar for `sim_DebugDelay`.
+   */
+  void register_TConVar_sim_DebugDelay()
+  {
+    RegisterStartupConVar(gTConVar_sim_DebugDelay, &cleanup_TConVar_sim_DebugDelay);
+  }
+
+  /**
+   * Address: 0x00C00BA0 (FUN_00C00BA0, ??1TConVar_sim_Interlocked@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_Interlocked`.
+   */
+  void cleanup_TConVar_sim_Interlocked()
+  {
+    CleanupStartupConCommand(gTConVar_sim_Interlocked);
+  }
+
+  /**
+   * Address: 0x00BDB860 (FUN_00BDB860, register_TConVar_sim_Interlocked)
+   *
+   * What it does:
+   * Registers startup convar for `sim_Interlocked`.
+   */
+  void register_TConVar_sim_Interlocked()
+  {
+    RegisterStartupConVar(gTConVar_sim_Interlocked, &cleanup_TConVar_sim_Interlocked);
+  }
+
+  /**
+   * Address: 0x00C00BD0 (FUN_00C00BD0, ??1TConVar_sim_IssueThreadDebugLevel@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_IssueThreadDebugLevel`.
+   */
+  void cleanup_TConVar_sim_IssueThreadDebugLevel()
+  {
+    CleanupStartupConCommand(gTConVar_sim_IssueThreadDebugLevel);
+  }
+
+  /**
+   * Address: 0x00BDB8A0 (FUN_00BDB8A0, register_TConVar_sim_IssueThreadDebugLevel)
+   *
+   * What it does:
+   * Registers startup convar for `sim_IssueThreadDebugLevel`.
+   */
+  void register_TConVar_sim_IssueThreadDebugLevel()
+  {
+    RegisterStartupConVar(gTConVar_sim_IssueThreadDebugLevel, &cleanup_TConVar_sim_IssueThreadDebugLevel);
+  }
+
+  /**
+   * Address: 0x00C00CB0 (FUN_00C00CB0, ??1TConVar_sim_KeepAllLogFiles@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_KeepAllLogFiles`.
+   */
+  void cleanup_TConVar_sim_KeepAllLogFiles()
+  {
+    CleanupStartupConCommand(gTConVar_sim_KeepAllLogFiles);
+  }
+
+  /**
+   * Address: 0x00BDBA10 (FUN_00BDBA10, register_TConVar_sim_KeepAllLogFiles)
+   *
+   * What it does:
+   * Registers startup convar for `sim_KeepAllLogFiles`.
+   */
+  void register_TConVar_sim_KeepAllLogFiles()
+  {
+    RegisterStartupConVar(gTConVar_sim_KeepAllLogFiles, &cleanup_TConVar_sim_KeepAllLogFiles);
+  }
+
+  /**
+   * Address: 0x00C00C80 (FUN_00C00C80, ??1TConVar_sim_LogSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_LogSize`.
+   */
+  void cleanup_TConVar_sim_LogSize()
+  {
+    CleanupStartupConCommand(gTConVar_sim_LogSize);
+  }
+
+  /**
+   * Address: 0x00BDB9D0 (FUN_00BDB9D0, register_TConVar_sim_LogSize)
+   *
+   * What it does:
+   * Registers startup convar for `sim_LogSize`.
+   */
+  void register_TConVar_sim_LogSize()
+  {
+    RegisterStartupConVar(gTConVar_sim_LogSize, &cleanup_TConVar_sim_LogSize);
+  }
+
+  /**
+   * Address: 0x00C00D10 (FUN_00C00D10, ??1TConVar_sim_ReportCheats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_ReportCheats`.
+   */
+  void cleanup_TConVar_sim_ReportCheats()
+  {
+    CleanupStartupConCommand(gTConVar_sim_ReportCheats);
+  }
+
+  /**
+   * Address: 0x00BDBA90 (FUN_00BDBA90, register_TConVar_sim_ReportCheats)
+   *
+   * What it does:
+   * Registers startup convar for `sim_ReportCheats`.
+   */
+  void register_TConVar_sim_ReportCheats()
+  {
+    RegisterStartupConVar(gTConVar_sim_ReportCheats, &cleanup_TConVar_sim_ReportCheats);
+  }
+
+  /**
+   * Address: 0x00C00AE0 (FUN_00C00AE0, ??1TConVar_sim_ShowDamage@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sim_ShowDamage`.
+   */
+  void cleanup_TConVar_sim_ShowDamage()
+  {
+    CleanupStartupConCommand(gTConVar_sim_ShowDamage);
+  }
+
+  /**
+   * Address: 0x00BDB6B0 (FUN_00BDB6B0, register_TConVar_sim_ShowDamage)
+   *
+   * What it does:
+   * Registers startup convar for `sim_ShowDamage`.
+   */
+  void register_TConVar_sim_ShowDamage()
+  {
+    RegisterStartupConVar(gTConVar_sim_ShowDamage, &cleanup_TConVar_sim_ShowDamage);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsSim2
+  {
+    ConsoleStartupRegistrationsSim2()
+    {
+      moho::register_TConVar_sim_DebugCheats();
+      moho::register_TConVar_sim_DebugDelay();
+      moho::register_TConVar_sim_Interlocked();
+      moho::register_TConVar_sim_IssueThreadDebugLevel();
+      moho::register_TConVar_sim_KeepAllLogFiles();
+      moho::register_TConVar_sim_LogSize();
+      moho::register_TConVar_sim_ReportCheats();
+      moho::register_TConVar_sim_ShowDamage();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsSim2 gConsoleStartupRegistrationsSim2;
+} // namespace
