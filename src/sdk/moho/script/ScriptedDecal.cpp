@@ -10,6 +10,7 @@
 
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -790,11 +791,38 @@ namespace
    * This object is that call, and the source-level invocation that keeps these
    * definitions off the linker's dead-strip list.
    */
+  /**
+   * Class-binder record at 0x00F5B6B8 (`.rdata`), the same table region as
+   * the other already-recovered class binders (e.g. `"moho.AimManipulator"`
+   * at 0x00F59A20). Its fields read:
+   *
+   *     name  0x00E498B4 -> "moho.userDecal_methods"
+   *     group 0x00E498A4 -> "ScriptedDecal"
+   *     help  0x00E00779 -> ""
+   *
+   * What it does:
+   * Publishes `CScrLuaMetatableFactory<ScriptedDecal>`'s method table as
+   * `moho.userDecal_methods`. `gamedata/lua/user/UserDecal.lua:3` does
+   * `UserDecal = Class(moho.userDecal_methods) { ... }` at module load time
+   * -- without this export that read is nil and the whole module fails to
+   * load, same failure family as the `moho.IEffect` gap this session already
+   * found and fixed (`f36336a0`).
+   */
+  CScrLuaInitForm* register_moho_userDecal_methods_ClassBinder()
+  {
+    static CScrLuaClassBinder binder(
+      UserLuaInitSet(), "moho.userDecal_methods", &CScrLuaMetatableFactory<ScriptedDecal>::Instance(),
+      kScriptedDecalLuaClassName, ""
+    );
+    return &binder;
+  }
+
   struct ScriptedDecalLuaFuncDefBootstrap
   {
     ScriptedDecalLuaFuncDefBootstrap()
     {
       (void)::moho::func__c_CreateDecal_LuaFuncDef();
+      (void)register_moho_userDecal_methods_ClassBinder();
       (void)::moho::func_ScriptedDecalSetTexture_LuaFuncDef();
       (void)::moho::func_ScriptedDecalSetScale_LuaFuncDef();
       (void)::moho::func_ScriptedDecalSetPositionByScreen_LuaFuncDef();
