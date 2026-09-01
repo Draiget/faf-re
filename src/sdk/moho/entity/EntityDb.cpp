@@ -3890,6 +3890,32 @@ namespace moho
     return kEmpty;
   }
 
+  void CEntityDb::QueueEntityForDestroy(Entity* const entity)
+  {
+    if (entity == nullptr) {
+      return;
+    }
+
+    CEntityDbListHead* const head = mEntityList.head;
+    if (head == nullptr) {
+      return;
+    }
+
+    // `_Incsize`'s overflow guard, shared by every MSVC8 `std::list` lane.
+    if (mEntityList.size == 0x3FFFFFFFu) {
+      throw std::length_error("list<T> too long");
+    }
+
+    auto* const node = static_cast<CEntityDbEntityListNode*>(::operator new(sizeof(CEntityDbEntityListNode)));
+    node->links.next = head;
+    node->links.prev = head->prev;
+    node->entity = entity;
+
+    ++mEntityList.size;
+    head->prev = &node->links;
+    node->links.prev->next = &node->links;
+  }
+
   void CEntityDb::RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept
   {
     LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));

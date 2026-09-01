@@ -57,6 +57,20 @@ namespace moho
   static_assert(sizeof(CEntityDbEntityListRuntime) == 0x0C, "CEntityDbEntityListRuntime size must be 0x0C");
 
   /**
+   * A non-sentinel node of `CEntityDb::mEntityList`. The sentinel is a bare
+   * `CEntityDbListHead`; real nodes carry the queued entity in a third word,
+   * which is the `_Myval` `EntityDB::Purge` (0x00684560) reads back before
+   * calling the entity's deleting destructor.
+   */
+  struct CEntityDbEntityListNode
+  {
+    CEntityDbListHead links; // +0x00
+    Entity* entity;          // +0x08
+  };
+  static_assert(offsetof(CEntityDbEntityListNode, entity) == 0x08, "CEntityDbEntityListNode::entity offset must be 0x08");
+  static_assert(sizeof(CEntityDbEntityListNode) == 0x0C, "CEntityDbEntityListNode size must be 0x0C");
+
+  /**
    * Binary layout of `gpg::PriorityQueue<Moho::SPropPriorityInfo,
    * Moho::WeakPtr<Moho::Prop>>` as used by `EntityDB::mBoundedProps`: a
    * min-heap of `CEntityDbBoundedPropQueueNode` ordered by
@@ -359,6 +373,24 @@ namespace moho
 
     [[nodiscard]] msvc8::list<Entity*>& Entities() noexcept;
     [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;
+
+    /**
+     * Address: 0x00679B80 (FUN_00679B80, the `Moho::Entity::OnDestroy` lane),
+     * node buy at 0x0067DE00 (`std::list<Entity*>::_Buynode`), size bump at
+     * `std::list::_Incsize`.
+     *
+     * What it does:
+     * Appends one entity to the pending-destroy queue - the source line is
+     * `mEntList.push_back(entity)`, and the three emitted bodies above are what
+     * MSVC8 produces for it. `EntityDB::Purge` (0x00684560) is the consumer: it
+     * walks this list, unlinks and frees each node, decrements the size, and
+     * calls each queued entity's deleting destructor.
+     *
+     * This lives on the owning class because both `Entity::OnDestroy` and
+     * `Prop`'s reclaim lane push here; they previously each carried their own
+     * copy of the splice.
+     */
+    void QueueEntityForDestroy(Entity* entity);
 
     /**
      * What it does:

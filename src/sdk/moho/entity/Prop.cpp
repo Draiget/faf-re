@@ -65,40 +65,20 @@ namespace
     return cache;
   }
 
-  struct DestroyQueueNodeView
+  /**
+   * What it does:
+   * Appends the entity to the entity DB's pending-destroy queue without running
+   * the script-side destroy callback. Same `mEntList.push_back(entity)` source
+   * line as `Entity::OnDestroy`'s lane, so it goes through the same owning
+   * container method rather than a second open-coded copy of the splice.
+   */
+  void QueueEntityForDestroyNoCallback(moho::Entity* const entity)
   {
-    DestroyQueueNodeView* next;
-    DestroyQueueNodeView* prev;
-    moho::Entity* entity;
-  };
-
-  struct CommandDbDestroyQueueView
-  {
-    std::uint8_t pad_00[0x20];
-    std::int32_t count;         // +0x20
-    DestroyQueueNodeView* head; // +0x24
-  };
-
-  void QueueEntityForDestroyNoCallback(moho::Entity* entity)
-  {
-    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mCommandDB) {
+    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mEntityDB) {
       return;
     }
 
-    auto* const queue = reinterpret_cast<CommandDbDestroyQueueView*>(entity->SimulationRef->mCommandDB);
-    DestroyQueueNodeView* const head = queue->head;
-    if (!head) {
-      return;
-    }
-
-    auto* const node = static_cast<DestroyQueueNodeView*>(::operator new(sizeof(DestroyQueueNodeView)));
-    node->next = head;
-    node->prev = head->prev;
-    node->entity = entity;
-
-    ++queue->count;
-    head->prev = node;
-    node->prev->next = node;
+    entity->SimulationRef->mEntityDB->QueueEntityForDestroy(entity);
   }
 
   void QueuePropReclaimDelete(moho::Prop& prop)

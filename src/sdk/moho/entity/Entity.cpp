@@ -1975,29 +1975,6 @@ namespace
     return out;
   }
 
-  struct DestroyQueueNodeView
-  {
-    DestroyQueueNodeView* next;
-    DestroyQueueNodeView* prev;
-    moho::Entity* entity;
-  };
-
-  static_assert(sizeof(DestroyQueueNodeView) == 0x0C, "DestroyQueueNodeView size must be 0x0C");
-
-  struct CommandDbDestroyQueueView
-  {
-    std::uint8_t pad_00[0x20];
-    std::int32_t count;         // +0x20
-    DestroyQueueNodeView* head; // +0x24
-  };
-
-  static_assert(
-    offsetof(CommandDbDestroyQueueView, count) == 0x20, "CommandDbDestroyQueueView::count offset must be 0x20"
-  );
-  static_assert(
-    offsetof(CommandDbDestroyQueueView, head) == 0x24, "CommandDbDestroyQueueView::head offset must be 0x24"
-  );
-
   /**
    * Address: 0x00679B80 (FUN_00679B80, Moho::Entity::OnDestroy destroy-queue lane)
    * Address: 0x0067DE00 (FUN_0067DE00, MSVC8 `std::list<Entity*>::_Buynode`
@@ -2006,38 +1983,19 @@ namespace
    * Address: 0x0067DE40 (deleting-destructor twin of FUN_0067DE00)
    *
    * What it does:
-   * Inserts one entity into the command-db destroy queue intrusive list and
-   * increments the queue size. The node allocation path is the one emitted
-   * by the MSVC8 STL for `std::list<Entity*>::push_back` / `::insert`, and is
-   * reused by `Moho::Entity::OnDestroy`, the entity-pool deleting lanes, and
-   * `EntityDbEntityListTypeInfo::SerLoad` (which uses a real
-   * `std::list<Entity*>::push_back` call whose backing allocator is this
-   * same helper in the original binary).
+   * Appends the entity to the entity DB's pending-destroy queue. The source
+   * line is `mEntList.push_back(entity)`; the node-buy, size bump and splice
+   * above are the bodies MSVC8 emits for it, and they now live on their owning
+   * container as `CEntityDb::QueueEntityForDestroy` rather than being
+   * open-coded here and again in Prop.cpp.
    */
-  void QueueEntityForDestroy(moho::Entity* entity)
+  void QueueEntityForDestroy(moho::Entity* const entity)
   {
-    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mCommandDB) {
+    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mEntityDB) {
       return;
     }
 
-    auto* queue = reinterpret_cast<CommandDbDestroyQueueView*>(entity->SimulationRef->mCommandDB);
-    DestroyQueueNodeView* const head = queue->head;
-    if (!head) {
-      return;
-    }
-
-    if (queue->count == 0x3FFFFFFF) {
-      throw std::length_error("list<T> too long");
-    }
-
-    auto* node = reinterpret_cast<DestroyQueueNodeView*>(::operator new(sizeof(DestroyQueueNodeView)));
-    node->next = head;
-    node->prev = head->prev;
-    node->entity = entity;
-
-    ++queue->count;
-    head->prev = node;
-    node->prev->next = node;
+    entity->SimulationRef->mEntityDB->QueueEntityForDestroy(entity);
   }
 } // namespace
 
