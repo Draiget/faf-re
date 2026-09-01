@@ -13930,6 +13930,21 @@ namespace
     return state->GetGlobal("__blueprints");
   }
 
+  /**
+   * Address: 0x00529B30 (FUN_00529B30, func_Add__blueprints) - by-ordinal lane
+   *
+   * What it does:
+   * Ground truth publishes the Lua blueprint object into `__blueprints`
+   * TWICE: first by ordinal (`__blueprints[mBlueprintOrdinal] = luaBlueprint`,
+   * read directly off `FUN_00529B30`'s own pseudocode: `SetObject(Global,
+   * mBlueprintOrdinal, a1)`), then by string name. This function previously
+   * only recovered the by-name half; the by-ordinal `SetObject` call below
+   * completes it. `RBlueprint::GetLuaBlueprint` (RBlueprint.cpp, ground
+   * truth FUN_0050DF90) reads back ONLY via the ordinal index
+   * (`__blueprints[mBlueprintOrdinal]`) - every Lua-side `unit:GetBlueprint()`
+   * call (cfunc_UserUnitGetBlueprintL/cfunc_EntityGetBlueprintL, both call
+   * this same GetLuaBlueprint) depends on this half existing.
+   */
   void PublishLuaBlueprint(
     LuaPlus::LuaObject& luaBlueprint,
     void* const blueprintObject,
@@ -13946,6 +13961,7 @@ namespace
       return;
     }
 
+    allBlueprints.SetObject(blueprint->mBlueprintOrdinal, luaBlueprint);
     allBlueprints.SetObject(blueprint->mBlueprintId.c_str(), luaBlueprint);
   }
 
