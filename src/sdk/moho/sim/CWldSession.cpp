@@ -14470,6 +14470,32 @@ namespace moho
       IsObservingAllowed = false;
     }
 
+    // 0x00893160 line ~317: size the vision quadtree from the height field.
+    //
+    //     v36    = this->mWldMap->mTerrainRes->mMap;
+    //     field  = v36->mHeightField.field;
+    //     Moho::VisionDB::Init(&this->mVisionDB,
+    //                          (float)(field->width  - 1),
+    //                          (float)(field->height - 1));
+    //
+    // `VisionDB::Init` is what allocates `rootNode_`, and neither
+    // `VisionDB::Entry::TryAdd` (0x0081B490) nor its caller
+    // `func_ren_FogOfWar` (0x0081C660) null-checks that root -- the binary
+    // relies on this call having run. Without it every fog-of-war frame
+    // dereferenced a null root: `TryAdd` read `entry->mCurCircle` at +0x1C
+    // off nullptr, faulting at address 0x1C in
+    // `Cartographic::Render -> RenderFogOfWar`.
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) {
+      if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
+        if (const CHeightField* const heightField = stiMap->mHeightField.get(); heightField != nullptr) {
+          mVisionDb.Init(
+            static_cast<float>(heightField->Width() - 1),
+            static_cast<float>(heightField->Height() - 1)
+          );
+        }
+      }
+    }
+
     gActiveWldSession = this;
   }
 
