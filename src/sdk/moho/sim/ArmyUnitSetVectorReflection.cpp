@@ -213,6 +213,13 @@ const char* gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetName() const
   return gEntitySetTemplateUnitVectorTypeName.c_str();
 }
 
+/**
+ * Address: 0x00701740 (FUN_00701740, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetLexical)
+ *
+ * What it does:
+ * Appends the element count to the base `RType::GetLexical` text, matching
+ * the binary's `"%s, size=%d"` formatting of the inherited lexical form.
+ */
 msvc8::string gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);

@@ -30,6 +30,15 @@ namespace gpg
     ~RVectorType() override;
 
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00701740 (FUN_00701740, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetLexical)
+     *
+     * What it does:
+     * Appends the element count to the base `RType::GetLexical` text,
+     * matching the binary's `"%s, size=%d"` formatting of the inherited
+     * lexical form.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
