@@ -2752,7 +2752,7 @@ namespace
  * input stream, returning it through the polymorphic `gpg::ReadArchive*`
  * factory interface. Returns `nullptr` if allocation fails.
  */
-ReadArchive* CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream)
+ReadArchive* gpg::CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream)
 {
   // Binary: `push 44h` before `operator new` (0x00939816-0x00939818), not
   // sizeof(TextReadArchive). TextReadArchive declares no fields of its own -
