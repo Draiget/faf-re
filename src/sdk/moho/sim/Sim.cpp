@@ -8611,6 +8611,58 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     mCommandDB->PublishSyncData(outSyncData, focusArmyChanged);
   }
 
+  // 0x00747B23 onward: republish the per-beat state Lua reads off the global
+  // `Sync` table. lua/SimSync.lua consumes these every beat; nothing wrote
+  // them, so the table's pause and cheater lanes were permanently stale.
+  //
+  //     LuaState::GetGlobal(mLuaState, &syncTable, "Sync");
+  //     if (mPausedBy == -1) { SetNil("PausedBy"); SetNil("TimeoutsRemaining"); }
+  //     else { SetInteger("PausedBy", mPausedBy + 1);
+  //            SetInteger("TimeoutsRemaining",
+  //                       mCommandSources[mPausedBy].mTimeouts); }
+  //     ... if (mCheaters non-empty) { t[i+1] = mCheaters[i] + 1;
+  //                                    SetObject("Cheaters", t);
+  //                                    mCheaters._Mylast = _Myfirst; }
+  //
+  // Both index lanes are published 1-based, matching every other army/source
+  // index handed to Lua; the cheater run is cleared after publication so each
+  // entry is reported exactly once.
+  if (mLuaState != nullptr) {
+    LuaPlus::LuaObject syncTable = mLuaState->GetGlobal("Sync");
+    if (syncTable.IsTable()) {
+      const std::int32_t pausedBy = mPausedByCommandSource;
+      if (pausedBy == -1) {
+        syncTable.SetNil("PausedBy");
+        syncTable.SetNil("TimeoutsRemaining");
+      } else {
+        syncTable.SetInteger("PausedBy", pausedBy + 1);
+        if (static_cast<std::size_t>(pausedBy) < mCommandSources.size()) {
+          syncTable.SetInteger("TimeoutsRemaining", mCommandSources[static_cast<std::size_t>(pausedBy)].mTimeouts);
+        }
+      }
+
+      if (!mCheaters.empty()) {
+        LuaPlus::LuaObject cheaters(mLuaState);
+        cheaters.AssignNewTable(mLuaState, static_cast<int>(mCheaters.size()), 0u);
+        std::int32_t luaIndex = 1;
+        for (auto it = mCheaters.begin(); it != mCheaters.end(); ++it, ++luaIndex) {
+          cheaters.SetInteger(luaIndex, *it + 1);
+        }
+        syncTable.SetObject("Cheaters", cheaters);
+        mCheaters.clear();
+      }
+    }
+  }
+
+  // NOTE: ground truth also publishes `__ArmyStats` here, built from
+  // `mArmiesList[mSyncArmy]->GetArmyStats()` via `STAT_GetLuaTable` with a
+  // `Tick` field added. That one reads a `StatItem*` at `CArmyStats + 0x04`
+  // (`*(StatItem **)(v68 + 4)`), which is the `Stats<T>` root-item field -
+  // present on the `Stats<StatItem>` specialisation as `mItem` but absent from
+  // the primary `Stats<T>` template that `CArmyStats` actually derives from,
+  // and modelling it changes `CArmyStats`'s base layout. Left out deliberately
+  // rather than guessed at; it is a layout task on `Stats<T>`, not on Sim.
+
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
   // rules layer raised becomes the one the client is told about.
