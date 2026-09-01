@@ -4069,6 +4069,7 @@ namespace
   constexpr const char* kConsoleStartupConInBindKeyDescription =
     "Specify a key combo and a console command, binds console command to key";
   constexpr const char* kConsoleStartupConInSetKeyNameDescription = "Set a key name to map to a key code";
+  constexpr const char* kConsoleStartupConInDumpKeyNamesDescription = "Shows all the key names.";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -4146,6 +4147,7 @@ namespace
   CConFunc gCConFunc_UI_ResetView{};
   CConFunc gCConFunc_IN_BindKey{};
   CConFunc gCConFunc_IN_SetKeyName{};
+  CConFunc gCConFunc_IN_DumpKeyNames{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_ANI_DumpSkeleton{};
@@ -5091,6 +5093,35 @@ namespace moho
       "IN_SetKeyName",
       &moho::IN_SetKeyName,
       &cleanup_CConFunc_IN_SetKeyName
+    );
+  }
+
+  // Compiler-generated global cleanup lane for FUN_00BE4910's atexit callee.
+  // The owning source construct is the typed CConFunc object registered
+  // below; no standalone engine behavior is attached to that artifact
+  // address.
+  void cleanup_CConFunc_IN_DumpKeyNames()
+  {
+    CleanupStartupConCommand(gCConFunc_IN_DumpKeyNames);
+  }
+
+  /**
+   * Address: 0x00BE4910 (FUN_00BE4910, register_CConFunc_IN_DumpKeyNames)
+   *
+   * What it does:
+   * Registers the `IN_DumpKeyNames` startup console callback with its exact
+   * command metadata (name and description confirmed from the registrar's
+   * stru_F5B1BC in the PE .data image) and schedules the generated
+   * command-object cleanup lane.
+   */
+  void register_CConFunc_IN_DumpKeyNames()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_IN_DumpKeyNames,
+      kConsoleStartupConInDumpKeyNamesDescription,
+      "IN_DumpKeyNames",
+      &moho::IN_DumpKeyNames,
+      &cleanup_CConFunc_IN_DumpKeyNames
     );
   }
 
@@ -6307,6 +6338,7 @@ namespace
       moho::register_CConFunc_ANI_DumpSkeleton();
       moho::register_CConFunc_IN_BindKey();
       moho::register_CConFunc_IN_SetKeyName();
+      moho::register_CConFunc_IN_DumpKeyNames();
       moho::register_console_command_buffer();
       moho::register_sConsoleOutputHandlers();
       moho::register_TConVar_con_TestVarBool();

@@ -29919,6 +29919,23 @@ int moho::IN_FindKeyNameIndexCi(const msvc8::string& needle)
 }
 
 /**
+ * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
+ *
+ * What it does:
+ * The `IN_DumpKeyNames` console command: prints every slot of
+ * `in_keyNames[0..255]` as `"%04d = %s"`. The binary's raw SSO-vs-heap
+ * pointer check on each slot's `_Bx`/`_Mysize`/`_Myres` triple is exactly
+ * what `msvc8::string::c_str()` already resolves, so it is not reproduced
+ * here.
+ */
+void moho::IN_DumpKeyNames(void* const /*commandArgs*/)
+{
+  for (int index = 0; index < 256; ++index) {
+    CON_Printf("%04d = %s", index, in_keyNames[index].c_str());
+  }
+}
+
+/**
  * Address: 0x008394B0 (FUN_008394B0, Moho::CUIKeyHandler::SetKeyNameTable)
  *
  * What it does:
