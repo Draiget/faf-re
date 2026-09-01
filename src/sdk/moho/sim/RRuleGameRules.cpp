@@ -489,9 +489,13 @@ namespace moho
 
     /**
      * Address: 0x0052AC40 (FUN_0052AC40, Moho::RRuleGameRulesImpl::GetProjectileBlueprint)
-     * and its FUN_0052AB70/FUN_0052AD10/FUN_0052AEF0 siblings; shared search
-     * primitive at 0x0052C0A0 (`sub_52C0A0`, a plain `std::string::operator<`
-     * tree search - confirmed ground truth, no hidden normalization).
+     * and its whole sibling family - FUN_0052AB70 (GetUnitBlueprint),
+     * FUN_0052AD10 (GetPropBlueprint), FUN_0052ADE0 (GetMeshBlueprint),
+     * FUN_0052AEF0 (GetEmitterBlueprint), FUN_0052AFC0 (GetBeamBlueprint),
+     * FUN_0052B090 (GetTrailBlueprint). All seven are the same body over a
+     * different map; shared search primitive at 0x0052C0A0 (`sub_52C0A0`, a
+     * plain `std::string::operator<` tree search - confirmed ground truth, no
+     * hidden normalization).
      *
      * What it does:
      * Looks up a blueprint by its registered resource id. The primary lookup
@@ -507,8 +511,15 @@ namespace moho
      * `cfunc_EntityCreateProjectileL` (0x0068A110) builds its lookup key via
      * `gpg::STR_InitFilename`/`STR_CanonizeFilename`, which - also confirmed
      * ground truth, same call sequence in FUN_0068A110 - produces lowercase
-     * BACKSLASH form. That is a genuine, reproducible mismatch against the
-     * forward-slash map key for any nested-path projectile id (e.g.
+     * BACKSLASH form. `CEffectManagerImpl`'s `LookupEmitterBlueprint` /
+     * `LookupTrailBlueprint` build their keys the identical way, so the
+     * emitter and trail lookups miss for exactly the same reason - confirmed
+     * live: a `/map SCMP_009` run warns "Failed to create emitter as you
+     * passed in an invalid blueprint name /effects/emitters/
+     * teleport_ring_01_emit.bp" on every commander warp-in, which then makes
+     * `unitteleport01_script.lua(61)`'s `ScaleEmitter` call fail on the nil
+     * return. That is a genuine, reproducible mismatch against the
+     * forward-slash map key for any nested-path blueprint id (e.g.
      * `/effects/entities/UnitTeleport01/UnitTeleport01_proj.bp`, confirmed
      * live via `/spewbp` against the registered key and the "Invalid
      * blueprint" warning): every individual function on both sides matches
@@ -1745,16 +1756,7 @@ namespace moho
    */
   RMeshBlueprint* RRuleGameRulesImpl::GetMeshBlueprint(const RResId& resId)
   {
-    if (resId.name.empty()) {
-      return nullptr;
-    }
-
-    const auto found = mMeshBlueprints.find(msvc8::string(resId.name.view()));
-    if (found == mMeshBlueprints.end()) {
-      return nullptr;
-    }
-
-    return static_cast<RMeshBlueprint*>(found->second);
+    return LookupBlueprintByResId<RMeshBlueprint>(mMeshBlueprints, resId);
   }
 
   /**
@@ -1770,16 +1772,7 @@ namespace moho
    */
   REmitterBlueprint* RRuleGameRulesImpl::GetEmitterBlueprint(const RResId& resId)
   {
-    if (resId.name.empty()) {
-      return nullptr;
-    }
-
-    const auto found = mEmitterBlueprints.find(msvc8::string(resId.name.view()));
-    if (found == mEmitterBlueprints.end()) {
-      return nullptr;
-    }
-
-    return static_cast<REmitterBlueprint*>(found->second);
+    return LookupBlueprintByResId<REmitterBlueprint>(mEmitterBlueprints, resId);
   }
 
   /**
@@ -1795,16 +1788,7 @@ namespace moho
    */
   RTrailBlueprint* RRuleGameRulesImpl::GetTrailBlueprint(const RResId& resId)
   {
-    if (resId.name.empty()) {
-      return nullptr;
-    }
-
-    const auto found = mTrailBlueprints.find(msvc8::string(resId.name.view()));
-    if (found == mTrailBlueprints.end()) {
-      return nullptr;
-    }
-
-    return static_cast<RTrailBlueprint*>(found->second);
+    return LookupBlueprintByResId<RTrailBlueprint>(mTrailBlueprints, resId);
   }
 
   /**
