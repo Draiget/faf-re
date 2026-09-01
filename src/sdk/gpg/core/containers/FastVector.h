@@ -830,6 +830,56 @@ namespace gpg::core
     }
 
     /**
+     * Lower-case aliases, shadowed deliberately.
+     *
+     * Nothing in `FastVector` is virtual -- the base is the binary's three-word
+     * `{start_, end_, capacity_}` triple and must stay layout-compatible, so it
+     * has no vptr and `FastVectorN::Reserve` above *shadows* rather than
+     * overrides. Name lookup inside a base member body therefore binds to
+     * `FastVector::Reserve`, which ends in `delete[] start_`. On a
+     * `FastVectorN` whose `start_` is still seated on `inlineVec_` that frees a
+     * pointer the allocator never handed out: the array cookie read just below
+     * the buffer is whatever the enclosing object happens to hold, so the
+     * `eh vector destructor iterator` runs a garbage element count and walks off
+     * the end destroying non-elements.
+     *
+     * `Reserve`, `Resize`, `PushBack`, `push_back`, `InsertAt` and `operator=`
+     * were already shadowed. `reserve`, `resize(n)` and `resize(n, value)` were
+     * not, so those three were live paths into the base's `delete[]`. Observed:
+     * `Unit::Sync`'s `mWeaponInfo.resize(weaponCount, UnitWeaponInfo{})`
+     * (Unit.cpp) on a `fastvector_n<UnitWeaponInfo, 1>` -- any unit with two or
+     * more weapons exceeds the single inline slot and takes the grow path --
+     * faulting in `~UnitWeaponInfo` -> `msvc8::string::tidy` on an unmapped
+     * address, via `FastVector::resize` -> `FastVector::Reserve`.
+     *
+     * These forward to the inline-aware members above, whose semantics match
+     * the base versions exactly (shrink rebases `end_`; equal size is a no-op;
+     * growth relocates through `GrowInsert`/`GrowToCapacity` instead of
+     * `delete[]`, and appended slots are filled with `fill`).
+     *
+     * Still outstanding, deliberately not changed here to avoid altering move
+     * semantics under other sessions' in-flight work: `FastVector`'s move
+     * constructor and move assignment (the `delete[] start_` at the top of
+     * `operator=(FastVector&&)`) have the same defect, and pointer-stealing is
+     * wrong for an SBO container regardless -- it would leave `start_` aimed at
+     * the moved-from object's `inlineVec_`.
+     */
+    void reserve(const size_t n)
+    {
+      Reserve(n);
+    }
+
+    void resize(const size_t n)
+    {
+      Resize(n);
+    }
+
+    void resize(const size_t n, const T& value)
+    {
+      Resize(n, value);
+    }
+
+    /**
      * Append by copy; grows capacity exponentially.
      */
     void PushBack(const T& v)
