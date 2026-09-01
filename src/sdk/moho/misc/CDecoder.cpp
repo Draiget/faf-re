@@ -586,7 +586,7 @@ namespace moho
   void CDecoder::DecodeSetCommandCells(gpg::BinaryReader& reader)
   {
     CmdId commandId = 0;
-    gpg::core::FastVector<SOCellPos> cells{};
+    gpg::core::FastVectorN<SOCellPos, 2> cells{};
     Wm3::Vec3f targetPosition{};
 
     reader.ReadExact(commandId);
@@ -795,23 +795,30 @@ namespace moho
 
   /**
    * Address: 0x006E55C0 (FUN_006E55C0)
+   *
+   * Ground truth calls a resize-with-fill container helper (`sub_5532F0`)
+   * that only reallocates past the inline capacity, via a conditional
+   * `start_ == originalVec_` check (`sub_553A80`) -- it never unconditionally
+   * frees. The prior recovery here reimplemented this as an unconditional
+   * `delete[] cells.start_`, which is undefined behavior on every real call:
+   * both call sites (`DecodeCommandData`'s freshly-constructed
+   * `commandData.mCells`, and `DecodeSetCommandCells`'s freshly-constructed
+   * local below) always enter this function with `cells` still pointing at
+   * its own inline SBO buffer, so the delete freed a stack/embedded address,
+   * not a heap block -- corrupting whatever the engine's small-object
+   * allocator's free-lane bookkeeping happened to find there. Fixed by
+   * calling the container's own `resize()`, which already implements the
+   * same inline-vs-heap distinction faithfully (`FastVector.h`'s
+   * `Resize`/`GrowToCapacity`/`ResetInline_` family).
    */
-  void CDecoder::DecodeCells(gpg::BinaryReader& reader, gpg::core::FastVector<SOCellPos>& cells)
+  void CDecoder::DecodeCells(gpg::BinaryReader& reader, gpg::core::FastVectorN<SOCellPos, 2>& cells)
   {
     std::int32_t count = 0;
     reader.ReadExact(count);
 
-    delete[] cells.start_;
-    cells.start_ = nullptr;
-    cells.end_ = nullptr;
-    cells.capacity_ = nullptr;
-
+    cells.resize(static_cast<std::size_t>(count));
     if (count != 0) {
-      const auto cellCount = static_cast<std::size_t>(count);
-      cells.start_ = new SOCellPos[cellCount];
-      cells.end_ = cells.start_ + cellCount;
-      cells.capacity_ = cells.end_;
-      reader.Read(reinterpret_cast<char*>(cells.start_), cellCount * sizeof(SOCellPos));
+      reader.Read(reinterpret_cast<char*>(cells.start_), static_cast<std::size_t>(count) * sizeof(SOCellPos));
     }
   }
 
