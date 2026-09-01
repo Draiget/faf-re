@@ -42558,6 +42558,50 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x009932B0 (FUN_009932B0, wxApp::OnIdle)
+ *
+ * IDA signature:
+ * void __thiscall wxApp::OnIdle(wxApp *this, wxIdleEvent *event);
+ *
+ * What it does:
+ * Reentrancy-guards against a nested idle cycle, then propagates the idle
+ * event to every window (via the sender below) and reports whether any of
+ * them asked to be woken again.
+ *
+ * Ground truth also calls, in order ahead of the propagation: an
+ * unconditional wxAppBase::ProcessPendingEvents() (vtable slot 37, RTTI-
+ * confirmed; already exists as a stub at wxApp::ProcessPendingEvents() -
+ * its own backing wxPendingEvents list is not modelled and no producer
+ * anywhere in this engine calls AddPendingEvent/QueueEvent, so the stub's
+ * current empty behaviour is correct for this engine's actual runtime, not
+ * a placeholder standing in for missing work); a flag-gated lazy log-target
+ * bootstrap (wxLog::GetActiveTarget-shaped, FUN_009C51F0); and, only when no
+ * mouse button/shift is held, a periodic wxModuleList reinit sweep
+ * (FUN_009CA2B0). Both of the latter two operate on wx subsystems (the
+ * active log target, and a pair of static wxModuleList instances) that are
+ * not modelled anywhere else in this engine either, and neither is
+ * render/idle-settling behaviour - each is its own separate, self-
+ * contained recovery, deliberately deferred rather than reproduced here
+ * with fabricated backing state.
+ */
+void wxApp::OnIdle(wxEventRuntime& event)
+{
+  static bool sInOnIdle = false;
+  if (sInOnIdle) {
+    return;
+  }
+  sInOnIdle = true;
+
+  ProcessPendingEvents();
+
+  if (WxSendIdleEventsRuntime()) {
+    static_cast<WxIdleEventRuntime&>(event).mRequestMore = true;
+  }
+
+  sInOnIdle = false;
+}
+
 bool wxApp::ProcessIdle()
 {
   WxIdleEventRuntime idleEvent{};
@@ -42565,22 +42609,19 @@ bool wxApp::ProcessIdle()
 
   (void)ProcessEvent(&idleEvent);
   bool requestMore = idleEvent.mRequestMore;
-  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&idleEvent));
 
-  // The event above reaches the application object and stops there. What
-  // carries idle on to the windows is wxApp::OnIdle (0x009932B0), bound as the
-  // first row of wxApp's own event table at 0x00D55930, which calls the
-  // sender below and takes its answer as the request-more flag.
-  //
-  // That table does not exist here, and building it needs wxApp::OnIdle,
-  // which also flushes the log target, deletes pending objects and runs
-  // periodic work behind a mouse-button check - none of which is recovered.
-  // So the sender is called directly and the routing through the table is the
-  // deviation. Everything the windows see is the same; what is missing is the
-  // chance for an application-level handler to intervene first.
-  if (WxSendIdleEventsRuntime()) {
+  // wxApp's own event table binds wxEVT_IDLE to OnIdle (0x00D55930's first
+  // row) - the table itself is not modelled, so OnIdle is called directly
+  // here instead. This is the deviation the address block on OnIdle
+  // documents; what each window sees is identical either way.
+  WxIdleEventRuntime windowIdleEvent{};
+  OnIdle(windowIdleEvent);
+  if (windowIdleEvent.mRequestMore) {
     requestMore = true;
   }
+  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&windowIdleEvent));
+
+  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&idleEvent));
 
   return requestMore;
 }

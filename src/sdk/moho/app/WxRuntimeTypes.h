@@ -6691,6 +6691,19 @@ public:
   virtual std::int32_t GetPrintMode() const;
 
   /**
+   * Address: 0x009932B0 (FUN_009932B0)
+   * Mangled: ?OnIdle@wxApp@@UAEXAAVwxIdleEvent@@@Z
+   *
+   * What it does:
+   * The idle handler bound to wxEVT_IDLE in wxApp's own event table (the
+   * table itself is not modelled - ProcessIdle calls this directly instead,
+   * which is behaviourally equivalent for what windows see). Reentrancy-
+   * guarded; propagates the idle event to every window via
+   * WxSendIdleEventsRuntime and reports whether any of them asked for more.
+   */
+  virtual void OnIdle(wxEventRuntime& event);
+
+  /**
    * Address: 0x00993100 (FUN_00993100)
    * Mangled: ?DoMessage@wxApp@@UAE_NXZ
    *
