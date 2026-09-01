@@ -16059,16 +16059,18 @@ namespace moho
       const LuaPlus::LuaObject previousSync = SCR_Copy(mState->GetGlobal("Sync"), mState);
       mState->GetGlobals().SetObject("PreviousSync", previousSync);
 
-      // The binary takes the stream by reference and never checks it, because
-      // its `Sim::Sync` always publishes one. Ours is still a partial lift that
-      // leaves `mStream` null, so the deserialize is skipped until it does -
-      // otherwise every beat faults in `BinaryReader::Read`.
-      if (beat.mStream != nullptr) {
-        gpg::BinaryReader syncReader(beat.mStream);
-        LuaPlus::LuaObject currentSync;
-        currentSync.SCR_FromByteStream(currentSync, mState, &syncReader);
-        mState->GetGlobals().SetObject("Sync", currentSync);
-      }
+      // The binary takes the stream by reference and never checks it: every
+      // beat carries one, because `Sim::Sync` installs a fresh
+      // `MemBufferStream` before serialising the table into it. That tail was
+      // an unrecovered gap here, which left `mStream` null and forced a guard
+      // that skipped the deserialize on every single beat - the sim wrote the
+      // `Sync` table and the UI never saw any of it. The tail is recovered
+      // now and `Sim::Sync` is the only producer of an `SSyncData`, so the
+      // guard is dead and the unchecked binary shape is restored.
+      gpg::BinaryReader syncReader(beat.mStream);
+      LuaPlus::LuaObject currentSync;
+      currentSync.SCR_FromByteStream(currentSync, mState, &syncReader);
+      mState->GetGlobals().SetObject("Sync", currentSync);
     }
     (void)SCR_LuaDoString("OnSync()", mState);
 
