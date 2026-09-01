@@ -1934,7 +1934,28 @@ namespace gpg::core
      * `gpg/core/containers/FastVectorInsertLanes.cpp` -- a RULE ONE
      * hand-rolled duplicate of this exact free function under a raw-offset
      * `InlineQwordVectorWithTagRuntimeView` struct name; see
-     * `Vector.h`'s `push_back` citation for the full evidence chain.)
+     * `Vector.h`'s `push_back` citation for the full evidence chain.
+     *
+     * The cited binary match is byte-identical only because
+     * `SExtraUnitDataPair` is a trivially-destructible 8-byte POD -- for a
+     * trivial T, `delete[] p` and a raw `operator delete[](p)` call compile
+     * to the same instructions, so the two forms are indistinguishable in
+     * the decompile. They stop being equivalent the moment this template is
+     * instantiated with a non-trivially-destructible T: `new T[n]` then
+     * writes a 4-byte element-count cookie before the returned pointer, and
+     * only the `delete[]` expression knows to back up over that cookie
+     * before calling the deallocation function. A raw
+     * `operator delete[](vec.start_)` call frees `vec.start_` itself --
+     * base+4 relative to the true allocation -- corrupting the free list and
+     * later handing out a block that overlaps a live one. This exact shape
+     * (a raw `::operator delete[]` call freeing a `new T[]`'d buffer of a
+     * non-trivial-dtor T) is the confirmed root cause of a wild-free heap
+     * corruption traced and fixed elsewhere in the engine (`Unit.cpp`,
+     * `ClearWeaponInfoVectorAndRebindInline`, commit 3cd159aa). Delegating
+     * to the member `ResetStorageToInline()` (which already uses the
+     * `delete[]` expression via `ResetInline_()`) keeps this free function
+     * correct for every instantiation instead of only the one currently
+     * exercised.)
      *
      * What it does:
      * Releases heap-backed storage (if any) and restores inline storage pointers.
@@ -1942,17 +1963,7 @@ namespace gpg::core
     template <class T, std::size_t N>
     inline void ResetStorageToInline(FastVectorN<T, N>& vec) noexcept
     {
-      if (vec.start_ == vec.originalVec_) {
-        vec.end_ = vec.start_;
-        return;
-      }
-
-      if (vec.start_) {
-        ::operator delete[](vec.start_);
-      }
-      vec.start_ = vec.originalVec_;
-      vec.capacity_ = *reinterpret_cast<T**>(vec.start_);
-      vec.end_ = vec.start_;
+      vec.ResetStorageToInline();
     }
 
     /**
