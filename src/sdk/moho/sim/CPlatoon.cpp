@@ -797,21 +797,29 @@ namespace
     return unit && !unit->IsDead() && !unit->DestroyQueued();
   }
 
+  /**
+   * Address: 0x00724EE8 (FUN_00724EE8, inlined into Moho::CPlatoon::~CPlatoon
+   * at 0x00724EB0)
+   *
+   * What it does:
+   * Destroys and frees one owned `CSquad`. `CSquad` has no vtable (confirmed:
+   * the real binary calls `Moho::CSquad::~CSquad()` directly by symbol, not
+   * through any indirection) -- an earlier recovery of this function
+   * fabricated a vtable-slot-2 dispatch through `*(void***)squad`, which in
+   * fact reads `squad->mSim` (offset 0x00) as a fake vtable and calls
+   * whatever 8 bytes live at `mSim+0x08` as a function pointer whenever
+   * `mSim != nullptr` -- i.e. for essentially every live squad reaching this
+   * point. Matches the already-correct sibling call site at line ~1659 in
+   * this file.
+   */
   void DestroyOwnedSquad(moho::CSquad* const squad) noexcept
   {
     if (squad == nullptr) {
       return;
     }
 
-    auto** const vtable = *reinterpret_cast<void***>(squad);
-    if (vtable == nullptr || vtable[2] == nullptr) {
-      operator delete(squad);
-      return;
-    }
-
-    using DeletingDtor = void(__thiscall*)(void*, int);
-    const auto deletingDtor = reinterpret_cast<DeletingDtor>(vtable[2]);
-    deletingDtor(squad, 1);
+    squad->~CSquad();
+    ::operator delete(squad);
   }
 
   [[nodiscard]] float ReadSquaredRadiusArg(LuaPlus::LuaState* const state, const int stackIndex)
