@@ -237,6 +237,25 @@ namespace boost
             }
         }
 
+        /**
+         * Same reseat, but from a real `boost::shared_ptr<T>` owner.
+         *
+         * The engine stores some of these lanes as this raw mirror and others
+         * as the genuine vendored `shared_ptr`, and assigns freely between
+         * them -- `Sim::Sync` copying `STIMap::mHeightField` into the beat
+         * packet's `mTerrainUpdate` is one such site. boost keeps `px` and
+         * `pn` private, so the (px, pi) pair has to be read through the layout
+         * mirror this struct exists to provide; doing it here keeps the
+         * reinterpret inside the wrapper rather than at each call site.
+         */
+        void reset_from_owner(const ::boost::shared_ptr<T>& owner) noexcept {
+            static_assert(
+                sizeof(::boost::shared_ptr<T>) == sizeof(SharedPtrRaw<T>),
+                "boost::shared_ptr<T> must have the same (px, pi) layout as SharedPtrRaw<T>"
+            );
+            reset_from(reinterpret_cast<const SharedPtrRaw<T>&>(owner));
+        }
+
         [[nodiscard]] bool add_ref_lock() const noexcept {
             return pi != nullptr && pi->add_ref_lock();
         }

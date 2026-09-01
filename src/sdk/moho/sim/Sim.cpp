@@ -8735,6 +8735,15 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   }
   outSyncData->mFogOfWar = fogOfWar;
 
+  // The terrain the client renders. `sub_743180` in the decompile is the
+  // shared_ptr copy the compiler materialises for the assignment's right-hand
+  // side; the body after it is the inlined `operator=`. `DoBeat` feeds this
+  // straight to `terrainRes->SyncTerrain(beat.mTerrainUpdate.px)`, so leaving
+  // it unset handed the terrain renderer a null height field every beat.
+  if (mMapData != nullptr) {
+    outSyncData->mTerrainUpdate.reset_from_owner(mMapData->mHeightField);
+  }
+
   // The decompiled body here is the inlined `shared_ptr::operator=` -- copy the
   // pointer, add a reference to the incoming control block, release the
   // outgoing one. `reset_from` is that mechanic on the wrapper itself.
