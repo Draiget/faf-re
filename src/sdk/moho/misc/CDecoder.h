@@ -208,7 +208,7 @@ namespace moho
     /**
      * Address: 0x006E55C0 (FUN_006E55C0)
      */
-    void DecodeCells(gpg::BinaryReader& reader, gpg::core::FastVector<SOCellPos>& cells);
+    void DecodeCells(gpg::BinaryReader& reader, gpg::core::FastVectorN<SOCellPos, 2>& cells);
 
     /**
      * Address: 0x004A92A0 (FUN_004A92A0, func_StringSetFilename)
