@@ -1,5 +1,6 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptEvent.h"
@@ -405,6 +406,32 @@ namespace moho
   }
 
   /**
+   * Class-binder record at 0x00F59F1C (`.rdata`), the same table region as
+   * the other already-recovered class binders (e.g. `"moho.AimManipulator"`
+   * at 0x00F59A20). Its fields read:
+   *
+   *     name  0x00E269B4 -> "moho.CollisionBeamEntity"
+   *     group 0x00E269A0 -> "CollisionBeamEntity"
+   *     help  0x00E00779 -> ""
+   *
+   * What it does:
+   * Publishes `CScrLuaMetatableFactory<CollisionBeamEntity>`'s method table as
+   * `moho.CollisionBeamEntity`. `sim/CollisionBeam.lua:34` does
+   * `CollisionBeam = Class(moho.CollisionBeamEntity) { ... }` at module load
+   * time -- without this export that read is nil and the whole module fails
+   * to load, same failure family as the `moho.IEffect` gap this session
+   * already found and fixed (`f36336a0`).
+   */
+  CScrLuaInitForm* register_moho_CollisionBeamEntity_ClassBinder()
+  {
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.CollisionBeamEntity", &CScrLuaMetatableFactory<CollisionBeamEntity>::Instance(),
+      kCollisionBeamEntityClassName, ""
+    );
+    return &binder;
+  }
+
+  /**
    * Address: 0x00673F80 (FUN_00673F80, func_CollisionBeamEntitySetBeamFx_LuaFuncDef)
    *
    * What it does:
@@ -603,6 +630,7 @@ namespace
     CollisionBeamEntityLuaFunctionThunksLuaFuncDefBootstrap()
     {
       (void)::moho::func_CollisionBeamEntity__init_LuaFuncDef();
+      (void)::moho::register_moho_CollisionBeamEntity_ClassBinder();
       (void)::moho::func_CollisionBeamEntitySetBeamFx_LuaFuncDef();
       (void)::moho::func_CollisionBeamEntityDisable_LuaFuncDef();
       (void)::moho::func_CollisionBeamEntityEnable_LuaFuncDef();
