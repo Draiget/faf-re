@@ -14412,9 +14412,21 @@ namespace moho
     mSelection.mSize = 0;
     mSelection.mSizeMirrorOrUnused = 0;
 
-    CursorWorldPos.x = 0.0f;
-    CursorWorldPos.y = 0.0f;
-    CursorWorldPos.z = 0.0f;
+    // 0x00893160 line ~288-293: seeds the initial cursor world position from
+    // the map's own bounds midpoint, not the origin - matters because
+    // nothing else writes CursorWorldPos until the first real mouse-move
+    // event, so any UI/camera code reading it on the first frame otherwise
+    // sees world-origin instead of a point actually on the map.
+    if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
+      const Wm3::AxisAlignedBox3f mapBounds = stiMap->GetBounds3D();
+      CursorWorldPos.x = (mapBounds.Min.x + mapBounds.Max.x) * 0.5f;
+      CursorWorldPos.y = (mapBounds.Min.y + mapBounds.Max.y) * 0.5f;
+      CursorWorldPos.z = (mapBounds.Min.z + mapBounds.Max.z) * 0.5f;
+    } else {
+      CursorWorldPos.x = 0.0f;
+      CursorWorldPos.y = 0.0f;
+      CursorWorldPos.z = 0.0f;
+    }
     CursorScreenPos.x = 0.0f;
     CursorScreenPos.y = 0.0f;
     HighlightCommandId = -1;
