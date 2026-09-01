@@ -2790,62 +2790,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x008E8990 (FUN_008E8990, boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `TextureD3D9`.
-   */
-  SpCountedImplStorage<gpg::gal::TextureD3D9>* SpCountedImplPConstructTextureD3D9(
-    SpCountedImplStorage<gpg::gal::TextureD3D9>* const countedImpl,
-    gpg::gal::TextureD3D9* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x008E89C0 (FUN_008E89C0, boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for
-   * `RenderTargetD3D9`.
-   */
-  SpCountedImplStorage<gpg::gal::RenderTargetD3D9>* SpCountedImplPConstructRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::RenderTargetD3D9>* const countedImpl,
-    gpg::gal::RenderTargetD3D9* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x008E89F0 (FUN_008E89F0, boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for
-   * `CubeRenderTargetD3D9`.
-   */
-  SpCountedImplStorage<gpg::gal::CubeRenderTargetD3D9>* SpCountedImplPConstructCubeRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::CubeRenderTargetD3D9>* const countedImpl,
-    gpg::gal::CubeRenderTargetD3D9* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
    * Address: 0x008E8A20 (FUN_008E8A20, boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D9>::sp_counted_impl_p)
    *
    * What it does:
@@ -3777,34 +3721,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x008E8B20 (FUN_008E8B20)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `RenderTargetD3D9` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForRenderTargetD3D9(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForTextureD3D9(control);
-  }
-
-  /**
-   * Address: 0x008E8B30 (FUN_008E8B30)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `CubeRenderTargetD3D9` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForCubeRenderTargetD3D9(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForTextureD3D9(control);
-  }
-
-  /**
    * Address: 0x008E8B40 (FUN_008E8B40)
    *
    * What it does:
@@ -4637,48 +4553,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x008E9840 (FUN_008E9840, boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::dispose)
-   *
-   * What it does:
-   * Releases one owned `TextureD3D9` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeTextureD3D9(
-    SpCountedImplStorage<gpg::gal::TextureD3D9>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
-   * Address: 0x008E9850 (FUN_008E9850, boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::dispose)
-   *
-   * What it does:
-   * Releases one owned `RenderTargetD3D9` pointee through its
-   * scalar-deleting virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::RenderTargetD3D9>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
-   * Address: 0x008E9860 (FUN_008E9860, boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::dispose)
-   *
-   * What it does:
-   * Releases one owned `CubeRenderTargetD3D9` pointee through its
-   * scalar-deleting virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeCubeRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::CubeRenderTargetD3D9>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
    * Address: 0x008E9870 (FUN_008E9870, boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D9>::dispose)
    *
    * What it does:
@@ -5292,51 +5166,6 @@ namespace boost
    */
   SpCountedImplStorage<moho::UICommandGraph>* SpCountedImplPDeletingDtorUICommandGraph(
     SpCountedImplStorage<moho::UICommandGraph>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x008E98C0 (FUN_008E98C0, boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<gpg::gal::TextureD3D9>* SpCountedImplPDeletingDtorTextureD3D9(
-    SpCountedImplStorage<gpg::gal::TextureD3D9>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x008E98E0 (FUN_008E98E0, boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<gpg::gal::RenderTargetD3D9>* SpCountedImplPDeletingDtorRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::RenderTargetD3D9>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x008E9900 (FUN_008E9900, boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<gpg::gal::CubeRenderTargetD3D9>* SpCountedImplPDeletingDtorCubeRenderTargetD3D9(
-    SpCountedImplStorage<gpg::gal::CubeRenderTargetD3D9>* const countedImpl,
     const unsigned char deleteFlag
   ) noexcept
   {
@@ -6076,32 +5905,6 @@ namespace boost
    * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
    */
   void* SpCountedImplPGetDeleterNullUICommandGraph(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x008E89B0 (FUN_008E89B0, boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullTextureD3D9(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x008E89E0 (FUN_008E89E0, boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullRenderTargetD3D9(
     detail::sp_typeinfo const& requestedType
   ) noexcept
   {
