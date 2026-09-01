@@ -8641,6 +8641,22 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
         }
       }
 
+      // 0x00747B8x..: the focused army's stat tree goes out as `__ArmyStats`
+      // with the current tick stamped on it. Ground truth reads the root item
+      // as `*(StatItem **)(v68 + 4)` off the CArmyStats - that is
+      // `Stats<CArmyStatItem>::mItem` (+0x04, asserted in Stats.h), and
+      // CArmyStatItem derives from StatItem, so the read is a plain upcast.
+      if (mSyncArmy > -1 && static_cast<std::size_t>(mSyncArmy) < mArmiesList.size()) {
+        if (CArmyImpl* const syncArmy = mArmiesList[static_cast<std::size_t>(mSyncArmy)]; syncArmy != nullptr) {
+          if (CArmyStats* const armyStats = syncArmy->GetArmyStats(); armyStats != nullptr) {
+            LuaPlus::LuaObject armyStatsTable{};
+            STAT_GetLuaTable(mLuaState, armyStats->mItem, armyStatsTable);
+            armyStatsTable.SetInteger("Tick", static_cast<std::int32_t>(mCurTick));
+            syncTable.SetObject("__ArmyStats", armyStatsTable);
+          }
+        }
+      }
+
       if (!mCheaters.empty()) {
         LuaPlus::LuaObject cheaters(mLuaState);
         cheaters.AssignNewTable(mLuaState, static_cast<int>(mCheaters.size()), 0u);
@@ -8654,14 +8670,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     }
   }
 
-  // NOTE: ground truth also publishes `__ArmyStats` here, built from
-  // `mArmiesList[mSyncArmy]->GetArmyStats()` via `STAT_GetLuaTable` with a
-  // `Tick` field added. That one reads a `StatItem*` at `CArmyStats + 0x04`
-  // (`*(StatItem **)(v68 + 4)`), which is the `Stats<T>` root-item field -
-  // present on the `Stats<StatItem>` specialisation as `mItem` but absent from
-  // the primary `Stats<T>` template that `CArmyStats` actually derives from,
-  // and modelling it changes `CArmyStats`'s base layout. Left out deliberately
-  // rather than guessed at; it is a layout task on `Stats<T>`, not on Sim.
 
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
