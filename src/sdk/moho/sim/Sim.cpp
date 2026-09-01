@@ -8705,6 +8705,41 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     mDesyncs.swap(outSyncData->mDesyncs);
   }
 
+  // 0x0074820x onward: the remaining per-beat packet fields. `CWldSession::
+  // DoBeat` reads every one of these each beat -- `mPausedBy` into
+  // `mSessionPauseStateA`, `mFogOfWar` into `ren_FogOfWar`, `mSimResources`
+  // through `ReseatSharedLane` -- but nothing here wrote them, so they were
+  // pinned at their default-constructed values for the whole session.
+  //
+  //     (*dataPtr)->mPausedBy = this->mPausedBy;
+  //     (*dataPtr)->mGameOver = this->mGameOver;
+  //     if (mArmiesList non-empty)
+  //         v88 = mArmiesList[0]->GetReconDB()->ReconGetFogOfWar();
+  //     else v88 = 0;
+  //     (*dataPtr)->mFogOfWar = v88;
+  //     ... mTerrainUpdate ...
+  //     (*dataPtr)->mSimResources = this->mSimResources;
+  outSyncData->mPausedBy = mPausedByCommandSource;
+  outSyncData->mGameOver = mGameOver;
+
+  // Fog of war is read off the FIRST army only, not the focused one, and is
+  // false when there are no armies at all. `GetReconDB` is the virtual at
+  // vtable +0x20 that the binary dispatches through.
+  bool fogOfWar = false;
+  if (!mArmiesList.empty()) {
+    if (CArmyImpl* const firstArmy = mArmiesList[0]; firstArmy != nullptr) {
+      if (CAiReconDBImpl* const reconDb = firstArmy->GetReconDB(); reconDb != nullptr) {
+        fogOfWar = reconDb->ReconGetFogOfWar();
+      }
+    }
+  }
+  outSyncData->mFogOfWar = fogOfWar;
+
+  // The decompiled body here is the inlined `shared_ptr::operator=` -- copy the
+  // pointer, add a reference to the incoming control block, release the
+  // outgoing one. `reset_from` is that mechanic on the wrapper itself.
+  outSyncData->mSimResources.reset_from(mSimResources);
+
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
   // rules layer raised becomes the one the client is told about.
