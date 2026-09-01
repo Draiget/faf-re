@@ -22619,6 +22619,10 @@ void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std:
       // every frame with the camera stuck at viewport width=1).
       if (moho::CameraImpl* const camera = worldViewView->mCamera; camera != nullptr) {
         camera->CameraSetViewport(Wm3::Vector2f(left, top), Wm3::Vector2f(right - left, bottom - top));
+        gpg::Warnf(
+          "[MMDIAG] DoRender PUSHED this=%p isMiniMap=%d viewport=(%.1f,%.1f,%.1f,%.1f)",
+          static_cast<const void*>(this), static_cast<int>(this->IsMiniMap()), left, top, right - left, bottom - top
+        );
       }
     }
     return;
@@ -29743,6 +29747,42 @@ void moho::IN_BindKey(void* const commandArgs)
   }
 
   gUiKeyActionMap[static_cast<UiKeyMask>(parsedKeyMask)].assign_owned_strong(actionText.view());
+}
+
+/**
+ * Address: 0x0083A080 (FUN_0083A080, sub_83A080)
+ *
+ * IDA signature:
+ * void __cdecl sub_83A080(std::vector<std::string>* commandArgs);
+ *
+ * What it does:
+ * The `IN_SetKeyName` console command. Parses token 1 as a hex key code,
+ * rejects codes above 0xFF, then either renames `in_keyNames[keyCode]`
+ * (when token 2's name isn't already used by another key, checked
+ * case-insensitively via `IN_FindKeyNameIndexCi`) or reports the collision.
+ */
+void moho::IN_SetKeyName(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 3u) {
+    CON_Printf("Syntax: IN_SetKeyName keyCodeHex nameString");
+    return;
+  }
+
+  const msvc8::string* const keyCodeArg = args.At(1u);
+  const unsigned int keyCode = gpg::STR_Xtoi(keyCodeArg->c_str());
+  if (keyCode > 0xFFu) {
+    CON_Printf("Invalid key code %02X, must be between 0x00 and 0xFF", keyCode);
+    return;
+  }
+
+  const msvc8::string* const nameArg = args.At(2u);
+  if (IN_FindKeyNameIndexCi(*nameArg) == -1) {
+    in_keyNames[keyCode].assign_owned(std::string_view{nameArg->c_str(), nameArg->size()});
+    CON_Printf("Key code %02X name is %s", keyCode, in_keyNames[keyCode].c_str());
+  } else {
+    CON_Printf("Key name must be unique, %s already used", nameArg->c_str());
+  }
 }
 
 /**

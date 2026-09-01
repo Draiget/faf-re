@@ -4068,6 +4068,7 @@ namespace
   constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset one or more named cameras.";
   constexpr const char* kConsoleStartupConInBindKeyDescription =
     "Specify a key combo and a console command, binds console command to key";
+  constexpr const char* kConsoleStartupConInSetKeyNameDescription = "Set a key name to map to a key code";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -4144,6 +4145,7 @@ namespace
   CConFunc gCConFunc_ExecutePasteBuffer{};
   CConFunc gCConFunc_UI_ResetView{};
   CConFunc gCConFunc_IN_BindKey{};
+  CConFunc gCConFunc_IN_SetKeyName{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_ANI_DumpSkeleton{};
@@ -5060,6 +5062,35 @@ namespace moho
       "IN_BindKey",
       &moho::IN_BindKey,
       &cleanup_CConFunc_IN_BindKey
+    );
+  }
+
+  // Compiler-generated global cleanup lane for FUN_00BE48D0's atexit callee.
+  // The owning source construct is the typed CConFunc object registered
+  // below; no standalone engine behavior is attached to that artifact
+  // address.
+  void cleanup_CConFunc_IN_SetKeyName()
+  {
+    CleanupStartupConCommand(gCConFunc_IN_SetKeyName);
+  }
+
+  /**
+   * Address: 0x00BE48D0 (FUN_00BE48D0, register_CConFunc_IN_SetKeyName)
+   *
+   * What it does:
+   * Registers the `IN_SetKeyName` startup console callback with its exact
+   * command metadata (name and description confirmed from the registrar's
+   * stru_F5B1AC in the PE .data image) and schedules the generated
+   * command-object cleanup lane.
+   */
+  void register_CConFunc_IN_SetKeyName()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_IN_SetKeyName,
+      kConsoleStartupConInSetKeyNameDescription,
+      "IN_SetKeyName",
+      &moho::IN_SetKeyName,
+      &cleanup_CConFunc_IN_SetKeyName
     );
   }
 
@@ -6275,6 +6306,7 @@ namespace
       moho::register_CConFunc_CON_ExecuteLastCommand();
       moho::register_CConFunc_ANI_DumpSkeleton();
       moho::register_CConFunc_IN_BindKey();
+      moho::register_CConFunc_IN_SetKeyName();
       moho::register_console_command_buffer();
       moho::register_sConsoleOutputHandlers();
       moho::register_TConVar_con_TestVarBool();

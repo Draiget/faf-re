@@ -478,6 +478,15 @@ namespace moho
   void register_CConFunc_IN_BindKey();
 
   /**
+   * Address: 0x00BE48D0 (FUN_00BE48D0, register_CConFunc_IN_SetKeyName)
+   *
+   * What it does:
+   * Registers the `IN_SetKeyName` startup console callback with its exact
+   * command metadata and schedules the generated command-object cleanup lane.
+   */
+  void register_CConFunc_IN_SetKeyName();
+
+  /**
    * Address: 0x00BDF8D0 (FUN_00BDF8D0, register_CConFunc_ANI_DumpSkeleton)
    *
    * What it does:

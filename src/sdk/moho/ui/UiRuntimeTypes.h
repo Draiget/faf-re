@@ -1402,6 +1402,24 @@ namespace moho
   void IN_BindKey(void* commandArgs);
 
   /**
+   * Address: 0x0083A080 (FUN_0083A080, sub_83A080)
+   *
+   * IDA signature:
+   * void __cdecl sub_83A080(std::vector<std::string>* commandArgs);
+   *
+   * What it does:
+   * The `IN_SetKeyName` console command ("Set a key name to map to a key
+   * code", per the PE .data image at the registrar's stru_F5B1AC). Parses
+   * token 1 as a hex key code, rejects codes above 0xFF, then either renames
+   * `in_keyNames[keyCode]` (when token 2's name isn't already used by
+   * another key) or reports the name collision.
+   * `register_CConFunc_IN_SetKeyName` (0x00BE48D0) takes this function's
+   * address when it registers the command, which is why the declaration
+   * has to be visible from `CConCommand.cpp`.
+   */
+  void IN_SetKeyName(void* commandArgs);
+
+  /**
    * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
    *
    * What it does:
