@@ -924,11 +924,26 @@ namespace moho
     const double now = gpg::time::GetSystemTimer().ElapsedSeconds();
 
     if (tick % 5 == 0) {
-      mGeneratorCache.clear();
+      // CollectInView takes the base gpg::fastvector<T>& and does an
+      // unconditional delete[] when it needs to grow (FastVector::Reserve
+      // has no originalVec_ to check). mGeneratorCache is a
+      // FastVectorN<WaveGenerator*,100> - member storage, not a stack
+      // local, but still SBO'd - so reinterpret_cast'ing it down to the
+      // base type let the tree walk delete[] the inline buffer the moment
+      // more than 100 generators are in view, corrupting this WaveSystem's
+      // own field the same way CDecoder::DecodeCells corrupted a caller's
+      // stack (00d79258). Collect into a genuinely heap-backed local
+      // instead and copy the results in.
+      gpg::fastvector<UserEntity*> collectedInView{};
       mSpatialMeshInstance.CollectInView(
         const_cast<GeomCamera3*>(&camera),
-        reinterpret_cast<gpg::fastvector<UserEntity*>&>(mGeneratorCache),
+        collectedInView,
         static_cast<EEntityType>(ENTITYTYPE_Entity));
+
+      mGeneratorCache.clear();
+      for (UserEntity* const entity : collectedInView) {
+        mGeneratorCache.push_back(reinterpret_cast<WaveGenerator*>(entity));
+      }
     }
 
     for (WaveGenerator** it = mGeneratorCache.begin(); it != mGeneratorCache.end(); ++it) {
