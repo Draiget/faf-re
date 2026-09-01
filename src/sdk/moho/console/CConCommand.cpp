@@ -7709,3 +7709,718 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsCam gConsoleStartupRegistrationsCam;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupDbgMetronomeDescription = "Tick a metronome every tick.";
+  constexpr const char* kConsoleStartupDbgMonitorAddressSpaceDescription = "If true, monitor address space usage.";
+  constexpr const char* kConsoleStartupDebugMovieDescription = "debug movie output";
+  constexpr const char* kConsoleStartupDumpRateDescription = "Frame rate to use for movie dumps";
+  constexpr const char* kConsoleStartupDumpOutputFrameNumberDescription = "Starting frame to dump on";
+  constexpr const char* kConsoleStartupEdEnableHookDescription = "ed_EnableHook tuning value.";
+  constexpr const char* kConsoleStartupEfxWaveCutoffDescription = "Shoreline LOD cutoff";
+  constexpr const char* kConsoleStartupFogDistanceFogDescription = "Distance fog enabled?";
+  constexpr const char* kConsoleStartupFogOffsetMultiplierDescription = "amount to fudge offset by to make fog go away as we zoom out";
+  constexpr const char* kConsoleStartupScFrameTimeClampDescription = "Minimum time between frames, in milliseconds";
+  constexpr const char* kConsoleStartupScSkipIntroDescription = "Skip intro movies";
+  constexpr const char* kConsoleStartupSndCheckDistanceDescription = "Do distance checks for sound culling.";
+  constexpr const char* kConsoleStartupSndCheckLOSDescription = "Do LOS checks for sound culling.";
+  constexpr const char* kConsoleStartupSndSpewSoundDescription = "Spew debug sound info";
+  constexpr const char* kConsoleStartupWldRunWithTheWindDescription = "If true, run beats as fast as we can.";
+  constexpr const char* kConsoleStartupWldSkewRateAdjustBaseDescription = "How much to adjust the sim rate based on one beat of skew.";
+  constexpr const char* kConsoleStartupWldSkewRateAdjustMaxDescription = "Max amount to adjust the sim rate due to skew.";
+  constexpr const char* kConsoleStartupWndDefaultCreateHeightDescription = "Minimum initial window height";
+  constexpr const char* kConsoleStartupWndDefaultCreateWidthDescription = "Minimum initial window width";
+  constexpr const char* kConsoleStartupWndMinCmdLineHeightDescription = "Minimum command line height";
+  constexpr const char* kConsoleStartupWndMinCmdLineWidthDescription = "Minimum command line width";
+  constexpr const char* kConsoleStartupWndMinDragHeightDescription = "Minimum drag-resize height";
+  constexpr const char* kConsoleStartupWndMinDragWidthDescription = "Minimum drag-resize width";
+} // namespace
+
+// New console-tunable storage with no other subsystem owner (default read from the
+// binary's .data image at the registrar's value-pointer field).
+bool moho::dbg_MonitorAddressSpace = false;
+float moho::dump_Rate = 30.0f;
+float moho::efx_WaveCutoff = 400.0f;
+float moho::sc_FrameTimeClamp = 10.0f;
+bool moho::sc_SkipIntro = false;
+
+namespace moho
+{
+  extern bool dbg_Metronome;
+  extern bool debug_movie;
+  extern int dump_outputFrameNumber;
+  extern bool ed_EnableHook;
+  extern bool fog_DistanceFog;
+  extern float fog_OffsetMultiplier;
+  extern bool snd_CheckDistance;
+  extern bool snd_CheckLOS;
+  extern bool snd_SpewSound;
+  extern bool wld_RunWithTheWind;
+  extern float wld_SkewRateAdjustBase;
+  extern float wld_SkewRateAdjustMax;
+  extern int wnd_DefaultCreateHeight;
+  extern int wnd_DefaultCreateWidth;
+  extern int wnd_MinCmdLineHeight;
+  extern int wnd_MinCmdLineWidth;
+  extern int wnd_MinDragHeight;
+  extern int wnd_MinDragWidth;
+
+  TConVar<bool> gTConVar_dbg_Metronome(
+    "dbg_Metronome",
+    kConsoleStartupDbgMetronomeDescription,
+    &moho::dbg_Metronome
+  );
+  TConVar<bool> gTConVar_dbg_MonitorAddressSpace(
+    "dbg_MonitorAddressSpace",
+    kConsoleStartupDbgMonitorAddressSpaceDescription,
+    &moho::dbg_MonitorAddressSpace
+  );
+  TConVar<bool> gTConVar_debug_movie(
+    "debug_movie",
+    kConsoleStartupDebugMovieDescription,
+    &moho::debug_movie
+  );
+  TConVar<float> gTConVar_dump_Rate(
+    "dump_Rate",
+    kConsoleStartupDumpRateDescription,
+    &moho::dump_Rate
+  );
+  TConVar<int> gTConVar_dump_outputFrameNumber(
+    "dump_outputFrameNumber",
+    kConsoleStartupDumpOutputFrameNumberDescription,
+    &moho::dump_outputFrameNumber
+  );
+  TConVar<bool> gTConVar_ed_EnableHook(
+    "ed_EnableHook",
+    kConsoleStartupEdEnableHookDescription,
+    &moho::ed_EnableHook
+  );
+  TConVar<float> gTConVar_efx_WaveCutoff(
+    "efx_WaveCutoff",
+    kConsoleStartupEfxWaveCutoffDescription,
+    &moho::efx_WaveCutoff
+  );
+  TConVar<bool> gTConVar_fog_DistanceFog(
+    "fog_DistanceFog",
+    kConsoleStartupFogDistanceFogDescription,
+    &moho::fog_DistanceFog
+  );
+  TConVar<float> gTConVar_fog_OffsetMultiplier(
+    "fog_OffsetMultiplier",
+    kConsoleStartupFogOffsetMultiplierDescription,
+    &moho::fog_OffsetMultiplier
+  );
+  TConVar<float> gTConVar_sc_FrameTimeClamp(
+    "sc_FrameTimeClamp",
+    kConsoleStartupScFrameTimeClampDescription,
+    &moho::sc_FrameTimeClamp
+  );
+  TConVar<bool> gTConVar_sc_SkipIntro(
+    "sc_SkipIntro",
+    kConsoleStartupScSkipIntroDescription,
+    &moho::sc_SkipIntro
+  );
+  TConVar<bool> gTConVar_snd_CheckDistance(
+    "snd_CheckDistance",
+    kConsoleStartupSndCheckDistanceDescription,
+    &moho::snd_CheckDistance
+  );
+  TConVar<bool> gTConVar_snd_CheckLOS(
+    "snd_CheckLOS",
+    kConsoleStartupSndCheckLOSDescription,
+    &moho::snd_CheckLOS
+  );
+  TConVar<bool> gTConVar_snd_SpewSound(
+    "snd_SpewSound",
+    kConsoleStartupSndSpewSoundDescription,
+    &moho::snd_SpewSound
+  );
+  TConVar<bool> gTConVar_wld_RunWithTheWind(
+    "wld_RunWithTheWind",
+    kConsoleStartupWldRunWithTheWindDescription,
+    &moho::wld_RunWithTheWind
+  );
+  TConVar<float> gTConVar_wld_SkewRateAdjustBase(
+    "wld_SkewRateAdjustBase",
+    kConsoleStartupWldSkewRateAdjustBaseDescription,
+    &moho::wld_SkewRateAdjustBase
+  );
+  TConVar<float> gTConVar_wld_SkewRateAdjustMax(
+    "wld_SkewRateAdjustMax",
+    kConsoleStartupWldSkewRateAdjustMaxDescription,
+    &moho::wld_SkewRateAdjustMax
+  );
+  TConVar<int> gTConVar_wnd_DefaultCreateHeight(
+    "wnd_DefaultCreateHeight",
+    kConsoleStartupWndDefaultCreateHeightDescription,
+    &moho::wnd_DefaultCreateHeight
+  );
+  TConVar<int> gTConVar_wnd_DefaultCreateWidth(
+    "wnd_DefaultCreateWidth",
+    kConsoleStartupWndDefaultCreateWidthDescription,
+    &moho::wnd_DefaultCreateWidth
+  );
+  TConVar<int> gTConVar_wnd_MinCmdLineHeight(
+    "wnd_MinCmdLineHeight",
+    kConsoleStartupWndMinCmdLineHeightDescription,
+    &moho::wnd_MinCmdLineHeight
+  );
+  TConVar<int> gTConVar_wnd_MinCmdLineWidth(
+    "wnd_MinCmdLineWidth",
+    kConsoleStartupWndMinCmdLineWidthDescription,
+    &moho::wnd_MinCmdLineWidth
+  );
+  TConVar<int> gTConVar_wnd_MinDragHeight(
+    "wnd_MinDragHeight",
+    kConsoleStartupWndMinDragHeightDescription,
+    &moho::wnd_MinDragHeight
+  );
+  TConVar<int> gTConVar_wnd_MinDragWidth(
+    "wnd_MinDragWidth",
+    kConsoleStartupWndMinDragWidthDescription,
+    &moho::wnd_MinDragWidth
+  );
+
+  /**
+   * Address: 0x00C08160 (FUN_00C08160, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `dbg_Metronome`.
+   */
+  void cleanup_TConVar_dbg_Metronome()
+  {
+    CleanupStartupConCommand(gTConVar_dbg_Metronome);
+  }
+
+  /**
+   * Address: 0x00BE76F0 (FUN_00BE76F0, register_TConVar_dbg_Metronome)
+   *
+   * What it does:
+   * Registers startup convar for `dbg_Metronome`.
+   */
+  void register_TConVar_dbg_Metronome()
+  {
+    RegisterStartupConVar(gTConVar_dbg_Metronome, &cleanup_TConVar_dbg_Metronome);
+  }
+
+  /**
+   * Address: 0x00C08C10 (FUN_00C08C10, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `dbg_MonitorAddressSpace`.
+   */
+  void cleanup_TConVar_dbg_MonitorAddressSpace()
+  {
+    CleanupStartupConCommand(gTConVar_dbg_MonitorAddressSpace);
+  }
+
+  /**
+   * Address: 0x00BE8F60 (FUN_00BE8F60, register_TConVar_dbg_MonitorAddressSpace)
+   *
+   * What it does:
+   * Registers startup convar for `dbg_MonitorAddressSpace`.
+   */
+  void register_TConVar_dbg_MonitorAddressSpace()
+  {
+    RegisterStartupConVar(gTConVar_dbg_MonitorAddressSpace, &cleanup_TConVar_dbg_MonitorAddressSpace);
+  }
+
+  /**
+   * Address: 0x00C07B10 (FUN_00C07B10, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `debug_movie`.
+   */
+  void cleanup_TConVar_debug_movie()
+  {
+    CleanupStartupConCommand(gTConVar_debug_movie);
+  }
+
+  /**
+   * Address: 0x00BE6C40 (FUN_00BE6C40, register_TConVar_debug_movie)
+   *
+   * What it does:
+   * Registers startup convar for `debug_movie`.
+   */
+  void register_TConVar_debug_movie()
+  {
+    RegisterStartupConVar(gTConVar_debug_movie, &cleanup_TConVar_debug_movie);
+  }
+
+  /**
+   * Address: 0x00C04210 (FUN_00C04210, ??1TConVar_dump_Rate@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `dump_Rate`.
+   */
+  void cleanup_TConVar_dump_Rate()
+  {
+    CleanupStartupConCommand(gTConVar_dump_Rate);
+  }
+
+  /**
+   * Address: 0x00BE0F10 (FUN_00BE0F10, register_TConVar_dump_Rate)
+   *
+   * What it does:
+   * Registers startup convar for `dump_Rate`.
+   */
+  void register_TConVar_dump_Rate()
+  {
+    RegisterStartupConVar(gTConVar_dump_Rate, &cleanup_TConVar_dump_Rate);
+  }
+
+  /**
+   * Address: 0x00C041E0 (FUN_00C041E0, ??1TConVar_dump_outputFrameNumber@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `dump_outputFrameNumber`.
+   */
+  void cleanup_TConVar_dump_outputFrameNumber()
+  {
+    CleanupStartupConCommand(gTConVar_dump_outputFrameNumber);
+  }
+
+  /**
+   * Address: 0x00BE0ED0 (FUN_00BE0ED0, register_TConVar_dump_outputFrameNumber)
+   *
+   * What it does:
+   * Registers startup convar for `dump_outputFrameNumber`.
+   */
+  void register_TConVar_dump_outputFrameNumber()
+  {
+    RegisterStartupConVar(gTConVar_dump_outputFrameNumber, &cleanup_TConVar_dump_outputFrameNumber);
+  }
+
+  /**
+   * Address: 0x00C04990 (FUN_00C04990, ??1TConVar_ed_EnableHook@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ed_EnableHook`.
+   */
+  void cleanup_TConVar_ed_EnableHook()
+  {
+    CleanupStartupConCommand(gTConVar_ed_EnableHook);
+  }
+
+  /**
+   * Address: 0x00BE1A10 (FUN_00BE1A10, register_TConVar_ed_EnableHook)
+   *
+   * What it does:
+   * Registers startup convar for `ed_EnableHook`.
+   */
+  void register_TConVar_ed_EnableHook()
+  {
+    RegisterStartupConVar(gTConVar_ed_EnableHook, &cleanup_TConVar_ed_EnableHook);
+  }
+
+  /**
+   * Address: 0x00C07E60 (FUN_00C07E60, ??1TConVar_efx_WaveCutoff@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `efx_WaveCutoff`.
+   */
+  void cleanup_TConVar_efx_WaveCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_efx_WaveCutoff);
+  }
+
+  /**
+   * Address: 0x00BE71B0 (FUN_00BE71B0, register_TConVar_efx_WaveCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `efx_WaveCutoff`.
+   */
+  void register_TConVar_efx_WaveCutoff()
+  {
+    RegisterStartupConVar(gTConVar_efx_WaveCutoff, &cleanup_TConVar_efx_WaveCutoff);
+  }
+
+  /**
+   * Address: 0x00C04720 (FUN_00C04720, ??1TConVar_fog_DistanceFog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `fog_DistanceFog`.
+   */
+  void cleanup_TConVar_fog_DistanceFog()
+  {
+    CleanupStartupConCommand(gTConVar_fog_DistanceFog);
+  }
+
+  /**
+   * Address: 0x00BE16D0 (FUN_00BE16D0, register_TConVar_fog_DistanceFog)
+   *
+   * What it does:
+   * Registers startup convar for `fog_DistanceFog`.
+   */
+  void register_TConVar_fog_DistanceFog()
+  {
+    RegisterStartupConVar(gTConVar_fog_DistanceFog, &cleanup_TConVar_fog_DistanceFog);
+  }
+
+  /**
+   * Address: 0x00C04B10 (FUN_00C04B10, ??1TConVar_fog_OffsetMultiplier@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `fog_OffsetMultiplier`.
+   */
+  void cleanup_TConVar_fog_OffsetMultiplier()
+  {
+    CleanupStartupConCommand(gTConVar_fog_OffsetMultiplier);
+  }
+
+  /**
+   * Address: 0x00BE1C10 (FUN_00BE1C10, register_TConVar_fog_OffsetMultiplier)
+   *
+   * What it does:
+   * Registers startup convar for `fog_OffsetMultiplier`.
+   */
+  void register_TConVar_fog_OffsetMultiplier()
+  {
+    RegisterStartupConVar(gTConVar_fog_OffsetMultiplier, &cleanup_TConVar_fog_OffsetMultiplier);
+  }
+
+  /**
+   * Address: 0x00C08AC0 (FUN_00C08AC0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sc_FrameTimeClamp`.
+   */
+  void cleanup_TConVar_sc_FrameTimeClamp()
+  {
+    CleanupStartupConCommand(gTConVar_sc_FrameTimeClamp);
+  }
+
+  /**
+   * Address: 0x00BE8DA0 (FUN_00BE8DA0, register_TConVar_sc_FrameTimeClamp)
+   *
+   * What it does:
+   * Registers startup convar for `sc_FrameTimeClamp`.
+   */
+  void register_TConVar_sc_FrameTimeClamp()
+  {
+    RegisterStartupConVar(gTConVar_sc_FrameTimeClamp, &cleanup_TConVar_sc_FrameTimeClamp);
+  }
+
+  /**
+   * Address: 0x00C08A90 (FUN_00C08A90, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `sc_SkipIntro`.
+   */
+  void cleanup_TConVar_sc_SkipIntro()
+  {
+    CleanupStartupConCommand(gTConVar_sc_SkipIntro);
+  }
+
+  /**
+   * Address: 0x00BE8D60 (FUN_00BE8D60, register_TConVar_sc_SkipIntro)
+   *
+   * What it does:
+   * Registers startup convar for `sc_SkipIntro`.
+   */
+  void register_TConVar_sc_SkipIntro()
+  {
+    RegisterStartupConVar(gTConVar_sc_SkipIntro, &cleanup_TConVar_sc_SkipIntro);
+  }
+
+  /**
+   * Address: 0x00C08520 (FUN_00C08520, ??1TConVar_snd_CheckDistance@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `snd_CheckDistance`.
+   */
+  void cleanup_TConVar_snd_CheckDistance()
+  {
+    CleanupStartupConCommand(gTConVar_snd_CheckDistance);
+  }
+
+  /**
+   * Address: 0x00BE7E40 (FUN_00BE7E40, register_TConVar_snd_CheckDistance)
+   *
+   * What it does:
+   * Registers startup convar for `snd_CheckDistance`.
+   */
+  void register_TConVar_snd_CheckDistance()
+  {
+    RegisterStartupConVar(gTConVar_snd_CheckDistance, &cleanup_TConVar_snd_CheckDistance);
+  }
+
+  /**
+   * Address: 0x00C08550 (FUN_00C08550, ??1TConVar_snd_CheckLOS@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `snd_CheckLOS`.
+   */
+  void cleanup_TConVar_snd_CheckLOS()
+  {
+    CleanupStartupConCommand(gTConVar_snd_CheckLOS);
+  }
+
+  /**
+   * Address: 0x00BE7E80 (FUN_00BE7E80, register_TConVar_snd_CheckLOS)
+   *
+   * What it does:
+   * Registers startup convar for `snd_CheckLOS`.
+   */
+  void register_TConVar_snd_CheckLOS()
+  {
+    RegisterStartupConVar(gTConVar_snd_CheckLOS, &cleanup_TConVar_snd_CheckLOS);
+  }
+
+  /**
+   * Address: 0x00C08580 (FUN_00C08580, ??1TConVar_snd_SpewSound@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `snd_SpewSound`.
+   */
+  void cleanup_TConVar_snd_SpewSound()
+  {
+    CleanupStartupConCommand(gTConVar_snd_SpewSound);
+  }
+
+  /**
+   * Address: 0x00BE7EC0 (FUN_00BE7EC0, register_TConVar_snd_SpewSound)
+   *
+   * What it does:
+   * Registers startup convar for `snd_SpewSound`.
+   */
+  void register_TConVar_snd_SpewSound()
+  {
+    RegisterStartupConVar(gTConVar_snd_SpewSound, &cleanup_TConVar_snd_SpewSound);
+  }
+
+  /**
+   * Address: 0x00C08190 (FUN_00C08190, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wld_RunWithTheWind`.
+   */
+  void cleanup_TConVar_wld_RunWithTheWind()
+  {
+    CleanupStartupConCommand(gTConVar_wld_RunWithTheWind);
+  }
+
+  /**
+   * Address: 0x00BE7730 (FUN_00BE7730, register_TConVar_wld_RunWithTheWind)
+   *
+   * What it does:
+   * Registers startup convar for `wld_RunWithTheWind`.
+   */
+  void register_TConVar_wld_RunWithTheWind()
+  {
+    RegisterStartupConVar(gTConVar_wld_RunWithTheWind, &cleanup_TConVar_wld_RunWithTheWind);
+  }
+
+  /**
+   * Address: 0x00C07F00 (FUN_00C07F00, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wld_SkewRateAdjustBase`.
+   */
+  void cleanup_TConVar_wld_SkewRateAdjustBase()
+  {
+    CleanupStartupConCommand(gTConVar_wld_SkewRateAdjustBase);
+  }
+
+  /**
+   * Address: 0x00BE7290 (FUN_00BE7290, register_TConVar_wld_SkewRateAdjustBase)
+   *
+   * What it does:
+   * Registers startup convar for `wld_SkewRateAdjustBase`.
+   */
+  void register_TConVar_wld_SkewRateAdjustBase()
+  {
+    RegisterStartupConVar(gTConVar_wld_SkewRateAdjustBase, &cleanup_TConVar_wld_SkewRateAdjustBase);
+  }
+
+  /**
+   * Address: 0x00C07F30 (FUN_00C07F30, ??1TConVar_wld_SkewRateAdjustMax@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wld_SkewRateAdjustMax`.
+   */
+  void cleanup_TConVar_wld_SkewRateAdjustMax()
+  {
+    CleanupStartupConCommand(gTConVar_wld_SkewRateAdjustMax);
+  }
+
+  /**
+   * Address: 0x00BE72D0 (FUN_00BE72D0, register_TConVar_wld_SkewRateAdjustMax)
+   *
+   * What it does:
+   * Registers startup convar for `wld_SkewRateAdjustMax`.
+   */
+  void register_TConVar_wld_SkewRateAdjustMax()
+  {
+    RegisterStartupConVar(gTConVar_wld_SkewRateAdjustMax, &cleanup_TConVar_wld_SkewRateAdjustMax);
+  }
+
+  /**
+   * Address: 0x00C08BE0 (FUN_00C08BE0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_DefaultCreateHeight`.
+   */
+  void cleanup_TConVar_wnd_DefaultCreateHeight()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_DefaultCreateHeight);
+  }
+
+  /**
+   * Address: 0x00BE8F20 (FUN_00BE8F20, register_TConVar_wnd_DefaultCreateHeight)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_DefaultCreateHeight`.
+   */
+  void register_TConVar_wnd_DefaultCreateHeight()
+  {
+    RegisterStartupConVar(gTConVar_wnd_DefaultCreateHeight, &cleanup_TConVar_wnd_DefaultCreateHeight);
+  }
+
+  /**
+   * Address: 0x00C08BB0 (FUN_00C08BB0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_DefaultCreateWidth`.
+   */
+  void cleanup_TConVar_wnd_DefaultCreateWidth()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_DefaultCreateWidth);
+  }
+
+  /**
+   * Address: 0x00BE8EE0 (FUN_00BE8EE0, register_TConVar_wnd_DefaultCreateWidth)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_DefaultCreateWidth`.
+   */
+  void register_TConVar_wnd_DefaultCreateWidth()
+  {
+    RegisterStartupConVar(gTConVar_wnd_DefaultCreateWidth, &cleanup_TConVar_wnd_DefaultCreateWidth);
+  }
+
+  /**
+   * Address: 0x00C08B20 (FUN_00C08B20, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_MinCmdLineHeight`.
+   */
+  void cleanup_TConVar_wnd_MinCmdLineHeight()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_MinCmdLineHeight);
+  }
+
+  /**
+   * Address: 0x00BE8E20 (FUN_00BE8E20, register_TConVar_wnd_MinCmdLineHeight)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_MinCmdLineHeight`.
+   */
+  void register_TConVar_wnd_MinCmdLineHeight()
+  {
+    RegisterStartupConVar(gTConVar_wnd_MinCmdLineHeight, &cleanup_TConVar_wnd_MinCmdLineHeight);
+  }
+
+  /**
+   * Address: 0x00C08AF0 (FUN_00C08AF0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_MinCmdLineWidth`.
+   */
+  void cleanup_TConVar_wnd_MinCmdLineWidth()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_MinCmdLineWidth);
+  }
+
+  /**
+   * Address: 0x00BE8DE0 (FUN_00BE8DE0, register_TConVar_wnd_MinCmdLineWidth)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_MinCmdLineWidth`.
+   */
+  void register_TConVar_wnd_MinCmdLineWidth()
+  {
+    RegisterStartupConVar(gTConVar_wnd_MinCmdLineWidth, &cleanup_TConVar_wnd_MinCmdLineWidth);
+  }
+
+  /**
+   * Address: 0x00C08B80 (FUN_00C08B80, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_MinDragHeight`.
+   */
+  void cleanup_TConVar_wnd_MinDragHeight()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_MinDragHeight);
+  }
+
+  /**
+   * Address: 0x00BE8EA0 (FUN_00BE8EA0, register_TConVar_wnd_MinDragHeight)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_MinDragHeight`.
+   */
+  void register_TConVar_wnd_MinDragHeight()
+  {
+    RegisterStartupConVar(gTConVar_wnd_MinDragHeight, &cleanup_TConVar_wnd_MinDragHeight);
+  }
+
+  /**
+   * Address: 0x00C08B50 (FUN_00C08B50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `wnd_MinDragWidth`.
+   */
+  void cleanup_TConVar_wnd_MinDragWidth()
+  {
+    CleanupStartupConCommand(gTConVar_wnd_MinDragWidth);
+  }
+
+  /**
+   * Address: 0x00BE8E60 (FUN_00BE8E60, register_TConVar_wnd_MinDragWidth)
+   *
+   * What it does:
+   * Registers startup convar for `wnd_MinDragWidth`.
+   */
+  void register_TConVar_wnd_MinDragWidth()
+  {
+    RegisterStartupConVar(gTConVar_wnd_MinDragWidth, &cleanup_TConVar_wnd_MinDragWidth);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsMisc
+  {
+    ConsoleStartupRegistrationsMisc()
+    {
+      moho::register_TConVar_dbg_Metronome();
+      moho::register_TConVar_dbg_MonitorAddressSpace();
+      moho::register_TConVar_debug_movie();
+      moho::register_TConVar_dump_Rate();
+      moho::register_TConVar_dump_outputFrameNumber();
+      moho::register_TConVar_ed_EnableHook();
+      moho::register_TConVar_efx_WaveCutoff();
+      moho::register_TConVar_fog_DistanceFog();
+      moho::register_TConVar_fog_OffsetMultiplier();
+      moho::register_TConVar_sc_FrameTimeClamp();
+      moho::register_TConVar_sc_SkipIntro();
+      moho::register_TConVar_snd_CheckDistance();
+      moho::register_TConVar_snd_CheckLOS();
+      moho::register_TConVar_snd_SpewSound();
+      moho::register_TConVar_wld_RunWithTheWind();
+      moho::register_TConVar_wld_SkewRateAdjustBase();
+      moho::register_TConVar_wld_SkewRateAdjustMax();
+      moho::register_TConVar_wnd_DefaultCreateHeight();
+      moho::register_TConVar_wnd_DefaultCreateWidth();
+      moho::register_TConVar_wnd_MinCmdLineHeight();
+      moho::register_TConVar_wnd_MinCmdLineWidth();
+      moho::register_TConVar_wnd_MinDragHeight();
+      moho::register_TConVar_wnd_MinDragWidth();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsMisc gConsoleStartupRegistrationsMisc;
+} // namespace
