@@ -529,6 +529,19 @@ namespace
      */
     ~RManyToOneListenerProjectileImpactTypeInfo() override;
 
+    /**
+     * Address: 0x0069EA30 (FUN_0069EA30, Moho::RManyListenerRType_EProjectileImpactEvent::GetName)
+     *
+     * What it does:
+     * The binary lazily builds this string once via a function-local static
+     * guard (`gpg::STR_Printf("ManyToOneListener<%s>", elementTypeName)`
+     * against the reflected `EProjectileImpactEvent` enum's own
+     * `RType::GetName()`) and registers its teardown with `atexit`, mirroring
+     * the sibling broadcaster's `GetName` above (0x0069E970). Since the
+     * formatted result is always this exact literal for this instantiation,
+     * returning the constant string is behaviorally equivalent for every
+     * caller.
+     */
     [[nodiscard]] const char* GetName() const override
     {
       return "ManyToOneListener<EProjectileImpactEvent>";
