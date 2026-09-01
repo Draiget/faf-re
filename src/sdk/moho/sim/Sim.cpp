@@ -4124,6 +4124,20 @@ namespace
     DestroyCommandIssueWeakSet(event.entitySet);
   }
 
+  /**
+   * Address: 0x008B56F0 (FUN_008B56F0, sub_8B56F0)
+   *
+   * What it does:
+   * Copy-constructs one command-issue local queue event: command id and event
+   * type by value, the weak-set entity payload via CopyCommandIssueWeakSet,
+   * count, target, and the inline cell-vector lanes via
+   * gpg::FastVectorN2RebindAndCopy. Reached unconditionally from
+   * EnqueueCommandIssueUpdateEvent (0x008B4E80) once that function has
+   * already guaranteed the destination slot is non-null -- the binary's
+   * sub_8B52C0 null-check wrapper around this body is therefore always-true
+   * at its only real call site and is correctly elided here rather than
+   * modeled as a separate function.
+   */
   void CopyCommandIssueUpdateEvent(
     CommandIssueUpdateEventRuntimeView& destination,
     const CommandIssueUpdateEventRuntimeView& source
