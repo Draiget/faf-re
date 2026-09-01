@@ -14518,6 +14518,23 @@ namespace moho
       }
     }
 
+    // 0x00893160 line ~324-326 (" CWldSession create 5" -> "create 6"): the
+    // global MeshRenderer singleton's own spatial db gets resized to the
+    // same map dimensions right after the session's. Ground truth's
+    // Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance(height,
+    // &Instance->bd, width) is the SAME 0x00501F50 body as the call above,
+    // already recovered and NAMED (not orphaned as a raw constructor) as
+    // MeshRenderer::UpdateMapSize(width, height) (Mesh.cpp:5992, address
+    // 0x007DF510) - a real, fully-recovered method with zero callers
+    // anywhere in src/sdk until this one.
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) {
+      if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
+        if (const CHeightField* const heightField = stiMap->mHeightField.get(); heightField != nullptr) {
+          MeshRenderer::GetInstance()->UpdateMapSize(heightField->Width() - 1, heightField->Height() - 1);
+        }
+      }
+    }
+
     gActiveWldSession = this;
   }
 
