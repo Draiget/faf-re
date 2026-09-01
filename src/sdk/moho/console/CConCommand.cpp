@@ -10489,3 +10489,2458 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsUiTuning gConsoleStartupRegistrationsUiTuning;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupRenBandwidthDisplayKernelDescription = "Width of bandwidth filter (in seconds).";
+  constexpr const char* kConsoleStartupRenBandwidthDisplaySecondsDescription = "Number of seconds of bandwidth data to display.";
+  constexpr const char* kConsoleStartupRenBgLowerBoundDescription = "ren_BgLowerBound tuning value.";
+  constexpr const char* kConsoleStartupRenBloomDescription = "Render Blooms?";
+  constexpr const char* kConsoleStartupRenBloomBlurCountDescription = "Bloom Blur Count";
+  constexpr const char* kConsoleStartupRenBloomBlurKernelScaleDescription = "Amount to scale blurred amount by.";
+  constexpr const char* kConsoleStartupRenBloomGlowCopyScaleDescription = "Scale when copying glowing stuff to glow buffer before blur";
+  constexpr const char* kConsoleStartupRenBorderSizeDescription = "Size of edge border";
+  constexpr const char* kConsoleStartupRenClipDecalLevelDescription = "Level at which we clip decals for super quick reject";
+  constexpr const char* kConsoleStartupRenClipDecalsDescription = "Clip Decals vertex count";
+  constexpr const char* kConsoleStartupRenClutterDescription = "Render clutter";
+  constexpr const char* kConsoleStartupRenClutterRadiusDescription = "ren_ClutterRadius tuning value.";
+  constexpr const char* kConsoleStartupRenDecalAlbedoLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for albedos";
+  constexpr const char* kConsoleStartupRenDecalFadeFractionDescription = "fraction (0..1) of their range that decals start to fade";
+  constexpr const char* kConsoleStartupRenDecalFidelityDescription = "ren_DecalFidelity tuning value.";
+  constexpr const char* kConsoleStartupRenDecalFlatTolDescription = "flatness tolerance";
+  constexpr const char* kConsoleStartupRenDecalNormalLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for normals";
+  constexpr const char* kConsoleStartupRenDecalOverDrawDescription = "Render overdraw display for decals";
+  constexpr const char* kConsoleStartupRenDecalsDescription = "Render Terrain Decals.";
+  constexpr const char* kConsoleStartupRenErrorCacheDescription = "use error threshold cache?";
+  constexpr const char* kConsoleStartupRenFogIntensityDescription = "intensity of gray fog";
+  constexpr const char* kConsoleStartupRenFogOfWarDescription = "Draw terrain with fog-of-war.";
+  constexpr const char* kConsoleStartupRenForceUpdateMinimapTerrainDescription = "Update the terrain tesselation/decals if it's a minimap";
+  constexpr const char* kConsoleStartupRenFrameTimeSecondsDescription = "Number of seconds to display.";
+  constexpr const char* kConsoleStartupRenFxDescription = "Render FX?";
+  constexpr const char* kConsoleStartupRenGenerateMeshDescription = "Generate a new mesh or use the old one?";
+  constexpr const char* kConsoleStartupRenHideSecondaryDescription = "Hide secondary views";
+  constexpr const char* kConsoleStartupRenIgnoreDecalLODDescription = "Force decals to render regardless of LOD";
+  constexpr const char* kConsoleStartupRenMeshDissolveDescription = "Fade mesh alpha from 1.0 to 0.0";
+  constexpr const char* kConsoleStartupRenMeshDissolveCutoffDescription = "ren_MeshDissolveCutoff tuning value.";
+  constexpr const char* kConsoleStartupRenMeshSkinnedDescription = "toggle rendering of meshes which have and use skeletons";
+  constexpr const char* kConsoleStartupRenMeshStaticDescription = "toggle rendering of meshes which do not have or ignore skeletons";
+  constexpr const char* kConsoleStartupRenNewFogUpdateDescription = "Use new fog update code";
+  constexpr const char* kConsoleStartupRenNewPipelineDescription = "ren_NewPipeline tuning value.";
+  constexpr const char* kConsoleStartupRenNormalDecalsDescription = "Render Normal Decals";
+  constexpr const char* kConsoleStartupRenOblivionDescription = "ren_Oblivion tuning value.";
+  constexpr const char* kConsoleStartupRenOnlyFirstViewDescription = "Render only the first view in the list";
+  constexpr const char* kConsoleStartupRenPlayableBoundaryDescription = "ren_PlayableBoundary tuning value.";
+  constexpr const char* kConsoleStartupRenReflectionDescription = "Render reflection?";
+  constexpr const char* kConsoleStartupRenRefractionDescription = "Render refraction?";
+  constexpr const char* kConsoleStartupRenRegenShoreDescription = "Regenerate shoreline (editor only)";
+  constexpr const char* kConsoleStartupRenRenderNothingDescription = "Render nothing?";
+  constexpr const char* kConsoleStartupRenSelectDescription = "Render select meshes?";
+  constexpr const char* kConsoleStartupRenSelectBoxesDescription = "Toggle selection box rendering";
+  constexpr const char* kConsoleStartupRenSelectBracketMinPixelSizeDescription = "Minimum selection bracket thickness in pixels.";
+  constexpr const char* kConsoleStartupRenSelectBracketSizeDescription = "Default selection bracket thickness";
+  constexpr const char* kConsoleStartupRenSelectColorDescription = "What color do we want the selection box?";
+  constexpr const char* kConsoleStartupRenSelectionHeightFudgeDescription = "How far off the ground selection boxes are fudged";
+  constexpr const char* kConsoleStartupRenSelectionSizeFudgeDescription = "How much selection box extents are fudged (multiplier)";
+  constexpr const char* kConsoleStartupRenShadowBlurDescription = "Toggle shadow blurring";
+  constexpr const char* kConsoleStartupRenShadowCoeffDescription = "ren_ShadowCoeff tuning value.";
+  constexpr const char* kConsoleStartupRenShadowLODDescription = "At what LODMetric do we stop rendering shadows";
+  constexpr const char* kConsoleStartupRenShadowSizeDescription = "Sizeof shadow texture";
+  constexpr const char* kConsoleStartupRenShadowsDescription = "Render Shadows?";
+  constexpr const char* kConsoleStartupRenShoreErrorCoeffDescription = "ren_ShoreErrorCoeff tuning value.";
+  constexpr const char* kConsoleStartupRenShorelineDescription = "Render shoreline";
+  constexpr const char* kConsoleStartupRenShorelineCutoffDescription = "Shoreline LOD cutoff";
+  constexpr const char* kConsoleStartupRenShowBandwidthUsageDescription = "Show the amount of network bandwidth we are using.";
+  constexpr const char* kConsoleStartupRenShowBoneNamesDescription = "Show bone names";
+  constexpr const char* kConsoleStartupRenShowDirtyTerrainDescription = "Show or hide the dirty terrain bits.";
+  constexpr const char* kConsoleStartupRenShowFrameTimesDescription = "Graphically show the frame times.";
+  constexpr const char* kConsoleStartupRenShowNetworkStatsDescription = "Show various network stats.";
+  constexpr const char* kConsoleStartupRenShowNormalsDescription = "Variable to track show/hide normals rendering.";
+  constexpr const char* kConsoleStartupRenShowWireframeDescription = "Variable to track show/hide wireframe rendering.";
+  constexpr const char* kConsoleStartupRenSkirtDescription = "Use new fog update code";
+  constexpr const char* kConsoleStartupRenSkyDomeDescription = "Render sky";
+  constexpr const char* kConsoleStartupRenSplatsDescription = "Render Terrain splats.";
+  constexpr const char* kConsoleStartupRenSyncTerrainLODDescription = "Distance at which to start display terrain sync changes";
+  constexpr const char* kConsoleStartupRenTTerrainGlowDescription = "Render the terrain using TTerrainGlow";
+  constexpr const char* kConsoleStartupRenTeamColorLookupCountDescription = "Number of 'channels' in team color lookup texture.";
+  constexpr const char* kConsoleStartupRenTerrainDescription = "Show or hide the terrain.";
+  constexpr const char* kConsoleStartupRenTreesDescription = "Show or hide the trees.";
+  constexpr const char* kConsoleStartupRenUiDescription = "Render UI?";
+  constexpr const char* kConsoleStartupRenUnitSelectionScaleDescription = "How much unit selection box extents are scaled (multiplier)";
+  constexpr const char* kConsoleStartupRenUnitSilhouetteDescription = "ren_UnitSilhouette tuning value.";
+  constexpr const char* kConsoleStartupRenViewErrorDescription = "ren_ViewError tuning value.";
+  constexpr const char* kConsoleStartupRenWaterDescription = "Show or hide the water.";
+  constexpr const char* kConsoleStartupRenWorldBorderDescription = "Render UI world border frame?";
+  constexpr const char* kConsoleStartupRenBicubicnormalsDescription = "Sample normal map basis using bicubic filter";
+  constexpr const char* kConsoleStartupRenFogDescription = "Do we render fog of war, rendering only no effect on database.";
+  constexpr const char* kConsoleStartupRenGlowingDecalsDescription = "Render glowing decals";
+} // namespace
+
+// New console-tunable storage with no other subsystem owner (default read from the
+// binary's .data image at the registrar's value-pointer field).
+bool moho::ren_Clutter = false;
+int moho::ren_FogIntensity = 100;
+bool moho::ren_HideSecondary = false;
+bool moho::ren_NewFogUpdate = true;
+bool moho::ren_NewPipeline = true;
+bool moho::ren_Refraction = true;
+bool moho::ren_RegenShore = false;
+bool moho::ren_ShowBoneNames = false;
+bool moho::ren_TTerrainGlow = false;
+int moho::ren_TeamColorLookupCount = 32;
+bool moho::ren_Trees = false;
+float moho::ren_ViewError = 0.003000000026077032f;
+
+namespace moho
+{
+  extern float ren_BandwidthDisplayKernel;
+  extern float ren_BandwidthDisplaySeconds;
+  extern float ren_BgLowerBound;
+  extern bool ren_Bloom;
+  extern int ren_BloomBlurCount;
+  extern float ren_BloomBlurKernelScale;
+  extern float ren_BloomGlowCopyScale;
+  extern float ren_BorderSize;
+  extern int ren_ClipDecalLevel;
+  extern bool ren_ClipDecals;
+  extern float ren_ClutterRadius;
+  extern float ren_DecalAlbedoLodCutoff;
+  extern float ren_DecalFadeFraction;
+  extern int ren_DecalFidelity;
+  extern float ren_DecalFlatTol;
+  extern float ren_DecalNormalLodCutoff;
+  extern bool ren_DecalOverDraw;
+  extern bool ren_Decals;
+  extern bool ren_ErrorCache;
+  extern bool ren_FogOfWar;
+  extern bool ren_ForceUpdateMinimapTerrain;
+  extern float ren_FrameTimeSeconds;
+  extern bool ren_Fx;
+  extern bool ren_GenerateMesh;
+  extern bool ren_IgnoreDecalLOD;
+  extern float ren_MeshDissolve;
+  extern float ren_MeshDissolveCutoff;
+  extern bool ren_MeshSkinned;
+  extern bool ren_MeshStatic;
+  extern bool ren_NormalDecals;
+  extern bool ren_Oblivion;
+  extern bool ren_OnlyFirstView;
+  extern bool ren_PlayableBoundary;
+  extern bool ren_Reflection;
+  extern bool ren_RenderNothing;
+  extern bool ren_Select;
+  extern bool ren_SelectBoxes;
+  extern float ren_SelectBracketMinPixelSize;
+  extern float ren_SelectBracketSize;
+  extern unsigned int ren_SelectColor;
+  extern float ren_SelectionHeightFudge;
+  extern float ren_SelectionSizeFudge;
+  extern bool ren_ShadowBlur;
+  extern float ren_ShadowCoeff;
+  extern float ren_ShadowLOD;
+  extern int ren_ShadowSize;
+  extern bool ren_Shadows;
+  extern float ren_ShoreErrorCoeff;
+  extern bool ren_Shoreline;
+  extern float ren_ShorelineCutoff;
+  extern bool ren_ShowBandwidthUsage;
+  extern bool ren_ShowDirtyTerrain;
+  extern bool ren_ShowFrameTimes;
+  extern bool ren_ShowNetworkStats;
+  extern bool ren_ShowNormals;
+  extern bool ren_ShowWireframe;
+  extern bool ren_Skirt;
+  extern bool ren_SkyDome;
+  extern bool ren_Splats;
+  extern float ren_SyncTerrainLOD;
+  extern bool ren_Terrain;
+  extern bool ren_Ui;
+  extern float ren_UnitSelectionScale;
+  extern bool ren_UnitSilhouette;
+  extern bool ren_Water;
+  extern bool ren_WorldBorder;
+  extern bool ren_bicubicnormals;
+  extern bool ren_fog;
+  extern bool ren_glowingDecals;
+
+  TConVar<float> gTConVar_ren_BandwidthDisplayKernel(
+    "ren_BandwidthDisplayKernel",
+    kConsoleStartupRenBandwidthDisplayKernelDescription,
+    &moho::ren_BandwidthDisplayKernel
+  );
+  TConVar<float> gTConVar_ren_BandwidthDisplaySeconds(
+    "ren_BandwidthDisplaySeconds",
+    kConsoleStartupRenBandwidthDisplaySecondsDescription,
+    &moho::ren_BandwidthDisplaySeconds
+  );
+  TConVar<float> gTConVar_ren_BgLowerBound(
+    "ren_BgLowerBound",
+    kConsoleStartupRenBgLowerBoundDescription,
+    &moho::ren_BgLowerBound
+  );
+  TConVar<bool> gTConVar_ren_Bloom(
+    "ren_Bloom",
+    kConsoleStartupRenBloomDescription,
+    &moho::ren_Bloom
+  );
+  TConVar<int> gTConVar_ren_BloomBlurCount(
+    "ren_BloomBlurCount",
+    kConsoleStartupRenBloomBlurCountDescription,
+    &moho::ren_BloomBlurCount
+  );
+  TConVar<float> gTConVar_ren_BloomBlurKernelScale(
+    "ren_BloomBlurKernelScale",
+    kConsoleStartupRenBloomBlurKernelScaleDescription,
+    &moho::ren_BloomBlurKernelScale
+  );
+  TConVar<float> gTConVar_ren_BloomGlowCopyScale(
+    "ren_BloomGlowCopyScale",
+    kConsoleStartupRenBloomGlowCopyScaleDescription,
+    &moho::ren_BloomGlowCopyScale
+  );
+  TConVar<float> gTConVar_ren_BorderSize(
+    "ren_BorderSize",
+    kConsoleStartupRenBorderSizeDescription,
+    &moho::ren_BorderSize
+  );
+  TConVar<int> gTConVar_ren_ClipDecalLevel(
+    "ren_ClipDecalLevel",
+    kConsoleStartupRenClipDecalLevelDescription,
+    &moho::ren_ClipDecalLevel
+  );
+  TConVar<bool> gTConVar_ren_ClipDecals(
+    "ren_ClipDecals",
+    kConsoleStartupRenClipDecalsDescription,
+    &moho::ren_ClipDecals
+  );
+  TConVar<bool> gTConVar_ren_Clutter(
+    "ren_Clutter",
+    kConsoleStartupRenClutterDescription,
+    &moho::ren_Clutter
+  );
+  TConVar<float> gTConVar_ren_ClutterRadius(
+    "ren_ClutterRadius",
+    kConsoleStartupRenClutterRadiusDescription,
+    &moho::ren_ClutterRadius
+  );
+  TConVar<float> gTConVar_ren_DecalAlbedoLodCutoff(
+    "ren_DecalAlbedoLodCutoff",
+    kConsoleStartupRenDecalAlbedoLodCutoffDescription,
+    &moho::ren_DecalAlbedoLodCutoff
+  );
+  TConVar<float> gTConVar_ren_DecalFadeFraction(
+    "ren_DecalFadeFraction",
+    kConsoleStartupRenDecalFadeFractionDescription,
+    &moho::ren_DecalFadeFraction
+  );
+  TConVar<int> gTConVar_ren_DecalFidelity(
+    "ren_DecalFidelity",
+    kConsoleStartupRenDecalFidelityDescription,
+    &moho::ren_DecalFidelity
+  );
+  TConVar<float> gTConVar_ren_DecalFlatTol(
+    "ren_DecalFlatTol",
+    kConsoleStartupRenDecalFlatTolDescription,
+    &moho::ren_DecalFlatTol
+  );
+  TConVar<float> gTConVar_ren_DecalNormalLodCutoff(
+    "ren_DecalNormalLodCutoff",
+    kConsoleStartupRenDecalNormalLodCutoffDescription,
+    &moho::ren_DecalNormalLodCutoff
+  );
+  TConVar<bool> gTConVar_ren_DecalOverDraw(
+    "ren_DecalOverDraw",
+    kConsoleStartupRenDecalOverDrawDescription,
+    &moho::ren_DecalOverDraw
+  );
+  TConVar<bool> gTConVar_ren_Decals(
+    "ren_Decals",
+    kConsoleStartupRenDecalsDescription,
+    &moho::ren_Decals
+  );
+  TConVar<bool> gTConVar_ren_ErrorCache(
+    "ren_ErrorCache",
+    kConsoleStartupRenErrorCacheDescription,
+    &moho::ren_ErrorCache
+  );
+  TConVar<int> gTConVar_ren_FogIntensity(
+    "ren_FogIntensity",
+    kConsoleStartupRenFogIntensityDescription,
+    &moho::ren_FogIntensity
+  );
+  TConVar<bool> gTConVar_ren_FogOfWar(
+    "ren_FogOfWar",
+    kConsoleStartupRenFogOfWarDescription,
+    &moho::ren_FogOfWar
+  );
+  TConVar<bool> gTConVar_ren_ForceUpdateMinimapTerrain(
+    "ren_ForceUpdateMinimapTerrain",
+    kConsoleStartupRenForceUpdateMinimapTerrainDescription,
+    &moho::ren_ForceUpdateMinimapTerrain
+  );
+  TConVar<float> gTConVar_ren_FrameTimeSeconds(
+    "ren_FrameTimeSeconds",
+    kConsoleStartupRenFrameTimeSecondsDescription,
+    &moho::ren_FrameTimeSeconds
+  );
+  TConVar<bool> gTConVar_ren_Fx(
+    "ren_Fx",
+    kConsoleStartupRenFxDescription,
+    &moho::ren_Fx
+  );
+  TConVar<bool> gTConVar_ren_GenerateMesh(
+    "ren_GenerateMesh",
+    kConsoleStartupRenGenerateMeshDescription,
+    &moho::ren_GenerateMesh
+  );
+  TConVar<bool> gTConVar_ren_HideSecondary(
+    "ren_HideSecondary",
+    kConsoleStartupRenHideSecondaryDescription,
+    &moho::ren_HideSecondary
+  );
+  TConVar<bool> gTConVar_ren_IgnoreDecalLOD(
+    "ren_IgnoreDecalLOD",
+    kConsoleStartupRenIgnoreDecalLODDescription,
+    &moho::ren_IgnoreDecalLOD
+  );
+  TConVar<float> gTConVar_ren_MeshDissolve(
+    "ren_MeshDissolve",
+    kConsoleStartupRenMeshDissolveDescription,
+    &moho::ren_MeshDissolve
+  );
+  TConVar<float> gTConVar_ren_MeshDissolveCutoff(
+    "ren_MeshDissolveCutoff",
+    kConsoleStartupRenMeshDissolveCutoffDescription,
+    &moho::ren_MeshDissolveCutoff
+  );
+  TConVar<bool> gTConVar_ren_MeshSkinned(
+    "ren_MeshSkinned",
+    kConsoleStartupRenMeshSkinnedDescription,
+    &moho::ren_MeshSkinned
+  );
+  TConVar<bool> gTConVar_ren_MeshStatic(
+    "ren_MeshStatic",
+    kConsoleStartupRenMeshStaticDescription,
+    &moho::ren_MeshStatic
+  );
+  TConVar<bool> gTConVar_ren_NewFogUpdate(
+    "ren_NewFogUpdate",
+    kConsoleStartupRenNewFogUpdateDescription,
+    &moho::ren_NewFogUpdate
+  );
+  TConVar<bool> gTConVar_ren_NewPipeline(
+    "ren_NewPipeline",
+    kConsoleStartupRenNewPipelineDescription,
+    &moho::ren_NewPipeline
+  );
+  TConVar<bool> gTConVar_ren_NormalDecals(
+    "ren_NormalDecals",
+    kConsoleStartupRenNormalDecalsDescription,
+    &moho::ren_NormalDecals
+  );
+  TConVar<bool> gTConVar_ren_Oblivion(
+    "ren_Oblivion",
+    kConsoleStartupRenOblivionDescription,
+    &moho::ren_Oblivion
+  );
+  TConVar<bool> gTConVar_ren_OnlyFirstView(
+    "ren_OnlyFirstView",
+    kConsoleStartupRenOnlyFirstViewDescription,
+    &moho::ren_OnlyFirstView
+  );
+  TConVar<bool> gTConVar_ren_PlayableBoundary(
+    "ren_PlayableBoundary",
+    kConsoleStartupRenPlayableBoundaryDescription,
+    &moho::ren_PlayableBoundary
+  );
+  TConVar<bool> gTConVar_ren_Reflection(
+    "ren_Reflection",
+    kConsoleStartupRenReflectionDescription,
+    &moho::ren_Reflection
+  );
+  TConVar<bool> gTConVar_ren_Refraction(
+    "ren_Refraction",
+    kConsoleStartupRenRefractionDescription,
+    &moho::ren_Refraction
+  );
+  TConVar<bool> gTConVar_ren_RegenShore(
+    "ren_RegenShore",
+    kConsoleStartupRenRegenShoreDescription,
+    &moho::ren_RegenShore
+  );
+  TConVar<bool> gTConVar_ren_RenderNothing(
+    "ren_RenderNothing",
+    kConsoleStartupRenRenderNothingDescription,
+    &moho::ren_RenderNothing
+  );
+  TConVar<bool> gTConVar_ren_Select(
+    "ren_Select",
+    kConsoleStartupRenSelectDescription,
+    &moho::ren_Select
+  );
+  TConVar<bool> gTConVar_ren_SelectBoxes(
+    "ren_SelectBoxes",
+    kConsoleStartupRenSelectBoxesDescription,
+    &moho::ren_SelectBoxes
+  );
+  TConVar<float> gTConVar_ren_SelectBracketMinPixelSize(
+    "ren_SelectBracketMinPixelSize",
+    kConsoleStartupRenSelectBracketMinPixelSizeDescription,
+    &moho::ren_SelectBracketMinPixelSize
+  );
+  TConVar<float> gTConVar_ren_SelectBracketSize(
+    "ren_SelectBracketSize",
+    kConsoleStartupRenSelectBracketSizeDescription,
+    &moho::ren_SelectBracketSize
+  );
+  TConVar<unsigned int> gTConVar_ren_SelectColor(
+    "ren_SelectColor",
+    kConsoleStartupRenSelectColorDescription,
+    &moho::ren_SelectColor
+  );
+  TConVar<float> gTConVar_ren_SelectionHeightFudge(
+    "ren_SelectionHeightFudge",
+    kConsoleStartupRenSelectionHeightFudgeDescription,
+    &moho::ren_SelectionHeightFudge
+  );
+  TConVar<float> gTConVar_ren_SelectionSizeFudge(
+    "ren_SelectionSizeFudge",
+    kConsoleStartupRenSelectionSizeFudgeDescription,
+    &moho::ren_SelectionSizeFudge
+  );
+  TConVar<bool> gTConVar_ren_ShadowBlur(
+    "ren_ShadowBlur",
+    kConsoleStartupRenShadowBlurDescription,
+    &moho::ren_ShadowBlur
+  );
+  TConVar<float> gTConVar_ren_ShadowCoeff(
+    "ren_ShadowCoeff",
+    kConsoleStartupRenShadowCoeffDescription,
+    &moho::ren_ShadowCoeff
+  );
+  TConVar<float> gTConVar_ren_ShadowLOD(
+    "ren_ShadowLOD",
+    kConsoleStartupRenShadowLODDescription,
+    &moho::ren_ShadowLOD
+  );
+  TConVar<int> gTConVar_ren_ShadowSize(
+    "ren_ShadowSize",
+    kConsoleStartupRenShadowSizeDescription,
+    &moho::ren_ShadowSize
+  );
+  TConVar<bool> gTConVar_ren_Shadows(
+    "ren_Shadows",
+    kConsoleStartupRenShadowsDescription,
+    &moho::ren_Shadows
+  );
+  TConVar<float> gTConVar_ren_ShoreErrorCoeff(
+    "ren_ShoreErrorCoeff",
+    kConsoleStartupRenShoreErrorCoeffDescription,
+    &moho::ren_ShoreErrorCoeff
+  );
+  TConVar<bool> gTConVar_ren_Shoreline(
+    "ren_Shoreline",
+    kConsoleStartupRenShorelineDescription,
+    &moho::ren_Shoreline
+  );
+  TConVar<float> gTConVar_ren_ShorelineCutoff(
+    "ren_ShorelineCutoff",
+    kConsoleStartupRenShorelineCutoffDescription,
+    &moho::ren_ShorelineCutoff
+  );
+  TConVar<bool> gTConVar_ren_ShowBandwidthUsage(
+    "ren_ShowBandwidthUsage",
+    kConsoleStartupRenShowBandwidthUsageDescription,
+    &moho::ren_ShowBandwidthUsage
+  );
+  TConVar<bool> gTConVar_ren_ShowBoneNames(
+    "ren_ShowBoneNames",
+    kConsoleStartupRenShowBoneNamesDescription,
+    &moho::ren_ShowBoneNames
+  );
+  TConVar<bool> gTConVar_ren_ShowDirtyTerrain(
+    "ren_ShowDirtyTerrain",
+    kConsoleStartupRenShowDirtyTerrainDescription,
+    &moho::ren_ShowDirtyTerrain
+  );
+  TConVar<bool> gTConVar_ren_ShowFrameTimes(
+    "ren_ShowFrameTimes",
+    kConsoleStartupRenShowFrameTimesDescription,
+    &moho::ren_ShowFrameTimes
+  );
+  TConVar<bool> gTConVar_ren_ShowNetworkStats(
+    "ren_ShowNetworkStats",
+    kConsoleStartupRenShowNetworkStatsDescription,
+    &moho::ren_ShowNetworkStats
+  );
+  TConVar<bool> gTConVar_ren_ShowNormals(
+    "ren_ShowNormals",
+    kConsoleStartupRenShowNormalsDescription,
+    &moho::ren_ShowNormals
+  );
+  TConVar<bool> gTConVar_ren_ShowWireframe(
+    "ren_ShowWireframe",
+    kConsoleStartupRenShowWireframeDescription,
+    &moho::ren_ShowWireframe
+  );
+  TConVar<bool> gTConVar_ren_Skirt(
+    "ren_Skirt",
+    kConsoleStartupRenSkirtDescription,
+    &moho::ren_Skirt
+  );
+  TConVar<bool> gTConVar_ren_SkyDome(
+    "ren_SkyDome",
+    kConsoleStartupRenSkyDomeDescription,
+    &moho::ren_SkyDome
+  );
+  TConVar<bool> gTConVar_ren_Splats(
+    "ren_Splats",
+    kConsoleStartupRenSplatsDescription,
+    &moho::ren_Splats
+  );
+  TConVar<float> gTConVar_ren_SyncTerrainLOD(
+    "ren_SyncTerrainLOD",
+    kConsoleStartupRenSyncTerrainLODDescription,
+    &moho::ren_SyncTerrainLOD
+  );
+  TConVar<bool> gTConVar_ren_TTerrainGlow(
+    "ren_TTerrainGlow",
+    kConsoleStartupRenTTerrainGlowDescription,
+    &moho::ren_TTerrainGlow
+  );
+  TConVar<int> gTConVar_ren_TeamColorLookupCount(
+    "ren_TeamColorLookupCount",
+    kConsoleStartupRenTeamColorLookupCountDescription,
+    &moho::ren_TeamColorLookupCount
+  );
+  TConVar<bool> gTConVar_ren_Terrain(
+    "ren_Terrain",
+    kConsoleStartupRenTerrainDescription,
+    &moho::ren_Terrain
+  );
+  TConVar<bool> gTConVar_ren_Trees(
+    "ren_Trees",
+    kConsoleStartupRenTreesDescription,
+    &moho::ren_Trees
+  );
+  TConVar<bool> gTConVar_ren_Ui(
+    "ren_Ui",
+    kConsoleStartupRenUiDescription,
+    &moho::ren_Ui
+  );
+  TConVar<float> gTConVar_ren_UnitSelectionScale(
+    "ren_UnitSelectionScale",
+    kConsoleStartupRenUnitSelectionScaleDescription,
+    &moho::ren_UnitSelectionScale
+  );
+  TConVar<bool> gTConVar_ren_UnitSilhouette(
+    "ren_UnitSilhouette",
+    kConsoleStartupRenUnitSilhouetteDescription,
+    &moho::ren_UnitSilhouette
+  );
+  TConVar<float> gTConVar_ren_ViewError(
+    "ren_ViewError",
+    kConsoleStartupRenViewErrorDescription,
+    &moho::ren_ViewError
+  );
+  TConVar<bool> gTConVar_ren_Water(
+    "ren_Water",
+    kConsoleStartupRenWaterDescription,
+    &moho::ren_Water
+  );
+  TConVar<bool> gTConVar_ren_WorldBorder(
+    "ren_WorldBorder",
+    kConsoleStartupRenWorldBorderDescription,
+    &moho::ren_WorldBorder
+  );
+  TConVar<bool> gTConVar_ren_bicubicnormals(
+    "ren_bicubicnormals",
+    kConsoleStartupRenBicubicnormalsDescription,
+    &moho::ren_bicubicnormals
+  );
+  TConVar<bool> gTConVar_ren_fog(
+    "ren_fog",
+    kConsoleStartupRenFogDescription,
+    &moho::ren_fog
+  );
+  TConVar<bool> gTConVar_ren_glowingDecals(
+    "ren_glowingDecals",
+    kConsoleStartupRenGlowingDecalsDescription,
+    &moho::ren_glowingDecals
+  );
+
+  /**
+   * Address: 0x00C040E0 (FUN_00C040E0, ??1TConVar_ren_BandwidthDisplayKernel@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BandwidthDisplayKernel`.
+   */
+  void cleanup_TConVar_ren_BandwidthDisplayKernel()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BandwidthDisplayKernel);
+  }
+
+  /**
+   * Address: 0x00BE0D40 (FUN_00BE0D40, register_TConVar_ren_BandwidthDisplayKernel)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BandwidthDisplayKernel`.
+   */
+  void register_TConVar_ren_BandwidthDisplayKernel()
+  {
+    RegisterStartupConVar(gTConVar_ren_BandwidthDisplayKernel, &cleanup_TConVar_ren_BandwidthDisplayKernel);
+  }
+
+  /**
+   * Address: 0x00C040B0 (FUN_00C040B0, ??1TConVar_ren_BandwidthDisplaySeconds@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BandwidthDisplaySeconds`.
+   */
+  void cleanup_TConVar_ren_BandwidthDisplaySeconds()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BandwidthDisplaySeconds);
+  }
+
+  /**
+   * Address: 0x00BE0D00 (FUN_00BE0D00, register_TConVar_ren_BandwidthDisplaySeconds)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BandwidthDisplaySeconds`.
+   */
+  void register_TConVar_ren_BandwidthDisplaySeconds()
+  {
+    RegisterStartupConVar(gTConVar_ren_BandwidthDisplaySeconds, &cleanup_TConVar_ren_BandwidthDisplaySeconds);
+  }
+
+  /**
+   * Address: 0x00C07960 (FUN_00C07960, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BgLowerBound`.
+   */
+  void cleanup_TConVar_ren_BgLowerBound()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BgLowerBound);
+  }
+
+  /**
+   * Address: 0x00BE68E0 (FUN_00BE68E0, register_TConVar_ren_BgLowerBound)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BgLowerBound`.
+   */
+  void register_TConVar_ren_BgLowerBound()
+  {
+    RegisterStartupConVar(gTConVar_ren_BgLowerBound, &cleanup_TConVar_ren_BgLowerBound);
+  }
+
+  /**
+   * Address: 0x00C04750 (FUN_00C04750, ??1TConVar_ren_Bloom@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Bloom`.
+   */
+  void cleanup_TConVar_ren_Bloom()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Bloom);
+  }
+
+  /**
+   * Address: 0x00BE1710 (FUN_00BE1710, register_TConVar_ren_Bloom)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Bloom`.
+   */
+  void register_TConVar_ren_Bloom()
+  {
+    RegisterStartupConVar(gTConVar_ren_Bloom, &cleanup_TConVar_ren_Bloom);
+  }
+
+  /**
+   * Address: 0x00C04130 (FUN_00C04130, ??1TConVar_ren_BloomBlurCount@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BloomBlurCount`.
+   */
+  void cleanup_TConVar_ren_BloomBlurCount()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BloomBlurCount);
+  }
+
+  /**
+   * Address: 0x00BE0E00 (FUN_00BE0E00, register_TConVar_ren_BloomBlurCount)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BloomBlurCount`.
+   */
+  void register_TConVar_ren_BloomBlurCount()
+  {
+    RegisterStartupConVar(gTConVar_ren_BloomBlurCount, &cleanup_TConVar_ren_BloomBlurCount);
+  }
+
+  /**
+   * Address: 0x00C04300 (FUN_00C04300, ??1TConVar_ren_BloomBlurKernelScale@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BloomBlurKernelScale`.
+   */
+  void cleanup_TConVar_ren_BloomBlurKernelScale()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BloomBlurKernelScale);
+  }
+
+  /**
+   * Address: 0x00BE1040 (FUN_00BE1040, register_TConVar_ren_BloomBlurKernelScale)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BloomBlurKernelScale`.
+   */
+  void register_TConVar_ren_BloomBlurKernelScale()
+  {
+    RegisterStartupConVar(gTConVar_ren_BloomBlurKernelScale, &cleanup_TConVar_ren_BloomBlurKernelScale);
+  }
+
+  /**
+   * Address: 0x00C04330 (FUN_00C04330, ??1TConVar_ren_BloomGlowCopyScale@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BloomGlowCopyScale`.
+   */
+  void cleanup_TConVar_ren_BloomGlowCopyScale()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BloomGlowCopyScale);
+  }
+
+  /**
+   * Address: 0x00BE1080 (FUN_00BE1080, register_TConVar_ren_BloomGlowCopyScale)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BloomGlowCopyScale`.
+   */
+  void register_TConVar_ren_BloomGlowCopyScale()
+  {
+    RegisterStartupConVar(gTConVar_ren_BloomGlowCopyScale, &cleanup_TConVar_ren_BloomGlowCopyScale);
+  }
+
+  /**
+   * Address: 0x00C05A00 (FUN_00C05A00, ??1TConVar_ren_BorderSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_BorderSize`.
+   */
+  void cleanup_TConVar_ren_BorderSize()
+  {
+    CleanupStartupConCommand(gTConVar_ren_BorderSize);
+  }
+
+  /**
+   * Address: 0x00BE31D0 (FUN_00BE31D0, register_TConVar_ren_BorderSize)
+   *
+   * What it does:
+   * Registers startup convar for `ren_BorderSize`.
+   */
+  void register_TConVar_ren_BorderSize()
+  {
+    RegisterStartupConVar(gTConVar_ren_BorderSize, &cleanup_TConVar_ren_BorderSize);
+  }
+
+  /**
+   * Address: 0x00C059D0 (FUN_00C059D0, ??1TConVar_ren_ClipDecalLevel@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ClipDecalLevel`.
+   */
+  void cleanup_TConVar_ren_ClipDecalLevel()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ClipDecalLevel);
+  }
+
+  /**
+   * Address: 0x00BE3190 (FUN_00BE3190, register_TConVar_ren_ClipDecalLevel)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ClipDecalLevel`.
+   */
+  void register_TConVar_ren_ClipDecalLevel()
+  {
+    RegisterStartupConVar(gTConVar_ren_ClipDecalLevel, &cleanup_TConVar_ren_ClipDecalLevel);
+  }
+
+  /**
+   * Address: 0x00C059A0 (FUN_00C059A0, ??1TConVar_ren_ClipDecals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ClipDecals`.
+   */
+  void cleanup_TConVar_ren_ClipDecals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ClipDecals);
+  }
+
+  /**
+   * Address: 0x00BE3150 (FUN_00BE3150, register_TConVar_ren_ClipDecals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ClipDecals`.
+   */
+  void register_TConVar_ren_ClipDecals()
+  {
+    RegisterStartupConVar(gTConVar_ren_ClipDecals, &cleanup_TConVar_ren_ClipDecals);
+  }
+
+  /**
+   * Address: 0x00C04810 (FUN_00C04810, ??1TConVar_ren_Clutter@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Clutter`.
+   */
+  void cleanup_TConVar_ren_Clutter()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Clutter);
+  }
+
+  /**
+   * Address: 0x00BE1810 (FUN_00BE1810, register_TConVar_ren_Clutter)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Clutter`.
+   */
+  void register_TConVar_ren_Clutter()
+  {
+    RegisterStartupConVar(gTConVar_ren_Clutter, &cleanup_TConVar_ren_Clutter);
+  }
+
+  /**
+   * Address: 0x00C03AC0 (FUN_00C03AC0, ??1TConVar_ren_ClutterRadius@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ClutterRadius`.
+   */
+  void cleanup_TConVar_ren_ClutterRadius()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ClutterRadius);
+  }
+
+  /**
+   * Address: 0x00BE0200 (FUN_00BE0200, register_TConVar_ren_ClutterRadius)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ClutterRadius`.
+   */
+  void register_TConVar_ren_ClutterRadius()
+  {
+    RegisterStartupConVar(gTConVar_ren_ClutterRadius, &cleanup_TConVar_ren_ClutterRadius);
+  }
+
+  /**
+   * Address: 0x00C083C0 (FUN_00C083C0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalAlbedoLodCutoff`.
+   */
+  void cleanup_TConVar_ren_DecalAlbedoLodCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalAlbedoLodCutoff);
+  }
+
+  /**
+   * Address: 0x00BE7A40 (FUN_00BE7A40, register_TConVar_ren_DecalAlbedoLodCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalAlbedoLodCutoff`.
+   */
+  void register_TConVar_ren_DecalAlbedoLodCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalAlbedoLodCutoff, &cleanup_TConVar_ren_DecalAlbedoLodCutoff);
+  }
+
+  /**
+   * Address: 0x00C083F0 (FUN_00C083F0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalFadeFraction`.
+   */
+  void cleanup_TConVar_ren_DecalFadeFraction()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalFadeFraction);
+  }
+
+  /**
+   * Address: 0x00BE7A80 (FUN_00BE7A80, register_TConVar_ren_DecalFadeFraction)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalFadeFraction`.
+   */
+  void register_TConVar_ren_DecalFadeFraction()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalFadeFraction, &cleanup_TConVar_ren_DecalFadeFraction);
+  }
+
+  /**
+   * Address: 0x00C05180 (FUN_00C05180, ??1TConVar_ren_DecalFidelity@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalFidelity`.
+   */
+  void cleanup_TConVar_ren_DecalFidelity()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalFidelity);
+  }
+
+  /**
+   * Address: 0x00BE2550 (FUN_00BE2550, register_TConVar_ren_DecalFidelity)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalFidelity`.
+   */
+  void register_TConVar_ren_DecalFidelity()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalFidelity, &cleanup_TConVar_ren_DecalFidelity);
+  }
+
+  /**
+   * Address: 0x00C08420 (FUN_00C08420, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalFlatTol`.
+   */
+  void cleanup_TConVar_ren_DecalFlatTol()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalFlatTol);
+  }
+
+  /**
+   * Address: 0x00BE7AC0 (FUN_00BE7AC0, register_TConVar_ren_DecalFlatTol)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalFlatTol`.
+   */
+  void register_TConVar_ren_DecalFlatTol()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalFlatTol, &cleanup_TConVar_ren_DecalFlatTol);
+  }
+
+  /**
+   * Address: 0x00C08390 (FUN_00C08390, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalNormalLodCutoff`.
+   */
+  void cleanup_TConVar_ren_DecalNormalLodCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalNormalLodCutoff);
+  }
+
+  /**
+   * Address: 0x00BE7A00 (FUN_00BE7A00, register_TConVar_ren_DecalNormalLodCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalNormalLodCutoff`.
+   */
+  void register_TConVar_ren_DecalNormalLodCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalNormalLodCutoff, &cleanup_TConVar_ren_DecalNormalLodCutoff);
+  }
+
+  /**
+   * Address: 0x00C05090 (FUN_00C05090, ??1TConVar_ren_DecalOverDraw@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_DecalOverDraw`.
+   */
+  void cleanup_TConVar_ren_DecalOverDraw()
+  {
+    CleanupStartupConCommand(gTConVar_ren_DecalOverDraw);
+  }
+
+  /**
+   * Address: 0x00BE2410 (FUN_00BE2410, register_TConVar_ren_DecalOverDraw)
+   *
+   * What it does:
+   * Registers startup convar for `ren_DecalOverDraw`.
+   */
+  void register_TConVar_ren_DecalOverDraw()
+  {
+    RegisterStartupConVar(gTConVar_ren_DecalOverDraw, &cleanup_TConVar_ren_DecalOverDraw);
+  }
+
+  /**
+   * Address: 0x00C04F70 (FUN_00C04F70, ??1TConVar_ren_Decals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Decals`.
+   */
+  void cleanup_TConVar_ren_Decals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Decals);
+  }
+
+  /**
+   * Address: 0x00BE2290 (FUN_00BE2290, register_TConVar_ren_Decals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Decals`.
+   */
+  void register_TConVar_ren_Decals()
+  {
+    RegisterStartupConVar(gTConVar_ren_Decals, &cleanup_TConVar_ren_Decals);
+  }
+
+  /**
+   * Address: 0x00C05A60 (FUN_00C05A60, ??1TConVar_ren_ErrorCache@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ErrorCache`.
+   */
+  void cleanup_TConVar_ren_ErrorCache()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ErrorCache);
+  }
+
+  /**
+   * Address: 0x00BE3250 (FUN_00BE3250, register_TConVar_ren_ErrorCache)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ErrorCache`.
+   */
+  void register_TConVar_ren_ErrorCache()
+  {
+    RegisterStartupConVar(gTConVar_ren_ErrorCache, &cleanup_TConVar_ren_ErrorCache);
+  }
+
+  /**
+   * Address: 0x00C08640 (FUN_00C08640, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_FogIntensity`.
+   */
+  void cleanup_TConVar_ren_FogIntensity()
+  {
+    CleanupStartupConCommand(gTConVar_ren_FogIntensity);
+  }
+
+  /**
+   * Address: 0x00BE8120 (FUN_00BE8120, register_TConVar_ren_FogIntensity)
+   *
+   * What it does:
+   * Registers startup convar for `ren_FogIntensity`.
+   */
+  void register_TConVar_ren_FogIntensity()
+  {
+    RegisterStartupConVar(gTConVar_ren_FogIntensity, &cleanup_TConVar_ren_FogIntensity);
+  }
+
+  /**
+   * Address: 0x00C04F10 (FUN_00C04F10, ??1TConVar_ren_FogOfWar@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_FogOfWar`.
+   */
+  void cleanup_TConVar_ren_FogOfWar()
+  {
+    CleanupStartupConCommand(gTConVar_ren_FogOfWar);
+  }
+
+  /**
+   * Address: 0x00BE2210 (FUN_00BE2210, register_TConVar_ren_FogOfWar)
+   *
+   * What it does:
+   * Registers startup convar for `ren_FogOfWar`.
+   */
+  void register_TConVar_ren_FogOfWar()
+  {
+    RegisterStartupConVar(gTConVar_ren_FogOfWar, &cleanup_TConVar_ren_FogOfWar);
+  }
+
+  /**
+   * Address: 0x00C050C0 (FUN_00C050C0, ??1TConVar_ren_ForceUpdateMinimapTerrain@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ForceUpdateMinimapTerrain`.
+   */
+  void cleanup_TConVar_ren_ForceUpdateMinimapTerrain()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ForceUpdateMinimapTerrain);
+  }
+
+  /**
+   * Address: 0x00BE2450 (FUN_00BE2450, register_TConVar_ren_ForceUpdateMinimapTerrain)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ForceUpdateMinimapTerrain`.
+   */
+  void register_TConVar_ren_ForceUpdateMinimapTerrain()
+  {
+    RegisterStartupConVar(gTConVar_ren_ForceUpdateMinimapTerrain, &cleanup_TConVar_ren_ForceUpdateMinimapTerrain);
+  }
+
+  /**
+   * Address: 0x00C049F0 (FUN_00C049F0, ??1TConVar_ren_FrameTimeSeconds@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_FrameTimeSeconds`.
+   */
+  void cleanup_TConVar_ren_FrameTimeSeconds()
+  {
+    CleanupStartupConCommand(gTConVar_ren_FrameTimeSeconds);
+  }
+
+  /**
+   * Address: 0x00BE1A90 (FUN_00BE1A90, register_TConVar_ren_FrameTimeSeconds)
+   *
+   * What it does:
+   * Registers startup convar for `ren_FrameTimeSeconds`.
+   */
+  void register_TConVar_ren_FrameTimeSeconds()
+  {
+    RegisterStartupConVar(gTConVar_ren_FrameTimeSeconds, &cleanup_TConVar_ren_FrameTimeSeconds);
+  }
+
+  /**
+   * Address: 0x00C045A0 (FUN_00C045A0, ??1TConVar_ren_Fx@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Fx`.
+   */
+  void cleanup_TConVar_ren_Fx()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Fx);
+  }
+
+  /**
+   * Address: 0x00BE14D0 (FUN_00BE14D0, register_TConVar_ren_Fx)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Fx`.
+   */
+  void register_TConVar_ren_Fx()
+  {
+    RegisterStartupConVar(gTConVar_ren_Fx, &cleanup_TConVar_ren_Fx);
+  }
+
+  /**
+   * Address: 0x00C05000 (FUN_00C05000, ??1TConVar_ren_GenerateMesh@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_GenerateMesh`.
+   */
+  void cleanup_TConVar_ren_GenerateMesh()
+  {
+    CleanupStartupConCommand(gTConVar_ren_GenerateMesh);
+  }
+
+  /**
+   * Address: 0x00BE2350 (FUN_00BE2350, register_TConVar_ren_GenerateMesh)
+   *
+   * What it does:
+   * Registers startup convar for `ren_GenerateMesh`.
+   */
+  void register_TConVar_ren_GenerateMesh()
+  {
+    RegisterStartupConVar(gTConVar_ren_GenerateMesh, &cleanup_TConVar_ren_GenerateMesh);
+  }
+
+  /**
+   * Address: 0x00C04900 (FUN_00C04900, ??1TConVar_ren_HideSecondary@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_HideSecondary`.
+   */
+  void cleanup_TConVar_ren_HideSecondary()
+  {
+    CleanupStartupConCommand(gTConVar_ren_HideSecondary);
+  }
+
+  /**
+   * Address: 0x00BE1950 (FUN_00BE1950, register_TConVar_ren_HideSecondary)
+   *
+   * What it does:
+   * Registers startup convar for `ren_HideSecondary`.
+   */
+  void register_TConVar_ren_HideSecondary()
+  {
+    RegisterStartupConVar(gTConVar_ren_HideSecondary, &cleanup_TConVar_ren_HideSecondary);
+  }
+
+  /**
+   * Address: 0x00C05030 (FUN_00C05030, ??1TConVar_ren_IgnoreDecalLOD@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_IgnoreDecalLOD`.
+   */
+  void cleanup_TConVar_ren_IgnoreDecalLOD()
+  {
+    CleanupStartupConCommand(gTConVar_ren_IgnoreDecalLOD);
+  }
+
+  /**
+   * Address: 0x00BE2390 (FUN_00BE2390, register_TConVar_ren_IgnoreDecalLOD)
+   *
+   * What it does:
+   * Registers startup convar for `ren_IgnoreDecalLOD`.
+   */
+  void register_TConVar_ren_IgnoreDecalLOD()
+  {
+    RegisterStartupConVar(gTConVar_ren_IgnoreDecalLOD, &cleanup_TConVar_ren_IgnoreDecalLOD);
+  }
+
+  /**
+   * Address: 0x00C03B90 (FUN_00C03B90, ??1TConVar_ren_MeshDissolve@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_MeshDissolve`.
+   */
+  void cleanup_TConVar_ren_MeshDissolve()
+  {
+    CleanupStartupConCommand(gTConVar_ren_MeshDissolve);
+  }
+
+  /**
+   * Address: 0x00BE03A0 (FUN_00BE03A0, register_TConVar_ren_MeshDissolve)
+   *
+   * What it does:
+   * Registers startup convar for `ren_MeshDissolve`.
+   */
+  void register_TConVar_ren_MeshDissolve()
+  {
+    RegisterStartupConVar(gTConVar_ren_MeshDissolve, &cleanup_TConVar_ren_MeshDissolve);
+  }
+
+  /**
+   * Address: 0x00C03BC0 (FUN_00C03BC0, ??1TConVar_ren_MeshDissolveCutoff@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_MeshDissolveCutoff`.
+   */
+  void cleanup_TConVar_ren_MeshDissolveCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_MeshDissolveCutoff);
+  }
+
+  /**
+   * Address: 0x00BE03E0 (FUN_00BE03E0, register_TConVar_ren_MeshDissolveCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_MeshDissolveCutoff`.
+   */
+  void register_TConVar_ren_MeshDissolveCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ren_MeshDissolveCutoff, &cleanup_TConVar_ren_MeshDissolveCutoff);
+  }
+
+  /**
+   * Address: 0x00C03B30 (FUN_00C03B30, ??1TConVar_ren_MeshSkinned@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_MeshSkinned`.
+   */
+  void cleanup_TConVar_ren_MeshSkinned()
+  {
+    CleanupStartupConCommand(gTConVar_ren_MeshSkinned);
+  }
+
+  /**
+   * Address: 0x00BE0320 (FUN_00BE0320, register_TConVar_ren_MeshSkinned)
+   *
+   * What it does:
+   * Registers startup convar for `ren_MeshSkinned`.
+   */
+  void register_TConVar_ren_MeshSkinned()
+  {
+    RegisterStartupConVar(gTConVar_ren_MeshSkinned, &cleanup_TConVar_ren_MeshSkinned);
+  }
+
+  /**
+   * Address: 0x00C03B60 (FUN_00C03B60, ??1TConVar_ren_MeshStatic@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_MeshStatic`.
+   */
+  void cleanup_TConVar_ren_MeshStatic()
+  {
+    CleanupStartupConCommand(gTConVar_ren_MeshStatic);
+  }
+
+  /**
+   * Address: 0x00BE0360 (FUN_00BE0360, register_TConVar_ren_MeshStatic)
+   *
+   * What it does:
+   * Registers startup convar for `ren_MeshStatic`.
+   */
+  void register_TConVar_ren_MeshStatic()
+  {
+    RegisterStartupConVar(gTConVar_ren_MeshStatic, &cleanup_TConVar_ren_MeshStatic);
+  }
+
+  /**
+   * Address: 0x00C05120 (FUN_00C05120, ??1TConVar_ren_NewFogUpdate@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_NewFogUpdate`.
+   */
+  void cleanup_TConVar_ren_NewFogUpdate()
+  {
+    CleanupStartupConCommand(gTConVar_ren_NewFogUpdate);
+  }
+
+  /**
+   * Address: 0x00BE24D0 (FUN_00BE24D0, register_TConVar_ren_NewFogUpdate)
+   *
+   * What it does:
+   * Registers startup convar for `ren_NewFogUpdate`.
+   */
+  void register_TConVar_ren_NewFogUpdate()
+  {
+    RegisterStartupConVar(gTConVar_ren_NewFogUpdate, &cleanup_TConVar_ren_NewFogUpdate);
+  }
+
+  /**
+   * Address: 0x00C044B0 (FUN_00C044B0, ??1TConVar_ren_NewPipeline@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_NewPipeline`.
+   */
+  void cleanup_TConVar_ren_NewPipeline()
+  {
+    CleanupStartupConCommand(gTConVar_ren_NewPipeline);
+  }
+
+  /**
+   * Address: 0x00BE1390 (FUN_00BE1390, register_TConVar_ren_NewPipeline)
+   *
+   * What it does:
+   * Registers startup convar for `ren_NewPipeline`.
+   */
+  void register_TConVar_ren_NewPipeline()
+  {
+    RegisterStartupConVar(gTConVar_ren_NewPipeline, &cleanup_TConVar_ren_NewPipeline);
+  }
+
+  /**
+   * Address: 0x00C04FA0 (FUN_00C04FA0, ??1TConVar_ren_NormalDecals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_NormalDecals`.
+   */
+  void cleanup_TConVar_ren_NormalDecals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_NormalDecals);
+  }
+
+  /**
+   * Address: 0x00BE22D0 (FUN_00BE22D0, register_TConVar_ren_NormalDecals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_NormalDecals`.
+   */
+  void register_TConVar_ren_NormalDecals()
+  {
+    RegisterStartupConVar(gTConVar_ren_NormalDecals, &cleanup_TConVar_ren_NormalDecals);
+  }
+
+  /**
+   * Address: 0x00C04510 (FUN_00C04510, ??1TConVar_ren_Oblivion@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Oblivion`.
+   */
+  void cleanup_TConVar_ren_Oblivion()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Oblivion);
+  }
+
+  /**
+   * Address: 0x00BE1410 (FUN_00BE1410, register_TConVar_ren_Oblivion)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Oblivion`.
+   */
+  void register_TConVar_ren_Oblivion()
+  {
+    RegisterStartupConVar(gTConVar_ren_Oblivion, &cleanup_TConVar_ren_Oblivion);
+  }
+
+  /**
+   * Address: 0x00C04780 (FUN_00C04780, ??1TConVar_ren_OnlyFirstView@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_OnlyFirstView`.
+   */
+  void cleanup_TConVar_ren_OnlyFirstView()
+  {
+    CleanupStartupConCommand(gTConVar_ren_OnlyFirstView);
+  }
+
+  /**
+   * Address: 0x00BE1750 (FUN_00BE1750, register_TConVar_ren_OnlyFirstView)
+   *
+   * What it does:
+   * Registers startup convar for `ren_OnlyFirstView`.
+   */
+  void register_TConVar_ren_OnlyFirstView()
+  {
+    RegisterStartupConVar(gTConVar_ren_OnlyFirstView, &cleanup_TConVar_ren_OnlyFirstView);
+  }
+
+  /**
+   * Address: 0x00C046C0 (FUN_00C046C0, ??1TConVar_ren_PlayableBoundary@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_PlayableBoundary`.
+   */
+  void cleanup_TConVar_ren_PlayableBoundary()
+  {
+    CleanupStartupConCommand(gTConVar_ren_PlayableBoundary);
+  }
+
+  /**
+   * Address: 0x00BE1650 (FUN_00BE1650, register_TConVar_ren_PlayableBoundary)
+   *
+   * What it does:
+   * Registers startup convar for `ren_PlayableBoundary`.
+   */
+  void register_TConVar_ren_PlayableBoundary()
+  {
+    RegisterStartupConVar(gTConVar_ren_PlayableBoundary, &cleanup_TConVar_ren_PlayableBoundary);
+  }
+
+  /**
+   * Address: 0x00C045D0 (FUN_00C045D0, ??1TConVar_ren_Reflection@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Reflection`.
+   */
+  void cleanup_TConVar_ren_Reflection()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Reflection);
+  }
+
+  /**
+   * Address: 0x00BE1510 (FUN_00BE1510, register_TConVar_ren_Reflection)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Reflection`.
+   */
+  void register_TConVar_ren_Reflection()
+  {
+    RegisterStartupConVar(gTConVar_ren_Reflection, &cleanup_TConVar_ren_Reflection);
+  }
+
+  /**
+   * Address: 0x00C04600 (FUN_00C04600, ??1TConVar_ren_Refraction@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Refraction`.
+   */
+  void cleanup_TConVar_ren_Refraction()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Refraction);
+  }
+
+  /**
+   * Address: 0x00BE1550 (FUN_00BE1550, register_TConVar_ren_Refraction)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Refraction`.
+   */
+  void register_TConVar_ren_Refraction()
+  {
+    RegisterStartupConVar(gTConVar_ren_Refraction, &cleanup_TConVar_ren_Refraction);
+  }
+
+  /**
+   * Address: 0x00C048A0 (FUN_00C048A0, ??1TConVar_ren_RegenShore@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_RegenShore`.
+   */
+  void cleanup_TConVar_ren_RegenShore()
+  {
+    CleanupStartupConCommand(gTConVar_ren_RegenShore);
+  }
+
+  /**
+   * Address: 0x00BE18D0 (FUN_00BE18D0, register_TConVar_ren_RegenShore)
+   *
+   * What it does:
+   * Registers startup convar for `ren_RegenShore`.
+   */
+  void register_TConVar_ren_RegenShore()
+  {
+    RegisterStartupConVar(gTConVar_ren_RegenShore, &cleanup_TConVar_ren_RegenShore);
+  }
+
+  /**
+   * Address: 0x00C044E0 (FUN_00C044E0, ??1TConVar_ren_RenderNothing@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_RenderNothing`.
+   */
+  void cleanup_TConVar_ren_RenderNothing()
+  {
+    CleanupStartupConCommand(gTConVar_ren_RenderNothing);
+  }
+
+  /**
+   * Address: 0x00BE13D0 (FUN_00BE13D0, register_TConVar_ren_RenderNothing)
+   *
+   * What it does:
+   * Registers startup convar for `ren_RenderNothing`.
+   */
+  void register_TConVar_ren_RenderNothing()
+  {
+    RegisterStartupConVar(gTConVar_ren_RenderNothing, &cleanup_TConVar_ren_RenderNothing);
+  }
+
+  /**
+   * Address: 0x00C04630 (FUN_00C04630, ??1TConVar_ren_Select@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Select`.
+   */
+  void cleanup_TConVar_ren_Select()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Select);
+  }
+
+  /**
+   * Address: 0x00BE1590 (FUN_00BE1590, register_TConVar_ren_Select)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Select`.
+   */
+  void register_TConVar_ren_Select()
+  {
+    RegisterStartupConVar(gTConVar_ren_Select, &cleanup_TConVar_ren_Select);
+  }
+
+  /**
+   * Address: 0x00C04C80 (FUN_00C04C80, ??1TConVar_ren_SelectBoxes@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectBoxes`.
+   */
+  void cleanup_TConVar_ren_SelectBoxes()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectBoxes);
+  }
+
+  /**
+   * Address: 0x00BE1E40 (FUN_00BE1E40, register_TConVar_ren_SelectBoxes)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectBoxes`.
+   */
+  void register_TConVar_ren_SelectBoxes()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectBoxes, &cleanup_TConVar_ren_SelectBoxes);
+  }
+
+  /**
+   * Address: 0x00C04BF0 (FUN_00C04BF0, ??1TConVar_ren_SelectBracketMinPixelSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectBracketMinPixelSize`.
+   */
+  void cleanup_TConVar_ren_SelectBracketMinPixelSize()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectBracketMinPixelSize);
+  }
+
+  /**
+   * Address: 0x00BE1D80 (FUN_00BE1D80, register_TConVar_ren_SelectBracketMinPixelSize)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectBracketMinPixelSize`.
+   */
+  void register_TConVar_ren_SelectBracketMinPixelSize()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectBracketMinPixelSize, &cleanup_TConVar_ren_SelectBracketMinPixelSize);
+  }
+
+  /**
+   * Address: 0x00C04C20 (FUN_00C04C20, ??1TConVar_ren_SelectBracketSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectBracketSize`.
+   */
+  void cleanup_TConVar_ren_SelectBracketSize()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectBracketSize);
+  }
+
+  /**
+   * Address: 0x00BE1DC0 (FUN_00BE1DC0, register_TConVar_ren_SelectBracketSize)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectBracketSize`.
+   */
+  void register_TConVar_ren_SelectBracketSize()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectBracketSize, &cleanup_TConVar_ren_SelectBracketSize);
+  }
+
+  /**
+   * Address: 0x00C04C50 (FUN_00C04C50, ??1TConVar_ren_SelectColor@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectColor`.
+   */
+  void cleanup_TConVar_ren_SelectColor()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectColor);
+  }
+
+  /**
+   * Address: 0x00BE1E00 (FUN_00BE1E00, register_TConVar_ren_SelectColor)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectColor`.
+   */
+  void register_TConVar_ren_SelectColor()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectColor, &cleanup_TConVar_ren_SelectColor);
+  }
+
+  /**
+   * Address: 0x00C04B90 (FUN_00C04B90, ??1TConVar_ren_SelectionHeightFudge@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectionHeightFudge`.
+   */
+  void cleanup_TConVar_ren_SelectionHeightFudge()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectionHeightFudge);
+  }
+
+  /**
+   * Address: 0x00BE1D00 (FUN_00BE1D00, register_TConVar_ren_SelectionHeightFudge)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectionHeightFudge`.
+   */
+  void register_TConVar_ren_SelectionHeightFudge()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectionHeightFudge, &cleanup_TConVar_ren_SelectionHeightFudge);
+  }
+
+  /**
+   * Address: 0x00C04B60 (FUN_00C04B60, ??1TConVar_ren_SelectionSizeFudge@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SelectionSizeFudge`.
+   */
+  void cleanup_TConVar_ren_SelectionSizeFudge()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SelectionSizeFudge);
+  }
+
+  /**
+   * Address: 0x00BE1CC0 (FUN_00BE1CC0, register_TConVar_ren_SelectionSizeFudge)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SelectionSizeFudge`.
+   */
+  void register_TConVar_ren_SelectionSizeFudge()
+  {
+    RegisterStartupConVar(gTConVar_ren_SelectionSizeFudge, &cleanup_TConVar_ren_SelectionSizeFudge);
+  }
+
+  /**
+   * Address: 0x00C04840 (FUN_00C04840, ??1TConVar_ren_ShadowBlur@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShadowBlur`.
+   */
+  void cleanup_TConVar_ren_ShadowBlur()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShadowBlur);
+  }
+
+  /**
+   * Address: 0x00BE1850 (FUN_00BE1850, register_TConVar_ren_ShadowBlur)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShadowBlur`.
+   */
+  void register_TConVar_ren_ShadowBlur()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShadowBlur, &cleanup_TConVar_ren_ShadowBlur);
+  }
+
+  /**
+   * Address: 0x00C04D80 (FUN_00C04D80, ??1TConVar_ren_ShadowCoeff@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShadowCoeff`.
+   */
+  void cleanup_TConVar_ren_ShadowCoeff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShadowCoeff);
+  }
+
+  /**
+   * Address: 0x00BE1FA0 (FUN_00BE1FA0, register_TConVar_ren_ShadowCoeff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShadowCoeff`.
+   */
+  void register_TConVar_ren_ShadowCoeff()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShadowCoeff, &cleanup_TConVar_ren_ShadowCoeff);
+  }
+
+  /**
+   * Address: 0x00C04DB0 (FUN_00C04DB0, ??1TConVar_ren_ShadowLOD@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShadowLOD`.
+   */
+  void cleanup_TConVar_ren_ShadowLOD()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShadowLOD);
+  }
+
+  /**
+   * Address: 0x00BE1FE0 (FUN_00BE1FE0, register_TConVar_ren_ShadowLOD)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShadowLOD`.
+   */
+  void register_TConVar_ren_ShadowLOD()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShadowLOD, &cleanup_TConVar_ren_ShadowLOD);
+  }
+
+  /**
+   * Address: 0x00C04870 (FUN_00C04870, ??1TConVar_ren_ShadowSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShadowSize`.
+   */
+  void cleanup_TConVar_ren_ShadowSize()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShadowSize);
+  }
+
+  /**
+   * Address: 0x00BE1890 (FUN_00BE1890, register_TConVar_ren_ShadowSize)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShadowSize`.
+   */
+  void register_TConVar_ren_ShadowSize()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShadowSize, &cleanup_TConVar_ren_ShadowSize);
+  }
+
+  /**
+   * Address: 0x00C047E0 (FUN_00C047E0, ??1TConVar_ren_Shadows@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Shadows`.
+   */
+  void cleanup_TConVar_ren_Shadows()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Shadows);
+  }
+
+  /**
+   * Address: 0x00BE17D0 (FUN_00BE17D0, register_TConVar_ren_Shadows)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Shadows`.
+   */
+  void register_TConVar_ren_Shadows()
+  {
+    RegisterStartupConVar(gTConVar_ren_Shadows, &cleanup_TConVar_ren_Shadows);
+  }
+
+  /**
+   * Address: 0x00C05A30 (FUN_00C05A30, ??1TConVar_ren_ShoreErrorCoeff@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShoreErrorCoeff`.
+   */
+  void cleanup_TConVar_ren_ShoreErrorCoeff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShoreErrorCoeff);
+  }
+
+  /**
+   * Address: 0x00BE3210 (FUN_00BE3210, register_TConVar_ren_ShoreErrorCoeff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShoreErrorCoeff`.
+   */
+  void register_TConVar_ren_ShoreErrorCoeff()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShoreErrorCoeff, &cleanup_TConVar_ren_ShoreErrorCoeff);
+  }
+
+  /**
+   * Address: 0x00C05CF0 (FUN_00C05CF0, ??1TConVar_ren_Shoreline@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Shoreline`.
+   */
+  void cleanup_TConVar_ren_Shoreline()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Shoreline);
+  }
+
+  /**
+   * Address: 0x00BE37B0 (FUN_00BE37B0, register_TConVar_ren_Shoreline)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Shoreline`.
+   */
+  void register_TConVar_ren_Shoreline()
+  {
+    RegisterStartupConVar(gTConVar_ren_Shoreline, &cleanup_TConVar_ren_Shoreline);
+  }
+
+  /**
+   * Address: 0x00C05D20 (FUN_00C05D20, ??1TConVar_ren_ShorelineCutoff@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShorelineCutoff`.
+   */
+  void cleanup_TConVar_ren_ShorelineCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShorelineCutoff);
+  }
+
+  /**
+   * Address: 0x00BE37F0 (FUN_00BE37F0, register_TConVar_ren_ShorelineCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShorelineCutoff`.
+   */
+  void register_TConVar_ren_ShorelineCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShorelineCutoff, &cleanup_TConVar_ren_ShorelineCutoff);
+  }
+
+  /**
+   * Address: 0x00C04A50 (FUN_00C04A50, ??1TConVar_ren_ShowBandwidthUsage@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowBandwidthUsage`.
+   */
+  void cleanup_TConVar_ren_ShowBandwidthUsage()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowBandwidthUsage);
+  }
+
+  /**
+   * Address: 0x00BE1B10 (FUN_00BE1B10, register_TConVar_ren_ShowBandwidthUsage)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowBandwidthUsage`.
+   */
+  void register_TConVar_ren_ShowBandwidthUsage()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowBandwidthUsage, &cleanup_TConVar_ren_ShowBandwidthUsage);
+  }
+
+  /**
+   * Address: 0x00C048D0 (FUN_00C048D0, ??1TConVar_ren_ShowBoneNames@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowBoneNames`.
+   */
+  void cleanup_TConVar_ren_ShowBoneNames()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowBoneNames);
+  }
+
+  /**
+   * Address: 0x00BE1910 (FUN_00BE1910, register_TConVar_ren_ShowBoneNames)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowBoneNames`.
+   */
+  void register_TConVar_ren_ShowBoneNames()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowBoneNames, &cleanup_TConVar_ren_ShowBoneNames);
+  }
+
+  /**
+   * Address: 0x00C04EB0 (FUN_00C04EB0, ??1TConVar_ren_ShowDirtyTerrain@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowDirtyTerrain`.
+   */
+  void cleanup_TConVar_ren_ShowDirtyTerrain()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowDirtyTerrain);
+  }
+
+  /**
+   * Address: 0x00BE2190 (FUN_00BE2190, register_TConVar_ren_ShowDirtyTerrain)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowDirtyTerrain`.
+   */
+  void register_TConVar_ren_ShowDirtyTerrain()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowDirtyTerrain, &cleanup_TConVar_ren_ShowDirtyTerrain);
+  }
+
+  /**
+   * Address: 0x00C049C0 (FUN_00C049C0, ??1TConVar_ren_ShowFrameTimes@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowFrameTimes`.
+   */
+  void cleanup_TConVar_ren_ShowFrameTimes()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowFrameTimes);
+  }
+
+  /**
+   * Address: 0x00BE1A50 (FUN_00BE1A50, register_TConVar_ren_ShowFrameTimes)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowFrameTimes`.
+   */
+  void register_TConVar_ren_ShowFrameTimes()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowFrameTimes, &cleanup_TConVar_ren_ShowFrameTimes);
+  }
+
+  /**
+   * Address: 0x00C04A20 (FUN_00C04A20, ??1TConVar_ren_ShowNetworkStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowNetworkStats`.
+   */
+  void cleanup_TConVar_ren_ShowNetworkStats()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowNetworkStats);
+  }
+
+  /**
+   * Address: 0x00BE1AD0 (FUN_00BE1AD0, register_TConVar_ren_ShowNetworkStats)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowNetworkStats`.
+   */
+  void register_TConVar_ren_ShowNetworkStats()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowNetworkStats, &cleanup_TConVar_ren_ShowNetworkStats);
+  }
+
+  /**
+   * Address: 0x00C04E50 (FUN_00C04E50, ??1TConVar_ren_ShowNormals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowNormals`.
+   */
+  void cleanup_TConVar_ren_ShowNormals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowNormals);
+  }
+
+  /**
+   * Address: 0x00BE2110 (FUN_00BE2110, register_TConVar_ren_ShowNormals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowNormals`.
+   */
+  void register_TConVar_ren_ShowNormals()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowNormals, &cleanup_TConVar_ren_ShowNormals);
+  }
+
+  /**
+   * Address: 0x00C04660 (FUN_00C04660, ??1TConVar_ren_ShowWireframe@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShowWireframe`.
+   */
+  void cleanup_TConVar_ren_ShowWireframe()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShowWireframe);
+  }
+
+  /**
+   * Address: 0x00BE15D0 (FUN_00BE15D0, register_TConVar_ren_ShowWireframe)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShowWireframe`.
+   */
+  void register_TConVar_ren_ShowWireframe()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShowWireframe, &cleanup_TConVar_ren_ShowWireframe);
+  }
+
+  /**
+   * Address: 0x00C05150 (FUN_00C05150, ??1TConVar_ren_Skirt@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Skirt`.
+   */
+  void cleanup_TConVar_ren_Skirt()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Skirt);
+  }
+
+  /**
+   * Address: 0x00BE2510 (FUN_00BE2510, register_TConVar_ren_Skirt)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Skirt`.
+   */
+  void register_TConVar_ren_Skirt()
+  {
+    RegisterStartupConVar(gTConVar_ren_Skirt, &cleanup_TConVar_ren_Skirt);
+  }
+
+  /**
+   * Address: 0x00C047B0 (FUN_00C047B0, ??1TConVar_ren_SkyDome@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SkyDome`.
+   */
+  void cleanup_TConVar_ren_SkyDome()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SkyDome);
+  }
+
+  /**
+   * Address: 0x00BE1790 (FUN_00BE1790, register_TConVar_ren_SkyDome)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SkyDome`.
+   */
+  void register_TConVar_ren_SkyDome()
+  {
+    RegisterStartupConVar(gTConVar_ren_SkyDome, &cleanup_TConVar_ren_SkyDome);
+  }
+
+  /**
+   * Address: 0x00C04FD0 (FUN_00C04FD0, ??1TConVar_ren_Splats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Splats`.
+   */
+  void cleanup_TConVar_ren_Splats()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Splats);
+  }
+
+  /**
+   * Address: 0x00BE2310 (FUN_00BE2310, register_TConVar_ren_Splats)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Splats`.
+   */
+  void register_TConVar_ren_Splats()
+  {
+    RegisterStartupConVar(gTConVar_ren_Splats, &cleanup_TConVar_ren_Splats);
+  }
+
+  /**
+   * Address: 0x00C084D0 (FUN_00C084D0, ??1TConVar_ren_SyncTerrainLOD@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_SyncTerrainLOD`.
+   */
+  void cleanup_TConVar_ren_SyncTerrainLOD()
+  {
+    CleanupStartupConCommand(gTConVar_ren_SyncTerrainLOD);
+  }
+
+  /**
+   * Address: 0x00BE7D90 (FUN_00BE7D90, register_TConVar_ren_SyncTerrainLOD)
+   *
+   * What it does:
+   * Registers startup convar for `ren_SyncTerrainLOD`.
+   */
+  void register_TConVar_ren_SyncTerrainLOD()
+  {
+    RegisterStartupConVar(gTConVar_ren_SyncTerrainLOD, &cleanup_TConVar_ren_SyncTerrainLOD);
+  }
+
+  /**
+   * Address: 0x00C050F0 (FUN_00C050F0, ??1TConVar_ren_TTerrainGlow@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_TTerrainGlow`.
+   */
+  void cleanup_TConVar_ren_TTerrainGlow()
+  {
+    CleanupStartupConCommand(gTConVar_ren_TTerrainGlow);
+  }
+
+  /**
+   * Address: 0x00BE2490 (FUN_00BE2490, register_TConVar_ren_TTerrainGlow)
+   *
+   * What it does:
+   * Registers startup convar for `ren_TTerrainGlow`.
+   */
+  void register_TConVar_ren_TTerrainGlow()
+  {
+    RegisterStartupConVar(gTConVar_ren_TTerrainGlow, &cleanup_TConVar_ren_TTerrainGlow);
+  }
+
+  /**
+   * Address: 0x00C08750 (FUN_00C08750, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_TeamColorLookupCount`.
+   */
+  void cleanup_TConVar_ren_TeamColorLookupCount()
+  {
+    CleanupStartupConCommand(gTConVar_ren_TeamColorLookupCount);
+  }
+
+  /**
+   * Address: 0x00BE86E0 (FUN_00BE86E0, register_TConVar_ren_TeamColorLookupCount)
+   *
+   * What it does:
+   * Registers startup convar for `ren_TeamColorLookupCount`.
+   */
+  void register_TConVar_ren_TeamColorLookupCount()
+  {
+    RegisterStartupConVar(gTConVar_ren_TeamColorLookupCount, &cleanup_TConVar_ren_TeamColorLookupCount);
+  }
+
+  /**
+   * Address: 0x00C04E80 (FUN_00C04E80, ??1TConVar_ren_Terrain@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Terrain`.
+   */
+  void cleanup_TConVar_ren_Terrain()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Terrain);
+  }
+
+  /**
+   * Address: 0x00BE2150 (FUN_00BE2150, register_TConVar_ren_Terrain)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Terrain`.
+   */
+  void register_TConVar_ren_Terrain()
+  {
+    RegisterStartupConVar(gTConVar_ren_Terrain, &cleanup_TConVar_ren_Terrain);
+  }
+
+  /**
+   * Address: 0x00C04EE0 (FUN_00C04EE0, ??1TConVar_ren_Trees@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Trees`.
+   */
+  void cleanup_TConVar_ren_Trees()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Trees);
+  }
+
+  /**
+   * Address: 0x00BE21D0 (FUN_00BE21D0, register_TConVar_ren_Trees)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Trees`.
+   */
+  void register_TConVar_ren_Trees()
+  {
+    RegisterStartupConVar(gTConVar_ren_Trees, &cleanup_TConVar_ren_Trees);
+  }
+
+  /**
+   * Address: 0x00C04540 (FUN_00C04540, ??1TConVar_ren_Ui@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Ui`.
+   */
+  void cleanup_TConVar_ren_Ui()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Ui);
+  }
+
+  /**
+   * Address: 0x00BE1450 (FUN_00BE1450, register_TConVar_ren_Ui)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Ui`.
+   */
+  void register_TConVar_ren_Ui()
+  {
+    RegisterStartupConVar(gTConVar_ren_Ui, &cleanup_TConVar_ren_Ui);
+  }
+
+  /**
+   * Address: 0x00C04BC0 (FUN_00C04BC0, ??1TConVar_ren_UnitSelectionScale@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_UnitSelectionScale`.
+   */
+  void cleanup_TConVar_ren_UnitSelectionScale()
+  {
+    CleanupStartupConCommand(gTConVar_ren_UnitSelectionScale);
+  }
+
+  /**
+   * Address: 0x00BE1D40 (FUN_00BE1D40, register_TConVar_ren_UnitSelectionScale)
+   *
+   * What it does:
+   * Registers startup convar for `ren_UnitSelectionScale`.
+   */
+  void register_TConVar_ren_UnitSelectionScale()
+  {
+    RegisterStartupConVar(gTConVar_ren_UnitSelectionScale, &cleanup_TConVar_ren_UnitSelectionScale);
+  }
+
+  /**
+   * Address: 0x00C04930 (FUN_00C04930, ??1TConVar_ren_UnitSilhouette@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_UnitSilhouette`.
+   */
+  void cleanup_TConVar_ren_UnitSilhouette()
+  {
+    CleanupStartupConCommand(gTConVar_ren_UnitSilhouette);
+  }
+
+  /**
+   * Address: 0x00BE1990 (FUN_00BE1990, register_TConVar_ren_UnitSilhouette)
+   *
+   * What it does:
+   * Registers startup convar for `ren_UnitSilhouette`.
+   */
+  void register_TConVar_ren_UnitSilhouette()
+  {
+    RegisterStartupConVar(gTConVar_ren_UnitSilhouette, &cleanup_TConVar_ren_UnitSilhouette);
+  }
+
+  /**
+   * Address: 0x00C05970 (FUN_00C05970, ??1TConVar_ren_maxViewError@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ViewError`.
+   */
+  void cleanup_TConVar_ren_ViewError()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ViewError);
+  }
+
+  /**
+   * Address: 0x00BE3110 (FUN_00BE3110, register_TConVar_ren_ViewError)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ViewError`.
+   */
+  void register_TConVar_ren_ViewError()
+  {
+    RegisterStartupConVar(gTConVar_ren_ViewError, &cleanup_TConVar_ren_ViewError);
+  }
+
+  /**
+   * Address: 0x00C04F40 (FUN_00C04F40, ??1TConVar_ren_Water@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_Water`.
+   */
+  void cleanup_TConVar_ren_Water()
+  {
+    CleanupStartupConCommand(gTConVar_ren_Water);
+  }
+
+  /**
+   * Address: 0x00BE2250 (FUN_00BE2250, register_TConVar_ren_Water)
+   *
+   * What it does:
+   * Registers startup convar for `ren_Water`.
+   */
+  void register_TConVar_ren_Water()
+  {
+    RegisterStartupConVar(gTConVar_ren_Water, &cleanup_TConVar_ren_Water);
+  }
+
+  /**
+   * Address: 0x00C04570 (FUN_00C04570, ??1TConVar_ren_WorldBorder@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_WorldBorder`.
+   */
+  void cleanup_TConVar_ren_WorldBorder()
+  {
+    CleanupStartupConCommand(gTConVar_ren_WorldBorder);
+  }
+
+  /**
+   * Address: 0x00BE1490 (FUN_00BE1490, register_TConVar_ren_WorldBorder)
+   *
+   * What it does:
+   * Registers startup convar for `ren_WorldBorder`.
+   */
+  void register_TConVar_ren_WorldBorder()
+  {
+    RegisterStartupConVar(gTConVar_ren_WorldBorder, &cleanup_TConVar_ren_WorldBorder);
+  }
+
+  /**
+   * Address: 0x00C04E20 (FUN_00C04E20, ??1TConVar_ren_bicubicnormals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_bicubicnormals`.
+   */
+  void cleanup_TConVar_ren_bicubicnormals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_bicubicnormals);
+  }
+
+  /**
+   * Address: 0x00BE20D0 (FUN_00BE20D0, register_TConVar_ren_bicubicnormals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_bicubicnormals`.
+   */
+  void register_TConVar_ren_bicubicnormals()
+  {
+    RegisterStartupConVar(gTConVar_ren_bicubicnormals, &cleanup_TConVar_ren_bicubicnormals);
+  }
+
+  /**
+   * Address: 0x00C04690 (FUN_00C04690, ??1TConVar_ren_fog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_fog`.
+   */
+  void cleanup_TConVar_ren_fog()
+  {
+    CleanupStartupConCommand(gTConVar_ren_fog);
+  }
+
+  /**
+   * Address: 0x00BE1610 (FUN_00BE1610, register_TConVar_ren_fog)
+   *
+   * What it does:
+   * Registers startup convar for `ren_fog`.
+   */
+  void register_TConVar_ren_fog()
+  {
+    RegisterStartupConVar(gTConVar_ren_fog, &cleanup_TConVar_ren_fog);
+  }
+
+  /**
+   * Address: 0x00C05060 (FUN_00C05060, ??1TConVar_ren_glowingDecals@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_glowingDecals`.
+   */
+  void cleanup_TConVar_ren_glowingDecals()
+  {
+    CleanupStartupConCommand(gTConVar_ren_glowingDecals);
+  }
+
+  /**
+   * Address: 0x00BE23D0 (FUN_00BE23D0, register_TConVar_ren_glowingDecals)
+   *
+   * What it does:
+   * Registers startup convar for `ren_glowingDecals`.
+   */
+  void register_TConVar_ren_glowingDecals()
+  {
+    RegisterStartupConVar(gTConVar_ren_glowingDecals, &cleanup_TConVar_ren_glowingDecals);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsRenTuning
+  {
+    ConsoleStartupRegistrationsRenTuning()
+    {
+      moho::register_TConVar_ren_BandwidthDisplayKernel();
+      moho::register_TConVar_ren_BandwidthDisplaySeconds();
+      moho::register_TConVar_ren_BgLowerBound();
+      moho::register_TConVar_ren_Bloom();
+      moho::register_TConVar_ren_BloomBlurCount();
+      moho::register_TConVar_ren_BloomBlurKernelScale();
+      moho::register_TConVar_ren_BloomGlowCopyScale();
+      moho::register_TConVar_ren_BorderSize();
+      moho::register_TConVar_ren_ClipDecalLevel();
+      moho::register_TConVar_ren_ClipDecals();
+      moho::register_TConVar_ren_Clutter();
+      moho::register_TConVar_ren_ClutterRadius();
+      moho::register_TConVar_ren_DecalAlbedoLodCutoff();
+      moho::register_TConVar_ren_DecalFadeFraction();
+      moho::register_TConVar_ren_DecalFidelity();
+      moho::register_TConVar_ren_DecalFlatTol();
+      moho::register_TConVar_ren_DecalNormalLodCutoff();
+      moho::register_TConVar_ren_DecalOverDraw();
+      moho::register_TConVar_ren_Decals();
+      moho::register_TConVar_ren_ErrorCache();
+      moho::register_TConVar_ren_FogIntensity();
+      moho::register_TConVar_ren_FogOfWar();
+      moho::register_TConVar_ren_ForceUpdateMinimapTerrain();
+      moho::register_TConVar_ren_FrameTimeSeconds();
+      moho::register_TConVar_ren_Fx();
+      moho::register_TConVar_ren_GenerateMesh();
+      moho::register_TConVar_ren_HideSecondary();
+      moho::register_TConVar_ren_IgnoreDecalLOD();
+      moho::register_TConVar_ren_MeshDissolve();
+      moho::register_TConVar_ren_MeshDissolveCutoff();
+      moho::register_TConVar_ren_MeshSkinned();
+      moho::register_TConVar_ren_MeshStatic();
+      moho::register_TConVar_ren_NewFogUpdate();
+      moho::register_TConVar_ren_NewPipeline();
+      moho::register_TConVar_ren_NormalDecals();
+      moho::register_TConVar_ren_Oblivion();
+      moho::register_TConVar_ren_OnlyFirstView();
+      moho::register_TConVar_ren_PlayableBoundary();
+      moho::register_TConVar_ren_Reflection();
+      moho::register_TConVar_ren_Refraction();
+      moho::register_TConVar_ren_RegenShore();
+      moho::register_TConVar_ren_RenderNothing();
+      moho::register_TConVar_ren_Select();
+      moho::register_TConVar_ren_SelectBoxes();
+      moho::register_TConVar_ren_SelectBracketMinPixelSize();
+      moho::register_TConVar_ren_SelectBracketSize();
+      moho::register_TConVar_ren_SelectColor();
+      moho::register_TConVar_ren_SelectionHeightFudge();
+      moho::register_TConVar_ren_SelectionSizeFudge();
+      moho::register_TConVar_ren_ShadowBlur();
+      moho::register_TConVar_ren_ShadowCoeff();
+      moho::register_TConVar_ren_ShadowLOD();
+      moho::register_TConVar_ren_ShadowSize();
+      moho::register_TConVar_ren_Shadows();
+      moho::register_TConVar_ren_ShoreErrorCoeff();
+      moho::register_TConVar_ren_Shoreline();
+      moho::register_TConVar_ren_ShorelineCutoff();
+      moho::register_TConVar_ren_ShowBandwidthUsage();
+      moho::register_TConVar_ren_ShowBoneNames();
+      moho::register_TConVar_ren_ShowDirtyTerrain();
+      moho::register_TConVar_ren_ShowFrameTimes();
+      moho::register_TConVar_ren_ShowNetworkStats();
+      moho::register_TConVar_ren_ShowNormals();
+      moho::register_TConVar_ren_ShowWireframe();
+      moho::register_TConVar_ren_Skirt();
+      moho::register_TConVar_ren_SkyDome();
+      moho::register_TConVar_ren_Splats();
+      moho::register_TConVar_ren_SyncTerrainLOD();
+      moho::register_TConVar_ren_TTerrainGlow();
+      moho::register_TConVar_ren_TeamColorLookupCount();
+      moho::register_TConVar_ren_Terrain();
+      moho::register_TConVar_ren_Trees();
+      moho::register_TConVar_ren_Ui();
+      moho::register_TConVar_ren_UnitSelectionScale();
+      moho::register_TConVar_ren_UnitSilhouette();
+      moho::register_TConVar_ren_ViewError();
+      moho::register_TConVar_ren_Water();
+      moho::register_TConVar_ren_WorldBorder();
+      moho::register_TConVar_ren_bicubicnormals();
+      moho::register_TConVar_ren_fog();
+      moho::register_TConVar_ren_glowingDecals();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsRenTuning gConsoleStartupRegistrationsRenTuning;
+} // namespace
