@@ -8424,3 +8424,2068 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsMisc gConsoleStartupRegistrationsMisc;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupUIRenProectileTrailWidthDescription = "The half width, in pixels, of the projectile trail";
+  constexpr const char* kConsoleStartupUIRenProjectileArcsSampleIntervalDescription = "How often the position is updated for the projectile trail";
+  constexpr const char* kConsoleStartupUIRenProjectileGlowDescription = "Toggle projectile icon glow";
+  constexpr const char* kConsoleStartupUIRenProjectileGlowMaxDescription = "Maximum glow alpha on projecile icon";
+  constexpr const char* kConsoleStartupUIRenProjectileGlowMinDescription = "Minimum glow alpha on projectile icon";
+  constexpr const char* kConsoleStartupUIRenProjectileGlowPeriodDescription = "The period in which the projectile icon glow will pulse from min to max to min";
+  constexpr const char* kConsoleStartupUIRenProjectileIconsDescription = "toggle projectile icons on/off";
+  constexpr const char* kConsoleStartupUIRenProjectileTrailColorDescription = "ARGB value of the projectile trail";
+  constexpr const char* kConsoleStartupUIRenResourcesDescription = "toggle resource icons on/off";
+  constexpr const char* kConsoleStartupUIResourceLODCutoffDescription = "When to draw icons instead of resource deposit textures";
+  constexpr const char* kConsoleStartupUISelectAnythingDescription = "Debug to allow UI to select anything";
+  constexpr const char* kConsoleStartupUIShowControlUnderMouseDescription = "Highlights the control currently under the mouse";
+  constexpr const char* kConsoleStartupUIStrategicProjectileLODDescription = "At what LODMetric do we draw projectile pixels on strategic view";
+  constexpr const char* kConsoleStartupUIForceWeaponsToYellowDescription = "Force all minimap weapon fire to yellow";
+  constexpr const char* kConsoleStartupUiAlwaysRenderStrategicIconsDescription = "When true, strategic icons always render, even when zoomed in";
+  constexpr const char* kConsoleStartupUiArrowKeysScrollViewDescription = "Toggle if the arrow keys scroll the main view";
+  constexpr const char* kConsoleStartupUiBuildPlaceTarmacAlphaDescription = "Tarmac alpha for buildings that are about to be placed";
+  constexpr const char* kConsoleStartupUiCommandClickScaleDescription = "Scale applied to the click distance size of command waypoints";
+  constexpr const char* kConsoleStartupUiCommandGraphMaxNodeUnitsDescription = "Limits the size of the waypoints";
+  constexpr const char* kConsoleStartupUiCurveSegmentsDescription = "How many segments to subdivide curves into";
+  constexpr const char* kConsoleStartupUiCurveSmoothnessDescription = "How big to make curves when drawing command previews";
+  constexpr const char* kConsoleStartupUiCustomNameColorDescription = "Color of the custom name display";
+  constexpr const char* kConsoleStartupUiCustomNameFontSizeDescription = "Point size of the custom name display";
+  constexpr const char* kConsoleStartupUiDebugAltClickDescription = "Enable ALT+Click debug command to switch armies";
+  constexpr const char* kConsoleStartupUiDisableCursorFixingDescription = "Allows you to toggle the cursor fixing functionality that is used for the mouse-controlled camera spinning/scrolling";
+  constexpr const char* kConsoleStartupUiDragSelect2DDescription = "Use a 2D (screen-space) drag-selection box";
+  constexpr const char* kConsoleStartupUiDrawPathPreviewDescription = "Turns on/off the arrow line";
+  constexpr const char* kConsoleStartupUiExtractSnapToleranceDescription = "Sets the extraction unit 'snap-to' tolerance (in meters) for building.  Increase this to make it easier to auto-snap to extraction sites.";
+  constexpr const char* kConsoleStartupUiFootprintMinThicknessDescription = "Mimimum render size for the footprint outline.";
+  constexpr const char* kConsoleStartupUiForceLifbarsOnEnemyDescription = "force lifebars on for enemy units";
+  constexpr const char* kConsoleStartupUiFuelBarColorDescription = "The color of the secondary Fuel bar";
+  constexpr const char* kConsoleStartupUiFuelEmptyBlinkRateDescription = "Blink timer scale for empty fuel";
+  constexpr const char* kConsoleStartupUiFuelWarningColorDescription = "The color of the feul warning flash";
+  constexpr const char* kConsoleStartupUiKeyboardPanAccelerateMultiplierDescription = "How much faster the camera pans when accelerated";
+  constexpr const char* kConsoleStartupUiKeyboardPanSpeedDescription = "How fast arrow keys pans camera";
+  constexpr const char* kConsoleStartupUiKeyboardRotateAccelerateMultiplierDescription = "How much faster the camera rotates when accelerated";
+  constexpr const char* kConsoleStartupUiKeyboardRotateSpeedDescription = "How fast ins/del rotate camera";
+  constexpr const char* kConsoleStartupUiLifeBarBadColorDescription = "The color of the lifebar when there is poor health";
+  constexpr const char* kConsoleStartupUiLifeBarBadCutoffDescription = "The percent of health where the life bar changes from bad to medium";
+  constexpr const char* kConsoleStartupUiLifeBarGoodColorDescription = "The color of the lifebar when there is good health";
+  constexpr const char* kConsoleStartupUiLifeBarGoodCutoffDescription = "The percent of health where the life bar changes from medium to good";
+  constexpr const char* kConsoleStartupUiLifeBarMedColorDescription = "The color of the lifebar when there is medium health";
+  constexpr const char* kConsoleStartupUiLifebarLODDescription = "LOD Cutoff for health bars";
+  constexpr const char* kConsoleStartupUiLifebarOffsetDescription = "Y Offset in ogrids of all lifebars";
+  constexpr const char* kConsoleStartupUiLifebarWidthDescription = "width of health/fuel bar in ogrids";
+  constexpr const char* kConsoleStartupUiMaxExtractSnapPixelsDescription = "Allows us to put a pixel cap on the snap tolerance (in case we are zoomed in close.";
+  constexpr const char* kConsoleStartupUiMaxTextLODDescription = "LOD level that timer text dissapears";
+  constexpr const char* kConsoleStartupUiMaxWaypointSizeDescription = "Set the maximum pixel size of a waypoint";
+  constexpr const char* kConsoleStartupUiMinExtractSnapPixelsDescription = "Allows us to put a pixel cap on the snap tolerance (in case we are zoomed out relatively far.";
+  constexpr const char* kConsoleStartupUiMinWaypointSizeDescription = "Set the minimum pixel size of a waypoint";
+  constexpr const char* kConsoleStartupUiNisRenderIconsDescription = "nis toggle for strat icons, also removes pause and diabled icons";
+  constexpr const char* kConsoleStartupUiPathPreviewDescription = "Turns on/off the pathfinding preview line";
+  constexpr const char* kConsoleStartupUiPathSmoothnessDescription = "How big to make curves when drawing path preview";
+  constexpr const char* kConsoleStartupUiProgressBarColorDescription = "The color of the secondary Construction Progress bar";
+  constexpr const char* kConsoleStartupUiRenderCustomNamesDescription = "toggle custom name display";
+  constexpr const char* kConsoleStartupUiRenderIconsDescription = "toggle strategic icons on/off";
+  constexpr const char* kConsoleStartupUiRenderSelectionSetNamesDescription = "toggle selection set names on/off";
+  constexpr const char* kConsoleStartupUiRenderUnitBarsDescription = "render unit life/fuel bars?";
+  constexpr const char* kConsoleStartupUiScreenEdgeScrollViewDescription = "Toggle if the mouse on the sides of the main window will scroll the view (fullscreen only)";
+  constexpr const char* kConsoleStartupUiSelectToleranceDescription = "Sets the unit click tolerance (in pixels) for selection.  Increase this to make units have a larger selection box.";
+  constexpr const char* kConsoleStartupUiSelectionSetNamesColorDescription = "Color of the selection set names";
+  constexpr const char* kConsoleStartupUiShieldBarColorDescription = "The color of the secondary Shield bar";
+  constexpr const char* kConsoleStartupUiStrategicIconBlinkDurationDescription = "How long to blink icon when unit is damage";
+  constexpr const char* kConsoleStartupUiStrategicIconBlinkRateDescription = "Blink timer scale for strategic icons on damage";
+  constexpr const char* kConsoleStartupUiWaypointLineScaleDescription = "Scale applied to the calculated waypoint line size";
+  constexpr const char* kConsoleStartupUiWindowedAlwaysShowsCursorDescription = "Always show cursor in windowed mode, regardless of show/hide";
+  constexpr const char* kConsoleStartupUiFuelbarHeightDescription = "size of the fuel bar as a fraction of the bar height";
+  constexpr const char* kConsoleStartupUiLifebarHeightDescription = "height of health/fuel bar in ogrids";
+} // namespace
+
+// New console-tunable storage with no other subsystem owner (default read from the
+// binary's .data image at the registrar's value-pointer field).
+float moho::ui_BuildPlaceTarmacAlpha = 0.5f;
+float moho::ui_CommandClickScale = 1.0f;
+float moho::ui_fuelbarHeight = 0.25f;
+
+namespace moho
+{
+  extern float UI_RenProectileTrailWidth;
+  extern int UI_RenProjectileArcsSampleInterval;
+  extern bool UI_RenProjectileGlow;
+  extern float UI_RenProjectileGlowMax;
+  extern float UI_RenProjectileGlowMin;
+  extern float UI_RenProjectileGlowPeriod;
+  extern bool UI_RenProjectileIcons;
+  extern int UI_RenProjectileTrailColor;
+  extern bool UI_RenResources;
+  extern float UI_ResourceLODCutoff;
+  extern bool UI_SelectAnything;
+  extern bool UI_ShowControlUnderMouse;
+  extern float UI_StrategicProjectileLOD;
+  extern bool UI_forceWeaponsToYellow;
+  extern bool ui_AlwaysRenderStrategicIcons;
+  extern bool ui_ArrowKeysScrollView;
+  extern int ui_CommandGraphMaxNodeUnits;
+  extern int ui_CurveSegments;
+  extern float ui_CurveSmoothness;
+  extern unsigned int ui_CustomNameColor;
+  extern int ui_CustomNameFontSize;
+  extern bool ui_DebugAltClick;
+  extern bool ui_DisableCursorFixing;
+  extern bool ui_DragSelect2D;
+  extern bool ui_DrawPathPreview;
+  extern float ui_ExtractSnapTolerance;
+  extern float ui_FootprintMinThickness;
+  extern bool ui_ForceLifbarsOnEnemy;
+  extern unsigned int ui_FuelBarColor;
+  extern float ui_FuelEmptyBlinkRate;
+  extern unsigned int ui_FuelWarningColor;
+  extern float ui_KeyboardPanAccelerateMultiplier;
+  extern float ui_KeyboardPanSpeed;
+  extern float ui_KeyboardRotateAccelerateMultiplier;
+  extern float ui_KeyboardRotateSpeed;
+  extern unsigned int ui_LifeBarBadColor;
+  extern float ui_LifeBarBadCutoff;
+  extern unsigned int ui_LifeBarGoodColor;
+  extern float ui_LifeBarGoodCutoff;
+  extern unsigned int ui_LifeBarMedColor;
+  extern float ui_LifebarLOD;
+  extern float ui_LifebarOffset;
+  extern float ui_LifebarWidth;
+  extern float ui_MaxExtractSnapPixels;
+  extern float ui_MaxTextLOD;
+  extern float ui_MaxWaypointSize;
+  extern float ui_MinExtractSnapPixels;
+  extern float ui_MinWaypointSize;
+  extern bool ui_NisRenderIcons;
+  extern bool ui_PathPreview;
+  extern float ui_PathSmoothness;
+  extern unsigned int ui_ProgressBarColor;
+  extern bool ui_RenderCustomNames;
+  extern bool ui_RenderIcons;
+  extern bool ui_RenderSelectionSetNames;
+  extern bool ui_RenderUnitBars;
+  extern bool ui_ScreenEdgeScrollView;
+  extern float ui_SelectTolerance;
+  extern unsigned int ui_SelectionSetNamesColor;
+  extern unsigned int ui_ShieldBarColor;
+  extern float ui_StrategicIconBlinkDuration;
+  extern float ui_StrategicIconBlinkRate;
+  extern float ui_WaypointLineScale;
+  extern bool ui_WindowedAlwaysShowsCursor;
+  extern float ui_lifebarHeight;
+
+  TConVar<float> gTConVar_UI_RenProectileTrailWidth(
+    "UI_RenProectileTrailWidth",
+    kConsoleStartupUIRenProectileTrailWidthDescription,
+    &moho::UI_RenProectileTrailWidth
+  );
+  TConVar<int> gTConVar_UI_RenProjectileArcsSampleInterval(
+    "UI_RenProjectileArcsSampleInterval",
+    kConsoleStartupUIRenProjectileArcsSampleIntervalDescription,
+    &moho::UI_RenProjectileArcsSampleInterval
+  );
+  TConVar<bool> gTConVar_UI_RenProjectileGlow(
+    "UI_RenProjectileGlow",
+    kConsoleStartupUIRenProjectileGlowDescription,
+    &moho::UI_RenProjectileGlow
+  );
+  TConVar<float> gTConVar_UI_RenProjectileGlowMax(
+    "UI_RenProjectileGlowMax",
+    kConsoleStartupUIRenProjectileGlowMaxDescription,
+    &moho::UI_RenProjectileGlowMax
+  );
+  TConVar<float> gTConVar_UI_RenProjectileGlowMin(
+    "UI_RenProjectileGlowMin",
+    kConsoleStartupUIRenProjectileGlowMinDescription,
+    &moho::UI_RenProjectileGlowMin
+  );
+  TConVar<float> gTConVar_UI_RenProjectileGlowPeriod(
+    "UI_RenProjectileGlowPeriod",
+    kConsoleStartupUIRenProjectileGlowPeriodDescription,
+    &moho::UI_RenProjectileGlowPeriod
+  );
+  TConVar<bool> gTConVar_UI_RenProjectileIcons(
+    "UI_RenProjectileIcons",
+    kConsoleStartupUIRenProjectileIconsDescription,
+    &moho::UI_RenProjectileIcons
+  );
+  TConVar<int> gTConVar_UI_RenProjectileTrailColor(
+    "UI_RenProjectileTrailColor",
+    kConsoleStartupUIRenProjectileTrailColorDescription,
+    &moho::UI_RenProjectileTrailColor
+  );
+  TConVar<bool> gTConVar_UI_RenResources(
+    "UI_RenResources",
+    kConsoleStartupUIRenResourcesDescription,
+    &moho::UI_RenResources
+  );
+  TConVar<float> gTConVar_UI_ResourceLODCutoff(
+    "UI_ResourceLODCutoff",
+    kConsoleStartupUIResourceLODCutoffDescription,
+    &moho::UI_ResourceLODCutoff
+  );
+  TConVar<bool> gTConVar_UI_SelectAnything(
+    "UI_SelectAnything",
+    kConsoleStartupUISelectAnythingDescription,
+    &moho::UI_SelectAnything
+  );
+  TConVar<bool> gTConVar_UI_ShowControlUnderMouse(
+    "UI_ShowControlUnderMouse",
+    kConsoleStartupUIShowControlUnderMouseDescription,
+    &moho::UI_ShowControlUnderMouse
+  );
+  TConVar<float> gTConVar_UI_StrategicProjectileLOD(
+    "UI_StrategicProjectileLOD",
+    kConsoleStartupUIStrategicProjectileLODDescription,
+    &moho::UI_StrategicProjectileLOD
+  );
+  TConVar<bool> gTConVar_UI_forceWeaponsToYellow(
+    "UI_forceWeaponsToYellow",
+    kConsoleStartupUIForceWeaponsToYellowDescription,
+    &moho::UI_forceWeaponsToYellow
+  );
+  TConVar<bool> gTConVar_ui_AlwaysRenderStrategicIcons(
+    "ui_AlwaysRenderStrategicIcons",
+    kConsoleStartupUiAlwaysRenderStrategicIconsDescription,
+    &moho::ui_AlwaysRenderStrategicIcons
+  );
+  TConVar<bool> gTConVar_ui_ArrowKeysScrollView(
+    "ui_ArrowKeysScrollView",
+    kConsoleStartupUiArrowKeysScrollViewDescription,
+    &moho::ui_ArrowKeysScrollView
+  );
+  TConVar<float> gTConVar_ui_BuildPlaceTarmacAlpha(
+    "ui_BuildPlaceTarmacAlpha",
+    kConsoleStartupUiBuildPlaceTarmacAlphaDescription,
+    &moho::ui_BuildPlaceTarmacAlpha
+  );
+  TConVar<float> gTConVar_ui_CommandClickScale(
+    "ui_CommandClickScale",
+    kConsoleStartupUiCommandClickScaleDescription,
+    &moho::ui_CommandClickScale
+  );
+  TConVar<int> gTConVar_ui_CommandGraphMaxNodeUnits(
+    "ui_CommandGraphMaxNodeUnits",
+    kConsoleStartupUiCommandGraphMaxNodeUnitsDescription,
+    &moho::ui_CommandGraphMaxNodeUnits
+  );
+  TConVar<int> gTConVar_ui_CurveSegments(
+    "ui_CurveSegments",
+    kConsoleStartupUiCurveSegmentsDescription,
+    &moho::ui_CurveSegments
+  );
+  TConVar<float> gTConVar_ui_CurveSmoothness(
+    "ui_CurveSmoothness",
+    kConsoleStartupUiCurveSmoothnessDescription,
+    &moho::ui_CurveSmoothness
+  );
+  TConVar<unsigned int> gTConVar_ui_CustomNameColor(
+    "ui_CustomNameColor",
+    kConsoleStartupUiCustomNameColorDescription,
+    &moho::ui_CustomNameColor
+  );
+  TConVar<int> gTConVar_ui_CustomNameFontSize(
+    "ui_CustomNameFontSize",
+    kConsoleStartupUiCustomNameFontSizeDescription,
+    &moho::ui_CustomNameFontSize
+  );
+  TConVar<bool> gTConVar_ui_DebugAltClick(
+    "ui_DebugAltClick",
+    kConsoleStartupUiDebugAltClickDescription,
+    &moho::ui_DebugAltClick
+  );
+  TConVar<bool> gTConVar_ui_DisableCursorFixing(
+    "ui_DisableCursorFixing",
+    kConsoleStartupUiDisableCursorFixingDescription,
+    &moho::ui_DisableCursorFixing
+  );
+  TConVar<bool> gTConVar_ui_DragSelect2D(
+    "ui_DragSelect2D",
+    kConsoleStartupUiDragSelect2DDescription,
+    &moho::ui_DragSelect2D
+  );
+  TConVar<bool> gTConVar_ui_DrawPathPreview(
+    "ui_DrawPathPreview",
+    kConsoleStartupUiDrawPathPreviewDescription,
+    &moho::ui_DrawPathPreview
+  );
+  TConVar<float> gTConVar_ui_ExtractSnapTolerance(
+    "ui_ExtractSnapTolerance",
+    kConsoleStartupUiExtractSnapToleranceDescription,
+    &moho::ui_ExtractSnapTolerance
+  );
+  TConVar<float> gTConVar_ui_FootprintMinThickness(
+    "ui_FootprintMinThickness",
+    kConsoleStartupUiFootprintMinThicknessDescription,
+    &moho::ui_FootprintMinThickness
+  );
+  TConVar<bool> gTConVar_ui_ForceLifbarsOnEnemy(
+    "ui_ForceLifbarsOnEnemy",
+    kConsoleStartupUiForceLifbarsOnEnemyDescription,
+    &moho::ui_ForceLifbarsOnEnemy
+  );
+  TConVar<unsigned int> gTConVar_ui_FuelBarColor(
+    "ui_FuelBarColor",
+    kConsoleStartupUiFuelBarColorDescription,
+    &moho::ui_FuelBarColor
+  );
+  TConVar<float> gTConVar_ui_FuelEmptyBlinkRate(
+    "ui_FuelEmptyBlinkRate",
+    kConsoleStartupUiFuelEmptyBlinkRateDescription,
+    &moho::ui_FuelEmptyBlinkRate
+  );
+  TConVar<unsigned int> gTConVar_ui_FuelWarningColor(
+    "ui_FuelWarningColor",
+    kConsoleStartupUiFuelWarningColorDescription,
+    &moho::ui_FuelWarningColor
+  );
+  TConVar<float> gTConVar_ui_KeyboardPanAccelerateMultiplier(
+    "ui_KeyboardPanAccelerateMultiplier",
+    kConsoleStartupUiKeyboardPanAccelerateMultiplierDescription,
+    &moho::ui_KeyboardPanAccelerateMultiplier
+  );
+  TConVar<float> gTConVar_ui_KeyboardPanSpeed(
+    "ui_KeyboardPanSpeed",
+    kConsoleStartupUiKeyboardPanSpeedDescription,
+    &moho::ui_KeyboardPanSpeed
+  );
+  TConVar<float> gTConVar_ui_KeyboardRotateAccelerateMultiplier(
+    "ui_KeyboardRotateAccelerateMultiplier",
+    kConsoleStartupUiKeyboardRotateAccelerateMultiplierDescription,
+    &moho::ui_KeyboardRotateAccelerateMultiplier
+  );
+  TConVar<float> gTConVar_ui_KeyboardRotateSpeed(
+    "ui_KeyboardRotateSpeed",
+    kConsoleStartupUiKeyboardRotateSpeedDescription,
+    &moho::ui_KeyboardRotateSpeed
+  );
+  TConVar<unsigned int> gTConVar_ui_LifeBarBadColor(
+    "ui_LifeBarBadColor",
+    kConsoleStartupUiLifeBarBadColorDescription,
+    &moho::ui_LifeBarBadColor
+  );
+  TConVar<float> gTConVar_ui_LifeBarBadCutoff(
+    "ui_LifeBarBadCutoff",
+    kConsoleStartupUiLifeBarBadCutoffDescription,
+    &moho::ui_LifeBarBadCutoff
+  );
+  TConVar<unsigned int> gTConVar_ui_LifeBarGoodColor(
+    "ui_LifeBarGoodColor",
+    kConsoleStartupUiLifeBarGoodColorDescription,
+    &moho::ui_LifeBarGoodColor
+  );
+  TConVar<float> gTConVar_ui_LifeBarGoodCutoff(
+    "ui_LifeBarGoodCutoff",
+    kConsoleStartupUiLifeBarGoodCutoffDescription,
+    &moho::ui_LifeBarGoodCutoff
+  );
+  TConVar<unsigned int> gTConVar_ui_LifeBarMedColor(
+    "ui_LifeBarMedColor",
+    kConsoleStartupUiLifeBarMedColorDescription,
+    &moho::ui_LifeBarMedColor
+  );
+  TConVar<float> gTConVar_ui_LifebarLOD(
+    "ui_LifebarLOD",
+    kConsoleStartupUiLifebarLODDescription,
+    &moho::ui_LifebarLOD
+  );
+  TConVar<float> gTConVar_ui_LifebarOffset(
+    "ui_LifebarOffset",
+    kConsoleStartupUiLifebarOffsetDescription,
+    &moho::ui_LifebarOffset
+  );
+  TConVar<float> gTConVar_ui_LifebarWidth(
+    "ui_LifebarWidth",
+    kConsoleStartupUiLifebarWidthDescription,
+    &moho::ui_LifebarWidth
+  );
+  TConVar<float> gTConVar_ui_MaxExtractSnapPixels(
+    "ui_MaxExtractSnapPixels",
+    kConsoleStartupUiMaxExtractSnapPixelsDescription,
+    &moho::ui_MaxExtractSnapPixels
+  );
+  TConVar<float> gTConVar_ui_MaxTextLOD(
+    "ui_MaxTextLOD",
+    kConsoleStartupUiMaxTextLODDescription,
+    &moho::ui_MaxTextLOD
+  );
+  TConVar<float> gTConVar_ui_MaxWaypointSize(
+    "ui_MaxWaypointSize",
+    kConsoleStartupUiMaxWaypointSizeDescription,
+    &moho::ui_MaxWaypointSize
+  );
+  TConVar<float> gTConVar_ui_MinExtractSnapPixels(
+    "ui_MinExtractSnapPixels",
+    kConsoleStartupUiMinExtractSnapPixelsDescription,
+    &moho::ui_MinExtractSnapPixels
+  );
+  TConVar<float> gTConVar_ui_MinWaypointSize(
+    "ui_MinWaypointSize",
+    kConsoleStartupUiMinWaypointSizeDescription,
+    &moho::ui_MinWaypointSize
+  );
+  TConVar<bool> gTConVar_ui_NisRenderIcons(
+    "ui_NisRenderIcons",
+    kConsoleStartupUiNisRenderIconsDescription,
+    &moho::ui_NisRenderIcons
+  );
+  TConVar<bool> gTConVar_ui_PathPreview(
+    "ui_PathPreview",
+    kConsoleStartupUiPathPreviewDescription,
+    &moho::ui_PathPreview
+  );
+  TConVar<float> gTConVar_ui_PathSmoothness(
+    "ui_PathSmoothness",
+    kConsoleStartupUiPathSmoothnessDescription,
+    &moho::ui_PathSmoothness
+  );
+  TConVar<unsigned int> gTConVar_ui_ProgressBarColor(
+    "ui_ProgressBarColor",
+    kConsoleStartupUiProgressBarColorDescription,
+    &moho::ui_ProgressBarColor
+  );
+  TConVar<bool> gTConVar_ui_RenderCustomNames(
+    "ui_RenderCustomNames",
+    kConsoleStartupUiRenderCustomNamesDescription,
+    &moho::ui_RenderCustomNames
+  );
+  TConVar<bool> gTConVar_ui_RenderIcons(
+    "ui_RenderIcons",
+    kConsoleStartupUiRenderIconsDescription,
+    &moho::ui_RenderIcons
+  );
+  TConVar<bool> gTConVar_ui_RenderSelectionSetNames(
+    "ui_RenderSelectionSetNames",
+    kConsoleStartupUiRenderSelectionSetNamesDescription,
+    &moho::ui_RenderSelectionSetNames
+  );
+  TConVar<bool> gTConVar_ui_RenderUnitBars(
+    "ui_RenderUnitBars",
+    kConsoleStartupUiRenderUnitBarsDescription,
+    &moho::ui_RenderUnitBars
+  );
+  TConVar<bool> gTConVar_ui_ScreenEdgeScrollView(
+    "ui_ScreenEdgeScrollView",
+    kConsoleStartupUiScreenEdgeScrollViewDescription,
+    &moho::ui_ScreenEdgeScrollView
+  );
+  TConVar<float> gTConVar_ui_SelectTolerance(
+    "ui_SelectTolerance",
+    kConsoleStartupUiSelectToleranceDescription,
+    &moho::ui_SelectTolerance
+  );
+  TConVar<unsigned int> gTConVar_ui_SelectionSetNamesColor(
+    "ui_SelectionSetNamesColor",
+    kConsoleStartupUiSelectionSetNamesColorDescription,
+    &moho::ui_SelectionSetNamesColor
+  );
+  TConVar<unsigned int> gTConVar_ui_ShieldBarColor(
+    "ui_ShieldBarColor",
+    kConsoleStartupUiShieldBarColorDescription,
+    &moho::ui_ShieldBarColor
+  );
+  TConVar<float> gTConVar_ui_StrategicIconBlinkDuration(
+    "ui_StrategicIconBlinkDuration",
+    kConsoleStartupUiStrategicIconBlinkDurationDescription,
+    &moho::ui_StrategicIconBlinkDuration
+  );
+  TConVar<float> gTConVar_ui_StrategicIconBlinkRate(
+    "ui_StrategicIconBlinkRate",
+    kConsoleStartupUiStrategicIconBlinkRateDescription,
+    &moho::ui_StrategicIconBlinkRate
+  );
+  TConVar<float> gTConVar_ui_WaypointLineScale(
+    "ui_WaypointLineScale",
+    kConsoleStartupUiWaypointLineScaleDescription,
+    &moho::ui_WaypointLineScale
+  );
+  TConVar<bool> gTConVar_ui_WindowedAlwaysShowsCursor(
+    "ui_WindowedAlwaysShowsCursor",
+    kConsoleStartupUiWindowedAlwaysShowsCursorDescription,
+    &moho::ui_WindowedAlwaysShowsCursor
+  );
+  TConVar<float> gTConVar_ui_fuelbarHeight(
+    "ui_fuelbarHeight",
+    kConsoleStartupUiFuelbarHeightDescription,
+    &moho::ui_fuelbarHeight
+  );
+  TConVar<float> gTConVar_ui_lifebarHeight(
+    "ui_lifebarHeight",
+    kConsoleStartupUiLifebarHeightDescription,
+    &moho::ui_lifebarHeight
+  );
+
+  /**
+   * Address: 0x00C071F0 (FUN_00C071F0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProectileTrailWidth`.
+   */
+  void cleanup_TConVar_UI_RenProectileTrailWidth()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProectileTrailWidth);
+  }
+
+  /**
+   * Address: 0x00BE5C70 (FUN_00BE5C70, register_TConVar_UI_RenProectileTrailWidth)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProectileTrailWidth`.
+   */
+  void register_TConVar_UI_RenProectileTrailWidth()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProectileTrailWidth, &cleanup_TConVar_UI_RenProectileTrailWidth);
+  }
+
+  /**
+   * Address: 0x00C07220 (FUN_00C07220, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileArcsSampleInterval`.
+   */
+  void cleanup_TConVar_UI_RenProjectileArcsSampleInterval()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileArcsSampleInterval);
+  }
+
+  /**
+   * Address: 0x00BE5CB0 (FUN_00BE5CB0, register_TConVar_UI_RenProjectileArcsSampleInterval)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileArcsSampleInterval`.
+   */
+  void register_TConVar_UI_RenProjectileArcsSampleInterval()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileArcsSampleInterval, &cleanup_TConVar_UI_RenProjectileArcsSampleInterval);
+  }
+
+  /**
+   * Address: 0x00C07310 (FUN_00C07310, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileGlow`.
+   */
+  void cleanup_TConVar_UI_RenProjectileGlow()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlow);
+  }
+
+  /**
+   * Address: 0x00BE5E20 (FUN_00BE5E20, register_TConVar_UI_RenProjectileGlow)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileGlow`.
+   */
+  void register_TConVar_UI_RenProjectileGlow()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileGlow, &cleanup_TConVar_UI_RenProjectileGlow);
+  }
+
+  /**
+   * Address: 0x00C07370 (FUN_00C07370, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileGlowMax`.
+   */
+  void cleanup_TConVar_UI_RenProjectileGlowMax()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowMax);
+  }
+
+  /**
+   * Address: 0x00BE5EA0 (FUN_00BE5EA0, register_TConVar_UI_RenProjectileGlowMax)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileGlowMax`.
+   */
+  void register_TConVar_UI_RenProjectileGlowMax()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowMax, &cleanup_TConVar_UI_RenProjectileGlowMax);
+  }
+
+  /**
+   * Address: 0x00C07340 (FUN_00C07340, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileGlowMin`.
+   */
+  void cleanup_TConVar_UI_RenProjectileGlowMin()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowMin);
+  }
+
+  /**
+   * Address: 0x00BE5E60 (FUN_00BE5E60, register_TConVar_UI_RenProjectileGlowMin)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileGlowMin`.
+   */
+  void register_TConVar_UI_RenProjectileGlowMin()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowMin, &cleanup_TConVar_UI_RenProjectileGlowMin);
+  }
+
+  /**
+   * Address: 0x00C073A0 (FUN_00C073A0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileGlowPeriod`.
+   */
+  void cleanup_TConVar_UI_RenProjectileGlowPeriod()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowPeriod);
+  }
+
+  /**
+   * Address: 0x00BE5EE0 (FUN_00BE5EE0, register_TConVar_UI_RenProjectileGlowPeriod)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileGlowPeriod`.
+   */
+  void register_TConVar_UI_RenProjectileGlowPeriod()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowPeriod, &cleanup_TConVar_UI_RenProjectileGlowPeriod);
+  }
+
+  /**
+   * Address: 0x00C072B0 (FUN_00C072B0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileIcons`.
+   */
+  void cleanup_TConVar_UI_RenProjectileIcons()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileIcons);
+  }
+
+  /**
+   * Address: 0x00BE5DA0 (FUN_00BE5DA0, register_TConVar_UI_RenProjectileIcons)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileIcons`.
+   */
+  void register_TConVar_UI_RenProjectileIcons()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileIcons, &cleanup_TConVar_UI_RenProjectileIcons);
+  }
+
+  /**
+   * Address: 0x00C071C0 (FUN_00C071C0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileTrailColor`.
+   */
+  void cleanup_TConVar_UI_RenProjectileTrailColor()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileTrailColor);
+  }
+
+  /**
+   * Address: 0x00BE5C30 (FUN_00BE5C30, register_TConVar_UI_RenProjectileTrailColor)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileTrailColor`.
+   */
+  void register_TConVar_UI_RenProjectileTrailColor()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileTrailColor, &cleanup_TConVar_UI_RenProjectileTrailColor);
+  }
+
+  /**
+   * Address: 0x00C07420 (FUN_00C07420, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenResources`.
+   */
+  void cleanup_TConVar_UI_RenResources()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenResources);
+  }
+
+  /**
+   * Address: 0x00BE5FD0 (FUN_00BE5FD0, register_TConVar_UI_RenResources)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenResources`.
+   */
+  void register_TConVar_UI_RenResources()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenResources, &cleanup_TConVar_UI_RenResources);
+  }
+
+  /**
+   * Address: 0x00C07450 (FUN_00C07450, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_ResourceLODCutoff`.
+   */
+  void cleanup_TConVar_UI_ResourceLODCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_UI_ResourceLODCutoff);
+  }
+
+  /**
+   * Address: 0x00BE6010 (FUN_00BE6010, register_TConVar_UI_ResourceLODCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `UI_ResourceLODCutoff`.
+   */
+  void register_TConVar_UI_ResourceLODCutoff()
+  {
+    RegisterStartupConVar(gTConVar_UI_ResourceLODCutoff, &cleanup_TConVar_UI_ResourceLODCutoff);
+  }
+
+  /**
+   * Address: 0x00C07520 (FUN_00C07520, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_SelectAnything`.
+   */
+  void cleanup_TConVar_UI_SelectAnything()
+  {
+    CleanupStartupConCommand(gTConVar_UI_SelectAnything);
+  }
+
+  /**
+   * Address: 0x00BE6180 (FUN_00BE6180, register_TConVar_UI_SelectAnything)
+   *
+   * What it does:
+   * Registers startup convar for `UI_SelectAnything`.
+   */
+  void register_TConVar_UI_SelectAnything()
+  {
+    RegisterStartupConVar(gTConVar_UI_SelectAnything, &cleanup_TConVar_UI_SelectAnything);
+  }
+
+  /**
+   * Address: 0x00C04960 (FUN_00C04960, ??1TConVar_UI_ShowControlUnderMouse@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_ShowControlUnderMouse`.
+   */
+  void cleanup_TConVar_UI_ShowControlUnderMouse()
+  {
+    CleanupStartupConCommand(gTConVar_UI_ShowControlUnderMouse);
+  }
+
+  /**
+   * Address: 0x00BE19D0 (FUN_00BE19D0, register_TConVar_UI_ShowControlUnderMouse)
+   *
+   * What it does:
+   * Registers startup convar for `UI_ShowControlUnderMouse`.
+   */
+  void register_TConVar_UI_ShowControlUnderMouse()
+  {
+    RegisterStartupConVar(gTConVar_UI_ShowControlUnderMouse, &cleanup_TConVar_UI_ShowControlUnderMouse);
+  }
+
+  /**
+   * Address: 0x00C072E0 (FUN_00C072E0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_StrategicProjectileLOD`.
+   */
+  void cleanup_TConVar_UI_StrategicProjectileLOD()
+  {
+    CleanupStartupConCommand(gTConVar_UI_StrategicProjectileLOD);
+  }
+
+  /**
+   * Address: 0x00BE5DE0 (FUN_00BE5DE0, register_TConVar_UI_StrategicProjectileLOD)
+   *
+   * What it does:
+   * Registers startup convar for `UI_StrategicProjectileLOD`.
+   */
+  void register_TConVar_UI_StrategicProjectileLOD()
+  {
+    RegisterStartupConVar(gTConVar_UI_StrategicProjectileLOD, &cleanup_TConVar_UI_StrategicProjectileLOD);
+  }
+
+  /**
+   * Address: 0x00C073D0 (FUN_00C073D0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_forceWeaponsToYellow`.
+   */
+  void cleanup_TConVar_UI_forceWeaponsToYellow()
+  {
+    CleanupStartupConCommand(gTConVar_UI_forceWeaponsToYellow);
+  }
+
+  /**
+   * Address: 0x00BE5F20 (FUN_00BE5F20, register_TConVar_UI_forceWeaponsToYellow)
+   *
+   * What it does:
+   * Registers startup convar for `UI_forceWeaponsToYellow`.
+   */
+  void register_TConVar_UI_forceWeaponsToYellow()
+  {
+    RegisterStartupConVar(gTConVar_UI_forceWeaponsToYellow, &cleanup_TConVar_UI_forceWeaponsToYellow);
+  }
+
+  /**
+   * Address: 0x00C070E0 (FUN_00C070E0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_AlwaysRenderStrategicIcons`.
+   */
+  void cleanup_TConVar_ui_AlwaysRenderStrategicIcons()
+  {
+    CleanupStartupConCommand(gTConVar_ui_AlwaysRenderStrategicIcons);
+  }
+
+  /**
+   * Address: 0x00BE5B00 (FUN_00BE5B00, register_TConVar_ui_AlwaysRenderStrategicIcons)
+   *
+   * What it does:
+   * Registers startup convar for `ui_AlwaysRenderStrategicIcons`.
+   */
+  void register_TConVar_ui_AlwaysRenderStrategicIcons()
+  {
+    RegisterStartupConVar(gTConVar_ui_AlwaysRenderStrategicIcons, &cleanup_TConVar_ui_AlwaysRenderStrategicIcons);
+  }
+
+  /**
+   * Address: 0x00C07810 (FUN_00C07810, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ArrowKeysScrollView`.
+   */
+  void cleanup_TConVar_ui_ArrowKeysScrollView()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ArrowKeysScrollView);
+  }
+
+  /**
+   * Address: 0x00BE6720 (FUN_00BE6720, register_TConVar_ui_ArrowKeysScrollView)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ArrowKeysScrollView`.
+   */
+  void register_TConVar_ui_ArrowKeysScrollView()
+  {
+    RegisterStartupConVar(gTConVar_ui_ArrowKeysScrollView, &cleanup_TConVar_ui_ArrowKeysScrollView);
+  }
+
+  /**
+   * Address: 0x00C06950 (FUN_00C06950, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_BuildPlaceTarmacAlpha`.
+   */
+  void cleanup_TConVar_ui_BuildPlaceTarmacAlpha()
+  {
+    CleanupStartupConCommand(gTConVar_ui_BuildPlaceTarmacAlpha);
+  }
+
+  /**
+   * Address: 0x00BE50E0 (FUN_00BE50E0, register_TConVar_ui_BuildPlaceTarmacAlpha)
+   *
+   * What it does:
+   * Registers startup convar for `ui_BuildPlaceTarmacAlpha`.
+   */
+  void register_TConVar_ui_BuildPlaceTarmacAlpha()
+  {
+    RegisterStartupConVar(gTConVar_ui_BuildPlaceTarmacAlpha, &cleanup_TConVar_ui_BuildPlaceTarmacAlpha);
+  }
+
+  /**
+   * Address: 0x00C06050 (FUN_00C06050, ??1TConVar_ui_CommandClickScale@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CommandClickScale`.
+   */
+  void cleanup_TConVar_ui_CommandClickScale()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CommandClickScale);
+  }
+
+  /**
+   * Address: 0x00BE3E40 (FUN_00BE3E40, register_TConVar_ui_CommandClickScale)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CommandClickScale`.
+   */
+  void register_TConVar_ui_CommandClickScale()
+  {
+    RegisterStartupConVar(gTConVar_ui_CommandClickScale, &cleanup_TConVar_ui_CommandClickScale);
+  }
+
+  /**
+   * Address: 0x00C05F30 (FUN_00C05F30, ??1TConVar_ui_CommandGraphMaxNodeUnits@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CommandGraphMaxNodeUnits`.
+   */
+  void cleanup_TConVar_ui_CommandGraphMaxNodeUnits()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CommandGraphMaxNodeUnits);
+  }
+
+  /**
+   * Address: 0x00BE3CC0 (FUN_00BE3CC0, register_TConVar_ui_CommandGraphMaxNodeUnits)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CommandGraphMaxNodeUnits`.
+   */
+  void register_TConVar_ui_CommandGraphMaxNodeUnits()
+  {
+    RegisterStartupConVar(gTConVar_ui_CommandGraphMaxNodeUnits, &cleanup_TConVar_ui_CommandGraphMaxNodeUnits);
+  }
+
+  /**
+   * Address: 0x00C05E70 (FUN_00C05E70, ??1TConVar_ui_CurveSegments@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CurveSegments`.
+   */
+  void cleanup_TConVar_ui_CurveSegments()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CurveSegments);
+  }
+
+  /**
+   * Address: 0x00BE3BC0 (FUN_00BE3BC0, register_TConVar_ui_CurveSegments)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CurveSegments`.
+   */
+  void register_TConVar_ui_CurveSegments()
+  {
+    RegisterStartupConVar(gTConVar_ui_CurveSegments, &cleanup_TConVar_ui_CurveSegments);
+  }
+
+  /**
+   * Address: 0x00C05EA0 (FUN_00C05EA0, ??1TConVar_ui_CurveSmoothness@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CurveSmoothness`.
+   */
+  void cleanup_TConVar_ui_CurveSmoothness()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CurveSmoothness);
+  }
+
+  /**
+   * Address: 0x00BE3C00 (FUN_00BE3C00, register_TConVar_ui_CurveSmoothness)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CurveSmoothness`.
+   */
+  void register_TConVar_ui_CurveSmoothness()
+  {
+    RegisterStartupConVar(gTConVar_ui_CurveSmoothness, &cleanup_TConVar_ui_CurveSmoothness);
+  }
+
+  /**
+   * Address: 0x00C06D80 (FUN_00C06D80, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CustomNameColor`.
+   */
+  void cleanup_TConVar_ui_CustomNameColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CustomNameColor);
+  }
+
+  /**
+   * Address: 0x00BE56A0 (FUN_00BE56A0, register_TConVar_ui_CustomNameColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CustomNameColor`.
+   */
+  void register_TConVar_ui_CustomNameColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_CustomNameColor, &cleanup_TConVar_ui_CustomNameColor);
+  }
+
+  /**
+   * Address: 0x00C06DB0 (FUN_00C06DB0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CustomNameFontSize`.
+   */
+  void cleanup_TConVar_ui_CustomNameFontSize()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CustomNameFontSize);
+  }
+
+  /**
+   * Address: 0x00BE56E0 (FUN_00BE56E0, register_TConVar_ui_CustomNameFontSize)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CustomNameFontSize`.
+   */
+  void register_TConVar_ui_CustomNameFontSize()
+  {
+    RegisterStartupConVar(gTConVar_ui_CustomNameFontSize, &cleanup_TConVar_ui_CustomNameFontSize);
+  }
+
+  /**
+   * Address: 0x00C074B0 (FUN_00C074B0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_DebugAltClick`.
+   */
+  void cleanup_TConVar_ui_DebugAltClick()
+  {
+    CleanupStartupConCommand(gTConVar_ui_DebugAltClick);
+  }
+
+  /**
+   * Address: 0x00BE60E0 (FUN_00BE60E0, register_TConVar_ui_DebugAltClick)
+   *
+   * What it does:
+   * Registers startup convar for `ui_DebugAltClick`.
+   */
+  void register_TConVar_ui_DebugAltClick()
+  {
+    RegisterStartupConVar(gTConVar_ui_DebugAltClick, &cleanup_TConVar_ui_DebugAltClick);
+  }
+
+  /**
+   * Address: 0x00C078A0 (FUN_00C078A0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_DisableCursorFixing`.
+   */
+  void cleanup_TConVar_ui_DisableCursorFixing()
+  {
+    CleanupStartupConCommand(gTConVar_ui_DisableCursorFixing);
+  }
+
+  /**
+   * Address: 0x00BE67E0 (FUN_00BE67E0, register_TConVar_ui_DisableCursorFixing)
+   *
+   * What it does:
+   * Registers startup convar for `ui_DisableCursorFixing`.
+   */
+  void register_TConVar_ui_DisableCursorFixing()
+  {
+    RegisterStartupConVar(gTConVar_ui_DisableCursorFixing, &cleanup_TConVar_ui_DisableCursorFixing);
+  }
+
+  /**
+   * Address: 0x00C074E0 (FUN_00C074E0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_DragSelect2D`.
+   */
+  void cleanup_TConVar_ui_DragSelect2D()
+  {
+    CleanupStartupConCommand(gTConVar_ui_DragSelect2D);
+  }
+
+  /**
+   * Address: 0x00BE6120 (FUN_00BE6120, register_TConVar_ui_DragSelect2D)
+   *
+   * What it does:
+   * Registers startup convar for `ui_DragSelect2D`.
+   */
+  void register_TConVar_ui_DragSelect2D()
+  {
+    RegisterStartupConVar(gTConVar_ui_DragSelect2D, &cleanup_TConVar_ui_DragSelect2D);
+  }
+
+  /**
+   * Address: 0x00C05FC0 (FUN_00C05FC0, ??1TConVar_ui_DrawPathPreview@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_DrawPathPreview`.
+   */
+  void cleanup_TConVar_ui_DrawPathPreview()
+  {
+    CleanupStartupConCommand(gTConVar_ui_DrawPathPreview);
+  }
+
+  /**
+   * Address: 0x00BE3D80 (FUN_00BE3D80, register_TConVar_ui_DrawPathPreview)
+   *
+   * What it does:
+   * Registers startup convar for `ui_DrawPathPreview`.
+   */
+  void register_TConVar_ui_DrawPathPreview()
+  {
+    RegisterStartupConVar(gTConVar_ui_DrawPathPreview, &cleanup_TConVar_ui_DrawPathPreview);
+  }
+
+  /**
+   * Address: 0x00C078D0 (FUN_00C078D0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ExtractSnapTolerance`.
+   */
+  void cleanup_TConVar_ui_ExtractSnapTolerance()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ExtractSnapTolerance);
+  }
+
+  /**
+   * Address: 0x00BE6820 (FUN_00BE6820, register_TConVar_ui_ExtractSnapTolerance)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ExtractSnapTolerance`.
+   */
+  void register_TConVar_ui_ExtractSnapTolerance()
+  {
+    RegisterStartupConVar(gTConVar_ui_ExtractSnapTolerance, &cleanup_TConVar_ui_ExtractSnapTolerance);
+  }
+
+  /**
+   * Address: 0x00C06B50 (FUN_00C06B50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_FootprintMinThickness`.
+   */
+  void cleanup_TConVar_ui_FootprintMinThickness()
+  {
+    CleanupStartupConCommand(gTConVar_ui_FootprintMinThickness);
+  }
+
+  /**
+   * Address: 0x00BE5370 (FUN_00BE5370, register_TConVar_ui_FootprintMinThickness)
+   *
+   * What it does:
+   * Registers startup convar for `ui_FootprintMinThickness`.
+   */
+  void register_TConVar_ui_FootprintMinThickness()
+  {
+    RegisterStartupConVar(gTConVar_ui_FootprintMinThickness, &cleanup_TConVar_ui_FootprintMinThickness);
+  }
+
+  /**
+   * Address: 0x00C06CC0 (FUN_00C06CC0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ForceLifbarsOnEnemy`.
+   */
+  void cleanup_TConVar_ui_ForceLifbarsOnEnemy()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ForceLifbarsOnEnemy);
+  }
+
+  /**
+   * Address: 0x00BE55A0 (FUN_00BE55A0, register_TConVar_ui_ForceLifbarsOnEnemy)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ForceLifbarsOnEnemy`.
+   */
+  void register_TConVar_ui_ForceLifbarsOnEnemy()
+  {
+    RegisterStartupConVar(gTConVar_ui_ForceLifbarsOnEnemy, &cleanup_TConVar_ui_ForceLifbarsOnEnemy);
+  }
+
+  /**
+   * Address: 0x00C07020 (FUN_00C07020, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_FuelBarColor`.
+   */
+  void cleanup_TConVar_ui_FuelBarColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_FuelBarColor);
+  }
+
+  /**
+   * Address: 0x00BE5A00 (FUN_00BE5A00, register_TConVar_ui_FuelBarColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_FuelBarColor`.
+   */
+  void register_TConVar_ui_FuelBarColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_FuelBarColor, &cleanup_TConVar_ui_FuelBarColor);
+  }
+
+  /**
+   * Address: 0x00C06ED0 (FUN_00C06ED0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_FuelEmptyBlinkRate`.
+   */
+  void cleanup_TConVar_ui_FuelEmptyBlinkRate()
+  {
+    CleanupStartupConCommand(gTConVar_ui_FuelEmptyBlinkRate);
+  }
+
+  /**
+   * Address: 0x00BE5840 (FUN_00BE5840, register_TConVar_ui_FuelEmptyBlinkRate)
+   *
+   * What it does:
+   * Registers startup convar for `ui_FuelEmptyBlinkRate`.
+   */
+  void register_TConVar_ui_FuelEmptyBlinkRate()
+  {
+    RegisterStartupConVar(gTConVar_ui_FuelEmptyBlinkRate, &cleanup_TConVar_ui_FuelEmptyBlinkRate);
+  }
+
+  /**
+   * Address: 0x00C07050 (FUN_00C07050, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_FuelWarningColor`.
+   */
+  void cleanup_TConVar_ui_FuelWarningColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_FuelWarningColor);
+  }
+
+  /**
+   * Address: 0x00BE5A40 (FUN_00BE5A40, register_TConVar_ui_FuelWarningColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_FuelWarningColor`.
+   */
+  void register_TConVar_ui_FuelWarningColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_FuelWarningColor, &cleanup_TConVar_ui_FuelWarningColor);
+  }
+
+  /**
+   * Address: 0x00C07A20 (FUN_00C07A20, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_KeyboardPanAccelerateMultiplier`.
+   */
+  void cleanup_TConVar_ui_KeyboardPanAccelerateMultiplier()
+  {
+    CleanupStartupConCommand(gTConVar_ui_KeyboardPanAccelerateMultiplier);
+  }
+
+  /**
+   * Address: 0x00BE6980 (FUN_00BE6980, register_TConVar_ui_KeyboardPanAccelerateMultiplier)
+   *
+   * What it does:
+   * Registers startup convar for `ui_KeyboardPanAccelerateMultiplier`.
+   */
+  void register_TConVar_ui_KeyboardPanAccelerateMultiplier()
+  {
+    RegisterStartupConVar(gTConVar_ui_KeyboardPanAccelerateMultiplier, &cleanup_TConVar_ui_KeyboardPanAccelerateMultiplier);
+  }
+
+  /**
+   * Address: 0x00C079F0 (FUN_00C079F0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_KeyboardPanSpeed`.
+   */
+  void cleanup_TConVar_ui_KeyboardPanSpeed()
+  {
+    CleanupStartupConCommand(gTConVar_ui_KeyboardPanSpeed);
+  }
+
+  /**
+   * Address: 0x00BE6940 (FUN_00BE6940, register_TConVar_ui_KeyboardPanSpeed)
+   *
+   * What it does:
+   * Registers startup convar for `ui_KeyboardPanSpeed`.
+   */
+  void register_TConVar_ui_KeyboardPanSpeed()
+  {
+    RegisterStartupConVar(gTConVar_ui_KeyboardPanSpeed, &cleanup_TConVar_ui_KeyboardPanSpeed);
+  }
+
+  /**
+   * Address: 0x00C07A80 (FUN_00C07A80, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_KeyboardRotateAccelerateMultiplier`.
+   */
+  void cleanup_TConVar_ui_KeyboardRotateAccelerateMultiplier()
+  {
+    CleanupStartupConCommand(gTConVar_ui_KeyboardRotateAccelerateMultiplier);
+  }
+
+  /**
+   * Address: 0x00BE6A00 (FUN_00BE6A00, register_TConVar_ui_KeyboardRotateAccelerateMultiplier)
+   *
+   * What it does:
+   * Registers startup convar for `ui_KeyboardRotateAccelerateMultiplier`.
+   */
+  void register_TConVar_ui_KeyboardRotateAccelerateMultiplier()
+  {
+    RegisterStartupConVar(gTConVar_ui_KeyboardRotateAccelerateMultiplier, &cleanup_TConVar_ui_KeyboardRotateAccelerateMultiplier);
+  }
+
+  /**
+   * Address: 0x00C07A50 (FUN_00C07A50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_KeyboardRotateSpeed`.
+   */
+  void cleanup_TConVar_ui_KeyboardRotateSpeed()
+  {
+    CleanupStartupConCommand(gTConVar_ui_KeyboardRotateSpeed);
+  }
+
+  /**
+   * Address: 0x00BE69C0 (FUN_00BE69C0, register_TConVar_ui_KeyboardRotateSpeed)
+   *
+   * What it does:
+   * Registers startup convar for `ui_KeyboardRotateSpeed`.
+   */
+  void register_TConVar_ui_KeyboardRotateSpeed()
+  {
+    RegisterStartupConVar(gTConVar_ui_KeyboardRotateSpeed, &cleanup_TConVar_ui_KeyboardRotateSpeed);
+  }
+
+  /**
+   * Address: 0x00C06F90 (FUN_00C06F90, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifeBarBadColor`.
+   */
+  void cleanup_TConVar_ui_LifeBarBadColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifeBarBadColor);
+  }
+
+  /**
+   * Address: 0x00BE5940 (FUN_00BE5940, register_TConVar_ui_LifeBarBadColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifeBarBadColor`.
+   */
+  void register_TConVar_ui_LifeBarBadColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifeBarBadColor, &cleanup_TConVar_ui_LifeBarBadColor);
+  }
+
+  /**
+   * Address: 0x00C06FF0 (FUN_00C06FF0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifeBarBadCutoff`.
+   */
+  void cleanup_TConVar_ui_LifeBarBadCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifeBarBadCutoff);
+  }
+
+  /**
+   * Address: 0x00BE59C0 (FUN_00BE59C0, register_TConVar_ui_LifeBarBadCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifeBarBadCutoff`.
+   */
+  void register_TConVar_ui_LifeBarBadCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifeBarBadCutoff, &cleanup_TConVar_ui_LifeBarBadCutoff);
+  }
+
+  /**
+   * Address: 0x00C06F30 (FUN_00C06F30, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifeBarGoodColor`.
+   */
+  void cleanup_TConVar_ui_LifeBarGoodColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifeBarGoodColor);
+  }
+
+  /**
+   * Address: 0x00BE58C0 (FUN_00BE58C0, register_TConVar_ui_LifeBarGoodColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifeBarGoodColor`.
+   */
+  void register_TConVar_ui_LifeBarGoodColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifeBarGoodColor, &cleanup_TConVar_ui_LifeBarGoodColor);
+  }
+
+  /**
+   * Address: 0x00C06FC0 (FUN_00C06FC0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifeBarGoodCutoff`.
+   */
+  void cleanup_TConVar_ui_LifeBarGoodCutoff()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifeBarGoodCutoff);
+  }
+
+  /**
+   * Address: 0x00BE5980 (FUN_00BE5980, register_TConVar_ui_LifeBarGoodCutoff)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifeBarGoodCutoff`.
+   */
+  void register_TConVar_ui_LifeBarGoodCutoff()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifeBarGoodCutoff, &cleanup_TConVar_ui_LifeBarGoodCutoff);
+  }
+
+  /**
+   * Address: 0x00C06F60 (FUN_00C06F60, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifeBarMedColor`.
+   */
+  void cleanup_TConVar_ui_LifeBarMedColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifeBarMedColor);
+  }
+
+  /**
+   * Address: 0x00BE5900 (FUN_00BE5900, register_TConVar_ui_LifeBarMedColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifeBarMedColor`.
+   */
+  void register_TConVar_ui_LifeBarMedColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifeBarMedColor, &cleanup_TConVar_ui_LifeBarMedColor);
+  }
+
+  /**
+   * Address: 0x00C06C30 (FUN_00C06C30, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifebarLOD`.
+   */
+  void cleanup_TConVar_ui_LifebarLOD()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifebarLOD);
+  }
+
+  /**
+   * Address: 0x00BE54E0 (FUN_00BE54E0, register_TConVar_ui_LifebarLOD)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifebarLOD`.
+   */
+  void register_TConVar_ui_LifebarLOD()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifebarLOD, &cleanup_TConVar_ui_LifebarLOD);
+  }
+
+  /**
+   * Address: 0x00C06C60 (FUN_00C06C60, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifebarOffset`.
+   */
+  void cleanup_TConVar_ui_LifebarOffset()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifebarOffset);
+  }
+
+  /**
+   * Address: 0x00BE5520 (FUN_00BE5520, register_TConVar_ui_LifebarOffset)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifebarOffset`.
+   */
+  void register_TConVar_ui_LifebarOffset()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifebarOffset, &cleanup_TConVar_ui_LifebarOffset);
+  }
+
+  /**
+   * Address: 0x00C06C00 (FUN_00C06C00, ??0TConVar_ui_LifebarWidth@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_LifebarWidth`.
+   */
+  void cleanup_TConVar_ui_LifebarWidth()
+  {
+    CleanupStartupConCommand(gTConVar_ui_LifebarWidth);
+  }
+
+  /**
+   * Address: 0x00BE54A0 (FUN_00BE54A0, register_TConVar_ui_LifebarWidth)
+   *
+   * What it does:
+   * Registers startup convar for `ui_LifebarWidth`.
+   */
+  void register_TConVar_ui_LifebarWidth()
+  {
+    RegisterStartupConVar(gTConVar_ui_LifebarWidth, &cleanup_TConVar_ui_LifebarWidth);
+  }
+
+  /**
+   * Address: 0x00C07930 (FUN_00C07930, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_MaxExtractSnapPixels`.
+   */
+  void cleanup_TConVar_ui_MaxExtractSnapPixels()
+  {
+    CleanupStartupConCommand(gTConVar_ui_MaxExtractSnapPixels);
+  }
+
+  /**
+   * Address: 0x00BE68A0 (FUN_00BE68A0, register_TConVar_ui_MaxExtractSnapPixels)
+   *
+   * What it does:
+   * Registers startup convar for `ui_MaxExtractSnapPixels`.
+   */
+  void register_TConVar_ui_MaxExtractSnapPixels()
+  {
+    RegisterStartupConVar(gTConVar_ui_MaxExtractSnapPixels, &cleanup_TConVar_ui_MaxExtractSnapPixels);
+  }
+
+  /**
+   * Address: 0x00C05F00 (FUN_00C05F00, ??1TConVar_ui_MaxTextLOD@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_MaxTextLOD`.
+   */
+  void cleanup_TConVar_ui_MaxTextLOD()
+  {
+    CleanupStartupConCommand(gTConVar_ui_MaxTextLOD);
+  }
+
+  /**
+   * Address: 0x00BE3C80 (FUN_00BE3C80, register_TConVar_ui_MaxTextLOD)
+   *
+   * What it does:
+   * Registers startup convar for `ui_MaxTextLOD`.
+   */
+  void register_TConVar_ui_MaxTextLOD()
+  {
+    RegisterStartupConVar(gTConVar_ui_MaxTextLOD, &cleanup_TConVar_ui_MaxTextLOD);
+  }
+
+  /**
+   * Address: 0x00C05F90 (FUN_00C05F90, ??1TConVar_ui_MaxWaypointSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_MaxWaypointSize`.
+   */
+  void cleanup_TConVar_ui_MaxWaypointSize()
+  {
+    CleanupStartupConCommand(gTConVar_ui_MaxWaypointSize);
+  }
+
+  /**
+   * Address: 0x00BE3D40 (FUN_00BE3D40, register_TConVar_ui_MaxWaypointSize)
+   *
+   * What it does:
+   * Registers startup convar for `ui_MaxWaypointSize`.
+   */
+  void register_TConVar_ui_MaxWaypointSize()
+  {
+    RegisterStartupConVar(gTConVar_ui_MaxWaypointSize, &cleanup_TConVar_ui_MaxWaypointSize);
+  }
+
+  /**
+   * Address: 0x00C07900 (FUN_00C07900, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_MinExtractSnapPixels`.
+   */
+  void cleanup_TConVar_ui_MinExtractSnapPixels()
+  {
+    CleanupStartupConCommand(gTConVar_ui_MinExtractSnapPixels);
+  }
+
+  /**
+   * Address: 0x00BE6860 (FUN_00BE6860, register_TConVar_ui_MinExtractSnapPixels)
+   *
+   * What it does:
+   * Registers startup convar for `ui_MinExtractSnapPixels`.
+   */
+  void register_TConVar_ui_MinExtractSnapPixels()
+  {
+    RegisterStartupConVar(gTConVar_ui_MinExtractSnapPixels, &cleanup_TConVar_ui_MinExtractSnapPixels);
+  }
+
+  /**
+   * Address: 0x00C05F60 (FUN_00C05F60, ??1TConVar_ui_MinWaypointSize@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_MinWaypointSize`.
+   */
+  void cleanup_TConVar_ui_MinWaypointSize()
+  {
+    CleanupStartupConCommand(gTConVar_ui_MinWaypointSize);
+  }
+
+  /**
+   * Address: 0x00BE3D00 (FUN_00BE3D00, register_TConVar_ui_MinWaypointSize)
+   *
+   * What it does:
+   * Registers startup convar for `ui_MinWaypointSize`.
+   */
+  void register_TConVar_ui_MinWaypointSize()
+  {
+    RegisterStartupConVar(gTConVar_ui_MinWaypointSize, &cleanup_TConVar_ui_MinWaypointSize);
+  }
+
+  /**
+   * Address: 0x00C06D20 (FUN_00C06D20, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_NisRenderIcons`.
+   */
+  void cleanup_TConVar_ui_NisRenderIcons()
+  {
+    CleanupStartupConCommand(gTConVar_ui_NisRenderIcons);
+  }
+
+  /**
+   * Address: 0x00BE5620 (FUN_00BE5620, register_TConVar_ui_NisRenderIcons)
+   *
+   * What it does:
+   * Registers startup convar for `ui_NisRenderIcons`.
+   */
+  void register_TConVar_ui_NisRenderIcons()
+  {
+    RegisterStartupConVar(gTConVar_ui_NisRenderIcons, &cleanup_TConVar_ui_NisRenderIcons);
+  }
+
+  /**
+   * Address: 0x00C05FF0 (FUN_00C05FF0, ??1TConVar_ui_PathPreview@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_PathPreview`.
+   */
+  void cleanup_TConVar_ui_PathPreview()
+  {
+    CleanupStartupConCommand(gTConVar_ui_PathPreview);
+  }
+
+  /**
+   * Address: 0x00BE3DC0 (FUN_00BE3DC0, register_TConVar_ui_PathPreview)
+   *
+   * What it does:
+   * Registers startup convar for `ui_PathPreview`.
+   */
+  void register_TConVar_ui_PathPreview()
+  {
+    RegisterStartupConVar(gTConVar_ui_PathPreview, &cleanup_TConVar_ui_PathPreview);
+  }
+
+  /**
+   * Address: 0x00C05ED0 (FUN_00C05ED0, ??1TConVar_ui_PathSmoothness@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_PathSmoothness`.
+   */
+  void cleanup_TConVar_ui_PathSmoothness()
+  {
+    CleanupStartupConCommand(gTConVar_ui_PathSmoothness);
+  }
+
+  /**
+   * Address: 0x00BE3C40 (FUN_00BE3C40, register_TConVar_ui_PathSmoothness)
+   *
+   * What it does:
+   * Registers startup convar for `ui_PathSmoothness`.
+   */
+  void register_TConVar_ui_PathSmoothness()
+  {
+    RegisterStartupConVar(gTConVar_ui_PathSmoothness, &cleanup_TConVar_ui_PathSmoothness);
+  }
+
+  /**
+   * Address: 0x00C070B0 (FUN_00C070B0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ProgressBarColor`.
+   */
+  void cleanup_TConVar_ui_ProgressBarColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ProgressBarColor);
+  }
+
+  /**
+   * Address: 0x00BE5AC0 (FUN_00BE5AC0, register_TConVar_ui_ProgressBarColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ProgressBarColor`.
+   */
+  void register_TConVar_ui_ProgressBarColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_ProgressBarColor, &cleanup_TConVar_ui_ProgressBarColor);
+  }
+
+  /**
+   * Address: 0x00C06D50 (FUN_00C06D50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_RenderCustomNames`.
+   */
+  void cleanup_TConVar_ui_RenderCustomNames()
+  {
+    CleanupStartupConCommand(gTConVar_ui_RenderCustomNames);
+  }
+
+  /**
+   * Address: 0x00BE5660 (FUN_00BE5660, register_TConVar_ui_RenderCustomNames)
+   *
+   * What it does:
+   * Registers startup convar for `ui_RenderCustomNames`.
+   */
+  void register_TConVar_ui_RenderCustomNames()
+  {
+    RegisterStartupConVar(gTConVar_ui_RenderCustomNames, &cleanup_TConVar_ui_RenderCustomNames);
+  }
+
+  /**
+   * Address: 0x00C06CF0 (FUN_00C06CF0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_RenderIcons`.
+   */
+  void cleanup_TConVar_ui_RenderIcons()
+  {
+    CleanupStartupConCommand(gTConVar_ui_RenderIcons);
+  }
+
+  /**
+   * Address: 0x00BE55E0 (FUN_00BE55E0, register_TConVar_ui_RenderIcons)
+   *
+   * What it does:
+   * Registers startup convar for `ui_RenderIcons`.
+   */
+  void register_TConVar_ui_RenderIcons()
+  {
+    RegisterStartupConVar(gTConVar_ui_RenderIcons, &cleanup_TConVar_ui_RenderIcons);
+  }
+
+  /**
+   * Address: 0x00C06E40 (FUN_00C06E40, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_RenderSelectionSetNames`.
+   */
+  void cleanup_TConVar_ui_RenderSelectionSetNames()
+  {
+    CleanupStartupConCommand(gTConVar_ui_RenderSelectionSetNames);
+  }
+
+  /**
+   * Address: 0x00BE5780 (FUN_00BE5780, register_TConVar_ui_RenderSelectionSetNames)
+   *
+   * What it does:
+   * Registers startup convar for `ui_RenderSelectionSetNames`.
+   */
+  void register_TConVar_ui_RenderSelectionSetNames()
+  {
+    RegisterStartupConVar(gTConVar_ui_RenderSelectionSetNames, &cleanup_TConVar_ui_RenderSelectionSetNames);
+  }
+
+  /**
+   * Address: 0x00C06C90 (FUN_00C06C90, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_RenderUnitBars`.
+   */
+  void cleanup_TConVar_ui_RenderUnitBars()
+  {
+    CleanupStartupConCommand(gTConVar_ui_RenderUnitBars);
+  }
+
+  /**
+   * Address: 0x00BE5560 (FUN_00BE5560, register_TConVar_ui_RenderUnitBars)
+   *
+   * What it does:
+   * Registers startup convar for `ui_RenderUnitBars`.
+   */
+  void register_TConVar_ui_RenderUnitBars()
+  {
+    RegisterStartupConVar(gTConVar_ui_RenderUnitBars, &cleanup_TConVar_ui_RenderUnitBars);
+  }
+
+  /**
+   * Address: 0x00C07840 (FUN_00C07840, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ScreenEdgeScrollView`.
+   */
+  void cleanup_TConVar_ui_ScreenEdgeScrollView()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ScreenEdgeScrollView);
+  }
+
+  /**
+   * Address: 0x00BE6760 (FUN_00BE6760, register_TConVar_ui_ScreenEdgeScrollView)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ScreenEdgeScrollView`.
+   */
+  void register_TConVar_ui_ScreenEdgeScrollView()
+  {
+    RegisterStartupConVar(gTConVar_ui_ScreenEdgeScrollView, &cleanup_TConVar_ui_ScreenEdgeScrollView);
+  }
+
+  /**
+   * Address: 0x00C07870 (FUN_00C07870, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_SelectTolerance`.
+   */
+  void cleanup_TConVar_ui_SelectTolerance()
+  {
+    CleanupStartupConCommand(gTConVar_ui_SelectTolerance);
+  }
+
+  /**
+   * Address: 0x00BE67A0 (FUN_00BE67A0, register_TConVar_ui_SelectTolerance)
+   *
+   * What it does:
+   * Registers startup convar for `ui_SelectTolerance`.
+   */
+  void register_TConVar_ui_SelectTolerance()
+  {
+    RegisterStartupConVar(gTConVar_ui_SelectTolerance, &cleanup_TConVar_ui_SelectTolerance);
+  }
+
+  /**
+   * Address: 0x00C06E70 (FUN_00C06E70, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_SelectionSetNamesColor`.
+   */
+  void cleanup_TConVar_ui_SelectionSetNamesColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_SelectionSetNamesColor);
+  }
+
+  /**
+   * Address: 0x00BE57C0 (FUN_00BE57C0, register_TConVar_ui_SelectionSetNamesColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_SelectionSetNamesColor`.
+   */
+  void register_TConVar_ui_SelectionSetNamesColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_SelectionSetNamesColor, &cleanup_TConVar_ui_SelectionSetNamesColor);
+  }
+
+  /**
+   * Address: 0x00C07080 (FUN_00C07080, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_ShieldBarColor`.
+   */
+  void cleanup_TConVar_ui_ShieldBarColor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_ShieldBarColor);
+  }
+
+  /**
+   * Address: 0x00BE5A80 (FUN_00BE5A80, register_TConVar_ui_ShieldBarColor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_ShieldBarColor`.
+   */
+  void register_TConVar_ui_ShieldBarColor()
+  {
+    RegisterStartupConVar(gTConVar_ui_ShieldBarColor, &cleanup_TConVar_ui_ShieldBarColor);
+  }
+
+  /**
+   * Address: 0x00C06F00 (FUN_00C06F00, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_StrategicIconBlinkDuration`.
+   */
+  void cleanup_TConVar_ui_StrategicIconBlinkDuration()
+  {
+    CleanupStartupConCommand(gTConVar_ui_StrategicIconBlinkDuration);
+  }
+
+  /**
+   * Address: 0x00BE5880 (FUN_00BE5880, register_TConVar_ui_StrategicIconBlinkDuration)
+   *
+   * What it does:
+   * Registers startup convar for `ui_StrategicIconBlinkDuration`.
+   */
+  void register_TConVar_ui_StrategicIconBlinkDuration()
+  {
+    RegisterStartupConVar(gTConVar_ui_StrategicIconBlinkDuration, &cleanup_TConVar_ui_StrategicIconBlinkDuration);
+  }
+
+  /**
+   * Address: 0x00C06EA0 (FUN_00C06EA0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_StrategicIconBlinkRate`.
+   */
+  void cleanup_TConVar_ui_StrategicIconBlinkRate()
+  {
+    CleanupStartupConCommand(gTConVar_ui_StrategicIconBlinkRate);
+  }
+
+  /**
+   * Address: 0x00BE5800 (FUN_00BE5800, register_TConVar_ui_StrategicIconBlinkRate)
+   *
+   * What it does:
+   * Registers startup convar for `ui_StrategicIconBlinkRate`.
+   */
+  void register_TConVar_ui_StrategicIconBlinkRate()
+  {
+    RegisterStartupConVar(gTConVar_ui_StrategicIconBlinkRate, &cleanup_TConVar_ui_StrategicIconBlinkRate);
+  }
+
+  /**
+   * Address: 0x00C06020 (FUN_00C06020, ??1TConVar_ui_WaypointLineScale@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_WaypointLineScale`.
+   */
+  void cleanup_TConVar_ui_WaypointLineScale()
+  {
+    CleanupStartupConCommand(gTConVar_ui_WaypointLineScale);
+  }
+
+  /**
+   * Address: 0x00BE3E00 (FUN_00BE3E00, register_TConVar_ui_WaypointLineScale)
+   *
+   * What it does:
+   * Registers startup convar for `ui_WaypointLineScale`.
+   */
+  void register_TConVar_ui_WaypointLineScale()
+  {
+    RegisterStartupConVar(gTConVar_ui_WaypointLineScale, &cleanup_TConVar_ui_WaypointLineScale);
+  }
+
+  /**
+   * Address: 0x00C02C40 (FUN_00C02C40, ??1TConVar_ui_WindowedAlwaysShowsCursor@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_WindowedAlwaysShowsCursor`.
+   */
+  void cleanup_TConVar_ui_WindowedAlwaysShowsCursor()
+  {
+    CleanupStartupConCommand(gTConVar_ui_WindowedAlwaysShowsCursor);
+  }
+
+  /**
+   * Address: 0x00BDDFB0 (FUN_00BDDFB0, register_TConVar_ui_WindowedAlwaysShowsCursor)
+   *
+   * What it does:
+   * Registers startup convar for `ui_WindowedAlwaysShowsCursor`.
+   */
+  void register_TConVar_ui_WindowedAlwaysShowsCursor()
+  {
+    RegisterStartupConVar(gTConVar_ui_WindowedAlwaysShowsCursor, &cleanup_TConVar_ui_WindowedAlwaysShowsCursor);
+  }
+
+  /**
+   * Address: 0x00C06BA0 (FUN_00C06BA0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_fuelbarHeight`.
+   */
+  void cleanup_TConVar_ui_fuelbarHeight()
+  {
+    CleanupStartupConCommand(gTConVar_ui_fuelbarHeight);
+  }
+
+  /**
+   * Address: 0x00BE5420 (FUN_00BE5420, register_TConVar_ui_fuelbarHeight)
+   *
+   * What it does:
+   * Registers startup convar for `ui_fuelbarHeight`.
+   */
+  void register_TConVar_ui_fuelbarHeight()
+  {
+    RegisterStartupConVar(gTConVar_ui_fuelbarHeight, &cleanup_TConVar_ui_fuelbarHeight);
+  }
+
+  /**
+   * Address: 0x00C06BD0 (FUN_00C06BD0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_lifebarHeight`.
+   */
+  void cleanup_TConVar_ui_lifebarHeight()
+  {
+    CleanupStartupConCommand(gTConVar_ui_lifebarHeight);
+  }
+
+  /**
+   * Address: 0x00BE5460 (FUN_00BE5460, register_TConVar_ui_lifebarHeight)
+   *
+   * What it does:
+   * Registers startup convar for `ui_lifebarHeight`.
+   */
+  void register_TConVar_ui_lifebarHeight()
+  {
+    RegisterStartupConVar(gTConVar_ui_lifebarHeight, &cleanup_TConVar_ui_lifebarHeight);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsUiTuning
+  {
+    ConsoleStartupRegistrationsUiTuning()
+    {
+      moho::register_TConVar_UI_RenProectileTrailWidth();
+      moho::register_TConVar_UI_RenProjectileArcsSampleInterval();
+      moho::register_TConVar_UI_RenProjectileGlow();
+      moho::register_TConVar_UI_RenProjectileGlowMax();
+      moho::register_TConVar_UI_RenProjectileGlowMin();
+      moho::register_TConVar_UI_RenProjectileGlowPeriod();
+      moho::register_TConVar_UI_RenProjectileIcons();
+      moho::register_TConVar_UI_RenProjectileTrailColor();
+      moho::register_TConVar_UI_RenResources();
+      moho::register_TConVar_UI_ResourceLODCutoff();
+      moho::register_TConVar_UI_SelectAnything();
+      moho::register_TConVar_UI_ShowControlUnderMouse();
+      moho::register_TConVar_UI_StrategicProjectileLOD();
+      moho::register_TConVar_UI_forceWeaponsToYellow();
+      moho::register_TConVar_ui_AlwaysRenderStrategicIcons();
+      moho::register_TConVar_ui_ArrowKeysScrollView();
+      moho::register_TConVar_ui_BuildPlaceTarmacAlpha();
+      moho::register_TConVar_ui_CommandClickScale();
+      moho::register_TConVar_ui_CommandGraphMaxNodeUnits();
+      moho::register_TConVar_ui_CurveSegments();
+      moho::register_TConVar_ui_CurveSmoothness();
+      moho::register_TConVar_ui_CustomNameColor();
+      moho::register_TConVar_ui_CustomNameFontSize();
+      moho::register_TConVar_ui_DebugAltClick();
+      moho::register_TConVar_ui_DisableCursorFixing();
+      moho::register_TConVar_ui_DragSelect2D();
+      moho::register_TConVar_ui_DrawPathPreview();
+      moho::register_TConVar_ui_ExtractSnapTolerance();
+      moho::register_TConVar_ui_FootprintMinThickness();
+      moho::register_TConVar_ui_ForceLifbarsOnEnemy();
+      moho::register_TConVar_ui_FuelBarColor();
+      moho::register_TConVar_ui_FuelEmptyBlinkRate();
+      moho::register_TConVar_ui_FuelWarningColor();
+      moho::register_TConVar_ui_KeyboardPanAccelerateMultiplier();
+      moho::register_TConVar_ui_KeyboardPanSpeed();
+      moho::register_TConVar_ui_KeyboardRotateAccelerateMultiplier();
+      moho::register_TConVar_ui_KeyboardRotateSpeed();
+      moho::register_TConVar_ui_LifeBarBadColor();
+      moho::register_TConVar_ui_LifeBarBadCutoff();
+      moho::register_TConVar_ui_LifeBarGoodColor();
+      moho::register_TConVar_ui_LifeBarGoodCutoff();
+      moho::register_TConVar_ui_LifeBarMedColor();
+      moho::register_TConVar_ui_LifebarLOD();
+      moho::register_TConVar_ui_LifebarOffset();
+      moho::register_TConVar_ui_LifebarWidth();
+      moho::register_TConVar_ui_MaxExtractSnapPixels();
+      moho::register_TConVar_ui_MaxTextLOD();
+      moho::register_TConVar_ui_MaxWaypointSize();
+      moho::register_TConVar_ui_MinExtractSnapPixels();
+      moho::register_TConVar_ui_MinWaypointSize();
+      moho::register_TConVar_ui_NisRenderIcons();
+      moho::register_TConVar_ui_PathPreview();
+      moho::register_TConVar_ui_PathSmoothness();
+      moho::register_TConVar_ui_ProgressBarColor();
+      moho::register_TConVar_ui_RenderCustomNames();
+      moho::register_TConVar_ui_RenderIcons();
+      moho::register_TConVar_ui_RenderSelectionSetNames();
+      moho::register_TConVar_ui_RenderUnitBars();
+      moho::register_TConVar_ui_ScreenEdgeScrollView();
+      moho::register_TConVar_ui_SelectTolerance();
+      moho::register_TConVar_ui_SelectionSetNamesColor();
+      moho::register_TConVar_ui_ShieldBarColor();
+      moho::register_TConVar_ui_StrategicIconBlinkDuration();
+      moho::register_TConVar_ui_StrategicIconBlinkRate();
+      moho::register_TConVar_ui_WaypointLineScale();
+      moho::register_TConVar_ui_WindowedAlwaysShowsCursor();
+      moho::register_TConVar_ui_fuelbarHeight();
+      moho::register_TConVar_ui_lifebarHeight();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsUiTuning gConsoleStartupRegistrationsUiTuning;
+} // namespace
