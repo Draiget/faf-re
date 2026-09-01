@@ -1146,13 +1146,27 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00677360 lines 106-120 (part of `FUN_00677360`,
+   * `func_FindBlueprintScriptModule` / `ResolveBlueprintScriptFactory`)
+   *
+   * What it does:
+   * Ground truth reads `blueprint->mSource` (the un-normalized full VFS path
+   * the blueprint's Lua script set via `GetSource()`/`SetShortId`, e.g.
+   * "/units/uel0001/uel0001_unit.bp" — NOT `mBlueprintId`, which by that point
+   * already holds the short id "uel0001" with no path or underscore left in
+   * it) and finds the LAST '_' via `func_StringSearchFromEnd`, not the first.
+   * The earlier revision of this helper read `mBlueprintId` and searched from
+   * the start, which can never match a short id like "uel0001" (zero
+   * underscores) and silently produced an always-empty result.
+   */
   [[nodiscard]] std::string BuildBlueprintScriptModuleFromId(const moho::REntityBlueprint* blueprint)
   {
     if (!blueprint) {
       return {};
     }
 
-    std::string id = blueprint->mBlueprintId.to_std();
+    std::string id = blueprint->mSource.to_std();
     if (id.empty()) {
       return {};
     }
@@ -1163,7 +1177,7 @@ namespace
     if (!id.empty() && id.front() == '/') {
       start = 1;
     }
-    const std::size_t underscorePos = id.find('_', start);
+    const std::size_t underscorePos = id.rfind('_');
     if (underscorePos == std::string::npos || underscorePos <= start) {
       return {};
     }
