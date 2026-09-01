@@ -96,12 +96,16 @@ namespace moho
      * `mValue` lane. Real vtable-construction evidence via `??_7?$TSimConVar@E@
      * Moho@@6B@+0x8` (`E` is IDA's demangled shorthand for `unsigned char`
      * here, not a real enum).)
-     * Address: 0x00735A30 (FUN_00735A30, `TSimConVar<msvc8::string>::CreateInstance`
-     * -- same generic shape, but `mValue = mDefaultValue` compiles to
-     * `msvc8::string`'s real assignment (SSO-reset the new instance's `mValue`
-     * then `assign()` from `mDefaultValue`) instead of a raw byte copy, since
-     * `operator=` is non-trivial for this `T`. Reached from
-     * `TSimConVar<msvc8::string>`'s own constructor (FUN_007354E0).)
+     *
+     * `T = msvc8::string` does NOT use this generic body -- traced its raw
+     * `.asm` and found the compiler splits it into two out-of-line symbols
+     * instead of the single generic shape above: 0x007354E0
+     * (`TSimConVar<msvc8::string>::CreateInstance` itself -- allocates
+     * `sizeof(TSimConVarInstance<msvc8::string>)` and builds a stack copy of
+     * `mDefaultValue`) and 0x00735A30 (the placement-construct step, taking
+     * the raw memory, `mName`, and that copy by value -- see
+     * `ConstructTSimConVarInstanceString`, CSimConVarInstanceBase.h/.cpp).
+     * See the explicit specialization below instead of this generic body.
      */
     CSimConVarInstanceBase* CreateInstance() override
     {
@@ -146,6 +150,21 @@ namespace moho
    */
   template <>
   CSimConVarInstanceBase* TSimConVar<float>::CreateInstance();
+
+  /**
+   * Address: 0x007354E0 (FUN_007354E0, Moho::TSimConVarInstance_string::NewInstance)
+   *
+   * What it does:
+   * Allocates one string sim-convar instance and constructs it in place
+   * from this convar's name and a copy of its default value. Unlike the
+   * `bool`/`float` overrides above, the binary splits this into two
+   * out-of-line symbols (this allocate-and-copy wrapper, plus the
+   * placement-construct step at 0x00735A30 -- see
+   * `ConstructTSimConVarInstanceString`), so it needs its own explicit
+   * specialization rather than sharing the generic template body.
+   */
+  template <>
+  CSimConVarInstanceBase* TSimConVar<msvc8::string>::CreateInstance();
 
   static_assert(
     offsetof(TSimConVar<bool>, mDefaultValue) == 0x10, "TSimConVar<bool>::mDefaultValue offset must be 0x10"
