@@ -69559,6 +69559,28 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       continue;
     }
 
+    // Refresh mScreenPos/mScreenSize/mFullScreen from THIS view's camera
+    // before drawing it. The binary calls UpdateRenderViewportCoordinates
+    // twice (confirmed via its two code xrefs): once per-iteration right
+    // here (0x007F9385, with mCam freshly bound to the current view), and
+    // once more after the loop as a shared tail (0x007F97A4, by which point
+    // the loop has reset mCam to null - see `runtime->mCam = nullptr;`
+    // below). This per-iteration call was missing from the recovery, so
+    // mScreenPos/mScreenSize never advanced past whatever the PREVIOUS
+    // frame's post-loop null-camera fallback wrote (the full head rect at
+    // origin) - every view, main and minimap alike, rendered its
+    // terrain/mesh/water passes through that full-screen rect instead of
+    // this view's own CameraSetViewport-pushed one.
+    UpdateRenderViewportCoordinates();
+
+    gpg::Warnf(
+      "[MMDIAG] Render.loop view=%p isMiniMap=%d mScreenPos=(%d,%d) mScreenSize=(%d,%d) camViewportR3=(%.1f,%.1f,%.1f,%.1f)",
+      static_cast<const void*>(worldView->view), static_cast<int>(worldView->view->IsMiniMap()),
+      runtime->mScreenPos.x, runtime->mScreenPos.y, runtime->mScreenSize.x, runtime->mScreenSize.y,
+      runtime->mCam->viewport.r[3].x, runtime->mCam->viewport.r[3].y, runtime->mCam->viewport.r[3].z,
+      runtime->mCam->viewport.r[3].w
+    );
+
     // Render the atmosphere/cloud sky dome for this world view before the
     // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
     // dispatches the sky dome pass right after the per-view camera bind,
