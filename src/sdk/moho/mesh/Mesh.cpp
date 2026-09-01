@@ -2992,7 +2992,7 @@ namespace
     node->parent = parent;
     node->right = right;
     new (&node->entry.key) moho::MeshKey(key);
-    new (&node->entry.mesh) boost::shared_ptr<moho::Mesh>(mesh);
+    new (&node->entry.mesh) boost::weak_ptr<moho::Mesh>(mesh);
     node->color = color;
     node->isSentinel = isSentinel;
     node->pad_26_27[0] = 0;
@@ -3006,7 +3006,7 @@ namespace
       return;
     }
 
-    node->entry.mesh.~shared_ptr<moho::Mesh>();
+    node->entry.mesh.~weak_ptr<moho::Mesh>();
     node->entry.key.~MeshKey();
     ::operator delete(node);
   }
@@ -5916,8 +5916,14 @@ namespace moho
    * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
    *
    * What it does:
-   * Looks up an existing cached mesh by (blueprint, material) key; on a miss,
-   * constructs a new Mesh and inserts it into the cache tree.
+   * Looks up an existing cached mesh by (blueprint, material) key and, if its
+   * weak entry is still alive, locks and returns it. On a genuine miss, or a
+   * key whose cached mesh has since been destroyed (the ground truth, FUN_
+   * 007E5900, checks the found node's control block use_count_ before
+   * trusting it - a `weak_ptr<Mesh>::lock()` in every way but name), builds a
+   * new Mesh, stores a weak reference to it in the tree (find-or-insert on
+   * `key`, so an expired-but-still-present node's entry is refreshed rather
+   * than duplicated), and returns the new strong reference.
    */
   boost::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
     const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg
@@ -5926,7 +5932,9 @@ namespace moho
     MeshKey key(blueprint, materialArg);
     MeshRendererMeshCacheNode* const foundNode = MeshCacheTreeFind(meshCacheTree, key);
     if (foundNode) {
-      return foundNode->entry.mesh;
+      if (boost::shared_ptr<Mesh> locked = foundNode->entry.mesh.lock()) {
+        return locked;
+      }
     }
 
     boost::shared_ptr<Mesh> mesh(new Mesh(blueprint, materialArg));
@@ -5936,11 +5944,11 @@ namespace moho
       return {};
     }
 
-    if (inserted || !insertedNode->entry.mesh) {
+    if (inserted || insertedNode->entry.mesh.expired()) {
       insertedNode->entry.mesh = mesh;
     }
 
-    return insertedNode->entry.mesh;
+    return mesh;
   }
 
   /**

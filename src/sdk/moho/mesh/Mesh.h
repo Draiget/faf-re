@@ -889,10 +889,22 @@ namespace moho
     static float sCurrentInterpolant;
   };
 
+  /**
+   * The cache does not keep meshes alive - `mesh` is a weak reference.
+   * `FUN_007E5850` (the entry destructor tail) is a lone `weak_count_`
+   * decrement into a single vtable dispatch (`sp_counted_base::
+   * weak_release()`'s exact shape), not the two-step use_count-then-
+   * weak_count teardown a `shared_ptr` release would emit. `FUN_007E5900`
+   * (`FindOrCreateMesh`'s lookup half) confirms it from the other side: on
+   * a tree hit it checks the found entry's control block `use_count_` and
+   * only "locks" a strong reference out of it when nonzero, exactly
+   * `weak_ptr<Mesh>::lock()` - a real owning `shared_ptr` member would
+   * never need that check.
+   */
   struct MeshRendererMeshCacheEntry
   {
-    MeshKey key;                  // +0x00
-    boost::shared_ptr<Mesh> mesh; // +0x10
+    MeshKey key;                // +0x00
+    boost::weak_ptr<Mesh> mesh; // +0x10
   };
 
   struct MeshRendererMeshCacheNode
