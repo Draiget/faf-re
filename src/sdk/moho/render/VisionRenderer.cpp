@@ -329,12 +329,7 @@ namespace moho
     const boost::shared_ptr<gpg::gal::EffectD3D9> effect = AcquireVisionBaseEffect();
     const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("CastVision");
 
-    // `CWldSession::mVisionDb` (+0x3C8) is still declared with the placeholder
-    // skeleton `moho::VisionDb` from moho/misc/VisionDb.h; the recovered layout
-    // is `moho::VisionDB` in moho/vision/VisionDB.h. Both model the same
-    // 0x24-byte binary object - collapsing the duplicate belongs to the owner of
-    // moho/misc/VisionDb.h, so the cast stands in for it here.
-    VisionDB& visionDb = reinterpret_cast<VisionDB&>(session.mVisionDb);
+    VisionDB& visionDb = session.mVisionDb;
     const CHeightField* const heightField = session.GetSTIMap()->mHeightField.get();
 
     // Terrain footprint of the camera's far frustum solid, flattened to the XZ
