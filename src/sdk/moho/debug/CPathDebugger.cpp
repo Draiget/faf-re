@@ -3,6 +3,7 @@
 #include <typeinfo>
 
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
@@ -243,6 +244,32 @@ namespace moho
 
     return 0;
   }
+
+  /**
+   * Class-binder record at 0x00F5A72C (`.rdata`), the same table region as
+   * the other already-recovered class binders (e.g. `"moho.AimManipulator"`
+   * at 0x00F59A20). Its fields read:
+   *
+   *     name  0x00E3C998 -> "moho.PathDebugger_methods"
+   *     group 0x00E3C988 -> "CPathDebugger"
+   *     help  0x00E00779 -> ""
+   *
+   * What it does:
+   * Publishes `CScrLuaMetatableFactory<CPathDebugger>`'s method table as
+   * `moho.PathDebugger_methods`. `gamedata/lua/debug/PathDebugger.lua:237`
+   * does `PathDebugger = Class(moho.PathDebugger_methods) { ... }` at module
+   * load time -- without this export that read is nil and the whole module
+   * fails to load, same failure family as the `moho.IEffect` gap this
+   * session already found and fixed (`f36336a0`).
+   */
+  CScrLuaInitForm* register_moho_PathDebugger_methods_ClassBinder()
+  {
+    static CScrLuaClassBinder binder(
+      UserLuaInitSet(), "moho.PathDebugger_methods", &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
+      kCPathDebuggerLuaClassName, ""
+    );
+    return &binder;
+  }
 } // namespace moho
 
 namespace
@@ -267,6 +294,7 @@ namespace
     CPathDebuggerLuaFuncDefBootstrap()
     {
       (void)::moho::func__c_CreatePathDebugger_LuaFuncDef();
+      (void)::moho::register_moho_PathDebugger_methods_ClassBinder();
       (void)::moho::func_CPathDebuggerDestroy_LuaFuncDef();
     }
   };
