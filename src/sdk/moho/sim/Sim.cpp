@@ -35,6 +35,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
@@ -8670,8 +8671,39 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
         mCheaters.clear();
       }
     }
+
+    // 0x00747BF1..0x00747C3x: flatten the table just written into the beat's
+    // packet. This is the sim -> UI data channel - everything set on `Sync`
+    // above only reaches the client because it is serialised here, so a beat
+    // that skips this step publishes an empty payload no matter what the
+    // table holds.
+    //
+    //     v79 = new MemBufferStream(256);
+    //     if (v79 != dataPtr->mStream && dataPtr->mStream)
+    //         dataPtr->mStream->dtr_Stream(dataPtr->mStream, 1);
+    //     dataPtr->mStream = v79;
+    //     SCR_ToByteStream(&syncTable, dataPtr->mStream);
+    //
+    // The serialisation runs on the same object the setters above wrote, and
+    // is not guarded by the table check: a non-table `Sync` still emits its
+    // tagged payload. The previous stream is released only when it is not the
+    // one being installed; the packet is freshly built each beat so it is
+    // normally null, but that is the shape the binary has.
+    auto* const beatStream = new gpg::MemBufferStream(256u);
+    if (beatStream != outSyncData->mStream && outSyncData->mStream != nullptr) {
+      delete outSyncData->mStream;
+    }
+    outSyncData->mStream = beatStream;
+
+    (void)syncTable.ToByteStream(*outSyncData->mStream);
   }
 
+  // The desync run is moved, not copied: the sim hands its accumulated
+  // reports to the packet and takes the packet's (empty) run in exchange, so
+  // each report is published exactly once.
+  if (!mDesyncs.empty()) {
+    mDesyncs.swap(outSyncData->mDesyncs);
+  }
 
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
