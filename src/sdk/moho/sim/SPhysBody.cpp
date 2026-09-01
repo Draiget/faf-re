@@ -546,16 +546,17 @@ namespace moho
    * Ground truth (`FUN_00697E70.c`) builds the basis via `Moho::VAxes3::
    * VAxes3(&result, &mOrientation)` and uses its `vX`/`vY`/`vZ` members
    * directly -- NOT the previous `Quaternion::Rotate` (upstream WildMagic,
-   * `.w`-scalar `ToMat3()`), but also NOT simply `MultQuadVec` against the
-   * three standard basis vectors: `VAxes3`'s `vX`/`vY`/`vZ` are a specific
-   * permuted-and-partially-negated readout of the `.x`-scalar rotation
-   * matrix (`vX = (M[2][2], M[2][1], -M[2][0])`, `vY = (-M[1][2], -M[1][1],
-   * M[1][0])`, `vZ = (M[0][2], M[0][1], -M[0][0])`, verified numerically),
-   * not the plain columns `MultQuadVec` would produce -- confirmed to
-   * disagree numerically with a first attempt at this fix that assumed the
-   * two were interchangeable. Each `mInvInertiaTensor` lane is tied to
-   * `VAxes3`'s specific basis (the body's real principal axes), so the
-   * `VAxes3` call itself must be used, not a substitute.
+   * `.w`-scalar `ToMat3()`). An earlier pass here also tried substituting
+   * `MultQuadVec` against the three standard basis vectors and found it
+   * numerically disagreed with `VAxes3` -- but that was because `VAxes3`'s
+   * own constructor had an independent, pre-existing bug (fixed in
+   * `MathReflection.cpp`, see `VAxes3::VAxes3`'s doc comment), not because
+   * the two are actually different operations: with that fixed, `VAxes3`'s
+   * `vX`/`vY`/`vZ` are exactly the `.x`-scalar rotation matrix's rows, i.e.
+   * numerically identical to `MultQuadVec` against the standard basis
+   * vectors. The call here matches the binary's own control flow either
+   * way (it constructs `VAxes3` and reads its members directly), so no
+   * code change was needed once the constructor itself was corrected.
    */
   Wm3::Vec3f* SPhysBody::GetImpulse(Wm3::Vec3f* const out) const
   {
