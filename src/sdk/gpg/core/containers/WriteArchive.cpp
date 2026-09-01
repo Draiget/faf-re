@@ -53,28 +53,17 @@ using TrackedPointerMap = std::map<const void*, WriteArchive::TrackedPointerReco
 
 class BinaryWriteArchive;
 
-struct BinaryWriteArchiveFileRuntimeView
-{
-    std::uint8_t reserved00[0x28];
-    std::FILE* stream;
-};
-
-static_assert(
-    offsetof(BinaryWriteArchiveFileRuntimeView, stream) == 0x28,
-    "BinaryWriteArchiveFileRuntimeView::stream offset must be 0x28"
-);
-
+// Defined below `BinaryWriteArchive`, which owns the stream handle these lanes
+// write through. This replaces a `BinaryWriteArchiveFileRuntimeView` reach-in
+// struct that cast the archive to `{ uint8_t[0x28]; FILE* stream; }` and read
+// offset 0x28 directly. That read was out of bounds: the class was 0x24 bytes
+// here (its base was 4 short and the duplicate handle was missing), so the lane
+// picked up whatever followed the allocation and handed it to `fwrite`.
 void WriteBinaryCompatibilityLane(
-    BinaryWriteArchive* const archive,
-    const void* const buffer,
-    const std::size_t elementSize
-)
-{
-    const auto* const view = reinterpret_cast<const BinaryWriteArchiveFileRuntimeView*>(archive);
-    if (std::fwrite(buffer, elementSize, 1u, view->stream) != 1u) {
-        ThrowSerializationError("nowrite");
-    }
-}
+    BinaryWriteArchive* archive,
+    const void* buffer,
+    std::size_t elementSize
+);
 
 /**
  * Address: 0x00905200 (FUN_00905200)
@@ -440,15 +429,22 @@ private:
     }
 
 private:
-    boost::shared_ptr<std::ostream> mStreamRef;
-    std::ostream* mStream;
+    boost::shared_ptr<std::ostream> mStreamRef;   // +0x20
+    std::ostream* mStream;                        // +0x28
 };
+
+// `CreateTextWriteArchive` (0x00939280) allocates 0x2C and writes [esi+20h],
+// [esi+24h], [esi+28h] -- the same three offsets as the binary archive. This
+// class already carried the shared-owner + raw-duplicate pair; the assert is
+// what pins the base at 0x20 from a second, independent site.
+static_assert(sizeof(TextWriteArchive) == 0x2C, "TextWriteArchive size must be 0x2C");
 
 class BinaryWriteArchive final : public gpg::WriteArchive
 {
 public:
     explicit BinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
         : mFile(file)
+        , mCachedFile(file.get())
     {
     }
 
@@ -470,7 +466,7 @@ public:
      */
     void WriteBytes(char* bytes, size_t byteCount) override
     {
-        if (std::fwrite(bytes, byteCount, 1u, mFile.get()) != 1u) {
+        if (std::fwrite(bytes, byteCount, 1u, mCachedFile) != 1u) {
             ThrowSerializationError("nowrite");
         }
     }
@@ -484,7 +480,7 @@ public:
      */
     void WriteString(msvc8::string* const value) override
     {
-        std::FILE* const file = mFile.get();
+        std::FILE* const file = mCachedFile;
         const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
 
         if (!file || std::fwrite(&byteCount, sizeof(byteCount), 1u, file) != 1u) {
@@ -650,9 +646,24 @@ public:
      */
     void WriteMarker(int marker) override
     {
-        std::FILE* const file = mFile.get();
+        std::FILE* const file = mCachedFile;
         const char markerByte = kArchiveTokenBytes[marker];
         if (!file || std::fwrite(&markerByte, 1u, 1u, file) != 1u) {
+            ThrowSerializationError("nowrite");
+        }
+    }
+
+    /**
+     * What it does:
+     * Writes one raw scalar span to the archive's stream, throwing
+     * `SerializationError("nowrite")` when the write comes up short. This is
+     * the shared body behind the compatibility lanes at 0x00905200-0x00905500,
+     * each of which is `fwrite(buffer, <width>, 1, this->file)` against the
+     * duplicate handle at +0x28.
+     */
+    void WriteScalarLane(const void* const buffer, const std::size_t elementSize)
+    {
+        if (std::fwrite(buffer, elementSize, 1u, mCachedFile) != 1u) {
             ThrowSerializationError("nowrite");
         }
     }
@@ -661,14 +672,32 @@ private:
     template <typename T>
     void WriteScalarNowrite(const T& value, std::size_t elementSize)
     {
-        if (std::fwrite(&value, elementSize, 1u, mFile.get()) != 1u) {
+        if (std::fwrite(&value, elementSize, 1u, mCachedFile) != 1u) {
             ThrowSerializationError("nowrite");
         }
     }
 
 private:
-    boost::shared_ptr<std::FILE> mFile;
+    // `gpg::CreateBinaryWriteArchive` (0x00904740) allocates 0x2C and sets the
+    // shared owner's `px`/`pn.pi_` pair at +0x20/+0x24 and then a plain
+    // duplicate of the same handle at +0x28. Every write slot uses the
+    // duplicate: `BinaryWriteArchive::WriteBytes` (0x00904A60) decompiles as
+    // `fwrite(Buffer, ElementSize, 1u, *(this + 10))` on a `FILE**`, and
+    // 10 * 4 == 0x28. Carrying it is what makes this class 0x2C, not 0x28.
+    boost::shared_ptr<std::FILE> mFile;   // +0x20
+    std::FILE* mCachedFile = nullptr;     // +0x28
 };
+
+static_assert(sizeof(BinaryWriteArchive) == 0x2C, "BinaryWriteArchive size must be 0x2C");
+
+void WriteBinaryCompatibilityLane(
+    BinaryWriteArchive* const archive,
+    const void* const buffer,
+    const std::size_t elementSize
+)
+{
+    archive->WriteScalarLane(buffer, elementSize);
+}
 
 /**
  * Address: 0x00904940 (FUN_00904940)

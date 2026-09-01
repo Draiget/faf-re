@@ -274,11 +274,35 @@ namespace gpg
         WriteArchive* WriteCFunction(CClosure* closure, const gpg::RRef& ownerRef);
 
     protected:
-        std::map<const RType*, int> mRefCounts;
-        std::map<const void*, TrackedPointerRecord> mObjRefs;
+        std::map<const RType*, int> mRefCounts;   // +0x04
+        std::map<const void*, TrackedPointerRecord> mObjRefs;  // +0x10
+
+        /**
+         * One 4-byte slot at +0x1C that this class's own ctor and dtor never
+         * touch, and which none of `Close`/`EndSection`/`PreCreatedPtr`/
+         * `Write`/`WriteRawPointer` reads. Its existence is nonetheless
+         * certain, from three independent readings of the binary:
+         *
+         *  - `gpg::WriteArchive::WriteArchive` (0x00953BE0) lays the two maps
+         *    at `lea esi, [edi+4]` and `lea esi, [edi+10h]`, each spanning 12
+         *    bytes, so the recovered members end at +0x1C;
+         *  - `CreateBinaryWriteArchive` (0x00904740) allocates 0x2C and writes
+         *    its shared owner at [esi+20h]/[esi+24h] and the duplicate handle
+         *    at [esi+28h];
+         *  - `CreateTextWriteArchive` (0x00939280) allocates 0x2C too and
+         *    writes the same three offsets.
+         *
+         * Two unrelated derived classes both starting at +0x20 puts the gap in
+         * the shared base, not in either of them. Named by the offset
+         * convention for not-yet-identified fields rather than guessed at: the
+         * layout is proven, the purpose is not.
+         */
+        std::uint32_t field_0x1C = 0;             // +0x1C
 
         friend void WriteRawPointer(WriteArchive* archive, const RRef& objectRef, TrackedPointerState state, const RRef& ownerRef);
     };
+
+    static_assert(sizeof(WriteArchive) == 0x20, "WriteArchive size must be 0x20");
 
     /**
      * Address: import thunk used at 0x008812DC callsite
