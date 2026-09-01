@@ -362,6 +362,25 @@ namespace moho
   template <>
   gpg::RRef* TSimConVarInstance<float>::GetValueRef(gpg::RRef* outRef);
 
+  /**
+   * Address: 0x00735A30 (FUN_00735A30, Moho::TSimConVarInstance_string::TSimConVarInstance_string)
+   *
+   * What it does:
+   * Constructs one `TSimConVarInstance<msvc8::string>` in-place at
+   * `instance` from `(name, value)`. `value` is taken by value and moved
+   * into `mValue`, matching the binary's by-value default-value parameter
+   * (the caller builds a copy of the convar's default before this runs,
+   * and this callee's copy is what gets consumed). Wired from
+   * `TSimConVar<msvc8::string>::CreateInstance()` (CSimConVarBase.cpp),
+   * mirroring the `ConstructTSimConVarInstance{Bool,Int,UInt8}` siblings
+   * above.
+   */
+  [[nodiscard]] TSimConVarInstance<msvc8::string>* ConstructTSimConVarInstanceString(
+    TSimConVarInstance<msvc8::string>* instance,
+    const char* name,
+    msvc8::string value
+  ) noexcept;
+
   static_assert(
     offsetof(TSimConVarInstance<bool>, mValue) == 0x08, "TSimConVarInstance<bool>::mValue offset must be 0x08"
   );

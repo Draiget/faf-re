@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <new>
+#include <utility>
 
 #include "moho/console/CConCommand.h"
 
@@ -362,6 +363,38 @@ CSimConVarInstanceBase::~CSimConVarInstanceBase() = default;
   ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<std::uint8_t>();
   instance->mName = name;
   instance->mValue = value;
+  return instance;
+}
+
+/**
+ * Address: 0x00735A30 (FUN_00735A30, Moho::TSimConVarInstance_string::TSimConVarInstance_string)
+ *
+ * What it does:
+ * Constructs one `TSimConVarInstance<msvc8::string>` in-place from
+ * `(name, value)`, consuming the by-value default-value string (its heap
+ * buffer, if any, is released once its content has been moved into
+ * `mValue`). Unlike its `Bool`/`Int`/`UInt8` siblings above, this one is
+ * wired from a real caller (`TSimConVar<msvc8::string>::CreateInstance()`,
+ * CSimConVarBase.cpp) rather than left orphaned, since the binary splits
+ * `TSimConVar<msvc8::string>::CreateInstance` (0x007354E0) into an outer
+ * allocate-and-copy-default-value wrapper plus this inner placement
+ * constructor -- the same two-symbol shape `TSimConVarInstance_uint8`
+ * shows between 0x00735400 (its `CreateInstance`) and 0x00735980 (its own
+ * constructor, cited on `ConstructTSimConVarInstanceUInt8` above).
+ */
+moho::TSimConVarInstance<msvc8::string>* moho::ConstructTSimConVarInstanceString(
+  moho::TSimConVarInstance<msvc8::string>* const instance,
+  const char* const name,
+  msvc8::string value
+) noexcept
+{
+  if (instance == nullptr) {
+    return nullptr;
+  }
+
+  ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<msvc8::string>();
+  instance->mName = name;
+  instance->mValue = std::move(value);
   return instance;
 }
 

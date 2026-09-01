@@ -1,6 +1,7 @@
 #include "moho/sim/CSimConVarBase.h"
 
 #include <cstdint>
+#include <new>
 
 #include "moho/sim/Sim.h"
 
@@ -131,6 +132,28 @@ CSimConVarInstanceBase* moho::TSimConVar<float>::CreateInstance()
   instance->mName = mName;
   instance->mValue = mDefaultValue;
   return instance;
+}
+
+/**
+ * Address: 0x007354E0 (FUN_007354E0, Moho::TSimConVarInstance_string::NewInstance)
+ *
+ * What it does:
+ * Allocates one string sim-convar instance and constructs it in place from
+ * this convar's name and a copy of its default value. Raw-allocates rather
+ * than using a `new`-expression because construction itself happens in
+ * `ConstructTSimConVarInstanceString` (matching the binary's two-symbol
+ * split for this instantiation -- see that function's Doxygen block,
+ * CSimConVarInstanceBase.cpp).
+ */
+template <>
+CSimConVarInstanceBase* moho::TSimConVar<msvc8::string>::CreateInstance()
+{
+  auto* const raw = ::operator new(sizeof(TSimConVarInstance<msvc8::string>), std::nothrow);
+  if (!raw) {
+    return nullptr;
+  }
+
+  return ConstructTSimConVarInstanceString(static_cast<TSimConVarInstance<msvc8::string>*>(raw), mName, mDefaultValue);
 }
 
 std::uint32_t CSimConVarBase::AllocateSimConVarIndex() noexcept
