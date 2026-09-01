@@ -16816,7 +16816,7 @@ int moho::cfunc_AddToSessionExtraSelectListL(LuaPlus::LuaState* const state)
 
     LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
     UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-    UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+    UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
     session->AddToExtraSelectList(userEntity);
   }
 
@@ -16872,7 +16872,7 @@ int moho::cfunc_RemoveFromSessionExtraSelectListL(LuaPlus::LuaState* const state
 
     LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
     UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-    UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+    UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
     session->RemoveFromExtraSelectList(userEntity);
   }
 
@@ -18953,7 +18953,7 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+      UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
       if (userEntity != nullptr && userEntity->IsSelectable()) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);
@@ -19035,7 +19035,7 @@ int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       const LuaPlus::LuaObject unitObject = sourceUnitsObject[unitIndex];
       UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
-      UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+      UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
       if (userEntity == nullptr || !userEntity->IsSelectable()) {
         continue;
       }

@@ -301,7 +301,7 @@ namespace
 
   [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
   {
-    return reinterpret_cast<UserEntity*>(userUnit);
+    return userUnit;  // UserEntity is a base of UserUnit; let the compiler adjust
   }
 
   /**

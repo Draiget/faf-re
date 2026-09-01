@@ -1131,8 +1131,15 @@ CScriptObject* SCommandUnitSet::EntryFromUnit(Unit* const unit) noexcept
     return nullptr;
   }
 
-  auto* const raw = reinterpret_cast<std::uint8_t*>(unit);
-  return reinterpret_cast<CScriptObject*>(raw + sizeof(IUnit));
+  // The command unit-set stores the CScriptObject subobject, which sits at
+  // +0x08 inside a Unit: `Unit : IUnit, Entity` with `sizeof(IUnit) == 0x08`,
+  // and `Entity : CScriptObject, CTask` puts CScriptObject at Entity's own
+  // offset 0. IUnit derives from WeakObject rather than CScriptObject, so
+  // there is exactly one CScriptObject in the hierarchy and the conversion is
+  // unambiguous. Letting the compiler apply that adjustment is both the
+  // original source form and the one that stays correct if the base list
+  // moves; the previous `raw + sizeof(IUnit)` hardcoded the answer.
+  return static_cast<CScriptObject*>(unit);
 }
 
 Unit* SCommandUnitSet::UnitFromEntry(CScriptObject* const entry) noexcept
@@ -1146,10 +1153,11 @@ const Unit* SCommandUnitSet::UnitFromEntry(const CScriptObject* const entry) noe
     return nullptr;
   }
 
-  // Command unit-set stores CScriptObject subobject pointers for Unit entries.
-  // Unit complete-object base is sizeof(IUnit) bytes before that subobject.
-  const auto* const raw = reinterpret_cast<const std::uint8_t*>(entry);
-  return reinterpret_cast<const Unit*>(raw - sizeof(IUnit));
+  // Inverse of EntryFromUnit: the stored entry is the CScriptObject subobject
+  // of a Unit, so this is the corresponding downcast. static_cast applies the
+  // same -0x08 adjustment the compiler used on the way in, instead of the
+  // hand-written `raw - sizeof(IUnit)` this replaces.
+  return static_cast<const Unit*>(entry);
 }
 
 EntId SCommandUnitSet::EntryEntityId(const CScriptObject* const entry) noexcept
