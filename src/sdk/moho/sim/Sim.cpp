@@ -8588,6 +8588,29 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     outSyncData->mSubmitArmyStats.assign_owned(std::string_view(armyStatsXml.data(), armyStatsXml.size()));
   }
 
+  // 0x00747AF2..0x00747B0C: drain the entity DB's pending-destroy queue, then
+  // publish the command DB's per-beat events. Ground truth runs these back to
+  // back with `forceRefresh` = the same focus-army-changed byte that selected
+  // the entity walk above:
+  //
+  //     mov  eax, [ebx+984h]   ; mEntityDB
+  //     call EntityDB::Purge
+  //     mov  ecx, [edi]        ; syncData
+  //     mov  edx, [ebp+a3]     ; forceRefresh
+  //     mov  eax, [ebx+988h]   ; mCommandDb  (NOT +0x984 - adjacent to it)
+  //     call CCommandDb::PublishSyncData
+  //
+  // `EntityDB::Purge` (0x00684560) has exactly one caller in the binary and
+  // this is it, so nothing destroyed the queued entities before this; and
+  // `PublishSyncData` had no source-level caller at all, so per-command sync
+  // events never reached the client.
+  if (mEntityDB != nullptr) {
+    mEntityDB->Purge();
+  }
+  if (mCommandDB != nullptr) {
+    mCommandDB->PublishSyncData(outSyncData, focusArmyChanged);
+  }
+
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
   // rules layer raised becomes the one the client is told about.
