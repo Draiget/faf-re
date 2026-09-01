@@ -325,32 +325,34 @@ namespace
     return AccessEntityLuaBindingRuntime(entity).mTextureScroller;
   }
 
-  struct EntityCreateInterfaceSyncDataView
-  {
-    std::uint8_t pad_0000_0137[0x138];
-    msvc8::vector<moho::SCreateEntityParams> mNewEntities; // +0x138
-  };
-
-  static_assert(
-    offsetof(EntityCreateInterfaceSyncDataView, mNewEntities) == 0x138,
-    "EntityCreateInterfaceSyncDataView::mNewEntities offset must be 0x138"
-  );
-
   /**
    * Address: 0x0067B6F0 (FUN_0067B6F0)
    *
    * What it does:
    * Appends one create-entity payload to the sync queue, growing the backing
-   * vector as needed and returning a pointer to the stored record.
+   * vector as needed and returning a pointer to the stored record. The binary
+   * takes the vector itself in `eax` and strides by 12 (`imul 2AAAAAABh`, the
+   * divide-by-`sizeof(SCreateEntityParams)` reciprocal); the member it is
+   * handed comes from the caller, which is `Entity::CreateInterface`
+   * (0x0067A220) doing `add eax, 128h` - that is `mNewEntities`.
+   *
+   * This used to reach into `SSyncData` through a hand-written view struct
+   * that placed `mNewEntities` at +0x138. +0x138 is `mNewUnits`, so every
+   * plain entity was appended to the unit queue instead, and through a view
+   * whose element stride was 0x0C against a container of 0x1C-byte
+   * `SCreateUnitParams`. `CWldSession::DoBeat` then built a `UserUnit` for
+   * each one and read `mConstDat` out of a record that never contained it,
+   * which faulted in `boost::sp_counted_base::add_ref_copy` copying a
+   * `shared_ptr<Stats<StatItem>>` whose control block was whatever followed
+   * the shorter record. Use the real typed member instead.
    */
   [[nodiscard]] moho::SCreateEntityParams* QueueCreateEntityParams(
     moho::SSyncData* const syncData,
     const moho::SCreateEntityParams& params
   )
   {
-    auto& syncView = *reinterpret_cast<EntityCreateInterfaceSyncDataView*>(syncData);
-    syncView.mNewEntities.push_back(params);
-    return &syncView.mNewEntities.back();
+    syncData->mNewEntities.push_back(params);
+    return &syncData->mNewEntities.back();
   }
 
   struct EntityTextureScrollRuntimeView
