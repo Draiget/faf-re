@@ -23,6 +23,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/script/CUnitScriptTask.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -41,30 +42,15 @@ namespace
   std::int32_t gRecoveredCScrLuaMetatableFactoryCStorageManipulatorIndex = 0;
   std::int32_t gRecoveredCScrLuaMetatableFactoryCThrustManipulatorIndex = 0;
 
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A18 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A08 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A20 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A20 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A64 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A64 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A98 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A98 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59ACC = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59ACC = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B80 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B80 = nullptr;
+  // F59B34 (moho.manipulator_methods) is republished at a second list
+  // position by register_sim_SimInits_mForms_off_F59B34_mFactory. The
+  // CScrLuaClassBinder that owns that slot is already constructed (and
+  // self-linked via its own ctor) by register_sim_SimInits_mForms_offVariant9
+  // below, so this lane only needs to record/restore the prior list head -
+  // relinking the anchor itself is deliberately suppressed, see
+  // RegisterRecoveredSimInitLinkerLane.
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B34_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B34_mFactory = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59BB4 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59BB4 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59BE8 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59BE8 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C1C = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C1C = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C50 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C50 = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
   {
@@ -569,26 +555,37 @@ namespace moho
 
   /**
    * Address: 0x00BD1980 (FUN_00BD1980, register_sim_SimInits_mForms_offVariant1)
+   * Record at 0x00F59A08.
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A08`.
+   * Publishes `CUnitScriptTask`'s method table as `moho.ScriptTask_Methods`,
+   * so `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it.
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant1()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A18, &gRecoveredSimLuaInitFormAnchor_off_F59A08>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.ScriptTask_Methods", &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(), "CUnitScriptTask", ""
+    );
+    return &binder;
   }
 
   /**
    * Address: 0x00BD21F0 (FUN_00BD21F0, register_sim_SimInits_mForms_offVariant2)
+   * Record at 0x00F59A20.
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A20`.
+   * Publishes `CAimManipulator`'s method table as `moho.AimManipulator`, so
+   * `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it and
+   * flattens in the `moho.manipulator_methods` base (e.g. `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant2()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A20, &gRecoveredSimLuaInitFormAnchor_off_F59A20>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.AimManipulator", &CScrLuaMetatableFactory<CAimManipulator>::Instance(), "CAimManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -661,14 +658,21 @@ namespace moho
 
   /**
    * Address: 0x00BD2400 (FUN_00BD2400, register_sim_SimInits_mForms_offVariant4)
+   * Record at 0x00F59A64.
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A64`.
+   * Publishes `CBoneEntityManipulator`'s method table as
+   * `moho.BoneEntityManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep
+   * reaches it and flattens in the `moho.manipulator_methods` base (e.g.
+   * `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant4()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A64, &gRecoveredSimLuaInitFormAnchor_off_F59A64>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.BoneEntityManipulator", &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(), "CBoneEntityManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -705,14 +709,21 @@ namespace moho
 
   /**
    * Address: 0x00BD2550 (FUN_00BD2550, register_sim_SimInits_mForms_offVariant6)
+   * Record at 0x00F59A98.
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A98`.
+   * Publishes `CBuilderArmManipulator`'s method table as
+   * `moho.BuilderArmManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep
+   * reaches it and flattens in the `moho.manipulator_methods` base (e.g.
+   * `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant6()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A98, &gRecoveredSimLuaInitFormAnchor_off_F59A98>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.BuilderArmManipulator", &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(), "CBuilderArmManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -749,14 +760,21 @@ namespace moho
 
   /**
    * Address: 0x00BD26C0 (FUN_00BD26C0, register_sim_SimInits_mForms_offVariant7)
+   * Record at 0x00F59ACC.
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59ACC`.
+   * Publishes `CCollisionManipulator`'s method table as
+   * `moho.CollisionManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep
+   * reaches it and flattens in the `moho.manipulator_methods` base (e.g.
+   * `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant7()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59ACC, &gRecoveredSimLuaInitFormAnchor_off_F59ACC>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.CollisionManipulator", &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(), "CCollisionManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -793,14 +811,21 @@ namespace moho
 
   /**
    * Address: 0x00BD29C0 (FUN_00BD29C0, register_sim_SimInits_mForms_offVariant8)
+   * Record at 0x00F59B00.
    *
    * What it does:
-   * Saves the current `sim` init-form head and relinks the list to
-   * `off_F59B00`.
+   * Publishes `CFootPlantManipulator`'s method table as
+   * `moho.FootPlantManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep
+   * reaches it and flattens in the `moho.manipulator_methods` base (e.g.
+   * `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant8()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B00, &gRecoveredSimLuaInitFormAnchor_off_F59B00>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.FootPlantManipulator", &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(), "CFootPlantManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -909,14 +934,20 @@ namespace moho
 
   /**
    * Address: 0x00BD2FB0 (FUN_00BD2FB0, sub_BD2FB0)
+   * Record at 0x00F59B80.
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59B80`.
+   * Publishes `CRotateManipulator`'s method table as `moho.RotateManipulator`,
+   * so `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it and
+   * flattens in the `moho.manipulator_methods` base (e.g. `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant11()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B80, &gRecoveredSimLuaInitFormAnchor_off_F59B80>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.RotateManipulator", &CScrLuaMetatableFactory<CRotateManipulator>::Instance(), "CRotateManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -953,14 +984,20 @@ namespace moho
 
   /**
    * Address: 0x00BD3190 (FUN_00BD3190, sub_BD3190)
+   * Record at 0x00F59BB4.
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59BB4`.
+   * Publishes `CSlaveManipulator`'s method table as `moho.SlaveManipulator`,
+   * so `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it and
+   * flattens in the `moho.manipulator_methods` base (e.g. `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant13()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59BB4, &gRecoveredSimLuaInitFormAnchor_off_F59BB4>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.SlaveManipulator", &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(), "CSlaveManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -997,14 +1034,20 @@ namespace moho
 
   /**
    * Address: 0x00BD3460 (FUN_00BD3460, sub_BD3460)
+   * Record at 0x00F59BE8.
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59BE8`.
+   * Publishes `CSlideManipulator`'s method table as `moho.SlideManipulator`,
+   * so `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it and
+   * flattens in the `moho.manipulator_methods` base (e.g. `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant15()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59BE8, &gRecoveredSimLuaInitFormAnchor_off_F59BE8>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.SlideManipulator", &CScrLuaMetatableFactory<CSlideManipulator>::Instance(), "CSlideManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1043,14 +1086,21 @@ namespace moho
 
   /**
    * Address: 0x00BD3600 (FUN_00BD3600, sub_BD3600)
+   * Record at 0x00F59C1C.
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59C1C`.
+   * Publishes `CStorageManipulator`'s method table as
+   * `moho.StorageManipulator`, so `globalInit.lua`'s `for name, cclass in
+   * moho do ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep
+   * reaches it and flattens in the `moho.manipulator_methods` base (e.g.
+   * `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant17()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59C1C, &gRecoveredSimLuaInitFormAnchor_off_F59C1C>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.StorageManipulator", &CScrLuaMetatableFactory<CStorageManipulator>::Instance(), "CStorageManipulator", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1087,14 +1137,20 @@ namespace moho
 
   /**
    * Address: 0x00BD3740 (FUN_00BD3740, sub_BD3740)
+   * Record at 0x00F59C50.
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59C50`.
+   * Publishes `CThrustManipulator`'s method table as `moho.ThrustManipulator`,
+   * so `globalInit.lua`'s `for name, cclass in moho do
+   * ConvertCClassToLuaSimplifiedClass(cclass, name) end` sweep reaches it and
+   * flattens in the `moho.manipulator_methods` base (e.g. `SetPrecedence`).
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant19()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59C50, &gRecoveredSimLuaInitFormAnchor_off_F59C50>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.ThrustManipulator", &CScrLuaMetatableFactory<CThrustManipulator>::Instance(), "CThrustManipulator", ""
+    );
+    return &binder;
   }
 
   /**
