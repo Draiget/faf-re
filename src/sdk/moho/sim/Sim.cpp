@@ -8417,6 +8417,33 @@ namespace
   {
     out.append(value.c_str(), value.size());
   }
+
+  /**
+   * Address: 0x00747954..0x007479C8 (inside FUN_007474B0, Moho::Sim::Sync)
+   *
+   * What it does:
+   * Publishes how many entities the beat's sync walk visited. The stat handle
+   * is looked up once and cached in a file static, released to zero on first
+   * acquisition, and the count is then stored through `StatItem::SetInt` -
+   * which is the interlocked compare-exchange loop on `mPrimaryValueBits`
+   * (+0x24) the binary open-codes here.
+   */
+  void StoreSyncEntityCountStat(const std::int32_t syncedEntityCount)
+  {
+    static moho::StatItem* sEngineStatSyncEntityCount = nullptr;
+    if (sEngineStatSyncEntityCount == nullptr) {
+      if (moho::EngineStats* const stats = moho::GetEngineStats(); stats != nullptr) {
+        sEngineStatSyncEntityCount = stats->GetItem2("Sync_Entity_Count");
+        if (sEngineStatSyncEntityCount != nullptr) {
+          (void)sEngineStatSyncEntityCount->Release(0);
+        }
+      }
+    }
+
+    if (sEngineStatSyncEntityCount != nullptr) {
+      (void)sEngineStatSyncEntityCount->SetInt(&syncedEntityCount);
+    }
+  }
 } // namespace
 
 /**
@@ -8431,7 +8458,30 @@ namespace
  */
 void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 {
+  // 0x007474EC..0x00747506: the focus army is compared BEFORE the incoming
+  // filter is adopted - `a3a[0] = mFocusArmy != v4` reads the old value off
+  // `mSyncfilter` and the new one off the argument, then `SSyncFilter::
+  // SSyncFilter(&this->mSyncfilter, that)` overwrites it. Copying first would
+  // make the two always equal and the flag permanently false.
+  const std::int32_t previousFocusArmy = mSyncFilter.focusArmy;
   mSyncFilter.CopyFrom(filter);
+  const bool focusArmyChanged = previousFocusArmy != filter.focusArmy;
+
+  if (focusArmyChanged && mLuaState != nullptr) {
+    // 0x00747512..0x00747560: Lua is told about the switch with 1-based army
+    // indices, except that "no focus army" stays -1 rather than becoming 0.
+    const auto toLuaArmyIndex = [](const std::int32_t index) {
+      return index == -1 ? -1 : index + 1;
+    };
+    // Argument order is (new, old): ground truth computes `v6` from the
+    // incoming filter and `v5` from the old value and calls `Call_Int2(v6, v5)`,
+    // matching `function NoteFocusArmyChanged(new, old)` in lua/SimSync.lua.
+    const LuaPlus::LuaObject noteFocusArmyChangedGlobal = mLuaState->GetGlobal("NoteFocusArmyChanged");
+    if (noteFocusArmyChangedGlobal.IsFunction()) {
+      const LuaPlus::LuaFunction<> noteFocusArmyChanged(noteFocusArmyChangedGlobal);
+      noteFocusArmyChanged.Call_Int2(toLuaArmyIndex(filter.focusArmy), toLuaArmyIndex(previousFocusArmy));
+    }
+  }
 
   delete outSyncData;
   outSyncData = new SSyncData{};
@@ -8479,6 +8529,44 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       (void)mArmiesList[armyIndex]->CopyArmyVariableData(&outSyncData->mArmyUpdates[armyIndex]);
     }
   }
+
+  // 0x007478A4..0x00747952: publish every entity that needs it into the packet.
+  // This is what turns sim entities into client-side ones at all: `Entity::Sync`
+  // calls `CreateInterface` the first time it sees an entity whose interface is
+  // not yet created, and that is the only producer of `mNewEntities` /
+  // `mNewUnits`. Without this walk the packet's entity lanes are empty forever,
+  // so `CWldSession::DoBeat` never constructs a `UserEntity`/`UserUnit`,
+  // `UserArmy::mAvatars` stays empty, and `GetArmyAvatars` returns nothing.
+  //
+  // Two lanes, selected by whether the focus army just changed:
+  //   changed -> every unit in the DB is resynced, because visibility is
+  //              computed against the focus army and all of it just became
+  //              stale (0x007478C2 walks `mEntityDB->mAllUnits`);
+  //   otherwise -> only the dirty run threaded through `Entity::mCoordNode`
+  //              (0x0074791E walks `mCoordEntities`).
+  //
+  // Both dispatch the same virtual, vtable slot 12 (`mov eax, [edx+30h]`), and
+  // both count into `Sync_Entity_Count`. The incremental walk advances to the
+  // successor BEFORE dispatching (`mov esi, [esi+4]` precedes the call),
+  // because `Entity::Sync` unlinks the node it was reached through.
+  std::int32_t syncedEntityCount = 0;
+  if (focusArmyChanged) {
+    ForEachAllArmyUnit(mEntityDB, [&](Unit* const unit) {
+      unit->Sync(outSyncData);
+      ++syncedEntityCount;
+    });
+  } else {
+    auto dirtyEntities = mCoordEntities.owners_member<Entity, &Entity::mCoordNode>();
+    for (auto it = dirtyEntities.begin(); it != dirtyEntities.end();) {
+      Entity* const entity = *it;
+      ++it;
+      if (entity != nullptr) {
+        entity->Sync(outSyncData);
+        ++syncedEntityCount;
+      }
+    }
+  }
+  StoreSyncEntityCountStat(syncedEntityCount);
 
   if (mRequestXMLArmyStatsSubmit) {
     mRequestXMLArmyStatsSubmit = false;
@@ -18345,6 +18433,23 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
   }
 
   const UserArmyAvatarVectorRuntimeView& avatarRefs = ResolveArmyAvatarVectorView(focusArmy);
+
+  {
+    // TEMPORARY PROBE (remove before commit). gamemain.lua's OnFirstUpdate only
+    // forks StartupSequence (camera zoom onto the commander + select it) when
+    // GetArmyAvatars returns a non-empty table whose [1] is in category
+    // COMMAND. An empty return here silently skips the whole sequence.
+    char probeBuf[192];
+    sprintf_s(
+      probeBuf, "[ZOOMDIAG] GetArmyAvatars: focusArmy=%p begin=%p end=%p count=%d\n",
+      static_cast<const void*>(focusArmy),
+      static_cast<const void*>(avatarRefs.begin), static_cast<const void*>(avatarRefs.end),
+      (avatarRefs.begin && avatarRefs.end && avatarRefs.end > avatarRefs.begin)
+        ? static_cast<int>(avatarRefs.end - avatarRefs.begin) : 0
+    );
+    ::OutputDebugStringA(probeBuf);
+  }
+
   if (avatarRefs.begin == nullptr || avatarRefs.end == nullptr || avatarRefs.end <= avatarRefs.begin) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
