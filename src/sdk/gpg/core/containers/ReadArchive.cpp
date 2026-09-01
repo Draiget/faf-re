@@ -2391,6 +2391,7 @@ namespace
     offsetof(TextReadArchiveRuntimeView, stream) == 0x40,
     "TextReadArchiveRuntimeView::stream offset must be 0x40"
   );
+  static_assert(sizeof(TextReadArchiveRuntimeView) == 0x44, "TextReadArchiveRuntimeView size must be 0x44");
 
   class TextReadArchive : public gpg::ReadArchive
   {
@@ -2753,7 +2754,19 @@ namespace
  */
 ReadArchive* CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream)
 {
-  return new (std::nothrow) TextReadArchive(stream);
+  // Binary: `push 44h` before `operator new` (0x00939816-0x00939818), not
+  // sizeof(TextReadArchive). TextReadArchive declares no fields of its own -
+  // every byte of its real state lives in TextReadArchiveRuntimeView, whose
+  // last field (`stream`) ends at +0x44 - while its base `gpg::ReadArchive`
+  // (and therefore TextReadArchive itself) is only 0x38 bytes. Allocating
+  // sizeof(TextReadArchive) here silently overflowed the block by 12 bytes on
+  // every text-archive construction, corrupting whatever the allocator handed
+  // out next to it.
+  void* const storage = ::operator new(0x44u, std::nothrow);
+  if (storage == nullptr) {
+    return nullptr;
+  }
+  return new (storage) TextReadArchive(stream);
 }
 
 /**
