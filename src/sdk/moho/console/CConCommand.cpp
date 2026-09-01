@@ -6589,3 +6589,354 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsAi gConsoleStartupRegistrationsAi;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupNetAckDelayDescription = "Number of milliseconds to delay before sending ACKs";
+  constexpr const char* kConsoleStartupNetCompressionMethodDescription = "Compression method, 0=none, 1=deflate.  Only takes effect when connections are first established.";
+  constexpr const char* kConsoleStartupNetDebugLevelDescription = "Amount of network debug spew";
+  constexpr const char* kConsoleStartupNetLagDescription = "Lag, in milliseconds.";
+  constexpr const char* kConsoleStartupNetLogPacketsDescription = "Log all incomming/outgoing packets.";
+  constexpr const char* kConsoleStartupNetMaxBacklogDescription = "Maximum number of bytes to backlog to any one client.";
+  constexpr const char* kConsoleStartupNetMaxResendDelayDescription = "Maximum number of milliseconds to delay before resending a packet.";
+  constexpr const char* kConsoleStartupNetMaxSendRateDescription = "Maximum number of bytes to send per second to any one client.";
+  constexpr const char* kConsoleStartupNetMinResendDelayDescription = "Minimum number of milliseconds to delay before resending a packet.";
+  constexpr const char* kConsoleStartupNetResendPingMultiplierDescription = "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.";
+  constexpr const char* kConsoleStartupNetSendDelayDescription = "Number of milliseconds to delay before sending Data";
+} // namespace
+
+namespace moho
+{
+  extern int net_AckDelay;
+  extern int net_CompressionMethod;
+  extern int net_DebugLevel;
+  extern bool net_LogPackets;
+  extern int net_MaxBacklog;
+  extern int net_MaxResendDelay;
+  extern int net_MaxSendRate;
+  extern int net_MinResendDelay;
+  extern float net_ResendPingMultiplier;
+  extern int net_SendDelay;
+
+  TConVar<int> gTConVar_net_AckDelay(
+    "net_AckDelay",
+    kConsoleStartupNetAckDelayDescription,
+    &moho::net_AckDelay
+  );
+  TConVar<int> gTConVar_net_CompressionMethod(
+    "net_CompressionMethod",
+    kConsoleStartupNetCompressionMethodDescription,
+    &moho::net_CompressionMethod
+  );
+  TConVar<int> gTConVar_net_DebugLevel(
+    "net_DebugLevel",
+    kConsoleStartupNetDebugLevelDescription,
+    &moho::net_DebugLevel
+  );
+  TConVar<float> gTConVar_net_Lag(
+    "net_Lag",
+    kConsoleStartupNetLagDescription,
+    &moho::net_Lag
+  );
+  TConVar<bool> gTConVar_net_LogPackets(
+    "net_LogPackets",
+    kConsoleStartupNetLogPacketsDescription,
+    &moho::net_LogPackets
+  );
+  TConVar<int> gTConVar_net_MaxBacklog(
+    "net_MaxBacklog",
+    kConsoleStartupNetMaxBacklogDescription,
+    &moho::net_MaxBacklog
+  );
+  TConVar<int> gTConVar_net_MaxResendDelay(
+    "net_MaxResendDelay",
+    kConsoleStartupNetMaxResendDelayDescription,
+    &moho::net_MaxResendDelay
+  );
+  TConVar<int> gTConVar_net_MaxSendRate(
+    "net_MaxSendRate",
+    kConsoleStartupNetMaxSendRateDescription,
+    &moho::net_MaxSendRate
+  );
+  TConVar<int> gTConVar_net_MinResendDelay(
+    "net_MinResendDelay",
+    kConsoleStartupNetMinResendDelayDescription,
+    &moho::net_MinResendDelay
+  );
+  TConVar<float> gTConVar_net_ResendPingMultiplier(
+    "net_ResendPingMultiplier",
+    kConsoleStartupNetResendPingMultiplierDescription,
+    &moho::net_ResendPingMultiplier
+  );
+  TConVar<int> gTConVar_net_SendDelay(
+    "net_SendDelay",
+    kConsoleStartupNetSendDelayDescription,
+    &moho::net_SendDelay
+  );
+
+  /**
+   * Address: 0x00BEFB50 (FUN_00BEFB50, ??1TConVar_net_AckDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_AckDelay`.
+   */
+  void cleanup_TConVar_net_AckDelay()
+  {
+    CleanupStartupConCommand(gTConVar_net_AckDelay);
+  }
+
+  /**
+   * Address: 0x00BC4EF0 (FUN_00BC4EF0, register_TConVar_net_AckDelay)
+   *
+   * What it does:
+   * Registers startup convar for `net_AckDelay`.
+   */
+  void register_TConVar_net_AckDelay()
+  {
+    RegisterStartupConVar(gTConVar_net_AckDelay, &cleanup_TConVar_net_AckDelay);
+  }
+
+  /**
+   * Address: 0x00BEFCA0 (FUN_00BEFCA0, ??1TConVar_net_CompressionMethod@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_CompressionMethod`.
+   */
+  void cleanup_TConVar_net_CompressionMethod()
+  {
+    CleanupStartupConCommand(gTConVar_net_CompressionMethod);
+  }
+
+  /**
+   * Address: 0x00BC50B0 (FUN_00BC50B0, register_TConVar_net_CompressionMethod)
+   *
+   * What it does:
+   * Registers startup convar for `net_CompressionMethod`.
+   */
+  void register_TConVar_net_CompressionMethod()
+  {
+    RegisterStartupConVar(gTConVar_net_CompressionMethod, &cleanup_TConVar_net_CompressionMethod);
+  }
+
+  /**
+   * Address: 0x00BEFB20 (FUN_00BEFB20, ??1TConVar_net_DebugLevel@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_DebugLevel`.
+   */
+  void cleanup_TConVar_net_DebugLevel()
+  {
+    CleanupStartupConCommand(gTConVar_net_DebugLevel);
+  }
+
+  /**
+   * Address: 0x00BC4EB0 (FUN_00BC4EB0, register_TConVar_net_DebugLevel)
+   *
+   * What it does:
+   * Registers startup convar for `net_DebugLevel`.
+   */
+  void register_TConVar_net_DebugLevel()
+  {
+    RegisterStartupConVar(gTConVar_net_DebugLevel, &cleanup_TConVar_net_DebugLevel);
+  }
+
+  /**
+   * Address: 0x00C00C00 (FUN_00C00C00, ??1TConVar_net_Lag@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_Lag`.
+   */
+  void cleanup_TConVar_net_Lag()
+  {
+    CleanupStartupConCommand(gTConVar_net_Lag);
+  }
+
+  /**
+   * Address: 0x00BDB8E0 (FUN_00BDB8E0, register_TConVar_net_Lag)
+   *
+   * What it does:
+   * Registers startup convar for `net_Lag`.
+   */
+  void register_TConVar_net_Lag()
+  {
+    RegisterStartupConVar(gTConVar_net_Lag, &cleanup_TConVar_net_Lag);
+  }
+
+  /**
+   * Address: 0x00BEFBB0 (FUN_00BEFBB0, ??1TConVar_net_LogPackets@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_LogPackets`.
+   */
+  void cleanup_TConVar_net_LogPackets()
+  {
+    CleanupStartupConCommand(gTConVar_net_LogPackets);
+  }
+
+  /**
+   * Address: 0x00BC4F70 (FUN_00BC4F70, register_TConVar_net_LogPackets)
+   *
+   * What it does:
+   * Registers startup convar for `net_LogPackets`.
+   */
+  void register_TConVar_net_LogPackets()
+  {
+    RegisterStartupConVar(gTConVar_net_LogPackets, &cleanup_TConVar_net_LogPackets);
+  }
+
+  /**
+   * Address: 0x00BEFC70 (FUN_00BEFC70, ??1TConVar_net_MaxBacklog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_MaxBacklog`.
+   */
+  void cleanup_TConVar_net_MaxBacklog()
+  {
+    CleanupStartupConCommand(gTConVar_net_MaxBacklog);
+  }
+
+  /**
+   * Address: 0x00BC5070 (FUN_00BC5070, register_TConVar_net_MaxBacklog)
+   *
+   * What it does:
+   * Registers startup convar for `net_MaxBacklog`.
+   */
+  void register_TConVar_net_MaxBacklog()
+  {
+    RegisterStartupConVar(gTConVar_net_MaxBacklog, &cleanup_TConVar_net_MaxBacklog);
+  }
+
+  /**
+   * Address: 0x00BEFC10 (FUN_00BEFC10, ??1TConVar_net_MaxResendDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_MaxResendDelay`.
+   */
+  void cleanup_TConVar_net_MaxResendDelay()
+  {
+    CleanupStartupConCommand(gTConVar_net_MaxResendDelay);
+  }
+
+  /**
+   * Address: 0x00BC4FF0 (FUN_00BC4FF0, register_TConVar_net_MaxResendDelay)
+   *
+   * What it does:
+   * Registers startup convar for `net_MaxResendDelay`.
+   */
+  void register_TConVar_net_MaxResendDelay()
+  {
+    RegisterStartupConVar(gTConVar_net_MaxResendDelay, &cleanup_TConVar_net_MaxResendDelay);
+  }
+
+  /**
+   * Address: 0x00BEFC40 (FUN_00BEFC40, ??1TConVar_net_MaxSendRate@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_MaxSendRate`.
+   */
+  void cleanup_TConVar_net_MaxSendRate()
+  {
+    CleanupStartupConCommand(gTConVar_net_MaxSendRate);
+  }
+
+  /**
+   * Address: 0x00BC5030 (FUN_00BC5030, register_TConVar_net_MaxSendRate)
+   *
+   * What it does:
+   * Registers startup convar for `net_MaxSendRate`.
+   */
+  void register_TConVar_net_MaxSendRate()
+  {
+    RegisterStartupConVar(gTConVar_net_MaxSendRate, &cleanup_TConVar_net_MaxSendRate);
+  }
+
+  /**
+   * Address: 0x00BEFBE0 (FUN_00BEFBE0, ??1TConVar_net_MinResendDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_MinResendDelay`.
+   */
+  void cleanup_TConVar_net_MinResendDelay()
+  {
+    CleanupStartupConCommand(gTConVar_net_MinResendDelay);
+  }
+
+  /**
+   * Address: 0x00BC4FB0 (FUN_00BC4FB0, register_TConVar_net_MinResendDelay)
+   *
+   * What it does:
+   * Registers startup convar for `net_MinResendDelay`.
+   */
+  void register_TConVar_net_MinResendDelay()
+  {
+    RegisterStartupConVar(gTConVar_net_MinResendDelay, &cleanup_TConVar_net_MinResendDelay);
+  }
+
+  /**
+   * Address: 0x00BEFCD0 (FUN_00BEFCD0, ??1TConVar_net_ResendPingMultiplier@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_ResendPingMultiplier`.
+   */
+  void cleanup_TConVar_net_ResendPingMultiplier()
+  {
+    CleanupStartupConCommand(gTConVar_net_ResendPingMultiplier);
+  }
+
+  /**
+   * Address: 0x00BC50F0 (FUN_00BC50F0, register_TConVar_net_ResendPingMultiplier)
+   *
+   * What it does:
+   * Registers startup convar for `net_ResendPingMultiplier`.
+   */
+  void register_TConVar_net_ResendPingMultiplier()
+  {
+    RegisterStartupConVar(gTConVar_net_ResendPingMultiplier, &cleanup_TConVar_net_ResendPingMultiplier);
+  }
+
+  /**
+   * Address: 0x00BEFB80 (FUN_00BEFB80, ??1TConVar_net_SendDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `net_SendDelay`.
+   */
+  void cleanup_TConVar_net_SendDelay()
+  {
+    CleanupStartupConCommand(gTConVar_net_SendDelay);
+  }
+
+  /**
+   * Address: 0x00BC4F30 (FUN_00BC4F30, register_TConVar_net_SendDelay)
+   *
+   * What it does:
+   * Registers startup convar for `net_SendDelay`.
+   */
+  void register_TConVar_net_SendDelay()
+  {
+    RegisterStartupConVar(gTConVar_net_SendDelay, &cleanup_TConVar_net_SendDelay);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsNet
+  {
+    ConsoleStartupRegistrationsNet()
+    {
+      moho::register_TConVar_net_AckDelay();
+      moho::register_TConVar_net_CompressionMethod();
+      moho::register_TConVar_net_DebugLevel();
+      moho::register_TConVar_net_Lag();
+      moho::register_TConVar_net_LogPackets();
+      moho::register_TConVar_net_MaxBacklog();
+      moho::register_TConVar_net_MaxResendDelay();
+      moho::register_TConVar_net_MaxSendRate();
+      moho::register_TConVar_net_MinResendDelay();
+      moho::register_TConVar_net_ResendPingMultiplier();
+      moho::register_TConVar_net_SendDelay();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsNet gConsoleStartupRegistrationsNet;
+} // namespace
