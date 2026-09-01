@@ -51,7 +51,7 @@ namespace moho
 CWaterShaderProperties::CWaterShaderProperties()
 {
   WaterShaderNumericState& state = mNumericState;
-  state.laneFlags = 0u;
+  state.scalarLead = 0.0f;
   state.scalar00 = 0.7f;
   state.scalar01 = 1.5f;
   state.scalar02 = 0.064f;
@@ -154,6 +154,12 @@ void CWaterShaderProperties::Save(gpg::BinaryWriter& writer) const
 {
   const WaterShaderNumericState& state = mNumericState;
 
+  // Mirrors `Load`'s archive order exactly - ground truth FUN_0089FEA0 writes
+  // from class +0x04 +0x08 +0x0C +0x10 +0x14 +0x18 +0x1C +0x20 +0x24 +0x28
+  // +0x5C +0x60 +0x64 +0x68 +0x6C +0x70 +0x74 +0x78 +0x7C +0x80, then the two
+  // paths, then +0x2C +0x30 +0x34 +0x38, then the wave entries. Same 20/4
+  // split as FUN_008A03C0, so the two round-trip.
+  WriteFloat(writer, state.scalarLead);
   WriteFloat(writer, state.scalar00);
   WriteFloat(writer, state.scalar01);
   WriteFloat(writer, state.scalar02);
@@ -163,7 +169,7 @@ void CWaterShaderProperties::Save(gpg::BinaryWriter& writer) const
   WriteFloat(writer, state.scalar06);
   WriteFloat(writer, state.scalar07);
   WriteFloat(writer, state.scalar08);
-  WriteFloat(writer, state.scalar09);
+  WriteFloat(writer, state.scalar21);
   WriteFloat(writer, state.scalar22);
   WriteFloat(writer, state.directionPrimary.x);
   WriteFloat(writer, state.directionPrimary.y);
@@ -177,6 +183,7 @@ void CWaterShaderProperties::Save(gpg::BinaryWriter& writer) const
   writer.WriteString(mWaterCubemap);
   writer.WriteString(mWaterRamp);
 
+  WriteFloat(writer, state.scalar09);
   WriteFloat(writer, state.scalar10);
   WriteFloat(writer, state.scalar11);
   WriteFloat(writer, state.scalar12);
@@ -214,6 +221,30 @@ void CWaterShaderProperties::Load(const unsigned int version, gpg::BinaryReader&
 
   WaterShaderNumericState& state = mNumericState;
 
+  // Archive order and destinations are ground truth, taken from the `movss
+  // dword ptr [ebp+NN], xmm0` store after each `BinaryReader::Read(&buf, 4)`
+  // in FUN_008A03C0 (`ebp` = `this`, so class offset = struct offset + 4):
+  //
+  //   header, 20 reads -> +0x04 +0x08 +0x0C +0x10 +0x14 +0x18 +0x1C +0x20
+  //                       +0x24 +0x28 +0x5C +0x60 +0x64 +0x68 +0x6C +0x70
+  //                       +0x74 +0x78 +0x7C +0x80
+  //   cubemap string    -> +0xF4       (lea ecx, [ebp+0F4h])
+  //   ramp string       -> +0x110      (lea ecx, [ebp+110h])
+  //   4 reads           -> +0x2C +0x30 +0x34 +0x38
+  //   then 4x { read, read, string } into the wave-texture lanes.
+  //
+  // The counts also match the on-disk map byte-for-byte: in SCMP_009.scmap the
+  // water block is exactly 20 floats, then the two paths, then 4 floats, then
+  // the interleaved wave entries - with the 13th..15th header floats forming a
+  // unit vector (the sun direction), which pins the alignment independently.
+  //
+  // This previously read 19 then 3, starting one lane too late in each run.
+  // Both shortfalls left the stream 4 bytes early at a string read, so the
+  // following path picked up the tail of the preceding float: the water
+  // cubemap loaded as "<2 junk bytes>(>/textures/environment/skycube_*.dds"
+  // and the first wave texture as "\n<junk>#</textures/engine/waves.dds",
+  // which is what the "Can't find texture" warnings were.
+  ReadFloat(reader, state.scalarLead);
   ReadFloat(reader, state.scalar00);
   ReadFloat(reader, state.scalar01);
   ReadFloat(reader, state.scalar02);
@@ -223,7 +254,7 @@ void CWaterShaderProperties::Load(const unsigned int version, gpg::BinaryReader&
   ReadFloat(reader, state.scalar06);
   ReadFloat(reader, state.scalar07);
   ReadFloat(reader, state.scalar08);
-  ReadFloat(reader, state.scalar09);
+  ReadFloat(reader, state.scalar21);
   ReadFloat(reader, state.scalar22);
   ReadFloat(reader, state.directionPrimary.x);
   ReadFloat(reader, state.directionPrimary.y);
@@ -237,6 +268,7 @@ void CWaterShaderProperties::Load(const unsigned int version, gpg::BinaryReader&
   reader.ReadString(&mWaterCubemap);
   reader.ReadString(&mWaterRamp);
 
+  ReadFloat(reader, state.scalar09);
   ReadFloat(reader, state.scalar10);
   ReadFloat(reader, state.scalar11);
   ReadFloat(reader, state.scalar12);
