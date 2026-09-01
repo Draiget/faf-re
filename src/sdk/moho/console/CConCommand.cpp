@@ -6510,3 +6510,82 @@ namespace
 
   const CConCommandLuaFuncDefBootstrap gCConCommandLuaFuncDefBootstrap{};
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupAiInitialEnergyCurrencyDescription = "Initial currency of energy economy.";
+  constexpr const char* kConsoleStartupAiInitialEnergyCurrencyMaxDescription = "Initial currency of energy economy.";
+} // namespace
+
+namespace moho
+{
+  TConVar<float> gTConVar_ai_InitialEnergyCurrency(
+    "ai_InitialEnergyCurrency",
+    kConsoleStartupAiInitialEnergyCurrencyDescription,
+    &moho::ai_InitialEnergyCurrency
+  );
+  TConVar<float> gTConVar_ai_InitialEnergyCurrencyMax(
+    "ai_InitialEnergyCurrencyMax",
+    kConsoleStartupAiInitialEnergyCurrencyMaxDescription,
+    &moho::ai_InitialEnergyCurrencyMax
+  );
+
+  /**
+   * Address: 0x00C02130 (FUN_00C02130, ??1TConVar_ai_InitialEnergyCurrency@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ai_InitialEnergyCurrency`.
+   */
+  void cleanup_TConVar_ai_InitialEnergyCurrency()
+  {
+    CleanupStartupConCommand(gTConVar_ai_InitialEnergyCurrency);
+  }
+
+  /**
+   * Address: 0x00BDCFB0 (FUN_00BDCFB0, register_TConVar_ai_InitialEnergyCurrency)
+   *
+   * What it does:
+   * Registers startup convar for `ai_InitialEnergyCurrency`.
+   */
+  void register_TConVar_ai_InitialEnergyCurrency()
+  {
+    RegisterStartupConVar(gTConVar_ai_InitialEnergyCurrency, &cleanup_TConVar_ai_InitialEnergyCurrency);
+  }
+
+  /**
+   * Address: 0x00C02190 (FUN_00C02190, ??1TConVar_ai_InitialEnergyCurrencyMax@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ai_InitialEnergyCurrencyMax`.
+   */
+  void cleanup_TConVar_ai_InitialEnergyCurrencyMax()
+  {
+    CleanupStartupConCommand(gTConVar_ai_InitialEnergyCurrencyMax);
+  }
+
+  /**
+   * Address: 0x00BDD030 (FUN_00BDD030, register_TConVar_ai_InitialEnergyCurrencyMax)
+   *
+   * What it does:
+   * Registers startup convar for `ai_InitialEnergyCurrencyMax`.
+   */
+  void register_TConVar_ai_InitialEnergyCurrencyMax()
+  {
+    RegisterStartupConVar(gTConVar_ai_InitialEnergyCurrencyMax, &cleanup_TConVar_ai_InitialEnergyCurrencyMax);
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsAi
+  {
+    ConsoleStartupRegistrationsAi()
+    {
+      moho::register_TConVar_ai_InitialEnergyCurrency();
+      moho::register_TConVar_ai_InitialEnergyCurrencyMax();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsAi gConsoleStartupRegistrationsAi;
+} // namespace
