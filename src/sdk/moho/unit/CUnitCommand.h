@@ -52,10 +52,28 @@ namespace moho
     [[nodiscard]] bool InsertUnitSorted(Unit* unit);
     [[nodiscard]] bool RemoveUnitSorted(Unit* unit);
 
-    gpg::core::FastVector<CScriptObject*> mVec;
+    /**
+     * Self-linked intrusive-node prefix (ground truth: `FUN_006E81B0` inits
+     * both slots to `&this->mUnitSet` before touching `mVec`, at absolute
+     * +0xF0/+0xF4 relative to a `CUnitCommand*`). Never observed linked to
+     * any other `SCommandUnitSet`; role beyond "self-linked sentinel" is not
+     * yet identified. Field order (this member first) matches
+     * `TDatListItem`'s own construction-order convention; the exact
+     * mPrev/mNext-vs-decompiler's-next/previous naming is immaterial for a
+     * self-linked node since both slots hold the identical value either way.
+     */
+    TDatListItem<SCommandUnitSet, void> mListNode;
+
+    // Ground truth: start/end/capacity/originalVec == &mVec+0x08 (an empty,
+    // 4-element-inline SBO vector) until the set holds a 5th unit, matching
+    // FastVectorN<CScriptObject*,4>'s own 0x20-byte shape exactly
+    // (FastVector.h's own `FastVectorN<uint,4> must be 0x20` size assert).
+    gpg::core::FastVectorN<CScriptObject*, 4> mVec;
   };
 
-  class CUnitCommand : public Broadcaster
+  static_assert(sizeof(SCommandUnitSet) == 0x28, "moho::SCommandUnitSet size must be 0x28");
+
+  class CUnitCommand : public CScriptObject, public Broadcaster
   {
   public:
     static gpg::RType* sType;
@@ -64,12 +82,34 @@ namespace moho
     [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
+     * Address: 0x006E7CF0 (FUN_006E7CF0, Moho::CUnitCommand::GetClass)
+     * VFTable SLOT: 0
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `CUnitCommand`, resolved
+     * via RTTI on first use.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
      * Address: 0x006E7D10 (FUN_006E7D10, Moho::CUnitCommand::GetDerivedObjectRef)
+     * VFTable SLOT: 1
      *
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
+     * VFTable SLOT: 2
+     *
+     * What it does:
+     * Runs `DestroyInternal()` teardown; the compiler-generated scalar
+     * deleting destructor (matching the binary's own vtable-slot-2 thunk)
+     * conditionally frees storage afterward.
+     */
+    ~CUnitCommand() override;
 
     /**
        * Address: 0x006E81B0 (FUN_006E81B0)
@@ -314,18 +354,13 @@ namespace moho
     /**
      * Address: 0x006E8500 (FUN_006E8500)
      *
-     * Internal teardown used by the deleting destructor.
+     * Internal teardown, run from the real destructor. The compiler-generated
+     * scalar deleting destructor (vtable slot 2) wraps `~CUnitCommand()` with
+     * the conditional `operator delete` the binary's own thunk at 0x006E8140
+     * performs by hand - no separate static helper is needed once the class
+     * has a real virtual destructor.
      */
     void DestroyInternal();
-
-    /**
-     * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
-     *
-     * What it does:
-     * Executes non-deleting teardown and conditionally frees object storage
-     * when `deleteFlag & 1` is set.
-     */
-    static CScriptObject* DestroyWithDeleteFlag(CScriptObject* object, std::uint8_t deleteFlag);
 
     /**
      * Address: 0x006E8DC0 (FUN_006E8DC0)
@@ -340,7 +375,8 @@ namespace moho
     Sim* mSim;
     SSTICommandConstantData mConstDat;
     SSTICommandVariableData mVarDat;
-    // Likely list/sentinel related storage near +0xF0/+0xF4.
+    // Ground truth: never written in the constructor (FUN_006E81B0), sits
+    // immediately before mUnitSet at +0xEC. Purpose not yet identified.
     void* unk1;
     SCommandUnitSet mUnitSet;
     CAiFormationInstance* mFormationInstance;
@@ -366,11 +402,14 @@ namespace moho
     int32_t mUnknownTailInt;
   };
 
-#if defined(MOHO_ABI_MSVC8_COMPAT)
+  // Both asserts verified directly against FUN_006E81B0's raw disassembly
+  // (field-by-field, every `[ebp+XX]` write in the real constructor) -
+  // unconditional, not MOHO_ABI_MSVC8_COMPAT-guarded: that macro is never
+  // defined anywhere in this tree (checked, zero /D definitions), so a
+  // guarded assert here would silently never compile-check this layout.
   static_assert(sizeof(CUnitCommand) == 0x178, "CUnitCommand size must be 0x178");
   // mUnit is the ferry-beacon weak lane read by Unit::GetTransportFerryBeacon (+0x158).
   static_assert(offsetof(CUnitCommand, mUnit) == 0x158, "CUnitCommand::mUnit offset must be 0x158");
-#endif
 
   /**
    * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)

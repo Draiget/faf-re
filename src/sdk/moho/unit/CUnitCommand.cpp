@@ -601,7 +601,7 @@ namespace
 
   void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SCommandUnitSet& destination)
   {
-    destination.mVec = gpg::core::FastVector<CScriptObject*>{};
+    destination.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};
     for (Unit* const* it = source.begin(); it != source.end(); ++it) {
       if (!*it) {
         continue;
@@ -1248,7 +1248,8 @@ bool SCommandUnitSet::RemoveUnitSorted(Unit* const unit)
  * Default-initializes one command instance used by serializer construct flow.
  */
 CUnitCommand::CUnitCommand()
-  : unk0(nullptr)
+  : CScriptObject()
+  , unk0(nullptr)
   , mSim(nullptr)
   , mConstDat{}
   , mVarDat{}
@@ -1283,7 +1284,6 @@ CUnitCommand::CUnitCommand()
   mConstDat.unk2 = msvc8::string{};
 
   mVarDat = SSTICommandVariableData{};
-  mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
 
   mTarget.targetType = EAiTargetType::AITARGET_None;
   mTarget.targetEntity.ClearLinkState();
@@ -1313,7 +1313,8 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
  * resolved command id passed by command-db allocation paths.
  */
 CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData, const CmdId resolvedCommandId)
-  : unk0(nullptr)
+  : CScriptObject()
+  , unk0(nullptr)
   , mSim(sim)
   , mConstDat{}
   , mVarDat{}
@@ -1345,7 +1346,6 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   mConstDat.cmd = resolvedCommandId;
 
   CopyIssueDataToVariablePayload(issueData, mVarDat);
-  mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
   mTarget.DecodeFromSSTITarget(issueData.mTarget, sim);
 
   if (!sim) {
@@ -2036,21 +2036,14 @@ void CUnitCommand::RefreshBlipState()
  * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
  *
  * What it does:
- * Executes `CUnitCommand` teardown and conditionally frees storage when
- * `deleteFlag & 1` is set.
+ * Runs `CUnitCommand` teardown. The compiler-generated scalar deleting
+ * destructor (vtable slot 2) wraps this with the conditional
+ * `operator delete` the binary's own thunk performs by hand via a hidden
+ * delete-flag parameter.
  */
-CScriptObject* CUnitCommand::DestroyWithDeleteFlag(CScriptObject* const object, const std::uint8_t deleteFlag)
+CUnitCommand::~CUnitCommand()
 {
-  auto* const command = reinterpret_cast<CUnitCommand*>(object);
-  if (!command) {
-    return object;
-  }
-
-  command->DestroyInternal();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(command);
-  }
-  return object;
+  DestroyInternal();
 }
 
 /**
@@ -2086,7 +2079,7 @@ void CUnitCommand::DestroyInternal()
   ReleaseIntrusiveRefcountedObject(runtime.formationObject);
 
   // +0x0F8 command unit-set vector payload.
-  mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
+  mUnitSet.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};
   runtime.unitSetOwnerChainNode.UnlinkFromOwnerChain();
 
   // +0x0068 legacy msvc8::string payload in constant command data.
