@@ -2907,10 +2907,6 @@ namespace
     return lastLod->cutoff + moho::ren_MeshDissolve;
   }
 
-  constexpr std::uint8_t kRbNodeRed = 0;
-  constexpr std::uint8_t kRbNodeBlack = 1;
-  constexpr std::uint8_t kRbNodeSentinel = 1;
-
   [[nodiscard]] moho::MeshInstance::ListLink* MeshInstanceLink(moho::MeshInstance* const instance) noexcept
   {
     if (!instance) {
@@ -2970,451 +2966,17 @@ namespace
     position->mPrev = link;
   }
 
-  [[nodiscard]] bool IsMeshCacheSentinelNode(const moho::MeshRendererMeshCacheNode* const node) noexcept
-  {
-    return node == nullptr || node->isSentinel == kRbNodeSentinel;
-  }
-
-  /**
-   * Address: 0x007E6090 (FUN_007E6090, regular-node emission, color=red/
-   * isSentinel=0)
-   * Address: 0x007E4770 (FUN_007E4770, sentinel-node emission, color=black/
-   * isSentinel=1)
-   *
-   * What it does:
-   * Allocates and populates one mesh-cache RB-tree node, generalizing both
-   * binary emissions above (which differ only in the hardcoded color/
-   * isSentinel constants and in whether the link triplet is fused here or
-   * finished by the caller) into one parameterized function. Matches
-   * `legacy::containers::rb_tree<MeshKey, MeshRendererMeshCacheEntry,
-   * ...>::buy_node`'s shape for this instantiation (`RbTree.h`, cited
-   * there in full on `buy_node`'s 0x007E6090 entry) -- this tree is not
-   * yet routed through that template. The two placement-new calls below
-   * fuse into one binary emission (0x007E6180, `CopyPairNodeMeshKey
-   * PayloadWithRetainedOwnersRuntime`'s former home) when constructed as a
-   * copy: `MeshKey`'s own copy ctor bumps `meshMaterial`'s shared refcount
-   * and `boost::weak_ptr<Mesh>`'s own copy ctor bumps `mesh`'s weak
-   * refcount, exactly matching that emission's two manual
-   * InterlockedExchangeAdd calls -- expressed here as two ordinary
-   * sub-object copy-constructions instead of one hand-fused byte copy.
-   */
-  [[nodiscard]] moho::MeshRendererMeshCacheNode* CreateMeshCacheNode(
-    const moho::MeshKey& key,
-    const boost::shared_ptr<moho::Mesh>& mesh,
-    moho::MeshRendererMeshCacheNode* const left,
-    moho::MeshRendererMeshCacheNode* const parent,
-    moho::MeshRendererMeshCacheNode* const right,
-    const std::uint8_t color,
-    const std::uint8_t isSentinel
-  )
-  {
-    void* const raw = ::operator new(sizeof(moho::MeshRendererMeshCacheNode));
-    auto* const node = static_cast<moho::MeshRendererMeshCacheNode*>(raw);
-
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    new (&node->entry.key) moho::MeshKey(key);
-    new (&node->entry.mesh) boost::weak_ptr<moho::Mesh>(mesh);
-    node->color = color;
-    node->isSentinel = isSentinel;
-    node->pad_26_27[0] = 0;
-    node->pad_26_27[1] = 0;
-    return node;
-  }
-
-  void DestroyMeshCacheNode(moho::MeshRendererMeshCacheNode* const node) noexcept
-  {
-    if (!node) {
-      return;
-    }
-
-    node->entry.mesh.~weak_ptr<moho::Mesh>();
-    node->entry.key.~MeshKey();
-    ::operator delete(node);
-  }
-
-  /**
-   * Address: 0x007E4770 (FUN_007E4770, mesh-cache tree head-node allocator)
-   *
-   * What it does:
-   * Allocates one raw 40-byte `MeshRendererMeshCacheNode` block through the
-   * shared VC8 checked allocator (`sub_7E56B0`, an ICF twin of
-   * `AllocateChecked40ByteElements` -- see its address list in
-   * `legacy/containers/Vector.cpp`), zeroes the `left`/`parent`/`right`
-   * link triplet at +0x00/+0x04/+0x08, and defaults `color` (+0x24) to
-   * `kRbNodeBlack` and `isSentinel` (+0x25) to `0`. Leaves `entry`
-   * (+0x0C..+0x24) unconstructed, matching the RbTree.h `buy_head()`
-   * pattern of buying a full node while leaving the value payload for the
-   * caller. Reached from the ctor-inlined sentinel build at 0x007DF150
-   * (`MeshRenderer::MeshRenderer`) and from `InitializeMeshCacheTreeStorageAdapter`
-   * (0x007E2B50); both finish the sentinel by self-linking the node and
-   * placing it in `head`, which this function fuses with the allocation.
-   */
-  [[nodiscard]] moho::MeshRendererMeshCacheNode* CreateMeshCacheTreeSentinel()
-  {
-    const boost::shared_ptr<moho::MeshMaterial> emptyMaterial;
-    const boost::shared_ptr<moho::Mesh> emptyMesh;
-    moho::MeshKey sentinelKey(nullptr, emptyMaterial);
-    moho::MeshRendererMeshCacheNode* const head =
-      CreateMeshCacheNode(sentinelKey, emptyMesh, nullptr, nullptr, nullptr, kRbNodeBlack, kRbNodeSentinel);
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    return head;
-  }
-
-  /**
-   * Address: 0x007E2B50 (FUN_007E2B50)
-   *
-   * What it does:
-   * Initializes one mesh-cache RB-tree storage lane with a fresh self-linked
-   * sentinel head and zero size.
-   */
-  [[maybe_unused]] moho::MeshRendererMeshCacheTree* InitializeMeshCacheTreeStorageAdapter(
-    moho::MeshRendererMeshCacheTree* const tree
-  )
-  {
-    tree->head = CreateMeshCacheTreeSentinel();
-    tree->size = 0u;
-    return tree;
-  }
-
-  void MeshCacheRotateLeft(moho::MeshRendererMeshCacheNode* const node, moho::MeshRendererMeshCacheTree& tree) noexcept
-  {
-    moho::MeshRendererMeshCacheNode* const pivot = node->right;
-    node->right = pivot->left;
-    if (!IsMeshCacheSentinelNode(pivot->left)) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    moho::MeshRendererMeshCacheNode* const head = tree.head;
-    if (node == head->parent) {
-      head->parent = pivot;
-    } else {
-      moho::MeshRendererMeshCacheNode* const parent = node->parent;
-      if (node == parent->left) {
-        parent->left = pivot;
-      } else {
-        parent->right = pivot;
-      }
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void MeshCacheRotateRight(moho::MeshRendererMeshCacheNode* const node, moho::MeshRendererMeshCacheTree& tree) noexcept
-  {
-    moho::MeshRendererMeshCacheNode* const pivot = node->left;
-    node->left = pivot->right;
-    if (!IsMeshCacheSentinelNode(pivot->right)) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    moho::MeshRendererMeshCacheNode* const head = tree.head;
-    if (node == head->parent) {
-      head->parent = pivot;
-    } else {
-      moho::MeshRendererMeshCacheNode* const parent = node->parent;
-      if (node == parent->right) {
-        parent->right = pivot;
-      } else {
-        parent->left = pivot;
-      }
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void
-  RebalanceMeshCacheAfterInsert(moho::MeshRendererMeshCacheTree& tree, moho::MeshRendererMeshCacheNode* node) noexcept
-  {
-    moho::MeshRendererMeshCacheNode* const head = tree.head;
-    while (!IsMeshCacheSentinelNode(node->parent) && node->parent->color == kRbNodeRed) {
-      moho::MeshRendererMeshCacheNode* const parent = node->parent;
-      moho::MeshRendererMeshCacheNode* const grandParent = parent->parent;
-      if (parent == grandParent->left) {
-        moho::MeshRendererMeshCacheNode* const uncle = grandParent->right;
-        if (!IsMeshCacheSentinelNode(uncle) && uncle->color == kRbNodeRed) {
-          parent->color = kRbNodeBlack;
-          uncle->color = kRbNodeBlack;
-          grandParent->color = kRbNodeRed;
-          node = grandParent;
-        } else {
-          if (node == parent->right) {
-            node = parent;
-            MeshCacheRotateLeft(node, tree);
-          }
-          node->parent->color = kRbNodeBlack;
-          node->parent->parent->color = kRbNodeRed;
-          MeshCacheRotateRight(node->parent->parent, tree);
-        }
-      } else {
-        moho::MeshRendererMeshCacheNode* const uncle = grandParent->left;
-        if (!IsMeshCacheSentinelNode(uncle) && uncle->color == kRbNodeRed) {
-          parent->color = kRbNodeBlack;
-          uncle->color = kRbNodeBlack;
-          grandParent->color = kRbNodeRed;
-          node = grandParent;
-        } else {
-          if (node == parent->left) {
-            node = parent;
-            MeshCacheRotateRight(node, tree);
-          }
-          node->parent->color = kRbNodeBlack;
-          node->parent->parent->color = kRbNodeRed;
-          MeshCacheRotateLeft(node->parent->parent, tree);
-        }
-      }
-    }
-
-    if (!IsMeshCacheSentinelNode(head->parent)) {
-      head->parent->color = kRbNodeBlack;
-    }
-  }
-
-  /**
-   * Address: 0x007E6050 (FUN_007E6050)
-   *
-   * What it does:
-   * Returns one lower-bound node in the mesh-cache tree for `key`, or the head
-   * sentinel when no key >= probe exists.
-   */
-  [[nodiscard]] moho::MeshRendererMeshCacheNode*
-  MeshCacheTreeLowerBound(const moho::MeshRendererMeshCacheTree& tree, const moho::MeshKey& key) noexcept
-  {
-    moho::MeshRendererMeshCacheNode* const head = tree.head;
-    if (!head) {
-      return nullptr;
-    }
-
-    moho::MeshRendererMeshCacheNode* candidate = head;
-    for (moho::MeshRendererMeshCacheNode* node = head->parent; !IsMeshCacheSentinelNode(node);) {
-      if (node->entry.key.LessThan(key)) {
-        node = node->right;
-      } else {
-        candidate = node;
-        node = node->left;
-      }
-    }
-
-    return candidate;
-  }
-
-  /**
-   * Address: 0x007E5C00 (FUN_007E5C00)
-   *
-   * What it does:
-   * Finds one exact mesh-cache key and stores either that node or the tree head
-   * sentinel (miss) into `outNode`.
-   */
-  moho::MeshRendererMeshCacheNode** FindMeshCacheNodeExactOrHead(
-    moho::MeshRendererMeshCacheNode** const outNode,
-    const moho::MeshRendererMeshCacheTree& tree,
-    const moho::MeshKey& key
-  ) noexcept
-  {
-    if (outNode == nullptr || tree.head == nullptr) {
-      return outNode;
-    }
-
-    moho::MeshRendererMeshCacheNode* const candidate = MeshCacheTreeLowerBound(tree, key);
-    if (candidate == tree.head || key.LessThan(candidate->entry.key)) {
-      *outNode = tree.head;
-    } else {
-      *outNode = candidate;
-    }
-    return outNode;
-  }
-
-  [[nodiscard]] moho::MeshRendererMeshCacheNode*
-  MeshCacheTreeFind(const moho::MeshRendererMeshCacheTree& tree, const moho::MeshKey& key) noexcept
-  {
-    moho::MeshRendererMeshCacheNode* candidate = tree.head;
-    (void)FindMeshCacheNodeExactOrHead(&candidate, tree, key);
-    if (!candidate || candidate == tree.head) {
-      return nullptr;
-    }
-
-    return candidate;
-  }
-
-  /**
-   * Address: 0x007E60F0 (FUN_007E60F0)
-   *
-   * What it does:
-   * Steps one mesh-cache RB-tree node to its in-order predecessor: the
-   * rightmost descendant of its left subtree if it has one, otherwise the
-   * nearest ancestor it is not a left descendant of. Matches
-   * `legacy::containers::rb_tree<MeshKey, MeshRendererMeshCacheEntry,
-   * ...>::rb_decrement`'s shape for this instantiation (`RbTree.h`, cited
-   * there in full). This tree is not yet routed through that template, so
-   * this is a same-shaped local duplicate -- flagged for a follow-up
-   * consolidation pass, the same category of per-instantiation duplicate
-   * `RbTree.h` already documents and defers elsewhere (e.g. its
-   * 0x0083C400 citation).
-   */
-  [[nodiscard]] moho::MeshRendererMeshCacheNode*
-  MeshCacheTreeDecrement(moho::MeshRendererMeshCacheNode* node) noexcept
-  {
-    if (IsMeshCacheSentinelNode(node)) {
-      return node->right;
-    }
-
-    if (!IsMeshCacheSentinelNode(node->left)) {
-      moho::MeshRendererMeshCacheNode* rightmost = node->left;
-      while (!IsMeshCacheSentinelNode(rightmost->right)) {
-        rightmost = rightmost->right;
-      }
-      return rightmost;
-    }
-
-    moho::MeshRendererMeshCacheNode* ancestor = node->parent;
-    while (!IsMeshCacheSentinelNode(ancestor) && node == ancestor->left) {
-      node = ancestor;
-      ancestor = ancestor->parent;
-    }
-    return IsMeshCacheSentinelNode(node) ? node : ancestor;
-  }
-
-  /**
-   * Address: 0x007E5B20 (FUN_007E5B20, descend + uniqueness orchestration)
-   * Address: 0x007E5DF0 (FUN_007E5DF0, node buy + link + rebalance)
-   *
-   * What it does:
-   * Descends the mesh-cache RB-tree comparing only `key < node.key` at
-   * each level (one comparison per level, not an early-exit three-way
-   * compare) and tracks the last branch taken. When the descent bottoms
-   * out on a left branch and the parent is the tree's current leftmost
-   * node, the key is unconditionally unique (nothing can be smaller) and
-   * the fresh node is linked in directly; otherwise uniqueness is
-   * confirmed by comparing the sought key against the in-order
-   * predecessor of the descent result (`MeshCacheTreeDecrement`) before
-   * linking. Matches `legacy::containers::rb_tree<MeshKey,
-   * MeshRendererMeshCacheEntry, ...>::insert_unique`/`insert_at`'s shape
-   * for this instantiation exactly (`RbTree.h`, cited there in full on
-   * both members) -- this tree is not yet routed through that template.
-   */
-  [[nodiscard]] moho::MeshRendererMeshCacheNode* MeshCacheTreeInsertUnique(
-    moho::MeshRendererMeshCacheTree& tree,
-    const moho::MeshKey& key,
-    const boost::shared_ptr<moho::Mesh>& mesh,
-    bool& inserted
-  )
-  {
-    inserted = false;
-    moho::MeshRendererMeshCacheNode* const head = tree.head;
-    if (!head) {
-      return nullptr;
-    }
-
-    moho::MeshRendererMeshCacheNode* where = head;
-    bool insertLeft = true;
-    for (moho::MeshRendererMeshCacheNode* node = head->parent; !IsMeshCacheSentinelNode(node);) {
-      where = node;
-      insertLeft = key.LessThan(node->entry.key);
-      node = insertLeft ? node->left : node->right;
-    }
-
-    // The `where == head->left` (leftmost) case needs no uniqueness check:
-    // nothing in the tree can be smaller, so the key is unconditionally
-    // unique. Every other case confirms uniqueness by comparing the sought
-    // key against a probe node: the in-order predecessor of `where` when
-    // the descent's last step went left, or `where` itself when it went
-    // right (the descent already proved `where.key <= key` in that case,
-    // so comparing `where` directly detects an exact-match collision
-    // without a separate predecessor lookup) -- matching `insert_unique`'s
-    // `probe = where` default, only overwritten on the left-descent branch.
-    if (!insertLeft || where != head->left) {
-      moho::MeshRendererMeshCacheNode* const probe = insertLeft ? MeshCacheTreeDecrement(where) : where;
-      if (!probe->entry.key.LessThan(key)) {
-        return probe;
-      }
-    }
-
-    moho::MeshRendererMeshCacheNode* const insertedNode =
-      CreateMeshCacheNode(key, mesh, head, where, head, kRbNodeRed, 0);
-    if (where == head) {
-      head->parent = insertedNode;
-      head->left = insertedNode;
-      head->right = insertedNode;
-    } else if (insertLeft) {
-      where->left = insertedNode;
-      if (where == head->left) {
-        head->left = insertedNode;
-      }
-    } else {
-      where->right = insertedNode;
-      if (where == head->right) {
-        head->right = insertedNode;
-      }
-    }
-
-    ++tree.size;
-    RebalanceMeshCacheAfterInsert(tree, insertedNode);
-    inserted = true;
-    return insertedNode;
-  }
-
-  void ClearMeshCacheTreeNodes(
-    moho::MeshRendererMeshCacheNode* const node, moho::MeshRendererMeshCacheNode* const head
-  ) noexcept
-  {
-    if (!node || node == head || IsMeshCacheSentinelNode(node)) {
-      return;
-    }
-
-    ClearMeshCacheTreeNodes(node->left, head);
-    ClearMeshCacheTreeNodes(node->right, head);
-    DestroyMeshCacheNode(node);
-  }
-
-  void ResetMeshCacheTree(moho::MeshRendererMeshCacheTree& tree) noexcept
-  {
-    if (!tree.head) {
-      tree.size = 0;
-      return;
-    }
-
-    ClearMeshCacheTreeNodes(tree.head->parent, tree.head);
-    tree.head->parent = tree.head;
-    tree.head->left = tree.head;
-    tree.head->right = tree.head;
-    tree.size = 0;
-  }
-
-  /**
-   * Address: 0x007DF2D0 (FUN_007DF2D0, sub_7DF2D0)
-   *
-   * What it does:
-   * Releases one mesh-cache RB-tree storage lane by erasing all entries,
-   * deleting the head sentinel, and zeroing `{head,size}`.
-   */
-  std::int32_t ReleaseMeshCacheTreeStorage(moho::MeshRendererMeshCacheTree* const tree) noexcept
-  {
-    if (tree == nullptr) {
-      return 0;
-    }
-
-    if (tree->head != nullptr) {
-      ResetMeshCacheTree(*tree);
-      DestroyMeshCacheNode(tree->head);
-    }
-
-    tree->head = nullptr;
-    tree->size = 0u;
-    return 0;
-  }
-
-  void DestroyMeshCacheTree(moho::MeshRendererMeshCacheTree& tree) noexcept
-  {
-    (void)ReleaseMeshCacheTreeStorage(&tree);
-    tree.proxy = nullptr;
-  }
+  // The mesh-cache tree is `msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
+  // MeshKeyLess>` (Mesh.h). Its storage lifecycle - header sentinel
+  // allocation (0x007E4770/0x007E2B50), buy_node (0x007E6090),
+  // insert_unique/insert_at/link_and_rebalance (0x007E5B20/0x007E5DF0),
+  // rb_decrement (0x007E60F0), lower_bound_node/find_node (0x007E6050/
+  // 0x007E5C00), and the full tidy that frees every node plus the header
+  // (0x007DF2D0) - is the container's own ctor / dtor, all cited on the
+  // matching `rb_tree<Traits>` members in RbTree.h. The hand-rolled copies
+  // that used to live here re-implemented all of that a second time over
+  // the same nodes, so they are gone; call sites use the map's own API
+  // (FindOrCreateMesh, below).
 
   // The mesh-batch bucket tree is `msvc8::map<MeshBatchKey,
   // msvc8::vector<MeshInstance*>, MeshBatchKeyLess>` (MeshBatchKey.h). Its
@@ -5870,7 +5432,7 @@ namespace moho
    */
   MeshRenderer::MeshRenderer()
     : meshEnvironment()
-    , meshCacheTree{nullptr, nullptr, 0}
+    , meshCacheTree()
     , dissolveTex()
     , meshEnvironmentTex()
     , anisotropiclookupTex()
@@ -5882,9 +5444,9 @@ namespace moho
     , meshes()
     , meshSpatialDb{}
   {
-    meshCacheTree.head = CreateMeshCacheTreeSentinel();
-    // `meshes` stands its own header sentinel up in the map constructor, which
-    // is the 0x007E2C30 `_Tree::_Tree` emission the binary's ctor inlines here.
+    // `meshCacheTree` and `meshes` both stand their own header sentinel up in
+    // the map constructor (0x007E4770+0x007E2B50 / 0x007E2C30 `_Tree::_Tree`
+    // emissions the binary's ctor inlines here).
     (void)UnlinkMeshInstanceListLink(&instanceListHead);
 
     // The binary's constructor ends by constructing this member:
@@ -5905,10 +5467,30 @@ namespace moho
   {
     Reset();
     meshSpatialDb.ClearRegistration();
-    // `meshes` frees its nodes and its header sentinel in the map destructor -
-    // the 0x007E2B20 tidy the binary calls at this point in the sequence.
+    // `meshes` frees its nodes and header sentinel right here, inline
+    // (0x007E2B20's tidy) - confirmed from FUN_007DF330.c: `sub_7E3E20` +
+    // `operator delete(this->mMeshes._Myhead)` fire immediately after
+    // ~SpatialDB_MeshInstance, before the instance-list unlink below. Real,
+    // automatic here via implicit member destruction (meshSpatialDb is the
+    // last-declared member with a destructor, meshes the next).
+    //
+    // `meshCacheTree` (the binary's `mMap`) frees its own nodes and header
+    // sentinel (0x007DF2D0's tidy) LAST, right before ~MeshEnvironment's
+    // inline string cleanup - confirmed the same way: `sub_7E3B70` +
+    // `operator delete(this->mMap._Myhead)` are the last two statements in
+    // FUN_007DF330.c before mEnvironment's teardown, AFTER all four texture
+    // shared_ptr releases. The previous recovery here called
+    // DestroyMeshCacheTree(meshCacheTree) explicitly, right after the
+    // instance-list unlink below - years too early relative to the real
+    // binary's actual reverse-declaration-order destruction sequence. Both
+    // trees are real typed `msvc8::map` members now, so both teardowns are
+    // just implicit member destruction, naturally landing in the same
+    // reverse-declaration order the binary shows: meshSpatialDb, meshes,
+    // ..., insectlookupTex, anisotropiclookupTex, meshEnvironmentTex,
+    // dissolveTex, meshCacheTree, meshEnvironment - no explicit call needed
+    // for either, and none for meshCacheTree specifically fixes the
+    // ordering bug.
     (void)UnlinkMeshInstanceListLink(&instanceListHead);
-    DestroyMeshCacheTree(meshCacheTree);
     if (gMeshRendererInstance == this) {
       gMeshRendererInstance = nullptr;
     }
@@ -6013,22 +5595,22 @@ namespace moho
   )
   {
     MeshKey key(blueprint, materialArg);
-    MeshRendererMeshCacheNode* const foundNode = MeshCacheTreeFind(meshCacheTree, key);
-    if (foundNode) {
-      if (boost::shared_ptr<Mesh> locked = foundNode->entry.mesh.lock()) {
+    if (boost::weak_ptr<Mesh>* const found = meshCacheTree.try_get(key)) {
+      if (boost::shared_ptr<Mesh> locked = found->lock()) {
         return locked;
       }
     }
 
     boost::shared_ptr<Mesh> mesh(new Mesh(blueprint, materialArg));
-    bool inserted = false;
-    MeshRendererMeshCacheNode* const insertedNode = MeshCacheTreeInsertUnique(meshCacheTree, key, mesh, inserted);
-    if (!insertedNode) {
-      return {};
-    }
+    const std::pair<MeshRendererMeshCacheTree::iterator, bool> result =
+      meshCacheTree.insert({key, boost::weak_ptr<Mesh>(mesh)});
 
-    if (inserted || insertedNode->entry.mesh.expired()) {
-      insertedNode->entry.mesh = mesh;
+    // A fresh insert always carries the new weak reference; a collision
+    // (key already present) only needs refreshing when the existing entry's
+    // mesh has since expired - matching insert_unique's own find-or-insert
+    // semantics for this instantiation (RbTree.h).
+    if (!result.second && result.first->second.expired()) {
+      result.first->second = mesh;
     }
 
     return mesh;

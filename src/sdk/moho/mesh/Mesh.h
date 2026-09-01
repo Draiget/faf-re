@@ -8,6 +8,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/mesh/MeshBatchKey.h"
@@ -625,6 +626,20 @@ namespace moho
     boost::shared_ptr<MeshMaterial> meshMaterial; // +0x08
   };
 
+  /**
+   * Comparator for `MeshRendererMeshCacheTree`'s `msvc8::map` instantiation.
+   * Stateless, so the tree's empty-base optimisation of the comparator
+   * (`msvc8::detail::rb_compare_carrier`) still applies, matching
+   * `MeshBatchKeyLess` (`MeshBatchKey.h`) for the sibling batch-bucket tree.
+   */
+  struct MeshKeyLess
+  {
+    [[nodiscard]] bool operator()(const MeshKey& lhs, const MeshKey& rhs) const noexcept
+    {
+      return lhs.LessThan(rhs);
+    }
+  };
+
   class MeshInstance
   {
   public:
@@ -890,40 +905,30 @@ namespace moho
   };
 
   /**
-   * The cache does not keep meshes alive - `mesh` is a weak reference.
-   * `FUN_007E5850` (the entry destructor tail) is a lone `weak_count_`
-   * decrement into a single vtable dispatch (`sp_counted_base::
-   * weak_release()`'s exact shape), not the two-step use_count-then-
+   * The cache does not keep meshes alive - the mapped value is a weak
+   * reference. `FUN_007E5850` (the entry destructor tail) is a lone
+   * `weak_count_` decrement into a single vtable dispatch (`sp_counted_
+   * base::weak_release()`'s exact shape), not the two-step use_count-then-
    * weak_count teardown a `shared_ptr` release would emit. `FUN_007E5900`
    * (`FindOrCreateMesh`'s lookup half) confirms it from the other side: on
    * a tree hit it checks the found entry's control block `use_count_` and
    * only "locks" a strong reference out of it when nonzero, exactly
    * `weak_ptr<Mesh>::lock()` - a real owning `shared_ptr` member would
    * never need that check.
+   *
+   * Routed through the canonical `msvc8::map<K,T,Less>` (`legacy/containers/
+   * Map.h`/`RbTree.h`) rather than a hand-rolled tree: this instantiation's
+   * `buy_node`/`buy_head`/`insert_unique`/`insert_at`/`link_and_rebalance`/
+   * `rb_decrement`/`lower_bound_node`/`find_node`/`~rb_tree()` members are
+   * all cited to real addresses in `RbTree.h` (search that file for
+   * `0x007E6090`, `0x007E4770`, `0x007E2B50`, `0x007E5B20`, `0x007E5DF0`,
+   * `0x007E60F0`, `0x007E6050`, `0x007E5C00`, `0x007DF2D0`) -- this is the
+   * same node/head layout (12-byte `{proxy, head, size}` header, EBO'd
+   * comparator) every other real `msvc8::map`/`msvc8::set` instantiation in
+   * this codebase already uses, matching `MeshBatchBucketTree`
+   * (`MeshBatchKey.h`), this file's own sibling batch-bucket tree.
    */
-  struct MeshRendererMeshCacheEntry
-  {
-    MeshKey key;                // +0x00
-    boost::weak_ptr<Mesh> mesh; // +0x10
-  };
-
-  struct MeshRendererMeshCacheNode
-  {
-    MeshRendererMeshCacheNode* left;   // +0x00
-    MeshRendererMeshCacheNode* parent; // +0x04
-    MeshRendererMeshCacheNode* right;  // +0x08
-    MeshRendererMeshCacheEntry entry;  // +0x0C
-    std::uint8_t color;                // +0x24
-    std::uint8_t isSentinel;           // +0x25
-    std::uint8_t pad_26_27[0x02]{};
-  };
-
-  struct MeshRendererMeshCacheTree
-  {
-    void* proxy;                     // +0x00
-    MeshRendererMeshCacheNode* head; // +0x04
-    std::uint32_t size;              // +0x08
-  };
+  using MeshRendererMeshCacheTree = msvc8::map<MeshKey, boost::weak_ptr<Mesh>, MeshKeyLess>;
 
   /**
    * Process-wide mesh-render shader-constant lane. The binary holds each of
@@ -1459,37 +1464,13 @@ namespace moho
   static_assert(sizeof(MeshInstance) == 0x160, "MeshInstance size must be 0x160");
   static_assert(sizeof(MeshInstance::ListLink) == 0x08, "MeshInstance::ListLink size must be 0x08");
 
-  static_assert(
-    offsetof(MeshRendererMeshCacheEntry, key) == 0x00, "MeshRendererMeshCacheEntry::key offset must be 0x00"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheEntry, mesh) == 0x10, "MeshRendererMeshCacheEntry::mesh offset must be 0x10"
-  );
-  static_assert(sizeof(MeshRendererMeshCacheEntry) == 0x18, "MeshRendererMeshCacheEntry size must be 0x18");
-
-  static_assert(
-    offsetof(MeshRendererMeshCacheNode, left) == 0x00, "MeshRendererMeshCacheNode::left offset must be 0x00"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheNode, entry) == 0x0C, "MeshRendererMeshCacheNode::entry offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheNode, color) == 0x24, "MeshRendererMeshCacheNode::color offset must be 0x24"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheNode, isSentinel) == 0x25, "MeshRendererMeshCacheNode::isSentinel offset must be 0x25"
-  );
-  static_assert(sizeof(MeshRendererMeshCacheNode) == 0x28, "MeshRendererMeshCacheNode size must be 0x28");
-
-  static_assert(
-    offsetof(MeshRendererMeshCacheTree, proxy) == 0x00, "MeshRendererMeshCacheTree::proxy offset must be 0x00"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheTree, head) == 0x04, "MeshRendererMeshCacheTree::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(MeshRendererMeshCacheTree, size) == 0x08, "MeshRendererMeshCacheTree::size offset must be 0x08"
-  );
+  // MeshRendererMeshCacheTree is msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
+  // MeshKeyLess> -- the 12-byte {proxy, head, size} header this size guards
+  // is shared by every msvc8::map/msvc8::set instantiation regardless of
+  // K/V/Less (comparator EBO'd away), already spot-checked generically in
+  // Map.h (`static_assert(sizeof(map<void*, void*>) == 0x0C, ...)`). Only
+  // the overall size needs re-asserting here, to guard MeshRenderer's own
+  // layout below.
   static_assert(sizeof(MeshRendererMeshCacheTree) == 0x0C, "MeshRendererMeshCacheTree size must be 0x0C");
 
   static_assert(offsetof(MeshRenderer, meshEnvironment) == 0x04, "MeshRenderer::meshEnvironment offset must be 0x04");

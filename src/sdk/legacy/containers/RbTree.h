@@ -2049,6 +2049,31 @@ namespace msvc8
              * (`DestroyTerrainResFields`, `CWldMap.cpp`) implicit member
              * destruction now that `mEnvLookup` is a real typed
              * `msvc8::map` member (`view.mEnvLookup.~TerrainEnvironmentLookupMap();`).
+             *
+             * Address: 0x007DF2D0 (FUN_007DF2D0, sub_7DF2D0) -- `msvc8::map<
+             * Moho::MeshKey, boost::weak_ptr<Moho::Mesh>>::~rb_tree()` --
+             * `Moho::MeshRenderer::meshCacheTree` (`Mesh.h`), isNil@+0x25
+             * (same instantiation cited on `buy_node`/`insert_unique`/
+             * `insert_at`/`link_and_rebalance`/`rb_decrement`/
+             * `lower_bound_node`/`find_node` elsewhere in this file). Frees
+             * every node reachable from the sentinel head then the head
+             * itself, matching this member's shape. Confirmed from
+             * `FUN_007DF330.c` (`~MeshRenderer`) to fire LAST -- right
+             * before `mEnvironment`'s inline string cleanup, after all four
+             * texture `shared_ptr` releases -- matching this member's
+             * natural reverse-declaration-order position (`meshCacheTree`
+             * is declared before `dissolveTex`/`meshEnvironmentTex`/
+             * `anisotropiclookupTex`/`insectlookupTex` in `Mesh.h`, so it is
+             * destroyed after all four). The previous recovery called this
+             * explicitly and far too early (right after the instance-list
+             * unlink, before any of the four texture releases) via a
+             * hand-rolled `DestroyMeshCacheTree`/`ReleaseMeshCacheTreeStorage`/
+             * `ResetMeshCacheTree`/`ClearMeshCacheTreeNodes` free-function
+             * chain in `moho/mesh/Mesh.cpp` -- a real destructor-ordering
+             * fidelity bug, not just a duplicate; fixed by deleting the
+             * explicit call and letting `meshCacheTree`'s own destructor run
+             * automatically, which lands it in the correct position with no
+             * source-level call needed at all.
              */
             ~rb_tree()
             {
@@ -2277,6 +2302,20 @@ namespace msvc8
              * `TerrainEnvironmentLookupNodeRuntimeView` struct pair over the
              * same node shape instead of calling this member (deleted along
              * with the whole hand-rolled tree it anchored).
+             *
+             * Address: 0x007E6050 (FUN_007E6050) -- `msvc8::map<Moho::MeshKey,
+             * boost::weak_ptr<Moho::Mesh>>::lower_bound_node` --
+             * `Moho::MeshRenderer::meshCacheTree` (`Mesh.h`), isNil@+0x25 (same
+             * instantiation cited on `buy_node`/`insert_unique`/`insert_at`/
+             * `link_and_rebalance`/`rb_decrement` elsewhere in this file).
+             * Plain descent loop matching this member's shape exactly. Sole
+             * real caller is `find_node`'s fused emission for this
+             * instantiation (cited below). Re-homed here from a hand-rolled
+             * `MeshCacheTreeLowerBound` free function in `moho/mesh/Mesh.cpp`
+             * that walked a duplicate `MeshRendererMeshCacheNode`/`...Tree`
+             * struct pair over the same node shape instead of calling this
+             * member (deleted along with the whole hand-rolled tree it
+             * anchored).
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -2551,6 +2590,20 @@ namespace msvc8
              * function_sha256. Formerly duplicated in the same file as
              * `LowerBoundTreeNodeFlag15ToOutputRecoveryB`, a thin forwarder
              * to the address above; deleted too.)
+             *
+             * Address: 0x007E5C00 (FUN_007E5C00) -- `msvc8::map<Moho::MeshKey,
+             * boost::weak_ptr<Moho::Mesh>>::find_node` -- `Moho::MeshRenderer::
+             * meshCacheTree` (`Mesh.h`), isNil@+0x25 (same instantiation cited
+             * on `lower_bound_node` above and `buy_node`/`insert_unique`/
+             * `insert_at`/`link_and_rebalance`/`rb_decrement` elsewhere in
+             * this file). Lower-bound-then-verify shape matching this member
+             * exactly. Sole real caller is `FindOrCreateMesh`'s lookup half
+             * (`Mesh.cpp`) via `try_get`. Re-homed here from a hand-rolled
+             * `MeshCacheTreeFind`/`FindMeshCacheNodeExactOrHead` free-function
+             * pair in `moho/mesh/Mesh.cpp` that walked a duplicate
+             * `MeshRendererMeshCacheNode`/`...Tree` struct pair over the same
+             * node shape instead of calling this member (deleted along with
+             * the whole hand-rolled tree it anchored).
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
