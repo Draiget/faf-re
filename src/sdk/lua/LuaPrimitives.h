@@ -271,6 +271,14 @@ namespace LuaPlus
 		static void MemberDeserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
 	};
 
+	// `traverseproto` (0x009154A0) walks a Proto's constant array as
+	// `[ecx+eax*8]`, so a TObject is 8 bytes; `newkey` (0x00927970) reads the
+	// tag as `*(_DWORD *)&mp->i_val.tt` at the start of the object, so `tt`
+	// leads. Both are load-bearing for Node's 20-byte stride.
+	static_assert(offsetof(TObject, tt) == 0x00, "TObject::tt must be at +0x00");
+	static_assert(offsetof(TObject, value) == 0x04, "TObject::value must be at +0x04");
+	static_assert(sizeof(TObject) == 0x08, "TObject size must be 0x08");
+
 	using StkId = TObject*;
 #pragma pack(pop)
 }
