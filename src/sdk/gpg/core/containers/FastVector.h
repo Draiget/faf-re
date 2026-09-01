@@ -792,6 +792,64 @@ namespace gpg::core
       return *this;
     }
 
+    /**
+     * `FastVector<T>` has no move constructor of its own that is safe to
+     * inherit here: it has no vtable (must stay the binary's plain
+     * `{start_,end_,capacity_}` triple), so `Base(FastVector&&)` is a
+     * non-virtual member that unconditionally steals `other.start_` -- for
+     * an SBO source still on its OWN inline buffer, that aims this object's
+     * `start_` at `other.inlineVec_`, a dangling interior pointer the
+     * instant `other` is destroyed, with no allocator involved at all. Only
+     * steal the pointer when the source is genuinely heap-backed; otherwise
+     * fall back to a real copy (`ResetFrom`, the same machinery the copy
+     * constructor above uses) exactly as `std::string`'s own SSO move
+     * constructor falls back to a copy when the source is using its small
+     * buffer -- there is no cheaper way to "move" data embedded inside
+     * another object.
+     */
+    FastVectorN(FastVectorN&& other) noexcept
+      : FastVectorN()
+    {
+      if (other.start_ != other.originalVec_) {
+        this->start_ = other.start_;
+        this->end_ = other.end_;
+        this->capacity_ = other.capacity_;
+        other.RebindInlineNoFree();
+      } else {
+        this->ResetFrom(other);
+        other.end_ = other.start_;
+      }
+    }
+
+    /**
+     * Same defect as the move constructor above, plus one more:
+     * `Base::operator=(FastVector&&)` opens with a bare `delete[] start_`
+     * with no check for inline storage, so assigning into an SBO vector
+     * still on its own inline buffer through this inherited operator frees
+     * that inline buffer -- i.e. corrupts `this` -- before it even looks at
+     * `other`. `ResetFrom` already releases any existing heap storage
+     * (SBO-aware) before copying, so the inline-source branch needs no
+     * separate release step.
+     */
+    FastVectorN& operator=(FastVectorN&& other) noexcept
+    {
+      if (this != &other) {
+        if (other.start_ != other.originalVec_) {
+          if (this->start_ != this->originalVec_) {
+            delete[] this->start_;
+          }
+          this->start_ = other.start_;
+          this->end_ = other.end_;
+          this->capacity_ = other.capacity_;
+          other.RebindInlineNoFree();
+        } else {
+          this->ResetFrom(other);
+          other.end_ = other.start_;
+        }
+      }
+      return *this;
+    }
+
     ~FastVectorN()
     {
       // Free heap only; inline buffer must not be freed
@@ -857,12 +915,15 @@ namespace gpg::core
      * growth relocates through `GrowInsert`/`GrowToCapacity` instead of
      * `delete[]`, and appended slots are filled with `fill`).
      *
-     * Still outstanding, deliberately not changed here to avoid altering move
-     * semantics under other sessions' in-flight work: `FastVector`'s move
-     * constructor and move assignment (the `delete[] start_` at the top of
-     * `operator=(FastVector&&)`) have the same defect, and pointer-stealing is
-     * wrong for an SBO container regardless -- it would leave `start_` aimed at
-     * the moved-from object's `inlineVec_`.
+     * `FastVector`'s move constructor and move assignment (the
+     * `delete[] start_` at the top of `operator=(FastVector&&)`) had the
+     * same defect, and pointer-stealing was wrong for an SBO container
+     * regardless -- it would leave `start_` aimed at the moved-from
+     * object's `inlineVec_`. Resolved by giving `FastVectorN` its own
+     * SBO-aware move constructor and move assignment (below, right after
+     * the copy assignment operator): steal the buffer when the source is
+     * genuinely heap-backed, fall back to a real copy when it is still on
+     * its own inline storage.
      */
     void reserve(const size_t n)
     {
