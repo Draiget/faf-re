@@ -32,7 +32,13 @@ namespace moho
    */
   struct WaterShaderNumericState
   {
-    std::uint32_t laneFlags{}; // +0x00
+    /**
+     * The first archive lane, not a flags word. `CWaterShaderProperties::Load`
+     * (0x008A03C0) stores its very first `BinaryReader::Read(&buf, 4)` here
+     * with `movss dword ptr [ebp+4], xmm0` at 0x008A03FB - a float store to
+     * class +0x04, which is this member. Nothing reads it as flags.
+     */
+    float scalarLead{}; // +0x00
 
     float scalar00{}; // +0x04
     float scalar01{}; // +0x08
