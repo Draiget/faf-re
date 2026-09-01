@@ -3543,6 +3543,15 @@ struct HeapElement72PartialSnapshot
     lane1C = other.lane1C;
     lane20 = other.lane20;
     lane28 = other.lane28;
+    // FastVectorN2RebindAndCopy unconditionally rebinds the destination to
+    // its own inline storage before copying (FastVectorN2InitInlineNoHeader,
+    // FastVector.h) -- correct for the copy constructor above, where lane30
+    // is freshly default-constructed and has nothing to free, but this is
+    // assignment: lane30 may already be on heap storage from a prior grow,
+    // and rebinding over it without releasing first leaks that buffer.
+    // ResetStorageToInline() releases it (a no-op if already inline) before
+    // the rebind-and-copy runs.
+    lane30.ResetStorageToInline();
     (void)gpg::FastVectorN2RebindAndCopy(&lane30, &other.lane30);
     return *this;
   }
