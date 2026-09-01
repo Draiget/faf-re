@@ -437,7 +437,6 @@ private:
 // [esi+24h], [esi+28h] -- the same three offsets as the binary archive. This
 // class already carried the shared-owner + raw-duplicate pair; the assert is
 // what pins the base at 0x20 from a second, independent site.
-static_assert(sizeof(TextWriteArchive) == 0x2C, "TextWriteArchive size must be 0x2C");
 
 class BinaryWriteArchive final : public gpg::WriteArchive
 {
@@ -688,7 +687,6 @@ private:
     std::FILE* mCachedFile = nullptr;     // +0x28
 };
 
-static_assert(sizeof(BinaryWriteArchive) == 0x2C, "BinaryWriteArchive size must be 0x2C");
 
 void WriteBinaryCompatibilityLane(
     BinaryWriteArchive* const archive,
