@@ -106,6 +106,16 @@ namespace moho
     CHeightField(std::int32_t width, std::int32_t height);
 
     /**
+     * Sample-grid dimensions. The binary reads these lanes directly --
+     * `CWldSession::CWldSession` (0x00893160) does `field->width` /
+     * `field->height` at 0x00893... to size the vision quadtree -- but the
+     * fields are private here, so these are the named accessors that read
+     * them. No layout impact.
+     */
+    [[nodiscard]] std::int32_t Width() const noexcept { return width; }
+    [[nodiscard]] std::int32_t Height() const noexcept { return height; }
+
+    /**
      * Address: 0x004784F0 (+ chunk 0x00478420 from ctor cleanup island)
      *
      * What it does:
