@@ -8306,6 +8306,30 @@ namespace moho
    */
   using WPreviewImageRuntime = boost::shared_ptr<ID3DTextureSheet>;
 
+  /**
+   * WARNING -- allocation size trap, read before adding a constructor.
+   *
+   * The real binary allocates this class at `sizeof == 0x21A8` (8616 bytes;
+   * confirmed at its construction site, `FUN_007FA230.c`:
+   * `(Moho::WRenViewport *)operator new(0x21A8u)`). This struct only models
+   * the leading ~0x2C bytes explicitly -- the rest is reached from outside
+   * via dedicated reach-in views at their real offsets (e.g.
+   * `WRenViewportRenderersView` in `StartupHelpers.cpp`,
+   * `WRenViewportDestroyRuntimeView` in `WxRuntimeTypes.cpp`), the same
+   * "thin class + RuntimeView" split already used for the mesh-cache
+   * cluster and others in this codebase.
+   *
+   * `WRenViewport::WRenViewport` (0x007F66A0) is NOT YET RECOVERED. If/when
+   * it is, it must NOT be constructed as plain `new WRenViewport(...)` --
+   * that allocates only `sizeof(WRenViewport)` (currently far short of
+   * 8616), overflowing into adjacent heap memory the moment the real
+   * constructor body (or any reach-in view) touches a field past this
+   * struct's own tail. Match the explicit-size placement-new pattern this
+   * codebase already uses for the same situation (see
+   * `cfunc_CreateAimControllerL`, `ManipulatorLuaFunctionThunks.cpp`, for
+   * `CAimManipulator`): `void* const storage = ::operator new(0x21A8u);
+   * new (storage) WRenViewport(...);`.
+   */
   struct WRenViewport : wxWindowMswRuntime
   {
     std::uint8_t mUnknown04To0C[0x08];
