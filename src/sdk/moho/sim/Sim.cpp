@@ -8588,6 +8588,13 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // one is drained -- the loaded run is the cumulative record that stays.
   mCachedMapRects.swap(outSyncData->mPlayableRectUpdates);
 
+  // 0x007480A4..0x007480EC: the beat's accumulated print lines.
+  // `[esi+0A1Ch/0A20h/0A24h]` is `mPrintField` (Sim+0x0A18) against
+  // `[eax+288h/28Ch/290h]`, `SSyncData::mPrintField` (+0x284); both are
+  // `msvc8::vector<msvc8::string>`. `Sim::Printf` appends into the sim side
+  // every time sim script writes a line, and nothing was carrying them across.
+  mPrintField.swap(outSyncData->mPrintField);
+
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
   // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
