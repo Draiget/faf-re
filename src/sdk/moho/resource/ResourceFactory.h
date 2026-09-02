@@ -25,9 +25,13 @@ namespace moho
      * Address: 0x00A82547 (FUN_00A82547, _purecall slot)
      *
      * What it does:
-     * Optional startup hook consumed by `ResourceManager::AttachFactory`.
+     * Startup hook consumed by `ResourceManager::AttachFactory`. Pure, not
+     * optional: every one of `ResourceFactoryBase`'s 4 vftable slots points
+     * at `_purecall`, as the address above already records, so the base
+     * supplies no body. The `{}` that used to be here would have answered a
+     * dispatch for any factory that forgot to override it.
      */
-    virtual void Init() {}
+    virtual void Init() = 0;
 
     /**
      * Address: 0x004AA9DE / 0x004AAA09 call lane in FUN_004AA690
