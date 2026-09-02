@@ -98,6 +98,52 @@ namespace moho
 
 #undef DEFINE_FRAME_SHADER_VAR_GETTER
 
+    // -------------------------------------------------------------------------
+    // Remaining "frame"-scope shader-vars (byte-verified names/scope from the
+    // binary's own register thunks at 0x00BE10C0..0x00BE1240). Unlike the nine
+    // above, no code anywhere in this binary reads these back -- a full
+    // data-xref sweep of every one of these nine globals turns up only its own
+    // register thunk plus its `atexit` destructor, never a `SetFloat`/
+    // `SetMatrix4x4`/`Exists()` call site. `CRenFrame::Render` (0x007F6030,
+    // the sole consumer of the "frame" effect scope) is fully recovered above
+    // and does not touch any of them. They are modeled as plain
+    // registration-only globals -- no accessor is added, since inventing one
+    // nothing calls would itself be unreferenced source.
+    // -------------------------------------------------------------------------
+#define DEFINE_FRAME_SHADER_VAR_REGISTRAR(GLOBAL_NAME, FUNC_NAME, VARIABLE_NAME) \
+    ShaderVar GLOBAL_NAME{}; \
+    void FUNC_NAME() { RegisterShaderVar(VARIABLE_NAME, &GLOBAL_NAME, "frame"); }
+
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameObjectToWorld, register_ShaderVarFrameObjectToWorld, "ObjectToWorld")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameWorldToView, register_ShaderVarFrameWorldToView, "WorldToView")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameProjection, register_ShaderVarFrameProjection, "Projection")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture1Amount, register_ShaderVarFrameTexture1Amount, "Texture1Amount")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture2Amount, register_ShaderVarFrameTexture2Amount, "Texture2Amount")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture3Amount, register_ShaderVarFrameTexture3Amount, "Texture3Amount")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture4Amount, register_ShaderVarFrameTexture4Amount, "Texture4Amount")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameFrameScreenLoc, register_ShaderVarFrameFrameScreenLoc, "FrameScreenLoc")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameWorldSize, register_ShaderVarFrameWorldSize, "WorldSize")
+
+#undef DEFINE_FRAME_SHADER_VAR_REGISTRAR
+
+    struct UnconsumedFrameShaderVarBootstrap
+    {
+      UnconsumedFrameShaderVarBootstrap()
+      {
+        register_ShaderVarFrameObjectToWorld();
+        register_ShaderVarFrameWorldToView();
+        register_ShaderVarFrameProjection();
+        register_ShaderVarFrameTexture1Amount();
+        register_ShaderVarFrameTexture2Amount();
+        register_ShaderVarFrameTexture3Amount();
+        register_ShaderVarFrameTexture4Amount();
+        register_ShaderVarFrameFrameScreenLoc();
+        register_ShaderVarFrameWorldSize();
+      }
+    };
+
+    [[maybe_unused]] UnconsumedFrameShaderVarBootstrap gUnconsumedFrameShaderVarBootstrap;
+
     // The frame texture slots are bound through the render-target binder at
     // FUN_00491280, which is what the binary calls here (0x007F6076, 0x007F6084,
     // 0x007F6092 and 0x007F60A0 all pass a &mFrameTextureN handle). It takes the
