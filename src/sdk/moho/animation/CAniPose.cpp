@@ -871,24 +871,76 @@ namespace moho
    * Address: 0x0054AF00 (FUN_0054AF00, ??0CAniPose@Moho@@QAE@V?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@M@Z)
    *
    * What it does:
-   * Stores pose skeleton handle + source scale and zeros trailing runtime bytes.
+   * Stores the pose's skeleton handle and source scale, then builds one pose
+   * bone per skeleton bone, seeded from the skeleton's rest pose: the rest
+   * offset scaled by `scale`, the rest orientation verbatim, the parent link
+   * resolved from the skeleton hierarchy, and the bone marked **visible**.
+   *
+   * A null skeleton falls back to `CAniSkel::GetDefaultSkeleton()`
+   * (0x0054AF4C..0x0054AFE9), so a pose always has a skeleton to size against.
    */
   CAniPose::CAniPose(const boost::shared_ptr<const CAniSkel> skeleton, const float scale)
     : mSkeleton(skeleton)
     , mScale(scale)
-    , mLocalTransform()
+    , mLocalTransform(MakeIdentityPoseTransform())
     , mBones()
     , mMaxOffset(-std::numeric_limits<float>::infinity())
   {
-    mLocalTransform.orient_.w = 1.0f;
-    mLocalTransform.orient_.x = 0.0f;
-    mLocalTransform.orient_.y = 0.0f;
-    mLocalTransform.orient_.z = 0.0f;
-    mLocalTransform.pos_.x = 0.0f;
-    mLocalTransform.pos_.y = 0.0f;
-    mLocalTransform.pos_.z = 0.0f;
-
     InitializePoseBonesInlineStorage(*this);
+
+    if (!mSkeleton) {
+      mSkeleton = CAniSkel::GetDefaultSkeleton();
+    }
+
+    // Bone count comes straight off the skeleton's own array (0x0054AFEC:
+    // `mBones._Mylast - mBones._Myfirst`, zero when the array is unallocated).
+    const std::uint32_t boneCount =
+      mSkeleton ? static_cast<std::uint32_t>(mSkeleton->mBones.size()) : 0u;
+
+    CAniPoseBone fillBone{};
+    fillBone.mCompositeTransform = MakeIdentityPoseTransform();
+    fillBone.mLocalTransform = MakeIdentityPoseTransform();
+    ResizePoseBoneStorage(mBones, boneCount, fillBone);
+
+    CAniPoseBone* const bonesBegin = mBones.begin();
+    if (bonesBegin == nullptr) {
+      return;
+    }
+
+    for (std::uint32_t index = 0; index < boneCount; ++index) {
+      const SAniSkelBone* const skeletonBone = mSkeleton->GetBone(index);
+      if (skeletonBone == nullptr) {
+        // Ground truth dereferences the skeleton bone unconditionally here; the
+        // resize above sized this loop from the same array, so the lookup only
+        // fails if the skeleton mutates underneath us.
+        continue;
+      }
+
+      CAniPoseBone& poseBone = bonesBegin[index];
+      poseBone.mPose = this;
+      poseBone.mIdx = static_cast<std::int32_t>(index);
+
+      // Bones start visible - this is what keeps a freshly posed unit on
+      // screen, since FillInstanceBonePalettes parks any bone with mVisible == 0
+      // at kHiddenBoneDepth.
+      poseBone.mVisible = 1u;
+      poseBone.mSkipNextInterp = 0u;
+
+      const std::int32_t parentIndex = skeletonBone->mParentBoneIndex;
+      poseBone.mParent =
+        (parentIndex >= 0 && static_cast<std::uint32_t>(parentIndex) < boneCount)
+          ? &bonesBegin[static_cast<std::uint32_t>(parentIndex)]
+          : nullptr;
+
+      const Wm3::Vec3f& restOffset = skeletonBone->mBoneTransform.pos_;
+      poseBone.mLocalTransform.pos_.x = restOffset.x * scale;
+      poseBone.mLocalTransform.pos_.y = restOffset.y * scale;
+      poseBone.mLocalTransform.pos_.z = restOffset.z * scale;
+      poseBone.mLocalTransform.orient_ = skeletonBone->mBoneTransform.orient_;
+
+      poseBone.mCompositeDirty = 1u;
+      poseBone.mCompositeIsLocal = 0u;
+    }
   }
 
   /**
