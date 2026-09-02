@@ -1661,6 +1661,16 @@ namespace msvc8
          *
          * Copy constructor (deep copy)
          */
+         /**
+          * Address: 0x007AEA30 (FUN_007AEA30, `msvc8::vector<moho::GeomCamera3>`)
+          * Address: 0x007AEBC0 (FUN_007AEBC0, the 4-byte-element sibling)
+          *
+          * Previously transcribed into `GeomCamera3.cpp` as
+          * `CloneGeomCameraVectorStorage` / `CloneDwordVectorStorage`, two
+          * orphaned `[[maybe_unused]]` free functions that reached into a
+          * `{begin, end, capacityEnd}` triple from outside the container. The
+          * source line is a vector copy, which is this constructor.
+          */
         vector(const vector& other) : vector() {
             const std::size_t n = other.size();
             if (n) {
@@ -6117,6 +6127,12 @@ namespace msvc8
          * `LaunchInfoBase.cpp`.
          */
     public:
+        /**
+         * Address: 0x007406E0 (FUN_007406E0)
+         *
+         * The `moho::GeomCamera3` destroy emission, previously hand-written in
+         * `GeomCamera3.cpp` as `DestroyGeomCameraRange` and orphaned.
+         */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
                 for (; first != last; ++first) first->~T();
@@ -6822,6 +6838,27 @@ namespace msvc8
          * its own); no further caller found beyond that shim.)
          *
          * Uninitialized copy N from src to dst
+         */
+        /**
+         * Address: 0x007425B0 (FUN_007425B0) / 0x00741880 (FUN_00741880)
+         * Address: 0x007B1290 (FUN_007B1290) / 0x00741E40 (FUN_00741E40)
+         * Address: 0x007B1970 (FUN_007B1970) / 0x007B1D20 (FUN_007B1D20)
+         * Address: 0x00741E10 (FUN_00741E10)
+         * Address: 0x00742A20 (FUN_00742A20) / 0x00742BA0 (FUN_00742BA0)
+         *   -- the single-element arms, `if (src) uninit_copy_n(src, 1, dst)`.
+         *
+         * Nine emissions of this member for `moho::GeomCamera3`, the element of
+         * `SSyncFilter::geoCams` (see `CEfxBeam.cpp` / `CEfxEmitter.cpp`, which
+         * read `sim->mSyncFilter.geoCams`). MSVC emits one out-of-line body per
+         * instantiating context -- copy-assign, insert, and the grow paths --
+         * which is why there are so many for one element type.
+         *
+         * These had been transcribed into `moho/render/camera/GeomCamera3.cpp`
+         * as nine hand-written `CopyConstructGeomCameraRange*` /
+         * `CopyGeomCameraIfPresent*` free functions, all `[[maybe_unused]]` and
+         * called by nothing. That is the compiler's output, not the
+         * programmer's input; the source line is the container operation that
+         * instantiates this template.
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -7815,6 +7852,13 @@ namespace msvc8
          * shape for a trivially-copyable element (no ctor/dtor call in the
          * shipped body). Called directly from this instantiation's
          * `push_back` (`FUN_00591C90`, cited above, `n=1`) fast path.
+         */
+        /**
+         * Address: 0x007B12C0 (FUN_007B12C0) / 0x007B19A0 (FUN_007B19A0)
+         *
+         * The `moho::GeomCamera3` fill emissions, previously hand-written in
+         * `GeomCamera3.cpp` as `FillGeomCameraRangeFromPrototype` and its
+         * `...LaneA` twin, both orphaned.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
