@@ -337,6 +337,19 @@ namespace msvc8
          * (`erase_node`, `~rb_tree()`) rather than a bespoke
          * `RecomputeTerrainEnvironmentExtrema` free function.
          */
+        /**
+         * Address: 0x004DD3F0 (FUN_004DD3F0, sub_4DD3F0) --
+         * `msvc8::set<msvc8::string>::rb_min` -- `Moho::AudioEngineImpl::
+         * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29. Plain
+         * `while (!n->left->isNil) n = n->left;` descent, matching this
+         * member exactly. Two real callers: `insert_at`'s emission for this
+         * instantiation (`FUN_004DBE30`, `RbTree.h`'s `insert_at`
+         * citations) re-seating `head->left` when the fresh node lands
+         * leftmost, and `erase_node`'s emission (`FUN_004DC850`, cited
+         * below) doing the same on the single/no-child erase path. Was
+         * previously duplicated as `LeftmostPausedDescendant`
+         * (`AudioEngine.cpp`, deleted by this migration).
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -519,6 +532,23 @@ namespace msvc8
          * instantiation cited on `rb_min` above; see that citation for the
          * two now-superseded callers this sibling shared in the deleted
          * hand-rolled `CWldMap.cpp` implementation).
+         */
+        /**
+         * Address: 0x004DD3D0 (FUN_004DD3D0, sub_4DD3D0) --
+         * `msvc8::set<msvc8::string>::rb_max` -- `Moho::AudioEngineImpl::
+         * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29 (same
+         * instantiation cited on `rb_min` above). Plain `while (!n->right->
+         * isNil) n = n->right;` descent, matching this member exactly. Two
+         * real callers: `insert_at`'s emission for this instantiation
+         * (`FUN_004DBE30`, `RbTree.h`'s `insert_at` citations) re-seating
+         * `head->right` when the fresh node lands rightmost, and
+         * `erase_node`'s emission (`FUN_004DC850`, cited below) doing the
+         * same on the single/no-child erase path, plus `insert_unique`'s
+         * own predecessor lookup on the leftmost-fast-path's sibling branch
+         * (`rb_decrement`, cited below, calls this same `rb_max` under the
+         * hood for the "descend left once then walk max of that subtree"
+         * case). Was previously duplicated as `RightmostPausedDescendant`
+         * (`AudioEngine.cpp`, deleted by this migration).
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -857,6 +887,25 @@ namespace msvc8
          * both trees onto this template, and this member's migration onto
          * it, is that fix.
          */
+        /**
+         * Address: 0x004DDD30 (FUN_004DDD30, sub_4DDD30) --
+         * `msvc8::set<msvc8::string>::rb_increment` -- `Moho::
+         * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil@
+         * +0x29. Matches this member exactly: nil no-op, `rb_min(n->right)`
+         * when the right child is real, else walk up while `n ==
+         * ancestor->right`. Two real callers: `erase_node`'s emission
+         * (`FUN_004DC850`, cited below) computing `next` before any
+         * mutation, and `erase_range`'s emission (`FUN_004DBD30`, cited
+         * below) inlining the same "advance first, then erase the old
+         * cursor" walk `erase_range`'s own C++ body performs (a second,
+         * separate inlined copy of this member's logic at that call site,
+         * distinct from the out-of-line 0x004DDD30 symbol). Was previously
+         * duplicated as `AdvancePausedCategoryIterator` (`AudioEngine.cpp`,
+         * deleted by this migration) -- that free function's own logic was
+         * correct (plain iterator stepping carries no rebalancing
+         * obligation), it was simply a hand-rolled reimplementation of this
+         * member rather than a call to it.
+         */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -1137,6 +1186,22 @@ namespace msvc8
          * 0x0087CDD0, this member got a separate copy per tree). Sole
          * caller is that tree's own `insert_hint` emission (`FUN_00879F60`,
          * cited below) at its predecessor-straddle branch.
+         */
+        /**
+         * Address: 0x004DD950 (FUN_004DD950, sub_4DD950) --
+         * `msvc8::set<msvc8::string>::rb_decrement` -- `Moho::
+         * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil@
+         * +0x29. Matches this member exactly: nil case returns `n->right`
+         * (rightmost), `rb_max(n->left)` when the left child is real, else
+         * walk up while `n == ancestor->left`, keeping the walked-to node
+         * when the walk falls off the front. Two real callers:
+         * `insert_unique`'s emission for this instantiation (`FUN_004DB600`,
+         * cited above) at its non-leftmost `probe = rb_decrement(where)`
+         * branch, and this instantiation's own iterator retreat (dual role
+         * with the free function below). Was previously duplicated as
+         * `RetreatPausedCategoryIterator` (`AudioEngine.cpp`, deleted by
+         * this migration) -- like `rb_increment` above, that logic was
+         * correct, just a hand-rolled reimplementation of this member.
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -2167,6 +2232,43 @@ namespace msvc8
              * `ResetDecalLookupTreeSecondary` free function is deleted for
              * the same reason.
              */
+            /**
+             * Address: 0x004DA220 (FUN_004DA220) Address: 0x004DB5D0
+             * (FUN_004DB5D0, duplicate emission) Address: 0x004DBFF0
+             * (FUN_004DBFF0, duplicate emission) -- three compiler emissions
+             * of `msvc8::set<msvc8::string>::~rb_tree()` for `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. All three match this member exactly:
+             * `erase_range(leftmost(), header())` (`FUN_004DBD30`, cited
+             * below), `free_raw(head_)`, null `head_`, zero `size_`. Real
+             * caller (confirmed via the callgraph index): `~AudioEngineImpl`
+             * (`FUN_004DA2A0`), which calls `FUN_004DA220` explicitly from
+             * its own body -- the other two addresses (`FUN_004DB5D0`/
+             * `FUN_004DBFF0`) have zero incoming xrefs in this sweep,
+             * matching the "compiler emits the same body more than once for
+             * different inlining contexts, only one of which is ever
+             * actually reached from a live caller" shape already documented
+             * elsewhere in this file (e.g. `CCommandDb`'s three `rb_tree()`
+             * ctor emissions above).
+             *
+             * `~AudioEngineImpl`'s real instruction stream calls this
+             * member's own emission for `mMap2` (`AudioCategoryVolumeNode`,
+             * `FUN_004DA250`) BEFORE this one -- true reverse-declaration
+             * order (`mMap2` is declared after `mPausedCategoryNames` in
+             * `AudioEngineImpl`, so it destructs first). The previously-
+             * recovered `~AudioEngineImpl` body called `ResetMap1(mMap1)`
+             * (this member) BEFORE `ResetCategoryMap(mMap2)` -- backwards
+             * from the real call order. Now that `mPausedCategoryNames` is a
+             * real typed member, its destructor runs implicitly at the true
+             * end of `~AudioEngineImpl` (after every explicit body
+             * statement, including the `mMap2` teardown that stays
+             * explicit), which reproduces the real binary's order for free
+             * without a hand-written call. Was previously duplicated as
+             * `ResetMap1`/`ResetPausedCategoryMapStorageAliasA`/
+             * `ResetPausedCategoryMapStorageAliasB`/
+             * `ResetPausedCategoryMapStorageCore` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
             ~rb_tree()
             {
                 erase_range(leftmost(), header());
@@ -2408,6 +2510,21 @@ namespace msvc8
              * struct pair over the same node shape instead of calling this
              * member (deleted along with the whole hand-rolled tree it
              * anchored).
+             *
+             * Address: 0x004DD380 (FUN_004DD380, sub_4DD380) --
+             * `msvc8::set<msvc8::string>::lower_bound_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Plain descent loop matching this member's shape
+             * exactly, using `msvc8::string`'s own less-than compare. Real
+             * out-of-line calls, not inlined at either call site: `erase(
+             * const key_type&)`'s emission (`FUN_004DB710`, cited below)
+             * and `count()`'s emission (`FUN_004DB770`, cited below) both
+             * call this address directly (and `upper_bound_node`'s
+             * 0x004DD410 below) rather than a fused `equal_range` symbol --
+             * this member simply never got its own combined-call emission
+             * for this instantiation. Was previously duplicated as
+             * `LowerBoundPausedCategoryNode` (`AudioEngine.cpp`, deleted by
+             * this migration).
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -2424,6 +2541,20 @@ namespace msvc8
             }
 
             /** First node whose key orders after `k`, or the header. */
+            /**
+             * Address: 0x004DD410 (FUN_004DD410, sub_4DD410) --
+             * `msvc8::set<msvc8::string>::upper_bound_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29 (same instantiation cited on `lower_bound_node`
+             * above; see that citation for why this address is a real
+             * out-of-line call rather than part of a fused `equal_range`
+             * emission). Plain descent loop matching this member's shape
+             * exactly. Two real callers: `erase(const key_type&)`'s
+             * emission (`FUN_004DB710`, cited below) and `count()`'s
+             * emission (`FUN_004DB770`, cited below). Was previously
+             * duplicated as `UpperBoundPausedCategoryNode` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
             [[nodiscard]] node_type* upper_bound_node(const key_type& k) const
             {
                 node_type* found = head_;
@@ -2506,6 +2637,39 @@ namespace msvc8
             [[nodiscard]] std::pair<node_type*, node_type*> equal_range(const key_type& k) const
             {
                 return {lower_bound_node(k), upper_bound_node(k)};
+            }
+
+            /**
+             * Address: 0x004DB770 (FUN_004DB770, sub_4DB770) --
+             * `msvc8::set<msvc8::string>::count` -- `Moho::AudioEngineImpl::
+             * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29. Matches
+             * the classic Dinkumware `_Tree::count(key)` shape exactly:
+             * `equal_range(k)`'s two calls issued directly (`lower_bound_node`/
+             * `upper_bound_node`, `FUN_004DD410`/`FUN_004DD380`, see the
+             * `lower_bound_node` citation for why this instantiation never
+             * got a fused `equal_range` emission) then a counting loop
+             * advancing via `rb_increment` (`FUN_004DDD30`, cited above) --
+             * no `erase_range` tail call, unlike `erase(const key_type&)`'s
+             * otherwise-identical shape. `msvc8::map`/`msvc8::set`'s own
+             * `count()` wrappers (`Map.h`/`Set.h`) previously used a
+             * `find(k) != end() ? 1u : 0u` shortcut instead -- numerically
+             * identical for these unique-key containers (any `[lower,upper)`
+             * range for an absent key is empty; a present key's range holds
+             * exactly one node either way), but not what the binary actually
+             * runs at this address. Sole real caller is `AudioEngine::
+             * GetPaused` (`AudioEngine.cpp`): `mPausedCategoryNames.count(
+             * category) != 0`. Was previously duplicated as
+             * `CountPausedCategoryMatches` (`AudioEngine.cpp`, deleted by
+             * this migration).
+             */
+            [[nodiscard]] size_type count(const key_type& k) const
+            {
+                const std::pair<node_type*, node_type*> range = equal_range(k);
+                size_type result = 0;
+                for (node_type* n = range.first; n != range.second; n = rb_increment(n)) {
+                    ++result;
+                }
+                return result;
             }
 
             /** Node holding `k`, or the header when absent. */
@@ -3145,6 +3309,41 @@ namespace msvc8
              * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
              * same shape, called from that tree's own `insert_hint`
              * (`FUN_00879F60`, cited below) at its final fallback.
+             */
+            /**
+             * Address: 0x004DB600 (FUN_004DB600, sub_4DB600) --
+             * `msvc8::set<msvc8::string>::insert_unique` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), a set
+             * of paused-category names (`value_type == msvc8::string`, no
+             * separate mapped value), isNil@+0x29 (0x0D header + 0x1C
+             * `msvc8::string`). Full descent via `msvc8::string`'s own
+             * less-than compare (`std::operator<<char>`) tracking `where`/
+             * `addLeft`, `where == leftmost()` fast path straight to
+             * `insert_at` (`FUN_004DBE30`, cited below), else `probe =
+             * rb_decrement(where)` (`FUN_004DD950`, cited below) then the
+             * final uniqueness compare deciding between `insert_at` and
+             * `{probe, false}` -- matches this member field for field. Sole
+             * real caller is `AudioEngine::SetPaused`'s
+             * `mPausedCategoryNames.insert(category)` (`AudioEngine.cpp`,
+             * the `paused == true` branch). Previously modelled as a
+             * hand-rolled, hand-walked hunt through a duplicate
+             * `AudioMap1CategoryNode`/`AudioMapStorage` struct pair
+             * (`InsertPausedCategoryName`, `AudioEngine.cpp`) that used this
+             * member's own search shape (three-way `strcmp` descent) but
+             * then linked the new node directly via `ConstructPausedCategoryNode`
+             * with **no rebalancing step at all** -- it never called
+             * `insert_at`/`link_and_rebalance`, so every insert degraded
+             * into a plain unbalanced BST insert. This is the bug
+             * `.memory/project_audiomap1_missing_rebalance_bug.md` diagnosed
+             * and this migration onto the real template fixes; the missing-
+             * rebalance shape is the same class already found on
+             * `CDecalManager`'s `mDecalGroupLookupByDecalIndex`/
+             * `mDecalGroupLookupBySplatIndex` (see the `insert_unique`
+             * citations above) and independently on `Unit::ArmorMultipliers`'
+             * `FindOrInsertCategoryVolumeNode` (`AudioEngine.cpp`'s own
+             * `AudioCategoryVolumeNode`/`mMap2` tree -- not yet migrated,
+             * flagged as a follow-up in
+             * `.memory/project_handrolled_rbtrees_are_the_wall.md`).
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -4154,6 +4353,46 @@ namespace msvc8
              * `CDecalManager::DestroyDecalGroup`/
              * `RemoveDecalFromManagerAndReturnNextSlot` (`CWldSplat.cpp`).
              */
+            /**
+             * Address: 0x004DC850 (FUN_004DC850, sub_4DC850) --
+             * `msvc8::set<msvc8::string>::erase_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Register-traced instruction-by-instruction
+             * against this member's C++ body and matches exactly, including
+             * the "lifted" single/no-child vs two-subtree branch split (no
+             * generic transplant-then-swap-color helper -- direct pointer
+             * surgery on `fixParent->left`/`right`, `head_->parent`/`left`/
+             * `right`), `rb_increment(erased)` computed as `next` before any
+             * mutation (`FUN_004DDD30`, cited above), `rb_min`/`rb_max`
+             * (`FUN_004DD3F0`/`FUN_004DD3D0`, cited above) re-seating
+             * extrema, the `erase_rebalance` fixup loop calling
+             * `rotate_left`/`rotate_right` (`FUN_004DCBE0`/`FUN_004DCC40`,
+             * cited above), and `free_node`'s `msvc8::string` teardown (free
+             * the heap buffer when `_Myres >= 0x10`) plus `operator
+             * delete(erased)` both inlined directly into this emission
+             * rather than calling a separate `free_node` symbol. Sole real
+             * caller is `erase_range`'s emission (`FUN_004DBD30`, cited
+             * below) via its per-element loop.
+             *
+             * Was previously duplicated as `ErasePausedCategoryNodeAndStoreNext`
+             * (`AudioEngine.cpp`, deleted by this migration) -- unlike the
+             * insert side, that free function's rebalancing WAS correct (it
+             * already called a real `FixupPausedCategoryMapAfterErase` that
+             * matched `erase_rebalance`'s CLRS shape), confirmed independently
+             * both by this pass and by the original diagnosis in
+             * `.memory/project_audiomap1_missing_rebalance_bug.md`. It was
+             * still a RULE ONE violation -- a hand-rolled duplicate of this
+             * member's mechanics reached through raw `mLeft`/`mRight`/
+             * `mParent` field access -- and, independently of that, it used
+             * a structurally different shape than the real binary: an
+             * explicit `TransplantPausedCategoryNode` helper modelled after
+             * the CLRS textbook `TRANSPLANT` subroutine, where the real
+             * emission (and this member) instead do the "lift the in-order
+             * successor into the erased slot" surgery directly inline with
+             * no separate transplant step. Both shapes are correct RB-tree
+             * deletions; only this member's is what the compiler actually
+             * emitted at this address.
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -4819,6 +5058,27 @@ namespace msvc8
              * of the hand-rolled tree pair now that both call sites reach
              * this member directly.
              */
+            /**
+             * Address: 0x004DBD30 (FUN_004DBD30, sub_4DBD30) --
+             * `msvc8::set<msvc8::string>::erase_range` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Matches this member exactly: whole-tree fast
+             * path (`first==leftmost() && last==header()`) calls
+             * `destroy_subtree(root())` (`FUN_004DD320`, cited below) then
+             * resets the head's self-links and zeroes `size_`; otherwise
+             * walks `erase(_First++)` -- advance `first` first (an inlined
+             * copy of `rb_increment`'s logic, not a call to the out-of-line
+             * `FUN_004DDD30` symbol), then erase the *old* cursor via
+             * `erase_node` (`FUN_004DC850`, cited above), discarding its
+             * returned iterator. Two real callers: `~rb_tree()`'s three
+             * emissions (`FUN_004DA220`/`FUN_004DB5D0`/`FUN_004DBFF0`, cited
+             * above) via `erase_range(leftmost(), header())`, and
+             * `erase(const key_type&)`'s emission (`FUN_004DB710`, cited
+             * below) via `erase_range(range.first, range.second)`. Was
+             * previously duplicated as `ErasePausedCategoryRangeAndStoreNext`/
+             * `ResetPausedCategoryMapStorageCore` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
                 if (first == leftmost() && last == header()) {
@@ -4931,6 +5191,24 @@ namespace msvc8
              * decal->mIndex)` call exactly (the compiler is free to choose
              * either calling convention for the same source-level `.erase(
              * key)` call; both compile to this member).
+             */
+            /**
+             * Address: 0x004DB710 (FUN_004DB710, sub_4DB710) --
+             * `msvc8::set<msvc8::string>::erase(const key_type&)` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Matches this member's general shape exactly, with
+             * `equal_range`'s two calls (`lower_bound_node` then
+             * `upper_bound_node`, `FUN_004DD410`/`FUN_004DD380`, both cited
+             * there) issued directly rather than through a fused
+             * `equal_range` symbol -- this instantiation's `equal_range`
+             * never got its own combined-call emission, see the
+             * `lower_bound_node` citation for the full note. Counting loop
+             * via `rb_increment` (`FUN_004DDD30`, cited above), tail call to
+             * `erase_range` (`FUN_004DBD30`, cited above). Sole real caller
+             * is `AudioEngine::SetPaused`'s `mPausedCategoryNames.erase(
+             * category)` (`AudioEngine.cpp`, the `paused == false` branch).
+             * Was previously duplicated as `ErasePausedCategoryName`
+             * (`AudioEngine.cpp`, deleted by this migration).
              */
             size_type erase(const key_type& k)
             {
@@ -5278,6 +5556,39 @@ namespace msvc8
              * `::operator new(sizeof(node))` for its single-node buy, the
              * same behaviorally-equivalent-for-count==1 simplification this
              * member itself makes.
+             */
+            /**
+             * Address: 0x004DE060 (FUN_004DE060, `func_NewS11N`) --
+             * `msvc8::set<msvc8::string>`'s checked single-node raw
+             * allocator -- `Moho::AudioEngineImpl::mPausedCategoryNames`
+             * (`AudioEngine.h`). Not this member's minimal `operator
+             * new(sizeof(node_type))` shape directly -- an overflow-checked
+             * "allocate N nodes" primitive (`if (count!=0 && (0xFFFFFFFFu/
+             * count) < sizeof(node_type)) throw bad_alloc; return operator
+             * new(sizeof(node_type)*count);`) always called with `count==1`
+             * by this instantiation's two node-buy call sites below, making
+             * it behaviourally identical to this member's plain form for
+             * every real call this instantiation makes (the overflow branch
+             * is dead code at `count==1`). Two real callers: `buy_node`'s
+             * emission for this instantiation (`FUN_004DCC90`, cited below)
+             * directly, and the `alloc_raw`-half of `buy_head` below
+             * (`FUN_004DD460`, cited there) indirectly through it.
+             * Address: 0x004DD460 (FUN_004DD460, sub_4DD460) -- a second,
+             * higher-level "alloc_raw half" for the same instantiation:
+             * calls `FUN_004DE060` above, then defaults `left`/`parent`/
+             * `right=nullptr`, `color=black`, `isNil=0` -- the same
+             * "dedicated alloc_raw half... `color=1`/`isNil=0`, then the
+             * self-link and `isNil=1` flag fixup this template's `buy_head()`
+             * performs inline" split already documented on `FUN_009471A0`/
+             * `FUN_00947FE0` above. Sole real caller is `AudioEngineImpl::
+             * AudioEngineImpl` (`FUN_004D9FF0`, `AudioEngine.cpp`), which
+             * patches `isNil=1` and self-links the three pointers
+             * immediately after the call -- exactly `buy_head()`'s own
+             * inline body for this instantiation. Both addresses were
+             * previously duplicated as `AllocatePausedCategoryNodeArrayChecked`/
+             * `AllocateSinglePausedCategoryNodeRaw`/
+             * `AllocatePausedCategoryNodeStorage` (`AudioEngine.cpp`,
+             * deleted by this migration).
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -6084,6 +6395,33 @@ namespace msvc8
              * cited on `buy_head` below) rather than needing a second
              * concrete copy. Not yet routed through this template.
              */
+            /**
+             * Address: 0x004DCC90 (FUN_004DCC90, sub_4DCC90) --
+             * `msvc8::set<msvc8::string>::buy_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`).
+             * Allocates via `alloc_raw`'s emission for this instantiation
+             * (`FUN_004DE060`, cited above), writes `left`/`parent`/`right`
+             * directly to the caller-supplied values (all three passed in
+             * by its sole caller rather than defaulted to `head_` here --
+             * the same "binary fuses the placeholder link-init with `link_
+             * and_rebalance`'s later overwrite" optimisation-not-taken shape
+             * documented on `FUN_007E6090` above), constructs the
+             * `msvc8::string` value via `std::string::assign` from the
+             * caller's `const char*`, then sets `color`/`isNil` from the
+             * caller-supplied values (matching `Args&&...` forwarding a
+             * `(left, parent, right, name, color)` tuple rather than this
+             * member's own `(const value_type&)` single-arg form -- the
+             * source-level call this recovers is `insert_at`'s own
+             * `buy_node(std::forward<Args>(args)...)`, which for
+             * `insert_unique(v)`'s `insert_at(addLeft, where, v)` forwards
+             * just `v`; this emission additionally forwards the resolved
+             * `left`/`parent`/`right`/`color` the caller (`insert_at`) had
+             * already computed, an inlining variant already documented for
+             * other instantiations in this file). Sole caller is this
+             * instantiation's `insert_at` emission (`FUN_004DBE30`, cited
+             * above). Was previously duplicated as `ConstructPausedCategoryNode`
+             * (`AudioEngine.cpp`, deleted by this migration).
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -6583,6 +6921,28 @@ namespace msvc8
              * fast whole-tree path (now `erase_range`'s fast path above,
              * which reaches this member indirectly through `clear()`).
              */
+            /**
+             * Address: 0x004DD320 (FUN_004DD320, sub_4DD320) --
+             * `msvc8::set<msvc8::string>::destroy_subtree` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`).
+             * Matches this member's iterative-left-spine/recurse-right shape
+             * exactly: `for (n=rootNode; !isNil(n); rootNode=n) { destroy_
+             * subtree(n->right); n=n->left; free_node(rootNode); }`, with
+             * `free_node`'s `msvc8::string` teardown (free the heap buffer
+             * when `_Myres >= 0x10`) plus `operator delete` inlined directly
+             * rather than calling a separate `free_node` symbol -- the same
+             * "value's own teardown inlined into `destroy_subtree`" pattern
+             * documented on `Unit::ArmorMultipliers`' own `msvc8::string`-
+             * keyed instantiation above. Sole real caller is `erase_range`'s
+             * emission (`FUN_004DBD30`, cited above) via its whole-tree fast
+             * path. Was previously duplicated as `DestroyMap1Subtree`
+             * (`AudioEngine.cpp`, deleted by this migration) -- that free
+             * function used a fully dual-recursive shape (`destroy(left);
+             * destroy(right); delete self;`) rather than this member's
+             * iterative-left-spine form; both destroy every node exactly
+             * once and are output-equivalent, but only this member's shape
+             * is what the compiler actually emitted at this address.
+             */
             void destroy_subtree(node_type* rootNode) noexcept
             {
                 for (node_type* n = rootNode; !rb_is_nil(n); rootNode = n) {
@@ -6984,6 +7344,31 @@ namespace msvc8
              * instantiation's `erase_node` rebalance loop (`sub_A3E450`,
              * cited on `erase_node` below).
              */
+            /**
+             * Address: 0x004DCBE0 (FUN_004DCBE0, sub_4DCBE0) --
+             * `msvc8::set<msvc8::string>::rotate_left` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. `pivot=n->right; n->right=pivot->left; if(!pivot
+             * ->left->isNil) pivot->left->parent=n; pivot->parent=n->
+             * parent; if(n==root()) head_->parent=pivot; else if(n==n->
+             * parent->left) parent->left=pivot; else parent->right=pivot;
+             * pivot->left=n; n->parent=pivot;` -- matches this member
+             * exactly, `this` (`n`) arrives in `ecx`. Two real callers, both
+             * this instantiation's own emissions: `insert_at`'s
+             * `link_and_rebalance` fixup loop (`FUN_004DBE30`, cited above)
+             * on its two accepted uncle-black branches, and `erase_node`'s
+             * `erase_rebalance` fixup loop (`FUN_004DC850`, cited below) on
+             * its three CLRS `RB-DELETE-FIXUP` call sites. Was previously
+             * duplicated as `RotatePausedCategoryNodeLeft` (`AudioEngine.cpp`),
+             * a byte-for-byte-correct standalone reimplementation of this
+             * member that a prior pass in this session attempted to wire
+             * directly into a hand-corrected `InsertPausedCategoryName` --
+             * `container_lane_guard.py` correctly denied that fix (per-type
+             * rotate helpers duplicating this member's algorithm are exactly
+             * RULE ONE's forbidden shape); this citation, plus routing
+             * `AudioEngine::SetPaused` through `mPausedCategoryNames.insert()`
+             * (`insert_unique` above), is the real fix.
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -7227,6 +7612,24 @@ namespace msvc8
              * `RIGHT-ROTATE` call sites CLRS's `RB-DELETE-FIXUP` makes,
              * confirmed independently against this member's own
              * unambiguous body.
+             */
+            /**
+             * Address: 0x004DCC40 (FUN_004DCC40, sub_4DCC40) --
+             * `msvc8::set<msvc8::string>::rotate_right` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29 (mirror of `rotate_left`'s 0x004DCBE0 above).
+             * `pivot=n->left; n->left=pivot->right; if(!pivot->right->isNil)
+             * pivot->right->parent=n; pivot->parent=n->parent; if(n==
+             * root()) head_->parent=pivot; else if(n==n->parent->right)
+             * parent->right=pivot; else parent->left=pivot; pivot->right=n;
+             * n->parent=pivot;` -- matches this member exactly. Same two
+             * real callers as `rotate_left` above: `insert_at`'s
+             * `link_and_rebalance` fixup loop (`FUN_004DBE30`) and
+             * `erase_node`'s `erase_rebalance` fixup loop (`FUN_004DC850`,
+             * cited below). Was previously duplicated as
+             * `RotatePausedCategoryNodeRight` (`AudioEngine.cpp`), the
+             * mirror half of the same denied bespoke-rotate-helpers fix
+             * attempt described on `rotate_left` above.
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -7619,6 +8022,39 @@ namespace msvc8
              * marked `skip` citing "Canonical template home: RbTree.h +
              * Map.h" with no address actually written here -- this
              * paragraph closes that gap.
+             */
+            /**
+             * Address: 0x004DBE30 (FUN_004DBE30, sub_4DBE30) --
+             * `msvc8::set<msvc8::string>::insert_at` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil
+             * @+0x29 (same instantiation cited on `insert_unique`/
+             * `rotate_left`/`rotate_right`/`rb_decrement` elsewhere in this
+             * file). The guard constant confirms `value_type ==
+             * msvc8::string` exactly (28 bytes): `cmp [tree+8], 0x9249248`
+             * matches `max_size() - 1u <= size_` for a 28-byte value_type.
+             * Buys the node through `sub_4DCC90` (`buy_node`, cited below),
+             * passing `head_`/`where`/`head_` as the fresh node's own
+             * initial left/parent/right (the same buy_node-fuses-the-link
+             * pattern documented on `FUN_007B3660`/`FUN_007E5DF0` above --
+             * no separate `fresh->parent = where` step in this emission
+             * either). Links under the caller's `where`/`addLeft` in the
+             * same three-case (`where==head_`/`addLeft`/general) shape as
+             * this member's C++ source, then repairs red-red violations
+             * calling `sub_4DCBE0`/`sub_4DCC40` (`rotate_left`/
+             * `rotate_right`, both cited below) on the uncle-red/uncle-black
+             * branches -- register-traced instruction-by-instruction against
+             * this member's C++ body and matches exactly, including the
+             * mirrored branch and the trailing `root()->color = kRbBlack`.
+             * Sole caller (confirmed via the callgraph index): `insert_unique`'s
+             * emission for this instantiation (`FUN_004DB600`, cited above),
+             * on both its accepted branches. This is the concrete evidence
+             * behind `.memory/project_audiomap1_missing_rebalance_bug.md`'s
+             * diagnosis: the previously-recovered `InsertPausedCategoryName`
+             * (`AudioEngine.cpp`) never called this address at all -- it
+             * built and linked nodes itself with no rotation/recolor step,
+             * so this real rebalancing body had zero source-level callers
+             * until this migration wired `AudioEngine::SetPaused` through
+             * `mPausedCategoryNames.insert()` (`insert_unique` above).
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {

@@ -187,7 +187,15 @@ namespace msvc8
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
 
-        [[nodiscard]] size_type count(const key_type& k) const { return find(k) != end() ? 1u : 0u; }
+        /**
+         * `rb_tree::count` (RbTree.h) carries this method's real address
+         * (0x004DB770, a `msvc8::set<msvc8::string>` instantiation -- the
+         * same shared `_Tree::count` member `map` and `set` both compile
+         * down to) -- see that citation for the full evidence trail,
+         * including why the general equal-range-based shape (not a
+         * `find`+ternary shortcut) is what the binary actually emits.
+         */
+        [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
         [[nodiscard]] iterator lower_bound(const key_type& k) { return iterator(tree_.lower_bound_node(k)); }
         [[nodiscard]] const_iterator lower_bound(const key_type& k) const
