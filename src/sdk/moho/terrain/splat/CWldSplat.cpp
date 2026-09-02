@@ -483,11 +483,11 @@ namespace moho
    * Scans all active decals for each requested runtime handle and marks
    * matching decals for deferred removal.
    */
-  void CDecalManager::RemoveDecals(const msvc8::vector<std::int32_t>& decalHandles)
+  void CDecalManager::RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles)
   {
-    for (const std::int32_t handle : decalHandles) {
+    for (const std::uint32_t handle : decalHandles) {
       for (CWldTerrainDecal* const decal : mDecals) {
-        if (decal->mRuntimeHandle == handle) {
+        if (static_cast<std::uint32_t>(decal->mRuntimeHandle) == handle) {
           decal->mRemoveTick = 1;
           break;
         }
