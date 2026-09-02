@@ -821,6 +821,41 @@ namespace msvc8
          * rather than carried from a stale per-type citation -- the deleted
          * hand-rolled `IncrementTerrainEnvironmentNode` free function in
          * `CWldMap.cpp` had no Address: annotation of its own.
+         *
+         * Address: 0x0087CD10 (FUN_0087CD10, sub_87CD10) -- `msvc8::map<
+         * std::uint32_t, Moho::CWldTerrainDecal*>::rb_increment` --
+         * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+         * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (8-byte
+         * `pair<const uint32_t, CWldTerrainDecal*>` value_type, same
+         * instantiation cited on `insert_hint`/`insert_unique`/`insert_at`/
+         * `rb_decrement`/`find_node` elsewhere in this file). Sole caller is
+         * this instantiation's own `insert_hint` emission (`FUN_00879B10`,
+         * cited below) at its successor-straddle branch.
+         * Address: 0x0087CDD0 (FUN_0087CDD0, sub_87CDD0) -- a second
+         * emission of the same member, shared between two different call
+         * sites: this instantiation's `erase(const key_type&)` counting
+         * loop (`FUN_00879510`, cited below, used by both the decal-index
+         * and group-index maps) and the sibling `msvc8::map<std::uint32_t,
+         * Moho::CDecalGroup*>::insert_hint` emission
+         * (`Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+         * `FUN_00879F60`, cited below) at its own successor-straddle
+         * branch -- the two instantiations differ only in `mapped_type`
+         * (both bare 4-byte pointers), which this member's own body never
+         * touches, so the compiler folded both call sites onto one emission
+         * while `rb_increment`'s *other* call site (tree1's `insert_hint`)
+         * kept a separate copy at 0x0087CD10 above -- an ordinary instance
+         * of this file's already-documented partial-ICF-folding pattern.
+         * Both trees were previously a hand-rolled RB-tree pair
+         * (`DecalGroupLookupTree`/`DecalGroupLookupNode` plus
+         * `FindLookupNodeByKey`/`ResolveLookupValueSlotForKey`/
+         * `EraseLookupEntriesByKey` and ~10 more free functions in
+         * `CWldSplat.cpp`) that never called this member at all -- the
+         * hand-rolled insert path linked new nodes straight onto their BST
+         * parent with **no rotation/recolor step whatsoever**, the same
+         * missing-rebalance shape documented on `AudioMap1CategoryNode` in
+         * `.memory/project_audiomap1_missing_rebalance_bug.md`. Migrating
+         * both trees onto this template, and this member's migration onto
+         * it, is that fix.
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1083,6 +1118,25 @@ namespace msvc8
          * descent instead of confirming uniqueness against the in-order
          * predecessor afterward, so this member is never reached from
          * recovered source yet. Not yet routed through this template.
+         *
+         * Address: 0x0087CCB0 (FUN_0087CCB0, sub_87CCB0) -- `msvc8::map<
+         * std::uint32_t, Moho::CWldTerrainDecal*>::rb_decrement` --
+         * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+         * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+         * instantiation cited on `insert_hint`/`insert_unique`/`insert_at`/
+         * `rb_increment`/`find_node` elsewhere in this file). Two real
+         * callers, both this instantiation's own emissions: `insert_unique`
+         * (`FUN_0087AB70`, cited below) at its non-leftmost `probe =
+         * rb_decrement(where)` branch, and `insert_hint` (`FUN_00879B10`,
+         * cited below) at its predecessor-straddle branch.
+         * Address: 0x0087CD70 (FUN_0087CD70, sub_87CD70) -- the sibling
+         * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::rb_decrement`
+         * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`
+         * -- a distinct out-of-line copy for the second tree (unlike
+         * `rb_increment`'s two trees, which share one emission at
+         * 0x0087CDD0, this member got a separate copy per tree). Sole
+         * caller is that tree's own `insert_hint` emission (`FUN_00879F60`,
+         * cited below) at its predecessor-straddle branch.
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -2074,6 +2128,44 @@ namespace msvc8
              * explicit call and letting `meshCacheTree`'s own destructor run
              * automatically, which lands it in the correct position with no
              * source-level call needed at all.
+             *
+             * Address: 0x00878D30 (FUN_00878D30, sub_878D30) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::~rb_tree()` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`
+             * elsewhere in this file). `erase_range(leftmost(),header())`
+             * (`FUN_00879C30`, cited on `erase_range` below) then `operator
+             * delete(head_)` then zero `head_`/`size_`, matching this
+             * member's shape exactly. NOT reached from `CDecalManager::
+             * CDecalManager`/`~CDecalManager`'s (0x00877A60/0x00877B70)
+             * ordinary instruction stream at all -- both `incoming_xrefs`
+             * for this address are the `0x00BAF679` (dtor) and `0x00BAF6D9`
+             * (ctor) entries in each function's own EH-unwind-funclet
+             * dispatch table, reached only if an exception propagates
+             * through a *later*-declared member's construction (ctor) or
+             * through the dtor's own body (dtor) -- the same "no
+             * corresponding source line, compiler-generated only" pattern
+             * already documented on this member's other EH-funclet clones
+             * above (RULE ONE: "EH unwind funclets... are not source at
+             * all"). A prior pass modelled this address as an explicit
+             * `ResetDecalLookupTreePrimary(tree)` free function called from
+             * `~CDecalManager`'s body in `CWldSplat.cpp` -- a genuine
+             * fabricated-callsite bug (the citation was real, the claimed
+             * *caller* was not): deleted, since ordinary reverse-
+             * declaration-order member destruction already reaches this
+             * exact address for real (the un-funcleted, "happy path" copy
+             * is `FUN_00879C30`, called directly from `~CDecalManager`'s
+             * main body -- see `erase_range` below).
+             * Address: 0x00878D60 (FUN_00878D60, sub_878D60) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::~rb_tree()`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same shape and same EH-funclet-only reachability (`0x00BAF68F`/
+             * `0x00BAF6EF`); its un-funcleted "happy path" copy is
+             * `FUN_0087A080` (cited on `erase_range` below). The matching
+             * `ResetDecalLookupTreeSecondary` free function is deleted for
+             * the same reason.
              */
             ~rb_tree()
             {
@@ -2386,6 +2478,30 @@ namespace msvc8
              * infrastructure for this project's own `msvc8::set`/`msvc8::map`
              * (used e.g. by `CCommandDb`/`EntityDb`), independent of the
              * external addresses that happen to confirm its shape above.
+             *
+             * Address: 0x0087A1A0 (FUN_0087A1A0, sub_87A1A0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::equal_range` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `~rb_tree()` elsewhere in this file). Caller is this
+             * instantiation's own `erase(const key_type&)` (`FUN_00879510`,
+             * cited below), which this member's shared emission also serves
+             * for the sibling `mDecalGroupLookupBySplatIndex` map (see that
+             * member's own citation for the sharing evidence).
+             * Address: 0x00879D50 (FUN_00879D50, sub_879D50) -- a second
+             * emission of the same member for this same tree: two
+             * independent fully-inlined descent loops (lower bound, then
+             * upper bound), storing the pair result through the hidden
+             * return slot -- matches this member's `{lower_bound_node(k),
+             * upper_bound_node(k)}` field for field, same as 0x0087A1A0
+             * above. Sole caller is this instantiation's *other*
+             * `erase(const key_type&)` emission (`FUN_008791E0`, cited
+             * below, reached from `RemoveDecalFromManagerAndReturnNextSlot`
+             * where the key is already resident in memory as `&decal->
+             * mIndex`, hence the pointer-passing calling convention this
+             * emission and 0x0087A1A0's differ by).
              */
             [[nodiscard]] std::pair<node_type*, node_type*> equal_range(const key_type& k) const
             {
@@ -2604,6 +2720,26 @@ namespace msvc8
              * `MeshRendererMeshCacheNode`/`...Tree` struct pair over the same
              * node shape instead of calling this member (deleted along with
              * the whole hand-rolled tree it anchored).
+             *
+             * Address: 0x008792A0 (FUN_008792A0, sub_8792A0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::find_node` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Lower-bound-then-verify
+             * shape matching this member exactly. Sole caller is
+             * `CDecalManager::FindDecalByIndex`'s `try_get(decalIndex)`
+             * (`CWldSplat.cpp`); re-homed here from a hand-rolled
+             * `FindLookupNodeByKey` free function that walked a duplicate
+             * `DecalGroupLookupNode`/`...Tree` struct pair instead of
+             * calling this member (deleted along with the whole hand-rolled
+             * tree it anchored).
+             * Address: 0x008795D0 (FUN_008795D0, sub_8795D0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::find_node`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`.
+             * Sole caller is `CDecalManager::FindGroupBySplatIndex`'s
+             * `try_get(splatIndex)` (`CWldSplat.cpp`), same re-homing.
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -2978,6 +3114,37 @@ namespace msvc8
              * (wrong ABI), so no line actually instantiated this template
              * until the retype in this pass (`StartupHelpers.h`/`.cpp`,
              * `Sim.cpp`).
+             *
+             * Address: 0x0087AB70 (FUN_0087AB70, sub_87AB70) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_unique` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_at`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Matches this member
+             * field for field: full descent tracking `where`/`addLeft`,
+             * `where == leftmost()` fast path straight to `insert_at`
+             * (`FUN_0087AF70`, cited below), else `probe = rb_decrement
+             * (where)` (`FUN_0087CCB0`, cited above), then the uniqueness
+             * compare against `probe` deciding between `insert_at` and
+             * `{probe, false}`. Sole real caller is this instantiation's own
+             * `insert_hint` (`FUN_00879B10`, cited below) at its final
+             * fallback. Both maps were previously a hand-rolled RB-tree pair
+             * (`DecalGroupLookupTree`/`DecalGroupLookupNode`,
+             * `CWldSplat.cpp`) whose insert path (`ResolveLookupValueSlotForKey`,
+             * FUN_00879120 -- cited on `Map.h`'s `operator[]` below) linked
+             * a freshly-allocated node straight onto its BST parent with
+             * **no rotation/recolor step at all** -- a plain unbalanced BST
+             * insert, not the real self-balancing algorithm this member (and
+             * `insert_hint`/`insert_at` beneath it) implements; the same
+             * missing-rebalance shape independently documented on
+             * `AudioMap1CategoryNode` in
+             * `.memory/project_audiomap1_missing_rebalance_bug.md`.
+             * Address: 0x0087B4F0 (FUN_0087B4F0, sub_87B4F0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_unique`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same shape, called from that tree's own `insert_hint`
+             * (`FUN_00879F60`, cited below) at its final fallback.
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -3271,6 +3438,59 @@ namespace msvc8
              * a separate `arcTable[key]` (`ProjectileArcRenderer.cpp`,
              * `Map.h`'s `operator[]`), matching this member's own
              * documented "same net state, different formulation" precedent.
+             *
+             * Address: 0x00879B10 (FUN_00879B10, sub_879B10) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_hint` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_unique`/`insert_at`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Matches this member's
+             * full branch structure field for field, register-traced
+             * instruction by instruction against this exact C++ body: empty
+             * tree (`size_==0`) straight to `insert_at(true, head_, v)`
+             * (`FUN_0087AF70`, cited below); `hint == leftmost()` check with
+             * a `comp(v,hint)` guard tailing `insert_at(true, hint, v)`;
+             * `rb_is_nil(hint)` (`hint==head_`, tested by pointer identity)
+             * check with a `comp(rightmost,v)` guard tailing
+             * `insert_at(false, rightmost(), v)`; a `comp(v,hint)` straddle
+             * branch calling `rb_decrement` (`FUN_0087CCB0`, cited above)
+             * for `before`, re-testing `comp(before,v)`, and picking
+             * `insert_at(false,before,v)`/`insert_at(true,hint,v)` on
+             * `rb_is_nil(before->right)`; a `comp(hint,v)` straddle branch
+             * calling `rb_increment` (`FUN_0087CD10`, cited above) for
+             * `after` and picking `insert_at(false,hint,v)`/
+             * `insert_at(true,after,v)` on `rb_is_nil(hint->right)`; and a
+             * final fallback to `insert_unique` (`FUN_0087AB70`, cited
+             * above) taking its `.first` -- the compiler reuses the
+             * successor-straddle guard's own comparison as a "for free"
+             * redirect into the fallback when the predecessor-straddle
+             * guard fails, which is why the predecessor branch's failure
+             * edge jumps into the middle of the successor branch's own test
+             * rather than to a dedicated fallback jump; both land on the
+             * same observable `insert_unique` call the source-level
+             * `else`-chain produces. Sole real caller is `CDecalManager::
+             * LoadDecal`'s `mDecalGroupLookupByDecalIndex[decalIndex] =
+             * loaded;` (`CWldSplat.cpp`, this instantiation's `Map.h`
+             * `operator[]`, cited there, passing its own `lower_bound`
+             * result as the hint). This -- not `insert_unique` alone -- is
+             * the rebalancing step the prior hand-rolled recovery
+             * (`ResolveLookupValueSlotForKey`, `CWldSplat.cpp`) skipped
+             * entirely: it linked a new node onto the BST parent found
+             * during its own descent with no call to anything resembling
+             * `insert_at`'s `link_and_rebalance` tail at all.
+             * Address: 0x00879F60 (FUN_00879F60, sub_879F60) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_hint`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same branch structure, register-traced the same way, calling
+             * this tree's own `insert_at`/`rb_decrement` (`FUN_0087B8F0`/
+             * `FUN_0087CD70`, cited above) plus the *shared*
+             * `rb_increment` emission (`FUN_0087CDD0`, cited above) and
+             * final fallback to this tree's own `insert_unique`
+             * (`FUN_0087B4F0`, cited above). Sole real caller is
+             * `CDecalManager::LoadDecalGroup`'s
+             * `mDecalGroupLookupBySplatIndex[*group->GetIndex()] = group;`
+             * (`CWldSplat.cpp`).
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -4538,6 +4758,37 @@ namespace msvc8
              * `clear()` compiles to exactly this shape) and from
              * `MeshRenderer::~MeshRenderer`'s (0x007DF330) implicit teardown
              * of its `MeshBatchBucketTree meshes` member.
+             *
+             * Address: 0x00879C30 (FUN_00879C30, sub_879C30) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase_range` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `equal_range`/`~rb_tree()` elsewhere in this file). Whole-tree
+             * fast path (`first==leftmost() && last==header()`) recursively
+             * destroys every node then re-links the sentinel to the empty
+             * state, matching this member's `clear()` branch; the slow path
+             * erases node-by-node in in-order sequence. Reached directly
+             * (NOT via the EH-funclet table -- ordinary control flow) from
+             * `Moho::CDecalManager::~CDecalManager`'s (0x00877B70) implicit
+             * destruction of this member, now that it is a real typed
+             * `msvc8::map` member -- this is the "happy path" sibling of
+             * this member's EH-unwind-only clone (`FUN_00878D30`, cited on
+             * `~rb_tree()` above).
+             * Address: 0x0087A080 (FUN_0087A080, sub_87A080) -- a second
+             * emission of the same member, shared between three call
+             * sites: this instantiation's own `erase(const key_type&)` tail
+             * call (`FUN_00879510`, cited below, used by both the
+             * decal-index and group-index maps), and the sibling
+             * `mDecalGroupLookupBySplatIndex` tree's implicit destruction
+             * from `~CDecalManager` (the "happy path" sibling of that tree's
+             * EH-unwind-only clone, `FUN_00878D60`, cited on `~rb_tree()`
+             * above). Both trees were previously modelled with a shared
+             * hand-rolled `ClearDecalLookupTree` free function citing this
+             * same address (`CWldSplat.cpp`) -- deleted along with the rest
+             * of the hand-rolled tree pair now that both call sites reach
+             * this member directly.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -4602,6 +4853,55 @@ namespace msvc8
              * `rb_increment` (already canonical here) rather than a
              * separately named helper, matching what `sub_A598A0`/
              * `sub_A52760` do for the external instantiation.
+             *
+             * Address: 0x00879510 (FUN_00879510, sub_879510) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase(const
+             * key_type&)` -- `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `equal_range`/`~rb_tree()` elsewhere in this file). Matches
+             * this member exactly: `equal_range(k)` (`FUN_0087A1A0`, cited
+             * above), a counting loop advancing via `rb_increment`
+             * (`FUN_0087CDD0`, cited above), then `erase_range(range.first,
+             * range.second)` (`FUN_0087A080`, cited above) and returns the
+             * count. This single emission is shared by BOTH lookup maps --
+             * confirmed directly: `CDecalManager::DestroyDecalGroup`
+             * (0x00878460) calls this exact address on
+             * `mDecalGroupLookupBySplatIndex` (`Moho::CDecalGroup*`-valued),
+             * and `RemoveDecalFromManagerAndReturnNextSlot`/
+             * `~CDecalManager`-adjacent cleanup call it on
+             * `mDecalGroupLookupByDecalIndex` (`Moho::CWldTerrainDecal*`-
+             * valued) -- this member's own body never reads/writes/compares
+             * the `mapped_type` at all, only node pointers and the shared
+             * `uint32_t` key, so the two 4-byte-pointer instantiations fold
+             * onto one address even though `operator[]`/`insert_hint`/
+             * `insert_unique`/`insert_at`/`rb_decrement`/`find_node` above
+             * did not. Real callers: `CDecalManager::DestroyDecalGroup`'s
+             * `mDecalGroupLookupBySplatIndex.erase(*group->GetIndex())` and
+             * `RemoveDecalFromManagerAndReturnNextSlot`'s
+             * `manager.mDecalGroupLookupByDecalIndex.erase(decal->mIndex)`
+             * (both `CWldSplat.cpp`). Re-homed here from a hand-rolled
+             * `EraseLookupEntriesByKey`/`ErasePrimaryDecalLookupEntriesByKey`
+             * pair that walked a duplicate `DecalGroupLookupNode`/`...Tree`
+             * struct instead of calling this member (deleted along with the
+             * whole hand-rolled tree pair).
+             * Address: 0x008791E0 (FUN_008791E0, sub_8791E0) -- a third
+             * emission, structurally identical to 0x00879510 field for
+             * field (`equal_range` via `FUN_00879D50`, cited above; the
+             * counting loop via `rb_increment`'s other emission,
+             * `FUN_0087CD10`, cited above; the tail `erase_range` call via
+             * the SAME `FUN_00879C30` 0x00879510 uses), differing only in
+             * calling convention: the key arrives by pointer rather than by
+             * value, because its sole caller already has the key resident
+             * in memory. That caller is `RemoveDecalFromManagerAndReturnNextSlot`
+             * (`FUN_008779B0`, `moho::CDecalManager::DestroyDecal`'s sibling
+             * cleanup path, `CWldSplat.cpp`): `sub_8779B0` loads `eax =
+             * &decal->mIndex` and passes it straight through, matching the
+             * recovered `manager.mDecalGroupLookupByDecalIndex.erase(
+             * decal->mIndex)` call exactly (the compiler is free to choose
+             * either calling convention for the same source-level `.erase(
+             * key)` call; both compile to this member).
              */
             size_type erase(const key_type& k)
             {
@@ -7209,6 +7509,24 @@ namespace msvc8
              * search/uniqueness phase (cited on `insert_unique` above)
              * still needs its algorithm brought in line. Not yet routed
              * through this template.
+             *
+             * Address: 0x0087AF70 (FUN_0087AF70, sub_87AF70) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_at` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Two real callers, both
+             * this instantiation's own emissions: `insert_unique`
+             * (`FUN_0087AB70`, cited above, both accepted branches) and
+             * `insert_hint` (`FUN_00879B10`, cited above, all five accepted
+             * branches) -- the same `insert_at(addLeft, where, v)` calls
+             * each member's own C++ source performs.
+             * Address: 0x0087B8F0 (FUN_0087B8F0, sub_87B8F0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_at`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * called from that tree's own `insert_unique`/`insert_hint`
+             * (`FUN_0087B4F0`/`FUN_00879F60`, cited above).
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {

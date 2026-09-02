@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "moho/render/CWldTerrainDecal.h"
 
@@ -21,40 +22,6 @@ namespace moho
   class UserEntity;
   struct GeomCamera3;
   struct SDecalInfo;
-
-  struct DecalGroupLookupNode
-  {
-    DecalGroupLookupNode* mLeft;     // +0x00
-    DecalGroupLookupNode* mParent;   // +0x04
-    DecalGroupLookupNode* mRight;    // +0x08
-    std::uint32_t mKey;              // +0x0C
-    std::int32_t mGroupIndex;        // +0x10
-    std::uint8_t mColor;             // +0x14
-    std::uint8_t mIsNil;             // +0x15
-    std::uint8_t mPad16_17[0x02];    // +0x16
-  };
-
-  static_assert(sizeof(DecalGroupLookupNode) == 0x18, "DecalGroupLookupNode size must be 0x18");
-  static_assert(offsetof(DecalGroupLookupNode, mLeft) == 0x00, "DecalGroupLookupNode::mLeft offset must be 0x00");
-  static_assert(offsetof(DecalGroupLookupNode, mParent) == 0x04, "DecalGroupLookupNode::mParent offset must be 0x04");
-  static_assert(offsetof(DecalGroupLookupNode, mRight) == 0x08, "DecalGroupLookupNode::mRight offset must be 0x08");
-  static_assert(offsetof(DecalGroupLookupNode, mKey) == 0x0C, "DecalGroupLookupNode::mKey offset must be 0x0C");
-  static_assert(
-    offsetof(DecalGroupLookupNode, mGroupIndex) == 0x10, "DecalGroupLookupNode::mGroupIndex offset must be 0x10"
-  );
-  static_assert(offsetof(DecalGroupLookupNode, mColor) == 0x14, "DecalGroupLookupNode::mColor offset must be 0x14");
-  static_assert(offsetof(DecalGroupLookupNode, mIsNil) == 0x15, "DecalGroupLookupNode::mIsNil offset must be 0x15");
-
-  struct DecalGroupLookupTree
-  {
-    std::uint32_t mUnknown00;         // +0x00
-    DecalGroupLookupNode* mHead;      // +0x04
-    std::uint32_t mNodeCount;         // +0x08
-    std::uint32_t mUnknown0C;         // +0x0C
-  };
-
-  static_assert(sizeof(DecalGroupLookupTree) == 0x10, "DecalGroupLookupTree size must be 0x10");
-  static_assert(offsetof(DecalGroupLookupTree, mHead) == 0x04, "DecalGroupLookupTree::mHead offset must be 0x04");
 
   /**
    * CWldTerrainDecal specialization that owns one terrain-splat quad and one
@@ -271,11 +238,19 @@ namespace moho
     /**
      * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
      *
+     * IDA signature:
+     * Moho::CWldTerrainDecal *__thiscall Moho::CDecalManager::Func5(Moho::CDecalManager *this, unsigned int decalIndex);
+     *
      * What it does:
-     * Looks up one decal-index key in the decal-group lookup tree and returns
-     * the mapped group index, or `0` when the key is absent.
+     * Looks up one decal-index key in `mDecalGroupLookupByDecalIndex` and
+     * returns the registered `CWldTerrainDecal*`, or `nullptr` when the key
+     * is absent. (The prior recovery pass named this "group index" and typed
+     * it `std::int32_t`; the real mapped value, confirmed from
+     * `LoadDecal`'s write side at 0x008780A0, is the decal pointer itself --
+     * this map is a `decalIndex -> CWldTerrainDecal*` lookup, not a group
+     * membership table.)
      */
-    [[nodiscard]] std::int32_t FindGroupByDecalIndex(std::uint32_t decalIndex) const;
+    [[nodiscard]] CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const;
 
     /**
      * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
@@ -289,11 +264,17 @@ namespace moho
     /**
      * Address: 0x008782A0 (FUN_008782A0, Moho::CDecalManager::Func10)
      *
+     * IDA signature:
+     * Moho::CDecalGroup *__thiscall Moho::CDecalManager::Func10(Moho::CDecalManager *this, unsigned int groupIndex);
+     *
      * What it does:
-     * Looks up one splat/decal-index key in the secondary lookup tree and
-     * returns the mapped group index, or `0` when the key is absent.
+     * Looks up one group-index key in `mDecalGroupLookupBySplatIndex` and
+     * returns the registered `CDecalGroup*`, or `nullptr` when the key is
+     * absent. (The prior recovery pass typed the return `std::int32_t`; the
+     * real mapped value, confirmed from `LoadDecalGroup`'s write side at
+     * 0x008782D0, is the group pointer itself.)
      */
-    [[nodiscard]] std::int32_t FindGroupBySplatIndex(std::uint32_t splatIndex) const;
+    [[nodiscard]] CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const;
 
     /**
      * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
@@ -477,12 +458,11 @@ namespace moho
   public:
     std::uint32_t mDecalCount; // +0x04
     std::uint32_t mNumDecals; // +0x08
-    std::uint8_t mUnknown0C_0F[0x04]; // +0x0C
-    msvc8::vector<CWldTerrainDecal*> mDecals; // +0x10
-    DecalGroupLookupTree mDecalGroupLookupByDecalIndex; // +0x1C
-    msvc8::vector<CDecalGroup*> mDecalGroups; // +0x2C
-    DecalGroupLookupTree mDecalGroupLookupBySplatIndex; // +0x38
-    msvc8::vector<CWldSplat*> mSplats; // +0x48
+    msvc8::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word HasDebugProxy=true vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
+    msvc8::map<std::uint32_t, CWldTerrainDecal*> mDecalGroupLookupByDecalIndex; // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
+    msvc8::vector<CDecalGroup*> mDecalGroups; // +0x28
+    msvc8::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
+    msvc8::vector<CWldSplat*> mSplats; // +0x44
     std::uint8_t mSpatialDbOwnerStorage[0x90]; // +0x54
     IWldTerrainRes* mWldTerrain; // +0xE4
     float mLodThresholds[10]; // +0xE8 (decal-area decile LOD histogram)
@@ -490,19 +470,31 @@ namespace moho
     std::uint8_t mPad111_113[0x03];
   };
 
-#if defined(MOHO_ABI_MSVC8_COMPAT)
+  // Verified directly against 0x00877A60 (ctor) and 0x00877B70 (dtor): both
+  // stage their per-member SEH-unwind markers across exactly these offsets,
+  // and the dtor's per-member teardown (delete-elements forward, then
+  // buffer/header reset in reverse declaration order) reads/writes precisely
+  // these addresses -- see CWldSplat.cpp.reconstruction.md for the full
+  // instruction-level trace. A prior pass had `mDecals`/`mDecalGroups`/
+  // `mSplats` each 4 bytes too high (offset by a phantom `mUnknown0C_0F` pad
+  // and a phantom trailing word on `DecalGroupLookupTree`) because it never
+  // accounted for `msvc8::vector<T>`'s own default `HasDebugProxy=true`
+  // leading proxy word; fixed here, and the asserts un-gated now that every
+  // offset is independently confirmed from raw disassembly (the previous
+  // `MOHO_ABI_MSVC8_COMPAT` gate meant these were never actually checked --
+  // that macro is defined nowhere in this tree).
   static_assert(offsetof(CDecalManager, mDecalCount) == 0x04, "CDecalManager::mDecalCount offset must be 0x04");
-  static_assert(offsetof(CDecalManager, mDecals) == 0x10, "CDecalManager::mDecals offset must be 0x10");
+  static_assert(offsetof(CDecalManager, mDecals) == 0x0C, "CDecalManager::mDecals offset must be 0x0C");
   static_assert(
     offsetof(CDecalManager, mDecalGroupLookupByDecalIndex) == 0x1C,
     "CDecalManager::mDecalGroupLookupByDecalIndex offset must be 0x1C"
   );
-  static_assert(offsetof(CDecalManager, mDecalGroups) == 0x2C, "CDecalManager::mDecalGroups offset must be 0x2C");
+  static_assert(offsetof(CDecalManager, mDecalGroups) == 0x28, "CDecalManager::mDecalGroups offset must be 0x28");
   static_assert(
     offsetof(CDecalManager, mDecalGroupLookupBySplatIndex) == 0x38,
     "CDecalManager::mDecalGroupLookupBySplatIndex offset must be 0x38"
   );
-  static_assert(offsetof(CDecalManager, mSplats) == 0x48, "CDecalManager::mSplats offset must be 0x48");
+  static_assert(offsetof(CDecalManager, mSplats) == 0x44, "CDecalManager::mSplats offset must be 0x44");
   static_assert(
     offsetof(CDecalManager, mSpatialDbOwnerStorage) == 0x54,
     "CDecalManager::mSpatialDbOwnerStorage offset must be 0x54"
@@ -517,5 +509,4 @@ namespace moho
     "CDecalManager::mDidSomething offset must be 0x110"
   );
   static_assert(sizeof(CDecalManager) == 0x114, "CDecalManager size must be 0x114");
-#endif
 } // namespace moho
