@@ -270,117 +270,11 @@ namespace
     return destination;
   }
 
-  /**
-   * Address: 0x007425B0 (FUN_007425B0, sub_7425B0)
-   *
-   * What it does:
-   * Copies one contiguous camera range `[sourceBegin, sourceEnd)` into
-   * `destinationBegin` with per-element camera-state copy and rolls back
-   * already-written destination elements on exception before rethrowing.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeAndReturnEnd(
-    const moho::GeomCamera3* sourceBegin,
-    const moho::GeomCamera3* const sourceEnd,
-    moho::GeomCamera3* destinationBegin
-  )
-  {
-    moho::GeomCamera3* destinationCursor = destinationBegin;
-    try {
-      while (sourceBegin != sourceEnd) {
-        if (destinationCursor != nullptr) {
-          (void)CopyGeomCameraStatePreservingFlags(destinationCursor, *sourceBegin);
-        }
-        ++destinationCursor;
-        ++sourceBegin;
-      }
-    } catch (...) {
-      for (moho::GeomCamera3* destroyCursor = destinationBegin; destroyCursor != destinationCursor; ++destroyCursor) {
-        destroyCursor->~GeomCamera3();
-      }
-      throw;
-    }
-    return destinationCursor;
-  }
 
-  /**
-   * Address: 0x00741880 (FUN_00741880, sub_741880)
-   *
-   * What it does:
-   * Adapter lane used by `std::vector_GeomCamera3::cpy` that forwards one
-   * range-copy request into `CopyConstructGeomCameraRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeForVectorCopyAssign(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyConstructGeomCameraRangeAndReturnEnd(sourceBegin, sourceEnd, destinationBegin);
-  }
 
-  /**
-   * Address: 0x007B1290 (FUN_007B1290, sub_7B1290)
-   *
-   * What it does:
-   * Adapter lane used by vector insert/growth paths that forwards one
-   * range-copy request into `CopyConstructGeomCameraRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeForVectorInsert(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyConstructGeomCameraRangeAndReturnEnd(sourceBegin, sourceEnd, destinationBegin);
-  }
 
-  /**
-   * Address: 0x00741E40 (FUN_00741E40, sub_741E40)
-   *
-   * What it does:
-   * Alternate ABI adapter lane forwarding GeomCamera range-copy requests into
-   * `CopyConstructGeomCameraRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeAdapterAlternateA(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyConstructGeomCameraRangeAndReturnEnd(sourceBegin, sourceEnd, destinationBegin);
-  }
 
-  /**
-   * Address: 0x007B1970 (FUN_007B1970, sub_7B1970)
-   *
-   * What it does:
-   * Alternate ABI adapter lane forwarding GeomCamera range-copy requests into
-   * `CopyConstructGeomCameraRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeAdapterAlternateB(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyConstructGeomCameraRangeAndReturnEnd(sourceBegin, sourceEnd, destinationBegin);
-  }
 
-  /**
-   * Address: 0x007B1D20 (FUN_007B1D20, sub_7B1D20)
-   *
-   * What it does:
-   * Alternate ABI adapter lane forwarding GeomCamera range-copy requests into
-   * `CopyConstructGeomCameraRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyConstructGeomCameraRangeAdapterAlternateC(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyConstructGeomCameraRangeAndReturnEnd(sourceBegin, sourceEnd, destinationBegin);
-  }
 
   [[nodiscard]] moho::GeomCamera3* CopyGeomCameraIfPresent(
     moho::GeomCamera3* const destination,
@@ -394,131 +288,12 @@ namespace
     return CopyGeomCameraStatePreservingFlags(destination, *source);
   }
 
-  /**
-   * Address: 0x00742A20 (FUN_00742A20)
-   *
-   * What it does:
-   * Primary adapter lane for nullable `GeomCamera3` state copy into
-   * caller-provided destination storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyGeomCameraIfPresentPrimary(
-    moho::GeomCamera3* const destination,
-    const moho::GeomCamera3* const source
-  )
-  {
-    return CopyGeomCameraIfPresent(destination, source);
-  }
 
-  /**
-   * Address: 0x00742BA0 (FUN_00742BA0)
-   *
-   * What it does:
-   * Secondary adapter lane for nullable `GeomCamera3` state copy into
-   * caller-provided destination storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyGeomCameraIfPresentSecondary(
-    moho::GeomCamera3* const destination,
-    const moho::GeomCamera3* const source
-  )
-  {
-    return CopyGeomCameraIfPresent(destination, source);
-  }
 
-  /**
-   * Address: 0x007B12C0 (FUN_007B12C0)
-   *
-   * What it does:
-   * Fills one destination camera range `[destinationBegin, destinationEnd)`
-   * from one prototype camera and returns the last assigned destination lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* FillGeomCameraRangeFromPrototype(
-    moho::GeomCamera3* destinationBegin,
-    const moho::GeomCamera3& prototype,
-    moho::GeomCamera3* const destinationEnd
-  )
-  {
-    moho::GeomCamera3* lastAssigned = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      lastAssigned = CopyGeomCameraStatePreservingFlags(destinationBegin, prototype);
-      ++destinationBegin;
-    }
-    return lastAssigned;
-  }
 
-  /**
-   * Address: 0x007B12E0 (FUN_007B12E0)
-   *
-   * What it does:
-   * Copies one camera range backward from `[sourceBegin, sourceEnd)` into the
-   * destination tail ending at `destinationEnd` and returns destination begin.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyGeomCameraRangeBackward(
-    const moho::GeomCamera3* const sourceBegin,
-    const moho::GeomCamera3* sourceEnd,
-    moho::GeomCamera3* destinationEnd
-  )
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      (void)CopyGeomCameraStatePreservingFlags(destinationEnd, *sourceEnd);
-    }
-    return destinationEnd;
-  }
 
-  /**
-   * Address: 0x007B19A0 (FUN_007B19A0)
-   *
-   * What it does:
-   * Fills one destination camera range `[destinationBegin, destinationEnd)`
-   * from one prototype camera and returns the last assigned destination lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* FillGeomCameraRangeFromPrototypeLaneA(
-    moho::GeomCamera3* const destinationBegin,
-    const moho::GeomCamera3* const sourceCamera,
-    moho::GeomCamera3* const destinationEnd
-  )
-  {
-    return FillGeomCameraRangeFromPrototype(destinationBegin, *sourceCamera, destinationEnd);
-  }
 
-  /**
-   * Address: 0x007B19D0 (FUN_007B19D0)
-   *
-   * What it does:
-   * Copies cameras backward from `sourceCursor` down to (but excluding)
-   * `sourceStop` into destination storage and returns the resulting
-   * destination cursor.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyGeomCameraRangeBackwardInclusiveLaneA(
-    moho::GeomCamera3* sourceCursor,
-    moho::GeomCamera3* destinationCursor,
-    moho::GeomCamera3* const sourceStop
-  )
-  {
-    while (sourceCursor != sourceStop) {
-      (void)CopyGeomCameraStatePreservingFlags(destinationCursor, *sourceCursor);
-      --sourceCursor;
-      --destinationCursor;
-    }
-    return destinationCursor;
-  }
 
-  /**
-   * Address: 0x007B1D50 (FUN_007B1D50)
-   *
-   * What it does:
-   * Copies one camera range backward from `[sourceBegin, sourceEnd)` into the
-   * destination tail ending at `destinationEnd` and returns destination begin.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::GeomCamera3* CopyGeomCameraRangeBackwardLaneA(
-    moho::GeomCamera3* const destinationEnd,
-    moho::GeomCamera3* const sourceEnd,
-    const moho::GeomCamera3* const sourceBegin
-  )
-  {
-    return CopyGeomCameraRangeBackward(sourceBegin, sourceEnd, destinationEnd);
-  }
 
   /**
    * Address: 0x007AEB10 (FUN_007AEB10, helper lane behind CAM_GetAllCameras)
@@ -555,64 +330,6 @@ namespace
     "GeomCameraVectorCloneRuntimeView::end offset must be 0x0C"
   );
 
-  /**
-   * Address: 0x007AEA30 (FUN_007AEA30)
-   *
-   * What it does:
-   * Clones one contiguous `GeomCamera3` storage span into `destination`,
-   * allocating exact-sized backing storage and copy-constructing each camera.
-   */
-  [[maybe_unused]] GeomCameraVectorCloneRuntimeView* CloneGeomCameraVectorStorage(
-    const GeomCameraVectorCloneRuntimeView* const source,
-    GeomCameraVectorCloneRuntimeView* const destination
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->first = nullptr;
-    destination->last = nullptr;
-    destination->end = nullptr;
-
-    if (source == nullptr || source->first == nullptr || source->last == nullptr) {
-      return destination;
-    }
-
-    const std::size_t count = static_cast<std::size_t>(source->last - source->first);
-    if (count == 0u) {
-      return destination;
-    }
-
-    constexpr std::size_t kMaxElementCount =
-      static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max() / sizeof(moho::GeomCamera3));
-    if (count > kMaxElementCount) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    auto* const storage = static_cast<moho::GeomCamera3*>(::operator new(sizeof(moho::GeomCamera3) * count));
-    destination->first = storage;
-    destination->last = storage;
-    destination->end = storage + count;
-
-    try {
-      for (std::size_t index = 0; index < count; ++index) {
-        new (storage + index) moho::GeomCamera3(source->first[index]);
-        destination->last = storage + index + 1;
-      }
-    } catch (...) {
-      while (destination->last != destination->first) {
-        --destination->last;
-        destination->last->~GeomCamera3();
-      }
-      ::operator delete(storage);
-      destination->first = nullptr;
-      destination->end = nullptr;
-      throw;
-    }
-
-    return destination;
-  }
 
   struct DwordVectorCloneRuntimeView
   {
@@ -634,50 +351,6 @@ namespace
     "DwordVectorCloneRuntimeView::end offset must be 0x0C"
   );
 
-  /**
-   * Address: 0x007AEBC0 (FUN_007AEBC0)
-   *
-   * What it does:
-   * Clones one contiguous dword-vector storage span into `destination` with
-   * checked element-count overflow semantics.
-   */
-  [[maybe_unused]] DwordVectorCloneRuntimeView* CloneDwordVectorStorage(
-    const DwordVectorCloneRuntimeView* const source,
-    DwordVectorCloneRuntimeView* const destination
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->first = nullptr;
-    destination->last = nullptr;
-    destination->end = nullptr;
-
-    if (source == nullptr || source->first == nullptr || source->last == nullptr) {
-      return destination;
-    }
-
-    const std::size_t count = static_cast<std::size_t>(source->last - source->first);
-    if (count == 0u) {
-      return destination;
-    }
-
-    constexpr std::size_t kMaxElementCount = 0x3FFFFFFFu;
-    if (count > kMaxElementCount) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    auto* const storage = static_cast<std::uint32_t*>(::operator new(sizeof(std::uint32_t) * count));
-    destination->first = storage;
-    destination->last = storage;
-    destination->end = storage + count;
-
-    const std::size_t byteCount = sizeof(std::uint32_t) * count;
-    std::memcpy(storage, source->first, byteCount);
-    destination->last = destination->end;
-    return destination;
-  }
 
   [[nodiscard]] moho::VMatrix4 BuildLookAtMatrix(
     const Wm3::Vector3f& eye, const Wm3::Vector3f& target, const Wm3::Vector3f& up
@@ -890,40 +563,7 @@ namespace moho
     return destination;
   }
 
-  /**
-   * Address: 0x00741E10 (FUN_00741E10)
-   *
-   * What it does:
-   * Register-shape adapter that copies one half-open camera range from
-   * `[sourceBegin, sourceEnd)` into destination storage and returns the
-   * destination end cursor.
-   */
-  [[maybe_unused]] [[nodiscard]] GeomCamera3* CopyGeomCameraRangeDestinationFirst(
-    GeomCamera3* const destinationBegin,
-    const GeomCamera3* const sourceBegin,
-    const GeomCamera3* const sourceEnd
-  )
-  {
-    return CopyGeomCameraRangeAndReturnEnd(sourceBegin, destinationBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007406E0 (FUN_007406E0)
-   *
-   * What it does:
-   * Destroys one contiguous `GeomCamera3` range `[begin, end)` by invoking the
-   * camera destructor for each element in forward order.
-   */
-  [[maybe_unused]] void DestroyGeomCameraRange(
-    GeomCamera3* begin,
-    GeomCamera3* const end
-  )
-  {
-    while (begin != end) {
-      begin->~GeomCamera3();
-      ++begin;
-    }
-  }
 
   /**
    * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
