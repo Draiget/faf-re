@@ -676,7 +676,34 @@ namespace moho
   {
     return SCR_CreateSimpleMetatable(state);
   }
+
+  /**
+   * Address: 0x00BDFFB0 (FUN_00BDFFB0, register_CScrLuaMetatableFactory_CLobby)
+   *
+   * What it does:
+   * Allocates and stores the startup Lua metatable-factory index for
+   * `CLobby`.
+   */
+  int register_CScrLuaMetatableFactory_CLobby_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<CLobby>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return 0;
+  }
 } // namespace moho
+
+namespace
+{
+  struct CLobbyFactoryIndexBootstrap
+  {
+    CLobbyFactoryIndexBootstrap()
+    {
+      (void)moho::register_CScrLuaMetatableFactory_CLobby_Index();
+    }
+  };
+
+  CLobbyFactoryIndexBootstrap gCLobbyFactoryIndexBootstrap;
+} // namespace
 
 /**
  * Address: 0x007C0780 (FUN_007C0780)
