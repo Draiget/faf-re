@@ -8580,6 +8580,14 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // `pad_0000[0x09C8]` pinned the offset. Both sides are `SCamShakeParams` now.
   mSyncCamShake.swap(outSyncData->mCamShakeParams);
 
+  // 0x00747740..0x00747782: the map rectangles flattened this beat.
+  // `[ebx+9FCh/0A00h/0A04h]` is `mCachedMapRects` (Sim+0x09F8) against
+  // `[eax+234h/238h/23Ch]`, `SSyncData::mPlayableRectUpdates` (+0x230); both
+  // are already `msvc8::vector<gpg::Rect2i>`. `FlattenMapRect` pushes each
+  // clamped rect into this vector and into `mLoadedMapRects`, and only this
+  // one is drained -- the loaded run is the cumulative record that stays.
+  mCachedMapRects.swap(outSyncData->mPlayableRectUpdates);
+
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
   // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
