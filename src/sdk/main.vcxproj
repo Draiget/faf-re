@@ -1928,6 +1928,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CRandomStream.h" />
     <ClInclude Include="moho\sim\CRandomStreamTypeInfo.h" />
     <ClInclude Include="moho\sim\CRandomStreamSerializer.h" />
+    <ClInclude Include="moho\sim\PathPreviewFinder.h" />
     <ClInclude Include="moho\sim\SDesyncInfo.h" />
     <ClInclude Include="moho\sim\SFootprint.h" />
     <ClInclude Include="moho\sim\SFootprintTypeInfo.h" />

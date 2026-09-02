@@ -4872,6 +4872,9 @@
     <ClInclude Include="moho\sim\CDebugCanvas.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\PathPreviewFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\ui\CUIManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
