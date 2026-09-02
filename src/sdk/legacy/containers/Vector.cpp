@@ -5000,7 +5000,6 @@ int PopHeapRootDoublePayloadRange(
 
 /**
  * Address: 0x00A73F50 (FUN_00A73F50)
- * Address: 0x004FBC10 (FUN_004FBC10)
  *
  * What it does:
  * Thunk lane that forwards one 8-byte heap pop/repair pass to the canonical

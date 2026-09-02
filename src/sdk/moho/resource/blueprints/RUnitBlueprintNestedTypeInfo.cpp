@@ -306,7 +306,6 @@ namespace
 
   /**
    * Address: 0x005238B0 (FUN_005238B0)
-   * Address: 0x00561430 (FUN_00561430)
    *
    * What it does:
    * Tail-thunk alias that forwards reflected vector-float count updates into

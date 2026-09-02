@@ -901,7 +901,6 @@ namespace moho
 
   /**
    * Address: 0x006DDD30 (FUN_006DDD30)
-   * Address: 0x006807A0 (FUN_006807A0)
    *
    * What it does:
    * Jump-thunk alias for forward weak-float payload range assignment.

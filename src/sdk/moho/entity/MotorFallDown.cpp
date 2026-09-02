@@ -300,7 +300,6 @@ namespace
 
   /**
    * Address: 0x00695DF0 (FUN_00695DF0, serializer save thunk alias)
-   * Address: 0x005191D0 (FUN_005191D0)
    *
    * What it does:
    * Tail-forwards the MotorFallDown serialize thunk alias to the recovered

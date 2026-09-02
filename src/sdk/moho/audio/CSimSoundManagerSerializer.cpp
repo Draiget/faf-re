@@ -260,7 +260,6 @@ namespace moho
 {
   /**
    * Address: 0x00762440 (FUN_00762440)
-   * Address: 0x007690E0 (FUN_007690E0)
    *
    * What it does:
    * Reflection load callback wrapper for `CSimSoundManager`.

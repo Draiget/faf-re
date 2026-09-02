@@ -338,7 +338,6 @@ namespace moho
 
   /**
    * Address: 0x0061A340 (FUN_0061A340)
-   * Address: 0x00610640 (FUN_00610640)
    *
    * What it does:
    * Thin alias lane that forwards one `(task, archive)` pair into

@@ -33,7 +33,6 @@ namespace
 
   /**
    * Address: 0x00599A40 (FUN_00599A40, j_Moho::IAiCommandDispatchImpl::MemberSerialize)
-   * Address: 0x0063A1B0 (FUN_0063A1B0)
    *
    * What it does:
    * Thin forwarding thunk to `IAiCommandDispatchImpl::MemberSerialize`.
