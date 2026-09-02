@@ -358,21 +358,6 @@ namespace
     (void)InitializePoseBoneArrayInlineLanes(&pose.mBones);
   }
 
-  [[nodiscard]] gpg::fastvector_runtime_view<moho::CAniPoseBone>&
-  PoseBoneRuntimeView(moho::CAniPoseBoneArray& storage) noexcept
-  {
-    return gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(&storage);
-  }
-
-  void ResizePoseBoneStorage(
-    moho::CAniPoseBoneArray& storage,
-    const std::uint32_t count,
-    const moho::CAniPoseBone& fillValue
-  )
-  {
-    auto& runtimeView = PoseBoneRuntimeView(storage);
-    gpg::FastVectorRuntimeResizeFill(&fillValue, count, runtimeView);
-  }
 
 
   [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
@@ -703,7 +688,7 @@ namespace moho
     CAniPoseBone fillBone{};
     fillBone.mCompositeTransform = MakeIdentityPoseTransform();
     fillBone.mLocalTransform = MakeIdentityPoseTransform();
-    ResizePoseBoneStorage(mBones, boneCount, fillBone);
+    mBones.resize(boneCount, fillBone);
 
     CAniPoseBone* const bonesBegin = mBones.begin();
     if (bonesBegin == nullptr) {
@@ -827,7 +812,7 @@ namespace moho
     const std::uint32_t boneCount = (sourceBegin && sourceEnd && sourceEnd >= sourceBegin)
       ? static_cast<std::uint32_t>(sourceEnd - sourceBegin)
       : 0u;
-    ResizePoseBoneStorage(mBones, boneCount, fillBone);
+    mBones.resize(boneCount, fillBone);
 
     if (boneCount == 0u || sourceBegin == nullptr) {
       return;
