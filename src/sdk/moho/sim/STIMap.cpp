@@ -1960,21 +1960,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00578F90 (FUN_00578F90, boost::shared_ptr_CHeightField::shared_ptr_CHeightField)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CHeightField>` from one raw height-field
-   * pointer lane.
-   */
-  boost::shared_ptr<CHeightField>* ConstructSharedHeightFieldFromRaw(
-    boost::shared_ptr<CHeightField>* const outHeightField,
-    CHeightField* const heightField
-  )
-  {
-    return ::new (outHeightField) boost::shared_ptr<CHeightField>(heightField);
-  }
-
-  /**
    * Address: 0x00476090 (FUN_00476090)
    *
    * int width, int height

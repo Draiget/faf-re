@@ -1396,21 +1396,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00544320 (FUN_00544320, boost::shared_ptr_LaunchInfoNew::shared_ptr_LaunchInfoNew)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<LaunchInfoNew>` from one raw launch-info
-   * pointer lane.
-   */
-  boost::shared_ptr<LaunchInfoNew>* ConstructSharedLaunchInfoNewFromRaw(
-    boost::shared_ptr<LaunchInfoNew>* const outLaunchInfo,
-    LaunchInfoNew* const launchInfo
-  )
-  {
-    return ::new (outLaunchInfo) boost::shared_ptr<LaunchInfoNew>(launchInfo);
-  }
-
-  /**
    * Address: 0x00542110 (FUN_00542110, scalar deleting destructor thunk)
    */
   ArmyLaunchInfoTypeInfo::~ArmyLaunchInfoTypeInfo() = default;

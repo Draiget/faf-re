@@ -20,17 +20,6 @@ namespace moho
   class CAniPose;
   struct SAniSkelBone;
 
-  /**
-   * Address: 0x0063D210 (FUN_0063D210, boost::shared_ptr_CAniPose::shared_ptr_CAniPose)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CAniPose>` from one raw pose pointer lane.
-   */
-  boost::shared_ptr<CAniPose>* ConstructSharedAniPoseFromRaw(
-    boost::shared_ptr<CAniPose>* outPose,
-    CAniPose* pose
-  );
-
   class CAniPoseBone
   {
   public:

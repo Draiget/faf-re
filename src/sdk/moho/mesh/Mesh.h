@@ -94,18 +94,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x00832060 (FUN_00832060, boost::shared_ptr_MeshInstance::shared_ptr_MeshInstance)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<MeshInstance>` from one raw mesh-instance
-   * pointer lane.
-   */
-  boost::shared_ptr<MeshInstance>* ConstructSharedMeshInstanceFromRaw(
-    boost::shared_ptr<MeshInstance>* outMeshInstance,
-    MeshInstance* meshInstance
-  );
-
-  /**
    * Address: 0x007E6CE0 (FUN_007E6CE0)
    *
    * What it does:
