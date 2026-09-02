@@ -8605,6 +8605,13 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // `CameraImpl::CameraFollow`, so until now it replayed an always-empty lane.
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
+  // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
+  // records: Sim+0x0A28 (`[ebx+0A2Ch/0A30h/0A34h]`) against SSyncData+0x294
+  // (`[eax+298h/29Ch/2A0h]`). `CWldSession::DoBeat` copies the packet side
+  // wholesale onto `CWldSession::mSyncExtraUnitData`, so this lane was being
+  // copied every beat and had never been filled.
+  mSyncSerializeGroup2.swap(outSyncData->mSyncExtraUnitData);
+
   // 0x00747AF9: entities that died this beat are retired from the entity DB
   // only after everything above has had its chance to publish them. Nothing in
   // the recovered tree was calling this, so the DB kept every entity it had
