@@ -6632,6 +6632,48 @@ extern "C" int __cdecl vfprintf(std::FILE* const stream, const char* const forma
 }
 
 /**
+ * Address: 0x00A8841A (FUN_00A8841A, _vfprintf_l)
+ *
+ * IDA signature:
+ * FILE *callcnv_F4 sub_A8841A@<eax>(FILE *a1, const char *a2, _locale_t a3, va_list a4);
+ *
+ * What it does:
+ * Locale-explicit CRT narrow-character formatted output to a stream from an
+ * existing `va_list`. Thin forward into `RuntimeDispatchLockedFormattedOutput`
+ * with the `_output_l` callback and the caller-supplied locale (matches
+ * `vfprintf`'s shape exactly, differing only in passing `locale` through
+ * instead of a hardcoded `nullptr`).
+ */
+extern "C" int __cdecl _vfprintf_l(
+  std::FILE* const stream, const char* const format, const _locale_t locale, va_list arguments
+)
+{
+  return RuntimeDispatchLockedFormattedOutput(_output_l, stream, format, locale, arguments);
+}
+
+/**
+ * Address: 0x00A85D11 (FUN_00A85D11, _fprintf_l)
+ *
+ * IDA signature:
+ * FILE *callcnv_F3 sub_A85D11@<eax>(FILE *a1, const char *a2, _locale_t a3, ...);
+ *
+ * What it does:
+ * Locale-explicit CRT narrow-character formatted output to a stream.
+ * Builds a `va_list` over its trailing arguments and forwards to
+ * `_vfprintf_l`, exactly mirroring how `fprintf`/`vfprintf` pair up.
+ */
+extern "C" int __cdecl _fprintf_l(
+  std::FILE* const stream, const char* const format, const _locale_t locale, ...
+)
+{
+  va_list arguments;
+  va_start(arguments, locale);
+  const int result = _vfprintf_l(stream, format, locale, arguments);
+  va_end(arguments);
+  return result;
+}
+
+/**
  * Address: 0x00A85BC2 (FUN_00A85BC2, fprintf)
  *
  * IDA signature:
