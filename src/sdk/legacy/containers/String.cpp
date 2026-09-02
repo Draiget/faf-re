@@ -99,8 +99,14 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
  */
 msvc8::string::~string() noexcept {
     // TEMPORARILY DISABLED -- see the note in String.h. Freeing here is
-    // correct and recovers ~389 MB, but it surfaces a latent double free
-    // that crashes in the lobby (SNetCommandArg copy -> assign_owned).
+    // correct and recovers ~443 MB (measured 2026-09-02: 736.0M -> 288.0M
+    // allocator-in-use on SCMP_009), but it surfaces a latent double free that
+    // crashes in the lobby (SNetCommandArg copy -> assign_owned).
+    //
+    // Re-measured with the free live: the main menu survives 70 s and a
+    // /map skirmish survives 120 s, both clean. That does NOT clear it --
+    // `/map` bypasses `CLobby::HostGame`, which is the path the crash was
+    // reported on, so the one path that matters here is still untested.
     // Restore `tidy(true, 0U);` once that is found.
 }
 
