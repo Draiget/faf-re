@@ -9116,6 +9116,24 @@ namespace msvc8
          * this member's multiplication-based check, algebraically
          * equivalent. Reached from this instantiation's `insert`
          * reallocation branch.
+         *
+         * Address: 0x00578F20 (FUN_00578F20, `msvc8::vector<LuaPlus::
+         * LuaObject>::allocate_slots_checked` for the 0x14-byte (20-byte)
+         * element) -- `.asm`-confirmed: `or eax, -1; div ecx` then
+         * `cmp eax, 14h`, i.e. `0xFFFFFFFF / count < 20 ? throw
+         * std::bad_alloc : operator new(count * 20)`, with the size folded
+         * as `lea edx,[ecx+ecx*4]; add edx,edx; add edx,edx` (count*5*4).
+         * Same division phrasing as FUN_007E9760 above. Reached from this
+         * instantiation's `insert` reallocation branch (`FUN_00578980`,
+         * itself a RULE ONE emission of `insert(pos,value)`).
+         *
+         * Address: 0x005823C0 (FUN_005823C0, `msvc8::vector<T>::
+         * allocate_slots_checked` for a second, distinct 0x14-byte element)
+         * -- byte-for-byte the same guard/allocate shape as FUN_00578F20,
+         * but a different 20-byte `T`: its `insert` (`FUN_00580D30`)
+         * constructs elements through `sub_5813C0` rather than the
+         * LuaObject ctor, so this is a separate instantiation of the same
+         * template, not an ICF twin of it.
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {

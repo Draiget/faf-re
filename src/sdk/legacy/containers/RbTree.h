@@ -2814,6 +2814,19 @@ namespace msvc8
              * for this instantiation. Was previously duplicated as
              * `LowerBoundPausedCategoryNode` (`AudioEngine.cpp`, deleted by
              * this migration).
+             *
+             * Address: 0x005808D0 (FUN_005808D0, sub_5808D0) --
+             * `msvc8::map<Wm3::Vector2i, Moho::SBuildReserveInfo>::
+             * lower_bound_node`, isNil@+0x25, `_Myval`@+0x0C, `_Left`@+0x00,
+             * `_Right`@+0x08. `.asm`-confirmed descent matching this member
+             * exactly: seeds `found = head_`, goes right (`[ebp+8]`) when the
+             * node key compares less, otherwise records the node and goes
+             * left (`[ebp+0]`), and returns `head_` untouched when the root
+             * is nil. The key compare is `Wm3::Vector2i`'s lexicographic
+             * two-component loop (`cmp edx, 2`), not a scalar compare. Sole
+             * caller is this instantiation's `operator[]` emission
+             * (`FUN_0057D910`), itself a RULE ONE compiler emission whose
+             * written source is the `map[key]` expression at its call site.
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
