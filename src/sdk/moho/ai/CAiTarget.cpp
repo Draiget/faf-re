@@ -273,8 +273,6 @@ void DeserializeCAiTargetThunkVariantA(gpg::ReadArchive* archive, int objectPtr,
 
 /**
  * Address: 0x005E3650 (FUN_005E3650, serializer save thunk alias)
- * Address: 0x006354D0 (FUN_006354D0)
- * Address: 0x00649BF0 (FUN_00649BF0)
  *
  * What it does:
  * Tail-forwards one CAiTarget serializer-save thunk alias into

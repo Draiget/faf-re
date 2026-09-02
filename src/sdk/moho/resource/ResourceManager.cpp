@@ -755,7 +755,6 @@ namespace
 
   /**
    * Address: 0x004AC9E0 (FUN_004AC9E0)
-   * Address: 0x00560CB0 (FUN_00560CB0)
    *
    * What it does:
    * Thunk lane that forwards one prefetch weak-pair ring-queue cleanup request

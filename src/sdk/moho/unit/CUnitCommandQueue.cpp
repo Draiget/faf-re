@@ -287,7 +287,6 @@ void SerializeCUnitCommandQueueThunkVariantA(
 
 /**
  * Address: 0x006F93C0 (FUN_006F93C0, serializer save thunk alias)
- * Address: 0x005958B0 (FUN_005958B0)
  *
  * What it does:
  * Tail-forwards a second CUnitCommandQueue serialize thunk alias into

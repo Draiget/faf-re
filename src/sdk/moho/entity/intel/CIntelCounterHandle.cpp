@@ -285,7 +285,6 @@ CIntelCounterHandle::CIntelCounterHandle(
 
   /**
    * Address: 0x0076FE00 (FUN_0076FE00)
-   * Address: 0x00649B50 (FUN_00649B50)
    *
    * What it does:
    * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberSerialize`.

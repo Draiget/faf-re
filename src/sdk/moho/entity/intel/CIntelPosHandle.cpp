@@ -313,7 +313,6 @@ namespace moho
 
   /**
    * Address: 0x0076FE20 (FUN_0076FE20)
-   * Address: 0x00649B40 (FUN_00649B40)
    *
    * What it does:
    * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberSerialize`.

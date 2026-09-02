@@ -2089,7 +2089,6 @@ namespace
 
     /**
      * Address: 0x009055A0 (FUN_009055A0, BinaryReadArchive::ReadUInt)
-     * Address: 0x00978C60 (FUN_00978C60)
      * Address: 0x009C6860 (FUN_009C6860)
      *
      * What it does:

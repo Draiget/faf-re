@@ -397,7 +397,6 @@ namespace moho
 
   /**
    * Address: 0x00608070 (FUN_00608070)
-   * Address: 0x0060C990 (FUN_0060C990)
    *
    * What it does:
    * Alternate deserialize thunk lane for `CUnitCarrierLaunch` serializer

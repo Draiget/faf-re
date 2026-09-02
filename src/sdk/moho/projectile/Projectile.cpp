@@ -1917,7 +1917,6 @@ namespace moho
 
   /**
    * Address: 0x0069F8E0 (FUN_0069F8E0, member-deserialize thunk lane)
-   * Address: 0x00680790 (FUN_00680790)
    * Address: 0x006A0370 (FUN_006A0370, Moho::Projectile::MemberDeserialize)
    *
    * What it does:

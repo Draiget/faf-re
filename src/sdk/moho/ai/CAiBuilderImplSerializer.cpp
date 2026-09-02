@@ -27,7 +27,6 @@ namespace
 
   /**
    * Address: 0x005A21F0 (FUN_005A21F0, j_Moho::CAiBuilderImpl::MemberSerialize_0)
-   * Address: 0x00635370 (FUN_00635370)
    * Address: 0x004E7070 (FUN_004E7070)
    *
    * What it does:
