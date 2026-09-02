@@ -29398,22 +29398,6 @@ namespace
     return value != nullptr ? value : "";
   }
 
-  [[nodiscard]] boost::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelResource(const char* const modelPath)
-  {
-    if (moho::RScmResource::sType == nullptr) {
-      moho::RScmResource::sType = gpg::LookupRType(typeid(moho::RScmResource));
-    }
-
-    boost::weak_ptr<moho::RScmResource> weakResource{};
-    (void)moho::RES_GetResource(
-      &weakResource,
-      modelPath != nullptr ? modelPath : "",
-      nullptr,
-      moho::RScmResource::sType
-    );
-    return weakResource.lock();
-  }
-
   [[nodiscard]] boost::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelFromDescriptor(
     const LuaPlus::LuaObject& meshDescriptor,
     moho::CWldSession* const worldSession,
@@ -29425,7 +29409,8 @@ namespace
       if (outUniformScale != nullptr) {
         *outUniformScale = static_cast<float>(meshDescriptor.GetByName("UniformScale").GetNumber());
       }
-      return ResolveCommandFeedbackModelResource(LuaStringOrEmpty(meshNameObject));
+      // 0x00857D0F: the shared `GetModel` lane.
+      return moho::GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
     }
 
     if (worldSession == nullptr || worldSession->mRules == nullptr) {
@@ -29455,7 +29440,9 @@ namespace
       return {};
     }
 
-    return ResolveCommandFeedbackModelResource(lodBegin->mMeshName.c_str());
+    // 0x00857E58: the second `GetModel` call in this function, on the blueprint
+    // arm's front LOD.
+    return moho::GetModel(lodBegin->mMeshName.c_str(), nullptr);
   }
 
   void DestroyCommandFeedbackBlipMeshInstance(moho::MeshInstance*& meshInstance) noexcept
