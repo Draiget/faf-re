@@ -8595,6 +8595,21 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // every time sim script writes a line, and nothing was carrying them across.
   mPrintField.swap(outSyncData->mPrintField);
 
+  // 0x007480EE..0x00748136: the two debug canvases, published by shared
+  // ownership rather than swapped. Wired by offset, because the names on the
+  // two sides do not line up and only the offsets are provable:
+  //
+  //   [esi+974h] -> [ebx+2A4h]   mDebugCanvas2 -> SSyncData::mTickDebugCanvas
+  //   [esi+96Ch] -> [ebx+2ACh]   mDebugCanvas1 -> SSyncData::mBeatDebugCanvas
+  //
+  // `Sim+0x096C` is pinned by `GetDebugCanvas` (FUN_00746720), whose whole body
+  // is `add edi, 96Ch` then a lazy `new CDebugCanvas`; that is the canvas sim
+  // script draws into. `AdvanceBeat` rolls it into `mDebugCanvas2` and clears
+  // slot 1, so slot 2 holds the finished beat. The crossing is what the binary
+  // does; the packet-side field names are recovered guesses and are left alone.
+  outSyncData->mTickDebugCanvas.reset_from_owner(mDebugCanvas2);
+  outSyncData->mBeatDebugCanvas.reset_from_owner(mDebugCanvas1);
+
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
   // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
