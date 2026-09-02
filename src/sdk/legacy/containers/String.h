@@ -85,23 +85,54 @@ namespace msvc8
          * shallowly, released the originals, and the allocator handed the same
          * block to the next `msvc8::string` built in the loop.
          *
-         * There is deliberately no destructor: nothing in this reconstruction
-         * frees a string on scope exit today, and adding that is a separate,
-         * wider change. Copies therefore leak rather than dangle, which is the
-         * behaviour these call sites already assumed.
+         * Each copy therefore owns a buffer that has to be released again, which
+         * is what the destructor below does.
          */
         string(const string& other) noexcept;
         string& operator=(const string& other) noexcept;
+
+        /**
+         * Releases the heap buffer, exactly as MSVC8's `~basic_string` does via
+         * `_Tidy(true)`.
+         *
+         * This was deliberately absent for a long time, on the reasoning that
+         * nothing in the reconstruction freed a string on scope exit yet and
+         * that adding it was a separate, wider change. The cost of leaving it
+         * out turned out to be the whole engine: measured against retail on
+         * SCMP_009 at the same point in the load, `gpg`'s allocator reported
+         * 632.4 MB in use here against retail's 293.3 MB -- 2.16x -- and the
+         * allocator's own free-region commit lane (`AllocateFreeRegion`,
+         * 0x00958660) discards `VirtualAlloc`'s return value, faithfully to the
+         * binary (verified at 0x009586F6 and 0x00958738). Once the process runs
+         * far enough ahead of retail's footprint for a commit to fail, that lane
+         * hands back a pointer into reserved-but-uncommitted address space and
+         * the next store through it faults. Two separate runs died that way, in
+         * unrelated places -- `_Alloc_proxy` and `luaH_getstr` -- both reading a
+         * `MEM_RESERVE`/`PAGE_NOACCESS` page inside the allocator's own
+         * reservation.
+         *
+         * The large multiplier comes from the containers rather than from
+         * scattered locals: `msvc8::vector<T>` guards its element teardown with
+         * `if constexpr (!std::is_trivially_destructible_v<T>)`, so while this
+         * type stayed trivially destructible every `msvc8::vector<msvc8::string>`
+         * released its own block and leaked every element's.
+         *
+         * `tidy(true, 0)` is the already-recovered lane (0x008846B0 and friends)
+         * and leaves the object a valid empty inline string, so running it again
+         * -- `scoped_string`'s destructor does, before this base destructor -- is
+         * a no-op rather than a double free.
+         */
+        ~string() noexcept;
 
         /**
          * Move semantics: transfer the buffer and leave the source an empty
          * inline string, so ownership stays single and nothing is copied.
          *
          * MSVC8's basic_string had no move operations - it did not need them,
-         * because its destructor freed whatever a relocation displaced. This
-         * reconstruction has no destructor (see above), so before these existed
-         * every `std::move` fell back on the copy assignment: it allocated a
-         * fresh buffer for the copy and abandoned the one it displaced.
+         * because its destructor freed whatever a relocation displaced. Before
+         * these existed every `std::move` fell back on the copy assignment: it
+         * allocated a fresh buffer for the copy and abandoned the one it
+         * displaced.
          *
          * `msvc8::vector::erase` moves the whole tail down one slot per erased
          * element. With the log window's committed history at tens of thousands
