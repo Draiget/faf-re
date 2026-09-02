@@ -8543,13 +8543,15 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   outSyncData->mAdvanced = mAdvancedThisTick;
   outSyncData->mFocusArmy = mSyncFilter.focusArmy;
 
-  // 0x00747666..0x007476E5. The army table is published in two halves: the
+  // 0x00747788..0x0074789B. The army table is published in two halves: the
   // constant half once per session, the variable half every beat. Without
   // either of them the client has no army data at all, which is why the HUD
   // read a frozen 650 mass / 3900 energy at +0 income -- `mArmyUpdates` is
   // where the economy lives.
   const std::size_t armyCount = mArmiesList.size();
 
+  // 0x00747788 tests `mDidSync` (Sim+0x0A6C); 0x007477CD reserves mNewGrids
+  // and 0x00747815 sets the flag.
   if (!mDidSync) {
     outSyncData->mNewGrids.resize(armyCount, SSTIArmyConstantData{});
     for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
@@ -8563,7 +8565,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     (void)mArmiesList[armyIndex]->CopyArmyVariableData(&outSyncData->mArmyUpdates[armyIndex]);
   }
 
-  // 0x0074772E..0x007477C6. Entities publish themselves through the virtual at
+  // 0x007478A1..0x00747954. Entities publish themselves through the virtual at
   // vtable slot +0x30 (`Entity::Sync`, which `Unit` and `Prop` override). Which
   // set gets walked depends on the flag computed above: a focus-army change
   // means the client's whole view is stale, so every unit in the entity DB
@@ -8591,7 +8593,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     }
   }
 
-  // 0x00747858..0x00747875. The camera-follow records the beat accumulated are
+  // 0x007479C6..0x007479FC. The camera-follow records the beat accumulated are
   // handed to the packet by SWAPPING the two vectors, not by copying: the sim
   // comes back owning whatever storage the previous packet had, which is how
   // the lane re-uses its allocation every beat. The decompile shows this as
@@ -8603,7 +8605,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // `CameraImpl::CameraFollow`, so until now it replayed an always-empty lane.
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
-  // 0x00747898: entities that died this beat are retired from the entity DB
+  // 0x00747AF9: entities that died this beat are retired from the entity DB
   // only after everything above has had its chance to publish them. Nothing in
   // the recovered tree was calling this, so the DB kept every entity it had
   // ever been given.
