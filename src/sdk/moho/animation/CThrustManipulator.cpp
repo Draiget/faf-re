@@ -643,7 +643,13 @@ namespace moho
    * Unwraps the raw Lua callback context and forwards to
    * `cfunc_CreateThrustControllerL`.
    */
-  int cfunc_CreateThrustController(lua_State* const luaContext)
+  // The parameter is deliberately NOT `lua_State* const`: MSVC encodes a
+  // top-level pointer-parameter const in the decorated name (`QAUlua_State@@`
+  // instead of `PAUlua_State@@`), and no header declares this thunk, so the
+  // `const` form emitted a symbol that `ManipulatorLuaFunctionThunks.cpp`'s
+  // own `int cfunc_CreateThrustController(lua_State*)` declaration could never
+  // resolve against.
+  int cfunc_CreateThrustController(lua_State* luaContext)
   {
     return cfunc_CreateThrustControllerL(moho::SCR_ResolveBindingState(luaContext));
   }

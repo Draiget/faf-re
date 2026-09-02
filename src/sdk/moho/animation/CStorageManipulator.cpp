@@ -404,7 +404,10 @@ namespace moho
    * Unwraps the raw Lua callback context and forwards to
    * `cfunc_CreateStorageManipL`.
    */
-  int cfunc_CreateStorageManip(lua_State* const luaContext)
+  // See the note on `cfunc_CreateThrustController`: a top-level `const` on this
+  // pointer parameter changes the decorated name to `QAUlua_State@@`, which the
+  // declaration in `ManipulatorLuaFunctionThunks.cpp` cannot resolve.
+  int cfunc_CreateStorageManip(lua_State* luaContext)
   {
     return cfunc_CreateStorageManipL(moho::SCR_ResolveBindingState(luaContext));
   }
