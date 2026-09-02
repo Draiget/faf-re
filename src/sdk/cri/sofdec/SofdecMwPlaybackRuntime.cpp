@@ -581,7 +581,7 @@
    * What it does:
    * Byte-copies one PCM payload window and returns copied byte count.
    */
-  [[maybe_unused]] std::uint32_t SofdecCopyPcmBytes(
+  std::uint32_t SofdecCopyPcmBytes(
     void* const destination,
     const void* const source,
     const std::uint32_t byteCount
@@ -597,7 +597,7 @@
    * What it does:
    * Expands mono PCM into interleaved stereo with center gain (0.70710677).
    */
-  [[maybe_unused]] void SofdecWriteStereoCenterMix(
+  void SofdecWriteStereoCenterMix(
     std::int16_t* const outInterleavedSamples,
     const std::int16_t* const monoSamples,
     const std::int32_t byteCount
@@ -622,7 +622,7 @@
    * What it does:
    * Writes mono PCM into one interleaved stereo lane (stride-2 store).
    */
-  [[maybe_unused]] void SofdecWriteMonoIntoInterleavedLane(
+  void SofdecWriteMonoIntoInterleavedLane(
     std::int16_t* const outLaneSamples,
     const std::int16_t* const monoSamples,
     const std::int32_t byteCount
@@ -645,7 +645,7 @@
    * What it does:
    * Writes mono PCM into stereo using primary pan-lane gain lookup.
    */
-  [[maybe_unused]] void SofdecWriteStereoPrimaryPanMix(
+  void SofdecWriteStereoPrimaryPanMix(
     const moho::SofdecSoundPort* const soundPort,
     std::int16_t* const outInterleavedSamples,
     const std::int16_t* const monoSamples,
@@ -672,9 +672,18 @@
    *
    * What it does:
    * Builds one stereo pan scratch lane from mono PCM using primary pan gains.
+   *
+   * Takes the same four-argument shape as the sibling
+   * `SofdecAccumulateStereoPanScratch` (its caller, `mwSndGetData`, pushes
+   * one shared four-argument block and branches to either function), but
+   * this one never reads the second (output-pointer) argument: the real
+   * disassembly loads only arg_0 (soundPort), arg_8 (monoSamples) and
+   * arg_C (byteCount) - arg_4 is dead on entry. Kept as an explicit
+   * unused parameter rather than dropped, to match the call-site ABI.
    */
-  [[maybe_unused]] void SofdecBuildStereoPanScratch(
+  void SofdecBuildStereoPanScratch(
     const moho::SofdecSoundPort* const soundPort,
+    [[maybe_unused]] std::int16_t* const unusedOutputSamples,
     const std::int16_t* const monoSamples,
     const std::int32_t byteCount
   )
@@ -701,7 +710,7 @@
    * Mixes mono PCM with scratch stereo lane using secondary pan gains and
    * saturates results to signed 16-bit PCM.
    */
-  [[maybe_unused]] void SofdecAccumulateStereoPanScratch(
+  void SofdecAccumulateStereoPanScratch(
     const moho::SofdecSoundPort* const soundPort,
     std::int16_t* const outInterleavedSamples,
     const std::int16_t* const monoSamples,
@@ -733,7 +742,7 @@
    * What it does:
    * Swaps primary/secondary DirectSound buffers and primes aux-drain state.
    */
-  [[maybe_unused]] void SofdecSwapPrimaryAndSecondaryBuffers(moho::SofdecSoundPort* const soundPort)
+  void SofdecSwapPrimaryAndSecondaryBuffers(moho::SofdecSoundPort* const soundPort)
   {
     if (soundPort->primaryBuffer == nullptr || soundPort->secondaryBuffer == nullptr) {
       return;
@@ -765,7 +774,7 @@
    * Zero-fills one pending aux-drain region on secondary buffer and clears
    * drain-pending flag after one full per-port buffer window.
    */
-  [[maybe_unused]] void SofdecDrainAuxBufferToSilence(moho::SofdecSoundPort* const soundPort)
+  void SofdecDrainAuxBufferToSilence(moho::SofdecSoundPort* const soundPort)
   {
     DWORD playCursor = 0;
     DWORD writeCursor = 0;
@@ -827,6 +836,118 @@
     if (soundPort->auxDrainAccumulatedBytes > fullWindowBytes) {
       soundPort->auxDrainPending = 0;
     }
+  }
+
+  /**
+   * Address: 0x00B174A0 (FUN_00B174A0, SofDecVirt2_Func19, _mwSndGetData)
+   *
+   * What it does:
+   * The Sofdec sound-port PCM-fill callback: locks `sampleCount` samples'
+   * worth of the primary DirectSound buffer starting at `sampleOffset`,
+   * services a pending buffer swap / aux-drain first when the port is in
+   * seamless/aux-maintenance mode, then converts `monoSamples` into the
+   * locked region according to output channel count and pan mode -
+   * straight copy for mono output, center-mix/primary-pan-mix for normal
+   * stereo, direct hard-left/hard-right lane write for the extreme
+   * (-15/+15) pan-preset combo, and build/accumulate through the shared
+   * pan-scratch buffer (keyed by `channelIndex`) for everything else -
+   * before unlocking. Reflection name recovered from the shared
+   * `kSofdecErrLockFailed`/`kSofdecErrUnlockFailed` strings, both of which
+   * say "in mwSndGetData".
+   *
+   * Address-taken only: reached exclusively through the `sofdec_vtable2`
+   * dispatch table (slot 19, between the already-recovered
+   * `SofDecVirt2_Func18` and `SofDecVirt2_Func20`), which is why every one
+   * of its eight PCM-mixing callees was orphaned until this was recovered.
+   */
+  [[maybe_unused]] std::int32_t mwSndGetData(
+    moho::SofdecSoundPort* const soundPort,
+    const std::int32_t channelIndex,
+    const std::int32_t sampleOffset,
+    const std::int16_t* const monoSamples,
+    const std::int32_t sampleCount
+  )
+  {
+    if (soundPort->used == 0) {
+      return soundPort->used;
+    }
+
+    IDirectSoundBuffer* const primaryBuffer = soundPort->primaryBuffer;
+    if (primaryBuffer == nullptr) {
+      CRIERR_CallErr(kSofdecErrNullPrimaryBuffer);
+      return 0;
+    }
+
+    if (soundPort->bufferPlacementMode == 1 || soundPort->auxMaintenanceMode == 1) {
+      if (soundPort->auxSwapPending == 1) {
+        SofdecSwapPrimaryAndSecondaryBuffers(soundPort);
+      }
+      if (soundPort->auxDrainPending == 1) {
+        SofdecDrainAuxBufferToSilence(soundPort);
+      }
+    }
+
+    const std::int32_t bytesPerSample = soundPort->format.bitsPerSample;
+    const std::int32_t requestedBytes = (sampleCount * bytesPerSample) / 8;
+    if (requestedBytes < 0x20) {
+      return requestedBytes;
+    }
+
+    const std::int32_t channelCount = soundPort->channelCountPrimary;
+    const auto lockOffsetBytes = static_cast<DWORD>(channelCount * ((sampleOffset * bytesPerSample) / 8));
+    const auto lockLengthBytes = static_cast<DWORD>(requestedBytes * channelCount);
+
+    void* lockRegion0 = nullptr;
+    DWORD lockBytes0 = 0;
+    void* lockRegion1 = nullptr;
+    DWORD lockBytes1 = 0;
+    const std::int32_t lockResult = primaryBuffer->lpVtbl->Lock(
+      primaryBuffer,
+      lockOffsetBytes,
+      lockLengthBytes,
+      &lockRegion0,
+      &lockBytes0,
+      &lockRegion1,
+      &lockBytes1,
+      0
+    );
+    if (lockResult != 0 && SofdecRestoreBufferIfLost(primaryBuffer, lockResult) == 0) {
+      CRIERR_CallErr(kSofdecErrLockFailed);
+      return 0;
+    }
+
+    auto* const outSamples = static_cast<std::int16_t*>(lockRegion0);
+    const auto lockedByteCount0 = static_cast<std::int32_t>(lockBytes0);
+    if (channelCount == 1) {
+      (void)SofdecCopyPcmBytes(outSamples, monoSamples, lockBytes0);
+    } else if (channelCount == 2) {
+      if (soundPort->channelModeFlag == 1) {
+        if (soundPort->spatialPresetPrimaryIndex != 0) {
+          SofdecWriteStereoPrimaryPanMix(soundPort, outSamples, monoSamples, lockedByteCount0);
+        } else {
+          SofdecWriteStereoCenterMix(outSamples, monoSamples, lockedByteCount0);
+        }
+      } else if (soundPort->spatialPresetPrimaryIndex == -15 && soundPort->spatialPresetSecondaryIndex == 15) {
+        SofdecWriteMonoIntoInterleavedLane(
+          channelIndex != 0 ? (outSamples + 1) : outSamples,
+          monoSamples,
+          lockedByteCount0
+        );
+      } else if (channelIndex != 0) {
+        SofdecAccumulateStereoPanScratch(soundPort, outSamples, monoSamples, lockedByteCount0);
+      } else {
+        SofdecBuildStereoPanScratch(soundPort, outSamples, monoSamples, lockedByteCount0);
+      }
+    }
+
+    const std::int32_t unlockResult =
+      primaryBuffer->lpVtbl->Unlock(primaryBuffer, lockRegion0, lockBytes0, lockRegion1, lockBytes1);
+    if (unlockResult != 0) {
+      CRIERR_CallErr(kSofdecErrUnlockFailed);
+      return 0;
+    }
+
+    return unlockResult;
   }
 
   /**
