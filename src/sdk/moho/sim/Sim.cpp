@@ -8543,56 +8543,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   outSyncData->mAdvanced = mAdvancedThisTick;
   outSyncData->mFocusArmy = mSyncFilter.focusArmy;
 
-  // 0x00747788..0x0074789B. The army table is published in two halves: the
-  // constant half once per session, the variable half every beat. Without
-  // either of them the client has no army data at all, which is why the HUD
-  // read a frozen 650 mass / 3900 energy at +0 income -- `mArmyUpdates` is
-  // where the economy lives.
-  const std::size_t armyCount = mArmiesList.size();
-
-  // 0x00747788 tests `mDidSync` (Sim+0x0A6C); 0x007477CD reserves mNewGrids
-  // and 0x00747815 sets the flag.
-  if (!mDidSync) {
-    outSyncData->mNewGrids.resize(armyCount, SSTIArmyConstantData{});
-    for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
-      (void)mArmiesList[armyIndex]->CopyArmyConstantData(&outSyncData->mNewGrids[armyIndex]);
-    }
-    mDidSync = true;
-  }
-
-  outSyncData->mArmyUpdates.resize(armyCount, SSTIArmyVariableData{});
-  for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
-    (void)mArmiesList[armyIndex]->CopyArmyVariableData(&outSyncData->mArmyUpdates[armyIndex]);
-  }
-
-  // 0x007478A1..0x00747954. Entities publish themselves through the virtual at
-  // vtable slot +0x30 (`Entity::Sync`, which `Unit` and `Prop` override). Which
-  // set gets walked depends on the flag computed above: a focus-army change
-  // means the client's whole view is stale, so every unit in the entity DB
-  // re-publishes; otherwise only the entities that marked themselves dirty this
-  // beat do.
-  //
-  // This walk is the sim-to-client bridge for units. While it was missing, units
-  // were constructed and ticked in the sim perfectly well and simply never
-  // reached the client -- no meshes, no strategic icons, no selection.
-  if (focusArmyChanged) {
-    for (CUnitIterAllArmies unitIter(this); unitIter.mCur != nullptr; unitIter.Next()) {
-      unitIter.mCur->Sync(outSyncData);
-    }
-  } else {
-    using CoordNode = TDatListItem<Entity, void>;
-    for (CoordNode* node = mCoordEntities.mNext; node != &mCoordEntities;) {
-      // Step the cursor before dispatching: `Entity::Sync` clears the entity's
-      // dirty state and unlinks the very node we were standing on.
-      CoordNode* const next = node->mNext;
-      Entity* const entity = TDatList<Entity, void>::owner_from_member_node<Entity, &Entity::mCoordNode>(node);
-      if (entity != nullptr) {
-        entity->Sync(outSyncData);
-      }
-      node = next;
-    }
-  }
-
   // 0x007479C6..0x007479FC. The camera-follow records the beat accumulated are
   // handed to the packet by SWAPPING the two vectors, not by copying: the sim
   // comes back owning whatever storage the previous packet had, which is how
@@ -8638,13 +8588,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   mAllyUpgradeNotifications.swap(outSyncData->mAllyUpgradeNotifications);
   mPendingPoseCopies.swap(outSyncData->mPoseUpdates);
 
-  // 0x00747AF9: entities that died this beat are retired from the entity DB
-  // only after everything above has had its chance to publish them. Nothing in
-  // the recovered tree was calling this, so the DB kept every entity it had
-  // ever been given.
-  if (mEntityDB != nullptr) {
-    mEntityDB->Purge();
-  }
 
   // 0x00747635..0x0074764C: hand the beat's queued audio requests to the
   // packet and reset the sim-side queue back to its inline storage. Without
