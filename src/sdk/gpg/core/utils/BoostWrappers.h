@@ -935,17 +935,6 @@ namespace boost
         return outStorage;
     }
 
-    /**
-     * Address: 0x00545340 (FUN_00545340, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `LaunchInfoNew`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::LaunchInfoNew>* SpCountedImplPConstructLaunchInfoNew(
-        SpCountedImplStorage<moho::LaunchInfoNew>* countedImpl,
-        moho::LaunchInfoNew* ownedPointee
-    ) noexcept;
 
     /**
      * Address: 0x005791B0 (FUN_005791B0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::sp_counted_impl_p)
@@ -1160,16 +1149,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x00884EF0 (FUN_00884EF0, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `LaunchInfoLoad`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::LaunchInfoLoad>* SpCountedImplPConstructLaunchInfoLoad(
-        SpCountedImplStorage<moho::LaunchInfoLoad>* countedImpl,
-        moho::LaunchInfoLoad* ownedPointee
-    ) noexcept;
 
     /**
      * Address: 0x00883F60 (FUN_00883F60, boost::shared_ptr<Moho::LaunchInfoLoad>::shared_ptr)
@@ -1468,16 +1447,6 @@ namespace boost
         detail::sp_counted_base* control
     ) noexcept;
 
-    /**
-     * Address: 0x00884F50 (FUN_00884F50, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `LaunchInfoLoad` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForLaunchInfoLoad(
-        detail::sp_counted_base* control
-    ) noexcept;
 
     /**
      * Address: 0x0089B930 (FUN_0089B930, boost::detail::sp_counted_base::sp_counted_base)
@@ -1579,15 +1548,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x00545460 (FUN_00545460)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `LaunchInfoNew` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForLaunchInfoNew(
-        detail::sp_counted_base* control
-    ) noexcept;
 
     /**
      * Address: 0x0054EE20 (FUN_0054EE20)
@@ -1664,27 +1624,6 @@ namespace boost
         SpCountedImplStorage<moho::RScaResource>* self
     ) noexcept;
 
-    /**
-     * Address: 0x00545360 (FUN_00545360, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `LaunchInfoNew` pointee bound to this shared-count
-     * control lane when present.
-     */
-    void SpCountedImplPDisposeLaunchInfoNew(
-        SpCountedImplStorage<moho::LaunchInfoNew>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x00545440 (FUN_00545440, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::destroy)
-     *
-     * What it does:
-     * Frees the control block itself once both use and weak counts reach
-     * zero (the pointee was already released by `dispose()`).
-     */
-    void SpCountedImplPDestroyLaunchInfoNew(
-        SpCountedImplStorage<moho::LaunchInfoNew>* self
-    ) noexcept;
 
     /**
      * Address: 0x005791D0 (FUN_005791D0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::dispose)
@@ -1769,15 +1708,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x00884F10 (FUN_00884F10, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::dispose)
-     *
-     * What it does:
-     * Releases one owned `LaunchInfoLoad` pointee through its scalar-deleting
-     * virtual destructor lane when present.
-     */
-    void SpCountedImplPDisposeLaunchInfoLoad(
-        SpCountedImplStorage<moho::LaunchInfoLoad>* countedImpl
-    ) noexcept;
 
     /**
      * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
@@ -2139,16 +2069,6 @@ namespace boost
         unsigned char deleteFlag
     ) noexcept;
 
-    /**
-     * Address: 0x00884F30 (FUN_00884F30, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<LaunchInfoLoad>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::LaunchInfoLoad>* SpCountedImplPDeletingDtorLaunchInfoLoad(
-        SpCountedImplStorage<moho::LaunchInfoLoad>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
 
     /**
      * Address: 0x0089B910 (FUN_0089B910, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::dtr)
@@ -2205,15 +2125,6 @@ namespace boost
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
-    /**
-     * Address: 0x00545370 (FUN_00545370, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullLaunchInfoNew(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
 
     /**
      * Address: 0x005791E0 (FUN_005791E0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::get_deleter)
@@ -2315,15 +2226,6 @@ namespace boost
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
-    /**
-     * Address: 0x00884F20 (FUN_00884F20, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullLaunchInfoLoad(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
 
     /**
      * Address: 0x0089B8A0 (FUN_0089B8A0, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::get_deleter)
