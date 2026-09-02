@@ -40,6 +40,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/RResId.h"
@@ -1229,7 +1230,26 @@ namespace
       }
     }
 
-    if (requestedModule && *requestedModule) {
+    // 0x006774F1: the binary asks the VFS whether the module file exists
+    // before importing it -- `boost::call_once(func_EnsureFileCWaitHandleSet,
+    // ...)` then `sPFWaitHandleSet->mHandle->GetFileInfo(path, 0)` -- and skips
+    // straight to the fallback when it does not.
+    //
+    // That guard was missing here, and its absence is expensive rather than
+    // cosmetic. `mScriptModule` is empty for every stock blueprint, so every
+    // entity falls into the synthesised `<id>_script.lua` path above; for props
+    // that file genuinely does not exist. Lua's `import` does not cache a
+    // failed module (`modules[name] = nil` in LoadModule's error arm), so each
+    // of the 5182 props on SCMP_009 re-ran the whole failure: a WARN, a
+    // `LuaState::Error`, and a C++ throw unwound back through `Prop::Prop`'s
+    // `RunScript`. dbgrun counted 3000 first-chance throws inside `Sim::Setup`.
+    // Retail, with this check, emits none of it.
+    const moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+    const bool moduleFileExists = requestedModule != nullptr && *requestedModule != '\0'
+      && waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
+      && waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr);
+
+    if (moduleFileExists) {
       LuaPlus::LuaObject requestedModuleObj = moho::SCR_ImportLuaModule(sim->mLuaState, requestedModule);
       if (requestedModuleObj) {
         LuaPlus::LuaObject factoryObj =
