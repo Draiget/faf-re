@@ -2736,24 +2736,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007E6970 (FUN_007E6970, boost::detail::sp_counted_impl_p<Moho::MeshBatch>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `MeshBatch`.
-   */
-  SpCountedImplStorage<moho::MeshBatch>* SpCountedImplPConstructMeshBatch(
-    SpCountedImplStorage<moho::MeshBatch>* const countedImpl,
-    moho::MeshBatch* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
    * Address: 0x00941660 (FUN_00941660, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::sp_counted_impl_p)
    *
    * What it does:
@@ -3334,20 +3316,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007E6AB0 (FUN_007E6AB0)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `MeshBatch` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshBatch(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
-
-  /**
    * Address: 0x008E8B10 (FUN_008E8B10, boost::detail::sp_counted_base::sp_counted_base)
    *
    * What it does:
@@ -3873,20 +3841,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007E6990 (FUN_007E6990, boost::detail::sp_counted_impl_p<Moho::MeshBatch>::dispose)
-   *
-   * What it does:
-   * Releases one owned `MeshBatch` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeMeshBatch(
-    SpCountedImplStorage<moho::MeshBatch>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
    * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
    *
    * What it does:
@@ -4325,21 +4279,6 @@ namespace boost
    */
   SpCountedImplStorage<moho::CGpgNetInterface>* SpCountedImplPDeletingDtorCGpgNetInterface(
     SpCountedImplStorage<moho::CGpgNetInterface>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x007E6A60 (FUN_007E6A60, boost::detail::sp_counted_impl_p<Moho::MeshBatch>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::MeshBatch>* SpCountedImplPDeletingDtorMeshBatch(
-    SpCountedImplStorage<moho::MeshBatch>* const countedImpl,
     const unsigned char deleteFlag
   ) noexcept
   {
@@ -4848,19 +4787,6 @@ namespace boost
    * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
    */
   void* SpCountedImplPGetDeleterNullCGpgNetInterface(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x007E69A0 (FUN_007E69A0, boost::detail::sp_counted_impl_p<Moho::MeshBatch>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullMeshBatch(
     detail::sp_typeinfo const& requestedType
   ) noexcept
   {
