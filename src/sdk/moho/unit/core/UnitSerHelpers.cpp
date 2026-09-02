@@ -78,8 +78,12 @@ namespace moho
       return;
     }
 
-    auto* const entitySubobject = reinterpret_cast<Entity*>(reinterpret_cast<std::uint8_t*>(objectPtr) + 0x08);
-    delete entitySubobject;
+    // The binary deletes through the Entity base, which sits at +0x08 -- and
+    // that is precisely where the compiler puts it: `Unit : public IUnit,
+    // public Entity` with `sizeof(IUnit) == 0x08`. So take the base by cast
+    // rather than by adding 8. Entity's destructor is virtual, so this still
+    // destroys the whole Unit.
+    delete static_cast<Entity*>(static_cast<Unit*>(objectPtr));
   }
 
   /**
