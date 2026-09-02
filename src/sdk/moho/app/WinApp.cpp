@@ -3168,7 +3168,36 @@ namespace
 
     const msvc8::string callstackText =
       moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
-    gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
+
+    // One Logf per frame. gpg::Logf formats through a bounded buffer, so a
+    // single multi-line call silently loses everything past the first frame or
+    // two -- which is precisely the part that names the faulting engine code.
+    gpg::Logf("CRASH callstack: %u frames", static_cast<unsigned int>(frameCount));
+    const char* const text = callstackText.c_str();
+    std::size_t lineStart = 0u;
+    for (std::size_t i = 0u;; ++i) {
+      const char ch = text[i];
+      if (ch != '\n' && ch != '\0') {
+        continue;
+      }
+      std::size_t lineLength = i - lineStart;
+      if (lineLength > 400u) {
+        lineLength = 400u; // keep each line well inside Logf's buffer
+      }
+      if (lineLength != 0u) {
+        gpg::Logf("CRASH   %.*s", static_cast<int>(lineLength), text + lineStart);
+      }
+      if (ch == '\0') {
+        break;
+      }
+      lineStart = i + 1u;
+    }
+
+    // Raw return addresses as well: when symbolisation fails for a frame the
+    // text above says nothing useful, but these still resolve against main.pdb.
+    for (std::uint32_t frame = 0u; frame < frameCount; ++frame) {
+      gpg::Logf("CRASH   frame[%u] = 0x%08X", frame, stackFrames[frame]);
+    }
   }
 
   /**
