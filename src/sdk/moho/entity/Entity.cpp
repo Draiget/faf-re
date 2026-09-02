@@ -2853,6 +2853,20 @@ namespace moho
    * Initializes Entity base state for derived runtime lanes, applies caller
    * collision bucket flags, and finalizes ownership through `StandardInit`.
    */
+  /**
+   * @warning The null thread here is correct -- do not "fix" it. `Entity` really
+   * does derive from `CTask` (RTTI puts the base at mdisp=52, with its own
+   * vftable at 0xE27590), and `CTask`'s ctor pushes onto a thread only when it
+   * is given one. Both Entity ctors in the binary inline that ctor and store the
+   * vftable straight into `[this+0x34]` (0x006779E0 and 0x00677F40) without ever
+   * touching a thread's task stack, so entities are *not* scheduled at
+   * construction.
+   *
+   * That matters because nothing currently ticks any unit at all -- see the
+   * warning on `Unit::MotionTick`, which measured zero calls over twenty minutes
+   * of game time. The missing link is whatever pushes the entity onto a
+   * `CTaskThread` later, not this constructor.
+   */
   Entity::Entity(Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
     : CTask(nullptr, false)
   {
