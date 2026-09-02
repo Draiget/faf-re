@@ -7272,7 +7272,7 @@
    * Decrements ADX critical-section init count and clears lock-level lane when
    * refcount reaches zero.
    */
-  [[maybe_unused]] std::int32_t ADXCRS_Finish()
+  std::int32_t ADXCRS_Finish()
   {
     const std::int32_t result = --gAdxcrsInitCount;
     if (gAdxcrsInitCount == 0) {
