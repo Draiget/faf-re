@@ -242,6 +242,63 @@ namespace moho
     }
 
   public:
+    /**
+     * Grows or shrinks the live range to `count` bones, filling any new slots
+     * with `fillValue`.
+     *
+     * This is the array's own operation. It was previously performed from
+     * outside by `ResizePoseBoneStorage`, which reinterpreted the four header
+     * pointers below as a `gpg::fastvector_runtime_view` and handed them to
+     * `FastVectorRuntimeResizeFill` -- the `AsFastVectorRuntimeView` reach-in
+     * that CLAUDE.md RULE ONE prohibits. The mechanics are unchanged; they just
+     * live on the type that owns the pointers.
+     *
+     * The inline-storage rule is the one thing that makes this not a plain
+     * vector: `mOriginal` always points at `mInlineStorage`, so while
+     * `mBegin == mOriginal` the storage is the object's own single-slot window
+     * and must never be freed. On the first grow past it the binary stashes the
+     * outgoing capacity sentinel into that now-dead inline slot instead of
+     * deleting anything (see `InlineCapacityFromHeader_` / `SaveInlineCapacity_`
+     * on the `gpg` fastvectors, and the same branch in
+     * `FastVectorRuntimeReallocateInsert`).
+     */
+    void resize(const std::size_t count, const CAniPoseBone& fillValue)
+    {
+      const std::size_t currentSize = size();
+      if (count == currentSize) {
+        return;
+      }
+
+      if (count < currentSize) {
+        mEnd = mBegin + count;
+        return;
+      }
+
+      if (count > capacity()) {
+        CAniPoseBone* const grown = new CAniPoseBone[count];
+        for (std::size_t i = 0; i < currentSize; ++i) {
+          grown[i] = mBegin[i];
+        }
+
+        if (mBegin == mOriginal) {
+          // Inline window: never freed. The outgoing capacity goes into the
+          // slot the live range has just vacated.
+          *reinterpret_cast<CAniPoseBone**>(mOriginal) = mCapacity;
+        } else {
+          delete[] mBegin;
+        }
+
+        mBegin = grown;
+        mCapacity = grown + count;
+      }
+
+      mEnd = mBegin + currentSize;
+      for (std::size_t i = currentSize; i < count; ++i) {
+        *mEnd = fillValue;
+        ++mEnd;
+      }
+    }
+
     CAniPoseBone* mBegin;         // +0x00
     CAniPoseBone* mEnd;           // +0x04
     CAniPoseBone* mCapacity;      // +0x08
