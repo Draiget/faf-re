@@ -6,6 +6,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/time/Timer.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "Wm3Vector3.h"
@@ -219,13 +220,6 @@ namespace moho
     void** mEnd;            // +0x0C
   };
 
-  struct AudioMapStorage
-  {
-    void* mAllocatorCookie; // +0x00
-    void* mHead;            // +0x04
-    std::uint32_t mSize;    // +0x08
-  };
-
   struct Audio3DVector
   {
     float x; // +0x00
@@ -379,7 +373,21 @@ namespace moho
     msvc8::set<msvc8::string> mPausedCategoryNames; // +0x28
     IXACTEngine* mInstance;             // +0x34
     Audio3DListener mListener;          // +0x38
-    AudioMapStorage mMap2;              // +0x6C
+
+    /**
+     * Per-category volume overrides, defaulting a category to full volume
+     * (`1.0f`) the first time it is touched by either `AudioEngine::
+     * SetVolume` or `AudioEngine::GetVolume`.
+     *
+     * Real `msvc8::map<std::uint16_t, float>` instantiation (`rb_tree<
+     * rb_map_traits<std::uint16_t, float, Less>>`; key = XACT category id,
+     * mapped value = volume scalar -- see `Map.h`). Was previously modelled
+     * as a hand-rolled, hand-walked `AudioMapStorage`/`AudioCategoryVolumeNode`
+     * tree whose insert path had no rebalancing step at all -- see RbTree.h's
+     * `insert_hint`/`insert_at`/`insert_unique` citations for this
+     * instantiation and `.memory/project_handrolled_rbtrees_are_the_wall.md`.
+     */
+    msvc8::map<std::uint16_t, float> mCategoryVolumes; // +0x6C
     float mGlobalCategoryVolume;        // +0x78
     Audio3DDspSettings mSettings;       // +0x7C
     Audio3DEmitter mEmitter;            // +0xAC
@@ -390,7 +398,6 @@ namespace moho
   static_assert(sizeof(IXACTSoundBank) == sizeof(void*), "IXACTSoundBank interface size must be pointer-sized");
   static_assert(sizeof(IXACTEngine) == sizeof(void*), "IXACTEngine interface size must be pointer-sized");
   static_assert(sizeof(AudioPointerVectorStorage) == 0x10, "AudioPointerVectorStorage size must be 0x10");
-  static_assert(sizeof(AudioMapStorage) == 0x0C, "AudioMapStorage size must be 0x0C");
   static_assert(sizeof(Audio3DVector) == 0x0C, "Audio3DVector size must be 0x0C");
   static_assert(sizeof(Audio3DListener) == 0x34, "Audio3DListener size must be 0x34");
   static_assert(sizeof(Audio3DDspSettings) == 0x30, "Audio3DDspSettings size must be 0x30");
@@ -433,7 +440,10 @@ namespace moho
   static_assert(offsetof(AudioEngineImpl, mBanks) == 0x08, "AudioEngineImpl::mBanks offset must be 0x08");
   static_assert(offsetof(AudioEngineImpl, mInstance) == 0x34, "AudioEngineImpl::mInstance offset must be 0x34");
   static_assert(offsetof(AudioEngineImpl, mListener) == 0x38, "AudioEngineImpl::mListener offset must be 0x38");
-  static_assert(offsetof(AudioEngineImpl, mMap2) == 0x6C, "AudioEngineImpl::mMap2 offset must be 0x6C");
+  static_assert(
+    offsetof(AudioEngineImpl, mCategoryVolumes) == 0x6C,
+    "AudioEngineImpl::mCategoryVolumes offset must be 0x6C"
+  );
   static_assert(
     offsetof(AudioEngineImpl, mGlobalCategoryVolume) == 0x78,
     "AudioEngineImpl::mGlobalCategoryVolume offset must be 0x78"
@@ -570,7 +580,11 @@ namespace moho
      * gpg::StrArg
      *
      * What it does:
-     * Returns effective volume scalar for a category.
+     * Returns effective volume scalar for a category. Not a pure read: the
+     * real binary reaches the same find-or-insert helper `SetVolume` uses, so
+     * the first query for a category persists a defaulted `1.0f` entry into
+     * `AudioEngineImpl::mCategoryVolumes` even when nothing was ever
+     * explicitly set.
      */
     float GetVolume(gpg::StrArg category);
 
