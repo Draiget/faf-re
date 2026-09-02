@@ -366,6 +366,34 @@ namespace
    * What it does:
    * Rebinds one runtime lane to the base `RangeExtractor` vtable tag.
    */
+  /**
+   * The sibling emissions of this same vptr fixup, one per class whose
+   * constructor or destructor writes a vtable into the lane. They were
+   * recovered as seventeen separate free functions, every one of them
+   * referenced by nothing (several were literally `return LaneA(view);`).
+   *
+   * No source line produces these: MSVC writes the vptr as part of ctor/dtor
+   * codegen, so there is nothing to call and nothing to invent a caller for.
+   * The addresses are kept here so they stay traceable.
+   *
+   * Address: 0x007EC380  base, void-adapter shape
+   * Address: 0x007EC580  base, LaneD secondary
+   * Address: 0x007EC860  base
+   * Address: 0x007ECBF0  base
+   * Address: 0x007EDBD0  base
+   * Address: 0x007EDBE0  base
+   * Address: 0x007EDBF0  base
+   * Address: 0x007EDC00  base
+   * Address: 0x007EDC10  base
+   * Address: 0x007EDC20  base
+   * Address: 0x007EC870  Moho::CountermeasureExtractor
+   * Address: 0x007EDAB0  Moho::MiscellaneousExtractor
+   * Address: 0x007EDAC0  Moho::IntelExtractor
+   * Address: 0x007EDAD0  Moho::RadarExtractor
+   * Address: 0x007EDAE0  Moho::SonarExtractor
+   * Address: 0x007EDAF0  Moho::OmniExtractor
+   * Address: 0x007EDB00  Moho::CounterIntelExtractor
+   */
   [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneA(
     ExtractorVtableOnlyRuntimeView* const runtimeView
   ) noexcept
@@ -374,33 +402,7 @@ namespace
     return RebindExtractorVtable(runtimeView, &sRangeExtractorVtableTag);
   }
 
-  /**
-   * Address: 0x007EC380 (FUN_007EC380)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the base `RangeExtractor` vtable tag
-   * through a void-return adapter shape.
-   */
-  [[maybe_unused]] void RebindRangeExtractorBaseVtableVoidAdapter(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    (void)RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EC580 (FUN_007EC580)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the base `RangeExtractor` vtable tag through
-   * an explicit return-value adapter lane.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneD_Secondary(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
   /**
    * Address: 0x007EC5A0 (FUN_007EC5A0)
@@ -422,215 +424,20 @@ namespace
     return initialized;
   }
 
-  /**
-   * Address: 0x007EC860 (FUN_007EC860)
-   *
-   * What it does:
-   * Secondary lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneB(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EC870 (FUN_007EC870)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `CountermeasureExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindCountermeasureExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sCountermeasureExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sCountermeasureExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007ECBF0 (FUN_007ECBF0)
-   *
-   * What it does:
-   * Third lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneC(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDAB0 (FUN_007EDAB0)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `MiscellaneousExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindMiscellaneousExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sMiscellaneousExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sMiscellaneousExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDAC0 (FUN_007EDAC0)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `IntelExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindIntelExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sIntelExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sIntelExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDAD0 (FUN_007EDAD0)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `RadarExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRadarExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sRadarExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sRadarExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDAE0 (FUN_007EDAE0)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `SonarExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindSonarExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sSonarExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sSonarExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDAF0 (FUN_007EDAF0)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `OmniExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindOmniExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sOmniExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sOmniExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDB00 (FUN_007EDB00)
-   *
-   * What it does:
-   * Rebinds one runtime lane to the `CounterIntelExtractor` vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindCounterIntelExtractorVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sCounterIntelExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sCounterIntelExtractorVtableTag);
-  }
 
-  /**
-   * Address: 0x007EDBD0 (FUN_007EDBD0)
-   *
-   * What it does:
-   * Fourth lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneD(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDBE0 (FUN_007EDBE0)
-   *
-   * What it does:
-   * Fifth lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneE(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDBF0 (FUN_007EDBF0)
-   *
-   * What it does:
-   * Sixth lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneF(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDC00 (FUN_007EDC00)
-   *
-   * What it does:
-   * Seventh lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneG(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDC10 (FUN_007EDC10)
-   *
-   * What it does:
-   * Eighth lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneH(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
-  /**
-   * Address: 0x007EDC20 (FUN_007EDC20)
-   *
-   * What it does:
-   * Ninth lane that rebinds one runtime lane to the base `RangeExtractor`
-   * vtable tag.
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneI(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    return RebindRangeExtractorBaseVtableLaneA(runtimeView);
-  }
 
   /**
    * Address: 0x007F1CB0 (FUN_007F1CB0)
