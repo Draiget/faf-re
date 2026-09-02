@@ -3175,6 +3175,18 @@ namespace moho
     mVizToNeutrals = 2;
 
     RegisterEntityInDbIfMissing(sim, this);
+
+    // 0x00678477: this is what makes an entity run at all. The binary pushes
+    // the CTask subobject (`lea esi, [ebp+34h]`, matching RTTI's mdisp=52) onto
+    // a fresh thread on `[this+0x148] + 0x930` -- `SimulationRef->mTaskStageA`,
+    // pinned by `mCurCommandSource` ending at 0x092C -- with `own = false`
+    // (`push 0`), between the entity-DB registration above and the collision
+    // revert below. Without it nothing ever calls Entity::Execute, so
+    // TaskTick/MotionTick never run and no unit is simulated.
+    if (sim != nullptr) {
+      (void)CTask::CreateTaskThread(static_cast<CTask*>(this), &sim->mTaskStageA, false);
+    }
+
     RefreshCollisionShapeFromBlueprint();
 
     if (SimulationRef) {
