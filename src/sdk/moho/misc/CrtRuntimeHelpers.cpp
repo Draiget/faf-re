@@ -6798,6 +6798,52 @@ extern "C" int __cdecl _fprintf_p(std::FILE* const stream, const char* const for
 }
 
 /**
+ * Address: 0x00A88490 (FUN_00A88490, _vfprintf_s)
+ *
+ * IDA signature:
+ * FILE *callcnv_F3 sub_A88490@<eax>(FILE *a1, const char *a2, va_list a3);
+ *
+ * What it does:
+ * Secure CRT narrow-character formatted output to a stream from an
+ * existing `va_list`, current-locale only (no locale parameter at all).
+ * Thin forward into `RuntimeDispatchLockedFormattedOutput` with the
+ * `_output_s_l` callback and a null locale, mirroring `vfprintf`'s
+ * null-locale shape but through the secure callback.
+ */
+extern "C" int __cdecl _vfprintf_s(std::FILE* const stream, const char* const format, va_list arguments)
+{
+  return RuntimeDispatchLockedFormattedOutput(_output_s_l, stream, format, nullptr, arguments);
+}
+
+/**
+ * Address: 0x00A48EF0 (FUN_00A48EF0, fprintf_s)
+ *
+ * IDA signature:
+ * int callcnv_F2 sub_A48EF0@<eax>(FILE *a1, const char *a2, ...);
+ *
+ * What it does:
+ * C11-standard-named secure CRT narrow-character formatted output to a
+ * stream (the non-underscore-prefixed `fprintf_s`, a separate real entry
+ * point from the legacy `_fprintf_s` recovered above). Rejects a null
+ * stream or format by returning -1 directly, without routing through
+ * `_invalid_parameter` the way the rest of this family does; otherwise
+ * builds a `va_list` over its trailing arguments and forwards to
+ * `_vfprintf_s`.
+ */
+extern "C" int __cdecl fprintf_s(std::FILE* const stream, const char* const format, ...)
+{
+  if (stream == nullptr || format == nullptr) {
+    return -1;
+  }
+
+  va_list arguments;
+  va_start(arguments, format);
+  const int result = _vfprintf_s(stream, format, arguments);
+  va_end(arguments);
+  return result;
+}
+
+/**
  * Address: 0x00A85BC2 (FUN_00A85BC2, fprintf)
  *
  * IDA signature:
