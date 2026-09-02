@@ -6097,23 +6097,10 @@ namespace
     return ADXB_GetNumChan(AsAdxsjdRuntimeView(sjdHandle)->adxbHandle);
   }
 
-  std::int32_t SetAdxrnaOutputPan(const std::int32_t rnaHandle, const std::int32_t channelIndex, const std::int32_t panLevel)
-  {
-    auto* const rnaRuntime = AsAdxrnaRuntimeView(rnaHandle);
-    if (rnaRuntime == nullptr) {
-      return ADXERR_CallErrFunc1_(kAdxrnaIllegalParameterMessage);
-    }
-
-    if (channelIndex < 0 || channelIndex >= static_cast<std::int32_t>(rnaRuntime->channelCount)) {
-      return 0;
-    }
-
-    const std::int32_t clampedPan = ClampAdxrnaPanLevel(panLevel);
-    const std::int32_t result =
-      rnaRuntime->outputRuntime->dispatchTable->setOutputPan(rnaRuntime->outputRuntime, channelIndex, clampedPan);
-    rnaRuntime->outputPanByChannel[channelIndex] = clampedPan;
-    return result;
-  }
+  // `SetAdxrnaOutputPan` used to live here as an unaddressed duplicate of
+  // `adxrna_SetOutPanCore` (src/sdk/cri/sofdec/SofdecAdxPlatformRuntime.cpp,
+  // FUN_00B15A80). Folded away 2026-09-02; `adxt_SetOutPan` now calls the
+  // addressed core function directly.
 
   /**
    * Transfer sink the MWL/RNA lane pushes decoded PCM runs into.

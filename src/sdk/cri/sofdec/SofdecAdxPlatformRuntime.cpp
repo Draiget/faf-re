@@ -8318,21 +8318,16 @@
    *
    * What it does:
    * Applies one channel output-pan lane with ADXRNA bounds/clamp semantics.
-   * This is the correctly-addressed recovery of this logic. The real public
-   * thunk for this body lives at 0x00B17D00 (FUN_00B17D00, _ADXRNA_SetOutPan)
-   * and is still unrecovered.
+   * Internal core reached through the `ADXRNA_SetOutPan` thunk at
+   * 0x00B17D00 (FUN_00B17D00, _ADXRNA_SetOutPan).
    *
-   * KNOWN DUPLICATE (found 2026-09-02, not yet resolved): the real caller
-   * of this logic, `adxt_SetOutPan` (0x00B0D9F0,
-   * src/sdk/cri/sofdec/SofdecAdxCodecRuntime.cpp), currently calls a
-   * second, unaddressed reimplementation named `SetAdxrnaOutputPan`
-   * (src/sdk/cri/sofdec/SofdecAdxDeclarationsRuntime.cpp) instead of this
-   * function. That helper has no `Address:` citation of its own and should
-   * be folded into this one (redirect `adxt_SetOutPan` to call this
-   * function directly, delete the duplicate, then add the missing
-   * 0x00B17D00 public thunk) rather than adding a third variant here.
+   * This is the correctly-addressed recovery of this logic (was a
+   * duplicate until 2026-09-02: `adxt_SetOutPan`, its real caller, used to
+   * call a second, unaddressed reimplementation named `SetAdxrnaOutputPan`
+   * in SofdecAdxDeclarationsRuntime.cpp instead. That duplicate has been
+   * folded away - `adxt_SetOutPan` now calls this function directly).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetOutPan(
+  std::int32_t adxrna_SetOutPanCore(
     const std::int32_t rnaHandle,
     const std::int32_t channelIndex,
     const std::int32_t panLevel
@@ -8431,7 +8426,7 @@
    * Stores ADXRNA transpose octave/cent lanes and recomputes effective sample
    * frequency.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetTransposeWords(
+  std::int32_t ADXRNA_SetTransposeWords(
     const std::int32_t rnaHandle,
     const std::int32_t transposeOctaves,
     const std::int32_t transposeCents
@@ -8813,6 +8808,21 @@
   std::int32_t ADXRNA_SetOutVol(const std::int32_t rnaHandle, const std::int32_t volumeLevel)
   {
     return adxrna_SetOutVolCore(rnaHandle, volumeLevel);
+  }
+
+  /**
+   * Address: 0x00B17D00 (FUN_00B17D00, _ADXRNA_SetOutPan)
+   *
+   * What it does:
+   * Public ADXRNA output-pan setter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_SetOutPan(
+    const std::int32_t rnaHandle,
+    const std::int32_t channelIndex,
+    const std::int32_t panLevel
+  )
+  {
+    return adxrna_SetOutPanCore(rnaHandle, channelIndex, panLevel);
   }
 
   /**

@@ -4447,7 +4447,7 @@
       return ADXERR_CallErrFunc1_(kAdxtSetOutPanLaneRangeMessage);
     }
 
-    return SetAdxrnaOutputPan(runtime->rnaHandle, laneIndex, effectivePan);
+    return adxrna_SetOutPanCore(runtime->rnaHandle, laneIndex, effectivePan);
   }
 
   /**
