@@ -152,6 +152,13 @@ namespace moho
     sDeviceLock = false;
   }
 
+  /**
+   * Address: 0x00C08D30 (FUN_00C08D30, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_PrimaryAdapter`.
+   */
   void cleanup_CConFunc_SC_PrimaryAdapter()
   {
     CleanupStartupConCommand(gCConFunc_SC_PrimaryAdapter);
@@ -195,6 +202,13 @@ namespace moho
     sDeviceLock = false;
   }
 
+  /**
+   * Address: 0x00C08DF0 (FUN_00C08DF0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_VerticalSync`.
+   */
   void cleanup_CConFunc_SC_VerticalSync()
   {
     CleanupStartupConCommand(gCConFunc_SC_VerticalSync);
@@ -252,6 +266,13 @@ namespace moho
     ::ClipCursor(&windowRect);
   }
 
+  /**
+   * Address: 0x00C08EE0 (FUN_00C08EE0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_ToggleCursorClip`.
+   */
   void cleanup_CConFunc_SC_ToggleCursorClip()
   {
     CleanupStartupConCommand(gCConFunc_SC_ToggleCursorClip);
@@ -286,6 +307,13 @@ namespace moho
     SetupSecondaryAdapterSettings(adapterNotCommandLineOverridden);
   }
 
+  /**
+   * Address: 0x00C08D60 (FUN_00C08D60, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_SecondaryAdapter`.
+   */
   void cleanup_CConFunc_SC_SecondaryAdapter()
   {
     CleanupStartupConCommand(gCConFunc_SC_SecondaryAdapter);
