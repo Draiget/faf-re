@@ -80,8 +80,34 @@ namespace moho
     ShaderVar shadowsEnabled;
     ShaderVar shadowMatrix;
     ShaderVar shadowTexture;
+
+    /**
+     * Address: 0x00BE26D0 (FUN_00BE26D0, register_ShaderVarTerrainShadowTexture_1)
+     *
+     * What it does:
+     * A second, independently-bound `ShaderVar` for the exact same HLSL name
+     * ("ShadowTexture") and effect scope ("terrain") as `shadowTexture`
+     * above. The two are genuinely distinct binary globals -- this thunk's
+     * target storage differs from `shadowTexture`'s (0x00BE2020's target)
+     * -- so this is a real duplicate registration in the original source,
+     * not an ICF twin: two separate C++ `ShaderVar` instances that both
+     * happen to bind the same named effect variable.
+     */
+    ShaderVar shadowTexture2;
+
     ShaderVar shadowSize;
     ShaderVar noiseTexture;
+
+    /**
+     * Address: 0x00BE2710 (FUN_00BE2710, register_ShaderVarTerrainVizTexture)
+     *
+     * What it does:
+     * Registers the `VizTexture` terrain effect variable (visualization
+     * overlay texture), installed alongside the rest of this lane's
+     * shadow/decal shader-vars.
+     */
+    ShaderVar vizTexture;
+
     ShaderVar decalMaskTexture;
     ShaderVar biCubicLookup;
     ShaderVar overlayTexture;
