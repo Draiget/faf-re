@@ -39,14 +39,9 @@ namespace moho
 // the paired addresses in EntityCollisionUpdater.h have always been.
 // Recovering that template is the follow-up.
 
-// ===== IWldSessionLoader (defined in CWldSessionLoaderImpl.h as base) =====
-bool IWldSessionLoader::IsLoaded()                       { return false; }
-SWldGameData* IWldSessionLoader::LoadGameData(SWldGameData* gd) { return gd; }
-SWldScenarioInfo* IWldSessionLoader::CreateScenarioInfo(const char*, msvc8::string*) { return nullptr; }
-SWldScenarioInfo* IWldSessionLoader::GetScenarioInfo(const char*, msvc8::string*, bool) { return nullptr; }
-void IWldSessionLoader::Finalize() {}
-void IWldSessionLoader::SetCreated() {}
-void IWldSessionLoader::Update() {}
+// IWldSessionLoader had all seven of its virtuals stubbed here. They are
+// pure in the binary: the interface vftable at 0x00E49FA4 points all 7 slots
+// at _purecall (0x00A82547). The declarations are now `= 0`.
 
 // ===== ICommandSink =====
 void ICommandSink::AdvanceBeat(int) {}
