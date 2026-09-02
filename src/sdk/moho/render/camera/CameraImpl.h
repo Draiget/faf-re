@@ -170,8 +170,14 @@ namespace moho
   {
     Wm3::Vec3f mCenter{};         // +0x00
     float mMaxRange = 0.0f;       // +0x0C
-    float mMinMagnitude = 0.0f;   // +0x10
-    float mMaxMagnitude = 0.0f;   // +0x14
+    /// Shake magnitude at the epicentre. Named `mMinMagnitude` until the
+    /// falloff at 0x007A67C0 was read: `(field@0x14 - field@0x10) * (dist /
+    /// range) + field@0x10`, so this field is what a listener standing on the
+    /// epicentre gets and is the LARGER of the two in normal use. The
+    /// `ShakeCamera` Lua binding passes its `maxIntensity` argument here.
+    float mMagnitudeAtCenter = 0.0f;     // +0x10
+    /// Shake magnitude out at `mMaxRange`; the binding's `minIntensity`.
+    float mMagnitudeAtMaxRange = 0.0f;   // +0x14
     float mDuration = 0.0f;       // +0x18
   };
 
@@ -179,12 +185,12 @@ namespace moho
   static_assert(offsetof(SCamShakeParams, mCenter) == 0x00, "SCamShakeParams::mCenter offset must be 0x00");
   static_assert(offsetof(SCamShakeParams, mMaxRange) == 0x0C, "SCamShakeParams::mMaxRange offset must be 0x0C");
   static_assert(
-    offsetof(SCamShakeParams, mMinMagnitude) == 0x10,
-    "SCamShakeParams::mMinMagnitude offset must be 0x10"
+    offsetof(SCamShakeParams, mMagnitudeAtCenter) == 0x10,
+    "SCamShakeParams::mMagnitudeAtCenter offset must be 0x10"
   );
   static_assert(
-    offsetof(SCamShakeParams, mMaxMagnitude) == 0x14,
-    "SCamShakeParams::mMaxMagnitude offset must be 0x14"
+    offsetof(SCamShakeParams, mMagnitudeAtMaxRange) == 0x14,
+    "SCamShakeParams::mMagnitudeAtMaxRange offset must be 0x14"
   );
   static_assert(offsetof(SCamShakeParams, mDuration) == 0x18, "SCamShakeParams::mDuration offset must be 0x18");
 

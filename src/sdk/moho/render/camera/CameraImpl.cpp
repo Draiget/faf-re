@@ -172,8 +172,8 @@ namespace
   {
     Wm3::Vec3f mCenter{};                  // +0x00
     float mMaxRange = 0.0f;                // +0x0C
-    float mMinMagnitude = 0.0f;            // +0x10
-    float mMaxMagnitude = 0.0f;            // +0x14
+    float mMagnitudeAtCenter = 0.0f;            // +0x10
+    float mMagnitudeAtMaxRange = 0.0f;            // +0x14
     float mDuration = 0.0f;                // +0x18
     float mElapsed = 0.0f;                 // +0x1C
     float mScale = 0.0f;                   // +0x20
@@ -186,12 +186,12 @@ namespace
     "CameraShakeParamsView::mMaxRange offset must be 0x0C"
   );
   static_assert(
-    offsetof(CameraShakeParamsView, mMinMagnitude) == 0x10,
-    "CameraShakeParamsView::mMinMagnitude offset must be 0x10"
+    offsetof(CameraShakeParamsView, mMagnitudeAtCenter) == 0x10,
+    "CameraShakeParamsView::mMagnitudeAtCenter offset must be 0x10"
   );
   static_assert(
-    offsetof(CameraShakeParamsView, mMaxMagnitude) == 0x14,
-    "CameraShakeParamsView::mMaxMagnitude offset must be 0x14"
+    offsetof(CameraShakeParamsView, mMagnitudeAtMaxRange) == 0x14,
+    "CameraShakeParamsView::mMagnitudeAtMaxRange offset must be 0x14"
   );
   static_assert(
     offsetof(CameraShakeParamsView, mDuration) == 0x18,
@@ -1162,7 +1162,7 @@ namespace
 
     const float magnitude =
       (1.0f - (shakeParams->mElapsed / shakeParams->mDuration)) *
-      (((shakeParams->mMaxMagnitude - shakeParams->mMinMagnitude) * distanceFactor) + shakeParams->mMinMagnitude);
+      (((shakeParams->mMagnitudeAtMaxRange - shakeParams->mMagnitudeAtCenter) * distanceFactor) + shakeParams->mMagnitudeAtCenter);
     const float radialAmount =
       static_cast<float>(moho::MathGlobalRandomUnitScaled(magnitude)) * shakeParams->mScale * 0.5f;
     const float tangentialAmount = static_cast<float>(moho::MathGlobalRandomRange(-magnitude, magnitude)) * 0.25f;
@@ -1601,8 +1601,8 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   // (+0x448, byte-verified `a7` = 1.0 in .rdata).
   runtime->mCamShakeParams.mCenter = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
   runtime->mCamShakeParams.mMaxRange = 0.0f;
-  runtime->mCamShakeParams.mMinMagnitude = 0.0f;
-  runtime->mCamShakeParams.mMaxMagnitude = 0.0f;
+  runtime->mCamShakeParams.mMagnitudeAtCenter = 0.0f;
+  runtime->mCamShakeParams.mMagnitudeAtMaxRange = 0.0f;
   runtime->mCamShakeParams.mDuration = 0.0f;
   runtime->mCamShakeParams.mElapsed = 0.0f;
   runtime->mCamShakeParams.mScale = 1.0f;
@@ -2252,15 +2252,15 @@ void moho::CameraImpl::CameraShake(const SCamShakeParams& shakeParams)
 
   if (
     runtime->mCamShakeParams.mElapsed < runtime->mCamShakeParams.mDuration &&
-    shakeParams.mMinMagnitude <= runtime->mCamShakeParams.mMinMagnitude
+    shakeParams.mMagnitudeAtCenter <= runtime->mCamShakeParams.mMagnitudeAtCenter
   ) {
     return;
   }
 
   runtime->mCamShakeParams.mCenter = shakeParams.mCenter;
   runtime->mCamShakeParams.mMaxRange = shakeParams.mMaxRange;
-  runtime->mCamShakeParams.mMinMagnitude = shakeParams.mMinMagnitude;
-  runtime->mCamShakeParams.mMaxMagnitude = shakeParams.mMaxMagnitude;
+  runtime->mCamShakeParams.mMagnitudeAtCenter = shakeParams.mMagnitudeAtCenter;
+  runtime->mCamShakeParams.mMagnitudeAtMaxRange = shakeParams.mMagnitudeAtMaxRange;
   runtime->mCamShakeParams.mDuration = shakeParams.mDuration;
   runtime->mCamShakeParams.mElapsed = 0.0f;
 }

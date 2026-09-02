@@ -5484,8 +5484,8 @@ namespace moho
       moho::SCamShakeParams request{};
       request.mCenter = entity->Position;
       request.mMaxRange = radius;
-      request.mMinMagnitude = maxIntensity;
-      request.mMaxMagnitude = minIntensity;
+      request.mMagnitudeAtCenter = maxIntensity;
+      request.mMagnitudeAtMaxRange = minIntensity;
       request.mDuration = durationSeconds;
       func_ShakeCamera(sim->mSyncCamShake, request);
     }
