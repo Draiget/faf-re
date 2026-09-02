@@ -8441,6 +8441,18 @@ namespace
 namespace
 {
   constexpr const char* kConsoleStartupUIRenProectileTrailWidthDescription = "The half width, in pixels, of the projectile trail";
+  // Unlike every other description string in this block, the two raw string
+  // pointers this convar's registrar (0x00BE5BF0) carries in its own .data
+  // image resolve into an unbacked/zero-filled region of .rdata rather than
+  // real string literals -- confirmed via direct PE byte reads that the same
+  // technique resolves correctly for every neighboring convar (e.g.
+  // UI_RenProjectileGlow at 0x00BE5E20). The identifier "UI_RenProjectileArcs"
+  // itself is certain (matches the CConCommand::mHandlerOrValue target
+  // symbol and every sibling convar's name==identifier precedent); this
+  // description text is inferred from the toggle's documented behavior
+  // ("Gates the whole arc pass", ProjectileArcRenderer.h) and this file's own
+  // "toggle X on/off" phrasing convention, not byte-verified.
+  constexpr const char* kConsoleStartupUIRenProjectileArcsDescription = "toggle projectile trail arcs on/off";
   constexpr const char* kConsoleStartupUIRenProjectileArcsSampleIntervalDescription = "How often the position is updated for the projectile trail";
   constexpr const char* kConsoleStartupUIRenProjectileGlowDescription = "Toggle projectile icon glow";
   constexpr const char* kConsoleStartupUIRenProjectileGlowMaxDescription = "Maximum glow alpha on projecile icon";
@@ -8462,6 +8474,7 @@ namespace
   constexpr const char* kConsoleStartupUiCurveSegmentsDescription = "How many segments to subdivide curves into";
   constexpr const char* kConsoleStartupUiCurveSmoothnessDescription = "How big to make curves when drawing command previews";
   constexpr const char* kConsoleStartupUiCustomNameColorDescription = "Color of the custom name display";
+  constexpr const char* kConsoleStartupUiCustomNameFontDescription = "Font family name of the custom name display";
   constexpr const char* kConsoleStartupUiCustomNameFontSizeDescription = "Point size of the custom name display";
   constexpr const char* kConsoleStartupUiDebugAltClickDescription = "Enable ALT+Click debug command to switch armies";
   constexpr const char* kConsoleStartupUiDisableCursorFixingDescription = "Allows you to toggle the cursor fixing functionality that is used for the mouse-controlled camera spinning/scrolling";
@@ -8519,6 +8532,7 @@ float moho::ui_fuelbarHeight = 0.25f;
 namespace moho
 {
   extern float UI_RenProectileTrailWidth;
+  extern bool UI_RenProjectileArcs;
   extern int UI_RenProjectileArcsSampleInterval;
   extern bool UI_RenProjectileGlow;
   extern float UI_RenProjectileGlowMax;
@@ -8538,6 +8552,7 @@ namespace moho
   extern int ui_CurveSegments;
   extern float ui_CurveSmoothness;
   extern unsigned int ui_CustomNameColor;
+  extern msvc8::string ui_CustomNameFont;
   extern int ui_CustomNameFontSize;
   extern bool ui_DebugAltClick;
   extern bool ui_DisableCursorFixing;
@@ -8588,6 +8603,11 @@ namespace moho
     "UI_RenProectileTrailWidth",
     kConsoleStartupUIRenProectileTrailWidthDescription,
     &moho::UI_RenProectileTrailWidth
+  );
+  TConVar<bool> gTConVar_UI_RenProjectileArcs(
+    "UI_RenProjectileArcs",
+    kConsoleStartupUIRenProjectileArcsDescription,
+    &moho::UI_RenProjectileArcs
   );
   TConVar<int> gTConVar_UI_RenProjectileArcsSampleInterval(
     "UI_RenProjectileArcsSampleInterval",
@@ -8693,6 +8713,11 @@ namespace moho
     "ui_CustomNameColor",
     kConsoleStartupUiCustomNameColorDescription,
     &moho::ui_CustomNameColor
+  );
+  TConVar<msvc8::string> gTConVar_ui_CustomNameFont(
+    "ui_CutsomNameFont",
+    kConsoleStartupUiCustomNameFontDescription,
+    &moho::ui_CustomNameFont
   );
   TConVar<int> gTConVar_ui_CustomNameFontSize(
     "ui_CustomNameFontSize",
@@ -8945,6 +8970,33 @@ namespace moho
   void register_TConVar_UI_RenProectileTrailWidth()
   {
     RegisterStartupConVar(gTConVar_UI_RenProectileTrailWidth, &cleanup_TConVar_UI_RenProectileTrailWidth);
+  }
+
+  /**
+   * Address: 0x00C07190 (FUN_00C07190, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `UI_RenProjectileArcs`.
+   */
+  void cleanup_TConVar_UI_RenProjectileArcs()
+  {
+    CleanupStartupConCommand(gTConVar_UI_RenProjectileArcs);
+  }
+
+  /**
+   * Address: 0x00BE5BF0 (FUN_00BE5BF0, register_SimConVar_UI_RenProjectileArcs)
+   *
+   * What it does:
+   * Registers startup convar for `UI_RenProjectileArcs`, gating
+   * `CRenderWorldView::Render`'s whole projectile-arc pass. The registrar
+   * constructs a `TConVar<bool>` (vtable `??_7?$TConVar@_N@Moho@@6B@`) over
+   * this storage -- the pre-existing `moho::UI_RenProjectileArcs` global was
+   * mistyped `std::int32_t` (fixed alongside this recovery to `bool`, per
+   * `ProjectileArcRenderer.h`/`.cpp`).
+   */
+  void register_TConVar_UI_RenProjectileArcs()
+  {
+    RegisterStartupConVar(gTConVar_UI_RenProjectileArcs, &cleanup_TConVar_UI_RenProjectileArcs);
   }
 
   /**
@@ -9407,6 +9459,32 @@ namespace moho
   void register_TConVar_ui_CustomNameColor()
   {
     RegisterStartupConVar(gTConVar_ui_CustomNameColor, &cleanup_TConVar_ui_CustomNameColor);
+  }
+
+  /**
+   * Address: 0x00C06E10 (FUN_00C06E10, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ui_CustomNameFont`.
+   */
+  void cleanup_TConVar_ui_CustomNameFont()
+  {
+    CleanupStartupConCommand(gTConVar_ui_CustomNameFont);
+  }
+
+  /**
+   * Address: 0x00BE5740 (FUN_00BE5740, register_ui_CutsomNameFont_ConVarDef)
+   *
+   * What it does:
+   * Registers startup convar for `ui_CustomNameFont`. The registered console
+   * name is byte-verified from the binary's own `.rdata` as
+   * `"ui_CutsomNameFont"` -- the transposition typo is genuinely shipped in
+   * the binary, not a transcription error here, so it is preserved exactly
+   * (matching the underlying `ui_CutsomNameFont_ConVarDef` IDA export name).
+   */
+  void register_TConVar_ui_CustomNameFont()
+  {
+    RegisterStartupConVar(gTConVar_ui_CustomNameFont, &cleanup_TConVar_ui_CustomNameFont);
   }
 
   /**
@@ -10430,6 +10508,7 @@ namespace
     ConsoleStartupRegistrationsUiTuning()
     {
       moho::register_TConVar_UI_RenProectileTrailWidth();
+      moho::register_TConVar_UI_RenProjectileArcs();
       moho::register_TConVar_UI_RenProjectileArcsSampleInterval();
       moho::register_TConVar_UI_RenProjectileGlow();
       moho::register_TConVar_UI_RenProjectileGlowMax();
@@ -10451,6 +10530,7 @@ namespace
       moho::register_TConVar_ui_CurveSegments();
       moho::register_TConVar_ui_CurveSmoothness();
       moho::register_TConVar_ui_CustomNameColor();
+      moho::register_TConVar_ui_CustomNameFont();
       moho::register_TConVar_ui_CustomNameFontSize();
       moho::register_TConVar_ui_DebugAltClick();
       moho::register_TConVar_ui_DisableCursorFixing();

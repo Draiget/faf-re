@@ -42,8 +42,8 @@ namespace
 
 namespace moho
 {
-  /** Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3HA) - tested by CRenderWorldView::Render. */
-  std::int32_t UI_RenProjectileArcs = 0;
+  /** Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3_NA) - tested by CRenderWorldView::Render. */
+  bool UI_RenProjectileArcs = false;
 
   /** Address: 0x00F57B50 (?UI_RenProjectileArcsSampleInterval@Moho@@3HA). */
   std::int32_t UI_RenProjectileArcsSampleInterval = 0;
