@@ -1671,6 +1671,18 @@ namespace msvc8
           * `{begin, end, capacityEnd}` triple from outside the container. The
           * source line is a vector copy, which is this constructor.
           */
+        /**
+         * Address: 0x005267A0 (FUN_005267A0, `msvc8::vector<float>` -- the
+         * occupancy-rect lane on `RUnitBlueprint`). Nulls the destination's
+         * three lanes (it is raw memory, so there is nothing to free), checks
+         * `max_size()`, allocates exactly the source's element count and
+         * copies `[begin, end)`. That is this constructor, not an assignment.
+         *
+         * It had been transcribed into
+         * `moho/resource/blueprints/RUnitBlueprint.cpp` as a `CopyOccupyRects`
+         * free function driving two `AsVectorRuntimeView` reach-ins, with no
+         * call site anywhere in the tree.
+         */
         vector(const vector& other) : vector() {
             const std::size_t n = other.size();
             if (n) {
@@ -3168,6 +3180,25 @@ namespace msvc8
          * `msvc8::vector<T>` API surface — that is the source-level invocation
          * the linker uses to keep the symbol shape in the recovered binary.
          */
+        /**
+         * Drops the storage lanes WITHOUT destroying elements or freeing the
+         * block -- the container stops owning what it points at.
+         *
+         * This is not a `_Tidy()` and must not become one. `RUnitBlueprint`'s
+         * constructor performs exactly this on `Weapons.WeaponBlueprints`
+         * (0x0051E9xx): the binary writes three nulls and moves on, because
+         * ownership has already passed elsewhere. Assigning an empty vector
+         * there would add a free the binary never performs.
+         *
+         * Named here so the operation has a verb, instead of call sites
+         * reaching through `AsVectorRuntimeView` to write the lanes by hand.
+         */
+        void release_storage_without_free() noexcept {
+            first_ = nullptr;
+            last_ = nullptr;
+            end_ = nullptr;
+        }
+
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
             // line: when a slot is already spare it fills in place, otherwise

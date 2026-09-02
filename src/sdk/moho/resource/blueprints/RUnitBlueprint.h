@@ -883,17 +883,6 @@ namespace moho
     [[nodiscard]] gpg::Rect2f GetSkirtRect(const SCoordsVec2& position) const;
   };
 
-  /**
-   * Address: 0x005267A0 (FUN_005267A0, Moho::CopyOccupyRects)
-   *
-   * What it does:
-   * Rebuilds destination `vector<float>` runtime lanes from source occupancy
-   * data and copies the full `[begin,end)` float range.
-   */
-  [[nodiscard]] msvc8::vector<float>* CopyOccupyRects(
-    const msvc8::vector<float>& source,
-    msvc8::vector<float>& destination
-  );
 
   static_assert(
     offsetof(RUnitBlueprintGeneral, UpgradesTo) == 0x08, "RUnitBlueprintGeneral::UpgradesTo offset must be 0x08"
