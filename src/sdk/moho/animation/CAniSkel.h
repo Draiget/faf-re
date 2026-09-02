@@ -142,6 +142,21 @@ namespace moho
      */
     void UpdateBoneBounds();
 
+    /**
+     * Address: 0x0054A840 (FUN_0054A840)
+     *
+     * IDA signature:
+     * int* __userpurge sub_54A840@<eax>(
+     *   CAniSkel* skeleton@<ebx>, msvc8::vector<int>* outIndices, int parentBoneIndex);
+     *
+     * What it does:
+     * Collects the indices of every bone whose parent is `parentBoneIndex`.
+     * The skeleton stores only the upward link (`SAniSkelBone::mParentBoneIndex`),
+     * so the children are found by scanning the whole bone array
+     * (0x0054A853: stride 88 = `sizeof(SAniSkelBone)`, comparing +0x04).
+     */
+    void CollectChildBoneIndices(std::int32_t parentBoneIndex, msvc8::vector<std::int32_t>& outIndices) const;
+
   public:
     boost::shared_ptr<const SScmFile> mFile;               // +0x04
     msvc8::vector<SAniSkelBone> mBones;                    // +0x0C
