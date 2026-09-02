@@ -12944,3 +12944,582 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsRenTuning gConsoleStartupRegistrationsRenTuning;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupCamSetLODDescription = "Set the lod scale factor for a camera";
+  constexpr const char* kConsoleStartupDumpCameraDescription = "Dump out camera position data for the editor";
+  constexpr const char* kConsoleStartupPopupCreateUnitMenuDescription = "Popup the create unit menu.";
+  constexpr const char* kConsoleStartupPathDebugDescription = "Debug the path finder";
+  constexpr const char* kConsoleStartupTeleportSelectedUnitsDescription = "teleport selected units.";
+  constexpr const char* kConsoleStartupSetFocusArmyDescription = "Pass in army index or -1";
+  constexpr const char* kConsoleStartupUISetSkinDescription = "Sets a new skin";
+  constexpr const char* kConsoleStartupUIRotateSkinDescription = "Cycles through all available skins";
+  constexpr const char* kConsoleStartupUIRotateLayoutDescription = "Cycles through all available layouts";
+  constexpr const char* kConsoleStartupUIToggleGamePanelsDescription = "Hide/show the UI panels in game, and expands the world view to fill the screen when panels are hidden.";
+  constexpr const char* kConsoleStartupUIQuitDescription = "Drives quit behavior of the game depending on the state of the UI";
+  constexpr const char* kConsoleStartupUIMakeSelectionSetDescription = "Takes a name, and makes a named selection set from the current selection";
+  constexpr const char* kConsoleStartupUIApplySelectionSetDescription = "Takes a selection set name and applies the selection";
+  constexpr const char* kConsoleStartupUICreateHead1MapDescription = "Destroys anything on head 1 and shows a full screen map in its place";
+  constexpr const char* kConsoleStartupUILuaDescription = "Run lua code in the appropriate UI lua state.";
+  constexpr const char* kConsoleStartupUIShowRenameDialogDescription = "Display the rename unit dialog during a game";
+  constexpr const char* kConsoleStartupUIDumpControlsDescription = "Dumps information about all controls to current log target.";
+  constexpr const char* kConsoleStartupUIDumpControlsUnderCursorDescription = "Dumps all controls under the cursor to the debug log";
+} // namespace
+
+namespace moho
+{
+  CConFunc gCConFunc_cam_SetLOD{};
+  CConFunc gCConFunc_DumpCamera{};
+  CConFunc gCConFunc_PopupCreateUnitMenu{};
+  CConFunc gCConFunc_PathDebug{};
+  CConFunc gCConFunc_TeleportSelectedUnits{};
+  CConFunc gCConFunc_SetFocusArmy{};
+  CConFunc gCConFunc_UI_SetSkin{};
+  CConFunc gCConFunc_UI_RotateSkin{};
+  CConFunc gCConFunc_UI_RotateLayout{};
+  CConFunc gCConFunc_UI_ToggleGamePanels{};
+  CConFunc gCConFunc_UI_Quit{};
+  CConFunc gCConFunc_UI_MakeSelectionSet{};
+  CConFunc gCConFunc_UI_ApplySelectionSet{};
+  CConFunc gCConFunc_UI_CreateHead1Map{};
+  CConFunc gCConFunc_UI_Lua{};
+  CConFunc gCConFunc_UI_ShowRenameDialog{};
+  CConFunc gCConFunc_UI_DumpControls{};
+  CConFunc gCConFunc_UI_DumpControlsUnderCursor{};
+
+  /**
+   * Address: 0x00C03650 (FUN_00C03650, ??1CConFunc_cam_SetLOD@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `cam_SetLOD`.
+   */
+  void cleanup_CConFunc_cam_SetLOD()
+  {
+    CleanupStartupConCommand(gCConFunc_cam_SetLOD);
+  }
+
+  /**
+   * Address: 0x00BDF7C0 (FUN_00BDF7C0, register_CConFunc_cam_SetLOD)
+   *
+   * What it does:
+   * Registers startup console callback for `cam_SetLOD`.
+   */
+  void register_CConFunc_cam_SetLOD()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_cam_SetLOD,
+      kConsoleStartupCamSetLODDescription,
+      "cam_SetLOD",
+      &moho::CAM_SetLOD,
+      &cleanup_CConFunc_cam_SetLOD
+    );
+  }
+
+  /**
+   * Address: 0x00C03680 (FUN_00C03680, ??1CConFunc_DumpCamera@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DumpCamera`.
+   */
+  void cleanup_CConFunc_DumpCamera()
+  {
+    CleanupStartupConCommand(gCConFunc_DumpCamera);
+  }
+
+  /**
+   * Address: 0x00BDF800 (FUN_00BDF800, register_CConFunc_DumpCamera)
+   *
+   * What it does:
+   * Registers startup console callback for `DumpCamera`.
+   */
+  void register_CConFunc_DumpCamera()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DumpCamera,
+      kConsoleStartupDumpCameraDescription,
+      "DumpCamera",
+      &moho::CON_DumpCamera,
+      &cleanup_CConFunc_DumpCamera
+    );
+  }
+
+  /**
+   * Address: 0x00C037A0 (FUN_00C037A0, ??1CON_PopupCreateUnitMenu@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `PopupCreateUnitMenu`.
+   */
+  void cleanup_CConFunc_PopupCreateUnitMenu()
+  {
+    CleanupStartupConCommand(gCConFunc_PopupCreateUnitMenu);
+  }
+
+  /**
+   * Address: 0x00BDFA80 (FUN_00BDFA80, register_CConFunc_PopupCreateUnitMenu)
+   *
+   * What it does:
+   * Registers startup console callback for `PopupCreateUnitMenu`.
+   */
+  void register_CConFunc_PopupCreateUnitMenu()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_PopupCreateUnitMenu,
+      kConsoleStartupPopupCreateUnitMenuDescription,
+      "PopupCreateUnitMenu",
+      &moho::CON_PopupCreateUnitMenu,
+      &cleanup_CConFunc_PopupCreateUnitMenu
+    );
+  }
+
+  /**
+   * Address: 0x00C03850 (FUN_00C03850, ??1CConFunc_PathDebug@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `PathDebug`.
+   */
+  void cleanup_CConFunc_PathDebug()
+  {
+    CleanupStartupConCommand(gCConFunc_PathDebug);
+  }
+
+  /**
+   * Address: 0x00BDFB90 (FUN_00BDFB90, register_CConFunc_PathDebug)
+   *
+   * What it does:
+   * Registers startup console callback for `PathDebug`.
+   */
+  void register_CConFunc_PathDebug()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_PathDebug,
+      kConsoleStartupPathDebugDescription,
+      "PathDebug",
+      &moho::CON_PathDebug,
+      &cleanup_CConFunc_PathDebug
+    );
+  }
+
+  /**
+   * Address: 0x00C06250 (FUN_00C06250, ??1CConFunc_TeleportSelectedUnits@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `TeleportSelectedUnits`.
+   */
+  void cleanup_CConFunc_TeleportSelectedUnits()
+  {
+    CleanupStartupConCommand(gCConFunc_TeleportSelectedUnits);
+  }
+
+  /**
+   * Address: 0x00BE4130 (FUN_00BE4130, register_CConFunc_TeleportSelectedUnits)
+   *
+   * What it does:
+   * Registers startup console callback for `TeleportSelectedUnits`.
+   */
+  void register_CConFunc_TeleportSelectedUnits()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_TeleportSelectedUnits,
+      kConsoleStartupTeleportSelectedUnitsDescription,
+      "TeleportSelectedUnits",
+      &moho::CON_TeleportSelectedUnits,
+      &cleanup_CConFunc_TeleportSelectedUnits
+    );
+  }
+
+  /**
+   * Address: 0x00C06460 (FUN_00C06460, ??1CConFunc_SetFocusArmy@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SetFocusArmy`.
+   */
+  void cleanup_CConFunc_SetFocusArmy()
+  {
+    CleanupStartupConCommand(gCConFunc_SetFocusArmy);
+  }
+
+  /**
+   * Address: 0x00BE43F0 (FUN_00BE43F0, register_CConFunc_SetFocusArmy)
+   *
+   * What it does:
+   * Registers startup console callback for `SetFocusArmy`.
+   */
+  void register_CConFunc_SetFocusArmy()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_SetFocusArmy,
+      kConsoleStartupSetFocusArmyDescription,
+      "SetFocusArmy",
+      &moho::SetFocusArmy,
+      &cleanup_CConFunc_SetFocusArmy
+    );
+  }
+
+  /**
+   * Address: 0x00C062E0 (FUN_00C062E0, ??1CConFunc_UI_SetSkin@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_SetSkin`.
+   */
+  void cleanup_CConFunc_UI_SetSkin()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_SetSkin);
+  }
+
+  /**
+   * Address: 0x00BE41F0 (FUN_00BE41F0, register_CConFunc_UI_SetSkin)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_SetSkin`.
+   */
+  void register_CConFunc_UI_SetSkin()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_SetSkin,
+      kConsoleStartupUISetSkinDescription,
+      "UI_SetSkin",
+      &moho::CON_UI_SetSkin,
+      &cleanup_CConFunc_UI_SetSkin
+    );
+  }
+
+  /**
+   * Address: 0x00C06310 (FUN_00C06310, ??1CConFunc_UI_RotateSkin@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_RotateSkin`.
+   */
+  void cleanup_CConFunc_UI_RotateSkin()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_RotateSkin);
+  }
+
+  /**
+   * Address: 0x00BE4230 (FUN_00BE4230, register_CConFunc_UI_RotateSkin)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_RotateSkin`.
+   */
+  void register_CConFunc_UI_RotateSkin()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_RotateSkin,
+      kConsoleStartupUIRotateSkinDescription,
+      "UI_RotateSkin",
+      &moho::UI_RotateSkin,
+      &cleanup_CConFunc_UI_RotateSkin
+    );
+  }
+
+  /**
+   * Address: 0x00C06340 (FUN_00C06340, ??1CConFunc_UI_RotateLayout@Moho@@QAE@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_RotateLayout`.
+   */
+  void cleanup_CConFunc_UI_RotateLayout()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_RotateLayout);
+  }
+
+  /**
+   * Address: 0x00BE4270 (FUN_00BE4270, register_CConFunc_UI_RotateLayout)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_RotateLayout`.
+   */
+  void register_CConFunc_UI_RotateLayout()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_RotateLayout,
+      kConsoleStartupUIRotateLayoutDescription,
+      "UI_RotateLayout",
+      &moho::UI_RotateLayout,
+      &cleanup_CConFunc_UI_RotateLayout
+    );
+  }
+
+  /**
+   * Address: 0x00C063A0 (FUN_00C063A0, ??1CConFunc_UI_ToggleGamePanels@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_ToggleGamePanels`.
+   */
+  void cleanup_CConFunc_UI_ToggleGamePanels()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_ToggleGamePanels);
+  }
+
+  /**
+   * Address: 0x00BE42F0 (FUN_00BE42F0, register_CConFunc_UI_ToggleGamePanels)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_ToggleGamePanels`.
+   */
+  void register_CConFunc_UI_ToggleGamePanels()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_ToggleGamePanels,
+      kConsoleStartupUIToggleGamePanelsDescription,
+      "UI_ToggleGamePanels",
+      &moho::CON_UI_ToggleGamePanels,
+      &cleanup_CConFunc_UI_ToggleGamePanels
+    );
+  }
+
+  /**
+   * Address: 0x00C06370 (FUN_00C06370, ??1CConFunc_UI_Quit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_Quit`.
+   */
+  void cleanup_CConFunc_UI_Quit()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_Quit);
+  }
+
+  /**
+   * Address: 0x00BE42B0 (FUN_00BE42B0, register_CConFunc_UI_Quit)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_Quit`.
+   */
+  void register_CConFunc_UI_Quit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_Quit,
+      kConsoleStartupUIQuitDescription,
+      "UI_Quit",
+      &moho::UI_Quit,
+      &cleanup_CConFunc_UI_Quit
+    );
+  }
+
+  /**
+   * Address: 0x00C063D0 (FUN_00C063D0, ??1CConFunc_UI_MakeSelectionSet@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_MakeSelectionSet`.
+   */
+  void cleanup_CConFunc_UI_MakeSelectionSet()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_MakeSelectionSet);
+  }
+
+  /**
+   * Address: 0x00BE4330 (FUN_00BE4330, register_CConFunc_UI_MakeSelectionSet)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_MakeSelectionSet`.
+   */
+  void register_CConFunc_UI_MakeSelectionSet()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_MakeSelectionSet,
+      kConsoleStartupUIMakeSelectionSetDescription,
+      "UI_MakeSelectionSet",
+      &moho::UI_MakeSelectionSet,
+      &cleanup_CConFunc_UI_MakeSelectionSet
+    );
+  }
+
+  /**
+   * Address: 0x00C06400 (FUN_00C06400, ??1CConFunc_UI_ApplySelectionSet@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_ApplySelectionSet`.
+   */
+  void cleanup_CConFunc_UI_ApplySelectionSet()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_ApplySelectionSet);
+  }
+
+  /**
+   * Address: 0x00BE4370 (FUN_00BE4370, register_CConFunc_UI_ApplySelectionSet)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_ApplySelectionSet`.
+   */
+  void register_CConFunc_UI_ApplySelectionSet()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_ApplySelectionSet,
+      kConsoleStartupUIApplySelectionSetDescription,
+      "UI_ApplySelectionSet",
+      &moho::UI_ApplySelectionSet,
+      &cleanup_CConFunc_UI_ApplySelectionSet
+    );
+  }
+
+  /**
+   * Address: 0x00C06430 (FUN_00C06430, ??1CConFunc_UI_CreateHead1Map@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_CreateHead1Map`.
+   */
+  void cleanup_CConFunc_UI_CreateHead1Map()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_CreateHead1Map);
+  }
+
+  /**
+   * Address: 0x00BE43B0 (FUN_00BE43B0, register_CConFunc_UI_CreateHead1Map)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_CreateHead1Map`.
+   */
+  void register_CConFunc_UI_CreateHead1Map()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_CreateHead1Map,
+      kConsoleStartupUICreateHead1MapDescription,
+      "UI_CreateHead1Map",
+      &moho::CON_UI_CreateHead1Map,
+      &cleanup_CConFunc_UI_CreateHead1Map
+    );
+  }
+
+  /**
+   * Address: 0x00C064F0 (FUN_00C064F0, ??1CConFunc_UI_Lua@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_Lua`.
+   */
+  void cleanup_CConFunc_UI_Lua()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_Lua);
+  }
+
+  /**
+   * Address: 0x00BE44B0 (FUN_00BE44B0, register_CConFunc_UI_Lua)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_Lua`.
+   */
+  void register_CConFunc_UI_Lua()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_Lua,
+      kConsoleStartupUILuaDescription,
+      "UI_Lua",
+      &moho::UI_Lua,
+      &cleanup_CConFunc_UI_Lua
+    );
+  }
+
+  /**
+   * Address: 0x00C06550 (FUN_00C06550, ??1CConFunc_UI_ShowRenameDialog@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_ShowRenameDialog`.
+   */
+  void cleanup_CConFunc_UI_ShowRenameDialog()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_ShowRenameDialog);
+  }
+
+  /**
+   * Address: 0x00BE4530 (FUN_00BE4530, register_CConFunc_UI_ShowRenameDialog)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_ShowRenameDialog`.
+   */
+  void register_CConFunc_UI_ShowRenameDialog()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_ShowRenameDialog,
+      kConsoleStartupUIShowRenameDialogDescription,
+      "UI_ShowRenameDialog",
+      reinterpret_cast<CConFunc::Callback>(&moho::UI_ShowRenameDialog),
+      &cleanup_CConFunc_UI_ShowRenameDialog
+    );
+  }
+
+  /**
+   * Address: 0x00C06580 (FUN_00C06580, ??1CConFunc_UI_DumpControls@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_DumpControls`.
+   */
+  void cleanup_CConFunc_UI_DumpControls()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_DumpControls);
+  }
+
+  /**
+   * Address: 0x00BE4570 (FUN_00BE4570, register_CConFunc_UI_DumpControls)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_DumpControls`.
+   */
+  void register_CConFunc_UI_DumpControls()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_DumpControls,
+      kConsoleStartupUIDumpControlsDescription,
+      "UI_DumpControls",
+      &moho::UI_DumpControls,
+      &cleanup_CConFunc_UI_DumpControls
+    );
+  }
+
+  /**
+   * Address: 0x00C065B0 (FUN_00C065B0, ??1CConFunc_UI_DumpControlsUnderCursor@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_DumpControlsUnderCursor`.
+   */
+  void cleanup_CConFunc_UI_DumpControlsUnderCursor()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_DumpControlsUnderCursor);
+  }
+
+  /**
+   * Address: 0x00BE45B0 (FUN_00BE45B0, register_CConFunc_UI_DumpControlsUnderCursor)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_DumpControlsUnderCursor`.
+   */
+  void register_CConFunc_UI_DumpControlsUnderCursor()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_DumpControlsUnderCursor,
+      kConsoleStartupUIDumpControlsUnderCursorDescription,
+      "UI_DumpControlsUnderCursor",
+      &moho::UI_DumpControlsUnderCursor,
+      &cleanup_CConFunc_UI_DumpControlsUnderCursor
+    );
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsUiMisc
+  {
+    ConsoleStartupRegistrationsUiMisc()
+    {
+      moho::register_CConFunc_cam_SetLOD();
+      moho::register_CConFunc_DumpCamera();
+      moho::register_CConFunc_PopupCreateUnitMenu();
+      moho::register_CConFunc_PathDebug();
+      moho::register_CConFunc_TeleportSelectedUnits();
+      moho::register_CConFunc_SetFocusArmy();
+      moho::register_CConFunc_UI_SetSkin();
+      moho::register_CConFunc_UI_RotateSkin();
+      moho::register_CConFunc_UI_RotateLayout();
+      moho::register_CConFunc_UI_ToggleGamePanels();
+      moho::register_CConFunc_UI_Quit();
+      moho::register_CConFunc_UI_MakeSelectionSet();
+      moho::register_CConFunc_UI_ApplySelectionSet();
+      moho::register_CConFunc_UI_CreateHead1Map();
+      moho::register_CConFunc_UI_Lua();
+      moho::register_CConFunc_UI_ShowRenameDialog();
+      moho::register_CConFunc_UI_DumpControls();
+      moho::register_CConFunc_UI_DumpControlsUnderCursor();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsUiMisc gConsoleStartupRegistrationsUiMisc;
+} // namespace
