@@ -6726,6 +6726,22 @@ namespace msvc8
             /**
              * Address: 0x00498010 (FUN_00498010, the `std::set<TrailSegmentBufferRuntime*>`
              * instantiation behind `CWorldParticles`' trail-segment owner pool)
+             *
+             * Canonical token of an 8-way ICF group (byte-identical
+             * `function_sha256`, confirmed via `_callgraph_index.sqlite`'s
+             * `function_icf_twins` view): `FUN_0052DAB0`, `FUN_00711440`,
+             * `FUN_0077C5E0`, `FUN_007B3590`, `FUN_007CA140`, `FUN_0087BFB0`,
+             * `FUN_008AF0C0` -- all `skip`-tagged in `recovered_progress.json`
+             * as ICF twins of this token; any two nil@+0x11 rotate_left
+             * emissions with the same `{left,parent,right}` offsets compile
+             * to identical machine code regardless of `value_type`, which is
+             * why a `set<uint32_t>` and a `set<T*>` fold together here.
+             * `FUN_007B3590` is `Moho::ANI_DumpSkeleton`'s dedup-tree inner
+             * `msvc8::set<std::uint32_t>` rotate (`moho/animation/
+             * CAniSkel.cpp`, reached via `insert_at`'s `FUN_007B2B30` cited
+             * on that member below); independently register-traced against
+             * this member's C++ body and confirmed to match branch-for-
+             * branch.
              */
             /**
              * Address: 0x00A553F0 (FUN_00A553F0)
@@ -6971,6 +6987,14 @@ namespace msvc8
              */
             /**
              * Address: 0x004980C0 (FUN_004980C0, the same set's right rotate)
+             *
+             * Canonical token of the mirrored 8-way ICF group (see
+             * `rotate_left`'s `0x00498010` entry above for the method):
+             * `FUN_0052DB00`, `FUN_007114A0`, `FUN_0077C640`, `FUN_007B3610`,
+             * `FUN_007CA190`, `FUN_0087C010`, `FUN_008AF170`. `FUN_007B3610`
+             * is `Moho::ANI_DumpSkeleton`'s dedup-tree inner `msvc8::
+             * set<std::uint32_t>` right rotate, same instantiation as
+             * `rotate_left`'s `FUN_007B3590` twin above.
              */
             /**
              * Address: 0x00A553A0 (FUN_00A553A0)
@@ -7527,6 +7551,45 @@ namespace msvc8
              * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
              * called from that tree's own `insert_unique`/`insert_hint`
              * (`FUN_0087B4F0`/`FUN_00879F60`, cited above).
+             *
+             * Address: 0x007B2B30 (FUN_007B2B30, sub_7B2B30) -- `msvc8::
+             * set<std::uint32_t>::insert_at` fused with `link_and_rebalance`
+             * (same one-function fusion documented on `FUN_006AFA40`/
+             * `FUN_007E5DF0` above), isNil@+0x11, 0x14-byte node (same
+             * instantiation cited on `erase_node`'s `FUN_007B46A0` and
+             * `destroy_subtree` above). `cmp dword ptr [edi+8], 3FFFFFFEh`
+             * matches `max_size() - 1u <= size_` for this 4-byte
+             * value_type, throwing `std::length_error("map/set<T> too
+             * long")` via the standard `logic_error`-then-vftable-patch
+             * shape documented throughout this file. Buys the node through
+             * `sub_7B3660` (`buy_node`), passing `head_`/`where`/`head_`
+             * as the fresh node's own initial left/parent/right -- the
+             * same buy_node-fuses-the-link pattern documented on
+             * `FUN_007E5DF0` above, which is why this emission's own body
+             * has no separate `fresh->parent = where` step. Links under
+             * the caller's `where`/`addLeft` in the same three-case
+             * (`where==head_`/`addLeft`/general) shape as this member's
+             * C++ source, then repairs red-red violations calling
+             * `sub_7B3590`/`sub_7B3610` (`rotate_left`/`rotate_right`,
+             * both cited below as ICF twins of this same instantiation's
+             * rotates) on the uncle-red/uncle-black branches --
+             * register-traced instruction-by-instruction against this
+             * member's C++ body and matches exactly, including the
+             * mirrored branch and the trailing `root()->color =
+             * kRbBlack`. Sole caller (confirmed via the callgraph index
+             * `call_edges` table): `insert_unique`'s emission for this
+             * instantiation (`FUN_007B26B0`, recovered as
+             * `FindOrInsertMapNodeNil17Runtime` in
+             * `moho/sim/SimRecoveryRuntime.cpp`), on both its accepted
+             * branches. Reached at the source level from `Moho::
+             * ANI_DumpSkeleton`'s `dedupTree[parentKey].insert(boneKey)`
+             * (`moho/animation/CAniSkel.cpp`), which is what actually
+             * instantiates this specialisation -- no standalone free
+             * function recovers this address; the call site above is the
+             * real recovery, per this project's RULE ONE. Previously
+             * marked `skip` citing "Canonical template home: RbTree.h +
+             * Map.h" with no address actually written here -- this
+             * paragraph closes that gap.
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
