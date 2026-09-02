@@ -2499,21 +2499,6 @@ LuaPlus::LuaObject* moho::func_GetUnitFactory(LuaPlus::LuaObject* const object, 
   return object;
 }
 
-namespace
-{
-  /**
-   * Address: 0x00564970 (FUN_00564970, func_StringLinkedListCpyRange)
-   *
-   * What it does:
-   * Clones one legacy MSVC8 string list into another, preserving the original
-   * element order and producing a fresh destination list.
-   */
-  void CopyStringListRange(msvc8::list<msvc8::string>& destination, const msvc8::list<msvc8::string>& source)
-  {
-    destination = source;
-  }
-} // namespace
-
 /**
  * Address: 0x00564660 (FUN_00564660, ?ARMOR_GetArmorDefinations@Moho@@YA?AV?$list@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PAVLuaState@LuaPlus@@VStrArg@gpg@@@Z)
  *
@@ -2565,9 +2550,12 @@ msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
     break;
   }
 
-  msvc8::list<msvc8::string> copiedDefinitions{};
-  CopyStringListRange(copiedDefinitions, definitions);
-  return copiedDefinitions;
+  // 0x00564970 is `func_StringLinkedListCpyRange` -- the copy constructor of
+  // the return value, emitted because NRVO does not apply to a function with
+  // three return statements. The binary has ONE local: the tail at LABEL_14
+  // is `func_StringLinkedListCpyRange(dest, &list)` then `func_FreeLinkedList
+  // (&list)`, i.e. copy-out then destroy. The source line is just this.
+  return definitions;
 }
 
 /**

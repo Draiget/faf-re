@@ -9647,6 +9647,20 @@ namespace msvc8
         // node: the first destructor frees the nodes and the head, the second
         // walks freed memory. `ARMOR_GetArmorDefinations` returns one of these
         // by value and hit exactly that as soon as units started being built.
+        /**
+         * Address: 0x00564970 (FUN_00564970, func_StringLinkedListCpyRange) --
+         * the `msvc8::list<msvc8::string>` emission, i.e. the copy constructor
+         * of `ARMOR_GetArmorDefinations`'s return value. NRVO does not apply
+         * there (three return statements), so the compiler copies the local
+         * into the caller's slot and then destroys it: the binary's tail is
+         * `func_StringLinkedListCpyRange(dest, &list)` followed by
+         * `func_FreeLinkedList(&list)`.
+         *
+         * That had been recovered in `moho/unit/core/Unit.cpp` as a
+         * `CopyStringListRange` free function plus a second local list built
+         * only to be copied into -- two lists and a helper standing in for one
+         * `return definitions;`.
+         */
         list(const list& other)
             : _Myhead(0)
             , _Mysize(0)
