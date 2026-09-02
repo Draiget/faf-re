@@ -136,6 +136,7 @@
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SPhysConstants.h"
+#include "moho/sim/PathPreviewFinder.h"
 #include "moho/sim/SpecialFileType.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/CWldSession.h"
@@ -6654,6 +6655,19 @@ namespace moho
     , mFootprint(nullptr)
     , mStartCellIsTraversable(false)
   {
+  }
+
+  /**
+   * Address: 0x007657D0 (FUN_007657D0)
+   *
+   * What it does:
+   * Destroys one heap-allocated `PathPreviewFinder` by invoking its real
+   * (implicit) destructor chain -- see `PathPreviewFinder.h` for the full
+   * cross-emission evidence -- then releasing the allocation.
+   */
+  void DeletePathPreviewFinder(PathPreviewFinder* const finder) noexcept
+  {
+    delete finder;
   }
 } // namespace moho
 

@@ -28,6 +28,7 @@
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CIntelGrid.h"
+#include "moho/sim/PathPreviewFinder.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/STIMap.h"
 
@@ -2339,46 +2340,6 @@ namespace boost
       DisposeSpCountedImplPointeeViaVirtualDeleteSlot(countedImpl, 0u);
     }
 
-    struct PathPreviewFinderDisposeRuntimeView
-    {
-      void* vftable;
-      PathPreviewFinderDisposeRuntimeView* next;
-      PathPreviewFinderDisposeRuntimeView* prev;
-    };
-    static_assert(
-      offsetof(PathPreviewFinderDisposeRuntimeView, next) == 0x04,
-      "PathPreviewFinderDisposeRuntimeView::next offset must be 0x04"
-    );
-    static_assert(
-      offsetof(PathPreviewFinderDisposeRuntimeView, prev) == 0x08,
-      "PathPreviewFinderDisposeRuntimeView::prev offset must be 0x08"
-    );
-    static_assert(sizeof(PathPreviewFinderDisposeRuntimeView) == 0x0C, "PathPreviewFinderDisposeRuntimeView size must be 0x0C");
-
-    /**
-     * Address: 0x007657D0 (FUN_007657D0)
-     *
-     * What it does:
-     * Unlinks one `PathPreviewFinder` intrusive queue node from its neighbors,
-     * rewires it to self-linked sentinel links, and releases its allocation.
-     */
-    PathPreviewFinderDisposeRuntimeView* DestroyPathPreviewFinderRuntime(
-      PathPreviewFinderDisposeRuntimeView* const finder
-    ) noexcept
-    {
-      if (finder == nullptr) {
-        return nullptr;
-      }
-
-      finder->prev->next = finder->next;
-      finder->next->prev = finder->prev;
-      finder->next = finder;
-      finder->prev = finder;
-
-      ::operator delete(static_cast<void*>(finder));
-      return finder;
-    }
-
     template <class TPointee>
     [[nodiscard]] SpCountedImplStorage<TPointee>* SpCountedImplDeletingDtorLane(
       SpCountedImplStorage<TPointee>* const countedImpl,
@@ -3264,8 +3225,10 @@ namespace boost
    * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
    *
    * What it does:
-   * Unlinks one owned `PathPreviewFinder` from its intrusive queue links and
-   * releases the owned pointee allocation.
+   * Destroys one owned `PathPreviewFinder` through its real destructor chain
+   * (see `moho::DeletePathPreviewFinder`, `moho/sim/PathPreviewFinder.h`),
+   * which unlinks it from its intrusive path-queue ring before the owned
+   * pointee allocation is released.
    */
   void SpCountedImplPDisposePathPreviewFinder(
     SpCountedImplStorage<moho::PathPreviewFinder>* const countedImpl
@@ -3275,8 +3238,7 @@ namespace boost
       return;
     }
 
-    auto* const finder = reinterpret_cast<PathPreviewFinderDisposeRuntimeView*>(countedImpl->px);
-    (void)DestroyPathPreviewFinderRuntime(finder);
+    moho::DeletePathPreviewFinder(countedImpl->px);
     countedImpl->px = nullptr;
   }
 
