@@ -21713,7 +21713,7 @@ int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
 
   std::string directory{};
   std::string extension{};
-  std::map<std::string, std::vector<std::string>> filesByProfile{};
+  msvc8::map<msvc8::string, msvc8::vector<msvc8::string>> filesByProfile{};
   USER_GetSpecialFiles(specialFileType, directory, extension, filesByProfile);
 
   LuaPlus::LuaObject filesTable(state);
@@ -21724,7 +21724,7 @@ int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
     profileTable.AssignNewTable(state, 0, 0);
 
     std::int32_t fileIndex = 1;
-    for (const std::string& fileNameWithExtension : profileFiles) {
+    for (const msvc8::string& fileNameWithExtension : profileFiles) {
       const msvc8::string baseFileName = FILE_Base(fileNameWithExtension.c_str(), true);
       profileTable.SetString(fileIndex, baseFileName.c_str());
       ++fileIndex;
