@@ -138,9 +138,22 @@ namespace moho
     if (paramName != nullptr && *paramName != '\0') {
       mStrings.start_[paramIndex].assign_owned(paramName);
 
-      CParticleTexture* texture = new (std::nothrow) CParticleTexture(paramName);
+      // The fresh texture is handed straight to the slot and NOT released
+      // afterwards. `CountedObject` starts at `mRefCount == 0` (0x004228D0
+      // clears it), so `AssignParticleTextureRef`'s retain is the slot's one
+      // and only reference; dropping a second one here deleted the texture the
+      // instant it was stored and left `mParticleTextures[paramIndex]`
+      // dangling. `~CEffectImpl` then released that dangling pointer, which is
+      // the `delete this` through a zeroed vptr seen in
+      // `ReleaseCountedTexturePointerRangeAndClear`.
+      //
+      // The binary agrees: 0x006544BB `operator new(0x2C)`, 0x006544D5
+      // `CParticleTexture::CParticleTexture`, 0x006544EF `sub_4954F0`
+      // (`AssignCountedParticleTexturePtr`), then straight to the epilogue at
+      // 0x006544F4 and `retn 8`. No release lane is called on this path -- only
+      // the empty-name branch at loc_654509 releases, which is the `else` below.
+      CParticleTexture* const texture = new (std::nothrow) CParticleTexture(paramName);
       AssignParticleTextureRef(mParticleTextures.start_[paramIndex], texture);
-      ReleaseParticleTextureRef(texture);
       return;
     }
 
