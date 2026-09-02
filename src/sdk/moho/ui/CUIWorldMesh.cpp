@@ -31,23 +31,6 @@ namespace moho
       return CUIWorldMesh::sType;
     }
 
-    /**
-     * Alias of FUN_00539BA0 (model-resource lookup lane).
-     *
-     * What it does:
-     * Resolves one SCM model resource from path into a retained shared handle.
-     */
-    [[nodiscard]] boost::shared_ptr<RScmResource> ResolveModelResourceByPath(const char* const modelPath)
-    {
-      if (RScmResource::sType == nullptr) {
-        RScmResource::sType = gpg::LookupRType(typeid(RScmResource));
-      }
-
-      boost::weak_ptr<RScmResource> weakResource{};
-      (void)RES_GetResource(&weakResource, modelPath != nullptr ? modelPath : "", nullptr, RScmResource::sType);
-      return weakResource.lock();
-    }
-
     [[nodiscard]] const char* LuaStringOrEmpty(const LuaPlus::LuaObject& object) noexcept
     {
       const char* const value = object.GetString();
@@ -180,7 +163,8 @@ namespace moho
         return;
       }
 
-      const boost::shared_ptr<RScmResource> modelResource = ResolveModelResourceByPath(LuaStringOrEmpty(meshNameObject));
+      // 0x0086B616: the shared `GetModel` lane, same as every other model consumer.
+      const boost::shared_ptr<RScmResource> modelResource = GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
       const msvc8::string textureName(LuaStringOrEmpty(textureNameObject));
       const msvc8::string shaderName(LuaStringOrEmpty(shaderNameObject));
       const msvc8::string emptyTextureName{};
