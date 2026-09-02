@@ -790,6 +790,13 @@ namespace
     "Expand selection to all units in view that is found in our current selection group";
   moho::CConFunc gCConFunc_UI_ExpandCurrentSelection{};
 
+  /**
+   * Address: 0x00C07550 (FUN_00C07550, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_ExpandCurrentSelection`.
+   */
   void cleanup_CConFunc_UI_ExpandCurrentSelection()
   {
     moho::CleanupStartupConCommand(gCConFunc_UI_ExpandCurrentSelection);
@@ -919,6 +926,13 @@ namespace
   constexpr const char* kConsoleStartupUISelectByCategoryDescription = "Select a set of units by category";
   moho::CConFunc gCConFunc_UI_SelectByCategory{};
 
+  /**
+   * Address: 0x00C07580 (FUN_00C07580, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_SelectByCategory`.
+   */
   void cleanup_CConFunc_UI_SelectByCategory()
   {
     moho::CleanupStartupConCommand(gCConFunc_UI_SelectByCategory);
