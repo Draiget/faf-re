@@ -44,9 +44,9 @@ namespace moho
    *   0x007E35C9  `cmp al,cl` on the static-pose bytes; when they differ,
    *               0x007E35D7 returns false for a set `lhs` byte and true for a
    *               set `rhs` byte - which is exactly `lhs.mIsStaticPose == 0`;
-   *   0x007E35D3  `setb` on the LOD-key lanes - an **unsigned** compare. That
-   *               lane carries a collection-buffer address, so values above
-   *               0x7FFFFFFF are reachable and the unsigned form matters. The
+   *   0x007E35D3  `setb` on the LOD lanes - an **unsigned** compare. That lane
+   *               carries a `MeshLOD*`, so values above 0x7FFFFFFF are
+   *               reachable and the unsigned form matters. The
    *               two inlined copies of this comparator agree (`setb` at
    *               0x007E40F2 in `_Lbound` and at 0x007E2CB7 in `operator[]`).
    *
@@ -63,7 +63,7 @@ namespace moho
       return lhs.mIsStaticPose == 0U;
     }
 
-    return static_cast<std::uint32_t>(lhs.mLodIndexKey) < static_cast<std::uint32_t>(rhs.mLodIndexKey);
+    return reinterpret_cast<std::uintptr_t>(lhs.mLod) < reinterpret_cast<std::uintptr_t>(rhs.mLod);
   }
 
   /**

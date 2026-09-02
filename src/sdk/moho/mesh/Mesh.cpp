@@ -6231,13 +6231,12 @@ namespace moho
     /**
      * Resolves the MeshLOD associated with one batch bucket.
      *
-     * The batch key's `mLodIndexKey` lane (`MeshBatchKey` +0x08) stores the
-     * owning `MeshLOD*` directly (the binary reads `key.lod`); centralizing the
-     * typed reinterpretation here keeps the render loops free of offset casts.
+     * The batch key's `mLod` lane (`MeshBatchKey` +0x08) stores the owning
+     * `MeshLOD*` directly (the binary reads `key.lod` at 0x007DFCDC).
      */
     [[nodiscard]] MeshLOD* MeshBatchEntryLod(const MeshBatchBucket& bucket) noexcept
     {
-      return reinterpret_cast<MeshLOD*>(static_cast<std::intptr_t>(bucket.first.mLodIndexKey));
+      return bucket.first.mLod;
     }
 
     /**
@@ -7001,13 +7000,15 @@ namespace moho
         continue;
       }
 
-      // Append into the bucket keyed by (isStaticPose, sort order). The LOD-key
-      // lane stores the collection buffer address the binary carries here as a
-      // per-call constant discriminator (identical for every instance this
-      // frame), so batching resolves purely by static-pose flag and sort order.
+      // Append into the bucket keyed by (isStaticPose, selected LOD, sort
+      // order). The LOD lane carries the `ComputeLOD` result: the binary
+      // stores it at 0x007DFBED and the key load at 0x007DFCDC reads that same
+      // slot back (see `MeshBatchKey::mLod` for why IDA splits the one slot
+      // into `var_1D0`/`var_1D4`). Keying on it is what keeps one bucket to one
+      // LOD, so each bucket draws with its own material and hardware batch.
       MeshBatchKey key;
       key.mIsStaticPose = instance->isStaticPose;
-      key.mLodIndexKey = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(collected.begin()));
+      key.mLod = const_cast<MeshLOD*>(lod);
       key.mSortKey = mesh->GetSortOrder();
 
       MeshBatchInstanceVector* const bucket = MeshBatchBucketTreeFindOrCreateInstances(key, meshes);
