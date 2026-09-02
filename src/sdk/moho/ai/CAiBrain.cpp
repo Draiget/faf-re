@@ -18,6 +18,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/IAiBuilder.h"
@@ -4826,7 +4827,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       float centerZ;
       float distanceSq;
     };
-    std::vector<SDepositCandidate> candidates;
+    msvc8::vector<SDepositCandidate> candidates;
     for (const ResourceDeposit& deposit : resources->GetDeposits()) {
       if (deposit.depositType != wantedDeposit) {
         continue;
