@@ -4301,7 +4301,7 @@ void UserUnit::UpdateVisibility()
     meshInstance->isHidden = ((mIntelStateFlags & 0x10u) == 0u) ? 1u : 0u;
     meshInstance->isLocked = ((mIntelStateFlags & 0x08u) == 0u) ? 1u : 0u;
     if (meshInstance->isLocked == 0u) {
-      meshInstance->frameCounter = static_cast<std::int8_t>(MeshInstance::sFrameCounter);
+      meshInstance->frameCounter = MeshInstance::sFrameCounter;
       meshInstance->currInterpolant = -1.0f;
     }
     break;

@@ -4849,7 +4849,7 @@ namespace moho
     , fractionHealthParameter(1.0f)
     , lifetimeParameter(0.0f)
     , auxiliaryParameter(0.0f)
-    , frameCounter(-1)
+    , frameCounter(0xFFu)
     , interpolationStateFresh(0)
     , pad_DA_DB{}
     , currInterpolant(-1.0f)
@@ -4982,7 +4982,7 @@ namespace moho
   void MeshInstance::SetInterpolantScale(const float interpolantScale)
   {
     uniformScale = interpolantScale;
-    frameCounter = static_cast<std::int8_t>(sFrameCounter);
+    frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
   }
 
@@ -5075,7 +5075,7 @@ namespace moho
     hasStanceUpdatePending = 1;
     endTransform = endTransformArg;
     startTransform = startTransformArg;
-    frameCounter = static_cast<std::int8_t>(sFrameCounter);
+    frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
     boundsValid = 1;
   }
@@ -5103,7 +5103,7 @@ namespace moho
       return;
     }
 
-    frameCounter = static_cast<std::int8_t>(sFrameCounter);
+    frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
   }
 
@@ -5131,7 +5131,7 @@ namespace moho
     startPose = startPoseArg;
     endPose = endPoseArg;
 
-    frameCounter = static_cast<std::int8_t>(sFrameCounter);
+    frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
     hasStanceUpdatePending = 1;
 
