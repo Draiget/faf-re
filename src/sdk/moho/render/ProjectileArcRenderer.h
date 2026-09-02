@@ -14,12 +14,15 @@ namespace moho
   class CWldSession;
 
   /**
-   * Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3HA)
+   * Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3_NA)
    *
    * Gates the whole arc pass from `CRenderWorldView::Render` (0x0086EEA3).
-   * Zero-fill in the shipped image, so trails are off by default.
+   * Zero-fill in the shipped image, so trails are off by default. Typed
+   * `bool`, not `int32_t`: `register_SimConVar_UI_RenProjectileArcs`
+   * (0x00BE5BF0) constructs a `TConVar<bool>` (vtable
+   * `??_7?$TConVar@_N@Moho@@6B@`) over this storage, not `TConVar<int>`.
    */
-  extern std::int32_t UI_RenProjectileArcs;
+  extern bool UI_RenProjectileArcs;
   struct GeomCamera3;
 
   /**
