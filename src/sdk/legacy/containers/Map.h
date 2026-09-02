@@ -418,6 +418,41 @@ namespace msvc8
          * `FUN_008A8590`, and their own callee chain had any citation
          * anywhere in `src/sdk`. This entry, and `mEnvLookup`'s migration
          * onto this template, is that recovery.
+         *
+         * Address: 0x00879120 (FUN_00879120, sub_879120) -- `msvc8::map<
+         * std::uint32_t, Moho::CWldTerrainDecal*>::operator[]` --
+         * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+         * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+         * instantiation cited on `insert_hint`/`insert_unique`/`insert_at`/
+         * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+         * `~rb_tree()`, `RbTree.h`). Register-traced field for field: fully
+         * inlined `lower_bound` descent (tracking the best `>=` candidate),
+         * a `where == end() || comp(k, where->first)` miss test, and on a
+         * miss a hinted insert (`insert_hint`'s emission for this
+         * instantiation, `FUN_00879B10`, `RbTree.h`) of a fresh
+         * `{k, mapped_type()}` pair built on the caller's stack -- exactly
+         * this member's shape, with `where->second` returned as `&node->
+         * value+0x10`. Sole real caller is `CDecalManager::LoadDecal`'s
+         * `mDecalGroupLookupByDecalIndex[decalIndex] = loaded;`
+         * (`CWldSplat.cpp`). Re-homed here from a hand-rolled
+         * `ResolveLookupValueSlotForKey` free function that walked a
+         * duplicate `DecalGroupLookupNode`/`...Tree` struct pair, found or
+         * linked a new node with **no rotation/recolor step at all**
+         * (a plain unbalanced-BST insert, not this member's real
+         * self-balancing algorithm -- the same missing-rebalance shape
+         * documented on `AudioMap1CategoryNode` in
+         * `.memory/project_audiomap1_missing_rebalance_bug.md`), and
+         * returned a raw `std::uint32_t*` the caller had to null-check and
+         * write through by hand -- all now replaced by this member's own
+         * `operator[]`.
+         * Address: 0x00879450 (FUN_00879450, sub_879450) -- the sibling
+         * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::operator[]`
+         * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+         * same shape, calling that tree's own `insert_hint`
+         * (`FUN_00879F60`, `RbTree.h`). Sole real caller is
+         * `CDecalManager::LoadDecalGroup`'s
+         * `mDecalGroupLookupBySplatIndex[*group->GetIndex()] = group;`
+         * (`CWldSplat.cpp`).
          */
         mapped_type& operator[](const key_type& k)
         {

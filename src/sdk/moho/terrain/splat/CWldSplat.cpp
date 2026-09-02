@@ -94,238 +94,6 @@ namespace
     decal.mOrientation = record.mRot;
   }
 
-  [[nodiscard]] const moho::DecalGroupLookupNode* FindLookupNodeByKey(
-    const moho::DecalGroupLookupTree& lookupTree, const std::uint32_t key
-  ) noexcept
-  {
-    const moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const moho::DecalGroupLookupNode* best = head;
-    const moho::DecalGroupLookupNode* cursor = head->mParent;
-    while (cursor != nullptr && cursor->mIsNil == 0u) {
-      if (cursor->mKey >= key) {
-        best = cursor;
-        cursor = cursor->mLeft;
-      } else {
-        cursor = cursor->mRight;
-      }
-    }
-
-    if (best == head || key < best->mKey) {
-      return head;
-    }
-
-    return best;
-  }
-
-  [[nodiscard]] moho::DecalGroupLookupNode* FindLookupNodeByKeyMutable(
-    moho::DecalGroupLookupTree& lookupTree, const std::uint32_t key
-  ) noexcept
-  {
-    moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::DecalGroupLookupNode* cursor = head->mParent;
-    while (cursor != nullptr && cursor->mIsNil == 0u) {
-      if (key < cursor->mKey) {
-        cursor = cursor->mLeft;
-      } else if (key > cursor->mKey) {
-        cursor = cursor->mRight;
-      } else {
-        return cursor;
-      }
-    }
-
-    return head;
-  }
-
-  [[nodiscard]] moho::DecalGroupLookupNode*
-  FindLookupTreeMinimumNode(moho::DecalGroupLookupNode* node, moho::DecalGroupLookupNode* const head) noexcept
-  {
-    while (node != nullptr && node != head && node->mIsNil == 0u && node->mLeft != nullptr && node->mLeft != head
-           && node->mLeft->mIsNil == 0u) {
-      node = node->mLeft;
-    }
-    return node;
-  }
-
-  [[nodiscard]] moho::DecalGroupLookupNode*
-  FindLookupTreeMaximumNode(moho::DecalGroupLookupNode* node, moho::DecalGroupLookupNode* const head) noexcept
-  {
-    while (node != nullptr && node != head && node->mIsNil == 0u && node->mRight != nullptr && node->mRight != head
-           && node->mRight->mIsNil == 0u) {
-      node = node->mRight;
-    }
-    return node;
-  }
-
-  void RefreshLookupHeadExtents(moho::DecalGroupLookupTree& lookupTree) noexcept
-  {
-    moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    if (lookupTree.mNodeCount == 0u || head->mParent == nullptr || head->mParent == head || head->mParent->mIsNil != 0u) {
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      lookupTree.mNodeCount = 0u;
-      return;
-    }
-
-    head->mLeft = FindLookupTreeMinimumNode(head->mParent, head);
-    head->mRight = FindLookupTreeMaximumNode(head->mParent, head);
-  }
-
-  [[nodiscard]] moho::DecalGroupLookupNode* CreateLookupNode(
-    moho::DecalGroupLookupNode* const head, moho::DecalGroupLookupNode* const parent, const std::uint32_t key
-  )
-  {
-    auto* const node = new moho::DecalGroupLookupNode{};
-    node->mLeft = head;
-    node->mParent = parent;
-    node->mRight = head;
-    node->mKey = key;
-    node->mGroupIndex = 0;
-    node->mColor = 0u;
-    node->mIsNil = 0u;
-    node->mPad16_17[0] = 0u;
-    node->mPad16_17[1] = 0u;
-    return node;
-  }
-
-  void ReplaceLookupNode(
-    moho::DecalGroupLookupTree& lookupTree, moho::DecalGroupLookupNode* node, moho::DecalGroupLookupNode* replacement
-  ) noexcept
-  {
-    moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr || node == nullptr) {
-      return;
-    }
-
-    if (node->mParent == head) {
-      head->mParent = replacement;
-    } else if (node == node->mParent->mLeft) {
-      node->mParent->mLeft = replacement;
-    } else {
-      node->mParent->mRight = replacement;
-    }
-
-    if (replacement != nullptr && replacement != head) {
-      replacement->mParent = node->mParent;
-    }
-  }
-
-  /**
-   * Address: 0x00879120 (FUN_00879120)
-   *
-   * What it does:
-   * Resolves one lookup-node value lane for `key`; inserts a new key node
-   * when the key is absent and returns the inserted value slot.
-   */
-  [[nodiscard]] std::uint32_t* ResolveLookupValueSlotForKey(
-    moho::DecalGroupLookupTree& lookupTree, const std::uint32_t key
-  )
-  {
-    moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::DecalGroupLookupNode* parent = head;
-    moho::DecalGroupLookupNode* cursor = head->mParent;
-    while (cursor != nullptr && cursor->mIsNil == 0u) {
-      parent = cursor;
-      if (key < cursor->mKey) {
-        cursor = cursor->mLeft;
-      } else if (key > cursor->mKey) {
-        cursor = cursor->mRight;
-      } else {
-        return reinterpret_cast<std::uint32_t*>(&cursor->mGroupIndex);
-      }
-    }
-
-    moho::DecalGroupLookupNode* const inserted = CreateLookupNode(head, parent, key);
-    if (parent == head) {
-      head->mParent = inserted;
-      head->mLeft = inserted;
-      head->mRight = inserted;
-    } else if (key < parent->mKey) {
-      parent->mLeft = inserted;
-      if (head->mLeft == head || key < head->mLeft->mKey) {
-        head->mLeft = inserted;
-      }
-    } else {
-      parent->mRight = inserted;
-      if (head->mRight == head || key > head->mRight->mKey) {
-        head->mRight = inserted;
-      }
-    }
-
-    ++lookupTree.mNodeCount;
-    return reinterpret_cast<std::uint32_t*>(&inserted->mGroupIndex);
-  }
-
-  /**
-   * Address: 0x00879510 (FUN_00879510)
-   *
-   * What it does:
-   * Erases one key range from the manager lookup tree and returns the number
-   * of removed nodes (0 or 1 for this unique-key lookup lane).
-   */
-  std::int32_t EraseLookupEntriesByKey(
-    moho::DecalGroupLookupTree& lookupTree, const std::int32_t* const keyLane
-  )
-  {
-    const std::uint32_t key = keyLane != nullptr ? static_cast<std::uint32_t>(*keyLane) : 0u;
-
-    moho::DecalGroupLookupNode* const head = lookupTree.mHead;
-    if (head == nullptr || lookupTree.mNodeCount == 0u) {
-      return 0;
-    }
-
-    moho::DecalGroupLookupNode* const target = FindLookupNodeByKeyMutable(lookupTree, key);
-    if (target == nullptr || target == head || target->mIsNil != 0u || target->mKey != key) {
-      return 0;
-    }
-
-    if (target->mLeft == nullptr || target->mLeft->mIsNil != 0u) {
-      ReplaceLookupNode(lookupTree, target, target->mRight);
-    } else if (target->mRight == nullptr || target->mRight->mIsNil != 0u) {
-      ReplaceLookupNode(lookupTree, target, target->mLeft);
-    } else {
-      moho::DecalGroupLookupNode* const successor = FindLookupTreeMinimumNode(target->mRight, head);
-      if (successor != nullptr && successor->mParent != target) {
-        ReplaceLookupNode(lookupTree, successor, successor->mRight);
-        successor->mRight = target->mRight;
-        if (successor->mRight != nullptr && successor->mRight != head) {
-          successor->mRight->mParent = successor;
-        }
-      }
-
-      if (successor != nullptr) {
-        ReplaceLookupNode(lookupTree, target, successor);
-        successor->mLeft = target->mLeft;
-        if (successor->mLeft != nullptr && successor->mLeft != head) {
-          successor->mLeft->mParent = successor;
-        }
-      }
-    }
-
-    delete target;
-    if (lookupTree.mNodeCount > 0u) {
-      --lookupTree.mNodeCount;
-    }
-    RefreshLookupHeadExtents(lookupTree);
-    return 1;
-  }
-
   [[nodiscard]] moho::SpatialDB_MeshInstance*
   AsDecalManagerSpatialDbRuntime(moho::CDecalManager* const manager) noexcept
   {
@@ -357,9 +125,6 @@ namespace
     return outValue;
   }
 
-  [[nodiscard]] std::int32_t
-  ErasePrimaryDecalLookupEntriesByKey(moho::DecalGroupLookupTree& lookupTree, const std::int32_t key);
-
   /**
    * Address: 0x008779B0 (FUN_008779B0)
    *
@@ -382,7 +147,7 @@ namespace
       groups.end(),
       decal->mIndex
     );
-    (void)ErasePrimaryDecalLookupEntriesByKey(manager.mDecalGroupLookupByDecalIndex, decal->mIndex);
+    (void)manager.mDecalGroupLookupByDecalIndex.erase(static_cast<std::uint32_t>(decal->mIndex));
 
     auto& decals = manager.mDecals;
     auto* const found = std::find(decals.begin(), decals.end(), decal);
@@ -453,181 +218,6 @@ namespace
     return static_cast<std::int32_t>(entities.size());
   }
 
-  [[nodiscard]] moho::DecalGroupLookupNode* CreateLookupHeadSentinel()
-  {
-    auto* const head = new moho::DecalGroupLookupNode{};
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mKey = 0u;
-    head->mGroupIndex = 0;
-    head->mColor = 0u;
-    head->mIsNil = 1u;
-    head->mPad16_17[0] = 0u;
-    head->mPad16_17[1] = 0u;
-    return head;
-  }
-
-  void InitializeLookupTree(moho::DecalGroupLookupTree& lookupTree)
-  {
-    lookupTree.mUnknown00 = 0u;
-    lookupTree.mHead = CreateLookupHeadSentinel();
-    lookupTree.mNodeCount = 0u;
-    lookupTree.mUnknown0C = 0u;
-  }
-
-  void DeleteLookupSubtree(
-    moho::DecalGroupLookupNode* const node,
-    const moho::DecalGroupLookupNode* const head
-  )
-  {
-    if (node == nullptr || node == head || node->mIsNil != 0u) {
-      return;
-    }
-
-    DeleteLookupSubtree(node->mLeft, head);
-    DeleteLookupSubtree(node->mRight, head);
-    delete node;
-  }
-
-  /**
-   * In-order successor step for the decal-group lookup tree, matching the
-   * MSVC8 `std::_Tree::_Inc` traversal the STL range-erase emission open-codes.
-   * A raw pointer walk is retained here because this is the exact successor
-   * mechanics the binary reproduces; higher-level range helpers cannot express
-   * the sentinel-anchored parent climb without changing node visitation order.
-   */
-  [[nodiscard]] moho::DecalGroupLookupNode*
-  AdvanceLookupNodeToInOrderSuccessor(moho::DecalGroupLookupNode* node) noexcept
-  {
-    if (node->mIsNil != 0u) {
-      return node;
-    }
-
-    if (node->mRight->mIsNil != 0u) {
-      // No right subtree: climb to the first ancestor whose left branch we came from.
-      moho::DecalGroupLookupNode* ancestor = node->mParent;
-      while (ancestor->mIsNil == 0u && node == ancestor->mRight) {
-        node = ancestor;
-        ancestor = ancestor->mParent;
-      }
-      return ancestor;
-    }
-
-    // Right subtree exists: successor is its left-most descendant.
-    node = node->mRight;
-    for (moho::DecalGroupLookupNode* left = node->mLeft; left->mIsNil == 0u; left = node->mLeft) {
-      node = left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x00879C30 (FUN_00879C30, sub_879C30)
-   * Mangled: MSVC8 `std::_Tree<...>::erase(iterator first, iterator last)`
-   *          emission for the primary decal-index lookup map.
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_879C30@<eax>(int this@<edi>, _DWORD *out,
-   *                                      _DWORD *first, _DWORD *last);
-   *
-   * What it does:
-   * Erases the half-open node range `[first,last)` from the decal-group lookup
-   * tree. When the range spans the whole tree (`first` is the minimum and
-   * `last` is the head sentinel) it destroys the entire body in one recursive
-   * sweep and re-links the sentinel to the empty state, keeping the head node
-   * alive for reuse. Otherwise it erases node-by-node in in-order sequence.
-   * Returns the node one past the erased range (`out`).
-   */
-  moho::DecalGroupLookupNode* ClearDecalLookupTree(
-    moho::DecalGroupLookupTree& tree,
-    moho::DecalGroupLookupNode* first,
-    moho::DecalGroupLookupNode* last
-  )
-  {
-    moho::DecalGroupLookupNode* const head = tree.mHead;
-
-    // Fast path: erasing every element ([_Lmost, _Head)) collapses to one
-    // recursive subtree destroy plus a sentinel re-link (head is retained).
-    if (first == head->mLeft && last == head) {
-      DeleteLookupSubtree(head->mParent, head);
-      head->mParent = head;
-      tree.mNodeCount = 0u;
-      head->mLeft = head;
-      head->mRight = head;
-      return head->mLeft;
-    }
-
-    // General range erase: remove each node in [first,last) individually,
-    // advancing to the in-order successor before the node is unlinked/freed.
-    moho::DecalGroupLookupNode* cursor = first;
-    while (cursor != last) {
-      moho::DecalGroupLookupNode* const doomed = cursor;
-      cursor = AdvanceLookupNodeToInOrderSuccessor(cursor);
-      // Unique-key map: erasing the specific node equals erasing by its key.
-      const std::int32_t doomedKey = static_cast<std::int32_t>(doomed->mKey);
-      (void)EraseLookupEntriesByKey(tree, &doomedKey);
-    }
-
-    return last;
-  }
-
-  /**
-   * Address: 0x00878D30 (FUN_00878D30)
-   *
-   * What it does:
-   * Releases one keyed lookup tree (`+0x1C` lane): clears every node via the
-   * `_Tree::erase` range emission (which keeps and re-links the sentinel),
-   * deletes the now-empty sentinel, and resets the header to
-   * `{head=null,count=0}`.
-   */
-  std::int32_t ResetDecalLookupTreePrimary(moho::DecalGroupLookupTree& lookupTree)
-  {
-    if (lookupTree.mHead != nullptr) {
-      (void)ClearDecalLookupTree(lookupTree, lookupTree.mHead->mLeft, lookupTree.mHead);
-      delete lookupTree.mHead;
-    }
-    lookupTree.mHead = nullptr;
-    lookupTree.mNodeCount = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x00878D60 (FUN_00878D60)
-   *
-   * What it does:
-   * Releases one keyed lookup tree (`+0x38` lane): clears every node via the
-   * `_Tree::erase` range emission (which keeps and re-links the sentinel),
-   * deletes the now-empty sentinel, and resets the header to
-   * `{head=null,count=0}`. The secondary tree shares the unified
-   * `ClearDecalLookupTree` helper with the primary lane (the binary emits a
-   * per-map instantiation, sub_87A080, folded here onto the generic body).
-   */
-  std::int32_t ResetDecalLookupTreeSecondary(moho::DecalGroupLookupTree& lookupTree)
-  {
-    if (lookupTree.mHead != nullptr) {
-      (void)ClearDecalLookupTree(lookupTree, lookupTree.mHead->mLeft, lookupTree.mHead);
-      delete lookupTree.mHead;
-    }
-    lookupTree.mHead = nullptr;
-    lookupTree.mNodeCount = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x008791E0 (FUN_008791E0)
-   *
-   * What it does:
-   * Erases one keyed entry range from the primary decal lookup tree and
-   * returns the number of removed entries.
-   */
-  std::int32_t ErasePrimaryDecalLookupEntriesByKey(
-    moho::DecalGroupLookupTree& lookupTree,
-    const std::int32_t key
-  )
-  {
-    return EraseLookupEntriesByKey(lookupTree, &key);
-  }
 } // namespace
 
 namespace moho
@@ -652,11 +242,10 @@ namespace moho
     : IDecalManager()
     , mDecalCount(0u)
     , mNumDecals(0u)
-    , mUnknown0C_0F{0u, 0u, 0u, 0u}
     , mDecals()
-    , mDecalGroupLookupByDecalIndex{}
+    , mDecalGroupLookupByDecalIndex()
     , mDecalGroups()
-    , mDecalGroupLookupBySplatIndex{}
+    , mDecalGroupLookupBySplatIndex()
     , mSplats()
     , mSpatialDbOwnerStorage{}
     , mWldTerrain(terrainRes)
@@ -664,9 +253,13 @@ namespace moho
     , mDidSomething(0u)
     , mPad111_113{0u, 0u, 0u}
   {
-    InitializeLookupTree(mDecalGroupLookupByDecalIndex);
-    InitializeLookupTree(mDecalGroupLookupBySplatIndex);
-
+    // The two lookup maps' sentinel heads are bought by their own default
+    // `msvc8::map` constructor in the member-init list above -- the binary's
+    // matching `buy_head()`-inlined self-link (isNil=1, left=parent=right=
+    // self, size_=0) runs as part of ordinary member construction, not as a
+    // separate call. A prior pass called this out explicitly as
+    // `InitializeLookupTree(...)`; that helper duplicated
+    // `msvc8::map<K,V>`'s own default constructor and is deleted.
     SpatialDB_MeshInstance* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
     spatialDb->InitializeStorage();
 
@@ -711,8 +304,29 @@ namespace moho
    * Address: 0x00877B70 (FUN_00877B70, Moho::CDecalManager::~CDecalManager)
    *
    * What it does:
-   * Deletes active decals/groups/splats, clears both keyed lookup trees, and
-   * tears down embedded spatial-db registration storage.
+   * Deletes active decals/groups/splats, then tears down embedded spatial-db
+   * registration storage.
+   *
+   * The binary additionally frees each container's own storage (the three
+   * vectors' buffers, the two lookup maps' nodes and head sentinels) in
+   * reverse declaration order right after -- `mSplats`, then
+   * `mDecalGroupLookupBySplatIndex`, then `mDecalGroups`, then
+   * `mDecalGroupLookupByDecalIndex`, then `mDecals` (confirmed instruction-
+   * by-instruction: the buffer/header resets at 0x00877BF3-0x00877C97 read
+   * and zero exactly those five members' fields in that order). That is now
+   * automatic C++ member-destruction once all five are real typed
+   * `msvc8::vector<T>`/`msvc8::map<K,V>` members, so no explicit call is
+   * written here -- writing one would just re-run the same teardown twice.
+   * A prior pass modelled this half as two explicit
+   * `ResetDecalLookupTreePrimary`/`Secondary` calls citing 0x00878D30/
+   * 0x00878D60; those two addresses are not reached from this function's (or
+   * the constructor's) ordinary control flow at all -- they are the
+   * compiler-generated SEH-unwind-funclet emission of `~rb_tree()`, reached
+   * only via the `0x00BAF679`/`0x00BAF6D9` (dtor) and `0x00BAF673`/
+   * `0x00BAF689` (ctor) exception-dispatch thunks for partially-constructed-
+   * member cleanup -- exactly the "EH unwind funclets... are not source at
+   * all" case (CLAUDE.md, RULE ONE). They are cited on `~rb_tree()` in
+   * `RbTree.h` instead, and the two wrapper functions are deleted.
    */
   CDecalManager::~CDecalManager()
   {
@@ -729,34 +343,19 @@ namespace moho
     }
 
     AsDecalManagerSpatialDbRuntime(this)->DestroyStorage();
-
-    // Each `= {}` is VC8's `_Tidy()`: free the block and null the three lanes.
-    // The binary interleaves them with the two lookup-tree teardowns in this
-    // exact order.
-    mSplats = {};
-    (void)ResetDecalLookupTreeSecondary(mDecalGroupLookupBySplatIndex);
-
-    mDecalGroups = {};
-    (void)ResetDecalLookupTreePrimary(mDecalGroupLookupByDecalIndex);
-
-    mDecals = {};
   }
 
   /**
    * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
    *
    * What it does:
-   * Looks up one decal-index key in the decal-group lookup tree and returns
-   * the mapped group index, or `0` when the key is absent.
+   * Looks up one decal-index key in `mDecalGroupLookupByDecalIndex` and
+   * returns the registered decal, or `nullptr` when the key is absent.
    */
-  std::int32_t CDecalManager::FindGroupByDecalIndex(const std::uint32_t decalIndex) const
+  CWldTerrainDecal* CDecalManager::FindDecalByIndex(const std::uint32_t decalIndex) const
   {
-    const DecalGroupLookupNode* const node = FindLookupNodeByKey(mDecalGroupLookupByDecalIndex, decalIndex);
-    if (node == nullptr || node == mDecalGroupLookupByDecalIndex.mHead) {
-      return 0;
-    }
-
-    return node->mGroupIndex;
+    CWldTerrainDecal* const* const found = mDecalGroupLookupByDecalIndex.try_get(decalIndex);
+    return found != nullptr ? *found : nullptr;
   }
 
   /**
@@ -802,17 +401,13 @@ namespace moho
    * Address: 0x008782A0 (FUN_008782A0, Moho::CDecalManager::Func10)
    *
    * What it does:
-   * Looks up one splat/decal-index key in the secondary lookup tree and
-   * returns the mapped group index, or `0` when the key is absent.
+   * Looks up one group-index key in `mDecalGroupLookupBySplatIndex` and
+   * returns the registered group, or `nullptr` when the key is absent.
    */
-  std::int32_t CDecalManager::FindGroupBySplatIndex(const std::uint32_t splatIndex) const
+  CDecalGroup* CDecalManager::FindGroupBySplatIndex(const std::uint32_t splatIndex) const
   {
-    const DecalGroupLookupNode* const node = FindLookupNodeByKey(mDecalGroupLookupBySplatIndex, splatIndex);
-    if (node == nullptr || node == mDecalGroupLookupBySplatIndex.mHead) {
-      return 0;
-    }
-
-    return node->mGroupIndex;
+    CDecalGroup* const* const found = mDecalGroupLookupBySplatIndex.try_get(splatIndex);
+    return found != nullptr ? *found : nullptr;
   }
 
   /**
@@ -1101,11 +696,7 @@ namespace moho
 
     AppendDecal(mDecals, loaded);
 
-    std::uint32_t* const valueLane =
-      ResolveLookupValueSlotForKey(mDecalGroupLookupByDecalIndex, static_cast<std::uint32_t>(loaded->mIndex));
-    if (valueLane != nullptr) {
-      *valueLane = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(loaded));
-    }
+    mDecalGroupLookupByDecalIndex[static_cast<std::uint32_t>(loaded->mIndex)] = loaded;
 
     mDidSomething = 1u;
     return loaded;
@@ -1124,8 +715,9 @@ namespace moho
       return 0;
     }
 
-    std::int32_t* const groupIndexLane = group->GetIndex();
-    const std::int32_t removedFromLookup = EraseLookupEntriesByKey(mDecalGroupLookupBySplatIndex, groupIndexLane);
+    const std::int32_t* const groupIndexLane = group->GetIndex();
+    const std::size_t removedFromLookup =
+      mDecalGroupLookupBySplatIndex.erase(static_cast<std::uint32_t>(*groupIndexLane));
 
     auto* const found = std::find(mDecalGroups.begin(), mDecalGroups.end(), group);
     if (found != mDecalGroups.end()) {
@@ -1133,7 +725,7 @@ namespace moho
     }
 
     delete group;
-    return removedFromLookup;
+    return static_cast<std::int32_t>(removedFromLookup);
   }
 
   /**
@@ -1516,11 +1108,7 @@ namespace moho
 
     AppendDecalGroup(mDecalGroups, group);
 
-    std::uint32_t* const valueLane =
-      ResolveLookupValueSlotForKey(mDecalGroupLookupBySplatIndex, static_cast<std::uint32_t>(*group->GetIndex()));
-    if (valueLane != nullptr) {
-      *valueLane = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(group));
-    }
+    mDecalGroupLookupBySplatIndex[static_cast<std::uint32_t>(*group->GetIndex())] = group;
 
     return group;
   }
