@@ -127,10 +127,18 @@ extern "C" {
   // is why a successfully created playback handle still drew "handle is
   // invalid" from mwPlyGetStat, mwPlySetFrmSync and mwPlyStartFname alike.
   void* MWSFD_SetCond() { return nullptr; }
-  void* MWSFD_SetReqSvrBdrHn() { return nullptr; }
+  // MWSFD_SetReqSvrBdrHn (0x00AD9910): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, next to MWSFSVR_SetHnSfdSvrFlg.
+  // As a no-arg void* stub it silently ate the "server border requested" flag
+  // instead of publishing it into the playback handle / library work lane, so
+  // mwlSfdSleepDecSvr's idle-border dance never actually latched anything.
   void* MWSFPLY_SetFlowLimit() { return nullptr; }
   // MWSFSVM_Error: real body in SofdecSvmTransferRuntime.cpp.
-  void* MWSFSVM_GotoIdleBorder() { return nullptr; }
+  // MWSFSVM_GotoIdleBorder (0x00ACCD00): real body in
+  // cri/sofdec/SofdecSvmTransferRuntime.cpp. A thin `SVM_GotoSvrBorder(6)`
+  // wrapper; while it was a stub the decode server never actually parked at
+  // its idle border, so mwPlyFinishSfdFx/mwlSfdSleepDecSvr's teardown/sleep
+  // dance was a no-op.
   // MWSFSVR_MainThrdProc (0x00AD9230), MWSFSVR_IdleThrdProc (0x00AD9250) and
   // MWSFSVR_VsyncThrdProc (0x00AD9220): real bodies in
   // SofdecAdxPlatformRuntime.cpp. These are the Sofdec worker-thread bodies;
@@ -244,7 +252,13 @@ extern "C" {
   void* decodeTsSub() { return nullptr; }
   // mpvcmc_InitMcOiTa: real body in SofdecMpvRuntime.cpp.
   void* mpvhdec_ReadKernelIntraIdcPrec3() { return nullptr; }
-  void* mwPlyFinishSfdFx() { return nullptr; }
+  // mwPlyFinishSfdFx (0x00AC93D0): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, next to mwPlySfdFinish. The
+  // reference-counted teardown mirror of mwPlyInitSfdFx; while it was a
+  // wrong-signature no-arg void* stub, CMovieManager::ShutdownMovieRuntimeNoDelete's
+  // call to it did nothing - none of the up-to-32 open playback handles, the
+  // MWSFSVM callback registrations, or any other Sofdec subsystem ADXT_Init
+  // brought up ever got torn down when a movie manager shut down.
   // mwPlyInitSfdFx: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp, next
   // to mwPlySfdInit. The SFD transfer strategy table it depends on
   // (mwsfd_initsfdpara.callbacks -> 0x00D7F3D0) is now modelled at the end of

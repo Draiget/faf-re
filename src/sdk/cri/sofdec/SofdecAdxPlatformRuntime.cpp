@@ -3487,6 +3487,72 @@
     return 0;
   }
 
+  // Defined later in this aggregate translation unit; mwPlyFinishSfdFx's
+  // teardown chain reaches every one of these ahead of its own definition.
+  std::int32_t MWSFSFX_Finish();
+  std::int32_t LSC_Finish();
+  void ADXT_Finish();
+  std::int32_t MWSTM_FinishStatic();
+  void MWSFD_SetReqSvrBdrHn(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t requestEnabled);
+  void MWSFSVM_DeleteVfunc();
+  void MWSFSVM_DeleteMainFunc();
+  void MWSFSVM_DeleteIdleFunc();
+  void MWSFSVM_GotoIdleBorder();
+  void MWSFSVM_Finish();
+
+  /**
+   * Address: 0x00AC93D0 (FUN_00AC93D0, _mwPlyFinishSfdFx)
+   * Mangled: _mwPlyFinishSfdFx
+   *
+   * IDA signature:
+   * void __cdecl mwPlyFinishSfdFx();
+   *
+   * What it does:
+   * Reference-counted teardown mirror of `mwPlyInitSfdFx`: on the final
+   * release, force-destroys every still-open playback handle across the
+   * 32-slot pool; if none needed force-destroying, cycles the decode server
+   * through its idle border so it is safely parked before teardown
+   * continues; then unwinds every subsystem the init path brought up (the
+   * three MWSFSVM callback registrations, SFX composition, LSC, the SFD
+   * work-control layer, ADXT, the static ADX stream layer, and the three SJ
+   * providers) and finally finishes the SVM server-manager layer itself.
+   */
+  void mwPlyFinishSfdFx()
+  {
+    moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    if (--mwsfd_init_cnt != 0) {
+      return;
+    }
+
+    auto* const slots = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(libWork->playbackSlotsRaw);
+    std::int32_t destroyedSlotCount = 0;
+    for (std::int32_t slotIndex = 0; slotIndex < moho::kMwsfdDecodeServerSlotCount; ++slotIndex) {
+      if (slots[slotIndex].used == 1) {
+        mwPlyDestroy(&slots[slotIndex]);
+        ++destroyedSlotCount;
+      }
+    }
+
+    if (destroyedSlotCount == 0) {
+      MWSFD_SetReqSvrBdrHn(nullptr, 1);
+      MWSFSVM_GotoIdleBorder();
+      MWSFD_SetReqSvrBdrHn(nullptr, 0);
+    }
+
+    MWSFSVM_DeleteVfunc();
+    MWSFSVM_DeleteMainFunc();
+    MWSFSVM_DeleteIdleFunc();
+    (void)MWSFSFX_Finish();
+    (void)LSC_Finish();
+    (void)mwPlySfdFinish();
+    ADXT_Finish();
+    (void)MWSTM_FinishStatic();
+    (void)SJUNI_Finish();
+    (void)SJMEM_Finish();
+    (void)SJRBF_Finish();
+    MWSFSVM_Finish();
+  }
+
   /**
    * Address: 0x00AC9540 (FUN_00AC9540, _MWSFLIB_SfdErrFunc)
    */
@@ -4538,6 +4604,25 @@
   {
     ply->sfdServerFlag = enabled;
     return enabled;
+  }
+
+  /**
+   * Address: 0x00AD9910 (FUN_00AD9910, _MWSFD_SetReqSvrBdrHn)
+   *
+   * What it does:
+   * Publishes one playback handle's "server border requested" flag
+   * (`serverWorkEnabled`), mirrored into the global MWSFD library work
+   * lane's `requestServerBridgeFlag` so `MWSFD_GetReqSvrBdrLib` sees it too.
+   * `ply` may be null for a library-wide request with no specific handle, in
+   * which case only the global lane is updated.
+   */
+  void MWSFD_SetReqSvrBdrHn(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t requestEnabled)
+  {
+    moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    if (ply != nullptr) {
+      ply->serverWorkEnabled = requestEnabled;
+    }
+    libWork->requestServerBridgeFlag = requestEnabled;
   }
 
   /**
@@ -7653,17 +7738,11 @@
    * ADXERR, and the three SJ providers, and finally releases the ADXCRS
    * critical section and finishes it.
    *
-   * NOT YET WIRED (documented 2026-09-02): the real caller is
-   * `mwPlyFinishSfdFx` (0x00AC93D0), which currently only exists as a
-   * wrong-signature stub (`void* mwPlyFinishSfdFx() { return nullptr; }`)
-   * in SofdecExternalStubs.cpp instead of its real ~155-byte teardown body.
-   * Its own callee closure (MWSFLIB_GetLibWorkPtr, mwPlyDestroy x32 slots,
-   * MWSFD_SetReqSvrBdrHn, MWSFSVM_GotoIdleBorder/DeleteVfunc/
-   * DeleteMainFunc/DeleteIdleFunc, MWSFSFX_Finish, mwPlySfdFinish,
-   * MWSTM_FinishStatic, MWSFSVM_Finish) is mostly unrecovered; recovering
-   * it is a separate, larger pass. `[[maybe_unused]]` kept until then.
+   * Real caller: `mwPlyFinishSfdFx` (0x00AC93D0), recovered 2026-09-02 in
+   * this same file. Wired directly (no adapter) - the disassembly for both
+   * confirms `mwPlyFinishSfdFx` calls this address by name.
    */
-  [[maybe_unused]] void ADXT_Finish()
+  void ADXT_Finish()
   {
     --gAdxtInitCount;
     if (gAdxtInitCount != 0) {
