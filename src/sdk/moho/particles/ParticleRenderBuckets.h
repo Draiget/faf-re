@@ -20,6 +20,25 @@ namespace moho
    * What it does:
    * Models one VC8 debug-vector lane (`_Myfirstiter + begin/end/capacity`) used
    * by particle/trail render buckets.
+   *
+   * @warning RULE ONE debt, recorded here so the collapse is a mechanical job
+   * rather than a rediscovery. This is a **verbatim duplicate of
+   * `msvc8::vector<T>`**: that template lays out `first_` at +0x04, `last_` at
+   * +0x08 and `end_` at +0x0C behind the same 4-byte debug proxy at +0x00
+   * (`legacy/containers/Vector.h`), so the two are byte-identical, and the 55
+   * uses of this struct are an open-coded reimplementation of a container the
+   * tree already models -- growth policy and element-count ceiling included,
+   * both of which CLAUDE.md confines to the container's own members.
+   *
+   * That duplication is not cosmetic: it is what stopped the sim beating. One
+   * `msvc8::vector<SWorldParticle>` was filled through `push_back`, which
+   * copies with the implicit copy constructor and takes no reference, and
+   * emptied through the hand-rolled `DestroyWorldParticleForVectorTailLocal`,
+   * which releases one. `CParticleTexture` refcounts therefore fell below what
+   * was taken and `CWldSession::DoBeat` faulted on a freed texture every frame.
+   * Giving `CountedPtr<T>` real ownership balanced the two halves; collapsing
+   * these lanes onto `msvc8::vector` removes the possibility of the two halves
+   * disagreeing again. Do not add new call sites here.
    */
   template <typename TValue>
   struct RenderBucketVectorRuntime
