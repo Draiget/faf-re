@@ -44,6 +44,20 @@ namespace moho
    * adding the five missing. The one piece still unresolved is the parameter
    * type of the object-taking overloads -- whatever owns an index at `+0x18`.
    * Do not guess it: a wrong signature silently changes the vtable.
+   *
+   * Avenues already tried for that type, all dead ends, so do not re-walk
+   * them: slots 6/8/10 and 7/9/11 have **no code xrefs at all** -- their only
+   * reference is the `??_7CDecalGroup@Moho@@6B@` vtable itself, so every call
+   * is an indirect dispatch the export does not capture. `CDecalManager::Load`
+   * (0x00877CD0), the obvious populator in the same TU, contains no dispatch
+   * through these slots either. `SDecalInfo` is not the type: its constructor
+   * leads with three `Wm3::Vec3f`, so `+0x18` lands inside the vectors.
+   *
+   * What is still worth trying: find the indirect dispatch by scanning for
+   * `call [reg+0x18]` / `[reg+0x20]` / `[reg+0x28]` on a value known to be an
+   * `IDecalGroup*`, or identify a decal object with an `int32` index at
+   * `+0x18` from the RTTI dump and confirm it against slot 7's scan of
+   * `mDecals` (a `msvc8::vector<std::int32_t>`).
    */
   class IDecalGroup
   {
