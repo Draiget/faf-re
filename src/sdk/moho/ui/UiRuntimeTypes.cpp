@@ -4222,26 +4222,12 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     "UserUnitScreenPosRuntimeView::mIUnitBridgeStorage offset must be 0x148"
   );
 
-  struct CUIWorldMeshRuntimeView
-  {
-    std::uint8_t mUnknown00To33[0x34]{};
-    moho::MeshInstance* mMeshInstance = nullptr; // +0x34
+  // CUIWorldMeshRuntimeView used to sit here: a pad-to-0x34 struct whose only
+  // member aliased CUIWorldMesh::mMeshInstance. That member is public and
+  // typed on the class, at the same offset and with its own static_assert, so
+  // the twelve call sites below now read `worldMesh->mMeshInstance` directly
+  // instead of reinterpret_casting the object to a parallel layout.
 
-    [[nodiscard]] static CUIWorldMeshRuntimeView* FromWorldMesh(moho::CUIWorldMesh* worldMesh) noexcept
-    {
-      return reinterpret_cast<CUIWorldMeshRuntimeView*>(worldMesh);
-    }
-
-    [[nodiscard]] static const CUIWorldMeshRuntimeView* FromWorldMesh(const moho::CUIWorldMesh* worldMesh) noexcept
-    {
-      return reinterpret_cast<const CUIWorldMeshRuntimeView*>(worldMesh);
-    }
-  };
-
-  static_assert(
-    offsetof(CUIWorldMeshRuntimeView, mMeshInstance) == 0x34,
-    "CUIWorldMeshRuntimeView::mMeshInstance offset must be 0x34"
-  );
 
   void ReleaseIntrusiveFont(CD3DFont*& font) noexcept
   {
@@ -21940,7 +21926,7 @@ int moho::cfunc_CUIWorldMeshSetStanceL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     VTransform stance{};
     stance.orient_ = orientation;
@@ -21969,7 +21955,7 @@ int moho::cfunc_CUIWorldMeshSetHiddenL(LuaPlus::LuaState* const state)
   LuaPlus::LuaStackObject hiddenArg(state, 2);
   const bool hidden = LuaPlus::LuaStackObject::GetBoolean(&hiddenArg);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->isHidden = hidden ? static_cast<std::uint8_t>(1u) : static_cast<std::uint8_t>(0u);
   }
@@ -21993,7 +21979,7 @@ int moho::cfunc_CUIWorldMeshIsHiddenL(LuaPlus::LuaState* const state)
   CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   bool isHidden = false;
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     isHidden = meshInstance->isHidden != 0;
   }
@@ -22025,7 +22011,7 @@ int moho::cfunc_CUIWorldMeshSetAuxiliaryParameterL(LuaPlus::LuaState* const stat
   }
   const float value = lua_tonumber(state->m_state, 2);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->auxiliaryParameter = value;
   }
@@ -22054,7 +22040,7 @@ int moho::cfunc_CUIWorldMeshSetFractionCompleteParameterL(LuaPlus::LuaState* con
   }
   const float value = lua_tonumber(state->m_state, 2);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->fractionCompleteParameter = value;
   }
@@ -22083,7 +22069,7 @@ int moho::cfunc_CUIWorldMeshSetFractionHealthParameterL(LuaPlus::LuaState* const
   }
   const float value = lua_tonumber(state->m_state, 2);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->fractionHealthParameter = value;
   }
@@ -22112,7 +22098,7 @@ int moho::cfunc_CUIWorldMeshSetLifetimeParameterL(LuaPlus::LuaState* const state
   }
   const float value = lua_tonumber(state->m_state, 2);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->lifetimeParameter = value;
   }
@@ -22139,7 +22125,7 @@ int moho::cfunc_CUIWorldMeshSetColorL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t color = SCR_DecodeColor(state, colorObject);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->color = static_cast<std::int32_t>(color);
   }
@@ -22165,7 +22151,7 @@ int moho::cfunc_CUIWorldMeshSetScaleL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject scaleObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f scale = SCR_FromLuaCopy<Wm3::Vector3f>(scaleObject);
 
-  MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
+  MeshInstance* const meshInstance = worldMesh->mMeshInstance;
   if (meshInstance != nullptr) {
     meshInstance->scale = scale;
   }
@@ -22222,8 +22208,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedPositionL(LuaPlus::LuaState* const st
 
   Wm3::Vector3f interpolatedPosition{};
   if (worldMesh != nullptr) {
-    const CUIWorldMeshRuntimeView* const worldMeshView = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh);
-    MeshInstance* const meshInstance = worldMeshView->mMeshInstance;
+    MeshInstance* const meshInstance = worldMesh->mMeshInstance;
     if (meshInstance != nullptr) {
       meshInstance->UpdateInterpolatedFields();
       interpolatedPosition = meshInstance->interpolatedPosition;
@@ -22429,8 +22414,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedOrientedBoxL(LuaPlus::LuaState* const
 
   Wm3::Box3f box{};
   if (worldMesh != nullptr) {
-    const CUIWorldMeshRuntimeView* const worldMeshView = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh);
-    MeshInstance* const meshInstance = worldMeshView->mMeshInstance;
+    MeshInstance* const meshInstance = worldMesh->mMeshInstance;
     if (meshInstance != nullptr) {
       meshInstance->UpdateInterpolatedFields();
       box = meshInstance->box;
@@ -22514,8 +22498,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* const stat
 
   Wm3::Vector2f interpolatedScroll{};
   if (worldMesh != nullptr) {
-    const CUIWorldMeshRuntimeView* const worldMeshView = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh);
-    MeshInstance* const meshInstance = worldMeshView->mMeshInstance;
+    MeshInstance* const meshInstance = worldMesh->mMeshInstance;
     if (meshInstance != nullptr) {
       const float t = MeshInstance::sCurrentInterpolant;
       interpolatedScroll.x = meshInstance->scroll1.x + (t * (meshInstance->scroll2.x - meshInstance->scroll1.x));
