@@ -19,6 +19,19 @@ namespace moho
   class CEconStorage;
   class Sim;
 
+  class CEconomy;
+
+  /**
+   * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
+   *
+   * What it does:
+   * Runs one army's per-tick economy: pools outstanding consumption demand,
+   * serves it from stored plus banked production at a ratio bounded by the
+   * scarcer resource, publishes `mIncome`/`mLastUse*`/`mStored`, and empties
+   * the per-tick banks. Called by `CArmyImpl::OnTick` with `army->EconomyInfo`.
+   */
+  void ProcessArmyEconomy(CEconomy& economy);
+
   /**
    * Runtime economy state serialized on army save/load lanes.
    */
