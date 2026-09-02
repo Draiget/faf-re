@@ -313,46 +313,6 @@ namespace moho
 
   } // namespace
 
-  /**
-   * Address: 0x005267A0 (FUN_005267A0, Moho::CopyOccupyRects)
-   *
-   * What it does:
-   * Rebuilds destination float-vector runtime lanes from source occupancy
-   * storage and copies the full `[begin,end)` float range.
-   */
-  msvc8::vector<float>* CopyOccupyRects(
-    const msvc8::vector<float>& source,
-    msvc8::vector<float>& destination
-  )
-  {
-    const auto& sourceView = msvc8::AsVectorRuntimeView(source);
-    auto& destinationView = msvc8::AsVectorRuntimeView(destination);
-
-    const std::uint32_t sourceCount = (sourceView.begin != nullptr)
-      ? static_cast<std::uint32_t>(sourceView.end - sourceView.begin)
-      : 0u;
-
-    destinationView.proxy = nullptr;
-    destinationView.begin = nullptr;
-    destinationView.end = nullptr;
-    destinationView.capacityEnd = nullptr;
-
-    if (sourceCount != 0u) {
-      if (sourceCount > msvc8::vector<float>::max_size()) {
-        msvc8::vector<float>::throw_too_long();
-      }
-
-      auto* const destinationBegin = static_cast<float*>(
-        ::operator new(static_cast<std::size_t>(sourceCount) * sizeof(float))
-      );
-      destinationView.begin = destinationBegin;
-      destinationView.end = destinationBegin;
-      destinationView.capacityEnd = destinationBegin + sourceCount;
-      destinationView.end = std::copy(sourceView.begin, sourceView.end, destinationBegin);
-    }
-
-    return &destination;
-  }
 
   /**
    * Address: 0x0051EE10 (FUN_0051EE10)
@@ -687,10 +647,7 @@ namespace moho
     // this is an ownership abandon, not a _Tidy(). Assigning an empty vector
     // here would add a free the binary does not perform, so the raw lane
     // write stays until the ownership transfer is traced.
-    auto& weaponBlueprintsView = msvc8::AsVectorRuntimeView(Weapons.WeaponBlueprints);
-    weaponBlueprintsView.begin = nullptr;
-    weaponBlueprintsView.end = nullptr;
-    weaponBlueprintsView.capacityEnd = nullptr;
+    Weapons.WeaponBlueprints.release_storage_without_free();
 
     mLifeBarRender = 1;
   }
