@@ -4930,6 +4930,9 @@ namespace moho
     frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
     boundsValid = 1;
+
+    // Same republish as the pose overload, at 0x007DEA0B..0x007DEA1A.
+    db.UpdateBounds(GetSweptAlignedBox());
   }
 
   /**
@@ -4999,8 +5002,13 @@ namespace moho
     startTransform = startTransformArg;
     boundsValid = 1;
 
-    // Keep interpolated pose-derived bounds coherent for immediate users.
-    UpdateInterpolatedFields();
+    // Republish the swept bounds into this instance's spatial-db entry
+    // (0x007DEBD4..0x007DEBE4: set the dirty byte, GetSweptAlignedBox, then
+    // UpdateBounds on `this + 0x0C`, which is `db`). Without it the entry keeps
+    // the NaN box the ctor gave it, `MeshRenderer::Batch`'s
+    // CollectAllInVolume never matches the instance, and the mesh is never
+    // drawn at all.
+    db.UpdateBounds(GetSweptAlignedBox());
   }
 
   /**
