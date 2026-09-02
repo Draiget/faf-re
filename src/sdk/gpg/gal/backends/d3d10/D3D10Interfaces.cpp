@@ -33,6 +33,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -5388,6 +5389,55 @@ namespace gpg::gal
     auto* const formatter = new (static_cast<void*>(formatterStorage)) Float16HardwareVertexFormatterD3D10();
     formatter->~Float16HardwareVertexFormatterD3D10();
   }
+
+  namespace
+  {
+    HardwareVertexFormatterD3D10 gHardwareVertexFormatterD3D10;
+    Float16HardwareVertexFormatterD3D10 gFloat16HardwareVertexFormatterD3D10;
+  } // namespace
+
+  /**
+   * Address: 0x00BE9B40 (FUN_00BE9B40, register_HardwareVertexFormatterD3D10)
+   *
+   * What it does:
+   * Constructs the process-wide D3D10 hardware-vertex formatter instance and
+   * installs its exit-time teardown (ShutdownHardwareVertexFormatterD3D10Adapter,
+   * matching the same "typed adapter" teardown lane its D3D9 sibling and this
+   * class's own destructor already model).
+   */
+  void register_HardwareVertexFormatterD3D10()
+  {
+    (void)gHardwareVertexFormatterD3D10;
+    (void)std::atexit(&ShutdownHardwareVertexFormatterD3D10Adapter);
+  }
+
+  /**
+   * Address: 0x00BE9B60 (FUN_00BE9B60, register_Float16HardwareVertexFormatterD3D10)
+   *
+   * What it does:
+   * Constructs the process-wide D3D10 float16 hardware-vertex formatter
+   * instance and installs its exit-time teardown
+   * (ShutdownFloat16HardwareVertexFormatterD3D10Adapter).
+   */
+  void register_Float16HardwareVertexFormatterD3D10()
+  {
+    (void)gFloat16HardwareVertexFormatterD3D10;
+    (void)std::atexit(&ShutdownFloat16HardwareVertexFormatterD3D10Adapter);
+  }
+
+  namespace
+  {
+    struct D3D10HardwareVertexFormatterBootstrap
+    {
+      D3D10HardwareVertexFormatterBootstrap()
+      {
+        register_HardwareVertexFormatterD3D10();
+        register_Float16HardwareVertexFormatterD3D10();
+      }
+    };
+
+    [[maybe_unused]] D3D10HardwareVertexFormatterBootstrap gD3D10HardwareVertexFormatterBootstrap;
+  } // namespace
 
   /**
    * Address: 0x0094D910 (FUN_0094D910)
