@@ -163,6 +163,15 @@ namespace moho
   void register_ShaderVarPrimBatcherAlphaMultiplier();
 
   /**
+   * Address: 0x00BE6050 (FUN_00BE6050, register_ShaderVarPrimBatcherTime)
+   *
+   * What it does:
+   * Registers the prim-batcher `time` shader-var (lowercase in the binary's
+   * `.rdata` string) and its exit cleanup thunk.
+   */
+  void register_ShaderVarPrimBatcherTime();
+
+  /**
    * What it does:
    * Registers the terrain `TerrainHeightScale`/`TerrainTime` shader-vars.
    * See `ShaderVar.cpp` for the evidence basis (slot addresses confirmed
@@ -197,12 +206,41 @@ namespace moho
    */
   void cleanup_ShaderVarPrimBatcherAlphaMultiplier();
 
+  /**
+   * Address: 0x00C07480 (FUN_00C07480, the `atexit` target the registrar
+   * above installs)
+   *
+   * What it does:
+   * Runs the prim-batcher `time` shader-var destructor at process exit.
+   */
+  void cleanup_ShaderVarPrimBatcherTime();
+
   void cleanup_ShaderVarTerrainHeightScale();
   void cleanup_ShaderVarTerrainTime();
 
   [[nodiscard]] ShaderVar& GetPrimBatcherCompositeMatrixShaderVar();
   [[nodiscard]] ShaderVar& GetPrimBatcherTexture1ShaderVar();
   [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar();
+  [[nodiscard]] ShaderVar& GetPrimBatcherTimeShaderVar();
+
+  /**
+   * Address: 0x010BF4E0 (?shaderVarFrameGlowCopyAdd@Moho@@3UstructShaderVar@@A)
+   *
+   * What it does:
+   * The glow-copy strength `CBloomRenderer::DoBloom` binds (0x007F526A, then
+   * reads `.effectVar.var` at `+0x40`). Sits in the zero-fill tail of
+   * `.data`, so the shipped image starts it default-constructed.
+   */
+  extern ShaderVar shaderVarFrameGlowCopyAdd;
+
+  /**
+   * Address: 0x00BE12A0 (FUN_00BE12A0, register_ShaderVarFrameGlowCopyAdd)
+   *
+   * What it does:
+   * Registers `shaderVarFrameGlowCopyAdd` under the HLSL name
+   * `"GlowCopyAdd"` in the `"frame"` effect scope.
+   */
+  void register_ShaderVarFrameGlowCopyAdd();
 
   /**
    * Standalone terrain shader-var globals bound by every TerrainCommon

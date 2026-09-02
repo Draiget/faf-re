@@ -35,6 +35,7 @@ namespace
   DEFINE_SHADER_VAR_SLOT(0x010A7888u);
   DEFINE_SHADER_VAR_SLOT(0x010C0630u);
   DEFINE_SHADER_VAR_SLOT(0x010C02D0u);
+  DEFINE_SHADER_VAR_SLOT(0x010C4340u);
 
 #undef DEFINE_SHADER_VAR_SLOT
 
@@ -111,6 +112,7 @@ namespace
       moho::register_ShaderVarPrimBatcherCompositeMatrix();
       moho::register_ShaderVarPrimBatcherTexture1();
       moho::register_ShaderVarPrimBatcherAlphaMultiplier();
+      moho::register_ShaderVarPrimBatcherTime();
     }
   };
 
@@ -143,6 +145,11 @@ namespace moho
   [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar()
   {
     return AccessShaderVarSlot<0x010A7888u>();
+  }
+
+  [[nodiscard]] ShaderVar& GetPrimBatcherTimeShaderVar()
+  {
+    return AccessShaderVarSlot<0x010C4340u>();
   }
 
   /**
@@ -456,6 +463,31 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C07480 (FUN_00C07480, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Runs the prim-batcher time shader-var destructor at process exit.
+   */
+  void cleanup_ShaderVarPrimBatcherTime()
+  {
+    DestroyShaderVarSlot<0x010C4340u>();
+  }
+
+  /**
+   * Address: 0x00BE6050 (FUN_00BE6050, register_ShaderVarPrimBatcherTime)
+   *
+   * What it does:
+   * Registers the prim-batcher `time` shader-var (lowercase in the binary's
+   * `.rdata` string, unlike its `CompositeMatrix`/`Texture1`/
+   * `AlphaMultiplier` siblings) and its exit cleanup thunk.
+   */
+  void register_ShaderVarPrimBatcherTime()
+  {
+    RegisterPrimBatcherShaderVar<0x010C4340u>("time", &cleanup_ShaderVarPrimBatcherTime);
+  }
+
+  /**
    * Address: 0x00BE2F70 (FUN_00BE2F70, register_ShaderVarTerrainHeightScale)
    * Cleanup: 0x00C056A0 (registered via atexit)
    *
@@ -519,5 +551,33 @@ namespace moho
    * bound it to a null and DoBloom faulted calling Exists() on it.
    */
   ShaderVar shaderVarFrameGlowCopyAdd;
+
+  /**
+   * Address: 0x00BE12A0 (FUN_00BE12A0, register_ShaderVarFrameGlowCopyAdd)
+   *
+   * What it does:
+   * Registers `shaderVarFrameGlowCopyAdd` under the HLSL name `"GlowCopyAdd"`
+   * in the `"frame"` effect scope -- the registration `DoBloom`'s
+   * `shaderVarFrameGlowCopyAdd.Exists()` check depends on. No per-field
+   * exit-cleanup is modeled here, matching every other plain-global member
+   * of this file's `frame`/`terrain`/`water2`/`mesh` shader-var sets (see
+   * `MeshShaderVarSet`, `TerrainShaderVarSet`, `WaterShaderVars.cpp`,
+   * `CRenFrame.cpp`), none of which track individual `atexit` cleanup for
+   * their `RegisterShaderVar` calls.
+   */
+  void register_ShaderVarFrameGlowCopyAdd()
+  {
+    RegisterShaderVar("GlowCopyAdd", &shaderVarFrameGlowCopyAdd, "frame");
+  }
+
+  namespace
+  {
+    struct FrameGlowCopyAddShaderVarBootstrap
+    {
+      FrameGlowCopyAddShaderVarBootstrap() { moho::register_ShaderVarFrameGlowCopyAdd(); }
+    };
+
+    [[maybe_unused]] FrameGlowCopyAddShaderVarBootstrap gFrameGlowCopyAddShaderVarBootstrap;
+  } // namespace
 
 } // namespace moho
