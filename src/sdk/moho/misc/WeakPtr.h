@@ -284,6 +284,29 @@ namespace moho
     }
 #endif
 
+    /**
+     * @warning This faults today once projectile impact scripts actually run.
+     * `ownerLinkSlot` is `owner + kOwnerLinkOffset`, so a node whose owner was
+     * freed without being drained dereferences into released memory here --
+     * observed reading 0xF2B8458D from
+     * `Projectile::~Projectile` -> `CAiTarget::~CAiTarget` ->
+     * `CAiTarget::UnlinkEntityTargetRef` -> `UnlinkFromOwnerChain` -> here.
+     * See [[project_onimpact_shape_and_weakptr_crash]] for the trigger.
+     *
+     * What is already ruled out: the drain itself is correct, and it does run.
+     * `CScriptObject::~CScriptObject` calls `ClearWeakObjectChain`, whose body
+     * walks the chain nulling each node's `ownerLinkSlot`/`nextInOwner` exactly
+     * as `WeakObject::DetachAllWeakReferences` does. A node that had been
+     * drained would leave `IsLinkedInOwnerChain()` false and return above.
+     *
+     * The open lead is **which** `WeakObject` subobject was drained. Entity
+     * carries one at RTTI mdisp=4 inside `CScriptObject`, and `Unit.cpp:13838`
+     * calls a second, duplicate `ClearWeakObjectChain` on a *different* one --
+     * `static_cast<WeakObject&>(static_cast<IUnit&>(*this))`. A `WeakPtr` bound
+     * to one subobject's head is not drained by the destructor that drains the
+     * other, which would leave exactly this dangling slot. Confirm which head
+     * `CAiTarget`'s entity ref binds to before changing anything here.
+     */
     [[nodiscard]] bool ReplaceInOwnerChain(WeakPtr<T>* replacement) noexcept
     {
       if (!IsLinkedInOwnerChain()) {
