@@ -611,6 +611,766 @@ namespace
     }
   }
 
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarBool()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00670 (FUN_00C00670, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestVarBool`.
+   */
+  void cleanup_sim_TestVarBool_ConAliasDef()
+  {
+    ConAlias_sim_TestVarBool().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB130 (FUN_00BDB130, register_sim_TestVarBool_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestVarBool` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestVarBool_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestVarBool().InitializeRecovered(
+      "Test variable - not used.",
+      "sim_TestVarBool",
+      "DoSimCommand sim_TestVarBool"
+    );
+    (void)std::atexit(&cleanup_sim_TestVarBool_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVar()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C006D0 (FUN_00C006D0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestVar`.
+   */
+  void cleanup_sim_TestVar_ConAliasDef()
+  {
+    ConAlias_sim_TestVar().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB1B0 (FUN_00BDB1B0, register_sim_TestVar_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestVar` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestVar_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestVar().InitializeRecovered(
+      "Test variable - not used.",
+      "sim_TestVar",
+      "DoSimCommand sim_TestVar"
+    );
+    (void)std::atexit(&cleanup_sim_TestVar_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarUByte()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00730 (FUN_00C00730, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestVarUByte`.
+   */
+  void cleanup_sim_TestVarUByte_ConAliasDef()
+  {
+    ConAlias_sim_TestVarUByte().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB230 (FUN_00BDB230, register_sim_TestVarUByte_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestVarUByte` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestVarUByte_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestVarUByte().InitializeRecovered(
+      "Test variable - not used.",
+      "sim_TestVarUByte",
+      "DoSimCommand sim_TestVarUByte"
+    );
+    (void)std::atexit(&cleanup_sim_TestVarUByte_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarFloat()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00790 (FUN_00C00790, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestVarFloat`.
+   */
+  void cleanup_sim_TestVarFloat_ConAliasDef()
+  {
+    ConAlias_sim_TestVarFloat().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB2B0 (FUN_00BDB2B0, register_sim_TestVarFloat_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestVarFloat` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestVarFloat_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestVarFloat().InitializeRecovered(
+      "Test variable - not used.",
+      "sim_TestVarFloat",
+      "DoSimCommand sim_TestVarFloat"
+    );
+    (void)std::atexit(&cleanup_sim_TestVarFloat_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarStr()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C007F0 (FUN_00C007F0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestVarStr`.
+   */
+  void cleanup_sim_TestVarStr_ConAliasDef()
+  {
+    ConAlias_sim_TestVarStr().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB330 (FUN_00BDB330, register_sim_TestVarStr_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestVarStr` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestVarStr_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestVarStr().InitializeRecovered(
+      "Test variable - not used.",
+      "sim_TestVarStr",
+      "DoSimCommand sim_TestVarStr"
+    );
+    (void)std::atexit(&cleanup_sim_TestVarStr_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestFunc()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00880 (FUN_00C00880, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_TestFunc`.
+   */
+  void cleanup_sim_TestFunc_ConAliasDef()
+  {
+    ConAlias_sim_TestFunc().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB3A0 (FUN_00BDB3A0, register_sim_TestFunc_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_TestFunc` console alias text for sim-command dispatch.
+   */
+  void register_sim_TestFunc_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_TestFunc().InitializeRecovered(
+      "Test function - not used.",
+      "sim_TestFunc",
+      "DoSimCommand sim_TestFunc"
+    );
+    (void)std::atexit(&cleanup_sim_TestFunc_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimLog()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C008E0 (FUN_00C008E0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimLog`.
+   */
+  void cleanup_SimLog_ConAliasDef()
+  {
+    ConAlias_SimLog().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB410 (FUN_00BDB410, register_SimLog_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimLog` console alias text for sim-command dispatch.
+   */
+  void register_SimLog_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimLog().InitializeRecovered(
+      "Log a string (for debugging purposes)",
+      "SimLog",
+      "DoSimCommand SimLog"
+    );
+    (void)std::atexit(&cleanup_SimLog_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimWarn()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00940 (FUN_00C00940, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimWarn`.
+   */
+  void cleanup_SimWarn_ConAliasDef()
+  {
+    ConAlias_SimWarn().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB480 (FUN_00BDB480, register_SimWarn_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimWarn` console alias text for sim-command dispatch.
+   */
+  void register_SimWarn_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimWarn().InitializeRecovered(
+      "Log a warning string (for debugging purposes)",
+      "SimWarn",
+      "DoSimCommand SimWarn"
+    );
+    (void)std::atexit(&cleanup_SimWarn_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimError()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C009A0 (FUN_00C009A0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimError`.
+   */
+  void cleanup_SimError_ConAliasDef()
+  {
+    ConAlias_SimError().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB4F0 (FUN_00BDB4F0, register_SimError_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimError` console alias text for sim-command dispatch.
+   */
+  void register_SimError_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimError().InitializeRecovered(
+      "Log an error string (for debugging purposes)",
+      "SimError",
+      "DoSimCommand SimError"
+    );
+    (void)std::atexit(&cleanup_SimError_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimAssert()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00A00 (FUN_00C00A00, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimAssert`.
+   */
+  void cleanup_SimAssert_ConAliasDef()
+  {
+    ConAlias_SimAssert().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB560 (FUN_00BDB560, register_SimAssert_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimAssert` console alias text for sim-command dispatch.
+   */
+  void register_SimAssert_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimAssert().InitializeRecovered(
+      "Fail an assertion (for debugging purposes)",
+      "SimAssert",
+      "DoSimCommand SimAssert"
+    );
+    (void)std::atexit(&cleanup_SimAssert_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimCrash()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00A60 (FUN_00C00A60, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimCrash`.
+   */
+  void cleanup_SimCrash_ConAliasDef()
+  {
+    ConAlias_SimCrash().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDB5D0 (FUN_00BDB5D0, register_SimCrash_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimCrash` console alias text for sim-command dispatch.
+   */
+  void register_SimCrash_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimCrash().InitializeRecovered(
+      "Cause a crash (for debugging purposes)",
+      "SimCrash",
+      "DoSimCommand SimCrash"
+    );
+    (void)std::atexit(&cleanup_SimCrash_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_path_BackgroundUpdate()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00D40 (FUN_00C00D40, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `path_BackgroundUpdate`.
+   */
+  void cleanup_path_BackgroundUpdate_ConAliasDef()
+  {
+    ConAlias_path_BackgroundUpdate().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDBAD0 (FUN_00BDBAD0, register_path_BackgroundUpdate_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `path_BackgroundUpdate` console alias text for sim-command dispatch.
+   */
+  void register_path_BackgroundUpdate_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_path_BackgroundUpdate().InitializeRecovered(
+      "Update pathfinding tables in background",
+      "path_BackgroundUpdate",
+      "DoSimCommand path_BackgroundUpdate"
+    );
+    (void)std::atexit(&cleanup_path_BackgroundUpdate_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_path_BackgroundBudget()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00DA0 (FUN_00C00DA0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `path_BackgroundBudget`.
+   */
+  void cleanup_path_BackgroundBudget_ConAliasDef()
+  {
+    ConAlias_path_BackgroundBudget().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDBB50 (FUN_00BDBB50, register_path_BackgroundBudget_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `path_BackgroundBudget` console alias text for sim-command dispatch.
+   */
+  void register_path_BackgroundBudget_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_path_BackgroundBudget().InitializeRecovered(
+      "Maximum number of steps to run pathfinder in background",
+      "path_BackgroundBudget",
+      "DoSimCommand path_BackgroundBudget"
+    );
+    (void)std::atexit(&cleanup_path_BackgroundBudget_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_ChecksumPeriod()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00E00 (FUN_00C00E00, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_ChecksumPeriod`.
+   */
+  void cleanup_sim_ChecksumPeriod_ConAliasDef()
+  {
+    ConAlias_sim_ChecksumPeriod().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDBBD0 (FUN_00BDBBD0, register_sim_ChecksumPeriod_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_ChecksumPeriod` console alias text for sim-command dispatch.
+   */
+  void register_sim_ChecksumPeriod_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_ChecksumPeriod().InitializeRecovered(
+      "How many beats between checksums.",
+      "sim_ChecksumPeriod",
+      "DoSimCommand sim_ChecksumPeriod"
+    );
+    (void)std::atexit(&cleanup_sim_ChecksumPeriod_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_sim_DebugCrash()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C00F50 (FUN_00C00F50, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `sim_DebugCrash`.
+   */
+  void cleanup_sim_DebugCrash_ConAliasDef()
+  {
+    ConAlias_sim_DebugCrash().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDBD50 (FUN_00BDBD50, register_sim_DebugCrash_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `sim_DebugCrash` console alias text for sim-command dispatch.
+   */
+  void register_sim_DebugCrash_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_sim_DebugCrash().InitializeRecovered(
+      "Crash the sim.",
+      "sim_DebugCrash",
+      "DoSimCommand sim_DebugCrash"
+    );
+    (void)std::atexit(&cleanup_sim_DebugCrash_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_SimLua()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C01210 (FUN_00C01210, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SimLua`.
+   */
+  void cleanup_SimLua_ConAliasDef()
+  {
+    ConAlias_SimLua().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDBF10 (FUN_00BDBF10, register_SimLua_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `SimLua` console alias text for sim-command dispatch.
+   */
+  void register_SimLua_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_SimLua().InitializeRecovered(
+      "Run some lua code in the sim's Lua.",
+      "SimLua",
+      "DoSimCommand SimLua"
+    );
+    (void)std::atexit(&cleanup_SimLua_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_DebugMoveCamera()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C01330 (FUN_00C01330, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `DebugMoveCamera`.
+   */
+  void cleanup_DebugMoveCamera_ConAliasDef()
+  {
+    ConAlias_DebugMoveCamera().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDC220 (FUN_00BDC220, register_DebugMoveCamera_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `DebugMoveCamera` console alias text for sim-command dispatch.
+   */
+  void register_DebugMoveCamera_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_DebugMoveCamera().InitializeRecovered(
+      "Debug function for moving the camera in sim script.",
+      "DebugMoveCamera",
+      "DoSimCommand DebugMoveCamera"
+    );
+    (void)std::atexit(&cleanup_DebugMoveCamera_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_path_TimeoutPreview()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C01970 (FUN_00C01970, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `path_TimeoutPreview`.
+   */
+  void cleanup_path_TimeoutPreview_ConAliasDef()
+  {
+    ConAlias_path_TimeoutPreview().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDC7A0 (FUN_00BDC7A0, register_path_TimeoutPreview_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `path_TimeoutPreview` console alias text for sim-command dispatch.
+   */
+  void register_path_TimeoutPreview_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_path_TimeoutPreview().InitializeRecovered(
+      "Maximum number of ticks to allow pathfinder preview to take",
+      "path_TimeoutPreview",
+      "DoSimCommand path_TimeoutPreview"
+    );
+    (void)std::atexit(&cleanup_path_TimeoutPreview_ConAliasDef);
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_path_GeneratePreview()
+  {
+    static moho::CConAlias sAlias{};
+    return sAlias;
+  }
+
+  /**
+   * Address: 0x00C019D0 (FUN_00C019D0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `path_GeneratePreview`.
+   */
+  void cleanup_path_GeneratePreview_ConAliasDef()
+  {
+    ConAlias_path_GeneratePreview().ShutdownRecovered();
+  }
+
+  /**
+   * Address: 0x00BDC820 (FUN_00BDC820, register_path_GeneratePreview_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `path_GeneratePreview` console alias text for sim-command dispatch.
+   */
+  void register_path_GeneratePreview_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_path_GeneratePreview().InitializeRecovered(
+      "Do a pathfind for the UI preview",
+      "path_GeneratePreview",
+      "DoSimCommand path_GeneratePreview"
+    );
+    (void)std::atexit(&cleanup_path_GeneratePreview_ConAliasDef);
+  }
+
   struct SimDebugCommandRegistrationsBootstrap
   {
     SimDebugCommandRegistrationsBootstrap()
@@ -681,6 +1441,25 @@ namespace
       moho::register_DebugDumpArmyStats_ConAliasDef();
       moho::register_DebugDumpArmyStats_SimConFuncDef();
       moho::register_path_GeneratePreview_SimConFuncDef();
+      register_sim_TestVarBool_ConAliasDef();
+      register_sim_TestVar_ConAliasDef();
+      register_sim_TestVarUByte_ConAliasDef();
+      register_sim_TestVarFloat_ConAliasDef();
+      register_sim_TestVarStr_ConAliasDef();
+      register_sim_TestFunc_ConAliasDef();
+      register_SimLog_ConAliasDef();
+      register_SimWarn_ConAliasDef();
+      register_SimError_ConAliasDef();
+      register_SimAssert_ConAliasDef();
+      register_SimCrash_ConAliasDef();
+      register_path_BackgroundUpdate_ConAliasDef();
+      register_path_BackgroundBudget_ConAliasDef();
+      register_sim_ChecksumPeriod_ConAliasDef();
+      register_sim_DebugCrash_ConAliasDef();
+      register_SimLua_ConAliasDef();
+      register_DebugMoveCamera_ConAliasDef();
+      register_path_TimeoutPreview_ConAliasDef();
+      register_path_GeneratePreview_ConAliasDef();
     }
   };
 
