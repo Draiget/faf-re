@@ -892,6 +892,21 @@ namespace moho
     );
 
     /**
+     * Address: 0x00734BA0 (FUN_00734BA0, Moho::Sim::sim_TestFunc)
+     *
+     * What it does:
+     * Debug console-command stub for the `sim_TestFunc` test entry: prints
+     * this sim instance's own address and returns.
+     */
+    static int sim_TestFunc(
+      Sim* sim,
+      CSimConCommand::ParsedCommandArgs* commandArgs,
+      Wm3::Vector3f* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    );
+
+    /**
      * Address: 0x0074B3F0 (FUN_0074B3F0, Moho::Sim::ScenarioMethod)
      *
      * What it does:
