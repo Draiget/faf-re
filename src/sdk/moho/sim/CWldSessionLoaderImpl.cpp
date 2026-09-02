@@ -569,16 +569,13 @@ namespace moho
     return &sWldSessionLoader;
   }
 
-  /**
-   * Address: 0x00885630 (FUN_00885630, sub_885630)
-   *
-   * What it does:
-   * Rebinds the loader singleton storage to base `IWldSessionLoader` vtable
-   * lane and returns the same singleton-address as interface pointer.
-   */
-  [[maybe_unused]] IWldSessionLoader* ResetWldSessionLoaderSingletonToInterfaceVtable() noexcept
-  {
-    IWldSessionLoader* const loader = static_cast<IWldSessionLoader*>(GetWldSessionLoader());
-    return ::new (loader) IWldSessionLoader();
-  }
+  // 0x00885630 used to live here as
+  // ResetWldSessionLoaderSingletonToInterfaceVtable, placement-new-ing an
+  // IWldSessionLoader over the singleton to "rebind the vtable lane". The
+  // binary body is two instructions -- install the base vftable pointer,
+  // return the object -- which is simply what MSVC emits for the abstract
+  // base's constructor. It is now cited on IWldSessionLoader::IWldSessionLoader
+  // in the header, where the derived loader's constructor invokes it. The
+  // helper had no callers, and with the interface's virtuals correctly pure it
+  // could not compile anyway: an abstract class cannot be constructed.
 } // namespace moho

@@ -9,8 +9,26 @@
 
 namespace moho
 {
+  // Every virtual below except the destructor is pure. IWldSessionLoader's
+  // vftable (0x00E49FA4) has all 7 of its slots pointing at _purecall
+  // (0x00A82547), so this interface contributes no bodies; the stubs that used
+  // to define them in EngineMethodStubs2.cpp were inventing behaviour.
   class IWldSessionLoader
   {
+  protected:
+    /**
+     * Address: 0x00885630 (FUN_00885630)
+     *
+     * What it does:
+     * Installs the base `IWldSessionLoader` vtable lane and returns `this` --
+     * `mov <obj>.__vftable, offset ??_7IWldSessionLoader@Moho@@6B@` then
+     * `mov eax, <obj>`. That is exactly what MSVC emits for this abstract
+     * base's constructor, which the derived loader runs before overwriting
+     * the lane with its own vtable. Protected because the class is abstract:
+     * only a derived constructor may run it.
+     */
+    IWldSessionLoader() = default;
+
   public:
     /**
      * Address: 0x00885450 (FUN_00885450, ??1IWldSessionLoader@Moho@@QAE@@Z)
@@ -24,7 +42,7 @@ namespace moho
     /**
      * Address: 0x00885890 (FUN_00885890, ?SetCreated@CWldSessionLoaderImpl@Moho@@UAEXXZ)
      */
-    virtual void SetCreated();
+    virtual void SetCreated() = 0;
 
     /**
      * Address: 0x008858A0 (FUN_008858A0, ?GetScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
@@ -32,22 +50,22 @@ namespace moho
      * What it does:
      * Reorders requested scenario into MRU position and optionally marks it as active game-data source.
      */
-    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData);
+    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) = 0;
 
     /**
      * Address: 0x00885920 (FUN_00885920, ?CreateScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods);
+    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) = 0;
 
     /**
      * Address: 0x00885970 (FUN_00885970, ?IsLoaded@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual bool IsLoaded();
+    virtual bool IsLoaded() = 0;
 
     /**
      * Address: 0x008859B0 (FUN_008859B0, ?LoadGameData@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldGameData* LoadGameData(SWldGameData* outData);
+    virtual SWldGameData* LoadGameData(SWldGameData* outData) = 0;
 
     /**
      * Address: 0x00885AD0 (FUN_00885AD0, ?Func5@CWldSessionLoaderImpl@Moho@@...)
@@ -55,7 +73,7 @@ namespace moho
      * What it does:
      * Drives background scenario-load scheduling and eviction.
      */
-    virtual void Update();
+    virtual void Update() = 0;
 
     /**
      * Address: 0x008856E0 (FUN_008856E0, ?Func6@CWldSessionLoaderImpl@Moho@@...)
@@ -63,7 +81,7 @@ namespace moho
      * What it does:
      * Finalizes loader runtime and destroys all scenario entries.
      */
-    virtual void Finalize();
+    virtual void Finalize() = 0;
   };
 
   class CWldSessionLoaderImpl final : public IWldSessionLoader
