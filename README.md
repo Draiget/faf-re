@@ -10,47 +10,47 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`99.42%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `66,778`*
+  - *Total amount of completed tokens: `66,782`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,901` (79.22%)
-- `skip`: `8,137` (12.19%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `52,688` (78.90%)
+- `skip`: `8,354` (12.51%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,740` (8.60%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `502` (0.75%)**
+- **`blocked`: `498` (0.74%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `505`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `505`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `501`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `501`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (52,901 functions) — binary caller context
+### Recovered (52,689 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `17,202` | 32.52% |
-| Vtable-anchored (virtual override of a recovered class) | `5,894` | 11.14% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,612` | 10.61% |
-| No recovered caller token yet (orphan risk) | `1,678` | 3.17% |
-| No callsite evidence (no recorded code/data caller in the index) | `22,295` | 42.14% |
+| **Recovered caller token exists** (source edge still requires verification) | `17,171` | 32.59% |
+| Vtable-anchored (virtual override of a recovered class) | `5,892` | 11.18% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,609` | 10.65% |
+| No recovered caller token yet (orphan risk) | `1,650` | 3.13% |
+| No callsite evidence (no recorded code/data caller in the index) | `22,147` | 42.03% |
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (505 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (501 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `8` | 1.58% |
-| Vtable-anchored (recover with the owning class) | `83` | 16.44% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `8` | 1.60% |
+| Vtable-anchored (recover with the owning class) | `82` | 16.37% |
 | Framework dispatch (wx/EH/Lua/reflection) | `0` | 0.00% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `136` | 26.93% |
-| No indexed callsite evidence (needs investigation/evidence) | `278` | 55.05% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `133` | 26.55% |
+| No indexed callsite evidence (needs investigation/evidence) | `278` | 55.49% |
 | Unclassified data xref (manual review) | `0` | 0.00% |
 | RTTI-only | `0` | 0.00% |
 
