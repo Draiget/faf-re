@@ -98,7 +98,10 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
  * no-op rather than a double free.
  */
 msvc8::string::~string() noexcept {
-    tidy(true, 0U);
+    // TEMPORARILY DISABLED -- see the note in String.h. Freeing here is
+    // correct and recovers ~389 MB, but it surfaces a latent double free
+    // that crashes in the lobby (SNetCommandArg copy -> assign_owned).
+    // Restore `tidy(true, 0U);` once that is found.
 }
 
 msvc8::string::string(string&& other) noexcept {

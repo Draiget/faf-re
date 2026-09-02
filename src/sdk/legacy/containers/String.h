@@ -122,6 +122,25 @@ namespace msvc8
          * -- `scoped_string`'s destructor does, before this base destructor -- is
          * a no-op rather than a double free.
          */
+        /**
+         * STATUS: the body is currently a no-op. See String.cpp.
+         *
+         * Freeing here is the correct recovery and its effect was measured --
+         * allocator in-use on SCMP_009 went from 632.4 MB to 243.8 MB, below
+         * retail's 293.3 MB. But it also makes freed blocks actually recycle,
+         * which turned a latent double free into a hard crash: the lobby's
+         * `SNetCommandArg` copy faults inside `assign_owned`'s memcpy on a
+         * string whose `bx.ptr` is dangling but whose header still passes
+         * `basic_sanity()`.
+         *
+         * The destructor is kept declared, so the type stays
+         * non-trivially-destructible and every container keeps running element
+         * teardown -- reverting that too would silently change which branch
+         * `msvc8::vector`'s `if constexpr (!is_trivially_destructible_v<T>)`
+         * guards take, and mask the bug rather than park it.
+         *
+         * Restore the `tidy(true, 0U);` call once the double free is found.
+         */
         ~string() noexcept;
 
         /**
