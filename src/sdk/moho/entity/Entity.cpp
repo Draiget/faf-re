@@ -41,6 +41,7 @@
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/RResId.h"
@@ -831,37 +832,6 @@ namespace
     return target;
   }
 
-  struct SyncCameraShakeRequest
-  {
-    float centerX;
-    float centerY;
-    float centerZ;
-    float radius;
-    float maxIntensity;
-    float minIntensity;
-    float durationSeconds;
-  };
-  static_assert(sizeof(SyncCameraShakeRequest) == 0x1C, "SyncCameraShakeRequest size must be 0x1C");
-
-  struct SimCameraShakeQueueRuntimeView
-  {
-    std::uint32_t lane00 = 0u;  // +0x00
-    msvc8::vector<SyncCameraShakeRequest> mSyncCamShake;
-  };
-  static_assert(
-    offsetof(SimCameraShakeQueueRuntimeView, mSyncCamShake) == 0x04,
-    "SimCameraShakeQueueRuntimeView::mSyncCamShake offset must be 0x04"
-  );
-
-  struct SimCameraShakeQueueOwnerRuntimeView
-  {
-    std::uint8_t pad_0000[0x09C8];
-    SimCameraShakeQueueRuntimeView mShakeQueue;
-  };
-  static_assert(
-    offsetof(SimCameraShakeQueueOwnerRuntimeView, mShakeQueue) == 0x09C8,
-    "SimCameraShakeQueueOwnerRuntimeView::mShakeQueue offset must be 0x09C8"
-  );
 
   /**
    * Address: 0x00692700 (FUN_00692700, func_ShakeCamera)
@@ -869,30 +839,9 @@ namespace
    * What it does:
    * Appends one camera-shake request to the sim sync camera-shake queue.
    */
-  void func_ShakeCamera(SimCameraShakeQueueRuntimeView* const queueRuntime, const SyncCameraShakeRequest& request)
+  void func_ShakeCamera(msvc8::vector<moho::SCamShakeParams>& shakeQueue, const moho::SCamShakeParams& request)
   {
-    if (queueRuntime == nullptr) {
-      return;
-    }
-    queueRuntime->mSyncCamShake.push_back(request);
-  }
-
-  /**
-   * Address: 0x00689F10 (FUN_00689F10)
-   *
-   * What it does:
-   * Resolves one owner queue lane at offset `+0x9C8` and forwards one camera
-   * shake request append into `func_ShakeCamera`.
-   */
-  [[maybe_unused]] void func_ShakeCameraOwnerQueueAdapter(
-    SimCameraShakeQueueOwnerRuntimeView* const ownerRuntime,
-    const SyncCameraShakeRequest& request
-  )
-  {
-    if (ownerRuntime == nullptr) {
-      return;
-    }
-    func_ShakeCamera(&ownerRuntime->mShakeQueue, request);
+    shakeQueue.push_back(request);
   }
 
   [[nodiscard]] gpg::RRef MakeVisibilityModeRef(moho::EVisibilityMode* const visibilityMode)
@@ -5532,16 +5481,13 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     if (sim != nullptr) {
-      SyncCameraShakeRequest request{};
-      request.centerX = entity->Position.x;
-      request.centerY = entity->Position.y;
-      request.centerZ = entity->Position.z;
-      request.radius = radius;
-      request.maxIntensity = maxIntensity;
-      request.minIntensity = minIntensity;
-      request.durationSeconds = durationSeconds;
-      auto* const ownerRuntime = reinterpret_cast<SimCameraShakeQueueOwnerRuntimeView*>(sim);
-      func_ShakeCamera(&ownerRuntime->mShakeQueue, request);
+      moho::SCamShakeParams request{};
+      request.mCenter = entity->Position;
+      request.mMaxRange = radius;
+      request.mMinMagnitude = maxIntensity;
+      request.mMaxMagnitude = minIntensity;
+      request.mDuration = durationSeconds;
+      func_ShakeCamera(sim->mSyncCamShake, request);
     }
 
     return 0;

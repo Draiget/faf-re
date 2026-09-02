@@ -8572,6 +8572,14 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     mDecalBuffer->SwapVectors(&outSyncData->mAddDecals, &outSyncData->mRemoveDecals);
   }
 
+  // 0x00747700..0x00747724: the camera-shake requests the beat accumulated,
+  // swapped over like the lanes below. `Sim::mSyncCamShake` (Sim+0x09C8) was
+  // declared `msvc8::vector<void*> mSyncSerializeGroup1` and had no users at
+  // all; the `ShakeCamera` Lua binding reached the same storage through a
+  // `reinterpret_cast<SimCameraShakeQueueOwnerRuntimeView*>(sim)` whose
+  // `pad_0000[0x09C8]` pinned the offset. Both sides are `SCamShakeParams` now.
+  mSyncCamShake.swap(outSyncData->mCamShakeParams);
+
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
   // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
