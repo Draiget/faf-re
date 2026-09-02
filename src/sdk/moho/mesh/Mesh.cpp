@@ -2687,16 +2687,6 @@ namespace
     return transform;
   }
 
-  [[nodiscard]] boost::shared_ptr<moho::RScmResource>
-  ResolveMeshResourceForLod(const msvc8::string& meshPath, moho::CResourceWatcher* const ownerWatcher)
-  {
-    // Address chain: 0x007DCED0 -> 0x00539BA0 -> 0x004ABEE0 -> 0x004AA220.
-    // Full resource-manager lifting is pending; keep the API seam typed.
-    (void)meshPath;
-    (void)ownerWatcher;
-    return {};
-  }
-
   [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>
   ResolveMaterialTextureSheet(const msvc8::string& textureName, moho::CResourceWatcher* const resourceWatcher)
   {
@@ -4309,7 +4299,9 @@ namespace moho
     // (FUN_007E6650) so the MSVC8 `shared_ptr<RMeshBlueprintLOD>(RMeshBlueprintLOD*)`
     // template emission symbol is preserved.
     ConstructSharedMeshBlueprintLODFromRaw(lodBlueprintCopy, new RMeshBlueprintLOD(blueprintLod));
-    res = ResolveMeshResourceForLod(blueprintLod.mMeshName, ownerWatcher);
+    // 0x007DCF58: the LOD's model path goes straight through the shared
+    // `GetModel` resource lane; there is no local caching or empty-path guard.
+    res = GetModel(blueprintLod.mMeshName.c_str(), ownerWatcher);
     previousResource = previousResourceArg ? previousResourceArg : res;
     cutoff = blueprintLod.mLodCutoff;
     scrolling = blueprintLod.mScrolling;
@@ -5473,7 +5465,11 @@ namespace moho
       return nullptr;
     }
 
-    if (lodBegin->mMeshName.empty()) {
+    // 0x007DF5AB..0x007DF5BC: the front LOD's model is resolved up front and
+    // the whole call is abandoned when it does not load. Without this the
+    // renderer hands back an instance whose mesh has a LOD but no resource,
+    // and `UserEntity::CreateMeshInstance` faults on the null skeleton.
+    if (!GetModel(lodBegin->mMeshName.c_str(), nullptr)) {
       return nullptr;
     }
 

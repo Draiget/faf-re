@@ -641,27 +641,15 @@ namespace moho
    */
   boost::shared_ptr<RScmResource> RMeshBlueprint::GetMesh() const
   {
-    gpg::RType* resourceType = moho::RScmResource::sType;
-    if (resourceType == nullptr) {
-      resourceType = gpg::LookupRType(typeid(moho::RScmResource));
-      moho::RScmResource::sType = resourceType;
-    }
-
     for (const RMeshBlueprintLOD& lod : mLods) {
       if (lod.mMeshName.empty()) {
         continue;
       }
 
-      boost::weak_ptr<RScmResource> weakResource{};
-      (void)moho::RES_GetResource(
-        &weakResource,
-        lod.mMeshName.c_str(),
-        nullptr,
-        resourceType
-      );
-
-      if (boost::shared_ptr<RScmResource> shared = weakResource.lock(); shared) {
-        return shared;
+      // 0x0067A650: each candidate path goes through the shared `GetModel`
+      // resource lane, which owns the cached-RType resolution.
+      if (boost::shared_ptr<RScmResource> resource = GetModel(lod.mMeshName.c_str(), nullptr); resource) {
+        return resource;
       }
     }
 
