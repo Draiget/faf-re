@@ -11680,6 +11680,14 @@ namespace
     return out;
   }
 
+} // namespace
+
+// Given moho:: linkage rather than internal: the shipped binary had this
+// file-static beside its only caller, but our tree recovers that caller
+// (ISSUE_FactoryCommand) into CWldSession.cpp, so an internal-linkage body
+// here can never satisfy it - it was one of the /FORCE-swallowed LNK2019s.
+namespace moho
+{
   /**
    * Address: 0x008B00A0 (FUN_008B00A0, func_DecodeEntIdSet)
    *
@@ -11731,7 +11739,7 @@ namespace
       (void)out.Bits().Add(entityId);
     }
   }
-} // namespace
+} // namespace moho
 
 /**
  * Address: 0x00749B60 (FUN_00749B60, ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
