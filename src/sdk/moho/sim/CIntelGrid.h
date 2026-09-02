@@ -42,18 +42,6 @@ namespace moho
 {
   class STIMap;
 
-  /**
-   * Address: 0x005CAFB0 (FUN_005CAFB0, boost::shared_ptr_CIntelGrid::shared_ptr_CIntelGrid)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CIntelGrid>` from one raw intel-grid pointer
-   * lane.
-   */
-  boost::shared_ptr<CIntelGrid>* ConstructSharedIntelGridFromRaw(
-    boost::shared_ptr<CIntelGrid>* outIntelGrid,
-    CIntelGrid* intelGrid
-  );
-
   struct SDelayedSubVizInfo
   {
     static gpg::RType* sType;

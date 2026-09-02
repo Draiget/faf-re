@@ -281,21 +281,6 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x005CAFB0 (FUN_005CAFB0, boost::shared_ptr_CIntelGrid::shared_ptr_CIntelGrid)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CIntelGrid>` from one raw intel-grid pointer
-   * lane.
-   */
-  boost::shared_ptr<CIntelGrid>* ConstructSharedIntelGridFromRaw(
-    boost::shared_ptr<CIntelGrid>* const outIntelGrid,
-    CIntelGrid* const intelGrid
-  )
-  {
-    return ::new (outIntelGrid) boost::shared_ptr<CIntelGrid>(intelGrid);
-  }
-
-  /**
    * Address: 0x00507720 (FUN_00507720, ??0CIntelGrid@Moho@@QAE@PBVSTIMap@1@H@Z)
    *
    * What it does:

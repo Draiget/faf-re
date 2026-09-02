@@ -616,20 +616,6 @@ namespace moho
   gpg::RType* CAniPose::sType = nullptr;
 
   /**
-   * Address: 0x0063D210 (FUN_0063D210, boost::shared_ptr_CAniPose::shared_ptr_CAniPose)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CAniPose>` from one raw pose pointer lane.
-   */
-  boost::shared_ptr<CAniPose>* ConstructSharedAniPoseFromRaw(
-    boost::shared_ptr<CAniPose>* const outPose,
-    CAniPose* const pose
-  )
-  {
-    return ::new (outPose) boost::shared_ptr<CAniPose>(pose);
-  }
-
-  /**
    * Address: 0x0063E180 (FUN_0063E180, boost::detail::shared_count_CAniPose::shared_count_CAniPose)
    *
    * What it does:
