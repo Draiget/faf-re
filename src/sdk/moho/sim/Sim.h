@@ -70,6 +70,7 @@ namespace moho
   // as the element type of a msvc8::vector<T> member (SimDriver.h forward-
   // declares it the same way for SSyncData::mFollowCameras).
   struct SCamFollowParams;
+  struct SCamShakeParams;
 
   /**
    * Address: 0x007538C0 (FUN_007538C0, boost::shared_ptr_SParticleBuffer::shared_ptr_SParticleBuffer)
@@ -1500,7 +1501,14 @@ namespace moho
     /// order -- the beat-copy site that drains this lane into
     /// `mFollowCameras` is not yet recovered.
     msvc8::vector<SCamFollowParams> mSyncSerializeGroup0; // 0x09B8
-    msvc8::vector<void*> mSyncSerializeGroup1;
+    /// Per-beat camera-shake requests, queued by the `ShakeCamera` Lua binding
+    /// (`Entity.cpp`, FUN_00692700) and drained into
+    /// `SSyncData::mCamShakeParams` (+0x1F0) by `Sim::Sync`'s swap. Was
+    /// declared `msvc8::vector<void*> mSyncSerializeGroup1` with no users at
+    /// all, while `Entity.cpp` reached the same storage through a
+    /// `reinterpret_cast<SimCameraShakeQueueOwnerRuntimeView*>(sim)` whose
+    /// `pad_0000[0x09C8]` pinned this exact offset.
+    msvc8::vector<SCamShakeParams> mSyncCamShake; // 0x09C8
     msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // 0x9D8 (was mSyncSerializeGroup3)
     msvc8::vector<SPendingPoseCopy> mPendingPoseCopies; // 0x9E8 (was mSyncSerializeGroup4)
     // 0x09F8 / 0x0A08: accumulated map-rect lists (each an msvc8::vector<gpg::Rect2i>,
