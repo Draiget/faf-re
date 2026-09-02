@@ -3873,6 +3873,37 @@ namespace msvc8
              * (now `mEnvLookup.erase(key)`, `RemoveEnvLookup`) and the
              * whole/partial-range erase walk (now `erase_range`'s slow path
              * below).
+             *
+             * Address: 0x007E47E0 (FUN_007E47E0, sub_7E47E0) -- `msvc8::map<
+             * Moho::MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>::
+             * erase_node` (`MeshBatchBucketTree`, `MeshBatchKey.h`), isNil@
+             * +0x2D (0x0D header + 0x10 `MeshBatchKey` + 0x10
+             * `MeshBatchInstanceVector` = 0x2D). Same `_Isnil` check +
+             * `out_of_range("invalid map/set<T> iterator")` throw, CLRS
+             * transplant (two-child case captures the in-order successor via
+             * this instantiation's `rb_increment`/`sub_7E42F0`, cited on
+             * `rb_increment` above), `erase_rebalance`-shaped fixup
+             * (`sub_7E4AC0`/`sub_7E4B10`/`sub_7E4B30`, this instantiation's
+             * rotate/min-successor helpers), then the value's implicit
+             * destructor inlined ahead of `operator delete(node)` -- frees
+             * `MeshBatchInstanceVector`'s heap buffer when non-null, matching
+             * `msvc8::vector<MeshInstance*>::~vector()`. Sole caller is this
+             * instantiation's `erase_range` (`FUN_007E3E20`, cited below) via
+             * its per-element loop; real reachability traces through that
+             * member's citation to `MeshRenderer::~MeshRenderer` (implicit
+             * `meshes` member teardown, `Mesh.cpp`) and to `MeshRenderer::
+             * Reset()`/`Shutdown()`'s explicit `meshes.clear()` calls
+             * (`Mesh.cpp`), both of which take `erase_range`'s whole-tree
+             * fast path -- so, per this file's established "template-
+             * instantiated but the per-node erase-rebalance path is
+             * compiled, not separately runtime-exercised through the
+             * currently-traced caller" shape (the `FUN_007CAC80`/
+             * `FUN_00A3E450`/`FUN_00856950` precedents above), this member is
+             * kept `recovered` as a genuine compiled emission of real
+             * template code. `FUN_007E34E0` (this same instantiation's whole-
+             * subtree `destroy_subtree`, IDA-named
+             * `std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`) is
+             * already cited on `destroy_subtree` below.
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -4485,6 +4516,28 @@ namespace msvc8
              * `FUN_00947E00`/`FUN_00947E90`/`FUN_00947F20` trio above); none
              * has any entry in `_callgraph_index.sqlite`'s `functions`,
              * `call_edges`, or `incoming_xrefs` tables.
+             *
+             * Address: 0x007E3E20 (FUN_007E3E20, sub_7E3E20) -- `msvc8::map<
+             * Moho::MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>::
+             * erase_range` (`MeshBatchBucketTree`, `MeshBatchKey.h`). Whole-
+             * tree fast path (`a3==*(int*)(a1+4) && a4==(a1+4)`, i.e.
+             * `first==leftmost() && last==header()`) calls `FUN_007E34E0`
+             * (`std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`, this
+             * instantiation's `destroy_subtree`, already cited below) on the
+             * root and resets head/size, matching this member's `clear()`
+             * branch; the slow path loops an inlined successor-capture (the
+             * `_Isnil`-guarded left/right/parent walk immediately before each
+             * iteration, rather than a separate `rb_increment` call -- MSVC
+             * inlined it here since the cursor only needs advancing, not
+             * returning) then `FUN_007E47E0` (this same instantiation's
+             * `erase_node`, cited above) -- matches `while (cursor != stop)
+             * erase_node((cursor++).node())` field for field. Reached from
+             * `MeshRenderer::Reset()` (0x007E1370) and `::Shutdown()`
+             * (0x007E1510)'s explicit `meshes.clear()` (both `Mesh.cpp`,
+             * already recovered, both taking the whole-tree fast path since
+             * `clear()` compiles to exactly this shape) and from
+             * `MeshRenderer::~MeshRenderer`'s (0x007DF330) implicit teardown
+             * of its `MeshBatchBucketTree meshes` member.
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
