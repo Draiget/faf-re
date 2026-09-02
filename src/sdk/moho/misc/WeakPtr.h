@@ -299,13 +299,25 @@ namespace moho
      * as `WeakObject::DetachAllWeakReferences` does. A node that had been
      * drained would leave `IsLinkedInOwnerChain()` false and return above.
      *
+     * Also ruled out, so do not "fix" either: `ResetFromOwnerLinkSlot` below is
+     * correct, and so is `CAiTarget::CopyFromLinkedTarget`, which is its only
+     * interesting caller. Both match `CAiTarget`'s copy helper in the binary
+     * (0x005D5670) step for step -- it walks the old owner's chain and splices
+     * the node out (0x005D5684..0x005D5694), then sets the new slot and pushes
+     * the node onto that owner's head, `nextInOwner = *ownerHead;
+     * *ownerHead = this` (0x005D569F..0x005D56A4). The `BindOwnerLinkSlotUnlinked`
+     * doc a few lines below *does* say "without inserting into the owner's
+     * chain", but that is a different method and not the one on this path.
+     *
      * The open lead is **which** `WeakObject` subobject was drained. Entity
      * carries one at RTTI mdisp=4 inside `CScriptObject`, and `Unit.cpp:13838`
      * calls a second, duplicate `ClearWeakObjectChain` on a *different* one --
      * `static_cast<WeakObject&>(static_cast<IUnit&>(*this))`. A `WeakPtr` bound
      * to one subobject's head is not drained by the destructor that drains the
      * other, which would leave exactly this dangling slot. Confirm which head
-     * `CAiTarget`'s entity ref binds to before changing anything here.
+     * `CAiTarget`'s entity ref binds to, and whether `WeakPtrOwnerLinkOffset<
+     * Entity>` agrees with the offset `ClearWeakObjectChain` walks, before
+     * changing anything here.
      */
     [[nodiscard]] bool ReplaceInOwnerChain(WeakPtr<T>* replacement) noexcept
     {
