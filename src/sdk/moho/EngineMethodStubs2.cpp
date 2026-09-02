@@ -44,8 +44,6 @@ namespace moho
 // at _purecall (0x00A82547). The declarations are now `= 0`.
 
 // ===== ICommandSink =====
-void ICommandSink::AdvanceBeat(int) {}
-void ICommandSink::EndGame() {}
 
 // ===== Misc instance methods =====
 void CMauiMesh::Frame(float) {}
