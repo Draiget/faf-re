@@ -5196,7 +5196,7 @@
    * Starts one pending MWSTM lane for playback object after applying stored
    * filename/range request and arming SJ supply state.
    */
-  [[maybe_unused]] std::int32_t mwsfsvr_StartStream(moho::MwsfdPlaybackStateSubobj* const ply)
+  std::int32_t mwsfsvr_StartStream(moho::MwsfdPlaybackStateSubobj* const ply)
   {
     if (MWSTM_GetStat(ply->adxStreamHandle) == 2) {
       return -1;
@@ -5838,7 +5838,7 @@
    * Formats one LSC error message into the global message buffer and calls the
    * registered error callback when present.
    */
-  [[maybe_unused]] std::int32_t LSC_CallErrFunc_(const char* const format, ...)
+  std::int32_t LSC_CallErrFunc_(const char* const format, ...)
   {
     va_list argumentList{};
     va_start(argumentList, format);
@@ -6339,7 +6339,7 @@
    * Binds the current queued entry to the ADX stream and starts non-blocking
    * playback when queue data is available.
    */
-  [[maybe_unused]] std::int32_t lsc_StatWait(void* const lscHandle)
+  std::int32_t lsc_StatWait(void* const lscHandle)
   {
     auto* const lsc = AsLscRuntimeView(lscHandle);
     LscStreamEntryRuntimeView& entry = LscCurrentStreamEntry(lsc);
@@ -6378,7 +6378,7 @@
    * Polls ADX stream state for the current entry and updates queued stream
    * status/read-sector lanes.
    */
-  [[maybe_unused]] std::int32_t lsc_StatRead(void* const lscHandle)
+  std::int32_t lsc_StatRead(void* const lscHandle)
   {
     auto* const lsc = AsLscRuntimeView(lscHandle);
     if (lsc->streamHandle == nullptr) {
@@ -6413,7 +6413,7 @@
    * Finalizes current stream entry, advances the read cursor, triggers status
    * callback on queue depletion, and re-enqueues looped entries.
    */
-  [[maybe_unused]] std::int32_t lsc_StatEnd(void* const lscHandle)
+  std::int32_t lsc_StatEnd(void* const lscHandle)
   {
     auto* const lsc = AsLscRuntimeView(lscHandle);
     if (lsc->streamHandle == nullptr) {
@@ -6451,7 +6451,7 @@
    * What it does:
    * Runs one LSC handle tick lane: read poll, end handling, then wait/start.
    */
-  [[maybe_unused]] std::int32_t lsc_ExecHndl(void* const lscHandle)
+  std::int32_t lsc_ExecHndl(void* const lscHandle)
   {
     auto* const lsc = AsLscRuntimeView(lscHandle);
     std::int32_t result = 1;
@@ -6483,7 +6483,7 @@
    * What it does:
    * Ticks all active LSC object lanes in the fixed object pool.
    */
-  [[maybe_unused]] std::int32_t lsc_ExecServer()
+  std::int32_t lsc_ExecServer()
   {
     std::int32_t result = 0;
     for (LscRuntimeView& lsc : gLscObjectPool) {
@@ -6500,7 +6500,7 @@
    * What it does:
    * Public wrapper for the LSC server execution tick.
    */
-  [[maybe_unused]] std::int32_t LSC_ExecServer()
+  std::int32_t LSC_ExecServer()
   {
     return lsc_ExecServer();
   }
@@ -7640,7 +7640,7 @@
    * What it does:
    * Enqueues one filename range into ADXT seamless LSC queue.
    */
-  [[maybe_unused]] std::int32_t adxt_EntryFnameRange(
+  std::int32_t adxt_EntryFnameRange(
     void* const adxtRuntime,
     const char* const fileName,
     const std::int32_t rangeStart,
@@ -7661,7 +7661,7 @@
    * What it does:
    * Enqueues one filename with full-range seamless playback bounds.
    */
-  [[maybe_unused]] std::int32_t adxt_EntryFname(void* const adxtRuntime, const char* const fileName)
+  std::int32_t adxt_EntryFname(void* const adxtRuntime, const char* const fileName)
   {
     return adxt_EntryFnameRange(adxtRuntime, fileName, 0, kLscRangeEndAll);
   }
@@ -7673,7 +7673,7 @@
    * Resolves one AFS entry into filename/range and enqueues it into seamless
    * LSC queue.
    */
-  [[maybe_unused]] std::int32_t adxt_EntryAfs(
+  std::int32_t adxt_EntryAfs(
     void* const adxtRuntime,
     const std::int32_t afsHandle,
     const std::int32_t fileIndex
@@ -7707,7 +7707,7 @@
    * Starts ADXT seamless path by resetting non-LSC playback, preparing SJ input
    * path, and starting LSC queue playback.
    */
-  [[maybe_unused]] std::int32_t adxt_StartSeamless(void* const adxtRuntime)
+  std::int32_t adxt_StartSeamless(void* const adxtRuntime)
   {
     auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
     void* const lscHandle = runtime->SeamlessLscHandle();
@@ -7984,7 +7984,7 @@
    * Validates runtime + SJ handle, stops current ADXT lane, starts SJ input
    * path, sets ADXT mode byte to SJ mode (`3`), and enables link-switch lane.
    */
-  [[maybe_unused]] void adxt_StartSj(void* const adxtRuntime, void* const sourceJoinHandle)
+  void adxt_StartSj(void* const adxtRuntime, void* const sourceJoinHandle)
   {
     auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
     if (runtime == nullptr || sourceJoinHandle == nullptr) {
@@ -8140,7 +8140,7 @@
    * Computes effective ADXRNA sample frequency from transpose lanes and base
    * sample-rate lane.
    */
-  [[maybe_unused]] std::int32_t mwRnaCalcSfreq(const std::int32_t rnaHandle)
+  std::int32_t mwRnaCalcSfreq(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8449,7 +8449,7 @@
    * What it does:
    * Returns ADXRNA transpose lanes (`octave`, `cent`) into two output words.
    */
-  [[maybe_unused]] std::int32_t* ADXRNA_GetTransposeWords(
+  std::int32_t* ADXRNA_GetTransposeWords(
     const std::int32_t rnaHandle,
     std::int32_t* const outOctaveWord,
     std::int32_t* const outCentWord
@@ -8662,7 +8662,7 @@
    * What it does:
    * Returns legacy ADXRNA queue metric lane at offset `0x08`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetLegacyQueueMetricWord08(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_GetLegacyQueueMetricWord08(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8678,7 +8678,7 @@
    * What it does:
    * Returns ADXRNA time-scale base word for one RNA handle.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetTimeScaleBase(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_GetTimeScaleBase(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8694,7 +8694,7 @@
    * What it does:
    * Returns ADXRNA stream-info word at lane `0x60`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetStreamInfoWord60(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_GetStreamInfoWord60(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8710,7 +8710,7 @@
    * What it does:
    * Returns ADXRNA stream-info word from lane array at `0x64 + 4*index`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetStreamInfoWord64(const std::int32_t rnaHandle, const std::int32_t wordIndex)
+  std::int32_t ADXRNA_GetStreamInfoWord64(const std::int32_t rnaHandle, const std::int32_t wordIndex)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8726,7 +8726,7 @@
    * What it does:
    * Returns ADXRNA stream-info word at lane `0x6C`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetStreamInfoWord6C(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_GetStreamInfoWord6C(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8841,7 +8841,7 @@
    * What it does:
    * Returns ADXRNA discard-sample result code for this build.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_DiscardSamples(const std::int32_t rnaHandle, const std::int32_t sampleCount)
+  std::int32_t ADXRNA_DiscardSamples(const std::int32_t rnaHandle, const std::int32_t sampleCount)
   {
     (void)rnaHandle;
     (void)sampleCount;
@@ -8886,7 +8886,7 @@
    * What it does:
    * Returns global ADXRNA pause-all state.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetPauseAllState()
+  std::int32_t ADXRNA_GetPauseAllState()
   {
     return gAdxrnaPauseAllState;
   }
@@ -10526,7 +10526,7 @@
    * Prepares one ADXSJD decode step by aligning source stream data, decoding
    * codec headers, and transitioning runtime state into decode phase.
    */
-  [[maybe_unused]] void adxsjd_decode_prep(AdxsjdRuntimeView* const runtime)
+  void adxsjd_decode_prep(AdxsjdRuntimeView* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -10629,7 +10629,7 @@
    * ADX footer/endcode paths, and dispatching ADXB input entry for active
    * decode formats.
    */
-  [[maybe_unused]] std::int32_t adxsjd_decexec_start(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_start(AdxsjdRuntimeView* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -10742,7 +10742,7 @@
    * running optional per-channel filter callback lanes, updating counters, and
    * resetting ADXB state.
    */
-  [[maybe_unused]] std::int32_t adxsjd_decexec_end(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_end(AdxsjdRuntimeView* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -10804,7 +10804,7 @@
    * Updates ADXSJD decode counters for codec lanes that bypass regular output
    * chunk split/submit completion handling.
    */
-  [[maybe_unused]] std::int32_t adxsjd_decexec_extra(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_extra(AdxsjdRuntimeView* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     const std::int32_t totalSamples = ADXB_GetTotalNumSmpl(decoder);
@@ -10829,7 +10829,7 @@
    * Runs one ADXSJD decode step (`start/exec/end`) and dispatches codec-specific
    * extra accounting for streamed compressed formats.
    */
-  [[maybe_unused]] std::int32_t adxsjd_decode_exec(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decode_exec(AdxsjdRuntimeView* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     if (ADXB_GetStat(decoder) == 0) {
@@ -10855,7 +10855,7 @@
    * Inserts silence samples into every ADXSJD output lane by zero-filling
    * writable lane-0 chunks and submitting them to lane 1.
    */
-  [[maybe_unused]] std::int32_t adxsjd_insert_proc(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_insert_proc(AdxsjdRuntimeView* const runtime)
   {
     std::int32_t insertBytes = 2 * runtime->positiveSampleAdjust;
     const std::int32_t outputHandleCount = runtime->OutputChannelCount();
@@ -10893,7 +10893,7 @@
    * Discards queued ADXSJD lane-1 samples across all output lanes by consuming
    * chunks and returning them into lane 0.
    */
-  [[maybe_unused]] std::int32_t adxsjd_discard_proc(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_discard_proc(AdxsjdRuntimeView* const runtime)
   {
     std::int32_t discardBytes = 2 * runtime->negativeSampleAdjust;
     const std::int32_t outputHandleCount = runtime->OutputChannelCount();
@@ -10930,7 +10930,7 @@
    * Runs one ADXSJD runtime tick: applies pending sample insert/discard lanes
    * under lock, then executes decode-prep/decode phases by state byte.
    */
-  [[maybe_unused]] void ADXSJD_ExecHndl(AdxsjdRuntimeView* const runtime)
+  void ADXSJD_ExecHndl(AdxsjdRuntimeView* const runtime)
   {
     if (runtime->positiveSampleAdjust > 0) {
       ADXCRS_Lock();
@@ -10957,7 +10957,7 @@
    * What it does:
    * Iterates ADXSJD runtime pool and executes active runtime lanes.
    */
-  [[maybe_unused]] void ADXSJD_ExecServer()
+  void ADXSJD_ExecServer()
   {
     for (auto& runtime : gAdxsjdObjectPool) {
       if (runtime.used == 1u) {
@@ -12799,7 +12799,7 @@
    * What it does:
    * Sets seamless-loop flag for ADXT-owned LSC queue.
    */
-  [[maybe_unused]] void adxt_SetSeamlessLp(void* const adxtRuntime, const std::int32_t enabled)
+  void adxt_SetSeamlessLp(void* const adxtRuntime, const std::int32_t enabled)
   {
     if (adxtRuntime != nullptr) {
       auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
@@ -12810,7 +12810,7 @@
     (void)ADXERR_CallErrFunc1_(kAdxtErrSetSeamlessLpParameter);
   }
 
-  [[maybe_unused]] std::int32_t adxt_StartFnameRangeLp(
+  std::int32_t adxt_StartFnameRangeLp(
     void* adxtRuntime,
     const char* fileName,
     std::int32_t rangeStart,
@@ -12823,7 +12823,7 @@
    * What it does:
    * Starts seamless loop playback for full filename range.
    */
-  [[maybe_unused]] std::int32_t adxt_StartFnameLp(void* const adxtRuntime, const char* const fileName)
+  std::int32_t adxt_StartFnameLp(void* const adxtRuntime, const char* const fileName)
   {
     return adxt_StartFnameRangeLp(adxtRuntime, fileName, 0, kLscRangeEndAll);
   }
@@ -12835,7 +12835,7 @@
    * Rebuilds seamless queue with one filename range, enables loop, and starts
    * seamless playback.
    */
-  [[maybe_unused]] std::int32_t adxt_StartFnameRangeLp(
+  std::int32_t adxt_StartFnameRangeLp(
     void* const adxtRuntime,
     const char* const fileName,
     const std::int32_t rangeStart,
@@ -12861,7 +12861,7 @@
    * Rebuilds seamless queue from one AFS entry, enables loop, and starts
    * seamless playback.
    */
-  [[maybe_unused]] std::int32_t adxt_StartAfsLp(
+  std::int32_t adxt_StartAfsLp(
     void* const adxtRuntime,
     const std::int32_t afsHandle,
     const std::int32_t fileIndex
@@ -12885,7 +12885,7 @@
    * What it does:
    * Returns number of queued seamless files for ADXT runtime.
    */
-  [[maybe_unused]] std::int32_t adxt_GetNumFiles(void* const adxtRuntime)
+  std::int32_t adxt_GetNumFiles(void* const adxtRuntime)
   {
     if (adxtRuntime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtErrGetNumFilesParameter);
@@ -13052,7 +13052,7 @@
    * What it does:
    * Clears ADXT seamless queue when runtime is idle.
    */
-  [[maybe_unused]] void adxt_ResetEntry(void* const adxtRuntime)
+  void adxt_ResetEntry(void* const adxtRuntime)
   {
     if (adxtRuntime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtErrResetEntryParameter);
@@ -13071,7 +13071,7 @@
    * What it does:
    * Runs one ADXT seamless LSC server tick under ADX server enter/leave guards.
    */
-  [[maybe_unused]] void adxt_ExecLscSvr()
+  void adxt_ExecLscSvr()
   {
     ADXCRS_Enter();
     (void)LSC_ExecServer();
@@ -13084,7 +13084,7 @@
    * What it does:
    * Legacy no-op ADXF callback lane.
    */
-  [[maybe_unused]] void ADXF_Ocbi([[maybe_unused]] const std::int32_t callbackArg0, [[maybe_unused]] const std::int32_t callbackArg1)
+  void ADXF_Ocbi([[maybe_unused]] const std::int32_t callbackArg0, [[maybe_unused]] const std::int32_t callbackArg1)
   {}
 
   /**
@@ -13184,7 +13184,7 @@
    * What it does:
    * Enters the ADX critical-section shim lane for ADXF API wrappers.
    */
-  [[maybe_unused]] void adxf_enter()
+  void adxf_enter()
   {
     ADXCRS_Enter();
   }
@@ -13195,7 +13195,7 @@
    * What it does:
    * Leaves the ADX critical-section shim lane for ADXF API wrappers.
    */
-  [[maybe_unused]] void adxf_leave()
+  void adxf_leave()
   {
     ADXCRS_Leave();
   }
