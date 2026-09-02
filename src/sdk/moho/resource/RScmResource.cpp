@@ -207,21 +207,6 @@ namespace
 
   RScmResourceConstruct gRScmResourceConstructHelper;
 
-  [[nodiscard]] boost::shared_ptr<moho::RScmResource> GetModelResourceByPath(
-    const char* const path,
-    moho::CResourceWatcher* const resourceWatcher
-  )
-  {
-    boost::weak_ptr<moho::RScmResource> weakResource{};
-    (void)moho::RES_GetResource(
-      &weakResource,
-      path,
-      resourceWatcher,
-      ResolveRScmResourceTypeCached()
-    );
-    return weakResource.lock();
-  }
-
   void SetConstructResultSharedRScmResource(
     gpg::SerConstructResult* const result,
     const boost::shared_ptr<moho::RScmResource>& resource
@@ -473,8 +458,9 @@ namespace moho
     msvc8::string modelPath{};
     archive->ReadString(&modelPath);
 
-    const boost::shared_ptr<RScmResource> modelResource =
-      GetModelResourceByPath(modelPath.c_str(), nullptr);
+    // 0x00539123: the same shared `GetModel` lane every other model consumer
+    // goes through, not a second copy of the lookup.
+    const boost::shared_ptr<RScmResource> modelResource = GetModel(modelPath.c_str(), nullptr);
     SetConstructResultSharedModelResource(result, modelResource);
   }
 
