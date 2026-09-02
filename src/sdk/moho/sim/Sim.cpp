@@ -8612,6 +8612,13 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // copied every beat and had never been filled.
   mSyncSerializeGroup2.swap(outSyncData->mSyncExtraUnitData);
 
+  // 0x00747A60 and 0x00747AAA, the last two of the four. Both were blocked on
+  // the same duplicate-layout problem until SimDriver.h took ownership of
+  // SUpgradeNotifyPair and SEntityPoseUpdateEntry: a three-pointer swap is only
+  // well-formed between identical types.
+  mAllyUpgradeNotifications.swap(outSyncData->mAllyUpgradeNotifications);
+  mPendingPoseCopies.swap(outSyncData->mPoseUpdates);
+
   // 0x00747AF9: entities that died this beat are retired from the entity DB
   // only after everything above has had its chance to publish them. Nothing in
   // the recovered tree was calling this, so the DB kept every entity it had

@@ -7,6 +7,7 @@
 #include "../resource/ISimResources.h"
 #include "CDebugCanvas.h"
 #include "CSimConVarInstanceBase.h"
+#include "SimDriver.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Deque.h"
@@ -152,13 +153,9 @@ namespace moho
    * upgrade-notify sync lane (`Sim::mAllyUpgradeNotifications`, +0x9D8) by
    * the `NotifyUpgrade` Lua binding when the destination army is an ally.
    */
-  struct SUpgradeNotifyPair
-  {
-    std::int32_t mSourceId; // +0x00
-    std::int32_t mDestId;   // +0x04
-  };
-
-  static_assert(sizeof(SUpgradeNotifyPair) == 0x08, "SUpgradeNotifyPair size must be 0x08");
+  // Owning definition moved to `SimDriver.h`, beside the packet lane
+  // `Sim::Sync` swaps this into (`SSyncData::mAllyUpgradeNotifications`,
+  // +0x210). A vector swap needs both sides to name one type.
 
   /**
    * One pending pose-copy request queued by the `TryCopyPose` Lua binding:
@@ -173,11 +170,12 @@ namespace moho
    * block at `+0x08` (the layout of a `boost::shared_ptr<CAniPose>` at
    * `+0x04`, matching this struct's tail).
    */
-  struct SPendingPoseCopy
-  {
-    EntId mEntityId;                 // +0x00
-    boost::shared_ptr<CAniPose> mPose; // +0x04 (px), +0x08 (pn.pi_)
-  };
+  // Owning definition is `SEntityPoseUpdateEntry` in `SimDriver.h`. The two
+  // were byte-identical declarations of one struct until `Sim::Sync`'s swap
+  // at 0x00747AAA proved it: a three-pointer vector swap is only
+  // well-formed between identical types. The drain site that comment used
+  // to call "not yet recovered" is that swap.
+  using SPendingPoseCopy = SEntityPoseUpdateEntry;
 
   static_assert(sizeof(SPendingPoseCopy) == 0x0C, "SPendingPoseCopy size must be 0x0C");
 
