@@ -39,8 +39,13 @@ namespace moho
    * Packages one shared `CAniSkel` lane into the construct-result shared
    * payload with resolved `CAniSkel` runtime type metadata.
    */
+  // No top-level `const` on `result`: MSVC folds it into the decorated name
+  // (`QAVSerConstructResult@gpg@@` rather than `PAV...`), and the only other
+  // reference is the cross-TU declaration in `CAniDefaultSkelConstruct.cpp`,
+  // which spells the parameter without it. The `const` form left this defined
+  // but unlinkable.
   void SetConstructResultSharedAniSkel(
-    gpg::SerConstructResult* const result,
+    gpg::SerConstructResult* result,
     const boost::shared_ptr<const CAniSkel>& skeleton
   )
   {
