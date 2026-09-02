@@ -8,6 +8,7 @@
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/DrawContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Device.hpp"
@@ -516,6 +517,71 @@ namespace moho
     constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
     for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
       reader.Read(reinterpret_cast<char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
+    }
+  }
+
+  /**
+   * Address: 0x008164D0 (FUN_008164D0, ?Save@SkyDome@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
+   *
+   * IDA signature:
+   * char* __usercall Moho::SkyDome::Save@<eax>(SkyDome* this@<eax>, gpg::Stream** stream@<ebx>);
+   *
+   * What it does:
+   * Writes the sky block of a `.scmap` back out, field for field in the order
+   * `SkyDome::Load` reads it: dome placement and shape, the horizon and sky
+   * gradient, the two atmosphere texture paths, the decal-upload run, the three
+   * cloud-texture paths, and the cirrus parameters plus its four layer records.
+   *
+   * Unlike `Load`, the cirrus layer count is written as the literal 4
+   * (0x0081681F stores an immediate `4` before the four-iteration copy loop) -
+   * the block is fixed size, which is why the reader consumes that count and
+   * ignores it.
+   */
+  void SkyDome::Save(gpg::BinaryWriter& writer)
+  {
+    writer.Write(reinterpret_cast<const char*>(&mDomeOrigin), sizeof(mDomeOrigin));
+    writer.Write(mDomeShapeParams.x);
+    writer.Write(mDomeShapeParams.y);
+    writer.Write(mDomeShapeParams.z);
+    writer.Write(mWidth);
+    writer.Write(mHeight);
+    writer.Write(mHorizonSize);
+    writer.Write(reinterpret_cast<const char*>(&mHorizonColor), sizeof(mHorizonColor));
+    writer.Write(reinterpret_cast<const char*>(&mSkyColor), sizeof(mSkyColor));
+    writer.Write(mHorizonBlend);
+
+    writer.WriteString(mAtmosphereTexPath);
+    writer.WriteString(mAtmosphereTexPath2);
+
+    // The decal-upload run: the live list size, then each node's 40-byte vertex
+    // payload in list order. The binary walks `mDecalUploadHead->mNext` until it
+    // comes back round to the sentinel and writes from node + 8, i.e. straight
+    // past the two link pointers (0x008167xx, `memcpy(..., v27 + 2, 0x28)`).
+    writer.Write(mDecalUploadCount);
+    if (mDecalUploadHead != nullptr) {
+      for (const SkyDomeDecalUploadNode* node = mDecalUploadHead->mNext; node != mDecalUploadHead;
+           node = node->mNext) {
+        writer.Write(reinterpret_cast<const char*>(node->mVertexData), sizeof(node->mVertexData));
+      }
+    }
+
+    writer.WriteString(mDecalTexPath1);
+    writer.WriteString(mDecalTexPath2);
+    writer.WriteString(mDecalTexPath3);
+
+    writer.Write(mCirrusMultiplier);
+    writer.Write(mCirrusColor_R);
+    writer.Write(mCirrusColor_G);
+    writer.Write(mCirrusColor_B);
+    writer.WriteString(mCirrusTexPath);
+
+    constexpr std::size_t kCirrusLayerRecordSize = 20u;
+    constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
+    writer.Write(static_cast<std::int32_t>(kCirrusLayerCount));
+    for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
+      writer.Write(
+        reinterpret_cast<const char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize
+      );
     }
   }
 
