@@ -2026,6 +2026,14 @@ namespace moho
 
     CleanUpPlatoons();
 
+    // 0x006FFDC4: the binary pushes `[army+0x1F4]` -- EconomyInfo -- and calls
+    // func_ArmyProcessEconomy. CSimArmyEconomyInfo is the same object viewed
+    // through its economy-facing field names, exactly as CArmyImpl's own ctor
+    // and Unit::HandleResourceManagement already treat it.
+    if (EconomyInfo != nullptr) {
+      ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+    }
+
     ProcessArmyEconomyTick(*this);
 
     if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {

@@ -10,6 +10,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
@@ -481,6 +482,190 @@ namespace moho
    * Unlinks the consumption-request sentinel node, releases extra-storage
    * ownership (with max-storage rollback), then frees this economy object.
    */
+  namespace
+  {
+    /// The two resource lanes, in the order the binary indexes them.
+    constexpr std::size_t kEnergyLane = 0u;
+    constexpr std::size_t kMassLane = 1u;
+    constexpr std::size_t kLaneCount = 2u;
+
+    /// `mRequested - mGranted`, clamped at zero per lane, as at 0x00771BC0.
+    [[nodiscard]] SEconValue OutstandingRequest(const CEconRequest& request) noexcept
+    {
+      const float energy = request.mRequested.energy - request.mGranted.energy;
+      const float mass = request.mRequested.mass - request.mGranted.mass;
+      return SEconValue{energy > 0.0f ? energy : 0.0f, mass > 0.0f ? mass : 0.0f};
+    }
+
+    [[nodiscard]] float Lane(const SEconValue& value, const std::size_t lane) noexcept
+    {
+      return lane == kEnergyLane ? value.energy : value.mass;
+    }
+
+    /// Bounds-checked army lookup, as the binary open-codes it at 0x00771C60.
+    [[nodiscard]] const CArmyImpl* ArmyAtEconomyIndex(const Sim& sim, const std::int32_t index) noexcept
+    {
+      if (index < 0 || static_cast<std::size_t>(index) >= sim.mArmiesList.size()) {
+        return nullptr;
+      }
+      return sim.mArmiesList[static_cast<std::size_t>(index)];
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
+   *
+   * IDA signature:
+   * void __stdcall func_ArmyProcessEconomy(Moho::CEconomy *this);
+   *
+   * What it does:
+   * The per-tick army economy solver. `Unit::HandleResourceManagement` banks
+   * each producing unit's output into `mResources`; this is what turns that
+   * into `mTotals`, which is what `cfunc_GetEconomyTotalsL` reports to the UI.
+   * Its only caller is `CArmyImpl::OnTick`, which passes `army->EconomyInfo`
+   * (`[army+0x1F4]`) at 0x006FFDC4.
+   *
+   * Consumption requests are served in two classes. A request that still wants
+   * both energy and mass competes for the scarcer lane, so those are pooled
+   * separately from requests wanting a single resource: the pooled demand sets
+   * a ratio bounded by whichever lane runs out first, and single-lane requests
+   * then get their own ratio out of what is left in the *other* lane. Every
+   * request is granted its outstanding share at whichever ratio applies, and
+   * that grant is added to its `mGranted` so the next tick asks only for the
+   * remainder.
+   *
+   * @note Two tails of the binary body are not written yet, and both are
+   * additive rather than corrective: the `mResourceSharing` block from
+   * 0x00771EE0, which spreads storage overflow across allied economies that
+   * still have room, and the twenty-four `Economy_*` army-stat publishes from
+   * 0x00772050, which push these same numbers through `func_GetArmyStat2` with
+   * an interlocked accumulate for the stats overlay and AI queries. Neither
+   * feeds anything computed here.
+   */
+  void ProcessArmyEconomy(CEconomy& economy)
+  {
+    // Pass one: pool outstanding demand, splitting requests that still want
+    // both lanes from those down to one (0x00771BE8 counts the non-zero lanes).
+    SEconValue dualLaneDemand{0.0f, 0.0f};
+    SEconValue singleLaneDemand{0.0f, 0.0f};
+
+    TDatListItem<void, void>* const listHead = &economy.mConsumptionData;
+    for (TDatListItem<void, void>* node = listHead->mNext; node != listHead; node = node->mNext) {
+      const SEconValue outstanding = OutstandingRequest(*RequestFromNode(node));
+      const int lanesWanted = (outstanding.energy != 0.0f ? 1 : 0) + (outstanding.mass != 0.0f ? 1 : 0);
+
+      SEconValue& pool = lanesWanted > 1 ? dualLaneDemand : singleLaneDemand;
+      pool.energy += outstanding.energy;
+      pool.mass += outstanding.mass;
+    }
+
+    // Banked production, scaled by the army handicap when one is set. The gate
+    // and the multiplier are read at [army+0x1DC] and [army+0x1E0] (0x00771C8D).
+    SEconValue banked = economy.mResources;
+    if (const CArmyImpl* const army =
+          economy.mSim != nullptr ? ArmyAtEconomyIndex(*economy.mSim, economy.mIndex) : nullptr;
+        army != nullptr && army->HasHandicap != 0.0f) {
+      const float handicapExtra = army->Handicap;
+      if (handicapExtra != 0.0f) {
+        const float multiplier = handicapExtra + 1.0f;
+        banked.energy *= multiplier;
+        banked.mass *= multiplier;
+      }
+    }
+
+    SEconValue available{
+      economy.mTotals.mStored.ENERGY + banked.energy, economy.mTotals.mStored.MASS + banked.mass
+    };
+
+    const SEconValue totalDemand{
+      dualLaneDemand.energy + singleLaneDemand.energy, dualLaneDemand.mass + singleLaneDemand.mass
+    };
+
+    // The pooled ratio is bounded by whichever lane runs out first; remember
+    // which one, because single-lane requests are then served from the other.
+    float dualLaneRatio = 1.0f;
+    std::size_t limitingLane = kEnergyLane;
+    for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+      const float demand = Lane(totalDemand, lane);
+      if (demand * dualLaneRatio > Lane(available, lane)) {
+        dualLaneRatio = Lane(available, lane) / demand;
+        limitingLane = lane;
+      }
+    }
+
+    SEconValue remaining{
+      available.energy - dualLaneDemand.energy * dualLaneRatio,
+      available.mass - dualLaneDemand.mass * dualLaneRatio
+    };
+    remaining.energy = remaining.energy > 0.0f ? remaining.energy : 0.0f;
+    remaining.mass = remaining.mass > 0.0f ? remaining.mass : 0.0f;
+
+    float singleLaneRatio = 1.0f;
+    for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+      if (lane == limitingLane) {
+        continue;
+      }
+      const float demand = Lane(singleLaneDemand, lane);
+      if (demand * singleLaneRatio > Lane(remaining, lane)) {
+        singleLaneRatio = Lane(remaining, lane) / demand;
+      }
+    }
+
+    // Pass two: grant each request its share and record it, so next tick asks
+    // only for the remainder.
+    for (TDatListItem<void, void>* node = listHead->mNext; node != listHead; node = node->mNext) {
+      CEconRequest* const request = RequestFromNode(node);
+      const SEconValue outstanding = OutstandingRequest(*request);
+
+      // A request that wants nothing from the limiting lane was pooled as a
+      // single-lane one, so it is served at the single-lane ratio (0x00771D9A).
+      const float ratio = Lane(outstanding, limitingLane) == 0.0f ? singleLaneRatio : dualLaneRatio;
+      const SEconValue granted{outstanding.energy * ratio, outstanding.mass * ratio};
+
+      available.energy = available.energy - granted.energy > 0.0f ? available.energy - granted.energy : 0.0f;
+      available.mass = available.mass - granted.mass > 0.0f ? available.mass - granted.mass : 0.0f;
+
+      request->mGranted.energy += granted.energy;
+      request->mGranted.mass += granted.mass;
+    }
+
+    economy.mTotals.mLastUseRequested.ENERGY = totalDemand.energy;
+    economy.mTotals.mLastUseRequested.MASS = totalDemand.mass;
+
+    // Reported usage is the pooled demand at its ratio, not the running total
+    // accumulated above -- the binary recomputes it here (0x00771E2C).
+    economy.mTotals.mLastUseActual.ENERGY =
+      dualLaneDemand.energy * dualLaneRatio + singleLaneDemand.energy * singleLaneRatio;
+    economy.mTotals.mLastUseActual.MASS =
+      dualLaneDemand.mass * dualLaneRatio + singleLaneDemand.mass * singleLaneRatio;
+
+    economy.mTotals.mIncome.ENERGY = economy.mResources.energy;
+    economy.mTotals.mIncome.MASS = economy.mResources.mass;
+
+    // Whatever survived the grants is stored, capped by max storage. The cap is
+    // a double and the binary masks its sign bit before comparing (0x00771EA0).
+    for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+      const double capacity =
+        lane == kEnergyLane ? economy.mTotals.mMaxStorage.ENERGY : economy.mTotals.mMaxStorage.MASS;
+      const auto cap = static_cast<float>(capacity < 0.0 ? -capacity : capacity);
+
+      float stored = Lane(available, lane);
+      if (cap <= stored) {
+        stored = cap;
+      }
+      if (stored < 0.0f) {
+        stored = 0.0f;
+      }
+
+      (lane == kEnergyLane ? economy.mTotals.mStored.ENERGY : economy.mTotals.mStored.MASS) = stored;
+    }
+
+    // The per-tick banks are consumed, so they start the next tick empty
+    // (0x00772D5E); without this, income would accumulate without bound.
+    economy.mResources = SEconValue{0.0f, 0.0f};
+    economy.mPendingResources = SEconValue{0.0f, 0.0f};
+  }
+
   CEconomy* CEconomy::Clear()
   {
     mConsumptionData.mNext->mPrev = mConsumptionData.mPrev;
