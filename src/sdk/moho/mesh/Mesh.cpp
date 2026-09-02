@@ -5216,7 +5216,7 @@ namespace moho
     // MeshInstance::SetStance's pose-carrying overload).
     if (isStaticPose != 0u && isLocked == 0u) {
       curPose->InterpolatePose(
-        interpolation, startPose.get(), endPose.get(), static_cast<std::int32_t>(resource->mFile->mBoneCount)
+        interpolation, startPose.get(), endPose.get(), static_cast<std::int32_t>(resource->mFile->mSkinBoneCount)
       );
     }
 
@@ -5293,7 +5293,7 @@ namespace moho
     }
 
     const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
-    return static_cast<std::int32_t>(resource->mFile->mBoneCount);
+    return static_cast<std::int32_t>(resource->mFile->mBoneTotalCount);
   }
 
   /**
@@ -5324,7 +5324,7 @@ namespace moho
     }
 
     const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
-    const std::int32_t boneCount = static_cast<std::int32_t>(resource->mFile->mBoneCount);
+    const std::int32_t boneCount = static_cast<std::int32_t>(resource->mFile->mBoneTotalCount);
 
     curPose->InterpolatePose(currInterpolant, startPose.get(), endPose.get(), boneCount);
     return curPose;

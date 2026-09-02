@@ -97,40 +97,6 @@ namespace
   static_assert(offsetof(SScmBoneRecord, mParentBoneIndex) == 0x60, "SScmBoneRecord::mParentBoneIndex offset must be 0x60");
   static_assert(sizeof(SScmBoneRecord) == 0x6C, "SScmBoneRecord size must be 0x6C");
 
-  /**
-   * Address: 0x005379D0 (FUN_005379D0, sub_5379D0)
-   *
-   * IDA signature:
-   * int callcnv_E3 sub_5379D0@<eax>(int file@<ebx>, int outNamePtrs);
-   *
-   * What it does:
-   * Fills one scratch `vector<const char*>` with one pointer per bone into the
-   * SScmFile bone-name string block (which begins at file offset 0x40): the
-   * names are stored back-to-back as null-terminated strings, so entry `i+1`
-   * starts one past the terminator of entry `i`. The output vector is first
-   * sized to hold `mBoneCount` entries. Shared with `Moho::MeshBatch::Func1`
-   * (FUN_007E6F60); kept file-static because that caller is not yet recovered
-   * into source.
-   */
-  void FillSScmBoneNamePointers(const moho::SScmFile& file, msvc8::vector<const char*>& outNamePointers)
-  {
-    const std::uint32_t boneCount = file.mBoneCount;
-    outNamePointers.resize(boneCount);
-
-    const char* cursor = reinterpret_cast<const char*>(&file) + 0x40;
-    for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
-      outNamePointers.begin()[boneIndex] = cursor;
-      cursor += std::strlen(cursor) + 1;
-    }
-  }
-
-  /**
-   * Address: 0x0054AC80 (FUN_0054AC80, nullsub_2)
-   *
-   * What it does:
-   * Preserves the default-skeleton shared-pointer deleter lane as a deliberate
-   * no-op.
-   */
   void DefaultAniSkelNoDelete(void*) noexcept {}
 
   struct NoDeleteAniSkel
@@ -954,11 +920,11 @@ namespace moho
     : mFile(file)
   {
     const SScmFile& scmFile = *file;
-    const std::uint32_t boneCount = scmFile.mBoneCount;
+    const std::uint32_t boneCount = scmFile.mBoneTotalCount;
 
     // Gather one name pointer per bone from the file's name string block.
     msvc8::vector<const char*> boneNamePointers{};
-    FillSScmBoneNamePointers(scmFile, boneNamePointers);
+    moho::scm_file::FillBoneNamePointers(scmFile, boneNamePointers);
 
     (void)ResizeAniSkelBoneVector(mBones, boneCount);
     (void)ResizeAniSkelBoneNameIndexVectorWithFill(

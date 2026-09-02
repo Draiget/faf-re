@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
+
 namespace moho
 {
   /**
@@ -85,13 +87,25 @@ namespace moho
   {
     std::uint8_t mUnknown00[0x08];
     std::uint32_t mBoneTableOffset;        // +0x08
-    std::uint8_t mUnknown0C[0x04];
+    /// Skinned bone count - the number of bones a pose blends and the number of
+    /// GPU skinning-palette slots one instance of this mesh occupies.
+    /// `MeshBatch::Initialize` seeds `mBoneCount` from here (0x007E6FD8
+    /// `mov ecx, [edi+0Ch]`), and `MeshInstance::UpdateInterpolatedFields`
+    /// passes it to `CAniPose::InterpolatePose` (0x007DEDEF, same +0x0C).
+    /// Distinct from `mBoneTotalCount` at +0x2C, which also counts attachment
+    /// bones; their difference is `MeshBatch::mAttachCount`.
+    std::uint32_t mSkinBoneCount;          // +0x0C
     std::uint32_t mBoneBoundsSampleOffset; // +0x10 (SCM vertex-data offset)
     std::uint8_t mUnknown14[0x04];
     std::uint32_t mBoneBoundsSampleCount;  // +0x18 (SCM vertex count)
     std::uint32_t mIndexDataOffset;        // +0x1C (SCM 16-bit index-data offset)
-    std::uint8_t mUnknown20[0x0C];
-    std::uint32_t mBoneCount;              // +0x2C
+    /// 16-bit index count; the triangle count is this divided by three
+    /// (0x007E6FC1 `mov ecx, [edi+20h]`, then the signed magic-divide by 3).
+    std::uint32_t mIndexCount;             // +0x20
+    std::uint8_t mUnknown24[0x08];
+    /// Total bone-table entries, skinned bones plus attachment bones. Named
+    /// `mBoneCount` before the +0x0C lane above was identified.
+    std::uint32_t mBoneTotalCount;         // +0x2C
   };
 
   static_assert(offsetof(SScmFile, mBoneTableOffset) == 0x08, "SScmFile::mBoneTableOffset offset must be 0x08");
@@ -104,7 +118,9 @@ namespace moho
     "SScmFile::mBoneBoundsSampleCount offset must be 0x18"
   );
   static_assert(offsetof(SScmFile, mIndexDataOffset) == 0x1C, "SScmFile::mIndexDataOffset offset must be 0x1C");
-  static_assert(offsetof(SScmFile, mBoneCount) == 0x2C, "SScmFile::mBoneCount offset must be 0x2C");
+  static_assert(offsetof(SScmFile, mSkinBoneCount) == 0x0C, "SScmFile::mSkinBoneCount offset must be 0x0C");
+  static_assert(offsetof(SScmFile, mIndexCount) == 0x20, "SScmFile::mIndexCount offset must be 0x20");
+  static_assert(offsetof(SScmFile, mBoneTotalCount) == 0x2C, "SScmFile::mBoneTotalCount offset must be 0x2C");
 
   namespace scm_file
   {
@@ -129,5 +145,17 @@ namespace moho
     }
 
     [[nodiscard]] const SScmBoneBoundsSample* GetBoneBoundsSamples(const SScmFile& file);
+
+    /**
+     * Address: 0x005379D0 (FUN_005379D0)
+     *
+     * Fills one scratch vector with a pointer per bone into the SCM bone-name
+     * string block, which starts at file offset 0x40 and stores the names
+     * back-to-back as null-terminated strings, so entry `i+1` begins one past
+     * entry `i`'s terminator. Shared by `CAniSkel`'s skeleton build and
+     * `MeshBatch::Initialize`'s bone-remap branch, which is why it lives here
+     * next to the file layout it walks rather than in either caller.
+     */
+    void FillBoneNamePointers(const SScmFile& file, msvc8::vector<const char*>& outNamePointers);
   } // namespace scm_file
 } // namespace moho
