@@ -22283,17 +22283,17 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedSphereL(LuaPlus::LuaState* const stat
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
-  Wm3::Vector3f center{};
-  float radius = 0.0f;
+  // The owner accessor at 0x0086AF80 does exactly this -- refresh the mesh
+  // instance's interpolated lanes and hand back its world sphere -- so call it
+  // by name instead of reaching through a CUIWorldMeshRuntimeView at +0x34.
+  Wm3::Sphere3f sphere{};
+  sphere.Center = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+  sphere.Radius = 0.0f;
   if (worldMesh != nullptr) {
-    const CUIWorldMeshRuntimeView* const worldMeshView = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh);
-    MeshInstance* const meshInstance = worldMeshView->mMeshInstance;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      center = meshInstance->sphere.Center;
-      radius = meshInstance->sphere.Radius;
-    }
+    (void)worldMesh->GetWorldSphere(sphere);
   }
+  const Wm3::Vector3f center = sphere.Center;
+  const float radius = sphere.Radius;
 
   LuaPlus::LuaObject sphereObject;
   sphereObject.AssignNewTable(state, 2, 0);
@@ -22352,25 +22352,20 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedAlignedBoxL(LuaPlus::LuaState* const 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
-  float xMin = 0.0f;
-  float yMin = 0.0f;
-  float zMin = 0.0f;
-  float xMax = 0.0f;
-  float yMax = 0.0f;
-  float zMax = 0.0f;
+  // Same story as the sphere lane: 0x0086AFC0 is the owner accessor for these
+  // six floats, so call it rather than re-reading MeshInstance through a view.
+  Wm3::AxisAlignedBox3f bounds{};
+  bounds.Min = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+  bounds.Max = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
   if (worldMesh != nullptr) {
-    const CUIWorldMeshRuntimeView* const worldMeshView = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh);
-    MeshInstance* const meshInstance = worldMeshView->mMeshInstance;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      xMin = meshInstance->xMin;
-      yMin = meshInstance->yMin;
-      zMin = meshInstance->zMin;
-      xMax = meshInstance->xMax;
-      yMax = meshInstance->yMax;
-      zMax = meshInstance->zMax;
-    }
+    (void)worldMesh->GetWorldBounds(bounds);
   }
+  const float xMin = bounds.Min.x;
+  const float yMin = bounds.Min.y;
+  const float zMin = bounds.Min.z;
+  const float xMax = bounds.Max.x;
+  const float yMax = bounds.Max.y;
+  const float zMax = bounds.Max.z;
 
   LuaPlus::LuaObject alignedBoxObject;
   alignedBoxObject.AssignNewTable(state, 6, 0);

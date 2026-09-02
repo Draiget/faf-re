@@ -171,115 +171,22 @@ namespace moho
     return destination;
   }
 
-  struct MeshInstanceOwnerRuntimeView
-  {
-    std::uint8_t reserved00_33[0x34];
-    MeshInstance* meshInstance; // +0x34
-  };
-  static_assert(
-    offsetof(MeshInstanceOwnerRuntimeView, meshInstance) == 0x34,
-    "MeshInstanceOwnerRuntimeView::meshInstance offset must be 0x34"
-  );
+  // Two dead reach-in lanes and their view structs used to live here.
+  // 0x0086AF80 and 0x0086AFC0 both read the owning object through a
+  // `MeshInstanceOwnerRuntimeView` whose only member sat at +0x34 -- which is
+  // exactly `CUIWorldMesh::mMeshInstance`. They are `CUIWorldMesh` accessors,
+  // not free functions over an offset struct, and they now live there as
+  // `GetWorldSphere` / `GetWorldBounds` against real `Wm3::Sphere3f` and
+  // `Wm3::AxisAlignedBox3f` (spatial locality agrees: both predict
+  // `moho/ui/CUIWorldMesh.cpp`). The sphere/bounds view structs they copied
+  // into were stand-ins for those same Wm3 types.
+  //
+  // 0x004FE260 went with them: it expanded one of those sphere views into one
+  // of those bounds views, so it has no reason to exist once both are real Wm3
+  // types. Nothing in the tree referenced any of the three -- each was counted
+  // with `grep -rc` across `src/sdk`, and all three report `xrefs_total: 0`
+  // with no code, data, vtable or RTTI reference in the binary either.
 
-  struct MeshInstanceSphereRuntimeView
-  {
-    float centerX; // +0x00
-    float centerY; // +0x04
-    float centerZ; // +0x08
-    float radius;  // +0x0C
-  };
-  static_assert(sizeof(MeshInstanceSphereRuntimeView) == 0x10, "MeshInstanceSphereRuntimeView size must be 0x10");
-
-  struct MeshInstanceBoundsRuntimeView
-  {
-    float minX; // +0x00
-    float minY; // +0x04
-    float minZ; // +0x08
-    float maxX; // +0x0C
-    float maxY; // +0x10
-    float maxZ; // +0x14
-  };
-  static_assert(sizeof(MeshInstanceBoundsRuntimeView) == 0x18, "MeshInstanceBoundsRuntimeView size must be 0x18");
-
-  /**
-   * Address: 0x004FE260 (FUN_004FE260)
-   *
-   * What it does:
-   * Expands one sphere `(center.xyz,radius)` into axis-aligned bounds
-   * `(min.xyz,max.xyz)` and writes the result into caller output storage.
-   */
-  [[maybe_unused]] MeshInstanceBoundsRuntimeView* ExpandMeshInstanceSphereToBounds(
-    MeshInstanceBoundsRuntimeView* const outBounds,
-    const MeshInstanceSphereRuntimeView* const sphere
-  ) noexcept
-  {
-    const float radius = sphere->radius;
-    outBounds->minX = sphere->centerX - radius;
-    outBounds->minY = sphere->centerY - radius;
-    outBounds->minZ = sphere->centerZ - radius;
-    outBounds->maxX = sphere->centerX + radius;
-    outBounds->maxY = sphere->centerY + radius;
-    outBounds->maxZ = sphere->centerZ + radius;
-    return outBounds;
-  }
-
-  /**
-   * Address: 0x0086AF80 (FUN_0086AF80)
-   *
-   * What it does:
-   * Refreshes interpolation on the owner mesh-instance lane and copies current
-   * world-space sphere `(center.xyz, radius)` into caller output storage.
-   */
-  [[maybe_unused]] MeshInstanceSphereRuntimeView* CopyOwnerMeshInstanceSphere(
-    const MeshInstanceOwnerRuntimeView* const owner,
-    MeshInstanceSphereRuntimeView* const outSphere
-  )
-  {
-    if (outSphere == nullptr) {
-      return nullptr;
-    }
-
-    MeshInstance* const meshInstance = owner != nullptr ? owner->meshInstance : nullptr;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      outSphere->centerX = meshInstance->sphere.Center.x;
-      outSphere->centerY = meshInstance->sphere.Center.y;
-      outSphere->centerZ = meshInstance->sphere.Center.z;
-      outSphere->radius = meshInstance->sphere.Radius;
-    }
-
-    return outSphere;
-  }
-
-  /**
-   * Address: 0x0086AFC0 (FUN_0086AFC0)
-   *
-   * What it does:
-   * Refreshes interpolation on the owner mesh-instance lane and copies current
-   * world-space axis-aligned bounds `(min.xyz,max.xyz)` into output storage.
-   */
-  [[maybe_unused]] MeshInstanceBoundsRuntimeView* CopyOwnerMeshInstanceBounds(
-    const MeshInstanceOwnerRuntimeView* const owner,
-    MeshInstanceBoundsRuntimeView* const outBounds
-  )
-  {
-    if (outBounds == nullptr) {
-      return nullptr;
-    }
-
-    MeshInstance* const meshInstance = owner != nullptr ? owner->meshInstance : nullptr;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      outBounds->minX = meshInstance->xMin;
-      outBounds->minY = meshInstance->yMin;
-      outBounds->minZ = meshInstance->zMin;
-      outBounds->maxX = meshInstance->xMax;
-      outBounds->maxY = meshInstance->yMax;
-      outBounds->maxZ = meshInstance->zMax;
-    }
-
-    return outBounds;
-  }
 
   /**
    * Address: 0x007E51E0 (FUN_007E51E0, boost::shared_ptr_MeshBatch::operator=)
