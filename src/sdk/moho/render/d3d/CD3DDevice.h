@@ -80,6 +80,24 @@ namespace moho
   /**
    * VFTABLE: 0x00E02214
    * COL:     0x00E5E54C
+   *
+   * The binary splits the device across two types:
+   *
+   *   Moho::ID3DDevice   vftable 0x00E0..  53 slots, every one `_purecall`
+   *   Moho::CD3DDevice : public Moho::ID3DDevice,
+   *                      public Broadcaster<SD3DDeviceEvent const&>
+   *                      vftable 0x00E02214, 53 real slots
+   *
+   * This tree keeps both levels but collapses the names by one step: there is
+   * no `ID3DDevice` class here, so `CD3DDevice` plays the interface role -- 
+   * hence the handful of `= 0` members below -- and
+   * `CD3DDeviceSingleton final : public moho::CD3DDevice` in CD3DDevice.cpp
+   * is the implementation.
+   *
+   * So the pure members here are deliberate, not a stray `= 0`, and the
+   * missing `ID3DDevice` base is not an omission to be "fixed" -- that class
+   * does not exist in this tree. Only 3 of the interface's 53 pure slots are
+   * modelled; the rest are simply not recovered yet.
    */
   class CD3DDevice : public Broadcaster
   {
