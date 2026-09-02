@@ -5033,8 +5033,16 @@ namespace moho
    */
   void Entity::UpdateVisibility()
   {
-    // No owning army: resolve to the neutral channel, flagged not-visible.
-    // (0x00678A73-0x00678A91)
+    // No owning army: resolve to the neutral channel and flag it VISIBLE.
+    // 0x00678A73 reads `[edi+14Ch]` (ArmyRef) and branches on it; the no-army
+    // arm copies `[edi+1E8h]` (mVizToNeutrals) into `[edi+114h]`
+    // (mFootprintLayer) and then does `mov byte ptr [edi+110h], 1` at
+    // 0x00678A89 -- mVisibilityState = 1, unconditionally, with no VIZMODE_Never
+    // test. Unowned entities are always published; only the army-relative arms
+    // below can suppress one.
+    //
+    // This comment used to say "flagged not-visible" while the code beside it
+    // set 1. The code was right.
     if (ArmyRef == nullptr) {
       mFootprintLayer = mVizToNeutrals;
       mVisibilityState = 1;
