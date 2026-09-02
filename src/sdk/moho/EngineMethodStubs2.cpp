@@ -27,17 +27,17 @@
 namespace moho
 {
 
-// ===== EntityCollisionUpdater virtual collision queries =====
-bool EntityCollisionUpdater::CollideBox(const Wm3::Box3<float>*, CollisionPairResult*) const { return false; }
-bool EntityCollisionUpdater::CollideLine(const Wm3::Vector3<float>*, const Wm3::Vector3<float>*, CollisionLineResult*) const { return false; }
-bool EntityCollisionUpdater::CollideSphere(const Wm3::Sphere3<float>*, CollisionPairResult*) const { return false; }
-bool EntityCollisionUpdater::PointInShape(const Wm3::Vector3<float>*) const { return false; }
-const Wm3::Box3<float>* EntityCollisionUpdater::GetBox() const { return nullptr; }
-const Wm3::Sphere3<float>* EntityCollisionUpdater::GetSphere() const { return nullptr; }
-Wm3::Vector3<float>* EntityCollisionUpdater::GetCenter(Wm3::Vector3<float>* out) const { return out; }
-const Wm3::Vector3<float>* EntityCollisionUpdater::SetCenter(const Wm3::Vector3<float>* in) { return in; }
-const EntityCollisionBoundsView* EntityCollisionUpdater::GetBoundingBox(EntityCollisionBoundsScratch*) const { return nullptr; }
-void EntityCollisionUpdater::SetTransform(const EntityTransformPayload&) {}
+// EntityCollisionUpdater (= Moho::CColPrimitiveBase) had all ten of its
+// virtuals stubbed here. They are pure in the binary: the class vftable at
+// 0x00E0D3F4 points every one of its 10 slots at _purecall (0x00A82547), so
+// the base contributes no bodies and these definitions were inventing
+// behaviour -- GetBox in particular answered nullptr where a real box
+// primitive hands back its payload. The declarations are now `= 0`.
+//
+// The real bodies belong to Moho::CColPrimitive<T>, a template with two
+// instantiations (Box3f @0x00E0D50C, Sphere3f @0x00E0D480), which is what
+// the paired addresses in EntityCollisionUpdater.h have always been.
+// Recovering that template is the follow-up.
 
 // ===== IWldSessionLoader (defined in CWldSessionLoaderImpl.h as base) =====
 bool IWldSessionLoader::IsLoaded()                       { return false; }
