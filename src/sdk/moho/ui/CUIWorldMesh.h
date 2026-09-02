@@ -3,6 +3,8 @@
 #include <cstddef>
 
 #include "moho/script/CScriptObject.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Sphere3.h"
 
 namespace moho
 {
@@ -74,6 +76,34 @@ namespace moho
      * instance from either direct model/material lanes or unit blueprint data.
      */
     void SetMesh(const LuaPlus::LuaObject& meshDescriptor);
+
+    /**
+     * Address: 0x0086AF80 (FUN_0086AF80)
+     *
+     * IDA signature:
+     * Wm3::Sphere3f *__usercall GetWorldSphere@<eax>(CUIWorldMesh *this@<eax>,
+     *                                                Wm3::Sphere3f *out@<edi>);
+     *
+     * What it does:
+     * Refreshes the owned mesh instance's interpolated lanes and copies its
+     * current world-space bounding sphere into `outSphere`. Leaves `outSphere`
+     * untouched when no mesh instance is bound, and returns it either way.
+     */
+    Wm3::Sphere3f& GetWorldSphere(Wm3::Sphere3f& outSphere) const;
+
+    /**
+     * Address: 0x0086AFC0 (FUN_0086AFC0)
+     *
+     * IDA signature:
+     * Wm3::AxisAlignedBox3f *__usercall GetWorldBounds@<eax>(
+     *     CUIWorldMesh *this@<eax>, Wm3::AxisAlignedBox3f *out@<edi>);
+     *
+     * What it does:
+     * Refreshes the owned mesh instance's interpolated lanes and copies its
+     * current world-space axis-aligned bounds into `outBounds`. Leaves
+     * `outBounds` untouched when no mesh instance is bound.
+     */
+    Wm3::AxisAlignedBox3f& GetWorldBounds(Wm3::AxisAlignedBox3f& outBounds) const;
 
   public:
     MeshInstance* mMeshInstance = nullptr; // +0x34

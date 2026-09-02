@@ -213,4 +213,50 @@ namespace moho
       gpg::Warnf("WorldMesh:SetMesh - unable to create MeshInsance");
     }
   }
+
+  /**
+   * Address: 0x0086AF80 (FUN_0086AF80)
+   *
+   * What it does:
+   * Refreshes the owned mesh instance's interpolated lanes and copies its
+   * current world-space bounding sphere into `outSphere`.
+   *
+   * The binary reads the instance through `[this + 0x34]` (0x0086AF81), skips
+   * everything when it is null (0x0086AF86), then copies the 16 bytes at
+   * `[instance + 0xE0]` -- `MeshInstance::sphere` -- into the caller's storage
+   * and returns that storage. There is no null check on the output pointer.
+   */
+  Wm3::Sphere3f& CUIWorldMesh::GetWorldSphere(Wm3::Sphere3f& outSphere) const
+  {
+    if (mMeshInstance != nullptr) {
+      mMeshInstance->UpdateInterpolatedFields();
+      outSphere = mMeshInstance->sphere;
+    }
+    return outSphere;
+  }
+
+  /**
+   * Address: 0x0086AFC0 (FUN_0086AFC0)
+   *
+   * What it does:
+   * Refreshes the owned mesh instance's interpolated lanes and copies its
+   * current world-space axis-aligned bounds into `outBounds`.
+   *
+   * Same shape as GetWorldSphere: `[this + 0x34]` at 0x0086AFC1, the null skip
+   * at 0x0086AFC6, then the six bound floats starting at `[instance + 0xF0]`
+   * (0x0086AFCE) -- `MeshInstance::xMin` through `zMax`.
+   */
+  Wm3::AxisAlignedBox3f& CUIWorldMesh::GetWorldBounds(Wm3::AxisAlignedBox3f& outBounds) const
+  {
+    if (mMeshInstance != nullptr) {
+      mMeshInstance->UpdateInterpolatedFields();
+      outBounds.Min.x = mMeshInstance->xMin;
+      outBounds.Min.y = mMeshInstance->yMin;
+      outBounds.Min.z = mMeshInstance->zMin;
+      outBounds.Max.x = mMeshInstance->xMax;
+      outBounds.Max.y = mMeshInstance->yMax;
+      outBounds.Max.z = mMeshInstance->zMax;
+    }
+    return outBounds;
+  }
 } // namespace moho
