@@ -912,7 +912,7 @@
    * What it does:
    * Sets global Sofdec mono-routing mode lane.
    */
-  [[maybe_unused]] std::int32_t SofdecSetMonoRoutingMode(const std::int32_t monoRoutingMode)
+  std::int32_t SofdecSetMonoRoutingMode(const std::int32_t monoRoutingMode)
   {
     gSofdecMonoRoutingMode = monoRoutingMode;
     return monoRoutingMode;
@@ -924,7 +924,7 @@
    * What it does:
    * Returns global Sofdec mono-routing mode lane.
    */
-  [[maybe_unused]] std::int32_t SofdecGetMonoRoutingMode()
+  std::int32_t SofdecGetMonoRoutingMode()
   {
     return gSofdecMonoRoutingMode;
   }
@@ -935,7 +935,7 @@
    * What it does:
    * Sets global Sofdec buffer-placement mode lane.
    */
-  [[maybe_unused]] std::int32_t SofdecSetBufferPlacementMode(const std::int32_t bufferPlacementMode)
+  std::int32_t SofdecSetBufferPlacementMode(const std::int32_t bufferPlacementMode)
   {
     gSofdecBufferPlacementMode = bufferPlacementMode;
     return bufferPlacementMode;

@@ -6650,7 +6650,7 @@
    * What it does:
    * Returns ADXRNA transfer-enable bit (`stateFlags bit0`) for one RNA handle.
    */
-  [[maybe_unused]] std::int32_t adxrna_IsTransferEnabled(const std::int32_t rnaHandle)
+  std::int32_t adxrna_IsTransferEnabled(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6678,7 +6678,7 @@
    * What it does:
    * Polls ADXRNA output lanes for stop completion and clears stop-pending lane.
    */
-  [[maybe_unused]] std::int32_t adxrna_PollTransferStopState(const std::int32_t rnaHandle)
+  std::int32_t adxrna_PollTransferStopState(const std::int32_t rnaHandle)
   {
     auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
     if (runtime->transferStopPending == 0) {
@@ -6712,7 +6712,7 @@
    * What it does:
    * Repeatedly polls ADXRNA stop completion up to 200 iterations.
    */
-  [[maybe_unused]] std::int32_t adxrna_WaitForTransferStop(const std::int32_t rnaHandle)
+  std::int32_t adxrna_WaitForTransferStop(const std::int32_t rnaHandle)
   {
     gAdxrnaTransferDrainPollCount = 0;
     std::int32_t pollResult = 0;
@@ -6735,7 +6735,7 @@
    * Advances ADXRNA transfer cursors by pending carry units and returns the new
    * accumulated transfer-unit lane.
    */
-  [[maybe_unused]] std::int32_t adxrna_AdvanceTransferCursors(const std::int32_t rnaHandle)
+  std::int32_t adxrna_AdvanceTransferCursors(const std::int32_t rnaHandle)
   {
     auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
     const std::int32_t transferCarryUnits = runtime->transferCarryUnits;
@@ -6754,7 +6754,7 @@
    * What it does:
    * Applies pending transfer units to ADXRNA write/queue/time cursors.
    */
-  [[maybe_unused]] void __cdecl mwlRnaAddWrPos(AdxrnaTransportRuntimeView* const runtime)
+  void __cdecl mwlRnaAddWrPos(AdxrnaTransportRuntimeView* const runtime)
   {
     CRICRS_Enter();
 
@@ -6840,7 +6840,7 @@
    * Drains and tears down one ADXRNA runtime object, including output runtime
    * destruction and full object reset.
    */
-  [[maybe_unused]] std::int32_t adxrna_DestroyCore(AdxrnaTransportRuntimeView* const runtime)
+  std::int32_t adxrna_DestroyCore(AdxrnaTransportRuntimeView* const runtime)
   {
     if (runtime == nullptr) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6888,7 +6888,7 @@
    * What it does:
    * Transitions ADXRNA into stop/replay transfer state and enables transfer.
    */
-  [[maybe_unused]] void adxrna_StopAndEnableTransfer(const std::int32_t rnaHandle)
+  void adxrna_StopAndEnableTransfer(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6985,7 +6985,7 @@
    * What it does:
    * Returns constant discard-sample status `0` for this ADXRNA build.
    */
-  [[maybe_unused]] std::int32_t adxrna_DiscardSamplesCoreNoOp()
+  std::int32_t adxrna_DiscardSamplesCoreNoOp()
   {
     return 0;
   }
@@ -6996,7 +6996,7 @@
    * What it does:
    * Returns ADXRNA time-scale base lane and emits queued/decoded delta units.
    */
-  [[maybe_unused]] std::int32_t adxrna_GetTimeCore(
+  std::int32_t adxrna_GetTimeCore(
     const std::int32_t rnaHandle,
     std::int32_t* const outQueuedDeltaUnits,
     std::int32_t* const outTimeScaleBase
@@ -7020,7 +7020,7 @@
    * What it does:
    * Thunk wrapper to ADXRNA time query core.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetTime(
+  std::int32_t ADXRNA_GetTime(
     const std::int32_t rnaHandle,
     std::int32_t* const outQueuedDeltaUnits,
     std::int32_t* const outTimeScaleBase
@@ -7035,7 +7035,7 @@
    * What it does:
    * Returns ADXRNA queued-data lane at offset `0x34`.
    */
-  [[maybe_unused]] std::int32_t adxrna_GetNumDataCore(const std::int32_t rnaHandle)
+  std::int32_t adxrna_GetNumDataCore(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7155,7 +7155,7 @@
    * Initializes ADXRNA global runtime pools, handler dispatch, and error callback
    * state on first init; then increments ADXRNA init reference count.
    */
-  [[maybe_unused]] std::int32_t adxrna_GlobalInit()
+  std::int32_t adxrna_GlobalInit()
   {
     (void)kRnaVersionBanner;
 
@@ -7186,7 +7186,7 @@
    * Decrements ADXRNA init reference count and, on final release, stops and
    * destroys all active ADXRNA runtime objects then resets global runtime state.
    */
-  [[maybe_unused]] std::int32_t adxrna_GlobalFinish()
+  std::int32_t adxrna_GlobalFinish()
   {
     const std::int32_t result = --gAdxrnaInitCount;
     if (gAdxrnaInitCount != 0) {
@@ -7244,7 +7244,7 @@
    * What it does:
    * Returns whether ADXT filesystem server enter-count is non-zero.
    */
-  [[maybe_unused]] BOOL adxt_IsActiveFsSvr()
+  BOOL adxt_IsActiveFsSvr()
   {
     return (gAdxtFsServerEnterCount != 0) ? TRUE : FALSE;
   }
@@ -7256,7 +7256,7 @@
    * Increments ADX critical-section init count and resets lock-level lane on
    * first initialization.
    */
-  [[maybe_unused]] std::int32_t ADXCRS_Init()
+  std::int32_t ADXCRS_Init()
   {
     const std::int32_t result = ++gAdxcrsInitCount;
     if (gAdxcrsInitCount == 1) {
@@ -7609,7 +7609,7 @@
    * What it does:
    * Returns global Sofdec buffer-placement mode lane.
    */
-  [[maybe_unused]] std::int32_t SofdecGetBufferPlacementMode()
+  std::int32_t SofdecGetBufferPlacementMode()
   {
     return gSofdecBufferPlacementMode;
   }
@@ -9944,7 +9944,7 @@
    * What it does:
    * Returns nested payload lane (`+0x0C -> +0x38 -> +0x08`) when present.
    */
-  [[maybe_unused]] std::int32_t adxpc_GetNestedPayloadWord(const AdxpcNestedValueOwner* const owner)
+  std::int32_t adxpc_GetNestedPayloadWord(const AdxpcNestedValueOwner* const owner)
   {
     AdxpcNestedValueParent* const parent = owner->parent;
     if (parent == nullptr) {
@@ -9964,7 +9964,7 @@
    * What it does:
    * Polls ADXPC video object status and returns whether the ready bit is set.
    */
-  [[maybe_unused]] std::int32_t SofdecIsVideoProcessingReady()
+  std::int32_t SofdecIsVideoProcessingReady()
   {
     if (SofdecWaitForSignal(gAdxpcVideoProcessingSignal) == 0) {
       return 0;
