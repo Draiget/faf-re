@@ -6674,6 +6674,68 @@ extern "C" int __cdecl _fprintf_l(
 }
 
 /**
+ * Address: 0x00A88438 (FUN_00A88438, _vfprintf_s_l)
+ *
+ * IDA signature:
+ * FILE *callcnv_F4 sub_A88438@<eax>(FILE *a1, const char *a2, _locale_t a3, va_list a4);
+ *
+ * What it does:
+ * Locale-explicit, secure (`_s`) CRT narrow-character formatted output to a
+ * stream from an existing `va_list`. Same shape as `_vfprintf_l`, but routed
+ * through the `_output_s_l` callback (the format-string-validating secure
+ * variant) instead of `_output_l`.
+ */
+extern "C" int __cdecl _vfprintf_s_l(
+  std::FILE* const stream, const char* const format, const _locale_t locale, va_list arguments
+)
+{
+  return RuntimeDispatchLockedFormattedOutput(_output_s_l, stream, format, locale, arguments);
+}
+
+/**
+ * Address: 0x00A85D2B (FUN_00A85D2B, _fprintf_s_l)
+ *
+ * IDA signature:
+ * FILE *callcnv_F3 sub_A85D2B@<eax>(FILE *a1, const char *a2, _locale_t a3, ...);
+ *
+ * What it does:
+ * Locale-explicit, secure CRT narrow-character formatted output to a
+ * stream. Builds a `va_list` over its trailing arguments and forwards to
+ * `_vfprintf_s_l`, mirroring `_fprintf_l`/`_vfprintf_l`.
+ */
+extern "C" int __cdecl _fprintf_s_l(
+  std::FILE* const stream, const char* const format, const _locale_t locale, ...
+)
+{
+  va_list arguments;
+  va_start(arguments, locale);
+  const int result = _vfprintf_s_l(stream, format, locale, arguments);
+  va_end(arguments);
+  return result;
+}
+
+/**
+ * Address: 0x00A85D45 (FUN_00A85D45, _fprintf_s)
+ *
+ * IDA signature:
+ * FILE *callcnv_F2 sub_A85D45@<eax>(FILE *a1, const char *a2, ...);
+ *
+ * What it does:
+ * Secure CRT narrow-character formatted output to a stream, current-locale
+ * only (no locale parameter exposed to the caller). Builds a `va_list` over
+ * its trailing arguments and forwards to `_vfprintf_s_l` with a null locale,
+ * mirroring `fprintf`/`vfprintf`'s null-locale forwarding.
+ */
+extern "C" int __cdecl _fprintf_s(std::FILE* const stream, const char* const format, ...)
+{
+  va_list arguments;
+  va_start(arguments, format);
+  const int result = _vfprintf_s_l(stream, format, nullptr, arguments);
+  va_end(arguments);
+  return result;
+}
+
+/**
  * Address: 0x00A85BC2 (FUN_00A85BC2, fprintf)
  *
  * IDA signature:
