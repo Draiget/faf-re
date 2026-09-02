@@ -74,8 +74,10 @@ namespace moho
     RegisterShaderVar("ShadowsEnabled", &shadowsEnabled, "terrain");
     RegisterShaderVar("ShadowMatrix", &shadowMatrix, "terrain");
     RegisterShaderVar("ShadowTexture", &shadowTexture, "terrain");
+    RegisterShaderVar("ShadowTexture", &shadowTexture2, "terrain");
     RegisterShaderVar("ShadowSize", &shadowSize, "terrain");
     RegisterShaderVar("NoiseTexture", &noiseTexture, "terrain");
+    RegisterShaderVar("VizTexture", &vizTexture, "terrain");
     RegisterShaderVar("DecalMaskTexture", &decalMaskTexture, "terrain");
     RegisterShaderVar("BiCubicLookup", &biCubicLookup, "terrain");
     RegisterShaderVar("OverlayTexture", &overlayTexture, "terrain");
