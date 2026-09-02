@@ -8301,9 +8301,12 @@ namespace moho
     );
 
     if (candidateNode == runtime.trailBuckets.head) {
-      auto* const newBucket = static_cast<TrailRenderBucketRuntime*>(
-        ::operator new(sizeof(TrailRenderBucketRuntime))
-      );
+      // Constructed, not merely allocated -- same defect as the particle
+      // buckets above. InitializeTrailRenderBucketFromTrail resets two
+      // shared_ptr texture handles and assigns into `tag`, and on raw
+      // `operator new` storage that releases a garbage control block and frees
+      // a garbage string buffer.
+      auto* const newBucket = new TrailRenderBucketRuntime();
       (void)InitializeTrailRenderBucketFromTrail(*newBucket, trail, this);
 
       PointerByteFlagPairRuntime insertResult{};

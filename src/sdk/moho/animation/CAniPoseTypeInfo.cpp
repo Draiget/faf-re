@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
-#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniPose.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -95,7 +95,16 @@ namespace
 
   void InitializeDefaultPoseStorage(CAniPose& pose)
   {
-    pose.mSkeleton = boost::shared_ptr<const CAniSkel>{};
+    // Both callers hand this raw, unconstructed storage -- `NewRef` straight
+    // off `operator new`, `CtrRef` from the reflection layer's own buffer -- so
+    // `mSkeleton` holds whatever bytes were already there. The binary does not
+    // run shared_ptr's assignment operator here either: `NewRef` (0x0054D8A0)
+    // stores two zero dwords directly into it at 0x0054D8BC and 0x0054D8C2,
+    // then fills the scalar fields. Copy-assigning instead would call
+    // `shared_count::operator=`, which releases the garbage control block those
+    // bytes decode to. Constructing in place reproduces the binary's empty
+    // {px, pi_} pair without touching it.
+    ::new (static_cast<void*>(&pose.mSkeleton)) boost::shared_ptr<const CAniSkel>();
     pose.mScale = 1.0f;
 
     pose.mLocalTransform.orient_.w = 1.0f;
