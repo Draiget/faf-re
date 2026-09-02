@@ -14092,3 +14092,114 @@ namespace
 
   [[maybe_unused]] ConsoleStartupRegistrationsMisc3 gConsoleStartupRegistrationsMisc3;
 } // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupAiInitialMassCurrencyDescription = "Initial currency of mass economy.";
+  constexpr const char* kConsoleStartupAiInitialMassCurrencyMaxDescription = "Initial currency of mass economy.";
+  constexpr const char* kConsoleStartupRenShadowBiasDescription = "Constant shadow bias";
+} // namespace
+
+namespace moho
+{
+  extern float ren_ShadowBias;
+
+  TConVar<float> gTConVar_ai_InitialMassCurrency(
+    "ai_InitialMassCurrency",
+    kConsoleStartupAiInitialMassCurrencyDescription,
+    &moho::ai_InitialMassCurrency
+  );
+  TConVar<float> gTConVar_ai_InitialMassCurrencyMax(
+    "ai_InitialMassCurrencyMax",
+    kConsoleStartupAiInitialMassCurrencyMaxDescription,
+    &moho::ai_InitialMassCurrencyMax
+  );
+  TConVar<float> gTConVar_ren_ShadowBias(
+    "ren_ShadowBias",
+    kConsoleStartupRenShadowBiasDescription,
+    &moho::ren_ShadowBias
+  );
+
+  /**
+   * Address: 0x00C02160 (FUN_00C02160, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ai_InitialMassCurrency`.
+   */
+  void cleanup_TConVar_ai_InitialMassCurrency()
+  {
+    CleanupStartupConCommand(gTConVar_ai_InitialMassCurrency);
+  }
+
+  /**
+   * Address: 0x00BDCFF0 (FUN_00BDCFF0, register_TConVar_ai_InitialMassCurrency)
+   *
+   * What it does:
+   * Registers startup convar for `ai_InitialMassCurrency`.
+   */
+  void register_TConVar_ai_InitialMassCurrency()
+  {
+    RegisterStartupConVar(gTConVar_ai_InitialMassCurrency, &cleanup_TConVar_ai_InitialMassCurrency);
+  }
+
+  /**
+   * Address: 0x00C021C0 (FUN_00C021C0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ai_InitialMassCurrencyMax`.
+   */
+  void cleanup_TConVar_ai_InitialMassCurrencyMax()
+  {
+    CleanupStartupConCommand(gTConVar_ai_InitialMassCurrencyMax);
+  }
+
+  /**
+   * Address: 0x00BDD070 (FUN_00BDD070, register_TConVar_ai_InitialMassCurrencyMax)
+   *
+   * What it does:
+   * Registers startup convar for `ai_InitialMassCurrencyMax`.
+   */
+  void register_TConVar_ai_InitialMassCurrencyMax()
+  {
+    RegisterStartupConVar(gTConVar_ai_InitialMassCurrencyMax, &cleanup_TConVar_ai_InitialMassCurrencyMax);
+  }
+
+  /**
+   * Address: 0x00C04D50 (FUN_00C04D50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `ren_ShadowBias`.
+   */
+  void cleanup_TConVar_ren_ShadowBias()
+  {
+    CleanupStartupConCommand(gTConVar_ren_ShadowBias);
+  }
+
+  /**
+   * Address: 0x00BE1F60 (FUN_00BE1F60, register_TConVar_ren_ShadowBias)
+   *
+   * What it does:
+   * Registers startup convar for `ren_ShadowBias`, the shadow depth bias
+   * `MeshRenderer::ConfigureShader`'s shadow lane already reads from the
+   * plain `moho::ren_ShadowBias` global (Mesh.cpp).
+   */
+  void register_TConVar_ren_ShadowBias()
+  {
+    RegisterStartupConVar(gTConVar_ren_ShadowBias, &cleanup_TConVar_ren_ShadowBias);
+  }
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsMisc4
+  {
+    ConsoleStartupRegistrationsMisc4()
+    {
+      moho::register_TConVar_ai_InitialMassCurrency();
+      moho::register_TConVar_ai_InitialMassCurrencyMax();
+      moho::register_TConVar_ren_ShadowBias();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsMisc4 gConsoleStartupRegistrationsMisc4;
+} // namespace
