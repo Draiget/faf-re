@@ -560,6 +560,13 @@ namespace moho
     }
   }
 
+  /**
+   * Address: 0x00C08DC0 (FUN_00C08DC0, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_CameraScaleLOD`.
+   */
   void cleanup_CConFunc_SC_CameraScaleLOD()
   {
     CleanupStartupConCommand(gCConFunc_SC_CameraScaleLOD);
