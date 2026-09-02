@@ -168,35 +168,22 @@ namespace
   constexpr const char* kCameraAccTypeFastInSlowOutName = "FastInSlowOut";
   constexpr const char* kCameraAccTypeSlowInOutName = "SlowInOut";
 
-  struct CameraShakeParamsView
+  /**
+   * The live shake record: `SCamShakeParams` (the 0x1C payload the sim sends)
+   * plus the two fields the camera keeps while playing it back.
+   *
+   * This used to redeclare all five payload fields, which is how its
+   * `mMinMagnitude`/`mMaxMagnitude` naming came to disagree with the producer
+   * in `Entity.cpp`. Deriving instead means there is one declaration of the
+   * payload and the offsets cannot drift apart again.
+   */
+  struct CameraShakeParamsView : moho::SCamShakeParams
   {
-    Wm3::Vec3f mCenter{};                  // +0x00
-    float mMaxRange = 0.0f;                // +0x0C
-    float mMagnitudeAtCenter = 0.0f;            // +0x10
-    float mMagnitudeAtMaxRange = 0.0f;            // +0x14
-    float mDuration = 0.0f;                // +0x18
     float mElapsed = 0.0f;                 // +0x1C
     float mScale = 0.0f;                   // +0x20
   };
 
   static_assert(sizeof(CameraShakeParamsView) == 0x24, "CameraShakeParamsView size must be 0x24");
-  static_assert(offsetof(CameraShakeParamsView, mCenter) == 0x00, "CameraShakeParamsView::mCenter offset must be 0x00");
-  static_assert(
-    offsetof(CameraShakeParamsView, mMaxRange) == 0x0C,
-    "CameraShakeParamsView::mMaxRange offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CameraShakeParamsView, mMagnitudeAtCenter) == 0x10,
-    "CameraShakeParamsView::mMagnitudeAtCenter offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CameraShakeParamsView, mMagnitudeAtMaxRange) == 0x14,
-    "CameraShakeParamsView::mMagnitudeAtMaxRange offset must be 0x14"
-  );
-  static_assert(
-    offsetof(CameraShakeParamsView, mDuration) == 0x18,
-    "CameraShakeParamsView::mDuration offset must be 0x18"
-  );
   static_assert(
     offsetof(CameraShakeParamsView, mElapsed) == 0x1C,
     "CameraShakeParamsView::mElapsed offset must be 0x1C"
