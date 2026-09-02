@@ -162,6 +162,24 @@
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
+      <!-- Both taken from the shipped binary's PE header, read with
+           `dumpbin /HEADERS ForgedAlliance.exe`:
+
+             characteristics  0x123  (RELOCS_STRIPPED | EXECUTABLE_IMAGE |
+                                      LARGE_ADDRESS_AWARE | 32BIT_MACHINE)
+             stack reserve    0x1E8480  (2,000,000 - a round decimal, so the
+                                         original link was /STACK:2000000)
+
+           Ours were 0x102 and 0x100000: no LARGE_ADDRESS_AWARE, default 1 MB
+           stack. Without the flag this 32-bit process is capped at a 2 GB user
+           address space where retail gets 4 GB on a 64-bit host, and that
+           ceiling is what the allocator falls off - `AllocateFreeRegion`
+           (0x00958660) discards `VirtualAlloc`'s return value, faithfully to
+           the binary, so a failed commit is returned as a live pointer into
+           reserved-but-uncommitted memory. The observed fault address was
+           0x592B5600, already 1.49 GB in. -->
+      <LargeAddressAware>true</LargeAddressAware>
+      <StackReserveSize>2000000</StackReserveSize>
     </Link>
     <PostBuildEvent>
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
@@ -196,6 +214,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
            unresolved externals, most of them compiler EH helpers. -->
       <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
+      <!-- See the Debug|Win32 link block above: both values come from the
+           shipped binary's PE header (characteristics 0x123, stack reserve
+           0x1E8480). -->
+      <LargeAddressAware>true</LargeAddressAware>
+      <StackReserveSize>2000000</StackReserveSize>
     </Link>
     <PostBuildEvent>
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
