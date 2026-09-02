@@ -970,17 +970,6 @@ namespace boost
         moho::CIntelGrid* ownedPointee
     ) noexcept;
 
-    /**
-     * Address: 0x007BDC20 (FUN_007BDC20, boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `CGpgNetInterface`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CGpgNetInterface>* SpCountedImplPConstructCGpgNetInterface(
-        SpCountedImplStorage<moho::CGpgNetInterface>* countedImpl,
-        moho::CGpgNetInterface* ownedPointee
-    ) noexcept;
 
     /**
      * Address: 0x00923700 (FUN_00923700, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>>::sp_counted_impl_p)
@@ -1079,29 +1068,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x00755FE0 (FUN_00755FE0, boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `CDebugCanvas`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CDebugCanvas>* SpCountedImplPConstructCDebugCanvas(
-        SpCountedImplStorage<moho::CDebugCanvas>* countedImpl,
-        moho::CDebugCanvas* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x00756030 (FUN_00756030, boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `SParticleBuffer`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::SParticleBuffer>* SpCountedImplPConstructSParticleBuffer(
-        SpCountedImplStorage<moho::SParticleBuffer>* countedImpl,
-        moho::SParticleBuffer* ownedPointee
-    ) noexcept;
-
-    /**
      * Address: 0x00765700 (FUN_00765700, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::sp_counted_impl_p)
      *
      * What it does:
@@ -1113,16 +1079,6 @@ namespace boost
         moho::PathPreviewFinder* ownedPointee
     ) noexcept;
 
-    /**
-     * Address: 0x00797040 (FUN_00797040, boost::detail::sp_counted_impl_p<Moho::CMauiFrame>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `CMauiFrame`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CMauiFrame>* SpCountedImplPConstructCMauiFrame(
-        SpCountedImplStorage<moho::CMauiFrame>* countedImpl,
-        moho::CMauiFrame* ownedPointee
-    ) noexcept;
 
     /**
      * Address: 0x007FC1A0 (FUN_007FC1A0, boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::sp_counted_impl_p)
@@ -1216,16 +1172,6 @@ namespace boost
         detail::sp_counted_base* control
     ) noexcept;
 
-    /**
-     * Address: 0x007BDC80 (FUN_007BDC80)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CGpgNetInterface` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCGpgNetInterface(
-        detail::sp_counted_base* control
-    ) noexcept;
 
     /**
      * Address: 0x008E8B10 (FUN_008E8B10, boost::detail::sp_counted_base::sp_counted_base)
@@ -1482,28 +1428,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007560F0 (FUN_007560F0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CDebugCanvas` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCDebugCanvas(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00756100 (FUN_00756100)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `SParticleBuffer` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForSParticleBuffer(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
      * Address: 0x00765790 (FUN_00765790)
      *
      * What it does:
@@ -1514,16 +1438,6 @@ namespace boost
         detail::sp_counted_base* control
     ) noexcept;
 
-    /**
-     * Address: 0x007970B0 (FUN_007970B0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CMauiFrame` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCMauiFrame(
-        detail::sp_counted_base* control
-    ) noexcept;
 
     /**
      * Address: 0x0053A290 (FUN_0053A290)
@@ -1661,39 +1575,6 @@ namespace boost
      */
     void SpCountedImplPDisposeCIntelGrid(
         SpCountedImplStorage<moho::CIntelGrid>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x00756000 (FUN_00756000, boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `CDebugCanvas` pointee bound to this shared-count
-     * control lane when present.
-     */
-    void SpCountedImplPDisposeCDebugCanvas(
-        SpCountedImplStorage<moho::CDebugCanvas>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x00756050 (FUN_00756050, boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `SParticleBuffer` pointee bound to this shared-count
-     * control lane when present.
-     */
-    void SpCountedImplPDisposeSParticleBuffer(
-        SpCountedImplStorage<moho::SParticleBuffer>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x007BDC40 (FUN_007BDC40, boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::dispose)
-     *
-     * What it does:
-     * Releases one owned `CGpgNetInterface` pointee through its
-     * scalar-deleting virtual destructor lane when present.
-     */
-    void SpCountedImplPDisposeCGpgNetInterface(
-        SpCountedImplStorage<moho::CGpgNetInterface>* countedImpl
     ) noexcept;
 
     /**
@@ -1883,29 +1764,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007560A0 (FUN_007560A0, boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for
-     * `sp_counted_impl_p<CDebugCanvas>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CDebugCanvas>* SpCountedImplPDeletingDtorCDebugCanvas(
-        SpCountedImplStorage<moho::CDebugCanvas>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x007560C0 (FUN_007560C0, boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for
-     * `sp_counted_impl_p<SParticleBuffer>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::SParticleBuffer>* SpCountedImplPDeletingDtorSParticleBuffer(
-        SpCountedImplStorage<moho::SParticleBuffer>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
     /**
      * Address: 0x00765770 (FUN_00765770, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dtr)
      *
@@ -2002,27 +1860,6 @@ namespace boost
         unsigned char deleteFlag
     ) noexcept;
 
-    /**
-     * Address: 0x00797090 (FUN_00797090, boost::detail::sp_counted_impl_p<Moho::CMauiFrame>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<CMauiFrame>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CMauiFrame>* SpCountedImplPDeletingDtorCMauiFrame(
-        SpCountedImplStorage<moho::CMauiFrame>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x007BDC60 (FUN_007BDC60, boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<CGpgNetInterface>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CGpgNetInterface>* SpCountedImplPDeletingDtorCGpgNetInterface(
-        SpCountedImplStorage<moho::CGpgNetInterface>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
 
     /**
      * Address: 0x007FBE80 (FUN_007FBE80, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dtr)
@@ -2156,25 +1993,6 @@ namespace boost
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
-    /**
-     * Address: 0x00756020 (FUN_00756020, boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullCDebugCanvas(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x00756070 (FUN_00756070, boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullSParticleBuffer(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
 
     /**
      * Address: 0x00765760 (FUN_00765760, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::get_deleter)
@@ -2186,15 +2004,6 @@ namespace boost
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
-    /**
-     * Address: 0x007BDC50 (FUN_007BDC50, boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullCGpgNetInterface(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
 
     /**
      * Address: 0x007FBE70 (FUN_007FBE70, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::get_deleter)
