@@ -1791,16 +1791,6 @@ namespace
     return node;
   }
 
-  /**
-   * Address: 0x00505F20 (FUN_00505F20)
-   *
-   * What it does:
-   * Allocates raw storage for one `SpatialMapNode` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SpatialMapNode* AllocateSingleSpatialMapNodeLane()
-  {
-    return static_cast<moho::SpatialMapNode*>(::operator new(sizeof(moho::SpatialMapNode)));
-  }
 
   /**
    * Address: 0x00505F40 (FUN_00505F40, sub_505F40)
@@ -1969,23 +1959,6 @@ namespace
     return InsertSpatialPayloadByFade(tree, payload);
   }
 
-  /**
-   * Address: 0x00504330 (FUN_00504330)
-   *
-   * What it does:
-   * Register-lane adapter that performs hint-aware payload insertion and
-   * returns the caller-provided node-slot lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SpatialMapNode** InsertSpatialPayloadWithHintSlotAdapter(
-    moho::SpatialMapNode** const outNodeSlot,
-    moho::SpatialMapTree& tree,
-    moho::SpatialMapNode* const hint,
-    const SpatialMapValuePayload& payload
-  )
-  {
-    (void)InsertSpatialPayloadWithHint(tree, payload, hint);
-    return outNodeSlot;
-  }
 
   struct PointerToPointerSlot04RuntimeView
   {
@@ -2020,25 +1993,32 @@ namespace
     return outLane;
   }
 
-  /**
-   * Address: 0x00504380 (FUN_00504380)
-   *
-   * What it does:
-   * Stores one pointer value loaded from the indirection lane at `+0x04`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StoreDereferencedPointerSlot04Lane(
-    std::uintptr_t* const outLane,
-    const PointerToPointerSlot04RuntimeView* const runtime
-  ) noexcept
-  {
-    return StorePointerLaneValue(outLane, *runtime->slot04);
-  }
 
   /**
    * Address: 0x00504390 (FUN_00504390)
    *
    * What it does:
    * Stores one direct pointer lane from `+0x04`.
+   */
+  /**
+   * The thin forwarders MSVC emitted alongside the bodies in this file --
+   * calling-convention bridges and ICF-style duplicate lanes, every one of them
+   * a single `return <the real thing>(...)` and referenced by nothing anywhere
+   * in the tree. There is no source line behind a thunk; the source called the
+   * target directly.
+   *
+   * Address: 0x005046C0  duplicate of this lane
+   * Address: 0x005046D0  duplicate of this lane
+   * Address: 0x005046F0  duplicate of the slot-08 lane
+   * Address: 0x00504380  slot-04 lane, dereferencing shape
+   * Address: 0x005060B0  alias of CopyDwordLaneRangeAndReturnEnd
+   * Address: 0x00505F20  `operator new(sizeof(SpatialMapNode))` lane
+   * Address: 0x00504330  bridge into the hint-slot spatial insert
+   * Address: 0x007E2AA0  placement-new bridge for SpatialDB_MeshInstance
+   * Address: 0x007E2AC0  bridge to SpatialDB_MeshInstance::CollectAllInVolume
+   * Address: 0x007E2AD0  bridge into the mask-0x800 entry register
+   * Address: 0x008C5A90  bridge to SpatialDB_MeshInstance::CollectInBox
+   * Address: 0x007AE170  bridge to SpatialDB_MeshInstance::CollectInView
    */
   [[maybe_unused]] [[nodiscard]] std::uintptr_t* StorePointerSlot04LaneA(
     std::uintptr_t* const outLane,
@@ -2048,33 +2028,7 @@ namespace
     return StorePointerLaneValue(outLane, runtime->slot04);
   }
 
-  /**
-   * Address: 0x005046C0 (FUN_005046C0)
-   *
-   * What it does:
-   * Alias lane that stores one direct pointer from `+0x04`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StorePointerSlot04LaneB(
-    std::uintptr_t* const outLane,
-    const PointerSlot04RuntimeView* const runtime
-  ) noexcept
-  {
-    return StorePointerSlot04LaneA(outLane, runtime);
-  }
 
-  /**
-   * Address: 0x005046D0 (FUN_005046D0)
-   *
-   * What it does:
-   * Alias lane that stores one direct pointer from `+0x04`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StorePointerSlot04LaneC(
-    std::uintptr_t* const outLane,
-    const PointerSlot04RuntimeView* const runtime
-  ) noexcept
-  {
-    return StorePointerSlot04LaneA(outLane, runtime);
-  }
 
   /**
    * Address: 0x005046E0 (FUN_005046E0)
@@ -2090,19 +2044,6 @@ namespace
     return StorePointerLaneValue(outLane, runtime->slot08);
   }
 
-  /**
-   * Address: 0x005046F0 (FUN_005046F0)
-   *
-   * What it does:
-   * Alias lane that stores one direct pointer from `+0x08`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StorePointerSlot08LaneB(
-    std::uintptr_t* const outLane,
-    const PointerSlot08RuntimeView* const runtime
-  ) noexcept
-  {
-    return StorePointerSlot08LaneA(outLane, runtime);
-  }
 
   /**
    * Address: 0x00504310 (FUN_00504310, sub_504310)
@@ -2186,20 +2127,6 @@ namespace
     return destinationEnd;
   }
 
-  /**
-   * Address: 0x005060B0 (FUN_005060B0)
-   *
-   * What it does:
-   * Duplicate adapter lane of `CopyDwordLaneRangeAndReturnEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordLaneRangeAndReturnEndAlias(
-    std::uint32_t* const destinationBegin,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return CopyDwordLaneRangeAndReturnEnd(destinationBegin, sourceBegin, sourceEnd);
-  }
 
   template <class TPredicate>
   void CollectTreeNodes(
@@ -3591,54 +3518,8 @@ namespace moho
     InitializeSpatialDbMeshStorage(storage);
   }
 
-  /**
-   * Address: 0x007E2AA0 (FUN_007E2AA0)
-   *
-   * What it does:
-   * Register-shape adapter that placement-constructs one
-   * `SpatialDB_MeshInstance` object in caller-provided storage.
-   */
-  [[maybe_unused]] SpatialDB_MeshInstance* ConstructSpatialDbMeshInstanceAdapter(
-    SpatialDB_MeshInstance* const storage
-  )
-  {
-    return ::new (storage) SpatialDB_MeshInstance();
-  }
 
-  /**
-   * Address: 0x007E2AC0 (FUN_007E2AC0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one collect-all-in-volume request to
-   * `SpatialDB_MeshInstance::CollectAllInVolume`.
-   */
-  [[maybe_unused]] std::int32_t CollectAllInVolumeAdapter(
-    SpatialDB_MeshInstance* const instance,
-    gpg::fastvector<UserEntity*>& destination,
-    CGeomSolid3* const volume,
-    const Wm3::Vector3f& supportSelector,
-    const Vector4f& fadePlane
-  )
-  {
-    return instance->CollectAllInVolume(destination, volume, supportSelector, fadePlane);
-  }
 
-  /**
-   * Address: 0x007E2AD0 (FUN_007E2AD0)
-   *
-   * What it does:
-   * Register-shape adapter that registers one spatial-db entry with fixed
-   * routing mask `0x800`.
-   */
-  [[maybe_unused]] SpatialDB_MeshInstance* RegisterSpatialDbEntryMask800Adapter(
-    SpatialDB_MeshInstance* const entry,
-    void* const spatialDbStorage,
-    void* const owner
-  )
-  {
-    entry->Register(spatialDbStorage, owner, 0x800);
-    return entry;
-  }
 
   /**
      * Alias of FUN_00501F50 (non-canonical helper lane).
@@ -3955,21 +3836,6 @@ namespace moho
     return instance->Collect(destination, type);
   }
 
-  /**
-   * Address: 0x008C5A90 (FUN_008C5A90)
-   *
-   * What it does:
-   * Source-first adapter that forwards one mesh-instance box query into
-   * `SpatialDB_MeshInstance::CollectInBox`.
-   */
-  [[maybe_unused]] std::int32_t CollectMeshInstanceInBoxSourceFirstAdapter(
-    SpatialDB_MeshInstance* const instance,
-    gpg::fastvector<UserEntity*>* const destination,
-    const Wm3::AxisAlignedBox3f* const bounds
-  )
-  {
-    return instance->CollectInBox(*destination, *bounds);
-  }
 
   /**
    * Address: 0x00504040 (FUN_00504040, Moho::SpatialDB_MeshInstance::CollectInBox)
@@ -4084,22 +3950,6 @@ namespace moho
     return static_cast<std::int32_t>(destination.size());
   }
 
-  /**
-   * Address: 0x007AE170 (FUN_007AE170)
-   *
-   * What it does:
-   * Register-order adapter that forwards one mesh-instance view collection lane
-   * through `SpatialDB_MeshInstance::CollectInView`.
-   */
-  [[maybe_unused]] std::int32_t CollectMeshInstanceInViewRegisterAdapter(
-    SpatialDB_MeshInstance* const instance,
-    const EEntityType type,
-    gpg::fastvector<UserEntity*>& destination,
-    GeomCamera3* const camera
-  )
-  {
-    return instance->CollectInView(camera, destination, type);
-  }
 
   /**
    * Address: 0x007DBEE0 (FUN_007DBEE0, ??0MeshMaterial@Moho@@QAE@XZ)
