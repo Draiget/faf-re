@@ -34,6 +34,7 @@ namespace moho
   class MeshMaterial;
   class MeshInstance;
   class CD3DDynamicTextureSheet;
+  class ID3DTextureSheet;
   class RD3DTextureResource;
   class ID3DRenderTarget;
   class ID3DDepthStencil;
@@ -319,18 +320,27 @@ namespace moho
     );
 
   public:
-    msvc8::string mShaderAnnotation;                              // +0x04
-    boost::shared_ptr<CD3DDynamicTextureSheet> mAlbedoSheet;      // +0x20
-    boost::shared_ptr<CD3DDynamicTextureSheet> mNormalsSheet;     // +0x28
-    boost::shared_ptr<CD3DDynamicTextureSheet> mSpecularSheet;    // +0x30
-    boost::shared_ptr<CD3DDynamicTextureSheet> mLookupSheet;      // +0x38
-    boost::shared_ptr<CD3DDynamicTextureSheet> mSecondarySheet;   // +0x40
-    boost::shared_ptr<CD3DDynamicTextureSheet> mEnvironmentSheet; // +0x48
-    std::int32_t mShaderIndex;                                    // +0x50
-    msvc8::string mAuxTag0;                                       // +0x54
-    msvc8::string mAuxTag1;                                       // +0x70
-    std::uint8_t mRuntimeFlag0;                                   // +0x8C
-    std::uint8_t mRuntimeFlag1;                                   // +0x8D
+    // These are sheet handles held at the interface, not at a leaf type.
+    // `MeshMaterial::Create` fills five of them from
+    // `ID3DDeviceResources::GetTexture` -- vtable slot 10 (`+0x28`), dispatched
+    // at 0x007DC2AE and stored into `+0x20`/`+0x24` at 0x007DC2C4 -- which
+    // yields `RD3DTextureResource`. `mEnvironmentSheet` additionally takes the
+    // terrain's per-environment lookup, a different concrete sheet. The one
+    // type that both producers and the `ShaderVar::GetTexture` consumer accept
+    // is their shared `ID3DTextureSheet` base, which sits at offset 0 in each,
+    // so the raw pointer stored is the same word the binary stores.
+    msvc8::string mShaderAnnotation;                      // +0x04
+    boost::shared_ptr<ID3DTextureSheet> mAlbedoSheet;      // +0x20
+    boost::shared_ptr<ID3DTextureSheet> mNormalsSheet;     // +0x28
+    boost::shared_ptr<ID3DTextureSheet> mSpecularSheet;    // +0x30
+    boost::shared_ptr<ID3DTextureSheet> mLookupSheet;      // +0x38
+    boost::shared_ptr<ID3DTextureSheet> mSecondarySheet;   // +0x40
+    boost::shared_ptr<ID3DTextureSheet> mEnvironmentSheet; // +0x48
+    std::int32_t mShaderIndex;                            // +0x50
+    msvc8::string mAuxTag0;                               // +0x54
+    msvc8::string mAuxTag1;                               // +0x70
+    std::uint8_t mRuntimeFlag0;                           // +0x8C
+    std::uint8_t mRuntimeFlag1;                           // +0x8D
     std::uint8_t mPad8E_8F[0x02]{};
   };
 

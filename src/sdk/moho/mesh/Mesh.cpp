@@ -2687,27 +2687,33 @@ namespace
     return transform;
   }
 
-  [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>
-  ResolveMaterialTextureSheet(const msvc8::string& textureName, moho::CResourceWatcher* const resourceWatcher)
-  {
-    // Address chain: 0x007DC1B0 -> D3D_GetDevice/GetResources -> resource lookup vfunc.
-    // Device/resource interfaces are still being reconstructed; keep this seam typed.
-    (void)textureName;
-    (void)resourceWatcher;
-    return {};
-  }
-
   void AssignMaterialTextureSheet(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& destination,
+    boost::shared_ptr<moho::ID3DTextureSheet>& destination,
     const msvc8::string& textureName,
     moho::CResourceWatcher* const resourceWatcher
   )
   {
+    // 0x007DC280: an empty path skips the lookup entirely -- the field keeps
+    // whatever it already held. 0x007DC2AE dispatches vtable slot 10 on the
+    // device's resource set, with the fallback flag set (`push 1`, 0x007DC292),
+    // so a missing texture resolves to the fallback rather than to null.
     if (textureName.empty()) {
       return;
     }
 
-    destination = ResolveMaterialTextureSheet(textureName, resourceWatcher);
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    if (device == nullptr) {
+      return;
+    }
+
+    moho::ID3DDeviceResources* const resources = device->GetResources();
+    if (resources == nullptr) {
+      return;
+    }
+
+    moho::ID3DDeviceResources::TextureResourceHandle texture{};
+    resources->GetTexture(texture, textureName.c_str(), resourceWatcher, true);
+    destination = texture;
   }
 
   [[nodiscard]] boost::shared_ptr<const moho::CAniSkel>
@@ -6528,19 +6534,16 @@ namespace moho
       // material is drawn. When a terrain resource is present the sheet is the
       // terrain's per-environment lookup (keyed by the material's "environment"
       // string annotation); otherwise it is the renderer's shared mesh
-      // environment texture. Both source handles are ID3DTextureSheet-rooted,
-      // so the assignment into the CD3DDynamicTextureSheet-typed lane is a
-      // pointer-identity sibling downcast (offset-0 single inheritance), exactly
-      // as the binary's raw pointer store.
+      // environment texture. Both are ID3DTextureSheet-rooted, which is why the
+      // lane is held at that base -- no cast is needed in either direction, and
+      // the stored word is the one the binary stores.
       if (!material.mEnvironmentSheet) {
         if (terrainRes != nullptr) {
           const msvc8::string environmentKey =
             meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("environment"), msvc8::string("<default>"));
-          const boost::shared_ptr<ID3DTextureSheet> environmentLookup = terrainRes->GetEnvLookup(environmentKey);
-          material.mEnvironmentSheet = boost::static_pointer_cast<CD3DDynamicTextureSheet>(environmentLookup);
+          material.mEnvironmentSheet = terrainRes->GetEnvLookup(environmentKey);
         } else {
-          material.mEnvironmentSheet = boost::static_pointer_cast<CD3DDynamicTextureSheet>(
-            boost::static_pointer_cast<ID3DTextureSheet>(meshEnvironmentTex));
+          material.mEnvironmentSheet = meshEnvironmentTex;
         }
       }
 
