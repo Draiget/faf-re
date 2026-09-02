@@ -740,21 +740,20 @@ namespace
     return (dx * dx) + (dz * dz) <= (radius * radius);
   }
 
-  [[nodiscard]] moho::Rect2<int> MakePointReconRect(const Wm3::Vec3f& pos) noexcept
-  {
-    const std::int32_t x = static_cast<std::int32_t>(pos.x);
-    const std::int32_t z = static_cast<std::int32_t>(pos.z);
-    return moho::Rect2<int>{
-      .x0 = x,
-      .z0 = z,
-      .x1 = x + 1,
-      .z1 = z + 1,
-    };
-  }
-
+  /**
+   * Point visibility against one intel grid.
+   *
+   * Both point-recon lanes reach the grid through
+   * `?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z` (0x005BE1C0) --
+   * the `Vec3f` overload -- at every one of their seven call sites:
+   * `GetNewReconFor` at 0x005CB3B6, 0x005CB40B, 0x005CB42C and 0x005CB446, and
+   * `ApplyReconCounters` at 0x005CB4A2, 0x005CB4B7 and 0x005CB4D6. That
+   * overload divides the world position by `mGridSize` and tests exactly one
+   * grid cell.
+   */
   [[nodiscard]] bool IsGridVisibleAtPoint(const CIntelGrid* const grid, const Wm3::Vec3f& pos)
   {
-    return grid && grid->IsVisible(MakePointReconRect(pos));
+    return grid && grid->IsVisible(pos);
   }
 
   [[nodiscard]] bool IsWithinPlayableMapRadius(
