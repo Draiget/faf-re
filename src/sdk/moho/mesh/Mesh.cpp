@@ -5579,16 +5579,28 @@ namespace moho
   /**
    * Address: 0x007E5280 (FUN_007E5280,
    * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+   * Address: 0x007E59C0 (FUN_007E59C0, the compiler-outlined cold-path chunk
+   * for the cache-miss branch: reserves the tree slot with a placeholder
+   * `weak_ptr`, builds the new `Mesh` + evicting-deleter `shared_ptr`, then
+   * fills the slot's weak reference in)
    *
    * What it does:
    * Looks up an existing cached mesh by (blueprint, material) key and, if its
    * weak entry is still alive, locks and returns it. On a genuine miss, or a
    * key whose cached mesh has since been destroyed (the ground truth, FUN_
    * 007E5900, checks the found node's control block use_count_ before
-   * trusting it - a `weak_ptr<Mesh>::lock()` in every way but name), builds a
-   * new Mesh, stores a weak reference to it in the tree (find-or-insert on
-   * `key`, so an expired-but-still-present node's entry is refreshed rather
-   * than duplicated), and returns the new strong reference.
+   * trusting it - a `weak_ptr<Mesh>::lock()` in every way but name), inserts
+   * (or reuses) the tree slot for `key` first -- matching FUN_007E59C0's real
+   * operand order, and its exception safety: if `new Mesh(...)` throws, the
+   * placeholder `weak_ptr` left in the tree is already empty/expired rather
+   * than leaking a stray strong reference -- then builds the new `Mesh`
+   * with its cache-evicting deleter and fills the slot's weak reference in.
+   * The unconditional final assignment is correct for both outcomes of
+   * `insert`: a fresh slot starts out default-constructed-empty, and an
+   * existing slot only reaches here when the top check has already proven it
+   * expired (single-threaded -- nothing runs between that check and here),
+   * so `insert_unique`'s own find-or-insert semantics (RbTree.h) need no
+   * extra conditional on this side.
    */
   boost::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
     const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg
@@ -5601,18 +5613,12 @@ namespace moho
       }
     }
 
+    const std::pair<MeshRendererMeshCacheTree::iterator, bool> result =
+      meshCacheTree.insert({key, boost::weak_ptr<Mesh>()});
+
     boost::shared_ptr<Mesh> mesh;
     ConstructSharedMeshWithCacheEvictingDeleter(mesh, new Mesh(blueprint, materialArg), meshCacheTree, key);
-    const std::pair<MeshRendererMeshCacheTree::iterator, bool> result =
-      meshCacheTree.insert({key, boost::weak_ptr<Mesh>(mesh)});
-
-    // A fresh insert always carries the new weak reference; a collision
-    // (key already present) only needs refreshing when the existing entry's
-    // mesh has since expired - matching insert_unique's own find-or-insert
-    // semantics for this instantiation (RbTree.h).
-    if (!result.second && result.first->second.expired()) {
-      result.first->second = mesh;
-    }
+    result.first->second = mesh;
 
     return mesh;
   }

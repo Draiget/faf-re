@@ -1518,6 +1518,12 @@ namespace moho
     RMeshBlueprintLOD* raw);
 
   /**
+   * Address: 0x007E6820 (FUN_007E6820, boost::detail::shared_count::
+   * shared_count(Mesh*, Deleter) -- the outer control-block allocator:
+   * `operator new(0x18)` then inline-constructs the `sp_counted_impl_pd`
+   * fields directly (vtable ptr, use_count=1, weak_count=1, the raw `Mesh*`
+   * at +0xC, and the two-DWORD `Deleter` payload at +0x10/+0x14); its EH
+   * cleanup funclet is FUN_007E68F0, skip'd separately)
    * Address: 0x007E69B0 (FUN_007E69B0, boost::detail::sp_counted_impl_pd<
    * Moho::Mesh*,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::
    * sp_counted_impl_pd)
