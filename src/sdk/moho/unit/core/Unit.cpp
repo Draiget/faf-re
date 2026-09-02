@@ -13221,6 +13221,34 @@ void Unit::UpdateGuardFormation()
  * the resource-management economy step. Finally, if this unit is not a POD
  * and its command queue is empty, issues an `AssistCommander` command to
  * itself; and if a builder sidecar is present, validates its factory queue.
+ *
+ * @warning **Nothing currently calls this**, so no unit is simulated at all.
+ * Measured, not inferred: a counter placed at the top of
+ * `HandleResourceManagement` -- which this function reaches unconditionally at
+ * the end, with no early return in between -- logged **zero** times across two
+ * runs covering more than twenty minutes of game time with nine armies. The
+ * `Sim::Logf` line at the top of this body likewise never appears.
+ *
+ * That single fact explains the economy symptoms without any second cause:
+ * production is banked into `CEconomy::mResources` only from here, so the
+ * income readout stays at +0 while the original binary shows +1 mass / +20
+ * energy on the same map. It is also why the sim can advance its clock and run
+ * Lua while units do nothing -- the beat counter is independent of entity
+ * ticking.
+ *
+ * The dispatch chain to restore, upward from here, is entirely virtual and so
+ * carries no direct call edges (the only xref to this body is vtable slot 20 of
+ * the `Entity` subobject at 0x00E2A5EC):
+ *
+ *     task scheduler -> Entity::Execute (0x00679F70)
+ *                    -> Entity::TaskTick (0x00679C40)
+ *                    -> MotionTick  [virtual slot 20]
+ *                    -> HandleResourceManagement
+ *
+ * `Entity::Execute` is the CTask entry point, so entities run as tasks; the
+ * missing link is whatever enqueues them into the task stage that
+ * `CArmyImpl::OnTick` drives through `CTaskStage::DoFrame`. Start there rather
+ * than anywhere in this file -- this body and everything below it is intact.
  */
 int Unit::MotionTick()
 {
