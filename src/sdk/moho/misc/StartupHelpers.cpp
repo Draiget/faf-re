@@ -5884,10 +5884,18 @@ namespace
    * Wired here so the linker preserves the binary's per-type
    * `vector_string::operator[]` symbol shape; the natural `map[key]` idiom
    * the compiler would inline does not guarantee the out-of-line emission.
+   *
+   * DB-integrity fix: this was originally typed over `std::map`/
+   * `std::vector`/`std::string` (modern STL), which compiles to a
+   * completely different, unrelated set of symbols -- not the
+   * `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` `_Tree`
+   * insert/lower_bound bodies this binary actually links (FUN_008CB860 /
+   * FUN_008CBA70, `legacy/containers/RbTree.h` + `Map.h`). Retyped to the
+   * legacy ABI containers so the template family is instantiated again.
    */
-  std::vector<std::string>& SubscriptStringToStringVectorMap(
-    std::map<std::string, std::vector<std::string>>& map,
-    const std::string& key
+  msvc8::vector<msvc8::string>& SubscriptStringToStringVectorMap(
+    msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& map,
+    const msvc8::string& key
   )
   {
     return map[key];
@@ -5908,7 +5916,7 @@ void moho::USER_GetSpecialFiles(
   const ESpecialFileType specialFileType,
   std::string& outDirectory,
   std::string& outExtension,
-  std::map<std::string, std::vector<std::string>>& outFilesByProfile
+  msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& outFilesByProfile
 )
 {
   switch (specialFileType) {
@@ -5964,7 +5972,7 @@ void moho::USER_GetSpecialFiles(
 
     do {
       const std::string fileName = gpg::STR_WideToUtf8(fileFindData.cFileName).to_std();
-      SubscriptStringToStringVectorMap(outFilesByProfile, profileName).push_back(fileName);
+      SubscriptStringToStringVectorMap(outFilesByProfile, profileName.c_str()).push_back(fileName.c_str());
     } while (::FindNextFileW(fileFindHandle, &fileFindData) != FALSE);
 
     if (::GetLastError() != ERROR_NO_MORE_FILES) {

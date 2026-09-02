@@ -2956,6 +2956,29 @@ namespace msvc8
              * but not a faithful structural match). Not yet routed through
              * this template.
              */
+            /**
+             * Address: 0x008CBA70 (FUN_008CBA70, sub_8CBA70) -- `msvc8::map<
+             * msvc8::string, msvc8::vector<msvc8::string>>::insert_unique`
+             * for `USER_GetSpecialFiles`'s `outFilesByProfile` out-param
+             * (`StartupHelpers.cpp`). Full descent tracking the last branch
+             * via `std::operator<<char>` (this instantiation's
+             * `msvc8::string` less-than compare, the shared per-char-type
+             * string-compare emission used by other `msvc8::string`-keyed
+             * trees), leftmost fast path, final
+             * uniqueness compare against the in-order predecessor, then
+             * tail-calls `insert_at` (`FUN_008CBB80`) either way -- matches
+             * this member field for field. Sole real caller is this
+             * instantiation's own `insert_hint` (`FUN_008CB860`, cited
+             * above) as its final fallback, taking `.first` via the
+             * hidden-return-slot convention. DB-integrity fix: was
+             * `blocked` ("owner/dependent lane not yet reconstructed")
+             * despite its caller already being marked `skip` as "the
+             * programmer-written source line... already exists" -- that
+             * claim was premature: the existing source used `std::map`
+             * (wrong ABI), so no line actually instantiated this template
+             * until the retype in this pass (`StartupHelpers.h`/`.cpp`,
+             * `Sim.cpp`).
+             */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -3062,6 +3085,29 @@ namespace msvc8
              * `value_type(parentPtr, mapped_type())` temporary -- exactly
              * this member's documented role. `Moho::CON_ANI_DumpSkeleton`
              * itself (CAniSkel.cpp) is not yet recovered.)
+             */
+            /**
+             * Address: 0x008CB860 (FUN_008CB860, sub_8CB860) --
+             * `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>::
+             * insert(hint, value)` for `USER_GetSpecialFiles`'s
+             * `outFilesByProfile` out-param (`StartupHelpers.cpp`). Matches
+             * this member's branch structure: empty-tree fast path straight
+             * to `insert_at` (`FUN_008CBB80`, cited below on
+             * `insert_unique`), `hint == leftmost()` / `hint == end()`
+             * checks (via `sub_423A00`, this instantiation's `msvc8::string`
+             * `operator<`), decrement/increment straddle checks (via
+             * `sub_8497C0`, `rb_decrement`), each tailing into `insert_at`
+             * with the decided `addLeft`, and a final fallback to
+             * `insert_unique` (`FUN_008CBA70`, cited below) taking its
+             * `.first`. Reached from `SubscriptStringToStringVectorMap`'s
+             * `map[key]` (`operator[]`, `StartupHelpers.cpp`, this
+             * instantiation's `Map.h` `operator[]` passing its `lower_bound`
+             * result as the hint) -- DB-integrity fix: the caller chain was
+             * recovered with `std::map`/`std::vector`/`std::string`
+             * (modern STL, wrong ABI), so nothing in the tree instantiated
+             * this template family; retyped to `msvc8::` throughout
+             * (`StartupHelpers.h`/`.cpp`, `Sim.cpp`'s
+             * `cfunc_GetSpecialFilesL`) so the compiler emits it again.
              */
             /**
              * Address: 0x0083B320 (FUN_0083B320, sub_83B320) --

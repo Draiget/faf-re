@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/audio/SofdecRuntime.h"
@@ -1348,7 +1349,7 @@ namespace moho
     ESpecialFileType specialFileType,
     std::string& outDirectory,
     std::string& outExtension,
-    std::map<std::string, std::vector<std::string>>& outFilesByProfile
+    msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& outFilesByProfile
   );
 
   /**
