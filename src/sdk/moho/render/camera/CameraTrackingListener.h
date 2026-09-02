@@ -20,6 +20,18 @@ namespace moho
    * `BroadcastCameraTrackingEvent` to walk the broadcaster ring without
    * depending on the typed `Listener<T>::mListenerLink` accessor.
    */
+  /**
+   * Intrusive link for the camera tracking broadcaster list.
+   *
+   * The field order here is the binary's: slot `+0x00` is **next** and `+0x04`
+   * is **prev**, confirmed by `FUN_007AE2B0`
+   * (`Broadcaster<SCameraTracking>::BroadcastEvent`), which splices with
+   * `X->[+0]->[+4] = S` / `X->[+4]->[+0] = S` and tests emptiness on `[+4]`.
+   *
+   * Note that `moho::TDatListItem` names the same two slots the opposite way
+   * round. See the warning on that template before mixing the two, and never
+   * reinterpret one as the other and then use the field names.
+   */
   struct CameraTrackingBroadcasterLink
   {
     CameraTrackingBroadcasterLink* mListNext = nullptr; // +0x00
