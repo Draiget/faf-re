@@ -1473,8 +1473,12 @@ namespace moho
     CTaskStage mTaskStageA;
     CTaskStage mDiskWatcherTaskStage;
     CTaskStage mTaskStageB;
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas1;
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas2;
+    /// The canvas sim script draws into. `GetDebugCanvas` (FUN_00746720) is
+    /// `add edi, 96Ch` plus a lazy `new CDebugCanvas`, which pins this offset
+    /// exactly; `AdvanceBeat` then rolls it into the slot below and clears it.
+    boost::shared_ptr<CDebugCanvas> mDebugCanvas1;  // 0x096C
+    /// The finished canvas from the previous beat roll.
+    boost::shared_ptr<CDebugCanvas> mDebugCanvas2;  // 0x0974
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
     CEntityDb* mEntityDB;             // 0x0984
@@ -7228,6 +7232,8 @@ namespace moho
   static_assert(offsetof(Sim, mSyncReserveUnused) == 0x0A84, "Sim::mSyncReserveUnused offset must be 0x0A84");
   static_assert(offsetof(Sim, mSyncFilter) == 0x0A88, "Sim::mSyncFilter offset must be 0x0A88");
   static_assert(offsetof(Sim, mFormationDB) == 0x0980, "Sim::mFormationDB offset must be 0x0980");
+  static_assert(offsetof(Sim, mDebugCanvas1) == 0x096C, "Sim::mDebugCanvas1 offset must be 0x096C");
+  static_assert(offsetof(Sim, mDebugCanvas2) == 0x0974, "Sim::mDebugCanvas2 offset must be 0x0974");
   static_assert(offsetof(Sim, mEntityDB) == 0x0984, "Sim::mEntityDB offset must be 0x0984");
   static_assert(offsetof(Sim, mCommandDB) == 0x0988, "Sim::mCommandDB offset must be 0x0988");
   static_assert(offsetof(Sim, mSyncSerializeGroup0) == 0x09B8, "Sim::mSyncSerializeGroup0 offset must be 0x09B8");
