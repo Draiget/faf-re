@@ -784,7 +784,10 @@ namespace moho
      *
      * What it does:
      * Recomputes interpolated transform fields for the current global
-     * interpolant and refreshes fallback runtime bounds.
+     * interpolant. When a stance update is pending, also re-blends the
+     * skinned pose (`curPose`) from `startPose`/`endPose` for static-pose
+     * (unit) instances that are not locked, and rebuilds the world
+     * sphere/oriented-box/AABB from the mesh resource's own local bounds.
      */
     void UpdateInterpolatedFields();
 

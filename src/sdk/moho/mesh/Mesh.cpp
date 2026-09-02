@@ -620,17 +620,6 @@ namespace
     return FloatEqual(lhs.w, rhs.w) && FloatEqual(lhs.x, rhs.x) && FloatEqual(lhs.y, rhs.y) && FloatEqual(lhs.z, rhs.z);
   }
 
-  [[nodiscard]] bool Finite(const float value) noexcept
-  {
-    return std::isfinite(value);
-  }
-
-  [[nodiscard]] bool HasFiniteWorldBounds(const moho::MeshInstance& instance) noexcept
-  {
-    return Finite(instance.xMin) && Finite(instance.yMin) && Finite(instance.zMin) && Finite(instance.xMax) &&
-      Finite(instance.yMax) && Finite(instance.zMax);
-  }
-
   [[nodiscard]] float Clamp01(const float value) noexcept
   {
     return std::clamp(value, 0.0f, 1.0f);
@@ -2511,49 +2500,6 @@ namespace
     dest.Extent[0] = halfX;
     dest.Extent[1] = halfY;
     dest.Extent[2] = halfZ;
-  }
-
-  void UpdateFallbackWorldBounds(moho::MeshInstance& instance) noexcept
-  {
-    float maxScale = std::max(instance.scale.x, std::max(instance.scale.y, instance.scale.z));
-    if (!(maxScale > 0.0f)) {
-      maxScale = 1.0f;
-    }
-
-    const float halfExtent = maxScale * 0.5f;
-    instance.sphere.Center = instance.interpolatedPosition;
-    instance.sphere.Radius = halfExtent;
-
-    instance.xMin = instance.interpolatedPosition.x - halfExtent;
-    instance.yMin = instance.interpolatedPosition.y - halfExtent;
-    instance.zMin = instance.interpolatedPosition.z - halfExtent;
-    instance.xMax = instance.interpolatedPosition.x + halfExtent;
-    instance.yMax = instance.interpolatedPosition.y + halfExtent;
-    instance.zMax = instance.interpolatedPosition.z + halfExtent;
-
-    instance.renderMinX = instance.xMin;
-    instance.renderMinY = instance.yMin;
-    instance.renderMinZ = instance.zMin;
-    instance.renderMaxX = instance.xMax;
-    instance.renderMaxY = instance.yMax;
-    instance.renderMaxZ = instance.zMax;
-
-    instance.box.Center[0] = instance.interpolatedPosition.x;
-    instance.box.Center[1] = instance.interpolatedPosition.y;
-    instance.box.Center[2] = instance.interpolatedPosition.z;
-    instance.box.Axis[0][0] = 1.0f;
-    instance.box.Axis[0][1] = 0.0f;
-    instance.box.Axis[0][2] = 0.0f;
-    instance.box.Axis[1][0] = 0.0f;
-    instance.box.Axis[1][1] = 1.0f;
-    instance.box.Axis[1][2] = 0.0f;
-    instance.box.Axis[2][0] = 0.0f;
-    instance.box.Axis[2][1] = 0.0f;
-    instance.box.Axis[2][2] = 1.0f;
-    instance.box.Extent[0] = halfExtent;
-    instance.box.Extent[1] = halfExtent;
-    instance.box.Extent[2] = halfExtent;
-    instance.boundsValid = 1;
   }
 
   [[nodiscard]] std::uintptr_t PointerOrderKey(const void* const ptr) noexcept
@@ -5210,18 +5156,29 @@ namespace moho
    *
    * What it does:
    * Recomputes interpolated transform fields for the current global
-   * interpolant and refreshes fallback runtime bounds.
+   * interpolant. When a stance update is pending, also re-blends the
+   * skinned pose (`curPose`) from `startPose`/`endPose` for static-pose
+   * (unit) instances that are not locked, and rebuilds the world
+   * sphere/oriented-box/AABB from the mesh resource's own local bounds.
    */
   void MeshInstance::UpdateInterpolatedFields()
   {
-    if (sCurrentInterpolant == currInterpolant) {
+    // Ground truth (FUN_007DEC80.c) enters when the interpolant changed AND
+    // (the frame counter is stale OR interpolation state isn't fresh yet
+    // this frame) - i.e. it returns early only when NEITHER half fired.
+    // SetStance resets currInterpolant to -1.0f but leaves frameCounter/
+    // interpolationStateFresh untouched, so the second half is what lets a
+    // fresh stance be picked up even on a call where sCurrentInterpolant
+    // already happens to equal that reset sentinel.
+    if (sCurrentInterpolant == currInterpolant ||
+        (frameCounter == sFrameCounter && interpolationStateFresh != 0u)) {
       return;
     }
 
     float interpolation = uniformScale * sCurrentInterpolant;
-    interpolation = Clamp01(interpolation);
     currInterpolant = sCurrentInterpolant;
     interpolationStateFresh = 1;
+    interpolation = Clamp01(interpolation);
 
     const Wm3::Vec3f startPos = startTransform.pos_;
     const Wm3::Vec3f endPos = endTransform.pos_;
@@ -5237,41 +5194,73 @@ namespace moho
       return;
     }
 
-    if (!HasFiniteWorldBounds(*this)) {
-      UpdateFallbackWorldBounds(*this);
+    // Ground truth reads the LOD-0 mesh resource unconditionally here and
+    // dereferences it with no null check; `mesh` is set once at construction
+    // and never cleared, so this should never actually be empty on a live
+    // instance. Guarded anyway, matching GetSweptAlignedBox's own established
+    // pattern in this class.
+    const boost::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
+    if (!resource) {
       return;
     }
 
-    // When existing bounds are valid, keep size and recenter around the current
-    // interpolated position. This mirrors the binary intent (bounds follow stance)
-    // without requiring unrecovered mesh-resource box helpers.
-    const float halfX = std::max(0.0f, (xMax - xMin) * 0.5f);
-    const float halfY = std::max(0.0f, (yMax - yMin) * 0.5f);
-    const float halfZ = std::max(0.0f, (zMax - zMin) * 0.5f);
-    xMin = interpolatedPosition.x - halfX;
-    xMax = interpolatedPosition.x + halfX;
-    yMin = interpolatedPosition.y - halfY;
-    yMax = interpolatedPosition.y + halfY;
-    zMin = interpolatedPosition.z - halfZ;
-    zMax = interpolatedPosition.z + halfZ;
-    renderMinX = xMin;
-    renderMinY = yMin;
-    renderMinZ = zMin;
-    renderMaxX = xMax;
-    renderMaxY = yMax;
-    renderMaxZ = zMax;
+    // Re-blend the skinned pose from start/end at the current interpolant so
+    // `curPose` - which HardwareMeshBatch::FillBatch reads directly to fill
+    // the GPU skinning palette (FillInstanceBonePalettes) - tracks the
+    // instance's live animation state. Only static-pose (real unit)
+    // instances that are not locked carry start/end pose handles (see
+    // MeshInstance::SetStance's pose-carrying overload).
+    if (isStaticPose != 0u && isLocked == 0u) {
+      curPose->InterpolatePose(
+        interpolation, startPose.get(), endPose.get(), static_cast<std::int32_t>(resource->mFile->mBoneCount)
+      );
+    }
 
-    const float radius = std::sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
+    float maxScale = scale.x;
+    if (scale.y > maxScale) {
+      maxScale = scale.y;
+    }
+    if (scale.z > maxScale) {
+      maxScale = scale.z;
+    }
+
+    float radius = maxScale * resource->mSize * 0.5f;
+    const float maxOffset = curPose->mMaxOffset;
+    if (maxOffset > radius) {
+      radius = maxOffset;
+    }
+    // curPose->mMaxOffset starts at -infinity (CAniPose's ctor default) and is
+    // only ever raised by InterpolatePose, so this really tests "has a pose
+    // blend ever actually run for this instance".
+    const bool maxOffsetUnset = maxOffset <= -std::numeric_limits<float>::infinity();
+
     sphere.Center = interpolatedPosition;
+    if (!maxOffsetUnset) {
+      sphere.Center.y += maxOffset;
+    }
     sphere.Radius = radius;
-    boundsValid = 1;
 
-    // Refresh oriented `box` lane from the interpolated stance so renderer
-    // and culling consumers always see a current OBB. Mirrors the binary
-    // call into FUN_00472CF0 from UpdateInterpolatedFields/GetSweptAlignedBox.
+    // Rebuild the world oriented box (and its derived AABB) from the mesh
+    // resource's own local bounds scaled by the instance, not by recentering
+    // whatever xMin..zMax happened to hold before - this is what ground
+    // truth actually does (FUN_007DAC10 + FUN_00472CF0 chained together),
+    // matching MeshInstance::GetSweptAlignedBox's already-correct pattern.
+    const Wm3::AxisAlignedBox3f scaledLocalBounds = ScaleLocalMeshBounds(scale, resource->mBounds);
     BuildOrientedBoxFromLocalAabb(
-      curOrientation, interpolatedPosition, xMin, yMin, zMin, xMax, yMax, zMax, box
+      curOrientation, interpolatedPosition,
+      scaledLocalBounds.Min.x, scaledLocalBounds.Min.y, scaledLocalBounds.Min.z,
+      scaledLocalBounds.Max.x, scaledLocalBounds.Max.y, scaledLocalBounds.Max.z,
+      box
     );
+
+    Wm3::AxisAlignedBox3f fromOrientedBox{};
+    box.ComputeAABB(fromOrientedBox.Min, fromOrientedBox.Max);
+    xMin = fromOrientedBox.Min.x;
+    yMin = fromOrientedBox.Min.y;
+    zMin = fromOrientedBox.Min.z;
+    xMax = fromOrientedBox.Max.x;
+    yMax = fromOrientedBox.Max.y;
+    zMax = fromOrientedBox.Max.z;
   }
 
   /**
