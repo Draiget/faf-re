@@ -17,6 +17,7 @@
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/audio/AudioEngine.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
@@ -2792,12 +2793,6 @@ namespace
     destination = ResolveMaterialTextureSheet(textureName, resourceWatcher);
   }
 
-  void MaybeRunExtraSoundWork()
-  {
-    // Address chain: 0x007DC1B0 -> gpg::time::Timer::ElapsedMilliseconds -> SND_Frame.
-    // Sound-system globals are not yet reconstructed in this pass.
-  }
-
   [[nodiscard]] boost::shared_ptr<const moho::CAniSkel>
   ResolveInitialPoseSkeleton(const boost::shared_ptr<moho::Mesh>& mesh, const bool isStaticPose)
   {
@@ -4215,7 +4210,16 @@ namespace moho
     AssignMaterialTextureSheet(material->mSpecularSheet, specularName, resourceWatcher);
     AssignMaterialTextureSheet(material->mLookupSheet, lookupName, resourceWatcher);
     AssignMaterialTextureSheet(material->mSecondarySheet, secondaryName, resourceWatcher);
-    MaybeRunExtraSoundWork();
+
+    // Pump the sound engine after the texture loads above, so a long material
+    // build cannot starve audio. MSVC inlined this at 0x007DC71E: gate on
+    // `snd_ExtraDoWorkCalls`, then `sSoundConfiguration->mTime
+    // .ElapsedMilliseconds()` against flt_E4F744 (0000c842 = 100.0f, verified
+    // from the PE) with `fcomip`/`jbe`, i.e. fire only when elapsed > 100ms.
+    // That is exactly SND_FrameExtraDoWorkTick (0x004D8F90), so the source line
+    // is the call to it.
+    SND_FrameExtraDoWorkTick();
+
     return material;
   }
 
