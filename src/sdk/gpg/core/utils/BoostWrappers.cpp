@@ -2856,8 +2856,6 @@ namespace boost
     return InitializeSpCountedBaseLaneForStatsStatItem(control);
   }
 
-
-
   /**
    * Address: 0x007560E0 (FUN_007560E0)
    *
@@ -3262,8 +3260,6 @@ namespace boost
     DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
   }
 
-
-
   /**
    * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
    *
@@ -3503,8 +3499,6 @@ namespace boost
   {
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
-
-
 
   /**
    * Address: 0x00756080 (FUN_00756080, boost::detail::sp_counted_impl_p<Moho::ISimResources>::dtr)
@@ -3858,8 +3852,6 @@ namespace boost
     return SpCountedImplGetDeleterNullResult(requestedType);
   }
 
-
-
   /**
    * Address: 0x00755FD0 (FUN_00755FD0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::get_deleter)
    *
@@ -3926,8 +3918,6 @@ namespace boost
   {
     return SpCountedImplGetDeleterNullResult(requestedType);
   }
-
-
 
   /**
    * Address: 0x0089B8A0 (FUN_0089B8A0, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::get_deleter)

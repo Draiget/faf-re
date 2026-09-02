@@ -1881,8 +1881,6 @@ namespace boost
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
-
-
     /**
      * Address: 0x00755FD0 (FUN_00755FD0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::get_deleter)
      *
