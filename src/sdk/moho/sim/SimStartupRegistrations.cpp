@@ -127,19 +127,23 @@ namespace
 
   /**
    * Address: 0x00735430 (FUN_00735430, Moho::sim_TestVarStr::sim_TestVarStr)
+   * Address: 0x00BDB360 (FUN_00BDB360, register_sim_TestVarStr_SimConVarDef)
    *
    * IDA signature:
    * void __fastcall Moho::sim_TestVarStr::sim_TestVarStr(bool a1, std::string a2);
    *
    * What it does:
    * Constructs one startup `TSimConVar<msvc8::string>` lane for
-   * `"sim_TestVarStr"` with default value `"string"`. The
-   * `static moho::TSimConVar<msvc8::string>` declaration below is the
-   * source-level site that emits the FUN_00735430 ctor template
-   * instantiation: it chains to `CSimConCommand::CSimConCommand`, pulls
-   * a unique index from `Moho::SimConVarIndexCounter`, sets the
+   * `"sim_TestVarStr"` with default value `"yea!"` -- the default is a
+   * caller-supplied argument, not baked into the ctor itself, and
+   * 0x00BDB360's own asm builds `std::string("yea!", 4)` immediately before
+   * calling this ctor (byte-verified; not `"string"`, an earlier
+   * transcription slip). The `static moho::TSimConVar<msvc8::string>`
+   * declaration below is the source-level site that emits the FUN_00735430
+   * ctor template instantiation: it chains to `CSimConCommand::CSimConCommand`,
+   * pulls a unique index from `Moho::SimConVarIndexCounter`, sets the
    * `TSimConVar<std::string>` vptr, then in-place initializes the
-   * SBO-default `value` string and assigns the `"string"` literal.
+   * SBO-default `value` string and assigns the `"yea!"` literal.
    *
    * Source-level callers: `GetSimTestVarStrStorage` invokes this
    * accessor; first invocation triggers the static-init that emits the
@@ -147,8 +151,73 @@ namespace
    */
   [[nodiscard]] moho::TSimConVar<msvc8::string>& SimConVar_sim_TestVarStr()
   {
-    static moho::TSimConVar<msvc8::string> sVar(false, "sim_TestVarStr", msvc8::string("string"));
+    static moho::TSimConVar<msvc8::string> sVar(false, "sim_TestVarStr", msvc8::string("yea!"));
     return sVar;
+  }
+
+  /**
+   * Address: 0x00BDB160 (FUN_00BDB160, register_sim_TestVarBool_SimConVarDef)
+   *
+   * What it does:
+   * Constructs one startup `TSimConVar<bool>` lane for `"sim_TestVarBool"`
+   * with default value `false`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<bool>& SimConVar_sim_TestVarBool()
+  {
+    static moho::TSimConVar<bool> sVar(false, "sim_TestVarBool", false);
+    return sVar;
+  }
+
+  /**
+   * Address: 0x00BDB1E0 (FUN_00BDB1E0, register_sim_TestVar_SimConVarDef)
+   *
+   * What it does:
+   * Constructs one startup `TSimConVar<int>` lane for `"sim_TestVar"` with
+   * default value `0`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<int>& SimConVar_sim_TestVar()
+  {
+    static moho::TSimConVar<int> sVar(false, "sim_TestVar", 0);
+    return sVar;
+  }
+
+  /**
+   * Address: 0x00BDB2E0 (FUN_00BDB2E0, register_sim_TestVarFloat_SimConVarDef)
+   *
+   * What it does:
+   * Constructs one startup `TSimConVar<float>` lane for `"sim_TestVarFloat"`
+   * with default value `0.0f`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<float>& SimConVar_sim_TestVarFloat()
+  {
+    static moho::TSimConVar<float> sVar(false, "sim_TestVarFloat", 0.0f);
+    return sVar;
+  }
+
+  /**
+   * Address: 0x00BDB3D0 (FUN_00BDB3D0, register_sim_TestFunc_SimConFuncDef)
+   *
+   * What it does:
+   * Constructs one startup `CSimConFunc` lane for `"sim_TestFunc"`, bound to
+   * `Sim::sim_TestFunc`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CSimConFunc& SimConFunc_sim_TestFunc()
+  {
+    static moho::CSimConFunc sFunc(false, "sim_TestFunc", &moho::Sim::sim_TestFunc);
+    return sFunc;
+  }
+
+  /**
+   * Address: 0x00BDBD80 (FUN_00BDBD80, register_sim_DebugCrash_SimConFuncDef)
+   *
+   * What it does:
+   * Constructs one startup `CSimConFunc` lane for `"sim_DebugCrash"`, bound
+   * to `Sim::sim_DebugCrash`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CSimConFunc& SimConFunc_sim_DebugCrash()
+  {
+    static moho::CSimConFunc sFunc(false, "sim_DebugCrash", &moho::Sim::sim_DebugCrash);
+    return sFunc;
   }
 
   /**
@@ -182,6 +251,51 @@ namespace
     }
 
     moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarStr());
+    return instance != nullptr ? instance->GetValueStorage() : nullptr;
+  }
+
+  /**
+   * What it does:
+   * Returns one raw storage pointer for the per-sim `sim_TestVarBool`
+   * runtime convar instance.
+   */
+  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarBoolStorage(moho::Sim* const sim)
+  {
+    if (sim == nullptr) {
+      return nullptr;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarBool());
+    return instance != nullptr ? instance->GetValueStorage() : nullptr;
+  }
+
+  /**
+   * What it does:
+   * Returns one raw storage pointer for the per-sim `sim_TestVar` runtime
+   * convar instance.
+   */
+  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarStorage(moho::Sim* const sim)
+  {
+    if (sim == nullptr) {
+      return nullptr;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVar());
+    return instance != nullptr ? instance->GetValueStorage() : nullptr;
+  }
+
+  /**
+   * What it does:
+   * Returns one raw storage pointer for the per-sim `sim_TestVarFloat`
+   * runtime convar instance.
+   */
+  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarFloatStorage(moho::Sim* const sim)
+  {
+    if (sim == nullptr) {
+      return nullptr;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarFloat());
     return instance != nullptr ? instance->GetValueStorage() : nullptr;
   }
 

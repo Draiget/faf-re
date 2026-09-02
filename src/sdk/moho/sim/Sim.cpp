@@ -13069,6 +13069,30 @@ int Sim::sim_DebugCrash(
 }
 
 /**
+ * Address: 0x00734BA0 (FUN_00734BA0, Moho::Sim::sim_TestFunc)
+ *
+ * What it does:
+ * Debug console-command stub for the `sim_TestFunc` test entry: prints this
+ * sim instance's own address and returns.
+ */
+int Sim::sim_TestFunc(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)commandArgs;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  sim->Printf("sim=0x%08x", sim);
+  return 0;
+}
+
+/**
  * Address: 0x0074B3F0 (FUN_0074B3F0, Moho::Sim::ScenarioMethod)
  *
  * What it does:
