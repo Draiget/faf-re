@@ -8591,6 +8591,26 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     }
   }
 
+  // 0x00747858..0x00747875. The camera-follow records the beat accumulated are
+  // handed to the packet by SWAPPING the two vectors, not by copying: the sim
+  // comes back owning whatever storage the previous packet had, which is how
+  // the lane re-uses its allocation every beat. The decompile shows this as
+  // three pointer exchanges because MSVC inlined `std::vector::swap`.
+  //
+  // `Sim.h`'s note on this member has been saying "the beat-copy site that
+  // drains this lane into `mFollowCameras` is not yet recovered" -- this is
+  // that site. `CWldSession::DoBeat` already replays the packet side through
+  // `CameraImpl::CameraFollow`, so until now it replayed an always-empty lane.
+  mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
+
+  // 0x00747898: entities that died this beat are retired from the entity DB
+  // only after everything above has had its chance to publish them. Nothing in
+  // the recovered tree was calling this, so the DB kept every entity it had
+  // ever been given.
+  if (mEntityDB != nullptr) {
+    mEntityDB->Purge();
+  }
+
   // 0x00747635..0x0074764C: hand the beat's queued audio requests to the
   // packet and reset the sim-side queue back to its inline storage. Without
   // this the packet's audio lane stayed empty for every beat, so nothing the
