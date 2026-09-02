@@ -4680,6 +4680,12 @@ namespace moho
     );
   }
 
+  /**
+   * Address: 0x00BF1880 (FUN_00BF1880, ??1CConFunc_exit@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Unregisters startup command storage for `exit`.
+   */
   void cleanup_CConFunc_exit()
   {
     CleanupStartupConCommand(gCConFunc_exit);
