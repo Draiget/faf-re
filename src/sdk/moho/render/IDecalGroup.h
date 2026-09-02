@@ -1,9 +1,21 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+
+#include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
+
+namespace gpg
+{
+  class BinaryReader;
+  class BinaryWriter;
+}
 
 namespace moho
 {
+  class CWldTerrainDecal;
+
   /**
    * Base interface lane for decal grouping owners.
    *
@@ -11,12 +23,8 @@ namespace moho
    * - constructor lane at 0x00877240
    * - base-vtable reset lane at 0x00877230
    *
-   * @warning This interface is under-modelled. Its vftable (0x00E49738) has
-   * **14 slots, every one `_purecall`**, but only the destructor is declared
-   * here. `CDecalGroup` (vftable 0x00E497F0, `: public IDecalGroup`) supplies
-   * all 14, and eight of them already exist in `CDecalGroup.h` under the right
-   * names and addresses -- but declared **non-virtual**, so a call through an
-   * `IDecalGroup*` cannot reach them.
+   * Its vftable (0x00E49738) has **14 slots, every one `_purecall`**;
+   * `CDecalGroup` (vftable 0x00E497F0, `: public IDecalGroup`) supplies all 14.
    *
    * The full slot map, read from the dump and the bodies:
    *
@@ -37,27 +45,23 @@ namespace moho
    *
    * Slots 6/8/10 are thunks over 7/9/11: each reads an index out of its
    * argument at `+0x18` and tail-jumps to the index-taking overload through
-   * this same vtable, so the pairs must keep these relative positions.
+   * this same vtable (`[vtbl+0x1C]`, `[vtbl+0x24]`, `[vtbl+0x2C]` -- slots 7,
+   * 9 and 11), so the pairs must keep these relative positions.
    *
-   * Completing this means declaring all 13 non-destructor slots pure here, in
-   * exactly that order, and marking CDecalGroup's eight `override` while
-   * adding the five missing. The one piece still unresolved is the parameter
-   * type of the object-taking overloads -- whatever owns an index at `+0x18`.
-   * Do not guess it: a wrong signature silently changes the vtable.
+   * The argument of those three is a `CWldTerrainDecal*`: that class carries
+   * `std::int32_t mIndex` at exactly `+0x18`, and `mDecals` here is a
+   * `msvc8::vector<std::int32_t>` of decal indices, so the object overloads
+   * are just index-extracting conveniences. `CDecalManager::DestroyDecal`
+   * already performs that extraction by hand -- `RemoveFromGroup(decal->mIndex)`
+   * in `CWldSplat.cpp` -- which is the same pairing spelled out at the caller.
    *
-   * Avenues already tried for that type, all dead ends, so do not re-walk
-   * them: slots 6/8/10 and 7/9/11 have **no code xrefs at all** -- their only
-   * reference is the `??_7CDecalGroup@Moho@@6B@` vtable itself, so every call
-   * is an indirect dispatch the export does not capture. `CDecalManager::Load`
-   * (0x00877CD0), the obvious populator in the same TU, contains no dispatch
-   * through these slots either. `SDecalInfo` is not the type: its constructor
-   * leads with three `Wm3::Vec3f`, so `+0x18` lands inside the vectors.
-   *
-   * What is still worth trying: find the indirect dispatch by scanning for
-   * `call [reg+0x18]` / `[reg+0x20]` / `[reg+0x28]` on a value known to be an
-   * `IDecalGroup*`, or identify a decal object with an `int32` index at
-   * `+0x18` from the RTTI dump and confirm it against slot 7's scan of
-   * `mDecals` (a `msvc8::vector<std::int32_t>`).
+   * None of slots 6/8/10 or 7/9/11 has a code xref: their only reference is
+   * the `??_7CDecalGroup@Moho@@6B@` vtable, so every call is an indirect
+   * dispatch the export does not capture, and the object overloads are reached
+   * only through an `IDecalGroup*`. `CDecalManager::Load` (0x00877CD0) has no
+   * dispatch through them, and `SDecalInfo` is not the argument type -- its
+   * constructor leads with three `Wm3::Vec3f`, putting `+0x18` inside the
+   * vectors.
    */
   class IDecalGroup
   {
@@ -70,7 +74,47 @@ namespace moho
      */
     IDecalGroup();
 
+    /// Slot 0.
     virtual ~IDecalGroup() = default;
+
+    /// Slot 1. Address of the stored group index lane.
+    [[nodiscard]] virtual std::int32_t* GetIndex() = 0;
+
+    /// Slot 2. Duplicate lane for mutable group display-name access.
+    [[nodiscard]] virtual msvc8::string* GetNameAlias() = 0;
+
+    /// Slot 3. Mutable access to the group display-name string lane.
+    [[nodiscard]] virtual msvc8::string* GetName() = 0;
+
+    /// Slot 4. Duplicate lane for mutable tracked decal-index vector access.
+    [[nodiscard]] virtual msvc8::vector<std::int32_t>* GetDecalsAlias() = 0;
+
+    /// Slot 5. Mutable access to the tracked decal-index vector lane.
+    [[nodiscard]] virtual msvc8::vector<std::int32_t>* GetDecals() = 0;
+
+    /// Slot 6. Whether `decal`'s index is tracked by this group.
+    [[nodiscard]] virtual bool Contains(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 7. Whether `decalIndex` is tracked by this group.
+    [[nodiscard]] virtual bool Contains(std::int32_t decalIndex) = 0;
+
+    /// Slot 8. Tracks `decal`'s index, if not already tracked.
+    virtual void Add(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 9. Tracks `decalIndex`, if not already tracked.
+    virtual void Add(std::int32_t decalIndex) = 0;
+
+    /// Slot 10. Stops tracking `decal`'s index.
+    virtual void RemoveFromGroup(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 11. Stops tracking `decalIndex`.
+    virtual void RemoveFromGroup(std::int32_t decalIndex) = 0;
+
+    /// Slot 12. Reads group index, name and tracked decal indices.
+    virtual void ReadFromStream(gpg::BinaryReader& reader, int version) = 0;
+
+    /// Slot 13. Writes group index, name and tracked decal indices.
+    virtual void WriteToStream(gpg::BinaryWriter& writer) = 0;
   };
 
   static_assert(sizeof(IDecalGroup) == 0x04, "IDecalGroup size must be 0x04");
