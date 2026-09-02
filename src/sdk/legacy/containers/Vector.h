@@ -3125,6 +3125,29 @@ namespace msvc8
          * instead of the real `moho::SCamFollowParams` type already
          * declared in `CameraImpl.h`.
          *
+         * Address: 0x00591C90 (FUN_00591C90, `msvc8::vector<SDepositCandidate>::
+         * push_back` for the 12-byte `{float centerX; float centerZ; float
+         * distanceSq;}` element -- a local struct declared identically in
+         * `cfunc_CAiBrainCreateResourceBuildingNearestL` and
+         * `cfunc_CAiBrainFindPlaceToBuildL`, `moho/ai/CAiBrain.cpp`). Same
+         * two-way split as this member's other instantiations:
+         * `size()<capacity()` fast path constructs the pushed value at
+         * `mLast` through this element's `uninit_fill_n` core (`FUN_00594A20`,
+         * cited below, `n=1`) then advances `mLast` by 12 in place; the
+         * capacity-exhausted path tail-calls `insert(mLast, value)`
+         * (`FUN_00591F40`, cited below on `insert`), whose grow core is the
+         * count=1-specialized `_Insert_n` emission `FUN_00592460` (cited
+         * above). Emitted via `candidates.push_back(SDepositCandidate{
+         * centerX, centerZ, distanceSq})` in both Lua-callback candidate
+         * scans named above, `.asm`-confirmed against `FUN_00589E30`'s
+         * pushed-temp construction at `0x0058A1BB`-`0x0058A1CF`. DB-integrity
+         * fix: both real callers were already `recovered` but had used
+         * `std::vector<SDepositCandidate>` (modern STL) instead of
+         * `msvc8::vector<SDepositCandidate>`, so this template family had no
+         * matching source-level instantiation anywhere in the tree; fixed by
+         * retyping both callers' `candidates` locals and adding the
+         * `legacy/containers/Vector.h` include.
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
@@ -4043,13 +4066,27 @@ namespace msvc8
          * `uninit_move_n`/`uninit_fill_n` per-T emissions FUN_005940F0 and
          * FUN_00592030 (both cited on those methods below); the in-place
          * tail-shift path calls the same two templates' non-reallocating
-         * siblings, FUN_00595F10 and FUN_00594A20, directly. Reachable from a
-         * static initializer (`ctor_static`/`__xc_a`, depth 6 via its own
-         * caller FUN_00591F40) -- the owning `vector<T>` field has not been
-         * pinned to a named engine type beyond "12-byte, three float lanes",
-         * consistent with this file's practice of citing structurally-proven
-         * but not fully name-identified instantiations (cf. the "unidentified
-         * map<int32_t,T>" family in RbTree.h).)
+         * siblings, FUN_00595F10 and FUN_00594A20, directly. Its own caller,
+         * the count=1 offset-computing wrapper FUN_00591F40, is this
+         * member's own `insert(pos, value)` instantiation (cited separately
+         * below). Type now pinned: the element is `SDepositCandidate` (12
+         * bytes, `{float centerX; float centerZ; float distanceSq;}`), a
+         * local struct declared identically in
+         * `cfunc_CAiBrainCreateResourceBuildingNearestL` and
+         * `cfunc_CAiBrainFindPlaceToBuildL` (`moho/ai/CAiBrain.cpp`) --
+         * confirmed against the caller's raw `.asm` (`FUN_00589E30` builds
+         * the pushed temp from the same `centerX*0.5f`/`centerZ*0.5f`/
+         * `dx*dx+dz*dz` math the recovered `SDepositCandidate` construction
+         * already performs, storing the three floats at offsets 0/4/8 in
+         * that exact order), not "reachable from a static initializer" as
+         * previously guessed from the generic BFS reachability graph --
+         * that edge was a false lead; the real path is the two Lua-callback
+         * candidate-list builders named above, each `push_back`ing onto a
+         * local `candidates` vector. Both callers were already recovered
+         * but had mistakenly used `std::vector` (modern STL, wrong ABI)
+         * instead of `msvc8::vector`; switched to
+         * `msvc8::vector<SDepositCandidate>` so the compiler actually emits
+         * this template family again.)
          *
          * Address: 0x0064E3B0 (FUN_0064E3B0, `msvc8::vector<moho::SDebugDecal>::
          * insert(iterator, const T&)` for the 52-byte element -- captures
@@ -4505,6 +4542,29 @@ namespace msvc8
          * same `SimRecoveryRuntime.cpp` RULE ONE cluster documented on
          * `push_back` above (`InsertElement12LaneAndRebaseCursorRuntime`
          * at this address).
+         *
+         * Address: 0x00591F40 (FUN_00591F40, `msvc8::vector<SDepositCandidate>::
+         * insert(pos,value)` for the 12-byte `{float centerX; float centerZ;
+         * float distanceSq;}` element, a local struct declared identically
+         * in `cfunc_CAiBrainCreateResourceBuildingNearestL` and
+         * `cfunc_CAiBrainFindPlaceToBuildL`, `moho/ai/CAiBrain.cpp`) -- same
+         * "capture offset up front, tail-call the count=1 core, rebuild the
+         * iterator from the offset afterwards" shape as the other
+         * instantiations here: `.c`-confirmed `v5=(z-v4)/12` offset capture
+         * guarded by `v4 && (mLast-mFirst)/12` (mirroring `size()==0`),
+         * tail-calls the count=1 growth core `FUN_00592460` (`_Insert_n`,
+         * cited above), rebuilds `*a2 = mFirst + 12*v5`. Direct caller
+         * (`.asm`-confirmed): this instantiation's own `push_back`
+         * (`FUN_00591C90`, cited above) on its capacity-exhausted branch,
+         * itself reached from the two Lua-callback candidate-list builders
+         * named above via `candidates.push_back(SDepositCandidate{...})`
+         * inside their nearest-first deposit scan. DB-integrity note: this
+         * token and its callers were `blocked`/`skip` as generic
+         * "owner/dependent lane not yet reconstructed" -- the real blocker
+         * was that both callers had been recovered with `std::vector`
+         * (wrong ABI) instead of `msvc8::vector`, so no source line in the
+         * tree actually instantiated this template; fixed by retyping both
+         * callers' `candidates` locals.
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -7745,6 +7805,16 @@ namespace msvc8
          * passthrough from its own caller. Called once from this
          * instantiation's `insert` in-place `tail<count` sub-branch (fills
          * the trailing gap beyond the relocated short tail).
+         *
+         * Address: 0x00594A20 (FUN_00594A20, `msvc8::vector<SDepositCandidate>::
+         * uninit_fill_n` for the 12-byte `{float centerX; float centerZ;
+         * float distanceSq;}` element, `moho/ai/CAiBrain.cpp`'s local
+         * `candidates` vector) -- `.c`-confirmed count-down copy loop
+         * (`*result=*a2; result[1]=a2[1]; result[2]=a2[2];` per slot,
+         * `result += 3` dwords), matching this member's memberwise-copy
+         * shape for a trivially-copyable element (no ctor/dtor call in the
+         * shipped body). Called directly from this instantiation's
+         * `push_back` (`FUN_00591C90`, cited above, `n=1`) fast path.
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
