@@ -2219,23 +2219,13 @@ namespace
     }
   };
 
-  struct CameraTargetRuntimeView
-  {
-    void* vftable = nullptr;
+  // CameraTargetRuntimeView used to sit here: a one-pointer struct that
+  // reinterpret_cast a CameraImpl* and hand-dispatched vtable slot 10 through
+  // a raw function-pointer cast. That slot is CameraImpl::TargetLocation
+  // (0x007A82F0, ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z),
+  // a recovered virtual with exactly that signature, and both call sites
+  // already held a typed CameraImpl*. They now make the virtual call directly.
 
-    [[nodiscard]] static CameraTargetRuntimeView* FromCamera(moho::CameraImpl* camera) noexcept
-    {
-      return reinterpret_cast<CameraTargetRuntimeView*>(camera);
-    }
-
-    void TargetLocation(const Wm3::Vector3f& worldPosition, const float transitionSeconds)
-    {
-      using TargetLocationFn = void(__thiscall*)(CameraTargetRuntimeView*, const Wm3::Vector3f*, float);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<TargetLocationFn>(table[10]);
-      fn(this, &worldPosition, transitionSeconds);
-    }
-  };
 
   struct CRenderWorldViewRuntimeView
   {
@@ -11151,7 +11141,7 @@ void CMiniMapDragger::DragMove(const moho::SMauiEventData* const eventData)
   cursorInfo.mMouseScreenPos.y = eventData->mMousePos.y;
   sessionView->mCursorInfo = cursorInfo;
 
-  CameraTargetRuntimeView::FromCamera(camera)->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
+  camera->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
 }
 
 /**
@@ -23358,7 +23348,7 @@ bool moho::CUIWorldView::HandleEvent(const SMauiEventData& eventData)
           }
 
           if (CameraImpl* const trackedCamera = CAM_GetCamera(mCameraTrack.c_str()); trackedCamera != nullptr) {
-            CameraTargetRuntimeView::FromCamera(trackedCamera)->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
+            trackedCamera->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
           }
 
           auto* const storage =
