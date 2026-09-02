@@ -10,6 +10,7 @@
 namespace moho
 {
   class MeshInstance;
+  class MeshLOD;
 
   class MeshBatchKey
   {
@@ -41,8 +42,24 @@ namespace moho
   public:
     std::uint8_t mIsStaticPose; // +0x04
     std::uint8_t pad_05_07[0x03];
-    std::int32_t mLodIndexKey; // +0x08
-    float mSortKey;            // +0x0C
+
+    /**
+     * The LOD this bucket batches (`MeshBatchKey` +0x08).
+     *
+     * `MeshRenderer::Batch` writes the `Mesh::ComputeLOD` result here
+     * (0x007DFBED `mov [esp+20h], eax` into the slot the key load at
+     * 0x007DFCDC reads back), and every render pass dereferences it for the
+     * bucket's material and hardware batch. IDA's frame-base tracking drifts
+     * across this function - it applies the demangled `ABEXXZ` (`retn 0`)
+     * signature to `MeshInstance::UpdateInterpolatedFields`, which actually
+     * ends `retn 4` (0x007DEF5C), so IDA counts the two `push edi` argument
+     * slots as never reclaimed and splits this one slot into `var_1D0` and
+     * `var_1D4`. The loop is esp-balanced (epilogue `add esp, 1E0h` after
+     * three pops returns to the E-0x1EC the loop starts at), so both
+     * `[esp+20h]` references name the same slot.
+     */
+    MeshLOD* mLod;  // +0x08
+    float mSortKey; // +0x0C
   };
 
   /**
@@ -157,7 +174,7 @@ namespace moho
   MeshBatchBucketTreeFindOrCreateInstances(const MeshBatchKey& key, MeshBatchBucketTree& tree);
 
   static_assert(offsetof(MeshBatchKey, mIsStaticPose) == 0x04, "MeshBatchKey::mIsStaticPose offset must be 0x04");
-  static_assert(offsetof(MeshBatchKey, mLodIndexKey) == 0x08, "MeshBatchKey::mLodIndexKey offset must be 0x08");
+  static_assert(offsetof(MeshBatchKey, mLod) == 0x08, "MeshBatchKey::mLod offset must be 0x08");
   static_assert(offsetof(MeshBatchKey, mSortKey) == 0x0C, "MeshBatchKey::mSortKey offset must be 0x0C");
   static_assert(sizeof(MeshBatchKey) == 0x10, "MeshBatchKey size must be 0x10");
 
