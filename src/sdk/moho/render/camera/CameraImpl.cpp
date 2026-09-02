@@ -3243,10 +3243,10 @@ namespace
   // `CTaskEvent::EventSetSignaled((CTaskEvent*)&this->CScriptEvent, 1)`.
   void EventSetSignaledCameraTransition(moho::CameraImpl& camera, const bool signaled) noexcept
   {
-    auto* const scriptEvent = reinterpret_cast<moho::CScriptEvent*>(
-      reinterpret_cast<std::uint8_t*>(&camera) + 0x0C
-    );
-    scriptEvent->EventSetSignaled(signaled);
+    // +0x0C is where the compiler puts it: `CameraImpl : public RCamCamera,
+    // public CScriptEvent` with `sizeof(RCamCamera) == 0x0C`, so CScriptEvent is
+    // the second base. Take it by cast rather than by adding 0x0C.
+    static_cast<moho::CScriptEvent&>(camera).EventSetSignaled(signaled);
   }
 }
 
