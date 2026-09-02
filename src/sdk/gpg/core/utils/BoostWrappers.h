@@ -936,17 +936,6 @@ namespace boost
     }
 
     /**
-     * Address: 0x0053A220 (FUN_0053A220, boost::detail::sp_counted_impl_p<Moho::RScmResource>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `RScmResource`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::RScmResource>* SpCountedImplPConstructRScmResource(
-        SpCountedImplStorage<moho::RScmResource>* countedImpl,
-        moho::RScmResource* ownedPointee
-    ) noexcept;
-
-    /**
      * Address: 0x00545340 (FUN_00545340, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::sp_counted_impl_p)
      *
      * What it does:
@@ -1765,28 +1754,6 @@ namespace boost
     }
 
     /**
-     * Address: 0x0053A240 (FUN_0053A240, boost::detail::sp_counted_impl_p<Moho::RScmResource>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `RScmResource` pointee bound to this shared-count
-     * control lane when present.
-     */
-    void SpCountedImplPDisposeRScmResource(
-        SpCountedImplStorage<moho::RScmResource>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x0053A270 (FUN_0053A270, boost::detail::sp_counted_impl_p<Moho::RScmResource>::destroy)
-     *
-     * What it does:
-     * Frees the control block itself once both use and weak counts reach
-     * zero (the pointee was already released by `dispose()`).
-     */
-    void SpCountedImplPDestroyRScmResource(
-        SpCountedImplStorage<moho::RScmResource>* self
-    ) noexcept;
-
-    /**
      * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
      *
      * What it does:
@@ -2448,16 +2415,6 @@ namespace boost
      * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
      */
     [[nodiscard]] void* SpCountedImplPGetDeleterNullAudioEngine(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x0053A260 (FUN_0053A260, boost::detail::sp_counted_impl_p<Moho::RScmResource>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullRScmResource(
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
