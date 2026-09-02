@@ -1409,6 +1409,17 @@ namespace moho
    * What it does:
    * Registers the `path_ArmyBudget` console alias text for sim-command dispatch.
    */
+  /**
+   * Address: 0x00BFE530 (FUN_00BFE530, cleanup_path_ArmyBudget_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `path_ArmyBudget`.
+   */
+  void cleanup_path_ArmyBudget_ConAliasDef()
+  {
+    ConAlias_path_ArmyBudget().ShutdownRecovered();
+  }
+
   void register_path_ArmyBudget_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -1422,6 +1433,7 @@ namespace moho
       "path_ArmyBudget",
       "DoSimCommand path_ArmyBudget"
     );
+    RegisterAtexitCleanup<&cleanup_path_ArmyBudget_ConAliasDef>();
   }
 
   /**
@@ -1558,6 +1570,17 @@ namespace moho
    * Registers the `AI_RenderBombDropZone` console alias text for sim-command
    * dispatch.
    */
+  /**
+   * Address: 0x00BFF2C0 (FUN_00BFF2C0, cleanup_AI_RenderBombDropZone_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `AI_RenderBombDropZone`.
+   */
+  void cleanup_AI_RenderBombDropZone_ConAliasDef()
+  {
+    ConAlias_AI_RenderBombDropZone().ShutdownRecovered();
+  }
+
   void register_AI_RenderBombDropZone_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -1571,6 +1594,7 @@ namespace moho
       "AI_RenderBombDropZone",
       "DoSimCommand AI_RenderBombDropZone"
     );
+    RegisterAtexitCleanup<&cleanup_AI_RenderBombDropZone_ConAliasDef>();
   }
 
   /**
