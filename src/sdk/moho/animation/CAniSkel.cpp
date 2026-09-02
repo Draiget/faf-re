@@ -1033,6 +1033,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x0054A840 (FUN_0054A840)
+   *
+   * What it does:
+   * Collects the indices of every bone parented to `parentBoneIndex`. Bones
+   * only carry the upward link, so this is a full scan of the bone array
+   * (0x0054A853 walks it at the 88-byte `SAniSkelBone` stride, comparing the
+   * +0x04 parent lane).
+   */
+  void CAniSkel::CollectChildBoneIndices(
+    const std::int32_t parentBoneIndex,
+    msvc8::vector<std::int32_t>& outIndices
+  ) const
+  {
+    outIndices.clear();
+
+    const SAniSkelBone* const begin = mBones.begin();
+    if (begin == nullptr) {
+      return;
+    }
+
+    const std::size_t boneCount = mBones.size();
+    for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+      if (begin[boneIndex].mParentBoneIndex == parentBoneIndex) {
+        outIndices.push_back(static_cast<std::int32_t>(boneIndex));
+      }
+    }
+  }
+
+  /**
    * Address: 0x0054A7B0 (FUN_0054A7B0)
    *
    * char const *

@@ -1595,9 +1595,16 @@ namespace moho
 
   /**
    * Address: 0x006412C0 (FUN_006412C0)
+   *
+   * What it does:
+   * Sets one bone's animation-mask bit and, when `includeDescendants` is set,
+   * recurses into that bone's children. The skeleton stores only the upward
+   * parent link, so the child set is gathered by
+   * `CAniSkel::CollectChildBoneIndices` (0x0054A840) and walked at
+   * 0x0064135F..0x0064137D, recursing with the same two flags.
    */
   void CAnimationManipulator::SetBoneEnabled(
-    const std::int32_t boneIndex, const bool /*includeDescendants*/, const bool enabled
+    const std::int32_t boneIndex, const bool includeDescendants, const bool enabled
   )
   {
     if (boneIndex < 0) {
@@ -1605,6 +1612,24 @@ namespace moho
     }
 
     mBoneMask.SetBit(static_cast<std::uint32_t>(boneIndex), enabled);
+
+    if (!includeDescendants) {
+      return;
+    }
+
+    const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+    if (!skeleton) {
+      return;
+    }
+
+    msvc8::vector<std::int32_t> childBoneIndices;
+    skeleton->CollectChildBoneIndices(boneIndex, childBoneIndices);
+
+    const std::int32_t* const childBegin = childBoneIndices.begin();
+    const std::int32_t* const childEnd = childBoneIndices.end();
+    for (const std::int32_t* child = childBegin; child != childEnd; ++child) {
+      SetBoneEnabled(*child, includeDescendants, enabled);
+    }
   }
 
   float CAnimationManipulator::GetRate() const noexcept
