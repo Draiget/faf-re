@@ -361,40 +361,18 @@ namespace moho
   /**
    * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
    *
+   * IDA signature:
+   * void __thiscall Moho::CDecalManager::DestroyDecal(CDecalManager *this,
+   *                                                   CWldTerrainDecal *decal);
+   *
    * What it does:
-   * Removes one decal from group memberships and manager storage, destroys
-   * the decal object, and compacts vector-index lanes.
+   * Six instructions. Forwards to the shared removal worker at 0x008779B0,
+   * handing it `this`, the decal, and the address of its own argument slot as
+   * that worker's out parameter, then discards the result.
    */
   void CDecalManager::DestroyDecal(CWldTerrainDecal* const decal)
   {
-    if (decal == nullptr) {
-      return;
-    }
-
-    for (CDecalGroup* const group : mDecalGroups) {
-      if (group != nullptr) {
-        group->RemoveFromGroup(decal->mIndex);
-      }
-    }
-
-    auto* const found = std::find(mDecals.begin(), mDecals.end(), decal);
-    if (found == mDecals.end()) {
-      return;
-    }
-
-    CWldTerrainDecal* const removedDecal = *found;
-    (void)mDecals.erase(found);
-
-    delete removedDecal;
-
-    for (auto* decalIt = mDecals.begin(); decalIt != mDecals.end(); ++decalIt) {
-      CWldTerrainDecal* const activeDecal = *decalIt;
-      if (activeDecal != nullptr) {
-        activeDecal->mVecIndex = static_cast<std::uint32_t>(decalIt - mDecals.begin());
-      }
-    }
-
-    mDidSomething = 1u;
+    (void)RemoveDecalFromManagerAndReturnNextSlot(*this, decal);
   }
 
   /**
