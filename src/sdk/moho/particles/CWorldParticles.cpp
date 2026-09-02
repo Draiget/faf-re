@@ -8193,9 +8193,14 @@ namespace moho
       );
 
       if (candidateNode == runtime.refractingParticleBuckets.head) {
-        auto* const newBucket = static_cast<ParticleRenderBucketRuntime*>(
-          ::operator new(sizeof(ParticleRenderBucketRuntime))
-        );
+        // Must be constructed, not just allocated: the bucket owns two
+        // shared_ptr texture handles, an msvc8::string and two vectors, and
+        // InitializeParticleRenderBucketFromWorldParticle's first act is to
+        // `reset()` those handles. On raw `operator new` storage that resets a
+        // garbage control block. `new T()` emits the same
+        // `operator new(sizeof(T))` the binary calls, plus the construction the
+        // binary's own constructor emission performs.
+        auto* const newBucket = new ParticleRenderBucketRuntime();
         (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
 
         PointerByteFlagPairRuntime insertResult{};
@@ -8228,9 +8233,9 @@ namespace moho
     );
 
     if (candidateNode == runtime.particleBuckets.head) {
-      auto* const newBucket = static_cast<ParticleRenderBucketRuntime*>(
-        ::operator new(sizeof(ParticleRenderBucketRuntime))
-      );
+      // Constructed, not merely allocated -- see the refracting-bucket site
+      // above for why raw storage faults inside the initializer's `reset()`.
+      auto* const newBucket = new ParticleRenderBucketRuntime();
       (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
 
       PointerByteFlagPairRuntime insertResult{};
