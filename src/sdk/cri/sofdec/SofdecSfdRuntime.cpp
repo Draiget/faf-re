@@ -8471,8 +8471,10 @@
     );
   }
 
-  extern "C" std::int32_t MWSFD_SetReqSvrBdrHn(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t requestEnabled);
-  extern "C" void MWSFSVM_GotoIdleBorder();
+  // MWSFD_SetReqSvrBdrHn and MWSFSVM_GotoIdleBorder are defined earlier in
+  // this aggregate translation unit (SofdecAdxPlatformRuntime.cpp and
+  // SofdecSvmTransferRuntime.cpp respectively); both are void, not the
+  // std::int32_t this file used to guess for the setter.
   extern "C" std::int32_t MWSFSVR_CheckForceSvrBdr(std::int32_t plyAddress);
 
   /**
@@ -8486,9 +8488,9 @@
   std::int32_t mwlSfdSleepDecSvr(moho::MwsfdPlaybackStateSubobj* const ply)
   {
     mwPlySaveRsc();
-    (void)MWSFD_SetReqSvrBdrHn(ply, 1);
+    MWSFD_SetReqSvrBdrHn(ply, 1);
     MWSFSVM_GotoIdleBorder();
-    (void)MWSFD_SetReqSvrBdrHn(ply, 0);
+    MWSFD_SetReqSvrBdrHn(ply, 0);
     mwPlyRestoreRsc();
     return MWSFSVR_CheckForceSvrBdr(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply)));
   }

@@ -3,6 +3,17 @@
 #endif
 
   /**
+   * Address: 0x00ACCAD0 (FUN_00ACCAD0, _MWSFSVM_Finish)
+   *
+   * What it does:
+   * Tears down the SVM server-manager layer. Tail-call thunk to `SVM_Finish`.
+   */
+  void MWSFSVM_Finish()
+  {
+    SVM_Finish();
+  }
+
+  /**
    * Address: 0x00ACCCC0 (FUN_00ACCCC0, _MWSFSVM_Error)
    *
    * IDA signature:
@@ -191,6 +202,18 @@
   void ADXM_SetCbErr(moho::AdxmErrorCallback callback, const std::int32_t callbackParam)
   {
     SVM_SetCbErr(callback, callbackParam);
+  }
+
+  /**
+   * Address: 0x00ACCD00 (FUN_00ACCD00, _MWSFSVM_GotoIdleBorder)
+   *
+   * What it does:
+   * Invokes the registered IDLE server-border callback lane (slot 6) - the
+   * same slot `MWSFSVM_EntryIdleFunc`/`MWSFSVM_DeleteIdleFunc` manage.
+   */
+  void MWSFSVM_GotoIdleBorder()
+  {
+    SVM_GotoSvrBorder(6);
   }
 
   /**
