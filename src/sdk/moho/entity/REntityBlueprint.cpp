@@ -2,7 +2,10 @@
 
 #include <cmath>
 
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 
@@ -109,6 +112,39 @@ namespace moho
     {
       return static_cast<std::uint8_t>(static_cast<int>(std::ceil(static_cast<double>(extent))));
     }
+
+    /** Where a non-absolute `StrategicIconName` is resolved from. */
+    constexpr const char* kStrategicIconDirectory = "/textures/ui/common/game/strategicicons/";
+
+    /**
+     * Address: 0x00511B80 (FUN_00511B80, func_LoadStratIcon)
+     *
+     * IDA signature:
+     * boost::shared_ptr_CD3DBatchTexture *__usercall func_LoadStratIcon@<eax>(
+     *     std::string *path@<edi>, boost::shared_ptr_CD3DBatchTexture *out, std::string *label);
+     *
+     * What it does:
+     * Loads one strategic-icon texture and names the variant in the failure
+     * log. `label` is the quoted variant word the caller passes -- `'rest'`,
+     * `'selected'`, `'over'`, `'selected over'` -- so a missing icon reports
+     * which of the four it was.
+     *
+     * The binary returns the out-parameter it was handed; the shared_ptr comes
+     * back by value here, which is the same net result now that
+     * `CD3DBatchTexture::FromFile` returns one directly.
+     */
+    [[nodiscard]] boost::shared_ptr<moho::CD3DBatchTexture> LoadStrategicIconTexture(
+      const msvc8::string& iconPath,
+      const msvc8::string& variantLabel
+    )
+    {
+      boost::shared_ptr<moho::CD3DBatchTexture> icon = moho::CD3DBatchTexture::FromFile(iconPath.c_str(), 0u);
+      if (!icon) {
+        gpg::Logf("Failed to load %s icon %s", variantLabel.c_str(), iconPath.c_str());
+      }
+
+      return icon;
+    }
   } // namespace
 
   /**
@@ -144,12 +180,22 @@ namespace moho
       mInertiaTensorZ = (sizeX2 + sizeY2) * kOneTwelfth;
     }
 
-    // NOTE:
-    // The strategic icon load path in this function (0x00512230..0x00512717)
-    // depends on the render-resource chain rooted at:
-    // - 0x00511B80 (FUN_00511B80, helper `func_LoadStratIcon`)
-    // - CD3DBatchTexture::FromFile(...)
-    // That dependency chain is still under reconstruction.
+    // 0x00512230..0x00512717. Both guards are the binary's: the name has to be
+    // non-empty, and an absolute name is left alone entirely -- there is no
+    // else branch, so a blueprint naming an absolute icon path simply gets no
+    // icons from here.
+    if (mStrategicIconName.empty() || FILE_IsAbsolute(mStrategicIconName.c_str())) {
+      return;
+    }
+
+    const msvc8::string iconBasePath = msvc8::string(kStrategicIconDirectory) + mStrategicIconName;
+
+    mStrategicIconRest = LoadStrategicIconTexture(iconBasePath + "_rest.dds", msvc8::string("'rest'"));
+    mStrategicIconSelected =
+      LoadStrategicIconTexture(iconBasePath + "_selected.dds", msvc8::string("'selected'"));
+    mStrategicIconOver = LoadStrategicIconTexture(iconBasePath + "_over.dds", msvc8::string("'over'"));
+    mStrategicIconSelectedOver =
+      LoadStrategicIconTexture(iconBasePath + "_selectedover.dds", msvc8::string("'selected over'"));
   }
 
   /**
