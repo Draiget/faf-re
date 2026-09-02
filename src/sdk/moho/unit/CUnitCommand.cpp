@@ -579,24 +579,19 @@ namespace
     return out;
   }
 
+  // The serializer works on the `Broadcaster` secondary base. That slice sits at
+  // +0x34 in the binary layout, which is exactly where the compiler puts it:
+  // `CUnitCommand : public CScriptObject, public Broadcaster` and
+  // `sizeof(CScriptObject) == 0x34`. So this is a base cast, not pointer
+  // arithmetic -- let the compiler compute the adjustment.
   [[nodiscard]] void* BroadcasterSubobjectPtr(CUnitCommand* const command) noexcept
   {
-    if (!command) {
-      return nullptr;
-    }
-
-    // `Broadcaster<ECommandEvent>` is serialized from a secondary base slice
-    // at +0x34 in the original binary object layout.
-    return reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(command) + 0x34u);
+    return static_cast<Broadcaster*>(command);
   }
 
   [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
   {
-    if (!command) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<const void*>(reinterpret_cast<const std::uint8_t*>(command) + 0x34u);
+    return static_cast<const Broadcaster*>(command);
   }
 
   void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SCommandUnitSet& destination)
