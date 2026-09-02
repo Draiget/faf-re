@@ -2596,41 +2596,6 @@ namespace boost
     return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
   }
 
-  /**
-   * Address: 0x0063E760 (FUN_0063E760)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `CAniPose`.
-   */
-  SpCountedImplStorage<moho::CAniPose>* SpCountedImplPConstructCAniPose(
-    SpCountedImplStorage<moho::CAniPose>* const countedImpl,
-    moho::CAniPose* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x00714670 (FUN_00714670, boost::detail::sp_counted_impl_p<Moho::STrigger>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `STrigger`.
-   */
-  SpCountedImplStorage<moho::STrigger>* SpCountedImplPConstructSTrigger(
-    SpCountedImplStorage<moho::STrigger>* const countedImpl,
-    moho::STrigger* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
 
   /**
    * Address: 0x00755FA0 (FUN_00755FA0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::sp_counted_impl_p)
@@ -3109,33 +3074,6 @@ namespace boost
     return InitializeSpCountedBaseLaneForStatsStatItem(control);
   }
 
-  /**
-   * Address: 0x0063E7D0 (FUN_0063E7D0)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `CAniPose` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForCAniPose(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForStatsStatItem(control);
-  }
-
-  /**
-   * Address: 0x007146E0 (FUN_007146E0, boost::detail::sp_counted_base::sp_counted_base)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane for the trigger
-   * shared-count constructor path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForSTrigger(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForStatsStatItem(control);
-  }
 
   /**
    * Address: 0x007560E0 (FUN_007560E0)
@@ -3724,33 +3662,6 @@ namespace boost
     DisposeSpCountedImplPointee(countedImpl);
   }
 
-  /**
-   * Address: 0x0063E780 (FUN_0063E780, boost::detail::sp_counted_impl_p<Moho::CAniPose>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `CAniPose` pointee bound to this shared-count control
-   * lane when present.
-   */
-  void SpCountedImplPDisposeCAniPose(
-    SpCountedImplStorage<moho::CAniPose>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointee(countedImpl);
-  }
-
-  /**
-   * Address: 0x00714690 (FUN_00714690, boost::detail::sp_counted_impl_p<Moho::STrigger>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `STrigger` pointee bound to this shared-count control
-   * lane when present.
-   */
-  void SpCountedImplPDisposeSTrigger(
-    SpCountedImplStorage<moho::STrigger>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointee(countedImpl);
-  }
 
   /**
    * Address: 0x00756000 (FUN_00756000, boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::dispose)
@@ -4119,35 +4030,6 @@ namespace boost
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
 
-  /**
-   * Address: 0x0063E7B0 (FUN_0063E7B0, boost::detail::sp_counted_impl_p<Moho::CAniPose>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::CAniPose>* SpCountedImplPDeletingDtorCAniPose(
-    SpCountedImplStorage<moho::CAniPose>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x007146C0 (FUN_007146C0, boost::detail::sp_counted_impl_p<Moho::STrigger>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::STrigger>* SpCountedImplPDeletingDtorSTrigger(
-    SpCountedImplStorage<moho::STrigger>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
 
   /**
    * Address: 0x00756080 (FUN_00756080, boost::detail::sp_counted_impl_p<Moho::ISimResources>::dtr)
@@ -4650,19 +4532,6 @@ namespace boost
    * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
    */
   void* SpCountedImplPGetDeleterNullCIntelGrid(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x0063E7A0 (FUN_0063E7A0, boost::detail::sp_counted_impl_p<Moho::CAniPose>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullCAniPose(
     detail::sp_typeinfo const& requestedType
   ) noexcept
   {

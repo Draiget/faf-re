@@ -982,17 +982,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x0063E760 (FUN_0063E760)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `CAniPose`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CAniPose>* SpCountedImplPConstructCAniPose(
-        SpCountedImplStorage<moho::CAniPose>* countedImpl,
-        moho::CAniPose* ownedPointee
-    ) noexcept;
-
-    /**
      * Address: 0x007BDC20 (FUN_007BDC20, boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::sp_counted_impl_p)
      *
      * What it does:
@@ -1087,17 +1076,6 @@ namespace boost
         SpCountedImplPdCharPointerStorage* countedImpl,
         char* ownedPointee,
         SharedByteDeleterFn deleter
-    ) noexcept;
-
-    /**
-     * Address: 0x00714670 (FUN_00714670, boost::detail::sp_counted_impl_p<Moho::STrigger>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `STrigger`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::STrigger>* SpCountedImplPConstructSTrigger(
-        SpCountedImplStorage<moho::STrigger>* countedImpl,
-        moho::STrigger* ownedPointee
     ) noexcept;
 
     /**
@@ -1290,17 +1268,6 @@ namespace boost
      * `CIntelGrid` control-block init path.
      */
     [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCIntelGrid(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0063E7D0 (FUN_0063E7D0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CAniPose` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCAniPose(
         detail::sp_counted_base* control
     ) noexcept;
 
@@ -1602,17 +1569,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007146E0 (FUN_007146E0, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane for the trigger
-     * shared-count constructor path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForSTrigger(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
      * Address: 0x007560E0 (FUN_007560E0)
      *
      * What it does:
@@ -1833,28 +1789,6 @@ namespace boost
      */
     void SpCountedImplPDisposeCIntelGrid(
         SpCountedImplStorage<moho::CIntelGrid>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x0063E780 (FUN_0063E780, boost::detail::sp_counted_impl_p<Moho::CAniPose>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `CAniPose` pointee bound to this shared-count control
-     * lane when present.
-     */
-    void SpCountedImplPDisposeCAniPose(
-        SpCountedImplStorage<moho::CAniPose>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x00714690 (FUN_00714690, boost::detail::sp_counted_impl_p<Moho::STrigger>::dispose)
-     *
-     * What it does:
-     * Deletes one owned `STrigger` pointee bound to this shared-count control
-     * lane when present.
-     */
-    void SpCountedImplPDisposeSTrigger(
-        SpCountedImplStorage<moho::STrigger>* countedImpl
     ) noexcept;
 
     /**
@@ -2103,30 +2037,6 @@ namespace boost
      */
     [[nodiscard]] SpCountedImplStorage<moho::CIntelGrid>* SpCountedImplPDeletingDtorCIntelGrid(
         SpCountedImplStorage<moho::CIntelGrid>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x0063E7B0 (FUN_0063E7B0, boost::detail::sp_counted_impl_p<Moho::CAniPose>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for
-     * `sp_counted_impl_p<CAniPose>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CAniPose>* SpCountedImplPDeletingDtorCAniPose(
-        SpCountedImplStorage<moho::CAniPose>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x007146C0 (FUN_007146C0, boost::detail::sp_counted_impl_p<Moho::STrigger>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for
-     * `sp_counted_impl_p<STrigger>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::STrigger>* SpCountedImplPDeletingDtorSTrigger(
-        SpCountedImplStorage<moho::STrigger>* countedImpl,
         unsigned char deleteFlag
     ) noexcept;
 
@@ -2455,16 +2365,6 @@ namespace boost
      * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
      */
     [[nodiscard]] void* SpCountedImplPGetDeleterNullCIntelGrid(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x0063E7A0 (FUN_0063E7A0, boost::detail::sp_counted_impl_p<Moho::CAniPose>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullCAniPose(
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
