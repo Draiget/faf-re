@@ -341,189 +341,17 @@ namespace
     return storage;
   }
 
-  /**
-   * Address: 0x0054C260 (FUN_0054C260)
-   *
-   * What it does:
-   * Returns one pose-bone array size lane by dividing `(end - begin)` bytes by
-   * `sizeof(CAniPoseBone)`.
-   */
-  [[maybe_unused]] [[nodiscard]] int PoseBoneArrayCountFromEnd(const moho::CAniPoseBoneArray* const storage) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(storage->mBegin);
-    const std::intptr_t endBytes = reinterpret_cast<std::intptr_t>(storage->mEnd);
-    return static_cast<int>((endBytes - beginBytes) / PoseBoneStrideBytes());
-  }
 
-  /**
-   * Address: 0x0054C320 (FUN_0054C320)
-   *
-   * What it does:
-   * Returns one mutable pose-bone pointer lane at `begin + index`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone* PoseBoneArrayAt(
-    const std::int32_t index,
-    moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    return PoseBoneByteOffset(storage->mBegin, index);
-  }
 
-  /**
-   * Address: 0x0054C330 (FUN_0054C330)
-   *
-   * What it does:
-   * Returns one const pose-bone pointer lane at `begin + index`.
-   */
-  [[maybe_unused]] [[nodiscard]] const moho::CAniPoseBone* PoseBoneArrayAt(
-    const std::int32_t index,
-    const moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    return PoseBoneByteOffset(storage->mBegin, index);
-  }
 
-  /**
-   * Address: 0x0054C340 (FUN_0054C340)
-   *
-   * What it does:
-   * Clears one pose-bone array tail lane triplet (`end`, `capacity`,
-   * `original`) and leaves `begin` unchanged.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* ClearPoseBoneArrayTailLanes(
-    moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    storage->mEnd = nullptr;
-    storage->mCapacity = nullptr;
-    storage->mOriginal = nullptr;
-    return storage;
-  }
 
-  /**
-   * Address: 0x0054CCE0 (FUN_0054CCE0)
-   *
-   * What it does:
-   * Seeds one pose-bone array with `begin=end=original=beginLane` and
-   * `capacity=beginLane+1`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* SeedPoseBoneArraySingleElementSpan(
-    moho::CAniPoseBoneArray* const storage,
-    moho::CAniPoseBone* const beginLane
-  ) noexcept
-  {
-    storage->mBegin = beginLane;
-    storage->mEnd = beginLane;
-    storage->mCapacity = PoseBoneByteOffset(beginLane, 1);
-    storage->mOriginal = beginLane;
-    return storage;
-  }
 
-  /**
-   * Address: 0x0054CD20 (FUN_0054CD20)
-   *
-   * What it does:
-   * Clears one pose-bone array head lane pair (`begin`, `end`).
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* ClearPoseBoneArrayHeadLanes(
-    moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    storage->mBegin = nullptr;
-    storage->mEnd = nullptr;
-    return storage;
-  }
 
-  /**
-   * Address: 0x0054CDC0 (FUN_0054CDC0)
-   *
-   * What it does:
-   * Stores one pose-bone pointer lane into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBonePointerLane(
-    moho::CAniPoseBone** const outLane,
-    moho::CAniPoseBone* const valueLane
-  ) noexcept
-  {
-    *outLane = valueLane;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x0054CDD0 (FUN_0054CDD0)
-   *
-   * What it does:
-   * Stores one pose-bone array `end` lane into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneEndLanePrimary(
-    moho::CAniPoseBone** const outLane,
-    const moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    *outLane = storage->mEnd;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x0054CDE0 (FUN_0054CDE0)
-   *
-   * What it does:
-   * Stores one pose-bone array `capacity` lane into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneCapacityLanePrimary(
-    moho::CAniPoseBone** const outLane,
-    const moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    *outLane = storage->mCapacity;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x0054D020 (FUN_0054D020)
-   *
-   * What it does:
-   * Alias entrypoint that stores one pose-bone array `end` lane into caller
-   * output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneEndLaneSecondary(
-    moho::CAniPoseBone** const outLane,
-    const moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    *outLane = storage->mEnd;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x0054D030 (FUN_0054D030)
-   *
-   * What it does:
-   * Alias entrypoint that stores one pose-bone array `capacity` lane into
-   * caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneCapacityLaneSecondary(
-    moho::CAniPoseBone** const outLane,
-    const moho::CAniPoseBoneArray* const storage
-  ) noexcept
-  {
-    *outLane = storage->mCapacity;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x0054D740 (FUN_0054D740)
-   *
-   * What it does:
-   * Returns one pose-bone array capacity count lane by dividing
-   * `(capacity - begin)` bytes by `sizeof(CAniPoseBone)`.
-   */
-  [[maybe_unused]] [[nodiscard]] int PoseBoneArrayCapacityFromBegin(const moho::CAniPoseBoneArray* const storage) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(storage->mBegin);
-    const std::intptr_t capacityBytes = reinterpret_cast<std::intptr_t>(storage->mCapacity);
-    return static_cast<int>((capacityBytes - beginBytes) / PoseBoneStrideBytes());
-  }
 
   void InitializePoseBonesInlineStorage(moho::CAniPose& pose)
   {
@@ -546,31 +374,6 @@ namespace
     gpg::FastVectorRuntimeResizeFill(&fillValue, count, runtimeView);
   }
 
-  /**
-   * Address: 0x0054DCF0 (FUN_0054DCF0)
-   *
-   * What it does:
-   * Copy-constructs one contiguous `CAniPoseBone` range
-   * `[sourceBegin, sourceEnd)` into destination storage and returns the end of
-   * the constructed destination range.
-   */
-  [[maybe_unused]] moho::CAniPoseBone* CopyConstructCAniPoseBoneRangeForward(
-    moho::CAniPoseBone* destinationBegin,
-    const moho::CAniPoseBone* sourceBegin,
-    const moho::CAniPoseBone* sourceEnd
-  )
-  {
-    moho::CAniPoseBone* destinationCursor = destinationBegin;
-    for (const moho::CAniPoseBone* sourceCursor = sourceBegin;
-         sourceCursor != sourceEnd;
-         ++sourceCursor, ++destinationCursor) {
-      if (destinationCursor != nullptr) {
-        ::new (destinationCursor) moho::CAniPoseBone(*sourceCursor);
-      }
-    }
-
-    return destinationCursor;
-  }
 
   [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
   {
