@@ -1532,13 +1532,6 @@ namespace
     throw std::length_error("vector<T> too long");
   }
 
-  /**
-   * Address: 0x0049E9A0 (FUN_0049E9A0, nullsub_635)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAP() noexcept {}
 
   /**
    * Address: 0x0049E9B0 (FUN_0049E9B0, sub_49E9B0)
@@ -1907,29 +1900,8 @@ namespace
     return ::operator new(static_cast<std::size_t>(elementCount) * kUInt32Size);
   }
 
-  /**
-   * Address: 0x0049EB70 (FUN_0049EB70, nullsub_636)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAQ() noexcept {}
 
-  /**
-   * Address: 0x0049EBD0 (FUN_0049EBD0, nullsub_637)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAR() noexcept {}
 
-  /**
-   * Address: 0x0049EBF0 (FUN_0049EBF0, nullsub_638)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAS() noexcept {}
 
   /**
    * Address: 0x0049B7B0 (FUN_0049B7B0, sub_49B7B0)
@@ -2099,21 +2071,7 @@ namespace
     return TrailSegmentPointerKey(lhs) < TrailSegmentPointerKey(rhs);
   }
 
-  /**
-   * Address: 0x0049EC60 (FUN_0049EC60, nullsub_639)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAT() noexcept {}
 
-  /**
-   * Address: 0x0049EC80 (FUN_0049EC80, nullsub_640)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAU() noexcept {}
 
   [[nodiscard]] bool AppendInterval(
     moho::ParticleRenderWorkItemRuntime& workItem, const float beginFrame, const float lifeFrames
@@ -2655,19 +2613,6 @@ namespace
     pendingParticles.capacityEnd = nullptr;
   }
 
-  /**
-   * Address: 0x00495580 (FUN_00495580)
-   *
-   * What it does:
-   * Thunk lane that forwards one world-particle vector storage cleanup request
-   * into `FUN_004972E0`.
-   */
-  [[maybe_unused]] void ResetWorldParticleVectorStorageDuplicateThunk(
-    moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles
-  ) noexcept
-  {
-    ResetWorldParticleVectorStorageDuplicate(pendingParticles);
-  }
 
   /**
    * Address: 0x00497330 (FUN_00497330, sub_497330)
@@ -2908,19 +2853,6 @@ namespace
     pendingTrails.capacityEnd = nullptr;
   }
 
-  /**
-   * Address: 0x00495730 (FUN_00495730)
-   *
-   * What it does:
-   * Thunk lane that forwards one trail-vector storage cleanup request into
-   * `FUN_00497490`.
-   */
-  [[maybe_unused]] void ResetTrailRuntimeVectorStorageDuplicateThunk(
-    moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails
-  ) noexcept
-  {
-    ResetTrailRuntimeVectorStorageDuplicate(pendingTrails);
-  }
 
   /**
    * Address: 0x004974E0 (FUN_004974E0, sub_4974E0)
