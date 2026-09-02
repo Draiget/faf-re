@@ -79,12 +79,26 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
         return *this;
     }
 
-    const string copied(other);
+    // Build the copy before releasing anything, because `other` may alias this
+    // string's own buffer, then take ownership of it through the move
+    // assignment. Lifting the fields out of `copied` by hand instead would hand
+    // this string a block that `copied`'s destructor then frees.
+    return *this = string(other);
+}
+
+/**
+ * Address: 0x008846B0 (FUN_008846B0, the `tidy(true, 0)` specialisation) is the
+ * body MSVC8 emits for `~basic_string`; see the destructor's own comment in
+ * `String.h` for why it was missing and what that cost.
+ *
+ * What it does:
+ * Releases the heap buffer when the string is not in its inline small-buffer
+ * state, and leaves the object a valid empty inline string so a second tidy
+ * (`scoped_string`'s destructor runs one immediately before this one) is a
+ * no-op rather than a double free.
+ */
+msvc8::string::~string() noexcept {
     tidy(true, 0U);
-    bx = copied.bx;
-    mySize = copied.mySize;
-    myRes = copied.myRes;
-    return *this;
 }
 
 msvc8::string::string(string&& other) noexcept {
