@@ -85,11 +85,39 @@ namespace moho
    * and passes the shared pose to `UserEntity::SetPose`. The 12-byte stride
    * comes from the drain loop at 0x00894F1C.
    */
+  /**
+   * One pending pose-copy request: the destination entity id plus a retained
+   * handle on the source pose to apply.
+   *
+   * This is the single owning definition. `Sim.h` queues these into
+   * `Sim::mPendingPoseCopies` (`+0x09E8`) from `cfunc_TryCopyPoseL`
+   * (0x0075D0E0) and aliases this type as `SPendingPoseCopy`; the two were
+   * separate byte-identical declarations until `Sim::Sync`'s swap at
+   * 0x00747AAA proved they are one struct -- a three-pointer vector swap is
+   * only well-formed between identical types.
+   */
   struct SEntityPoseUpdateEntry
   {
     EntId mEntityId = 0;                  // +0x00
     boost::shared_ptr<CAniPose> mPose;    // +0x04
   };
+
+  /**
+   * One pending allied-upgrade notification: the pre-upgrade (source) and
+   * post-upgrade (destination) unit ids. Accumulated into
+   * `Sim::mAllyUpgradeNotifications` (`+0x09D8`) by the `NotifyUpgrade` Lua
+   * binding when the destination army is an ally, and drained into the lane
+   * below by `Sim::Sync` at 0x00747A60.
+   *
+   * Defined here rather than in `Sim.h` for the same reason as the pose entry:
+   * the swap needs both sides to name one type.
+   */
+  struct SUpgradeNotifyPair
+  {
+    std::int32_t mSourceId = 0; // +0x00
+    std::int32_t mDestId = 0;   // +0x04
+  };
+  static_assert(sizeof(SUpgradeNotifyPair) == 0x08, "SUpgradeNotifyPair size must be 0x08");
 
   struct SSyncPublishedCommandPacket
   {
@@ -206,8 +234,14 @@ namespace moho
     msvc8::vector<std::int32_t> mRemoveDecals;              // +0x1E0
     msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
     msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
-    /// Seventeenth vector lane; untouched by `CWldSession::DoBeat`.
-    msvc8::vector<std::byte> mAuxiliaryVector17;            // +0x210
+    /// Allied-upgrade notifications for this beat. `Sim::Sync` swaps
+    /// `Sim::mAllyUpgradeNotifications` (`Sim+0x09D8`) into this lane at
+    /// 0x00747A60 -- `[ebx+9DCh/9E0h/9E4h]` against `[eax+214h/218h/21Ch]`.
+    /// Previously declared `msvc8::vector<std::byte> mAuxiliaryVector17` and
+    /// described as "untouched by `CWldSession::DoBeat`"; the element type is
+    /// pinned by the swap's source, which is a
+    /// `msvc8::vector<SUpgradeNotifyPair>`.
+    msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // +0x210
     msvc8::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
     msvc8::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
     msvc8::vector<SDesyncInfo> mDesyncs;                    // +0x240
