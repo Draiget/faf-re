@@ -4124,6 +4124,35 @@ namespace msvc8
              * subtree `destroy_subtree`, IDA-named
              * `std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`) is
              * already cited on `destroy_subtree` below.
+             *
+             * Address: 0x0087B5B0 (FUN_0087B5B0, sub_87B5B0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase_node` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`/
+             * `mDecalGroupLookupBySplatIndex` (`moho/terrain/splat/
+             * CWldSplat.h`), isNil@+0x15 (same instantiation cited on
+             * `erase_range`/`erase(const key_type&)` above -- `FUN_0087A080`/
+             * `FUN_00879510`). Register-traced field for field: the `_Isnil`
+             * check + `out_of_range("invalid map/set<T> iterator")` throw
+             * (`0x0087B5CC`-`0x0087B626`), `rb_increment` for the in-order
+             * successor (`call sub_87CDD0` at `0x0087B630`, this
+             * instantiation's own `rb_increment`), the CLRS transplant
+             * (one/two-child relink, `leftmost()`/`rightmost()` header
+             * adjustment via `rb_min`/`rb_max`-equivalents `sub_87C540`/
+             * `sub_87C520`), the black-node rebalance calling this
+             * instantiation's rotates (`sub_87C4D0`/`sub_87C570`), then a
+             * bare `operator delete(void *)` on the erased node with no
+             * value-specific teardown (matches the value type being a raw
+             * `CWldTerrainDecal*`/`CDecalGroup*` pointer, nothing owning to
+             * destroy) and a saturating size decrement (`if (eax > 0)
+             * --eax`, matching this member's `if (size_ > 0) --size_`).
+             * Reached from this instantiation's `erase_range` (`FUN_0087A080`,
+             * cited above) via its general (non-whole-tree) loop branch --
+             * same "template-instantiated, per-node path compiled but not
+             * separately traced through the currently-known caller" shape as
+             * the precedents immediately above; real reachability traces
+             * through `erase_range`'s own citation to
+             * `CDecalManager::DestroyDecalGroup`/
+             * `RemoveDecalFromManagerAndReturnNextSlot` (`CWldSplat.cpp`).
              */
             node_type* erase_node(node_type* const erased)
             {
