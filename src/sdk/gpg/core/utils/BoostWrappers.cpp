@@ -2522,25 +2522,6 @@ namespace boost
     return control;
   }
 
-
-  /**
-   * Address: 0x005791B0 (FUN_005791B0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `CHeightField`.
-   */
-  SpCountedImplStorage<moho::CHeightField>* SpCountedImplPConstructCHeightField(
-    SpCountedImplStorage<moho::CHeightField>* const countedImpl,
-    moho::CHeightField* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
   /**
    * Address: 0x005CC7C0 (FUN_005CC7C0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::sp_counted_impl_p)
    *
@@ -2559,25 +2540,6 @@ namespace boost
 
     return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
   }
-
-  /**
-   * Address: 0x005CD540 (FUN_005CD540)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `CIntelGrid`.
-   */
-  SpCountedImplStorage<moho::CIntelGrid>* SpCountedImplPConstructCIntelGrid(
-    SpCountedImplStorage<moho::CIntelGrid>* const countedImpl,
-    moho::CIntelGrid* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
 
   /**
    * Address: 0x00755FA0 (FUN_00755FA0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::sp_counted_impl_p)
@@ -2894,19 +2856,6 @@ namespace boost
     return InitializeSpCountedBaseLaneForStatsStatItem(control);
   }
 
-  /**
-   * Address: 0x005CD5E0 (FUN_005CD5E0)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `CIntelGrid` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForCIntelGrid(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForStatsStatItem(control);
-  }
 
 
   /**
@@ -2982,20 +2931,6 @@ namespace boost
    * `CAniDefaultSkel` function-deleter control path.
    */
   detail::sp_counted_base* InitializeSpCountedBaseLaneForAniDefaultSkelDeleter(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
-
-  /**
-   * Address: 0x00579210 (FUN_00579210)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `CHeightField` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForCHeightField(
     detail::sp_counted_base* const control
   ) noexcept
   {
@@ -3298,42 +3233,6 @@ namespace boost
     DestroySpCountedImplSelf(self);
   }
 
-
-  /**
-   * Address: 0x005791D0 (FUN_005791D0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `CHeightField` pointee bound to this shared-count
-   * control lane when present. The real asm (`mov esi,[ecx+0Ch]; test
-   * esi,esi; jz +5; call sub_579250`) reads `countedImpl->px` at control-block
-   * offset +0x0C (confirmed against `SpCountedImplStorage<PointeeT>::px`),
-   * and passes it to the callee in `esi` with no explicit push -- an
-   * `@<esi>`-register `this` convention, not a stack argument.
-   *
-   * Address: 0x00579250 (FUN_00579250, the compiler's own re-inlined clone of
-   * CHeightField::~CHeightField() plus operator delete, reproduced below)
-   *
-   * The callee, `FUN_00579250` (0x00579250), is the compiler's own re-inlined
-   * clone of `CHeightField::~CHeightField()` (0x004784F0 / 0x00478420):
-   * it releases `mGrids`'s tier range through the same per-tier
-   * `operator delete[]` loop already recovered as
-   * `DestroyHeightFieldTierRangeVariant1` (0x00478910), frees the vector's
-   * backing buffer, then `delete[]`s the base `data` sample array -- but
-   * unlike the standalone destructor, it *also* finishes with
-   * `operator delete(this)`, because this is the compiled body of
-   * `boost::checked_delete(px)` (a full `delete px;` expression), not a bare
-   * destructor call. `delete countedImpl->px` below reproduces that exact
-   * sequence through the real recovered destructor plus a compiler-emitted
-   * `operator delete`, matching FUN_00579250's observable behavior without
-   * duplicating its logic a second time in source.
-   */
-  void SpCountedImplPDisposeCHeightField(
-    SpCountedImplStorage<moho::CHeightField>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointee(countedImpl);
-  }
-
   /**
    * Address: 0x005CC7E0 (FUN_005CC7E0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::dispose)
    *
@@ -3348,19 +3247,6 @@ namespace boost
     DisposeSpCountedImplPointee(countedImpl);
   }
 
-  /**
-   * Address: 0x005CD560 (FUN_005CD560, boost::detail::sp_counted_impl_p<Moho::CIntelGrid>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `CIntelGrid` pointee bound to this shared-count control
-   * lane when present.
-   */
-  void SpCountedImplPDisposeCIntelGrid(
-    SpCountedImplStorage<moho::CIntelGrid>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointee(countedImpl);
-  }
 
   /**
    * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
@@ -3618,20 +3504,6 @@ namespace boost
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
 
-  /**
-   * Address: 0x005CD5C0 (FUN_005CD5C0, boost::detail::sp_counted_impl_p<Moho::CIntelGrid>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::CIntelGrid>* SpCountedImplPDeletingDtorCIntelGrid(
-    SpCountedImplStorage<moho::CIntelGrid>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
 
 
   /**
@@ -3987,31 +3859,6 @@ namespace boost
   }
 
 
-  /**
-   * Address: 0x005791E0 (FUN_005791E0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullCHeightField(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x005CD5B0 (FUN_005CD5B0, boost::detail::sp_counted_impl_p<Moho::CIntelGrid>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullCIntelGrid(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
 
   /**
    * Address: 0x00755FD0 (FUN_00755FD0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::get_deleter)
