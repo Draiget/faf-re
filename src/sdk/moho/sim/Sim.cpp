@@ -3877,6 +3877,12 @@ namespace
     return FindCommandIssueHelperInManager(commandManager, cmdId);
   }
 
+} // namespace
+
+// External linkage: moho::ISSUE_FactoryCommand (CWldSession.cpp) references
+// this as moho::, so an anonymous-namespace body here could never resolve it.
+namespace moho
+{
   /**
    * Address: 0x008B5B50 (FUN_008B5B50, struct_CommandManager::NextCmdId)
    *
@@ -3906,6 +3912,10 @@ namespace
     *outCommandId = nextLowId | (static_cast<std::uint32_t>(commandManager->mSourceId) << 24u);
     return outCommandId;
   }
+} // namespace moho
+
+namespace
+{
 
   constexpr std::uint32_t kCommandIssueUpdateEventTypeIncreaseCount = 1u;
   constexpr std::uint32_t kCommandIssueUpdateEventTypeDecreaseCount = 2u;
