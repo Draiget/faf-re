@@ -2839,60 +2839,6 @@ namespace boost
     return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
   }
 
-  /**
-   * Address: 0x007FF6B0 (FUN_007FF6B0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for
-   * `ID3DVertexSheet`.
-   */
-  SpCountedImplStorage<moho::ID3DVertexSheet>* SpCountedImplPConstructID3DVertexSheet(
-    SpCountedImplStorage<moho::ID3DVertexSheet>* const countedImpl,
-    moho::ID3DVertexSheet* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x008142A0 (FUN_008142A0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `ShoreCell`.
-   */
-  SpCountedImplStorage<moho::ShoreCell>* SpCountedImplPConstructShoreCell(
-    SpCountedImplStorage<moho::ShoreCell>* const countedImpl,
-    moho::ShoreCell* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
-
-  /**
-   * Address: 0x00832A00 (FUN_00832A00, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::sp_counted_impl_p)
-   *
-   * What it does:
-   * Initializes one recovered shared-count control block for `MeshInstance`.
-   */
-  SpCountedImplStorage<moho::MeshInstance>* SpCountedImplPConstructMeshInstance(
-    SpCountedImplStorage<moho::MeshInstance>* const countedImpl,
-    moho::MeshInstance* const ownedPointee
-  ) noexcept
-  {
-    if (countedImpl == nullptr) {
-      return nullptr;
-    }
-
-    return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtable(), ownedPointee);
-  }
 
   /**
    * Address: 0x008847F0 (FUN_008847F0, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::sp_counted_impl_pd)
@@ -3501,47 +3447,6 @@ namespace boost
     return InitializeSpCountedBaseLaneForRScmResource(control);
   }
 
-  /**
-   * Address: 0x007FF710 (FUN_007FF710)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `ID3DVertexSheet` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForID3DVertexSheet(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
-
-  /**
-   * Address: 0x00814300 (FUN_00814300)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `ShoreCell` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForShoreCell(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
-
-  /**
-   * Address: 0x00832A60 (FUN_00832A60)
-   *
-   * What it does:
-   * Restores one abstract `sp_counted_base` vtable lane used by the
-   * `MeshInstance` control-block init path.
-   */
-  detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshInstance(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return InitializeSpCountedBaseLaneForRScmResource(control);
-  }
 
   /**
    * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
@@ -3719,47 +3624,6 @@ namespace boost
     DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
   }
 
-  /**
-   * Address: 0x007FF6D0 (FUN_007FF6D0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::dispose)
-   *
-   * What it does:
-   * Releases one owned `ID3DVertexSheet` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeID3DVertexSheet(
-    SpCountedImplStorage<moho::ID3DVertexSheet>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
-   * Address: 0x008142C0 (FUN_008142C0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::dispose)
-   *
-   * What it does:
-   * Releases one owned `ShoreCell` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeShoreCell(
-    SpCountedImplStorage<moho::ShoreCell>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
-
-  /**
-   * Address: 0x00832A20 (FUN_00832A20, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::dispose)
-   *
-   * What it does:
-   * Releases one owned `MeshInstance` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeMeshInstance(
-    SpCountedImplStorage<moho::MeshInstance>* const countedImpl
-  ) noexcept
-  {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
-  }
 
   /**
    * Address: 0x00884F10 (FUN_00884F10, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::dispose)
@@ -4166,50 +4030,6 @@ namespace boost
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
 
-  /**
-   * Address: 0x007FF6F0 (FUN_007FF6F0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::ID3DVertexSheet>* SpCountedImplPDeletingDtorID3DVertexSheet(
-    SpCountedImplStorage<moho::ID3DVertexSheet>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x008142E0 (FUN_008142E0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::ShoreCell>* SpCountedImplPDeletingDtorShoreCell(
-    SpCountedImplStorage<moho::ShoreCell>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x00832A40 (FUN_00832A40, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::MeshInstance>* SpCountedImplPDeletingDtorMeshInstance(
-    SpCountedImplStorage<moho::MeshInstance>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
 
   /**
    * Address: 0x00884870 (FUN_00884870, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::dtr)
@@ -4642,44 +4462,6 @@ namespace boost
     return SpCountedImplGetDeleterNullResult(requestedType);
   }
 
-  /**
-   * Address: 0x007FF6E0 (FUN_007FF6E0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullID3DVertexSheet(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x008142D0 (FUN_008142D0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullShoreCell(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
-
-  /**
-   * Address: 0x00832A30 (FUN_00832A30, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  void* SpCountedImplPGetDeleterNullMeshInstance(
-    detail::sp_typeinfo const& requestedType
-  ) noexcept
-  {
-    return SpCountedImplGetDeleterNullResult(requestedType);
-  }
 
   /**
    * Address: 0x00884F20 (FUN_00884F20, boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::get_deleter)

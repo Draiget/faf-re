@@ -1148,40 +1148,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007FF6B0 (FUN_007FF6B0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `ID3DVertexSheet`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::ID3DVertexSheet>* SpCountedImplPConstructID3DVertexSheet(
-        SpCountedImplStorage<moho::ID3DVertexSheet>* countedImpl,
-        moho::ID3DVertexSheet* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x008142A0 (FUN_008142A0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `ShoreCell`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::ShoreCell>* SpCountedImplPConstructShoreCell(
-        SpCountedImplStorage<moho::ShoreCell>* countedImpl,
-        moho::ShoreCell* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x00832A00 (FUN_00832A00, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `MeshInstance`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::MeshInstance>* SpCountedImplPConstructMeshInstance(
-        SpCountedImplStorage<moho::MeshInstance>* countedImpl,
-        moho::MeshInstance* ownedPointee
-    ) noexcept;
-
-    /**
      * Address: 0x008847F0 (FUN_008847F0, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::sp_counted_impl_pd)
      *
      * What it does:
@@ -1488,39 +1454,6 @@ namespace boost
      * `CD3DPrimBatcher` control-block init path.
      */
     [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCD3DPrimBatcher(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x007FF710 (FUN_007FF710)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `ID3DVertexSheet` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForID3DVertexSheet(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00814300 (FUN_00814300)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `ShoreCell` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForShoreCell(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00832A60 (FUN_00832A60)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `MeshInstance` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForMeshInstance(
         detail::sp_counted_base* control
     ) noexcept;
 
@@ -1833,39 +1766,6 @@ namespace boost
      */
     void SpCountedImplPDisposeIRenTerrain(
         SpCountedImplStorage<moho::IRenTerrain>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x007FF6D0 (FUN_007FF6D0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::dispose)
-     *
-     * What it does:
-     * Releases one owned `ID3DVertexSheet` pointee through its scalar-deleting
-     * virtual destructor lane when present.
-     */
-    void SpCountedImplPDisposeID3DVertexSheet(
-        SpCountedImplStorage<moho::ID3DVertexSheet>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x008142C0 (FUN_008142C0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::dispose)
-     *
-     * What it does:
-     * Releases one owned `ShoreCell` pointee through its scalar-deleting
-     * virtual destructor lane when present.
-     */
-    void SpCountedImplPDisposeShoreCell(
-        SpCountedImplStorage<moho::ShoreCell>* countedImpl
-    ) noexcept;
-
-    /**
-     * Address: 0x00832A20 (FUN_00832A20, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::dispose)
-     *
-     * What it does:
-     * Releases one owned `MeshInstance` pointee through its scalar-deleting
-     * virtual destructor lane when present.
-     */
-    void SpCountedImplPDisposeMeshInstance(
-        SpCountedImplStorage<moho::MeshInstance>* countedImpl
     ) noexcept;
 
     /**
@@ -2228,39 +2128,6 @@ namespace boost
     ) noexcept;
 
     /**
-     * Address: 0x007FF6F0 (FUN_007FF6F0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<ID3DVertexSheet>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::ID3DVertexSheet>* SpCountedImplPDeletingDtorID3DVertexSheet(
-        SpCountedImplStorage<moho::ID3DVertexSheet>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x008142E0 (FUN_008142E0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<ShoreCell>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::ShoreCell>* SpCountedImplPDeletingDtorShoreCell(
-        SpCountedImplStorage<moho::ShoreCell>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x00832A40 (FUN_00832A40, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<MeshInstance>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::MeshInstance>* SpCountedImplPDeletingDtorMeshInstance(
-        SpCountedImplStorage<moho::MeshInstance>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
      * Address: 0x00884870 (FUN_00884870, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::dtr)
      *
      * What it does:
@@ -2445,36 +2312,6 @@ namespace boost
      * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
      */
     [[nodiscard]] void* SpCountedImplPGetDeleterNullCD3DPrimBatcher(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x007FF6E0 (FUN_007FF6E0, boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullID3DVertexSheet(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x008142D0 (FUN_008142D0, boost::detail::sp_counted_impl_p<Moho::ShoreCell>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullShoreCell(
-        detail::sp_typeinfo const& requestedType
-    ) noexcept;
-
-    /**
-     * Address: 0x00832A30 (FUN_00832A30, boost::detail::sp_counted_impl_p<Moho::MeshInstance>::get_deleter)
-     *
-     * What it does:
-     * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-     */
-    [[nodiscard]] void* SpCountedImplPGetDeleterNullMeshInstance(
         detail::sp_typeinfo const& requestedType
     ) noexcept;
 
