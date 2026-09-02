@@ -527,7 +527,18 @@ namespace moho
       return self->mCompositeTransform;
     }
 
-    if (self->mCompositeIsLocal != 0u) {
+    // Branch polarity is the binary's, at 0x0054BED1..0x0054BF0C: a NON-ZERO
+    // `mCompositeIsLocal` takes the local-only path (0x0054BED7 copies
+    // `mLocalTransform` at +0x20 straight into `mCompositeTransform` at +0x00),
+    // and a ZERO one falls through to `loc_54BF0C`, which composes against the
+    // parent bone (+0x44) or, with no parent, against the owning pose's root
+    // transform (`[esi+40h] + 0x0C` == `CAniPose::mLocalTransform`).
+    //
+    // These two arms were swapped here. Skeleton bones carry the flag clear, so
+    // every bone took the local-only arm, the pose root was never folded in,
+    // and every skinned mesh was posed at the world origin - which is why units
+    // were submitted to D3D each frame and never appeared.
+    if (self->mCompositeIsLocal == 0u) {
       if (self->mParent != nullptr) {
         self->mCompositeTransform = VTransform::Compose(self->mLocalTransform, self->mParent->GetCompositeTransform());
       } else if (self->mPose != nullptr) {
