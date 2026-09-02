@@ -488,6 +488,13 @@ namespace
   constexpr const char* kConsoleStartupSCStopMemoryLogDescription = "Stop memory logging";
   moho::CConFunc gCConFunc_SC_StopMemoryLog{};
 
+  /**
+   * Address: 0x00C08F10 (FUN_00C08F10, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_StartMemoryLog`.
+   */
   void cleanup_CConFunc_SC_StartMemoryLog()
   {
     moho::CleanupStartupConCommand(gCConFunc_SC_StartMemoryLog);
@@ -501,6 +508,13 @@ namespace
     (void)std::atexit(&cleanup_CConFunc_SC_StartMemoryLog);
   }
 
+  /**
+   * Address: 0x00C08F40 (FUN_00C08F40, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_StopMemoryLog`.
+   */
   void cleanup_CConFunc_SC_StopMemoryLog()
   {
     moho::CleanupStartupConCommand(gCConFunc_SC_StopMemoryLog);
