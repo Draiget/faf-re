@@ -3372,3 +3372,255 @@ namespace moho
     RegisterAtexitCleanup<&cleanup_DestroyAll_SimConFunc>();
   }
 } // namespace moho
+
+namespace
+{
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimLog_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimWarn_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimError_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimAssert_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimCrash_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_SimLua_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugMoveCamera_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00C00930 (FUN_00C00930, cleanup_SimLog_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimLog` sim-command callback object.
+   */
+  void cleanup_SimLog_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimLog_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDB440 (FUN_00BDB440, register_SimLog_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimLog` sim command callback (bound to the already-recovered
+   * `Sim::Log`) and attaches startup cleanup.
+   */
+  void register_SimLog_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::Log>(SimConFunc_SimLog_slot(), "SimLog");
+    RegisterAtexitCleanup<&cleanup_SimLog_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C00990 (FUN_00C00990, cleanup_SimWarn_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimWarn` sim-command callback object.
+   */
+  void cleanup_SimWarn_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimWarn_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDB4B0 (FUN_00BDB4B0, register_SimWarn_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimWarn` sim command callback and attaches startup cleanup.
+   */
+  void register_SimWarn_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::SimWarn>(SimConFunc_SimWarn_slot(), "SimWarn");
+    RegisterAtexitCleanup<&cleanup_SimWarn_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C009F0 (FUN_00C009F0, cleanup_SimError_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimError` sim-command callback object.
+   */
+  void cleanup_SimError_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimError_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDB520 (FUN_00BDB520, register_SimError_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimError` sim command callback and attaches startup cleanup.
+   */
+  void register_SimError_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::SimError>(SimConFunc_SimError_slot(), "SimError");
+    RegisterAtexitCleanup<&cleanup_SimError_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C00A50 (FUN_00C00A50, cleanup_SimAssert_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimAssert` sim-command callback object.
+   */
+  void cleanup_SimAssert_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimAssert_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDB590 (FUN_00BDB590, register_SimAssert_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimAssert` sim command callback and attaches startup cleanup.
+   */
+  void register_SimAssert_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::SimAssert>(SimConFunc_SimAssert_slot(), "SimAssert");
+    RegisterAtexitCleanup<&cleanup_SimAssert_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C00AB0 (FUN_00C00AB0, cleanup_SimCrash_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimCrash` sim-command callback object.
+   */
+  void cleanup_SimCrash_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimCrash_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDB600 (FUN_00BDB600, register_SimCrash_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimCrash` sim command callback and attaches startup cleanup.
+   */
+  void register_SimCrash_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::SimCrash>(SimConFunc_SimCrash_slot(), "SimCrash");
+    RegisterAtexitCleanup<&cleanup_SimCrash_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C01260 (FUN_00C01260, cleanup_SimLua_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `SimLua` sim-command callback object.
+   */
+  void cleanup_SimLua_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_SimLua_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDBF40 (FUN_00BDBF40, register_SimLua_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `SimLua` sim command callback (bound to the already-recovered
+   * `Sim::SimLua`) and attaches startup cleanup.
+   */
+  void register_SimLua_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::SimLua>(SimConFunc_SimLua_slot(), "SimLua");
+    RegisterAtexitCleanup<&cleanup_SimLua_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C01380 (FUN_00C01380, cleanup_DebugMoveCamera_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `DebugMoveCamera` sim-command callback object.
+   */
+  void cleanup_DebugMoveCamera_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_DebugMoveCamera_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00BDC250 (FUN_00BDC250, register_DebugMoveCamera_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `DebugMoveCamera` sim command callback (bound to the
+   * already-recovered `Sim::DebugMoveCamera`) and attaches startup cleanup.
+   */
+  void register_DebugMoveCamera_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::DebugMoveCamera>(SimConFunc_DebugMoveCamera_slot(), "DebugMoveCamera");
+    RegisterAtexitCleanup<&cleanup_DebugMoveCamera_SimConFunc>();
+  }
+} // namespace moho
+
+namespace
+{
+  struct SimConFuncMiscBootstrap
+  {
+    SimConFuncMiscBootstrap()
+    {
+      moho::register_SimLog_SimConFuncDef();
+      moho::register_SimWarn_SimConFuncDef();
+      moho::register_SimError_SimConFuncDef();
+      moho::register_SimAssert_SimConFuncDef();
+      moho::register_SimCrash_SimConFuncDef();
+      moho::register_SimLua_SimConFuncDef();
+      moho::register_DebugMoveCamera_SimConFuncDef();
+    }
+  };
+
+  [[maybe_unused]] SimConFuncMiscBootstrap gSimConFuncMiscBootstrap;
+} // namespace
