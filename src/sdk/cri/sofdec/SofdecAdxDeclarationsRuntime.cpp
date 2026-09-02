@@ -998,8 +998,15 @@
     std::int32_t(__cdecl*)(std::int32_t adxtRuntime, std::int32_t sampleRate, std::int32_t channelCount, std::int32_t sampleCount);
   AdxtEndDecodeInfoCallback ADXT_SetCbEndDecinfo(AdxtEndDecodeInfoCallback callback);
   void adxt_stat_playend();
+  std::int32_t adxt_stat_decinfo(void* adxtRuntime);
+  std::int32_t adxt_stat_prep(void* adxtRuntime);
   std::int32_t adxt_stat_playing(void* adxtRuntime);
   std::int32_t adxt_stat_decend(void* adxtRuntime);
+  std::int32_t adxt_trap_entry_lps(void* adxtRuntime);
+  std::int32_t adxt_trap_entry(void* adxtRuntime);
+  std::int32_t adxt_nlp_trap_entry(void* adxtRuntime);
+  int ADX_ScanInfoCode(const std::uint8_t* sourceBytes, std::int32_t sourceLength, std::int16_t* outOffset);
+  std::int32_t ADXAMP_SetSfreq(void* channelExpandHandle, std::int32_t sampleRate);
   void adxt_StartSj(void* adxtRuntime, void* sourceJoinHandle);
   void adxt_ResetEntry(void* adxtRuntime);
   /**
@@ -4771,9 +4778,9 @@ namespace
 
   struct AdxtDecodeSourceHandle : AdxtDestroyableHandle
   {
-    virtual void Reserved18() = 0;
-    virtual void Reserved1C() = 0;
-    virtual void Reserved20() = 0;
+    virtual void AcquireChunk(std::int32_t lane, std::int32_t requestedBytes, SjChunkRange* outChunkRange) = 0; // +0x18
+    virtual void ReturnChunk(std::int32_t lane, const SjChunkRange* chunkRange) = 0; // +0x1C
+    virtual void CommitChunk(std::int32_t lane, const SjChunkRange* chunkRange) = 0; // +0x20
     virtual std::int32_t QueryDecodeBacklog(std::int32_t lane) = 0; // +0x24
   };
 
@@ -5030,6 +5037,36 @@ namespace
     [[nodiscard]] std::int32_t& StreamDecodeWindowState()
     {
       return streamDecodeWindowState;
+    }
+
+    [[nodiscard]] std::int32_t& LoopLeadInPadSamples()
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(this);
+      return *reinterpret_cast<std::int32_t*>(base + 0x50);
+    }
+
+    [[nodiscard]] const char*& LinkRestartFileName()
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(this);
+      return *reinterpret_cast<const char**>(base + 0xB0);
+    }
+
+    [[nodiscard]] std::int32_t& LinkRestartStartOffset()
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(this);
+      return *reinterpret_cast<std::int32_t*>(base + 0xB4);
+    }
+
+    [[nodiscard]] std::int32_t& LinkRestartRangeStart()
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(this);
+      return *reinterpret_cast<std::int32_t*>(base + 0xB8);
+    }
+
+    [[nodiscard]] std::int32_t& LinkRestartRangeEnd()
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(this);
+      return *reinterpret_cast<std::int32_t*>(base + 0xBC);
     }
   };
 
@@ -7195,6 +7232,10 @@ namespace
   constexpr const char* kAdxtDestroyParameterErrorMessage = "E02080805 adxt_Destroy: parameter error";
   constexpr const char* kAdxtStopParameterErrorMessage = "E02080813 adxt_Stop: parameter error";
   constexpr const char* kAdxtGetStatParameterErrorMessage = "E02080814 adxt_GetStat: parameter error";
+  constexpr const char* kAdxtExecHndlParameterErrorMessage = "E02080842 adxt_ExecHndl: parameter error";
+  constexpr const char* kAdxtStatDecinfoChannelCountMessage =
+    "E9081001 adxt_stat_decinfo: can't play this number of channels";
+  constexpr const char* kAdxtTrapEntryNotEnoughDataMessage = "E8101201 adxt_trap_entry: not enough data";
   constexpr const char* kAdxtGetNumSmplParameterErrorMessage = "E02080817 adxt_GetNumSmpl: parameter error";
   constexpr const char* kAdxtGetSfreqParameterErrorMessage = "E02080819 adxt_GetSfreq: parameter error";
   constexpr const char* kAdxtGetNumChanParameterErrorMessage = "E02080820 adxt_GetNumChan: parameter error";
