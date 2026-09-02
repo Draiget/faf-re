@@ -8942,7 +8942,7 @@
    * Thunk lane that forwards one global ADXRNA pause-all state update into
    * `FUN_00B15530`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetPauseAllStateAdapter(const std::int32_t pauseAllEnabled)
+  std::int32_t ADXRNA_SetPauseAllStateAdapter(const std::int32_t pauseAllEnabled)
   {
     return adxrna_SetPauseAllState(pauseAllEnabled);
   }
@@ -9786,11 +9786,13 @@
    * Address: 0x00B0E6F0 (FUN_00B0E6F0, _adxt_PauseAll)
    *
    * What it does:
-   * Forwards global ADXT pause-all state to ADXRNA pause-all runtime lanes.
+   * Forwards global ADXT pause-all state to ADXRNA pause-all runtime lanes,
+   * through the ADXRNA-side adapter thunk (a pure 5-byte `jmp` in the real
+   * binary, not a direct call to `adxrna_SetPauseAllState`).
    */
   std::int32_t adxt_PauseAll(const std::int32_t pauseAllEnabled)
   {
-    return adxrna_SetPauseAllState(pauseAllEnabled);
+    return ADXRNA_SetPauseAllStateAdapter(pauseAllEnabled);
   }
 
   /**
