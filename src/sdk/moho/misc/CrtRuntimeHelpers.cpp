@@ -330,10 +330,8 @@ extern "C" int __cdecl _SFUO_Destroy()
 // C++ overload. Unit.cpp/CWldSession.cpp/PathTables.cpp's forward
 // declarations all use the plain form; this must match or every one of
 // them is a permanently-unresolved external.
-[[noreturn]] void RuntimeThrowContainerTooLong(const char* message)
-{
-  throw std::length_error(message);
-}
+// MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp: this TU is excluded from
+// the build, and RuntimeThrowContainerTooLong has live callers.
 
 namespace
 {
@@ -2890,10 +2888,9 @@ extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(
  * What it does:
  * Parses one base-10 signed wide integer by forwarding to `wcstol`.
  */
-extern "C" int __cdecl RuntimeWtoiFromWide(const wchar_t* const text)
-{
-  return static_cast<int>(::wcstol(text, nullptr, 10));
-}
+// MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp (this TU is excluded from
+// the build; the helper has live callers).
+
 
 /**
  * Address: 0x00A8FC71 (FUN_00A8FC71, _wtoi thunk lane)
@@ -2901,10 +2898,9 @@ extern "C" int __cdecl RuntimeWtoiFromWide(const wchar_t* const text)
  * What it does:
  * Tail-forwards one `_wtoi` thunk lane into `RuntimeWtoiFromWide`.
  */
-extern "C" int __cdecl RuntimeWtoiFromWideThunk(const wchar_t* const text)
-{
-  return RuntimeWtoiFromWide(text);
-}
+// MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp (this TU is excluded from
+// the build; the helper has live callers).
+
 
 /**
  * Address: 0x00A8FC5C (FUN_00A8FC5C, _wtoi_l wrapper lane)
@@ -6920,10 +6916,9 @@ extern "C" unsigned char* __cdecl _mbschr(const unsigned char* const text, const
  *   - `WxRuntimeTypes.cpp:49627` (typed wxString lowercase loop) calls
  *     this helper for each character in a wide-string argument.
  */
-int RuntimeToLowerWideWithCurrentLocale(const wchar_t character)
-{
-  return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
-}
+// MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp (this TU is excluded from
+// the build; the helper has live callers).
+
 
 namespace
 {
@@ -8489,18 +8484,8 @@ extern "C" std::int64_t __cdecl __ftol2(const double value)
  * that position, or null when absent. Searching the terminator itself finds it,
  * because the backward scan starts there.
  */
-extern "C" wchar_t* __cdecl RuntimeWideStringFindLast(wchar_t* const text, const wchar_t needle)
-{
-  wchar_t* cursor = text;
-  while (*cursor++ != L'\0') {
-  }
-
-  do {
-    --cursor;
-  } while (cursor != text && *cursor != needle);
-
-  return (*cursor == needle) ? cursor : nullptr;
-}
+// MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp (this TU is excluded from
+// the build; the helper has live callers).
 
 /**
  * Address: 0x00B57ED0 (FUN_00B57ED0, func_SofdecToInt)

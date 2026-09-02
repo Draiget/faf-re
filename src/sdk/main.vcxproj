@@ -277,6 +277,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="moho\misc\CrtRuntimeExportedHelpers.cpp" />
     <ClCompile Include="moho\misc\WxCrtBridge.cpp" />
     <ClCompile Include="moho\misc\RuntimeTuningGlobals.cpp" />
     <ClCompile Include="moho\misc\DName.cpp" />
