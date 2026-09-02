@@ -234,7 +234,6 @@ extern "C" {
   void* adxf_SetFileInfoEx() { return nullptr; }
   void* adxf_Stop() { return nullptr; }
   void* adxt_Create() { return nullptr; }
-  void* adxt_ExecHndl() { return nullptr; }
   void* adxt_GetTime() { return nullptr; }
   void* adxt_Pause() { return nullptr; }
   void* ahxexecfunc() { return nullptr; }

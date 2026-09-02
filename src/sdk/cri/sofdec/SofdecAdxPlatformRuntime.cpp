@@ -8072,7 +8072,7 @@
    * Rebinds ADXT stream file range and starts stream + SJ decode chain for one
    * runtime object.
    */
-  [[maybe_unused]] std::int32_t adxt_start_stm(
+  std::int32_t adxt_start_stm(
     void* const adxtRuntime,
     const char* const fileName,
     const std::int32_t startOffset,
@@ -8693,7 +8693,7 @@
    * Applies lane-`4` stream-header word, snapshots dispatch-derived header
    * lanes, and refreshes ADXRNA bit-depth/sample-rate mirrors.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetStreamHeaderLane4(
+  std::int32_t ADXRNA_SetStreamHeaderLane4(
     const std::int32_t rnaHandle,
     const std::int32_t lane4Word,
     std::int32_t* const inOutLane4Word
@@ -8746,9 +8746,11 @@
    * Address: 0x00B17C90 (FUN_00B17C90, _ADXRNA_GetNumRoom)
    *
    * What it does:
-   * Returns unconstrained room sentinel used by ADXRNA prep lanes.
+   * Returns unconstrained room sentinel used by ADXRNA prep lanes. Legacy
+   * thunk for this build: the RNA handle argument is pushed by every caller
+   * (cdecl ABI) but never read by the real `retn`-only body.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetNumRoom()
+  std::int32_t ADXRNA_GetNumRoom([[maybe_unused]] const std::int32_t rnaHandle)
   {
     return 0x7FFFFFFF;
   }
@@ -8782,7 +8784,7 @@
    * What it does:
    * Legacy thunk to ADXRNA channel-count setter.
    */
-  [[maybe_unused]] void ADXRNA_SetNumChan(const std::int32_t rnaHandle, const std::int32_t channelCount)
+  void ADXRNA_SetNumChan(const std::int32_t rnaHandle, const std::int32_t channelCount)
   {
     mwRnaSetNumChan(AsAdxrnaRuntimeView(rnaHandle), channelCount);
   }
@@ -10183,9 +10185,14 @@
    * Address: 0x00B17DD0 (FUN_00B17DD0, _ADXRNA_SetTotalNumSmpl)
    *
    * What it does:
-   * Legacy ADXRNA total-sample hook for this build; no runtime behavior.
+   * Legacy ADXRNA total-sample hook for this build; no runtime behavior. Both
+   * arguments are pushed by the real caller (cdecl ABI) but never read by the
+   * real `retn`-only body.
    */
-  [[maybe_unused]] void ADXRNA_SetTotalNumSmpl()
+  void ADXRNA_SetTotalNumSmpl(
+    [[maybe_unused]] const std::int32_t rnaHandle,
+    [[maybe_unused]] const std::int32_t totalNumSmpl
+  )
   {
   }
 
@@ -10197,6 +10204,19 @@
    */
   [[maybe_unused]] void ADXRNA_SetWavFname()
   {
+  }
+
+  /**
+   * Address: 0x00B17DF0 (FUN_00B17DF0, _ADXRNA_SetStmHdInfo)
+   *
+   * What it does:
+   * Applies lane-`4` stream-header word through `ADXRNA_SetStreamHeaderLane4`
+   * and returns the lane's refreshed status word.
+   */
+  std::int32_t ADXRNA_SetStmHdInfo(const std::int32_t rnaHandle, const std::int32_t lane4Word)
+  {
+    std::int32_t lane4StatusWord = lane4Word;
+    return ADXRNA_SetStreamHeaderLane4(rnaHandle, lane4Word, &lane4StatusWord);
   }
 
   /**
@@ -12562,6 +12582,85 @@
   }
 
   /**
+   * Address: 0x00B1A230 (FUN_00B1A230, _adxt_trap_entry_lps)
+   *
+   * What it does:
+   * ADXSJD trap callback for the pre-loop-splice case: snapshots decode
+   * state, arms the trap window across the loop span, and re-enters the
+   * general loop-boundary trap callback (`adxt_trap_entry`) at the loop
+   * point itself.
+   */
+  std::int32_t adxt_trap_entry_lps(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const std::int32_t sjdHandle = runtime->sjdHandle;
+
+    const std::int32_t loopStartPos = ADXSJD_GetLpStartPos(sjdHandle);
+    const std::int32_t loopStartOffset = ADXSJD_GetLpStartOfst(sjdHandle);
+    const std::int32_t loopEndPos = ADXSJD_GetLpEndPos(sjdHandle);
+    ADXSJD_TakeSnapshot(sjdHandle);
+    ADXSJD_SetTrapCnt(sjdHandle, 0);
+    runtime->StreamLoopStartSample() = loopEndPos - loopStartPos;
+    ADXSJD_SetTrapNumSmpl(sjdHandle, loopEndPos - loopStartPos);
+    ADXSJD_SetTrapDtLen(sjdHandle, loopStartOffset);
+    ADXSJD_SetDecPos(sjdHandle, loopStartPos);
+    return ADXSJD_EntryTrapFunc(
+      sjdHandle,
+      reinterpret_cast<void*>(adxt_trap_entry),
+      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime))
+    );
+  }
+
+  /**
+   * Address: 0x00B1A2A0 (FUN_00B1A2A0, _adxt_trap_entry)
+   *
+   * What it does:
+   * ADXSJD trap callback for the general loop-boundary case: re-arms the
+   * trap window at the loop span, re-syncs the seamless stream-join lane's
+   * read cursor by the loop lead-in pad, and (in AFS/file-join mode)
+   * re-primes the lane at the loop start offset before restoring the SJD
+   * decode snapshot.
+   */
+  std::int32_t adxt_trap_entry(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const std::int32_t sjdHandle = runtime->sjdHandle;
+    AdxtStreamJoinHandle* const streamJoinHandle = runtime->streamJoinInputHandle;
+
+    const std::int32_t loopStartPos = ADXSJD_GetLpStartPos(sjdHandle);
+    const std::int32_t loopStartOffset = ADXSJD_GetLpStartOfst(sjdHandle);
+    const std::int32_t loopEndPos = ADXSJD_GetLpEndPos(sjdHandle);
+    const auto pmode = static_cast<std::uint8_t>(runtime->mUnknown02);
+
+    if ((pmode == 2u || pmode == 3u) && runtime->StreamLoopSeekOnEosFlag() == 0u) {
+      return ADXSJD_SetTrapNumSmpl(sjdHandle, -1);
+    }
+
+    SjChunkRange skipChunk{};
+    streamJoinHandle->AcquireChunk(1, runtime->LoopLeadInPadSamples(), &skipChunk);
+    if (skipChunk.byteCount < runtime->LoopLeadInPadSamples()) {
+      (void)ADXERR_CallErrFunc1_(kAdxtTrapEntryNotEnoughDataMessage);
+    }
+    streamJoinHandle->CommitChunk(0, &skipChunk);
+
+    ADXSJD_SetTrapCnt(sjdHandle, 0);
+    runtime->StreamLoopStartSample() = loopEndPos - loopStartPos;
+    ADXSJD_SetTrapNumSmpl(sjdHandle, loopEndPos - loopStartPos);
+    ADXSJD_SetTrapDtLen(sjdHandle, loopStartOffset);
+    ADXSJD_SetDecPos(sjdHandle, loopStartPos);
+
+    if (pmode == 2u) {
+      streamJoinHandle->OnSeamlessStart();
+      SjChunkRange primeChunk{};
+      streamJoinHandle->AcquireChunk(1, loopStartOffset, &primeChunk);
+      streamJoinHandle->CommitChunk(0, &primeChunk);
+    }
+
+    ADXSJD_RestoreSnapshot(sjdHandle);
+    return ++runtime->StreamStartScratchWord();
+  }
+
+  /**
    * Address: 0x00B1A3B0 (FUN_00B1A3B0, _adxt_eos_entry)
    *
    * What it does:
@@ -12610,6 +12709,100 @@
   }
 
   /**
+   * Address: 0x00B1A480 (FUN_00B1A480, _adxt_nlp_trap_entry)
+   *
+   * What it does:
+   * ADXSJD trap callback that runs only while a link-switch is requested:
+   * probes up to two lanes of pending stream-join data for a trailing footer
+   * marker and an embedded info code, splits whichever lane holds the split
+   * point at the scan boundary, commits the front half and returns the back
+   * half to the stream-join lane, then restarts SJD decode and re-arms the
+   * decode-end trap once the lane reaches its prep state.
+   */
+  std::int32_t adxt_nlp_trap_entry(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    if (runtime->linkSwitchRequested == 0u) {
+      return 0;
+    }
+
+    const std::int32_t sjdHandle = runtime->sjdHandle;
+    AdxtStreamJoinHandle* const streamJoinHandle = runtime->streamJoinInputHandle;
+
+    SjChunkRange chunkA{};
+    streamJoinHandle->AcquireChunk(1, 0x7FFFFFFF, &chunkA);
+    SjChunkRange chunkB{};
+    streamJoinHandle->AcquireChunk(1, 0x7FFFFFFF, &chunkB);
+
+    std::int16_t footerBytes = 0;
+    const int decodedFooter = ADX_DecodeFooter(
+      reinterpret_cast<const std::uint8_t*>(SjAddressToPointer(chunkA.bufferAddress)),
+      chunkA.byteCount,
+      &footerBytes
+    );
+    if (decodedFooter != 0) {
+      (void)ADXT_SetLnkSw(runtime, 0);
+      streamJoinHandle->ReturnChunk(1, &chunkB);
+      streamJoinHandle->ReturnChunk(1, &chunkA);
+      return 0;
+    }
+
+    std::int16_t scanOffsetA = 0;
+    const int scanResultA = ADX_ScanInfoCode(
+      reinterpret_cast<const std::uint8_t*>(SjAddressToPointer(chunkA.bufferAddress + footerBytes)),
+      chunkA.byteCount - footerBytes,
+      &scanOffsetA
+    );
+
+    std::int16_t scanOffsetB = 0;
+    int scanResultB = -1;
+    if (scanResultA != 0) {
+      scanResultB = ADX_ScanInfoCode(
+        reinterpret_cast<const std::uint8_t*>(SjAddressToPointer(chunkB.bufferAddress)),
+        chunkB.byteCount,
+        &scanOffsetB
+      );
+    }
+
+    const std::int32_t splitBytesA = footerBytes + scanOffsetA;
+
+    if (scanResultA == 0) {
+      streamJoinHandle->ReturnChunk(1, &chunkB);
+
+      SjChunkRange splitTailA{};
+      (void)SJ_SplitChunk(&chunkA, splitBytesA, &chunkA, &splitTailA);
+      streamJoinHandle->CommitChunk(0, &chunkA);
+      streamJoinHandle->ReturnChunk(1, &splitTailA);
+    } else if (scanResultB != 0) {
+      streamJoinHandle->ReturnChunk(1, &chunkB);
+      streamJoinHandle->ReturnChunk(1, &chunkA);
+      return ADXT_SetLnkSw(runtime, 0);
+    } else {
+      streamJoinHandle->CommitChunk(0, &chunkA);
+
+      SjChunkRange splitTailB{};
+      (void)SJ_SplitChunk(&chunkB, scanOffsetB, &chunkB, &splitTailB);
+      streamJoinHandle->CommitChunk(0, &chunkB);
+      streamJoinHandle->ReturnChunk(1, &splitTailB);
+    }
+
+    runtime->PlaybackTimeDeltaFrames() += ADXSJD_GetDecNumSmpl(sjdHandle);
+    ADXSJD_Stop(sjdHandle);
+    ADXSJD_Start(sjdHandle);
+    ADXSJD_ExecHndl(AsAdxsjdRuntimeView(sjdHandle));
+
+    if (ADXSJD_GetStat(sjdHandle) != 2) {
+      return ADXT_SetLnkSw(runtime, 0);
+    }
+
+    ADXSJD_SetMaxDecSmpl(sjdHandle, runtime->TransposeDecodeWindowSamples());
+    const std::int32_t totalNumSmpl = ADXSJD_GetTotalNumSmpl(sjdHandle);
+    ADXSJD_SetTrapNumSmpl(sjdHandle, totalNumSmpl);
+    ADXSJD_SetTrapDtLen(sjdHandle, 0);
+    return ADXSJD_SetTrapCnt(sjdHandle, 0);
+  }
+
+  /**
    * Address: 0x00B1A9C0 (FUN_00B1A9C0, _ADXT_SetCbEndDecinfo)
    *
    * What it does:
@@ -12620,6 +12813,206 @@
     const auto previousCallback = adxt_enddecinfo_cbfn;
     adxt_enddecinfo_cbfn = callback;
     return previousCallback;
+  }
+
+  /**
+   * Address: 0x00B1A6A0 (FUN_00B1A6A0, _adxt_stat_decinfo)
+   *
+   * What it does:
+   * Runs the ADXT decode-info state: on entry from a pending link-switch it
+   * restarts the stream at the cached restart parameters, then reads back
+   * SJD stream stats to size the decode window, arm the non-looping or
+   * looping trap callback, push channel/sample-rate/format info into RNA,
+   * reapply transpose/output-pan/volume, and invoke the decode-info-complete
+   * callback before advancing to the prep state. Reports and stops playback
+   * when the stream carries more channels than this ADXT lane supports.
+   */
+  std::int32_t adxt_stat_decinfo(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const std::int32_t sjdHandle = runtime->sjdHandle;
+
+    if (static_cast<std::uint8_t>(runtime->mUnknown02) <= 1u && runtime->linkSwitchActive == 1u) {
+      const std::int32_t streamStat = ADXSTM_GetStat(runtime->streamHandle);
+      if (streamStat == 2) {
+        return streamStat;
+      }
+
+      if (runtime->sourceRingHandle != nullptr) {
+        runtime->sourceRingHandle->Destroy();
+      }
+
+      (void)adxt_start_stm(
+        runtime,
+        runtime->LinkRestartFileName(),
+        runtime->LinkRestartStartOffset(),
+        runtime->LinkRestartRangeStart(),
+        runtime->LinkRestartRangeEnd()
+      );
+      runtime->linkSwitchActive = 0;
+    }
+
+    std::int32_t result = ADXSJD_GetStat(sjdHandle);
+    if (result == 2) {
+      const std::int32_t channelCount = ADXSJD_GetNumChan(sjdHandle);
+      const auto maxChannels = static_cast<std::int32_t>(runtime->maxChannelCount);
+      if (channelCount <= maxChannels) {
+        const std::int32_t sampleRate = ADXSJD_GetSfreq(sjdHandle);
+        const std::int32_t loopCount = ADXSJD_GetNumLoop(sjdHandle);
+        const std::int32_t dividedRate = sampleRate / runtime->TransposeScaleDivisor();
+        if (loopCount <= 0) {
+          runtime->TransposeDecodeWindowSamples() = (3 * dividedRate) / 2;
+        } else {
+          runtime->TransposeDecodeWindowSamples() = 3 * dividedRate;
+        }
+
+        const std::int32_t blockSamples = ADXSJD_GetBlkSmpl(sjdHandle);
+        const std::int32_t frameSamples = 2 * blockSamples;
+        const std::int32_t alignedMaxDecodeSamples =
+          frameSamples * ((frameSamples + runtime->TransposeDecodeWindowSamples()) / frameSamples);
+        runtime->TransposeDecodeWindowSamples() = alignedMaxDecodeSamples;
+        ADXSJD_SetMaxDecSmpl(sjdHandle, alignedMaxDecodeSamples);
+
+        if (loopCount <= 0) {
+          if (runtime->streamHandle != nullptr) {
+            ADXSTM_SetEos(runtime->streamHandle, 0x7FFFFFFF);
+          }
+          const std::int32_t totalNumSmpl = ADXSJD_GetTotalNumSmpl(sjdHandle);
+          ADXSJD_SetTrapNumSmpl(sjdHandle, totalNumSmpl);
+          ADXSJD_SetTrapDtLen(sjdHandle, 0);
+          ADXSJD_SetTrapCnt(sjdHandle, 0);
+          ADXSJD_EntryTrapFunc(sjdHandle, reinterpret_cast<void*>(adxt_nlp_trap_entry), static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime)));
+        } else {
+          if (runtime->mUnknown02 == 2u) {
+            runtime->LoopLeadInPadSamples() = 0;
+          } else {
+            const std::int32_t loopEndOffset = ADXSJD_GetLpEndOfst(sjdHandle);
+            runtime->LoopLeadInPadSamples() = (2048 - (loopEndOffset % 2048)) % 2048;
+            const std::int32_t loopEndSector = (loopEndOffset + 2047) / 2048;
+            runtime->StreamEndSector() = loopEndSector;
+            ADXSTM_SetEos(runtime->streamHandle, loopEndSector);
+            ADXSTM_EntryEosFunc(
+              static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime->streamHandle)),
+              reinterpret_cast<std::int32_t>(adxt_eos_entry),
+              static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime))
+            );
+          }
+
+          (void)ADXSJD_GetLpEndPos(sjdHandle);
+          const std::int32_t loopStartPos = ADXSJD_GetLpStartPos(sjdHandle);
+          runtime->StreamLoopStartSample() = loopStartPos;
+          ADXSJD_SetTrapNumSmpl(sjdHandle, loopStartPos);
+          ADXSJD_SetTrapDtLen(sjdHandle, 0);
+          ADXSJD_SetTrapCnt(sjdHandle, 0);
+          ADXSJD_EntryTrapFunc(sjdHandle, reinterpret_cast<void*>(adxt_trap_entry_lps), static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime)));
+        }
+
+        const std::int32_t sfreq = ADXSJD_GetSfreq(sjdHandle);
+        const std::int32_t numChan = ADXSJD_GetNumChan(sjdHandle);
+        const std::int32_t totalNumSmpl = ADXSJD_GetTotalNumSmpl(sjdHandle);
+        const std::int32_t outBps = ADXSJD_GetOutBps(sjdHandle);
+        ADXRNA_SetBitPerSmpl(runtime->rnaHandle, outBps);
+        ADXRNA_SetSfreq(runtime->rnaHandle, sfreq);
+        ADXRNA_SetNumChan(runtime->rnaHandle, numChan);
+        ADXRNA_SetTotalNumSmpl(runtime->rnaHandle, totalNumSmpl);
+        ADXT_SetOutVol(runtime, runtime->OutputVolumeLevel());
+
+        std::int32_t transposeOctaves = 0;
+        std::int32_t transposeCents = 0;
+        ADXT_GetTranspose(runtime, &transposeOctaves, &transposeCents);
+        if (transposeOctaves != 0 || transposeCents != 0) {
+          ADXT_SetTranspose(runtime, transposeOctaves, transposeCents);
+        }
+
+        (void)adxt_set_outpan(runtime);
+        if (runtime->channelExpandHandle != nullptr) {
+          ADXAMP_SetSfreq(runtime->channelExpandHandle, sfreq);
+        }
+
+        if (ADXSJD_GetFormat(sjdHandle) == 2) {
+          const std::int32_t spsdInfo = ADXSJD_GetSpsdInfo(sjdHandle);
+          ADXRNA_SetStmHdInfo(runtime->rnaHandle, spsdInfo);
+        }
+
+        j__ADXRNA_SetTransSw(runtime->rnaHandle, 1);
+        result = 0;
+        if (adxt_enddecinfo_cbfn != nullptr) {
+          result = adxt_enddecinfo_cbfn(
+            static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime)),
+            sfreq,
+            numChan,
+            totalNumSmpl
+          );
+        }
+        runtime->mUnknown01 = 2;
+      } else {
+        char channelCountText[16]{};
+        (void)ADXERR_ItoA2(channelCount, maxChannels, channelCountText, 16);
+        (void)ADXERR_CallErrFunc2_(kAdxtStatDecinfoChannelCountMessage, channelCountText);
+        ADXT_Stop(runtime);
+        return 0;
+      }
+    } else if (result == 4) {
+      runtime->mUnknown01 = 6;
+    }
+
+    return result;
+  }
+
+  /**
+   * Address: 0x00B1A9D0 (FUN_00B1A9D0, _adxt_stat_prep)
+   *
+   * What it does:
+   * Runs the ADXT prep state: once RNA queue room drops to threshold (or the
+   * SJD lane reaches prep state), arms RNA play-switch and playback timing on
+   * first entry, mirrors SJD sample-rate/channel-count into RNA, and advances
+   * to the playing state. While the SJD lane is in prep state, refills every
+   * source channel lane's decode buffer with silence ahead of playback.
+   */
+  std::int32_t adxt_stat_prep(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const std::int32_t rnaHandle = runtime->rnaHandle;
+    const std::int32_t sjdHandle = runtime->sjdHandle;
+
+    const std::int32_t numData = ADXRNA_GetNumData(rnaHandle);
+    const std::int32_t numRoom = ADXRNA_GetNumRoom(rnaHandle);
+    std::int32_t decodeWindowCap = 2 * runtime->TransposeDecodeWindowSamples();
+    if (decodeWindowCap >= 0x4000) {
+      decodeWindowCap = 0x4000;
+    }
+
+    if (numData >= decodeWindowCap || numRoom <= ADXSJD_GetBlkSmpl(sjdHandle) || ADXSJD_GetStat(sjdHandle) == 3) {
+      if (runtime->WaitPlayStartFlag() == 0u) {
+        if (runtime->PauseStateFlag() == 0u) {
+          j__ADXRNA_SetPlaySw(rnaHandle, 1);
+          runtime->PlaybackTimeBaseFrames() = 0;
+          runtime->PlaybackTimeVsyncAnchor() = gAdxtVsyncCount;
+        }
+
+        const std::int32_t sampleRate = ADXSJD_GetSfreq(sjdHandle);
+        const std::int32_t channelCount = ADXSJD_GetNumChan(sjdHandle);
+        ADXRNA_SetNumChan(rnaHandle, channelCount);
+        ADXRNA_SetSfreq(rnaHandle, sampleRate);
+        runtime->mUnknown01 = 3;
+      }
+      runtime->ReadyPlayStartFlag() = 1;
+    }
+
+    std::int32_t result = ADXSJD_GetStat(sjdHandle);
+    if (result == 3) {
+      result = ADXT_GetNumChan(runtime);
+      const std::int32_t fillBytes = 2 * result * runtime->TransposeDecodeWindowSamples();
+      for (std::int32_t lane = 0; lane < result; ++lane) {
+        auto* const sourceLane = static_cast<AdxtDecodeSourceHandle*>(runtime->SourceChannelRingLane(lane));
+        SjChunkRange fillChunk{};
+        sourceLane->AcquireChunk(0, fillBytes, &fillChunk);
+        std::memset(SjAddressToPointer(fillChunk.bufferAddress), 0, static_cast<std::size_t>(fillChunk.byteCount));
+        sourceLane->CommitChunk(1, &fillChunk);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -12894,6 +13287,37 @@
     ADXCRS_Enter();
     adxt_ExecHndl(adxtRuntime);
     ADXCRS_Leave();
+  }
+
+  /**
+   * Address: 0x00B1AEE0 (FUN_00B1AEE0, _adxt_ExecHndl)
+   *
+   * What it does:
+   * Dispatches one ADXT handle tick by runtime stat: decode-info prep on
+   * stat `1`, decode-info wait on stat `2`, playing checks on stat `3`,
+   * decode-end drain on stat `4`. Runs the read-completion/read-error checks
+   * after every dispatched (or no-op default) branch.
+   */
+  void adxt_ExecHndl(void* const adxtRuntime)
+  {
+    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    if (runtime == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxtExecHndlParameterErrorMessage);
+      return;
+    }
+
+    const auto stat = static_cast<std::uint8_t>(runtime->mUnknown01);
+    if (stat == 3u) {
+      (void)adxt_stat_playing(runtime);
+    } else if (stat == 1u) {
+      (void)adxt_stat_decinfo(runtime);
+    } else if (stat == 2u) {
+      (void)adxt_stat_prep(runtime);
+    } else if (stat == 4u) {
+      (void)adxt_stat_decend(runtime);
+    }
+    (void)ADXT_ExecRdCompChk(runtime);
+    (void)ADXT_ExecRdErrChk(runtime);
   }
 
   /**
