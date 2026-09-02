@@ -4406,6 +4406,14 @@ namespace
     DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
   }
 
+} // namespace
+
+// External linkage, not internal: CWldSession.cpp calls this as
+// moho::ISSUE_SetCommandTarget from three sites, so an anonymous-namespace
+// body here could never resolve them - it was one of the LNK2019s /FORCE
+// swallows into live call sites pointing at nothing.
+namespace moho
+{
   /**
    * Address: 0x008B0EE0 (FUN_008B0EE0, ?ISSUE_SetCommandTarget@Moho@@YAXPAVUserCommand@1@ABVUserTarget@1@@Z)
    *
@@ -4494,6 +4502,10 @@ namespace
     }
     QueueCommandIssueSetTargetEvent(helperView, helperView.commandId, target);
   }
+} // namespace moho
+
+namespace
+{
 
   // Local command-issue update event type used for "set command type" events
   // (0x008B4AE3: `mov ecx, 5` feeding InitializeCommandIssueUpdateEvent).
