@@ -831,11 +831,49 @@ namespace
   }
 
   /**
-   * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
-   *
-   * What it does:
    * Refreshes army-visible economy cache lanes from the current per-army
    * economy totals block.
+   *
+   * @warning This is NOT `func_ArmyProcessEconomy`. It used to claim address
+   * 0x00771B50, which is a **1418-instruction** function; this body is a
+   * twenty-line field copy, so the annotation asserted a recovery that does not
+   * exist and the progress DB still calls that address `recovered`. The copy
+   * itself duplicates what `CArmyImpl::CopyArmyVariableData` already does at
+   * sync time and is kept only because both tick paths call it.
+   *
+   * What 0x00771B50 actually is, and what is still missing -- established from
+   * its disassembly and decompilation so the recovery is mechanical:
+   *
+   * - Signature is `func_ArmyProcessEconomy(CEconomy*)`, not an army. Its sole
+   *   caller is `CArmyImpl::OnTick` at 0x006FFDC4, which pushes `[army+0x1F4]`
+   *   -- `EconomyInfo`. The call site below is therefore already correct.
+   * - It is the per-tick economy solver, and its absence is why the income
+   *   readout stays at +0 while the original binary shows +1 mass / +20 energy
+   *   on the same map. `Unit::HandleResourceManagement` banks production into
+   *   `mResources`/`mPendingResources` correctly; nothing then turns that into
+   *   `mTotals`, which is what `cfunc_GetEconomyTotalsL` reports to the UI.
+   * - Pass one walks the `mConsumptionData` list of `CEconRequest` nodes
+   *   (layout proven by the ctor at 0x00773630: `mNode` +0x00, `mRequested`
+   *   +0x08, `mGranted` +0x10, size 0x18) and sums each node's outstanding
+   *   `mRequested - mGranted`, clamped at zero, splitting requests that need
+   *   both resources from those needing one.
+   * - Available is `mTotals.mStored` plus banked production, the latter scaled
+   *   by `(mVarDat.mHandicapExtra + 1)` when `mVarDat.mHandicapValue` is
+   *   non-zero (read at `[army+0x1DC]` / `[army+0x1E0]` at 0x00771C8D).
+   * - A dual ratio is the smallest `available/demand` across both resources,
+   *   remembering which resource limited it; a single ratio is then taken from
+   *   what remains, over the other resource only. Pass two grants each node its
+   *   outstanding share at whichever ratio applies, accumulating the granted
+   *   total and adding it into that node's `mGranted`.
+   * - It then writes `mLastUseRequested`, `mLastUseActual` and `mIncome`
+   *   (`mIncome` is simply `mResources`), shares excess with allied economies
+   *   when `mResourceSharing` is set, clamps `mStored` into `[0, mMaxStorage]`,
+   *   and publishes twenty-four `Economy_*` army stats through
+   *   `func_GetArmyStat2` with interlocked accumulate.
+   *
+   * Note when writing the walk that `TDatListItem`'s `mPrev`/`mNext` names are
+   * the opposite of their slots (see the warning in `TDatList.h`); the binary
+   * starts from `[economy+0x5C]` and advances through the +0x04 slot.
    */
   void ProcessArmyEconomyTick(moho::CArmyImpl& army)
   {
