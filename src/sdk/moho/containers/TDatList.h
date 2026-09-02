@@ -10,6 +10,35 @@ namespace moho
   /**
    * Intrusive list node (prev/next only). No payload.
    * T is the *declared* owner type for RTTI/signatures; layout is two pointers.
+   *
+   * @warning These two names are inverted with respect to the binary. Slot
+   * `+0x00` is the **next** pointer and `+0x04` is the **prev** pointer, so
+   * `mPrev` below actually names the next link. Verified from two independent
+   * functions:
+   *
+   *   - `FUN_00632BC0` (the generic unlink for this very node) does
+   *     `[+0]->[+4] = [+4]` then `[+4]->[+0] = [+0]`, i.e.
+   *     `next->prev = prev; prev->next = next`.
+   *   - `FUN_007AE2B0` (`Broadcaster<SCameraTracking>::BroadcastEvent`) splices
+   *     with `X->[+0]->[+4] = S` and `X->[+4]->[+0] = S`, and tests emptiness
+   *     on `[+4]`.
+   *
+   * `moho::CameraTrackingBroadcasterLink` in
+   * `moho/render/camera/CameraTrackingListener.h` names the same two slots the
+   * other way round -- `{mListNext @ +0x00, mListPrev @ +0x04}` -- and is the
+   * one that matches the binary.
+   *
+   * This is **not** a live bug and must not be "fixed" casually. A doubly
+   * linked list is symmetric under swapping the two names, and every use here
+   * is internally consistent: `ListUnlinkSelf`'s
+   * `mPrev->mNext = mNext; mNext->mPrev = mPrev;` emits exactly the binary's
+   * two stores. Renaming would touch nearly the whole engine for no
+   * behavioural gain, and a half-applied swap would be catastrophic.
+   *
+   * What it does forbid: mixing the two views on one list, and converting a
+   * raw `object + 0x04` sub-object pointer into a `TDatListItem*`/`Broadcaster*`
+   * and then using the field names. By slot the two agree; by name they are
+   * opposites, so such a "tidy-up" silently swaps prev and next.
    */
   template <class T, class U>
   struct TDatListItem
@@ -17,7 +46,9 @@ namespace moho
     using type = T;
     using item_t = TDatListItem<type, U>;
 
+    /// Binary slot `+0x00`, which is the **next** link (see the warning above).
     item_t* mPrev;
+    /// Binary slot `+0x04`, which is the **prev** link (see the warning above).
     item_t* mNext;
 
     /**
