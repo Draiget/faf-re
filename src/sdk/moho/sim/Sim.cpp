@@ -26383,6 +26383,22 @@ int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
  *
  * What it does:
  * Pushes whether the current world session is in replay mode.
+ *
+ * @note Deliberately not registered through `SimLuaInitSet()`, and that is not
+ * an oversight. The string `"SessionIsReplay"` has exactly one reference in the
+ * whole image -- `func_SessionIsReplayUser_LuaFuncDef` (0x00897D90), the
+ * **user** binder recovered above -- so the base engine publishes this global
+ * to the UI Lua state only. This body lives at 0x0128BB27, inside `.exxt`
+ * (VA 0x0128B000), the section FAF's own patcher owns: `start_exxt`
+ * (0x0128BE0D) `LoadLibraryA`s `faext.dll` and hot-patches slots from a
+ * `(procName, target)` table via `VirtualProtect`. The sim-side binding is
+ * installed at runtime by that external DLL, not by anything in this binary.
+ *
+ * The visible consequence is real -- `lua/sim/score.lua(288)` calls
+ * `SessionIsReplay()` and logs "access to nonexistent global variable", which
+ * kills the forked `ScoreThread` only and does not stop the beat. Do not
+ * "fix" it by adding a `CScrLuaBinder` to the sim set: there is no callsite
+ * evidence for one, so that would be fabricated recovery.
  */
 int moho::cfunc_SessionIsReplaySim(lua_State* const luaContext)
 {
