@@ -167,6 +167,65 @@ namespace moho
     }
 
     /**
+     * Address: 0x0054C260 (FUN_0054C260)
+     *
+     * Live element count, `(mEnd - mBegin) / sizeof(CAniPoseBone)`.
+     */
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+      return static_cast<std::size_t>(mEnd - mBegin);
+    }
+
+    /**
+     * Address: 0x0054D740 (FUN_0054D740)
+     *
+     * Slots the current storage can hold, `(mCapacity - mBegin) / stride`.
+     */
+    [[nodiscard]] std::size_t capacity() const noexcept
+    {
+      return static_cast<std::size_t>(mCapacity - mBegin);
+    }
+
+    [[nodiscard]] bool empty() const noexcept
+    {
+      return mBegin == mEnd;
+    }
+
+    /**
+     * Address: 0x0054C320 (FUN_0054C320) -- mutable
+     * Address: 0x0054C330 (FUN_0054C330) -- const
+     *
+     * Unchecked indexed access, `mBegin + index`.
+     */
+    [[nodiscard]] CAniPoseBone& operator[](const std::size_t index) noexcept
+    {
+      return mBegin[index];
+    }
+
+    [[nodiscard]] const CAniPoseBone& operator[](const std::size_t index) const noexcept
+    {
+      return mBegin[index];
+    }
+
+    /**
+     * The raw lane stores MSVC emitted for this array's `{mBegin, mEnd,
+     * mCapacity, mOriginal}` header, recovered as free functions until they were
+     * collapsed here. None of them is a source-level operation: they are the
+     * pointer writes inside `resize` / `reserve` / the inline-storage rebind.
+     *
+     * Address: 0x0054C340 (FUN_0054C340) -- clear the tail lanes
+     * Address: 0x0054CD20 (FUN_0054CD20) -- clear the head lanes
+     * Address: 0x0054CCE0 (FUN_0054CCE0) -- seed a single-element span
+     * Address: 0x0054CDC0 (FUN_0054CDC0) -- store `mBegin`
+     * Address: 0x0054CDD0 (FUN_0054CDD0) -- store `mEnd`   (primary lane)
+     * Address: 0x0054CDE0 (FUN_0054CDE0) -- store `mCapacity` (primary lane)
+     * Address: 0x0054D020 (FUN_0054D020) -- store `mEnd`   (secondary lane)
+     * Address: 0x0054D030 (FUN_0054D030) -- store `mCapacity` (secondary lane)
+     * Address: 0x0054DCF0 (FUN_0054DCF0) -- uninitialised forward copy of a
+     *   `[first, last)` bone range into fresh storage
+     */
+
+    /**
      * Reads back the capacity pointer stashed in the first pointer-sized
      * slot of `mInlineStorage` the last time this array grew past inline
      * storage. `mOriginal` always points at `mInlineStorage`, so once the
