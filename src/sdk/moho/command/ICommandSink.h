@@ -207,18 +207,23 @@ namespace moho
     ExecuteDebugCommand(const char*, Wm3::Vector3<float> const&, uint32_t, BVSet<EntId, EntIdUniverse> const&) = 0;
 
     /**
-     * Address: 0x00749F40 (FUN_00749F40)
-     *
      * VFTable SLOT: 22
+     *
+     * Pure like every other slot here. 0x00749F40 used to be cited on this
+     * declaration, but that address is `Sim`'s override -- it is slot 22 of
+     * `Moho::Sim`'s vftable (0x00E34714), not of this interface's
+     * (0x00E2E794), whose slot 22 is `_purecall`. `Sim::AdvanceBeat` already
+     * carries it.
      */
-    virtual void AdvanceBeat(int);
+    virtual void AdvanceBeat(int) = 0;
 
     /**
-     * Address: 0x0074B100 (FUN_0074B100)
-     *
      * VFTable SLOT: 23
+     *
+     * Same as above: 0x0074B100 is slot 23 of `Moho::Sim`'s vftable and is
+     * already cited on `Sim::EndGame`.
      */
-    virtual void EndGame();
+    virtual void EndGame() = 0;
   };
 
   /**
