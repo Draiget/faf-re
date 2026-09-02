@@ -81,6 +81,10 @@ namespace moho
   extern CWinLogTarget sLogWindowTarget;
 }
 
+// Defined at global scope in SimRecoveryRuntime.cpp (that file declares no
+// header of its own).
+extern void SimDriverDebugClientManagerRuntime();
+
 namespace moho
 {
   [[nodiscard]] msvc8::string ToString(const Wm3::Vec3f& value);
@@ -13949,4 +13953,56 @@ namespace
   };
 
   [[maybe_unused]] ConsoleStartupRegistrationsMisc2 gConsoleStartupRegistrationsMisc2;
+} // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupWldClientDebugDumpDescription = "Dump out debug info about the network connections";
+} // namespace
+
+namespace moho
+{
+  CConFunc gCConFunc_wld_ClientDebugDump{};
+
+  /**
+   * Address: 0x00C08080 (FUN_00C08080, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `wld_ClientDebugDump`.
+   */
+  void cleanup_CConFunc_wld_ClientDebugDump()
+  {
+    CleanupStartupConCommand(gCConFunc_wld_ClientDebugDump);
+  }
+
+  /**
+   * Address: 0x00BE7510 (FUN_00BE7510, register_CConFunc_wld_ClientDebugDump)
+   *
+   * What it does:
+   * Registers startup console callback for `wld_ClientDebugDump`.
+   */
+  void register_CConFunc_wld_ClientDebugDump()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_wld_ClientDebugDump,
+      kConsoleStartupWldClientDebugDumpDescription,
+      "wld_ClientDebugDump",
+      reinterpret_cast<CConFunc::Callback>(&SimDriverDebugClientManagerRuntime),
+      &cleanup_CConFunc_wld_ClientDebugDump
+    );
+  }
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsMisc3
+  {
+    ConsoleStartupRegistrationsMisc3()
+    {
+      moho::register_CConFunc_wld_ClientDebugDump();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsMisc3 gConsoleStartupRegistrationsMisc3;
 } // namespace
