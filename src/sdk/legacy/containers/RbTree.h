@@ -1334,9 +1334,23 @@ namespace msvc8
         /**
          * Bidirectional iterator over an MSVC8 tree.
          *
-         * One pointer wide, exactly like the shipped iterator: the binary's
-         * step routines take `_Node**` as `this` and never consult a container
-         * back-pointer.
+         * One pointer wide, matching the shipped iterator for every
+         * instantiation this project relies on for engine behavior: the
+         * binary's step routines take `_Node**` as `this` and never consult
+         * a container back-pointer. A minority of instantiations (every one
+         * traced so far is WildMagic/`external_dependency` -- see
+         * `operator++`/`operator--`/`operator!=`/the constructor below)
+         * compile as the real Dinkumware `_SECURE_SCL=1` *checked* iterator
+         * instead: two words wide, `{_Mycont, _Ptr}`, with a
+         * validated-but-inert container back-pointer used only to fail fast
+         * on iterator misuse (see the `proxy_` field's comment on `rb_tree`
+         * below for the general policy this follows). The checked shape's
+         * validation never alters the computed result on any valid input --
+         * proven per-member below, not assumed -- so this one-word member
+         * models both shapes' success-path behavior exactly; only the
+         * fail-fast-on-misuse crash is left unmodeled, matching this
+         * project's fidelity contract (observable behavior on well-formed
+         * usage, not crash-on-misuse).
          */
         template<class Traits, bool IsConst>
         class rb_iterator
@@ -1350,6 +1364,40 @@ namespace msvc8
             using pointer = std::conditional_t<IsConst, const value_type*, value_type*>;
 
             rb_iterator() noexcept = default;
+            /**
+             * Address: 0x00A552D0 (FUN_00A552D0, sub_A552D0) Address:
+             * 0x00A55670 (FUN_00A55670, sub_A55670) -- the shipped VS2005
+             * Release build's `_SECURE_SCL=1` *checked* iterator constructor
+             * for a `Wm3::ConvexHull3<Real>`-family tree instantiation
+             * (isNil-independent shape; owner not pinned to one specific
+             * field for these two addresses specifically -- sibling of the
+             * checked `operator++`/`operator--`/`operator!=` emissions cited
+             * below, all confirmed WildMagic). Both were previously
+             * `blocked` citing a `CrtRuntimeHelpers.cpp` source path that
+             * does not contain either address (2026-08-24 DB-integrity bulk
+             * revert); corrected in `recovered_progress.json` alongside this
+             * citation. Real shape: `*this = 0; this[1] = a2 (node); if
+             * (!a3 (owner)) sub_A84A40(); this[0] = a3; return this;` --
+             * i.e. the shipped iterator for these instantiations is a real
+             * Dinkumware-style *checked* iterator, two words wide (`{_Mycont,
+             * _Ptr}`), not this member's one-word shape. The `owner`
+             * argument is validated (non-null) via the `_SECURE_SCL` trap
+             * `sub_A84A40` (`_invalid_parameter`, cited on `operator++`/
+             * `operator--`/`operator!=` below) -- the `call sub_A84A40`
+             * falls through into the remaining stores exactly like every
+             * other checked emission cited in this file, so a null `owner`
+             * changes nothing about the constructed iterator's node field --
+             * and is never read again by any checked emission this file has
+             * traced; it exists purely so a *later* checked operation can
+             * fail fast on a default-constructed or cross-container
+             * iterator. Dropping the validated-but-otherwise-inert `owner`
+             * parameter and keeping only the node argument reproduces this
+             * constructor's success-path behavior exactly -- see the
+             * `proxy_` field's comment on `rb_tree` below for the
+             * established "checked-container machinery is real in the
+             * binary but deliberately unmodeled because it never changes
+             * observable behavior" policy this follows.
+             */
             explicit rb_iterator(node_type* const n) noexcept : node_(n) {}
 
             /** Implicit non-const to const conversion, as in the standard containers. */
@@ -1407,6 +1455,49 @@ namespace msvc8
              * three specialisations above; a fourth sibling, `FUN_00947080`
              * (`d3d9::RenderState`'s `operator++(int)`), is not
              * independently exported in this pass.
+             */
+            /**
+             * Address: 0x00A52760 (FUN_00A52760, sub_A52760) Address:
+             * 0x00A52930 (FUN_00A52930, sub_A52930) -- the checked
+             * (`_SECURE_SCL=1`) `operator++()` for `Wm3::ConvexHull3<float>`/
+             * `<double>::m_kHull` (`std::set<HullTriangle3<Real>*>`,
+             * vendored `dependencies/WildMagic3p8/Foundation/Containment/
+             * Wm3ConvexHull3.h:89`), isNil@+0x11 -- `external_dependency`,
+             * WildMagic is not engine code, kept here purely as
+             * cross-reference confirmation of this member's shape (matching
+             * this file's existing `rb_min`/`rb_max`/`erase_node` WildMagic
+             * cross-references elsewhere). Address: 0x00A52CB0
+             * (FUN_00A52CB0) Address: 0x00A52E00 (FUN_00A52E00) -- the same
+             * checked `operator++()` for the same class's `Update()`-local
+             * `std::map<int, TerminatorData>` ("kTerminator"), isNil@+0x21
+             * (also `external_dependency`, same WildMagic exclusion).
+             *
+             * All four are real two-word checked iterators (`{_Mycont,
+             * _Ptr}`, cited on the constructor above): `this[0]` is the
+             * owning-container pointer, `this[1]` is the node. Full asm
+             * trace of 0x00A52760 (representative; the other three are the
+             * identical shape at a different isNil offset): `cmp dword ptr
+             * [esi],0; jnz +5; call sub_A84A40` -- FALLS THROUGH into the
+             * walk regardless of whether the call returns, so a null
+             * `this[0]` changes nothing about the computed result. The walk
+             * itself is exactly this member's `rb_increment(node_)`: reads
+             * `this[1]->right` (isNil test), then either `rb_min(node->
+             * right)` (descend, take least of the right subtree) or an
+             * ancestor climb while `node==ancestor->right`, writing the
+             * result back into `this[1]`. The only branch that does NOT
+             * fall through is a tail `jmp sub_A84A40` taken when `this[1]`
+             * (the node being stepped from) is *already* nil -- i.e.
+             * `++end()`, undefined behavior for any iterator, checked or
+             * not, so it is not part of the success-path contract this
+             * project's fidelity rules require reproducing (see the
+             * `proxy_` field's comment on `rb_tree` below for the same
+             * "checked-container machinery documented but deliberately
+             * unmodeled" policy; `recovered_progress.json`'s note on
+             * 0x00A65320 records an independent prior pass reaching the
+             * same conclusion for this same class's `erase` path). This
+             * member's plain `node_ = rb_increment(node_); return *this;`
+             * is therefore byte-for-byte behaviorally equivalent to all
+             * four checked emissions on every valid (non-`end()`) input.
              */
             rb_iterator& operator++() noexcept
             {
@@ -1485,6 +1576,46 @@ namespace msvc8
              * (successor) walk instead of the real decrement one, a latent
              * mismatch harmless only because neither had a real caller.)
              */
+            /**
+             * Address: 0x00A528A0 (FUN_00A528A0, sub_A528A0) Address:
+             * 0x00A526D0 (FUN_00A526D0, sub_A526D0) -- the checked
+             * (`_SECURE_SCL=1`) `operator--()` sibling of the `operator++()`
+             * pair cited above: `Wm3::ConvexHull3<float>`/`<double>::
+             * m_kHull`'s checked iterator decrement, isNil@+0x11 --
+             * `external_dependency`, WildMagic, cross-reference only (both
+             * addresses were previously mis-marked `recovered` citing
+             * `CrtRuntimeHelpers.cpp` -- that file does not contain either
+             * address; corrected in `recovered_progress.json` alongside this
+             * citation). Address: 0x00A52C20 (FUN_00A52C20) Address:
+             * 0x00A52D70 (FUN_00A52D70) -- the same checked `operator--()`
+             * for the `Update()`-local `std::map<int, TerminatorData>`
+             * ("kTerminator") pair cited on `operator++()` above, isNil@+0x21
+             * (also `external_dependency`; note enriched alongside this
+             * citation from a generic "all-external-callees thunk" batch
+             * classification to this specific identity -- the terminal
+             * status was already correct).
+             *
+             * All four are the two-word checked iterator shape cited on the
+             * constructor above. Full asm trace of 0x00A528A0
+             * (representative): `cmp dword ptr [esi],0; jnz +5; call
+             * sub_A84A40` -- falls through into the walk exactly like
+             * `operator++()` above, so a null `this[0]` changes nothing.
+             * `this[1]` (the node) is then checked for nil *first*: if nil,
+             * this is the `--end()` case and the result is `node->right`
+             * (matching this member's `rb_is_nil(n) ? n->right : ...`
+             * special case) -- UNLESS `node->right` is *also* nil (empty
+             * tree, no valid last element), which tail-`jmp`s into
+             * `sub_A84A40` instead of returning a bogus node: `--end()` on
+             * an empty container, undefined behavior. If `node` is not nil,
+             * the walk matches this member's `rb_max(n->left)`-or-ancestor-
+             * climb-while-`node==ancestor->left` exactly, and a THIRD
+             * `sub_A84A40` tail-call fires only if the ancestor climb walks
+             * all the way to the nil sentinel (`--begin()`, also undefined
+             * behavior). Every reachable success-path input -- valid
+             * non-null container, valid non-`end()`/non-`begin()` node --
+             * produces the identical result this member's plain
+             * `node_ = rb_decrement(node_); return *this;` already computes.
+             */
             rb_iterator& operator--() noexcept
             {
                 node_ = rb_decrement(node_);
@@ -1504,6 +1635,41 @@ namespace msvc8
             {
                 return node_ == other.node();
             }
+            /**
+             * Address: 0x00A55150 (FUN_00A55150, sub_A55150) -- the checked
+             * (`_SECURE_SCL=1`) `operator!=()` for the same two-word checked
+             * iterator family cited on the constructor/`operator++`/
+             * `operator--` above: `if (!this[0] || this[0]!=other[0])
+             * sub_A84A40(); return this[1]!=other[1];`. Owning
+             * `msvc8::map`/`msvc8::set` instantiation not pinned for this
+             * specific address (isNil-independent shape -- `operator!=`
+             * never reads the node's isNil byte, so it carries no
+             * owner-identifying offset); zero incoming xrefs/callers found
+             * in the callgraph index, the same "compiler emits the same
+             * body more than once, only some copies are ever reached from a
+             * live caller" pattern already documented throughout this file
+             * for other zero-xref duplicate emissions. Two sibling
+             * emissions of the identical shape, 0x00A52870/0x00A52A40 (also
+             * isNil-independent, in the same address neighbourhood as
+             * `m_kHull` above), are already separately recovered as
+             * `AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA`/`...LaneB` in
+             * `moho/math/Wm3DistanceFafExtras.cpp` -- a
+             * `QueryTreeOwnerKeyCursorNil17`-typed reach-in wrapper around
+             * this exact comparison. That is real RULE ONE debt (a bespoke
+             * per-instantiation wrapper duplicating this member instead of
+             * calling it directly), left as-is here rather than folded in:
+             * it already has real, working, cited behavior, and collapsing
+             * it into a direct `rb_iterator` usage is a separate, larger
+             * pass through that file's whole `QueryTree*` family, not an
+             * opportunistic one-line change.
+             *
+             * The `call sub_A84A40` at the top of 0x00A55150 falls through
+             * into the comparison exactly like the constructor/`operator++`/
+             * `operator--` emissions above -- `this[1]!=other[1]` is
+             * computed and returned unconditionally regardless of whether
+             * the container-pointer check passed, so this member's plain
+             * `node_ != other.node()` is exact on every reachable input.
+             */
             template<bool OtherConst>
             [[nodiscard]] bool operator!=(const rb_iterator<Traits, OtherConst>& other) const noexcept
             {
