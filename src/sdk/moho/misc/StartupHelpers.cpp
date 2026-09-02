@@ -7097,7 +7097,7 @@ namespace moho
   float patch_maxMapHeight = 0.0f;
   float patch_minMapHeight = 0.0f;
 
-  [[maybe_unused]] void PrintExecutableTimestampToConsole()
+  void PrintExecutableTimestampToConsole()
   {
     CON_Printf("Exe timestamp : %s", "Mon Jun 22 14:06:14 2009");
   }

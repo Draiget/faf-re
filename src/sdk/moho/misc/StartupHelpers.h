@@ -1446,4 +1446,12 @@ namespace moho
 
   [[nodiscard]] std::filesystem::path DISK_GetLaunchDirectory();
   [[nodiscard]] std::filesystem::path DISK_GetDataPathScriptFile();
+
+  /**
+   * Address: 0x008D3FF0 (FUN_008D3FF0, sub_8D3FF0)
+   *
+   * What it does:
+   * Emits one executable build timestamp line to the in-game console.
+   */
+  void PrintExecutableTimestampToConsole();
 } // namespace moho
