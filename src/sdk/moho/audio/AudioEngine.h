@@ -6,6 +6,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/time/Timer.h"
+#include "legacy/containers/Set.h"
+#include "legacy/containers/String.h"
 #include "Wm3Vector3.h"
 
 namespace boost
@@ -362,7 +364,19 @@ namespace moho
     AudioEngine* mEngine;               // +0x04
     AudioPointerVectorStorage mBanks;   // +0x08
     AudioPointerVectorStorage mHandles; // +0x18
-    AudioMapStorage mMap1;              // +0x28
+
+    /**
+     * Set of currently-paused category names.
+     *
+     * Real `msvc8::set<msvc8::string>` instantiation (`rb_tree<rb_set_traits<
+     * msvc8::string, Less>>`; `value_type == msvc8::string`, no separate
+     * mapped value -- see `Set.h`). Was previously modelled as a hand-rolled,
+     * hand-walked `AudioMapStorage`/`AudioMap1CategoryNode` tree whose insert
+     * path had no rebalancing step at all -- see RbTree.h's
+     * `insert_unique`/`insert_at` citations for this instantiation and
+     * `.memory/project_audiomap1_missing_rebalance_bug.md`.
+     */
+    msvc8::set<msvc8::string> mPausedCategoryNames; // +0x28
     IXACTEngine* mInstance;             // +0x34
     Audio3DListener mListener;          // +0x38
     AudioMapStorage mMap2;              // +0x6C
