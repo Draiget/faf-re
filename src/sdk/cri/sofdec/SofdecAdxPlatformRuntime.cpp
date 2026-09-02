@@ -5897,7 +5897,7 @@
    * Decrements LSC init reference count; on final release destroys active pool
    * objects, clears pool memory, and clears error callback state.
    */
-  [[maybe_unused]] std::int32_t LSC_Finish()
+  std::int32_t LSC_Finish()
   {
     const std::int32_t result = --gLscInitCount;
     if (gLscInitCount != 0) {
@@ -7562,6 +7562,13 @@
   /** `ADXT_Init` arms the ADXT server at 60 Hz. */
   constexpr std::int32_t kAdxtDefaultServerFrequencyHz = 60;
 
+  // Defined later in this aggregate translation unit.
+  void SVM_Finish();
+  void SVM_DelCbSvrWithLock(std::int32_t svtype, std::int32_t id);
+  void ADXT_DestroyAll();
+  std::int32_t ADXF_Finish();
+  std::int32_t ADXSJD_Finish();
+
   /**
    * Address: 0x00B0A390 (FUN_00B0A390, _ADXT_Init)
    * Mangled: _ADXT_Init
@@ -7632,6 +7639,56 @@
   {
     gAdxtInitCount = 0;
     ADXT_Init();
+  }
+
+  /**
+   * Address: 0x00B0A4A0 (FUN_00B0A4A0, _ADXT_Finish)
+   *
+   * What it does:
+   * Reference-counted teardown mirror of `ADXT_Init`: on the final release,
+   * destroys all ADXT runtime instances, tears down every subsystem `Init`
+   * brought up (in reverse-ish order: ADXRNA, ADXF, ADXSTM, LSC), removes the
+   * three SVM server-callback registrations `ADXT_Init` installed (decode
+   * tick, filesystem tick, seamless-LSC tick), then finishes SVM, ADXSJD,
+   * ADXERR, and the three SJ providers, and finally releases the ADXCRS
+   * critical section and finishes it.
+   *
+   * NOT YET WIRED (documented 2026-09-02): the real caller is
+   * `mwPlyFinishSfdFx` (0x00AC93D0), which currently only exists as a
+   * wrong-signature stub (`void* mwPlyFinishSfdFx() { return nullptr; }`)
+   * in SofdecExternalStubs.cpp instead of its real ~155-byte teardown body.
+   * Its own callee closure (MWSFLIB_GetLibWorkPtr, mwPlyDestroy x32 slots,
+   * MWSFD_SetReqSvrBdrHn, MWSFSVM_GotoIdleBorder/DeleteVfunc/
+   * DeleteMainFunc/DeleteIdleFunc, MWSFSFX_Finish, mwPlySfdFinish,
+   * MWSTM_FinishStatic, MWSFSVM_Finish) is mostly unrecovered; recovering
+   * it is a separate, larger pass. `[[maybe_unused]]` kept until then.
+   */
+  [[maybe_unused]] void ADXT_Finish()
+  {
+    --gAdxtInitCount;
+    if (gAdxtInitCount != 0) {
+      return;
+    }
+
+    ADXT_DestroyAll();
+    (void)ADXRNA_Finish();
+    (void)ADXF_Finish();
+    (void)ADXSTM_Finish();
+    (void)LSC_Finish();
+
+    ADXCRS_Lock();
+    SVM_DelCbSvrWithLock(2, 1);
+    SVM_DelCbSvrWithLock(4, gAdxtServerFsSlotId);
+    SVM_DelCbSvrWithLock(5, gAdxtServerMainSlotId);
+    SVM_Finish();
+    (void)ADXSJD_Finish();
+    (void)ADXERR_Finish();
+    (void)SJMEM_Finish();
+    (void)SJRBF_Finish();
+    (void)SJUNI_Finish();
+    ADXCRS_Unlock();
+
+    (void)ADXCRS_Finish();
   }
 
   /**
