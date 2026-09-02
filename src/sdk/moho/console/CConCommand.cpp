@@ -26,6 +26,7 @@
 #include "moho/app/WEmitterWx.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/audio/CUserSoundManager.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
@@ -46,6 +47,7 @@
 #include "moho/misc/IConOutputHandler.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/render/MapImager.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -59,6 +61,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/UserArmy.h"
@@ -3464,7 +3467,7 @@ void moho::DoSimCommand(void* const commandArgs)
  * two command tokens are present, forwards token `0` to
  * `d3d_AntiAliasingSamples`.
  */
-[[maybe_unused]] void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(void* const commandArgs)
+void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(void* const commandArgs)
 {
   const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
   if (args.Count() != 2u) {
@@ -13522,4 +13525,428 @@ namespace
   };
 
   [[maybe_unused]] ConsoleStartupRegistrationsUiMisc gConsoleStartupRegistrationsUiMisc;
+} // namespace
+
+namespace
+{
+  constexpr const char* kConsoleStartupDumpActiveLoopsDescription = "List all active entity loops";
+  constexpr const char* kConsoleStartupShowArmyStatsDescription = "Show engine statistics";
+  constexpr const char* kConsoleStartupShowStatsDescription = "Show engine statistics";
+  constexpr const char* kConsoleStartupRenMapBorderAddDescription = "Add a mesh to the map border list";
+  constexpr const char* kConsoleStartupRenMapBorderClearDescription = "Clear all map border meshes";
+  constexpr const char* kConsoleStartupRenShowSkeletonsDescription = "Show mesh skeletons";
+  constexpr const char* kConsoleStartupTimestampDescription = "Dump out EXE timestamp";
+  constexpr const char* kConsoleStartupSCCreateEntityDialogDescription = "Create object editing box for the primary selected unit";
+  constexpr const char* kConsoleStartupSCAntiAliasingSamplesDescription = "SC_AntiAliasingSamples console command.";
+  constexpr const char* kConsoleStartupQuitDescription = "Quit the session.";
+  constexpr const char* kConsoleStartupWLDIncreaseSimRateDescription = "Increase the game speed.";
+  constexpr const char* kConsoleStartupWLDDecreaseSimRateDescription = "Decrease the game speed.";
+  constexpr const char* kConsoleStartupWLDResetSimRateDescription = "Increase the game speed.";
+} // namespace
+
+namespace moho
+{
+  CConFunc gCConFunc_DumpActiveLoops{};
+  CConFunc gCConFunc_ShowArmyStats{};
+  CConFunc gCConFunc_ShowStats{};
+  CConFunc gCConFunc_ren_MapBorderAdd{};
+  CConFunc gCConFunc_ren_MapBorderClear{};
+  CConFunc gCConFunc_ren_ShowSkeletons{};
+  CConFunc gCConFunc_timestamp{};
+  CConFunc gCConFunc_SC_CreateEntityDialog{};
+  CConFunc gCConFunc_SC_AntiAliasingSamples{};
+  CConFunc gCConFunc_quit{};
+  CConFunc gCConFunc_WLD_IncreaseSimRate{};
+  CConFunc gCConFunc_WLD_DecreaseSimRate{};
+  CConFunc gCConFunc_WLD_ResetSimRate{};
+
+  /**
+   * Address: 0x00C085D0 (FUN_00C085D0, ??1CConFunc_DumpActiveLoops@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DumpActiveLoops`.
+   */
+  void cleanup_CConFunc_DumpActiveLoops()
+  {
+    CleanupStartupConCommand(gCConFunc_DumpActiveLoops);
+  }
+
+  /**
+   * Address: 0x00BE7F70 (FUN_00BE7F70, register_CConFunc_DumpActiveLoops)
+   *
+   * What it does:
+   * Registers startup console callback for `DumpActiveLoops`.
+   */
+  void register_CConFunc_DumpActiveLoops()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DumpActiveLoops,
+      kConsoleStartupDumpActiveLoopsDescription,
+      "DumpActiveLoops",
+      reinterpret_cast<CConFunc::Callback>(&moho::Con_DumpActiveLoops),
+      &cleanup_CConFunc_DumpActiveLoops
+    );
+  }
+
+  /**
+   * Address: 0x00C064C0 (FUN_00C064C0, ??1CConFunc_ShowArmyStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ShowArmyStats`.
+   */
+  void cleanup_CConFunc_ShowArmyStats()
+  {
+    CleanupStartupConCommand(gCConFunc_ShowArmyStats);
+  }
+
+  /**
+   * Address: 0x00BE4470 (FUN_00BE4470, register_CConFunc_ShowArmyStats)
+   *
+   * What it does:
+   * Registers startup console callback for `ShowArmyStats`.
+   */
+  void register_CConFunc_ShowArmyStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ShowArmyStats,
+      kConsoleStartupShowArmyStatsDescription,
+      "ShowArmyStats",
+      &moho::ShowArmyStats,
+      &cleanup_CConFunc_ShowArmyStats
+    );
+  }
+
+  /**
+   * Address: 0x00C06490 (FUN_00C06490, ??1CConFunc_ShowStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ShowStats`.
+   */
+  void cleanup_CConFunc_ShowStats()
+  {
+    CleanupStartupConCommand(gCConFunc_ShowStats);
+  }
+
+  /**
+   * Address: 0x00BE4430 (FUN_00BE4430, register_CConFunc_ShowStats)
+   *
+   * What it does:
+   * Registers startup console callback for `ShowStats`.
+   */
+  void register_CConFunc_ShowStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ShowStats,
+      kConsoleStartupShowStatsDescription,
+      "ShowStats",
+      &moho::ShowStats,
+      &cleanup_CConFunc_ShowStats
+    );
+  }
+
+  /**
+   * Address: 0x00C04AB0 (FUN_00C04AB0, ??1CConFunc_ren_MapBorderAdd@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ren_MapBorderAdd`.
+   */
+  void cleanup_CConFunc_ren_MapBorderAdd()
+  {
+    CleanupStartupConCommand(gCConFunc_ren_MapBorderAdd);
+  }
+
+  /**
+   * Address: 0x00BE1B90 (FUN_00BE1B90, register_CConFunc_ren_MapBorderAdd)
+   *
+   * What it does:
+   * Registers startup console callback for `ren_MapBorderAdd`.
+   */
+  void register_CConFunc_ren_MapBorderAdd()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ren_MapBorderAdd,
+      kConsoleStartupRenMapBorderAddDescription,
+      "ren_MapBorderAdd",
+      &moho::REN_MapBorderAdd,
+      &cleanup_CConFunc_ren_MapBorderAdd
+    );
+  }
+
+  /**
+   * Address: 0x00C04AE0 (FUN_00C04AE0, ??1CConFunc_ren_MapBorderClear@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ren_MapBorderClear`.
+   */
+  void cleanup_CConFunc_ren_MapBorderClear()
+  {
+    CleanupStartupConCommand(gCConFunc_ren_MapBorderClear);
+  }
+
+  /**
+   * Address: 0x00BE1BD0 (FUN_00BE1BD0, register_CConFunc_ren_MapBorderClear)
+   *
+   * What it does:
+   * Registers startup console callback for `ren_MapBorderClear`.
+   */
+  void register_CConFunc_ren_MapBorderClear()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ren_MapBorderClear,
+      kConsoleStartupRenMapBorderClearDescription,
+      "ren_MapBorderClear",
+      &moho::REN_MapBorderClear,
+      &cleanup_CConFunc_ren_MapBorderClear
+    );
+  }
+
+  /**
+   * Address: 0x00C04A80 (FUN_00C04A80, ??1CConFunc_ren_ShowSkeletons@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ren_ShowSkeletons`.
+   */
+  void cleanup_CConFunc_ren_ShowSkeletons()
+  {
+    CleanupStartupConCommand(gCConFunc_ren_ShowSkeletons);
+  }
+
+  /**
+   * Address: 0x00BE1B50 (FUN_00BE1B50, register_CConFunc_ren_ShowSkeletons)
+   *
+   * What it does:
+   * Registers startup console callback for `ren_ShowSkeletons`.
+   */
+  void register_CConFunc_ren_ShowSkeletons()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ren_ShowSkeletons,
+      kConsoleStartupRenShowSkeletonsDescription,
+      "ren_ShowSkeletons",
+      reinterpret_cast<CConFunc::Callback>(&moho::REN_ShowSkeletons),
+      &cleanup_CConFunc_ren_ShowSkeletons
+    );
+  }
+
+  /**
+   * Address: 0x00C08E50 (FUN_00C08E50, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `timestamp`.
+   */
+  void cleanup_CConFunc_timestamp()
+  {
+    CleanupStartupConCommand(gCConFunc_timestamp);
+  }
+
+  /**
+   * Address: 0x00BE9600 (FUN_00BE9600, register_CConFunc_timestamp)
+   *
+   * What it does:
+   * Registers startup console callback for `timestamp`.
+   */
+  void register_CConFunc_timestamp()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_timestamp,
+      kConsoleStartupTimestampDescription,
+      "timestamp",
+      reinterpret_cast<CConFunc::Callback>(&moho::PrintExecutableTimestampToConsole),
+      &cleanup_CConFunc_timestamp
+    );
+  }
+
+  /**
+   * Address: 0x00C08E80 (FUN_00C08E80, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_CreateEntityDialog`.
+   */
+  void cleanup_CConFunc_SC_CreateEntityDialog()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_CreateEntityDialog);
+  }
+
+  /**
+   * Address: 0x00BE9640 (FUN_00BE9640, register_CConFunc_SC_CreateEntityDialog)
+   *
+   * What it does:
+   * Registers startup console callback for `SC_CreateEntityDialog`.
+   */
+  void register_CConFunc_SC_CreateEntityDialog()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_SC_CreateEntityDialog,
+      kConsoleStartupSCCreateEntityDialogDescription,
+      "SC_CreateEntityDialog",
+      reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog),
+      &cleanup_CConFunc_SC_CreateEntityDialog
+    );
+  }
+
+  /**
+   * Address: 0x00C08D90 (FUN_00C08D90, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `SC_AntiAliasingSamples`.
+   */
+  void cleanup_CConFunc_SC_AntiAliasingSamples()
+  {
+    CleanupStartupConCommand(gCConFunc_SC_AntiAliasingSamples);
+  }
+
+  /**
+   * Address: 0x00BE9500 (FUN_00BE9500, register_CConFunc_SC_AntiAliasingSamples)
+   *
+   * What it does:
+   * Registers startup console callback for `SC_AntiAliasingSamples`.
+   */
+  void register_CConFunc_SC_AntiAliasingSamples()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_SC_AntiAliasingSamples,
+      kConsoleStartupSCAntiAliasingSamplesDescription,
+      "SC_AntiAliasingSamples",
+      &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken,
+      &cleanup_CConFunc_SC_AntiAliasingSamples
+    );
+  }
+
+  /**
+   * Address: 0x00C080B0 (FUN_00C080B0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `quit`.
+   */
+  void cleanup_CConFunc_quit()
+  {
+    CleanupStartupConCommand(gCConFunc_quit);
+  }
+
+  /**
+   * Address: 0x00BE7550 (FUN_00BE7550, register_CConFunc_quit)
+   *
+   * What it does:
+   * Registers startup console callback for `quit`.
+   */
+  void register_CConFunc_quit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_quit,
+      kConsoleStartupQuitDescription,
+      "quit",
+      &moho::CON_WLD_RequestEndSession,
+      &cleanup_CConFunc_quit
+    );
+  }
+
+  /**
+   * Address: 0x00C07F60 (FUN_00C07F60, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_IncreaseSimRate`.
+   */
+  void cleanup_CConFunc_WLD_IncreaseSimRate()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_IncreaseSimRate);
+  }
+
+  /**
+   * Address: 0x00BE7370 (FUN_00BE7370, register_CConFunc_WLD_IncreaseSimRate)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_IncreaseSimRate`.
+   */
+  void register_CConFunc_WLD_IncreaseSimRate()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_IncreaseSimRate,
+      kConsoleStartupWLDIncreaseSimRateDescription,
+      "WLD_IncreaseSimRate",
+      reinterpret_cast<CConFunc::Callback>(&moho::WLD_IncreaseSimRate),
+      &cleanup_CConFunc_WLD_IncreaseSimRate
+    );
+  }
+
+  /**
+   * Address: 0x00C07FC0 (FUN_00C07FC0, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_DecreaseSimRate`.
+   */
+  void cleanup_CConFunc_WLD_DecreaseSimRate()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_DecreaseSimRate);
+  }
+
+  /**
+   * Address: 0x00BE73F0 (FUN_00BE73F0, register_CConFunc_WLD_DecreaseSimRate)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_DecreaseSimRate`.
+   */
+  void register_CConFunc_WLD_DecreaseSimRate()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_DecreaseSimRate,
+      kConsoleStartupWLDDecreaseSimRateDescription,
+      "WLD_DecreaseSimRate",
+      reinterpret_cast<CConFunc::Callback>(&moho::WLD_DecreaseSimRate),
+      &cleanup_CConFunc_WLD_DecreaseSimRate
+    );
+  }
+
+  /**
+   * Address: 0x00C07F90 (FUN_00C07F90, the `atexit` target the registrar below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `WLD_ResetSimRate`.
+   */
+  void cleanup_CConFunc_WLD_ResetSimRate()
+  {
+    CleanupStartupConCommand(gCConFunc_WLD_ResetSimRate);
+  }
+
+  /**
+   * Address: 0x00BE73B0 (FUN_00BE73B0, register_CConFunc_WLD_ResetSimRate)
+   *
+   * What it does:
+   * Registers startup console callback for `WLD_ResetSimRate`.
+   */
+  void register_CConFunc_WLD_ResetSimRate()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WLD_ResetSimRate,
+      kConsoleStartupWLDResetSimRateDescription,
+      "WLD_ResetSimRate",
+      reinterpret_cast<CConFunc::Callback>(&moho::WLD_ResetSimRate),
+      &cleanup_CConFunc_WLD_ResetSimRate
+    );
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct ConsoleStartupRegistrationsMisc2
+  {
+    ConsoleStartupRegistrationsMisc2()
+    {
+      moho::register_CConFunc_DumpActiveLoops();
+      moho::register_CConFunc_ShowArmyStats();
+      moho::register_CConFunc_ShowStats();
+      moho::register_CConFunc_ren_MapBorderAdd();
+      moho::register_CConFunc_ren_MapBorderClear();
+      moho::register_CConFunc_ren_ShowSkeletons();
+      moho::register_CConFunc_timestamp();
+      moho::register_CConFunc_SC_CreateEntityDialog();
+      moho::register_CConFunc_SC_AntiAliasingSamples();
+      moho::register_CConFunc_quit();
+      moho::register_CConFunc_WLD_IncreaseSimRate();
+      moho::register_CConFunc_WLD_DecreaseSimRate();
+      moho::register_CConFunc_WLD_ResetSimRate();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsMisc2 gConsoleStartupRegistrationsMisc2;
 } // namespace
