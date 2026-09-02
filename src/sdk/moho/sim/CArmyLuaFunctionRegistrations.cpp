@@ -1,5 +1,6 @@
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
 
+#include <cstdlib>
 #include <cstring>
 
 #include "lua/LuaTableIterator.h"
@@ -860,6 +861,17 @@ namespace moho
    * Registers the `SetArmyColor` console alias that routes to
    * `DoSimCommand SetArmyColor`.
    */
+  /**
+   * Address: 0x00BFF4F0 (FUN_00BFF4F0, cleanup_SetArmyColor_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `SetArmyColor`.
+   */
+  void cleanup_SetArmyColor_ConAliasDef()
+  {
+    ConAlias_SetArmyColor().ShutdownRecovered();
+  }
+
   void register_SetArmyColor_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -873,6 +885,7 @@ namespace moho
       "SetArmyColor",
       "DoSimCommand SetArmyColor"
     );
+    (void)std::atexit(&cleanup_SetArmyColor_ConAliasDef);
   }
 
   /**

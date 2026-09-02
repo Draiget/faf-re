@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <map>
 #include <new>
@@ -2841,6 +2842,17 @@ namespace moho
   /**
    * Address: 0x00BDA3E0 (FUN_00BDA3E0, register_imap_debug_ConAliasDef)
    */
+  /**
+   * Address: 0x00BFFCD0 (FUN_00BFFCD0, cleanup_imap_debug_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `imap_debug`.
+   */
+  void cleanup_imap_debug_ConAliasDef()
+  {
+    ConAlias_imap_debug().ShutdownRecovered();
+  }
+
   void register_imap_debug_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -2854,6 +2866,7 @@ namespace moho
       "imap_debug",
       "DoSimCommand imap_debug"
     );
+    (void)std::atexit(&cleanup_imap_debug_ConAliasDef);
   }
 
   /**
@@ -2867,6 +2880,17 @@ namespace moho
   /**
    * Address: 0x00BDA460 (FUN_00BDA460, register_imap_debug_grid_ConAliasDef)
    */
+  /**
+   * Address: 0x00BFFD30 (FUN_00BFFD30, cleanup_imap_debug_grid_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `imap_debug_grid`.
+   */
+  void cleanup_imap_debug_grid_ConAliasDef()
+  {
+    ConAlias_imap_debug_grid().ShutdownRecovered();
+  }
+
   void register_imap_debug_grid_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -2880,6 +2904,7 @@ namespace moho
       "imap_debug_grid",
       "DoSimCommand imap_debug_grid"
     );
+    (void)std::atexit(&cleanup_imap_debug_grid_ConAliasDef);
   }
 
   /**
@@ -2893,6 +2918,17 @@ namespace moho
   /**
    * Address: 0x00BDA4E0 (FUN_00BDA4E0, register_imap_debug_path_graph_ConAliasDef)
    */
+  /**
+   * Address: 0x00BFFD90 (FUN_00BFFD90, cleanup_imap_debug_path_graph_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `imap_debug_path_graph`.
+   */
+  void cleanup_imap_debug_path_graph_ConAliasDef()
+  {
+    ConAlias_imap_debug_path_graph().ShutdownRecovered();
+  }
+
   void register_imap_debug_path_graph_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -2906,6 +2942,7 @@ namespace moho
       "imap_debug_path_graph",
       "DoSimCommand imap_debug_path_graph"
     );
+    (void)std::atexit(&cleanup_imap_debug_path_graph_ConAliasDef);
   }
 
   /**
@@ -2919,6 +2956,17 @@ namespace moho
   /**
    * Address: 0x00BDA560 (FUN_00BDA560, register_imap_debug_grid_type_ConAliasDef)
    */
+  /**
+   * Address: 0x00BFFDF0 (FUN_00BFFDF0, cleanup_imap_debug_grid_type_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `imap_debug_grid_type`.
+   */
+  void cleanup_imap_debug_grid_type_ConAliasDef()
+  {
+    ConAlias_imap_debug_grid_type().ShutdownRecovered();
+  }
+
   void register_imap_debug_grid_type_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -2932,6 +2980,7 @@ namespace moho
       "imap_debug_grid_type",
       "DoSimCommand imap_debug_grid_type"
     );
+    (void)std::atexit(&cleanup_imap_debug_grid_type_ConAliasDef);
   }
 
   /**
@@ -2945,6 +2994,17 @@ namespace moho
   /**
    * Address: 0x00BDA5E0 (FUN_00BDA5E0, register_imap_debug_grid_army_ConAliasDef)
    */
+  /**
+   * Address: 0x00BFFE50 (FUN_00BFFE50, cleanup_imap_debug_grid_army_ConAliasDef)
+   *
+   * What it does:
+   * Tears down startup-owned alias payload for `imap_debug_grid_army`.
+   */
+  void cleanup_imap_debug_grid_army_ConAliasDef()
+  {
+    ConAlias_imap_debug_grid_army().ShutdownRecovered();
+  }
+
   void register_imap_debug_grid_army_ConAliasDef()
   {
     static bool sInitialized = false;
@@ -2958,6 +3018,7 @@ namespace moho
       "imap_debug_grid_army",
       "DoSimCommand imap_debug_grid_army"
     );
+    (void)std::atexit(&cleanup_imap_debug_grid_army_ConAliasDef);
   }
 
   /**
