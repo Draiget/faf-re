@@ -5762,7 +5762,7 @@
    * What it does:
    * Returns first free LSC object lane from the global fixed pool.
    */
-  [[maybe_unused]] [[nodiscard]] LscRuntimeView* lsc_Alloc() noexcept
+  [[nodiscard]] LscRuntimeView* lsc_Alloc() noexcept
   {
     for (LscRuntimeView& lscObject : gLscObjectPool) {
       if (lscObject.used == 0) {
@@ -5772,6 +5772,10 @@
     return nullptr;
   }
 
+  // Defined later in this aggregate translation unit.
+  void LSC_LockCrs();
+  void LSC_UnlockCrs();
+
   /**
    * Address: 0x00B08A90 (FUN_00B08A90, _LSC_Create)
    *
@@ -5779,18 +5783,18 @@
    * Allocates one LSC object from the global pool and binds it to an SJ
    * provider handle for seamless stream scheduling.
    */
-  [[maybe_unused]] void* LSC_Create(void* const sjHandle)
+  void* LSC_Create(void* const sjHandle)
   {
     if (sjHandle == nullptr) {
       (void)LSC_CallErrFunc_(kLscErrInvalidSjHandle);
       return nullptr;
     }
 
-    SJCRS_Lock();
+    LSC_LockCrs();
     LscRuntimeView* const lsc = lsc_Alloc();
     if (lsc == nullptr) {
       (void)LSC_CallErrFunc_(kLscErrNoFreeLscInstance);
-      SJCRS_Unlock();
+      LSC_UnlockCrs();
       return nullptr;
     }
 
@@ -5804,7 +5808,7 @@
     }
 
     lsc->used = 1;
-    SJCRS_Unlock();
+    LSC_UnlockCrs();
     return lsc;
   }
 
@@ -5876,14 +5880,14 @@
    */
   void LSC_Init()
   {
-    SJCRS_Lock();
+    LSC_LockCrs();
     if (gLscInitCount == 0) {
       std::memset(gLscObjectPool.data(), 0, sizeof(gLscObjectPool));
       (void)LSC_EntryErrFunc(nullptr, 0);
     }
 
     ++gLscInitCount;
-    SJCRS_Unlock();
+    LSC_UnlockCrs();
   }
 
   /**
@@ -6312,7 +6316,7 @@
    * What it does:
    * LSC lock wrapper over the shared Sofdec critical section.
    */
-  [[maybe_unused]] void LSC_LockCrs()
+  void LSC_LockCrs()
   {
     SJCRS_Lock();
   }
@@ -6323,7 +6327,7 @@
    * What it does:
    * LSC unlock wrapper over the shared Sofdec critical section.
    */
-  [[maybe_unused]] void LSC_UnlockCrs()
+  void LSC_UnlockCrs()
   {
     SJCRS_Unlock();
   }
@@ -8096,12 +8100,12 @@
 
   /**
    * Address: 0x00B15810 (FUN_00B15810, sub_B15810)
-   * Also emitted at: 0x00B17CA0 (FUN_00B17CA0)
    *
    * What it does:
-   * Returns ADXRNA state byte.
+   * Returns ADXRNA state byte. Internal core reached through the
+   * `ADXRNA_GetStateByte` thunk at 0x00B17CA0 (FUN_00B17CA0).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetStateByte(const std::int32_t rnaHandle)
+  std::int32_t adxrna_GetStateByteCore(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8113,12 +8117,12 @@
 
   /**
    * Address: 0x00B15960 (FUN_00B15960, sub_B15960)
-   * Also emitted at: 0x00B17CC0 (FUN_00B17CC0)
    *
    * What it does:
-   * Stores one ADXRNA control word at lane `0x44`.
+   * Stores one ADXRNA control word at lane `0x44`. Internal core reached
+   * through the `ADXRNA_SetControlWord44` thunk at 0x00B17CC0 (FUN_00B17CC0).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetControlWord44(const std::int32_t rnaHandle, const std::int32_t controlWord)
+  std::int32_t adxrna_SetControlWord44Core(const std::int32_t rnaHandle, const std::int32_t controlWord)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8157,12 +8161,13 @@
 
   /**
    * Address: 0x00B15980 (FUN_00B15980, sub_B15980)
-   * Also emitted at: 0x00B17D20 (FUN_00B17D20, _ADXRNA_SetBitPerSmpl)
    *
    * What it does:
    * Updates ADXRNA bits-per-sample lane and rescales transfer-capacity lane.
+   * Internal core reached through the `ADXRNA_SetBitPerSmpl` thunk at
+   * 0x00B17D20 (FUN_00B17D20, _ADXRNA_SetBitPerSmpl).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetBitPerSmpl(const std::int32_t rnaHandle, const std::int32_t bitsPerSample)
+  std::int32_t adxrna_SetBitPerSmplCore(const std::int32_t rnaHandle, const std::int32_t bitsPerSample)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8182,13 +8187,13 @@
 
   /**
    * Address: 0x00B159D0 (FUN_00B159D0, sub_B159D0)
-   * Also emitted at: 0x00B17CE0 (FUN_00B17CE0, _ADXRNA_SetSfreq)
    *
    * What it does:
    * Stores ADXRNA base sample-rate lane and recomputes effective sample
-   * frequency lane.
+   * frequency lane. Internal core reached through the `ADXRNA_SetSfreq`
+   * thunk at 0x00B17CE0 (FUN_00B17CE0, _ADXRNA_SetSfreq).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetSfreq(const std::int32_t rnaHandle, const std::int32_t sampleRate)
+  std::int32_t adxrna_SetSfreqCore(const std::int32_t rnaHandle, const std::int32_t sampleRate)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8225,13 +8230,13 @@
 
   /**
    * Address: 0x00B15A40 (FUN_00B15A40, sub_B15A40)
-   * Also emitted at: 0x00B17CF0 (FUN_00B17CF0, _ADXRNA_SetOutVol)
    *
    * What it does:
    * Applies ADXRNA output-volume lane and mirrors clamped value to stream-info
-   * lane at `0x60`.
+   * lane at `0x60`. Internal core reached through the `ADXRNA_SetOutVol`
+   * thunk at 0x00B17CF0 (FUN_00B17CF0, _ADXRNA_SetOutVol).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetOutVol(const std::int32_t rnaHandle, const std::int32_t volumeLevel)
+  std::int32_t adxrna_SetOutVolCore(const std::int32_t rnaHandle, const std::int32_t volumeLevel)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8253,10 +8258,22 @@
 
   /**
    * Address: 0x00B15A80 (FUN_00B15A80, sub_B15A80)
-   * Also emitted at: 0x00B17D00 (FUN_00B17D00, _ADXRNA_SetOutPan)
    *
    * What it does:
    * Applies one channel output-pan lane with ADXRNA bounds/clamp semantics.
+   * This is the correctly-addressed recovery of this logic. The real public
+   * thunk for this body lives at 0x00B17D00 (FUN_00B17D00, _ADXRNA_SetOutPan)
+   * and is still unrecovered.
+   *
+   * KNOWN DUPLICATE (found 2026-09-02, not yet resolved): the real caller
+   * of this logic, `adxt_SetOutPan` (0x00B0D9F0,
+   * src/sdk/cri/sofdec/SofdecAdxCodecRuntime.cpp), currently calls a
+   * second, unaddressed reimplementation named `SetAdxrnaOutputPan`
+   * (src/sdk/cri/sofdec/SofdecAdxDeclarationsRuntime.cpp) instead of this
+   * function. That helper has no `Address:` citation of its own and should
+   * be folded into this one (redirect `adxt_SetOutPan` to call this
+   * function directly, delete the duplicate, then add the missing
+   * 0x00B17D00 public thunk) rather than adding a third variant here.
    */
   [[maybe_unused]] std::int32_t ADXRNA_SetOutPan(
     const std::int32_t rnaHandle,
@@ -8291,13 +8308,14 @@
 
   /**
    * Address: 0x00B15AE0 (FUN_00B15AE0, sub_B15AE0)
-   * Also emitted at: 0x00B17D10 (FUN_00B17D10, _ADXRNA_SetOutBalance)
    *
    * What it does:
    * Applies output-balance lane with ADXRNA clamp semantics and stores
-   * clamped balance in stream-info lane `0x6C`.
+   * clamped balance in stream-info lane `0x6C`. Internal core reached
+   * through the `ADXRNA_SetOutBalance` thunk at 0x00B17D10 (FUN_00B17D10,
+   * _ADXRNA_SetOutBalance).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_SetOutBalance(const std::int32_t rnaHandle, const std::int32_t balanceLevel)
+  std::int32_t adxrna_SetOutBalanceCore(const std::int32_t rnaHandle, const std::int32_t balanceLevel)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -8577,8 +8595,8 @@
       std::int32_t lane3Word1 = 0;
       dispatch->queryLaneWordPair(outputRuntime, 3, &lane3Word0, &lane3Word1);
 
-      (void)ADXRNA_SetBitPerSmpl(rnaHandle, bitsPerSample);
-      (void)ADXRNA_SetSfreq(rnaHandle, sampleRate);
+      (void)adxrna_SetBitPerSmplCore(rnaHandle, bitsPerSample);
+      (void)adxrna_SetSfreqCore(rnaHandle, sampleRate);
 
       auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
       runtime->streamInfoWords64[0] = streamInfoWord64;
@@ -8602,6 +8620,29 @@
   [[maybe_unused]] std::int32_t ADXRNA_GetNumRoom()
   {
     return 0x7FFFFFFF;
+  }
+
+  /**
+   * Address: 0x00B17CA0 (FUN_00B17CA0)
+   *
+   * What it does:
+   * Public ADXRNA state-byte getter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_GetStateByte(const std::int32_t rnaHandle)
+  {
+    return adxrna_GetStateByteCore(rnaHandle);
+  }
+
+  /**
+   * Address: 0x00B17CC0 (FUN_00B17CC0)
+   *
+   * What it does:
+   * Public ADXRNA control-word-`0x44` setter thunk; tail-calls the internal
+   * core.
+   */
+  std::int32_t ADXRNA_SetControlWord44(const std::int32_t rnaHandle, const std::int32_t controlWord)
+  {
+    return adxrna_SetControlWord44Core(rnaHandle, controlWord);
   }
 
   /**
@@ -8693,6 +8734,50 @@
     }
 
     return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWord6C;
+  }
+
+  /**
+   * Address: 0x00B17CE0 (FUN_00B17CE0, _ADXRNA_SetSfreq)
+   *
+   * What it does:
+   * Public ADXRNA sample-rate setter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_SetSfreq(const std::int32_t rnaHandle, const std::int32_t sampleRate)
+  {
+    return adxrna_SetSfreqCore(rnaHandle, sampleRate);
+  }
+
+  /**
+   * Address: 0x00B17CF0 (FUN_00B17CF0, _ADXRNA_SetOutVol)
+   *
+   * What it does:
+   * Public ADXRNA output-volume setter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_SetOutVol(const std::int32_t rnaHandle, const std::int32_t volumeLevel)
+  {
+    return adxrna_SetOutVolCore(rnaHandle, volumeLevel);
+  }
+
+  /**
+   * Address: 0x00B17D10 (FUN_00B17D10, _ADXRNA_SetOutBalance)
+   *
+   * What it does:
+   * Public ADXRNA output-balance setter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_SetOutBalance(const std::int32_t rnaHandle, const std::int32_t balanceLevel)
+  {
+    return adxrna_SetOutBalanceCore(rnaHandle, balanceLevel);
+  }
+
+  /**
+   * Address: 0x00B17D20 (FUN_00B17D20, _ADXRNA_SetBitPerSmpl)
+   *
+   * What it does:
+   * Public ADXRNA bits-per-sample setter thunk; tail-calls the internal core.
+   */
+  std::int32_t ADXRNA_SetBitPerSmpl(const std::int32_t rnaHandle, const std::int32_t bitsPerSample)
+  {
+    return adxrna_SetBitPerSmplCore(rnaHandle, bitsPerSample);
   }
 
   /**
