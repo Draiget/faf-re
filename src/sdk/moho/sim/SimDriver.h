@@ -231,7 +231,7 @@ namespace moho
     /// `CWldSession::DoBeat`; the removal run carries decal handles, not
     /// entity ids.
     msvc8::vector<SDecalInfo> mAddDecals;                   // +0x1D0
-    msvc8::vector<std::int32_t> mRemoveDecals;              // +0x1E0
+    msvc8::vector<std::uint32_t> mRemoveDecals;             // +0x1E0
     msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
     msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
     /// Allied-upgrade notifications for this beat. `Sim::Sync` swaps

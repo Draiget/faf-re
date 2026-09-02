@@ -301,7 +301,7 @@ namespace moho
      * Scans all active decals for each requested runtime handle and marks
      * matching decals for deferred removal.
      */
-    void RemoveDecals(const msvc8::vector<std::int32_t>& decalHandles);
+    void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles);
 
     /**
      * Address: 0x008776D0 (FUN_008776D0, Moho::CDecalManager::Reindex)

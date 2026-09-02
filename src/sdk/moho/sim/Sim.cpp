@@ -8603,6 +8603,25 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // drains this lane into `mFollowCameras` is not yet recovered" -- this is
   // that site. `CWldSession::DoBeat` already replays the packet side through
   // `CameraImpl::CameraFollow`, so until now it replayed an always-empty lane.
+  // 0x00747693..0x007476DB. The particle buffer is *handed over*, not shared:
+  // the packet takes the pointer and the sim is left with none, so the next
+  // beat starts a fresh buffer. The decompile spells this out as a raw px copy,
+  // an add-ref on the incoming control block, a weak_release of the outgoing
+  // one, and then `[ebx+994h] = 0` / `[ebx+998h] = 0` with a full release --
+  // which is an assignment followed by a reset.
+  outSyncData->mParticleBuffer = mParticleBuffer;
+  mParticleBuffer.reset();
+
+  // 0x007476EF: the decal buffer publishes both of its lanes in one call --
+  // visible decals into `mAddDecals`, pending hide ids into `mRemoveDecals` --
+  // by swapping, same as the lanes below. `CDecalBuffer::SwapVectors`
+  // (0x00779BB0) was recovered with no caller anywhere in the tree; this is it,
+  // and `CWldSession::DoBeat` already feeds both lanes to
+  // `CDecalManager::AddDecals` / `RemoveDecals`.
+  if (mDecalBuffer != nullptr) {
+    mDecalBuffer->SwapVectors(&outSyncData->mAddDecals, &outSyncData->mRemoveDecals);
+  }
+
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
   // 0x00747A16..0x00747A58, the same swap idiom for the per-beat extra-unit-data
