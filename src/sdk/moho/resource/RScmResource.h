@@ -62,6 +62,23 @@ namespace moho
   static_assert(offsetof(RScmResource, mSize) == 0x48, "RScmResource::mSize offset must be 0x48");
   static_assert(sizeof(RScmResource) == 0x4C, "RScmResource size must be 0x4C");
 
+  class CResourceWatcher;
+
+  /**
+   * Address: 0x00539BA0 (FUN_00539BA0, func_GetModel)
+   *
+   * IDA signature:
+   * boost::shared_ptr<RScmResource> *__cdecl func_GetModel(
+   *     boost::shared_ptr<RScmResource> *out, const char *path, int resWatcher);
+   *
+   * What it does:
+   * Lazily resolves the `RScmResource` reflection descriptor, dispatches one
+   * model path through `RES_GetResource`, and returns the resolved SCM model
+   * as a live owning handle. Yields an empty pointer when the path is empty,
+   * unmounted, or the lookup resolved to a dead handle.
+   */
+  [[nodiscard]] boost::shared_ptr<RScmResource> GetModel(gpg::StrArg path, CResourceWatcher* resourceWatcher);
+
   /**
    * Address: 0x00BC91A0 (FUN_00BC91A0)
    *

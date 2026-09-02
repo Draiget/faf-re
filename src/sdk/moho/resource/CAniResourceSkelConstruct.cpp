@@ -100,21 +100,41 @@ namespace moho
     msvc8::string modelPath{};
     archive->ReadString(&modelPath);
 
+    boost::shared_ptr<const CAniSkel> skeleton{};
+    if (const boost::shared_ptr<RScmResource> modelResource = GetModel(modelPath.c_str(), nullptr); modelResource) {
+      skeleton = modelResource->GetSkeleton();
+    }
+
+    SetConstructResultSharedAniSkel(result, skeleton);
+  }
+
+  /**
+   * Address: 0x00539BA0 (FUN_00539BA0, func_GetModel)
+   *
+   * IDA signature:
+   * boost::shared_ptr<RScmResource> *__cdecl func_GetModel(
+   *     boost::shared_ptr<RScmResource> *out, const char *path, int resWatcher);
+   *
+   * What it does:
+   * Lazily resolves the `RScmResource` reflection descriptor (0x00539BC6
+   * caches it in `RScmResource::sType`), dispatches one model path through
+   * `RES_GetResource` (0x00539BF0), and retains the resolved object into the
+   * caller's handle (0x00539BFC) before releasing the manager's temporary.
+   * Yields an empty pointer when the lookup produced no live object -- the
+   * empty-path case lands there too, via the manager's own
+   * `GetResource: Invalid name` rejection.
+   */
+  boost::shared_ptr<RScmResource> GetModel(const gpg::StrArg path, CResourceWatcher* const resourceWatcher)
+  {
     gpg::RType* resourceType = RScmResource::sType;
     if (resourceType == nullptr) {
       resourceType = gpg::LookupRType(typeid(RScmResource));
       RScmResource::sType = resourceType;
     }
 
-    boost::weak_ptr<RScmResource> modelWeak{};
-    (void)RES_GetResource(&modelWeak, modelPath.c_str(), nullptr, resourceType);
-
-    boost::shared_ptr<const CAniSkel> skeleton{};
-    if (boost::shared_ptr<RScmResource> modelResource = modelWeak.lock(); modelResource) {
-      skeleton = modelResource->GetSkeleton();
-    }
-
-    SetConstructResultSharedAniSkel(result, skeleton);
+    boost::weak_ptr<RScmResource> resolved{};
+    (void)RES_GetResource(&resolved, path, resourceWatcher, resourceType);
+    return resolved.lock();
   }
 
   /**
