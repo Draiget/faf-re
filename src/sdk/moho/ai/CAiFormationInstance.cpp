@@ -431,17 +431,6 @@ namespace
     gSUnitOffsetInfoSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x00566390 (FUN_00566390, SerSaveLoadHelper<SUnitOffsetInfo>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the `SUnitOffsetInfo`
-   * serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkSUnitOffsetInfoSerializerLaneB() noexcept
-  {
-    gSUnitOffsetInfoSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x00566550 (FUN_00566550, SerSaveLoadHelper<SOffsetInfo>::unlink lane A)
@@ -455,17 +444,6 @@ namespace
     gSOffsetInfoSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x00566580 (FUN_00566580, SerSaveLoadHelper<SOffsetInfo>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the `SOffsetInfo` serializer
-   * helper node.
-   */
-  [[maybe_unused]] void UnlinkSOffsetInfoSerializerLaneB() noexcept
-  {
-    gSOffsetInfoSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x00566740 (FUN_00566740, SerSaveLoadHelper<IFormationInstance>::unlink lane A)
@@ -474,22 +452,25 @@ namespace
    * Unlinks `IFormationInstance` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
+  /**
+   * The duplicate emissions of this file's serializer glue -- second entry
+   * points for the same work, each a single call and referenced by nothing.
+   * A thunk has no source line behind it; the source called the target.
+   *
+   * Address: 0x00566770  duplicate of this lane
+   * Address: 0x00566970  duplicate of the SAssignedLocInfo unlink lane
+   * Address: 0x00566580  duplicate of the SOffsetInfo unlink lane
+   * Address: 0x00566390  duplicate of the SUnitOffsetInfo unlink lane
+   * Address: 0x0059DB60 / 0x0059E000  bridges into
+   *   CAiFormationInstance::MemberDeserialize
+   * Address: 0x0059DB70 / 0x0059E010  bridges into
+   *   CAiFormationInstance::MemberSerialize
+   */
   void UnlinkIFormationInstanceSerializerLaneA() noexcept
   {
     gIFormationInstanceSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x00566770 (FUN_00566770, SerSaveLoadHelper<IFormationInstance>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `IFormationInstance` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkIFormationInstanceSerializerLaneB() noexcept
-  {
-    gIFormationInstanceSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x00566940 (FUN_00566940, SerSaveLoadHelper<SAssignedLocInfo>::unlink lane A)
@@ -503,17 +484,6 @@ namespace
     gSAssignedLocInfoSerializer.ResetLinks();
   }
 
-  /**
-   * Address: 0x00566970 (FUN_00566970, SerSaveLoadHelper<SAssignedLocInfo>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `SAssignedLocInfo` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkSAssignedLocInfoSerializerLaneB() noexcept
-  {
-    gSAssignedLocInfoSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x00566300 (FUN_00566300, Moho::SUnitOffsetInfoSerializer::Deserialize)
@@ -5331,21 +5301,6 @@ namespace moho
     mSim = ReadPointerSim(archive, owner);
   }
 
-  /**
-   * Address: 0x0059DB60 (FUN_0059DB60)
-   *
-   * What it does:
-   * Serializer bridge thunk that forwards to `CAiFormationInstance::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CAiFormationInstanceMemberDeserializeBridgeA(
-    gpg::ReadArchive* const archive,
-    CAiFormationInstance* const formation
-  )
-  {
-    if (formation != nullptr) {
-      formation->MemberDeserialize(archive);
-    }
-  }
 
   /**
    * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
@@ -5370,53 +5325,8 @@ namespace moho
     WritePointerSim(archive, mSim, owner);
   }
 
-  /**
-   * Address: 0x0059DB70 (FUN_0059DB70)
-   *
-   * What it does:
-   * Serializer bridge thunk that forwards to `CAiFormationInstance::MemberSerialize`.
-   */
-  [[maybe_unused]] void CAiFormationInstanceMemberSerializeBridgeA(
-    const CAiFormationInstance* const formation,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (formation != nullptr) {
-      formation->MemberSerialize(archive);
-    }
-  }
 
-  /**
-   * Address: 0x0059E000 (FUN_0059E000)
-   *
-   * What it does:
-   * Serializer bridge thunk that forwards to `CAiFormationInstance::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CAiFormationInstanceMemberDeserializeBridgeB(
-    gpg::ReadArchive* const archive,
-    CAiFormationInstance* const formation
-  )
-  {
-    if (formation != nullptr) {
-      formation->MemberDeserialize(archive);
-    }
-  }
 
-  /**
-   * Address: 0x0059E010 (FUN_0059E010)
-   *
-   * What it does:
-   * Serializer bridge thunk that forwards to `CAiFormationInstance::MemberSerialize`.
-   */
-  [[maybe_unused]] void CAiFormationInstanceMemberSerializeBridgeB(
-    const CAiFormationInstance* const formation,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (formation != nullptr) {
-      formation->MemberSerialize(archive);
-    }
-  }
 
   /**
    * Address: 0x00569A10 (FUN_00569A10)
