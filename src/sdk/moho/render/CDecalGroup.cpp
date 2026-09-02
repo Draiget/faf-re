@@ -5,6 +5,7 @@
 
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "moho/render/CWldTerrainDecal.h"
 
 namespace moho
 {
@@ -141,6 +142,76 @@ namespace moho
     for (const std::int32_t decal : mDecals) {
       writer.Write(decal);
     }
+  }
+
+  /**
+   * Address: 0x008773A0 (FUN_008773A0, Moho::CDecalGroup::Func4)
+   * Slot: 6
+   *
+   * What it does:
+   * Reads `decal->mIndex` (`mov edx, [edx+18h]`), overwrites the incoming
+   * argument slot with it, and tail-jumps to slot 7 (`jmp [vtbl+0x1C]`).
+   * `decal` is dereferenced unconditionally.
+   */
+  bool CDecalGroup::Contains(CWldTerrainDecal* const decal)
+  {
+    return Contains(decal->mIndex);
+  }
+
+  /**
+   * Address: 0x00877370 (FUN_00877370, Moho::CDecalGroup::HasDecal)
+   * Slot: 7
+   *
+   * What it does:
+   * Walks `mDecals` from begin (`[this+0x28]`) to end (`[this+0x2C]`) looking
+   * for `decalIndex`, then returns `end != cursor` -- true when the walk broke
+   * early on a match, false when it ran to the end or the vector was empty.
+   */
+  bool CDecalGroup::Contains(const std::int32_t decalIndex)
+  {
+    return std::find(mDecals.begin(), mDecals.end(), decalIndex) != mDecals.end();
+  }
+
+  /**
+   * Address: 0x008773F0 (FUN_008773F0, Moho::CDecalGroup::Func6)
+   * Slot: 8
+   *
+   * What it does:
+   * Reads `decal->mIndex` and tail-jumps to slot 9 (`jmp [vtbl+0x24]`).
+   * `decal` is dereferenced unconditionally.
+   */
+  void CDecalGroup::Add(CWldTerrainDecal* const decal)
+  {
+    Add(decal->mIndex);
+  }
+
+  /**
+   * Address: 0x008773C0 (FUN_008773C0, Moho::CDecalGroup::AddToGroup)
+   * Slot: 9
+   *
+   * What it does:
+   * Dispatches slot 7 (`call [vtbl+0x1C]`) to test membership and returns when
+   * it reports the index is already tracked; otherwise appends it to `mDecals`
+   * (`sub_686E80`, the `msvc8::vector<std::int32_t>` push_back emission).
+   */
+  void CDecalGroup::Add(const std::int32_t decalIndex)
+  {
+    if (!Contains(decalIndex)) {
+      mDecals.push_back(decalIndex);
+    }
+  }
+
+  /**
+   * Address: 0x00877460 (FUN_00877460, Moho::CDecalGroup::Func8)
+   * Slot: 10
+   *
+   * What it does:
+   * Reads `decal->mIndex` and tail-jumps to slot 11 (`jmp [vtbl+0x2C]`).
+   * `decal` is dereferenced unconditionally.
+   */
+  void CDecalGroup::RemoveFromGroup(CWldTerrainDecal* const decal)
+  {
+    RemoveFromGroup(decal->mIndex);
   }
 
   /**
