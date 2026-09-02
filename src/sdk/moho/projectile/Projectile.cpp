@@ -1265,9 +1265,27 @@ namespace moho
     // The collided-entity weak link (asm `v4 = &this->v182`).
     Entity* const collidedEntity = view.mCollidedEntityWeak.GetObjectPtr();
 
-    // Fire the `OnImpact(self, impactTypeString)` script. The binary guards the
-    // Lua state with a temporary LuaObject when no collided entity is present;
-    // LuaPCall performs the equivalent marshalling.
+    // FIXME: this call is the wrong shape and every impact fails on it. The
+    // binary runs `OnImpact(self, impactTypeString, collidedEntityObject)` --
+    // 0x0069DF11..0x0069DF41 takes the collided entity's weak-link target, steps
+    // back to the object base and reads `[base+0x20]`, which is
+    // `CScriptObject::mLuaObj` at that same offset, and when nothing was hit it
+    // constructs a temporary `LuaObject` on this projectile's Lua state
+    // (0x0069DF2E) rather than passing an unbound one. `LuaPCall` pushes that
+    // argument, and a default-constructed LuaObject has no state to validate
+    // against, so `PushStack` throws `state->l_G == m_state->m_state->l_G`:
+    // 10,960 "Error running OnImpact script" warnings in a seventy-second run
+    // once units actually started shooting.
+    //
+    // The obvious fix -- pass `collidedEntity->mLuaObj`, else a LuaObject built
+    // on `mLuaObj.GetActiveState()` -- does silence all 10,960 of them, but it
+    // must not land alone. Letting OnImpact scripts finally execute exposes a
+    // weak-pointer lifetime bug underneath: `Projectile::~Projectile` ->
+    // `CAiTarget::~CAiTarget` -> `CAiTarget::UnlinkEntityTargetRef` ->
+    // `WeakPtr<Entity>::UnlinkFromOwnerChain` -> `ReplaceInOwnerChain`
+    // (`WeakPtr.h:294`) faults reading a garbage chain pointer, the sim stalls
+    // back to `Game time 00:00:00`, and a clean 49-minute run becomes two
+    // crashes. Fix the weak-pointer chain first, then restore the call shape.
     const char* impactTypeString = ENT_GetImpactTypeString(view.mImpactType);
     LuaPlus::LuaObject impactResult;
     const char* impactArgs[] = {impactTypeString};
