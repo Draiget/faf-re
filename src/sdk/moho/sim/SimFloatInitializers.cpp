@@ -11323,3 +11323,6414 @@ namespace moho
 
 
 
+namespace
+{
+  template <>
+  struct SimFloatSlot<0>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<0>::pInf = 0.0f;
+  float SimFloatSlot<0>::nInf = 0.0f;
+  float SimFloatSlot<0>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<1>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<1>::pInf = 0.0f;
+  float SimFloatSlot<1>::nInf = 0.0f;
+  float SimFloatSlot<1>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<2>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<2>::pInf = 0.0f;
+  float SimFloatSlot<2>::nInf = 0.0f;
+  float SimFloatSlot<2>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<3>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<3>::pInf = 0.0f;
+  float SimFloatSlot<3>::nInf = 0.0f;
+  float SimFloatSlot<3>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<4>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<4>::pInf = 0.0f;
+  float SimFloatSlot<4>::nInf = 0.0f;
+  float SimFloatSlot<4>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<5>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<5>::pInf = 0.0f;
+  float SimFloatSlot<5>::nInf = 0.0f;
+  float SimFloatSlot<5>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<6>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<6>::pInf = 0.0f;
+  float SimFloatSlot<6>::nInf = 0.0f;
+  float SimFloatSlot<6>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<7>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<7>::pInf = 0.0f;
+  float SimFloatSlot<7>::nInf = 0.0f;
+  float SimFloatSlot<7>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<8>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<8>::pInf = 0.0f;
+  float SimFloatSlot<8>::nInf = 0.0f;
+  float SimFloatSlot<8>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<200>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<200>::pInf = 0.0f;
+  float SimFloatSlot<200>::nInf = 0.0f;
+  float SimFloatSlot<200>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<201>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<201>::pInf = 0.0f;
+  float SimFloatSlot<201>::nInf = 0.0f;
+  float SimFloatSlot<201>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<202>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<202>::pInf = 0.0f;
+  float SimFloatSlot<202>::nInf = 0.0f;
+  float SimFloatSlot<202>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<203>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<203>::pInf = 0.0f;
+  float SimFloatSlot<203>::nInf = 0.0f;
+  float SimFloatSlot<203>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<204>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<204>::pInf = 0.0f;
+  float SimFloatSlot<204>::nInf = 0.0f;
+  float SimFloatSlot<204>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<205>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<205>::pInf = 0.0f;
+  float SimFloatSlot<205>::nInf = 0.0f;
+  float SimFloatSlot<205>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<206>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<206>::pInf = 0.0f;
+  float SimFloatSlot<206>::nInf = 0.0f;
+  float SimFloatSlot<206>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<207>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<207>::pInf = 0.0f;
+  float SimFloatSlot<207>::nInf = 0.0f;
+  float SimFloatSlot<207>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<208>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<208>::pInf = 0.0f;
+  float SimFloatSlot<208>::nInf = 0.0f;
+  float SimFloatSlot<208>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<209>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<209>::pInf = 0.0f;
+  float SimFloatSlot<209>::nInf = 0.0f;
+  float SimFloatSlot<209>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<210>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<210>::pInf = 0.0f;
+  float SimFloatSlot<210>::nInf = 0.0f;
+  float SimFloatSlot<210>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<211>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<211>::pInf = 0.0f;
+  float SimFloatSlot<211>::nInf = 0.0f;
+  float SimFloatSlot<211>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<212>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<212>::pInf = 0.0f;
+  float SimFloatSlot<212>::nInf = 0.0f;
+  float SimFloatSlot<212>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<213>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<213>::pInf = 0.0f;
+  float SimFloatSlot<213>::nInf = 0.0f;
+  float SimFloatSlot<213>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<214>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<214>::pInf = 0.0f;
+  float SimFloatSlot<214>::nInf = 0.0f;
+  float SimFloatSlot<214>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<215>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<215>::pInf = 0.0f;
+  float SimFloatSlot<215>::nInf = 0.0f;
+  float SimFloatSlot<215>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<216>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<216>::pInf = 0.0f;
+  float SimFloatSlot<216>::nInf = 0.0f;
+  float SimFloatSlot<216>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<217>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<217>::pInf = 0.0f;
+  float SimFloatSlot<217>::nInf = 0.0f;
+  float SimFloatSlot<217>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<218>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<218>::pInf = 0.0f;
+  float SimFloatSlot<218>::nInf = 0.0f;
+  float SimFloatSlot<218>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<219>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<219>::pInf = 0.0f;
+  float SimFloatSlot<219>::nInf = 0.0f;
+  float SimFloatSlot<219>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<220>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<220>::pInf = 0.0f;
+  float SimFloatSlot<220>::nInf = 0.0f;
+  float SimFloatSlot<220>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<221>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<221>::pInf = 0.0f;
+  float SimFloatSlot<221>::nInf = 0.0f;
+  float SimFloatSlot<221>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<222>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<222>::pInf = 0.0f;
+  float SimFloatSlot<222>::nInf = 0.0f;
+  float SimFloatSlot<222>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<223>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<223>::pInf = 0.0f;
+  float SimFloatSlot<223>::nInf = 0.0f;
+  float SimFloatSlot<223>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<224>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<224>::pInf = 0.0f;
+  float SimFloatSlot<224>::nInf = 0.0f;
+  float SimFloatSlot<224>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<225>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<225>::pInf = 0.0f;
+  float SimFloatSlot<225>::nInf = 0.0f;
+  float SimFloatSlot<225>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<226>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<226>::pInf = 0.0f;
+  float SimFloatSlot<226>::nInf = 0.0f;
+  float SimFloatSlot<226>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<227>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<227>::pInf = 0.0f;
+  float SimFloatSlot<227>::nInf = 0.0f;
+  float SimFloatSlot<227>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<228>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<228>::pInf = 0.0f;
+  float SimFloatSlot<228>::nInf = 0.0f;
+  float SimFloatSlot<228>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<229>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<229>::pInf = 0.0f;
+  float SimFloatSlot<229>::nInf = 0.0f;
+  float SimFloatSlot<229>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<230>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<230>::pInf = 0.0f;
+  float SimFloatSlot<230>::nInf = 0.0f;
+  float SimFloatSlot<230>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<231>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<231>::pInf = 0.0f;
+  float SimFloatSlot<231>::nInf = 0.0f;
+  float SimFloatSlot<231>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<232>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<232>::pInf = 0.0f;
+  float SimFloatSlot<232>::nInf = 0.0f;
+  float SimFloatSlot<232>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<233>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<233>::pInf = 0.0f;
+  float SimFloatSlot<233>::nInf = 0.0f;
+  float SimFloatSlot<233>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<234>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<234>::pInf = 0.0f;
+  float SimFloatSlot<234>::nInf = 0.0f;
+  float SimFloatSlot<234>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<235>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<235>::pInf = 0.0f;
+  float SimFloatSlot<235>::nInf = 0.0f;
+  float SimFloatSlot<235>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<236>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<236>::pInf = 0.0f;
+  float SimFloatSlot<236>::nInf = 0.0f;
+  float SimFloatSlot<236>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<237>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<237>::pInf = 0.0f;
+  float SimFloatSlot<237>::nInf = 0.0f;
+  float SimFloatSlot<237>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<238>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<238>::pInf = 0.0f;
+  float SimFloatSlot<238>::nInf = 0.0f;
+  float SimFloatSlot<238>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<239>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<239>::pInf = 0.0f;
+  float SimFloatSlot<239>::nInf = 0.0f;
+  float SimFloatSlot<239>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<240>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<240>::pInf = 0.0f;
+  float SimFloatSlot<240>::nInf = 0.0f;
+  float SimFloatSlot<240>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<241>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<241>::pInf = 0.0f;
+  float SimFloatSlot<241>::nInf = 0.0f;
+  float SimFloatSlot<241>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<242>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<242>::pInf = 0.0f;
+  float SimFloatSlot<242>::nInf = 0.0f;
+  float SimFloatSlot<242>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<243>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<243>::pInf = 0.0f;
+  float SimFloatSlot<243>::nInf = 0.0f;
+  float SimFloatSlot<243>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<244>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<244>::pInf = 0.0f;
+  float SimFloatSlot<244>::nInf = 0.0f;
+  float SimFloatSlot<244>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<245>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<245>::pInf = 0.0f;
+  float SimFloatSlot<245>::nInf = 0.0f;
+  float SimFloatSlot<245>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<246>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<246>::pInf = 0.0f;
+  float SimFloatSlot<246>::nInf = 0.0f;
+  float SimFloatSlot<246>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<247>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<247>::pInf = 0.0f;
+  float SimFloatSlot<247>::nInf = 0.0f;
+  float SimFloatSlot<247>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<248>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<248>::pInf = 0.0f;
+  float SimFloatSlot<248>::nInf = 0.0f;
+  float SimFloatSlot<248>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<249>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<249>::pInf = 0.0f;
+  float SimFloatSlot<249>::nInf = 0.0f;
+  float SimFloatSlot<249>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<250>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<250>::pInf = 0.0f;
+  float SimFloatSlot<250>::nInf = 0.0f;
+  float SimFloatSlot<250>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<251>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<251>::pInf = 0.0f;
+  float SimFloatSlot<251>::nInf = 0.0f;
+  float SimFloatSlot<251>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<252>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<252>::pInf = 0.0f;
+  float SimFloatSlot<252>::nInf = 0.0f;
+  float SimFloatSlot<252>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<253>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<253>::pInf = 0.0f;
+  float SimFloatSlot<253>::nInf = 0.0f;
+  float SimFloatSlot<253>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<254>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<254>::pInf = 0.0f;
+  float SimFloatSlot<254>::nInf = 0.0f;
+  float SimFloatSlot<254>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<255>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<255>::pInf = 0.0f;
+  float SimFloatSlot<255>::nInf = 0.0f;
+  float SimFloatSlot<255>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<256>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<256>::pInf = 0.0f;
+  float SimFloatSlot<256>::nInf = 0.0f;
+  float SimFloatSlot<256>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<257>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<257>::pInf = 0.0f;
+  float SimFloatSlot<257>::nInf = 0.0f;
+  float SimFloatSlot<257>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<258>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<258>::pInf = 0.0f;
+  float SimFloatSlot<258>::nInf = 0.0f;
+  float SimFloatSlot<258>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<259>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<259>::pInf = 0.0f;
+  float SimFloatSlot<259>::nInf = 0.0f;
+  float SimFloatSlot<259>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<260>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<260>::pInf = 0.0f;
+  float SimFloatSlot<260>::nInf = 0.0f;
+  float SimFloatSlot<260>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<261>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<261>::pInf = 0.0f;
+  float SimFloatSlot<261>::nInf = 0.0f;
+  float SimFloatSlot<261>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<262>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<262>::pInf = 0.0f;
+  float SimFloatSlot<262>::nInf = 0.0f;
+  float SimFloatSlot<262>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<263>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<263>::pInf = 0.0f;
+  float SimFloatSlot<263>::nInf = 0.0f;
+  float SimFloatSlot<263>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<264>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<264>::pInf = 0.0f;
+  float SimFloatSlot<264>::nInf = 0.0f;
+  float SimFloatSlot<264>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<265>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<265>::pInf = 0.0f;
+  float SimFloatSlot<265>::nInf = 0.0f;
+  float SimFloatSlot<265>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<266>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<266>::pInf = 0.0f;
+  float SimFloatSlot<266>::nInf = 0.0f;
+  float SimFloatSlot<266>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<267>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<267>::pInf = 0.0f;
+  float SimFloatSlot<267>::nInf = 0.0f;
+  float SimFloatSlot<267>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<268>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<268>::pInf = 0.0f;
+  float SimFloatSlot<268>::nInf = 0.0f;
+  float SimFloatSlot<268>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<269>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<269>::pInf = 0.0f;
+  float SimFloatSlot<269>::nInf = 0.0f;
+  float SimFloatSlot<269>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<270>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<270>::pInf = 0.0f;
+  float SimFloatSlot<270>::nInf = 0.0f;
+  float SimFloatSlot<270>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<271>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<271>::pInf = 0.0f;
+  float SimFloatSlot<271>::nInf = 0.0f;
+  float SimFloatSlot<271>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<272>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<272>::pInf = 0.0f;
+  float SimFloatSlot<272>::nInf = 0.0f;
+  float SimFloatSlot<272>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<273>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<273>::pInf = 0.0f;
+  float SimFloatSlot<273>::nInf = 0.0f;
+  float SimFloatSlot<273>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<274>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<274>::pInf = 0.0f;
+  float SimFloatSlot<274>::nInf = 0.0f;
+  float SimFloatSlot<274>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<275>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<275>::pInf = 0.0f;
+  float SimFloatSlot<275>::nInf = 0.0f;
+  float SimFloatSlot<275>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<276>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<276>::pInf = 0.0f;
+  float SimFloatSlot<276>::nInf = 0.0f;
+  float SimFloatSlot<276>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<277>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<277>::pInf = 0.0f;
+  float SimFloatSlot<277>::nInf = 0.0f;
+  float SimFloatSlot<277>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<278>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<278>::pInf = 0.0f;
+  float SimFloatSlot<278>::nInf = 0.0f;
+  float SimFloatSlot<278>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<279>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<279>::pInf = 0.0f;
+  float SimFloatSlot<279>::nInf = 0.0f;
+  float SimFloatSlot<279>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<280>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<280>::pInf = 0.0f;
+  float SimFloatSlot<280>::nInf = 0.0f;
+  float SimFloatSlot<280>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<281>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<281>::pInf = 0.0f;
+  float SimFloatSlot<281>::nInf = 0.0f;
+  float SimFloatSlot<281>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<282>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<282>::pInf = 0.0f;
+  float SimFloatSlot<282>::nInf = 0.0f;
+  float SimFloatSlot<282>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<283>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<283>::pInf = 0.0f;
+  float SimFloatSlot<283>::nInf = 0.0f;
+  float SimFloatSlot<283>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<284>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<284>::pInf = 0.0f;
+  float SimFloatSlot<284>::nInf = 0.0f;
+  float SimFloatSlot<284>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<285>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<285>::pInf = 0.0f;
+  float SimFloatSlot<285>::nInf = 0.0f;
+  float SimFloatSlot<285>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<286>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<286>::pInf = 0.0f;
+  float SimFloatSlot<286>::nInf = 0.0f;
+  float SimFloatSlot<286>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<287>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<287>::pInf = 0.0f;
+  float SimFloatSlot<287>::nInf = 0.0f;
+  float SimFloatSlot<287>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<288>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<288>::pInf = 0.0f;
+  float SimFloatSlot<288>::nInf = 0.0f;
+  float SimFloatSlot<288>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<289>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<289>::pInf = 0.0f;
+  float SimFloatSlot<289>::nInf = 0.0f;
+  float SimFloatSlot<289>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<290>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<290>::pInf = 0.0f;
+  float SimFloatSlot<290>::nInf = 0.0f;
+  float SimFloatSlot<290>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<291>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<291>::pInf = 0.0f;
+  float SimFloatSlot<291>::nInf = 0.0f;
+  float SimFloatSlot<291>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<292>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<292>::pInf = 0.0f;
+  float SimFloatSlot<292>::nInf = 0.0f;
+  float SimFloatSlot<292>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<293>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<293>::pInf = 0.0f;
+  float SimFloatSlot<293>::nInf = 0.0f;
+  float SimFloatSlot<293>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<294>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<294>::pInf = 0.0f;
+  float SimFloatSlot<294>::nInf = 0.0f;
+  float SimFloatSlot<294>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<295>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<295>::pInf = 0.0f;
+  float SimFloatSlot<295>::nInf = 0.0f;
+  float SimFloatSlot<295>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<296>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<296>::pInf = 0.0f;
+  float SimFloatSlot<296>::nInf = 0.0f;
+  float SimFloatSlot<296>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<297>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<297>::pInf = 0.0f;
+  float SimFloatSlot<297>::nInf = 0.0f;
+  float SimFloatSlot<297>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<298>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<298>::pInf = 0.0f;
+  float SimFloatSlot<298>::nInf = 0.0f;
+  float SimFloatSlot<298>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<299>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<299>::pInf = 0.0f;
+  float SimFloatSlot<299>::nInf = 0.0f;
+  float SimFloatSlot<299>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<300>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<300>::pInf = 0.0f;
+  float SimFloatSlot<300>::nInf = 0.0f;
+  float SimFloatSlot<300>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<301>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<301>::pInf = 0.0f;
+  float SimFloatSlot<301>::nInf = 0.0f;
+  float SimFloatSlot<301>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<302>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<302>::pInf = 0.0f;
+  float SimFloatSlot<302>::nInf = 0.0f;
+  float SimFloatSlot<302>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<303>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<303>::pInf = 0.0f;
+  float SimFloatSlot<303>::nInf = 0.0f;
+  float SimFloatSlot<303>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<304>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<304>::pInf = 0.0f;
+  float SimFloatSlot<304>::nInf = 0.0f;
+  float SimFloatSlot<304>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<305>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<305>::pInf = 0.0f;
+  float SimFloatSlot<305>::nInf = 0.0f;
+  float SimFloatSlot<305>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<306>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<306>::pInf = 0.0f;
+  float SimFloatSlot<306>::nInf = 0.0f;
+  float SimFloatSlot<306>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<307>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<307>::pInf = 0.0f;
+  float SimFloatSlot<307>::nInf = 0.0f;
+  float SimFloatSlot<307>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<308>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<308>::pInf = 0.0f;
+  float SimFloatSlot<308>::nInf = 0.0f;
+  float SimFloatSlot<308>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<309>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<309>::pInf = 0.0f;
+  float SimFloatSlot<309>::nInf = 0.0f;
+  float SimFloatSlot<309>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<310>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<310>::pInf = 0.0f;
+  float SimFloatSlot<310>::nInf = 0.0f;
+  float SimFloatSlot<310>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<311>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<311>::pInf = 0.0f;
+  float SimFloatSlot<311>::nInf = 0.0f;
+  float SimFloatSlot<311>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<312>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<312>::pInf = 0.0f;
+  float SimFloatSlot<312>::nInf = 0.0f;
+  float SimFloatSlot<312>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<313>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<313>::pInf = 0.0f;
+  float SimFloatSlot<313>::nInf = 0.0f;
+  float SimFloatSlot<313>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<314>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<314>::pInf = 0.0f;
+  float SimFloatSlot<314>::nInf = 0.0f;
+  float SimFloatSlot<314>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<315>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<315>::pInf = 0.0f;
+  float SimFloatSlot<315>::nInf = 0.0f;
+  float SimFloatSlot<315>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<316>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<316>::pInf = 0.0f;
+  float SimFloatSlot<316>::nInf = 0.0f;
+  float SimFloatSlot<316>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<317>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<317>::pInf = 0.0f;
+  float SimFloatSlot<317>::nInf = 0.0f;
+  float SimFloatSlot<317>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<318>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<318>::pInf = 0.0f;
+  float SimFloatSlot<318>::nInf = 0.0f;
+  float SimFloatSlot<318>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<319>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<319>::pInf = 0.0f;
+  float SimFloatSlot<319>::nInf = 0.0f;
+  float SimFloatSlot<319>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<320>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<320>::pInf = 0.0f;
+  float SimFloatSlot<320>::nInf = 0.0f;
+  float SimFloatSlot<320>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<321>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<321>::pInf = 0.0f;
+  float SimFloatSlot<321>::nInf = 0.0f;
+  float SimFloatSlot<321>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<322>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<322>::pInf = 0.0f;
+  float SimFloatSlot<322>::nInf = 0.0f;
+  float SimFloatSlot<322>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<323>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<323>::pInf = 0.0f;
+  float SimFloatSlot<323>::nInf = 0.0f;
+  float SimFloatSlot<323>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<324>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<324>::pInf = 0.0f;
+  float SimFloatSlot<324>::nInf = 0.0f;
+  float SimFloatSlot<324>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<325>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<325>::pInf = 0.0f;
+  float SimFloatSlot<325>::nInf = 0.0f;
+  float SimFloatSlot<325>::qNaN = 0.0f;
+
+  template <>
+  struct SimFloatSlot<326>
+  {
+    static float pInf;
+    static float nInf;
+    static float qNaN;
+  };
+  float SimFloatSlot<326>::pInf = 0.0f;
+  float SimFloatSlot<326>::nInf = 0.0f;
+  float SimFloatSlot<326>::qNaN = 0.0f;
+
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BE9780 (FUN_00BE9780, register_pInf_0)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 0.
+   */
+  void register_pInf_0()
+  {
+    RegisterPositiveInfinity<0>();
+  }
+
+  /**
+   * Address: 0x00BE97A0 (FUN_00BE97A0, register_nInf_0)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 0 from `pInf_0`.
+   */
+  void register_nInf_0()
+  {
+    RegisterNegativeInfinity<0>();
+  }
+
+  /**
+   * Address: 0x00BE97C0 (FUN_00BE97C0, register_NaN_0)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 0.
+   */
+  void register_NaN_0()
+  {
+    RegisterQuietNaN<0>();
+  }
+
+  /**
+   * Address: 0x00BE99C0 (FUN_00BE99C0, register_pInf_1)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 1.
+   */
+  void register_pInf_1()
+  {
+    RegisterPositiveInfinity<1>();
+  }
+
+  /**
+   * Address: 0x00BE99E0 (FUN_00BE99E0, register_nInf_1)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 1 from `pInf_1`.
+   */
+  void register_nInf_1()
+  {
+    RegisterNegativeInfinity<1>();
+  }
+
+  /**
+   * Address: 0x00BE9A00 (FUN_00BE9A00, register_NaN_1)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 1.
+   */
+  void register_NaN_1()
+  {
+    RegisterQuietNaN<1>();
+  }
+
+  /**
+   * Address: 0x00BE9A30 (FUN_00BE9A30, register_pInf_2)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 2.
+   */
+  void register_pInf_2()
+  {
+    RegisterPositiveInfinity<2>();
+  }
+
+  /**
+   * Address: 0x00BE9A50 (FUN_00BE9A50, register_nInf_2)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 2 from `pInf_2`.
+   */
+  void register_nInf_2()
+  {
+    RegisterNegativeInfinity<2>();
+  }
+
+  /**
+   * Address: 0x00BE9A70 (FUN_00BE9A70, register_NaN_2)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 2.
+   */
+  void register_NaN_2()
+  {
+    RegisterQuietNaN<2>();
+  }
+
+  /**
+   * Address: 0x00BE9A90 (FUN_00BE9A90, register_pInf_3)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 3.
+   */
+  void register_pInf_3()
+  {
+    RegisterPositiveInfinity<3>();
+  }
+
+  /**
+   * Address: 0x00BE9AB0 (FUN_00BE9AB0, register_nInf_3)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 3 from `pInf_3`.
+   */
+  void register_nInf_3()
+  {
+    RegisterNegativeInfinity<3>();
+  }
+
+  /**
+   * Address: 0x00BE9AD0 (FUN_00BE9AD0, register_NaN_3)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 3.
+   */
+  void register_NaN_3()
+  {
+    RegisterQuietNaN<3>();
+  }
+
+  /**
+   * Address: 0x00BE9D50 (FUN_00BE9D50, register_pInf_4)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 4.
+   */
+  void register_pInf_4()
+  {
+    RegisterPositiveInfinity<4>();
+  }
+
+  /**
+   * Address: 0x00BE9D70 (FUN_00BE9D70, register_nInf_4)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 4 from `pInf_4`.
+   */
+  void register_nInf_4()
+  {
+    RegisterNegativeInfinity<4>();
+  }
+
+  /**
+   * Address: 0x00BE9D90 (FUN_00BE9D90, register_NaN_4)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 4.
+   */
+  void register_NaN_4()
+  {
+    RegisterQuietNaN<4>();
+  }
+
+  /**
+   * Address: 0x00BEA910 (FUN_00BEA910, register_pInf_5)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 5.
+   */
+  void register_pInf_5()
+  {
+    RegisterPositiveInfinity<5>();
+  }
+
+  /**
+   * Address: 0x00BEA930 (FUN_00BEA930, register_nInf_5)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 5 from `pInf_5`.
+   */
+  void register_nInf_5()
+  {
+    RegisterNegativeInfinity<5>();
+  }
+
+  /**
+   * Address: 0x00BEA950 (FUN_00BEA950, register_NaN_5)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 5.
+   */
+  void register_NaN_5()
+  {
+    RegisterQuietNaN<5>();
+  }
+
+  /**
+   * Address: 0x00BEA970 (FUN_00BEA970, register_pInf_6)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 6.
+   */
+  void register_pInf_6()
+  {
+    RegisterPositiveInfinity<6>();
+  }
+
+  /**
+   * Address: 0x00BEA990 (FUN_00BEA990, register_nInf_6)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 6 from `pInf_6`.
+   */
+  void register_nInf_6()
+  {
+    RegisterNegativeInfinity<6>();
+  }
+
+  /**
+   * Address: 0x00BEA9B0 (FUN_00BEA9B0, register_NaN_6)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 6.
+   */
+  void register_NaN_6()
+  {
+    RegisterQuietNaN<6>();
+  }
+
+  /**
+   * Address: 0x00BEAAD0 (FUN_00BEAAD0, register_pInf_7)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 7.
+   */
+  void register_pInf_7()
+  {
+    RegisterPositiveInfinity<7>();
+  }
+
+  /**
+   * Address: 0x00BEAAF0 (FUN_00BEAAF0, register_nInf_7)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 7 from `pInf_7`.
+   */
+  void register_nInf_7()
+  {
+    RegisterNegativeInfinity<7>();
+  }
+
+  /**
+   * Address: 0x00BEAB10 (FUN_00BEAB10, register_NaN_7)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 7.
+   */
+  void register_NaN_7()
+  {
+    RegisterQuietNaN<7>();
+  }
+
+  /**
+   * Address: 0x00BEAB30 (FUN_00BEAB30, register_pInf_8)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 8.
+   */
+  void register_pInf_8()
+  {
+    RegisterPositiveInfinity<8>();
+  }
+
+  /**
+   * Address: 0x00BEAB50 (FUN_00BEAB50, register_nInf_8)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 8 from `pInf_8`.
+   */
+  void register_nInf_8()
+  {
+    RegisterNegativeInfinity<8>();
+  }
+
+  /**
+   * Address: 0x00BEAB70 (FUN_00BEAB70, register_NaN_8)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 8.
+   */
+  void register_NaN_8()
+  {
+    RegisterQuietNaN<8>();
+  }
+
+  /**
+   * Address: 0x00BDA310 (FUN_00BDA310, register_pInf_200)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 200.
+   */
+  void register_pInf_200()
+  {
+    RegisterPositiveInfinity<200>();
+  }
+
+  /**
+   * Address: 0x00BDA330 (FUN_00BDA330, register_nInf_200)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 200 from `pInf_200`.
+   */
+  void register_nInf_200()
+  {
+    RegisterNegativeInfinity<200>();
+  }
+
+  /**
+   * Address: 0x00BDA350 (FUN_00BDA350, register_NaN_200)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 200.
+   */
+  void register_NaN_200()
+  {
+    RegisterQuietNaN<200>();
+  }
+
+  /**
+   * Address: 0x00BDA8B0 (FUN_00BDA8B0, register_pInf_201)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 201.
+   */
+  void register_pInf_201()
+  {
+    RegisterPositiveInfinity<201>();
+  }
+
+  /**
+   * Address: 0x00BDA8D0 (FUN_00BDA8D0, register_nInf_201)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 201 from `pInf_201`.
+   */
+  void register_nInf_201()
+  {
+    RegisterNegativeInfinity<201>();
+  }
+
+  /**
+   * Address: 0x00BDA8F0 (FUN_00BDA8F0, register_NaN_201)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 201.
+   */
+  void register_NaN_201()
+  {
+    RegisterQuietNaN<201>();
+  }
+
+  /**
+   * Address: 0x00BDAB00 (FUN_00BDAB00, register_pInf_202)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 202.
+   */
+  void register_pInf_202()
+  {
+    RegisterPositiveInfinity<202>();
+  }
+
+  /**
+   * Address: 0x00BDAB20 (FUN_00BDAB20, register_nInf_202)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 202 from `pInf_202`.
+   */
+  void register_nInf_202()
+  {
+    RegisterNegativeInfinity<202>();
+  }
+
+  /**
+   * Address: 0x00BDAB40 (FUN_00BDAB40, register_NaN_202)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 202.
+   */
+  void register_NaN_202()
+  {
+    RegisterQuietNaN<202>();
+  }
+
+  /**
+   * Address: 0x00BDAD30 (FUN_00BDAD30, register_pInf_203)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 203.
+   */
+  void register_pInf_203()
+  {
+    RegisterPositiveInfinity<203>();
+  }
+
+  /**
+   * Address: 0x00BDAD50 (FUN_00BDAD50, register_nInf_203)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 203 from `pInf_203`.
+   */
+  void register_nInf_203()
+  {
+    RegisterNegativeInfinity<203>();
+  }
+
+  /**
+   * Address: 0x00BDAD70 (FUN_00BDAD70, register_NaN_203)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 203.
+   */
+  void register_NaN_203()
+  {
+    RegisterQuietNaN<203>();
+  }
+
+  /**
+   * Address: 0x00BDB0C0 (FUN_00BDB0C0, register_pInf_204)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 204.
+   */
+  void register_pInf_204()
+  {
+    RegisterPositiveInfinity<204>();
+  }
+
+  /**
+   * Address: 0x00BDB0E0 (FUN_00BDB0E0, register_nInf_204)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 204 from `pInf_204`.
+   */
+  void register_nInf_204()
+  {
+    RegisterNegativeInfinity<204>();
+  }
+
+  /**
+   * Address: 0x00BDB100 (FUN_00BDB100, register_NaN_204)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 204.
+   */
+  void register_NaN_204()
+  {
+    RegisterQuietNaN<204>();
+  }
+
+  /**
+   * Address: 0x00BDB650 (FUN_00BDB650, register_pInf_205)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 205.
+   */
+  void register_pInf_205()
+  {
+    RegisterPositiveInfinity<205>();
+  }
+
+  /**
+   * Address: 0x00BDB670 (FUN_00BDB670, register_nInf_205)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 205 from `pInf_205`.
+   */
+  void register_nInf_205()
+  {
+    RegisterNegativeInfinity<205>();
+  }
+
+  /**
+   * Address: 0x00BDB690 (FUN_00BDB690, register_NaN_205)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 205.
+   */
+  void register_NaN_205()
+  {
+    RegisterQuietNaN<205>();
+  }
+
+  /**
+   * Address: 0x00BDB7F0 (FUN_00BDB7F0, register_pInf_206)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 206.
+   */
+  void register_pInf_206()
+  {
+    RegisterPositiveInfinity<206>();
+  }
+
+  /**
+   * Address: 0x00BDB810 (FUN_00BDB810, register_nInf_206)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 206 from `pInf_206`.
+   */
+  void register_nInf_206()
+  {
+    RegisterNegativeInfinity<206>();
+  }
+
+  /**
+   * Address: 0x00BDB830 (FUN_00BDB830, register_NaN_206)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 206.
+   */
+  void register_NaN_206()
+  {
+    RegisterQuietNaN<206>();
+  }
+
+  /**
+   * Address: 0x00BDB970 (FUN_00BDB970, register_pInf_207)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 207.
+   */
+  void register_pInf_207()
+  {
+    RegisterPositiveInfinity<207>();
+  }
+
+  /**
+   * Address: 0x00BDB990 (FUN_00BDB990, register_nInf_207)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 207 from `pInf_207`.
+   */
+  void register_nInf_207()
+  {
+    RegisterNegativeInfinity<207>();
+  }
+
+  /**
+   * Address: 0x00BDB9B0 (FUN_00BDB9B0, register_NaN_207)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 207.
+   */
+  void register_NaN_207()
+  {
+    RegisterQuietNaN<207>();
+  }
+
+  /**
+   * Address: 0x00BDBE70 (FUN_00BDBE70, register_pInf_208)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 208.
+   */
+  void register_pInf_208()
+  {
+    RegisterPositiveInfinity<208>();
+  }
+
+  /**
+   * Address: 0x00BDBE90 (FUN_00BDBE90, register_nInf_208)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 208 from `pInf_208`.
+   */
+  void register_nInf_208()
+  {
+    RegisterNegativeInfinity<208>();
+  }
+
+  /**
+   * Address: 0x00BDBEB0 (FUN_00BDBEB0, register_NaN_208)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 208.
+   */
+  void register_NaN_208()
+  {
+    RegisterQuietNaN<208>();
+  }
+
+  /**
+   * Address: 0x00BDC430 (FUN_00BDC430, register_pInf_209)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 209.
+   */
+  void register_pInf_209()
+  {
+    RegisterPositiveInfinity<209>();
+  }
+
+  /**
+   * Address: 0x00BDC450 (FUN_00BDC450, register_nInf_209)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 209 from `pInf_209`.
+   */
+  void register_nInf_209()
+  {
+    RegisterNegativeInfinity<209>();
+  }
+
+  /**
+   * Address: 0x00BDC470 (FUN_00BDC470, register_NaN_209)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 209.
+   */
+  void register_NaN_209()
+  {
+    RegisterQuietNaN<209>();
+  }
+
+  /**
+   * Address: 0x00BDC740 (FUN_00BDC740, register_pInf_210)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 210.
+   */
+  void register_pInf_210()
+  {
+    RegisterPositiveInfinity<210>();
+  }
+
+  /**
+   * Address: 0x00BDC760 (FUN_00BDC760, register_nInf_210)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 210 from `pInf_210`.
+   */
+  void register_nInf_210()
+  {
+    RegisterNegativeInfinity<210>();
+  }
+
+  /**
+   * Address: 0x00BDC780 (FUN_00BDC780, register_NaN_210)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 210.
+   */
+  void register_NaN_210()
+  {
+    RegisterQuietNaN<210>();
+  }
+
+  /**
+   * Address: 0x00BDC890 (FUN_00BDC890, register_pInf_211)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 211.
+   */
+  void register_pInf_211()
+  {
+    RegisterPositiveInfinity<211>();
+  }
+
+  /**
+   * Address: 0x00BDC8B0 (FUN_00BDC8B0, register_nInf_211)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 211 from `pInf_211`.
+   */
+  void register_nInf_211()
+  {
+    RegisterNegativeInfinity<211>();
+  }
+
+  /**
+   * Address: 0x00BDC8D0 (FUN_00BDC8D0, register_NaN_211)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 211.
+   */
+  void register_NaN_211()
+  {
+    RegisterQuietNaN<211>();
+  }
+
+  /**
+   * Address: 0x00BDC9E0 (FUN_00BDC9E0, register_pInf_212)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 212.
+   */
+  void register_pInf_212()
+  {
+    RegisterPositiveInfinity<212>();
+  }
+
+  /**
+   * Address: 0x00BDCA00 (FUN_00BDCA00, register_nInf_212)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 212 from `pInf_212`.
+   */
+  void register_nInf_212()
+  {
+    RegisterNegativeInfinity<212>();
+  }
+
+  /**
+   * Address: 0x00BDCA20 (FUN_00BDCA20, register_NaN_212)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 212.
+   */
+  void register_NaN_212()
+  {
+    RegisterQuietNaN<212>();
+  }
+
+  /**
+   * Address: 0x00BDCA70 (FUN_00BDCA70, register_pInf_213)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 213.
+   */
+  void register_pInf_213()
+  {
+    RegisterPositiveInfinity<213>();
+  }
+
+  /**
+   * Address: 0x00BDCA90 (FUN_00BDCA90, register_nInf_213)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 213 from `pInf_213`.
+   */
+  void register_nInf_213()
+  {
+    RegisterNegativeInfinity<213>();
+  }
+
+  /**
+   * Address: 0x00BDCAB0 (FUN_00BDCAB0, register_NaN_213)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 213.
+   */
+  void register_NaN_213()
+  {
+    RegisterQuietNaN<213>();
+  }
+
+  /**
+   * Address: 0x00BDCB60 (FUN_00BDCB60, register_pInf_214)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 214.
+   */
+  void register_pInf_214()
+  {
+    RegisterPositiveInfinity<214>();
+  }
+
+  /**
+   * Address: 0x00BDCB80 (FUN_00BDCB80, register_nInf_214)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 214 from `pInf_214`.
+   */
+  void register_nInf_214()
+  {
+    RegisterNegativeInfinity<214>();
+  }
+
+  /**
+   * Address: 0x00BDCBA0 (FUN_00BDCBA0, register_NaN_214)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 214.
+   */
+  void register_NaN_214()
+  {
+    RegisterQuietNaN<214>();
+  }
+
+  /**
+   * Address: 0x00BDCC20 (FUN_00BDCC20, register_pInf_215)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 215.
+   */
+  void register_pInf_215()
+  {
+    RegisterPositiveInfinity<215>();
+  }
+
+  /**
+   * Address: 0x00BDCC40 (FUN_00BDCC40, register_nInf_215)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 215 from `pInf_215`.
+   */
+  void register_nInf_215()
+  {
+    RegisterNegativeInfinity<215>();
+  }
+
+  /**
+   * Address: 0x00BDCC60 (FUN_00BDCC60, register_NaN_215)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 215.
+   */
+  void register_NaN_215()
+  {
+    RegisterQuietNaN<215>();
+  }
+
+  /**
+   * Address: 0x00BDCDE0 (FUN_00BDCDE0, register_pInf_216)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 216.
+   */
+  void register_pInf_216()
+  {
+    RegisterPositiveInfinity<216>();
+  }
+
+  /**
+   * Address: 0x00BDCE00 (FUN_00BDCE00, register_nInf_216)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 216 from `pInf_216`.
+   */
+  void register_nInf_216()
+  {
+    RegisterNegativeInfinity<216>();
+  }
+
+  /**
+   * Address: 0x00BDCE20 (FUN_00BDCE20, register_NaN_216)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 216.
+   */
+  void register_NaN_216()
+  {
+    RegisterQuietNaN<216>();
+  }
+
+  /**
+   * Address: 0x00BDCF40 (FUN_00BDCF40, register_pInf_217)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 217.
+   */
+  void register_pInf_217()
+  {
+    RegisterPositiveInfinity<217>();
+  }
+
+  /**
+   * Address: 0x00BDCF60 (FUN_00BDCF60, register_nInf_217)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 217 from `pInf_217`.
+   */
+  void register_nInf_217()
+  {
+    RegisterNegativeInfinity<217>();
+  }
+
+  /**
+   * Address: 0x00BDCF80 (FUN_00BDCF80, register_NaN_217)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 217.
+   */
+  void register_NaN_217()
+  {
+    RegisterQuietNaN<217>();
+  }
+
+  /**
+   * Address: 0x00BDD2A0 (FUN_00BDD2A0, register_pInf_218)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 218.
+   */
+  void register_pInf_218()
+  {
+    RegisterPositiveInfinity<218>();
+  }
+
+  /**
+   * Address: 0x00BDD2C0 (FUN_00BDD2C0, register_nInf_218)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 218 from `pInf_218`.
+   */
+  void register_nInf_218()
+  {
+    RegisterNegativeInfinity<218>();
+  }
+
+  /**
+   * Address: 0x00BDD2E0 (FUN_00BDD2E0, register_NaN_218)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 218.
+   */
+  void register_NaN_218()
+  {
+    RegisterQuietNaN<218>();
+  }
+
+  /**
+   * Address: 0x00BDD460 (FUN_00BDD460, register_pInf_219)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 219.
+   */
+  void register_pInf_219()
+  {
+    RegisterPositiveInfinity<219>();
+  }
+
+  /**
+   * Address: 0x00BDD480 (FUN_00BDD480, register_nInf_219)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 219 from `pInf_219`.
+   */
+  void register_nInf_219()
+  {
+    RegisterNegativeInfinity<219>();
+  }
+
+  /**
+   * Address: 0x00BDD4A0 (FUN_00BDD4A0, register_NaN_219)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 219.
+   */
+  void register_NaN_219()
+  {
+    RegisterQuietNaN<219>();
+  }
+
+  /**
+   * Address: 0x00BDD610 (FUN_00BDD610, register_pInf_220)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 220.
+   */
+  void register_pInf_220()
+  {
+    RegisterPositiveInfinity<220>();
+  }
+
+  /**
+   * Address: 0x00BDD630 (FUN_00BDD630, register_nInf_220)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 220 from `pInf_220`.
+   */
+  void register_nInf_220()
+  {
+    RegisterNegativeInfinity<220>();
+  }
+
+  /**
+   * Address: 0x00BDD650 (FUN_00BDD650, register_NaN_220)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 220.
+   */
+  void register_NaN_220()
+  {
+    RegisterQuietNaN<220>();
+  }
+
+  /**
+   * Address: 0x00BDD7A0 (FUN_00BDD7A0, register_pInf_221)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 221.
+   */
+  void register_pInf_221()
+  {
+    RegisterPositiveInfinity<221>();
+  }
+
+  /**
+   * Address: 0x00BDD7C0 (FUN_00BDD7C0, register_nInf_221)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 221 from `pInf_221`.
+   */
+  void register_nInf_221()
+  {
+    RegisterNegativeInfinity<221>();
+  }
+
+  /**
+   * Address: 0x00BDD7E0 (FUN_00BDD7E0, register_NaN_221)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 221.
+   */
+  void register_NaN_221()
+  {
+    RegisterQuietNaN<221>();
+  }
+
+  /**
+   * Address: 0x00BDD970 (FUN_00BDD970, register_pInf_222)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 222.
+   */
+  void register_pInf_222()
+  {
+    RegisterPositiveInfinity<222>();
+  }
+
+  /**
+   * Address: 0x00BDD990 (FUN_00BDD990, register_nInf_222)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 222 from `pInf_222`.
+   */
+  void register_nInf_222()
+  {
+    RegisterNegativeInfinity<222>();
+  }
+
+  /**
+   * Address: 0x00BDD9B0 (FUN_00BDD9B0, register_NaN_222)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 222.
+   */
+  void register_NaN_222()
+  {
+    RegisterQuietNaN<222>();
+  }
+
+  /**
+   * Address: 0x00BDDBC0 (FUN_00BDDBC0, register_pInf_223)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 223.
+   */
+  void register_pInf_223()
+  {
+    RegisterPositiveInfinity<223>();
+  }
+
+  /**
+   * Address: 0x00BDDBE0 (FUN_00BDDBE0, register_nInf_223)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 223 from `pInf_223`.
+   */
+  void register_nInf_223()
+  {
+    RegisterNegativeInfinity<223>();
+  }
+
+  /**
+   * Address: 0x00BDDC00 (FUN_00BDDC00, register_NaN_223)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 223.
+   */
+  void register_NaN_223()
+  {
+    RegisterQuietNaN<223>();
+  }
+
+  /**
+   * Address: 0x00BDDCD0 (FUN_00BDDCD0, register_pInf_224)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 224.
+   */
+  void register_pInf_224()
+  {
+    RegisterPositiveInfinity<224>();
+  }
+
+  /**
+   * Address: 0x00BDDCF0 (FUN_00BDDCF0, register_nInf_224)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 224 from `pInf_224`.
+   */
+  void register_nInf_224()
+  {
+    RegisterNegativeInfinity<224>();
+  }
+
+  /**
+   * Address: 0x00BDDD10 (FUN_00BDDD10, register_NaN_224)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 224.
+   */
+  void register_NaN_224()
+  {
+    RegisterQuietNaN<224>();
+  }
+
+  /**
+   * Address: 0x00BDDF50 (FUN_00BDDF50, register_pInf_225)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 225.
+   */
+  void register_pInf_225()
+  {
+    RegisterPositiveInfinity<225>();
+  }
+
+  /**
+   * Address: 0x00BDDF70 (FUN_00BDDF70, register_nInf_225)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 225 from `pInf_225`.
+   */
+  void register_nInf_225()
+  {
+    RegisterNegativeInfinity<225>();
+  }
+
+  /**
+   * Address: 0x00BDDF90 (FUN_00BDDF90, register_NaN_225)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 225.
+   */
+  void register_NaN_225()
+  {
+    RegisterQuietNaN<225>();
+  }
+
+  /**
+   * Address: 0x00BDE0C0 (FUN_00BDE0C0, register_pInf_226)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 226.
+   */
+  void register_pInf_226()
+  {
+    RegisterPositiveInfinity<226>();
+  }
+
+  /**
+   * Address: 0x00BDE0E0 (FUN_00BDE0E0, register_nInf_226)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 226 from `pInf_226`.
+   */
+  void register_nInf_226()
+  {
+    RegisterNegativeInfinity<226>();
+  }
+
+  /**
+   * Address: 0x00BDE100 (FUN_00BDE100, register_NaN_226)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 226.
+   */
+  void register_NaN_226()
+  {
+    RegisterQuietNaN<226>();
+  }
+
+  /**
+   * Address: 0x00BDE1C0 (FUN_00BDE1C0, register_pInf_227)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 227.
+   */
+  void register_pInf_227()
+  {
+    RegisterPositiveInfinity<227>();
+  }
+
+  /**
+   * Address: 0x00BDE1E0 (FUN_00BDE1E0, register_nInf_227)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 227 from `pInf_227`.
+   */
+  void register_nInf_227()
+  {
+    RegisterNegativeInfinity<227>();
+  }
+
+  /**
+   * Address: 0x00BDE200 (FUN_00BDE200, register_NaN_227)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 227.
+   */
+  void register_NaN_227()
+  {
+    RegisterQuietNaN<227>();
+  }
+
+  /**
+   * Address: 0x00BDE4C0 (FUN_00BDE4C0, register_pInf_228)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 228.
+   */
+  void register_pInf_228()
+  {
+    RegisterPositiveInfinity<228>();
+  }
+
+  /**
+   * Address: 0x00BDE4E0 (FUN_00BDE4E0, register_nInf_228)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 228 from `pInf_228`.
+   */
+  void register_nInf_228()
+  {
+    RegisterNegativeInfinity<228>();
+  }
+
+  /**
+   * Address: 0x00BDE500 (FUN_00BDE500, register_NaN_228)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 228.
+   */
+  void register_NaN_228()
+  {
+    RegisterQuietNaN<228>();
+  }
+
+  /**
+   * Address: 0x00BDE550 (FUN_00BDE550, register_pInf_229)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 229.
+   */
+  void register_pInf_229()
+  {
+    RegisterPositiveInfinity<229>();
+  }
+
+  /**
+   * Address: 0x00BDE570 (FUN_00BDE570, register_nInf_229)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 229 from `pInf_229`.
+   */
+  void register_nInf_229()
+  {
+    RegisterNegativeInfinity<229>();
+  }
+
+  /**
+   * Address: 0x00BDE590 (FUN_00BDE590, register_NaN_229)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 229.
+   */
+  void register_NaN_229()
+  {
+    RegisterQuietNaN<229>();
+  }
+
+  /**
+   * Address: 0x00BDE680 (FUN_00BDE680, register_pInf_230)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 230.
+   */
+  void register_pInf_230()
+  {
+    RegisterPositiveInfinity<230>();
+  }
+
+  /**
+   * Address: 0x00BDE6A0 (FUN_00BDE6A0, register_nInf_230)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 230 from `pInf_230`.
+   */
+  void register_nInf_230()
+  {
+    RegisterNegativeInfinity<230>();
+  }
+
+  /**
+   * Address: 0x00BDE6C0 (FUN_00BDE6C0, register_NaN_230)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 230.
+   */
+  void register_NaN_230()
+  {
+    RegisterQuietNaN<230>();
+  }
+
+  /**
+   * Address: 0x00BDE780 (FUN_00BDE780, register_pInf_231)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 231.
+   */
+  void register_pInf_231()
+  {
+    RegisterPositiveInfinity<231>();
+  }
+
+  /**
+   * Address: 0x00BDE7A0 (FUN_00BDE7A0, register_nInf_231)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 231 from `pInf_231`.
+   */
+  void register_nInf_231()
+  {
+    RegisterNegativeInfinity<231>();
+  }
+
+  /**
+   * Address: 0x00BDE7C0 (FUN_00BDE7C0, register_NaN_231)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 231.
+   */
+  void register_NaN_231()
+  {
+    RegisterQuietNaN<231>();
+  }
+
+  /**
+   * Address: 0x00BDE8A0 (FUN_00BDE8A0, register_pInf_232)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 232.
+   */
+  void register_pInf_232()
+  {
+    RegisterPositiveInfinity<232>();
+  }
+
+  /**
+   * Address: 0x00BDE8C0 (FUN_00BDE8C0, register_nInf_232)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 232 from `pInf_232`.
+   */
+  void register_nInf_232()
+  {
+    RegisterNegativeInfinity<232>();
+  }
+
+  /**
+   * Address: 0x00BDE8E0 (FUN_00BDE8E0, register_NaN_232)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 232.
+   */
+  void register_NaN_232()
+  {
+    RegisterQuietNaN<232>();
+  }
+
+  /**
+   * Address: 0x00BDEAE0 (FUN_00BDEAE0, register_pInf_233)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 233.
+   */
+  void register_pInf_233()
+  {
+    RegisterPositiveInfinity<233>();
+  }
+
+  /**
+   * Address: 0x00BDEB00 (FUN_00BDEB00, register_nInf_233)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 233 from `pInf_233`.
+   */
+  void register_nInf_233()
+  {
+    RegisterNegativeInfinity<233>();
+  }
+
+  /**
+   * Address: 0x00BDEB20 (FUN_00BDEB20, register_NaN_233)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 233.
+   */
+  void register_NaN_233()
+  {
+    RegisterQuietNaN<233>();
+  }
+
+  /**
+   * Address: 0x00BDEBB0 (FUN_00BDEBB0, register_pInf_234)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 234.
+   */
+  void register_pInf_234()
+  {
+    RegisterPositiveInfinity<234>();
+  }
+
+  /**
+   * Address: 0x00BDEBD0 (FUN_00BDEBD0, register_nInf_234)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 234 from `pInf_234`.
+   */
+  void register_nInf_234()
+  {
+    RegisterNegativeInfinity<234>();
+  }
+
+  /**
+   * Address: 0x00BDEBF0 (FUN_00BDEBF0, register_NaN_234)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 234.
+   */
+  void register_NaN_234()
+  {
+    RegisterQuietNaN<234>();
+  }
+
+  /**
+   * Address: 0x00BDECD0 (FUN_00BDECD0, register_pInf_235)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 235.
+   */
+  void register_pInf_235()
+  {
+    RegisterPositiveInfinity<235>();
+  }
+
+  /**
+   * Address: 0x00BDECF0 (FUN_00BDECF0, register_nInf_235)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 235 from `pInf_235`.
+   */
+  void register_nInf_235()
+  {
+    RegisterNegativeInfinity<235>();
+  }
+
+  /**
+   * Address: 0x00BDED10 (FUN_00BDED10, register_NaN_235)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 235.
+   */
+  void register_NaN_235()
+  {
+    RegisterQuietNaN<235>();
+  }
+
+  /**
+   * Address: 0x00BDEE40 (FUN_00BDEE40, register_pInf_236)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 236.
+   */
+  void register_pInf_236()
+  {
+    RegisterPositiveInfinity<236>();
+  }
+
+  /**
+   * Address: 0x00BDEE60 (FUN_00BDEE60, register_nInf_236)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 236 from `pInf_236`.
+   */
+  void register_nInf_236()
+  {
+    RegisterNegativeInfinity<236>();
+  }
+
+  /**
+   * Address: 0x00BDEE80 (FUN_00BDEE80, register_NaN_236)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 236.
+   */
+  void register_NaN_236()
+  {
+    RegisterQuietNaN<236>();
+  }
+
+  /**
+   * Address: 0x00BDEF80 (FUN_00BDEF80, register_pInf_237)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 237.
+   */
+  void register_pInf_237()
+  {
+    RegisterPositiveInfinity<237>();
+  }
+
+  /**
+   * Address: 0x00BDEFA0 (FUN_00BDEFA0, register_nInf_237)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 237 from `pInf_237`.
+   */
+  void register_nInf_237()
+  {
+    RegisterNegativeInfinity<237>();
+  }
+
+  /**
+   * Address: 0x00BDEFC0 (FUN_00BDEFC0, register_NaN_237)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 237.
+   */
+  void register_NaN_237()
+  {
+    RegisterQuietNaN<237>();
+  }
+
+  /**
+   * Address: 0x00BDF110 (FUN_00BDF110, register_pInf_238)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 238.
+   */
+  void register_pInf_238()
+  {
+    RegisterPositiveInfinity<238>();
+  }
+
+  /**
+   * Address: 0x00BDF130 (FUN_00BDF130, register_nInf_238)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 238 from `pInf_238`.
+   */
+  void register_nInf_238()
+  {
+    RegisterNegativeInfinity<238>();
+  }
+
+  /**
+   * Address: 0x00BDF150 (FUN_00BDF150, register_NaN_238)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 238.
+   */
+  void register_NaN_238()
+  {
+    RegisterQuietNaN<238>();
+  }
+
+  /**
+   * Address: 0x00BDF1D0 (FUN_00BDF1D0, register_pInf_239)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 239.
+   */
+  void register_pInf_239()
+  {
+    RegisterPositiveInfinity<239>();
+  }
+
+  /**
+   * Address: 0x00BDF1F0 (FUN_00BDF1F0, register_nInf_239)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 239 from `pInf_239`.
+   */
+  void register_nInf_239()
+  {
+    RegisterNegativeInfinity<239>();
+  }
+
+  /**
+   * Address: 0x00BDF210 (FUN_00BDF210, register_NaN_239)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 239.
+   */
+  void register_NaN_239()
+  {
+    RegisterQuietNaN<239>();
+  }
+
+  /**
+   * Address: 0x00BDF860 (FUN_00BDF860, register_pInf_240)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 240.
+   */
+  void register_pInf_240()
+  {
+    RegisterPositiveInfinity<240>();
+  }
+
+  /**
+   * Address: 0x00BDF880 (FUN_00BDF880, register_nInf_240)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 240 from `pInf_240`.
+   */
+  void register_nInf_240()
+  {
+    RegisterNegativeInfinity<240>();
+  }
+
+  /**
+   * Address: 0x00BDF8A0 (FUN_00BDF8A0, register_NaN_240)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 240.
+   */
+  void register_NaN_240()
+  {
+    RegisterQuietNaN<240>();
+  }
+
+  /**
+   * Address: 0x00BDF920 (FUN_00BDF920, register_pInf_241)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 241.
+   */
+  void register_pInf_241()
+  {
+    RegisterPositiveInfinity<241>();
+  }
+
+  /**
+   * Address: 0x00BDF940 (FUN_00BDF940, register_nInf_241)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 241 from `pInf_241`.
+   */
+  void register_nInf_241()
+  {
+    RegisterNegativeInfinity<241>();
+  }
+
+  /**
+   * Address: 0x00BDF960 (FUN_00BDF960, register_NaN_241)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 241.
+   */
+  void register_NaN_241()
+  {
+    RegisterQuietNaN<241>();
+  }
+
+  /**
+   * Address: 0x00BDFA10 (FUN_00BDFA10, register_pInf_242)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 242.
+   */
+  void register_pInf_242()
+  {
+    RegisterPositiveInfinity<242>();
+  }
+
+  /**
+   * Address: 0x00BDFA30 (FUN_00BDFA30, register_nInf_242)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 242 from `pInf_242`.
+   */
+  void register_nInf_242()
+  {
+    RegisterNegativeInfinity<242>();
+  }
+
+  /**
+   * Address: 0x00BDFA50 (FUN_00BDFA50, register_NaN_242)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 242.
+   */
+  void register_NaN_242()
+  {
+    RegisterQuietNaN<242>();
+  }
+
+  /**
+   * Address: 0x00BDFAC0 (FUN_00BDFAC0, register_pInf_243)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 243.
+   */
+  void register_pInf_243()
+  {
+    RegisterPositiveInfinity<243>();
+  }
+
+  /**
+   * Address: 0x00BDFAE0 (FUN_00BDFAE0, register_nInf_243)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 243 from `pInf_243`.
+   */
+  void register_nInf_243()
+  {
+    RegisterNegativeInfinity<243>();
+  }
+
+  /**
+   * Address: 0x00BDFB00 (FUN_00BDFB00, register_NaN_243)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 243.
+   */
+  void register_NaN_243()
+  {
+    RegisterQuietNaN<243>();
+  }
+
+  /**
+   * Address: 0x00BDFC00 (FUN_00BDFC00, register_pInf_244)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 244.
+   */
+  void register_pInf_244()
+  {
+    RegisterPositiveInfinity<244>();
+  }
+
+  /**
+   * Address: 0x00BDFC20 (FUN_00BDFC20, register_nInf_244)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 244 from `pInf_244`.
+   */
+  void register_nInf_244()
+  {
+    RegisterNegativeInfinity<244>();
+  }
+
+  /**
+   * Address: 0x00BDFC40 (FUN_00BDFC40, register_NaN_244)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 244.
+   */
+  void register_NaN_244()
+  {
+    RegisterQuietNaN<244>();
+  }
+
+  /**
+   * Address: 0x00BDFCD0 (FUN_00BDFCD0, register_pInf_245)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 245.
+   */
+  void register_pInf_245()
+  {
+    RegisterPositiveInfinity<245>();
+  }
+
+  /**
+   * Address: 0x00BDFCF0 (FUN_00BDFCF0, register_nInf_245)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 245 from `pInf_245`.
+   */
+  void register_nInf_245()
+  {
+    RegisterNegativeInfinity<245>();
+  }
+
+  /**
+   * Address: 0x00BDFD10 (FUN_00BDFD10, register_NaN_245)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 245.
+   */
+  void register_NaN_245()
+  {
+    RegisterQuietNaN<245>();
+  }
+
+  /**
+   * Address: 0x00BDFFE0 (FUN_00BDFFE0, register_pInf_246)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 246.
+   */
+  void register_pInf_246()
+  {
+    RegisterPositiveInfinity<246>();
+  }
+
+  /**
+   * Address: 0x00BE0000 (FUN_00BE0000, register_nInf_246)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 246 from `pInf_246`.
+   */
+  void register_nInf_246()
+  {
+    RegisterNegativeInfinity<246>();
+  }
+
+  /**
+   * Address: 0x00BE0020 (FUN_00BE0020, register_NaN_246)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 246.
+   */
+  void register_NaN_246()
+  {
+    RegisterQuietNaN<246>();
+  }
+
+  /**
+   * Address: 0x00BE0050 (FUN_00BE0050, register_pInf_247)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 247.
+   */
+  void register_pInf_247()
+  {
+    RegisterPositiveInfinity<247>();
+  }
+
+  /**
+   * Address: 0x00BE0070 (FUN_00BE0070, register_nInf_247)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 247 from `pInf_247`.
+   */
+  void register_nInf_247()
+  {
+    RegisterNegativeInfinity<247>();
+  }
+
+  /**
+   * Address: 0x00BE0090 (FUN_00BE0090, register_NaN_247)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 247.
+   */
+  void register_NaN_247()
+  {
+    RegisterQuietNaN<247>();
+  }
+
+  /**
+   * Address: 0x00BE00C0 (FUN_00BE00C0, register_pInf_248)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 248.
+   */
+  void register_pInf_248()
+  {
+    RegisterPositiveInfinity<248>();
+  }
+
+  /**
+   * Address: 0x00BE00E0 (FUN_00BE00E0, register_nInf_248)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 248 from `pInf_248`.
+   */
+  void register_nInf_248()
+  {
+    RegisterNegativeInfinity<248>();
+  }
+
+  /**
+   * Address: 0x00BE0100 (FUN_00BE0100, register_NaN_248)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 248.
+   */
+  void register_NaN_248()
+  {
+    RegisterQuietNaN<248>();
+  }
+
+  /**
+   * Address: 0x00BE0130 (FUN_00BE0130, register_pInf_249)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 249.
+   */
+  void register_pInf_249()
+  {
+    RegisterPositiveInfinity<249>();
+  }
+
+  /**
+   * Address: 0x00BE0150 (FUN_00BE0150, register_nInf_249)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 249 from `pInf_249`.
+   */
+  void register_nInf_249()
+  {
+    RegisterNegativeInfinity<249>();
+  }
+
+  /**
+   * Address: 0x00BE0170 (FUN_00BE0170, register_NaN_249)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 249.
+   */
+  void register_NaN_249()
+  {
+    RegisterQuietNaN<249>();
+  }
+
+  /**
+   * Address: 0x00BE01A0 (FUN_00BE01A0, register_pInf_250)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 250.
+   */
+  void register_pInf_250()
+  {
+    RegisterPositiveInfinity<250>();
+  }
+
+  /**
+   * Address: 0x00BE01C0 (FUN_00BE01C0, register_nInf_250)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 250 from `pInf_250`.
+   */
+  void register_nInf_250()
+  {
+    RegisterNegativeInfinity<250>();
+  }
+
+  /**
+   * Address: 0x00BE01E0 (FUN_00BE01E0, register_NaN_250)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 250.
+   */
+  void register_NaN_250()
+  {
+    RegisterQuietNaN<250>();
+  }
+
+  /**
+   * Address: 0x00BE0240 (FUN_00BE0240, register_pInf_251)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 251.
+   */
+  void register_pInf_251()
+  {
+    RegisterPositiveInfinity<251>();
+  }
+
+  /**
+   * Address: 0x00BE0260 (FUN_00BE0260, register_nInf_251)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 251 from `pInf_251`.
+   */
+  void register_nInf_251()
+  {
+    RegisterNegativeInfinity<251>();
+  }
+
+  /**
+   * Address: 0x00BE0280 (FUN_00BE0280, register_NaN_251)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 251.
+   */
+  void register_NaN_251()
+  {
+    RegisterQuietNaN<251>();
+  }
+
+  /**
+   * Address: 0x00BE02B0 (FUN_00BE02B0, register_pInf_252)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 252.
+   */
+  void register_pInf_252()
+  {
+    RegisterPositiveInfinity<252>();
+  }
+
+  /**
+   * Address: 0x00BE02D0 (FUN_00BE02D0, register_nInf_252)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 252 from `pInf_252`.
+   */
+  void register_nInf_252()
+  {
+    RegisterNegativeInfinity<252>();
+  }
+
+  /**
+   * Address: 0x00BE02F0 (FUN_00BE02F0, register_NaN_252)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 252.
+   */
+  void register_NaN_252()
+  {
+    RegisterQuietNaN<252>();
+  }
+
+  /**
+   * Address: 0x00BE0450 (FUN_00BE0450, register_pInf_253)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 253.
+   */
+  void register_pInf_253()
+  {
+    RegisterPositiveInfinity<253>();
+  }
+
+  /**
+   * Address: 0x00BE0470 (FUN_00BE0470, register_nInf_253)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 253 from `pInf_253`.
+   */
+  void register_nInf_253()
+  {
+    RegisterNegativeInfinity<253>();
+  }
+
+  /**
+   * Address: 0x00BE0490 (FUN_00BE0490, register_NaN_253)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 253.
+   */
+  void register_NaN_253()
+  {
+    RegisterQuietNaN<253>();
+  }
+
+  /**
+   * Address: 0x00BE04C0 (FUN_00BE04C0, register_pInf_254)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 254.
+   */
+  void register_pInf_254()
+  {
+    RegisterPositiveInfinity<254>();
+  }
+
+  /**
+   * Address: 0x00BE04E0 (FUN_00BE04E0, register_nInf_254)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 254 from `pInf_254`.
+   */
+  void register_nInf_254()
+  {
+    RegisterNegativeInfinity<254>();
+  }
+
+  /**
+   * Address: 0x00BE0500 (FUN_00BE0500, register_NaN_254)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 254.
+   */
+  void register_NaN_254()
+  {
+    RegisterQuietNaN<254>();
+  }
+
+  /**
+   * Address: 0x00BE0950 (FUN_00BE0950, register_pInf_255)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 255.
+   */
+  void register_pInf_255()
+  {
+    RegisterPositiveInfinity<255>();
+  }
+
+  /**
+   * Address: 0x00BE0970 (FUN_00BE0970, register_nInf_255)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 255 from `pInf_255`.
+   */
+  void register_nInf_255()
+  {
+    RegisterNegativeInfinity<255>();
+  }
+
+  /**
+   * Address: 0x00BE0990 (FUN_00BE0990, register_NaN_255)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 255.
+   */
+  void register_NaN_255()
+  {
+    RegisterQuietNaN<255>();
+  }
+
+  /**
+   * Address: 0x00BE09B0 (FUN_00BE09B0, register_pInf_256)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 256.
+   */
+  void register_pInf_256()
+  {
+    RegisterPositiveInfinity<256>();
+  }
+
+  /**
+   * Address: 0x00BE09D0 (FUN_00BE09D0, register_nInf_256)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 256 from `pInf_256`.
+   */
+  void register_nInf_256()
+  {
+    RegisterNegativeInfinity<256>();
+  }
+
+  /**
+   * Address: 0x00BE09F0 (FUN_00BE09F0, register_NaN_256)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 256.
+   */
+  void register_NaN_256()
+  {
+    RegisterQuietNaN<256>();
+  }
+
+  /**
+   * Address: 0x00BE0A70 (FUN_00BE0A70, register_pInf_257)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 257.
+   */
+  void register_pInf_257()
+  {
+    RegisterPositiveInfinity<257>();
+  }
+
+  /**
+   * Address: 0x00BE0A90 (FUN_00BE0A90, register_nInf_257)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 257 from `pInf_257`.
+   */
+  void register_nInf_257()
+  {
+    RegisterNegativeInfinity<257>();
+  }
+
+  /**
+   * Address: 0x00BE0AB0 (FUN_00BE0AB0, register_NaN_257)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 257.
+   */
+  void register_NaN_257()
+  {
+    RegisterQuietNaN<257>();
+  }
+
+  /**
+   * Address: 0x00BE0C90 (FUN_00BE0C90, register_pInf_258)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 258.
+   */
+  void register_pInf_258()
+  {
+    RegisterPositiveInfinity<258>();
+  }
+
+  /**
+   * Address: 0x00BE0CB0 (FUN_00BE0CB0, register_nInf_258)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 258 from `pInf_258`.
+   */
+  void register_nInf_258()
+  {
+    RegisterNegativeInfinity<258>();
+  }
+
+  /**
+   * Address: 0x00BE0CD0 (FUN_00BE0CD0, register_NaN_258)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 258.
+   */
+  void register_NaN_258()
+  {
+    RegisterQuietNaN<258>();
+  }
+
+  /**
+   * Address: 0x00BE0DA0 (FUN_00BE0DA0, register_pInf_259)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 259.
+   */
+  void register_pInf_259()
+  {
+    RegisterPositiveInfinity<259>();
+  }
+
+  /**
+   * Address: 0x00BE0DC0 (FUN_00BE0DC0, register_nInf_259)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 259 from `pInf_259`.
+   */
+  void register_nInf_259()
+  {
+    RegisterNegativeInfinity<259>();
+  }
+
+  /**
+   * Address: 0x00BE0DE0 (FUN_00BE0DE0, register_NaN_259)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 259.
+   */
+  void register_NaN_259()
+  {
+    RegisterQuietNaN<259>();
+  }
+
+  /**
+   * Address: 0x00BE0E50 (FUN_00BE0E50, register_pInf_260)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 260.
+   */
+  void register_pInf_260()
+  {
+    RegisterPositiveInfinity<260>();
+  }
+
+  /**
+   * Address: 0x00BE0E70 (FUN_00BE0E70, register_nInf_260)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 260 from `pInf_260`.
+   */
+  void register_nInf_260()
+  {
+    RegisterNegativeInfinity<260>();
+  }
+
+  /**
+   * Address: 0x00BE0E90 (FUN_00BE0E90, register_NaN_260)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 260.
+   */
+  void register_NaN_260()
+  {
+    RegisterQuietNaN<260>();
+  }
+
+  /**
+   * Address: 0x00BE0FE0 (FUN_00BE0FE0, register_pInf_261)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 261.
+   */
+  void register_pInf_261()
+  {
+    RegisterPositiveInfinity<261>();
+  }
+
+  /**
+   * Address: 0x00BE1000 (FUN_00BE1000, register_nInf_261)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 261 from `pInf_261`.
+   */
+  void register_nInf_261()
+  {
+    RegisterNegativeInfinity<261>();
+  }
+
+  /**
+   * Address: 0x00BE1020 (FUN_00BE1020, register_NaN_261)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 261.
+   */
+  void register_NaN_261()
+  {
+    RegisterQuietNaN<261>();
+  }
+
+  /**
+   * Address: 0x00BE1330 (FUN_00BE1330, register_pInf_262)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 262.
+   */
+  void register_pInf_262()
+  {
+    RegisterPositiveInfinity<262>();
+  }
+
+  /**
+   * Address: 0x00BE1350 (FUN_00BE1350, register_nInf_262)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 262 from `pInf_262`.
+   */
+  void register_nInf_262()
+  {
+    RegisterNegativeInfinity<262>();
+  }
+
+  /**
+   * Address: 0x00BE1370 (FUN_00BE1370, register_NaN_262)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 262.
+   */
+  void register_NaN_262()
+  {
+    RegisterQuietNaN<262>();
+  }
+
+  /**
+   * Address: 0x00BE1C50 (FUN_00BE1C50, register_pInf_263)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 263.
+   */
+  void register_pInf_263()
+  {
+    RegisterPositiveInfinity<263>();
+  }
+
+  /**
+   * Address: 0x00BE1C70 (FUN_00BE1C70, register_nInf_263)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 263 from `pInf_263`.
+   */
+  void register_nInf_263()
+  {
+    RegisterNegativeInfinity<263>();
+  }
+
+  /**
+   * Address: 0x00BE1C90 (FUN_00BE1C90, register_NaN_263)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 263.
+   */
+  void register_NaN_263()
+  {
+    RegisterQuietNaN<263>();
+  }
+
+  /**
+   * Address: 0x00BE1EF0 (FUN_00BE1EF0, register_pInf_264)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 264.
+   */
+  void register_pInf_264()
+  {
+    RegisterPositiveInfinity<264>();
+  }
+
+  /**
+   * Address: 0x00BE1F10 (FUN_00BE1F10, register_nInf_264)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 264 from `pInf_264`.
+   */
+  void register_nInf_264()
+  {
+    RegisterNegativeInfinity<264>();
+  }
+
+  /**
+   * Address: 0x00BE1F30 (FUN_00BE1F30, register_NaN_264)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 264.
+   */
+  void register_NaN_264()
+  {
+    RegisterQuietNaN<264>();
+  }
+
+  /**
+   * Address: 0x00BE2070 (FUN_00BE2070, register_pInf_265)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 265.
+   */
+  void register_pInf_265()
+  {
+    RegisterPositiveInfinity<265>();
+  }
+
+  /**
+   * Address: 0x00BE2090 (FUN_00BE2090, register_nInf_265)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 265 from `pInf_265`.
+   */
+  void register_nInf_265()
+  {
+    RegisterNegativeInfinity<265>();
+  }
+
+  /**
+   * Address: 0x00BE20B0 (FUN_00BE20B0, register_NaN_265)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 265.
+   */
+  void register_NaN_265()
+  {
+    RegisterQuietNaN<265>();
+  }
+
+  /**
+   * Address: 0x00BE30A0 (FUN_00BE30A0, register_pInf_266)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 266.
+   */
+  void register_pInf_266()
+  {
+    RegisterPositiveInfinity<266>();
+  }
+
+  /**
+   * Address: 0x00BE30C0 (FUN_00BE30C0, register_nInf_266)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 266 from `pInf_266`.
+   */
+  void register_nInf_266()
+  {
+    RegisterNegativeInfinity<266>();
+  }
+
+  /**
+   * Address: 0x00BE30E0 (FUN_00BE30E0, register_NaN_266)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 266.
+   */
+  void register_NaN_266()
+  {
+    RegisterQuietNaN<266>();
+  }
+
+  /**
+   * Address: 0x00BE32A0 (FUN_00BE32A0, register_pInf_267)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 267.
+   */
+  void register_pInf_267()
+  {
+    RegisterPositiveInfinity<267>();
+  }
+
+  /**
+   * Address: 0x00BE32C0 (FUN_00BE32C0, register_nInf_267)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 267 from `pInf_267`.
+   */
+  void register_nInf_267()
+  {
+    RegisterNegativeInfinity<267>();
+  }
+
+  /**
+   * Address: 0x00BE32E0 (FUN_00BE32E0, register_NaN_267)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 267.
+   */
+  void register_NaN_267()
+  {
+    RegisterQuietNaN<267>();
+  }
+
+  /**
+   * Address: 0x00BE3750 (FUN_00BE3750, register_pInf_268)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 268.
+   */
+  void register_pInf_268()
+  {
+    RegisterPositiveInfinity<268>();
+  }
+
+  /**
+   * Address: 0x00BE3770 (FUN_00BE3770, register_nInf_268)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 268 from `pInf_268`.
+   */
+  void register_nInf_268()
+  {
+    RegisterNegativeInfinity<268>();
+  }
+
+  /**
+   * Address: 0x00BE3790 (FUN_00BE3790, register_NaN_268)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 268.
+   */
+  void register_NaN_268()
+  {
+    RegisterQuietNaN<268>();
+  }
+
+  /**
+   * Address: 0x00BE38A0 (FUN_00BE38A0, register_pInf_269)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 269.
+   */
+  void register_pInf_269()
+  {
+    RegisterPositiveInfinity<269>();
+  }
+
+  /**
+   * Address: 0x00BE38C0 (FUN_00BE38C0, register_nInf_269)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 269 from `pInf_269`.
+   */
+  void register_nInf_269()
+  {
+    RegisterNegativeInfinity<269>();
+  }
+
+  /**
+   * Address: 0x00BE38E0 (FUN_00BE38E0, register_NaN_269)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 269.
+   */
+  void register_NaN_269()
+  {
+    RegisterQuietNaN<269>();
+  }
+
+  /**
+   * Address: 0x00BE3910 (FUN_00BE3910, register_pInf_270)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 270.
+   */
+  void register_pInf_270()
+  {
+    RegisterPositiveInfinity<270>();
+  }
+
+  /**
+   * Address: 0x00BE3930 (FUN_00BE3930, register_nInf_270)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 270 from `pInf_270`.
+   */
+  void register_nInf_270()
+  {
+    RegisterNegativeInfinity<270>();
+  }
+
+  /**
+   * Address: 0x00BE3950 (FUN_00BE3950, register_NaN_270)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 270.
+   */
+  void register_NaN_270()
+  {
+    RegisterQuietNaN<270>();
+  }
+
+  /**
+   * Address: 0x00BE3980 (FUN_00BE3980, register_pInf_271)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 271.
+   */
+  void register_pInf_271()
+  {
+    RegisterPositiveInfinity<271>();
+  }
+
+  /**
+   * Address: 0x00BE39A0 (FUN_00BE39A0, register_nInf_271)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 271 from `pInf_271`.
+   */
+  void register_nInf_271()
+  {
+    RegisterNegativeInfinity<271>();
+  }
+
+  /**
+   * Address: 0x00BE39C0 (FUN_00BE39C0, register_NaN_271)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 271.
+   */
+  void register_NaN_271()
+  {
+    RegisterQuietNaN<271>();
+  }
+
+  /**
+   * Address: 0x00BE39E0 (FUN_00BE39E0, register_pInf_272)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 272.
+   */
+  void register_pInf_272()
+  {
+    RegisterPositiveInfinity<272>();
+  }
+
+  /**
+   * Address: 0x00BE3A00 (FUN_00BE3A00, register_nInf_272)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 272 from `pInf_272`.
+   */
+  void register_nInf_272()
+  {
+    RegisterNegativeInfinity<272>();
+  }
+
+  /**
+   * Address: 0x00BE3A20 (FUN_00BE3A20, register_NaN_272)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 272.
+   */
+  void register_NaN_272()
+  {
+    RegisterQuietNaN<272>();
+  }
+
+  /**
+   * Address: 0x00BE3A70 (FUN_00BE3A70, register_pInf_273)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 273.
+   */
+  void register_pInf_273()
+  {
+    RegisterPositiveInfinity<273>();
+  }
+
+  /**
+   * Address: 0x00BE3A90 (FUN_00BE3A90, register_nInf_273)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 273 from `pInf_273`.
+   */
+  void register_nInf_273()
+  {
+    RegisterNegativeInfinity<273>();
+  }
+
+  /**
+   * Address: 0x00BE3AB0 (FUN_00BE3AB0, register_NaN_273)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 273.
+   */
+  void register_NaN_273()
+  {
+    RegisterQuietNaN<273>();
+  }
+
+  /**
+   * Address: 0x00BE3AE0 (FUN_00BE3AE0, register_pInf_274)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 274.
+   */
+  void register_pInf_274()
+  {
+    RegisterPositiveInfinity<274>();
+  }
+
+  /**
+   * Address: 0x00BE3B00 (FUN_00BE3B00, register_nInf_274)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 274 from `pInf_274`.
+   */
+  void register_nInf_274()
+  {
+    RegisterNegativeInfinity<274>();
+  }
+
+  /**
+   * Address: 0x00BE3B20 (FUN_00BE3B20, register_NaN_274)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 274.
+   */
+  void register_NaN_274()
+  {
+    RegisterQuietNaN<274>();
+  }
+
+  /**
+   * Address: 0x00BE3B50 (FUN_00BE3B50, register_pInf_275)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 275.
+   */
+  void register_pInf_275()
+  {
+    RegisterPositiveInfinity<275>();
+  }
+
+  /**
+   * Address: 0x00BE3B70 (FUN_00BE3B70, register_nInf_275)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 275 from `pInf_275`.
+   */
+  void register_nInf_275()
+  {
+    RegisterNegativeInfinity<275>();
+  }
+
+  /**
+   * Address: 0x00BE3B90 (FUN_00BE3B90, register_NaN_275)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 275.
+   */
+  void register_NaN_275()
+  {
+    RegisterQuietNaN<275>();
+  }
+
+  /**
+   * Address: 0x00BE3E80 (FUN_00BE3E80, register_pInf_276)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 276.
+   */
+  void register_pInf_276()
+  {
+    RegisterPositiveInfinity<276>();
+  }
+
+  /**
+   * Address: 0x00BE3EA0 (FUN_00BE3EA0, register_nInf_276)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 276 from `pInf_276`.
+   */
+  void register_nInf_276()
+  {
+    RegisterNegativeInfinity<276>();
+  }
+
+  /**
+   * Address: 0x00BE3EC0 (FUN_00BE3EC0, register_NaN_276)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 276.
+   */
+  void register_NaN_276()
+  {
+    RegisterQuietNaN<276>();
+  }
+
+  /**
+   * Address: 0x00BE45F0 (FUN_00BE45F0, register_pInf_277)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 277.
+   */
+  void register_pInf_277()
+  {
+    RegisterPositiveInfinity<277>();
+  }
+
+  /**
+   * Address: 0x00BE4610 (FUN_00BE4610, register_nInf_277)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 277 from `pInf_277`.
+   */
+  void register_nInf_277()
+  {
+    RegisterNegativeInfinity<277>();
+  }
+
+  /**
+   * Address: 0x00BE4630 (FUN_00BE4630, register_NaN_277)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 277.
+   */
+  void register_NaN_277()
+  {
+    RegisterQuietNaN<277>();
+  }
+
+  /**
+   * Address: 0x00BE46D0 (FUN_00BE46D0, register_pInf_278)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 278.
+   */
+  void register_pInf_278()
+  {
+    RegisterPositiveInfinity<278>();
+  }
+
+  /**
+   * Address: 0x00BE46F0 (FUN_00BE46F0, register_nInf_278)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 278 from `pInf_278`.
+   */
+  void register_nInf_278()
+  {
+    RegisterNegativeInfinity<278>();
+  }
+
+  /**
+   * Address: 0x00BE4710 (FUN_00BE4710, register_NaN_278)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 278.
+   */
+  void register_NaN_278()
+  {
+    RegisterQuietNaN<278>();
+  }
+
+  /**
+   * Address: 0x00BE4730 (FUN_00BE4730, register_pInf_279)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 279.
+   */
+  void register_pInf_279()
+  {
+    RegisterPositiveInfinity<279>();
+  }
+
+  /**
+   * Address: 0x00BE4750 (FUN_00BE4750, register_nInf_279)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 279 from `pInf_279`.
+   */
+  void register_nInf_279()
+  {
+    RegisterNegativeInfinity<279>();
+  }
+
+  /**
+   * Address: 0x00BE4770 (FUN_00BE4770, register_NaN_279)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 279.
+   */
+  void register_NaN_279()
+  {
+    RegisterQuietNaN<279>();
+  }
+
+  /**
+   * Address: 0x00BE4990 (FUN_00BE4990, register_pInf_280)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 280.
+   */
+  void register_pInf_280()
+  {
+    RegisterPositiveInfinity<280>();
+  }
+
+  /**
+   * Address: 0x00BE49B0 (FUN_00BE49B0, register_nInf_280)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 280 from `pInf_280`.
+   */
+  void register_nInf_280()
+  {
+    RegisterNegativeInfinity<280>();
+  }
+
+  /**
+   * Address: 0x00BE49D0 (FUN_00BE49D0, register_NaN_280)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 280.
+   */
+  void register_NaN_280()
+  {
+    RegisterQuietNaN<280>();
+  }
+
+  /**
+   * Address: 0x00BE4DA0 (FUN_00BE4DA0, register_pInf_281)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 281.
+   */
+  void register_pInf_281()
+  {
+    RegisterPositiveInfinity<281>();
+  }
+
+  /**
+   * Address: 0x00BE4DC0 (FUN_00BE4DC0, register_nInf_281)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 281 from `pInf_281`.
+   */
+  void register_nInf_281()
+  {
+    RegisterNegativeInfinity<281>();
+  }
+
+  /**
+   * Address: 0x00BE4DE0 (FUN_00BE4DE0, register_NaN_281)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 281.
+   */
+  void register_NaN_281()
+  {
+    RegisterQuietNaN<281>();
+  }
+
+  /**
+   * Address: 0x00BE4E10 (FUN_00BE4E10, register_pInf_282)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 282.
+   */
+  void register_pInf_282()
+  {
+    RegisterPositiveInfinity<282>();
+  }
+
+  /**
+   * Address: 0x00BE4E30 (FUN_00BE4E30, register_nInf_282)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 282 from `pInf_282`.
+   */
+  void register_nInf_282()
+  {
+    RegisterNegativeInfinity<282>();
+  }
+
+  /**
+   * Address: 0x00BE4E50 (FUN_00BE4E50, register_NaN_282)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 282.
+   */
+  void register_NaN_282()
+  {
+    RegisterQuietNaN<282>();
+  }
+
+  /**
+   * Address: 0x00BE4EE0 (FUN_00BE4EE0, register_pInf_283)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 283.
+   */
+  void register_pInf_283()
+  {
+    RegisterPositiveInfinity<283>();
+  }
+
+  /**
+   * Address: 0x00BE4F00 (FUN_00BE4F00, register_nInf_283)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 283 from `pInf_283`.
+   */
+  void register_nInf_283()
+  {
+    RegisterNegativeInfinity<283>();
+  }
+
+  /**
+   * Address: 0x00BE4F20 (FUN_00BE4F20, register_NaN_283)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 283.
+   */
+  void register_NaN_283()
+  {
+    RegisterQuietNaN<283>();
+  }
+
+  /**
+   * Address: 0x00BE5010 (FUN_00BE5010, register_pInf_284)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 284.
+   */
+  void register_pInf_284()
+  {
+    RegisterPositiveInfinity<284>();
+  }
+
+  /**
+   * Address: 0x00BE5030 (FUN_00BE5030, register_nInf_284)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 284 from `pInf_284`.
+   */
+  void register_nInf_284()
+  {
+    RegisterNegativeInfinity<284>();
+  }
+
+  /**
+   * Address: 0x00BE5050 (FUN_00BE5050, register_NaN_284)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 284.
+   */
+  void register_NaN_284()
+  {
+    RegisterQuietNaN<284>();
+  }
+
+  /**
+   * Address: 0x00BE5070 (FUN_00BE5070, register_pInf_285)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 285.
+   */
+  void register_pInf_285()
+  {
+    RegisterPositiveInfinity<285>();
+  }
+
+  /**
+   * Address: 0x00BE5090 (FUN_00BE5090, register_nInf_285)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 285 from `pInf_285`.
+   */
+  void register_nInf_285()
+  {
+    RegisterNegativeInfinity<285>();
+  }
+
+  /**
+   * Address: 0x00BE50B0 (FUN_00BE50B0, register_NaN_285)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 285.
+   */
+  void register_NaN_285()
+  {
+    RegisterQuietNaN<285>();
+  }
+
+  /**
+   * Address: 0x00BE5120 (FUN_00BE5120, register_pInf_286)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 286.
+   */
+  void register_pInf_286()
+  {
+    RegisterPositiveInfinity<286>();
+  }
+
+  /**
+   * Address: 0x00BE5140 (FUN_00BE5140, register_nInf_286)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 286 from `pInf_286`.
+   */
+  void register_nInf_286()
+  {
+    RegisterNegativeInfinity<286>();
+  }
+
+  /**
+   * Address: 0x00BE5160 (FUN_00BE5160, register_NaN_286)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 286.
+   */
+  void register_NaN_286()
+  {
+    RegisterQuietNaN<286>();
+  }
+
+  /**
+   * Address: 0x00BE51D0 (FUN_00BE51D0, register_pInf_287)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 287.
+   */
+  void register_pInf_287()
+  {
+    RegisterPositiveInfinity<287>();
+  }
+
+  /**
+   * Address: 0x00BE51F0 (FUN_00BE51F0, register_nInf_287)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 287 from `pInf_287`.
+   */
+  void register_nInf_287()
+  {
+    RegisterNegativeInfinity<287>();
+  }
+
+  /**
+   * Address: 0x00BE5210 (FUN_00BE5210, register_NaN_287)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 287.
+   */
+  void register_NaN_287()
+  {
+    RegisterQuietNaN<287>();
+  }
+
+  /**
+   * Address: 0x00BE5290 (FUN_00BE5290, register_pInf_288)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 288.
+   */
+  void register_pInf_288()
+  {
+    RegisterPositiveInfinity<288>();
+  }
+
+  /**
+   * Address: 0x00BE52B0 (FUN_00BE52B0, register_nInf_288)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 288 from `pInf_288`.
+   */
+  void register_nInf_288()
+  {
+    RegisterNegativeInfinity<288>();
+  }
+
+  /**
+   * Address: 0x00BE52D0 (FUN_00BE52D0, register_NaN_288)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 288.
+   */
+  void register_NaN_288()
+  {
+    RegisterQuietNaN<288>();
+  }
+
+  /**
+   * Address: 0x00BE5300 (FUN_00BE5300, register_pInf_289)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 289.
+   */
+  void register_pInf_289()
+  {
+    RegisterPositiveInfinity<289>();
+  }
+
+  /**
+   * Address: 0x00BE5320 (FUN_00BE5320, register_nInf_289)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 289 from `pInf_289`.
+   */
+  void register_nInf_289()
+  {
+    RegisterNegativeInfinity<289>();
+  }
+
+  /**
+   * Address: 0x00BE5340 (FUN_00BE5340, register_NaN_289)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 289.
+   */
+  void register_NaN_289()
+  {
+    RegisterQuietNaN<289>();
+  }
+
+  /**
+   * Address: 0x00BE53C0 (FUN_00BE53C0, register_pInf_290)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 290.
+   */
+  void register_pInf_290()
+  {
+    RegisterPositiveInfinity<290>();
+  }
+
+  /**
+   * Address: 0x00BE53E0 (FUN_00BE53E0, register_nInf_290)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 290 from `pInf_290`.
+   */
+  void register_nInf_290()
+  {
+    RegisterNegativeInfinity<290>();
+  }
+
+  /**
+   * Address: 0x00BE5400 (FUN_00BE5400, register_NaN_290)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 290.
+   */
+  void register_NaN_290()
+  {
+    RegisterQuietNaN<290>();
+  }
+
+  /**
+   * Address: 0x00BE5B90 (FUN_00BE5B90, register_pInf_291)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 291.
+   */
+  void register_pInf_291()
+  {
+    RegisterPositiveInfinity<291>();
+  }
+
+  /**
+   * Address: 0x00BE5BB0 (FUN_00BE5BB0, register_nInf_291)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 291 from `pInf_291`.
+   */
+  void register_nInf_291()
+  {
+    RegisterNegativeInfinity<291>();
+  }
+
+  /**
+   * Address: 0x00BE5BD0 (FUN_00BE5BD0, register_NaN_291)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 291.
+   */
+  void register_NaN_291()
+  {
+    RegisterQuietNaN<291>();
+  }
+
+  /**
+   * Address: 0x00BE5D40 (FUN_00BE5D40, register_pInf_292)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 292.
+   */
+  void register_pInf_292()
+  {
+    RegisterPositiveInfinity<292>();
+  }
+
+  /**
+   * Address: 0x00BE5D60 (FUN_00BE5D60, register_nInf_292)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 292 from `pInf_292`.
+   */
+  void register_nInf_292()
+  {
+    RegisterNegativeInfinity<292>();
+  }
+
+  /**
+   * Address: 0x00BE5D80 (FUN_00BE5D80, register_NaN_292)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 292.
+   */
+  void register_NaN_292()
+  {
+    RegisterQuietNaN<292>();
+  }
+
+  /**
+   * Address: 0x00BE5F70 (FUN_00BE5F70, register_pInf_293)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 293.
+   */
+  void register_pInf_293()
+  {
+    RegisterPositiveInfinity<293>();
+  }
+
+  /**
+   * Address: 0x00BE5F90 (FUN_00BE5F90, register_nInf_293)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 293 from `pInf_293`.
+   */
+  void register_nInf_293()
+  {
+    RegisterNegativeInfinity<293>();
+  }
+
+  /**
+   * Address: 0x00BE5FB0 (FUN_00BE5FB0, register_NaN_293)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 293.
+   */
+  void register_NaN_293()
+  {
+    RegisterQuietNaN<293>();
+  }
+
+  /**
+   * Address: 0x00BE6080 (FUN_00BE6080, register_pInf_294)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 294.
+   */
+  void register_pInf_294()
+  {
+    RegisterPositiveInfinity<294>();
+  }
+
+  /**
+   * Address: 0x00BE60A0 (FUN_00BE60A0, register_nInf_294)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 294 from `pInf_294`.
+   */
+  void register_nInf_294()
+  {
+    RegisterNegativeInfinity<294>();
+  }
+
+  /**
+   * Address: 0x00BE60C0 (FUN_00BE60C0, register_NaN_294)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 294.
+   */
+  void register_NaN_294()
+  {
+    RegisterQuietNaN<294>();
+  }
+
+  /**
+   * Address: 0x00BE6270 (FUN_00BE6270, register_pInf_295)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 295.
+   */
+  void register_pInf_295()
+  {
+    RegisterPositiveInfinity<295>();
+  }
+
+  /**
+   * Address: 0x00BE6290 (FUN_00BE6290, register_nInf_295)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 295 from `pInf_295`.
+   */
+  void register_nInf_295()
+  {
+    RegisterNegativeInfinity<295>();
+  }
+
+  /**
+   * Address: 0x00BE62B0 (FUN_00BE62B0, register_NaN_295)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 295.
+   */
+  void register_NaN_295()
+  {
+    RegisterQuietNaN<295>();
+  }
+
+  /**
+   * Address: 0x00BE6370 (FUN_00BE6370, register_pInf_296)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 296.
+   */
+  void register_pInf_296()
+  {
+    RegisterPositiveInfinity<296>();
+  }
+
+  /**
+   * Address: 0x00BE6390 (FUN_00BE6390, register_nInf_296)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 296 from `pInf_296`.
+   */
+  void register_nInf_296()
+  {
+    RegisterNegativeInfinity<296>();
+  }
+
+  /**
+   * Address: 0x00BE63B0 (FUN_00BE63B0, register_NaN_296)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 296.
+   */
+  void register_NaN_296()
+  {
+    RegisterQuietNaN<296>();
+  }
+
+  /**
+   * Address: 0x00BE6460 (FUN_00BE6460, register_pInf_297)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 297.
+   */
+  void register_pInf_297()
+  {
+    RegisterPositiveInfinity<297>();
+  }
+
+  /**
+   * Address: 0x00BE6480 (FUN_00BE6480, register_nInf_297)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 297 from `pInf_297`.
+   */
+  void register_nInf_297()
+  {
+    RegisterNegativeInfinity<297>();
+  }
+
+  /**
+   * Address: 0x00BE64A0 (FUN_00BE64A0, register_NaN_297)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 297.
+   */
+  void register_NaN_297()
+  {
+    RegisterQuietNaN<297>();
+  }
+
+  /**
+   * Address: 0x00BE6630 (FUN_00BE6630, register_pInf_298)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 298.
+   */
+  void register_pInf_298()
+  {
+    RegisterPositiveInfinity<298>();
+  }
+
+  /**
+   * Address: 0x00BE6650 (FUN_00BE6650, register_nInf_298)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 298 from `pInf_298`.
+   */
+  void register_nInf_298()
+  {
+    RegisterNegativeInfinity<298>();
+  }
+
+  /**
+   * Address: 0x00BE6670 (FUN_00BE6670, register_NaN_298)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 298.
+   */
+  void register_NaN_298()
+  {
+    RegisterQuietNaN<298>();
+  }
+
+  /**
+   * Address: 0x00BE6BD0 (FUN_00BE6BD0, register_pInf_299)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 299.
+   */
+  void register_pInf_299()
+  {
+    RegisterPositiveInfinity<299>();
+  }
+
+  /**
+   * Address: 0x00BE6BF0 (FUN_00BE6BF0, register_nInf_299)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 299 from `pInf_299`.
+   */
+  void register_nInf_299()
+  {
+    RegisterNegativeInfinity<299>();
+  }
+
+  /**
+   * Address: 0x00BE6C10 (FUN_00BE6C10, register_NaN_299)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 299.
+   */
+  void register_NaN_299()
+  {
+    RegisterQuietNaN<299>();
+  }
+
+  /**
+   * Address: 0x00BE6CB0 (FUN_00BE6CB0, register_pInf_300)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 300.
+   */
+  void register_pInf_300()
+  {
+    RegisterPositiveInfinity<300>();
+  }
+
+  /**
+   * Address: 0x00BE6CD0 (FUN_00BE6CD0, register_nInf_300)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 300 from `pInf_300`.
+   */
+  void register_nInf_300()
+  {
+    RegisterNegativeInfinity<300>();
+  }
+
+  /**
+   * Address: 0x00BE6CF0 (FUN_00BE6CF0, register_NaN_300)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 300.
+   */
+  void register_NaN_300()
+  {
+    RegisterQuietNaN<300>();
+  }
+
+  /**
+   * Address: 0x00BE6D40 (FUN_00BE6D40, register_pInf_301)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 301.
+   */
+  void register_pInf_301()
+  {
+    RegisterPositiveInfinity<301>();
+  }
+
+  /**
+   * Address: 0x00BE6D60 (FUN_00BE6D60, register_nInf_301)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 301 from `pInf_301`.
+   */
+  void register_nInf_301()
+  {
+    RegisterNegativeInfinity<301>();
+  }
+
+  /**
+   * Address: 0x00BE6D80 (FUN_00BE6D80, register_NaN_301)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 301.
+   */
+  void register_NaN_301()
+  {
+    RegisterQuietNaN<301>();
+  }
+
+  /**
+   * Address: 0x00BE6DB0 (FUN_00BE6DB0, register_pInf_302)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 302.
+   */
+  void register_pInf_302()
+  {
+    RegisterPositiveInfinity<302>();
+  }
+
+  /**
+   * Address: 0x00BE6DD0 (FUN_00BE6DD0, register_nInf_302)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 302 from `pInf_302`.
+   */
+  void register_nInf_302()
+  {
+    RegisterNegativeInfinity<302>();
+  }
+
+  /**
+   * Address: 0x00BE6DF0 (FUN_00BE6DF0, register_NaN_302)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 302.
+   */
+  void register_NaN_302()
+  {
+    RegisterQuietNaN<302>();
+  }
+
+  /**
+   * Address: 0x00BE6E30 (FUN_00BE6E30, register_pInf_303)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 303.
+   */
+  void register_pInf_303()
+  {
+    RegisterPositiveInfinity<303>();
+  }
+
+  /**
+   * Address: 0x00BE6E50 (FUN_00BE6E50, register_nInf_303)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 303 from `pInf_303`.
+   */
+  void register_nInf_303()
+  {
+    RegisterNegativeInfinity<303>();
+  }
+
+  /**
+   * Address: 0x00BE6E70 (FUN_00BE6E70, register_NaN_303)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 303.
+   */
+  void register_NaN_303()
+  {
+    RegisterQuietNaN<303>();
+  }
+
+  /**
+   * Address: 0x00BE6F60 (FUN_00BE6F60, register_pInf_304)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 304.
+   */
+  void register_pInf_304()
+  {
+    RegisterPositiveInfinity<304>();
+  }
+
+  /**
+   * Address: 0x00BE6F80 (FUN_00BE6F80, register_nInf_304)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 304 from `pInf_304`.
+   */
+  void register_nInf_304()
+  {
+    RegisterNegativeInfinity<304>();
+  }
+
+  /**
+   * Address: 0x00BE6FA0 (FUN_00BE6FA0, register_NaN_304)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 304.
+   */
+  void register_NaN_304()
+  {
+    RegisterQuietNaN<304>();
+  }
+
+  /**
+   * Address: 0x00BE70C0 (FUN_00BE70C0, register_pInf_305)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 305.
+   */
+  void register_pInf_305()
+  {
+    RegisterPositiveInfinity<305>();
+  }
+
+  /**
+   * Address: 0x00BE70E0 (FUN_00BE70E0, register_nInf_305)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 305 from `pInf_305`.
+   */
+  void register_nInf_305()
+  {
+    RegisterNegativeInfinity<305>();
+  }
+
+  /**
+   * Address: 0x00BE7100 (FUN_00BE7100, register_NaN_305)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 305.
+   */
+  void register_NaN_305()
+  {
+    RegisterQuietNaN<305>();
+  }
+
+  /**
+   * Address: 0x00BE7150 (FUN_00BE7150, register_pInf_306)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 306.
+   */
+  void register_pInf_306()
+  {
+    RegisterPositiveInfinity<306>();
+  }
+
+  /**
+   * Address: 0x00BE7170 (FUN_00BE7170, register_nInf_306)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 306 from `pInf_306`.
+   */
+  void register_nInf_306()
+  {
+    RegisterNegativeInfinity<306>();
+  }
+
+  /**
+   * Address: 0x00BE7190 (FUN_00BE7190, register_NaN_306)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 306.
+   */
+  void register_NaN_306()
+  {
+    RegisterQuietNaN<306>();
+  }
+
+  /**
+   * Address: 0x00BE7200 (FUN_00BE7200, register_pInf_307)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 307.
+   */
+  void register_pInf_307()
+  {
+    RegisterPositiveInfinity<307>();
+  }
+
+  /**
+   * Address: 0x00BE7220 (FUN_00BE7220, register_nInf_307)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 307 from `pInf_307`.
+   */
+  void register_nInf_307()
+  {
+    RegisterNegativeInfinity<307>();
+  }
+
+  /**
+   * Address: 0x00BE7240 (FUN_00BE7240, register_NaN_307)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 307.
+   */
+  void register_NaN_307()
+  {
+    RegisterQuietNaN<307>();
+  }
+
+  /**
+   * Address: 0x00BE75A0 (FUN_00BE75A0, register_pInf_308)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 308.
+   */
+  void register_pInf_308()
+  {
+    RegisterPositiveInfinity<308>();
+  }
+
+  /**
+   * Address: 0x00BE75C0 (FUN_00BE75C0, register_nInf_308)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 308 from `pInf_308`.
+   */
+  void register_nInf_308()
+  {
+    RegisterNegativeInfinity<308>();
+  }
+
+  /**
+   * Address: 0x00BE75E0 (FUN_00BE75E0, register_NaN_308)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 308.
+   */
+  void register_NaN_308()
+  {
+    RegisterQuietNaN<308>();
+  }
+
+  /**
+   * Address: 0x00BE7610 (FUN_00BE7610, register_pInf_309)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 309.
+   */
+  void register_pInf_309()
+  {
+    RegisterPositiveInfinity<309>();
+  }
+
+  /**
+   * Address: 0x00BE7630 (FUN_00BE7630, register_nInf_309)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 309 from `pInf_309`.
+   */
+  void register_nInf_309()
+  {
+    RegisterNegativeInfinity<309>();
+  }
+
+  /**
+   * Address: 0x00BE7650 (FUN_00BE7650, register_NaN_309)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 309.
+   */
+  void register_NaN_309()
+  {
+    RegisterQuietNaN<309>();
+  }
+
+  /**
+   * Address: 0x00BE7690 (FUN_00BE7690, register_pInf_310)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 310.
+   */
+  void register_pInf_310()
+  {
+    RegisterPositiveInfinity<310>();
+  }
+
+  /**
+   * Address: 0x00BE76B0 (FUN_00BE76B0, register_nInf_310)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 310 from `pInf_310`.
+   */
+  void register_nInf_310()
+  {
+    RegisterNegativeInfinity<310>();
+  }
+
+  /**
+   * Address: 0x00BE76D0 (FUN_00BE76D0, register_NaN_310)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 310.
+   */
+  void register_NaN_310()
+  {
+    RegisterQuietNaN<310>();
+  }
+
+  /**
+   * Address: 0x00BE7990 (FUN_00BE7990, register_pInf_311)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 311.
+   */
+  void register_pInf_311()
+  {
+    RegisterPositiveInfinity<311>();
+  }
+
+  /**
+   * Address: 0x00BE79B0 (FUN_00BE79B0, register_nInf_311)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 311 from `pInf_311`.
+   */
+  void register_nInf_311()
+  {
+    RegisterNegativeInfinity<311>();
+  }
+
+  /**
+   * Address: 0x00BE79D0 (FUN_00BE79D0, register_NaN_311)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 311.
+   */
+  void register_NaN_311()
+  {
+    RegisterQuietNaN<311>();
+  }
+
+  /**
+   * Address: 0x00BE7D20 (FUN_00BE7D20, register_pInf_312)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 312.
+   */
+  void register_pInf_312()
+  {
+    RegisterPositiveInfinity<312>();
+  }
+
+  /**
+   * Address: 0x00BE7D40 (FUN_00BE7D40, register_nInf_312)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 312 from `pInf_312`.
+   */
+  void register_nInf_312()
+  {
+    RegisterNegativeInfinity<312>();
+  }
+
+  /**
+   * Address: 0x00BE7D60 (FUN_00BE7D60, register_NaN_312)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 312.
+   */
+  void register_NaN_312()
+  {
+    RegisterQuietNaN<312>();
+  }
+
+  /**
+   * Address: 0x00BE7DD0 (FUN_00BE7DD0, register_pInf_313)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 313.
+   */
+  void register_pInf_313()
+  {
+    RegisterPositiveInfinity<313>();
+  }
+
+  /**
+   * Address: 0x00BE7DF0 (FUN_00BE7DF0, register_nInf_313)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 313 from `pInf_313`.
+   */
+  void register_nInf_313()
+  {
+    RegisterNegativeInfinity<313>();
+  }
+
+  /**
+   * Address: 0x00BE7E10 (FUN_00BE7E10, register_NaN_313)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 313.
+   */
+  void register_NaN_313()
+  {
+    RegisterQuietNaN<313>();
+  }
+
+  /**
+   * Address: 0x00BE8040 (FUN_00BE8040, register_pInf_314)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 314.
+   */
+  void register_pInf_314()
+  {
+    RegisterPositiveInfinity<314>();
+  }
+
+  /**
+   * Address: 0x00BE8060 (FUN_00BE8060, register_nInf_314)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 314 from `pInf_314`.
+   */
+  void register_nInf_314()
+  {
+    RegisterNegativeInfinity<314>();
+  }
+
+  /**
+   * Address: 0x00BE8080 (FUN_00BE8080, register_NaN_314)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 314.
+   */
+  void register_NaN_314()
+  {
+    RegisterQuietNaN<314>();
+  }
+
+  /**
+   * Address: 0x00BE80C0 (FUN_00BE80C0, register_pInf_315)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 315.
+   */
+  void register_pInf_315()
+  {
+    RegisterPositiveInfinity<315>();
+  }
+
+  /**
+   * Address: 0x00BE80E0 (FUN_00BE80E0, register_nInf_315)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 315 from `pInf_315`.
+   */
+  void register_nInf_315()
+  {
+    RegisterNegativeInfinity<315>();
+  }
+
+  /**
+   * Address: 0x00BE8100 (FUN_00BE8100, register_NaN_315)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 315.
+   */
+  void register_NaN_315()
+  {
+    RegisterQuietNaN<315>();
+  }
+
+  /**
+   * Address: 0x00BE8160 (FUN_00BE8160, register_pInf_316)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 316.
+   */
+  void register_pInf_316()
+  {
+    RegisterPositiveInfinity<316>();
+  }
+
+  /**
+   * Address: 0x00BE8180 (FUN_00BE8180, register_nInf_316)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 316 from `pInf_316`.
+   */
+  void register_nInf_316()
+  {
+    RegisterNegativeInfinity<316>();
+  }
+
+  /**
+   * Address: 0x00BE81A0 (FUN_00BE81A0, register_NaN_316)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 316.
+   */
+  void register_NaN_316()
+  {
+    RegisterQuietNaN<316>();
+  }
+
+  /**
+   * Address: 0x00BE81D0 (FUN_00BE81D0, register_pInf_317)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 317.
+   */
+  void register_pInf_317()
+  {
+    RegisterPositiveInfinity<317>();
+  }
+
+  /**
+   * Address: 0x00BE81F0 (FUN_00BE81F0, register_nInf_317)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 317 from `pInf_317`.
+   */
+  void register_nInf_317()
+  {
+    RegisterNegativeInfinity<317>();
+  }
+
+  /**
+   * Address: 0x00BE8210 (FUN_00BE8210, register_NaN_317)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 317.
+   */
+  void register_NaN_317()
+  {
+    RegisterQuietNaN<317>();
+  }
+
+  /**
+   * Address: 0x00BE8240 (FUN_00BE8240, register_pInf_318)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 318.
+   */
+  void register_pInf_318()
+  {
+    RegisterPositiveInfinity<318>();
+  }
+
+  /**
+   * Address: 0x00BE8260 (FUN_00BE8260, register_nInf_318)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 318 from `pInf_318`.
+   */
+  void register_nInf_318()
+  {
+    RegisterNegativeInfinity<318>();
+  }
+
+  /**
+   * Address: 0x00BE8280 (FUN_00BE8280, register_NaN_318)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 318.
+   */
+  void register_NaN_318()
+  {
+    RegisterQuietNaN<318>();
+  }
+
+  /**
+   * Address: 0x00BE82C0 (FUN_00BE82C0, register_pInf_319)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 319.
+   */
+  void register_pInf_319()
+  {
+    RegisterPositiveInfinity<319>();
+  }
+
+  /**
+   * Address: 0x00BE82E0 (FUN_00BE82E0, register_nInf_319)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 319 from `pInf_319`.
+   */
+  void register_nInf_319()
+  {
+    RegisterNegativeInfinity<319>();
+  }
+
+  /**
+   * Address: 0x00BE8300 (FUN_00BE8300, register_NaN_319)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 319.
+   */
+  void register_NaN_319()
+  {
+    RegisterQuietNaN<319>();
+  }
+
+  /**
+   * Address: 0x00BE8320 (FUN_00BE8320, register_pInf_320)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 320.
+   */
+  void register_pInf_320()
+  {
+    RegisterPositiveInfinity<320>();
+  }
+
+  /**
+   * Address: 0x00BE8340 (FUN_00BE8340, register_nInf_320)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 320 from `pInf_320`.
+   */
+  void register_nInf_320()
+  {
+    RegisterNegativeInfinity<320>();
+  }
+
+  /**
+   * Address: 0x00BE8360 (FUN_00BE8360, register_NaN_320)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 320.
+   */
+  void register_NaN_320()
+  {
+    RegisterQuietNaN<320>();
+  }
+
+  /**
+   * Address: 0x00BE8600 (FUN_00BE8600, register_pInf_321)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 321.
+   */
+  void register_pInf_321()
+  {
+    RegisterPositiveInfinity<321>();
+  }
+
+  /**
+   * Address: 0x00BE8620 (FUN_00BE8620, register_nInf_321)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 321 from `pInf_321`.
+   */
+  void register_nInf_321()
+  {
+    RegisterNegativeInfinity<321>();
+  }
+
+  /**
+   * Address: 0x00BE8640 (FUN_00BE8640, register_NaN_321)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 321.
+   */
+  void register_NaN_321()
+  {
+    RegisterQuietNaN<321>();
+  }
+
+  /**
+   * Address: 0x00BE8670 (FUN_00BE8670, register_pInf_322)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 322.
+   */
+  void register_pInf_322()
+  {
+    RegisterPositiveInfinity<322>();
+  }
+
+  /**
+   * Address: 0x00BE8690 (FUN_00BE8690, register_nInf_322)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 322 from `pInf_322`.
+   */
+  void register_nInf_322()
+  {
+    RegisterNegativeInfinity<322>();
+  }
+
+  /**
+   * Address: 0x00BE86B0 (FUN_00BE86B0, register_NaN_322)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 322.
+   */
+  void register_NaN_322()
+  {
+    RegisterQuietNaN<322>();
+  }
+
+  /**
+   * Address: 0x00BE89C0 (FUN_00BE89C0, register_pInf_323)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 323.
+   */
+  void register_pInf_323()
+  {
+    RegisterPositiveInfinity<323>();
+  }
+
+  /**
+   * Address: 0x00BE89E0 (FUN_00BE89E0, register_nInf_323)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 323 from `pInf_323`.
+   */
+  void register_nInf_323()
+  {
+    RegisterNegativeInfinity<323>();
+  }
+
+  /**
+   * Address: 0x00BE8A00 (FUN_00BE8A00, register_NaN_323)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 323.
+   */
+  void register_NaN_323()
+  {
+    RegisterQuietNaN<323>();
+  }
+
+  /**
+   * Address: 0x00BE8A60 (FUN_00BE8A60, register_pInf_324)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 324.
+   */
+  void register_pInf_324()
+  {
+    RegisterPositiveInfinity<324>();
+  }
+
+  /**
+   * Address: 0x00BE8A80 (FUN_00BE8A80, register_nInf_324)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 324 from `pInf_324`.
+   */
+  void register_nInf_324()
+  {
+    RegisterNegativeInfinity<324>();
+  }
+
+  /**
+   * Address: 0x00BE8AA0 (FUN_00BE8AA0, register_NaN_324)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 324.
+   */
+  void register_NaN_324()
+  {
+    RegisterQuietNaN<324>();
+  }
+
+  /**
+   * Address: 0x00BE8AD0 (FUN_00BE8AD0, register_pInf_325)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 325.
+   */
+  void register_pInf_325()
+  {
+    RegisterPositiveInfinity<325>();
+  }
+
+  /**
+   * Address: 0x00BE8AF0 (FUN_00BE8AF0, register_nInf_325)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 325 from `pInf_325`.
+   */
+  void register_nInf_325()
+  {
+    RegisterNegativeInfinity<325>();
+  }
+
+  /**
+   * Address: 0x00BE8B10 (FUN_00BE8B10, register_NaN_325)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 325.
+   */
+  void register_NaN_325()
+  {
+    RegisterQuietNaN<325>();
+  }
+
+  /**
+   * Address: 0x00BE8D00 (FUN_00BE8D00, register_pInf_326)
+   *
+   * What it does:
+   * Initializes the recovered positive-infinity lane for slot 326.
+   */
+  void register_pInf_326()
+  {
+    RegisterPositiveInfinity<326>();
+  }
+
+  /**
+   * Address: 0x00BE8D20 (FUN_00BE8D20, register_nInf_326)
+   *
+   * What it does:
+   * Initializes the recovered negative-infinity lane for slot 326 from `pInf_326`.
+   */
+  void register_nInf_326()
+  {
+    RegisterNegativeInfinity<326>();
+  }
+
+  /**
+   * Address: 0x00BE8D40 (FUN_00BE8D40, register_NaN_326)
+   *
+   * What it does:
+   * Initializes the recovered quiet-NaN lane for slot 326.
+   */
+  void register_NaN_326()
+  {
+    RegisterQuietNaN<326>();
+  }
+
+} // namespace moho
+
+namespace
+{
+  struct SimFloatInitializersBootstrap2
+  {
+    SimFloatInitializersBootstrap2()
+    {
+      moho::register_pInf_0();
+      moho::register_nInf_0();
+      moho::register_NaN_0();
+      moho::register_pInf_1();
+      moho::register_nInf_1();
+      moho::register_NaN_1();
+      moho::register_pInf_2();
+      moho::register_nInf_2();
+      moho::register_NaN_2();
+      moho::register_pInf_3();
+      moho::register_nInf_3();
+      moho::register_NaN_3();
+      moho::register_pInf_4();
+      moho::register_nInf_4();
+      moho::register_NaN_4();
+      moho::register_pInf_5();
+      moho::register_nInf_5();
+      moho::register_NaN_5();
+      moho::register_pInf_6();
+      moho::register_nInf_6();
+      moho::register_NaN_6();
+      moho::register_pInf_7();
+      moho::register_nInf_7();
+      moho::register_NaN_7();
+      moho::register_pInf_8();
+      moho::register_nInf_8();
+      moho::register_NaN_8();
+      moho::register_pInf_200();
+      moho::register_nInf_200();
+      moho::register_NaN_200();
+      moho::register_pInf_201();
+      moho::register_nInf_201();
+      moho::register_NaN_201();
+      moho::register_pInf_202();
+      moho::register_nInf_202();
+      moho::register_NaN_202();
+      moho::register_pInf_203();
+      moho::register_nInf_203();
+      moho::register_NaN_203();
+      moho::register_pInf_204();
+      moho::register_nInf_204();
+      moho::register_NaN_204();
+      moho::register_pInf_205();
+      moho::register_nInf_205();
+      moho::register_NaN_205();
+      moho::register_pInf_206();
+      moho::register_nInf_206();
+      moho::register_NaN_206();
+      moho::register_pInf_207();
+      moho::register_nInf_207();
+      moho::register_NaN_207();
+      moho::register_pInf_208();
+      moho::register_nInf_208();
+      moho::register_NaN_208();
+      moho::register_pInf_209();
+      moho::register_nInf_209();
+      moho::register_NaN_209();
+      moho::register_pInf_210();
+      moho::register_nInf_210();
+      moho::register_NaN_210();
+      moho::register_pInf_211();
+      moho::register_nInf_211();
+      moho::register_NaN_211();
+      moho::register_pInf_212();
+      moho::register_nInf_212();
+      moho::register_NaN_212();
+      moho::register_pInf_213();
+      moho::register_nInf_213();
+      moho::register_NaN_213();
+      moho::register_pInf_214();
+      moho::register_nInf_214();
+      moho::register_NaN_214();
+      moho::register_pInf_215();
+      moho::register_nInf_215();
+      moho::register_NaN_215();
+      moho::register_pInf_216();
+      moho::register_nInf_216();
+      moho::register_NaN_216();
+      moho::register_pInf_217();
+      moho::register_nInf_217();
+      moho::register_NaN_217();
+      moho::register_pInf_218();
+      moho::register_nInf_218();
+      moho::register_NaN_218();
+      moho::register_pInf_219();
+      moho::register_nInf_219();
+      moho::register_NaN_219();
+      moho::register_pInf_220();
+      moho::register_nInf_220();
+      moho::register_NaN_220();
+      moho::register_pInf_221();
+      moho::register_nInf_221();
+      moho::register_NaN_221();
+      moho::register_pInf_222();
+      moho::register_nInf_222();
+      moho::register_NaN_222();
+      moho::register_pInf_223();
+      moho::register_nInf_223();
+      moho::register_NaN_223();
+      moho::register_pInf_224();
+      moho::register_nInf_224();
+      moho::register_NaN_224();
+      moho::register_pInf_225();
+      moho::register_nInf_225();
+      moho::register_NaN_225();
+      moho::register_pInf_226();
+      moho::register_nInf_226();
+      moho::register_NaN_226();
+      moho::register_pInf_227();
+      moho::register_nInf_227();
+      moho::register_NaN_227();
+      moho::register_pInf_228();
+      moho::register_nInf_228();
+      moho::register_NaN_228();
+      moho::register_pInf_229();
+      moho::register_nInf_229();
+      moho::register_NaN_229();
+      moho::register_pInf_230();
+      moho::register_nInf_230();
+      moho::register_NaN_230();
+      moho::register_pInf_231();
+      moho::register_nInf_231();
+      moho::register_NaN_231();
+      moho::register_pInf_232();
+      moho::register_nInf_232();
+      moho::register_NaN_232();
+      moho::register_pInf_233();
+      moho::register_nInf_233();
+      moho::register_NaN_233();
+      moho::register_pInf_234();
+      moho::register_nInf_234();
+      moho::register_NaN_234();
+      moho::register_pInf_235();
+      moho::register_nInf_235();
+      moho::register_NaN_235();
+      moho::register_pInf_236();
+      moho::register_nInf_236();
+      moho::register_NaN_236();
+      moho::register_pInf_237();
+      moho::register_nInf_237();
+      moho::register_NaN_237();
+      moho::register_pInf_238();
+      moho::register_nInf_238();
+      moho::register_NaN_238();
+      moho::register_pInf_239();
+      moho::register_nInf_239();
+      moho::register_NaN_239();
+      moho::register_pInf_240();
+      moho::register_nInf_240();
+      moho::register_NaN_240();
+      moho::register_pInf_241();
+      moho::register_nInf_241();
+      moho::register_NaN_241();
+      moho::register_pInf_242();
+      moho::register_nInf_242();
+      moho::register_NaN_242();
+      moho::register_pInf_243();
+      moho::register_nInf_243();
+      moho::register_NaN_243();
+      moho::register_pInf_244();
+      moho::register_nInf_244();
+      moho::register_NaN_244();
+      moho::register_pInf_245();
+      moho::register_nInf_245();
+      moho::register_NaN_245();
+      moho::register_pInf_246();
+      moho::register_nInf_246();
+      moho::register_NaN_246();
+      moho::register_pInf_247();
+      moho::register_nInf_247();
+      moho::register_NaN_247();
+      moho::register_pInf_248();
+      moho::register_nInf_248();
+      moho::register_NaN_248();
+      moho::register_pInf_249();
+      moho::register_nInf_249();
+      moho::register_NaN_249();
+      moho::register_pInf_250();
+      moho::register_nInf_250();
+      moho::register_NaN_250();
+      moho::register_pInf_251();
+      moho::register_nInf_251();
+      moho::register_NaN_251();
+      moho::register_pInf_252();
+      moho::register_nInf_252();
+      moho::register_NaN_252();
+      moho::register_pInf_253();
+      moho::register_nInf_253();
+      moho::register_NaN_253();
+      moho::register_pInf_254();
+      moho::register_nInf_254();
+      moho::register_NaN_254();
+      moho::register_pInf_255();
+      moho::register_nInf_255();
+      moho::register_NaN_255();
+      moho::register_pInf_256();
+      moho::register_nInf_256();
+      moho::register_NaN_256();
+      moho::register_pInf_257();
+      moho::register_nInf_257();
+      moho::register_NaN_257();
+      moho::register_pInf_258();
+      moho::register_nInf_258();
+      moho::register_NaN_258();
+      moho::register_pInf_259();
+      moho::register_nInf_259();
+      moho::register_NaN_259();
+      moho::register_pInf_260();
+      moho::register_nInf_260();
+      moho::register_NaN_260();
+      moho::register_pInf_261();
+      moho::register_nInf_261();
+      moho::register_NaN_261();
+      moho::register_pInf_262();
+      moho::register_nInf_262();
+      moho::register_NaN_262();
+      moho::register_pInf_263();
+      moho::register_nInf_263();
+      moho::register_NaN_263();
+      moho::register_pInf_264();
+      moho::register_nInf_264();
+      moho::register_NaN_264();
+      moho::register_pInf_265();
+      moho::register_nInf_265();
+      moho::register_NaN_265();
+      moho::register_pInf_266();
+      moho::register_nInf_266();
+      moho::register_NaN_266();
+      moho::register_pInf_267();
+      moho::register_nInf_267();
+      moho::register_NaN_267();
+      moho::register_pInf_268();
+      moho::register_nInf_268();
+      moho::register_NaN_268();
+      moho::register_pInf_269();
+      moho::register_nInf_269();
+      moho::register_NaN_269();
+      moho::register_pInf_270();
+      moho::register_nInf_270();
+      moho::register_NaN_270();
+      moho::register_pInf_271();
+      moho::register_nInf_271();
+      moho::register_NaN_271();
+      moho::register_pInf_272();
+      moho::register_nInf_272();
+      moho::register_NaN_272();
+      moho::register_pInf_273();
+      moho::register_nInf_273();
+      moho::register_NaN_273();
+      moho::register_pInf_274();
+      moho::register_nInf_274();
+      moho::register_NaN_274();
+      moho::register_pInf_275();
+      moho::register_nInf_275();
+      moho::register_NaN_275();
+      moho::register_pInf_276();
+      moho::register_nInf_276();
+      moho::register_NaN_276();
+      moho::register_pInf_277();
+      moho::register_nInf_277();
+      moho::register_NaN_277();
+      moho::register_pInf_278();
+      moho::register_nInf_278();
+      moho::register_NaN_278();
+      moho::register_pInf_279();
+      moho::register_nInf_279();
+      moho::register_NaN_279();
+      moho::register_pInf_280();
+      moho::register_nInf_280();
+      moho::register_NaN_280();
+      moho::register_pInf_281();
+      moho::register_nInf_281();
+      moho::register_NaN_281();
+      moho::register_pInf_282();
+      moho::register_nInf_282();
+      moho::register_NaN_282();
+      moho::register_pInf_283();
+      moho::register_nInf_283();
+      moho::register_NaN_283();
+      moho::register_pInf_284();
+      moho::register_nInf_284();
+      moho::register_NaN_284();
+      moho::register_pInf_285();
+      moho::register_nInf_285();
+      moho::register_NaN_285();
+      moho::register_pInf_286();
+      moho::register_nInf_286();
+      moho::register_NaN_286();
+      moho::register_pInf_287();
+      moho::register_nInf_287();
+      moho::register_NaN_287();
+      moho::register_pInf_288();
+      moho::register_nInf_288();
+      moho::register_NaN_288();
+      moho::register_pInf_289();
+      moho::register_nInf_289();
+      moho::register_NaN_289();
+      moho::register_pInf_290();
+      moho::register_nInf_290();
+      moho::register_NaN_290();
+      moho::register_pInf_291();
+      moho::register_nInf_291();
+      moho::register_NaN_291();
+      moho::register_pInf_292();
+      moho::register_nInf_292();
+      moho::register_NaN_292();
+      moho::register_pInf_293();
+      moho::register_nInf_293();
+      moho::register_NaN_293();
+      moho::register_pInf_294();
+      moho::register_nInf_294();
+      moho::register_NaN_294();
+      moho::register_pInf_295();
+      moho::register_nInf_295();
+      moho::register_NaN_295();
+      moho::register_pInf_296();
+      moho::register_nInf_296();
+      moho::register_NaN_296();
+      moho::register_pInf_297();
+      moho::register_nInf_297();
+      moho::register_NaN_297();
+      moho::register_pInf_298();
+      moho::register_nInf_298();
+      moho::register_NaN_298();
+      moho::register_pInf_299();
+      moho::register_nInf_299();
+      moho::register_NaN_299();
+      moho::register_pInf_300();
+      moho::register_nInf_300();
+      moho::register_NaN_300();
+      moho::register_pInf_301();
+      moho::register_nInf_301();
+      moho::register_NaN_301();
+      moho::register_pInf_302();
+      moho::register_nInf_302();
+      moho::register_NaN_302();
+      moho::register_pInf_303();
+      moho::register_nInf_303();
+      moho::register_NaN_303();
+      moho::register_pInf_304();
+      moho::register_nInf_304();
+      moho::register_NaN_304();
+      moho::register_pInf_305();
+      moho::register_nInf_305();
+      moho::register_NaN_305();
+      moho::register_pInf_306();
+      moho::register_nInf_306();
+      moho::register_NaN_306();
+      moho::register_pInf_307();
+      moho::register_nInf_307();
+      moho::register_NaN_307();
+      moho::register_pInf_308();
+      moho::register_nInf_308();
+      moho::register_NaN_308();
+      moho::register_pInf_309();
+      moho::register_nInf_309();
+      moho::register_NaN_309();
+      moho::register_pInf_310();
+      moho::register_nInf_310();
+      moho::register_NaN_310();
+      moho::register_pInf_311();
+      moho::register_nInf_311();
+      moho::register_NaN_311();
+      moho::register_pInf_312();
+      moho::register_nInf_312();
+      moho::register_NaN_312();
+      moho::register_pInf_313();
+      moho::register_nInf_313();
+      moho::register_NaN_313();
+      moho::register_pInf_314();
+      moho::register_nInf_314();
+      moho::register_NaN_314();
+      moho::register_pInf_315();
+      moho::register_nInf_315();
+      moho::register_NaN_315();
+      moho::register_pInf_316();
+      moho::register_nInf_316();
+      moho::register_NaN_316();
+      moho::register_pInf_317();
+      moho::register_nInf_317();
+      moho::register_NaN_317();
+      moho::register_pInf_318();
+      moho::register_nInf_318();
+      moho::register_NaN_318();
+      moho::register_pInf_319();
+      moho::register_nInf_319();
+      moho::register_NaN_319();
+      moho::register_pInf_320();
+      moho::register_nInf_320();
+      moho::register_NaN_320();
+      moho::register_pInf_321();
+      moho::register_nInf_321();
+      moho::register_NaN_321();
+      moho::register_pInf_322();
+      moho::register_nInf_322();
+      moho::register_NaN_322();
+      moho::register_pInf_323();
+      moho::register_nInf_323();
+      moho::register_NaN_323();
+      moho::register_pInf_324();
+      moho::register_nInf_324();
+      moho::register_NaN_324();
+      moho::register_pInf_325();
+      moho::register_nInf_325();
+      moho::register_NaN_325();
+      moho::register_pInf_326();
+      moho::register_nInf_326();
+      moho::register_NaN_326();
+    }
+  };
+
+  [[maybe_unused]] SimFloatInitializersBootstrap2 gSimFloatInitializersBootstrap2;
+} // namespace
