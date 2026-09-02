@@ -14,6 +14,8 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/sim/Sim.h"
 
 using namespace moho;
@@ -192,9 +194,15 @@ namespace
    * Address: 0x0062EE40 (FUN_0062EE40)
    *
    * What it does:
-   * Scans one unit set's weak-entry lane, queries each unit's formation-bucket
-   * class tag (`+0x290` in the slot-7 runtime-info object), and returns the
-   * bucket: `0 = no air bucket`, `1 = only air bucket`, `2 = mixed buckets`.
+   * Scans one unit set's weak-entry lane and returns which movement buckets it
+   * spans: `0 = no air bucket`, `1 = only air bucket`, `2 = mixed buckets`.
+   *
+   * A unit counts as air when its blueprint's `Physics.MotionType` is
+   * `RULEUMT_Air`. The binary reaches that through vtable slot 7 and a raw
+   * `+0x290` read: slot 7 is `Unit::GetBlueprint` (0x006A8B20, annotated
+   * `Slot: 7` in Unit.h), and `+0x290` lands in `Physics` (which starts at
+   * `RUnitBlueprint + 0x278`) at its `MotionType` field (`Physics + 0x18`).
+   * The compared constant 2 is `RULEUMT_Air`.
    *
    * The unit set is taken type-erased: callers pass two distinct but
    * layout-compatible types -- `moho::SEntitySetTemplateUnit` (GetScriptIndex) and
@@ -209,31 +217,21 @@ namespace
       return 0;
     }
 
-    using QueryRuntimeInfoFn = void* (__thiscall*)(void*);
     bool hasAirBucket = false;
     bool hasNonAirBucket = false;
 
     for (const std::uint32_t* cursor = weakSet->begin; cursor != weakSet->end; ++cursor) {
+      // The weak entry stores the referenced unit biased by 8; the entity base
+      // sits at `Unit + 0x08`, so unbiasing yields the owning `Unit`.
       const std::uint32_t weakWord = *cursor;
-      void* const unitObject =
-        (weakWord != 0u) ? reinterpret_cast<void*>(static_cast<std::uintptr_t>(weakWord) - 8u) : nullptr;
-      if (unitObject == nullptr) {
-        hasNonAirBucket = true;
-        continue;
-      }
+      auto* const unit = (weakWord != 0u)
+        ? reinterpret_cast<const moho::Unit*>(static_cast<std::uintptr_t>(weakWord) - 8u)
+        : nullptr;
 
-      auto** const vtable = *reinterpret_cast<void***>(unitObject);
-      if (vtable == nullptr) {
-        hasNonAirBucket = true;
-        continue;
-      }
+      const moho::RUnitBlueprint* const blueprint =
+        (unit != nullptr) ? unit->GetBlueprint() : nullptr;
 
-      auto* const queryRuntimeInfo = reinterpret_cast<QueryRuntimeInfoFn>(vtable[7]);
-      void* const runtimeInfo = (queryRuntimeInfo != nullptr) ? queryRuntimeInfo(unitObject) : nullptr;
-      const std::uint32_t classTag = (runtimeInfo != nullptr)
-        ? *reinterpret_cast<const std::uint32_t*>(reinterpret_cast<const std::uint8_t*>(runtimeInfo) + 0x290u)
-        : 0u;
-      if (classTag == 2u) {
+      if (blueprint != nullptr && blueprint->Physics.MotionType == moho::RULEUMT_Air) {
         hasAirBucket = true;
       } else {
         hasNonAirBucket = true;
