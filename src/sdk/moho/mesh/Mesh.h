@@ -869,7 +869,17 @@ namespace moho
     float fractionHealthParameter;         // +0xCC
     float lifetimeParameter;               // +0xD0
     float auxiliaryParameter;              // +0xD4
-    std::int8_t frameCounter;              // +0xD8
+    /**
+     * Frame stamp this instance's interpolation state was last refreshed on.
+     *
+     * Unsigned to match `sFrameCounter`: the binary compares the two as raw
+     * bytes (`mov al, [ebp+0D8h]` / `cmp al, ?sFrameCounter@...@@0EA` at
+     * 0x007DECB9, an `uchar`). A signed lane here would promote to a negative
+     * `int` against the static's positive one for every value above 127, so
+     * the "already refreshed this frame" half of `UpdateInterpolatedFields`'
+     * guard would never fire across half of each 256-frame wrap.
+     */
+    std::uint8_t frameCounter;             // +0xD8
     std::uint8_t interpolationStateFresh;  // +0xD9
     std::uint8_t pad_DA_DB[0x02]{};
     float currInterpolant;    // +0xDC
