@@ -70581,7 +70581,12 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes();
       terrainRes != nullptr && !RenderAdditionsDisabled()) {
     if (!terrainRes->GetBool()) {
-      (void)terrainRes->Finalize();
+      // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
+      ::OutputDebugStringA("[TERRDIAG] Finalize: entering\n");
+      const bool finalized = terrainRes->Finalize();
+      char probe[64];
+      (void)std::snprintf(probe, sizeof(probe), "[TERRDIAG] Finalize: returned %d\n", finalized ? 1 : 0);
+      ::OutputDebugStringA(probe);
     }
   }
 

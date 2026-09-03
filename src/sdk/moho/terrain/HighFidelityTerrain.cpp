@@ -1,4 +1,5 @@
 #include "moho/terrain/HighFidelityTerrain.h"
+#include <cstdio>
 
 #include <algorithm>
 #include <cmath>
@@ -1069,6 +1070,17 @@ namespace moho
     // The count is zero until IWldTerrainRes::Finalize has run; WRenViewport::
     // Render dispatches that on the first frame after a map load.
     const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
+
+    // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
+    {
+      static std::int32_t sLastReported = -1;
+      if (normalMapCount != sLastReported) {
+        sLastReported = normalMapCount;
+        char probe[96];
+        (void)std::snprintf(probe, sizeof(probe), "[TERRDIAG] normalMapCount=%d\n", normalMapCount);
+        ::OutputDebugStringA(probe);
+      }
+    }
 
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
       const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
