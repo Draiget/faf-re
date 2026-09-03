@@ -321,7 +321,10 @@ namespace
     }
 
     // TEMPORARY PROBE (do not commit). See the free path in free_0.
-    constexpr std::uint32_t kProbeWatchedKind = 25u;   // 768-byte class
+    // Re-pointed 2026-09-03: the band-box / move-order fault pops lane 6
+    // (cache+0x48 = lanes[6]) with head = 0x666F7270 ("prof"), so this is the
+    // class every stamp/chain/double-free probe below now watches.
+    constexpr std::uint32_t kProbeWatchedKind = 6u;
     constexpr std::uint32_t kProbeFreedMagic = 0xFEEDFACEu;
     // Victim block address observed by [CLOBBER]; heap layout is deterministic.
     constexpr std::uintptr_t kProbeVictimBlock = 0x5C803E00u;
@@ -332,6 +335,9 @@ namespace
         std::uint32_t magic;        // +0x04
         const void* freedBy;        // +0x08
         SmallBlockNode* nextCopy;   // +0x0C
+        // +0x10..+0x18: the three frames above free_crt (the class-6 block is
+        // 28 bytes, so this fits). freedBy alone only ever names free_crt.
+        const void* frames[3];
     };
 
     void ProbeStampFreedBlock(SmallBlockNode* const node, const void* const freedBy)
@@ -339,6 +345,13 @@ namespace
         auto* const stamp = reinterpret_cast<ProbeFreedStamp*>(node);
         stamp->magic = kProbeFreedMagic;
         stamp->freedBy = freedBy;
+        {
+            void* captured[8] = {};
+            const USHORT got = ::RtlCaptureStackBackTrace(3, 3, captured, nullptr);
+            for (int i = 0; i < 3; ++i) {
+                stamp->frames[i] = (i < got) ? captured[i] : nullptr;
+            }
+        }
         // Redundant copy of the `next` link. Offset 0 is the word that gets
         // clobbered; offset 0x0C is not. If they ever disagree we have PROOF
         // that offset 0 was overwritten (rather than the list being mislinked),
@@ -369,12 +382,25 @@ namespace
             if (node == block) {
                 if (sDoubleFreeBudget < 6) {
                     ++sDoubleFreeBudget;
-                    char probe[192];
+                    // `block` was just pushed and stamped, so its stamp holds the
+                    // frames of THIS (second) free; `node` is the earlier push of the
+                    // same address, whose stamp still holds the FIRST free's frames.
+                    const auto* const nowStamp = reinterpret_cast<const ProbeFreedStamp*>(block);
+                    void* firstFrames[8] = {};
+                    (void)::RtlCaptureStackBackTrace(2, 4, firstFrames, nullptr);
+                    char probe[320];
                     sprintf_s(probe, sizeof(probe),
-                              "[DOUBLEFREE] block=%08X alreadyAtStep=%d count=%d freedBy=%08X\n",
+                              "[DOUBLEFREE] block=%08X alreadyAtStep=%d count=%d freedBy=%08X second=%08X,%08X,%08X,%08X first=%08X,%08X,%08X\n",
                               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(block)),
                               step, lane.count,
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(freedBy)));
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(freedBy)),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[0])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[1])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[2])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[3])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[0])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[1])),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[2])));
                     ::OutputDebugStringA(probe);
                 }
                 return;

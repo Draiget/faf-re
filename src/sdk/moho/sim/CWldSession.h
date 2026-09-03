@@ -506,10 +506,7 @@ namespace moho
    *
    * What it does:
    * Erases every node of one bare `WeakSet<UserEntity>` while keeping the head
-   * sentinel alive, through the shared full-range erase (FUN_007AF740). The
-   * bare 12-byte set has no `mSizeMirrorOrUnused` lane, so the operation runs
-   * on a staged `SSelectionSetUserEntity` view - the same adapter pattern the
-   * per-unit issue sets use - and the three ABI lanes are written back.
+   * sentinel alive, through the shared full-range erase (FUN_007AF740).
    */
   inline void ClearWeakEntitySet(WeakEntitySetUserEntity& set) noexcept
   {
@@ -518,18 +515,16 @@ namespace moho
       return;
     }
 
-    SSelectionSetUserEntity view{};
-    view.mAllocProxy = set.mAllocProxy;
-    view.mHead = set.mHead;
-    view.mSize = set.mSize;
-    view.mSizeMirrorOrUnused = set.mSize;
-
+    // `EraseRange` is a member of the bare 12-byte header, so it runs on the
+    // set itself. This used to stage the call through a by-value
+    // `SSelectionSetUserEntity` copy aliasing `set.mHead`; that type inherits
+    // `~WeakEntitySetUserEntity` -> `ReleaseStorage()` -> `operator delete`
+    // on the head, so the staged copy freed the caller's head sentinel on its
+    // way out of scope and `DestroyWeakEntitySet` then freed it again. That
+    // double free poisoned the 28-byte allocator lane and surfaced as the
+    // band-box / move-order crashes.
     SSelectionNodeUserEntity* outNode = nullptr;
-    (void)view.EraseRange(&outNode, head->mLeft, head);
-
-    set.mAllocProxy = view.mAllocProxy;
-    set.mHead = view.mHead;
-    set.mSize = view.mSize;
+    (void)set.EraseRange(&outNode, head->mLeft, head);
   }
 
   /**
