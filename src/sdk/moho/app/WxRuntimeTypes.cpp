@@ -69,6 +69,7 @@
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/Shadow.h"
@@ -70497,24 +70498,6 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   //   -> RenderFrames
   // The SetRenderTarget2 arguments are read straight off the push sequence at
   // 0x007F919E..0x007F91B1 (stencil, z via fld1/fstp, color, clear, index).
-  // TEMPORARY PROBE (do not commit). The map-preview path above clears
-  // ren_Ui/ren_Fx/... around a Render() call and restores them afterwards with
-  // no RAII guard, so a single escaping exception leaves ren_Ui false for the
-  // rest of the process and the UI never draws again -- which is exactly the
-  // "603 controls tick, nothing on screen" symptom. Report the gate state.
-  {
-    static int sUiGateBudget = 0;
-    static bool sLastRenUi = true;
-    if (moho::ren_Ui != sLastRenUi && sUiGateBudget < 10) {
-      ++sUiGateBudget;
-      sLastRenUi = moho::ren_Ui;
-      char probe[128];
-      sprintf_s(probe, sizeof(probe), "[UIGATE] ren_Ui -> %d  uiMgr=%p\n",
-                moho::ren_Ui ? 1 : 0, static_cast<const void*>(moho::UI_GetManager()));
-      ::OutputDebugStringA(probe);
-    }
-  }
-
   moho::IUIManager* const uiManager = moho::ren_Ui ? moho::UI_GetManager() : nullptr;
   if (uiManager != nullptr) {
     uiManager->ValidateFrame(head);
@@ -70536,6 +70519,47 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // binary's direct field load at 0x007F91C4 (same lane `GetPrimBatcher`
     // returns).
     uiManager->RenderFrames(runtime->mHead, runtime->mPrimBatcher.batcher);
+  }
+
+  // Range-ring category filter, refreshed from the session's overlay filters
+  // before any world view draws. Binary 0x007F91DB..0x007F91FE: loads
+  // `sWldSession`, gates on it and on `ren_Ranges`, then passes
+  // `session + 0x4D8` (`mOverlayFilters`) to the viewport's own RangeRenderer
+  // at `+0x37C`.
+  if (moho::CWldSession* const session = moho::WLD_GetActiveSession();
+      session != nullptr && moho::ren_Ranges) {
+    headView->mRangeRenderer.MoveCategories(session->mOverlayFilters);
+  }
+
+  // Lazy terrain finalize. Binary 0x007F9203..0x007F9231:
+  //
+  //     mov  eax, sWldMap        ; jz skip
+  //     mov  esi, [eax+4]        ; mTerrainRes; jz skip
+  //     mov  eax, [esi]
+  //     mov  edx, [eax+4]        ; vtable slot 1  -> GetBool (0x008A1030)
+  //     call edx
+  //     test al, al
+  //     jnz  skip
+  //     mov  edx, [eax+12Ch]     ; vtable slot 75 -> Finalize (0x008A2DD0)
+  //     call edx
+  //
+  // `Finalize` is where the terrain's D3D-side runtime is built: the two
+  // stratum-mask sheets, the water-map sheet, and -- via `InitNormalMap` --
+  // the normal-map tile sheets. It cannot run on the loader thread, so the
+  // render thread does it once, the first frame after a map load, gated on the
+  // ready flag `Finalize` itself sets.
+  //
+  // `MapLoad` deliberately does not call it (FUN_00890DA0 ends after
+  // `CWldProps::Load`), and this was the only dispatch site, so with the block
+  // missing `Finalize` never ran at all: `GetNormalMapCount()` stayed 0, the
+  // `TTerrainBasis` tile loop in every fidelity's `DrawTerrainNormals` never
+  // executed, the normals target's B/A channels stayed zero, and frame.fx's
+  // `BasisPS` reconstructed `baseNormal.y = sqrt(1 - x*x - z*z)` from them --
+  // which is why lit terrain came out near-black while meshes shaded normally.
+  if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes(); terrainRes != nullptr) {
+    if (!terrainRes->GetBool()) {
+      (void)terrainRes->Finalize();
+    }
   }
 
   // Re-center border mesh stances over the active terrain every frame.
