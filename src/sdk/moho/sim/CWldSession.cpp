@@ -1966,17 +1966,6 @@ namespace moho
     );
 
     /**
-     * Not a distinct binary function: the Park-Miller "minimal standard"
-     * integer scramble (`ldiv(key ^ 0xDEADBEEF, 127773)` then
-     * `16807*rem - 2836*quot`, wrapping negative results by `+0x7FFFFFFF`)
-     * is inlined independently at every hash-table site below
-     * (0x0082C240, 0x0082C2E0, 0x0082BFB0 x2) rather than shared in the
-     * binary. Lifted into one named helper here per the intent-first
-     * helper contract instead of duplicating the scramble four times.
-     */
-    [[nodiscard]] static std::uint32_t HashKeyToBucketIndex(const HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
-
-    /**
      * Address: 0x0082C240 (FUN_0082C240, sub_82C240)
      *
      * What it does:
@@ -2133,11 +2122,24 @@ namespace moho
     static std::uint32_t CheckedIncrementListSize10(std::uint32_t count, std::uint32_t& sizeField);
 
     /**
-     * Not a distinct binary function - the scalar 32-bit-key half of
-     * `HashKeyToBucketIndex`'s scramble, generalised over `TNode` so
-     * `HashListNode10` (`mMapD`) shares this template with `HashListNode88`
-     * (`mMapAB0`/`mMapAB1`) rather than forking a copy - both tables hash
-     * the exact same way (0x0082C240's scramble == 0x0082C950's).
+     * Not a distinct binary function - the scalar 32-bit-key half of the
+     * hash scramble, generalised over `TNode` so `HashListNode10` (`mMapD`)
+     * shares this template with `HashListNode88` (`mMapAB0`/`mMapAB1`)
+     * rather than forking a copy - both tables hash the exact same way
+     * (0x0082C240's scramble == 0x0082C950's).
+     *
+     * The scramble is Park-Miller "minimal standard":
+     * `ldiv(key ^ 0xDEADBEEF, 127773)` then `16807*rem - 2836*quot`, with
+     * negative results wrapped by `+0x7FFFFFFF`. The binary inlines it
+     * independently at every hash-table site (0x0082C240, 0x0082C2E0,
+     * 0x0082BFB0 x2) rather than sharing it; it is lifted into this one
+     * named helper per the intent-first helper contract.
+     *
+     * A non-template `HashListNode88` declaration of this name used to sit
+     * above `CheckedIncrementListSize10`. Being an exact match it won
+     * overload resolution against this template at every `mMapAB0`/`mMapAB1`
+     * call site, and it had no definition anywhere - so those calls resolved
+     * to nothing and, under /FORCE, linked against garbage.
      */
     template <typename TNode>
     [[nodiscard]] static std::uint32_t HashKeyToBucketIndex(const HashTable<TNode>& table, std::uint32_t key) noexcept;
@@ -16564,8 +16566,14 @@ namespace moho
    * set first, then sequential cursor), packs the active source byte into
    * the high byte, and writes the result to `outCommandId` (also returned).
    */
+  // The top-level `const` on both parameters is load-bearing, not style:
+  // MSVC decorates a `T* const` parameter as `QA...` and a plain `T*` as
+  // `PA...`, so a declaration that drops it does not name the definition in
+  // Sim.cpp. That mismatch is what left this call unresolved -
+  // `?...@moho@@YAPAIPAUCommandManager@1@PAI@Z` wanted here against
+  // `?...@moho@@YAPAIQAUCommandManager@1@QAI@Z` defined there.
   [[nodiscard]] std::uint32_t* AllocatePackedCommandIdFromManager(
-    CommandManager* commandManager, std::uint32_t* outCommandId
+    CommandManager* const commandManager, std::uint32_t* const outCommandId
   ) noexcept;
 
   /**
@@ -17906,9 +17914,6 @@ namespace moho
         return;
     }
   }
-
-  /**
-   * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
 
   /**
    * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
