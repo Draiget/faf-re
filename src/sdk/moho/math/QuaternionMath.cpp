@@ -67,20 +67,6 @@ namespace moho
     return result;
   }
 
-  Wm3::Quaternionf ComposeWScalarDeltaOntoOrientation(
-    const Wm3::Quaternionf& delta, const Wm3::Quaternionf& orientation
-  ) noexcept
-  {
-    const Wm3::Quaternionf& d = delta;
-    const Wm3::Quaternionf& o = orientation;
-    Wm3::Quaternionf result{};
-    result.x = (d.w * o.x) - (d.x * o.y) - (d.y * o.z) - (d.z * o.w);
-    result.y = (d.w * o.y) + (d.x * o.x) + (d.y * o.w) - (d.z * o.z);
-    result.z = (d.w * o.z) + (d.y * o.x) + (d.z * o.y) - (d.x * o.w);
-    result.w = (d.w * o.w) + (d.x * o.z) + (d.z * o.x) - (d.y * o.y);
-    return result;
-  }
-
   namespace
   {
     /**

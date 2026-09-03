@@ -262,23 +262,4 @@ namespace moho
    */
   Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept;
 
-  /**
-   * Not a single-address recovery -- this is the shared mixed-convention
-   * compose used where one operand is a freshly-built shortest-arc delta
-   * quaternion whose OWN scalar lane is `.w` (matching a plain
-   * `Quaternion(1+dot, cross.x, cross.y, cross.z)` construction, e.g.
-   * `MotorFallDown::BuildRotationDeltaFromAxes`), composed onto a genuine
-   * `.x`-scalar engine orientation. Independently re-derived term-by-term
-   * from three ground truth sites: `FUN_006FCB00` (`cfunc_EntityPushOverL`),
-   * `FUN_0050B820` (`Moho::COORDS_Tilt`), and `FUN_00695180`
-   * (`Moho::MotorFallDown::Update`) -- all three confirm the identical
-   * formula with `delta` (the `.w`-scalar operand) always left/first and
-   * `orientation` (the `.x`-scalar operand) always right/second, matching
-   * each binary call site's argument order. The result is written back in
-   * the engine's `.x`-scalar convention, matching `orientation`'s layout.
-   */
-  Wm3::Quaternionf ComposeWScalarDeltaOntoOrientation(
-    const Wm3::Quaternionf& delta, const Wm3::Quaternionf& orientation
-  ) noexcept;
-
 } // namespace moho

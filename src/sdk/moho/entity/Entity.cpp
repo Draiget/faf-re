@@ -8591,7 +8591,7 @@ namespace moho
       Wm3::Quaternionf tiltDelta{};
       BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
 
-      tran.orient_ = ComposeWScalarDeltaOntoOrientation(tiltDelta, o);
+      tran.orient_ = MultiplyQuat(tiltDelta, o);
       NormalizeQuatInPlace(&tran.orient_);
       entity->SetPendingTransform(tran, 1.0f);
     }
@@ -9000,7 +9000,7 @@ namespace moho
 
     Wm3::Quaternionf tiltDelta{};
     (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
-    *orientation = ComposeWScalarDeltaOntoOrientation(tiltDelta, oldOrientation);
+    *orientation = MultiplyQuat(tiltDelta, oldOrientation);
   }
 
   /**
