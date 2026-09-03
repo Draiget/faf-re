@@ -517,7 +517,7 @@ namespace moho
       }
     }
 
-    pendingTransform.orient_ = ComposeWScalarDeltaOntoOrientation(delta, pendingTransform.orient_);
+    pendingTransform.orient_ = MultiplyQuat(delta, pendingTransform.orient_);
     pendingTransform.orient_.Normalize();
     entity->SetPendingTransform(pendingTransform, 1.0f);
   }
