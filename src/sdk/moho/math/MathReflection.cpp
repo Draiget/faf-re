@@ -1895,6 +1895,26 @@ namespace moho
    * What it does:
    * Expands quaternion lanes into the matrix 3x3 rotation block and writes
    * translation into row 3 with homogeneous w set to 1.
+   *
+   * Ordinary scalar-first quaternion: `.w` is the scalar, `(.x,.y,.z)` the
+   * imaginary lanes. The binary loads `[ecx+0]=w, [ecx+4]=x, [ecx+8]=y,
+   * [ecx+0Ch]=z`, pre-doubles all four (0x004EE99E..0x004EE9B3) and forms
+   * only the nine cross terms below - there is **no `ww` term anywhere in the
+   * function**, which is what fixes `.w` as the scalar lane. Stores:
+   *
+   *   [eax+00] 1-(zz+yy)  [eax+04] wz+xy    [eax+08] xz-wy    [eax+0C] 0
+   *   [eax+10] xy-wz      [eax+14] 1-(zz+xx)[eax+18] yz+wx    [eax+1C] 0
+   *   [eax+20] wy+xz      [eax+24] yz-wx    [eax+28] 1-(yy+xx)[eax+2C] 0
+   *   [eax+30..38] vec    [eax+3C] 1.0
+   *
+   * This is exactly the transpose of `Moho::QuatToMatrix` (0x00452FD0) - the
+   * row-vector form against that helper's column-vector form - which is the
+   * consistency check that both are recovered correctly. A prior revision
+   * wrote both in an `.x`-scalar form, complete with a `ww2` term this
+   * function never computes.
+   *
+   * Float addition does not associate, so the diagonal sums keep the binary's
+   * operand order (`zz+yy`, `zz+xx`, `yy+xx`), as do the off-diagonal pairs.
    */
   void VMatrix4::Set(const Wm3::Quaternionf& quat, const Wm3::Vector3f& vec)
   {
@@ -1903,28 +1923,28 @@ namespace moho
     const float twoZ = quat.z * 2.0f;
     const float twoW = quat.w * 2.0f;
 
-    const float zz2 = twoZ * quat.z;
-    const float ww2 = twoW * quat.w;
-    const float yz2 = twoZ * quat.y;
+    const float xx2 = twoX * quat.x;
     const float yy2 = twoY * quat.y;
+    const float zz2 = twoZ * quat.z;
+    const float xy2 = twoY * quat.x;
+    const float xz2 = twoZ * quat.x;
+    const float yz2 = twoZ * quat.y;
+    const float wx2 = twoW * quat.x;
     const float wy2 = twoW * quat.y;
-    const float xy2 = twoX * quat.y;
     const float wz2 = twoW * quat.z;
-    const float xz2 = twoX * quat.z;
-    const float wx2 = twoX * quat.w;
 
-    r[0].x = 1.0f - (ww2 + zz2);
-    r[1].x = yz2 - wx2;
-    r[0].y = wx2 + yz2;
-    r[1].y = 1.0f - (ww2 + yy2);
-    r[2].y = wz2 - xy2;
-    r[0].z = wy2 - xz2;
+    r[0].x = 1.0f - (zz2 + yy2);
+    r[0].y = wz2 + xy2;
+    r[0].z = xz2 - wy2;
     r[0].w = 0.0f;
+    r[1].x = xy2 - wz2;
+    r[1].y = 1.0f - (zz2 + xx2);
+    r[1].z = yz2 + wx2;
     r[1].w = 0.0f;
-    r[2].x = xz2 + wy2;
+    r[2].x = wy2 + xz2;
+    r[2].y = yz2 - wx2;
+    r[2].z = 1.0f - (yy2 + xx2);
     r[2].w = 0.0f;
-    r[1].z = wz2 + xy2;
-    r[2].z = 1.0f - (zz2 + yy2);
     r[3].x = vec.x;
     r[3].y = vec.y;
     r[3].z = vec.z;
