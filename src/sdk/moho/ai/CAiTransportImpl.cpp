@@ -915,8 +915,8 @@ namespace
   {
     return Wm3::Vec3f(
       ((orient.x * orient.z) + (orient.w * orient.y)) * 2.0f,
-      ((orient.y * orient.z) - (orient.w * orient.x)) * 2.0f,
-      1.0f - (((orient.x * orient.x) + (orient.y * orient.y)) * 2.0f)
+      ((orient.w * orient.z) - (orient.x * orient.y)) * 2.0f,
+      1.0f - (((orient.z * orient.z) + (orient.y * orient.y)) * 2.0f)
     );
   }
 

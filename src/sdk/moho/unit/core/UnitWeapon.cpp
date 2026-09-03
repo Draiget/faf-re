@@ -4162,13 +4162,7 @@ namespace moho
       const float pitchJitter = mSim->mRngState->FRandGaussian() * mFiringRandomness * kDegreesToRadians;
       const float headingJitter = mSim->mRngState->FRandGaussian() * mFiringRandomness * kDegreesToRadians;
       const Wm3::Quaternionf jitterOrientation = COORDS_Orient(headingJitter, pitchJitter);
-      // 0x006D66FF..0x006D672D forms the scalar term as
-      // `J0*L0 - J1*L1 - J2*L2 - J3*L3` (positive in lane 0), and
-      // 0x006D6731..0x006D675E gives `J0*L1 + J1*L0 + J3*L2 - J2*L3`, whose
-      // cross-term signs are `L * J` - the launch orientation on the LEFT and
-      // the jitter on the right, the same order every other composition site
-      // in this binary uses.
-      launchTransform.orient_ = MultiplyQuat(launchTransform.orient_, jitterOrientation);
+      launchTransform.orient_ = MultiplyQuatXScalar(jitterOrientation, launchTransform.orient_);
     }
 
     const float damageRadius =

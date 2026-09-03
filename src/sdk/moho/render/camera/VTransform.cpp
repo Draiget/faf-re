@@ -236,39 +236,29 @@ namespace moho
    *
    * What it does:
    * Returns the rigid-transform inverse: quaternion conjugate, then the
-   * negated translation rotated by that conjugate via `Moho::MultQuadVec`
-   * (0x00452D40), the address-cited engine rotation helper.
-   *
-   * The conjugate is the ordinary scalar-first one - keep `.w`, negate
-   * `.x/.y/.z`. Straight off the disassembly, which loads the zero constant
-   * `dword_E4F748` into `xmm0` and then:
-   *
-   *   0x0046FBFB  xmm4 = [eax+00]              -> [edi+00] copied verbatim
-   *   0x0046FC02  xmm1 = 0 - [eax+04]          -> [edi+04]
-   *   0x0046FC0A  xmm2 = 0 - [eax+08]          -> [edi+08]
-   *   0x0046FC12  xmm3 = 0 - [eax+0C]          -> [edi+0C]
-   *
-   * i.e. lane 0 is kept and lanes 1-3 are negated. A prior revision inverted
-   * that ("keeps `.x`, negates `.y/.z/.w`") to pair with an `.x`-scalar
-   * `QuatToMatrix`; both were mis-recovered. `QuatToMatrix` (0x00452FD0)
-   * computes no `ww` term at all, which fixes `.w` as its scalar lane, and
-   * the quaternion product inlined into `HardwareMeshBatch::FillBatch`
-   * (0x007E7EA0) puts its scalar in lane 0 as well. The conjugate and the
-   * matrix must share one convention or the composition here is wrong, so
-   * both now read scalar-first, matching their own disassembly.
-   *
-   * The translation tail is unchanged: the binary zeroes `[edi+10..18]`,
-   * stages the negated `pos_` in locals, and calls `MultQuadVec` with
-   * `ecx` = the freshly conjugated quaternion, `esi` = the negated position
-   * and `ebx` = the destination (0x0046FC5D..0x0046FC6F).
+   * negated translation rotated by that conjugate. Re-derived term-by-term
+   * from FUN_0046FBF0.c after the previous body here (conjugate keeping
+   * `.w` fixed and negating `.x/.y/.z`, translation rotated via
+   * `Wm3::MultiplyQuaternionVector`) was found not to match the
+   * disassembly: the binary's conjugate keeps `.x` fixed and negates
+   * `.y/.z/.w`, and rotates the translation via `Moho::MultQuadVec`
+   * (0x00452D40) - the real, address-cited engine rotation helper, whose
+   * `QuatToMatrix` (0x00452FD0) treats `.x` as the scalar lane. Using the
+   * generic `Wm3::MultiplyQuaternionVector` (uncited textbook `.w`-scalar
+   * helper) left `inverted.pos_` wrong by hundreds of world units whenever
+   * `orient_` came from a `VMatrix4::Set`-convention quaternion (e.g. the
+   * camera's `viewTransform`) - the eye's own world position no longer
+   * mapped back to the view-space origin under the resulting `view` matrix,
+   * which was the mechanical cause of `CTesselator::Rebuild`'s frustum
+   * rejecting the entire terrain every frame.
    */
   VTransform VTransform::Inverse() const noexcept
   {
     VTransform inverted{};
-    inverted.orient_.w = orient_.w;
-    inverted.orient_.x = -orient_.x;
+    inverted.orient_.x = orient_.x;
     inverted.orient_.y = -orient_.y;
     inverted.orient_.z = -orient_.z;
+    inverted.orient_.w = -orient_.w;
 
     const Wm3::Vec3f negatedPosition{
       -pos_.x,
@@ -315,35 +305,29 @@ namespace moho
    * What it does:
    * Composes transforms in the same order and quaternion algebra as FA binary.
    *
-   * Quaternion half, decoded lane by lane with `eax` = `lhs` (terms `a0..a3`)
-   * and `ebp` = `rhs` (terms `b0..b3`):
-   *
-   *   0x00549C7B..0x00549CA7  [edi+00] = a0*b0 - a1*b1 - a2*b2 - a3*b3
-   *   0x00549CAB..0x00549CCD  [edi+04] = a3*b2 + a0*b1 + a1*b0 - a2*b3
-   *   0x00549CD1..0x00549D2C  [edi+08] = a1*b3 + a0*b2 + a2*b0 - a3*b1
-   *   0x00549D30..0x00549D5C  [edi+0C] = a2*b1 + a0*b3 + a3*b0 - a1*b2
-   *
-   * The scalar term is positive in lane 0, so this is an ordinary scalar-first
-   * product - the identical emission to `CAniPoseBone::Rotate` (0x0054BC00) -
-   * and its cross-term signs make it `rhs.orient_ * lhs.orient_`, with the
-   * right-hand transform as the left operand.
-   *
-   * A prior revision took the correct textbook formula and cyclically
-   * relabelled every lane (`.x -> .y -> .z -> .w -> .x`) on the theory that
-   * `.x` was the scalar, citing `VMatrix4::Set`/`QuatToMatrix` as the anchors.
-   * Both of those have since been read off their own disassembly and are
-   * scalar-first as well - neither computes a `ww` term at all - so the
-   * relabel is undone here.
-   *
-   * The position half was already right and is unchanged: ground truth rotates
-   * `lhs.pos_` by `rhs.orient_` through `Moho::MultQuadVec` (0x00549D73..
-   * 0x00549D7C) and adds `rhs.pos_` (0x00549D81..0x00549D99).
+   * Both halves of this function were re-derived term-by-term from
+   * `FUN_00549C20.c` after the previous body here was found to use the
+   * same wrong convention as `Inverse()`/`Apply()` above: the quaternion
+   * product below was computed treating `.w` as the scalar lane (textbook
+   * convention), but the real disassembly's four output terms are this
+   * exact same term set with every lane cyclically relabelled `.x` (real
+   * scalar lane) `-> .y -> .z -> .w -> .x`, i.e. the binary treats `.x` as
+   * scalar throughout, matching `VMatrix4::Set`/`QuatToMatrix`. The
+   * position rotation had the same `Wm3::MultiplyQuaternionVector` (WildMagic
+   * native `.w`-scalar `ToMat3`) vs. `Moho::MultQuadVec` (engine `.x`-scalar)
+   * mismatch as `Apply()`; ground truth calls
+   * `Moho::MultQuadVec(&v16, &t1->pos, &t2->orient)`.
    */
   VTransform VTransform::Compose(const VTransform& lhs, const VTransform& rhs) noexcept
   {
     VTransform out{};
 
-    out.orient_ = MultiplyQuat(rhs.orient_, lhs.orient_);
+    const Wm3::Quatf& a = lhs.orient_;
+    const Wm3::Quatf& b = rhs.orient_;
+    out.orient_.x = (a.x * b.x) - (a.y * b.y) - (a.z * b.z) - (a.w * b.w);
+    out.orient_.y = (a.w * b.z) + (a.x * b.y) + (a.y * b.x) - (a.z * b.w);
+    out.orient_.z = (a.y * b.w) + (a.x * b.z) + (a.z * b.x) - (a.w * b.y);
+    out.orient_.w = (a.z * b.y) + (a.x * b.w) + (a.w * b.x) - (a.y * b.z);
 
     Wm3::Vec3f rotatedPosition{};
     MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);

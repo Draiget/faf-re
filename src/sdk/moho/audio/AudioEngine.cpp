@@ -3169,17 +3169,13 @@ namespace moho
     const float z = transform.orient_.z;
     const float w = transform.orient_.w;
 
-    // Listener basis, scalar-first. Front is column 2 of the rotation matrix
-    // (the local Z axis) and top is column 1 (the local Y axis); the previous
-    // spelling had every lane rotated one place and gave `mOrientTop.y` a
-    // `w*w` diagonal term the binary never computes.
     mImpl->mListener.mOrientFront.x = ((x * z) + (w * y)) * 2.0f;
-    mImpl->mListener.mOrientFront.y = ((y * z) - (w * x)) * 2.0f;
-    mImpl->mListener.mOrientFront.z = 1.0f - (((x * x) + (y * y)) * 2.0f);
+    mImpl->mListener.mOrientFront.y = ((w * z) - (x * y)) * 2.0f;
+    mImpl->mListener.mOrientFront.z = 1.0f - (((z * z) + (y * y)) * 2.0f);
 
-    mImpl->mListener.mOrientTop.x = ((x * y) - (w * z)) * 2.0f;
-    mImpl->mListener.mOrientTop.y = 1.0f - (((x * x) + (z * z)) * 2.0f);
-    mImpl->mListener.mOrientTop.z = ((y * z) + (w * x)) * 2.0f;
+    mImpl->mListener.mOrientTop.x = ((z * y) - (x * w)) * 2.0f;
+    mImpl->mListener.mOrientTop.y = 1.0f - (((w * w) + (y * y)) * 2.0f);
+    mImpl->mListener.mOrientTop.z = ((w * z) + (x * y)) * 2.0f;
   }
 
   /**

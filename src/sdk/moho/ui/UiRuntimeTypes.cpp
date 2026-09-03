@@ -29489,10 +29489,10 @@ int moho::cfunc_AddCommandFeedbackBlipL(LuaPlus::LuaState* const state)
   meshInstance->lifetimeParameter = blip.mDuration * 10.0f;
 
   VTransform transform{};
-  transform.orient_.w = 1.0f;
-  transform.orient_.x = 0.0f;
+  transform.orient_.x = 1.0f;
   transform.orient_.y = 0.0f;
   transform.orient_.z = 0.0f;
+  transform.orient_.w = 0.0f;
   transform.pos_.x = worldPosition.x;
   transform.pos_.y = worldPosition.y;
   transform.pos_.z = worldPosition.z;

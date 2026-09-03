@@ -23,10 +23,10 @@ namespace moho
     , outputRect{}
     , outputSheet()
   {
-    orientation.w = 1.0f;
-    orientation.x = 0.0f;
+    orientation.x = 1.0f;
     orientation.y = 0.0f;
     orientation.z = 0.0f;
+    orientation.w = 0.0f;
     outputRect.x0 = 0.0f;
     outputRect.z0 = 0.0f;
     outputRect.x1 = 1.0f;
