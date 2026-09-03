@@ -294,9 +294,12 @@ namespace moho
       const std::size_t boneCount = static_cast<std::size_t>(skel->mBones.end() - bonesBegin);
       if (boneA < boneCount) {
         const Wm3::Quaternionf& ori = bonesBegin[boneA].mBoneTransform.orient_;
+        // atan2(m02, m22) - the same heading extraction the disassembly of
+        // CRotateManipulator::MoveManipulator (0x00643860) spells out at
+        // 0x006438CD..0x00643925.
         mHeadingCenter = std::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         );
       }
     }
