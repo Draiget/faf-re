@@ -432,16 +432,21 @@ namespace moho
         interp = 1.0f;
       }
 
-      currentTransform.orient_.x = attachedEntity->Orientation.x;
-      currentTransform.orient_.y = attachedEntity->Orientation.y;
-      currentTransform.orient_.z = attachedEntity->Orientation.z;
-      currentTransform.orient_.w = attachedEntity->Orientation.w;
+      // Entity::Orientation is a Vector4f, so its `.x` is memory lane 0 - the
+      // scalar - whereas Wm3::Quaternionf spells lane 0 `.w`. Copying these
+      // across by matching field NAME rotates all four lanes; the copy has to
+      // go lane for lane, exactly as CollisionBeamEntity::GetBoneWorldTransform
+      // and Prop's write-back already do.
+      currentTransform.orient_.w = attachedEntity->Orientation.x;
+      currentTransform.orient_.x = attachedEntity->Orientation.y;
+      currentTransform.orient_.y = attachedEntity->Orientation.z;
+      currentTransform.orient_.z = attachedEntity->Orientation.w;
       currentTransform.pos_ = attachedEntity->Position;
 
-      previousOrientation.x = attachedEntity->PendingOrientation.x;
-      previousOrientation.y = attachedEntity->PendingOrientation.y;
-      previousOrientation.z = attachedEntity->PendingOrientation.z;
-      previousOrientation.w = attachedEntity->PendingOrientation.w;
+      previousOrientation.w = attachedEntity->PendingOrientation.x;
+      previousOrientation.x = attachedEntity->PendingOrientation.y;
+      previousOrientation.y = attachedEntity->PendingOrientation.z;
+      previousOrientation.z = attachedEntity->PendingOrientation.w;
       previousPosition = attachedEntity->PendingPosition;
     } else {
       const VTransform& previousHistory = attachedEntity->GetPositionHistory(tick - 1);

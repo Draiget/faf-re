@@ -5446,9 +5446,13 @@ namespace moho
       const float y = mOrientation.y;
       const float z = mOrientation.z;
       const float w = mOrientation.w;
-      mForwardVector.x = ((x * z) + (y * w)) * 2.0f;
-      mForwardVector.y = ((z * w) - (x * y)) * 2.0f;
-      mForwardVector.z = 1.0f - (((y * y) + (z * z)) * 2.0f);
+      // Third column of the rotation matrix, scalar-first: the y and z terms
+      // here were still the lane-rotated form (2(zw - xy), 1 - 2(y^2 + z^2)).
+      // Only x reads the same under both conventions, which is why it was
+      // easy to miss.
+      mForwardVector.x = ((x * z) + (w * y)) * 2.0f;
+      mForwardVector.y = ((y * z) - (w * x)) * 2.0f;
+      mForwardVector.z = 1.0f - (((x * x) + (y * y)) * 2.0f);
     }
 
     CleanupFormation();
@@ -6785,9 +6789,13 @@ namespace moho
       const float y = mOrientation.y;
       const float z = mOrientation.z;
       const float w = mOrientation.w;
-      mForwardVector.x = ((x * z) + (y * w)) * 2.0f;
-      mForwardVector.y = ((z * w) - (x * y)) * 2.0f;
-      mForwardVector.z = 1.0f - (((y * y) + (z * z)) * 2.0f);
+      // Third column of the rotation matrix, scalar-first: the y and z terms
+      // here were still the lane-rotated form (2(zw - xy), 1 - 2(y^2 + z^2)).
+      // Only x reads the same under both conventions, which is why it was
+      // easy to miss.
+      mForwardVector.x = ((x * z) + (w * y)) * 2.0f;
+      mForwardVector.y = ((y * z) - (w * x)) * 2.0f;
+      mForwardVector.z = 1.0f - (((x * x) + (y * y)) * 2.0f);
     }
 
     mPlanUpdateRequested = 1;
