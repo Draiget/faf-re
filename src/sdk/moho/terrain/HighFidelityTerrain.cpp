@@ -1061,23 +1061,14 @@ namespace moho
 
     device->SelectTechnique(ren_bicubicnormals ? "TTerrainBasisBiCubic" : "TTerrainBasis");
 
+    // frame.fx's BasisPS reads all four channels of the normals target: raw.xy
+    // is the screen normal, written by the TTerrainNormals pass above, and
+    // raw.zw is the heightmap normal, written only by the tile loop below. A
+    // zero count here leaves B/A at zero and BasisPS reconstructs
+    // baseNormal.y = sqrt(1 - x*x - z*z) from them, shading terrain near-black.
+    // The count is zero until IWldTerrainRes::Finalize has run; WRenViewport::
+    // Render dispatches that on the first frame after a map load.
     const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
-
-    // TEMPORARY PROBE (do not commit). frame.fx's BasisPS reads all four
-    // channels of the normals target: raw.xy is the screen normal (written by
-    // the TTerrainNormals pass above) and raw.zw is the heightmap normal,
-    // written ONLY by this TTerrainBasis tile loop. Our dump of
-    // mSecondaryTargetLocks[head] has blue == 0 everywhere, so if this count is
-    // zero the loop never runs, B/A stay 0, and BasisPS computes
-    // baseNormal.y = sqrt(1 - 1 - z*z) on garbage -- which is why TCreateBasis
-    // emits a constant and terrain shades to near-black.
-    {
-      static int sNmBudget = 0;
-      if (sNmBudget < 4) {
-        ++sNmBudget;
-        gpg::Warnf("[NORMALMAPDIAG] normalMapCount=%d", normalMapCount);
-      }
-    }
 
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
       const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);

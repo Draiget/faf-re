@@ -3691,17 +3691,6 @@ namespace moho
 
     ResizeNormalMapHandleStorage(normalView->mNormalMap, tileCount);
 
-    // TEMPORARY PROBE (do not commit). GetNormalMapCount() returns 0 at render
-    // time (mNormalMap.mBegin == nullptr), which stops HighFidelityTerrain's
-    // TTerrainBasis tile loop from ever running, leaves the normals target's
-    // B/A channels at 0, and makes frame.fx's BasisPS compute
-    // baseNormal.y = sqrt(1 - 1 - z*z) -- the reason terrain shades black.
-    // Report what this function actually does.
-    gpg::Warnf("[INITNM] enter field=%dx%d tile=%dx%d tileCount=%u begin=%08X",
-               field->width, field->height, tileWidth, tileHeight,
-               static_cast<unsigned>(tileCount),
-               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(normalView->mNormalMap.mBegin)));
-
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     moho::ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
 
@@ -3712,10 +3701,6 @@ namespace moho
       }
 
       normalView->mNormalMap.mBegin[i] = texture;
-      gpg::Warnf("[INITNM] tile %u texture=%08X resources=%08X",
-                 static_cast<unsigned>(i),
-                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(texture.get())),
-                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(resources)));
       if (normalView->mNormalMap.mBegin[i].get() == nullptr) {
         // Original binary at 0x008A5715 constructs one default-shaped
         // gpg::gal::Error via the 0x00940560 ctor then `_CxxThrowException`s it.
