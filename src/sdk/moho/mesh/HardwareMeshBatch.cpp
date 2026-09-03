@@ -195,28 +195,29 @@ namespace moho
           instanceScale,
         };
 
-        // Hamilton product `composite.orient_ * restRotation`, re-derived
-        // term-by-term from ground truth (inlined into `HardwareMeshBatch::
-        // Func9`/`FillBatch`, 0x007E7EA0, the four `v68.x/.y/.z/.w` writes
-        // around 0x007E8730). The previous body here used the textbook
-        // `.w`-scalar Hamilton product formula; `composite.orient_` is a
-        // `VTransform`-family quaternion (always `VMatrix4::Set`'s `.x`-scalar
-        // convention, same as `VTransform::Compose`), and `restRotation` is
-        // read in the binary as four raw floats straight off
-        // `SAniSkelBone::mBoneTransform.orient_`'s memory layout (`(w,x,y,z)`
-        // storage order, `VTransform.h`), which is why `b.w` pairs with `c.x`
-        // below rather than `b.x` - confirmed against ground truth with a
-        // concrete numeric substitution (`c=(1,2,3,4)`, `b=(6,7,8,5)` in
-        // `x,y,z,w`), not just symbol matching. Float addition does not
-        // associate, so the parenthesisation below mirrors the binary's exact
-        // grouping.
+        // Hamilton product `composite.orient_ * restRotation`, transcribed from
+        // the four inlined SSE blocks in `HardwareMeshBatch::Func9`/`FillBatch`
+        // (0x007E7EA0). Both operands are ordinary `(w,x,y,z)`-storage
+        // quaternions - `Wm3::Quaternion` keeps `m_afTuple[0]=w,[1]=x,[2]=y,
+        // [3]=z`, and the binary loads `composite.orient_` from the transform's
+        // `+0x00..+0x0C` and `restRotation` from `SAniSkelBone::mBoneTransform.
+        // orient_`'s `+0x24..+0x30` as four raw floats in that same order - so
+        // this is the plain textbook product, with no scalar-lane reinterpret.
+        // Naming the loaded slots `c0..c3` / `r0..r3` by memory index, the
+        // binary computes:
+        //   0x007E84D4..0x007E8510  w = c0*r0 - c1*r1 - c2*r2 - c3*r3
+        //   0x007E8516..0x007E8543  x = c0*r1 + c2*r3 + c1*r0 - c3*r2
+        //   0x007E8549..0x007E8591  y = c0*r2 + c3*r1 + c2*r0 - c1*r3
+        //   0x007E8571..0x007E8595  z = c1*r2 + c0*r3 + c3*r0 - c2*r1
+        // Float addition does not associate, so the parenthesisation below
+        // mirrors the binary's exact accumulation order.
         const Wm3::Quatf& c = composite.orient_;
         const Wm3::Quatf& b = restRotation;
         Wm3::Quatf composed{
-          ((c.y * b.y + c.x * b.z) + c.w * b.w) - c.z * b.x,
-          ((c.x * b.w - c.y * b.x) - c.z * b.y) - c.w * b.z,
-          ((c.x * b.x + c.z * b.z) + c.y * b.w) - c.w * b.y,
-          ((c.x * b.y + c.w * b.x) + c.z * b.w) - c.y * b.z,
+          ((c.w * b.w - c.x * b.x) - c.y * b.y) - c.z * b.z,
+          ((c.w * b.x + c.y * b.z) + c.x * b.w) - c.z * b.y,
+          ((c.w * b.y + c.z * b.x) + c.y * b.w) - c.x * b.z,
+          ((c.x * b.y + c.w * b.z) + c.z * b.w) - c.y * b.x,
         };
         NormalizeQuatInPlace(&composed);
 
