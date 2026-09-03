@@ -70444,6 +70444,28 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
   delete camera;
 }
 
+namespace
+{
+  // TEMPORARY BISECT SWITCH -- delete once the commander-spawn heap corruption
+  // is attributed. Three blocks in `WRenViewport::Render` were restored on
+  // 2026-09-03 (range-category refresh, lazy terrain finalize, clutter
+  // refresh). All three had never executed in any prior session, so all three
+  // are newly-live recovered code running on the render thread during the
+  // loading screen. Setting FAF_NO_RENDER_ADDITIONS=1 skips exactly those
+  // three and nothing else, which separates "one of today's blocks corrupts
+  // the heap" from "the corruption predates them" in a single run.
+  [[nodiscard]] bool RenderAdditionsDisabled() noexcept
+  {
+    static const bool disabled = [] {
+      std::size_t length = 0u;
+      char value[8] = {};
+      return ::getenv_s(&length, value, sizeof(value), "FAF_NO_RENDER_ADDITIONS") == 0
+             && length != 0u && value[0] == '1';
+    }();
+    return disabled;
+  }
+} // namespace
+
 /**
  * Address: 0x007F90D0 (FUN_007F90D0, Moho::WRenViewport::Render)
  *
@@ -70527,7 +70549,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // `session + 0x4D8` (`mOverlayFilters`) to the viewport's own RangeRenderer
   // at `+0x37C`.
   if (moho::CWldSession* const session = moho::WLD_GetActiveSession();
-      session != nullptr && moho::ren_Ranges) {
+      session != nullptr && moho::ren_Ranges && !RenderAdditionsDisabled()) {
     headView->mRangeRenderer.MoveCategories(session->mOverlayFilters);
   }
 
@@ -70556,7 +70578,8 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // executed, the normals target's B/A channels stayed zero, and frame.fx's
   // `BasisPS` reconstructed `baseNormal.y = sqrt(1 - x*x - z*z)` from them --
   // which is why lit terrain came out near-black while meshes shaded normally.
-  if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes(); terrainRes != nullptr) {
+  if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes();
+      terrainRes != nullptr && !RenderAdditionsDisabled()) {
     if (!terrainRes->GetBool()) {
       (void)terrainRes->Finalize();
     }
@@ -70624,7 +70647,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // read like a sheet comparison). `UpdateCurrent` retires regions the camera
     // has left, `GenerateNew` fills in the ones it has entered; both take the
     // view camera and both live at `viewport + 0x808`.
-    if (moho::ren_Clutter && worldView == begin) {
+    if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled()) {
       headView->mClutter.UpdateCurrent(runtime->mCam);
       headView->mClutter.GenerateNew(runtime->mCam);
     }
