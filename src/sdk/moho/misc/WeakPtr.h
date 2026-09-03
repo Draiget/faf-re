@@ -323,12 +323,30 @@ namespace moho
      * `ClearWeakObjectChain` walks. (`UserEntity`/`UserUnit` need their 0x08
      * specialisations because of their vtable; plain `Entity` does not.)
      *
-     * What is left is which destructor path actually ran for the freed owner. A
-     * `Unit` carries two `WeakObject` subobjects -- the `CScriptObject`/`Entity`
-     * one at +4, drained by `CScriptObject::~CScriptObject`, and the `IUnit` one
-     * drained separately at `Unit.cpp:13838`. Establish whether the owner in the
-     * faulting case was torn down through a path that runs neither, e.g. freed
-     * without its destructor, before changing anything here.
+     * **The owner is not a freed object at all.** Instrumenting
+     * `CAiTarget::UnlinkEntityTargetRef` with the OnImpact fix applied caught
+     * the faulting node: `slot=00C466A1 owner=00C4669D linked=1`, against 848
+     * unlinks that were all clean (`slot=0`). Two things rule out the lifetime
+     * story that the rest of this comment was chasing:
+     *
+     *  - `0x00C4669D` is **odd**, and every `Entity` is at least 4-byte
+     *    aligned, so it was never an object pointer;
+     *  - it lies inside the **module image** (base 0x00400000, ~12 MB), not the
+     *    heap -- live entities in the same run sat at 0x4F84231C, 0x55745000.
+     *    It reads like a vtable or constant-pool address.
+     *
+     * So `ownerLinkSlot` is holding a non-pointer rather than a stale one, and
+     * the drain machinery is exonerated: there is nothing for
+     * `ClearWeakObjectChain` to have missed. Look instead at how this
+     * `CAiTarget` got that value -- a layout or aliasing problem, e.g.
+     * `Projectile::mTargetPosData` at +0x2EC reading the wrong bytes, or a
+     * `CAiTarget` copied out of storage that was never constructed. `CAiTarget`
+     * itself is `= default` and `WeakPtr`'s default ctor does zero both fields,
+     * so plain default construction is not the source.
+     *
+     * The corruption is rare -- one node in 848 -- so reproduce it with the
+     * OnImpact fix from [[project_onimpact_shape_and_weakptr_crash]] applied
+     * and that same probe, rather than expecting it on demand.
      */
     [[nodiscard]] bool ReplaceInOwnerChain(WeakPtr<T>* replacement) noexcept
     {
