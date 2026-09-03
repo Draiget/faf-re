@@ -683,6 +683,125 @@ namespace moho
      * each of the two lane vectors (destroying every lane entry's unit map and
      * unlinking its weak back-link words) before resetting them to inline.
      */
+    /**
+     * Address: 0x00569A10 (FUN_00569A10)
+     * Slot: 1
+     * Demangled: Moho::CFormationInstance::Func2 (GetCenter)
+     */
+    SCoordsVec2* Func2(SCoordsVec2* outCenter) const override;
+
+    /**
+     * Address: 0x00569A30 (FUN_00569A30)
+     * Slot: 2
+     * Demangled: Moho::CFormationInstance::Func3 (SetCenter)
+     */
+    void Func3(const SCoordsVec2& center) override;
+
+    /**
+     * Address: 0x0056A210 (FUN_0056A210)
+     * Slot: 3
+     * Demangled: Moho::CFormationInstance::UnitCount
+     */
+    int UnitCount() const override;
+
+    /**
+     * Address: 0x00569BD0 (FUN_00569BD0)
+     *
+     * IDA signature:
+     * int __stdcall Moho::CFormationInstance::GetLayer(Moho::Unit *unit);
+     *
+     * What it does:
+     * Returns the formation layer this unit belongs to: `1` for air-motion
+     * blueprints, `0` for everything else. The result indexes `mLanes`.
+     * `PreRunScript` (0x00566B10) dispatches this through slot 4 and compares
+     * the result against the layer being built, which is where the name comes
+     * from.
+     *
+     * Slot: 4
+     * Demangled: Moho::CFormationInstance::GetLayer
+     */
+    std::int32_t GetLayer(Unit* unit) const override;
+
+    /**
+     * Address: 0x005669A0 (FUN_005669A0)
+     * Slot: 5
+     * Demangled: Moho::CFormationInstance::Func6
+     */
+    SFormationLaneEntry* Func6(Unit* unit) override;
+
+    /**
+     * Address: 0x00569CB0 (FUN_00569CB0)
+     * Slot: 6
+     * Demangled: Moho::CFormationInstance::GetFormationPosition
+     */
+    SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x00569EA0 (FUN_00569EA0)
+     * Slot: 7
+     * Demangled: Moho::CFormationInstance::GetAdjustedFormationPosition
+     */
+    SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x00569F70 (FUN_00569F70)
+     * Slot: 8
+     * Demangled: Moho::CFormationInstance::Func9
+     */
+    SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x0056A150 (FUN_0056A150)
+     * Slot: 9
+     * Demangled: Moho::CFormationInstance::Func10
+     */
+    Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x00566070 (FUN_00566070, Moho::CFormationInstance::Func11)
+     * Slot: 10
+     */
+    float Func11(Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x00566080 (FUN_00566080, Moho::CFormationInstance::Func12)
+     * Slot: 11
+     */
+    std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
+     * Slot: 12
+     */
+    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x0056A6E0 (FUN_0056A6E0, Moho::CFormationInstance::Func14)
+     * Slot: 13
+     */
+    Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry) override;
+
+    /**
+     * Address: 0x0056A220 (FUN_0056A220)
+     * Slot: 14
+     * Demangled: Moho::CFormationInstance::AddUnit
+     */
+    void AddUnit(Unit* unit) override;
+
+    /**
+     * Address: 0x0056A300 (FUN_0056A300)
+     * Slot: 15
+     * Demangled: Moho::CFormationInstance::RemoveUnit
+     */
+    void RemoveUnit(Unit* unit) override;
+
+    /**
+     * Address: 0x0056A440 (FUN_0056A440)
+     * Slot: 16
+     * Demangled: Moho::CFormationInstance::Func17
+     */
+    bool Func17(Unit* unit, bool checkAll) const override;
+
     void CleanupFormation();
 
     /**
@@ -697,7 +816,159 @@ namespace moho
      * base implementation is the one every other `CFormationInstance`-rooted
      * override falls back to.
      */
-    virtual void Update();
+    void Update() override;
+
+    /**
+     * Address: 0x00569B60 (FUN_00569B60)
+     * Slot: 18
+     * Demangled: Moho::CFormationInstance::Func19
+     */
+    Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const override;
+
+    /**
+     * Address: 0x00569BF0 (FUN_00569BF0)
+     * Slot: 19
+     * Demangled: Moho::CFormationInstance::CommandIsForm
+     */
+    bool CommandIsForm() const override;
+
+    /**
+     * Address: 0x00569C20 (FUN_00569C20)
+     * Slot: 20
+     * Demangled: Moho::CFormationInstance::Func21
+     */
+    bool Func21(Unit* unit) const override;
+
+    /**
+     * Address: 0x0056A4F0 (FUN_0056A4F0)
+     * Slot: 21
+     * Demangled: Moho::CFormationInstance::Func22
+     */
+    void Func22(float scale) override;
+
+    /**
+     * Address: 0x0056A520 (FUN_0056A520)
+     * Slot: 22
+     * Demangled: Moho::CFormationInstance::SetOrientation
+     */
+    void SetOrientation(const Wm3::Quatf& orientation) override;
+
+    /**
+     * Address: 0x0056A680 (FUN_0056A680)
+     * Slot: 23
+     * Demangled: Moho::CFormationInstance::GetOrientation
+     */
+    Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const override;
+
+    /**
+     * Address: 0x00569A00 (FUN_00569A00)
+     * Slot: 24
+     * Demangled: Moho::CFormationInstance::GetCommandType
+     */
+    EUnitCommandType GetCommandType() const override;
+
+    /**
+     * Address: 0x0056A700 (FUN_0056A700, Moho::CFormationInstance::FindSlotFor)
+     * Slot: 25
+     *
+     * What it does:
+     * Base implementation: hands `pos` straight back through `dest`. It never
+     * consults the occupied-slot table; `CAiFormationInstance` overrides it
+     * with the real slot search.
+     */
+    virtual SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit);
+
+    /**
+     * Address: 0x005691E0 (FUN_005691E0, Moho::CFormationInstance::RemoveDeadUnits)
+     *
+     * What it does:
+     * Removes null/dead/destroy-queued units from linked formation unit refs
+     * and reports whether `checkForUnit` remains live in the set.
+     */
+    bool RemoveDeadUnits(Unit* checkForUnit);
+
+    /**
+     * Address: 0x00566A30 (FUN_00566A30, Moho::CFormationInstance::ComputeRunScriptOffset)
+     *
+     * What it does:
+     * Scales one script-local formation offset, optionally rotates it by the
+     * current formation orientation, then multiplies by slot-span scale.
+     */
+    SCoordsVec2* ComputeRunScriptOffset(const SCoordsVec2* sourceOffset, SCoordsVec2* dest) const;
+
+    /**
+     * Address: 0x00566B10 (FUN_00566B10, Moho::CFormationInstance::PreRunScript)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CFormationInstance::PreRunScript(
+     *     gpg::fastvector_n4_WeakPtr_IUnit *layerUnitsOut@<ebx>,
+     *     Moho::CAiFormationInstance *this,
+     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits, int layerIndex);
+     *
+     * What it does:
+     * Partitions the shared candidate-unit list by `GetLayer()`: every unit
+     * whose layer matches `layerIndex` is moved out of `candidateUnits` into
+     * `layerUnitsOut` (erased from the shared list so a later layer's pass
+     * never sees it again); units belonging to a different layer are left
+     * in place.
+     */
+    void PreRunScript(SFormationLayerUnitSet& layerUnitsOut, SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00568820 (FUN_00568820, Moho::CFormationInstance::Setup)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CFormationInstance::Setup(
+     *     int layerIndex@<edi>, Moho::CAiFormationInstance *this,
+     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits);
+     *
+     * What it does:
+     * Claims this layer's units out of the shared candidate list via
+     * `PreRunScript`, runs the formation script over them via `RunScript`
+     * when any were claimed, then releases the per-layer scratch list.
+     */
+    void Setup(SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00567300 (FUN_00567300, Moho::CFormationInstance::RunScript)
+     *
+     * ASM-only recovery (no `.c` decompile); see
+     * `decomp/recovery/escalations/FUN_00567300.md` for the stack-frame
+     * decode key, EH funclet table, and the seven-phase behavior this
+     * follows. 1010 instructions.
+     *
+     * IDA signature:
+     * void __stdcall Moho::CFormationInstance::RunScript(
+     *     gpg::fastvector_n4_WeakPtr_IUnit *units, std::int32_t layerIndex);
+     *
+     * What it does:
+     * Builds a Lua unit table from `units` and calls `Moho::FORMATION_RunScript`;
+     * early-exits if it produced no slots. Computes the mean unit position,
+     * builds one relative-position descriptor per unit (optionally rotated by
+     * `mOrientationBaseline`) while folding the lane's `preferredSpeed`,
+     * computes slot-table span/mean statistics, builds one scored candidate
+     * per (slot, unit) pair whose category matches and sorts them by squared
+     * distance, then greedily assigns each candidate's nearest still-free
+     * unit into the new lane entry's `unitMap` (warning on duplicate
+     * assignment), calls `RemoveUnit` for anything left unassigned, and
+     * appends the finished lane entry to `mLanes[layerIndex]`.
+     */
+    void RunScript(SFormationLayerUnitSet& units, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00568CA0 (FUN_00568CA0, Moho::CFormationInstance::UpdateFormation)
+     *
+     * What it does:
+     * Snapshots every live, mobile, non-building, non-destroy-queued linked
+     * unit into a weak-slot scratch list, accumulates the formation's mean
+     * facing and each unit's max footprint size, refreshes
+     * `mOrientationChng` when the facing changed enough, then rebuilds each
+     * formation layer in turn: releases the previous lane entries for that
+     * layer and calls `Setup` to claim and script this layer's units. After
+     * both layers rebuild, merges overlapping lane bands for `Form*`
+     * commands and broadcasts `FORMATIONSTATUS_FormationUpdated`.
+     */
+    void UpdateFormation();
 
     /**
      * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
@@ -772,127 +1043,32 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-     * Address: 0x00569A10 (FUN_00569A10)
-     * Slot: 1
-     * Demangled: Moho::CFormationInstance::Func2 (GetCenter)
-     */
-    virtual SCoordsVec2* Func2(SCoordsVec2* outCenter) const;
-
-    /**
-     * Address: 0x00569A30 (FUN_00569A30)
-     * Slot: 2
-     * Demangled: Moho::CFormationInstance::Func3 (SetCenter)
-     */
-    virtual void Func3(const SCoordsVec2& center);
-
-    /**
-     * Address: 0x0056A210 (FUN_0056A210)
-     * Slot: 3
-     * Demangled: Moho::CFormationInstance::UnitCount
-     */
-    virtual int UnitCount() const;
-
-    /**
-     * Address: 0x00569BD0 (FUN_00569BD0)
-     *
-     * IDA signature:
-     * int __stdcall Moho::CFormationInstance::GetLayer(Moho::Unit *unit);
-     *
-     * What it does:
-     * Returns the formation layer this unit belongs to: `1` for air-motion
-     * blueprints, `0` for everything else. The result indexes `mLanes`.
-     * `PreRunScript` (0x00566B10) dispatches this through slot 4 and compares
-     * the result against the layer being built, which is where the name comes
-     * from.
-     *
-     * Slot: 4
-     * Demangled: Moho::CFormationInstance::GetLayer
-     */
-    virtual std::int32_t GetLayer(Unit* unit) const;
-
-    /**
-     * Address: 0x005669A0 (FUN_005669A0)
-     * Slot: 5
-     * Demangled: Moho::CFormationInstance::Func6
-     */
-    virtual SFormationLaneEntry* Func6(Unit* unit);
-
-    /**
-     * Address: 0x00569CB0 (FUN_00569CB0)
-     * Slot: 6
-     * Demangled: Moho::CFormationInstance::GetFormationPosition
-     */
-    virtual SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
-
-    /**
-     * Address: 0x00569EA0 (FUN_00569EA0)
-     * Slot: 7
-     * Demangled: Moho::CFormationInstance::GetAdjustedFormationPosition
-     */
-    virtual SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SFormationLaneEntry* laneEntry);
-
-    /**
-     * Address: 0x00569F70 (FUN_00569F70)
-     * Slot: 8
-     * Demangled: Moho::CFormationInstance::Func9
-     */
-    virtual SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
-
-    /**
-     * Address: 0x0056A150 (FUN_0056A150)
-     * Slot: 9
-     * Demangled: Moho::CFormationInstance::Func10
-     */
-    virtual Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SFormationLaneEntry* laneEntry);
-
-    /**
      * Address: 0x0059A790 (FUN_0059A790)
      * Slot: 10
      * Demangled: Moho::CAiFormationInstance::Func11
      */
-    virtual float Func11(Unit* unit, SFormationLaneEntry* laneEntry);
+    float Func11(Unit* unit, SFormationLaneEntry* laneEntry) override;
 
     /**
      * Address: 0x0059A7D0 (FUN_0059A7D0)
      * Slot: 11
      * Demangled: Moho::CAiFormationInstance::Func12
      */
-    virtual std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry);
+    std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry) override;
 
     /**
      * Address: 0x0059A620 (FUN_0059A620)
      * Slot: 12
      * Demangled: Moho::CAiFormationInstance::CalcFormationSpeed
      */
-    virtual float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry);
+    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry) override;
 
     /**
      * Address: 0x0059A870 (FUN_0059A870)
      * Slot: 13
      * Demangled: Moho::CAiFormationInstance::Func14
      */
-    virtual Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry);
-
-    /**
-     * Address: 0x0056A220 (FUN_0056A220)
-     * Slot: 14
-     * Demangled: Moho::CFormationInstance::AddUnit
-     */
-    virtual void AddUnit(Unit* unit);
-
-    /**
-     * Address: 0x0056A300 (FUN_0056A300)
-     * Slot: 15
-     * Demangled: Moho::CFormationInstance::RemoveUnit
-     */
-    virtual void RemoveUnit(Unit* unit);
-
-    /**
-     * Address: 0x0056A440 (FUN_0056A440)
-     * Slot: 16
-     * Demangled: Moho::CFormationInstance::Func17
-     */
-    virtual bool Func17(Unit* unit, bool checkAll) const;
+    Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry) override;
 
     /**
      * Address: 0x0059AE80 (FUN_0059AE80, Moho::CAiFormationInstance::Update)
@@ -904,56 +1080,7 @@ namespace moho
      * Slot: 17
      * Demangled: Moho::CAiFormationInstance::Update
      */
-    virtual void Update();
-
-    /**
-     * Address: 0x00569B60 (FUN_00569B60)
-     * Slot: 18
-     * Demangled: Moho::CFormationInstance::Func19
-     */
-    virtual Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const;
-
-    /**
-     * Address: 0x00569BF0 (FUN_00569BF0)
-     * Slot: 19
-     * Demangled: Moho::CFormationInstance::CommandIsForm
-     */
-    virtual bool CommandIsForm() const;
-
-    /**
-     * Address: 0x00569C20 (FUN_00569C20)
-     * Slot: 20
-     * Demangled: Moho::CFormationInstance::Func21
-     */
-    virtual bool Func21(Unit* unit) const;
-
-    /**
-     * Address: 0x0056A4F0 (FUN_0056A4F0)
-     * Slot: 21
-     * Demangled: Moho::CFormationInstance::Func22
-     */
-    virtual void Func22(float scale);
-
-    /**
-     * Address: 0x0056A520 (FUN_0056A520)
-     * Slot: 22
-     * Demangled: Moho::CFormationInstance::SetOrientation
-     */
-    virtual void SetOrientation(const Wm3::Quatf& orientation);
-
-    /**
-     * Address: 0x0056A680 (FUN_0056A680)
-     * Slot: 23
-     * Demangled: Moho::CFormationInstance::GetOrientation
-     */
-    virtual Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const;
-
-    /**
-     * Address: 0x00569A00 (FUN_00569A00)
-     * Slot: 24
-     * Demangled: Moho::CFormationInstance::GetCommandType
-     */
-    virtual EUnitCommandType GetCommandType() const;
+    void Update() override;
 
     /**
      * Address: 0x0059AA20 (FUN_0059AA20)
@@ -965,7 +1092,7 @@ namespace moho
      * slot, and falls back to current unit position when no free slot can be
      * found.
      */
-    virtual SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit);
+    SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit) override;
 
     /**
      * Address: 0x0059A570 (FUN_0059A570)
@@ -974,97 +1101,6 @@ namespace moho
      */
     virtual bool Func27(const SCoordsVec2& position, std::int32_t footprintSize, std::int32_t laneToken) const;
 
-    /**
-     * Address: 0x005691E0 (FUN_005691E0, Moho::CAiFormationInstance::RemoveDeadUnits)
-     *
-     * What it does:
-     * Removes null/dead/destroy-queued units from linked formation unit refs
-     * and reports whether `checkForUnit` remains live in the set.
-     */
-    bool RemoveDeadUnits(Unit* checkForUnit);
-
-    /**
-     * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)
-     *
-     * What it does:
-     * Scales one script-local formation offset, optionally rotates it by the
-     * current formation orientation, then multiplies by slot-span scale.
-     */
-    SCoordsVec2* ComputeRunScriptOffset(const SCoordsVec2* sourceOffset, SCoordsVec2* dest) const;
-
-    /**
-     * Address: 0x00566B10 (FUN_00566B10, Moho::CAiFormationInstance::PreRunScript)
-     *
-     * IDA signature:
-     * void __userpurge Moho::CAiFormationInstance::PreRunScript(
-     *     gpg::fastvector_n4_WeakPtr_IUnit *layerUnitsOut@<ebx>,
-     *     Moho::CAiFormationInstance *this,
-     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits, int layerIndex);
-     *
-     * What it does:
-     * Partitions the shared candidate-unit list by `GetLayer()`: every unit
-     * whose layer matches `layerIndex` is moved out of `candidateUnits` into
-     * `layerUnitsOut` (erased from the shared list so a later layer's pass
-     * never sees it again); units belonging to a different layer are left
-     * in place.
-     */
-    void PreRunScript(SFormationLayerUnitSet& layerUnitsOut, SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
-
-    /**
-     * Address: 0x00568820 (FUN_00568820, Moho::CAiFormationInstance::Setup)
-     *
-     * IDA signature:
-     * void __userpurge Moho::CAiFormationInstance::Setup(
-     *     int layerIndex@<edi>, Moho::CAiFormationInstance *this,
-     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits);
-     *
-     * What it does:
-     * Claims this layer's units out of the shared candidate list via
-     * `PreRunScript`, runs the formation script over them via `RunScript`
-     * when any were claimed, then releases the per-layer scratch list.
-     */
-    void Setup(SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
-
-    /**
-     * Address: 0x00567300 (FUN_00567300, Moho::CAiFormationInstance::RunScript)
-     *
-     * ASM-only recovery (no `.c` decompile); see
-     * `decomp/recovery/escalations/FUN_00567300.md` for the stack-frame
-     * decode key, EH funclet table, and the seven-phase behavior this
-     * follows. 1010 instructions.
-     *
-     * IDA signature:
-     * void __stdcall Moho::CAiFormationInstance::RunScript(
-     *     gpg::fastvector_n4_WeakPtr_IUnit *units, std::int32_t layerIndex);
-     *
-     * What it does:
-     * Builds a Lua unit table from `units` and calls `Moho::FORMATION_RunScript`;
-     * early-exits if it produced no slots. Computes the mean unit position,
-     * builds one relative-position descriptor per unit (optionally rotated by
-     * `mOrientationBaseline`) while folding the lane's `preferredSpeed`,
-     * computes slot-table span/mean statistics, builds one scored candidate
-     * per (slot, unit) pair whose category matches and sorts them by squared
-     * distance, then greedily assigns each candidate's nearest still-free
-     * unit into the new lane entry's `unitMap` (warning on duplicate
-     * assignment), calls `RemoveUnit` for anything left unassigned, and
-     * appends the finished lane entry to `mLanes[layerIndex]`.
-     */
-    void RunScript(SFormationLayerUnitSet& units, std::int32_t layerIndex);
-
-    /**
-     * Address: 0x00568CA0 (FUN_00568CA0, Moho::CAiFormationInstance::UpdateFormation)
-     *
-     * What it does:
-     * Snapshots every live, mobile, non-building, non-destroy-queued linked
-     * unit into a weak-slot scratch list, accumulates the formation's mean
-     * facing and each unit's max footprint size, refreshes
-     * `mOrientationChng` when the facing changed enough, then rebuilds each
-     * formation layer in turn: releases the previous lane entries for that
-     * layer and calls `Setup` to claim and script this layer's units. After
-     * both layers rebuild, merges overlapping lane bands for `Form*`
-     * commands and broadcasts `FORMATIONSTATUS_FormationUpdated`.
-     */
-    void UpdateFormation();
 
   public:
     Sim* mSim;                                    // +0x328

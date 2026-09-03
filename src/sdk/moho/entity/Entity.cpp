@@ -3176,6 +3176,9 @@ namespace moho
     mVizToEnemies = 4;
     mVizToNeutrals = 2;
 
+    // 0x00678370: `std::map_EntId_Entity::find(&node, sim->mEntityDB, &id); node->second = this;`
+    // -- the id node was inserted (null payload) by `EntityDB::DoReserveId`.
+    sim->mEntityDB->mAllUnits.find(entityId)->second = this;
     RegisterEntityInDbIfMissing(sim, this);
 
     // 0x00678477: this is what makes an entity run at all. The binary pushes

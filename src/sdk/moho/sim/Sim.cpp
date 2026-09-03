@@ -4731,67 +4731,26 @@ namespace
     return it->second;
   }
 
-  struct EntityDbEntityMapView
-  {
-    void* allocatorProxy;           // +0x00
-    CEntityDbAllUnitsNode* head;    // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(offsetof(EntityDbEntityMapView, head) == 0x04, "EntityDbEntityMapView::head offset must be 0x04");
-  static_assert(offsetof(EntityDbEntityMapView, size) == 0x08, "EntityDbEntityMapView::size offset must be 0x08");
-  static_assert(sizeof(EntityDbEntityMapView) == 0x0C, "EntityDbEntityMapView size must be 0x0C");
-
-  [[nodiscard]] EntityDbEntityMapView& GetEntityDbEntityMapView(CEntityDb* const entityDb) noexcept
-  {
-    return *reinterpret_cast<EntityDbEntityMapView*>(entityDb);
-  }
-
   /**
    * Address: 0x006856C0 (FUN_006856C0, std::map_EntId_Entity::find)
    *
    * What it does:
-   * Returns the exact entity-id tree node when present, otherwise the map
-   * sentinel/head node.
+   * The `sim->mEntityDB->mAllUnits.find(id)` + end-check that every EntId
+   * consumer in the sim (IssueCommand, DestroyEntity, WarpEntity, AdvanceBeat,
+   * ProcessInfoPair, ...) open-codes around that one map lookup.
    */
-  [[nodiscard]] CEntityDbAllUnitsNode* FindEntityMapNode(EntityDbEntityMapView& map, const EntId id) noexcept
-  {
-    CEntityDbAllUnitsNode* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t key = static_cast<std::uint32_t>(id);
-    CEntityDbAllUnitsNode* result = head;
-    CEntityDbAllUnitsNode* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= key) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || key < result->key) {
-      return head;
-    }
-
-    return result;
-  }
-
   Entity* FindEntityById(CEntityDb* entityDb, const EntId id)
   {
     if (!entityDb) {
       return nullptr;
     }
 
-    EntityDbEntityMapView& entityMap = GetEntityDbEntityMapView(entityDb);
-    CEntityDbAllUnitsNode* const node = FindEntityMapNode(entityMap, id);
-    if (node == nullptr || node == entityMap.head || node->unitListNode == nullptr) {
+    const auto it = entityDb->mAllUnits.find(static_cast<std::uint32_t>(id));
+    if (it == entityDb->mAllUnits.end()) {
       return nullptr;
     }
 
-    return static_cast<Entity*>(node->unitListNode);
+    return it->second;
   }
 
   static_assert(sizeof(SEntitySetTemplateUnit) == 0x28, "SEntitySetTemplateUnit size must be 0x28");
@@ -5895,8 +5854,13 @@ namespace
 
     CUnitCommand* issuedCommand = nullptr;
     bool queuedAtLeastOnce = false;
-    const std::uint32_t commandIdTopByte = static_cast<std::uint32_t>(commandIssueData.nextCommandId) & 0xFF000000u;
-    const bool appendByDefault = commandIdTopByte == 0xFF000000u;
+    // 0x006F12C0: the append-vs-insert decision reads the issue data's +0x08
+    // lane (`mIndex`, the id of the queued command to insert before; -1 =
+    // append), not the freshly allocated id at +0x00. Reading +0x00 here made
+    // every ordinary order look like an insert before an id that is not in
+    // the queue, so nothing was ever queued and the unit stayed idle.
+    const std::uint32_t insertBeforeTopByte = static_cast<std::uint32_t>(commandIssueData.mIndex) & 0xFF000000u;
+    const bool appendByDefault = insertBeforeTopByte == 0xFF000000u;
 
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
       Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
@@ -5932,7 +5896,7 @@ namespace
         continue;
       }
 
-      const int insertIndex = queue->FindCommandIndex(commandIssueData.nextCommandId);
+      const int insertIndex = queue->FindCommandIndex(static_cast<CmdId>(commandIssueData.mIndex));
       if (insertIndex >= 0) {
         queue->InsertCommandToQueue(issuedCommand, insertIndex);
         queuedAtLeastOnce = true;

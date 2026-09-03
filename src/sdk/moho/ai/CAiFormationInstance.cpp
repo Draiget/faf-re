@@ -2356,7 +2356,7 @@ namespace
     cache.size = 0u;
   }
 
-  void CleanupFormationTransientState(moho::CAiFormationInstance& formation)
+  void CleanupFormationTransientState(moho::CFormationInstance& formation)
   {
     formation.mOccupiedSlots.ResetStorageToInline();
     DestroyCoordCacheMapStorage(formation.mCoordCachePrimary);
@@ -2376,7 +2376,7 @@ namespace
     }
   }
 
-  void CleanupFormationUnitLinks(moho::CAiFormationInstance& formation)
+  void CleanupFormationUnitLinks(moho::CFormationInstance& formation)
   {
     moho::SFormationLinkedUnitRef* unitRef = formation.mUnits.begin();
     const moho::SFormationLinkedUnitRef* const endRef = formation.mUnits.end();
@@ -3211,7 +3211,7 @@ namespace
    * units while preserving intrusive owner-chain wiring for each entry.
    */
   void ResetLinkedUnitRefsFromUnits(
-    moho::CAiFormationInstance& formation,
+    moho::CFormationInstance& formation,
     const std::vector<moho::Unit*>& keptUnits
   )
   {
@@ -4266,7 +4266,7 @@ namespace
    * both lane groups, then merges overlap extents/speed bands with a minimum
    * floor to keep coupled lane movement consistent.
    */
-  [[maybe_unused]] void MergeOverlappingLaneBands(moho::CAiFormationInstance& formation)
+  [[maybe_unused]] void MergeOverlappingLaneBands(moho::CFormationInstance& formation)
   {
     if (formation.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Guard) {
       return;
@@ -4411,7 +4411,7 @@ namespace
    * it: `RemoveDeadUnits` -> `CleanupFormation` -> `UpdateFormation`, in that
    * order (see 0x0059AEA8 / 0x0059AEAF / 0x0059AEB5).
    */
-  void RefreshFormationPlanIfRequested(moho::CAiFormationInstance& formation)
+  void RefreshFormationPlanIfRequested(moho::CFormationInstance& formation)
   {
     if (formation.mPlanUpdateRequested == 0u) {
       return;
@@ -4874,15 +4874,66 @@ namespace moho
   }
 
   /**
-   * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
+   * Address: 0x00566070 (FUN_00566070, Moho::CFormationInstance::Func11)
+   * Slot: 10
    *
    * What it does:
-   * Models the base `CFormationInstance` speed-stub lane that returns zero
-   * speed for non-specialized formation owners.
+   * Base lane: no per-unit formation speed factor, always zero.
    */
-  float CFormationInstanceCalcFormationSpeedFallback(Unit*, float*, SFormationLaneEntry*)
+  float CFormationInstance::Func11(Unit* const, SFormationLaneEntry* const)
   {
     return 0.0f;
+  }
+
+  /**
+   * Address: 0x00566080 (FUN_00566080, Moho::CFormationInstance::Func12)
+   * Slot: 11
+   *
+   * What it does:
+   * Base lane: every unit reports formation state 1.
+   */
+  std::int32_t CFormationInstance::Func12(Unit* const, SFormationLaneEntry* const)
+  {
+    return 1;
+  }
+
+  /**
+   * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
+   * Slot: 12
+   *
+   * What it does:
+   * Base lane: zero formation speed; `CAiFormationInstance` overrides it with
+   * the lane-relative speed computation.
+   */
+  float CFormationInstance::CalcFormationSpeed(Unit* const, float* const, SFormationLaneEntry* const)
+  {
+    return 0.0f;
+  }
+
+  /**
+   * Address: 0x0056A6E0 (FUN_0056A6E0, Moho::CFormationInstance::Func14)
+   * Slot: 13
+   *
+   * What it does:
+   * Base lane: no lane leader, always null.
+   */
+  Unit* CFormationInstance::Func14(Unit* const, SFormationLaneEntry* const)
+  {
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x0056A700 (FUN_0056A700, Moho::CFormationInstance::FindSlotFor)
+   * Slot: 25
+   *
+   * What it does:
+   * Base lane: hands `pos` straight back through `dest` without consulting
+   * the occupied-slot table.
+   */
+  SCoordsVec2* CFormationInstance::FindSlotFor(SCoordsVec2* const dest, const SCoordsVec2* const pos, Unit* const)
+  {
+    *dest = *pos;
+    return dest;
   }
 
   std::uint32_t* SFormationLinkedUnitRef::NextChainLinkSlot(const std::uint32_t linkWord) noexcept
@@ -5336,7 +5387,7 @@ namespace moho
    * What it does:
    * Copies the current formation center into `outCenter`.
    */
-  SCoordsVec2* CAiFormationInstance::Func2(SCoordsVec2* const outCenter) const
+  SCoordsVec2* CFormationInstance::Func2(SCoordsVec2* const outCenter) const
   {
     outCenter->x = mFormationCenter.x;
     outCenter->z = mFormationCenter.z;
@@ -5351,7 +5402,7 @@ namespace moho
    * What it does:
    * Applies a new center (if finite and changed), then invalidates slot and coord caches.
    */
-  void CAiFormationInstance::Func3(const SCoordsVec2& center)
+  void CFormationInstance::Func3(const SCoordsVec2& center)
   {
     if (!BinaryFloatNotEqual(mFormationCenter.x, center.x) && !BinaryFloatNotEqual(mFormationCenter.z, center.z)) {
       return;
@@ -5589,7 +5640,7 @@ namespace moho
    * What it does:
    * Returns number of linked unit references currently tracked by this formation.
    */
-  int CAiFormationInstance::UnitCount() const
+  int CFormationInstance::UnitCount() const
   {
     return static_cast<int>(mUnits.end() - mUnits.begin());
   }
@@ -5604,7 +5655,7 @@ namespace moho
    * Classifies the unit into its formation layer: air-motion blueprints get
    * layer 1, everything else layer 0. The value indexes `mLanes`.
    */
-  std::int32_t CAiFormationInstance::GetLayer(Unit* const unit) const
+  std::int32_t CFormationInstance::GetLayer(Unit* const unit) const
   {
     if (unit == nullptr) {
       return kGroundFormationLayer;
@@ -5621,7 +5672,7 @@ namespace moho
    * What it does:
    * Resolves and returns the lane entry that currently owns `unit`.
    */
-  SFormationLaneEntry* CAiFormationInstance::Func6(Unit* const unit)
+  SFormationLaneEntry* CFormationInstance::Func6(Unit* const unit)
   {
     if (!unit) {
       return nullptr;
@@ -5653,7 +5704,7 @@ namespace moho
    * Scales one script-local formation offset by update scale, rotates by
    * current orientation when non-zero, then applies slot-span scaling.
    */
-  SCoordsVec2* CAiFormationInstance::ComputeRunScriptOffset(
+  SCoordsVec2* CFormationInstance::ComputeRunScriptOffset(
     const SCoordsVec2* const sourceOffset,
     SCoordsVec2* const dest
   ) const
@@ -5692,7 +5743,7 @@ namespace moho
    * never sees it again. Units belonging to a different layer are left in
    * place.
    */
-  void CAiFormationInstance::PreRunScript(
+  void CFormationInstance::PreRunScript(
     SFormationLayerUnitSet& layerUnitsOut,
     SFormationLayerUnitSet& candidateUnits,
     const std::int32_t layerIndex
@@ -5721,7 +5772,7 @@ namespace moho
    * `PreRunScript`, runs the formation script over them via `RunScript`
    * when any were claimed, then releases the per-layer scratch list.
    */
-  void CAiFormationInstance::Setup(SFormationLayerUnitSet& candidateUnits, const std::int32_t layerIndex)
+  void CFormationInstance::Setup(SFormationLayerUnitSet& candidateUnits, const std::int32_t layerIndex)
   {
     SFormationLayerUnitSet layerUnits{};
     PreRunScript(layerUnits, candidateUnits, layerIndex);
@@ -5792,7 +5843,7 @@ namespace moho
    *     unassigned, and appends the finished lane entry to
    *     `mLanes[layerIndex]`.
    */
-  void CAiFormationInstance::RunScript(SFormationLayerUnitSet& units, const std::int32_t layerIndex)
+  void CFormationInstance::RunScript(SFormationLayerUnitSet& units, const std::int32_t layerIndex)
   {
     // Phase 1 (0x00567364-0x005673B9). The binary does not null-check the
     // resolved unit -- every caller (Setup, via PreRunScript) guarantees
@@ -6005,7 +6056,7 @@ namespace moho
    * (`MergeOverlappingLaneBands`) and broadcasts
    * `FORMATIONSTATUS_FormationUpdated`.
    */
-  void CAiFormationInstance::UpdateFormation()
+  void CFormationInstance::UpdateFormation()
   {
     SFormationLayerUnitSet mobileUnits{};
     float orientXSum = 0.0f;
@@ -6035,7 +6086,16 @@ namespace moho
         footprintSize = (static_cast<std::int32_t>(blueprint->mFootprint.mSizeX)
                         + static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ)) / 2;
       } else {
-        footprintSize = unit->GetMaxFootprintSize();
+        // 0x00568CA0: the ground lane reads the blueprint footprint bytes at
+        // +0xD8/+0xD9 off the IUnit::GetBlueprint result and keeps the larger
+        // one. It never calls the sim-side Unit::GetMaxFootprintSize - the
+        // participants here are IUnit bridges that, on the user side of the
+        // formation preview, are UserUnits with no Entity blueprint lane, and
+        // that call threw "Attempt to get footprint on nameless entity" out
+        // of every right-click order.
+        const auto sizeX = static_cast<std::int32_t>(blueprint->mFootprint.mSizeX);
+        const auto sizeZ = static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ);
+        footprintSize = (sizeX > sizeZ) ? sizeX : sizeZ;
       }
       mMaxUnitSlotCount = std::max(mMaxUnitSlotCount, footprintSize);
     }
@@ -6093,7 +6153,7 @@ namespace moho
    * Computes one formation target position for `unit` and updates the primary
    * coord cache.
    */
-  SCoordsVec2* CAiFormationInstance::GetFormationPosition(
+  SCoordsVec2* CFormationInstance::GetFormationPosition(
     SCoordsVec2* const dest,
     Unit* const unit,
     SFormationLaneEntry* laneEntry
@@ -6157,7 +6217,7 @@ namespace moho
    * What it does:
    * Converts formation world coordinates to footprint-min cell coordinates.
    */
-  SOCellPos* CAiFormationInstance::GetAdjustedFormationPosition(
+  SOCellPos* CFormationInstance::GetAdjustedFormationPosition(
     SOCellPos* const dest,
     Unit* const unit,
     SFormationLaneEntry* laneEntry
@@ -6197,7 +6257,7 @@ namespace moho
    * Computes one formation/steering hint coordinate and updates the secondary
    * coord cache.
    */
-  SCoordsVec2* CAiFormationInstance::Func9(SCoordsVec2* const dest, Unit* const unit, SFormationLaneEntry* laneEntry)
+  SCoordsVec2* CFormationInstance::Func9(SCoordsVec2* const dest, Unit* const unit, SFormationLaneEntry* laneEntry)
   {
     if (!dest || !unit) {
       return dest;
@@ -6245,7 +6305,7 @@ namespace moho
    * What it does:
    * Returns lane-provided formation vector when present, else unit position.
    */
-  Wm3::Vec3f* CAiFormationInstance::Func10(Wm3::Vec3f* const out, Unit* const unit, SFormationLaneEntry* laneEntry)
+  Wm3::Vec3f* CFormationInstance::Func10(Wm3::Vec3f* const out, Unit* const unit, SFormationLaneEntry* laneEntry)
   {
     if (!out) {
       return out;
@@ -6278,7 +6338,7 @@ namespace moho
    * What it does:
    * Adds one live unit weak-ref to this formation and marks plan rebuild.
    */
-  void CAiFormationInstance::AddUnit(Unit* const unit)
+  void CFormationInstance::AddUnit(Unit* const unit)
   {
     if (!unit || unit->IsDead()) {
       return;
@@ -6327,7 +6387,7 @@ namespace moho
    * What it does:
    * Removes one unit from lane maps and linked unit-reference storage.
    */
-  void CAiFormationInstance::RemoveUnit(Unit* const unit)
+  void CFormationInstance::RemoveUnit(Unit* const unit)
   {
     if (!unit) {
       return;
@@ -6367,7 +6427,7 @@ namespace moho
    * Returns true if `unit` exists in the lane map (or full linked set when
    * `checkAll` is true).
    */
-  bool CAiFormationInstance::Func17(Unit* const unit, const bool checkAll) const
+  bool CFormationInstance::Func17(Unit* const unit, const bool checkAll) const
   {
     if (!unit) {
       return false;
@@ -6407,7 +6467,7 @@ namespace moho
    * Compacts linked formation unit refs by removing null/dead/destroy-queued
    * units and returns whether `checkForUnit` is still present after cleanup.
    */
-  bool CAiFormationInstance::RemoveDeadUnits(Unit* const checkForUnit)
+  bool CFormationInstance::RemoveDeadUnits(Unit* const checkForUnit)
   {
     bool hasCheckForUnit = false;
     std::vector<Unit*> kept;
@@ -6437,7 +6497,7 @@ namespace moho
    * What it does:
    * Returns formation forward vector for contained units, else zero.
    */
-  Wm3::Vec3f* CAiFormationInstance::Func19(Wm3::Vec3f* const out, Unit* const unit) const
+  Wm3::Vec3f* CFormationInstance::Func19(Wm3::Vec3f* const out, Unit* const unit) const
   {
     if (!out) {
       return out;
@@ -6458,10 +6518,10 @@ namespace moho
    * Returns lane slot availability status for `unit`, or aggregate
    * all-lane availability when no valid unit target is provided.
    */
-  bool CAiFormationInstance::Func21(Unit* const unit) const
+  bool CFormationInstance::Func21(Unit* const unit) const
   {
     if (unit != nullptr && !unit->IsDead() && Func17(unit, false)) {
-      if (SFormationLaneEntry* const lane = const_cast<CAiFormationInstance*>(this)->Func6(unit); lane != nullptr) {
+      if (SFormationLaneEntry* const lane = const_cast<CFormationInstance*>(this)->Func6(unit); lane != nullptr) {
         return lane->slotAvailable != 0u;
       }
       return true;
@@ -6735,7 +6795,7 @@ namespace moho
    * What it does:
    * Returns true when current command type is one of the formation commands.
    */
-  bool CAiFormationInstance::CommandIsForm() const
+  bool CFormationInstance::CommandIsForm() const
   {
     switch (mCommandType) {
     case EUnitCommandType::UNITCOMMAND_FormMove:
@@ -6757,7 +6817,7 @@ namespace moho
    * What it does:
    * Updates formation scale and marks the plan for rebuild when value changed.
    */
-  void CAiFormationInstance::Func22(const float scale)
+  void CFormationInstance::Func22(const float scale)
   {
     if (!BinaryFloatNotEqual(mFormationUpdateScale, scale)) {
       return;
@@ -6775,7 +6835,7 @@ namespace moho
    * What it does:
    * Sets formation orientation, recomputes forward vector, and requests a plan rebuild.
    */
-  void CAiFormationInstance::SetOrientation(const Wm3::Quatf& orientation)
+  void CFormationInstance::SetOrientation(const Wm3::Quatf& orientation)
   {
     if (QuaternionEqualsExact(mOrientation, orientation)) {
       return;
@@ -6809,7 +6869,7 @@ namespace moho
    * What it does:
    * Copies the current orientation into `outOrientation`.
    */
-  Wm3::Quatf* CAiFormationInstance::GetOrientation(Wm3::Quatf* const outOrientation) const
+  Wm3::Quatf* CFormationInstance::GetOrientation(Wm3::Quatf* const outOrientation) const
   {
     *outOrientation = mOrientation;
     return outOrientation;
@@ -6821,7 +6881,7 @@ namespace moho
    * What it does:
    * Returns the active command type for this formation.
    */
-  EUnitCommandType CAiFormationInstance::GetCommandType() const
+  EUnitCommandType CFormationInstance::GetCommandType() const
   {
     return mCommandType;
   }

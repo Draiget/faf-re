@@ -104,7 +104,7 @@ namespace moho
      * What it does:
      * Queues one released low-id bit into the current recycle-history tail bucket.
      */
-    void QueueReleasedLowId(unsigned int lowId);
+    BVIntSetAddResult QueueReleasedLowId(unsigned int lowId);
 
     /**
      * Address: 0x00403A30 (FUN_00403A30, Moho::IdPool::Update)

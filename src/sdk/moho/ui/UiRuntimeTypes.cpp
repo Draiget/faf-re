@@ -23329,13 +23329,22 @@ bool moho::CUIWorldView::HandleEvent(const SMauiEventData& eventData)
     }
   }
 
-  // --- right-button double click (0x00870F12) -----------------------------
-  if (eventData.mEventType == MET_ButtonDClick && eventData.mKeyCode == kPostDraggerRightButton) {
-    mLastRightButtonEvent = MET_ButtonDClick;
+  // --- right-button press / double click (0x00870F12) ----------------------
+  //
+  // The binary reaches this arm for both MET_ButtonPress and MET_ButtonDClick
+  // on the right button (the left-press arm is `if (press) { if (key==1) ...}`
+  // and everything else that is a press or a double click falls through to
+  // the `mKeyCode == 3` test at 0x00870F12), storing the event type in the
+  // last-right-event lane. Handling only the double click left the command
+  // data unset on an ordinary right click, so the release issued nothing.
+  if ((eventData.mEventType == MET_ButtonPress || eventData.mEventType == MET_ButtonDClick)
+      && eventData.mKeyCode == kPostDraggerRightButton) {
+    mLastRightButtonEvent = eventData.mEventType;
 
     CommandModeData rightCommand{};
     (void)func_GetRightMouseButtonAction(&rightCommand, &cursorInfo, eventData.mModifiers, mWldSession);
     mCommandData = rightCommand;
+
 
     if (mCommandData.mMode != COMMOD_Order) {
       return false;
