@@ -29188,10 +29188,8 @@ namespace moho
     session->DirtyCommandGraph();
   }
 
-namespace moho
-{
+  // Owned by SimDebugCommandRegistrations.cpp (same namespace).
   TSimConVar<bool>& AI_DebugCollisionConVar();
-} // namespace moho
 
 namespace
 {
@@ -29201,7 +29199,7 @@ namespace
   // physical collision resolution so the collision overlay can be inspected.
   [[nodiscard]] CSimConVarBase* AIDebugCollisionConVar() noexcept
   {
-    return &moho::AI_DebugCollisionConVar();
+    return &AI_DebugCollisionConVar();
   }
 
   // Owner "mass" proxy = blueprint average density folded over the unit's
