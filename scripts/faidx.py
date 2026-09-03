@@ -1170,6 +1170,12 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_hook)
 
     args = ap.parse_args(argv)
+    # Notes and symbols carry UTF-8; the Windows console default is cp1252.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     args.repo = os.path.abspath(args.repo)
     args.db = os.path.abspath(args.db) if args.db else os.path.join(args.repo, DB_REL)
     return args.fn(args)
