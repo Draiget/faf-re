@@ -3065,12 +3065,6 @@ namespace LuaPlus
 		}
 	};
 
-	inline LuaState*& g_ConsoleLuaState()
-	{
-		// Base image has no ASLR in this build.
-		static auto** pp = reinterpret_cast<LuaState**>(0x010A6478);
-		return *pp;
-	}
 #pragma pack(pop)
 }
 
