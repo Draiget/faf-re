@@ -313,8 +313,8 @@ namespace moho
     {
       Wm3::Vector3f out{};
       out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
       return out;
     }
 
@@ -429,8 +429,8 @@ namespace moho
     {
       Wm3::Vector3f out{};
       out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
       return out;
     }
 
@@ -897,8 +897,8 @@ namespace moho
     const float qz = spawnTransform.orient_.Z();
     const float qw = spawnTransform.orient_.W();
     mFormationVec.x = ((qx * qz) + (qw * qy)) * 2.0f;
-    mFormationVec.y = ((qw * qz) - (qx * qy)) * 2.0f;
-    mFormationVec.z = 1.0f - (((qz * qz) + (qy * qy)) * 2.0f);
+    mFormationVec.y = ((qy * qz) - (qw * qx)) * 2.0f;
+    mFormationVec.z = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
 
     // Physics body: mass is the blueprint's density over its bounding volume,
     // and the stored tensor is the reciprocal of mass-scaled inertia.
@@ -1484,8 +1484,8 @@ namespace moho
 
     Wm3::Vector3f forward{};
     forward.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-    forward.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-    forward.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+    forward.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+    forward.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
 
     const Wm3::Vector3f alignedImpulse = ProjectVectorOntoAxis(forward, impulse);
 
@@ -4183,9 +4183,9 @@ namespace moho
 
     if (air.BankForward == 0u) {
       const float forwardX = ((body.mOrientation.x * body.mOrientation.z) + (body.mOrientation.w * body.mOrientation.y)) * 2.0f;
-      const float forwardY = ((body.mOrientation.w * body.mOrientation.z) - (body.mOrientation.x * body.mOrientation.y)) * 2.0f;
+      const float forwardY = ((body.mOrientation.y * body.mOrientation.z) - (body.mOrientation.w * body.mOrientation.x)) * 2.0f;
       const float forwardZ =
-        1.0f - (((body.mOrientation.z * body.mOrientation.z) + (body.mOrientation.y * body.mOrientation.y)) * 2.0f);
+        1.0f - (((body.mOrientation.x * body.mOrientation.x) + (body.mOrientation.y * body.mOrientation.y)) * 2.0f);
 
       const float forwardLengthSq = (forwardX * forwardX) + (forwardY * forwardY) + (forwardZ * forwardZ);
       if (forwardLengthSq > 0.0f) {
