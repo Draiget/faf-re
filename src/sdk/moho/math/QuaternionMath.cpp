@@ -146,11 +146,14 @@ namespace moho
     const Wm3::Vector3f* const sourceVector
   )
   {
+    // 0x0062FBA3 copies `[eax+0]` verbatim and 0x0062FBB8 / 0x0062FBC7 /
+    // 0x0062FBCC subtract `[eax+4]`, `[eax+8]` and `[eax+0Ch]` from the zero
+    // constant `dword_E4F748`: keep lane 0, negate lanes 1-3.
     Wm3::Quaternionf conjugate{};
-    conjugate.x = quaternionLanes[0];
-    conjugate.y = -quaternionLanes[1];
-    conjugate.z = -quaternionLanes[2];
-    conjugate.w = -quaternionLanes[3];
+    conjugate.w = quaternionLanes[0];
+    conjugate.x = -quaternionLanes[1];
+    conjugate.y = -quaternionLanes[2];
+    conjugate.z = -quaternionLanes[3];
     moho::MultQuadVec(outVector, sourceVector, &conjugate);
     return outVector;
   }

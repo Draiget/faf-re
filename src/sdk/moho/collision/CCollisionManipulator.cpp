@@ -139,11 +139,14 @@ namespace
     localPoint.y = worldPointLanes[1] - transformLanes[5];
     localPoint.z = worldPointLanes[2] - transformLanes[6];
 
+    // 0x006377E2 copies `[eax+0]` verbatim into the conjugate's lane 0, and
+    // 0x006377F7 / 0x00637806 / 0x0063780B subtract `[eax+4]`, `[eax+8]` and
+    // `[eax+0Ch]` from the zero constant `dword_E4F748`.
     Wm3::Quaternionf inverseRotation{};
-    inverseRotation.x = transformLanes[0];
-    inverseRotation.y = -transformLanes[1];
-    inverseRotation.z = -transformLanes[2];
-    inverseRotation.w = -transformLanes[3];
+    inverseRotation.w = transformLanes[0];
+    inverseRotation.x = -transformLanes[1];
+    inverseRotation.y = -transformLanes[2];
+    inverseRotation.z = -transformLanes[3];
 
     moho::MultQuadVec(outVector, &localPoint, &inverseRotation);
     return outVector;
