@@ -14380,6 +14380,13 @@ namespace moho
     mSaveSourceTreeSize = 0u;
 
     std::memset(mEntitySpatialDbStorage, 0, sizeof(mEntitySpatialDbStorage));
+    // 0x00893160 line 84: `SpatialDB_MeshInstance::SpatialDB_MeshInstance(&mSpatialDB)`
+    // (0x00501D80) runs right after the entity map's head sentinel is built.
+    // It allocates the map-tree head sentinel and the root shard-data lane;
+    // without it every `Register` from a UserEntity ctor finds a null tree
+    // head and silently drops the entry, so unit picking, band-box
+    // selection and every area query see an empty database.
+    static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->InitializeStorage();
     // mBuildTemplates (gpg::fastvector_n<SBuildTemplateInfo, 16>) already rebound
     // itself to inline storage via its own default constructor, which runs
     // implicitly before this body -- matching the binary's per-member subobject
@@ -14671,6 +14678,10 @@ namespace moho
       mCurFormation = nullptr;
     }
     mLaunchInfo.reset();
+    // 0x00893A60 line 297: `~SpatialDB_MeshInstance(&mSpatialDB)` (0x00501E50)
+    // runs after the extra-selection set is torn down and before the entity
+    // map's storage is released.
+    static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->DestroyStorage();
     DestroySessionEntityMapStorage(GetSessionEntityMap(this));
 
     InitSessionPauseCallbackHead(head0);

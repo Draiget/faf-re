@@ -925,7 +925,11 @@ namespace
   void SpatialMapEraseNode(moho::SpatialMapTree& tree, moho::SpatialMapNode* const eraseTarget) noexcept
   {
     moho::SpatialMapNode* const head = tree.mHead;
-    if (IsSpatialMapSentinel(eraseTarget) || IsSpatialMapSentinel(head)) {
+    // The head is the tree's nil sentinel by construction (mIsNil == 1), so
+    // testing it with IsSpatialMapSentinel turned every erase into a no-op:
+    // destroyed entities stayed in the map and the next collect handed their
+    // freed storage to DoBeat. Only a missing head is a reason to bail.
+    if (IsSpatialMapSentinel(eraseTarget) || head == nullptr) {
       return;
     }
 
