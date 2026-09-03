@@ -298,8 +298,17 @@ namespace moho
   static_assert(offsetof(ClutterRegion, mBox) == 0x14, "ClutterRegion::mBox offset must be 0x14");
   static_assert(offsetof(ClutterRegion, mMap) == 0x2C, "ClutterRegion::mMap offset must be 0x2C");
 
+  class WRenViewport;
+
   class Clutter
   {
+    // `WRenViewport::Render` drives the per-frame clutter refresh by calling
+    // `UpdateCurrent` then `GenerateNew` directly (0x007F9322 / 0x007F932B).
+    // Both are private `__thiscall` members in the binary
+    // (`?UpdateCurrent@Clutter@Moho@@AAE...` / `?GenerateNew@Clutter@Moho@@AAE...`),
+    // so the viewport reaching them means the original declared it a friend.
+    friend class WRenViewport;
+
   public:
     /**
      * Address: 0x007D60D0 (FUN_007D60D0, ??0Clutter@Moho@@QAE@XZ)

@@ -70616,6 +70616,19 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       continue;
     }
 
+    // Ground clutter, refreshed once per frame off the primary world view.
+    // Binary 0x007F9301..0x007F9330: gated on `ren_Clutter` and on this entry
+    // being the first in the world-view list (the same `== begin` comparison
+    // `ren_HideSecondary` uses two instructions earlier -- IDA types the list's
+    // begin/end pair as `mVertexSheets[0]`/`[1]`, which is what makes that test
+    // read like a sheet comparison). `UpdateCurrent` retires regions the camera
+    // has left, `GenerateNew` fills in the ones it has entered; both take the
+    // view camera and both live at `viewport + 0x808`.
+    if (moho::ren_Clutter && worldView == begin) {
+      headView->mClutter.UpdateCurrent(runtime->mCam);
+      headView->mClutter.GenerateNew(runtime->mCam);
+    }
+
     // Refresh mScreenPos/mScreenSize/mFullScreen from THIS view's camera
     // before drawing it. The binary calls UpdateRenderViewportCoordinates
     // twice (confirmed via its two code xrefs): once per-iteration right
