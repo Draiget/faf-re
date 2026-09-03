@@ -36,11 +36,12 @@ namespace
     return (raw & kWeaponDepthMask) | kWeaponDepthAlpha;
   }
 
-  // Ground truth (FUN_00652E00.c, Moho::RDebugWeapons::OnTick) builds this
-  // quaternion as `v36.x = cos(-kWeaponLabelPitch's magnitude); v36.y = sin(...);
-  // v36.z = 0; v36.w = 0` (scalar in `.x`, matching `QuatToMatrix`/`MultQuadVec`),
-  // not `.w = cos` / `.x = sin`, and rotates via `Moho::MultQuadVec(&v47, &v41,
-  // &v36)`, not `Wm3::MultiplyQuaternionVector`.
+  // Ground truth (FUN_00652E00.c, Moho::RDebugWeapons::OnTick) fills memory
+  // lanes 0..3 with `cos, sin, 0, 0` - IDA names lane 0 `x` for this type, so
+  // that is the scalar-first `{w = cos, x = sin, y = 0, z = 0}` the rest of
+  // the engine uses: a rotation about X, which is what a label pitch is. It
+  // then rotates via `Moho::MultQuadVec(&v47, &v41, &v36)`, not
+  // `Wm3::MultiplyQuaternionVector`.
   [[nodiscard]] Wm3::Vector3f BuildWeaponLabelOffset(const float angle, const float radius) noexcept
   {
     Wm3::Vector3f orbitOffset{};
@@ -49,10 +50,10 @@ namespace
     orbitOffset.z = 0.0f;
 
     Wm3::Quaternionf labelPitch{};
-    labelPitch.x = std::cos(kWeaponLabelPitch);
-    labelPitch.y = std::sin(kWeaponLabelPitch);
+    labelPitch.w = std::cos(kWeaponLabelPitch);
+    labelPitch.x = std::sin(kWeaponLabelPitch);
+    labelPitch.y = 0.0f;
     labelPitch.z = 0.0f;
-    labelPitch.w = 0.0f;
 
     Wm3::Vector3f out{};
     moho::MultQuadVec(&out, &orbitOffset, &labelPitch);

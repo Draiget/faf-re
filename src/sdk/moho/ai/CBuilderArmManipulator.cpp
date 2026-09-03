@@ -294,9 +294,12 @@ namespace moho
       const std::size_t boneCount = static_cast<std::size_t>(skel->mBones.end() - bonesBegin);
       if (boneA < boneCount) {
         const Wm3::Quaternionf& ori = bonesBegin[boneA].mBoneTransform.orient_;
+        // atan2(m02, m22) - the same heading extraction the disassembly of
+        // CRotateManipulator::MoveManipulator (0x00643860) spells out at
+        // 0x006438CD..0x00643925.
         mHeadingCenter = std::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         );
       }
     }
@@ -421,11 +424,15 @@ namespace moho
     Wm3::Vector3f transformedTarget = targetDirection;
     if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
       const VTransform& compositeTransform = watchBone->GetCompositeTransform();
+      // Scalar-first conjugate: keep `.w`, negate `.x/.y/.z`. Every conjugate
+      // decoded in this binary copies lane 0 verbatim and negates lanes 1-3 -
+      // see `VTransform::Inverse` (0x0046FBF0) and the raw-lane helpers at
+      // 0x0062FBA0 and 0x006377B0.
       Wm3::Quaternionf inverseOrientation{};
-      inverseOrientation.x = compositeTransform.orient_.x;
+      inverseOrientation.w = compositeTransform.orient_.w;
+      inverseOrientation.x = -compositeTransform.orient_.x;
       inverseOrientation.y = -compositeTransform.orient_.y;
       inverseOrientation.z = -compositeTransform.orient_.z;
-      inverseOrientation.w = -compositeTransform.orient_.w;
       MultQuadVec(&transformedTarget, &targetDirection, &inverseOrientation);
     }
 
@@ -436,11 +443,14 @@ namespace moho
       desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z);
     } else {
       const float halfCenter = angleCenter * kHalfScale;
+      // `(cos, sin, 0, 0)` in memory - a scalar-first rotation about X, the
+      // same pitch basis `CAimManipulator::CheckTracking` builds at
+      // 0x00630ADC..0x00630AF0.
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.x = std::cos(halfCenter);
-      pitchBasis.y = std::sin(halfCenter);
+      pitchBasis.w = std::cos(halfCenter);
+      pitchBasis.x = std::sin(halfCenter);
+      pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
-      pitchBasis.w = 0.0f;
 
       Wm3::Vector3f pitchSpaceTarget{};
       MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);

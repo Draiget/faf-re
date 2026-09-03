@@ -3635,6 +3635,47 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
   }
 }
 
+namespace
+{
+  /**
+   * Turns a `COORDS_Orient` look quaternion into the view orientation, by
+   * post-multiplying a half turn about +Y: `look * (w=0, x=0, y=1, z=0)`.
+   *
+   * `UpdateCoords` (0x007AA330) open-codes this in both branches with the
+   * roll factor folded to zero, so the decompile reads as a pile of `* 0.0`
+   * terms. Reduced, it writes memory lanes `{-y, -z, w, x}` from an input
+   * `{w, x, y, z}` - which is exactly the product above. Ordering the lanes
+   * that way is only meaningful under the binary's scalar-first layout
+   * (lane 0 is the scalar; see `QuatToMatrix` at 0x00452FD0, whose diagonals
+   * pair only lanes 1..3).
+   */
+  [[nodiscard]] Wm3::Quaternionf ViewOrientFromLook(const Wm3::Quaternionf& look) noexcept
+  {
+    Wm3::Quaternionf orient{};
+    orient.w = -look.y;
+    orient.x = -look.z;
+    orient.y = look.w;
+    orient.z = look.x;
+    return orient;
+  }
+
+  /**
+   * Third column of the rotation matrix a unit quaternion expands to - the
+   * axis `UpdateCoords` walks the eye back along from the camera target.
+   *
+   * Same terms `QuatToMatrix` writes to `[eax+08]`, `[eax+14h]` and
+   * `[eax+20h]`.
+   */
+  [[nodiscard]] Wm3::Vector3f QuaternionForwardColumn(const Wm3::Quaternionf& q) noexcept
+  {
+    return Wm3::Vector3f{
+      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
+      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
+    };
+  }
+} // namespace
+
 /**
  * Address: 0x007AA330 (FUN_007AA330, Moho::CameraImpl::UpdateCoords)
  * Mangled: ?UpdateCoords@CameraImpl@Moho@@QAEXMM@Z
@@ -3689,33 +3730,12 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
     const float verticalExtent = targetZoom / runtime->mVerticalZoomMetricScale;
 
     const Wm3::Quaternionf look = moho::COORDS_Orient(kPi, kHalfPi);
-    const float lx = look.x;
-    const float ly = look.y;
-    const float lz = look.z;
-    const float lw = look.w;
+    viewTransform.orient_ = ViewOrientFromLook(look);
 
-    // Conjugate-rotation expansion of the look quaternion (matches the binary's
-    // open-coded `q * conj` lane that yields the orientation rows).
-    const float lxZero = lx * 0.0f;
-    const float lyZero = ly * 0.0f;
-    const float lzZero = lz * 0.0f;
-    const float lwZero = lw * 0.0f;
-    const float qx = ((lxZero - lyZero) - lz) - lwZero;
-    const float qy = (((lzZero + lyZero) + lxZero) - lw);
-    const float qz = (((lzZero + lwZero) + lx) - lyZero);
-    const float qw = (((lwZero + lxZero) + ly) - lzZero);
-
-    viewTransform.orient_.x = qx;
-    viewTransform.orient_.y = qy;
-    viewTransform.orient_.z = qz;
-    viewTransform.orient_.w = qw;
-
-    viewTransform.pos_.x =
-      runtime->mOffset.x + ((((qy * qw) + (qz * qx)) * 2.0f) * eyeDistance);
-    viewTransform.pos_.y =
-      runtime->mOffset.y + ((((qz * qw) - (qy * qx)) * 2.0f) * eyeDistance);
-    viewTransform.pos_.z =
-      runtime->mOffset.z + ((1.0f - (((qy * qy) + (qz * qz)) * 2.0f)) * eyeDistance);
+    const Wm3::Vector3f eyeAxis = QuaternionForwardColumn(viewTransform.orient_);
+    viewTransform.pos_.x = runtime->mOffset.x + (eyeAxis.x * eyeDistance);
+    viewTransform.pos_.y = runtime->mOffset.y + (eyeAxis.y * eyeDistance);
+    viewTransform.pos_.z = runtime->mOffset.z + (eyeAxis.z * eyeDistance);
 
     // Orthographic projection rows (row-vector convention).
     projection.r[0] = Vector4f{};
@@ -3737,31 +3757,14 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
   } else {
     // Perspective mode: build the orientation quaternion from heading/pitch.
     const Wm3::Quaternionf orient = moho::COORDS_Orient(runtime->mHeading, runtime->mFarPitch);
-    const float ox = orient.x;
-    const float oy = orient.y;
-    const float oz = orient.z;
-    const float ow = orient.w;
-
-    const float oxZero = ox * 0.0f;
-    const float oyZero = oy * 0.0f;
-    const float ozZero = oz * 0.0f;
-    const float owZero = ow * 0.0f;
-
-    const float qx = ((oxZero - oyZero) - oz) - owZero;
-    const float qy = (((ozZero + oyZero) + oxZero) - ow);
-    const float qz = ((ox + ozZero) + owZero) - oyZero;
-    const float qw = ((oy + owZero) + oxZero) - ozZero;
-
-    viewTransform.orient_.x = qx;
-    viewTransform.orient_.y = qy;
-    viewTransform.orient_.z = qz;
-    viewTransform.orient_.w = qw;
+    viewTransform.orient_ = ViewOrientFromLook(orient);
 
     // Eye position = offset + rotated forward axis (from the quaternion) scaled
     // by the eye distance, before shake.
-    const float eyeY = runtime->mOffset.y + ((((qw * qz) - (qy * qx)) * 2.0f) * eyeDistance);
-    const float eyeX = runtime->mOffset.x + ((((qw * qy) + (qz * qx)) * 2.0f) * eyeDistance);
-    const float eyeZ = runtime->mOffset.z + ((1.0f - (((qz * qz) + (qy * qy)) * 2.0f)) * eyeDistance);
+    const Wm3::Vector3f eyeAxis = QuaternionForwardColumn(viewTransform.orient_);
+    const float eyeX = runtime->mOffset.x + (eyeAxis.x * eyeDistance);
+    const float eyeY = runtime->mOffset.y + (eyeAxis.y * eyeDistance);
+    const float eyeZ = runtime->mOffset.z + (eyeAxis.z * eyeDistance);
 
     // Apply per-frame camera shake to the eye position.
     Wm3::Vector3f shakeOffset{};

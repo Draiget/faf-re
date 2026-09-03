@@ -68,17 +68,21 @@ namespace
     (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
   }
 
-  // NOTE: this braced init is NOT the .x-scalar-vs-.w-scalar convention bug
-  // found throughout the rest of the engine's quaternion code (see
-  // QuaternionMath.h's MultiplyQuatXScalar/ConjugateQuatXScalar). The
-  // 4-arg Quaternion ctor is (fW, fX, fY, fZ), so this positionally maps
-  // entity.Orientation's engine-.x-scalar lanes onto native w/x/y/z: native
-  // .w gets the true scalar (entity.Orientation.x), and native .x/.y/.z get
-  // the imaginary triple in the same cyclic order it already had. That is a
-  // correct, if easy-to-misread, .x-scalar -> native-.w-scalar conversion:
-  // verified numerically (MultQuadVec on the original quaternion vs.
-  // orientation.Rotate() below agree to machine precision for arbitrary
-  // axis-angle inputs). Do not "fix" this to MultQuadVec directly.
+  // This braced init is a straight lane-for-lane copy, which is what is
+  // wanted. `Entity::Orientation` is a `Vector4f`, so its `.x/.y/.z/.w` are
+  // memory lanes 0-3, and the 4-arg `Quaternion` ctor is `(fW, fX, fY, fZ)`,
+  // which writes its arguments into memory in that same order - so lane 0
+  // stays in lane 0 and the scalar stays put.
+  //
+  // An earlier note here described this as a deliberate `.x`-scalar ->
+  // native-`.w`-scalar conversion. That convention does not exist in this
+  // binary (`QuatToMatrix` at 0x00452FD0 and `VMatrix4::Set` at 0x004EE980
+  // compute no `ww` term at all), and reading the init as a lane rotation
+  // rather than a copy is what made it look like one.
+  //
+  // `orientation.Rotate()` below is WildMagic's own scalar-first rotate, so
+  // it now agrees with `Moho::MultQuadVec` on the same input; either spelling
+  // is correct here.
   [[nodiscard]] Wm3::Box3f BuildCollisionBeamDebugBox(const moho::CollisionBeamEntity& entity)
   {
     const Wm3::Quaternionf orientation{

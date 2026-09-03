@@ -313,8 +313,8 @@ namespace moho
     {
       Wm3::Vector3f out{};
       out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
       return out;
     }
 
@@ -429,8 +429,8 @@ namespace moho
     {
       Wm3::Vector3f out{};
       out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
       return out;
     }
 
@@ -897,8 +897,8 @@ namespace moho
     const float qz = spawnTransform.orient_.Z();
     const float qw = spawnTransform.orient_.W();
     mFormationVec.x = ((qx * qz) + (qw * qy)) * 2.0f;
-    mFormationVec.y = ((qw * qz) - (qx * qy)) * 2.0f;
-    mFormationVec.z = 1.0f - (((qz * qz) + (qy * qy)) * 2.0f);
+    mFormationVec.y = ((qy * qz) - (qw * qx)) * 2.0f;
+    mFormationVec.z = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
 
     // Physics body: mass is the blueprint's density over its bounding volume,
     // and the stored tensor is the reciprocal of mass-scaled inertia.
@@ -1484,8 +1484,8 @@ namespace moho
 
     Wm3::Vector3f forward{};
     forward.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-    forward.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
-    forward.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+    forward.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+    forward.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
 
     const Wm3::Vector3f alignedImpulse = ProjectVectorOntoAxis(forward, impulse);
 
@@ -3030,8 +3030,10 @@ namespace moho
     const VTransform& transform = unit->GetTransform();
     const std::int32_t combatState = static_cast<std::int32_t>(mCombatState);
 
+    // m11 - the Y component of the local up axis. The previous spelling used a
+    // `w*w` diagonal term, which no matrix expansion in this binary computes.
     const float currentOrientationY =
-      1.0f - (((transform.orient_.w * transform.orient_.w) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+      1.0f - (((transform.orient_.x * transform.orient_.x) + (transform.orient_.z * transform.orient_.z)) * 2.0f);
 
     outAxes.vX = {1.0f, 0.0f, 0.0f};
     outAxes.vY = {0.0f, 1.0f, 0.0f};
@@ -3318,18 +3320,19 @@ namespace moho
    *
    * What it does: see header.
    *
-   * Ground truth (`FUN_006BE6B0.c`) re-derived term-by-term for the
-   * relative-orientation block: `desiredOrientation * body.mOrientation.
-   * Conjugate()` used upstream WildMagic's `operator*`/`Conjugate()` (both
-   * `.w`-scalar), not the engine's `.x`-scalar `MultiplyQuatXScalar`/
-   * `ConjugateQuatXScalar` -- same convention mismatch as the rest of this
-   * bug class. The shortest-arc hemisphere check also read the wrong lane:
-   * ground truth tests the value about to be written into the *first*
-   * (`.x`, the real/scalar lane in this engine's convention) output lane,
-   * not `.w`. The `bodyLocalImpulse` rotation had the matching
-   * `Conjugate().Rotate()` bug (upstream `.w`-scalar `ToMat3`), fixed to
-   * `ConjugateQuatXScalar` + `MultQuadVec` to match `SPhysBody::
-   * IntegrateAngularImpulse`'s already-fixed identical pattern.
+   * Rotating `mWorldImpulse` through `Moho::MultQuadVec` rather than upstream
+   * WildMagic's `Conjugate().Rotate()` was already right and is unchanged.
+   *
+   * The relative-orientation block is ordinary scalar-first. 0x006BE916 keeps
+   * `[ebx+2Ch]` (lane 0) and 0x006BE93A / 0x006BE950 / 0x006BE966 negate lanes
+   * 1-3, and the product that follows puts that conjugate on the LEFT. The
+   * shortest-arc test at 0x006BEA17/0x006BEA1A compares zero against the value
+   * bound for lane 0 - the scalar - so it reads `.w`.
+   *
+   * A prior revision recorded the first output lane as `.x` "the real/scalar
+   * lane in this engine's convention"; that convention does not exist in the
+   * binary - see `QuatToMatrix` (0x00452FD0) and `VMatrix4::Set` (0x004EE980),
+   * neither of which computes a `ww` term at all.
    */
   void CUnitMotion::ComputeAirControl(
     const SPhysBody& body,
@@ -3393,8 +3396,17 @@ namespace moho
     Wm3::Quaternionf desiredOrientation{};
     MatrixColumnsToQuatCanonical(&axes.vX, &desiredOrientation);
 
-    Wm3::Quaternionf relativeOrientation = MultiplyQuatXScalar(desiredOrientation, ConjugateQuatXScalar(body.mOrientation));
-    if (relativeOrientation.x < 0.0f) {
+    // 0x006BE916..0x006BE966 conjugates `body.mOrientation` by keeping
+    // `[ebx+2Ch]` (lane 0) and negating lanes 1-3, then 0x006BE927..0x006BEA13
+    // multiplies with the conjugate as the LEFT operand: the scalar term is
+    // `D0*c0 - D1*c1 - D2*c2 - D3*c3` and the next lane is
+    // `D0*c1 + D1*c0 + D3*c2 - D2*c3`, whose cross-term signs are `c * D`.
+    Wm3::Quaternionf relativeOrientation =
+      MultiplyQuat(ConjugateQuat(body.mOrientation), desiredOrientation);
+    // Shortest-arc hemisphere flip. 0x006BEA17/0x006BEA1A compare zero against
+    // the value about to be stored in lane 0 - the scalar - and negate all
+    // four lanes when it is below zero.
+    if (relativeOrientation.w < 0.0f) {
       relativeOrientation = relativeOrientation * -1.0f;
     }
 
@@ -3407,7 +3419,7 @@ namespace moho
 
     const Wm3::Vector3f velocityError{-body.mVelocity.x, -body.mVelocity.y, -body.mVelocity.z};
 
-    const Wm3::Quaternionf bodyConjugateOrientation = ConjugateQuatXScalar(body.mOrientation);
+    const Wm3::Quaternionf bodyConjugateOrientation = ConjugateQuat(body.mOrientation);
     Wm3::Vector3f bodyLocalImpulse{};
     MultQuadVec(&bodyLocalImpulse, &body.mWorldImpulse, &bodyConjugateOrientation);
     const Wm3::Vector3f dampingTerm{
@@ -4173,9 +4185,9 @@ namespace moho
 
     if (air.BankForward == 0u) {
       const float forwardX = ((body.mOrientation.x * body.mOrientation.z) + (body.mOrientation.w * body.mOrientation.y)) * 2.0f;
-      const float forwardY = ((body.mOrientation.w * body.mOrientation.z) - (body.mOrientation.x * body.mOrientation.y)) * 2.0f;
+      const float forwardY = ((body.mOrientation.y * body.mOrientation.z) - (body.mOrientation.w * body.mOrientation.x)) * 2.0f;
       const float forwardZ =
-        1.0f - (((body.mOrientation.z * body.mOrientation.z) + (body.mOrientation.y * body.mOrientation.y)) * 2.0f);
+        1.0f - (((body.mOrientation.x * body.mOrientation.x) + (body.mOrientation.y * body.mOrientation.y)) * 2.0f);
 
       const float forwardLengthSq = (forwardX * forwardX) + (forwardY * forwardY) + (forwardZ * forwardZ);
       if (forwardLengthSq > 0.0f) {

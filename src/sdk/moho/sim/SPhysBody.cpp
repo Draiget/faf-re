@@ -191,10 +191,10 @@ namespace
       object->mPos.x = 0.0f;
       object->mPos.y = 0.0f;
       object->mPos.z = 0.0f;
-      object->mOrientation.x = 1.0f;
+      object->mOrientation.w = 1.0f;
+      object->mOrientation.x = 0.0f;
       object->mOrientation.y = 0.0f;
       object->mOrientation.z = 0.0f;
-      object->mOrientation.w = 0.0f;
       object->mVelocity.x = 0.0f;
       object->mVelocity.y = 0.0f;
       object->mVelocity.z = 0.0f;
@@ -378,10 +378,10 @@ namespace moho
     body->mPos.x = 0.0f;
     body->mPos.y = 0.0f;
     body->mPos.z = 0.0f;
-    body->mOrientation.x = 1.0f;
+    body->mOrientation.w = 1.0f;
+    body->mOrientation.x = 0.0f;
     body->mOrientation.y = 0.0f;
     body->mOrientation.z = 0.0f;
-    body->mOrientation.w = 0.0f;
     body->mVelocity.x = 0.0f;
     body->mVelocity.y = 0.0f;
     body->mVelocity.z = 0.0f;
@@ -514,10 +514,13 @@ namespace moho
    * Rotates `mWorldImpulse` into local space using the orientation conjugate and
    * scales each axis by `mInvInertiaTensor`.
    *
-   * Ground truth (`FUN_00697F80.c`) keeps `.x` unchanged and negates
-   * `.y`/`.z`/`.w` -- the engine `.x`-scalar conjugate confirmed throughout
-   * this file, not the `.w`-kept/`.x,.y,.z`-negated conjugate the previous
-   * body here built (upstream WildMagic convention).
+   * The conjugate is the ordinary scalar-first one. 0x00697F83 copies
+   * `[edi+2Ch]` (orientation lane 0) verbatim, and 0x00697F9A / 0x00697FAD /
+   * 0x00697FB2 subtract `[edi+30h]` / `[edi+34h]` / `[edi+38h]` from the zero
+   * constant `dword_E4F748` - keep `.w`, negate `.x/.y/.z`. A prior revision
+   * recorded this as an `.x`-scalar conjugate "confirmed throughout this
+   * file"; the same lane-0-kept shape appears in `VTransform::Inverse`
+   * (0x0046FBF0) and `IntegrateAngularImpulse` (0x006978D0).
    */
   [[maybe_unused]] Wm3::Vec3f* ComputeWorldImpulseFromInertiaTensor(const SPhysBody* const body, Wm3::Vec3f* const out)
   {
@@ -525,7 +528,7 @@ namespace moho
       return out;
     }
 
-    const Wm3::Quaternionf inverseOrientation = ConjugateQuatXScalar(body->mOrientation);
+    const Wm3::Quaternionf inverseOrientation = ConjugateQuat(body->mOrientation);
 
     Wm3::Vec3f localImpulse{};
     moho::MultQuadVec(&localImpulse, &body->mWorldImpulse, &inverseOrientation);
@@ -713,7 +716,7 @@ namespace moho
       (mWorldImpulse.z + oldWorldImpulse.z) * halfDt
     };
 
-    const Wm3::Quaternionf conjugateOrientation = ConjugateQuatXScalar(mOrientation);
+    const Wm3::Quaternionf conjugateOrientation = ConjugateQuat(mOrientation);
     Wm3::Vec3f localImpulse{};
     MultQuadVec(&localImpulse, &avgWorldImpulse, &conjugateOrientation);
     const Wm3::Vec3f scaledImpulse{
@@ -725,7 +728,12 @@ namespace moho
     Wm3::Quaternionf deltaOrientation{};
     QuatFromAxisAngleVector(&deltaOrientation, scaledImpulse);
 
-    mOrientation = MultiplyQuatXScalar(deltaOrientation, mOrientation);
+    // 0x006979F0..0x00697A38 forms the scalar term as `o0*d0 - o1*d1 - o2*d2 -
+    // o3*d3` (positive in lane 0), and 0x00697A3F..0x00697A67 gives
+    // `o0*d1 + o1*d0 + o2*d3 - o3*d2` - the cross-term signs of
+    // `orientation * delta`, with the existing orientation as the LEFT
+    // operand, exactly as `CAniPoseBone::Rotate` (0x0054BC00) composes.
+    mOrientation = MultiplyQuat(mOrientation, deltaOrientation);
     NormalizeQuatInPlace(&mOrientation);
   }
 
