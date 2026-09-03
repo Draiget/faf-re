@@ -545,8 +545,12 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
       const VTransform& composite = followBone->GetCompositeTransform();
       const float x =
         ((composite.orient_.x * composite.orient_.z) + (composite.orient_.w * composite.orient_.y)) * 2.0f;
+      // Heading is atan2(m02, m22), not atan2(m02, m00). Ground truth at
+      // 0x006438EB..0x0064390D forms `1 - 2*(q1*q1 + q2*q2)` - the x/y
+      // diagonal, m22 - and 0x00643913..0x00643925 passes it as atan2's
+      // second argument.
       const float y =
-        1.0f - (((composite.orient_.z * composite.orient_.z) + (composite.orient_.y * composite.orient_.y)) * 2.0f);
+        1.0f - (((composite.orient_.x * composite.orient_.x) + (composite.orient_.y * composite.orient_.y)) * 2.0f);
       mGoalAngle = std::atan2(x, y);
     }
   }
