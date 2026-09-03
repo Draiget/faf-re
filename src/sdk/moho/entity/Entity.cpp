@@ -1882,10 +1882,10 @@ namespace
   ) noexcept
   {
     moho::VTransform out{};
-    out.orient_.x = 1.0f;
+    out.orient_.w = 1.0f;
+    out.orient_.x = 0.0f;
     out.orient_.y = 0.0f;
     out.orient_.z = 0.0f;
-    out.orient_.w = 0.0f;
     out.pos_.x = 0.0f;
     out.pos_.y = 0.0f;
     out.pos_.z = 0.0f;

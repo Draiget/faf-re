@@ -13589,10 +13589,10 @@ Unit::Unit(const SUnitConstructionParams& params)
       (void)EulerRollToQuat(&yawAxis, &spawnRotation, yaw);
       spawnTransform.orient_ = spawnRotation;
     } else {
-      spawnTransform.orient_.x = 1.0f;
+      spawnTransform.orient_.w = 1.0f;
+      spawnTransform.orient_.x = 0.0f;
       spawnTransform.orient_.y = 0.0f;
       spawnTransform.orient_.z = 0.0f;
-      spawnTransform.orient_.w = 0.0f;
     }
   }
 

@@ -440,11 +440,14 @@ namespace moho
       desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z);
     } else {
       const float halfCenter = angleCenter * kHalfScale;
+      // `(cos, sin, 0, 0)` in memory - a scalar-first rotation about X, the
+      // same pitch basis `CAimManipulator::CheckTracking` builds at
+      // 0x00630ADC..0x00630AF0.
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.x = std::cos(halfCenter);
-      pitchBasis.y = std::sin(halfCenter);
+      pitchBasis.w = std::cos(halfCenter);
+      pitchBasis.x = std::sin(halfCenter);
+      pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
-      pitchBasis.w = 0.0f;
 
       Wm3::Vector3f pitchSpaceTarget{};
       MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
