@@ -16,6 +16,7 @@
 #include "moho/vision/VisionDB.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/ISessionListener.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/command/CommandManager.h"
@@ -1603,17 +1604,22 @@ namespace moho
 
   static_assert(sizeof(EWldFrameAction) == 0x4, "EWldFrameAction size must be 0x4");
 
-  class IWldTeardownCallback
-  {
-  public:
-    virtual ~IWldTeardownCallback() = default;
-
-    /**
-     * Address family: callback invoke lane used by world teardown callback
-     * dispatch (`FUN_00869870`).
-     */
-    virtual int OnWldSessionTeardown(CWldSession* session) = 0;
-  };
+  /**
+   * The world-session loader's callback registry holds **session listeners**,
+   * not a teardown-only interface. Both dispatchers index the same two-slot
+   * `ISessionListener` vftable:
+   *
+   *   FUN_00869870  `(**v4)(v4, sWldSession)`         -> slot 0, attach
+   *   FUN_008698B0  `(*(*v4 + 4))(v4, sWldSession)`   -> slot 1, detach
+   *
+   * and every registrant (`SelectionListener`, `PauseListener`,
+   * `IdleUnitSelector`) derives from `ISessionListener` as its primary base.
+   * The interface this used to declare had a virtual destructor in slot 0, so
+   * its single "teardown" method resolved to slot 1 in both dispatchers: the
+   * creation-time pass detached listeners that had never been attached, and no
+   * listener was ever linked into a session's broadcaster lane.
+   */
+  using IWldTeardownCallback = ISessionListener;
   static_assert(sizeof(IWldTeardownCallback) == 0x4, "IWldTeardownCallback size must be 0x4");
 
   using WldTeardownCallbackVector = msvc8::vector<IWldTeardownCallback*>;

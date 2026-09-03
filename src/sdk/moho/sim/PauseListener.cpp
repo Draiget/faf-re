@@ -99,13 +99,14 @@ namespace moho
      * static initialization, keeping the instance reachable from the startup
      * graph.
      *
-     * The cast to `IWldTeardownCallback*` is layout-compatible: the registration
-     * vector stores the raw listener pointer in an untyped pointer lane, exactly
-     * as the original binary stored `&off_F5B548`.
+     * The registry is typed on `ISessionListener`, this listener's primary
+     * base, so the registration is an ordinary base conversion - the session
+     * loader calls slot 0 (attach) on creation and slot 1 (detach) on
+     * teardown. The original binary stored `&off_F5B548`, the same address.
      */
     [[maybe_unused]] const bool kPauseListenerStaticInit = []() noexcept {
       PauseListener& listener = GlobalPauseListener();
-      (void)WLD_AddOnTeardownCallback(reinterpret_cast<IWldTeardownCallback*>(&listener));
+      (void)WLD_AddOnTeardownCallback(static_cast<ISessionListener*>(&listener));
       return true;
     }();
   } // namespace
