@@ -18,7 +18,7 @@
 #include "moho/path/PathTables.h"
 #include "Wm3Box3.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/GridTraversalLine.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -84,6 +84,14 @@ namespace
   {
     return static_cast<std::int32_t>(std::floor(value));
   }
+
+  [[nodiscard]] std::int32_t CeilToInt(const float value) noexcept
+  {
+    return static_cast<std::int32_t>(std::ceil(value));
+  }
+
+  // One collision cell spans 4 world units, so world -> cell is a shift by 2.
+  inline constexpr int kWorldToCollisionCellShift = 2;
 } // namespace
 
 /**
@@ -382,20 +390,21 @@ namespace
     return static_cast<std::uint16_t>(extent);
   }
 
+  // `EntityCollisionBoundsView` is the same six-float min/max footprint the
+  // collision primitives hand back from their `GetBoundingBox` slot, so the
+  // quantization is `func_AABoxToRect` (0x004FCBE0) verbatim -- the binary
+  // reaches it from the same eight collision-query sites this file recovers.
   [[nodiscard]] moho::CollisionDBRect BuildCollisionRectFromBounds(
     const moho::EntityCollisionBoundsView& bounds
   ) noexcept
   {
-    const int minCellX = FloorToInt(bounds.minX) >> 2;
-    const int minCellZ = FloorToInt(bounds.minZ) >> 2;
-    const int maxCellX = (static_cast<int>(std::ceil(bounds.maxX)) + 3) >> 2;
-    const int maxCellZ = (static_cast<int>(std::ceil(bounds.maxZ)) + 3) >> 2;
+    const Wm3::AxisAlignedBox3f box{
+      Wm3::Vector3f{bounds.minX, bounds.minY, bounds.minZ},
+      Wm3::Vector3f{bounds.maxX, bounds.maxY, bounds.maxZ},
+    };
 
     moho::CollisionDBRect rect{};
-    rect.mStartX = ClampCollisionCellStartToU16(minCellX);
-    rect.mStartZ = ClampCollisionCellStartToU16(minCellZ);
-    rect.mWidth = ClampCollisionCellExtentToU16(maxCellX - static_cast<int>(rect.mStartX), rect.mStartX);
-    rect.mHeight = ClampCollisionCellExtentToU16(maxCellZ - static_cast<int>(rect.mStartZ), rect.mStartZ);
+    (void)moho::func_AABoxToRect(&rect, box);
     return rect;
   }
 
@@ -1486,6 +1495,43 @@ namespace moho
     }
     out->mHeight = static_cast<std::uint16_t>(heightRequested);
 
+    return out;
+  }
+
+  /**
+   * Address: 0x004FCBE0 (FUN_004FCBE0, Moho::func_AABoxToRect)
+   *
+   * IDA signature:
+   * Moho::CollisionDBRect *__usercall func_AABoxToRect@<eax>(
+   *   Wm3::AxisAlignedBox3f *box@<eax>, Moho::CollisionDBRect *out@<ebx>);
+   *
+   * What it does:
+   * Quantizes the X/Z footprint of a world-space axis-aligned box into a
+   * cell-space `CollisionDBRect`.
+   *
+   * The binary derives each corner with `frndint` plus a compare-and-adjust
+   * rather than a library call -- `fld x; frndint; fld x; fcomip; cmovb
+   * eax,-1` at 0x004FCBFD is `floor`, and the `cmova eax,1` variants at
+   * 0x004FCC59 / 0x004FCC88 are `ceil`. Only the X and Z lanes are read
+   * (`[box+0]`, `[box+8]`, `[box+0Ch]`, `[box+14h]`); the Y extent plays no
+   * part, because collision cells tile the ground plane.
+   *
+   * Both extents are measured from the *clamped* start (`movzx esi, dx` at
+   * 0x004FCCCE re-reads the value already stored to the rect), so a box that
+   * starts past the last cell yields an empty rect rather than a negative
+   * width that would wrap when stored as `uint16_t`.
+   */
+  CollisionDBRect* func_AABoxToRect(CollisionDBRect* const out, const Wm3::AxisAlignedBox3f& box)
+  {
+    const int minCellX = FloorToInt(box.Min.x) >> kWorldToCollisionCellShift;
+    const int minCellZ = FloorToInt(box.Min.z) >> kWorldToCollisionCellShift;
+    const int maxCellX = (CeilToInt(box.Max.x) + 3) >> kWorldToCollisionCellShift;
+    const int maxCellZ = (CeilToInt(box.Max.z) + 3) >> kWorldToCollisionCellShift;
+
+    out->mStartX = ClampCollisionCellStartToU16(minCellX);
+    out->mStartZ = ClampCollisionCellStartToU16(minCellZ);
+    out->mWidth = ClampCollisionCellExtentToU16(maxCellX - static_cast<int>(out->mStartX), out->mStartX);
+    out->mHeight = ClampCollisionCellExtentToU16(maxCellZ - static_cast<int>(out->mStartZ), out->mStartZ);
     return out;
   }
 
