@@ -1265,6 +1265,33 @@ void CSimDriver::ThreadRun()
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
       } else {
+        // @warning The sim currently runs about eleven times too fast, and this
+        // is the branch that is supposed to pace it. Measured on SCMP_009: our
+        // build goes from `Game time 00:00:00` at 33 s of session time to
+        // 00:01:49 at 43 s -- 109 game-seconds in 10 real ones. The original
+        // binary launched the same way goes 00:00:00 at 19 s to 00:00:09 at
+        // 29 s, i.e. real time. At that rate the game is unplayable even though
+        // it is stable.
+        //
+        // Eliminated so far, none of them the cause:
+        //  - `GetSimRate()` is 0. Every `CLIENT_CreateClientManager` call site
+        //    in `SessionStartup.cpp` passes `gameSpeed = 0`, and the accessor
+        //    takes the min across clients, so the scale below is 1 and this
+        //    works out to the correct 100 ms per beat.
+        //  - `net_Lag` is 0 (`CConCommand.cpp:109`), so it is not dragging
+        //    `dueAt` into the past.
+        //  - `mSimBusy` is only set for a pause or game-over sync, so this
+        //    branch really is the one running, not the untimed one above.
+        //  - The one stamp of `mLastSyncCycleTime` that looked wrong -- guarded
+        //    by the busy-transition check rather than done per sync -- is
+        //    faithful: 0x0073DAD0 has the identical shape, `if (busy != new) {
+        //    busy = new; if (!new) stamp; SetEvent; }`.
+        //
+        // So the next thing to check is whether `mLastSyncCycleTime` is being
+        // advanced at all during steady play by the other three stamp sites in
+        // this file, since a stale stamp leaves `dueAt` permanently in the past
+        // and every iteration takes the catch-up path below with
+        // `waitMilliseconds = 0`.
         const float simRateScale = std::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
         const float leadMilliseconds =
