@@ -315,29 +315,35 @@ namespace moho
    * What it does:
    * Composes transforms in the same order and quaternion algebra as FA binary.
    *
-   * Both halves of this function were re-derived term-by-term from
-   * `FUN_00549C20.c` after the previous body here was found to use the
-   * same wrong convention as `Inverse()`/`Apply()` above: the quaternion
-   * product below was computed treating `.w` as the scalar lane (textbook
-   * convention), but the real disassembly's four output terms are this
-   * exact same term set with every lane cyclically relabelled `.x` (real
-   * scalar lane) `-> .y -> .z -> .w -> .x`, i.e. the binary treats `.x` as
-   * scalar throughout, matching `VMatrix4::Set`/`QuatToMatrix`. The
-   * position rotation had the same `Wm3::MultiplyQuaternionVector` (WildMagic
-   * native `.w`-scalar `ToMat3`) vs. `Moho::MultQuadVec` (engine `.x`-scalar)
-   * mismatch as `Apply()`; ground truth calls
-   * `Moho::MultQuadVec(&v16, &t1->pos, &t2->orient)`.
+   * Quaternion half, decoded lane by lane with `eax` = `lhs` (terms `a0..a3`)
+   * and `ebp` = `rhs` (terms `b0..b3`):
+   *
+   *   0x00549C7B..0x00549CA7  [edi+00] = a0*b0 - a1*b1 - a2*b2 - a3*b3
+   *   0x00549CAB..0x00549CCD  [edi+04] = a3*b2 + a0*b1 + a1*b0 - a2*b3
+   *   0x00549CD1..0x00549D2C  [edi+08] = a1*b3 + a0*b2 + a2*b0 - a3*b1
+   *   0x00549D30..0x00549D5C  [edi+0C] = a2*b1 + a0*b3 + a3*b0 - a1*b2
+   *
+   * The scalar term is positive in lane 0, so this is an ordinary scalar-first
+   * product - the identical emission to `CAniPoseBone::Rotate` (0x0054BC00) -
+   * and its cross-term signs make it `rhs.orient_ * lhs.orient_`, with the
+   * right-hand transform as the left operand.
+   *
+   * A prior revision took the correct textbook formula and cyclically
+   * relabelled every lane (`.x -> .y -> .z -> .w -> .x`) on the theory that
+   * `.x` was the scalar, citing `VMatrix4::Set`/`QuatToMatrix` as the anchors.
+   * Both of those have since been read off their own disassembly and are
+   * scalar-first as well - neither computes a `ww` term at all - so the
+   * relabel is undone here.
+   *
+   * The position half was already right and is unchanged: ground truth rotates
+   * `lhs.pos_` by `rhs.orient_` through `Moho::MultQuadVec` (0x00549D73..
+   * 0x00549D7C) and adds `rhs.pos_` (0x00549D81..0x00549D99).
    */
   VTransform VTransform::Compose(const VTransform& lhs, const VTransform& rhs) noexcept
   {
     VTransform out{};
 
-    const Wm3::Quatf& a = lhs.orient_;
-    const Wm3::Quatf& b = rhs.orient_;
-    out.orient_.x = (a.x * b.x) - (a.y * b.y) - (a.z * b.z) - (a.w * b.w);
-    out.orient_.y = (a.w * b.z) + (a.x * b.y) + (a.y * b.x) - (a.z * b.w);
-    out.orient_.z = (a.y * b.w) + (a.x * b.z) + (a.z * b.x) - (a.w * b.y);
-    out.orient_.w = (a.z * b.y) + (a.x * b.w) + (a.w * b.x) - (a.y * b.z);
+    out.orient_ = MultiplyQuat(rhs.orient_, lhs.orient_);
 
     Wm3::Vec3f rotatedPosition{};
     MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);
