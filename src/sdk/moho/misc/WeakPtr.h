@@ -226,6 +226,55 @@ namespace moho
       , nextInOwner(nextNode)
     {}
 
+    /**
+     * Address: 0x00736C8F (inlined into `CDamage::CDamage(const CDamage&)`,
+     * FUN_00736C40, once per weak lane -- `mInstigator` at `+0x38` and
+     * `mTarget` at `+0x40`):
+     *
+     *     mov  eax, [edi+38h]        ; other.ownerLinkSlot
+     *     lea  ecx, [esi+38h]        ; this
+     *     mov  [ecx], eax            ; ownerLinkSlot = other.ownerLinkSlot
+     *     jz   short zero_next       ; slot == 0 ?
+     *     mov  edx, [eax]            ; *slot -- current chain head
+     *     mov  [ecx+4], edx          ; nextInOwner = head
+     *     mov  [eax], ecx            ; *slot = this
+     *
+     * What it does:
+     * Copy-constructs one weak node onto the *same* owner as `other` and
+     * inserts it at the head of that owner's intrusive chain. It never
+     * detaches first -- the destination storage is fresh, so it holds no
+     * prior chain membership. This is the construct-into-fresh-storage
+     * counterpart to `operator=` below, and the shape every relinking
+     * copy lane in this header (`FillConstructRange`,
+     * `CopyWeakPtrPayloadRangeCore`, ...) is a vectorised emission of.
+     */
+    WeakPtr(const WeakPtr<T>& other) noexcept
+      : ownerLinkSlot(other.ownerLinkSlot)
+      , nextInOwner(nullptr)
+    {
+      if (ownerLinkSlot != nullptr && !IsSentinel()) {
+        auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
+        nextInOwner = *head;
+        *head = this;
+      }
+    }
+
+    /**
+     * Address: 0x00737D52 (inlined into `func_DoDamageRing`, FUN_00737B30,
+     * for the `pointDamage.mInstigator = damage.mInstigator` lane): compares
+     * the incoming slot against the current one, unlinks this node from its
+     * present chain when they differ, then relinks at the new owner's head --
+     * i.e. exactly `ResetFromOwnerLinkSlot(other.ownerLinkSlot)`, which is
+     * why the two share one body in the binary.
+     */
+    WeakPtr<T>& operator=(const WeakPtr<T>& other) noexcept
+    {
+      if (this != &other) {
+        ResetFromOwnerLinkSlot(other.ownerLinkSlot);
+      }
+      return *this;
+    }
+
     ~WeakPtr() noexcept;
 
     [[nodiscard]] static bool IsSentinelSlot(void* slot) noexcept
@@ -1395,28 +1444,65 @@ namespace moho
     }
   }
 
-  template <class T>
-  inline WeakPtr<T>::~WeakPtr() noexcept = default;
-
   /**
-   * Address: 0x0056AA50 (FUN_0056AA50, Moho::WeakPtr_IUnit::~WeakPtr_IUnit)
+   * Address: 0x005A6DE0 (FUN_005A6DE0, `WeakPtr<Entity>`'s emission -- the
+   * `CDamage` copy-ctor unwind funclets at 0x00BAC2EF / 0x00BAC2FA reach it
+   * as `mov ecx,[ebp+4]; add ecx,38h/40h; jmp sub_5A6DE0`, i.e. as the
+   * member destructor of the two weak lanes)
+   * Address: 0x0056AA50 (FUN_0056AA50, Moho::WeakPtr_IUnit::~WeakPtr_IUnit --
+   * the `WeakPtr<IUnit>` emission of this same body)
+   *
+   * IDA signature:
+   * void __fastcall sub_5A6DE0(WeakPtr<T> *this@<ecx>);
    *
    * What it does:
-   * Unlinks one `WeakPtr<IUnit>` node from its owner's intrusive weak-link
-   * chain without mutating the local node storage lanes.
+   * Unlinks this node from its owner's intrusive weak-link chain. The node's
+   * own storage is left untouched -- it is about to die, and the binary
+   * likewise never clears it:
+   *
+   *     mov  eax, [ecx]        ; ownerLinkSlot
+   *     test eax, eax
+   *     jz   ret               ; not linked
+   *     cmp  [eax], ecx        ; head == this ?
+   *     jz   unlink            ;   eax still holds the head slot
+   *  loop:
+   *     mov  eax, [eax]        ; node = *cursor
+   *     add  eax, 4            ; cursor = &node->nextInOwner
+   *     cmp  [eax], ecx
+   *     jnz  loop
+   *  unlink:
+   *     mov  ecx, [ecx+4]      ; this->nextInOwner
+   *     mov  [eax], ecx        ; *cursor = nextInOwner
+   *
+   * This body is why the chain stays consistent when a weak holder dies while
+   * still aimed at a live owner. Leaving it defaulted -- as this template did
+   * until the `CDamage` ring-damage crash -- silently strands the dead node in
+   * the owner's chain, and the next walk of that chain (a `Set`, another
+   * destructor, or `ClearWeakObjectChain`) dereferences whatever has since
+   * reused the storage. That is the `0xF2B8458D` / `0x00C4669D` "corrupt
+   * ownerLinkSlot" class of fault documented on `ReplaceInOwnerChain` above:
+   * the drain was always correct, the *departures* were not.
+   *
+   * The `while` here additionally stops on a null cursor. The binary runs off
+   * the end instead, which cannot happen there because every live node really
+   * is in the chain it names; keeping the guard costs nothing and contains the
+   * damage if a node is ever staged with a slot it was never linked into (see
+   * `BindOwnerLinkSlotUnlinked`).
    */
-  template <>
-  inline WeakPtr<IUnit>::~WeakPtr() noexcept
+  template <class T>
+  inline WeakPtr<T>::~WeakPtr() noexcept
   {
-    if (ownerLinkSlot == nullptr) {
+    if (ownerLinkSlot == nullptr || IsSentinel()) {
       return;
     }
 
-    auto** cursor = reinterpret_cast<WeakPtr<IUnit>**>(ownerLinkSlot);
-    while (*cursor != this) {
+    auto** cursor = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
+    while (*cursor != nullptr && *cursor != this) {
       cursor = &(*cursor)->nextInOwner;
     }
-    *cursor = nextInOwner;
+    if (*cursor == this) {
+      *cursor = nextInOwner;
+    }
   }
 
   /**
@@ -1661,8 +1747,12 @@ namespace moho
       // uninitialized capacity, so the new value is constructed directly,
       // matching FUN_008B2770's fast path and FUN_008B2B70's own
       // tailCount==0 fallback (both call FUN_008B39A0).
-      const WeakPtr<T> stagedValue(WeakPtr<T>::EncodeOwnerLinkSlot(object), nullptr);
-      (void)WeakPtr<T>::FillConstructRange(view.begin + clampedIndex, 1, stagedValue);
+      // Constructed in place rather than staged through a local node: a local
+      // would name `object`'s chain without ever being linked into it, and
+      // `~WeakPtr` (which unlinks) would then walk that chain for a node that
+      // is not there. The one-arg constructor is the same bind-then-link-at-head
+      // sequence `FillConstructRange` performs for a single lane.
+      ::new (static_cast<void*>(view.begin + clampedIndex)) WeakPtr<T>(object);
     }
 
     view.end = view.begin + size + 1u;
