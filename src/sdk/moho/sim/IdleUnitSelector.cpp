@@ -145,7 +145,7 @@ namespace moho
      */
     [[maybe_unused]] const bool kIdleUnitSelectorStaticInit = []() noexcept {
       IdleUnitSelector& selector = GlobalIdleUnitSelector();
-      (void)WLD_AddOnTeardownCallback(reinterpret_cast<IWldTeardownCallback*>(&selector));
+      (void)WLD_AddOnTeardownCallback(static_cast<ISessionListener*>(&selector));
       return true;
     }();
   } // namespace

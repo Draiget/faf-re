@@ -227,15 +227,14 @@ namespace moho
      * `Broadcaster<SSelectionEvent>::BroadcastEvent` whenever
      * `CWldSession::SetSelection` runs.
      *
-     * The cast to `IWldTeardownCallback*` is layout-compatible: both the
-     * recovered `IWldTeardownCallback` slot 0 and the `SelectionListener`
-     * primary vtable slot 0 (`AttachToSessionListenerLane(void*)`) accept a
-     * single pointer-sized argument; the original binary stored the listener
-     * pointer in the same untyped pointer vector lane.
+     * The registry is typed on `ISessionListener`, this listener's primary
+     * base, so the registration is an ordinary base conversion: the session
+     * loader calls slot 0 (`AttachToSessionListenerLane`) on session creation
+     * and slot 1 (`DetachFromSessionListenerLane`) on teardown.
      */
     [[maybe_unused]] const bool kSelectionListenerStaticInit = []() noexcept {
       SelectionListener& listener = GlobalSelectionListener();
-      (void)WLD_AddOnTeardownCallback(reinterpret_cast<IWldTeardownCallback*>(&listener));
+      (void)WLD_AddOnTeardownCallback(static_cast<ISessionListener*>(&listener));
       return true;
     }();
   } // namespace

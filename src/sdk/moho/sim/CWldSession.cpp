@@ -3341,7 +3341,34 @@ namespace moho
     CWldSession* gActiveWldSession = nullptr;
     SWldSessionInfo* gPendingWldSessionInfo = nullptr;
     EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
-    WldTeardownCallbackVector gWldTeardownCallbacks{};
+    /**
+     * The session-listener registry, held as a **function-local** static.
+     *
+     * The binary's own storage is a zero-initialised static whose only
+     * "construction" is the atexit registration guarded by
+     * `gWldTeardownCallbacksInitMask` (FUN_00869810's magic-static guard) -
+     * an empty VC8 vector is all zero bytes, so it needs no dynamic
+     * initialiser at all.
+     *
+     * Our `msvc8::vector` default constructor is not `constexpr`, so writing
+     * this as a namespace-scope object gave it a dynamic initialiser and put
+     * it into static-initialisation order. Every registrant
+     * (`SelectionListener`, `PauseListener`, `IdleUnitSelector`) registers
+     * from its own translation unit's static initialiser, and those ran
+     * first: their `push_back`s landed in the vector, and this object's
+     * constructor then null'd all three lanes on top of them. The registry
+     * was empty by the time a session was created, so no listener was ever
+     * attached and `OnSelectionChanged` never fired.
+     *
+     * A function-local static is constructed on first use, which is exactly
+     * when the first `push_back` needs it.
+     */
+    [[nodiscard]] WldTeardownCallbackVector& WldTeardownCallbackStorage()
+    {
+      static WldTeardownCallbackVector sCallbacks;
+      return sCallbacks;
+    }
+
     std::uint32_t gWldTeardownCallbacksInitMask = 0;
 
     /**
@@ -3373,27 +3400,31 @@ namespace moho
 
     void CleanupWldTeardownCallbacks()
     {
-      gWldTeardownCallbacks.clear();
+      WldTeardownCallbackStorage().clear();
       gWldTeardownCallbacksInitMask &= ~1u;
     }
 
     /**
-     * Address: 0x00869870 (FUN_00869870, teardown callback dispatch core)
+     * Address: 0x00869870 (FUN_00869870, session-listener attach dispatch)
      *
      * What it does:
-     * Iterates every registered world-session teardown callback and invokes it
-     * with the current active world-session pointer.
+     * Attaches every registered session listener to the current active world
+     * session. The binary calls **vtable slot 0** here -
+     * `(**v4)(v4, Moho::sWldSession)` - which is
+     * `ISessionListener::AttachToSessionListenerLane`, not the detach slot the
+     * teardown pass uses (see `DoTeardownCallbacks`, FUN_008698B0, which takes
+     * `*v4 + 4`).
      */
-    void DispatchTeardownCallbacksCore(WldTeardownCallbackVector* const callbacks)
+    void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
     {
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
-        IWldTeardownCallback* const callback = (*callbacks)[i];
-        (void)callback->OnWldSessionTeardown(gActiveWldSession);
+        ISessionListener* const listener = (*callbacks)[i];
+        listener->AttachToSessionListenerLane(gActiveWldSession);
       }
     }
 
-    [[nodiscard]] std::intptr_t DispatchTeardownCallbacksCoreAndReturnLastResult(
+    [[nodiscard]] std::intptr_t DispatchSessionListenerAttachAndReturnLastResult(
       WldTeardownCallbackVector* const callbacks
     )
     {
@@ -3402,13 +3433,15 @@ namespace moho
       }
 
       // The binary's return register still holds `_Myfirst` when the callback
-      // list is empty, so that is the seed value here.
+      // list is empty, and otherwise whatever the last slot-0 call left in eax.
+      // The attach hook is `void`, so the seed is the only defined value here
+      // and no caller reads the result for anything but its truthiness.
       std::intptr_t result = reinterpret_cast<std::intptr_t>(callbacks->data());
 
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
-        IWldTeardownCallback* const callback = (*callbacks)[i];
-        result = static_cast<std::intptr_t>(callback->OnWldSessionTeardown(gActiveWldSession));
+        ISessionListener* const listener = (*callbacks)[i];
+        listener->AttachToSessionListenerLane(gActiveWldSession);
       }
 
       return result;
@@ -3418,8 +3451,11 @@ namespace moho
      * Address: 0x008698B0 (FUN_008698B0, func_DoTeardownCallbacks)
      *
      * What it does:
-     * Invokes every registered world-session teardown callback with the current
-     * global active-session pointer and returns the last callback result lane.
+     * Detaches every registered session listener from the current active world
+     * session. This is the teardown half of the pair: the binary dispatches
+     * `(*(*v4 + 4))(v4, Moho::sWldSession)` - **vtable slot 1**,
+     * `ISessionListener::DetachFromSessionListenerLane` - where the
+     * creation-time pass at FUN_00869870 dispatches slot 0.
      */
     [[nodiscard]] std::intptr_t DoTeardownCallbacks(WldTeardownCallbackVector* const callbacks)
     {
@@ -3427,7 +3463,15 @@ namespace moho
         return 0;
       }
 
-      return DispatchTeardownCallbacksCoreAndReturnLastResult(callbacks);
+      std::intptr_t result = reinterpret_cast<std::intptr_t>(callbacks->data());
+
+      const std::size_t callbackCount = callbacks->size();
+      for (std::size_t i = 0; i < callbackCount; ++i) {
+        ISessionListener* const listener = (*callbacks)[i];
+        listener->DetachFromSessionListenerLane(gActiveWldSession);
+      }
+
+      return result;
     }
 
     struct VizUpdateNode
@@ -21509,26 +21553,26 @@ namespace moho
    */
   WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks()
   {
+    WldTeardownCallbackVector& callbacks = WldTeardownCallbackStorage();
     if ((gWldTeardownCallbacksInitMask & 1u) == 0u) {
       gWldTeardownCallbacksInitMask |= 1u;
-      gWldTeardownCallbacks.clear();
       (void)std::atexit(&CleanupWldTeardownCallbacks);
     }
 
-    return &gWldTeardownCallbacks;
+    return &callbacks;
   }
 
   /**
    * Address: 0x008699A0 (FUN_008699A0)
    *
    * What it does:
-   * Resolves the process-global teardown-callback vector and dispatches its
-   * core callback lane.
+   * Resolves the process-global session-listener registry and attaches every
+   * listener in it to the freshly created world session (vtable slot 0).
    */
   std::int32_t WLD_DispatchOnTeardownCallbacksCoreFromGlobalList()
   {
     WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
-    return static_cast<std::int32_t>(DispatchTeardownCallbacksCoreAndReturnLastResult(callbacks));
+    return static_cast<std::int32_t>(DispatchSessionListenerAttachAndReturnLastResult(callbacks));
   }
 
   /**
@@ -21554,7 +21598,7 @@ namespace moho
    */
   void WLD_ResetOnTeardownCallbackStorage()
   {
-    gWldTeardownCallbacks = WldTeardownCallbackVector{};
+    WldTeardownCallbackStorage() = WldTeardownCallbackVector{};
   }
 
   /**
