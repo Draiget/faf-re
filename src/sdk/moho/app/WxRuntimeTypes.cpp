@@ -66689,14 +66689,17 @@ namespace
    * back onto the head's back buffer. Saves and restores the device viewport
    * around the passes.
    *
-   * NOTE: the `amt` parameter is dead. The binary reuses the incoming float's
-   * stack slot as the temporary viewport's X field and never reads it; the
-   * effect strength fed to shaderVarFrameGlowCopyAdd is the constant 1.0f loaded
-   * from .rdata @0x00DFEC20 (byte-verified `00 00 80 3F`), which is the same slot
-   * used for the temporary viewport's MaxZ. It is preserved as a parameter for
-   * signature fidelity.
+   * `amt` is the glow-copy bias. 0x007F527E `fld [esp+30h+a18]` pushes the
+   * incoming argument into shaderVarFrameGlowCopyAdd; the 1.0f loaded from
+   * 0x00DFEC20 at 0x007F51FC/0x007F524F is the temporary viewport's MaxZ, not
+   * this value. An earlier revision read those two slots as one and hard-wired
+   * GlowCopyAdd = 1.0, which makes frame.fx's CopyGlowingPS
+   * (`a = saturate((a - 0.02) * GlowCopyScale + GlowCopyAdd)`) saturate for
+   * every pixel: the whole scene was copied as glow, blurred, and added back
+   * One+One onto the back buffer -- the global white-out of terrain and
+   * meshes alike.
    */
-  void DoBloom(CBloomRendererRuntime* const bloomRenderer, [[maybe_unused]] const float amt)
+  void DoBloom(CBloomRendererRuntime* const bloomRenderer, const float amt)
   {
     // Guard: both render targets must be present (binary tests [ebx+8] and
     // [ebx+0x10], i.e. the two render-target shared_ptr px lanes).
@@ -66756,11 +66759,10 @@ namespace
     bloomViewport.maxZ = 1.0f;
     deviceInstance->SetViewport(&bloomViewport);
 
-    // Effect strength for the additive glow-copy technique. Byte-verified
-    // constant 1.0f (see the DoBloom note above).
-    constexpr float kFrameGlowCopyAmount = 1.0f;
+    // Glow-copy bias for the extract pass (see the note above): the map's
+    // bloom value, handed in by WRenViewport::Render.
     if (moho::shaderVarFrameGlowCopyAdd.Exists()) {
-      moho::shaderVarFrameGlowCopyAdd.SetFloat(kFrameGlowCopyAmount);
+      moho::shaderVarFrameGlowCopyAdd.SetFloat(amt);
     }
 
     // Copy the glowing scene into the extract/glow target (mRenderTargetLocks[0]),
@@ -70963,12 +70965,15 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // !ren_ShowNormals` and invokes it on the active head's bloom renderer:
   //   Moho::CBloomRenderer::DoBloom(&viewport->mBloomRenderers[viewport->mHead], amt)
   // mBloomRenderers @+0x128 and mHead @+0x320 are both modeled by the
-  // WRenViewportDestroyRuntimeView overlay. The float amount is dead inside
-  // DoBloom (see its note), so the elided water-amount fetch is not modeled and
-  // 0.0f is passed.
+  // WRenViewportDestroyRuntimeView overlay. The amount is the map's bloom:
+  // 0x007F97DF..0x007F97FE loads sWldMap, then its terrain res, and calls
+  // vtable slot 53 (+0xD4, `GetBloom`, 0x008A6BF0), falling back to 0.0f when
+  // either is null. It becomes the glow-copy bias inside DoBloom.
   if (!moho::ren_Oblivion && moho::ren_Bloom && !moho::ren_ShowNormals) {
     auto* const bloomHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
-    DoBloom(&bloomHost->mBloomRenderers[bloomHost->mHead], 0.0f);
+    moho::IWldTerrainRes* const bloomTerrainRes = moho::REN_GetTerrainRes();
+    const float bloomAmount = bloomTerrainRes != nullptr ? bloomTerrainRes->GetBloom() : 0.0f;
+    DoBloom(&bloomHost->mBloomRenderers[bloomHost->mHead], bloomAmount);
   }
 
   // UI-overlay + debug-HUD pass. In the binary (WRenViewport::Render @0x007F90D0,
