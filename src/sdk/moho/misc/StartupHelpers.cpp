@@ -1579,27 +1579,6 @@ namespace
     return true;
   }
 
-  [[nodiscard]] bool TryGetStringFromLuaValue(const LuaPlus::LuaObject& value, msvc8::string* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsString()) {
-      outValue->assign_owned(value.GetString());
-      return true;
-    }
-    if (value.IsNumber()) {
-      *outValue = gpg::STR_Printf("%d", static_cast<std::int32_t>(value.GetNumber()));
-      return true;
-    }
-    if (value.IsBoolean()) {
-      outValue->assign_owned(value.GetBoolean() ? "true" : "false");
-      return true;
-    }
-    return false;
-  }
-
   /**
    * Address: 0x008C7C30 (FUN_008C7C30, Moho::CUserPrefs::StringObject)
    *
@@ -2049,19 +2028,6 @@ namespace
      */
     msvc8::string* GetStr2() override;
 
-    void RefreshCurrentProfile() override
-    {
-      const LuaPlus::LuaObject currentProfile = QueryOptionValue("profile.current");
-      if (currentProfile.IsNil()) {
-        return;
-      }
-
-      msvc8::string profileName;
-      if (TryGetStringFromLuaValue(currentProfile, &profileName)) {
-        mPreferencesPrimaryString = profileName;
-      }
-    }
-
     /**
      * Address: 0x008C7560 (FUN_008C7560, Moho::CUserPrefs::GetBoolean)
      *
@@ -2071,7 +2037,7 @@ namespace
      */
     bool GetBoolean(const msvc8::string& key, const bool fallback) override
     {
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
       }
@@ -2088,7 +2054,7 @@ namespace
      */
     std::int32_t GetInteger(const msvc8::string& key, const std::int32_t fallback) override
     {
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
       }
@@ -2105,7 +2071,7 @@ namespace
      */
     float GetNumber(const msvc8::string& key, const float fallback) override
     {
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
       }
@@ -2122,7 +2088,7 @@ namespace
      */
     std::uint32_t GetHex(const msvc8::string& key, const std::uint32_t fallback) override
     {
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (!value.IsConvertibleToString()) {
         return fallback;
       }
@@ -2148,7 +2114,7 @@ namespace
      */
     msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) override
     {
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
       }
@@ -2170,7 +2136,7 @@ namespace
     {
       msvc8::vector<msvc8::string> outValues = fallback;
 
-      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil() || !value.IsTable()) {
         return outValues;
       }
@@ -2226,11 +2192,15 @@ namespace
     /**
      * Address: 0x008C7EA0 (FUN_008C7EA0, Moho::CUserPrefs::LookupCurrentOption)
      *
+     * VFTable SLOT: 15 (+0x3C)
+     *
      * What it does:
      * Resolves one option value from the currently selected profile:
-     * `profile.profiles[profile.current].options[key]`.
+     * `profile.profiles[profile.current].options[key]`. The value stays bound
+     * to the preferences state; it is returned as-is (number, string, table)
+     * rather than flattened to text.
      */
-    [[nodiscard]] LuaPlus::LuaObject LookupCurrentOptionObject(const msvc8::string& key)
+    LuaPlus::LuaObject LookupCurrentOption(const msvc8::string& key) override
     {
       LuaPlus::LuaObject currentProfile = mRoot.Lookup("profile.current");
       if (currentProfile.IsNil()) {
@@ -2255,36 +2225,18 @@ namespace
     /**
      * Address: 0x008C8040 (FUN_008C8040, Moho::CUserPrefs::LookupKey)
      *
+     * VFTable SLOT: 16 (+0x40)
+     *
      * What it does:
      * Resolves one root preference table entry by key from `mRoot`.
      */
-    [[nodiscard]] LuaPlus::LuaObject LookupKeyObject(const msvc8::string& key)
+    LuaPlus::LuaObject LookupKey(const msvc8::string& key) override
     {
       if (mRoot.IsNil()) {
         return LuaPlus::LuaObject(mRoot);
       }
 
       return mRoot.Lookup(key.c_str());
-    }
-
-    bool LookupCurrentOption(msvc8::string* const outOption, const msvc8::string& key) override
-    {
-      if (outOption == nullptr) {
-        return false;
-      }
-
-      const LuaPlus::LuaObject optionObject = LookupCurrentOptionObject(key);
-      return TryGetStringFromLuaValue(optionObject, outOption);
-    }
-
-    bool LookupKey(msvc8::string* const outOption, const msvc8::string& key) override
-    {
-      if (outOption == nullptr) {
-        return false;
-      }
-
-      const LuaPlus::LuaObject optionObject = LookupKeyObject(key);
-      return TryGetStringFromLuaValue(optionObject, outOption);
     }
 
     /**
@@ -3759,16 +3711,11 @@ int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
   msvc8::string optionKey{};
   optionKey.assign_owned(keyText);
 
-  LuaPlus::LuaObject valueObject(state);
-  valueObject.AssignNil(state);
-
-  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    msvc8::string optionValue{};
-    if (preferences->LookupCurrentOption(&optionValue, optionKey)) {
-      valueObject.AssignString(state, optionValue.c_str());
-    }
-  }
-
+  // 0x008C95BF..0x008C95DE: the option object lives on the preferences state;
+  // SCR_Copy rebuilds it on the caller's state so numbers stay numbers.
+  const LuaPlus::LuaObject valueObject = SCR_Copy(
+    USER_GetPreferences()->LookupCurrentOption(optionKey), state
+  );
   valueObject.PushStack(state);
   return 1;
 }
@@ -3840,13 +3787,13 @@ int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
   preferenceObject.AssignNil(state);
 
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    const LuaPlus::LuaObject preferenceTable = preferences->GetPreferenceTable();
     // The preferences table lives on the preferences LuaState, so the looked-up
     // value is bound to that state and cannot be pushed onto the caller's -
     // PushStack rejects it on `state->l_G == m_state->m_state->l_G`, which is a
-    // check the binary has too. The binary copies across first: FUN_008C98D0
-    // calls SCR_Copy(&result, looked_up, callerState) before the push.
-    preferenceObject = SCR_Copy(preferenceTable.Lookup(key.c_str()), state);
+    // check the binary has too. The binary copies across first: 0x008C9991
+    // dispatches vtable slot 16 (LookupKey), then 0x008C99AE calls
+    // SCR_Copy(&result, looked_up, callerState) before the push.
+    preferenceObject = SCR_Copy(preferences->LookupKey(key), state);
   }
 
   if (preferenceObject.IsNil()) {
