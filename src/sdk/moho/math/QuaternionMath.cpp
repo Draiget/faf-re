@@ -876,46 +876,63 @@ namespace moho
    * Moho::VMatrix3* func_QuatToMatrix(Wm3::Quaternionf* this, Moho::VMatrix3* a2);
    *
    * What it does:
-   * Expands a unit quaternion into a row-major 3x3 rotation matrix. Re-derived
-   * term-by-term from FUN_00452FD0.c after the previous body here (which
-   * assumed textbook scalar-first `.w` storage) was found not to match the
-   * disassembly at all past one coincidental term. The real binary pairs
-   * `.w` with `.z` (row 0) and with `.y` (row 1), and pairs `.z` with `.y`
-   * alone (row 2, no `.w`/`.x` term) - i.e. `.x` never appears in any
-   * diagonal term, which is the signature of `.x` being the scalar lane and
-   * `(.y, .z, .w)` the imaginary lanes, not `.w`. This is the exact
-   * transpose of `VMatrix4::Set` (0x004EE980) applied to the same four
-   * fields with no relabelling, which is why `MultQuadVec`'s row-of-matrix
-   * dot vec produces `vec * VMatrix4::Set(quat)` under this engine's
-   * row-vector convention. Cross-confirmed against `VTransform::Inverse`
-   * (0x0046FBF0) and `SelectionDragger3D::BuildSelectionSolid`
-   * (0x00864670), both of which conjugate by keeping `.x` and negating
-   * `.y/.z/.w`.
+   * Expands a unit quaternion into a 3x3 rotation matrix - the plain textbook
+   * scalar-first form, with `.w` the scalar and `(.x, .y, .z)` the imaginary
+   * lanes. Transcribed store by store from the disassembly, which loads the
+   * four lanes as `[ecx+0]=w, [ecx+4]=x, [ecx+8]=y, [ecx+0Ch]=z` and writes:
+   *
+   *   [eax+00] 1-(zz+yy)   [eax+04] xy-wz     [eax+08] xz+wy
+   *   [eax+0C] xy+wz       [eax+10] 1-(zz+xx) [eax+14] yz-wx
+   *   [eax+18] xz-wy       [eax+1C] yz+wx     [eax+20] 1-(yy+xx)
+   *
+   * where each named product already carries the factor of two (the binary
+   * pre-doubles `x`, `y` and `z` at 0x00452FEE..0x00452FFF and multiplies the
+   * undoubled lane against those). The function computes **no `ww` term at
+   * all** - the diagonals pair only `x`, `y` and `z` with each other - which
+   * is the signature of `.w` being the scalar, not `.x`.
+   *
+   * A prior revision "re-derived" this into an `.x`-scalar matrix. That form
+   * is self-consistent as a rotation matrix, but it is not what this function
+   * computes, and it disagrees with the quaternion product inlined into
+   * `HardwareMeshBatch::FillBatch` (0x007E7EA0), whose scalar term
+   * `c0*r0 - c1*r1 - c2*r2 - c3*r3` puts the scalar in lane 0 - corroborated
+   * there by the palette store order and by the identity seed `{0,0,0,1}`.
+   * Both operate on the same `VTransform::orient_`, so only one convention can
+   * hold, and the disassembly of both agrees it is scalar-in-lane-0.
+   *
+   * Float addition does not associate; the diagonal sums keep the binary's
+   * operand order (`zz+yy`, `zz+xx`, `yy+xx`).
    */
   Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* const quat, Wm3::Vector3f* const outMatrix) noexcept
   {
+    const float w = quat->w;
     const float x = quat->x;
     const float y = quat->y;
-    const float twoW = quat->w * 2.0f;
-    const float xy = x * (y * 2.0f);
-    const float xw = x * twoW;
-    const float xz = x * (quat->z * 2.0f);
-    const float ww = quat->w * twoW;
-    const float yy = y * (y * 2.0f);
-    const float yz = y * (quat->z * 2.0f);
-    const float yw = y * twoW;
-    const float zz = quat->z * (quat->z * 2.0f);
-    const float zw = quat->z * twoW;
+    const float z = quat->z;
 
-    outMatrix[0].x = static_cast<float>(1.0 - (ww + zz));
-    outMatrix[0].y = yz - xw;
-    outMatrix[0].z = yw + xz;
-    outMatrix[1].x = yz + xw;
-    outMatrix[1].y = static_cast<float>(1.0 - (ww + yy));
-    outMatrix[1].z = zw - xy;
-    outMatrix[2].x = yw - xz;
-    outMatrix[2].y = zw + xy;
-    outMatrix[2].z = static_cast<float>(1.0 - (zz + yy));
+    const float twoX = x * 2.0f;
+    const float twoY = y * 2.0f;
+    const float twoZ = z * 2.0f;
+
+    const float wx = w * twoX;
+    const float wy = w * twoY;
+    const float wz = w * twoZ;
+    const float xx = x * twoX;
+    const float xy = x * twoY;
+    const float xz = x * twoZ;
+    const float yy = y * twoY;
+    const float yz = y * twoZ;
+    const float zz = z * twoZ;
+
+    outMatrix[0].x = 1.0f - (zz + yy);
+    outMatrix[0].y = xy - wz;
+    outMatrix[0].z = xz + wy;
+    outMatrix[1].x = xy + wz;
+    outMatrix[1].y = 1.0f - (zz + xx);
+    outMatrix[1].z = yz - wx;
+    outMatrix[2].x = xz - wy;
+    outMatrix[2].y = yz + wx;
+    outMatrix[2].z = 1.0f - (yy + xx);
     return outMatrix;
   }
 } // namespace moho
