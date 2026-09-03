@@ -743,19 +743,26 @@ namespace moho
       invTransform.pos_.z *= scaleZ;
 
       // Fixed 90-degree quaternion multiply (q' = q * qFixed), from the original
-      // lanes before any are overwritten. 1:1 with FUN_006FB620.
-      const float qx = invTransform.orient_.x;
-      const float qy = invTransform.orient_.y;
-      const float qz = invTransform.orient_.z;
-      const float qw = invTransform.orient_.w;
-      const float newY = (((qz * 0.0f) + (qy * kQ)) + (qx * kQ)) - (qw * 0.0f);
-      const float newZ = (((qz * kQ) + (qx * 0.0f)) + (qw * kQ)) - (qy * 0.0f);
-      const float newW = (((qy * 0.0f) + (qx * 0.0f)) + (qw * kQ)) - (qz * kQ);
-      const float newX = (((qx * kQ) - (qy * kQ)) - (qz * 0.0f)) - (qw * 0.0f);
-      invTransform.orient_.x = newX;
-      invTransform.orient_.y = newY;
-      invTransform.orient_.z = newZ;
-      invTransform.orient_.w = newW;
+      // lanes before any are overwritten. 1:1 with FUN_006FB620, which reads
+      // and writes the quaternion's MEMORY LANES 0..3 (IDA names them x,y,z,w
+      // because its struct puts x at offset 0). Wm3 stores those lanes as
+      // (w,x,y,z), so index the storage directly rather than by name -- the
+      // named transcription this replaced was correct only under the old
+      // x-is-lane-0 convention and rotated every lane after the scalar-first
+      // conversion.
+      float* const q = invTransform.orient_.m_afTuple;
+      const float l0 = q[0];
+      const float l1 = q[1];
+      const float l2 = q[2];
+      const float l3 = q[3];
+      const float new1 = (((l2 * 0.0f) + (l1 * kQ)) + (l0 * kQ)) - (l3 * 0.0f);
+      const float new2 = (((l2 * kQ) + (l0 * 0.0f)) + (l3 * kQ)) - (l1 * 0.0f);
+      const float new3 = (((l1 * 0.0f) + (l0 * 0.0f)) + (l3 * kQ)) - (l2 * kQ);
+      const float new0 = (((l0 * kQ) - (l1 * kQ)) - (l2 * 0.0f)) - (l3 * 0.0f);
+      q[0] = new0;
+      q[1] = new1;
+      q[2] = new2;
+      q[3] = new3;
 
       const VTransform composed = VTransform::Compose(invTransform, original->GetTransformWm3());
       Prop* const child = Prop::CreateFromBlueprintResolved(original->SimulationRef, childBlueprint, composed);
