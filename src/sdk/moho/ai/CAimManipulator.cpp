@@ -747,15 +747,15 @@ moho::CAimManipulator::CAimManipulator()
   runtimeView->mMaxPitch = 0.0f;
   runtimeView->mPitchMaxSlew = 0.0f;
 
-  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.w = 1.0f;
+  runtimeView->mBone0Rot.x = 0.0f;
   runtimeView->mBone0Rot.y = 0.0f;
   runtimeView->mBone0Rot.z = 0.0f;
-  runtimeView->mBone0Rot.w = 0.0f;
 
-  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.w = 1.0f;
+  runtimeView->mBone1Rot.x = 0.0f;
   runtimeView->mBone1Rot.y = 0.0f;
   runtimeView->mBone1Rot.z = 0.0f;
-  runtimeView->mBone1Rot.w = 0.0f;
 
   runtimeView->mHeadingOffset = 0.0f;
 }
@@ -821,14 +821,14 @@ moho::CAimManipulator::CAimManipulator(
   runtimeView->mUnknownBoolE1 = false;
   runtimeView->mResetPoseTime = 0;
   runtimeView->mResetTime = 0;
-  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.w = 1.0f;
+  runtimeView->mBone0Rot.x = 0.0f;
   runtimeView->mBone0Rot.y = 0.0f;
   runtimeView->mBone0Rot.z = 0.0f;
-  runtimeView->mBone0Rot.w = 0.0f;
-  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.w = 1.0f;
+  runtimeView->mBone1Rot.x = 0.0f;
   runtimeView->mBone1Rot.y = 0.0f;
   runtimeView->mBone1Rot.z = 0.0f;
-  runtimeView->mBone1Rot.w = 0.0f;
   runtimeView->mHeadingOffset = 0.0f;
 
   // Materialize the Lua script object through the CAimManipulator metatable

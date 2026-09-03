@@ -191,10 +191,10 @@ namespace
       object->mPos.x = 0.0f;
       object->mPos.y = 0.0f;
       object->mPos.z = 0.0f;
-      object->mOrientation.x = 1.0f;
+      object->mOrientation.w = 1.0f;
+      object->mOrientation.x = 0.0f;
       object->mOrientation.y = 0.0f;
       object->mOrientation.z = 0.0f;
-      object->mOrientation.w = 0.0f;
       object->mVelocity.x = 0.0f;
       object->mVelocity.y = 0.0f;
       object->mVelocity.z = 0.0f;
@@ -378,10 +378,10 @@ namespace moho
     body->mPos.x = 0.0f;
     body->mPos.y = 0.0f;
     body->mPos.z = 0.0f;
-    body->mOrientation.x = 1.0f;
+    body->mOrientation.w = 1.0f;
+    body->mOrientation.x = 0.0f;
     body->mOrientation.y = 0.0f;
     body->mOrientation.z = 0.0f;
-    body->mOrientation.w = 0.0f;
     body->mVelocity.x = 0.0f;
     body->mVelocity.y = 0.0f;
     body->mVelocity.z = 0.0f;

@@ -492,10 +492,10 @@ namespace moho
       nullptr,
       true
     };
-    constructionParams.mTransform.orient_.x = 1.0f;
+    constructionParams.mTransform.orient_.w = 1.0f;
+    constructionParams.mTransform.orient_.x = 0.0f;
     constructionParams.mTransform.orient_.y = 0.0f;
     constructionParams.mTransform.orient_.z = 0.0f;
-    constructionParams.mTransform.orient_.w = 0.0f;
     constructionParams.mUseLayerOverride = 1;
 
     Unit* const unit = sim ? sim->CreateUnitForScript(constructionParams, true) : nullptr;
