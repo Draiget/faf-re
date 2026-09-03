@@ -86,18 +86,26 @@ namespace
     float mMaxSpeed;
     float mAcceleration;
     Wm3::Vector3f mBallisticAcceleration;
+    float mDamage;
+    float mDamageRadius;
+    msvc8::string mDamageTypeName;
+    moho::CAiTarget mTargetPosData;
     // Cached homing aim point (asm this+0x30C). Written from GetTargetPosGun
     // while a live target exists; re-used when the "keep last aim" latch is set.
+    //
+    // These two used to sit before `mDamage`, which put them 0x10 bytes ahead of
+    // where the binary reads them and dragged every later field down with them:
+    // `mTargetPosData` landed at 0x2FC instead of 0x2EC, so its weak-link words
+    // read `position`'s float bytes as a pointer. That is where the bogus
+    // `ownerLinkSlot` values came from (0x00C466A1 -- odd, and inside the module
+    // image rather than the heap). Their own comments always said 0x30C/0x318,
+    // which is after `mTargetPosData`, not before `mDamage`.
     Wm3::Vector3f mCachedAimPoint;
     // "Keep last aim" latch (asm this+0x318). Set in the launch ctor for ground
     // targets (non-Air/Sub layer); when set, UpdateTracking keeps steering toward
     // the cached aim point after the live target is lost instead of returning.
     bool mKeepLastAimLatch;
     std::uint8_t mKeepLastAimPadding[3];
-    float mDamage;
-    float mDamageRadius;
-    msvc8::string mDamageTypeName;
-    moho::CAiTarget mTargetPosData;
     Wm3::Vector3f mImpactPosition;
     moho::WeakPtr<moho::Entity> mCollidedEntityWeak;
     std::uint32_t mLifetimeEnd;
@@ -116,6 +124,39 @@ namespace
     bool mIsChildProjectile;
     std::uint8_t mTailPadding[3];
   };
+
+  // Offsets verified against Moho::Projectile::Impact (0x0069DEC0), which reads
+  // [edi+270h], [edi+278h], [edi+2A4h], [edi+2ECh], [edi+2F0h], [edi+31Ch],
+  // [edi+320h], [edi+324h], [edi+328h] and [edi+364h]. They must also agree with
+  // Projectile.h's own asserted layout -- this view aliases the same object.
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mImpactEventBroadcaster) == 0x270,
+    "ProjectileDeserializeRuntimeView::mImpactEventBroadcaster must be at 0x270"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mDamage) == 0x2C8,
+    "ProjectileDeserializeRuntimeView::mDamage must be at 0x2C8"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mTargetPosData) == 0x2EC,
+    "ProjectileDeserializeRuntimeView::mTargetPosData must be at 0x2EC (Impact reads [edi+2ECh])"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mCachedAimPoint) == 0x30C,
+    "ProjectileDeserializeRuntimeView::mCachedAimPoint must be at 0x30C"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mImpactPosition) == 0x31C,
+    "ProjectileDeserializeRuntimeView::mImpactPosition must be at 0x31C (Impact reads [edi+31Ch])"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mCollidedEntityWeak) == 0x328,
+    "ProjectileDeserializeRuntimeView::mCollidedEntityWeak must be at 0x328 (Impact reads [edi+328h])"
+  );
+  static_assert(
+    offsetof(ProjectileDeserializeRuntimeView, mImpactType) == 0x364,
+    "ProjectileDeserializeRuntimeView::mImpactType must be at 0x364 (Impact reads [edi+364h])"
+  );
 
   static_assert(
     offsetof(ProjectileDeserializeRuntimeView, mImpactEventBroadcaster) == 0x270,
@@ -1287,9 +1328,25 @@ namespace moho
     // back to `Game time 00:00:00`, and a clean 49-minute run becomes two
     // crashes. Fix the weak-pointer chain first, then restore the call shape.
     const char* impactTypeString = ENT_GetImpactTypeString(view.mImpactType);
-    LuaPlus::LuaObject impactResult;
     const char* impactArgs[] = {impactTypeString};
-    this->LuaPCall("OnImpact", impactArgs, &impactResult);
+
+    // 0x0069DF11..0x0069DF41: the third argument is the collided entity's own
+    // script object -- the binary takes the weak link's target, steps back to
+    // the object base and reads `[base+0x20]`, which is `CScriptObject::mLuaObj`
+    // at that same offset. When nothing was hit it constructs a temporary
+    // `LuaObject` on this projectile's Lua state (0x0069DF2E) rather than
+    // passing an unbound one, because `LuaPCall` pushes this argument and a
+    // default-constructed LuaObject has no state to validate against --
+    // `PushStack` then throws `state->l_G == m_state->m_state->l_G` and the
+    // script never runs.
+    LuaPlus::LuaObject impactObject;
+    if (collidedEntity != nullptr) {
+      impactObject = collidedEntity->mLuaObj;
+    } else if (LuaPlus::LuaState* const scriptState = mLuaObj.GetActiveState(); scriptState != nullptr) {
+      impactObject = LuaPlus::LuaObject(scriptState);
+    }
+
+    this->LuaPCall("OnImpact", impactArgs, &impactObject);
 
     // Target/army accounting: only when the projectile had a real target entity.
     Entity* const targetEntity = view.mTargetPosData.GetEntity();
