@@ -8212,8 +8212,39 @@ namespace
 			}
 		}
 
+		// TEMPORARY PROBE (do not commit). This loop is where the engine dies
+		// (LuaObject.cpp:8216, reading ~0x0005C05F). Validate `varname` instead
+		// of dereferencing it -- an earlier probe used a 0x10000 floor, which
+		// 0x0005C05A passes, so it faulted instead of reporting. Report the
+		// Proto, its locvars block and the bad index so it can be cross-checked
+		// against the close_func shrink frees logged below, then skip the entry
+		// so the run survives and we see every occurrence rather than the first.
 		for (int index = 0; index < f->sizelocvars; ++index) {
-			f->locvars[index].varname->marked |= 1u;
+			TString* const varname = f->locvars[index].varname;
+			const auto nameBits = reinterpret_cast<std::uintptr_t>(varname);
+			if (nameBits < 0x00100000u || (nameBits & 3u) != 0u) {
+				static int sBadNameBudget = 0;
+				if (sBadNameBudget < 10) {
+					++sBadNameBudget;
+					char probe[224];
+					sprintf_s(probe, sizeof(probe),
+					          "[LOCVARBAD] proto=%08X locvars=%08X(%d) idx=%d varname=%08X | code=%08X(%d end=%08X) k=%08X(%d) p=%08X(%d) lineinfo=%08X(%d)\n",
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f)),
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->locvars)),
+					          f->sizelocvars, index, static_cast<unsigned>(nameBits),
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->code)),
+					          f->sizecode,
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->code) +
+					                                sizeof(Instruction) * static_cast<std::size_t>(f->sizecode)),
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->k)), f->sizek,
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->p)), f->sizep,
+					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->lineinfo)),
+					          f->sizelineinfo);
+					::OutputDebugStringA(probe);
+				}
+				continue;
+			}
+			varname->marked |= 1u;
 		}
 	}
 

@@ -1,4 +1,5 @@
 #include "moho/terrain/MediumFidelityTerrain.h"
+#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 
 #include <algorithm>
 #include <cmath>
@@ -1704,6 +1705,14 @@ namespace moho
 
       const std::int32_t rectCacheCount = mTesselator->GetRectCacheCount();
       std::int32_t collisionIndexCount = mTesselator->GetCollisionIndexCount();
+      // TEMPORARY PROBE (do not commit)
+      {
+        static int sRectBudget = 0;
+        if (sRectBudget < 8) {
+          ++sRectBudget;
+          gpg::Warnf("[TERRDIAG-MED] rectCacheCount=%d collisionIndexCount=%d", rectCacheCount, collisionIndexCount);
+        }
+      }
       if (collisionIndexCount > kSkirtMaxIndexCount) {
         collisionIndexCount = kSkirtMaxIndexCount;
       }

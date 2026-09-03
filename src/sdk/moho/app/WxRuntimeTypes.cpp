@@ -70497,6 +70497,24 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   //   -> RenderFrames
   // The SetRenderTarget2 arguments are read straight off the push sequence at
   // 0x007F919E..0x007F91B1 (stencil, z via fld1/fstp, color, clear, index).
+  // TEMPORARY PROBE (do not commit). The map-preview path above clears
+  // ren_Ui/ren_Fx/... around a Render() call and restores them afterwards with
+  // no RAII guard, so a single escaping exception leaves ren_Ui false for the
+  // rest of the process and the UI never draws again -- which is exactly the
+  // "603 controls tick, nothing on screen" symptom. Report the gate state.
+  {
+    static int sUiGateBudget = 0;
+    static bool sLastRenUi = true;
+    if (moho::ren_Ui != sLastRenUi && sUiGateBudget < 10) {
+      ++sUiGateBudget;
+      sLastRenUi = moho::ren_Ui;
+      char probe[128];
+      sprintf_s(probe, sizeof(probe), "[UIGATE] ren_Ui -> %d  uiMgr=%p\n",
+                moho::ren_Ui ? 1 : 0, static_cast<const void*>(moho::UI_GetManager()));
+      ::OutputDebugStringA(probe);
+    }
+  }
+
   moho::IUIManager* const uiManager = moho::ren_Ui ? moho::UI_GetManager() : nullptr;
   if (uiManager != nullptr) {
     uiManager->ValidateFrame(head);
@@ -70605,6 +70623,27 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     }
 
     moho::TerrainCommon* const terrain = worldView->terrain.get();
+
+    // TEMPORARY PROBE (do not commit). The HUD renders but the 3D viewport is
+    // flat, so establish whether the world pass has a terrain bound at all.
+    {
+      static int sWorldDiagBudget = 0;
+      if (sWorldDiagBudget < 6) {
+        ++sWorldDiagBudget;
+        gpg::Warnf("[WORLDDIAG] terrain=%08X ren_Terrain=%d view=%08X | camPos=(%.1f,%.1f,%.1f) viewFwd=(%.2f,%.2f,%.2f) zoom=%.1f",
+                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(terrain)),
+                  moho::ren_Terrain ? 1 : 0,
+                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(worldView->view)),
+                  runtime->mCam->inverseView.r[3].x,
+                  runtime->mCam->inverseView.r[3].y,
+                  runtime->mCam->inverseView.r[3].z,
+                  runtime->mCam->inverseView.r[2].x,
+                  runtime->mCam->inverseView.r[2].y,
+                  runtime->mCam->inverseView.r[2].z,
+                  worldView->view->CameraGetZoom());
+      }
+    }
+
     if (moho::ren_Terrain && terrain != nullptr) {
       // Per-frame render-context update (TerrainCommon slot 5), dispatched
       // immediately before RenderTerrainNormals in the binary
@@ -70787,7 +70826,30 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // body, which orphaned `Moho::Cartographic::Render` (its sole caller).
   // The return value (outline-overlay draw count) is unused by this caller,
   // matching the binary (the pushed result is never read after the call).
-  (void)moho::REN_RenderCartographic(this, head, worldViewInfoVector);
+  // TEMPORARY PROBE (do not commit). The world pass is provably healthy
+  // (rectCacheCount=122..128, DrawNormals=1, target bound, camera over the map)
+  // yet the viewport is a flat fill. This pass runs right after the post-loop
+  // UpdateRenderViewportCoordinates(), which restores the FULL head rect, so
+  // anything it draws covers the whole screen. Report its overlay draw count
+  // and allow skipping it to see whether the terrain underneath appears.
+  {
+    static const bool skipCartographic = (getenv("FAF_SKIP_CARTOGRAPHIC") != nullptr);
+    if (!skipCartographic) {
+      const auto cartographicDraws = moho::REN_RenderCartographic(this, head, worldViewInfoVector);
+      static int sCartoBudget = 0;
+      if (sCartoBudget < 5) {
+        ++sCartoBudget;
+        gpg::Warnf("[CARTODIAG] REN_RenderCartographic drew=%d head=%d",
+                   static_cast<int>(cartographicDraws), head);
+      }
+    } else {
+      static bool sReportedSkip = false;
+      if (!sReportedSkip) {
+        sReportedSkip = true;
+        gpg::Warnf("[CARTODIAG] SKIPPED via FAF_SKIP_CARTOGRAPHIC");
+      }
+    }
+  }
 
   // Draw the UI control tree over the rendered viewport. The binary does this
   // at 0x007F97B7..0x007F97DD, immediately after the coordinate update and
@@ -70870,6 +70932,28 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // where mLocks1[0] is the primary render-target writer-lock slot at +0x2164.
   // It is a no-op unless frame dumping has been armed via `dump_frameRate`.
   WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+
+  // TEMPORARY PROBE (do not commit). Arm the engine's own frame dumper for a
+  // few frames so we get a BMP of exactly what the renderer produced. The whole
+  // terrain path measures healthy (rectCacheCount=122..128, DrawNormals=1,
+  // colour writes 0x07, camera over the map, cartographic drew=0) yet the
+  // window shows a flat fill -- this distinguishes "terrain is in the target
+  // but never reaches the screen" from "the draw genuinely produces nothing".
+  {
+    // Arm LATE: the first dumps came out as the Cybran loading screen because
+    // they fired on the very first Render call, during loading. Wait several
+    // thousand frames so the capture is unambiguously in-session.
+    static int sRenderCalls = 0;
+    static bool sArmedDump = false;
+    ++sRenderCalls;
+    if (!sArmedDump && sRenderCalls > 4000 && getenv("FAF_DUMP_FRAMES") != nullptr) {
+      sArmedDump = true;
+      moho::dump_frameDumpName.assign("C:\\ProgramData\\FAForever\\bin\\framedump");
+      moho::dump_frameRate = 3;
+      gpg::Warnf("[DUMPDIAG] armed frame dump -> %s", moho::dump_frameDumpName.c_str());
+    }
+  }
+
   moho::REN_MaybeDumpFrame(passView->mPrimaryTargetLocks[0].get());
 }
 
@@ -70911,11 +70995,28 @@ void moho::WRenViewport::RenderSkyDome()
   const float simDeltaSeconds = moho::REN_GetSimDeltaSeconds();
   const int gameTick = moho::REN_GetGameTick();
 
+  // TEMPORARY PROBE (do not commit). MMDIAG (a few lines earlier in the caller's
+  // loop) fires 787x per run while a probe placed immediately AFTER this call
+  // fires 0x, so RenderSkyDome throws every frame and aborts the whole world
+  // pass before terrain/mesh/water ever draw -- which is why the HUD renders
+  // but the 3D viewport is empty. Step markers to find which call throws.
+  static int sSkyBudget = 0;
+  const bool probeSky = (sSkyBudget < 3);
+  if (probeSky) {
+    ++sSkyBudget;
+    ::OutputDebugStringA("[SKYDIAG] 1 enter\n");
+  }
+
   skyDome.CreateRenderAbility();
+  if (probeSky) { ::OutputDebugStringA("[SKYDIAG] 2 CreateRenderAbility ok\n"); }
   skyDome.RenderAtmosphere(cam);
+  if (probeSky) { ::OutputDebugStringA("[SKYDIAG] 3 RenderAtmosphere ok\n"); }
   skyDome.RenderDecals(cam);
+  if (probeSky) { ::OutputDebugStringA("[SKYDIAG] 4 RenderDecals ok\n"); }
   skyDome.RenderCirrus(gameTick, simDeltaSeconds, cam);
+  if (probeSky) { ::OutputDebugStringA("[SKYDIAG] 5 RenderCirrus ok\n"); }
   skyDome.RenderCumulus(runtime->mHead, simDeltaSeconds, cam, cumulusVertices);
+  if (probeSky) { ::OutputDebugStringA("[SKYDIAG] 6 RenderCumulus ok\n"); }
 }
 
 /**
@@ -70946,13 +71047,31 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
       ? reinterpret_cast<moho::TerrainShadowContext*>(&runtime->mShadowRenderer)
       : nullptr;
 
-  (void)terrain->DrawNormals(
+  const auto drewNormals = terrain->DrawNormals(
     moho::REN_GetGameTick(),
     moho::REN_GetSimDeltaSeconds(),
     AsRenderPassView(this)->mPrimaryTargetLocks[runtime->mHead],
     shadowContext
   );
   terrain->DrawTerrainSkirt();
+
+  // TEMPORARY PROBE (do not commit). The tessellator produces real geometry
+  // (rectCacheCount=122..128) and the vertex upload runs, yet the viewport is
+  // flat -- so the failure is at or after this composite dispatch. Report
+  // whether this is even reached, what DrawNormals returned, and whether the
+  // primary target lock it draws into is bound.
+  {
+    static int sCompositeBudget = 0;
+    if (sCompositeBudget < 5) {
+      ++sCompositeBudget;
+      gpg::Warnf(
+        "[COMPDIAG] RenderCompositeTerrain head=%d drewNormals=%d target=%08X shadowCtx=%08X",
+        runtime->mHead, static_cast<int>(drewNormals),
+        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(
+          AsRenderPassView(this)->mPrimaryTargetLocks[runtime->mHead].get())),
+        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowContext)));
+    }
+  }
 }
 
 namespace
@@ -71464,6 +71583,52 @@ void moho::WRenViewport::TransformTerrainNormals()
   destroyView->mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
   destroyView->mFrame.SetTexture(0u, passView->mSecondaryTargetLocks[head]);
   destroyView->mFrame.Render(headWidth, headHeight);
+
+  // TEMPORARY PROBE (do not commit). SCMP_009's ambient is genuinely (0,0,0)
+  // (verified byte-for-byte against the .scmap lighting block at 0x2411CC), so
+  // terrain is lit ENTIRELY by the diffuse N.L term. Forcing ambient to 0.5
+  // makes fully-textured terrain appear, which proves geometry/albedo are fine
+  // and the normal basis is dead. This is the pass that builds it: normals ->
+  // mSecondaryTargetLocks[head], TCreateBasis -> mPrimaryTargetLocks[head].
+  {
+    static int sBasisBudget = 0;
+    if (sBasisBudget < 4) {
+      ++sBasisBudget;
+      gpg::Warnf("[BASISDIAG] head=%d src(secondary)=%08X dst(primary)=%08X size=%dx%d",
+                 head,
+                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(passView->mSecondaryTargetLocks[head].get())),
+                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(passView->mPrimaryTargetLocks[head].get())),
+                 headWidth, headHeight);
+    }
+
+    // Dump the two normal-basis targets AS-IS (no screen copy, unlike
+    // REN_MaybeDumpFrame) so we can see whether DrawTerrainNormal actually
+    // wrote normals and whether TCreateBasis produced a usable basis.
+    static int sBasisDumps = 0;
+    if (sBasisDumps < 2 && getenv("FAF_DUMP_BASIS") != nullptr) {
+      const int which = sBasisDumps++;
+      moho::ID3DRenderTarget* const target = (which == 0)
+        ? passView->mSecondaryTargetLocks[head].get()
+        : passView->mPrimaryTargetLocks[head].get();
+      boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet{};
+      device->GetResources()->Func10(sheet, target, sheet);
+      gpg::gal::DeviceD3D9* const dev9 = device->GetDeviceD3D9();
+      if (dev9 != nullptr && sheet) {
+        boost::shared_ptr<gpg::gal::TextureD3D9> tex{};
+        sheet->GetTexture(tex);
+        const msvc8::string dest = gpg::STR_Printf(
+          "C:\\ProgramData\\FAForever\\bin\\framedump\\BASIS_%s.bmp",
+          (which == 0) ? "secondary_normals" : "primary_basis");
+        try {
+          gpg::gal::TextureD3D9* raw = tex.get();
+          dev9->Func5(&raw, dest, 0, nullptr);
+          gpg::Warnf("[BASISDIAG] dumped %s", dest.c_str());
+        } catch (const std::exception& e) {
+          gpg::Warnf("[BASISDIAG] dump failed: %s", e.what());
+        }
+      }
+    }
+  }
 }
 
 /**

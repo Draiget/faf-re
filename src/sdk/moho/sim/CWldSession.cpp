@@ -21232,9 +21232,27 @@ namespace moho
         wldUIProvider->StopLoadingDialog();
       }
 
+      // TEMPORARY PROBE (do not commit). `mOutstandingRequests` stays at 1
+      // forever, which means `clientManager->Cleanup()` below never runs and
+      // the session sits in Waiting. `CreateGameInterface` is the one call
+      // between here and there that can throw (it runs the UI's Lua
+      // `CreateGameInterface`), so bracket it and report which side we reach.
+      ::OutputDebugStringA("[INITDIAG] before CreateGameInterface\n");
       if (wldUIProvider != nullptr) {
-        wldUIProvider->CreateGameInterface(gPendingWldSessionInfo != nullptr && gPendingWldSessionInfo->mIsReplay);
+        // TEMPORARY PROBE (do not commit). Confirmed: this call never returns,
+        // so `clientManager->Cleanup()` below is skipped and the session is
+        // stuck in Waiting forever. Catch it just long enough to print what.
+        try {
+          wldUIProvider->CreateGameInterface(gPendingWldSessionInfo != nullptr && gPendingWldSessionInfo->mIsReplay);
+        } catch (const std::exception& ex) {
+          char probe[512];
+          sprintf_s(probe, "[INITDIAG] CreateGameInterface THREW std::exception: %.400s\n", ex.what());
+          ::OutputDebugStringA(probe);
+        } catch (...) {
+          ::OutputDebugStringA("[INITDIAG] CreateGameInterface THREW non-std exception\n");
+        }
       }
+      ::OutputDebugStringA("[INITDIAG] after CreateGameInterface\n");
 
       // The session info existed only to carry launch parameters into the
       // session; the session owns everything it needed by now.
@@ -21251,7 +21269,10 @@ namespace moho
       // `mEveryoneIsReady` - so without this the session sits in Waiting
       // forever showing "waiting for other players", local game or not.
       if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+        ::OutputDebugStringA("[INITDIAG] declaring ready (Cleanup)\n");  // TEMPORARY PROBE
         clientManager->Cleanup();
+      } else {
+        ::OutputDebugStringA("[INITDIAG] NO client manager - ready never declared\n");  // TEMPORARY PROBE
       }
 
       if (outContinue != nullptr) {

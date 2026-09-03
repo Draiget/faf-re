@@ -6,6 +6,7 @@
 #include <limits>
 
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
@@ -520,11 +521,41 @@ namespace moho
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
     SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
 
-    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+    Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+    // TEMPORARY PROBE (do not commit). Measured ambience is (0,0,0) while sun
+    // colour/direction/multiplier all carry real map values. With zero ambient
+    // the terrain is lit purely by N.L, so a dead normal texture would render
+    // it uniformly near-black -- exactly the observed RGB ~32/31/23. Forcing a
+    // non-zero ambient separates the two: if terrain becomes visible, the
+    // albedo/geometry path is fine and the defect is in the normal/lighting
+    // term; if it stays black, the problem is upstream of shading entirely.
+    if (getenv("FAF_FORCE_AMBIENT") != nullptr) {
+      sunAmbience.x = 0.5f;
+      sunAmbience.y = 0.5f;
+      sunAmbience.z = 0.5f;
+    }
     SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
 
     const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
     SetShaderVarMem(shaderVars.sunColor, 3U, &sunColor.x);
+
+    // TEMPORARY PROBE (do not commit). Terrain rasterizes but comes out
+    // near-black (RGB ~32/31/23) with the correct effect bound, the correct
+    // technique, 3571 triangles and shadows disabled -- so the remaining
+    // suspects are the lighting terms themselves. Zero sun colour / ambience /
+    // multiplier would produce exactly this.
+    {
+      static int sLightBudget = 0;
+      if (sLightBudget < 4) {
+        ++sLightBudget;
+        gpg::Warnf(
+          "[LIGHTDIAG] mult=%.3f sunDir=(%.3f,%.3f,%.3f) sunColor=(%.3f,%.3f,%.3f) ambience=(%.3f,%.3f,%.3f)",
+          lightingMultiplier,
+          sunDirection.x, sunDirection.y, sunDirection.z,
+          sunColor.x, sunColor.y, sunColor.z,
+          sunAmbience.x, sunAmbience.y, sunAmbience.z);
+      }
+    }
 
     // Half-angle vector: normalize(sunDirection + inverseView.r[2]). The binary
     // spells each component `sunDir - (-0.0 - invView.r[2].c)`, which is an
@@ -584,6 +615,23 @@ namespace moho
 
       const boost::shared_ptr<CD3DRenderTarget> shadowTexture = GetActiveShadowTexture(*shadowContext);
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
+
+      // TEMPORARY PROBE (do not commit). Terrain rasterizes but comes out
+      // near-black (frame-dump sampling: RGB ~32/31/23). Shadow::
+      // PrepareLightCamera refuses to build a light camera when zoom exceeds
+      // ren_ShadowLOD (250) and the live camera zoom is 854-883, so the shadow
+      // map may never be rendered this frame while shadowsEnabled stays 1 --
+      // the shader would then multiply terrain by an empty (fully-shadowed)
+      // texture. Report the flag and whether a texture is actually bound.
+      {
+        static int sShadowBudget = 0;
+        if (sShadowBudget < 4) {
+          ++sShadowBudget;
+          gpg::Warnf("[SHADOWDIAG] shadowsEnabled=%u shadowTexture=%08X",
+                     shadowsEnabledBlob,
+                     static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowTexture.get())));
+        }
+      }
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);
@@ -825,6 +873,20 @@ namespace moho
 
       const std::int32_t rectCacheCount = mTesselator->GetRectCacheCount();
       std::int32_t collisionIndexCount = mTesselator->GetCollisionIndexCount();
+
+      // TEMPORARY PROBE (do not commit). The HUD renders but the 3D viewport is
+      // flat, while the world pass runs with a bound terrain, a healthy camera
+      // (camPos=(512,757,939) over the map centre) and compiled shaders. This is
+      // the real geometry-to-GPU path, so log what the tessellator actually
+      // accepted. A previous regression here (fixed in a15c5cc8) saturated the
+      // 65000-node cap and rejected all terrain; the healthy value was ~20.
+      {
+        static int sRectBudget = 0;
+        if (sRectBudget < 8) {
+          ++sRectBudget;
+          gpg::Warnf("[TERRDIAG-HIGH] rectCacheCount=%d collisionIndexCount=%d", rectCacheCount, collisionIndexCount);
+        }
+      }
       if (collisionIndexCount > kSkirtMaxIndexCount) {
         collisionIndexCount = kSkirtMaxIndexCount;
       }
@@ -1000,6 +1062,23 @@ namespace moho
     device->SelectTechnique(ren_bicubicnormals ? "TTerrainBasisBiCubic" : "TTerrainBasis");
 
     const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
+
+    // TEMPORARY PROBE (do not commit). frame.fx's BasisPS reads all four
+    // channels of the normals target: raw.xy is the screen normal (written by
+    // the TTerrainNormals pass above) and raw.zw is the heightmap normal,
+    // written ONLY by this TTerrainBasis tile loop. Our dump of
+    // mSecondaryTargetLocks[head] has blue == 0 everywhere, so if this count is
+    // zero the loop never runs, B/A stay 0, and BasisPS computes
+    // baseNormal.y = sqrt(1 - 1 - z*z) on garbage -- which is why TCreateBasis
+    // emits a constant and terrain shades to near-black.
+    {
+      static int sNmBudget = 0;
+      if (sNmBudget < 4) {
+        ++sNmBudget;
+        gpg::Warnf("[NORMALMAPDIAG] normalMapCount=%d", normalMapCount);
+      }
+    }
+
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
       const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
 
@@ -1257,6 +1336,31 @@ namespace moho
     shaderVars.waterRamp.GetTexture(waterProperties->GetWaterRamp());
 
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
+
+    // TEMPORARY PROBE (do not commit). The draw succeeds (DrawNormals returns
+    // 1, rectCacheCount 122..128, colour writes on, depth cleared) yet emits no
+    // pixels. The technique is selected BY NAME from the map's stratum
+    // material -- an empty or unresolved name would bind nothing and draw
+    // nothing, which matches the symptom exactly.
+    {
+      static int sTechBudget = 0;
+      if (sTechBudget < 4) {
+        ++sTechBudget;
+        // DrawNormals never calls SelectFxFile("terrain") itself (faithful to
+        // FUN_00801BE0) -- it relies on a prior pass having left the terrain
+        // effect bound. Compare the currently-bound effect against "terrain"
+        // and "frame" by pointer identity: if "frame" is bound, SelectTechnique
+        // is setting a terrain technique on the wrong effect.
+        CD3DDevice* const dev = D3D_GetDevice();
+        ID3DDeviceResources* const res = dev->GetResources();
+        gpg::Warnf("[TECHDIAG] stratum='%s' cur=%08X terrain=%08X frame=%08X",
+                   strata.mShaderName.c_str(),
+                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(dev->GetCurEffect())),
+                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(res->FindEffect("terrain"))),
+                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(res->FindEffect("frame"))));
+      }
+    }
+
     D3D_GetDevice()->SelectTechnique(strata.mShaderName.c_str());
 
     // Absent water puts every elevation below the terrain so the shader's
@@ -1516,6 +1620,21 @@ namespace moho
   void HighFidelityTerrain::DrawTriangles()
   {
     std::int32_t indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+
+    // TEMPORARY PROBE (do not commit). This is the terrain's ONLY geometry
+    // submission, and it silently early-returns on a zero or non-multiple-of-3
+    // index count while DrawNormals still reports success -- exactly the
+    // observed "draw succeeds, no pixels" shape.
+    {
+      static int sDrawBudget = 0;
+      if (sDrawBudget < 6) {
+        ++sDrawBudget;
+        gpg::Warnf("[DRAWDIAG] DrawTriangles mSkirtStartIndex=%d -> %s",
+                   indexCount,
+                   (indexCount <= 0 || (indexCount % 3) != 0) ? "EARLY RETURN (nothing drawn)" : "submitting");
+      }
+    }
+
     if (indexCount <= 0 || (indexCount % 3) != 0) {
       return;
     }
