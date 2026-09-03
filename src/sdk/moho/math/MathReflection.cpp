@@ -402,41 +402,40 @@ namespace moho
    */
   VAxes3::VAxes3(const Wm3::Quaternionf& orientation)
   {
-    // The three columns of the rotation matrix the quaternion denotes.
-    // Re-derived term-by-term from ground truth (`FUN_004EC590.c`) after the
-    // previous body here was found to compute a different, wrong matrix --
-    // confirmed by direct numeric substitution, not just symbol matching
-    // (e.g. orientation=(x=1,y=2,z=3,w=4) gave vX.x=-49 in ground truth vs.
-    // -25 in the old code here). This engine's quaternions are `.x`-scalar
-    // (`VMatrix4::Set` convention); the corrected formula below is exactly
-    // `VMatrix4::Set`'s rotation block, row by row (r[0]->vX, r[1]->vY,
-    // r[2]->vZ), which the same numeric substitution confirms matches.
+    // The three rows of the rotation matrix the quaternion denotes - exactly
+    // `VMatrix4::Set`'s rotation block (0x004EE980), r[0]->vX, r[1]->vY,
+    // r[2]->vZ, which is the consistency check that both are right.
+    //
+    // This was previously written one lane out of step, with `.x` as the
+    // scalar. The tell is `ww` appearing in two diagonals: under the binary's
+    // scalar-first layout the scalar lane never appears in a diagonal term at
+    // all (see `QuatToMatrix`, 0x00452FD0).
     const float twoW = orientation.w * 2.0f;
     const float twoX = orientation.x * 2.0f;
     const float twoY = orientation.y * 2.0f;
     const float twoZ = orientation.z * 2.0f;
 
-    const float ww = twoW * orientation.w;
-    const float zz = twoZ * orientation.z;
+    const float xx = twoX * orientation.x;
     const float yy = twoY * orientation.y;
-    const float xw = twoX * orientation.w;
-    const float zy = twoZ * orientation.y;
+    const float zz = twoZ * orientation.z;
+    const float wx = twoW * orientation.x;
     const float wy = twoW * orientation.y;
-    const float xz = twoX * orientation.z;
     const float wz = twoW * orientation.z;
     const float xy = twoX * orientation.y;
+    const float xz = twoX * orientation.z;
+    const float yz = twoY * orientation.z;
 
-    vX.x = 1.0f - (ww + zz);
-    vX.y = xw + zy;
-    vX.z = wy - xz;
+    vX.x = 1.0f - (zz + yy);
+    vX.y = wz + xy;
+    vX.z = xz - wy;
 
-    vY.x = zy - xw;
-    vY.y = 1.0f - (ww + yy);
-    vY.z = wz + xy;
+    vY.x = xy - wz;
+    vY.y = 1.0f - (zz + xx);
+    vY.z = yz + wx;
 
-    vZ.x = xz + wy;
-    vZ.y = wz - xy;
-    vZ.z = 1.0f - (zz + yy);
+    vZ.x = wy + xz;
+    vZ.y = yz - wx;
+    vZ.z = 1.0f - (yy + xx);
   }
 
   /**
