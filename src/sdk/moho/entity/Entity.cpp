@@ -8583,9 +8583,14 @@ namespace moho
       // VTransform::orient_ union lanes exactly as the binary reads Entity's
       // Orientation Vector4f (the same construct as the recovered COORDS_Tilt).
       const Wm3::Vector3f currentUp{
-        ((o.z * o.y) - (o.w * o.x)) * 2.0f,
-        1.0f - (((o.w * o.w) + (o.y * o.y)) * 2.0f),
-        ((o.w * o.z) + (o.y * o.x)) * 2.0f,
+        // Column 1 of the rotation matrix - the local up axis - in the
+        // scalar-first form: (2(xy-wz), 1-2(x*x+z*z), 2(yz+wx)). Identical to
+        // the sibling extraction further down this file and to
+        // `QuaternionExtractYAxisColumn` (0x00694AF0). The previous spelling
+        // carried a `w*w` diagonal term, which the binary never computes.
+        ((o.y * o.x) - (o.w * o.z)) * 2.0f,
+        1.0f - (((o.z * o.z) + (o.x * o.x)) * 2.0f),
+        ((o.z * o.y) + (o.w * o.x)) * 2.0f,
       };
 
       Wm3::Quaternionf tiltDelta{};
