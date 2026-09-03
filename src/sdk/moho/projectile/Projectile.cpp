@@ -1097,8 +1097,8 @@ namespace moho
       const float qz = tran.orient_.z;
       const float qw = tran.orient_.w;
       const float accel = view.mAcceleration * kProjectileTickSeconds;
-      const float forwardX = 1.0f - (((qy * qy) + (qz * qz)) * 2.0f);
-      const float forwardY = ((qw * qz) - (qy * qx)) * 2.0f;
+      const float forwardX = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
+      const float forwardY = ((qy * qz) - (qw * qx)) * 2.0f;
       const float forwardZ = ((qz * qx) + (qw * qy)) * 2.0f;
       view.mVelocity.x += forwardZ * accel;
       view.mVelocity.y += forwardY * accel;
@@ -1117,8 +1117,8 @@ namespace moho
       const float qw = tran.orient_.w;
       const float accel = view.mAcceleration * kProjectileTickSeconds;
       view.mVelocity.x += (((qz * qx) + (qw * qy)) * 2.0f) * accel;
-      view.mVelocity.y += (((qw * qz) - (qy * qx)) * 2.0f) * accel;
-      view.mVelocity.z += (1.0f - (((qy * qy) + (qz * qz)) * 2.0f)) * accel;
+      view.mVelocity.y += (((qy * qz) - (qw * qx)) * 2.0f) * accel;
+      view.mVelocity.z += (1.0f - (((qx * qx) + (qy * qy)) * 2.0f)) * accel;
     }
 
     if (view.mMaxSpeed != 0.0f) {
@@ -1134,8 +1134,8 @@ namespace moho
       const float qw = tran.orient_.w;
       const Wm3::Vector3f forward{
         ((qz * qx) + (qw * qy)) * 2.0f,
-        ((qw * qz) - (qy * qx)) * 2.0f,
-        1.0f - (((qy * qy) + (qz * qz)) * 2.0f),
+        ((qy * qz) - (qw * qx)) * 2.0f,
+        1.0f - (((qx * qx) + (qy * qy)) * 2.0f),
       };
       tran.orient_ = moho::COORDS_Orient(forward);
     }
@@ -1588,8 +1588,8 @@ namespace moho
       const float qw = trn.orient_.w;
       const Wm3::Vector3f forward{
         ((qz * qx) + (qw * qy)) * 2.0f,
-        ((qz * qw) - (qx * qy)) * 2.0f,
-        1.0f - (((qz * qz) + (qy * qy)) * 2.0f),
+        ((qy * qz) - (qw * qx)) * 2.0f,
+        1.0f - (((qx * qx) + (qy * qy)) * 2.0f),
       };
       view.mVelocity = ProjectVectorOntoAxisLocal(forward, view.mVelocity);
     }
