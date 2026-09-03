@@ -314,10 +314,21 @@ namespace moho
      * calls a second, duplicate `ClearWeakObjectChain` on a *different* one --
      * `static_cast<WeakObject&>(static_cast<IUnit&>(*this))`. A `WeakPtr` bound
      * to one subobject's head is not drained by the destructor that drains the
-     * other, which would leave exactly this dangling slot. Confirm which head
-     * `CAiTarget`'s entity ref binds to, and whether `WeakPtrOwnerLinkOffset<
-     * Entity>` agrees with the offset `ClearWeakObjectChain` walks, before
-     * changing anything here.
+     * other, which would leave exactly this dangling slot.
+     *
+     * The offset half of that question is now answered, and it is *not* the
+     * bug: `WeakPtr<Entity>` takes the default `WeakPtrOwnerLinkOffset` of
+     * `sizeof(void*)`, and RTTI puts Entity's `WeakObject` at mdisp=4, so the
+     * slot `EncodeOwnerLinkSlot` produces is the same one
+     * `ClearWeakObjectChain` walks. (`UserEntity`/`UserUnit` need their 0x08
+     * specialisations because of their vtable; plain `Entity` does not.)
+     *
+     * What is left is which destructor path actually ran for the freed owner. A
+     * `Unit` carries two `WeakObject` subobjects -- the `CScriptObject`/`Entity`
+     * one at +4, drained by `CScriptObject::~CScriptObject`, and the `IUnit` one
+     * drained separately at `Unit.cpp:13838`. Establish whether the owner in the
+     * faulting case was torn down through a path that runs neither, e.g. freed
+     * without its destructor, before changing anything here.
      */
     [[nodiscard]] bool ReplaceInOwnerChain(WeakPtr<T>* replacement) noexcept
     {
