@@ -883,10 +883,22 @@ namespace moho
       }
     }
 
+    // The scanned column trails the running bound by two. Ground truth seats
+    // the column pointer at `base + 4*(glyphWidth - 2)` (0x00425D32, against
+    // the pixel base `var_10014` established at 0x00425BA1) while the bound
+    // itself starts at `glyphWidth` (0x00425B8F, `var_10050 = ebx`), and
+    // 0x00425D63..0x00425D69 decrements the two in lockstep. So the bound
+    // settles at `lastInkColumn + 2`, not at `lastInkColumn`.
+    //
+    // Scanning at the bound instead - what this did before - burns two extra
+    // iterations on the black padding and lands two columns short. After the
+    // round-up to a 4-pixel DXT block that is frequently a whole block, which
+    // is what cropped the right edge off glyphs ('P' as 'F', 'U' as 'L', '1'
+    // as its bare top flag).
     int xMaxExclusive = glyphWidth;
     while (xMaxExclusive > 1) {
-      const int sampleX = (std::min)(xMaxExclusive, kGlyphScratchWidth - 1);
-      if (!isColumnBlack(sampleX, 0, glyphHeight)) {
+      const int sampleX = (std::min)(xMaxExclusive - 2, kGlyphScratchWidth - 1);
+      if (sampleX < 0 || !isColumnBlack(sampleX, 0, glyphHeight)) {
         break;
       }
       --xMaxExclusive;
@@ -908,10 +920,15 @@ namespace moho
       }
     }
 
+    // Same trailing-by-two shape as the column trim above: 0x00425DD5 seats the
+    // row at `glyphHeight - 2` (`lea esi, [ecx-2]`) while the bound starts at
+    // `glyphHeight` (0x00425B97, `var_10048 = edi`), and they decrement
+    // together at 0x00425E14..0x00425E1A.
     int yMin = 0;
     int yMaxExclusive = glyphHeight;
     while (yMaxExclusive > 1) {
-      if (!isRowBlack(yMaxExclusive - 1, xMin, xMin + blockWidth)) {
+      const int sampleY = yMaxExclusive - 2;
+      if (sampleY < 0 || !isRowBlack(sampleY, xMin, xMin + blockWidth)) {
         break;
       }
       --yMaxExclusive;
