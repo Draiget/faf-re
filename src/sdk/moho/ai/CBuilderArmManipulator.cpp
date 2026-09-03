@@ -421,11 +421,15 @@ namespace moho
     Wm3::Vector3f transformedTarget = targetDirection;
     if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
       const VTransform& compositeTransform = watchBone->GetCompositeTransform();
+      // Scalar-first conjugate: keep `.w`, negate `.x/.y/.z`. Every conjugate
+      // decoded in this binary copies lane 0 verbatim and negates lanes 1-3 -
+      // see `VTransform::Inverse` (0x0046FBF0) and the raw-lane helpers at
+      // 0x0062FBA0 and 0x006377B0.
       Wm3::Quaternionf inverseOrientation{};
-      inverseOrientation.x = compositeTransform.orient_.x;
+      inverseOrientation.w = compositeTransform.orient_.w;
+      inverseOrientation.x = -compositeTransform.orient_.x;
       inverseOrientation.y = -compositeTransform.orient_.y;
       inverseOrientation.z = -compositeTransform.orient_.z;
-      inverseOrientation.w = -compositeTransform.orient_.w;
       MultQuadVec(&transformedTarget, &targetDirection, &inverseOrientation);
     }
 

@@ -701,10 +701,12 @@ namespace moho
     desiredDirection.z += (rolledOffset.z - boneOffset.z) * runtime->mTurnForceMult;
 
     const moho::VTransform& compositeTransform = watchedBone->GetCompositeTransform();
+    // Scalar-first conjugate: keep `.w`, negate `.x/.y/.z`, as every decoded
+    // conjugate in this binary does (lane 0 verbatim, lanes 1-3 negated).
     Wm3::Quaternionf inverseComposite = compositeTransform.orient_;
+    inverseComposite.x = -inverseComposite.x;
     inverseComposite.y = -inverseComposite.y;
     inverseComposite.z = -inverseComposite.z;
-    inverseComposite.w = -inverseComposite.w;
 
     Wm3::Vector3f localDesired{};
     (void)moho::MultQuadVec(&localDesired, &desiredDirection, &inverseComposite);

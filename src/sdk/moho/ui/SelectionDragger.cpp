@@ -1046,11 +1046,13 @@ namespace moho
   {
     const Wm3::Quaternionf headingOrientation = COORDS_Orient(mCam->CameraGetHeading(), 0.0f);
 
+    // Scalar-first conjugate: keep `.w`, negate `.x/.y/.z`. The `-0.0f -`
+    // spelling mirrors the binary's `subss` against its zero constant.
     Wm3::Quaternionf inverseHeadingOrientation{};
-    inverseHeadingOrientation.x = headingOrientation.x;
+    inverseHeadingOrientation.w = headingOrientation.w;
+    inverseHeadingOrientation.x = -0.0f - headingOrientation.x;
     inverseHeadingOrientation.y = -0.0f - headingOrientation.y;
     inverseHeadingOrientation.z = -0.0f - headingOrientation.z;
-    inverseHeadingOrientation.w = -0.0f - headingOrientation.w;
 
     Wm3::Vector3f worldDelta{};
     worldDelta.x = mDragEndPos.x - mPos.x;
