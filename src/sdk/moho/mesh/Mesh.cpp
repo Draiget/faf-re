@@ -6723,21 +6723,24 @@ namespace moho
 
       instance->UpdateInterpolatedFields();
 
-      // View-depth distance = plane dot of the interpolated world position with
-      // the camera transform's orientation quaternion treated as (a,b,c,d).
-      // Ground truth (FUN_007DFA00.c) reads the NAMED fields
-      // (orient.z/orient.y/orient.x/orient.w) - the previous body here used
-      // operator[] (0/1/2/3) instead, which indexes the union's raw
-      // m_afTuple storage in ITS declared memory order (w,x,y,z; see
-      // Wm3Quaternion.h's "FAF MOD" union), not name order - so orient_[0]
-      // silently read .w, [1] read .x, [2] read .y and [3] read .z, putting
-      // every term one field off from what the binary actually computes.
+      // View-depth distance: the binary treats the first sixteen bytes of the
+      // camera transform as a plane (a,b,c,d) and dots the interpolated world
+      // position against it -- 0x007DFB7F..0x007DFBB9 reads [cam+8]*pos.z +
+      // [cam+4]*pos.y + [cam+0]*pos.x + [cam+0Ch], with `orient_` at +0x00.
+      // Those are MEMORY LANES 0..3 of the quaternion, which in Wm3's storage
+      // are (w,x,y,z). The previous body spelled them as the named fields
+      // (.x,.y,.z,.w) -- correct only while lane 0 was called .x; the
+      // scalar-first conversion moved lane 0 to .w, and this site was not
+      // converted with it, so every mesh got a garbage depth and was culled by
+      // ComputeLOD. Index the storage directly so the lane order can no
+      // longer drift with the naming.
       const Wm3::Vec3f& worldPos = instance->interpolatedPosition;
+      const Wm3::Quatf& plane = camera.tranform.orient_;
       const float distance =
-        worldPos.z * camera.tranform.orient_.z
-        + worldPos.y * camera.tranform.orient_.y
-        + camera.tranform.orient_.x * worldPos.x
-        + camera.tranform.orient_.w;
+        worldPos.z * plane.m_afTuple[2]
+        + worldPos.y * plane.m_afTuple[1]
+        + plane.m_afTuple[0] * worldPos.x
+        + plane.m_afTuple[3];
 
       const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
