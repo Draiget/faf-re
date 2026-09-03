@@ -222,7 +222,6 @@ namespace moho
 
     virtual msvc8::string* GetStr1() = 0;
     virtual msvc8::string* GetStr2() = 0;
-    virtual void RefreshCurrentProfile() = 0;
     virtual bool GetBoolean(const msvc8::string& key, bool fallback) = 0;
     virtual std::int32_t GetInteger(const msvc8::string& key, std::int32_t fallback) = 0;
     virtual float GetNumber(const msvc8::string& key, float fallback) = 0;
@@ -238,8 +237,27 @@ namespace moho
     virtual void SetHex(const msvc8::string& key, std::uint32_t value) = 0;
     virtual void SetString(const msvc8::string& key, const msvc8::string& value) = 0;
     virtual void SetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& values) = 0;
-    virtual bool LookupCurrentOption(msvc8::string* outOption, const msvc8::string& key) = 0;
-    virtual bool LookupKey(msvc8::string* outOption, const msvc8::string& key) = 0;
+    /**
+     * Address: 0x008C7EA0 (FUN_008C7EA0, Moho::CUserPrefs::LookupCurrentOption)
+     *
+     * VFTable SLOT: 15 (+0x3C)
+     *
+     * What it does:
+     * Resolves `profile.profiles[profile.current].options[key]` and returns
+     * the value object bound to the preferences state (nil when any link of
+     * that chain is missing). Callers copy it across with `SCR_Copy` before
+     * pushing it on another state.
+     */
+    virtual LuaPlus::LuaObject LookupCurrentOption(const msvc8::string& key) = 0;
+    /**
+     * Address: 0x008C8040 (FUN_008C8040, Moho::CUserPrefs::LookupKey)
+     *
+     * VFTable SLOT: 16 (+0x40)
+     *
+     * What it does:
+     * Resolves one dotted key from the root preference table.
+     */
+    virtual LuaPlus::LuaObject LookupKey(const msvc8::string& key) = 0;
     /**
      * Address: 0x008C8020 (FUN_008C8020, Moho::CUserPrefs::GetPreferenceTable)
      *
