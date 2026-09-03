@@ -964,7 +964,24 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   const int updatedSimRate = QuantizeSimRateSample(simRateEstimate);
   if (updatedSimRate != mCurrentSimRate) {
     mCurrentSimRate = updatedSimRate;
-    mClientManager->SetSimRate(updatedSimRate);
+
+    // This is a measurement of how fast this client *can* run -- the debug
+    // readout below calls it "max speed", and `SessionStartup` reports the same
+    // lane to the lobby as `maxSP`. It is published as this client's capability
+    // through `CLIMSG_IntParam`, which every peer stores in `CClientBase::
+    // mSimRate`; `CClientManagerImpl::GetSimRate` then takes the min across
+    // clients so the session paces to the slowest machine.
+    //
+    // It must NOT go through `SetSimRate`, which broadcasts
+    // `CLIMSG_AdjustSimSpeed` and overwrites `mGameSpeed` -- the *requested*
+    // game speed. Feeding a measurement into that request built a feedback
+    // loop: a fast dispatch raised the requested speed, the higher speed made
+    // dispatch faster still, and the request ran away (observed climbing
+    // 2, 53, 61, 81, 94 ...). `GetSimRate` then returned
+    // min(runaway mGameSpeed, mSimRate's default 50) = 50, giving
+    // `simRateScale` 100000 and 0.0010 ms per beat, which is why the sim ran
+    // about eleven times real time.
+    mClientManager->BroadcastIntParam(updatedSimRate);
   }
 }
 
