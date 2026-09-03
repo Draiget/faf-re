@@ -4803,23 +4803,44 @@ bool UserUnit::IsBeingBuilt() const
 /**
  * Address: 0x008C0500 (FUN_008C0500, moho::UserUnit::IsSelectable)
  *
+ * IDA signature:
+ * char __thiscall Moho::UserUnit::Select(Moho::UserEntity *this);
+ *
  * What it does:
  * Evaluates whether this user unit is currently selectable by UI selectors.
+ *
+ * The first guard rejects a unit that is riding something: `mIsBusy`
+ * (+0x1A2 == `mUnitVarDat` +0x0A) is the sim's "has an attach target" lane
+ * (`Unit.cpp` sets it from `mAttachInfo.HasAttachTarget()`), so a *mobile*
+ * passenger inside a transport is not individually selectable - while an
+ * attached POD stays selectable, which is why the category test is the third
+ * term of the same conjunction.
+ *
+ * The whole conjunction is one short-circuit chain at 0x008C0522..0x008C056D,
+ * and its sense is the opposite of what a naive read of the decompile gives:
+ *
+ *   0x008C0522  mov al, [esi+1A2h] / test al, al / jz  loc_8C056F   ; -> continue
+ *   0x008C052C  call [[esi+148h]+30h]  (IUnit slot 12, IsMobile)
+ *   0x008C053D  test al, al           / jz  loc_8C056F              ; -> continue
+ *   0x008C0562  call UserEntity::IsInCategory("POD")
+ *   0x008C0569  mov [esp+var_65], bl  ; bl == 1  -> "reject"
+ *   0x008C056D  jz  loc_8C0574        ; POD false keeps the reject flag set
+ *   0x008C056F  mov [esp+var_65], 0   ; POD true clears it -> continue
+ *   0x008C059C  cmp [esp+var_65], 0 / jz loc_8C05B6                 ; 0 == continue
+ *
+ * so the rejecting case is `busy && mobile && !POD`, not `!busy || !mobile`.
  */
 bool UserUnit::IsSelectable() const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
-  if (iunitBridge == nullptr || !mUnitVarDat.mIsBusy || !iunitBridge->IsMobile()) {
+  if (iunitBridge == nullptr) {
     return false;
   }
 
-  const UserEntity* const entityView = reinterpret_cast<const UserEntity*>(this);
-  if (entityView == nullptr) {
-    return false;
-  }
+  const UserEntity* const entityView = this;  // base conversion, not a reinterpretation
 
   const msvc8::string podCategory("POD", 3u);
-  if (entityView->IsInCategory(podCategory)) {
+  if (mUnitVarDat.mIsBusy && iunitBridge->IsMobile() && !entityView->IsInCategory(podCategory)) {
     return false;
   }
 
