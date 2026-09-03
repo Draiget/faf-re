@@ -30,6 +30,7 @@
 #include "moho/math/MathReflection.h"
 #include "moho/math/Vector3f.h"
 #include "gpg/core/time/Timer.h"
+#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 #include "moho/math/QuaternionMath.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/RCamManager.h"
@@ -1641,6 +1642,9 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   const Wm3::Vector2f viewportSize{1.0f, 1.0f};
   CameraSetViewport(viewportOrigin, viewportSize);
   CameraReset();
+  // TEMPORARY PROBE (do not commit)
+  gpg::Warnf("[CAMDIAG] ctor name=%s this=%08X", runtime->mName.c_str(),
+             static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(this)));
 }
 
 /**
@@ -1921,10 +1925,25 @@ void moho::CameraImpl::CameraSetPivot(const Wm3::Vector2f& pivot)
 void moho::CameraImpl::CameraReset()
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 20) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] Reset name=%s this=%08X type=%d targetZoom=%.1f near=%.1f dur=%.2f",
+                 runtime->mName.c_str(), static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(this)),
+                 runtime->mTargetType, runtime->mTargetZoom, runtime->mNearZoom, runtime->mTimedMoveDuration);
+    }
+  }
 
   runtime->mFarFov = cam_FarFOV * kDegreesToRadians;
   runtime->mHeading = kPi;
   runtime->mIsRotated = 0u;
+  // 0x007A80EB..0x007A8116: the far pitch is stored into both the far-pitch
+  // (+0x344) and current-pitch (+0x348) lanes, the nose-cam adjust (+0x3D0)
+  // is zeroed, and the heading-zoom lane (+0x350) gets the same pi constant
+  // as the heading (+0x34C), so a Hermite transition started right after a
+  // reset holds the current heading and pitch instead of swinging to 0.
   runtime->mFarPitch = cam_FarPitch * kDegreesToRadians;
   runtime->mCurrentPitch = runtime->mFarPitch;
   runtime->mNoseCamPitchAdjust = 0.0f;
@@ -1939,11 +1958,6 @@ void moho::CameraImpl::CameraReset()
       float targetElevation = heightField->GetElevation(runtime->mTargetLocation.x, runtime->mTargetLocation.z);
       if (terrainMap->IsWaterEnabled()) {
         const float waterElevation = terrainMap->GetWaterElevation();
-  // 0x007A80EB..0x007A8116: the far pitch is stored into both the far-pitch
-  // (+0x344) and current-pitch (+0x348) lanes, the nose-cam adjust (+0x3D0)
-  // is zeroed, and the heading-zoom lane (+0x350) gets the same pi constant
-  // as the heading (+0x34C), so a Hermite transition started right after a
-  // reset holds the current heading and pitch instead of swinging to 0.
         if (waterElevation > targetElevation) {
           targetElevation = waterElevation;
         }
@@ -2913,6 +2927,20 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
 
   const float startTargetZoom = runtime->mTargetZoom;
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sCalls = 0;
+    static int sBudget = 0;
+    if ((sCalls++ % 150) == 0 && sBudget < 40) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] UpdateBasis name=%s call=%d type=%d targetZoom=%.1f near=%.1f zoom=%.1f rotated=%u "
+                 "target=(%.1f,%.1f,%.1f) offset=(%.1f,%.1f,%.1f) maxZoom=%.1f dt=%.4f",
+                 runtime->mName.c_str(), sCalls, runtime->mTargetType, runtime->mTargetZoom, runtime->mNearZoom,
+                 runtime->mZoom, static_cast<unsigned>(runtime->mIsRotated), runtime->mTargetLocation.x,
+                 runtime->mTargetLocation.y, runtime->mTargetLocation.z, runtime->mOffset.x, runtime->mOffset.y,
+                 runtime->mOffset.z, GetMaxZoom(), frameSeconds);
+    }
+  }
 
   // Move target-zoom in log2 space toward mNearZoom at a slew rate proportional
   // to the absolute log-distance plus a constant floor, both scaled by frame
@@ -3287,6 +3315,21 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
   // time source.
   CameraTimeSourceRuntime* const timeSource = runtime->mTimeSources[runtime->mTimeSource];
   float progress = (timeSource->Time() - runtime->mTimedMoveStartTime) / runtime->mTimedMoveDuration;
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 80) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] Interp name=%s progress=%.3f now=%.3f start=%.3f dur=%.2f type=%d targetZoom=%.1f near=%.1f "
+                 "moveZoom=%.1f offset=(%.1f,%.1f,%.1f) target=(%.1f,%.1f,%.1f) moveOff=(%.1f,%.1f,%.1f) acc=%d",
+                 runtime->mName.c_str(), progress, timeSource->Time(), runtime->mTimedMoveStartTime,
+                 runtime->mTimedMoveDuration, runtime->mTargetType, runtime->mTargetZoom, runtime->mNearZoom,
+                 runtime->mTimedMoveZoom, runtime->mOffset.x, runtime->mOffset.y, runtime->mOffset.z,
+                 runtime->mTargetLocation.x, runtime->mTargetLocation.y, runtime->mTargetLocation.z,
+                 runtime->mTimedMoveOffset.x, runtime->mTimedMoveOffset.y, runtime->mTimedMoveOffset.z,
+                 runtime->mAccType);
+    }
+  }
 
   // Entity-follow transitions keep the target location pinned to the live
   // entity each frame.
@@ -3762,6 +3805,15 @@ void moho::CameraImpl::TargetNothing()
 void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float seconds)
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 20) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] TargetLocation name=%s pos=(%.1f,%.1f,%.1f) seconds=%.2f", runtime->mName.c_str(),
+                 position.x, position.y, position.z, seconds);
+    }
+  }
   if (runtime->mTargetType == kCameraTargetTypeEntity) {
     BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
   }
@@ -3793,6 +3845,21 @@ void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float se
 void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const float seconds)
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 20) {
+      ++sBudget;
+      CameraTimeSourceRuntime* const probeSource = runtime->mTimeSources[runtime->mTimeSource];
+      gpg::Warnf("[CAMDIAG] TargetBox name=%s box=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f) seconds=%.2f | before type=%d "
+                 "targetZoom=%.1f near=%.1f ease=%u timeSrc=%d now=%.3f maxZoom=%.1f offset=(%.1f,%.1f,%.1f)",
+                 runtime->mName.c_str(), targetBox.Min.x, targetBox.Min.y, targetBox.Min.z, targetBox.Max.x,
+                 targetBox.Max.y, targetBox.Max.z, seconds, runtime->mTargetType, runtime->mTargetZoom,
+                 runtime->mNearZoom, static_cast<unsigned>(runtime->mEnableEaseInOut), runtime->mTimeSource,
+                 probeSource != nullptr ? probeSource->Time() : -1.0f, GetMaxZoom(), runtime->mOffset.x,
+                 runtime->mOffset.y, runtime->mOffset.z);
+    }
+  }
   if (runtime->mTargetType == kCameraTargetTypeEntity) {
     BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
   }
@@ -3879,6 +3946,15 @@ void moho::CameraImpl::TargetEntities(
 )
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 20) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] TargetEntities name=%s track=%d zoom=%.1f seconds=%.2f", runtime->mName.c_str(),
+                 trackEntities ? 1 : 0, zoom, seconds);
+    }
+  }
 
   runtime->mTargetTimeLeft = 0.0f;
   runtime->mTargetTime = 0u;
@@ -4036,6 +4112,15 @@ void moho::CameraImpl::TargetManual(
 )
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  // TEMPORARY PROBE (do not commit)
+  {
+    static int sBudget = 0;
+    if (sBudget < 20) {
+      ++sBudget;
+      gpg::Warnf("[CAMDIAG] TargetManual name=%s pos=(%.1f,%.1f,%.1f) heading=%.3f pitch=%.3f zoom=%.1f seconds=%.2f",
+                 runtime->mName.c_str(), position.x, position.y, position.z, heading, pitch, zoom, seconds);
+    }
+  }
   if (runtime->mTargetType == kCameraTargetTypeEntity) {
     BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
   }

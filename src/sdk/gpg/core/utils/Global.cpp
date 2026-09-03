@@ -2,6 +2,8 @@
 
 #include <Windows.h>
 
+#include <intrin.h>   // TEMPORARY PROBE (do not commit): _ReturnAddress
+
 #include <algorithm>
 #include <array>
 #include <cstdarg>
@@ -205,6 +207,38 @@ namespace
     };
 
     thread_local ThreadHeapCache* gThreadHeapCache = nullptr;
+
+    // TEMPORARY PROBE (do not commit). Registry of caches currently held by a
+    // live thread. Address reuse after a thread detaches is legitimate; two
+    // live threads holding the SAME ThreadHeapCache is the bug. Mutated only
+    // under gAllocatorSentinel, which both call sites already hold.
+    struct ProbeLiveCache { ThreadHeapCache* cache; unsigned long tid; };
+    ProbeLiveCache gProbeLiveCaches[128]{};
+
+    void ProbeRegisterCache(ThreadHeapCache* const cache, const unsigned long tid)
+    {
+        for (const auto& entry : gProbeLiveCaches) {
+            if (entry.cache == cache) {
+                char probe[160];
+                sprintf_s(probe, sizeof(probe),
+                          "[DUPCACHE] cache=%08X already live on tid=%lu, now handed to tid=%lu\n",
+                          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cache)),
+                          entry.tid, tid);
+                ::OutputDebugStringA(probe);
+                break;
+            }
+        }
+        for (auto& slot : gProbeLiveCaches) {
+            if (slot.cache == nullptr) { slot.cache = cache; slot.tid = tid; return; }
+        }
+    }
+
+    void ProbeUnregisterCache(const ThreadHeapCache* const cache)
+    {
+        for (auto& slot : gProbeLiveCaches) {
+            if (slot.cache == cache) { slot.cache = nullptr; slot.tid = 0; return; }
+        }
+    }
     [[maybe_unused]] thread_local ThreadCacheTlsDetachBridge gThreadCacheTlsDetachBridge{};
 
     [[nodiscard]] constexpr std::uint32_t BytesToPages(const std::uint32_t bytes)
@@ -284,6 +318,212 @@ namespace
             lane.lowWatermark = lane.count;
         }
         return node;
+    }
+
+    // TEMPORARY PROBE (do not commit). See the free path in free_0.
+    constexpr std::uint32_t kProbeWatchedKind = 25u;   // 768-byte class
+    constexpr std::uint32_t kProbeFreedMagic = 0xFEEDFACEu;
+    // Victim block address observed by [CLOBBER]; heap layout is deterministic.
+    constexpr std::uintptr_t kProbeVictimBlock = 0x5C803E00u;
+
+    struct ProbeFreedStamp
+    {
+        SmallBlockNode* next;       // +0x00, owned by the lane
+        std::uint32_t magic;        // +0x04
+        const void* freedBy;        // +0x08
+        SmallBlockNode* nextCopy;   // +0x0C
+    };
+
+    void ProbeStampFreedBlock(SmallBlockNode* const node, const void* const freedBy)
+    {
+        auto* const stamp = reinterpret_cast<ProbeFreedStamp*>(node);
+        stamp->magic = kProbeFreedMagic;
+        stamp->freedBy = freedBy;
+        // Redundant copy of the `next` link. Offset 0 is the word that gets
+        // clobbered; offset 0x0C is not. If they ever disagree we have PROOF
+        // that offset 0 was overwritten (rather than the list being mislinked),
+        // plus the exact block address -- and heap addresses repeat run to run,
+        // so that address can then be watched directly from the next run.
+        stamp->nextCopy = node->next;
+    }
+
+    // Called just after the block was pushed, so lane.head IS the block; walk
+    // from the second node and report if it is already on the chain.
+    void ProbeDetectDoubleFree(
+      const ThreadSmallBlockLane& lane,
+      const SmallBlockNode* const block,
+      const void* const freedBy
+    )
+    {
+        static int sDoubleFreeBudget = 0;
+        if (lane.head == nullptr) {
+            return;
+        }
+
+        const SmallBlockNode* node = lane.head->next;
+        for (int step = 0; node != nullptr && step < 64; ++step) {
+            const auto bits = reinterpret_cast<std::uintptr_t>(node);
+            if (bits < 0x10000u || (bits & 3u) != 0u) {
+                return;
+            }
+            if (node == block) {
+                if (sDoubleFreeBudget < 6) {
+                    ++sDoubleFreeBudget;
+                    char probe[192];
+                    sprintf_s(probe, sizeof(probe),
+                              "[DOUBLEFREE] block=%08X alreadyAtStep=%d count=%d freedBy=%08X\n",
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(block)),
+                              step, lane.count,
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(freedBy)));
+                    ::OutputDebugStringA(probe);
+                }
+                return;
+            }
+            node = node->next;
+        }
+    }
+
+    // Every observed [CLOBBER] had step=0, i.e. the victim is always whatever
+    // block is currently `lane.head`. This class sees very few operations per
+    // run (<64), so we can afford to re-point dbgrun's single DR0 watchpoint at
+    // the current head after every operation. While a block IS the head nothing
+    // may legitimately write its offset 0 -- PushLaneNode writes a node's `next`
+    // only as it becomes head, and the owner only writes it after it is popped.
+    // So any write dbgrun reports while it is parked here is the corruptor.
+    void ProbeRearmOnHead(const ThreadSmallBlockLane& lane)
+    {
+        static int sArmBudget = 0;
+        static const SmallBlockNode* sLastArmed = nullptr;
+        if (lane.head == nullptr || lane.head == sLastArmed || sArmBudget >= 250) {
+            return;
+        }
+        ++sArmBudget;
+        sLastArmed = lane.head;
+        char watch[64];
+        sprintf_s(watch, sizeof(watch), "lane8=%08X\n",
+                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(lane.head)));
+        ::OutputDebugStringA(watch);
+    }
+
+    // Deterministic window-narrowing. Watching a block is a lottery and its
+    // legitimate reallocation looks identical to a clobber, so instead check the
+    // watched lane after EVERY allocator operation and record the caller of the
+    // one that was running. The first operation that finds the chain dirty
+    // bounds the corruption to the interval since the previous (clean) check,
+    // and `lastCaller` names the code path that was executing in that interval.
+    struct ProbeOpRecord { const void* caller; std::uint32_t size; };
+    ProbeOpRecord gProbeLastOp{};
+
+    void ProbeCheckWatchedLaneEveryOp(ThreadHeapCache* const cache, const std::uint32_t opSize,
+                                      const void* const caller, const char* const where);
+
+    void ProbeValidateLaneChain(const ThreadSmallBlockLane& lane, const char* const where)
+    {
+        static int sChainBudget = 0;
+        const SmallBlockNode* previous = nullptr;
+        const SmallBlockNode* node = lane.head;
+
+        for (int step = 0; node != nullptr && step < 64; ++step) {
+            const auto bits = reinterpret_cast<std::uintptr_t>(node);
+            const auto* const stamp = reinterpret_cast<const ProbeFreedStamp*>(node);
+            const bool plausible = bits >= 0x10000u && (bits & 3u) == 0u;
+
+            // Proof-of-clobber: the block is intact (magic survives) but its
+            // offset-0 `next` no longer matches the copy we wrote at +0x0C.
+            if (plausible && stamp->magic == kProbeFreedMagic && stamp->next != stamp->nextCopy) {
+                static int sClobberBudget = 0;
+                if (sClobberBudget < 8) {
+                    ++sClobberBudget;
+                    char probe[224];
+                    sprintf_s(probe, sizeof(probe),
+                              "[CLOBBER] %s block=%08X next=%08X expected=%08X freedBy=%08X step=%d\n",
+                              where, static_cast<unsigned>(bits),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->next)),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->nextCopy)),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->freedBy)),
+                              step);
+                    ::OutputDebugStringA(probe);
+                }
+                return;
+            }
+
+            if (!plausible || stamp->magic != kProbeFreedMagic) {
+                if (sChainBudget < 6) {
+                    ++sChainBudget;
+                    const auto* const prevStamp = reinterpret_cast<const ProbeFreedStamp*>(previous);
+                    char probe[256];
+                    sprintf_s(probe, sizeof(probe),
+                              "[CHAIN] %s step=%d bad=%08X magic=%08X prev=%08X prevFreedBy=%08X count=%d\n",
+                              where, step, static_cast<unsigned>(bits),
+                              plausible ? stamp->magic : 0u,
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(previous)),
+                              previous != nullptr
+                                ? static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(prevStamp->freedBy))
+                                : 0u,
+                              lane.count);
+                    ::OutputDebugStringA(probe);
+
+                    // The corruptor is still holding this block and typically
+                    // rewrites it, so arm dbgrun's DR0 write watchpoint on the
+                    // clobbered word to catch the next write with a stack.
+                    if (previous != nullptr) {
+                        char watch[64];
+                        sprintf_s(watch, sizeof(watch), "lane8=%08X\n",
+                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(previous)));
+                        ::OutputDebugStringA(watch);
+                    }
+                }
+                return;
+            }
+
+            previous = node;
+            node = node->next;
+        }
+    }
+
+    // TEMPORARY PROBE (do not commit). Definition for the every-op check
+    // declared above. dbgrun dumps a symbolised stack for every marker, so the
+    // [WINDOW] line arrives with the stack of the operation that first saw the
+    // chain dirty -- within one allocator call of the corrupting write.
+    void ProbeCheckWatchedLaneEveryOp(ThreadHeapCache* const cache, const std::uint32_t opSize,
+                                      const void* const caller, const char* const where)
+    {
+        if (cache == nullptr || cache == kThreadCacheDisabled) {
+            return;
+        }
+
+        ThreadSmallBlockLane& lane = cache->lanes[kProbeWatchedKind];
+        SmallBlockNode* node = lane.head;
+        for (int step = 0; node != nullptr && step < 32; ++step) {
+            const auto bits = reinterpret_cast<std::uintptr_t>(node);
+            if (bits < 0x10000u || (bits & 3u) != 0u) {
+                break;
+            }
+            auto* const stamp = reinterpret_cast<ProbeFreedStamp*>(node);
+            if (stamp->magic == kProbeFreedMagic && stamp->next != stamp->nextCopy) {
+                static int sWindowBudget = 0;
+                if (sWindowBudget < 6) {
+                    ++sWindowBudget;
+                    char probe[256];
+                    sprintf_s(probe, sizeof(probe),
+                              "[WINDOW] dirty at %s size=%u caller=%08X | prev size=%u caller=%08X | block=%08X next=%08X want=%08X\n",
+                              where, opSize,
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(caller)),
+                              gProbeLastOp.size,
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(gProbeLastOp.caller)),
+                              static_cast<unsigned>(bits),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->next)),
+                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->nextCopy)));
+                    ::OutputDebugStringA(probe);
+                }
+                stamp->next = stamp->nextCopy;   // repair and keep hunting
+                return;
+            }
+            node = stamp->next;
+        }
+
+        gProbeLastOp.caller = caller;
+        gProbeLastOp.size = opSize;
     }
 
     /**
@@ -783,6 +1023,8 @@ namespace
         ::EnterCriticalSection(&gAllocatorSentinel);
         TrimThreadCache(cache, true);
 
+        ProbeUnregisterCache(cache);   // TEMPORARY PROBE (do not commit)
+
         const std::uint32_t recordKind = GetSmallBlockIndex(kThreadCacheSizeBytes);
         PushHeapBlock(reinterpret_cast<SmallBlockNode*>(cache), static_cast<std::int32_t>(recordKind));
 
@@ -1162,6 +1404,21 @@ namespace
 
         if (request.head != nullptr) {
             gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
+
+            // TEMPORARY PROBE (do not commit). Record every cache the allocator
+            // hands a thread. If a later [LANEBAD] reports a cache pointer that
+            // never appears here for that tid, the thread_local pointer itself
+            // is bogus and GetLane is reading unrelated memory -- which would
+            // explain why a DR0 watchpoint on &lane.head never fires even though
+            // the head reads back as 0x178.
+            {
+                char probe[128];
+                sprintf_s(probe, sizeof(probe), "[CACHENEW] cache=%08X tid=%lu kind=%u\n",
+                          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(gThreadHeapCache)),
+                          ::GetCurrentThreadId(), kind);
+                ::OutputDebugStringA(probe);
+                ProbeRegisterCache(gThreadHeapCache, ::GetCurrentThreadId());
+            }
             if (hasLock != 0) {
                 ::LeaveCriticalSection(&gAllocatorSentinel);
             }
@@ -1279,6 +1536,43 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
                 ::EnterCriticalSection(&gAllocatorSentinel);
                 AllocateSmallBlocksAmount(reinterpret_cast<SmallBlockRequestLane*>(&lane), kind, 16, true);
 
+                // TEMPORARY PROBE (do not commit). Stamp the freshly refilled
+                // blocks too, so a cleared magic means a real overwrite rather
+                // than "this block was never freed".
+                if (kind == kProbeWatchedKind) {
+                    for (SmallBlockNode* fresh = lane.head; fresh != nullptr; fresh = fresh->next) {
+                        ProbeStampFreedBlock(fresh, nullptr);
+                    }
+
+                    // Every [CLOBBER] victim so far was a fresh refill block
+                    // whose `next` was overwritten while it sat on the lane, and
+                    // the addresses differ run to run so they cannot be
+                    // hardcoded. Arm DR0 on this refill's head from a LATE
+                    // refill, so the thread set is complete and the block is one
+                    // of the candidates. dbgrun keeps only one watch address.
+                    // Watching a block that stays on the lane is ambiguous: it
+                    // gets popped and legitimately reused (first attempt caught
+                    // newlstr writing a TString header into it, which is
+                    // correct behaviour). So UNLINK the block first -- it is
+                    // never handed to anyone -- and then watch it. Nothing may
+                    // ever write to it, so any reported write is the bug.
+                    static int sRefills = 0;
+                    if (++sRefills == 3 && lane.head != nullptr) {
+                        SmallBlockNode* const quarantined = lane.head;
+                        lane.head = quarantined->next;
+                        --lane.count;
+                        quarantined->next = nullptr;
+
+                        char watch[144];
+                        sprintf_s(watch, sizeof(watch),
+                                  "[QUARANTINEWATCH] block=%08X (unlinked, never reissued) count=%d\nlane8=%08X\n",
+                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(quarantined)),
+                                  lane.count,
+                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(quarantined)));
+                        ::OutputDebugStringA(watch);
+                    }
+                }
+
                 threadCache->cachedBytes += static_cast<std::int32_t>(16u * GetBlockSize(kind));
                 if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {
                     TrimThreadCache(threadCache, false);
@@ -1287,6 +1581,39 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
             }
 
             threadCache->cachedBytes -= static_cast<std::int32_t>(GetBlockSize(kind));
+
+            // TEMPORARY PROBE (do not commit). The free list gets a bogus head
+            // (observed 0x00000178) and PopLaneNode faults dereferencing it.
+            // The allocator itself is byte-faithful to 0x00958B20/0x009582C0,
+            // so a freed block is being written by engine code. Catch it at
+            // the first bad head and name the size class.
+            {
+                if (kind == kProbeWatchedKind) {
+                    ProbeValidateLaneChain(lane, "alloc");
+                    ProbeRearmOnHead(lane);
+                }
+                const auto headBits = reinterpret_cast<std::uintptr_t>(lane.head);
+                if (lane.head != nullptr && (headBits < 0x10000u || (headBits & 3u) != 0u)) {
+                    static int sBadHeadBudget = 0;
+                    if (sBadHeadBudget < 8) {
+                        ++sBadHeadBudget;
+                        char probe[192];
+                        sprintf_s(probe, sizeof(probe),
+                                  "[LANEBAD] kind=%u blockSize=%u head=%08X count=%d low=%d cache=%08X tid=%lu cachedBytes=%d\n",
+                                  kind, GetBlockSize(kind), static_cast<unsigned>(headBits),
+                                  lane.count, lane.lowWatermark,
+                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(threadCache)),
+                                  ::GetCurrentThreadId(), threadCache->cachedBytes);
+                        ::OutputDebugStringA(probe);
+                    }
+                    // Drop the poisoned chain rather than faulting, so the run
+                    // survives long enough to show whether more classes rot.
+                    lane.head = nullptr;
+                    lane.count = 0;
+                    lane.lowWatermark = 0;
+                }
+            }
+
             allocation = PopLaneNode(lane);
         }
     } else {
@@ -1319,6 +1646,43 @@ extern "C" void __cdecl free(void* ptr)
         const std::uint32_t kind = static_cast<std::uint32_t>(record->kind);
         const std::uint32_t blockSize = GetBlockSize(kind);
 
+        // TEMPORARY PROBE (do not commit). A live block keeps getting its first
+        // dword rewritten while it sits on the free list, which is what happens
+        // when free() is handed a pointer that is not the start of a real block:
+        // PushLaneNode links live memory into the lane and its true owner keeps
+        // writing through it. Validate the block origin and let dbgrun
+        // symbolise this stack for the caller.
+        {
+            const auto regionBase = reinterpret_cast<std::uintptr_t>(record->allocation);
+            const auto blockAddr = reinterpret_cast<std::uintptr_t>(ptr);
+            if (blockAddr < regionBase || ((blockAddr - regionBase) % blockSize) != 0u) {
+                static int sBadFreeBudget = 0;
+                if (sBadFreeBudget < 6) {
+                    ++sBadFreeBudget;
+                    char probe[512];
+                    // _ReturnAddress() only reaches `free_crt`, the CRT
+                    // wrapper, so capture a real backtrace and emit each frame
+                    // as a `frame=<hex>` token -- dbgrun symbolises every one.
+                    void* frames[10] = {};
+                    const USHORT captured = ::RtlCaptureStackBackTrace(1, 10, frames, nullptr);
+                    int written = sprintf_s(probe, sizeof(probe),
+                              "[BADFREE] ptr=%08X base=%08X kind=%u blockSize=%u delta=%d",
+                              static_cast<unsigned>(blockAddr), static_cast<unsigned>(regionBase),
+                              kind, blockSize, static_cast<int>(blockAddr - regionBase));
+                    for (USHORT f = 0; f < captured && written > 0 && written < 200; ++f) {
+                        written += sprintf_s(probe + written, sizeof(probe) - static_cast<std::size_t>(written),
+                                             " frame=%08X",
+                                             static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(frames[f])));
+                    }
+                    if (written > 0 && written < static_cast<int>(sizeof(probe)) - 2) {
+                        probe[written] = '\n';
+                        probe[written + 1] = '\0';
+                    }
+                    ::OutputDebugStringA(probe);
+                }
+            }
+        }
+
         if (gMemHook != nullptr) {
             gMemHook(1, static_cast<int>(blockSize), ptr);
         }
@@ -1330,7 +1694,52 @@ extern "C" void __cdecl free(void* ptr)
             ::LeaveCriticalSection(&gAllocatorSentinel);
         } else {
             ThreadSmallBlockLane& lane = GetLane(threadCache, kind);
+
+            // TEMPORARY PROBE (do not commit). Quarantine ONE freed 768-byte
+            // block: keep it permanently off the free list and arm dbgrun's DR0
+            // write watchpoint on it. Nothing may legitimately touch a block
+            // after it is freed, and this one is never handed back out, so any
+            // write to it is the use-after-free we are hunting -- reported with
+            // the writer's full stack. Leaking one block is harmless.
+            // TEMPORARY PROBE (do not commit). Watch the LANE SLOT, not the
+            // blocks. `lanes[25].head` sits at offset 0x12C inside the ~532-byte
+            // ThreadHeapCache, so if that cache block is live-but-recycled the
+            // slot is written by its second owner -- which is why the bad head
+            // is the same constant 0x178 every run. Legitimate writers are only
+            // PushLaneNode/PopLaneNode/TrimThreadCache/refill, and this class is
+            // low traffic, so any other stack dbgrun reports is the culprit.
+            // Armed from the first free on the Lua-heavy thread.
+            if (kind == kProbeWatchedKind) {
+                // DR0 is armed per-thread and only on threads that already
+                // exist, so arming on the very first free covered just 4 of the
+                // ~45 threads and missed the sim thread entirely. Wait for a
+                // free from a *different* thread than the first one -- that is
+                // the Lua/sim side, whose cache is the one seen corrupt, and by
+                // then the full thread set exists.
+                // Watch a BLOCK that is sitting on the free list, at offset 0 --
+                // the word that reads back as 0x178. Watching &lane.head was the
+                // wrong target: PopLaneNode assigns it legitimately from
+                // node->next, so the clobber happens in the block, not the lane.
+                // Arm late (after the session is up) so DR0 covers all threads.
+                // Arming happens at the REFILL site instead: every observed
+                // victim was a fresh refill block, and dbgrun tracks only ONE
+                // watch address, so this path must not consume it.
+                (void)lane;
+            }
+
             PushLaneNode(lane, static_cast<SmallBlockNode*>(ptr));
+
+            // TEMPORARY PROBE (do not commit). kind 25 (768 bytes) is the class
+            // whose free chain rots. Stamp each freed block with a magic and the
+            // freeing caller, then verify the chain; the first bad chain reports
+            // the block and who freed it, and dbgrun symbolises this stack.
+            if (kind == kProbeWatchedKind) {
+                ProbeDetectDoubleFree(lane, static_cast<SmallBlockNode*>(ptr), _ReturnAddress());
+                ProbeStampFreedBlock(static_cast<SmallBlockNode*>(ptr), _ReturnAddress());
+                ProbeValidateLaneChain(lane, "free");
+                ProbeRearmOnHead(lane);
+            }
+
             threadCache->cachedBytes += static_cast<std::int32_t>(blockSize);
 
             if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {

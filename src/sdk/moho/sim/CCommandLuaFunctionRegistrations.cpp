@@ -3821,6 +3821,9 @@ namespace moho
 
     const LuaPlus::LuaObject unitTable(LuaPlus::LuaStackObject(state, 1));
     if (!unitTable.IsTable() || unitTable.GetCount() <= 0) {
+      // TEMPORARY PROBE (do not commit)
+      gpg::Warnf("[CAMDIAG] UIZoomTo: arg1 isTable=%d count=%d -> ignored", unitTable.IsTable() ? 1 : 0,
+                 unitTable.IsTable() ? unitTable.GetCount() : -1);
       return 0;
     }
 
@@ -3853,6 +3856,8 @@ namespace moho
     }
 
     if (count <= 0.0f) {
+      // TEMPORARY PROBE (do not commit)
+      gpg::Warnf("[CAMDIAG] UIZoomTo: %d table entries, none resolved to a UserUnit -> ignored", unitCount);
       return 0;
     }
 
@@ -3875,6 +3880,10 @@ namespace moho
       seconds = static_cast<float>(secondsArg.GetNumber());
     }
 
+    // TEMPORARY PROBE (do not commit)
+    gpg::Warnf("[CAMDIAG] UIZoomTo: entries=%d resolved=%.0f box=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f) seconds=%.2f",
+               unitCount, count, targetBox.Min.x, targetBox.Min.y, targetBox.Min.z, targetBox.Max.x, targetBox.Max.y,
+               targetBox.Max.z, seconds);
     camera->TargetBox(targetBox, seconds);
     camera->TargetNothing();
     return 0;
