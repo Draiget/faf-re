@@ -237,6 +237,51 @@ namespace moho
   );
 
   /**
+   * Ordinary scalar-first Hamilton product: `.w` is the scalar, `(.x,.y,.z)`
+   * the imaginary lanes, `a` the left operand and `b` the right one.
+   *
+   * This is the engine's real convention. `QuatToMatrix` (0x00452FD0) and
+   * `VMatrix4::Set` (0x004EE980) both compute no `ww` term at all, which fixes
+   * `.w` as their scalar lane; `VTransform::Inverse` (0x0046FBF0) conjugates by
+   * keeping lane 0 and negating lanes 1-3; the product inlined into
+   * `HardwareMeshBatch::FillBatch` (0x007E7EA0) and the one inlined into
+   * `CAniPoseBone::Rotate` (0x0054BC00) both form their scalar term as
+   * `a0*b0 - a1*b1 - a2*b2 - a3*b3`, positive in lane 0.
+   *
+   * Mind the operand order at each site: `CAniPoseBone::Rotate` composes as
+   * `orient_ * rotation` (the existing orientation on the LEFT), which is the
+   * reverse of how that call used to be written. The two orders differ by the
+   * sign of the cross-product term, so they are not interchangeable.
+   */
+  Wm3::Quaternionf MultiplyQuat(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept;
+
+  /**
+   * Ordinary scalar-first conjugate: keeps `.w`, negates `.x`/`.y`/`.z`.
+   * Transcribed from `VTransform::Inverse` (0x0046FBF0), which copies
+   * `[eax+0]` verbatim and negates `[eax+4]`/`[eax+8]`/`[eax+0Ch]`.
+   */
+  Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept;
+
+  /**
+   * DISPROVEN PREMISE - do not use in new code; migrate callers to
+   * `MultiplyQuat` as each callsite's operand order is verified against its
+   * own disassembly.
+   *
+   * The `.x`-scalar convention this models does not exist in the binary. Two
+   * of the five sites cited below have been decoded lane by lane and both
+   * contradict it: `VTransform::Inverse` (0x0046FBF0) conjugates lane-0-first,
+   * and `CAniPoseBone::Rotate` (0x0054BC00) forms `a0*b0 - a1*b1 - a2*b2 -
+   * a3*b3` and composes in the opposite operand order to the one claimed here.
+   * `QuatToMatrix` and `VMatrix4::Set`, named below as the convention's
+   * anchors, have since been corrected to scalar-first from their own
+   * disassembly.
+   *
+   * It is kept only so the remaining callers (`SPhysBody`, `CUnitMotion`,
+   * `UnitWeapon`) keep compiling unchanged until each is checked; every one of
+   * them is expected to be wrong.
+   *
+   * Original (incorrect) rationale follows.
+   *
    * Not a single-address recovery -- this is the shared engine-convention
    * (`.x`-scalar, matching `VMatrix4::Set`/`QuatToMatrix`) quaternion Hamilton
    * product, independently re-derived term-by-term from four separate ground

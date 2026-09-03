@@ -35,6 +35,38 @@ namespace moho
     return dest;
   }
 
+  /**
+   * Scalar-first Hamilton product `a * b`. The accumulation order mirrors the
+   * emission inlined into `CAniPoseBone::Rotate` (0x0054BC00), decoded lane by
+   * lane: the scalar term subtracts left-to-right from `a.w*b.w`, and each
+   * vector lane accumulates as `(scalar-cross + own-scalar) + ...` before the
+   * single trailing subtraction. Float addition does not associate, so the
+   * grouping is kept rather than normalised.
+   */
+  Wm3::Quaternionf MultiplyQuat(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
+  {
+    Wm3::Quaternionf result{};
+    result.w = ((a.w * b.w - a.x * b.x) - a.y * b.y) - a.z * b.z;
+    result.x = ((a.x * b.w + a.y * b.z) + a.w * b.x) - a.z * b.y;
+    result.y = ((a.z * b.x + a.y * b.w) + a.w * b.y) - a.x * b.z;
+    result.z = ((a.x * b.y + a.w * b.z) + a.z * b.w) - a.y * b.x;
+    return result;
+  }
+
+  /**
+   * Scalar-first conjugate: keep `.w`, negate `.x`/`.y`/`.z`, exactly as
+   * `VTransform::Inverse` (0x0046FBF0) does at 0x0046FBFB..0x0046FC12.
+   */
+  Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept
+  {
+    Wm3::Quaternionf result{};
+    result.w = q.w;
+    result.x = -q.x;
+    result.y = -q.y;
+    result.z = -q.z;
+    return result;
+  }
+
   Wm3::Quaternionf MultiplyQuatXScalar(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
   {
     // NOTE: deliberately NOT `Wm3::Quaternionf{...}` -- that brace-init form
