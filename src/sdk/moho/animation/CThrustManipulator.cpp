@@ -573,9 +573,9 @@ namespace moho
     }
 
     const Wm3::Quaternionf& orientation = watchedBone->mLocalTransform.orient_;
-    runtime->mDirectionLane.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
+    runtime->mDirectionLane.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
     runtime->mDirectionLane.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-    runtime->mDirectionLane.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
+    runtime->mDirectionLane.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
 
     const Wm3::Vector3f worldUp{0.0f, 1.0f, 0.0f};
     (void)BuildShortestArcDeltaQuaternion(&runtime->mOrientation, worldUp, runtime->mDirectionLane);
@@ -701,12 +701,10 @@ namespace moho
     desiredDirection.z += (rolledOffset.z - boneOffset.z) * runtime->mTurnForceMult;
 
     const moho::VTransform& compositeTransform = watchedBone->GetCompositeTransform();
-    // Scalar-first conjugate: keep `.w`, negate `.x/.y/.z`, as every decoded
-    // conjugate in this binary does (lane 0 verbatim, lanes 1-3 negated).
     Wm3::Quaternionf inverseComposite = compositeTransform.orient_;
-    inverseComposite.x = -inverseComposite.x;
     inverseComposite.y = -inverseComposite.y;
     inverseComposite.z = -inverseComposite.z;
+    inverseComposite.w = -inverseComposite.w;
 
     Wm3::Vector3f localDesired{};
     (void)moho::MultQuadVec(&localDesired, &desiredDirection, &inverseComposite);

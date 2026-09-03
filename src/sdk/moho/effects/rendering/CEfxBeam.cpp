@@ -136,10 +136,10 @@ namespace
 
   void SetIdentityTransform(moho::VTransform& transform) noexcept
   {
-    transform.orient_.w = 1.0f;
-    transform.orient_.x = 0.0f;
+    transform.orient_.x = 1.0f;
     transform.orient_.y = 0.0f;
     transform.orient_.z = 0.0f;
+    transform.orient_.w = 0.0f;
     transform.pos_.x = 0.0f;
     transform.pos_.y = 0.0f;
     transform.pos_.z = 0.0f;

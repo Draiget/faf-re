@@ -187,8 +187,8 @@ SteeringParams BuildSteeringParamsFromTransform(
   const Wm3::Quaternionf& q = transform.orient_;
   Wm3::Vector3f forward{};
   forward.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
-  forward.y = ((q.y * q.z) - (q.w * q.x)) * 2.0f;
-  forward.z = 1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f);
+  forward.y = ((q.w * q.z) - (q.x * q.y)) * 2.0f;
+  forward.z = 1.0f - (((q.z * q.z) + (q.y * q.y)) * 2.0f);
 
   Wm3::Vector3f source{};
   source.x = transform.pos_.x;

@@ -6059,12 +6059,10 @@ namespace moho
       if (std::fabs(angleDelta) < 1.8849558f) {
         const float halfAngle = angleDelta * 0.5f;
         const float sinHalf = std::sin(halfAngle);
-        // `(cos, 0, sin, 0)` in memory - a scalar-first rotation about Y, i.e.
-        // a heading, which is what a formation baseline is.
-        mOrientationBaseline.w = std::cos(halfAngle);
-        mOrientationBaseline.x = 0.0f;
-        mOrientationBaseline.y = sinHalf;
-        mOrientationBaseline.z = 0.0f;
+        mOrientationBaseline.x = std::cos(halfAngle);
+        mOrientationBaseline.y = 0.0f;
+        mOrientationBaseline.z = sinHalf;
+        mOrientationBaseline.w = 0.0f;
       }
     }
 

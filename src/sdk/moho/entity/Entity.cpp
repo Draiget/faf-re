@@ -1882,10 +1882,10 @@ namespace
   ) noexcept
   {
     moho::VTransform out{};
-    out.orient_.w = 1.0f;
-    out.orient_.x = 0.0f;
+    out.orient_.x = 1.0f;
     out.orient_.y = 0.0f;
     out.orient_.z = 0.0f;
+    out.orient_.w = 0.0f;
     out.pos_.x = 0.0f;
     out.pos_.y = 0.0f;
     out.pos_.z = 0.0f;
@@ -8583,20 +8583,15 @@ namespace moho
       // VTransform::orient_ union lanes exactly as the binary reads Entity's
       // Orientation Vector4f (the same construct as the recovered COORDS_Tilt).
       const Wm3::Vector3f currentUp{
-        // Column 1 of the rotation matrix - the local up axis - in the
-        // scalar-first form: (2(xy-wz), 1-2(x*x+z*z), 2(yz+wx)). Identical to
-        // the sibling extraction further down this file and to
-        // `QuaternionExtractYAxisColumn` (0x00694AF0). The previous spelling
-        // carried a `w*w` diagonal term, which the binary never computes.
-        ((o.y * o.x) - (o.w * o.z)) * 2.0f,
-        1.0f - (((o.z * o.z) + (o.x * o.x)) * 2.0f),
-        ((o.z * o.y) + (o.w * o.x)) * 2.0f,
+        ((o.z * o.y) - (o.w * o.x)) * 2.0f,
+        1.0f - (((o.w * o.w) + (o.y * o.y)) * 2.0f),
+        ((o.w * o.z) + (o.y * o.x)) * 2.0f,
       };
 
       Wm3::Quaternionf tiltDelta{};
       BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
 
-      tran.orient_ = MultiplyQuat(tiltDelta, o);
+      tran.orient_ = ComposeWScalarDeltaOntoOrientation(tiltDelta, o);
       NormalizeQuatInPlace(&tran.orient_);
       entity->SetPendingTransform(tran, 1.0f);
     }
@@ -9005,7 +9000,7 @@ namespace moho
 
     Wm3::Quaternionf tiltDelta{};
     (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
-    *orientation = MultiplyQuat(tiltDelta, oldOrientation);
+    *orientation = ComposeWScalarDeltaOntoOrientation(tiltDelta, oldOrientation);
   }
 
   /**
