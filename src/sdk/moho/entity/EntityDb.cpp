@@ -1241,17 +1241,6 @@ namespace
     return type;
   }
 
-  struct IdPoolRuntime
-  {
-    // Corresponds to the sequential `(*v3)++` path in 0x00684480.
-    std::uint32_t mNextSerial = 1u;
-    // Corresponds to `(BVIntSet*)(v3 + 2)` in 0x00684480.
-    moho::BVIntSet mReleasedSerials{};
-    bool mSeededFromEntityDb = false;
-  };
-
-  using FamilyPoolMap = std::unordered_map<std::uint32_t, IdPoolRuntime>;
-  std::unordered_map<const moho::CEntityDb*, FamilyPoolMap> gRuntimePools;
   std::unordered_map<const moho::CEntityDb*, msvc8::list<moho::Entity*>> gRuntimeEntityLists;
   moho::EntityDBSerializer gEntityDBSerializer;
   constexpr std::uint32_t kEntityIdInvalidSentinel = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
@@ -1539,7 +1528,7 @@ namespace
     }
 
     const std::uint32_t lowerBoundKey = (sourceIndex + 1u) << kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, lowerBoundKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
     return outNode;
   }
 
@@ -1558,7 +1547,7 @@ namespace
       return nullptr;
     }
 
-    moho::CEntityDbAllUnitsNode* head = (entityDb != nullptr) ? entityDb->mAllUnits : nullptr;
+    moho::CEntityDbAllUnitsNode* head = (entityDb != nullptr) ? entityDb->AllUnitsHead() : nullptr;
     if (head == nullptr) {
       *outNode = nullptr;
       return outNode;
@@ -1608,7 +1597,7 @@ namespace
       return nullptr;
     }
 
-    moho::CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(entityDb->mAllUnits, entityId);
+    moho::CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(entityDb->AllUnitsHead(), entityId);
     if (node != nullptr) {
       node->unitListNode = entity;
     }
@@ -1627,11 +1616,11 @@ namespace
     const std::uint32_t entityId
   ) noexcept
   {
-    if (entityDb == nullptr || entityDb->mAllUnits == nullptr) {
+    if (entityDb == nullptr) {
       return nullptr;
     }
 
-    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+    moho::CEntityDbAllUnitsNode* const head = entityDb->AllUnitsHead();
     moho::CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(head, entityId);
     if (node == nullptr || node == head) {
       return nullptr;
@@ -1655,7 +1644,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsHighFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1675,7 +1664,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsMidFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsMidFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1695,7 +1684,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsShieldFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsShieldFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1716,7 +1705,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsOtherFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsOtherFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1736,7 +1725,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsLateFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsLateFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1758,7 +1747,7 @@ namespace
     }
 
     const std::uint32_t lowerBoundKey = (armyIndex | 0x200U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, lowerBoundKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
     return outNode;
   }
 
@@ -1796,7 +1785,7 @@ namespace
     }
 
     const std::uint32_t lowerBoundKey = (armyIndex | 0x100U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, lowerBoundKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
     return outNode;
   }
 
@@ -1834,7 +1823,7 @@ namespace
     }
 
     const std::uint32_t lowerBoundKey = (armyIndex | 0x400U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, lowerBoundKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
     return outNode;
   }
 
@@ -1872,7 +1861,7 @@ namespace
     }
 
     const std::uint32_t lowerBoundKey = (armyIndex | 0x500U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, lowerBoundKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
     return outNode;
   }
 
@@ -1908,7 +1897,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsUnitTypeBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsUnitTypeBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1928,7 +1917,7 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->mAllUnits, kAllUnitsHighFamilyBoundaryKey) : nullptr;
+    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -1979,373 +1968,24 @@ namespace
   }
 
   /**
-   * Address: 0x006887D0 (FUN_006887D0)
+   * Address: 0x00685410 (FUN_00685410, std::map<EntId, Entity*>::erase(iterator))
    *
-   * IDA signature:
-   * void __stdcall sub_6887D0(void *node);
-   *
-   * What it does:
-   * Post-order recursive destroy pass over one `CEntityDbAllUnitsNode`
-   * sentinel-RB subtree: for each non-sentinel node it first recursively
-   * destroys the right child (`v2[2]` in the decomp, `right` at offset
-   * 0x08), then advances the working cursor to the left child (`*v2`,
-   * `left` at offset 0x00), releases the previous node storage, and
-   * repeats until the `isNil` byte (offset 0x15) is set.
-   *
-   * Reached directly from `CEntityDb::~CEntityDb`'s `mAllUnits` teardown,
-   * matching the exact recursive shape the original 2007 destructor used.
-   */
-  void DestroyAllUnitsSubtreeRecursive(moho::CEntityDbAllUnitsNode* node) noexcept
-  {
-    while (node != nullptr && node->isNil == 0u) {
-      DestroyAllUnitsSubtreeRecursive(node->right);
-      moho::CEntityDbAllUnitsNode* const leftChild = node->left;
-      ::operator delete(node);
-      node = leftChild;
-    }
-  }
-
-  /**
-   * Address: 0x005C8A20 (FUN_005C8A20)
-   *
-   * IDA signature:
-   * std::map_EntId_Entity::_Node *__usercall sub_5C8A20@<eax>(
-   *     std::map_EntId_Entity::_Node *node@<eax>);
-   *
-   * What it does:
-   * Walks one all-units node's left-child chain and returns the last
-   * non-sentinel lane reached (dinkumware `std::_Tree::_Min`).
-   */
-  [[nodiscard]] moho::CEntityDbAllUnitsNode* DescendAllUnitsLeftChainRuntime(moho::CEntityDbAllUnitsNode* node) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    moho::CEntityDbAllUnitsNode* cursor = node->left;
-    if (cursor != nullptr && cursor->isNil == 0u) {
-      do {
-        node = cursor;
-        cursor = cursor->left;
-      } while (cursor->isNil == 0u);
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x00686390 (FUN_00686390)
-   *
-   * IDA signature:
-   * std::map_EntId_Entity::_Node *__usercall sub_686390@<eax>(
-   *     std::map_EntId_Entity::_Node *node@<eax>);
-   *
-   * What it does:
-   * Walks one all-units node's right-child chain and returns the last
-   * non-sentinel lane reached (dinkumware `std::_Tree::_Max`).
-   */
-  [[nodiscard]] moho::CEntityDbAllUnitsNode* DescendAllUnitsRightChainRuntime(moho::CEntityDbAllUnitsNode* node) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    for (moho::CEntityDbAllUnitsNode* cursor = node->right; cursor != nullptr && cursor->isNil == 0u;
-         cursor = cursor->right) {
-      node = cursor;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x00686340 (FUN_00686340)
-   *
-   * IDA signature:
-   * _DWORD *__thiscall sub_686340(_DWORD *this, int a2);
-   *
-   * ICF note: the linker folds every `std::_Tree<...>::_Lrotate`
-   * instantiation whose node layout matches this project's sentinel-node
-   * convention (`left@0/parent@4/right@8/isNil@0x15`) onto this one address.
-   * This recovery covers the `CEntityDbAllUnitsNode` instantiation exercised
-   * by `EraseAllUnitsTreeNode` below (verified caller: FUN_00685410, second
-   * caller FUN_00686190 belongs to an unrelated tree and is out of scope
-   * here).
-   *
-   * What it does:
-   * Standard red-black left rotation around `node`, re-pointing the tree's
-   * root link (`entityDb->mAllUnits->parent`) when `node` was the root.
-   */
-  moho::CEntityDbAllUnitsNode* RotateAllUnitsNodeLeft(
-    moho::CEntityDbAllUnitsNode* const node,
-    moho::CEntityDb* const entityDb
-  ) noexcept
-  {
-    moho::CEntityDbAllUnitsNode* const pivot = node->right;
-    node->right = pivot->left;
-    if (pivot->left->isNil == 0u) {
-      pivot->left->parent = node;
-    }
-    pivot->parent = node->parent;
-
-    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
-    if (node == head->parent) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-    return pivot;
-  }
-
-  /**
-   * Address: 0x006863C0 (FUN_006863C0)
-   *
-   * IDA signature:
-   * int __thiscall sub_6863C0(_DWORD *this, int a2);
-   *
-   * ICF note: see `RotateAllUnitsNodeLeft`; same folding pattern, mirrored
-   * rotation.
-   *
-   * What it does:
-   * Standard red-black right rotation around `node`.
-   */
-  moho::CEntityDbAllUnitsNode* RotateAllUnitsNodeRight(
-    moho::CEntityDbAllUnitsNode* const node,
-    moho::CEntityDb* const entityDb
-  ) noexcept
-  {
-    moho::CEntityDbAllUnitsNode* const pivot = node->left;
-    node->left = pivot->right;
-    if (pivot->right->isNil == 0u) {
-      pivot->right->parent = node;
-    }
-    pivot->parent = node->parent;
-
-    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
-    if (node == head->parent) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-    return pivot;
-  }
-
-  /**
-   * Address: 0x00685410 (FUN_00685410)
-   *
-   * IDA signature:
-   * int *__stdcall sub_685410(Moho::EntityDB *a1, std::map_EntId_Entity::_Node **a2,
-   *     Moho::CUnitIterAllArmies a3);
-   *
-   * IDA typing note: the decompiler infers a 12-byte `CUnitIterAllArmies`
-   * parameter for `a3` and separately mistypes the erased-node pointer as
-   * `Moho::EntityDB*` (`a1a`) in the red-black fixup section, reading a
-   * `mIdPool._Mysize` byte that is really the SAME register still holding
-   * the erased tree node -- i.e. `a1a->mIdPool` at that point in the
-   * pseudocode is really `erasedNode->color` (offset `+0x14`), not a real
-   * `EntityDB::mIdPool` access. The raw disassembly resolves both
-   * ambiguities: `retn 0Ch` pops exactly 3 caller-pushed dwords, and the
-   * caller (FUN_00686EF0) pushes exactly one dword for the third argument,
-   * so `a3` is a bare `CEntityDbAllUnitsNode*` node to erase, not a
-   * struct-by-value iterator; and the "Next" call at the top is the plain
-   * successor walk already recovered as `NextNodeInAllUnitsTree` (shared,
-   * ICF-folded address 0x005C87A0).
-   *
-   * What it does:
-   * Unlinks and destroys `erased` from the `mAllUnits` RB-tree, returning
-   * its in-order successor. Transplants the successor into the erased
-   * node's slot when both subtrees exist, then repairs the black-height
-   * deficit from the stitched-up child upward. MSVC8
-   * `std::_Tree<EntId, Entity*>::erase(iterator)` specialized for
-   * `CEntityDbAllUnitsNode` (`color` at `+0x14`, `isNil` at `+0x15`).
-   *
-   * Throws `std::out_of_range` when `erased` is the header sentinel
-   * (matches the binary's "invalid map/set<T> iterator" guard).
+   * The all-units map is `msvc8::map<std::uint32_t, Entity*>`; its node
+   * erase/rotate/subtree-destroy emissions live on `legacy/containers/RbTree.h`
+   * (RULE ONE). The two wrappers below only translate the family-boundary
+   * iterators' node view into map iterators.
    */
   moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeNode(
     moho::CEntityDb* const entityDb,
     moho::CEntityDbAllUnitsNode* const erased
   )
   {
-    if (erased->isNil != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    moho::CEntityDbAllUnitsNode* const next = NextNodeInAllUnitsTree(erased);
-
-    moho::CEntityDbAllUnitsNode* lifted = erased;
-    moho::CEntityDbAllUnitsNode* fix = nullptr;
-    moho::CEntityDbAllUnitsNode* fixParent = nullptr;
-
-    if (erased->left->isNil != 0u) {
-      fix = erased->right;
-    } else if (erased->right->isNil != 0u) {
-      fix = erased->left;
-    } else {
-      lifted = next;
-      fix = lifted->right;
-    }
-
-    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
-
-    if (lifted == erased) {
-      fixParent = erased->parent;
-      if (fix->isNil == 0u) {
-        fix->parent = fixParent;
-      }
-
-      if (head->parent == erased) {
-        head->parent = fix;
-      } else if (fixParent->left == erased) {
-        fixParent->left = fix;
-      } else {
-        fixParent->right = fix;
-      }
-
-      if (head->left == erased) {
-        head->left = (fix->isNil != 0u) ? fixParent : DescendAllUnitsLeftChainRuntime(fix);
-      }
-      if (head->right == erased) {
-        head->right = (fix->isNil != 0u) ? fixParent : DescendAllUnitsRightChainRuntime(fix);
-      }
-    } else {
-      erased->left->parent = lifted;
-      lifted->left = erased->left;
-
-      if (lifted == erased->right) {
-        fixParent = lifted;
-      } else {
-        fixParent = lifted->parent;
-        if (fix->isNil == 0u) {
-          fix->parent = fixParent;
-        }
-        fixParent->left = fix;
-        lifted->right = erased->right;
-        erased->right->parent = lifted;
-      }
-
-      if (head->parent == erased) {
-        head->parent = lifted;
-      } else if (erased->parent->left == erased) {
-        erased->parent->left = lifted;
-      } else {
-        erased->parent->right = lifted;
-      }
-
-      lifted->parent = erased->parent;
-      std::swap(lifted->color, erased->color);
-    }
-
-    if (erased->color == 1u) {
-      moho::CEntityDbAllUnitsNode* fixCursor = fix;
-      moho::CEntityDbAllUnitsNode* fixParentCursor = fixParent;
-      while (fixCursor != head->parent && fixCursor->color == 1u) {
-        if (fixCursor == fixParentCursor->left) {
-          moho::CEntityDbAllUnitsNode* sibling = fixParentCursor->right;
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            fixParentCursor->color = 0u;
-            (void)RotateAllUnitsNodeLeft(fixParentCursor, entityDb);
-            sibling = fixParentCursor->right;
-          }
-
-          if (sibling->isNil != 0u) {
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else if (sibling->left->color == 1u && sibling->right->color == 1u) {
-            sibling->color = 0u;
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else {
-            if (sibling->right->color == 1u) {
-              sibling->left->color = 1u;
-              sibling->color = 0u;
-              (void)RotateAllUnitsNodeRight(sibling, entityDb);
-              sibling = fixParentCursor->right;
-            }
-            sibling->color = fixParentCursor->color;
-            fixParentCursor->color = 1u;
-            sibling->right->color = 1u;
-            (void)RotateAllUnitsNodeLeft(fixParentCursor, entityDb);
-            fixCursor = head->parent;
-            break;
-          }
-        } else {
-          moho::CEntityDbAllUnitsNode* sibling = fixParentCursor->left;
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            fixParentCursor->color = 0u;
-            (void)RotateAllUnitsNodeRight(fixParentCursor, entityDb);
-            sibling = fixParentCursor->left;
-          }
-
-          if (sibling->isNil != 0u) {
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else if (sibling->right->color == 1u && sibling->left->color == 1u) {
-            sibling->color = 0u;
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else {
-            if (sibling->left->color == 1u) {
-              sibling->right->color = 1u;
-              sibling->color = 0u;
-              (void)RotateAllUnitsNodeLeft(sibling, entityDb);
-              sibling = fixParentCursor->left;
-            }
-            sibling->color = fixParentCursor->color;
-            fixParentCursor->color = 1u;
-            sibling->left->color = 1u;
-            (void)RotateAllUnitsNodeRight(fixParentCursor, entityDb);
-            fixCursor = head->parent;
-            break;
-          }
-        }
-      }
-      fixCursor->color = 1u;
-    }
-
-    ::operator delete(erased);
-    if (entityDb->mAllUnitsSize != 0u) {
-      --entityDb->mAllUnitsSize;
-    }
-    return next;
+    using Map = msvc8::map<std::uint32_t, moho::Entity*>;
+    const Map::const_iterator position(reinterpret_cast<Map::const_iterator::node_type*>(erased));
+    const Map::iterator next = entityDb->mAllUnits.erase(position);
+    return reinterpret_cast<moho::CEntityDbAllUnitsNode*>(next.node());
   }
 
-  /**
-   * Address: 0x00686EF0 (FUN_00686EF0)
-   *
-   * IDA signature:
-   * int *__userpurge sub_686EF0@<eax>(Moho::EntityDB *a1@<edi>, int *arg0,
-   *     Moho::Unit *a3, Moho::Unit *a3_4);
-   *
-   * IDA typing note: the decompiler types `a3`/`a3_4` as `Moho::Unit*` and
-   * reads a `__vftable_unit`-shaped field from the same base pointer that
-   * the loop branch treats as a raw `std::map_EntId_Entity::_Node*`
-   * sentinel (`_Myhead`, `_Left`, `_Right`, `_Parent`). Both readings are
-   * the SAME pointer: the `mAllUnits` RB-tree head/leftmost sentinel,
-   * misattributed to `Moho::Unit` because the decompiler's type inference
-   * for this register leaked in from an unrelated branch. Confirmed from
-   * the raw disassembly: `a3`/`a3_4` are compared directly against
-   * `entityDb->mAllUnits` and `entityDb->mAllUnits->left` -- real
-   * `CEntityDbAllUnitsNode*` iterators, never a `Moho::Unit*`.
-   *
-   * What it does:
-   * Erases `[first, last)` from the `mAllUnits` RB-tree. Takes the O(1)
-   * whole-tree fast path (recursive subtree destroy + sentinel reset) when
-   * erasing the full range (`first == begin() && last == end()`);
-   * otherwise advances to each node's successor before erasing it, so the
-   * walk stays valid across the erase. MSVC8
-   * `std::_Tree<EntId, Entity*>::erase(iterator, iterator)`.
-   */
   moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeRange(
     moho::CEntityDb* const entityDb,
     moho::CEntityDbAllUnitsNode** const outPosition,
@@ -2353,99 +1993,14 @@ namespace
     moho::CEntityDbAllUnitsNode* const last
   )
   {
-    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
-    moho::CEntityDbAllUnitsNode* cursor = first;
-
-    if (first == head->left && last == head) {
-      DestroyAllUnitsSubtreeRecursive(head->parent);
-      head->parent = head;
-      entityDb->mAllUnitsSize = 0u;
-      head->left = head;
-      head->right = head;
-      *outPosition = head;
-      return *outPosition;
-    }
-
-    if (first != last) {
-      do {
-        moho::CEntityDbAllUnitsNode* const erasing = cursor;
-        cursor = NextNodeInAllUnitsTree(cursor);
-        (void)EraseAllUnitsTreeNode(entityDb, erasing);
-      } while (cursor != last);
-    }
-
-    *outPosition = cursor;
+    using Map = msvc8::map<std::uint32_t, moho::Entity*>;
+    const Map::const_iterator firstIt(reinterpret_cast<Map::const_iterator::node_type*>(first));
+    const Map::const_iterator lastIt(reinterpret_cast<Map::const_iterator::node_type*>(last));
+    const Map::iterator next = entityDb->mAllUnits.erase(firstIt, lastIt);
+    *outPosition = reinterpret_cast<moho::CEntityDbAllUnitsNode*>(next.node());
     return *outPosition;
   }
 
-  /**
-   * Address: 0x00687BC0 (FUN_00687BC0, sub_687BC0)
-   *
-   * What it does:
-   * Raw node allocator only (left/parent/right left null); the immediate
-   * caller (InitializeAllUnitsTreeHeadLane below) overwrites isNil=1 and
-   * self-links left/parent/right, matching the binary's split shape.
-   */
-  [[nodiscard]] moho::CEntityDbAllUnitsNode* AllocateAllUnitsTreeNode()
-  {
-    auto* const node = static_cast<moho::CEntityDbAllUnitsNode*>(::operator new(sizeof(moho::CEntityDbAllUnitsNode)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
-
-  struct CEntityDbAllUnitsTreeRuntime
-  {
-    std::uint32_t iteratorProxy;
-    moho::CEntityDbAllUnitsNode* head;
-    std::uint32_t size;
-  };
-  static_assert(sizeof(CEntityDbAllUnitsTreeRuntime) == 0x0C, "CEntityDbAllUnitsTreeRuntime size must be 0x0C");
-  static_assert(offsetof(CEntityDbAllUnitsTreeRuntime, head) == 0x04, "CEntityDbAllUnitsTreeRuntime::head offset must be 0x04");
-  static_assert(offsetof(CEntityDbAllUnitsTreeRuntime, size) == 0x08, "CEntityDbAllUnitsTreeRuntime::size offset must be 0x08");
-
-  /**
-   * Address: 0x006852E0 (FUN_006852E0)
-   * Address: 0x00686150 (FUN_00686150)
-   *
-   * What it does:
-   * Allocates one all-units tree head node, marks it sentinel/self-linked, and
-   * clears the tree-size lane.
-   */
-  CEntityDbAllUnitsTreeRuntime* InitializeAllUnitsTreeHeadLane(
-    CEntityDbAllUnitsTreeRuntime* const tree
-  ) noexcept
-  {
-    if (tree == nullptr) {
-      return nullptr;
-    }
-
-    tree->head = AllocateAllUnitsTreeNode();
-    tree->head->isNil = 1u;
-    tree->head->parent = tree->head;
-    tree->head->left = tree->head;
-    tree->head->right = tree->head;
-    tree->size = 0u;
-    return tree;
-  }
-
-  /**
-   * Address: 0x00686FB0 (FUN_00686FB0)
-   *
-   * What it does:
-   * Initializes one all-units tree head lane and returns the allocated
-   * sentinel-head node pointer.
-   */
-  moho::CEntityDbAllUnitsNode* InitializeAllUnitsTreeHeadLaneReturnHead(
-    CEntityDbAllUnitsTreeRuntime* const tree
-  ) noexcept
-  {
-    CEntityDbAllUnitsTreeRuntime* const initialized = InitializeAllUnitsTreeHeadLane(tree);
-    return initialized != nullptr ? initialized->head : nullptr;
-  }
 
 
   [[nodiscard]] moho::CEntityDbListHead* AllocateEntityListHeadNode()
@@ -2631,88 +2186,9 @@ namespace
 
   void AdvanceRuntimeIdPools(moho::CEntityDb& entityDb)
   {
-    auto poolsIt = gRuntimePools.find(&entityDb);
-    if (poolsIt == gRuntimePools.end()) {
-      return;
-    }
-
-    for (auto& [familySourceBits, pool] : poolsIt->second) {
+    for (auto& [familySourceBits, pool] : entityDb.mIdPoolTree) {
       (void)familySourceBits;
-
-      moho::IdPool mirroredPool{};
-      mirroredPool.mNextLowId = static_cast<std::int32_t>(pool.mNextSerial);
-      mirroredPool.mReleasedLows = pool.mReleasedSerials;
-      mirroredPool.Update();
-
-      const std::uint32_t mirroredNextSerial = static_cast<std::uint32_t>(mirroredPool.mNextLowId);
-      pool.mNextSerial = mirroredNextSerial == 0u ? 1u : mirroredNextSerial;
-      pool.mReleasedSerials = mirroredPool.mReleasedLows;
-    }
-  }
-
-  [[nodiscard]] bool
-  IdExistsInList(const msvc8::list<moho::Entity*>& entities, const std::uint32_t entityIdCandidate) noexcept
-  {
-    for (const moho::Entity* const entity : entities) {
-      if (!entity) {
-        continue;
-      }
-
-      if (static_cast<std::uint32_t>(entity->id_) == entityIdCandidate) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void SeedFamilyPoolFromEntities(
-    const msvc8::list<moho::Entity*>& entities, const std::uint32_t familySourceBits, IdPoolRuntime& pool
-  )
-  {
-    if (pool.mSeededFromEntityDb) {
-      return;
-    }
-
-    std::uint32_t maxSerial = 0u;
-    for (const moho::Entity* const entity : entities) {
-      if (!entity) {
-        continue;
-      }
-
-      const std::uint32_t entityId = static_cast<std::uint32_t>(entity->id_);
-      if ((entityId & kEntityIdFamilySourceMaskRaw) != familySourceBits) {
-        continue;
-      }
-
-      const std::uint32_t serial = entityId & kEntityIdSerialMask;
-      if (serial > maxSerial) {
-        maxSerial = serial;
-      }
-    }
-
-    pool.mNextSerial = maxSerial + 1u;
-    if ((pool.mNextSerial & kEntityIdSerialMask) == 0u) {
-      pool.mNextSerial = 1u;
-    }
-
-    pool.mSeededFromEntityDb = true;
-  }
-
-  [[nodiscard]] std::uint32_t AllocateSerialFromFamilyPool(IdPoolRuntime& pool)
-  {
-    if (pool.mReleasedSerials.Buckets() != 0) {
-      const std::uint32_t serial = pool.mReleasedSerials.GetNext(std::numeric_limits<std::uint32_t>::max());
-      if (serial < pool.mReleasedSerials.Max() && pool.mReleasedSerials.Remove(serial)) {
-        return serial;
-      }
-    }
-
-    for (;;) {
-      const std::uint32_t serial = (pool.mNextSerial++) & kEntityIdSerialMask;
-      if (serial != 0u) {
-        return serial;
-      }
+      pool.Update();
     }
   }
 
@@ -3252,12 +2728,6 @@ namespace moho
    */
   CEntityDb::CEntityDb()
   {
-    mAllUnits = AllocateAllUnitsTreeNode();
-    mAllUnits->isNil = 1u;
-    mAllUnits->parent = mAllUnits;
-    mAllUnits->left = mAllUnits;
-    mAllUnits->right = mAllUnits;
-    mAllUnitsSize = 0u;
 
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
@@ -3284,15 +2754,15 @@ namespace moho
    * `std::map_IdPool::Deserialize`'s call site, is `head->parent`. The
    * container's own destructor does not have that bug.)
    *
-   * `mAllUnits`'s teardown is the shipped body's direct call `sub_686EF0(
-   * this, &outIter, mAllUnits->_Myhead->_Left, mAllUnits->_Myhead)` --
+   * `AllUnitsHead()`'s teardown is the shipped body's direct call `sub_686EF0(
+   * this, &outIter, AllUnitsHead()->_Myhead->_Left, AllUnitsHead()->_Myhead)` --
    * `EraseAllUnitsRange(leftmost(), header())`, cited on that member above
    * (0x00686EF0) -- not an inlined recursive destroy. DB-integrity fix:
-   * this body previously called `DestroyAllUnitsSubtreeRecursive(mAllUnits
+   * this body previously called `DestroyAllUnitsSubtreeRecursive(AllUnitsHead()
    * ->left)` directly, i.e. from the *leftmost* node instead of the real
-   * root (`mAllUnits->parent`) -- the exact same wrong-root bug already
+   * root (`AllUnitsHead()->parent`) -- the exact same wrong-root bug already
    * documented and fixed for `mIdPoolTree` above, independently reintroduced
-   * here for `mAllUnits`. Since leftmost() has no left child by definition,
+   * here for `AllUnitsHead()`. Since leftmost() has no left child by definition,
    * that call would destroy at most leftmost's own right subtree and then
    * stop, leaking essentially the entire all-units tree (every tracked
    * `Unit`) on every `CEntityDb` teardown. Routing through the already-
@@ -3313,15 +2783,8 @@ namespace moho
     }
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
-    if (mAllUnits != nullptr) {
-      (void)EraseAllUnitsRange(mAllUnits->left, mAllUnits);
-    }
-    ::operator delete(mAllUnits);
-    mAllUnits = nullptr;
-    mAllUnitsSize = 0u;
 
     gRuntimeEntityLists.erase(this);
-    gRuntimePools.erase(this);
   }
 
   /**
@@ -3450,7 +2913,7 @@ namespace moho
     }
 
     CEntityDb* const entityDb = sim->mEntityDB;
-    CEntityDbAllUnitsNode* leftMost = entityDb->mAllUnits;
+    CEntityDbAllUnitsNode* leftMost = entityDb->AllUnitsHead();
     if (leftMost == nullptr) {
       return;
     }
@@ -3496,7 +2959,7 @@ namespace moho
    */
   CEntityDbAllUnitsNode* CEntityDb::AllUnitsEnd(const std::uint32_t sourceIndex) const
   {
-    return TreeLowerBound(mAllUnits, sourceIndex << kEntityIdSourceShift);
+    return TreeLowerBound(AllUnitsHead(), sourceIndex << kEntityIdSourceShift);
   }
 
   /**
@@ -3509,7 +2972,7 @@ namespace moho
    */
   CEntityDbAllUnitsNode* CEntityDb::AllUnitsEnd() const
   {
-    return TreeLowerBound(mAllUnits, kAllUnitsUnitTypeBoundaryKey);
+    return TreeLowerBound(AllUnitsHead(), kAllUnitsUnitTypeBoundaryKey);
   }
 
   /**
@@ -3540,11 +3003,16 @@ namespace moho
    * Address: 0x00686EF0 (FUN_00686EF0, sub_686EF0)
    *
    * What it does:
-   * Erases `[first, last)` from `mAllUnits` and returns the node that
+   * Erases `[first, last)` from `AllUnitsHead()` and returns the node that
    * followed the erased range (see `EraseAllUnitsTreeRange` for the full
    * recovery, and `EraseAllUnitsTreeNode`/FUN_00685410 for the single-node
    * erase it loops on).
    */
+  CEntityDbAllUnitsNode* CEntityDb::AllUnitsHead() const noexcept
+  {
+    return reinterpret_cast<CEntityDbAllUnitsNode*>(const_cast<void*>(mAllUnits.header_ptr()));
+  }
+
   CEntityDbAllUnitsNode* CEntityDb::EraseAllUnitsRange(
     CEntityDbAllUnitsNode* const first,
     CEntityDbAllUnitsNode* const last
@@ -3565,8 +3033,8 @@ namespace moho
    */
   Entity* CEntityDb::FindEntityById(const std::uint32_t entityId) const noexcept
   {
-    CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(mAllUnits, entityId);
-    if (node == nullptr || node == mAllUnits) {
+    CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(AllUnitsHead(), entityId);
+    if (node == nullptr || node == AllUnitsHead()) {
       return nullptr;
     }
     return static_cast<Entity*>(node->unitListNode);
@@ -3580,23 +3048,20 @@ namespace moho
    */
   std::uint32_t CEntityDb::DoReserveId(const std::uint32_t requestedFamilySourceBits)
   {
-    const std::uint32_t familySourceBits = requestedFamilySourceBits & kEntityIdFamilySourceMaskRaw;
-    IdPoolRuntime& pool = gRuntimePools[this][familySourceBits];
-    SeedFamilyPoolFromEntities(Entities(), familySourceBits, pool);
+    IdPool& pool = mIdPoolTree[requestedFamilySourceBits];
 
-    for (std::uint32_t attempt = 0; attempt < kEntityIdSerialMask; ++attempt) {
-      const std::uint32_t serial = AllocateSerialFromFamilyPool(pool);
-      const std::uint32_t entityId = familySourceBits | serial;
-      if (!IdExistsInList(Entities(), entityId)) {
-        UpdateEntityCountStats(entityId, 1u);
-        return entityId;
-      }
+    std::uint32_t serial;
+    if (pool.mReleasedLows.mWords.Empty()) {
+      serial = static_cast<std::uint32_t>(pool.mNextLowId++);
+    } else {
+      serial = pool.mReleasedLows.GetNext(std::numeric_limits<unsigned int>::max());
+      (void)pool.mReleasedLows.Remove(serial);
     }
 
-    // Family/source pool exhausted: preserve old fail-safe behavior and hand back +1 serial.
-    const std::uint32_t fallbackEntityId = familySourceBits | 1u;
-    UpdateEntityCountStats(fallbackEntityId, 1u);
-    return fallbackEntityId;
+    const std::uint32_t entityId = requestedFamilySourceBits | serial;
+    UpdateEntityCountStats(entityId, 1u);
+    (void)mAllUnits.insert(std::pair<const std::uint32_t, Entity*>(entityId, nullptr));
+    return entityId;
   }
 
   /**
@@ -3612,15 +3077,11 @@ namespace moho
   {
     UpdateEntityCountStats(releasedId, static_cast<std::uint32_t>(-1));
 
-    msvc8::list<Entity*>& entities = Entities();
-    RemoveTrackedEntityById(entities, releasedId);
+    (void)mAllUnits.erase(mAllUnits.find(releasedId));
+    RemoveTrackedEntityById(Entities(), releasedId);
 
-    const std::uint32_t familySourceBits = releasedId & kEntityIdFamilySourceMaskRaw;
-    IdPoolRuntime& pool = gRuntimePools[this][familySourceBits];
-    SeedFamilyPoolFromEntities(entities, familySourceBits, pool);
-
-    const std::uint32_t serial = releasedId & kEntityIdSerialMask;
-    return pool.mReleasedSerials.Add(serial);
+    IdPool& pool = mIdPoolTree[releasedId & kEntityIdFamilySourceMaskRaw];
+    return pool.QueueReleasedLowId(releasedId & kEntityIdSerialMask);
   }
 
   /**
@@ -4083,10 +3544,7 @@ namespace moho
 
     // Reads directly into the real `mIdPoolTree` member (binary:
     // `gpg::ReadArchive::Read(a1, v4, &a2->mIdPool, ...)`, FUN_00689760) --
-    // no local staging map. `gRuntimePools` is a separate, already-existing
-    // runtime allocator-side cache (see `DoReserveId`/`ReleaseId`) kept in
-    // sync from the now-authoritative `mIdPoolTree` values; it is not part
-    // of the binary's own serialize path.
+    // no local staging map.
     //
     // The binary resolves the map's RType via one direct cached `typeid`
     // lookup (`std::map_IdPool::sType` in the FUN_00689760 decompilation),
@@ -4095,17 +3553,6 @@ namespace moho
     // of the generic by-name fallback.
     if (gpg::RType* const idPoolMapType = ResolveLegacyEntityDbIdPoolMapType()) {
       archive->Read(idPoolMapType, &mIdPoolTree, NullOwnerRef());
-
-      FamilyPoolMap& runtimePools = gRuntimePools[this];
-      runtimePools.clear();
-      for (const auto& [familySourceBits, serializedPool] : mIdPoolTree) {
-        IdPoolRuntime runtimePool{};
-        runtimePool.mNextSerial =
-          serializedPool.mNextLowId > 0 ? static_cast<std::uint32_t>(serializedPool.mNextLowId) : 1u;
-        runtimePool.mReleasedSerials = serializedPool.mReleasedLows;
-        runtimePool.mSeededFromEntityDb = true;
-        runtimePools[familySourceBits] = runtimePool;
-      }
     }
 
     SerSets(archive);
@@ -4137,11 +3584,7 @@ namespace moho
 
     // Writes the real `mIdPoolTree` member directly (binary:
     // `gpg::WriteArchive::Write(a1, v4, &a2->mIdPool, &a5)`, FUN_006897F0 --
-    // no synchronization step of any kind precedes it there). `gRuntimePools`
-    // may hold newer allocator-side state accumulated since the last load
-    // (`DoReserveId`/`ReleaseId`), so it is folded back into `mIdPoolTree`
-    // via the map's own `operator[]` before writing, keeping the persisted
-    // map authoritative without introducing a second serialization path.
+    // no synchronization step of any kind precedes it there).
     //
     // The binary resolves the map's RType via one direct cached `typeid`
     // lookup (`std::map_IdPool::sType` in the FUN_006897F0 decompilation),
@@ -4149,15 +3592,6 @@ namespace moho
     // `ResolveLegacyEntityDbIdPoolMapType()`, so call it by name here instead
     // of the generic by-name fallback.
     if (gpg::RType* const idPoolMapType = ResolveLegacyEntityDbIdPoolMapType()) {
-      const auto poolsIt = gRuntimePools.find(this);
-      if (poolsIt != gRuntimePools.end()) {
-        for (const auto& [familySourceBits, runtimePool] : poolsIt->second) {
-          moho::IdPool& destinationPool = mIdPoolTree[familySourceBits];
-          destinationPool.mNextLowId = static_cast<std::int32_t>(runtimePool.mNextSerial);
-          destinationPool.mReleasedLows = runtimePool.mReleasedSerials;
-        }
-      }
-
       archive->Write(idPoolMapType, &mIdPoolTree, NullOwnerRef());
     }
 

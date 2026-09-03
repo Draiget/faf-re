@@ -245,10 +245,10 @@ IdPool::IdPool()
  * What it does:
  * Queues one released low-id bit into the current recycle-history tail bucket.
  */
-void IdPool::QueueReleasedLowId(const unsigned int lowId)
+BVIntSetAddResult IdPool::QueueReleasedLowId(const unsigned int lowId)
 {
   const int bucketIndex = (mSubRes2.mEnd + (kHistoryCapacity - 1)) % kHistoryCapacity;
-  (void)AsBitSet(mSubRes2.mData[bucketIndex]).Add(lowId);
+  return AsBitSet(mSubRes2.mData[bucketIndex]).Add(lowId);
 }
 
 /**

@@ -357,6 +357,13 @@ namespace moho
     CEntityDbAllUnitsNode* EraseAllUnitsRange(CEntityDbAllUnitsNode* first, CEntityDbAllUnitsNode* last);
 
     /**
+     * The `mAllUnits` header sentinel, typed as the node view the
+     * family-boundary iterators walk. Never null: the map allocates its
+     * head in its constructor (`FUN_00684230` line 1).
+     */
+    [[nodiscard]] CEntityDbAllUnitsNode* AllUnitsHead() const noexcept;
+
+    /**
      * Address: 0x006856C0 (FUN_006856C0)
      * Mangled: ?find@?$map@VEntId@Moho@@PAVEntity@2@@std@@QAE?AViterator@12@ABVEntId@Moho@@@Z
      *
@@ -456,9 +463,15 @@ namespace moho
     void SerSets(gpg::WriteArchive* archive);
 
   public:
-    std::uint32_t mAllUnitsIteratorProxy;           // +0x00
-    CEntityDbAllUnitsNode* mAllUnits;               // +0x04
-    std::uint32_t mAllUnitsSize;                    // +0x08
+    // `std::map<Moho::EntId, Moho::Entity*>` (`Moho::EntityDB::mAllUnits` in
+    // the binary). `DoReserveId` (0x00684480) inserts `{id, nullptr}` through
+    // `sub_685350` (insert_unique), `Entity::StandardInit` (0x00678370) stores
+    // the entity into `find(id)->second`, `ReleaseId` (0x00684690) erases the
+    // node through `sub_685410` (erase_node), and every id lookup in the sim
+    // is `std::map_EntId_Entity::find` (0x006856C0). The node layout is the
+    // `CEntityDbAllUnitsNode` view below (`AllUnitsHead()` hands it out for
+    // the family-boundary iterators).
+    msvc8::map<std::uint32_t, Entity*> mAllUnits;    // +0x00
     // `std::map<unsigned int, Moho::IdPool>` (`Moho::EntityDB::mIdPool` in the
     // binary). Confirmed against `gpg/core/containers/ArchiveSerialization.cpp`
     // and `EntityDb.cpp`'s own reflection typing, both of which read this field
@@ -473,7 +486,8 @@ namespace moho
     CEntityDbBoundedPropQueueRuntime mBoundedProps; // +0x2C
   };
 
-  static_assert(offsetof(CEntityDb, mAllUnits) == 0x04, "CEntityDb::mAllUnits offset must be 0x04");
+  static_assert(offsetof(CEntityDb, mAllUnits) == 0x00, "CEntityDb::mAllUnits offset must be 0x00");
+  static_assert(sizeof(msvc8::map<std::uint32_t, Entity*>) == 0x0C, "CEntityDb::mAllUnits must be the 12-byte MSVC8 map header");
   static_assert(offsetof(CEntityDb, mIdPoolTree) == 0x0C, "CEntityDb::mIdPoolTree offset must be 0x0C");
   static_assert(
     offsetof(CEntityDb, mRegisteredEntitySets) == 0x18, "CEntityDb::mRegisteredEntitySets offset must be 0x18"
