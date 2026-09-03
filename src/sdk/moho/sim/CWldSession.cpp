@@ -14451,9 +14451,25 @@ namespace moho
       IsCheatsEnabled = false;
     }
 
+    // The session's selection set is a real weak-entity set and needs its
+    // sentinel head, exactly like every locally-built selection set in this
+    // file. Ground truth, 0x00893465..0x00893497:
+    //
+    //   call sub_7B08D0                ; AllocateWeakEntitySetHead
+    //   mov  [ebp+4A4h], eax           ; mSelection.mHead   (0x04A0 + 0x04)
+    //   mov  byte ptr [eax+19h], 1     ; head->mIsSentinel
+    //   mov  [eax+4], eax              ; head->mParent = head
+    //   mov  [eax], eax                ; head->mLeft   = head
+    //   mov  [eax+8], eax              ; head->mRight  = head
+    //   mov  [ebp+4A8h], ebx           ; mSelection.mSize = 0
+    //   mov  [ebp+4ACh], ebx           ; mSizeMirrorOrUnused = 0
+    //
+    // Leaving mHead null made `SetSelection`'s copy-back guard
+    // (`mSelection.mHead != nullptr`) fail every time, so the session never
+    // retained a selection: `GetSelectedUnits` always returned nil and the
+    // in-game UI kept its orders and construction panels hidden.
     mSelection.mAllocProxy = nullptr;
-    mSelection.mHead = nullptr;
-    mSelection.mSize = 0;
+    (void)InitializeSelectionSetHeadStorage(&mSelection);
     mSelection.mSizeMirrorOrUnused = 0;
 
     // 0x00893160 line ~288-293: seeds the initial cursor world position from
