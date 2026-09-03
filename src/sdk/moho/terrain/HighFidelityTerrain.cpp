@@ -390,6 +390,44 @@ namespace moho
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
 
+    // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
+    // The reference binary renders textured ground here; ours renders a flat
+    // pale wash, which is what an unbound albedo set looks like once the sun
+    // term is applied. Report which sheets are actually resident.
+    {
+      static int sStrataBudget = 0;
+      if (sStrataBudget < 2) {
+        ++sStrataBudget;
+        char probe[320];
+        (void)std::snprintf(
+          probe, sizeof(probe),
+          "[STRATADIAG] shader='%s' maskA=%d maskB=%d water=%d lower=%d upper=%d "
+          "albedo=%d%d%d%d%d%d%d%d normal=%d%d%d%d%d%d%d%d\n",
+          strata.mShaderName.c_str(),
+          strata.mStratumMask0.px != nullptr, strata.mStratumMask1.px != nullptr,
+          terrainRes->GetWaterMap().get() != nullptr,
+          strata.mLowerAlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mUpperAlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum0AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum1AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum2AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum3AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum4AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum5AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum6AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum7AlbedoTexture.mTextureSheet.px != nullptr,
+          strata.mStratum0NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum1NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum2NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum3NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum4NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum5NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum6NormalTexture.mTextureSheet.px != nullptr,
+          strata.mStratum7NormalTexture.mTextureSheet.px != nullptr);
+        ::OutputDebugStringA(probe);
+      }
+    }
+
     BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture));
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
@@ -547,14 +585,17 @@ namespace moho
     // multiplier would produce exactly this.
     {
       static int sLightBudget = 0;
-      if (sLightBudget < 4) {
+      if (sLightBudget < 2) {
         ++sLightBudget;
-        gpg::Warnf(
-          "[LIGHTDIAG] mult=%.3f sunDir=(%.3f,%.3f,%.3f) sunColor=(%.3f,%.3f,%.3f) ambience=(%.3f,%.3f,%.3f)",
+        char probe[256];
+        (void)std::snprintf(
+          probe, sizeof(probe),
+          "[LIGHTDIAG] mult=%.3f sunDir=(%.3f,%.3f,%.3f) sunColor=(%.3f,%.3f,%.3f) ambience=(%.3f,%.3f,%.3f)\n",
           lightingMultiplier,
           sunDirection.x, sunDirection.y, sunDirection.z,
           sunColor.x, sunColor.y, sunColor.z,
           sunAmbience.x, sunAmbience.y, sunAmbience.z);
+        ::OutputDebugStringA(probe);
       }
     }
 
@@ -603,6 +644,22 @@ namespace moho
 
     const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
     SetShaderVarMem(shaderVars.shadowFillColor, 3U, &shadowFillColor.x);
+
+    // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
+    {
+      static int sExtraBudget = 0;
+      if (sExtraBudget < 2) {
+        ++sExtraBudget;
+        char probe[256];
+        (void)std::snprintf(
+          probe, sizeof(probe),
+          "[LIGHTDIAG] specular=(%.3f,%.3f,%.3f,%.3f) shadowFill=(%.3f,%.3f,%.3f) shadowCtx=%d\n",
+          specularColor.x, specularColor.y, specularColor.z, specularColor.w,
+          shadowFillColor.x, shadowFillColor.y, shadowFillColor.z,
+          shadowContext != nullptr ? 1 : 0);
+        ::OutputDebugStringA(probe);
+      }
+    }
 
     if (shadowContext != nullptr) {
       // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
