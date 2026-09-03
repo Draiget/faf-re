@@ -3030,8 +3030,10 @@ namespace moho
     const VTransform& transform = unit->GetTransform();
     const std::int32_t combatState = static_cast<std::int32_t>(mCombatState);
 
+    // m11 - the Y component of the local up axis. The previous spelling used a
+    // `w*w` diagonal term, which no matrix expansion in this binary computes.
     const float currentOrientationY =
-      1.0f - (((transform.orient_.w * transform.orient_.w) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+      1.0f - (((transform.orient_.x * transform.orient_.x) + (transform.orient_.z * transform.orient_.z)) * 2.0f);
 
     outAxes.vX = {1.0f, 0.0f, 0.0f};
     outAxes.vY = {0.0f, 1.0f, 0.0f};
