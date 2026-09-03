@@ -1385,7 +1385,7 @@ void moho::CAimManipulator::SetFiringArc(const CAimFiringArc arc)
  * Both quaternions here are ordinary scalar-first ones. The conjugate at
  * 0x00630A2D..0x00630A41 keeps lane 0 and negates lanes 1-3, and the
  * pitch-basis quaternion at 0x00630ADC..0x00630AF0 is written `(cos, sin, 0,
- * 0)` - a rotation about X. A prior revision recorded both as `.x`-scalar,
+ * 0)` - a rotation about X. A prior revision recorded both as scalar-first,
  * citing `QuatToMatrix`/`MultQuadVec`; those have since been read off their
  * own disassembly and are scalar-first too.
  */

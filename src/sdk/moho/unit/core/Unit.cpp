@@ -2039,7 +2039,7 @@ namespace
   // builds the forward vector via `Moho::VAxes3::VAxes3(&result, &orient)`
   // and reads its `.vZ` member -- NOT the generic `Quaternion::Rotate((0,0,
   // 1))` (upstream WildMagic, `.w`-scalar `ToMat3()`) the previous body used.
-  // `VAxes3::vZ` is the `.x`-scalar rotation matrix's row 0 (see
+  // `VAxes3::vZ` is the scalar-first rotation matrix's row 0 (see
   // `VAxes3::VAxes3`'s doc comment in `MathReflection.cpp` for the
   // constructor fix this depends on) -- numerically the same as
   // `Moho::MultQuadVec` against `(0,0,1)` would give, once `VAxes3`'s own
@@ -7838,7 +7838,7 @@ CScrLuaInitForm* moho::func_UnitGetNumBuildOrders_LuaFuncDef()
  * Ground truth (`FUN_006C74F0.c`) rotates via
  * `Moho::MultQuadVec(&v13, &v15, v3)` (`v3` is the unit's transform, reread
  * as a `Wm3::Quaternionf*` since `orient` is its first member), not the
- * generic `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+ * generic `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
  * mismatch as the other `orient_`-consuming sites.
  */
 int moho::cfunc_UnitCalculateWorldPositionFromRelativeL(LuaPlus::LuaState* const state)
@@ -14757,7 +14757,7 @@ bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
  * `Wm3::Quaternionf::MakeFromAxisAngle` (numerically identical for this
  * axis+angle, but not the function the binary actually calls), and rotates
  * via `Moho::MultQuadVec(&a2a, &v14, &v17)` each iteration, not the generic
- * `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+ * `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
  * mismatch as the other `MultQuadVec` consumers in this bug class.
  */
 Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision) const

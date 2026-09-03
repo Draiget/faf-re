@@ -920,7 +920,7 @@ void CAiBuilderImpl::BuilderSetIsFactory(const bool isFactory)
  * Address: 0x0059EEF0 (FUN_0059EEF0)
  *
  * Ground truth (`FUN_0059EEF0.c`, `Moho::CAiBuilderImpl::IssueRallyPoint`)
- * re-derived term-by-term: the rotation matches the engine `.x`-scalar
+ * re-derived term-by-term: the rotation matches the engine scalar-first
  * `Moho::QuatToMatrix` formula exactly, not the generic `Quaternion::Rotate`
  * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
  */

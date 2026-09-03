@@ -36,9 +36,10 @@ namespace
    * Builds a `GeomCamera3` derived matrix (`view`/`inverseView`) from a
    * `VTransform`. Delegates to the real, address-cited `VMatrix4::Set`
    * (0x004EE980, `MathReflection.cpp`) rather than a textbook quaternion-to-
-   * matrix formula: `Set`'s binary combines `quat.x` in the role a standard
-   * formula reserves for the scalar term and `(quat.y, quat.z, quat.w)` as
-   * the three imaginary lanes, under transposed cross-term signs. A
+   * matrix formula. `Set` is the transpose of `QuatToMatrix` - the row-vector
+   * form against that helper's column-vector form - and both are scalar-first
+   * (`.w` the scalar, `(.x, .y, .z)` the imaginary lanes), so the difference
+   * that matters here is the transpose, not the lane order. A
    * previous pass here called an uncited, textbook-formula stand-in instead
    * (`FromQuatPos`), whose row 2 is provably pitch-invariant in y for every
    * heading/pitch pair - the mechanical cause of `CTesselator::Rebuild`'s

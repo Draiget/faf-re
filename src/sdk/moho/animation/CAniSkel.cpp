@@ -1127,7 +1127,7 @@ namespace moho
    *
    * Ground truth (`FUN_0054A540.c`) rotates via
    * `Moho::MultQuadVec(&v31, v11, &v12->ori)`, not the generic
-   * `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+   * `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
    * convention mismatch as the other `orient_`-consuming sites (this bone
    * transform's quaternion is always in `VMatrix4::Set`'s convention).
    */

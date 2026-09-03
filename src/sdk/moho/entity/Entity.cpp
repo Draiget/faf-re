@@ -796,7 +796,7 @@ namespace
   }
 
   // Ground truth (`FUN_0068A6F0.c`, `cfunc_EntityCreateProjectileAtBoneL`'s
-  // only caller of this helper) rotates via the engine's .x-scalar rotation
+  // only caller of this helper) rotates via the engine's scalar-first rotation
   // matrix, not the generic `Quaternion::Rotate` (upstream WildMagic,
   // `.w`-scalar `ToMat3()`) this replaces -- same convention mismatch as
   // `cfunc_EntityGetBoneDirectionL` below, whose own ground truth
@@ -1344,7 +1344,7 @@ namespace
     Wm3::Vector3f out{};
     // Ground truth (FUN_00679CE0.c) rotates via
     // Moho::MultQuadVec(&v13, &v12, &this->mVarDat.mCurTransform.orient), not
-    // the generic Wm3::MultiplyQuaternionVector -- same .x-scalar-vs-.w-scalar
+    // the generic Wm3::MultiplyQuaternionVector -- same quaternion-convention
     // mismatch as the other orient_-consuming sites (`quaternion` above is a
     // byte-exact repack of the entity's own VTransform::orient_, which is
     // always in VMatrix4::Set's convention).
@@ -5909,7 +5909,7 @@ namespace moho
    * Ground truth (`FUN_0068B3F0.c`) rotates via `Moho::MultQuadVec(&n, &obj,
    * (Wm3::Quaternionf*)&v10)`, not the generic `Quaternion::Rotate` (upstream
    * WildMagic, `.w`-scalar `ToMat3()`) this replaces -- `boneTransform.
-   * orient_` is always this engine's `.x`-scalar convention.
+   * orient_` is always this engine's scalar-first convention.
    */
   int cfunc_EntityGetBoneDirectionL(LuaPlus::LuaState* const state)
   {
@@ -7559,7 +7559,7 @@ namespace moho
    * `Moho::SPhysBody::AddLocalImpulse(mPhysBody, &a2, &a3)` directly, the same
    * method `Entity::AddLocalImpulse` and `Unit::AddLocalImpulse` already
    * delegate to. The previous body reimplemented that conversion inline via
-   * `Wm3::MultiplyQuaternionVector` (the `.x`-scalar-vs-`.w`-scalar mismatch
+   * `Wm3::MultiplyQuaternionVector` (the quaternion-convention mismatch
    * shared with every other `mOrientation`/`orient_`-consuming site) and, on
    * top of that, never applied `mCollisionOffset` at all -- a second,
    * independent divergence from `SPhysBody::AddLocalImpulse`'s real behavior.
@@ -8928,7 +8928,7 @@ namespace moho
    * `Wm3::Quaternion` stores `.w` at offset 0 and `.x/.y/.z` at offsets
    * 4/8/12 (`Wm3Quaternion.h`'s declared union order) -- so this
    * construction is one of the rare cases (like `RotateQuatByAngle`) that
-   * genuinely produces a native `.w`-scalar result, unlike the `.x`-scalar
+   * genuinely produces a native `.w`-scalar result, unlike the scalar-first
    * convention every *engine orientation* quaternion uses. The previous body
    * here wrote the scalar to `.x` and cyclically shifted the three
    * cross-product terms onto `.y/.z/.w`, silently relabelling the same

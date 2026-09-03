@@ -2784,7 +2784,6 @@ namespace
     return reinterpret_cast<UserEntity*>(rawOwnerSlot - kUserEntityWeakOwnerOffset);
   }
 
-  /**
 } // namespace
 
 namespace moho

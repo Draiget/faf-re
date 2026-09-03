@@ -200,7 +200,7 @@ namespace
    * `Moho::VAxes3::VAxes3(&v40, &transform.orient)`'s `.vZ`/`.vX` members,
    * NOT the generic `Quaternion::Rotate((0,0,1))`/`Rotate((1,0,0))` (upstream
    * WildMagic, `.w`-scalar `ToMat3()`) the previous body here used. `VAxes3`'s
-   * `vZ`/`vX` are the `.x`-scalar rotation matrix's row 0 / row 2 (see
+   * `vZ`/`vX` are the scalar-first rotation matrix's row 0 / row 2 (see
    * `VAxes3::VAxes3`'s doc comment in `MathReflection.cpp` for the
    * constructor fix this depends on) -- numerically the same as
    * `Moho::MultQuadVec` against those axes would give, once `VAxes3`'s own

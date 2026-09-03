@@ -503,7 +503,7 @@ namespace
    * vector and taking `atan2` of it -- but `ToAngle`'s own formula,
    * `atan2(2*(w*y+x*z), 1-2*(z*z+y*y))`, is exactly `atan2(forward.x,
    * forward.z)` for `forward = Rotate((0,0,1))` under this engine's
-   * `.x`-scalar convention, algebraically fused into one function. The
+   * scalar-first convention, algebraically fused into one function. The
    * `.Rotate()`-based computation below matched ground truth in *shape* but
    * used the wrong (`.w`-scalar, upstream WildMagic) convention; fixed to
    * `Moho::MultQuadVec`, which makes it numerically identical to `ToAngle`.
@@ -3291,7 +3291,7 @@ namespace moho
    * bomb-drop release timing, and heading constraints) for one target payload.
    *
    * Ground truth (`FUN_006D4C80.c`) re-derived term-by-term: the forward-axis
-   * extraction (`dir.x/y/z`) matches the engine `.x`-scalar rotation matrix
+   * extraction (`dir.x/y/z`) matches the engine scalar-first rotation matrix
    * exactly (`Moho::MultQuadVec`), not the generic `Quaternion::Rotate`
    * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
    */
@@ -4124,8 +4124,8 @@ namespace moho
    * orientation/randomness, damage payload, velocity, and lifetime lanes.
    *
    * Ground truth (`FUN_006D64E0.c`) re-derived term-by-term for the jitter
-   * compose: `jitterOrientation` (from `COORDS_Orient`, already `.x`-scalar)
-   * composed with `launchTransform.orient_` matches the engine `.x`-scalar
+   * compose: `jitterOrientation` (from `COORDS_Orient`, already scalar-first)
+   * composed with `launchTransform.orient_` matches the engine scalar-first
    * Hamilton product exactly, jitter left/first and the existing orientation
    * right/second -- not the generic `Wm3::Quaternionf::Multiply` (`.w`-scalar
    * on both operands).

@@ -103,7 +103,7 @@ namespace
   // `Moho::DRAW_WireCircle`, and `Moho::DRAW_Circle`'s own doc comment below)
   // calls the real, already-fixed `Moho::QuatCrossAdd` (0x0044F880, defined
   // in Sim.cpp) directly, so the local duplicate is removed in favor of that
-  // canonical definition -- see its doc comment for the `.x`-scalar layout.
+  // canonical definition -- see its doc comment for the scalar-first layout.
 
   [[nodiscard]] moho::Vector3f RotateByQuaternion(
     const moho::Vector3f& vector, const Wm3::Quaternionf& orientation
@@ -1330,7 +1330,7 @@ namespace moho
    *
    * Ground truth (`FUN_00453ED0.c`) calls the real `Moho::QuatCrossAdd`
    * (0x0044F880) with the hardcoded +Z axis, then rotates both tangent axes
-   * via `Moho::MultQuadVec` against that quaternion -- same `.x`-scalar
+   * via `Moho::MultQuadVec` against that quaternion -- same scalar-first
    * convention as every other `MultQuadVec` consumer in this bug class.
    */
   void DRAW_WireCircle(

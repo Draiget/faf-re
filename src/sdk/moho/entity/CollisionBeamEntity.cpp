@@ -74,7 +74,7 @@ namespace
   // which writes its arguments into memory in that same order - so lane 0
   // stays in lane 0 and the scalar stays put.
   //
-  // An earlier note here described this as a deliberate `.x`-scalar ->
+  // An earlier note here described this as a deliberate scalar-first ->
   // native-`.w`-scalar conversion. That convention does not exist in this
   // binary (`QuatToMatrix` at 0x00452FD0 and `VMatrix4::Set` at 0x004EE980
   // compute no `ww` term at all), and reading the init as a lane rotation

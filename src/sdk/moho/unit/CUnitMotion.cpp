@@ -528,7 +528,7 @@ namespace moho
     // Ground truth for this helper's callers (0x006BD7B0 CalcWingedOrientation,
     // FUN_006BD7B0.c; 0x006C1610 SnapToGround, FUN_006C1610.c) all rotate via
     // Moho::MultQuadVec, not the generic Wm3::MultiplyQuaternionVector -- same
-    // .x-scalar-vs-.w-scalar mismatch as the other orient_-consuming sites.
+    // quaternion-convention mismatch as the other orient_-consuming sites.
     [[nodiscard]] Wm3::Vector3f RotateByQuaternion(
       const Wm3::Vector3f& vector,
       const Wm3::Quaternionf& quaternion
@@ -1545,7 +1545,7 @@ namespace moho
 
       // Ground truth (FUN_006B8AC0.c) rotates via
       // Moho::MultQuadVec(&v42, &v41, &v6->mOrientation), not the generic
-      // Wm3::MultiplyQuaternionVector -- same .x-scalar-vs-.w-scalar mismatch
+      // Wm3::MultiplyQuaternionVector -- same quaternion-convention mismatch
       // as the other mOrientation/orient_-consuming sites.
       MultQuadVec(&mVector108, &localAngularImpulse, &body->mOrientation);
 

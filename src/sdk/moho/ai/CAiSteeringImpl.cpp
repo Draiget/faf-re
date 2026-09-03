@@ -108,7 +108,7 @@ namespace
 
   // Ground truth (`FUN_00596F30.c`, `func_ResolvePossibleCollision`, the sole
   // reachability path for every caller of this helper) computes the
-  // collision-unit forward vector via the engine `.x`-scalar rotation matrix
+  // collision-unit forward vector via the engine scalar-first rotation matrix
   // (confirmed term-by-term: `2*(w*z-x*y)`, `2*(x*z+w*y)`, `1-2*(z*z+y*y)`
   // match `Moho::QuatToMatrix`'s column exactly), not the generic
   // `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) this

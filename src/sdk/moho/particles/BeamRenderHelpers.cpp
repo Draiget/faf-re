@@ -106,7 +106,7 @@ namespace
     Wm3::Vector3<float> out{};
     // Ground truth (FUN_00491760.c, EmitInterpolatedBeamQuadVertices) rotates
     // via Moho::MultQuadVec, not the generic Wm3::MultiplyQuaternionVector --
-    // same .x-scalar-vs-.w-scalar mismatch as the other orient_-consuming
+    // same quaternion-convention mismatch as the other orient_-consuming
     // sites. `orientation` here is a Wm3::Quaternion::Nlerp of two orient_
     // fields; Nlerp treats all four lanes symmetrically (component-wise lerp
     // + Dot-based hemisphere check + normalize), so it preserves whatever

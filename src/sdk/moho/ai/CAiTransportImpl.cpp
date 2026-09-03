@@ -1470,7 +1470,7 @@ bool CAiTransportImpl::TransportIsUnitAssignedForPickup(Unit* const unit) const
  * Ground truth (`FUN_005E66B0.c`) rotates via `Moho::MultQuadVec(&v13, &v12,
  * &this->mRes.mOri)`, not the generic `Quaternion::Rotate` (upstream
  * WildMagic, `.w`-scalar `ToMat3()`) this replaces -- `mPickupInfo.mOri` is
- * always this engine's `.x`-scalar convention.
+ * always this engine's scalar-first convention.
  */
 SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(Unit* const unit) const
 {
@@ -2322,7 +2322,7 @@ VTransform CAiTransportImpl::TransportGetAttachBoneTransform(Unit* const unit) c
  * Ground truth (`FUN_005E7AD0.c`) builds the local-bone forward via
  * `Moho::VAxes3::VAxes3(&result, &a2)` and reads its `vZ` member -- NOT the
  * generic `Quaternion::Rotate((0,0,1))` (upstream WildMagic, `.w`-scalar
- * `ToMat3()`). `VAxes3::vZ` is the `.x`-scalar rotation matrix's row 0 (see
+ * `ToMat3()`). `VAxes3::vZ` is the scalar-first rotation matrix's row 0 (see
  * `VAxes3::VAxes3`'s doc comment in `MathReflection.cpp` for the constructor
  * fix this depends on) -- numerically the same as `Moho::MultQuadVec`
  * against `(0,0,1)` would give, once `VAxes3`'s own constructor is correct.

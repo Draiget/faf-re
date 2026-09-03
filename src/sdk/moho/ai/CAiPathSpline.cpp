@@ -434,7 +434,7 @@ namespace
   }
 
   // Ground truth (`FUN_005B2FF0.c`, `Moho::CAiPathSpline::Generate`, this
-  // helper's sole caller) matches the engine `.x`-scalar rotation matrix
+  // helper's sole caller) matches the engine scalar-first rotation matrix
   // term-by-term, not the generic `Quaternion::Rotate` (upstream WildMagic,
   // `.w`-scalar `ToMat3()`) this replaces.
   [[nodiscard]] Wm3::Vector3f UnitForwardXZ(const Unit* unit) noexcept
@@ -1183,7 +1183,7 @@ const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
  *
  * Returns the number of nodes produced.
  *
- * Ground truth (`FUN_005B26C0.c`) matches the engine `.x`-scalar rotation
+ * Ground truth (`FUN_005B26C0.c`) matches the engine scalar-first rotation
  * matrix term-by-term for the initial forward sample, not the generic
  * `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) the
  * previous body here used.

@@ -280,7 +280,7 @@ namespace moho
    * Ground truth (`FUN_00697750.c`) rotates via
    * `Moho::MultQuadVec(&v7, &a2->mCollisionOffset, &a2->mOrientation)`, not
    * the generic `Wm3::MultiplyQuaternionVector`. `mOrientation` is always in
-   * this engine's `.x`-scalar convention (it is copied byte-for-byte to/from
+   * this engine's scalar-first convention (it is copied byte-for-byte to/from
    * `VTransform::orient_` both here and in `SetTransform`, below).
    */
   VTransform* BuildTransformFromSPhysBody(VTransform* const outTransform, const SPhysBody* const body)
@@ -492,7 +492,7 @@ namespace moho
    *
    * Ground truth (`FUN_006976E0.c`) rotates via
    * `Moho::MultQuadVec(&v5, &a2->mCollisionOffset, &a1->orient)`, not the
-   * generic `Wm3::MultiplyQuaternionVector` -- same `.x`-scalar-vs-`.w`-scalar
+   * generic `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
    * mismatch as `BuildTransformFromSPhysBody`, above.
    */
   void SPhysBody::SetTransform(const VTransform& transform)
@@ -518,7 +518,7 @@ namespace moho
    * `[edi+2Ch]` (orientation lane 0) verbatim, and 0x00697F9A / 0x00697FAD /
    * 0x00697FB2 subtract `[edi+30h]` / `[edi+34h]` / `[edi+38h]` from the zero
    * constant `dword_E4F748` - keep `.w`, negate `.x/.y/.z`. A prior revision
-   * recorded this as an `.x`-scalar conjugate "confirmed throughout this
+   * recorded this as an scalar-first conjugate "confirmed throughout this
    * file"; the same lane-0-kept shape appears in `VTransform::Inverse`
    * (0x0046FBF0) and `IntegrateAngularImpulse` (0x006978D0).
    */
@@ -555,7 +555,7 @@ namespace moho
    * own constructor had an independent, pre-existing bug (fixed in
    * `MathReflection.cpp`, see `VAxes3::VAxes3`'s doc comment), not because
    * the two are actually different operations: with that fixed, `VAxes3`'s
-   * `vX`/`vY`/`vZ` are exactly the `.x`-scalar rotation matrix's rows, i.e.
+   * `vX`/`vY`/`vZ` are exactly the scalar-first rotation matrix's rows, i.e.
    * numerically identical to `MultQuadVec` against the standard basis
    * vectors. The call here matches the binary's own control flow either
    * way (it constructs `VAxes3` and reads its members directly), so no
@@ -626,7 +626,7 @@ namespace moho
    * both the point and the impulse via two `Moho::MultQuadVec` calls against
    * that transform's `orient` -- not `Quaternion::Rotate` (upstream WildMagic,
    * same `.w`-scalar `ToMat3()` formula as `Wm3::MultiplyQuaternionVector`).
-   * `mOrientation` is always in this engine's `.x`-scalar convention (see
+   * `mOrientation` is always in this engine's scalar-first convention (see
    * `BuildTransformFromSPhysBody`/`SetTransform`, above), so the previous
    * `.Rotate()`-based body also silently dropped the collision-offset term
    * that `BuildTransformFromSPhysBody` folds into its transform's position.
@@ -692,11 +692,11 @@ namespace moho
    * renormalizes in place.
    *
    * Ground truth (`FUN_006978D0.c`) independently confirms both halves of the
-   * engine `.x`-scalar convention this file already established elsewhere:
+   * engine scalar-first convention this file already established elsewhere:
    * the conjugate keeps `.x` and negates `.y/.z/.w` (manually built, then fed
    * to `Moho::MultQuadVec`) -- not `Quaternion::Conjugate().Rotate()`
    * (upstream WildMagic, keeps `.w`/negates `.x/.y/.z`, `.w`-scalar `ToMat3`)
-   * -- and the final compose is the same `.x`-scalar Hamilton product as
+   * -- and the final compose is the same scalar-first Hamilton product as
    * `CAniPoseBone::Rotate`/`VTransform::Compose`, with `deltaOrientation` as
    * the left/first operand and the existing `mOrientation` as the
    * right/second operand -- not `operator*` (same upstream `.w`-scalar

@@ -1909,7 +1909,7 @@ namespace moho
    * This is exactly the transpose of `Moho::QuatToMatrix` (0x00452FD0) - the
    * row-vector form against that helper's column-vector form - which is the
    * consistency check that both are recovered correctly. A prior revision
-   * wrote both in an `.x`-scalar form, complete with a `ww2` term this
+   * wrote both in an scalar-first form, complete with a `ww2` term this
    * function never computes.
    *
    * Float addition does not associate, so the diagonal sums keep the binary's
