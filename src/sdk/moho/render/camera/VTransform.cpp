@@ -249,7 +249,7 @@ namespace moho
    *   0x0046FC12  xmm3 = 0 - [eax+0C]          -> [edi+0C]
    *
    * i.e. lane 0 is kept and lanes 1-3 are negated. A prior revision inverted
-   * that ("keeps `.x`, negates `.y/.z/.w`") to pair with an `.x`-scalar
+   * that ("keeps `.x`, negates `.y/.z/.w`") to pair with an scalar-first
    * `QuatToMatrix`; both were mis-recovered. `QuatToMatrix` (0x00452FD0)
    * computes no `ww` term at all, which fixes `.w` as its scalar lane, and
    * the quaternion product inlined into `HardwareMeshBatch::FillBatch`

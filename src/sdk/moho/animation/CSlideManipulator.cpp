@@ -572,7 +572,7 @@ moho::CSlideManipulator::CSlideManipulator(moho::Sim* const sim, moho::CAniActor
  * Ground truth (`FUN_00647300.c`) rotates via
  * `Moho::MultQuadVec(&v15, v8, (Wm3::Quaternionf*)(v11+32))` -- the bone's own
  * `orient_` field -- not the generic `Wm3::MultiplyQuaternionVector`, same
- * `.x`-scalar-vs-`.w`-scalar mismatch as the other `orient_`-consuming sites.
+ * quaternion-convention mismatch as the other `orient_`-consuming sites.
  */
 bool moho::CSlideManipulator::ManipulatorUpdate()
 {

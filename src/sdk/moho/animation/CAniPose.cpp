@@ -491,7 +491,7 @@ namespace moho
    *   0x0054BCDC..0x0054BD03  z = a2*b1 + a0*b3 + a3*b0 - a1*b2
    *
    * The scalar term is positive in lane 0, so this is an ordinary scalar-first
-   * product, not the `.x`-scalar one a prior revision assumed. And the cross
+   * product, not the scalar-first one a prior revision assumed. And the cross
    * terms carry the opposite sign to `rotation * orient_`: the binary composes
    * `orient_ * rotation`, with the existing orientation as the LEFT operand.
    * The previous body had both the convention and the operand order wrong.

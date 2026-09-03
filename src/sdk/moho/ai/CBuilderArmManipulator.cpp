@@ -399,7 +399,7 @@ namespace moho
    * Updates one heading/pitch tracking lane against one watched bone and
    * returns tracking-state bits (`outside-tolerance`, `heading-moving`).
    *
-   * Same .x-scalar-vs-.w-scalar mismatch as `CAimManipulator::CheckTracking`
+   * Same quaternion-convention mismatch as `CAimManipulator::CheckTracking`
    * (identical structure): ground truth (`FUN_00636220.c`) conjugates
    * `orient_` keeping `.x` fixed and negating `.y/.z/.w`, and rotates via
    * `Moho::MultQuadVec`, not `Wm3::MultiplyQuaternionVector`. The local

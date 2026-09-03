@@ -888,7 +888,7 @@ namespace moho
    * all** - the diagonals pair only `x`, `y` and `z` with each other - which
    * is the signature of `.w` being the scalar, not `.x`.
    *
-   * A prior revision "re-derived" this into an `.x`-scalar matrix. That form
+   * A prior revision "re-derived" this into an scalar-first matrix. That form
    * is self-consistent as a rotation matrix, but it is not what this function
    * computes, and it disagrees with the quaternion product inlined into
    * `HardwareMeshBatch::FillBatch` (0x007E7EA0), whose scalar term

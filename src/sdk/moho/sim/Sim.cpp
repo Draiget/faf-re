@@ -6008,7 +6008,7 @@ namespace
   // Ground truth (`FUN_00748AA0`, `Sim::CreateUnit`'s inlined call to this
   // helper; confirmed from the .asm's literal `call Moho__EulerRollToQuat`)
   // builds the spawn orientation via `Moho::EulerRollToQuat`, which writes
-  // this engine's `.x`-scalar convention directly -- not
+  // this engine's scalar-first convention directly -- not
   // `Wm3::Quatf::MakeFromAxisAngle` (a FAF-added WildMagic-style helper that
   // writes cos(half) into the native `.w` lane), which produced a
   // `.w`-scalar-tagged-as-`.x` quaternion for every spawned unit's initial

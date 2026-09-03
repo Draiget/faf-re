@@ -278,7 +278,7 @@ namespace
   // (UnitWeapon::TargetSolutionStatusGun, FUN_006D5B40) -- see that
   // function's own doc comment for the full ground-truth citation
   // (FUN_006D5B40.c calls Wm3::Quaternion::ToAngle, algebraically identical
-  // to atan2(MultQuadVec(quat,(0,0,1)).x, .z) under this engine's .x-scalar
+  // to atan2(MultQuadVec(quat,(0,0,1)).x, .z) under this engine's scalar-first
   // convention). This copy's own reachability is a separate, pre-existing
   // concern; the quaternion fix below is the same either way.
   [[nodiscard]] WeaponTargetRangeStatus EvaluateWeaponTargetSolutionStatusGun(
