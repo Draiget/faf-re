@@ -274,6 +274,26 @@ namespace moho
   CollisionDBRect* func_Rect2fToInt16(CollisionDBRect* out, const gpg::Rect2f& rect);
 
   /**
+   * Address: 0x004FCBE0 (FUN_004FCBE0, Moho::func_AABoxToRect)
+   *
+   * IDA signature:
+   * Moho::CollisionDBRect *__usercall func_AABoxToRect@<eax>(
+   *   Wm3::AxisAlignedBox3f *box@<eax>, Moho::CollisionDBRect *out@<ebx>);
+   *
+   * What it does:
+   * Quantizes a world-space axis-aligned box's X/Z footprint into a 16-bit
+   * cell-space `CollisionDBRect` (one collision cell = 4 world units). The
+   * start corner floors, the far corner ceils and is then rounded up to the
+   * next whole cell, and both extents are measured from the *clamped* start
+   * so the rect can never run past cell 0xFFFF.
+   *
+   * Differs from `func_Rect2fToInt16` above in two ways that matter: that one
+   * truncates toward zero instead of flooring/ceiling, and it forces width and
+   * height to at least 1 where this one allows an empty rect.
+   */
+  CollisionDBRect* func_AABoxToRect(CollisionDBRect* out, const Wm3::AxisAlignedBox3f& box);
+
+  /**
    * Address: 0x00720770 (FUN_00720770, Moho::struct_poi::RectFreeOfUnits)
    *
    * What it does:

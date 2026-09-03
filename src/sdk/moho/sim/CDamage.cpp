@@ -871,23 +871,25 @@ namespace moho
     outerSphere.Center = damage.mOrigin;
     outerSphere.Radius = damage.mMaxRadius;
 
-    // Bounding cell rect covering the outer sphere (one collision cell = 4 world units).
-    const float minX = damage.mOrigin.x - damage.mMaxRadius;
-    const float minZ = damage.mOrigin.z - damage.mMaxRadius;
-    const float maxX = damage.mOrigin.x + damage.mMaxRadius;
-    const float maxZ = damage.mOrigin.z + damage.mMaxRadius;
-    const int minCellX = static_cast<int>(std::floor(minX)) >> 2;
-    const int minCellZ = static_cast<int>(std::floor(minZ)) >> 2;
-    const int maxCellX = (static_cast<int>(std::ceil(maxX)) + 3) >> 2;
-    const int maxCellZ = (static_cast<int>(std::ceil(maxZ)) + 3) >> 2;
+    // Bounding cell rect covering the outer sphere. The binary builds the
+    // enclosing box around `mMaxRadius` on all three axes and hands it to
+    // `func_AABoxToRect` (0x004FCBE0, called here from 0x00722619), which
+    // quantizes the X/Z footprint into collision cells.
+    const Wm3::AxisAlignedBox3f outerBounds{
+      Wm3::Vector3f{
+        damage.mOrigin.x - damage.mMaxRadius,
+        damage.mOrigin.y - damage.mMaxRadius,
+        damage.mOrigin.z - damage.mMaxRadius,
+      },
+      Wm3::Vector3f{
+        damage.mOrigin.x + damage.mMaxRadius,
+        damage.mOrigin.y + damage.mMaxRadius,
+        damage.mOrigin.z + damage.mMaxRadius,
+      },
+    };
 
     CollisionDBRect cellRect{};
-    cellRect.mStartX = static_cast<std::uint16_t>(std::clamp(minCellX, 0, 0xFFFF));
-    cellRect.mStartZ = static_cast<std::uint16_t>(std::clamp(minCellZ, 0, 0xFFFF));
-    cellRect.mWidth = static_cast<std::uint16_t>(
-      std::clamp(maxCellX - static_cast<int>(cellRect.mStartX), 0, 0xFFFF - static_cast<int>(cellRect.mStartX)));
-    cellRect.mHeight = static_cast<std::uint16_t>(
-      std::clamp(maxCellZ - static_cast<int>(cellRect.mStartZ), 0, 0xFFFF - static_cast<int>(cellRect.mStartZ)));
+    (void)func_AABoxToRect(&cellRect, outerBounds);
 
     EntityGatherVector gatheredEntities{};
     (void)oGrid->mEntityOccupationManager.GatherUnmarkedEntities(
