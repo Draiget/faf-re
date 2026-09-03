@@ -273,33 +273,40 @@ namespace moho
      * What it does:
      * Emits the eight-triangle fan that fills one tier-1 quadtree cell's four
      * children directly, instead of recursing `TesselateTile` one level
-     * further. Samples a 2(x)x3(z) grid of quantized rect-cache indices
-     * anchored at `(x, z)` - each grid point is queried by its own
-     * `GetIndexAt` call, including the three points queried twice more for a
-     * second sample (`ren_ErrorCache` gates whether `GetIndexAt` reuses a
-     * cached rect or appends a fresh one, so the repeat calls are not
-     * redundant and must not be collapsed to a single sample).
+     * further.
+     *
+     * A tier-1 cell spans two finest-level quads on each axis, so it is
+     * bounded by a 3x3 grid of grid points - which is why `TesselateTile`
+     * calls in with the doubled origin `(2x, 2z)`. The nine `GetIndexAt`
+     * calls below sample that grid in row-major order, and the eight
+     * triangles are the two-per-quad split of the resulting 2x2 quad block.
+     *
+     * Sampling order and triangle operands both read off 0x0080DE80:
+     *   ebp = x, ebx = z; the three column offsets are `ebp`, `lea edi,
+     *   [ebp+1]` (0x0080DEAB, cached in var_10) and `lea ecx, [ebp+2]`
+     *   (0x0080DECC, cached in var_1C), and the row advances by `ebx+1`
+     *   (0x0080DEE9) then `add ebx, 2` (0x0080DF40).
      */
     void EmitTileSubdivisionFan(CTesselator& tesselator, const std::int32_t x, const std::int32_t z)
     {
       const std::uint16_t p00 = tesselator.GetIndexAt(0, x, z);
       const std::uint16_t p10 = tesselator.GetIndexAt(0, x + 1, z);
-      const std::uint16_t p10b = tesselator.GetIndexAt(0, x + 1, z);
+      const std::uint16_t p20 = tesselator.GetIndexAt(0, x + 2, z);
       const std::uint16_t p01 = tesselator.GetIndexAt(0, x, z + 1);
       const std::uint16_t p11 = tesselator.GetIndexAt(0, x + 1, z + 1);
-      const std::uint16_t p11b = tesselator.GetIndexAt(0, x + 1, z + 1);
+      const std::uint16_t p21 = tesselator.GetIndexAt(0, x + 2, z + 1);
       const std::uint16_t p02 = tesselator.GetIndexAt(0, x, z + 2);
       const std::uint16_t p12 = tesselator.GetIndexAt(0, x + 1, z + 2);
-      const std::uint16_t p12b = tesselator.GetIndexAt(0, x + 1, z + 2);
+      const std::uint16_t p22 = tesselator.GetIndexAt(0, x + 2, z + 2);
 
       tesselator.AppendCollisionTriangleIndices(p00, p10, p11);
       tesselator.AppendCollisionTriangleIndices(p00, p11, p01);
-      tesselator.AppendCollisionTriangleIndices(p10, p10b, p11b);
-      tesselator.AppendCollisionTriangleIndices(p10, p11b, p11);
+      tesselator.AppendCollisionTriangleIndices(p10, p20, p21);
+      tesselator.AppendCollisionTriangleIndices(p10, p21, p11);
       tesselator.AppendCollisionTriangleIndices(p01, p11, p12);
       tesselator.AppendCollisionTriangleIndices(p01, p12, p02);
-      tesselator.AppendCollisionTriangleIndices(p11, p11b, p12b);
-      tesselator.AppendCollisionTriangleIndices(p11, p12b, p12);
+      tesselator.AppendCollisionTriangleIndices(p11, p21, p22);
+      tesselator.AppendCollisionTriangleIndices(p11, p22, p12);
     }
 
     // Tighter than AddRect's own 65000-entry cap: leaves headroom so a skirt
