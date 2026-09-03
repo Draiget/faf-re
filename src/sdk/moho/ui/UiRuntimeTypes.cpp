@@ -2162,62 +2162,6 @@ namespace
   );
   static_assert(offsetof(CMauiScrollbarRuntimeView, mAxis) == 0x154, "CMauiScrollbarRuntimeView::mAxis offset must be 0x154");
 
-  struct CameraZoomRuntimeView
-  {
-    void* vftable = nullptr;
-
-    [[nodiscard]] const moho::GeomCamera3& GetView() const
-    {
-      using GetViewFn = const moho::GeomCamera3&(__thiscall*)(const CameraZoomRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<GetViewFn>(table[2]);
-      return fn(this);
-    }
-
-    [[nodiscard]] Wm3::Vector3f CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const
-    {
-      using CameraScreenToSurfaceFn = void(__thiscall*)(const CameraZoomRuntimeView*, Wm3::Vector3f*, const Wm3::Vector2f*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<CameraScreenToSurfaceFn>(table[7]);
-      Wm3::Vector3f worldPoint{};
-      fn(this, &worldPoint, &screenPoint);
-      return worldPoint;
-    }
-
-    void Reset()
-    {
-      using ResetFn = void(__thiscall*)(CameraZoomRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<ResetFn>(table[8]);
-      fn(this);
-    }
-
-    void SetZoomAnchor(float* const zoomAnchor)
-    {
-      using SetZoomAnchorFn = void(__thiscall*)(CameraZoomRuntimeView*, float*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<SetZoomAnchorFn>(table[30]);
-      fn(this, zoomAnchor);
-    }
-
-    void ApplyWheelZoomRatio(const float zoomRatio)
-    {
-      using ApplyWheelZoomRatioFn = void(__thiscall*)(CameraZoomRuntimeView*, float);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<ApplyWheelZoomRatioFn>(table[31]);
-      fn(this, zoomRatio);
-    }
-
-    [[nodiscard]] float CameraGetTargetZoom() const
-    {
-      return reinterpret_cast<const moho::CameraImpl*>(this)->CameraGetTargetZoom();
-    }
-
-    [[nodiscard]] float CameraGetZoom() const
-    {
-      return reinterpret_cast<const moho::CameraImpl*>(this)->CameraGetZoom();
-    }
-  };
 
   // CameraTargetRuntimeView used to sit here: a one-pointer struct that
   // reinterpret_cast a CameraImpl* and hand-dispatched vtable slot 10 through
@@ -2242,9 +2186,9 @@ namespace
      * What it does:
      * Returns the retained world-view camera pointer lane.
      */
-    [[nodiscard]] CameraZoomRuntimeView* GetCamera()
+    [[nodiscard]] moho::CameraImpl* GetCamera()
     {
-      return reinterpret_cast<CameraZoomRuntimeView*>(mCamera);
+      return mCamera;
     }
 
     /**
@@ -20226,7 +20170,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
+  if (moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
     LuaPlus::LuaStackObject yArg(state, 3);
     if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&yArg, "number");
@@ -20238,9 +20182,9 @@ int moho::cfunc_CUIWorldViewZoomScaleL(LuaPlus::LuaState* const state)
       LuaPlus::LuaStackObject::TypeError(&xArg, "number");
     }
     float zoomAnchor[2] = {static_cast<float>(lua_tonumber(state->m_state, 2)), y};
-    camera->SetZoomAnchor(zoomAnchor);
+    camera->CameraSetPivot(Wm3::Vector2f(zoomAnchor[0], zoomAnchor[1]));
 
-    CameraZoomRuntimeView* const wheelCamera = worldViewView->RenderWorldView()->GetCamera();
+    moho::CameraImpl* const wheelCamera = worldViewView->RenderWorldView()->GetCamera();
     LuaPlus::LuaStackObject wheelDeltaArg(state, 5);
     if (lua_type(state->m_state, 5) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&wheelDeltaArg, "number");
@@ -20252,7 +20196,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(LuaPlus::LuaState* const state)
       LuaPlus::LuaStackObject::TypeError(&wheelRotArg, "number");
     }
     const float wheelRotation = static_cast<float>(lua_tonumber(state->m_state, 4));
-    wheelCamera->ApplyWheelZoomRatio(wheelRotation / wheelDelta);
+    wheelCamera->CameraZoom(wheelRotation / wheelDelta);
   }
 
   return 0;
@@ -20304,7 +20248,7 @@ int moho::cfunc_UnProjectL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  CameraZoomRuntimeView* const camera = CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->GetCamera();
 
   const LuaPlus::LuaObject screenPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector2f screenPoint = SCR_FromLuaCopy<Wm3::Vector2f>(screenPointObject);
@@ -20363,7 +20307,7 @@ int moho::cfunc_CUIWorldViewProjectL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera();
   if (camera == nullptr) {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
@@ -20378,7 +20322,7 @@ int moho::cfunc_CUIWorldViewProjectL(LuaPlus::LuaState* const state)
   const float height = CScriptLazyVar_float::GetValue(&controlView->mHeightLV);
   const float width = CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
 
-  const Wm3::Vector2f projectedPoint = camera->GetView().Project(worldPoint, 0.0f, width, height, 0.0f);
+  const Wm3::Vector2f projectedPoint = camera->CameraGetView().Project(worldPoint, 0.0f, width, height, 0.0f);
   LuaPlus::LuaObject projectedPointObject = SCR_ToLua<Wm3::Vector2f>(state, projectedPoint);
   projectedPointObject.PushStack(state);
   return 1;
@@ -20735,8 +20679,8 @@ int moho::cfunc_CUIWorldViewCameraResetL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
-    camera->Reset();
+  if (moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
+    camera->CameraReset();
   }
 
   CUIWorldViewLuaObjectRuntimeView::FromWorldView(worldView)->mLuaObject.PushStack(state);
@@ -23570,7 +23514,7 @@ int moho::cfunc_CUIWorldViewGetScreenPosL(LuaPlus::LuaState* const state)
   const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
   CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  CameraZoomRuntimeView* const camera = worldViewView->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera();
 
   const UserUnitScreenPosRuntimeView* const userUnitView = UserUnitScreenPosRuntimeView::FromUserUnit(userUnit);
   MeshInstance* const meshInstance = userUnitView->mMeshInstance;
@@ -23582,7 +23526,7 @@ int moho::cfunc_CUIWorldViewGetScreenPosL(LuaPlus::LuaState* const state)
 
   meshInstance->UpdateInterpolatedFields();
 
-  const GeomCamera3& cameraView = camera->GetView();
+  const GeomCamera3& cameraView = camera->CameraGetView();
   const Wm3::AxisAlignedBox3f meshBounds{
     {meshInstance->xMin, meshInstance->yMin, meshInstance->zMin},
     {meshInstance->xMax, meshInstance->yMax, meshInstance->zMax},
