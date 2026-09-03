@@ -119,6 +119,21 @@ namespace
     out.reset(pose);
   }
 
+  // Same drain over the `void*` head lane an inline `HSndEntityLoop` keeps: the
+  // nodes are the sound manager's tracking records, which share the two-pointer
+  // shape (0x008B88A0's loop reads `[eax+4]` and clears both words).
+  void ResetLinkChain(void*& head) noexcept
+  {
+    auto* node = static_cast<moho::UserEntityLinkNode*>(head);
+    while (node) {
+      moho::UserEntityLinkNode* const next = node->mNext;
+      node->mPrev = nullptr;
+      node->mNext = nullptr;
+      node = next;
+    }
+    head = nullptr;
+  }
+
   void ResetLinkChain(moho::UserEntityLinkNode*& head) noexcept
   {
     // 0x004DFC50 / 0x00406560: unlink chain head by nulling each node's prev/next.
@@ -381,9 +396,9 @@ namespace moho
     , mPosePrimary()
     , mPoseSecondary()
     , mMeshInstance(nullptr)
-    , mRuntimeLinkHead(nullptr)
-    , mRuntimeSelectionToken(-1)
-    , mCachedAmbientSound(nullptr)
+    // The -1 seeds `HSndEntityLoop::mLoopIndex`: no ambient loop playing yet,
+    // which is the condition CUserSoundManager tests before starting one.
+    , mAmbientLoop{nullptr, -1, nullptr}
     , mRumbleLoopHandle(nullptr)
     , mLastFocusDamageGameTick(-1000)
     , mParams(createParams)
@@ -434,7 +449,7 @@ namespace moho
     // (0x00560310) during standard C++ member destruction.
 
     // Matches the two intrusive-list teardown loops at +0x30 and +0x08.
-    ResetLinkChain(mRuntimeLinkHead);
+    ResetLinkChain(mAmbientLoop.mListLinkHead);
 
     if (mVisionHandle) {
       delete mVisionHandle;
@@ -547,8 +562,8 @@ namespace moho
     }
 
     mVariableData = variableData;
-    if (mVariableData.mAmbientSound != mCachedAmbientSound) {
-      mCachedAmbientSound = mVariableData.mAmbientSound;
+    if (mVariableData.mAmbientSound != mAmbientLoop.mParams) {
+      mAmbientLoop.mParams = mVariableData.mAmbientSound;
     }
     if (mRumbleLoopHandle == nullptr || mVariableData.mRumbleSound != mRumbleLoopHandle->mParams) {
       mRumbleLoopHandle = SND_GetSharedAmbientHandle(mVariableData.mRumbleSound);

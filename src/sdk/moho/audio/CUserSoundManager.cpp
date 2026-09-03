@@ -51,6 +51,10 @@ namespace
   constexpr moho::ELayer kLayerSeabed = static_cast<moho::ELayer>(2);
   constexpr moho::ELayer kLayerSub = static_cast<moho::ELayer>(4);
   constexpr const char* kWorldCameraName = "WorldCamera";
+
+  // 0x008AC9EC `comiss xmm0, ds:dword_E4F8E4`; the constant reads 43 48 00 00 in
+  // the shipped image. Above this listener metric no entity loop is started.
+  constexpr float kEntityLoopListenerCutoff = 200.0f;
   constexpr const char* kAngleVariableName = "Angle";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
@@ -1843,8 +1847,13 @@ namespace moho
 
     mRecentOneShotKeys.Clear();
 
+    // The binary keeps this camera live in a frame slot from here to the tail of
+    // the function (0x008AC1F8 stores it, 0x008AC9D4 reads it back), because the
+    // loop-start pass at the bottom needs it too.
+    CameraImpl* worldCamera = nullptr;
     if (RCamManager* const camManager = CAM_GetManager(); camManager != nullptr) {
-      if (CameraImpl* const camera = camManager->GetCamera(kWorldCameraName); camera != nullptr) {
+      worldCamera = camManager->GetCamera(kWorldCameraName);
+      if (CameraImpl* const camera = worldCamera; camera != nullptr) {
         if (IsSndVarReady(mCameraDistanceVar)) {
           const float lodMetric = camera->LODMetric(camera->CameraGetOffset());
           if (lodMetric != mCurrentCameraDistanceMetric) {
@@ -1983,7 +1992,7 @@ namespace moho
         // decides whether the whole loop keeps playing.
         UserEntity* const entity =
           FindUserSessionEntityById(WLD_GetActiveSession(), treeHead->mLeft->mEntityId);
-        const CSndParams* const ambientParams = entity != nullptr ? entity->mCachedAmbientSound : nullptr;
+        const CSndParams* const ambientParams = entity != nullptr ? entity->mAmbientLoop.mParams : nullptr;
 
         EFilterType filterResult = EFilterType::Pass;
         if (ambientParams != nullptr && record.mParams == ambientParams) {
@@ -2049,6 +2058,59 @@ namespace moho
         }
 
         node = EraseEntityLoopTreeNode(trackedSet, node);
+      }
+    }
+
+    // Third pass (0x008AC9D4..0x008ACBBF): start the loops that are not playing
+    // yet. Nothing else in the engine starts an entity's ambient or rumble loop,
+    // so without this pass `StartEntityLoop` / `StartRPCEntityLoop` are never
+    // reached and no unit is ever audible.
+    //
+    // The candidate set is whatever the world camera currently has in frustum
+    // (`CacheCameraFrustumUnits` refreshes it a few times a second), walked as
+    // weak references so an entity destroyed since the last refresh drops out on
+    // its own -- the binary's `mov esi,[ecx]; sub esi,8` is
+    // `WeakPtr<UserEntity>::DecodeOwnerObject`, null slot and sentinel included.
+    if (worldCamera == nullptr) {
+      return;
+    }
+    if (mCurrentCameraDistanceMetric > kEntityLoopListenerCutoff) {
+      return;
+    }
+
+    const CameraFrustumUserEntityList& audibleEntities = worldCamera->GetAllSoundEntitiesInFrustum();
+    for (const CameraUserEntityWeakRef* ref = audibleEntities.mStart; ref != audibleEntities.mFinish; ++ref) {
+      UserEntity* const entity = WeakPtr<UserEntity>::DecodeOwnerObject(ref->mOwnerLinkSlot);
+      if (entity == nullptr) {
+        continue;
+      }
+
+      const auto layer = static_cast<ELayer>(entity->mVariableData.mLayerMask);
+      const Wm3::Vector3f& position = entity->mVariableData.mCurTransform.pos_;
+
+      // Ambient loop: the entity's own inline HSndEntityLoop, started once and
+      // then held down by its mLoopIndex leaving -1 (0x008ACA2F..0x008ACAE4).
+      CSndParams* const ambientParams = entity->mAmbientLoop.mParams;
+      if (ambientParams != nullptr && ParamsHasResolvedEngine(*ambientParams)
+          && entity->mAmbientLoop.mLoopIndex == -1) {
+        if (FilterSound(ambientParams, layer, &position) == EFilterType::Pass) {
+          const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
+          StartEntityLoop(entityId, &entity->mAmbientLoop);
+        }
+      }
+
+      // Rumble loop: a shared handle, so the "already started for this entity"
+      // latch lives on the entity instead (+0x144), set right after the start
+      // call at 0x008ACBA6 and cleared by the cull pass above.
+      HSndEntityLoop* const rumbleLoop = entity->mRumbleLoopHandle;
+      CSndParams* const rumbleParams = rumbleLoop != nullptr ? rumbleLoop->mParams : nullptr;
+      if (rumbleParams != nullptr && ParamsHasResolvedEngine(*rumbleParams)
+          && entity->mHasInitialUpdate == 0u) {
+        if (FilterSound(rumbleParams, layer, &position) == EFilterType::Pass) {
+          const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
+          StartRPCEntityLoop(entityId, rumbleLoop);
+          entity->mHasInitialUpdate = 1u;
+        }
       }
     }
   }

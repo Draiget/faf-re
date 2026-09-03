@@ -5,6 +5,7 @@
 
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
+#include "moho/audio/CSndParams.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/WeakObject.h"
@@ -22,7 +23,6 @@ namespace moho
   class CD3DBatchTexture;
   class UserArmy;
   class CSndParams;
-  struct HSndEntityLoop;
   struct REntityBlueprint;
 
   using UserEntityLinkNode = TDatListItem<void, void>;
@@ -297,9 +297,22 @@ namespace moho
     boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
     boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
     MeshInstance* mMeshInstance;                // 0x2C
-    UserEntityLinkNode* mRuntimeLinkHead;       // 0x30
-    std::int32_t mRuntimeSelectionToken;        // 0x34
-    CSndParams* mCachedAmbientSound;            // 0x38
+    /**
+     * The entity's own ambient sound loop, stored inline rather than behind a
+     * pointer. `CUserSoundManager::UpdateSoundRequests` takes its address as
+     * the `HSndEntityLoop*` argument to `StartEntityLoop`
+     * (`lea eax, [esi+30h]` at 0x008ACAD5) and reads `mLoopIndex == -1` at
+     * 0x008ACA5B as "this entity's ambient loop is not currently playing".
+     *
+     * The three lanes were previously modelled as separate fields
+     * (`mRuntimeLinkHead` / `mRuntimeSelectionToken` / `mCachedAmbientSound`),
+     * which is why the ambient loop had no way to be started: nothing could
+     * form the `HSndEntityLoop*` the sound manager needs. They line up exactly:
+     * `~UserEntity` drains `mListLinkHead` at +0x30 as the tracking chain, the
+     * constructor seeds `mLoopIndex` at +0x34 with -1, and `UpdateEntityData`
+     * refreshes `mParams` at +0x38 from the replicated ambient sound.
+     */
+    HSndEntityLoop mAmbientLoop;                // 0x30
     HSndEntityLoop* mRumbleLoopHandle;          // 0x3C
     std::int32_t mLastFocusDamageGameTick;      // 0x40
     SCreateEntityParams mParams;                // 0x44
@@ -326,9 +339,14 @@ namespace moho
   static_assert(offsetof(UserEntity, mPosePrimary) == 0x1C, "UserEntity::mPosePrimary offset must be 0x1C");
   static_assert(offsetof(UserEntity, mPoseSecondary) == 0x24, "UserEntity::mPoseSecondary offset must be 0x24");
   static_assert(offsetof(UserEntity, mMeshInstance) == 0x2C, "UserEntity::mMeshInstance offset must be 0x2C");
-  static_assert(offsetof(UserEntity, mRuntimeLinkHead) == 0x30, "UserEntity::mRuntimeLinkHead offset must be 0x30");
+  static_assert(offsetof(UserEntity, mAmbientLoop) == 0x30, "UserEntity::mAmbientLoop offset must be 0x30");
   static_assert(
-    offsetof(UserEntity, mRuntimeSelectionToken) == 0x34, "UserEntity::mRuntimeSelectionToken offset must be 0x34"
+    offsetof(UserEntity, mAmbientLoop) + offsetof(HSndEntityLoop, mLoopIndex) == 0x34,
+    "UserEntity::mAmbientLoop.mLoopIndex must land at 0x34"
+  );
+  static_assert(
+    offsetof(UserEntity, mAmbientLoop) + offsetof(HSndEntityLoop, mParams) == 0x38,
+    "UserEntity::mAmbientLoop.mParams must land at 0x38"
   );
   static_assert(
     offsetof(UserEntity, mRumbleLoopHandle) == 0x3C, "UserEntity::mRumbleLoopHandle offset must be 0x3C"

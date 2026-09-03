@@ -2622,6 +2622,20 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
 }
 
 /**
+ * Address: 0x007A78F0 (FUN_007A78F0, Moho::CameraImpl::GetAllSoundEntitiesInFrustum)
+ * Slot: 39 (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474)
+ *
+ * What it does:
+ * Hands back the sound/all-entities frustum cache at `camera + 0x460` -- the
+ * lane `CacheCameraFrustumUnits` above fills with every live entity inside the
+ * current camera view. The binary is a bare `lea eax, [ecx+460h]; retn`.
+ */
+moho::CameraFrustumUserEntityList& moho::CameraImpl::GetAllSoundEntitiesInFrustum()
+{
+  return AsFrustumLanesView(this)->mFrustumLaneA.mView;
+}
+
+/**
  * Address: 0x007A73C0 (FUN_007A73C0)
  *
  * What it does:

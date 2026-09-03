@@ -982,6 +982,26 @@ namespace moho
      * Slot: 45
      */
     [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
+
+    /**
+     * Address: 0x007A78F0 (FUN_007A78F0,
+     *   ?GetAllSoundEntitiesInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ)
+     * Slot: 39 (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474)
+     *
+     * IDA signature:
+     * gpg::fastvector_n<Moho::WeakPtr<Moho::UserEntity>, 40> &__thiscall
+     *   Moho::CameraImpl::GetAllSoundEntitiesInFrustum(Moho::CameraImpl *this);
+     *
+     * What it does:
+     * Returns the first of the three frustum caches `CacheCameraFrustumUnits`
+     * rebuilds -- every live entity currently inside the camera view, held as
+     * weak references. The whole body is `lea eax, [ecx+460h]; retn`.
+     *
+     * Its one caller is `CUserSoundManager::UpdateSoundRequests`, which walks
+     * this list to start the ambient and rumble loops of everything the
+     * listener can currently hear.
+     */
+    [[nodiscard]] CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum();
   };
 
   /**
