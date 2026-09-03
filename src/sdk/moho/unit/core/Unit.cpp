@@ -13596,10 +13596,16 @@ Unit::Unit(const SUnitConstructionParams& params)
       IUnit::CalcSpawnElevation(sim->mMapData, mCurrentLayer, spawnTransform, VarDat().mAttributes);
   }
 
-  PendingOrientation.x = spawnTransform.orient_.X();
-  PendingOrientation.y = spawnTransform.orient_.Y();
-  PendingOrientation.z = spawnTransform.orient_.Z();
-  PendingOrientation.w = spawnTransform.orient_.W();
+  // Lane-for-lane copy (0x006A5BF9..0x006A5C23 stores the transform's four
+  // orientation dwords straight into PendingOrientation). Entity keeps the
+  // orientation as a Vector4f whose lane 0 is the scalar, so the copy must be
+  // by memory lane, not by name: `.x = orient_.X()` put the imaginary x into
+  // lane 0 and rotated the whole quaternion, which flipped every spawned unit
+  // upside-down on the user side (its skinned mesh drew as an unlit black blob).
+  PendingOrientation.x = spawnTransform.orient_.W();
+  PendingOrientation.y = spawnTransform.orient_.X();
+  PendingOrientation.z = spawnTransform.orient_.Y();
+  PendingOrientation.w = spawnTransform.orient_.Z();
   PendingPosition = spawnTransform.pos_;
   // Twice, as the binary does: the first call publishes the spawn pose into the
   // current lane and the second copies it into the previous-frame lane, so the
