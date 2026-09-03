@@ -95,36 +95,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00721A90 (FUN_00721A90)
-   *
-   * What it does:
-   * Marks terrain/water occupancy masks for the reclaim area rectangle.
-   */
-  void LoadOccupancy(const std::uint8_t occupancyCaps, moho::COGrid* grid, const gpg::Rect2i& rect)
-  {
-    if (!grid) {
-      return;
-    }
-
-    const int width = rect.x1 - rect.x0;
-    const int height = rect.z1 - rect.z0;
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    if ((occupancyCaps & 0x07u) != 0u) {
-      grid->terrainOccupation.FillRect(rect.x0, rect.z0, width, height, true);
-    }
-    if ((occupancyCaps & 0x08u) != 0u) {
-      grid->waterOccupation.FillRect(rect.x0, rect.z0, width, height, true);
-    }
-
-    if (grid->sim && grid->sim->mPathTables) {
-      grid->sim->mPathTables->DirtyClusters(rect);
-    }
-  }
-
   struct OccupancyFootprintRuntimeView
   {
     std::uint8_t widthCells = 0;         // +0x00
