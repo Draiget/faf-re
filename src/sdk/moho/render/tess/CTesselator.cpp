@@ -612,6 +612,17 @@ namespace moho
         }
 
         for (std::size_t v = 1; v < clippedCount - 1u; ++v) {
+          // Cap check at 0x0080D9C1: `if ((mRectCache.finish - .start) <
+          // 0xFDE5)`, i.e. stop three short of the 65000-entry cache so the
+          // three pushes below cannot take it past the limit. Without it the
+          // cache grows unbounded, `Size() - 1` wraps past 0xFFFF, and the
+          // unclamped `Lock(0, rectCacheCount)` in the fidelity classes runs
+          // off the end of a 0xFFFF-vertex sheet.
+          constexpr std::size_t kClipRectCacheHeadroom = 0xFDE5u;
+          if (tesselator.GetRectCacheCount() >= static_cast<std::int32_t>(kClipRectCacheHeadroom)) {
+            continue;
+          }
+
           const CTesselator::Rect16 rectA = QuantizeClipCornerToRect(tesselator.mClipPolygonScratch[0]);
           const CTesselator::Rect16 rectB = QuantizeClipCornerToRect(tesselator.mClipPolygonScratch[v]);
           const CTesselator::Rect16 rectC = QuantizeClipCornerToRect(tesselator.mClipPolygonScratch[v + 1]);
@@ -625,7 +636,12 @@ namespace moho
           const auto idxB = static_cast<std::uint16_t>(tesselator.mRectCache.Size() - 1);
           tesselator.mRectCache.PushBack(rectC);
           const auto idxC = static_cast<std::uint16_t>(tesselator.mRectCache.Size() - 1);
-          tesselator.AppendCollisionTriangleIndices(idxA, idxB, idxC);
+
+          // Newest index first: the binary emits `sub_80D2F0(this, size-1,
+          // size-2, size-3)` at 0x0080DA9C, which is (C, B, A) - the reverse
+          // of the push order. Emitting (A, B, C) reverses the winding of
+          // every clipped decal triangle, so back-face culling drops them.
+          tesselator.AppendCollisionTriangleIndices(idxC, idxB, idxA);
           ++emittedTriangleCount;
         }
       }
