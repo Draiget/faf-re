@@ -1272,7 +1272,13 @@ namespace
   constexpr std::uint32_t kIntelEnabledFlagMask = ~kIntelRadiusMagnitudeMask;
   constexpr std::size_t kEntityIntelAttributesOffset = 0x128u;
   constexpr std::size_t kDiscardClientSlotCount = 17u;
-  constexpr std::uintptr_t kLuaCallbackDispatchBlockedFlagEa = 0x011FD23Fu;
+  // FAF-patch global (BSS byte at 0x011FD23F in the shipped exe, read by
+  // cfunc_SimCallbackL 0x008BA770 and cfunc_SetPausedL 0x008BC100). It is a
+  // latch the patch region raises to stop UI Lua from marshalling sim
+  // callbacks once the session is over; zero-initialised, so callbacks flow
+  // by default. Modelled as a real global -- it used to be read through the
+  // original image's address, which in this process is unmapped memory.
+  bool gLuaSimCallbackDispatchBlocked = false;
 
   struct EntityIntelAttributeRangesView
   {
@@ -1589,13 +1595,7 @@ namespace
 
   [[nodiscard]] bool IsLuaCallbackDispatchBlocked() noexcept
   {
-#if defined(_M_IX86)
-    const auto* const blockedFlag =
-      reinterpret_cast<const volatile std::uint8_t*>(kLuaCallbackDispatchBlockedFlagEa);
-    return *blockedFlag == 1u;
-#else
-    return false;
-#endif
+    return gLuaSimCallbackDispatchBlocked;
   }
 
   [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
@@ -29188,16 +29188,20 @@ namespace moho
     session->DirtyCommandGraph();
   }
 
+namespace moho
+{
+  TSimConVar<bool>& AI_DebugCollisionConVar();
+} // namespace moho
+
 namespace
 {
   // Process-global `AI_DebugCollision` sim convar singleton (statically
-  // constructed at .data 0x010AD5F8). When set, `Sim::DoCollisionsFor` skips
+  // constructed at .data 0x010AD5F8 in the shipped exe; owned here by
+  // SimDebugCommandRegistrations.cpp). When set, `Sim::DoCollisionsFor` skips
   // physical collision resolution so the collision overlay can be inspected.
-  // Same fixed-address accessor pattern as `moho::console::Sim*ConVar()`.
   [[nodiscard]] CSimConVarBase* AIDebugCollisionConVar() noexcept
   {
-    constexpr std::uintptr_t kAIDebugCollisionConVarEa = 0x010AD5F8u;
-    return reinterpret_cast<CSimConVarBase*>(kAIDebugCollisionConVarEa);
+    return &moho::AI_DebugCollisionConVar();
   }
 
   // Owner "mass" proxy = blueprint average density folded over the unit's

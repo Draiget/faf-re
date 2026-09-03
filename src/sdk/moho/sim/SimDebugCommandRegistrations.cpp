@@ -1469,6 +1469,16 @@ namespace
 namespace moho
 {
   /**
+   * The process-wide `AI_DebugCollision` sim convar (statically constructed in
+   * the shipped exe at .data 0x010AD5F8). `Sim::DoCollisionsFor` reads it to
+   * skip physical collision resolution while the collision overlay is on.
+   */
+  TSimConVar<bool>& AI_DebugCollisionConVar()
+  {
+    return ConstructAiDebugCollisionSimConVar();
+  }
+
+  /**
    * Address: 0x00BFB7D0 (FUN_00BFB7D0, cleanup_dbg_ConAlias)
    *
    * What it does:
