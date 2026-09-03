@@ -42,3 +42,6 @@ build_sdk.bat
 
 # Unpacked game data (extracted from C:\ProgramData\FAForever\gamedata)
 gamedata/
+
+# Session memory is machine-local; never pushed.
+.memory/
