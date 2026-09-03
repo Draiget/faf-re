@@ -6,6 +6,7 @@
 #include <limits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <typeinfo>
@@ -2531,6 +2532,90 @@ namespace moho
     });
   }
 
+  // ---------------------------------------------------------------------
+  // TEMPORARY PROBE -- delete with the call site in DirtyClusters below.
+  // Not part of the recovery: the binary dereferences the lane unguarded.
+  // ---------------------------------------------------------------------
+
+  /// True when `cluster` points at committed, writable private heap memory,
+  /// which every live `ClusterMap` does (`::operator new(sizeof(ClusterMap))`
+  /// in the `PathTables` constructor). A pointer into the image, a reserved
+  /// or free region, or a read-only page is corruption by definition.
+  [[nodiscard]] bool ClusterMapPointerLooksLive(const ClusterMap* const cluster) noexcept
+  {
+    MEMORY_BASIC_INFORMATION info{};
+    if (::VirtualQuery(cluster, &info, sizeof(info)) != sizeof(info)) {
+      return false;
+    }
+    if (info.State != MEM_COMMIT || info.Type != MEM_PRIVATE) {
+      return false;
+    }
+
+    constexpr DWORD kWritableMask = PAGE_READWRITE | PAGE_WRITECOPY
+                                  | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+    if ((info.Protect & kWritableMask) == 0u || (info.Protect & PAGE_GUARD) != 0u) {
+      return false;
+    }
+
+    // The object must fit inside the region it starts in; a pointer landing in
+    // the last few bytes of a block is the signature of a mid-block overwrite.
+    const auto address = reinterpret_cast<std::uintptr_t>(cluster);
+    const auto regionEnd = reinterpret_cast<std::uintptr_t>(info.BaseAddress) + info.RegionSize;
+    return (address + sizeof(ClusterMap)) <= regionEnd;
+  }
+
+  /// Emits one line per corrupt lane entry, plus the whole array on the first
+  /// hit, so the shape of the damage is visible: a single bad slot means the
+  /// `ClusterMap` block was recycled, whereas several bad slots (or a wrecked
+  /// `mFirst`/`mLast` pair) mean the pointer array itself was overwritten.
+  void ReportCorruptClusterMapLane(
+    const PathTablesImpl* const impl,
+    ClusterMap** const slot,
+    const ClusterMap* const cluster
+  ) noexcept
+  {
+    static bool sDumpedLane = false;
+
+    char line[256];
+    MEMORY_BASIC_INFORMATION info{};
+    const bool queried = ::VirtualQuery(cluster, &info, sizeof(info)) == sizeof(info);
+    (void)std::snprintf(
+      line, sizeof(line),
+      "[CLUSTERLANE] bad slot=%p index=%d cluster=%p state=%08lX type=%08lX protect=%08lX\n",
+      static_cast<const void*>(slot),
+      static_cast<int>(slot - impl->mMaps.mFirst),
+      static_cast<const void*>(cluster),
+      queried ? info.State : 0ul,
+      queried ? info.Type : 0ul,
+      queried ? info.Protect : 0ul
+    );
+    ::OutputDebugStringA(line);
+
+    if (sDumpedLane) {
+      return;
+    }
+    sDumpedLane = true;
+
+    (void)std::snprintf(
+      line, sizeof(line),
+      "[CLUSTERLANE] impl=%p first=%p last=%p end=%p count=%d\n",
+      static_cast<const void*>(impl),
+      static_cast<const void*>(impl->mMaps.mFirst),
+      static_cast<const void*>(impl->mMaps.mLast),
+      static_cast<const void*>(impl->mMaps.mEnd),
+      static_cast<int>(impl->mMaps.mLast - impl->mMaps.mFirst)
+    );
+    ::OutputDebugStringA(line);
+
+    for (ClusterMap** it = impl->mMaps.mFirst; it != impl->mMaps.mLast; ++it) {
+      (void)std::snprintf(
+        line, sizeof(line), "[CLUSTERLANE]   [%d] = %p\n",
+        static_cast<int>(it - impl->mMaps.mFirst), static_cast<const void*>(*it)
+      );
+      ::OutputDebugStringA(line);
+    }
+  }
+
   /**
    * Address: 0x0076BBD0 (FUN_0076BBD0, Moho::PathQueue::DirtyClusters)
    */
@@ -2543,6 +2628,18 @@ namespace moho
     for (ClusterMap** it = mImpl->mMaps.mFirst; it != mImpl->mMaps.mLast; ++it) {
       ClusterMap* const cluster = *it;
       if (!cluster) {
+        continue;
+      }
+
+      // TEMPORARY PROBE (remove once the ClusterMap* corruption is root-caused).
+      // The reported fault is inside DirtyRect's very first statement, reading
+      // `mArea` at +0x90 -- i.e. this array held a readable-but-wrong pointer.
+      // Classify it before dereferencing so one run says whether the *array*
+      // was smashed or a single entry, and what the garbage actually is (a
+      // freed block, an image/.rdata address like the documented small-block
+      // allocator defect, or an unmapped page).
+      if (!ClusterMapPointerLooksLive(cluster)) {
+        ReportCorruptClusterMapLane(mImpl, it, cluster);
         continue;
       }
 
