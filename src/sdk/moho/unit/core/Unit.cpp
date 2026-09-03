@@ -2205,9 +2205,6 @@ namespace
     );
   }
 
-  constexpr std::uint8_t kTerrainOccupancyMask = static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND) |
-    static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED) | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
-
   /**
    * Address: 0x00565980 (FUN_00565980)
    *
@@ -2335,31 +2332,6 @@ namespace
   [[nodiscard]] std::int32_t RoundOccupyRectEdge(const float value) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value + 0.5f));
-  }
-
-  void ApplyOccupancyRect(const std::uint8_t occupancyCaps, COGrid* const grid, const gpg::Rect2i& rect)
-  {
-    if (!grid) {
-      return;
-    }
-
-    const int width = rect.x1 - rect.x0;
-    const int height = rect.z1 - rect.z0;
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    if ((occupancyCaps & kTerrainOccupancyMask) != 0u) {
-      grid->terrainOccupation.FillRect(rect.x0, rect.z0, width, height, true);
-    }
-
-    if ((occupancyCaps & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) != 0u) {
-      grid->waterOccupation.FillRect(rect.x0, rect.z0, width, height, true);
-    }
-
-    if (grid->sim && grid->sim->mPathTables) {
-      grid->sim->mPathTables->DirtyClusters(rect);
-    }
   }
 
   void DrawRaisedPlatformEdge(
@@ -16318,7 +16290,10 @@ void Unit::ExecuteOccupyGround()
   const SFootprint& footprint = GetFootprint();
   const RUnitBlueprint* const blueprint = GetBlueprint();
   COGrid* const ogrid = SimulationRef ? SimulationRef->mOGrid : nullptr;
-  const std::uint8_t occupancyCaps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+  if (ogrid == nullptr) {
+    return;
+  }
+  const EOccupancyCaps occupancyCaps = footprint.mOccupancyCaps;
 
   const auto& occupyRects = blueprint->Physics.OccupyRects;
   if (occupyRects.empty()) {
@@ -16335,7 +16310,7 @@ void Unit::ExecuteOccupyGround()
     rect.z0 = static_cast<std::int32_t>(z0);
     rect.x1 = rect.x0 + static_cast<std::int32_t>(footprint.mSizeX);
     rect.z1 = rect.z0 + static_cast<std::int32_t>(footprint.mSizeZ);
-    ApplyOccupancyRect(occupancyCaps, ogrid, rect);
+    ogrid->ExecuteOccupy(occupancyCaps, rect);
     return;
   }
 
@@ -16346,7 +16321,7 @@ void Unit::ExecuteOccupyGround()
     rect.x1 = RoundOccupyRectEdge(unitPos.x + occupyRect.CenterOffsetX + occupyRect.HalfSizeX);
     rect.z0 = RoundOccupyRectEdge(unitPos.z + occupyRect.CenterOffsetZ - occupyRect.HalfSizeZ);
     rect.z1 = RoundOccupyRectEdge(unitPos.z + occupyRect.CenterOffsetZ + occupyRect.HalfSizeZ);
-    ApplyOccupancyRect(occupancyCaps, ogrid, rect);
+    ogrid->ExecuteOccupy(occupancyCaps, rect);
   }
 }
 
