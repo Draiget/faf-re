@@ -32,6 +32,7 @@
 #include "moho/net/INetNATTraversalProviderWeakPtrReflection.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/ui/IUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "platform/Platform.h"
 #include <array>
@@ -1605,15 +1606,24 @@ void CGpgNetInterface::CreateLobby(
     throw std::runtime_error("Lobby already exists.");
   }
 
-  LuaPlus::LuaState* const state = LuaPlus::g_ConsoleLuaState();
-  if (!state) {
-    throw std::runtime_error("No active Lua state.");
+  // 0x007B7EAD..0x007B7F3B: the user Lua state is handed to the UI manager as
+  // its new state, the UI moves to the lobby state, and the online provider
+  // module is imported into it. (An earlier revision read the state through a
+  // fabricated accessor over the original image's address 0x010A6478.)
+  LuaPlus::LuaState* const state = USER_GetLuaState();
+  sUIState = UIS_lobby;
+  if (!UI_GetManager()->SetNewLuaState(state)) {
+    throw std::runtime_error("UI_GetManager()->SetNewLuaState() failed.");
   }
 
-  LuaPlus::LuaObject createLobby = state->GetGlobal("CreateLobby");
-  if (createLobby.IsNil()) {
-    throw std::runtime_error("Failed to load \"/lua/multiplayer/onlineprovider.lua\".");
+  constexpr const char* kOnlineProviderModule = "/lua/multiplayer/onlineprovider.lua";
+  const LuaPlus::LuaObject providerModule = SCR_Import(state, gpg::StrArg(kOnlineProviderModule));
+  if (!providerModule.IsTable()) {
+    throw std::runtime_error(gpg::STR_Printf("Failed to load \"%s\".", kOnlineProviderModule).c_str());
   }
+
+  // 0x007B7F7B..0x007B7F8E: the entry point is looked up on the module.
+  LuaPlus::LuaObject createLobby = providerModule["CreateLobby"];
 
   const bool useUdp = ExpectIntArg(*this, &args[0]) != 0;
   const int localPort = ExpectIntArg(*this, &args[1]);
