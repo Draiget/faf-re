@@ -1865,16 +1865,17 @@ namespace
    * Solves owner-world transform from child-bone local transform and already
    * composed parent-bone world transform.
    *
-   * Ground truth (`FUN_00676850.c`) reads `a1->orient.x` (child) UNNEGATED and
-   * negates `.y/.z/.w` -- the real `.x`-scalar conjugate (matching
-   * `VTransform::Inverse`), not the previous body's "negate x/y/z, keep w"
-   * textbook conjugate. The whole quaternion-product formula was re-derived
-   * term-by-term from ground truth and cross-checked by substituting
-   * `a=conjugate(child), b=parent` into `VTransform::Compose`'s
-   * already-fixed formula -- both methods agree exactly. The position rotate
-   * uses `Moho::MultQuadVec(&v21, &v20, &a2->orient)`, not
-   * `Wm3::MultiplyQuaternionVector`, same convention mismatch as the other
-   * `orient_`-consuming sites.
+   * Ground truth (`FUN_00676850.c`) keeps the child's lane 0 unnegated and
+   * negates lanes 1..3 - the conjugate under the binary's scalar-first
+   * layout, which `Wm3::Quaternionf` spells "keep `.w`, negate `.x/.y/.z`".
+   * The product then reduces exactly to `parent * conj(child)`, i.e. the
+   * child-local transform undone from the composed parent world transform,
+   * which is what the name says and an independent check on the lane
+   * assignment. The identity it starts from is `{1, 0, 0, 0}`, matching the
+   * `1.0` the binary stores to `[edi+00]`.
+   *
+   * The position rotate uses `Moho::MultQuadVec(&v21, &v20, &a2->orient)`,
+   * not `Wm3::MultiplyQuaternionVector`.
    */
   [[nodiscard]] moho::VTransform SolveAttachedWorldTransformFromChildLocal(
     const moho::VTransform& childLocalTransform,
@@ -1882,33 +1883,34 @@ namespace
   ) noexcept
   {
     moho::VTransform out{};
-    out.orient_.x = 1.0f;
+    out.orient_.w = 1.0f;
+    out.orient_.x = 0.0f;
     out.orient_.y = 0.0f;
     out.orient_.z = 0.0f;
-    out.orient_.w = 0.0f;
     out.pos_.x = 0.0f;
     out.pos_.y = 0.0f;
     out.pos_.z = 0.0f;
 
+    const float parentW = parentComposedTransform.orient_.w;
     const float parentX = parentComposedTransform.orient_.x;
     const float parentY = parentComposedTransform.orient_.y;
     const float parentZ = parentComposedTransform.orient_.z;
-    const float parentW = parentComposedTransform.orient_.w;
 
+    const float childW = childLocalTransform.orient_.w;
     const float childX = childLocalTransform.orient_.x;
     const float childY = childLocalTransform.orient_.y;
     const float childZ = childLocalTransform.orient_.z;
-    const float childW = childLocalTransform.orient_.w;
 
-    const float outX = (parentX * childX) + (parentY * childY) + (parentZ * childZ) + (parentW * childW);
-    const float outY = (parentY * childX) - (parentX * childY) + (parentW * childZ) - (parentZ * childW);
-    const float outZ = (parentZ * childX) - (parentW * childY) + (parentY * childW) - (parentX * childZ);
-    const float outW = (parentW * childX) + (parentZ * childY) - (parentY * childZ) - (parentX * childW);
+    // parent * conj(child).
+    const float outW = (parentW * childW) + (parentX * childX) + (parentY * childY) + (parentZ * childZ);
+    const float outX = (parentX * childW) - (parentW * childX) + (parentZ * childY) - (parentY * childZ);
+    const float outY = (parentY * childW) - (parentZ * childX) + (parentX * childZ) - (parentW * childY);
+    const float outZ = (parentZ * childW) + (parentY * childX) - (parentX * childY) - (parentW * childZ);
 
+    out.orient_.w = outW;
     out.orient_.x = outX;
     out.orient_.y = outY;
     out.orient_.z = outZ;
-    out.orient_.w = outW;
 
     const Wm3::Vector3f negChildPos{
       -childLocalTransform.pos_.x,
@@ -8583,15 +8585,20 @@ namespace moho
       // VTransform::orient_ union lanes exactly as the binary reads Entity's
       // Orientation Vector4f (the same construct as the recovered COORDS_Tilt).
       const Wm3::Vector3f currentUp{
-        ((o.z * o.y) - (o.w * o.x)) * 2.0f,
-        1.0f - (((o.w * o.w) + (o.y * o.y)) * 2.0f),
-        ((o.w * o.z) + (o.y * o.x)) * 2.0f,
+        // Column 1 of the rotation matrix - the local up axis - in the
+        // scalar-first form: (2(xy-wz), 1-2(x*x+z*z), 2(yz+wx)). Identical to
+        // the sibling extraction further down this file and to
+        // `QuaternionExtractYAxisColumn` (0x00694AF0). The previous spelling
+        // carried a `w*w` diagonal term, which the binary never computes.
+        ((o.y * o.x) - (o.w * o.z)) * 2.0f,
+        1.0f - (((o.z * o.z) + (o.x * o.x)) * 2.0f),
+        ((o.z * o.y) + (o.w * o.x)) * 2.0f,
       };
 
       Wm3::Quaternionf tiltDelta{};
       BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
 
-      tran.orient_ = ComposeWScalarDeltaOntoOrientation(tiltDelta, o);
+      tran.orient_ = MultiplyQuat(tiltDelta, o);
       NormalizeQuatInPlace(&tran.orient_);
       entity->SetPendingTransform(tran, 1.0f);
     }
@@ -8711,30 +8718,27 @@ namespace moho
    * Builds a heading/pitch orientation quaternion from half-angle sine/cosine
    * products, preserving the original lane order used by camera/weapon code.
    *
-   * Field assignment verified term-by-term against the raw decompile
-   * (FUN_0050B300.c): the binary composes a pitch-then-heading quaternion
-   * product with an identity third factor (roll=0, folded away at compile
-   * time - the `* cos(0.0)` / `* sin(0.0)` terms throughout are exactly
-   * `*1.0` / `*0.0`), and assigns the four resulting terms by NAME to
-   * dest->x/y/z/w in that order:
-   *   dest->x = cosHeading*cosPitch
-   *   dest->y = sinPitch*cosHeading
-   *   dest->z = sinHeading*cosPitch
-   *   dest->w = -(sinHeading*sinPitch)
-   * A prior recovery pass assigned these same four products to
-   * w/x/y/z instead of x/y/z/w - a one-position cyclic shift of which
-   * named component receives which value. That mislabeled quaternion is
-   * consumed downstream by GeomCamera3::Init (via CameraImpl::UpdateCoords)
-   * to rebuild the camera's view/frustum planes every frame; confirmed live
-   * via dbgrun that the resulting camera.solid2 frustum was validly shaped
-   * (6 real planes, symmetric left/right pair) but did not enclose the
-   * camera's own position - MeshRenderer::Batch's CollectAllInVolume query
-   * against it returned 0 instances every frame regardless of a populated
-   * spatial DB, a correctly-sized viewport, and a correct camera position,
-   * which is the direct, mechanical cause of the persistently black 3D
-   * viewport this session's whole investigation chased. This function is
-   * also called from weapon/projectile/AI aim code (13 call sites across
-   * src/sdk), so the same mislabeling likely affected those consumers too.
+   * The binary composes a pitch-then-heading quaternion product with an
+   * identity third factor (roll = 0, folded away at compile time - the
+   * `* cos(0.0)` / `* sin(0.0)` terms throughout FUN_0050B300.c are exactly
+   * `*1.0` / `*0.0`), and stores the four terms to consecutive offsets:
+   *   [eax+00] = cosHeading*cosPitch
+   *   [eax+04] = sinPitch*cosHeading
+   *   [eax+08] = sinHeading*cosPitch
+   *   [eax+0C] = -(sinHeading*sinPitch)
+   *
+   * Offset 0 therefore carries the scalar, which is what `Wm3::Quaternionf`
+   * spells `.w` (`m_afTuple[0]`). IDA's own struct for the type names offset
+   * 0 `x`, so the decompile's `dest->x = ...` line is lane 0, not `.x` - and
+   * reading that literally is how this body came to sit one lane out of
+   * step, scalar in `.x`, with `COORDS_Orient(0, 0)` returning a 180-degree
+   * rotation instead of the identity.
+   *
+   * The corrected assignment is exactly the Hamilton product
+   * qHeading (cH, 0, sH, 0) * qPitch (cP, sP, 0, 0):
+   *   w = cH*cP,  v = cH*(sP,0,0) + cP*(0,sH,0) + (0,sH,0)x(sP,0,0)
+   *             = (cH*sP, cP*sH, -sH*sP)
+   * which is an independent confirmation of the lane order above.
    */
   Wm3::Quaternionf COORDS_Orient(const float heading, const float pitch) noexcept
   {
@@ -8747,10 +8751,10 @@ namespace moho
     const float sinPitch = std::sin(halfPitch);
 
     Wm3::Quaternionf orientation{};
-    orientation.x = cosHeading * cosPitch;
-    orientation.y = sinPitch * cosHeading;
-    orientation.z = sinHeading * cosPitch;
-    orientation.w = -(sinHeading * sinPitch);
+    orientation.w = cosHeading * cosPitch;
+    orientation.x = sinPitch * cosHeading;
+    orientation.y = sinHeading * cosPitch;
+    orientation.z = -(sinHeading * sinPitch);
     return orientation;
   }
 
@@ -8770,9 +8774,16 @@ namespace moho
 
     Wm3::Vector3f right{forward.z, 0.0f, -forward.x};
     if (Wm3::Vector3f::Normalize(&right) == 0.0f) {
+      // Straight up / straight down: a quarter turn about X, whose sign
+      // follows the vertical direction. Memory lanes are
+      // {kHalfSqrtTwo, +-kHalfSqrtTwo, 0, 0} - scalar first, matching
+      // COORDS_Orient(heading, pitch) above and the binary's `QuatToMatrix`.
+      // The previous form put the scalar in lane 1, which reads back as a
+      // 180-degree turn about (1, +-1, 0) and sends forward to -forward
+      // instead of up/down.
       constexpr float kHalfSqrtTwo = 0.70710677f;
-      const float yLane = direction.y > 0.0f ? -kHalfSqrtTwo : kHalfSqrtTwo;
-      return Wm3::Quaternionf{0.0f, kHalfSqrtTwo, yLane, 0.0f};
+      const float pitchLane = direction.y > 0.0f ? -kHalfSqrtTwo : kHalfSqrtTwo;
+      return Wm3::Quaternionf{kHalfSqrtTwo, pitchLane, 0.0f, 0.0f};
     }
 
     const Wm3::Vector3f up{
@@ -9000,7 +9011,7 @@ namespace moho
 
     Wm3::Quaternionf tiltDelta{};
     (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
-    *orientation = ComposeWScalarDeltaOntoOrientation(tiltDelta, oldOrientation);
+    *orientation = MultiplyQuat(tiltDelta, oldOrientation);
   }
 
   /**

@@ -702,13 +702,16 @@ namespace moho
       const auto& last = lastTransform.orient_;
       const float offset = mScroller.mFloat24;
 
-      const float curAxisX = 1.0f - (((cur.w * cur.w) + (cur.z * cur.z)) * 2.0f);
-      const float curAxisY = ((cur.z * cur.y) + (cur.w * cur.x)) * 2.0f;
-      const float curAxisZ = ((cur.w * cur.y) - (cur.z * cur.x)) * 2.0f;
+      // Column 0 of the rotation matrix - the local X axis - scalar-first:
+      // (1-2(y*y+z*z), 2(xy+wz), 2(xz-wy)). The previous spelling had every
+      // lane rotated one place, leaving a `w*w` diagonal term behind.
+      const float curAxisX = 1.0f - (((cur.z * cur.z) + (cur.y * cur.y)) * 2.0f);
+      const float curAxisY = ((cur.y * cur.x) + (cur.z * cur.w)) * 2.0f;
+      const float curAxisZ = ((cur.z * cur.x) - (cur.y * cur.w)) * 2.0f;
 
-      const float lastAxisX = 1.0f - (((last.w * last.w) + (last.z * last.z)) * 2.0f);
-      const float lastAxisY = ((last.w * last.x) + (last.z * last.y)) * 2.0f;
-      const float lastAxisZ = ((last.w * last.y) - (last.z * last.x)) * 2.0f;
+      const float lastAxisX = 1.0f - (((last.z * last.z) + (last.y * last.y)) * 2.0f);
+      const float lastAxisY = ((last.z * last.w) + (last.y * last.x)) * 2.0f;
+      const float lastAxisZ = ((last.z * last.x) - (last.y * last.w)) * 2.0f;
 
       const float leadDeltaX =
         (curTransform.pos_.x + (curAxisX * offset)) - (lastTransform.pos_.x + (lastAxisX * offset));
@@ -727,9 +730,9 @@ namespace moho
       const float avgBasisX =
         ((((cur.z * cur.x) + (cur.w * cur.y)) * 2.0f) + (((last.z * last.x) + (last.w * last.y)) * 2.0f)) * 0.5f;
       const float avgBasisY =
-        ((1.0f - (((cur.y * cur.y) + (cur.z * cur.z)) * 2.0f)) + (1.0f - (((last.y * last.y) + (last.z * last.z)) * 2.0f))) * 0.5f;
+        ((1.0f - (((cur.x * cur.x) + (cur.y * cur.y)) * 2.0f)) + (1.0f - (((last.x * last.x) + (last.y * last.y)) * 2.0f))) * 0.5f;
       const float avgBasisZ =
-        ((((cur.w * cur.z) - (cur.y * cur.x)) * 2.0f) + (((last.w * last.z) - (last.x * last.y)) * 2.0f)) * 0.5f;
+        ((((cur.y * cur.z) - (cur.w * cur.x)) * 2.0f) + (((last.y * last.z) - (last.w * last.x)) * 2.0f)) * 0.5f;
 
       const float scrollScale = mScroller.mFloat28;
       const float scrollDeltaX = ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;

@@ -37,6 +37,7 @@
 namespace moho
 {
   Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+  Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept;
 }
 
 bool moho::dbg_Ballistics = false;
@@ -512,11 +513,11 @@ namespace
     const moho::VTransform& transform = unit.GetTransform();
     Wm3::Vector3f direction{};
     direction.y =
-      ((transform.orient_.w * transform.orient_.z) - (transform.orient_.x * transform.orient_.y)) * 2.0f;
+      ((transform.orient_.y * transform.orient_.z) - (transform.orient_.w * transform.orient_.x)) * 2.0f;
     direction.x =
       ((transform.orient_.x * transform.orient_.z) + (transform.orient_.w * transform.orient_.y)) * 2.0f;
     direction.z =
-      1.0f - (((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+      1.0f - (((transform.orient_.x * transform.orient_.x) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
     return direction;
   }
 
@@ -606,7 +607,7 @@ namespace
   {
     const float forwardProjection = (muzzleOrientation.w * muzzleOrientation.y) + (muzzleOrientation.x * muzzleOrientation.z);
     const float horizontalProjection =
-      1.0f - (((muzzleOrientation.z * muzzleOrientation.z) + (muzzleOrientation.y * muzzleOrientation.y)) * 2.0f);
+      1.0f - (((muzzleOrientation.x * muzzleOrientation.x) + (muzzleOrientation.y * muzzleOrientation.y)) * 2.0f);
     const float horizontalSpeed = std::sqrt(
                                     ((forwardProjection * 2.0f) * (forwardProjection * 2.0f)) +
                                     (horizontalProjection * horizontalProjection)
@@ -746,15 +747,15 @@ moho::CAimManipulator::CAimManipulator()
   runtimeView->mMaxPitch = 0.0f;
   runtimeView->mPitchMaxSlew = 0.0f;
 
-  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.w = 1.0f;
+  runtimeView->mBone0Rot.x = 0.0f;
   runtimeView->mBone0Rot.y = 0.0f;
   runtimeView->mBone0Rot.z = 0.0f;
-  runtimeView->mBone0Rot.w = 0.0f;
 
-  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.w = 1.0f;
+  runtimeView->mBone1Rot.x = 0.0f;
   runtimeView->mBone1Rot.y = 0.0f;
   runtimeView->mBone1Rot.z = 0.0f;
-  runtimeView->mBone1Rot.w = 0.0f;
 
   runtimeView->mHeadingOffset = 0.0f;
 }
@@ -820,14 +821,14 @@ moho::CAimManipulator::CAimManipulator(
   runtimeView->mUnknownBoolE1 = false;
   runtimeView->mResetPoseTime = 0;
   runtimeView->mResetTime = 0;
-  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.w = 1.0f;
+  runtimeView->mBone0Rot.x = 0.0f;
   runtimeView->mBone0Rot.y = 0.0f;
   runtimeView->mBone0Rot.z = 0.0f;
-  runtimeView->mBone0Rot.w = 0.0f;
-  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.w = 1.0f;
+  runtimeView->mBone1Rot.x = 0.0f;
   runtimeView->mBone1Rot.y = 0.0f;
   runtimeView->mBone1Rot.z = 0.0f;
-  runtimeView->mBone1Rot.w = 0.0f;
   runtimeView->mHeadingOffset = 0.0f;
 
   // Materialize the Lua script object through the CAimManipulator metatable
@@ -877,7 +878,7 @@ moho::CAimManipulator::CAimManipulator(
       runtimeView->mMinHeading =
         std::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         )
         + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       runtimeView->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
@@ -1378,14 +1379,15 @@ void moho::CAimManipulator::SetFiringArc(const CAimFiringArc arc)
  * Computes one heading/pitch tracking step against one watched pose bone,
  * clamps slew and arc lanes, and returns tracking-state bit flags.
  *
- * Ground truth (`FUN_006309F0.c`) conjugates `orient_` by keeping `.x` fixed
- * and negating `.y/.z/.w` (this engine's real `.x`-scalar conjugate, same as
- * `VTransform::Inverse`), not textbook "keep `.w`, negate `.x/.y/.z`", and
- * rotates via `Moho::MultQuadVec`, not `Wm3::MultiplyQuaternionVector`. The
- * local pitch-basis quaternion below has the identical convention bug at
- * construction time: ground truth writes `.x = cos(halfCenter)`,
- * `.y = sin(halfCenter)`, `.z = 0`, `.w = 0` (scalar in `.x`, matching
- * `QuatToMatrix`/`MultQuadVec`), not `.w = cos`, `.x = sin`, `.y = 0`, `.z = 0`.
+ * Rotates via `Moho::MultQuadVec`, not `Wm3::MultiplyQuaternionVector` - that
+ * part of the earlier recovery was right and is unchanged.
+ *
+ * Both quaternions here are ordinary scalar-first ones. The conjugate at
+ * 0x00630A2D..0x00630A41 keeps lane 0 and negates lanes 1-3, and the
+ * pitch-basis quaternion at 0x00630ADC..0x00630AF0 is written `(cos, sin, 0,
+ * 0)` - a rotation about X. A prior revision recorded both as `.x`-scalar,
+ * citing `QuatToMatrix`/`MultQuadVec`; those have since been read off their
+ * own disassembly and are scalar-first too.
  */
 std::uint8_t moho::CAimManipulator::CheckTracking(
   const Wm3::Vector3f& targetDirection,
@@ -1406,11 +1408,11 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
 
   if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
     const VTransform& compositeTransform = watchBone->GetCompositeTransform();
-    Wm3::Quaternionf inverseOrientation{};
-    inverseOrientation.x = compositeTransform.orient_.x;
-    inverseOrientation.y = -compositeTransform.orient_.y;
-    inverseOrientation.z = -compositeTransform.orient_.z;
-    inverseOrientation.w = -compositeTransform.orient_.w;
+    // 0x00630A2D copies lane 0 verbatim (`movss xmm3, [eax]`) and 0x00630A34/
+    // 0x00630A3C/0x00630A41 subtract lanes 1-3 from the zero constant
+    // `dword_E4F748`: the ordinary scalar-first conjugate, same as
+    // `VTransform::Inverse` (0x0046FBF0).
+    const Wm3::Quaternionf inverseOrientation = ConjugateQuat(compositeTransform.orient_);
 
     const Wm3::Vector3f sourceTarget = targetDirection;
     MultQuadVec(&transformedTarget, &sourceTarget, &inverseOrientation);
@@ -1423,11 +1425,15 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z) + runtimeView->mHeadingOffset;
   } else {
     const float halfCenter = minAngleCenter * kHalfScale;
+    // The four consecutive stack floats handed to `MultQuadVec` as the
+    // quaternion are written as `(cos, sin, 0, 0)`: 0x00630ADC/0x00630AE4 zero
+    // the last two lanes, 0x00630AE2 `fcos` stores lane 0 and 0x00630AEE
+    // `fsin` stores lane 1. Scalar-first, so this is a rotation about X.
     Wm3::Quaternionf pitchBasis{};
-    pitchBasis.x = std::cos(halfCenter);
-    pitchBasis.y = std::sin(halfCenter);
+    pitchBasis.w = std::cos(halfCenter);
+    pitchBasis.x = std::sin(halfCenter);
+    pitchBasis.y = 0.0f;
     pitchBasis.z = 0.0f;
-    pitchBasis.w = 0.0f;
 
     Wm3::Vector3f pitchSpaceTarget{};
     MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);

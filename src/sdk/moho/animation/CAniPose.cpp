@@ -482,18 +482,23 @@ namespace moho
    * Applies one local-space quaternion delta to this bone orientation and
    * marks the owning pose lane dirty for composite rebuild.
    *
-   * Ground truth (`FUN_0054BC00.c`) re-derived term-by-term: every output
-   * lane matches the engine's `.x`-scalar Hamilton product exactly (the same
-   * formula already confirmed in `VTransform::Compose`), with `rotation` as
-   * the left/first operand and the existing `mLocalTransform.orient_` as the
-   * right/second operand -- not the generic `Wm3::Quaternionf::Multiply`,
-   * which assumes textbook `.w`-scalar layout and silently produces a
-   * different rotation for every caller of this method (every `bone->
-   * Rotate(quat)` call site in the animation/AI manipulators).
+   * Decoded lane by lane from the disassembly, with `ecx` the `rotation`
+   * argument and the existing orientation at `[eax+20h..2Ch]`:
+   *
+   *   0x0054BC27..0x0054BC53  w = a0*b0 - a1*b1 - a2*b2 - a3*b3
+   *   0x0054BC57..0x0054BC79  x = a0*b1 + a3*b2 + a1*b0 - a2*b3
+   *   0x0054BC82..0x0054BCD8  y = a1*b3 + a0*b2 + a2*b0 - a3*b1
+   *   0x0054BCDC..0x0054BD03  z = a2*b1 + a0*b3 + a3*b0 - a1*b2
+   *
+   * The scalar term is positive in lane 0, so this is an ordinary scalar-first
+   * product, not the `.x`-scalar one a prior revision assumed. And the cross
+   * terms carry the opposite sign to `rotation * orient_`: the binary composes
+   * `orient_ * rotation`, with the existing orientation as the LEFT operand.
+   * The previous body had both the convention and the operand order wrong.
    */
   void CAniPoseBone::Rotate(const Wm3::Quaternionf& rotation)
   {
-    mLocalTransform.orient_ = MultiplyQuatXScalar(rotation, mLocalTransform.orient_);
+    mLocalTransform.orient_ = MultiplyQuat(mLocalTransform.orient_, rotation);
     if (mPose != nullptr) {
       mPose->MarkBoneDirty(mIdx);
     }

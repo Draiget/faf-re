@@ -793,28 +793,38 @@ namespace moho
         view.mVelocity.z += rng->FRand(-jitter, jitter);
       }
     } else {
-      // Ballistic forward direction derived from the launch quaternion, scaled by
-      // a random initial speed (asm 0x0069B85F-0x0069B918). Transcribed 1:1 from the
-      // .asm (movaps/mulss/addss/subss chain, flt_DFEB0C == 2.0); the store order
-      // (mVelocity.x/y/z <- result.y / result.z / var_10 each * GetRandomInitialSpeed)
-      // is confirmed. Lane mapping resolved against the algebra: the four values the
-      // asm loads at 0x0069B55C-0x0069B56E (IDA slot labels x/y/z/qx) map to
-      // orient_.w / orient_.y / orient_.z / orient_.x respectively, since that is the
-      // only binding for which the forward vector R(orient)*(1,0,0) matches
-      // result.y = 2(qx*qy + qz*qw), result.z = 2(qx*qz - qy*qw),
-      // var_10 = 1 - 2(qz^2 + qy^2). The typed orient_.{x,y,z,w} access below is
-      // therefore exact for both realistic and ballistic launches.
+      // Ballistic launch direction: the orientation's forward (local Z) axis,
+      // scaled by a random initial speed (asm 0x0069B85F..0x0069B918).
+      //
+      // 0x0069B55C..0x0069B56E loads the four quaternion lanes off the stack in
+      // order - 0x50, 0x54, 0x58, 0x5C into xmm5, xmm2, xmm1, xmm4 - so with
+      // the ordinary scalar-first reading w/x/y/z = xmm5/xmm2/xmm1/xmm4 the
+      // chain computes:
+      //
+      //   0x0069B86B..0x0069B885  2*(x*z + w*y)      = m02
+      //   0x0069B88F..0x0069B8A1  2*(y*z - w*x)      = m12
+      //   0x0069B8AB..0x0069B8C9  1 - 2*(x*x + y*y)  = m22
+      //
+      // i.e. column 2, and 0x0069B908..0x0069B918 stores those three into
+      // mVelocity.x/y/z in that order. That is the same forward vector this
+      // file's other extraction builds at 0x0069CFA4..0x0069D017.
+      //
+      // A prior revision read the result as column 0 instead, which forced a
+      // permuted lane binding (IDA's slot labels x/y/z/qx mapped onto
+      // orient_.w/.y/.z/.x) to make the algebra close. The natural in-order
+      // binding needs no permutation and agrees with every other forward
+      // extraction in the engine.
       const float qx = launchTransform.orient_.x;
       const float qy = launchTransform.orient_.y;
       const float qz = launchTransform.orient_.z;
       const float qw = launchTransform.orient_.w;
 
-      const float forwardY = ((qx * qy) + (qz * qw)) * 2.0f;
-      const float forwardZ = ((qx * qz) - (qy * qw)) * 2.0f;
-      const float forwardX = 1.0f - (((qz * qz) + (qy * qy)) * 2.0f);
+      const float forwardX = ((qx * qz) + (qw * qy)) * 2.0f;
+      const float forwardY = ((qy * qz) - (qw * qx)) * 2.0f;
+      const float forwardZ = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
 
       const float initialSpeed = blueprint->GetRandomInitialSpeed(rng);
-      view.mVelocity = Wm3::Vector3f{forwardY * initialSpeed, forwardZ * initialSpeed, forwardX * initialSpeed};
+      view.mVelocity = Wm3::Vector3f{forwardX * initialSpeed, forwardY * initialSpeed, forwardZ * initialSpeed};
     }
 
     // Draw scale = Display.UniformScale + rand(±Display.MeshScaleRange).
@@ -1097,8 +1107,8 @@ namespace moho
       const float qz = tran.orient_.z;
       const float qw = tran.orient_.w;
       const float accel = view.mAcceleration * kProjectileTickSeconds;
-      const float forwardX = 1.0f - (((qy * qy) + (qz * qz)) * 2.0f);
-      const float forwardY = ((qw * qz) - (qy * qx)) * 2.0f;
+      const float forwardX = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
+      const float forwardY = ((qy * qz) - (qw * qx)) * 2.0f;
       const float forwardZ = ((qz * qx) + (qw * qy)) * 2.0f;
       view.mVelocity.x += forwardZ * accel;
       view.mVelocity.y += forwardY * accel;
@@ -1117,8 +1127,8 @@ namespace moho
       const float qw = tran.orient_.w;
       const float accel = view.mAcceleration * kProjectileTickSeconds;
       view.mVelocity.x += (((qz * qx) + (qw * qy)) * 2.0f) * accel;
-      view.mVelocity.y += (((qw * qz) - (qy * qx)) * 2.0f) * accel;
-      view.mVelocity.z += (1.0f - (((qy * qy) + (qz * qz)) * 2.0f)) * accel;
+      view.mVelocity.y += (((qy * qz) - (qw * qx)) * 2.0f) * accel;
+      view.mVelocity.z += (1.0f - (((qx * qx) + (qy * qy)) * 2.0f)) * accel;
     }
 
     if (view.mMaxSpeed != 0.0f) {
@@ -1134,8 +1144,8 @@ namespace moho
       const float qw = tran.orient_.w;
       const Wm3::Vector3f forward{
         ((qz * qx) + (qw * qy)) * 2.0f,
-        ((qw * qz) - (qy * qx)) * 2.0f,
-        1.0f - (((qy * qy) + (qz * qz)) * 2.0f),
+        ((qy * qz) - (qw * qx)) * 2.0f,
+        1.0f - (((qx * qx) + (qy * qy)) * 2.0f),
       };
       tran.orient_ = moho::COORDS_Orient(forward);
     }
@@ -1588,8 +1598,8 @@ namespace moho
       const float qw = trn.orient_.w;
       const Wm3::Vector3f forward{
         ((qz * qx) + (qw * qy)) * 2.0f,
-        ((qz * qw) - (qx * qy)) * 2.0f,
-        1.0f - (((qz * qz) + (qy * qy)) * 2.0f),
+        ((qy * qz) - (qw * qx)) * 2.0f,
+        1.0f - (((qx * qx) + (qy * qy)) * 2.0f),
       };
       view.mVelocity = ProjectVectorOntoAxisLocal(forward, view.mVelocity);
     }

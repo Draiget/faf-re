@@ -35,41 +35,35 @@ namespace moho
     return dest;
   }
 
-  Wm3::Quaternionf MultiplyQuatXScalar(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
+  /**
+   * Scalar-first Hamilton product `a * b`. The accumulation order mirrors the
+   * emission inlined into `CAniPoseBone::Rotate` (0x0054BC00), decoded lane by
+   * lane: the scalar term subtracts left-to-right from `a.w*b.w`, and each
+   * vector lane accumulates as `(scalar-cross + own-scalar) + ...` before the
+   * single trailing subtraction. Float addition does not associate, so the
+   * grouping is kept rather than normalised.
+   */
+  Wm3::Quaternionf MultiplyQuat(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
   {
-    // NOTE: deliberately NOT `Wm3::Quaternionf{...}` -- that brace-init form
-    // resolves to the upstream `Quaternion(fW, fX, fY, fZ)` constructor
-    // (first arg -> .w), which would silently scramble these `.x`-first
-    // engine-convention terms. Named-field assignment avoids that trap.
     Wm3::Quaternionf result{};
-    result.x = (a.x * b.x) - (a.y * b.y) - (a.z * b.z) - (a.w * b.w);
-    result.y = (a.w * b.z) + (a.x * b.y) + (a.y * b.x) - (a.z * b.w);
-    result.z = (a.y * b.w) + (a.x * b.z) + (a.z * b.x) - (a.w * b.y);
-    result.w = (a.z * b.y) + (a.x * b.w) + (a.w * b.x) - (a.y * b.z);
+    result.w = ((a.w * b.w - a.x * b.x) - a.y * b.y) - a.z * b.z;
+    result.x = ((a.x * b.w + a.y * b.z) + a.w * b.x) - a.z * b.y;
+    result.y = ((a.z * b.x + a.y * b.w) + a.w * b.y) - a.x * b.z;
+    result.z = ((a.x * b.y + a.w * b.z) + a.z * b.w) - a.y * b.x;
     return result;
   }
 
-  Wm3::Quaternionf ConjugateQuatXScalar(const Wm3::Quaternionf& q) noexcept
+  /**
+   * Scalar-first conjugate: keep `.w`, negate `.x`/`.y`/`.z`, exactly as
+   * `VTransform::Inverse` (0x0046FBF0) does at 0x0046FBFB..0x0046FC12.
+   */
+  Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept
   {
     Wm3::Quaternionf result{};
-    result.x = q.x;
+    result.w = q.w;
+    result.x = -q.x;
     result.y = -q.y;
     result.z = -q.z;
-    result.w = -q.w;
-    return result;
-  }
-
-  Wm3::Quaternionf ComposeWScalarDeltaOntoOrientation(
-    const Wm3::Quaternionf& delta, const Wm3::Quaternionf& orientation
-  ) noexcept
-  {
-    const Wm3::Quaternionf& d = delta;
-    const Wm3::Quaternionf& o = orientation;
-    Wm3::Quaternionf result{};
-    result.x = (d.w * o.x) - (d.x * o.y) - (d.y * o.z) - (d.z * o.w);
-    result.y = (d.w * o.y) + (d.x * o.x) + (d.y * o.w) - (d.z * o.z);
-    result.z = (d.w * o.z) + (d.y * o.x) + (d.z * o.y) - (d.x * o.w);
-    result.w = (d.w * o.w) + (d.x * o.z) + (d.z * o.x) - (d.y * o.y);
     return result;
   }
 
@@ -152,11 +146,14 @@ namespace moho
     const Wm3::Vector3f* const sourceVector
   )
   {
+    // 0x0062FBA3 copies `[eax+0]` verbatim and 0x0062FBB8 / 0x0062FBC7 /
+    // 0x0062FBCC subtract `[eax+4]`, `[eax+8]` and `[eax+0Ch]` from the zero
+    // constant `dword_E4F748`: keep lane 0, negate lanes 1-3.
     Wm3::Quaternionf conjugate{};
-    conjugate.x = quaternionLanes[0];
-    conjugate.y = -quaternionLanes[1];
-    conjugate.z = -quaternionLanes[2];
-    conjugate.w = -quaternionLanes[3];
+    conjugate.w = quaternionLanes[0];
+    conjugate.x = -quaternionLanes[1];
+    conjugate.y = -quaternionLanes[2];
+    conjugate.z = -quaternionLanes[3];
     moho::MultQuadVec(outVector, sourceVector, &conjugate);
     return outVector;
   }
@@ -590,31 +587,31 @@ namespace moho
    * pre-multiplies the delta into the source quaternion in-place.
    * Used by Moho::Projectile::MotionTick and UpdateTracking.
    *
-   * Both the column-extraction and the final Hamilton product were re-derived
-   * term-by-term from `FUN_0069AA50.c` after the previous body here was found
-   * to read `quat` (this function's own running orientation, `.x`-scalar
-   * convention like every other `VMatrix4::Set`-family quaternion in this
-   * engine) as textbook `.w`-scalar. `delta` (the `QuatCrossAdd` output, as
-   * rebuilt by `RotateQuatByAngle`) genuinely IS `.w`-scalar at the point of
-   * the final product -- `RotateQuatByAngle` always writes `cos`/`sin` in
-   * that layout regardless of what convention fed it -- so the two operands
-   * of this specific product are in two different conventions; the terms
-   * below read each field by its literal ground-truth name/position rather
-   * than assuming either operand's convention, which reproduces the
-   * binary's mixed-convention result exactly.
+   * Both operands are scalar-first, and so is the result. Mapping
+   * `FUN_0069AA50.c`'s IDA field names to offsets (its `Wm3::Quaternionf`
+   * struct calls offset 0 `x`, so `a1->x` is lane 0 = `Wm3`'s `.w`), the
+   * column extraction is the textbook third column of the rotation matrix -
+   * `2(xz + wy)`, `2(yz - wx)`, `1 - 2(x^2 + y^2)` - and the final product is
+   * `delta * quat`, pre-multiplying the delta:
+   *   w = dw*ow - dx*ox - dy*oy - dz*oz
+   *   x = dw*ox + dx*ow + dy*oz - dz*oy
+   *   y = dw*oy + dy*ow + dz*ox - dx*oz
+   *   z = dw*oz + dz*ow + dx*oy - dy*ox
+   *
+   * A previous pass recorded these two operands as being in *different*
+   * conventions and reproduced that as a mixed-convention product. They are
+   * not: `RotateQuatByAngle` writes cos/sin scalar-first, `QuatCrossAdd`
+   * (0x0044F880) now does too, and this body consumes both that way.
    */
   void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads)
   {
     const Wm3::Vector3f refVec{refAxis->x, refAxis->y, refAxis->z};
 
-    // Extract the z-axis (forward) column of the rotation matrix. This
-    // engine's quat is .x-scalar, so the standard q=(w,x,y,z) column-3
-    // formula applies with quat->x playing w's role and quat->y/.z/.w
-    // playing the standard x/y/z roles (matching VMatrix4::Set).
+    // Third column of the rotation matrix - the forward axis.
     Wm3::Vector3f forwardAxis;
     forwardAxis.x = ((quat->x * quat->z) + (quat->w * quat->y)) * 2.0f;
-    forwardAxis.y = ((quat->w * quat->z) - (quat->x * quat->y)) * 2.0f;
-    forwardAxis.z = 1.0f - ((quat->z * quat->z) + (quat->y * quat->y)) * 2.0f;
+    forwardAxis.y = ((quat->y * quat->z) - (quat->w * quat->x)) * 2.0f;
+    forwardAxis.z = 1.0f - ((quat->x * quat->x) + (quat->y * quat->y)) * 2.0f;
 
     // Build a delta quaternion that rotates forwardAxis toward refVec
     Wm3::Quaternionf delta;
@@ -623,20 +620,20 @@ namespace moho
     // Apply partial rotation to the delta quaternion
     RotateQuatByAngle(&delta, rads);
 
+    const float dw = delta.w;
     const float dx = delta.x;
     const float dy = delta.y;
     const float dz = delta.z;
-    const float dw = delta.w;
 
+    const float ow = quat->w;
     const float ox = quat->x;
     const float oy = quat->y;
     const float oz = quat->z;
-    const float ow = quat->w;
 
-    quat->x = (ox * dx) - (oy * dy) - (oz * dz) - (ow * dw);
-    quat->y = (ow * dz) + (oy * dx) + (ox * dy) - (oz * dw);
-    quat->z = (ox * dz) + (oy * dw) + (oz * dx) - (ow * dy);
-    quat->w = (ox * dw) + (ow * dx) + (oz * dy) - (oy * dz);
+    quat->w = (dw * ow) - (dx * ox) - (dy * oy) - (dz * oz);
+    quat->x = (dw * ox) + (dx * ow) + (dy * oz) - (dz * oy);
+    quat->y = (dw * oy) + (dy * ow) + (dz * ox) - (dx * oz);
+    quat->z = (dw * oz) + (dz * ow) + (dx * oy) - (dy * ox);
   }
 
   /**
@@ -876,46 +873,63 @@ namespace moho
    * Moho::VMatrix3* func_QuatToMatrix(Wm3::Quaternionf* this, Moho::VMatrix3* a2);
    *
    * What it does:
-   * Expands a unit quaternion into a row-major 3x3 rotation matrix. Re-derived
-   * term-by-term from FUN_00452FD0.c after the previous body here (which
-   * assumed textbook scalar-first `.w` storage) was found not to match the
-   * disassembly at all past one coincidental term. The real binary pairs
-   * `.w` with `.z` (row 0) and with `.y` (row 1), and pairs `.z` with `.y`
-   * alone (row 2, no `.w`/`.x` term) - i.e. `.x` never appears in any
-   * diagonal term, which is the signature of `.x` being the scalar lane and
-   * `(.y, .z, .w)` the imaginary lanes, not `.w`. This is the exact
-   * transpose of `VMatrix4::Set` (0x004EE980) applied to the same four
-   * fields with no relabelling, which is why `MultQuadVec`'s row-of-matrix
-   * dot vec produces `vec * VMatrix4::Set(quat)` under this engine's
-   * row-vector convention. Cross-confirmed against `VTransform::Inverse`
-   * (0x0046FBF0) and `SelectionDragger3D::BuildSelectionSolid`
-   * (0x00864670), both of which conjugate by keeping `.x` and negating
-   * `.y/.z/.w`.
+   * Expands a unit quaternion into a 3x3 rotation matrix - the plain textbook
+   * scalar-first form, with `.w` the scalar and `(.x, .y, .z)` the imaginary
+   * lanes. Transcribed store by store from the disassembly, which loads the
+   * four lanes as `[ecx+0]=w, [ecx+4]=x, [ecx+8]=y, [ecx+0Ch]=z` and writes:
+   *
+   *   [eax+00] 1-(zz+yy)   [eax+04] xy-wz     [eax+08] xz+wy
+   *   [eax+0C] xy+wz       [eax+10] 1-(zz+xx) [eax+14] yz-wx
+   *   [eax+18] xz-wy       [eax+1C] yz+wx     [eax+20] 1-(yy+xx)
+   *
+   * where each named product already carries the factor of two (the binary
+   * pre-doubles `x`, `y` and `z` at 0x00452FEE..0x00452FFF and multiplies the
+   * undoubled lane against those). The function computes **no `ww` term at
+   * all** - the diagonals pair only `x`, `y` and `z` with each other - which
+   * is the signature of `.w` being the scalar, not `.x`.
+   *
+   * A prior revision "re-derived" this into an `.x`-scalar matrix. That form
+   * is self-consistent as a rotation matrix, but it is not what this function
+   * computes, and it disagrees with the quaternion product inlined into
+   * `HardwareMeshBatch::FillBatch` (0x007E7EA0), whose scalar term
+   * `c0*r0 - c1*r1 - c2*r2 - c3*r3` puts the scalar in lane 0 - corroborated
+   * there by the palette store order and by the identity seed `{0,0,0,1}`.
+   * Both operate on the same `VTransform::orient_`, so only one convention can
+   * hold, and the disassembly of both agrees it is scalar-in-lane-0.
+   *
+   * Float addition does not associate; the diagonal sums keep the binary's
+   * operand order (`zz+yy`, `zz+xx`, `yy+xx`).
    */
   Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* const quat, Wm3::Vector3f* const outMatrix) noexcept
   {
+    const float w = quat->w;
     const float x = quat->x;
     const float y = quat->y;
-    const float twoW = quat->w * 2.0f;
-    const float xy = x * (y * 2.0f);
-    const float xw = x * twoW;
-    const float xz = x * (quat->z * 2.0f);
-    const float ww = quat->w * twoW;
-    const float yy = y * (y * 2.0f);
-    const float yz = y * (quat->z * 2.0f);
-    const float yw = y * twoW;
-    const float zz = quat->z * (quat->z * 2.0f);
-    const float zw = quat->z * twoW;
+    const float z = quat->z;
 
-    outMatrix[0].x = static_cast<float>(1.0 - (ww + zz));
-    outMatrix[0].y = yz - xw;
-    outMatrix[0].z = yw + xz;
-    outMatrix[1].x = yz + xw;
-    outMatrix[1].y = static_cast<float>(1.0 - (ww + yy));
-    outMatrix[1].z = zw - xy;
-    outMatrix[2].x = yw - xz;
-    outMatrix[2].y = zw + xy;
-    outMatrix[2].z = static_cast<float>(1.0 - (zz + yy));
+    const float twoX = x * 2.0f;
+    const float twoY = y * 2.0f;
+    const float twoZ = z * 2.0f;
+
+    const float wx = w * twoX;
+    const float wy = w * twoY;
+    const float wz = w * twoZ;
+    const float xx = x * twoX;
+    const float xy = x * twoY;
+    const float xz = x * twoZ;
+    const float yy = y * twoY;
+    const float yz = y * twoZ;
+    const float zz = z * twoZ;
+
+    outMatrix[0].x = 1.0f - (zz + yy);
+    outMatrix[0].y = xy - wz;
+    outMatrix[0].z = xz + wy;
+    outMatrix[1].x = xy + wz;
+    outMatrix[1].y = 1.0f - (zz + xx);
+    outMatrix[1].z = yz - wx;
+    outMatrix[2].x = xz - wy;
+    outMatrix[2].y = yz + wx;
+    outMatrix[2].z = 1.0f - (yy + xx);
     return outMatrix;
   }
 } // namespace moho
