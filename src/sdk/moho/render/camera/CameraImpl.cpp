@@ -1926,9 +1926,9 @@ void moho::CameraImpl::CameraReset()
   runtime->mHeading = kPi;
   runtime->mIsRotated = 0u;
   runtime->mFarPitch = cam_FarPitch * kDegreesToRadians;
-  runtime->mCurrentPitch = 0.0f;
+  runtime->mCurrentPitch = runtime->mFarPitch;
   runtime->mNoseCamPitchAdjust = 0.0f;
-  runtime->mHeadingZoom = runtime->mFarPitch;
+  runtime->mHeadingZoom = kPi;
   runtime->mEnableEaseInOut = 1u;
 
   runtime->mTargetLocation = {};
@@ -1939,6 +1939,11 @@ void moho::CameraImpl::CameraReset()
       float targetElevation = heightField->GetElevation(runtime->mTargetLocation.x, runtime->mTargetLocation.z);
       if (terrainMap->IsWaterEnabled()) {
         const float waterElevation = terrainMap->GetWaterElevation();
+  // 0x007A80EB..0x007A8116: the far pitch is stored into both the far-pitch
+  // (+0x344) and current-pitch (+0x348) lanes, the nose-cam adjust (+0x3D0)
+  // is zeroed, and the heading-zoom lane (+0x350) gets the same pi constant
+  // as the heading (+0x34C), so a Hermite transition started right after a
+  // reset holds the current heading and pitch instead of swinging to 0.
         if (waterElevation > targetElevation) {
           targetElevation = waterElevation;
         }
