@@ -513,11 +513,11 @@ namespace
     const moho::VTransform& transform = unit.GetTransform();
     Wm3::Vector3f direction{};
     direction.y =
-      ((transform.orient_.w * transform.orient_.z) - (transform.orient_.x * transform.orient_.y)) * 2.0f;
+      ((transform.orient_.y * transform.orient_.z) - (transform.orient_.w * transform.orient_.x)) * 2.0f;
     direction.x =
       ((transform.orient_.x * transform.orient_.z) + (transform.orient_.w * transform.orient_.y)) * 2.0f;
     direction.z =
-      1.0f - (((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+      1.0f - (((transform.orient_.x * transform.orient_.x) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
     return direction;
   }
 
@@ -607,7 +607,7 @@ namespace
   {
     const float forwardProjection = (muzzleOrientation.w * muzzleOrientation.y) + (muzzleOrientation.x * muzzleOrientation.z);
     const float horizontalProjection =
-      1.0f - (((muzzleOrientation.z * muzzleOrientation.z) + (muzzleOrientation.y * muzzleOrientation.y)) * 2.0f);
+      1.0f - (((muzzleOrientation.x * muzzleOrientation.x) + (muzzleOrientation.y * muzzleOrientation.y)) * 2.0f);
     const float horizontalSpeed = std::sqrt(
                                     ((forwardProjection * 2.0f) * (forwardProjection * 2.0f)) +
                                     (horizontalProjection * horizontalProjection)
@@ -878,7 +878,7 @@ moho::CAimManipulator::CAimManipulator(
       runtimeView->mMinHeading =
         std::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         )
         + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       runtimeView->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;

@@ -730,9 +730,9 @@ namespace moho
       const float avgBasisX =
         ((((cur.z * cur.x) + (cur.w * cur.y)) * 2.0f) + (((last.z * last.x) + (last.w * last.y)) * 2.0f)) * 0.5f;
       const float avgBasisY =
-        ((1.0f - (((cur.y * cur.y) + (cur.z * cur.z)) * 2.0f)) + (1.0f - (((last.y * last.y) + (last.z * last.z)) * 2.0f))) * 0.5f;
+        ((1.0f - (((cur.x * cur.x) + (cur.y * cur.y)) * 2.0f)) + (1.0f - (((last.x * last.x) + (last.y * last.y)) * 2.0f))) * 0.5f;
       const float avgBasisZ =
-        ((((cur.w * cur.z) - (cur.y * cur.x)) * 2.0f) + (((last.w * last.z) - (last.x * last.y)) * 2.0f)) * 0.5f;
+        ((((cur.y * cur.z) - (cur.w * cur.x)) * 2.0f) + (((last.y * last.z) - (last.w * last.x)) * 2.0f)) * 0.5f;
 
       const float scrollScale = mScroller.mFloat28;
       const float scrollDeltaX = ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;

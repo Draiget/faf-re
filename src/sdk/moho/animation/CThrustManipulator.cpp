@@ -573,9 +573,9 @@ namespace moho
     }
 
     const Wm3::Quaternionf& orientation = watchedBone->mLocalTransform.orient_;
-    runtime->mDirectionLane.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
+    runtime->mDirectionLane.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
     runtime->mDirectionLane.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-    runtime->mDirectionLane.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+    runtime->mDirectionLane.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
 
     const Wm3::Vector3f worldUp{0.0f, 1.0f, 0.0f};
     (void)BuildShortestArcDeltaQuaternion(&runtime->mOrientation, worldUp, runtime->mDirectionLane);

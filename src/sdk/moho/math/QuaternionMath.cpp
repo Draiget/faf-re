@@ -610,8 +610,8 @@ namespace moho
     // playing the standard x/y/z roles (matching VMatrix4::Set).
     Wm3::Vector3f forwardAxis;
     forwardAxis.x = ((quat->x * quat->z) + (quat->w * quat->y)) * 2.0f;
-    forwardAxis.y = ((quat->w * quat->z) - (quat->x * quat->y)) * 2.0f;
-    forwardAxis.z = 1.0f - ((quat->z * quat->z) + (quat->y * quat->y)) * 2.0f;
+    forwardAxis.y = ((quat->y * quat->z) - (quat->w * quat->x)) * 2.0f;
+    forwardAxis.z = 1.0f - ((quat->x * quat->x) + (quat->y * quat->y)) * 2.0f;
 
     // Build a delta quaternion that rotates forwardAxis toward refVec
     Wm3::Quaternionf delta;
