@@ -413,8 +413,9 @@ namespace
 
     moho::CD3DVertexSheetViewRuntime vertexSheetView{};
     vertexSheetView.sheet = segmentBuffer.vertexSheet;
-    vertexSheetView.startVertex = kTrailVerticesPerSegment * startSegmentIndex;
-    vertexSheetView.baseVertex = 0;
+    // Binary (0x004967E0): +0x04 (BaseVertexIndex) = 4 * startSegment, +0x08 (MinIndex) = 0.
+    vertexSheetView.startVertex = 0;
+    vertexSheetView.baseVertex = kTrailVerticesPerSegment * startSegmentIndex;
     vertexSheetView.endVertex = (kTrailVerticesPerSegment * segmentCount) - 1;
 
     moho::CD3DIndexSheetViewRuntime indexSheetView{};

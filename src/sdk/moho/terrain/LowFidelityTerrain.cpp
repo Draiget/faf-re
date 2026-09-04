@@ -158,8 +158,8 @@ namespace
 
     moho::CD3DVertexSheetViewRuntime vertexView{};
     vertexView.sheet = vertexSheet;
-    vertexView.startVertex = 0;
-    vertexView.baseVertex = command.baseVertex;
+    vertexView.startVertex = command.startVertex;
+    vertexView.baseVertex = 0;
     vertexView.endVertex = command.endVertex;
 
     (void)moho::D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
@@ -569,8 +569,8 @@ namespace moho
 
     CD3DVertexSheetViewRuntime vertexView{};
     vertexView.sheet = mTerrainVertexSheet;
-    vertexView.startVertex = 0;
-    vertexView.baseVertex = mSkirtBaseVertex;
+    vertexView.startVertex = mSkirtBaseVertex;
+    vertexView.baseVertex = 0;
     vertexView.endVertex = mSkirtEndVertex;
 
     (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
@@ -932,8 +932,8 @@ namespace moho
 
         CD3DVertexSheetViewRuntime vertexView{};
         vertexView.sheet = mTerrainVertexSheet;
-        vertexView.startVertex = 0;
-        vertexView.baseVertex = minValue;
+        vertexView.startVertex = minValue;
+        vertexView.baseVertex = 0;
         vertexView.endVertex = maxValue;
 
         (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
@@ -1069,7 +1069,7 @@ namespace moho
             std::uint32_t addedIndexCount = 0;
             (void)mTesselator->EmitCollisionQuad(
               reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0), &command.startIndex, &addedIndexCount,
-              &command.baseVertex, reinterpret_cast<std::uint32_t*>(&command.endVertex));
+              &command.startVertex, reinterpret_cast<std::uint32_t*>(&command.endVertex));
             command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 
             if (command.indexCount > 0 && (command.startIndex + command.indexCount) < kSkirtMaxIndexCount) {
@@ -1096,7 +1096,7 @@ namespace moho
                 && (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount) {
               command.startIndex = baselineIndexCount;
               command.indexCount = static_cast<std::int32_t>(addedIndexCount);
-              command.baseVertex = minRectIndex;
+              command.startVertex = minRectIndex;
               command.endVertex = maxRectIndex;
               reinterpret_cast<LowFidelityDecalCommandLane&>(mPrimaryPatchData).PushBack(command);
 

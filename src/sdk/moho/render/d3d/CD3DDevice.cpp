@@ -1542,8 +1542,9 @@ namespace moho
       DrawPrimitiveContextRuntime drawContext{};
       drawContext.topologyToken = static_cast<std::uint32_t>(*primitiveType);
       drawContext.primitiveCountInput =
-        static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->baseVertex) + 1);
-      drawContext.startVertex = static_cast<std::uint32_t>(vertexSheetView->startVertex);
+        static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->startVertex) + 1);
+      // Binary (0x0042F8D0): StartVertex comes from the view's +0x04 lane (baseVertex).
+      drawContext.startVertex = static_cast<std::uint32_t>(vertexSheetView->baseVertex);
 
       (void)device->DrawPrimitive(&drawContext);
       technique->EndPass();
