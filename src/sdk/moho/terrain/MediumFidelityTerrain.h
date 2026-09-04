@@ -36,7 +36,7 @@ namespace moho
   {
     std::int32_t startIndex;   // +0x00 -> CD3DIndexSheetViewRuntime::startIndex
     std::int32_t indexCount;   // +0x04 -> CD3DIndexSheetViewRuntime::indexCount
-    std::int32_t baseVertex;   // +0x08 -> CD3DVertexSheetViewRuntime::baseVertex
+    std::int32_t startVertex;  // +0x08 -> CD3DVertexSheetViewRuntime::startVertex (min referenced vertex)
     std::int32_t endVertex;    // +0x0C -> CD3DVertexSheetViewRuntime::endVertex
     float alpha;               // +0x10 -> DecalAlpha shader-var value
     CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)

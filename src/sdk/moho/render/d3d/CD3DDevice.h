@@ -51,9 +51,9 @@ namespace moho
   struct CD3DVertexSheetViewRuntime
   {
     ID3DVertexSheet* sheet = nullptr; // +0x00
-    std::int32_t startVertex = 0;     // +0x04
-    std::int32_t baseVertex = 0;      // +0x08
-    std::int32_t endVertex = -1;      // +0x0C
+    std::int32_t baseVertex = 0;      // +0x04 D3D BaseVertexIndex (FUN_0042FA10 pushes [+4] as baseVertIndex)
+    std::int32_t startVertex = 0;     // +0x08 D3D MinIndex (first referenced vertex)
+    std::int32_t endVertex = -1;      // +0x0C last referenced vertex; NumVertices = end - start + 1
   };
 
   static_assert(
