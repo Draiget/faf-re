@@ -156,17 +156,6 @@ namespace
     meshInstance->ClearRegistration();
   }
 
-  [[nodiscard]] bool IsFinite(const float value) noexcept
-  {
-    return std::isfinite(value);
-  }
-
-  [[nodiscard]] bool HasFiniteMeshBounds(const moho::MeshInstance& mesh) noexcept
-  {
-    return IsFinite(mesh.xMin) && IsFinite(mesh.yMin) && IsFinite(mesh.zMin) && IsFinite(mesh.xMax) &&
-      IsFinite(mesh.yMax) && IsFinite(mesh.zMax);
-  }
-
   void CopyPoseState(moho::CAniPose& dst, const moho::CAniPose& src)
   {
     dst.mScale = src.mScale;
@@ -617,14 +606,14 @@ namespace moho
 
     if (stanceOrSpatialUpdateNeeded) {
       mLastInterpAmt = -1.0f;
+      // 0x008B92A0..0x008B92E5: the entity spatial entry takes the mesh's swept
+      // stance box (start/end stance OBBs over the scaled resource bounds), so
+      // it is finite from the very first sync; the lazily-refreshed xMin..zMax
+      // interpolation lanes are not what the binary reads here. Without a mesh
+      // the entry collapses to the current position.
       Wm3::AxisAlignedBox3f spatialBounds{};
-      if (mMeshInstance != nullptr && HasFiniteMeshBounds(*mMeshInstance)) {
-        spatialBounds.Min.x = mMeshInstance->xMin;
-        spatialBounds.Min.y = mMeshInstance->yMin;
-        spatialBounds.Min.z = mMeshInstance->zMin;
-        spatialBounds.Max.x = mMeshInstance->xMax;
-        spatialBounds.Max.y = mMeshInstance->yMax;
-        spatialBounds.Max.z = mMeshInstance->zMax;
+      if (mMeshInstance != nullptr) {
+        spatialBounds = mMeshInstance->GetSweptAlignedBox();
       } else {
         spatialBounds.Min = variableData.mCurTransform.pos_;
         spatialBounds.Max = variableData.mCurTransform.pos_;

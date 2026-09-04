@@ -4099,9 +4099,8 @@ namespace moho
       }
 
       case kUnitMotionStateBallistic: {
-        float moveDistance = 0.0f;
-        CalcMoveBallistic(transform, &moveDistance);
-        MoveTo(transform, moveDistance);
+        CalcMoveBallistic(transform, &moveTimeFraction);
+        MoveTo(transform, moveTimeFraction);
         return TASKSTATUS_Wait;
       }
 
@@ -4117,11 +4116,18 @@ namespace moho
             return TASKSTATUS_Wait;
           }
 
-          float moveDistance = 0.0f;
-          CalcMoveAir(transform, &moveDistance);
-          MoveTo(transform, moveDistance);
+          CalcMoveAir(transform, &moveTimeFraction);
+          MoveTo(transform, moveTimeFraction);
           return TASKSTATUS_Wait;
         }
+    // 0x006B9D10: one shared out-lane, seeded to 1.0 before the state switch.
+    // The CalcMove* steps only overwrite it when the unit actually moved, so an
+    // idle unit still hands MoveTo a whole-tick fraction. MoveTo divides by it
+    // to derive the transform interpolation rate; a zero here (the previous
+    // per-case `= 0.0f` seed) produced an infinite rate and NaN-poisoned every
+    // interpolated user-side transform.
+    float moveTimeFraction = 1.0f;
+
 
         if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->StunnedState) {
           mFollowingWaypoint = nullptr;
@@ -4140,19 +4146,18 @@ namespace moho
           mUnit->UpdateTerrainType(transform.pos_);
         }
 
-        float moveDistance = 0.0f;
         if (blueprint->Physics.MotionType == RULEUMT_Hover) {
-          CalcMoveHover(transform, &moveDistance);
-          MoveTo(transform, moveDistance);
+          CalcMoveHover(transform, &moveTimeFraction);
+          MoveTo(transform, moveTimeFraction);
           return TASKSTATUS_Wait;
         }
 
         if (mUnit->mCurrentLayer == LAYER_Land || mUnit->mCurrentLayer == LAYER_Seabed) {
-          CalcMoveLand(transform, &moveDistance);
+          CalcMoveLand(transform, &moveTimeFraction);
         } else {
-          CalcMoveWater(transform, &moveDistance);
+          CalcMoveWater(transform, &moveTimeFraction);
         }
-        MoveTo(transform, moveDistance);
+        MoveTo(transform, moveTimeFraction);
         return TASKSTATUS_Wait;
       }
     }
