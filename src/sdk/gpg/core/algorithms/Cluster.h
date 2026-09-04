@@ -42,10 +42,19 @@ namespace gpg::HaStar
         virtual void Evict(const void* key) = 0;
     };
 
+    /**
+     * The 9x9 passability window one level-1 cluster is built from: nine
+     * 16-bit row masks (bit x set = cell passable), padded to 20 bytes. Both
+     * the writer (`OccupySourceBinding::GetOccupyData`, `mov [ecx+eax*2], dx`
+     * at 0x0076B897) and the contact extractor (`movzx esi, word ptr
+     * [esi+ecx*2]` at 0x00955129) address it as 16-bit rows.
+     */
     struct OccupationData
     {
-        std::uint32_t mWords[5];
+        std::uint16_t mRows[9];
+        std::uint16_t mPad;
     };
+    static_assert(sizeof(OccupationData) == 0x14, "OccupationData size must be 0x14");
 
     class Cluster
     {
@@ -59,6 +68,16 @@ namespace gpg::HaStar
         {
             std::uint8_t x;
             std::uint8_t z;
+
+            /**
+             * Address: 0x0092E2E0 (FUN_0092E2E0, gpg::HaStar::Cluster::Node::CostTo)
+             *
+             * What it does:
+             * Quantises the searched `cost` between `from` and `to` into the
+             * edge bucket byte, relative to their octile distance
+             * (`max + 0.41421354f * min` of the axis deltas).
+             */
+            [[nodiscard]] static std::int8_t CostTo(const Node& from, const Node& to, float cost);
         };
         static_assert(sizeof(Node) == 0x02, "Cluster::Node size must be 0x02");
 

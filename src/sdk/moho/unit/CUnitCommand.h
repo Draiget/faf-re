@@ -289,14 +289,6 @@ namespace moho
     void SetTarget(const CAiTarget& target);
 
     /**
-      * Alias of FUN_005BF810 (non-canonical helper lane).
-     *
-     * What it does:
-     * Refreshes cached command blip/transform state for the current frame.
-     */
-    void RefreshBlipState();
-
-    /**
      * Address: 0x006E9000 (FUN_006E9000, ?CoordinateWith@CUnitCommand@Moho@@QAEXPAV12@@Z)
      *
      * What it does:

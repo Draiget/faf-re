@@ -2523,15 +2523,13 @@ namespace
 
     cmd.mMouseDragStart.mHitValid = 0;
     cmd.mMouseDragStart.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-    cmd.mMouseDragStart.mUnitHover = nullptr;
-    cmd.mMouseDragStart.mPrevious = nullptr;
+    cmd.mMouseDragStart.SetHoveredEntity(nullptr);
     cmd.mMouseDragStart.mIsDragger = -1;
     cmd.mMouseDragStart.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
 
     cmd.mMouseDragEnd.mHitValid = 0;
     cmd.mMouseDragEnd.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-    cmd.mMouseDragEnd.mUnitHover = nullptr;
-    cmd.mMouseDragEnd.mPrevious = nullptr;
+    cmd.mMouseDragEnd.SetHoveredEntity(nullptr);
     cmd.mMouseDragEnd.mIsDragger = -1;
     cmd.mMouseDragEnd.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
 
@@ -22859,7 +22857,7 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
   MouseInfo resultCursor;
   resultCursor.mHitValid = hit.mHitValid;
   resultCursor.mMouseWorldPos = hit.mMouseWorldPos;
-  resultCursor.mUnitHover = bestCandidate;
+  resultCursor.SetHoveredEntity(bestCandidate);
   resultCursor.mMouseScreenPos = mouseScreenPos;
   mWldSession->CursorInfo() = resultCursor;
 }

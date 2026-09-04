@@ -189,74 +189,15 @@ namespace moho
   static_assert(offsetof(EntityCollisionCellNode, next) == 0x00, "EntityCollisionCellNode::next offset must be 0x00");
   static_assert(offsetof(EntityCollisionCellNode, owner) == 0x04, "EntityCollisionCellNode::owner offset must be 0x04");
 
-  /**
-   * Prefix layout used by collision-cell linking helpers (0x004FCF20/0x004FCF90/0x004FCE90).
-   *
-   * Notes:
-   * - This is a recovered view of the hot-path prefix only.
-   * - Offsets >= +0x34 may exist in the real object and remain unresolved.
-   */
-  struct EntityCollisionSpatialGrid
-  {
-    std::int32_t mRowStride;                           // +0x00
-    std::uint32_t mReserved04;                         // +0x04
-    std::uint32_t mBucketMask;                         // +0x08
-    std::uint32_t mRowShift;                           // +0x0C
-    EntityCollisionCellNode** mBucketHeads100;         // +0x10
-    EntityCollisionCellNode** mBucketHeads200;         // +0x14
-    EntityCollisionCellNode** mBucketHeadsC00;         // +0x18
-    EntityCollisionCellNode* mFreeNodeHead;            // +0x1C
-    std::int32_t mFreeNodeCount;                       // +0x20
-    std::uint32_t mReserved24;                         // +0x24
-    EntityCollisionCellNode** mChunkBlocksBegin;       // +0x28
-    EntityCollisionCellNode** mChunkBlocksEnd;         // +0x2C
-    EntityCollisionCellNode** mChunkBlocksCapacityEnd; // +0x30
-  };
+  struct EntityOccupationManager;
 
-  static_assert(sizeof(EntityCollisionSpatialGrid) == 0x34, "EntityCollisionSpatialGrid prefix size must be 0x34");
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mRowStride) == 0x00,
-    "EntityCollisionSpatialGrid::mRowStride offset must be 0x00"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mBucketMask) == 0x08,
-    "EntityCollisionSpatialGrid::mBucketMask offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mRowShift) == 0x0C, "EntityCollisionSpatialGrid::mRowShift offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mBucketHeads100) == 0x10,
-    "EntityCollisionSpatialGrid::mBucketHeads100 offset must be 0x10"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mBucketHeads200) == 0x14,
-    "EntityCollisionSpatialGrid::mBucketHeads200 offset must be 0x14"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mBucketHeadsC00) == 0x18,
-    "EntityCollisionSpatialGrid::mBucketHeadsC00 offset must be 0x18"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mFreeNodeHead) == 0x1C,
-    "EntityCollisionSpatialGrid::mFreeNodeHead offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mFreeNodeCount) == 0x20,
-    "EntityCollisionSpatialGrid::mFreeNodeCount offset must be 0x20"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mChunkBlocksBegin) == 0x28,
-    "EntityCollisionSpatialGrid::mChunkBlocksBegin offset must be 0x28"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mChunkBlocksEnd) == 0x2C,
-    "EntityCollisionSpatialGrid::mChunkBlocksEnd offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(EntityCollisionSpatialGrid, mChunkBlocksCapacityEnd) == 0x30,
-    "EntityCollisionSpatialGrid::mChunkBlocksCapacityEnd offset must be 0x30"
-  );
+  /**
+   * The collision bucket grid an entity span links into is the sim's
+   * `COGrid::mEntityOccupationManager` itself (`CollisionShapeBase::Add`,
+   * 0x004FD420, reads its width/mask/shift straight off that object). The
+   * owning layout lives in `moho/sim/COGrid.h`.
+   */
+  using EntityCollisionSpatialGrid = EntityOccupationManager;
 
   /**
    * Address owner: Entity + 0x4C

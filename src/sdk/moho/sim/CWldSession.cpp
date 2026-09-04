@@ -647,39 +647,6 @@ namespace
   //   FUN_0085A920  uninit_fill_n / in-place construct, push_back fast path
   //   FUN_0085A0E0  reallocate_to + insert, push_back grow path
   //
-  void LinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
-  {
-    moho::WeakObject::WeakLinkNodeView* const self =
-      reinterpret_cast<moho::WeakObject::WeakLinkNodeView*>(&info.mUnitHover);
-    if (self->ownerLinkSlot == nullptr) {
-      self->nextInOwner = nullptr;
-      return;
-    }
-
-    auto** const ownerLinkSlot = reinterpret_cast<moho::WeakObject::WeakLinkNodeView**>(self->ownerLinkSlot);
-    self->nextInOwner = *ownerLinkSlot;
-    *ownerLinkSlot = self;
-  }
-
-  void UnlinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
-  {
-    moho::WeakObject::WeakLinkNodeView* const self =
-      reinterpret_cast<moho::WeakObject::WeakLinkNodeView*>(&info.mUnitHover);
-    moho::WeakObject::WeakLinkNodeView** cursor =
-      reinterpret_cast<moho::WeakObject::WeakLinkNodeView**>(self->ownerLinkSlot);
-    if (cursor == nullptr) {
-      return;
-    }
-
-    while (*cursor != nullptr && *cursor != self) {
-      cursor = &((*cursor)->nextInOwner);
-    }
-
-    if (*cursor == self) {
-      *cursor = self->nextInOwner;
-    }
-  }
-
 } // namespace
 
 // Defined at file scope (global namespace, external linkage) in
@@ -724,8 +691,7 @@ namespace moho
     : mHitValid(0u)
     , pad_01{0u, 0u, 0u}
     , mMouseWorldPos(0.0f, 0.0f, 0.0f)
-    , mUnitHover(nullptr)
-    , mPrevious(nullptr)
+    , mUnitHover()
     , mIsDragger(-1)
     , mMouseScreenPos(0.0f, 0.0f)
   {}
@@ -737,14 +703,13 @@ namespace moho
    * Copy-constructs cursor info and relinks weak hovered-unit ownership to this instance.
    */
   MouseInfo::MouseInfo(const MouseInfo& other)
+    : mHitValid(other.mHitValid)
+    , pad_01{0u, 0u, 0u}
+    , mMouseWorldPos(other.mMouseWorldPos)
+    , mUnitHover(other.mUnitHover)
+    , mIsDragger(other.mIsDragger)
+    , mMouseScreenPos(other.mMouseScreenPos)
   {
-    mHitValid = other.mHitValid;
-    mMouseWorldPos = other.mMouseWorldPos;
-    mUnitHover = other.mUnitHover;
-    LinkCursorInfoWeakOwnerRef(*this);
-
-    mIsDragger = other.mIsDragger;
-    mMouseScreenPos = other.mMouseScreenPos;
   }
 
   /**
@@ -776,10 +741,7 @@ namespace moho
    * wrappers have been deleted; this destructor (via
    * `UnlinkCursorInfoWeakOwnerRef`) is their sole recovery.
    */
-  MouseInfo::~MouseInfo()
-  {
-    UnlinkCursorInfoWeakOwnerRef(*this);
-  }
+  MouseInfo::~MouseInfo() = default;
 
   /**
    * Address: 0x0082B270 (FUN_0082B270, Moho::UICursorInfo::Copy)
@@ -791,21 +753,7 @@ namespace moho
   {
     mHitValid = other.mHitValid;
     mMouseWorldPos = other.mMouseWorldPos;
-
-    if (other.mUnitHover != mUnitHover) {
-      if (mUnitHover != nullptr) {
-        UnlinkCursorInfoWeakOwnerRef(*this);
-      }
-
-      mUnitHover = other.mUnitHover;
-      LinkCursorInfoWeakOwnerRef(*this);
-      if (mUnitHover != nullptr) {
-        mIsDragger = other.mIsDragger;
-        mMouseScreenPos = other.mMouseScreenPos;
-        return *this;
-      }
-    }
-
+    mUnitHover = other.mUnitHover;
     mIsDragger = other.mIsDragger;
     mMouseScreenPos = other.mMouseScreenPos;
     return *this;
@@ -863,8 +811,7 @@ namespace moho
   {
     mMouseDragEnd.mHitValid = 0u;
     mMouseDragEnd.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-    mMouseDragEnd.mUnitHover = nullptr;
-    mMouseDragEnd.mPrevious = nullptr;
+    mMouseDragEnd.SetHoveredEntity(nullptr);
     mMouseDragEnd.mIsDragger = -1;
     mMouseDragEnd.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
   }
@@ -7822,22 +7769,6 @@ namespace moho
     // DecodeUserEntityWeakRef(const CameraUserEntityWeakRef&) lives in
     // CameraImpl.h/.cpp now - it decodes the same GetArmyUnitsInFrustum()
     // lanes and CRenderWorldView's build-drag adjacency pass needs it too.
-
-    [[nodiscard]] UserEntity* DecodeUserEntityWeakLinkSlot(const UserEntityWeakLinkSlotRuntimeView& weakSlot)
-    {
-      constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-      static_assert(kUserEntityWeakOwnerOffset == 0x08, "UserEntity weak-link owner offset must stay 0x08");
-#endif
-
-      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakSlot.mOwnerLinkSlot);
-      if (raw == 0u || raw == kUserEntityWeakOwnerOffset || raw < kUserEntityWeakOwnerOffset) {
-        return nullptr;
-      }
-
-      return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
-    }
-
     /**
      * Address: 0x0081FD2B..0x0081FD4E (inlined into
      * `Moho::SCommandModeData::HandleEvent`, FUN_0081FCD0)
@@ -7851,8 +7782,7 @@ namespace moho
      */
     [[nodiscard]] UserEntity* DecodeHoveredDragEntity(const MouseInfo& cursor) noexcept
     {
-      UserEntity* const entity =
-        DecodeUserEntityWeakLinkSlot(reinterpret_cast<const UserEntityWeakLinkSlotRuntimeView&>(cursor.mUnitHover));
+      UserEntity* const entity = cursor.HoveredEntity();
       if (entity == nullptr || entity->mMarkedForDeletion != 0u) {
         return nullptr;
       }
@@ -14807,7 +14737,7 @@ namespace moho
    */
   UserEntity* CWldSession::GetHoveredUserEntity() const noexcept
   {
-    return DecodeUserEntityWeakLinkSlot(AccessCursorInfoRuntime(*this).mUnitHover);
+    return GetCursorInfo().HoveredEntity();
   }
 
   /**
@@ -22047,7 +21977,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     }
   }
 
-  UserEntity* const hoverEntity = mouseInfo->mUnitHover;
+  UserEntity* const hoverEntity = mouseInfo->HoveredEntity();
 
   if (hoverEntity == nullptr) {
     // No hover: consult the pending right-click command-manager helper. An

@@ -1268,8 +1268,10 @@ namespace
       return nullptr;
     }
 
-    auto* const rawEntityGrid = reinterpret_cast<std::uint8_t*>(&sim->mOGrid->mEntityOccupationManager);
-    return reinterpret_cast<moho::EntityCollisionSpatialGrid*>(rawEntityGrid + 0x04);
+    // 0x004FD420 (`CollisionShapeBase::Add`) reads width/mask/shift straight
+    // off `COGrid::mEntityOccupationManager`; the old `+ 0x04` view here put
+    // the chunk vector's capacity word on `COGrid::terrainOccupation.ptr`.
+    return &sim->mOGrid->mEntityOccupationManager;
   }
 
   void RegisterEntityInDbIfMissing(moho::Sim* sim, moho::Entity* entity)
@@ -1398,13 +1400,13 @@ namespace
    */
   void AppendCollisionChunkPointer(moho::EntityCollisionSpatialGrid& grid, moho::EntityCollisionCellNode* chunkBase)
   {
-    auto** begin = grid.mChunkBlocksBegin;
-    auto** end = grid.mChunkBlocksEnd;
-    auto** capacityEnd = grid.mChunkBlocksCapacityEnd;
+    auto** begin = grid.mAllBlocksBegin;
+    auto** end = grid.mAllBlocksEnd;
+    auto** capacityEnd = grid.mAllBlocksCapacityEnd;
 
     if (begin && end < capacityEnd) {
       *end = chunkBase;
-      grid.mChunkBlocksEnd = end + 1;
+      grid.mAllBlocksEnd = end + 1;
       return;
     }
 
@@ -1436,9 +1438,9 @@ namespace
       ::operator delete(begin);
     }
 
-    grid.mChunkBlocksBegin = newBegin;
-    grid.mChunkBlocksEnd = newBegin + size + 1u;
-    grid.mChunkBlocksCapacityEnd = newBegin + newCapacity;
+    grid.mAllBlocksBegin = newBegin;
+    grid.mAllBlocksEnd = newBegin + size + 1u;
+    grid.mAllBlocksCapacityEnd = newBegin + newCapacity;
   }
 
   /**
@@ -1468,13 +1470,13 @@ namespace
   SelectCollisionBucketHeadArray(moho::EntityCollisionSpatialGrid& grid, const std::uint32_t bucketFlags) noexcept
   {
     if ((bucketFlags & 0x100u) != 0u) {
-      return grid.mBucketHeads100;
+      return grid.mUnitBuckets;
     }
     if ((bucketFlags & 0x200u) != 0u) {
-      return grid.mBucketHeads200;
+      return grid.mPropBuckets;
     }
     if ((bucketFlags & 0x0C00u) != 0u) {
-      return grid.mBucketHeadsC00;
+      return grid.mEntityBuckets;
     }
     return nullptr;
   }
@@ -1548,13 +1550,13 @@ namespace
     );
     EnsureCollisionFreeNodes(grid, requiredNodes);
 
-    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mRowShift);
+    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mGridWidthShift);
     for (int row = 0; row < static_cast<int>(span.mCellHeight); ++row) {
       for (int col = 0; col < static_cast<int>(span.mCellWidth); ++col) {
-        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mBucketMask);
+        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mLastIndex);
         InsertSpanNodeIntoBucket(span, bucketIndex);
       }
-      rowBase += grid.mRowStride;
+      rowBase += grid.mWidth;
     }
   }
 
@@ -1567,13 +1569,13 @@ namespace
   void RemoveSpanMembership(moho::EntityCollisionCellSpan& span)
   {
     moho::EntityCollisionSpatialGrid& grid = *span.mSpatialGrid;
-    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mRowShift);
+    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mGridWidthShift);
     for (int row = 0; row < static_cast<int>(span.mCellHeight); ++row) {
       for (int col = 0; col < static_cast<int>(span.mCellWidth); ++col) {
-        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mBucketMask);
+        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mLastIndex);
         RemoveSpanNodeFromBucket(bucketIndex, grid, span);
       }
-      rowBase += grid.mRowStride;
+      rowBase += grid.mWidth;
     }
   }
 

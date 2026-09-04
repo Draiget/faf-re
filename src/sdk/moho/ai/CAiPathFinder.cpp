@@ -951,21 +951,44 @@ bool CAiPathFinder::RunDirectProbe()
  */
 void CAiPathFinder::QueueSearch()
 {
+  // 0x005AA318: the very first thing the binary does is move this traveler
+  // onto the army path queue's pending ring; `PathQueue::Work` (run from
+  // `CArmyImpl::OnTick`) only ever services travelers linked there.
+  static_cast<PathQueue*>(mPathQueueProxy)->QueueTraveler(*this);
   mIsQueuedOnPathQueue = 1;
-  mHasPathResult = 0;
-  mHasOccupancyMask = (GetFootprint() != nullptr) ? 1u : 0u;
-
-  if (mUnit && mUnit->ArmyRef) {
-    mUseWholeMap = mUnit->ArmyRef->UseWholeMap() ? 1u : 0u;
-  }
+  mUseWholeMap = mUnit->ArmyRef->UseWholeMap() ? 1u : 0u;
   UpdatePlayableRectGate();
+  mHasPathResult = 0;
+
+  // 0x005AA3E8..0x005AA47A: the search runs its per-cell footprint-fit test
+  // only when the unit currently fits at its own footprint-adjusted cell.
+  const SFootprint& footprint = mUnit->GetFootprint();
+  const Wm3::Vec3f& position = mUnit->GetPosition();
+  SOCellPos anchorCell{};
+  anchorCell.x = static_cast<std::int16_t>(static_cast<int>(position.x - static_cast<float>(footprint.mSizeX) * 0.5f));
+  anchorCell.z = static_cast<std::int16_t>(static_cast<int>(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+  mHasOccupancyMask =
+    (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY)) != 0u)
+      ? 1u
+      : 0u;
 
   if (mSearchType == AIPATHSEARCH_None) {
     ClearRectHistory();
     return;
   }
 
-  PushRectHistory(GoalOuterRect(mGoal));
+  // 0x005AA483..0x005AA531: remember a 17x17-cell window around the unit
+  // (clipped to the height field) as a recently searched rect; `ShouldSearchRect`
+  // lets the level-0 expansion walk inside it, the cluster graph covers the rest.
+  const CHeightField* const field = mSim->mMapData->mHeightField.get();
+  const int cellX = static_cast<int>(anchorCell.x);
+  const int cellZ = static_cast<int>(anchorCell.z);
+  gpg::Rect2i searchWindow{};
+  searchWindow.x0 = std::max(0, cellX - 8);
+  searchWindow.x1 = std::min(field->width - 2, cellX + 8);
+  searchWindow.z0 = std::max(0, cellZ - 8);
+  searchWindow.z1 = std::min(field->height - 2, cellZ + 8);
+  PushRectHistory(searchWindow);
 }
 
 /**
@@ -1390,8 +1413,10 @@ void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
     head = RectHistoryHead(mRecentSearchRects);
   }
 
+  // 0x005AA4E0: `if (size > 2) pop_back()` -- the list is push_front'ed
+  // below, so the oldest rect is the back (`head->prev`), not the front.
   while (mRecentSearchRects.mSize > 2) {
-    RectHistoryNode* const oldest = head->next;
+    RectHistoryNode* const oldest = head->prev;
     if (oldest == head) {
       mRecentSearchRects.mSize = 0;
       break;

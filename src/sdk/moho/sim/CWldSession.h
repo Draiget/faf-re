@@ -6,6 +6,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "CArmyImpl.h"
 #include "gpg/core/containers/IntrusiveLink.h"
+#include "moho/misc/WeakPtr.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/List.h"
@@ -136,15 +137,22 @@ namespace moho
     std::uint8_t mHitValid; // +0x00
     std::uint8_t pad_01[3];
     Wm3::Vector3f mMouseWorldPos;  // +0x04
-    UserEntity* mUnitHover;        // +0x10
-    UserEntity* mPrevious;         // +0x14
+    // Weak reference to the hovered entity: owner slot at +0x10 (points at
+    // `UserEntity::mIUnitChainHead`), next-in-owner at +0x14. The copy ctor
+    // (0x0081CF00), `Copy` (0x0082B270) and dtor (0x00893140) are this
+    // member's link/relink/unlink.
+    WeakPtr<UserEntity> mUnitHover; // +0x10
     std::int32_t mIsDragger;       // +0x18
     Wm3::Vector2f mMouseScreenPos; // +0x1C
+
+    [[nodiscard]] UserEntity* HoveredEntity() const noexcept { return mUnitHover.GetObjectPtr(); }
+    void SetHoveredEntity(UserEntity* const entity) noexcept { mUnitHover.ResetFromObject(entity); }
   };
 
   static_assert(sizeof(MouseInfo) == 0x24, "MouseInfo size must be 0x24");
   static_assert(offsetof(MouseInfo, mMouseWorldPos) == 0x04, "MouseInfo::mMouseWorldPos offset must be 0x04");
   static_assert(offsetof(MouseInfo, mUnitHover) == 0x10, "MouseInfo::mUnitHover offset must be 0x10");
+  static_assert(sizeof(WeakPtr<UserEntity>) == 0x08, "MouseInfo::mUnitHover must be the two-word weak link");
   static_assert(offsetof(MouseInfo, mIsDragger) == 0x18, "MouseInfo::mIsDragger offset must be 0x18");
 
   enum ECommandMode : std::int32_t
