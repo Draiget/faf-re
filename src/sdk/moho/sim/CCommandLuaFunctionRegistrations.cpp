@@ -3538,13 +3538,9 @@ namespace moho
     bool inWorld = false;
     if (session != nullptr) {
       const MouseInfo& cursor = session->GetCursorInfo();
-      if (cursor.mUnitHover != nullptr) {
-        hoverOwner = reinterpret_cast<moho::WeakObject*>(cursor.mUnitHover);
-        // The hovered UserEntity is (weak-slot value) - offsetof(UserEntity, mIUnitChainHead).
-        if (reinterpret_cast<std::uintptr_t>(cursor.mUnitHover) != offsetof(UserEntity, mIUnitChainHead)) {
-          hoveredEntity = reinterpret_cast<UserEntity*>(
-            reinterpret_cast<char*>(cursor.mUnitHover) - offsetof(UserEntity, mIUnitChainHead));
-        }
+      hoveredEntity = cursor.HoveredEntity();
+      if (hoveredEntity != nullptr) {
+        hoverOwner = static_cast<moho::WeakObject*>(hoveredEntity);
       }
       inWorld = cursor.mHitValid != 0;
     }

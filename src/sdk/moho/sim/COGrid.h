@@ -70,21 +70,37 @@ namespace moho
 
   using EntityLineCollisionVector = gpg::core::FastVectorN<EntityLineCollision, 10>;
 
+  struct EntityCollisionCellNode;
+
+  /**
+   * The 4x4-cell collision bucket grid every entity's `EntityCollisionCellSpan`
+   * links into. Field roles from the binary: `EnsureSize` (0x004FCE90) grows
+   * `mFreeNodeCount` (+0x1C) by 0x2000 per 0x10000-byte chunk, threads the
+   * chunk onto `mFreeNodeHead` (+0x20) and pushes it onto the `mAllBlocks`
+   * MSVC8 vector at +0x24 (proxy, first, last, end); `AddColShapeAt`
+   * (0x004FCF20) / `RemoveColShapeAt` (0x004FCF90) pick the bucket array by
+   * entity family (+0x10 units, +0x14 props, +0x18 projectiles/entities) and
+   * pop/push the free list at +0x20 while adjusting the count at +0x1C;
+   * `CollisionShapeBase::Add` (0x004FD420) walks rows with `mWidth` (+0x00)
+   * as the stride, `mLastIndex` (+0x08) as the bucket mask and
+   * `mGridWidthShift` (+0x0C) as the row shift. This is the one owning layout;
+   * `EntityCollisionSpatialGrid` in Entity.h is an alias of it.
+   */
   struct EntityOccupationManager
   {
-    std::int32_t mWidth;            // +0x00
-    std::int32_t mHeight;           // +0x04
-    std::int32_t mLastIndex;        // +0x08
-    std::int32_t mGridWidthShift;   // +0x0C
-    void** mUnitBuckets;            // +0x10
-    void** mPropBuckets;            // +0x14
-    void** mEntityBuckets;          // +0x18
-    std::int32_t mUnknown1C;        // +0x1C
-    std::int32_t mUnknown20;        // +0x20
-    std::int32_t mUnknown24;        // +0x24
-    void** mAllBlocksBegin;         // +0x28
-    void** mAllBlocksEnd;           // +0x2C
-    void** mAllBlocksCapacityEnd;   // +0x30
+    std::int32_t mWidth;                                 // +0x00
+    std::int32_t mHeight;                                // +0x04
+    std::int32_t mLastIndex;                             // +0x08
+    std::int32_t mGridWidthShift;                        // +0x0C
+    EntityCollisionCellNode** mUnitBuckets;              // +0x10
+    EntityCollisionCellNode** mPropBuckets;              // +0x14
+    EntityCollisionCellNode** mEntityBuckets;            // +0x18
+    std::int32_t mFreeNodeCount;                         // +0x1C
+    EntityCollisionCellNode* mFreeNodeHead;              // +0x20
+    void* mAllBlocksProxy;                               // +0x24
+    EntityCollisionCellNode** mAllBlocksBegin;           // +0x28
+    EntityCollisionCellNode** mAllBlocksEnd;             // +0x2C
+    EntityCollisionCellNode** mAllBlocksCapacityEnd;     // +0x30
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)

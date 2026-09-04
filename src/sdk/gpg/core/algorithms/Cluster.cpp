@@ -14,7 +14,9 @@
 
 #include <intrin.h>
 
+#include "gpg/core/algorithms/AStarSearch.h"
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
@@ -205,7 +207,7 @@ namespace
 
         for (std::uint8_t step = 0u; step <= 8u; ++step) {
           const bool occupied =
-            (occupationData.mWords[currentLayer] & (1u << currentBit)) != 0u;
+            (occupationData.mRows[currentLayer] & (1u << currentBit)) != 0u;
           if (occupied) {
             runEnd = step;
             if (runStart == 0xFFu) {
@@ -1997,37 +1999,6 @@ namespace
             return msvc8::hash_value(static_cast<long>(packedCoordinate));
         }
     };
-
-    struct ClusterSearchScratchNode
-    {
-        std::int32_t mNodeIndex = 0;        // +0x00
-        std::int32_t mPreviousNodeIndex = 0; // +0x04
-        float mTraversalCost = 0.0f;         // +0x08
-    };
-    static_assert(sizeof(ClusterSearchScratchNode) == 0x0C, "ClusterSearchScratchNode size must be 0x0C");
-
-    struct ClusterSearchScratch
-    {
-        std::vector<ClusterSearchScratchNode> mPendingNodes;
-        std::vector<std::int32_t> mFrontierNodeIndices;
-        std::int32_t mActiveNodeIndex = -1;
-
-        /**
-         * Address: 0x0092EF80 (FUN_0092EF80, struct_Ha2::Reset)
-         *
-         * What it does:
-         * Clears search frontier/state vectors and resets the active-node
-         * marker used during subcluster cluster-build traversal.
-         */
-        void Reset();
-    };
-
-    void ClusterSearchScratch::Reset()
-    {
-        mPendingNodes.clear();
-        mFrontierNodeIndices.clear();
-        mActiveNodeIndex = -1;
-    }
 
     using ClusterNodeSearchStateMap =
         std::unordered_map<std::uint16_t, ClusterNodeSearchState, ClusterNodeSearchStateHash>;
@@ -4081,7 +4052,7 @@ namespace
       const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(nodes.start);
       // Occupation rows are a uint16 bitmask grid: row r's passability mask is
       // the 16-bit word at byte offset r*2 (the binary reads word ptr[a1 + r*2]).
-      const auto* const layerRows = reinterpret_cast<const std::uint16_t*>(occupation.mWords);
+      const std::uint16_t* const layerRows = occupation.mRows;
 
       for (std::uint32_t source = 0u; source + 1u < nodeCount; ++source) {
         PathSearchFrontierNodeRuntime openListHead{};
@@ -4391,6 +4362,20 @@ float Cluster::QuantizeEdgeCost(const float a, const float b)
 }
 
 /**
+ * Address: 0x0092E2E0 (FUN_0092E2E0, gpg::HaStar::Cluster::Node::CostTo)
+ *
+ * What it does:
+ * Quantises `cost` against the octile distance between the two nodes.
+ */
+std::int8_t Cluster::Node::CostTo(const Node& from, const Node& to, const float cost)
+{
+    const float dx = std::fabs(static_cast<float>(static_cast<int>(from.x) - static_cast<int>(to.x)));
+    const float dz = std::fabs(static_cast<float>(static_cast<int>(from.z) - static_cast<int>(to.z)));
+    const float distance = (dz <= dx) ? (dz * 0.41421354f + dx) : (dx * 0.41421354f + dz);
+    return static_cast<std::int8_t>(static_cast<int>(QuantizeEdgeCost(cost, distance)));
+}
+
+/**
  * Address: 0x00954110 (FUN_00954110,
  * ?SetData@Cluster@HaStar@gpg@@QAEXPBUNode@123@PBUEdge@123@I@Z)
  *
@@ -4577,24 +4562,395 @@ Cluster ClusterBuild(const OccupationData& occupationData)
     return cluster;
 }
 
+namespace
+{
+    /**
+     * One search cell of the subcluster merge: the running distance the
+     * search reached this node with, plus the node's coordinates inside the
+     * parent (level+1) cluster. The binary hashes and compares cells by the
+     * packed `(x | z << 8)` word only (`a3` in FUN_00930D60), the distance is
+     * payload. `AStarNode<SubclusterCell>` is IDA's `struct_Ha4`: cell @+0x00,
+     * state @+0x08, parent @+0x0C, cost @+0x10, estimate @+0x14, handle @+0x18.
+     */
+    struct SubclusterCell
+    {
+        float mDistance;      // +0x00
+        Cluster::Node mNode;  // +0x04
+        std::uint8_t mPad[2]; // +0x06
+    };
+    static_assert(sizeof(SubclusterCell) == 0x08, "SubclusterCell size must be 0x08");
+
+    [[nodiscard]] std::uint16_t PackedSubclusterNodeKey(const Cluster::Node& node) noexcept
+    {
+        return static_cast<std::uint16_t>(node.x | (static_cast<std::uint16_t>(node.z) << 8u));
+    }
+
+    [[nodiscard]] std::size_t hash_value(const SubclusterCell& cell)
+    {
+        return msvc8::hash_value(static_cast<long>(PackedSubclusterNodeKey(cell.mNode)));
+    }
+
+    struct SubclusterCellLess
+    {
+        [[nodiscard]] bool operator()(const SubclusterCell& lhs, const SubclusterCell& rhs) const noexcept
+        {
+            return PackedSubclusterNodeKey(lhs.mNode) < PackedSubclusterNodeKey(rhs.mNode);
+        }
+    };
+
+    using SubclusterCellTraits = msvc8::hash_compare<SubclusterCell, SubclusterCellLess>;
+
+    /**
+     * One neighbour emitted by `SubclusterSearch::ExpandNode` (the 12-byte
+     * record `v42` in FUN_009304F0): the distance reached through this edge,
+     * the neighbour node, and the edge cost itself.
+     */
+    struct SubclusterNeighbour
+    {
+        float mDistance;      // +0x00
+        Cluster::Node mNode;  // +0x04
+        std::uint8_t mPad[2]; // +0x06
+        float mEdgeCost;      // +0x08
+    };
+    static_assert(sizeof(SubclusterNeighbour) == 0x0C, "SubclusterNeighbour size must be 0x0C");
+
+    /**
+     * The Dijkstra the subcluster merge runs from each boundary node over the
+     * 4x4 child clusters' edge graphs. IDA's `struct_Ha1` is exactly
+     * `gpg::AStarSearch<SubclusterCell, SubclusterSearch>`: the node hash map
+     * at +0x00 and the open heap (`struct_Ha2`) at +0x28.
+     *
+     * Address: 0x00930C00 (FUN_00930C00, struct_Ha1::struct_Ha1) -- the
+     *   `AStarSearch` constructor emission for this instantiation.
+     * Address: 0x0092EF80 (FUN_0092EF80, struct_Ha2::Reset) -- `ResetSearch`'s
+     *   open-heap clear.
+     * Address: 0x00930C80 (FUN_00930C80) -- `AddStartNode` for this
+     *   instantiation (`ClusterBuild` seeds it with cost 0).
+     * Address: 0x0092DD60 / 0x00930B40 (FUN_0092DD60, FUN_00930B40) --
+     *   `msvc8::hash_map<SubclusterCell, AStarNode>::find` / `clear`.
+     */
+    class SubclusterSearch final
+        : public gpg::AStarSearch<SubclusterCell, SubclusterSearch, SubclusterCellTraits>
+    {
+    public:
+        // The merge is a plain shortest-path relaxation: no heuristic, no
+        // closest-cell tracking (both hooks are empty in the binary).
+        [[nodiscard]] float GetHeuristicCost(const SubclusterCell&) const noexcept { return 0.0f; }
+        void NoteCandidateCell(const SubclusterCell&, float) noexcept {}
+
+        /**
+         * Address: 0x009304F0 (FUN_009304F0)
+         *
+         * What it does:
+         * Emits every neighbour reachable from `node` through the child
+         * clusters that contain it: for each child cluster of the parent's 4x4
+         * grid whose index rect covers the node, finds the node's slot in that
+         * child's node table and, for every other node of the child with a
+         * non-negative quantised edge, pushes a neighbour whose edge cost is
+         * the dequantised bucket scaled by the octile distance. Never reports
+         * a goal (the merge wants every node's distance).
+         */
+        bool ExpandNode(
+            const SubclusterData& data,
+            const node_type& node,
+            std::vector<SubclusterNeighbour>& outNeighbours
+        ) const;
+
+        /**
+         * Address: 0x00930D60 (FUN_00930D60)
+         *
+         * What it does:
+         * Drains the open heap: expands the cheapest node, closes it, and
+         * relaxes every emitted neighbour -- fresh nodes open with the
+         * reached cost, open nodes improve when the reached cost is lower.
+         * Returns true only if an expansion reports a goal (never, here).
+         */
+        bool Run(const SubclusterData& data);
+    };
+
+    bool SubclusterSearch::ExpandNode(
+        const SubclusterData& data,
+        const node_type& node,
+        std::vector<SubclusterNeighbour>& outNeighbours
+    ) const
+    {
+        const int level = data.mLevel;
+        const int shift = sClusterSizeLog2[level];
+        const int nodeX = node.mCell.mNode.x;
+        const int nodeZ = node.mCell.mNode.z;
+
+        const gpg::Rect2i childRect = ClusterIndexRect(nodeX, nodeZ, static_cast<std::uint8_t>(level), 4, 4);
+
+        for (int childZ = childRect.z0; childZ != childRect.z1; ++childZ) {
+            const int originZ = childZ << shift;
+            for (int childX = childRect.x0; childX != childRect.x1; ++childX) {
+                const int originX = childX << shift;
+
+                const Cluster::Data* const child = data.mClusters[childX + 4 * childZ].mData;
+                const std::uint32_t nodeCount = (child != nullptr) ? child->mNodeCount : 0u;
+                if (nodeCount == 0u) {
+                    continue;
+                }
+
+                const Cluster::Node* const nodes = child->mNodes;
+                const auto* const edges = reinterpret_cast<const std::int8_t*>(nodes + nodeCount);
+
+                std::uint32_t fromIndex = 0u;
+                for (; fromIndex < nodeCount; ++fromIndex) {
+                    if (nodes[fromIndex].x == static_cast<std::uint8_t>(nodeX - originX)
+                        && nodes[fromIndex].z == static_cast<std::uint8_t>(nodeZ - originZ)) {
+                        break;
+                    }
+                }
+                if (fromIndex == nodeCount) {
+                    continue;
+                }
+
+                for (std::uint32_t toIndex = 0u; toIndex < nodeCount; ++toIndex) {
+                    if (toIndex == fromIndex) {
+                        continue;
+                    }
+
+                    const std::int8_t bucket = edges[TriangularEdgePairIndex(fromIndex, toIndex)];
+                    if (bucket < 0) {
+                        continue;
+                    }
+
+                    const float edgeCost = Cluster::DequantizeEdgeCost(
+                        bucket, Cluster::NodeOctileDistance(*child, fromIndex, toIndex));
+
+                    SubclusterNeighbour neighbour{};
+                    neighbour.mDistance = node.mCell.mDistance + edgeCost;
+                    neighbour.mNode.x = static_cast<std::uint8_t>(originX + nodes[toIndex].x);
+                    neighbour.mNode.z = static_cast<std::uint8_t>(originZ + nodes[toIndex].z);
+                    neighbour.mEdgeCost = edgeCost;
+                    outNeighbours.push_back(neighbour);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    bool SubclusterSearch::Run(const SubclusterData& data)
+    {
+        std::vector<SubclusterNeighbour> neighbours;
+
+        while (!OpenSet().empty()) {
+            node_type* const current = OpenSet().top();
+
+            neighbours.clear();
+            if (ExpandNode(data, *current, neighbours)) {
+                return true;
+            }
+
+            current->mState = gpg::AStarNodeState::Closed;
+            (void)OpenSet().Pop();
+
+            for (const SubclusterNeighbour& neighbour : neighbours) {
+                SubclusterCell cell{};
+                cell.mDistance = neighbour.mDistance;
+                cell.mNode = neighbour.mNode;
+
+                node_type& next = FindOrCreateNode(cell);
+                const float reachedCost = current->mCost + neighbour.mEdgeCost;
+
+                switch (next.mState) {
+                    case gpg::AStarNodeState::Unvisited: {
+                        next.mState = gpg::AStarNodeState::Open;
+                        next.mEstimate = 0.0f;
+                        next.mParent = current;
+                        next.mCell = cell;
+                        next.mCost = reachedCost;
+                        next.mHandle = OpenSet().Push(reachedCost, &next);
+                        break;
+                    }
+
+                    case gpg::AStarNodeState::Open: {
+                        if (next.mCost > reachedCost) {
+                            next.mParent = current;
+                            next.mCell = cell;
+                            next.mCost = reachedCost;
+                            OpenSet().UpdatePriority(next.mHandle, next.mEstimate + reachedCost);
+                        }
+                        break;
+                    }
+
+                    case gpg::AStarNodeState::Closed:
+                    default:
+                        // "neib->mState == CLOSED", AStarSearch.h:253
+                        assert(next.mState == gpg::AStarNodeState::Closed);
+                        break;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Address: 0x0092FE30 (FUN_0092FE30)
+     *
+     * What it does:
+     * Gathers the parent cluster's boundary node set from its sixteen
+     * children: every child node that lands on the parent-size grid boundary
+     * (`x` or `z` a multiple of the level+1 cluster size) is appended in
+     * parent-local coordinates, then the set is sorted by its packed
+     * `(x | z << 8)` word and deduplicated.
+     */
+    void CollectSubclusterBoundaryNodes(
+        const SubclusterData& data,
+        gpg::fastvector_n<Cluster::Node, 64>& outNodes
+    )
+    {
+        const int level = data.mLevel;
+        const int boundaryMask = sClusterSize[level + 1] - 1;
+        const int shift = sClusterSizeLog2[level];
+
+        outNodes.clear();
+        for (int childZ = 0; childZ < 4; ++childZ) {
+            for (int childX = 0; childX < 4; ++childX) {
+                const Cluster::Data* const child = data.mClusters[childX + 4 * childZ].mData;
+                const std::uint32_t nodeCount = (child != nullptr) ? child->mNodeCount : 0u;
+                for (std::uint32_t index = 0u; index < nodeCount; ++index) {
+                    const int parentX = (childX << shift) + child->mNodes[index].x;
+                    const int parentZ = (childZ << shift) + child->mNodes[index].z;
+                    if ((parentX & boundaryMask) != 0 && (parentZ & boundaryMask) != 0) {
+                        continue;
+                    }
+                    Cluster::Node node{};
+                    node.x = static_cast<std::uint8_t>(parentX);
+                    node.z = static_cast<std::uint8_t>(parentZ);
+                    outNodes.push_back(node);
+                }
+            }
+        }
+
+        // The binary sorts the packed words as signed 16-bit values.
+        std::sort(outNodes.begin(), outNodes.end(), [](const Cluster::Node& lhs, const Cluster::Node& rhs) {
+            return static_cast<std::int16_t>(PackedSubclusterNodeKey(lhs))
+                 < static_cast<std::int16_t>(PackedSubclusterNodeKey(rhs));
+        });
+        const auto uniqueEnd = std::unique(outNodes.begin(), outNodes.end(), [](const Cluster::Node& lhs, const Cluster::Node& rhs) {
+            return PackedSubclusterNodeKey(lhs) == PackedSubclusterNodeKey(rhs);
+        });
+        outNodes.resize(static_cast<std::size_t>(uniqueEnd - outNodes.begin()));
+    }
+
+    /**
+     * Drops nodes with no non-negative edge and compacts the triangular edge
+     * table to the survivors -- the same pass `EraseUnconnectedNodes` runs on
+     * the level-1 build's scratch views, written against the container API.
+     */
+    template <std::size_t NodeInline, std::size_t EdgeInline>
+    void EraseUnconnectedNodes(
+        gpg::fastvector_n<Cluster::Node, NodeInline>& ioNodes,
+        gpg::fastvector_n<Cluster::Edge, EdgeInline>& ioEdges
+    )
+    {
+        const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
+        gpg::fastvector_n<char, 12> reachable;
+        reachable.resize(nodeCount, 0);
+
+        std::int32_t reachedCount = 0;
+        for (std::uint32_t high = 1u; high < nodeCount; ++high) {
+            std::uint32_t edgeIndex = TriangularEdgePairIndex(0u, high);
+            for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
+                if (ioEdges[edgeIndex].cost >= 0) {
+                    reachedCount += (reachable[low] == 0) ? 1 : 0;
+                    reachedCount += (reachable[high] == 0) ? 1 : 0;
+                    reachable[low] = 1;
+                    reachable[high] = 1;
+                }
+            }
+        }
+
+        if (reachedCount == static_cast<std::int32_t>(nodeCount)) {
+            return;
+        }
+
+        std::size_t edgeWrite = 0u;
+        std::size_t nodeWrite = 0u;
+        for (std::uint32_t high = 0u; high < nodeCount; ++high) {
+            if (reachable[high] == 0) {
+                continue;
+            }
+            if (high != 0u) {
+                const std::uint32_t rowBase = TriangularEdgePairIndex(0u, high);
+                for (std::uint32_t low = 0u; low < high; ++low) {
+                    if (reachable[low] != 0) {
+                        ioEdges[edgeWrite++] = ioEdges[rowBase + low];
+                    }
+                }
+            }
+            ioNodes[nodeWrite++] = ioNodes[high];
+        }
+
+        ioNodes.resize(nodeWrite);
+        ioEdges.resize(edgeWrite);
+    }
+} // namespace
+
 /**
  * Address: 0x009310E0 (FUN_009310E0,
  * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUSubclusterData@12@@Z)
  *
- * Notes:
- * Full 4x4 subcluster-merge lane is still being recovered; this stub
- * preserves the binary's `SetData` wiring (empty payload) and scratch-pad
- * reset so the payload is a valid refcounted empty cluster until the child
- * merging lane is finished.
+ * IDA signature:
+ * gpg::HaStar::Cluster *__cdecl gpg::HaStar::ClusterBuild(
+ *   gpg::HaStar::Cluster *result, gpg::HaStar::SubclusterData *children);
+ *
+ * What it does:
+ * Builds one level-N cluster from its sixteen level-(N-1) children: collects
+ * the parent-boundary node set (`CollectSubclusterBoundaryNodes`), sizes the
+ * triangular edge table to n(n-1)/2 "no edge" buckets, then for every node i
+ * runs one `SubclusterSearch` from it over the children's edge graphs and
+ * quantises the distance to each earlier node j into edge (j, i)
+ * (`Cluster::Node::CostTo`). Nodes that end up with no edge are dropped and
+ * the survivors are committed through `Cluster::SetData`.
+ *
+ * Address: 0x0092E410 (FUN_0092E410) -- `edges.resize(n(n-1)/2, {-1})`, the
+ *   `gpg::fastvector_n<Cluster::Edge, 50>::resize` fill emission.
  */
 Cluster ClusterBuild(const SubclusterData& subclusterData)
 {
-    ClusterSearchScratch searchScratch{};
-    searchScratch.Reset();
-    (void)subclusterData;
+    gpg::fastvector_n<Cluster::Node, 64> nodes;
+    gpg::fastvector_n<Cluster::Edge, 50> edges;
+
+    CollectSubclusterBoundaryNodes(subclusterData, nodes);
+
+    const std::uint32_t nodeCount = static_cast<std::uint32_t>(nodes.Size());
+    Cluster::Edge noEdge{};
+    noEdge.cost = -1;
+    edges.resize(static_cast<std::size_t>((nodeCount * (nodeCount - 1u)) >> 1u), noEdge);
+
+    SubclusterSearch search;
+    for (std::uint32_t high = 1u; high < nodeCount; ++high) {
+        search.ResetSearch();
+
+        SubclusterCell start{};
+        start.mNode = nodes[high];
+        start.mDistance = 0.0f;
+        search.AddStartNode(start, search);
+        (void)search.Run(subclusterData);
+
+        for (std::uint32_t low = 0u; low < high; ++low) {
+            SubclusterCell key{};
+            key.mNode = nodes[low];
+            const auto found = search.Nodes().find(key);
+            if (found == search.Nodes().end()) {
+                continue;
+            }
+            edges[low + ((high * (high - 1u)) >> 1u)].cost =
+                Cluster::Node::CostTo(nodes[low], nodes[high], found->second.mCell.mDistance);
+        }
+    }
+
+    EraseUnconnectedNodes(nodes, edges);
 
     Cluster cluster{};
-    cluster.SetData(nullptr, nullptr, 0u);
+    cluster.mData = &Cluster::sDefaultConstructData;
+    ++Cluster::sDefaultConstructData.mRefs;
+    cluster.SetData(nodes.begin(), edges.begin(), static_cast<unsigned int>(nodes.Size()));
     return cluster;
 }
 

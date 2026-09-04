@@ -74,6 +74,17 @@ namespace moho
      * Replaces one owner slot with a new queue pointer, then tears down and
      * frees the previous queue payload when present.
      */
+    /**
+     * Address: 0x005AA318..0x005AA345 (inlined into Moho::CAiPathFinder::QueueSearch, FUN_005AA310)
+     *
+     * What it does:
+     * Unlinks `traveller`'s path-queue node from wherever it sits and appends
+     * it to this queue's pending ring (the `mHeightSentinel` list `Work`
+     * drains). Nothing else enqueues a search: without this, `Work` never
+     * sees a traveler and every navigator waits at `AIPATHNAVSTATE_PathEvent3`.
+     */
+    void QueueTraveler(IPathTraveler& traveller);
+
     static void Move(PathQueue** slot, PathQueue* replacement) noexcept;
 
     struct Impl;

@@ -8906,6 +8906,14 @@ void Sim::FlushLog()
   mIsDesyncFree = true;
 }
 
+namespace
+{
+  // EntId family nibble 3 is the recon-blip family (EntityDb.cpp's
+  // kAllUnitsMidFamilyBoundaryKey / kAllUnitsShieldFamilyBoundaryKey pair).
+  constexpr std::uint32_t kReconBlipFamilyBeginId = 0x30000000u;
+  constexpr std::uint32_t kReconBlipFamilyEndId = 0x40000000u;
+} // namespace
+
 /**
  * Address: 0x005C3710 (FUN_005C3710, sub_5C3710)
  *
@@ -8914,14 +8922,13 @@ void Sim::FlushLog()
  */
 void Sim::RefreshBlips()
 {
-  if (!mCommandDB || !mCommandDB->commands.header_ptr()) {
-    return;
-  }
-
-  for (auto it = mCommandDB->commands.begin(); it != mCommandDB->commands.end(); ++it) {
-    if (CUnitCommand* const command = it->second) {
-      command->RefreshBlipState();
-    }
+  // 0x005C3710 walks `mEntityDB->mAllUnits` from lower_bound(0x30000000) to
+  // lower_bound(0x40000000) -- the recon-blip id family -- through
+  // `CUnitIterAllArmies::Next`, refreshing each blip from its source unit.
+  auto& entities = mEntityDB->mAllUnits;
+  const auto blipsEnd = entities.lower_bound(kReconBlipFamilyEndId);
+  for (auto it = entities.lower_bound(kReconBlipFamilyBeginId); it != blipsEnd; ++it) {
+    static_cast<ReconBlip*>(it->second)->Refresh();
   }
 }
 
@@ -9961,6 +9968,7 @@ Sim::Sim(LaunchInfoBase* const info)
       delete previousTables;
     }
   }
+    ProbeTerrainOccupancy(mOGrid, "after COGrid ctor");
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
   mRules->UpdateChecksum(&mContext, mLog);
@@ -9977,6 +9985,7 @@ Sim::Sim(LaunchInfoBase* const info)
  *
  * What it does:
  * New-game initialization pass, populating the subsystems the constructor left
+  ProbeTerrainOccupancy(mOGrid, "after PathTables ctor");
  * null and running the Lua `SetupSession`/`BeginSession` callbacks around
  * `CreateArmies`/`PostInitialize`. See the class declaration for the ordered
  * list of subsystems constructed here.
@@ -10061,6 +10070,7 @@ void Sim::Setup(LaunchInfoNew* const info)
     newFormationDB->mSim = this;
     CAiFormationDBImpl* const previousFormationDB = mFormationDB;
     mFormationDB = newFormationDB;
+    ProbeTerrainOccupancy(mOGrid, "after SetupSession");
     if (previousFormationDB) {
       delete previousFormationDB;
     }
@@ -10128,7 +10138,9 @@ void Sim::Setup(LaunchInfoNew* const info)
     }
   }
 
+  ProbeTerrainOccupancy(mOGrid, "before CreateArmies");
   // Spawn scenario props unless /noprops was requested. Each record's blueprint
+  ProbeTerrainOccupancy(mOGrid, "after CreateArmies");
   // id is resolved through the rules and instantiated at its stored transform.
   if (!CFG_GetArgOption("/noprops", 0u, nullptr)) {
     CWldProps* const props = info->mProps;
@@ -10165,6 +10177,7 @@ void Sim::Setup(LaunchInfoNew* const info)
  * What it does:
  * Load-game initialization pass. Deserializes this Sim from the saved archive,
  * refreshes heightfield bounds, re-arms every loaded unit's intel handles and
+  ProbeTerrainOccupancy(mOGrid, "after props");
  * re-binds each loaded prop into the entity DB bounded-prop queue, then re-syncs
  * the playable rectangle and fires the `OnPostLoad` Lua callback.
  */
@@ -10174,9 +10187,11 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
 
   // Deserialize this Sim instance from the saved archive.
   if (!Sim::sType) {
+  ProbeTerrainOccupancy(mOGrid, "after BeginSession");
     Sim::sType = gpg::LookupRType(typeid(Sim));
   }
   gpg::RRef ownerRef{};
+  ProbeTerrainOccupancy(mOGrid, "end of Sim::Setup");
   archive->Read(Sim::sType, this, ownerRef);
   archive->EndSection(false);
 
@@ -13865,7 +13880,12 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  RRuleGameRulesImpl* const rules = ResolveRulesImpl(state);
+  // 0x00528550: `(*TLS)->rules->mFootprints` -- the rules object the blueprint
+  // loader is currently filling, which is the same thread-local the
+  // Register*Blueprint bindings read. `Sim::mRules` is not published yet while
+  // `LoadBlueprints` runs, so resolving through the sim left the footprint table
+  // empty and every ground unit's `ResolvedFootprint` null.
+  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
   if (!rules || !rules->mFootprints.mHead) {
     return 0;
   }
@@ -13908,6 +13928,11 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
 
     const LuaPlus::LuaObject maxSlopeObject = footprintObject.GetByName("MaxSlope");
     if (maxSlopeObject) {
+namespace
+{
+  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* state) noexcept;
+} // namespace
+
       footprint.mMaxSlope = static_cast<float>(maxSlopeObject.GetNumber());
     }
 

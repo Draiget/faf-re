@@ -417,6 +417,7 @@ namespace
       }
 
       const int candidateX = static_cast<std::uint16_t>(cell.x) + kStepOffsetX[step];
+        ++probeGated;
       const int candidateZ = static_cast<std::uint16_t>(cell.z) + kStepOffsetZ[step];
 
       if (!traveler->ShouldSearchRect(implBase.mClusterMap->ClusterRect(candidateX, candidateZ, 1u))) {
@@ -424,6 +425,7 @@ namespace
       }
 
       moho::SOCellPos candidate{};
+        ++probeRect;
       candidate.x = static_cast<std::int16_t>(candidateX);
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
@@ -432,13 +434,16 @@ namespace
       }
 
       float cost = kStepCost[step];
+        ++probeTraverse;
       if (!traveler->IsInBounds(cell, candidate, &cost)) {
         continue;
       }
 
       PathQueueNeighbour neighbour{};
+        ++probeBounds;
       neighbour.mCell = candidate;
       neighbour.mCost = cost;
+      ++probeAccepted;
       outNeighbours.push_back(neighbour);
 
       acceptedMask |= 1u << step;
@@ -1640,16 +1645,6 @@ namespace
     return reinterpret_cast<std::uint32_t*>(destination);
   }
 
-  struct OccupationDataRuntimeView
-  {
-    std::uint16_t mLayers[9];
-    std::uint16_t mPad;
-  };
-  static_assert(
-    sizeof(OccupationDataRuntimeView) == sizeof(gpg::HaStar::OccupationData),
-    "OccupationDataRuntimeView size must match OccupationData"
-  );
-
   /**
    * Address: 0x0076CBA0 (FUN_0076CBA0)
    *
@@ -2267,6 +2262,20 @@ namespace moho
    */
   void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
   {
+  void PathQueue::QueueTraveler(IPathTraveler& traveller)
+  {
+    PathQueueIntrusiveNode& node = traveller.mPathQueueNode;
+    PathQueueIntrusiveNode& sentinel = mImpl->mHeightSentinel;
+
+    (void)node.ListUnlink();
+    node.mPrev = node.mNext = &node;
+
+    node.mPrev = sentinel.mPrev;
+    node.mNext = &sentinel;
+    sentinel.mPrev = &node;
+    node.mPrev->mNext = &node;
+  }
+
     PathQueue* const previous = *slot;
     *slot = replacement;
 
@@ -2373,11 +2382,10 @@ namespace moho
       }
     }
 
-    auto& outView = reinterpret_cast<OccupationDataRuntimeView&>(outData);
     for (std::size_t i = 0; i < kOccupationResultColumnCount; ++i) {
-      outView.mLayers[i] = static_cast<std::uint16_t>(rowMasks[i]);
+      outData.mRows[i] = static_cast<std::uint16_t>(rowMasks[i]);
     }
-    outView.mPad = 0u;
+    outData.mPad = 0u;
   }
 
   /**

@@ -524,9 +524,9 @@ namespace moho
     , mUnitBuckets(nullptr)
     , mPropBuckets(nullptr)
     , mEntityBuckets(nullptr)
-    , mUnknown1C(0)
-    , mUnknown20(0)
-    , mUnknown24(0)
+    , mFreeNodeCount(0)
+    , mFreeNodeHead(nullptr)
+    , mAllBlocksProxy(nullptr)
     , mAllBlocksBegin(nullptr)
     , mAllBlocksEnd(nullptr)
     , mAllBlocksCapacityEnd(nullptr)
@@ -537,9 +537,9 @@ namespace moho
     const std::size_t bucketCount = static_cast<std::size_t>(mLastIndex + 1);
     const std::size_t bucketBytes = bucketCount * sizeof(void*);
 
-    mUnitBuckets = static_cast<void**>(::operator new(bucketBytes));
-    mPropBuckets = static_cast<void**>(::operator new(bucketBytes));
-    mEntityBuckets = static_cast<void**>(::operator new(bucketBytes));
+    mUnitBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
+    mPropBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
+    mEntityBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
 
     std::memset(mUnitBuckets, 0, bucketBytes);
     std::memset(mPropBuckets, 0, bucketBytes);

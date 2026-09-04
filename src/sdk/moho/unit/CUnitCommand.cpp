@@ -2011,23 +2011,6 @@ void CUnitCommand::SetTarget(const CAiTarget& target)
 }
 
 /**
-  * Alias of FUN_005BF810 (non-canonical helper lane).
- *
- * What it does:
- * Compatibility forwarder for legacy callsites that still dispatch the recon
- * blip refresh slot through `CUnitCommand`.
- */
-void CUnitCommand::RefreshBlipState()
-{
-  auto* const blip = reinterpret_cast<ReconBlip*>(this);
-  if (!blip) {
-    return;
-  }
-
-  blip->Refresh();
-}
-
-/**
  * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
  *
  * What it does:
