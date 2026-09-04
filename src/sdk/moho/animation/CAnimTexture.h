@@ -16,7 +16,6 @@ namespace moho
   {
   public:
     using FrameRef = boost::SharedPtrRaw<ID3DTextureSheet>;
-    using FrameResolver = FrameRef (*)(const char* textureName);
 
     /**
      * Address: 0x00422D20 (FUN_00422D20)
@@ -54,11 +53,6 @@ namespace moho
      */
     void GetFrameAt(FrameRef& outFrame, float frameIndex) const;
 
-    /**
-     * Hook to connect reconstructed logic with engine texture loading once the
-     * owning texture manager interface is recovered.
-     */
-    static void SetFrameResolver(FrameResolver resolver);
 
     [[nodiscard]] const msvc8::string& GetBaseTextureName() const noexcept;
 
