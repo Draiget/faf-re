@@ -51,9 +51,9 @@ namespace moho
     [[nodiscard]] gpg::Rect2i FootprintCellRect(const RUnitBlueprint& blueprint, const SCoordsVec2& posXZ) noexcept
     {
       const int fx0 =
-        static_cast<std::int16_t>(static_cast<int>(posXZ.x - static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f));
+        static_cast<std::int16_t>(static_cast<int>(std::lrintf(posXZ.x - static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f)));
       const int fz0 =
-        static_cast<std::int16_t>(static_cast<int>(posXZ.z - static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f));
+        static_cast<std::int16_t>(static_cast<int>(std::lrintf(posXZ.z - static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f)));
       gpg::Rect2i out{};
       out.x0 = static_cast<std::int16_t>(fx0);
       out.z0 = static_cast<std::int16_t>(fz0);

@@ -960,8 +960,8 @@ namespace
     }
 
     const SFootprint& footprint = unit->GetFootprint();
-    const int x = static_cast<int>(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    const int z = static_cast<int>(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    const int x = static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    const int z = static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
 
     SOCellPos out{};
     out.x = static_cast<std::int16_t>(x);

@@ -992,10 +992,10 @@ namespace moho
   gpg::Rect2f RUnitBlueprint::GetSkirtRect(const SCoordsVec2& position) const
   {
     const std::int16_t xLower = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(position.x - (static_cast<float>(mFootprint.mSizeX) * 0.5f))
+      static_cast<std::int32_t>(std::lrintf(position.x - (static_cast<float>(mFootprint.mSizeX) * 0.5f)))
     );
     const std::int16_t zLower = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(position.z - (static_cast<float>(mFootprint.mSizeZ) * 0.5f))
+      static_cast<std::int32_t>(std::lrintf(position.z - (static_cast<float>(mFootprint.mSizeZ) * 0.5f)))
     );
 
     gpg::Rect2f skirtRect{};

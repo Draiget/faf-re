@@ -1,4 +1,5 @@
 #include "moho/ai/CAiNavigatorImpl.h"
+#include <cmath>
 
 #include <cstring>
 #include <cstdint>
@@ -259,8 +260,8 @@ namespace
     const SFootprint& footprint
   ) noexcept
   {
-    const std::int32_t minXCell = static_cast<std::int32_t>(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    const std::int32_t minZCell = static_cast<std::int32_t>(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    const std::int32_t minXCell = static_cast<std::int32_t>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    const std::int32_t minZCell = static_cast<std::int32_t>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
 
     const std::int16_t packedMinX = static_cast<std::int16_t>(minXCell);
     const std::int16_t packedMinZ = static_cast<std::int16_t>(minZCell);

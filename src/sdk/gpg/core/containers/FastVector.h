@@ -506,6 +506,9 @@ namespace gpg::core
      * `result.mObjs.push_back(slot)` in `Moho::FORMATION_RunScript`, one call
      * per five-element tuple the formation script returns. Reaches the grow
      * lane at 0x00576D60 when the twenty inline slots are used up.)
+     * Address: 0x005B4BB0 (FUN_005B4BB0, gpg::fastvector_n<Moho::CPathPoint, 20>
+     * grow lane of `nodes.push_back(point)` in Moho::CAiPathSpline::Generate,
+     * element width 0x1C.)
      */
     void push_back(const value_type& v)
     {

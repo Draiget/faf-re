@@ -211,9 +211,9 @@ namespace
     }
 
     buildRect.x0 =
-      static_cast<int>(placementPosition.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f);
+      static_cast<int>(std::lrintf(placementPosition.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
     buildRect.z0 =
-      static_cast<int>(placementPosition.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f);
+      static_cast<int>(std::lrintf(placementPosition.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
     buildRect.x1 = buildRect.x0 + static_cast<int>(blueprint->mFootprint.mSizeX);
     buildRect.z1 = buildRect.z0 + static_cast<int>(blueprint->mFootprint.mSizeZ);
     return buildRect;
@@ -779,8 +779,8 @@ namespace moho
     const Wm3::Vec3f targetPos = mCommand->mTarget.GetTargetPosGun(false);
 
     const SOCellPos originCell{
-      static_cast<std::int16_t>(static_cast<std::int32_t>(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f))),
-      static_cast<std::int16_t>(static_cast<std::int32_t>(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))),
+      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))))
     };
 
     mBuildPosition = COORDS_ToWorldPos(
@@ -795,12 +795,12 @@ namespace moho
     // *new* build position rather than reusing `originCell` - the shipped body
     // reloads the blueprint and both footprint bytes for this second pass.
     const auto rectX0 = static_cast<std::int32_t>(
-      static_cast<std::int16_t>(static_cast<std::int32_t>(
-        mBuildPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(
+        mBuildPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f))))
     );
     const auto rectZ0 = static_cast<std::int32_t>(
-      static_cast<std::int16_t>(static_cast<std::int32_t>(
-        mBuildPosition.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(
+        mBuildPosition.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))))
     );
 
     mBuildRect.x0 = rectX0;

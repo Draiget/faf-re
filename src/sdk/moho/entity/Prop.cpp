@@ -580,8 +580,8 @@ namespace moho
       mTracksReclaimArea = true;
 
       if (sim && sim->mOGrid) {
-        const int originX = static_cast<int>(transform.pos_.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f);
-        const int originZ = static_cast<int>(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f);
+        const int originX = static_cast<int>(std::lrintf(transform.pos_.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
+        const int originZ = static_cast<int>(std::lrintf(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
 
         const OccupancyFootprintRuntimeView footprint{
           static_cast<std::uint8_t>(blueprint->mFootprint.mSizeX),
@@ -626,8 +626,8 @@ namespace moho
       const auto* const blueprint = static_cast<const RPropBlueprint*>(BluePrint);
       const SFootprint& footprint = blueprint->mFootprint;
 
-      const int originX = static_cast<int>(Position.x - static_cast<float>(footprint.mSizeX) * 0.5f);
-      const int originZ = static_cast<int>(Position.z - static_cast<float>(footprint.mSizeZ) * 0.5f);
+      const int originX = static_cast<int>(std::lrintf(Position.x - static_cast<float>(footprint.mSizeX) * 0.5f));
+      const int originZ = static_cast<int>(std::lrintf(Position.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
 
       gpg::Rect2i rect{};
       rect.x0 = originX;

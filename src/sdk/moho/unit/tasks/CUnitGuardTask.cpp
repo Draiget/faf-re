@@ -1132,8 +1132,8 @@ namespace moho
 
     const SFootprint& footprint = mUnit->GetFootprint();
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
-    const int ownerMinZ = static_cast<int>(ownerPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f);
-    const int ownerMinX = static_cast<int>(ownerPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f);
+    const int ownerMinZ = static_cast<int>(std::lrintf(ownerPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+    const int ownerMinX = static_cast<int>(std::lrintf(ownerPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f));
 
     const std::int16_t ownerCellMinX = static_cast<std::int16_t>(ownerMinX);
     const std::int16_t ownerCellMinZ = static_cast<std::int16_t>(ownerMinZ);
@@ -1221,10 +1221,10 @@ namespace moho
     const SFootprint& footprint = mUnit->GetFootprint();
     SNavGoal proposedGoal{};
     proposedGoal.minX = static_cast<std::int16_t>(
-      static_cast<int>(desiredPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+      static_cast<int>(std::lrintf(desiredPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f))
     );
     proposedGoal.minZ = static_cast<std::int16_t>(
-      static_cast<int>(desiredPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+      static_cast<int>(std::lrintf(desiredPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
     );
     proposedGoal.maxX = proposedGoal.minX + 1;
     proposedGoal.maxZ = proposedGoal.minZ + 1;

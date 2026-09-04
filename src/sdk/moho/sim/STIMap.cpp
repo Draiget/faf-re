@@ -4383,8 +4383,8 @@ namespace moho
   {
     if (blueprint.IsMobile()) {
       const SOCellPos originCell{
-        static_cast<std::int16_t>(static_cast<int>(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f))),
-        static_cast<std::int16_t>(static_cast<int>(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f))),
+        static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f)))),
+        static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f)))),
       };
       const EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(blueprint.mFootprint, map, originCell);
       dest.pos = COORDS_GridSnap(&map, worldPos, blueprint.mFootprint, static_cast<ELayer>(static_cast<std::uint8_t>(mobileCaps)));
@@ -4396,8 +4396,8 @@ namespace moho
     dest.layers = LAYER_None;
 
     const SOCellPos originCell{
-      static_cast<std::int16_t>(static_cast<int>(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f))),
-      static_cast<std::int16_t>(static_cast<int>(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f))),
+      static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f)))),
+      static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f)))),
     };
     dest.pos = COORDS_ToWorldPos(
       &map,
@@ -4509,9 +4509,9 @@ namespace moho
 
     // Integer footprint rect at the resolved dest position.
     const int footprintX0 =
-      static_cast<int>(dest.pos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f));
+      static_cast<int>(std::lrintf(dest.pos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f)));
     const int footprintZ0 =
-      static_cast<int>(dest.pos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f));
+      static_cast<int>(std::lrintf(dest.pos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f)));
     const int footprintWidth = static_cast<int>(blueprint.mFootprint.mSizeX);
     const int footprintHeight = static_cast<int>(blueprint.mFootprint.mSizeZ);
 

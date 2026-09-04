@@ -735,8 +735,8 @@ namespace moho
     const SFootprint& footprint = AsCommandTask(runtime)->mUnit->GetFootprint();
 
     SOCellPos targetCell{};
-    targetCell.x = static_cast<std::int16_t>(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    targetCell.z = static_cast<std::int16_t>(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    targetCell.x = static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    targetCell.z = static_cast<std::int16_t>(std::lrintf(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
     SetPosGoal(targetCell);
   }
 
