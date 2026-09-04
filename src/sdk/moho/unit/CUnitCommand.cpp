@@ -1,4 +1,5 @@
 #include "CUnitCommand.h"
+#include <cmath>
 
 #include <cstdio>
 #include <cstddef>
@@ -1816,8 +1817,8 @@ SOCellPos* CUnitCommand::GetPosition(CUnitCommand* const command, Unit* const un
   if (command->mUnitSet.mVec.size() <= 1u || !formationInstance) {
     const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
     const SFootprint& footprint = unit->GetFootprint();
-    dest->x = static_cast<std::int32_t>(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    dest->z = static_cast<std::int32_t>(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    dest->x = static_cast<std::int32_t>(std::lrintf(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    dest->z = static_cast<std::int32_t>(std::lrintf(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
     return dest;
   }
 

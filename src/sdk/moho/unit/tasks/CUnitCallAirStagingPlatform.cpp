@@ -72,8 +72,8 @@ namespace
   [[nodiscard]] moho::SOCellPos ToCellPos(const Wm3::Vector3f& position, const moho::SFootprint& footprint) noexcept
   {
     moho::SOCellPos cell{};
-    cell.x = static_cast<std::int16_t>(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    cell.z = static_cast<std::int16_t>(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    cell.x = static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    cell.z = static_cast<std::int16_t>(std::lrintf(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
     return cell;
   }
 

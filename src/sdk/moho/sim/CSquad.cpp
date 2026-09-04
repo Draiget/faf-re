@@ -1,4 +1,5 @@
 #include "moho/sim/CSquad.h"
+#include <cmath>
 
 #include <cstddef>
 #include <cstdint>
@@ -338,10 +339,10 @@ namespace moho
       const SFootprint& footprint = unit->GetFootprint();
       SOCellPos cellPos{};
       cellPos.x = static_cast<std::int16_t>(
-        static_cast<int>(position.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+        static_cast<int>(std::lrintf(position.x - static_cast<float>(footprint.mSizeX) * 0.5f))
       );
       cellPos.z = static_cast<std::int16_t>(
-        static_cast<int>(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+        static_cast<int>(std::lrintf(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
       );
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();

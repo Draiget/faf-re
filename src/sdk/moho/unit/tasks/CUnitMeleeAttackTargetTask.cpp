@@ -275,9 +275,9 @@ namespace
 
     moho::SOCellPos destination{};
     destination.x =
-      static_cast<std::int16_t>(static_cast<int>(center.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+      static_cast<std::int16_t>(static_cast<int>(std::lrintf(center.x - (static_cast<float>(footprint.mSizeX) * 0.5f))));
     destination.z =
-      static_cast<std::int16_t>(static_cast<int>(center.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
+      static_cast<std::int16_t>(static_cast<int>(std::lrintf(center.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))));
     return destination;
   }
 
@@ -290,12 +290,12 @@ namespace
 
     moho::SOCellPos destination{};
     destination.x = static_cast<std::int16_t>(
-      static_cast<int>(
+      static_cast<int>(std::lrintf(
         ((targetPos.x + ownerPos.x) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeX) * 0.5f)
       )
     );
     destination.z = static_cast<std::int16_t>(
-      static_cast<int>(
+      static_cast<int>(std::lrintf(
         ((targetPos.z + ownerPos.z) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f)
       )
     );
@@ -330,10 +330,10 @@ namespace
     const moho::SFootprint& footprint = unit.GetFootprint();
     const Wm3::Vector3f unitPos = unit.GetPosition();
 
-    const int unitCellX = static_cast<int>(unitPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    const int unitCellZ = static_cast<int>(unitPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
-    const int targetCellX = static_cast<int>(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    const int targetCellZ = static_cast<int>(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    const int unitCellX = static_cast<int>(std::lrintf(unitPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    const int unitCellZ = static_cast<int>(std::lrintf(unitPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
+    const int targetCellX = static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    const int targetCellZ = static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
 
     return static_cast<std::uint16_t>(unitCellX) == static_cast<std::uint16_t>(targetCellX)
       && static_cast<std::uint16_t>(unitCellZ) == static_cast<std::uint16_t>(targetCellZ);

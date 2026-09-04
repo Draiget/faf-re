@@ -84,14 +84,6 @@ namespace
     return cachedType;
   }
 
-  [[nodiscard]] bool IsAtPosition(const Unit* unit, const Wm3::Vector3f& target, const float tolerance) noexcept
-  {
-    if (!unit) {
-      return false;
-    }
-    const float tolSq = tolerance * tolerance;
-    return Wm3::Vector3f::DistanceSqXZ(unit->GetPosition(), target) <= tolSq;
-  }
 
   [[nodiscard]] bool IsUnitState(const Unit* unit, const EUnitState state) noexcept
   {
@@ -1469,7 +1461,7 @@ bool CAiSteeringImpl::ProcessSplineMovement()
     }
   } else {
     if (mPath && (mPath->mCurrentNodeIndex + 1U) >= mPath->mNodeCount) {
-      if (Wm3::Vector3f::IsInvalid(mDestination) || IsAtPosition(mOwnerUnit, mDestination, 1.0f)) {
+      if (Wm3::Vector3f::IsInvalid(mDestination) || mOwnerUnit->IsAtPosition(mDestination)) {
         Stop();
         return true;
       }
@@ -1569,7 +1561,7 @@ bool CAiSteeringImpl::DriveToNextWaypoint()
   mNeedsWaypointRefresh = 0;
 
   const Wm3::Vector3f waypoint = mWaypoints[mCurrentWaypointIndex];
-  if (!IsAtPosition(mOwnerUnit, waypoint, 0.5f)) {
+  if (!mOwnerUnit->IsAtPosition(waypoint)) {
     MotionSetTarget(mUnitMotion, mDestination);
     UpdatePath(GetVal(), mDestination, true);
     CheckCollisions();

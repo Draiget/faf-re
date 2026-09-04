@@ -965,8 +965,8 @@ void CAiPathFinder::QueueSearch()
   const SFootprint& footprint = mUnit->GetFootprint();
   const Wm3::Vec3f& position = mUnit->GetPosition();
   SOCellPos anchorCell{};
-  anchorCell.x = static_cast<std::int16_t>(static_cast<int>(position.x - static_cast<float>(footprint.mSizeX) * 0.5f));
-  anchorCell.z = static_cast<std::int16_t>(static_cast<int>(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+  anchorCell.x = static_cast<std::int16_t>(static_cast<int>(std::lrintf(position.x - static_cast<float>(footprint.mSizeX) * 0.5f)));
+  anchorCell.z = static_cast<std::int16_t>(static_cast<int>(std::lrintf(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f)));
   mHasOccupancyMask =
     (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY)) != 0u)
       ? 1u

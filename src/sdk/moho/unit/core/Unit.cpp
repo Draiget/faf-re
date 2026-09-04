@@ -4620,8 +4620,8 @@ int moho::cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState* const state)
   const Wm3::Vec3f& targetPosition = target->GetPosition();
 
   SOCellPos cell{};
-  cell.x = static_cast<std::int16_t>(static_cast<int>(targetPosition.x - (targetFootprint.mSizeX * 0.5f)));
-  cell.z = static_cast<std::int16_t>(static_cast<int>(targetPosition.z - (targetFootprint.mSizeZ * 0.5f)));
+  cell.x = static_cast<std::int16_t>(static_cast<int>(std::lrintf(targetPosition.x - (targetFootprint.mSizeX * 0.5f))));
+  cell.z = static_cast<std::int16_t>(static_cast<int>(std::lrintf(targetPosition.z - (targetFootprint.mSizeZ * 0.5f))));
 
   bool useLargeTargetCheck = false;
   if (target->IsMobile()) {
@@ -4684,8 +4684,8 @@ int moho::cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState* const state)
   const Wm3::Vec3f& targetPosition = target->GetPosition();
 
   SOCellPos cell{};
-  cell.x = static_cast<std::int16_t>(static_cast<int>(targetPosition.x - (targetFootprint.mSizeX * 0.5f)));
-  cell.z = static_cast<std::int16_t>(static_cast<int>(targetPosition.z - (targetFootprint.mSizeZ * 0.5f)));
+  cell.x = static_cast<std::int16_t>(static_cast<int>(std::lrintf(targetPosition.x - (targetFootprint.mSizeX * 0.5f))));
+  cell.z = static_cast<std::int16_t>(static_cast<int>(std::lrintf(targetPosition.z - (targetFootprint.mSizeZ * 0.5f))));
 
   bool hasMeleeSpace = false;
   if (target->IsMobile()) {
@@ -13910,18 +13910,18 @@ bool Unit::IsAtPosition(const Wm3::Vec3f& position) const
   const Wm3::Vec3f& currentPosition = GetPosition();
 
   const std::int16_t currentCellZ = static_cast<std::int16_t>(
-    static_cast<int>(currentPosition.z - static_cast<float>(unitFootprint.mSizeZ) * 0.5f)
+    static_cast<int>(std::lrintf(currentPosition.z - static_cast<float>(unitFootprint.mSizeZ) * 0.5f))
   );
   const std::int16_t currentCellX = static_cast<std::int16_t>(
-    static_cast<int>(currentPosition.x - static_cast<float>(unitFootprint.mSizeX) * 0.5f)
+    static_cast<int>(std::lrintf(currentPosition.x - static_cast<float>(unitFootprint.mSizeX) * 0.5f))
   );
 
   const SFootprint& targetFootprint = GetFootprint();
   const std::int16_t targetCellZ = static_cast<std::int16_t>(
-    static_cast<int>(position.z - static_cast<float>(targetFootprint.mSizeZ) * 0.5f)
+    static_cast<int>(std::lrintf(position.z - static_cast<float>(targetFootprint.mSizeZ) * 0.5f))
   );
   const std::int16_t targetCellX = static_cast<std::int16_t>(
-    static_cast<int>(position.x - static_cast<float>(targetFootprint.mSizeX) * 0.5f)
+    static_cast<int>(std::lrintf(position.x - static_cast<float>(targetFootprint.mSizeX) * 0.5f))
   );
 
   return currentCellX == targetCellX && currentCellZ == targetCellZ;
@@ -14569,10 +14569,10 @@ void Unit::UpdateTerrainType(const Wm3::Vector3f& position)
   const SFootprint& footprint = GetFootprint();
 
   const auto sampleX = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f))
+    static_cast<std::int32_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
   );
   const auto sampleZ = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))
+    static_cast<std::int32_t>(std::lrintf(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
   );
 
   const std::uint8_t previousTerrainType = CurrentTerrainType;
@@ -16305,10 +16305,10 @@ void Unit::ExecuteOccupyGround()
   if (occupyRects.empty()) {
     const Wm3::Vec3f& unitPos = GetPosition();
     const auto x0 = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+      static_cast<std::int32_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f))
     );
     const auto z0 = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+      static_cast<std::int32_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
     );
 
     gpg::Rect2i rect{};
@@ -16348,10 +16348,10 @@ void Unit::ReleaseOccupyGround()
   const Wm3::Vec3f& unitPos = GetPosition();
   gpg::Rect2i occupyRect{};
   occupyRect.x0 = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+    static_cast<std::int32_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f))
   );
   occupyRect.z0 = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+    static_cast<std::int32_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
   );
   occupyRect.x1 = static_cast<std::int16_t>(occupyRect.x0 + static_cast<std::int32_t>(footprint.mSizeX));
   occupyRect.z1 = static_cast<std::int16_t>(occupyRect.z0 + static_cast<std::int32_t>(footprint.mSizeZ));
