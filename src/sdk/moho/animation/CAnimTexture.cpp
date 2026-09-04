@@ -1,5 +1,10 @@
 #include "CAnimTexture.h"
 
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+
 #include <cmath>
 #include <map>
 #include <stdexcept>
@@ -277,22 +282,6 @@ namespace
   {
     auto slot = ResolveAnimTextureCacheIndexSlot(cache, key);
     return slot->second;
-  }
-
-  [[nodiscard]] moho::CAnimTexture::FrameResolver& AnimTextureResolver()
-  {
-    static moho::CAnimTexture::FrameResolver resolver = nullptr;
-    return resolver;
-  }
-
-  [[nodiscard]] moho::CAnimTexture::FrameRef ResolveFrameTexture(const char* const textureName)
-  {
-    const auto resolver = AnimTextureResolver();
-    if (!resolver) {
-      return {};
-    }
-
-    return resolver(textureName ? textureName : "");
   }
 
   using AnimTextureFrameRef = moho::CAnimTexture::FrameRef;
@@ -585,11 +574,6 @@ namespace moho
     outFrame.add_ref_copy();
   }
 
-  void CAnimTexture::SetFrameResolver(const FrameResolver resolver)
-  {
-    AnimTextureResolver() = resolver;
-  }
-
   const msvc8::string& CAnimTexture::GetBaseTextureName() const noexcept
   {
     return mBaseTextureName;
@@ -611,16 +595,24 @@ namespace moho
     frameName.tidy(false, 0U);
     frameName.assign_owned(baseTextureName);
 
+    // 0x00422FA0: every frame goes through the device resource cache with the
+    // fallback texture allowed, so a frame is appended unconditionally; the
+    // loop only stops when the name has no numeric suffix left to bump or the
+    // next numbered file is not on the virtual file system.
     while (true) {
-      FrameRef loadedFrame = ResolveFrameTexture(frameName.data());
-      if (loadedFrame.px == nullptr && loadedFrame.pi == nullptr) {
-        break;
-      }
-
+      ID3DDeviceResources::TextureResourceHandle textureResource{};
+      D3D_GetDevice()->GetResources()->GetTexture(textureResource, frameName.c_str(), nullptr, true);
+      FrameRef loadedFrame{};
+      loadedFrame.reset_from_owner(boost::static_pointer_cast<ID3DTextureSheet>(textureResource));
       AppendFrameRef(loadedFrame);
       loadedFrame.release();
 
       if (!IncrementFrameNameSuffix(frameName)) {
+        break;
+      }
+      const FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+      if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr
+          || !waitHandleSet->mHandle->GetFileInfo(frameName.c_str(), nullptr)) {
         break;
       }
     }
