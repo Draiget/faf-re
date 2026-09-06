@@ -104,6 +104,7 @@
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/HighFidelityTerrain.h"
 #include "moho/terrain/LowFidelityTerrain.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
@@ -70942,6 +70943,16 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   }
 
   // Unit-silhouette overlay. Binary (WRenViewport::Render @0x007F90D0,
+  // Every world view has consumed this frame's decal set, so drop the decal
+  // manager's pending-changes flag. Binary 0x007F9779..0x007F979C: inside the
+  // non-empty-list branch, after the loop - `sWldMap`, its `mTerrainRes`
+  // (which is what REN_GetTerrainRes checks), `GetDecalManager` (slot +0x130),
+  // then slot +0x74 on the manager. Without it HasPendingChanges stays set
+  // and every view re-tessellates the terrain each frame.
+  if (moho::IWldTerrainRes* const decalTerrainRes = moho::REN_GetTerrainRes(); decalTerrainRes != nullptr) {
+    static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
+  }
+
   // 0x007F95EC..0x007F9614) calls it right after the UI prim-batcher pass:
   //   lea ecx, [ebp+2134h]   -> &mSilhouetteRenderer
   //   mov edi, [ebp+219Ch]   -> the camera

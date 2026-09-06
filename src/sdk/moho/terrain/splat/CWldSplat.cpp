@@ -222,6 +222,8 @@ namespace
 
 namespace moho
 {
+  constexpr std::int32_t kSplatSpatialEntityType = 0x200; // CWldSplat ctor, 0x0089DFF3 `push 200h`
+
   /**
    * Address: 0x00877250 (FUN_00877250, ??0IDecalManager@Moho@@QAE@XZ)
    * Address: 0x00878D20 (FUN_00878D20, IDecalManager ctor lane)
@@ -820,6 +822,16 @@ namespace moho
   }
 
   /**
+   * Address: 0x00878CC0 (FUN_00878CC0, Moho::CDecalManager::Func27)
+   *
+   * What it does: clears the pending-changes flag read by HasPendingChanges.
+   */
+  void CDecalManager::ClearPendingChanges()
+  {
+    mDidSomething = 0u;
+  }
+
+  /**
    * Address: 0x0089DF70 (FUN_0089DF70, Moho::CWldSplat::CWldSplat)
    *
    * What it does:
@@ -829,7 +841,13 @@ namespace moho
   CWldSplat::CWldSplat(SpatialDB_MeshInstance* const spatialDbOwner, IWldTerrainRes* const terrainRes)
     : CWldTerrainDecal(spatialDbOwner, terrainRes)
     , mTex()
-  {}
+  {
+    // 0x0089DFE2..0x0089DFF8: after the base registered this entry as a decal
+    // (0x800), the splat re-runs the spatial entry constructor with 0x200.
+    // That is what keeps splats out of the albedo decal pass (which collects
+    // 0x800) and inside the splat composite lane (which collects 0x200).
+    mEntry.Register(spatialDbOwner, this, kSplatSpatialEntityType);
+  }
 
   /**
    * Address: 0x0089DFE0 (FUN_0089DFE0, Moho::CWldSplat::dtr)
