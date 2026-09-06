@@ -22,6 +22,10 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/animation/CAniPose.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -86,18 +90,53 @@ namespace
   struct AnimationClipHeaderView
   {
     std::uint8_t mReserved00[0x08];
-    std::uint32_t mFrameCount;     // +0x08
-    float mDurationSeconds;        // +0x0C
-    std::uint32_t mBoneTrackCount; // +0x10
+    std::uint32_t mFrameCount;          // +0x08
+    float mDurationSeconds;             // +0x0C
+    std::uint32_t mBoneTrackCount;      // +0x10
+    std::uint32_t mBoneNameTableOffset; // +0x14 (from the header start; NUL-separated names)
   };
 
   struct AnimationResourceView
+  // One bone key inside an SCA frame: position then rotation, 28 bytes.
+  struct AnimationBoneKeyView
+  {
+    float mPosition[3]; // +0x00
+    float mRotation[4]; // +0x0C (VTransform::orient_ memory order: w,x,y,z)
+  };
+  static_assert(sizeof(AnimationBoneKeyView) == 0x1C, "AnimationBoneKeyView size must be 0x1C");
+
   {
     std::uint8_t mReserved00[0x2C];
-    AnimationClipHeaderView* mClipHeader; // +0x2C
+    AnimationClipHeaderView* mClipHeader; // +0x2C (RScaResource::mStart: the SCA header)
+    char* mAnimData;                      // +0x30 (RScaResource::mEnd: 28-byte root transform, then frames)
   };
 
   [[nodiscard]] const AnimationClipHeaderView*
+  // Frame `index` of a clip: the animation section starts with a 28-byte root
+  // transform, each frame is an 8-byte prefix (time, flags) plus one 28-byte
+  // key per bone track (0x0063FDD0: stride = 28 * tracks + 8, base + 28).
+  [[nodiscard]] const AnimationBoneKeyView* AnimationFrameKeys(
+    const AnimationResourceView& resource, const std::uint32_t boneTrackCount, const std::int32_t index
+  )
+  {
+    const std::size_t frameStride = 28u * static_cast<std::size_t>(boneTrackCount) + 8u;
+    const char* const frame = resource.mAnimData + 28 + static_cast<std::size_t>(index) * frameStride;
+    return reinterpret_cast<const AnimationBoneKeyView*>(frame + 8);
+  }
+
+  /**
+   * Address: 0x0063EE30 (FUN_0063EE30)
+   *
+   * What it does:
+   * Returns the skeleton bone a pose bone was built from (`skel->mBones[bone.mIdx]`),
+   * or null when the pose's skeleton has no such index.
+   */
+  [[nodiscard]] const moho::SAniSkelBone* SkeletonBoneForPoseBone(const moho::CAniPoseBone& bone)
+  {
+    const boost::shared_ptr<const moho::CAniSkel> skeleton = bone.mPose->GetSkeleton();
+    return skeleton->GetBone(static_cast<std::uint32_t>(bone.mIdx));
+  }
+
   GetAnimationClipHeader(const moho::CAnimationManipulator::AnimationResourceRef& ref)
   {
     if (!ref.px) {
@@ -1413,6 +1452,11 @@ namespace moho
     mGoal.BindObjectUnlinked(goalMotionScaleUnit);
     (void)mGoal.LinkIntoOwnerChainHeadUnlinked();
 
+    // 0x0063F4A3..0x0063F4C1: size the bone mask to the owner's skeleton and enable
+    // every bone (sub_641B70 is the inlined SBitStorage32::Resize(count, true) that
+    // InitializeBoneMask (0x0063EFA0) also wraps).
+    const boost::shared_ptr<const CAniSkel> skeleton = ownerActor->GetSkeleton();
+    InitializeBoneMask(static_cast<std::uint32_t>(skeleton->mBones.size()));
     // Size the bone mask to the owner skeleton and set every bit, so a fresh
     // manipulator starts out affecting all bones. sub_641B70 computes the
     // word count as (boneCount + 31) >> 5 and fills with -1; Resize is that
@@ -1490,20 +1534,62 @@ namespace moho
    */
   bool CAnimationManipulator::ManipulatorUpdate()
   {
-    const AnimationClipHeaderView* const clip = GetAnimationClipHeader(mAnimationRef);
-    if (!clip || clip->mFrameCount == 0) {
+    const auto* const resource = static_cast<const AnimationResourceView*>(mAnimationRef.px);
+    if (resource == nullptr) {
+      return false;
+    }
+    const AnimationClipHeaderView* const clip = resource->mClipHeader;
+    if (clip->mFrameCount == 0u) {
       return false;
     }
 
     if (!mIgnoreMotionScaling) {
-      mAnimationTime += mRate * 0.1f;
+    // 0x0063FE34..0x0063FEF7: a directional animation runs backwards while the
+    // goal unit moves against its own facing.
+    float rate = mRate;
+    if (mDirectionalAnim) {
+      Unit* const unit = mGoal.GetObjectPtr();
+      const Wm3::Quatf& q = unit->GetTransform().orient_;
+      const Wm3::Vec3f velocity = unit->GetVelocity();
+      const float forwardX = 2.0f * (q.x * q.z + q.w * q.y);
+      const float forwardY = 2.0f * (q.y * q.z - q.w * q.x);
+      const float forwardZ = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+      if (velocity.x * forwardX + velocity.y * forwardY + velocity.z * forwardZ < 0.0f) {
+        rate = -mRate;
+      }
+    }
+
+    // 0x0063FEF7..0x0063FFC5: advance by rate * 0.1 per tick; with a goal unit
+    // attached the step is scaled by its speed over the blueprint's MaxSpeed
+    // (times ten), floored at 0.25 while the unit is turning.
+      Unit* const unit = mGoal.GetObjectPtr();
+      if (unit == nullptr) {
+        mAnimationTime += rate * 0.1f;
+      } else {
+        const Wm3::Vec3f velocity = unit->GetVelocity();
+        const float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
+        const float speedFraction = speed / unit->GetBlueprint()->Physics.MaxSpeed;
+        const Vector4f& orientation = unit->Orientation;
+        const Vector4f& prevOrientation = unit->PrevOrientation;
+        const bool turning = orientation.x != prevOrientation.x || orientation.y != prevOrientation.y
+                          || orientation.z != prevOrientation.z || orientation.w != prevOrientation.w;
+        float motionScale = speedFraction * 10.0f;
+        if (turning && motionScale <= 0.25f) {
+          motionScale = 0.25f;
+        }
+        mAnimationTime += (motionScale * rate) * 0.1f;
+      }
     }
 
     const float duration = clip->mDurationSeconds;
     if (mLooping) {
-      mAnimationTime = WrapToRange(mAnimationTime, duration);
+      mAnimationTime = duration != 0.0f ? WrapToRange(mAnimationTime, duration) : 0.0f;
     } else {
-      mAnimationTime = std::clamp(mAnimationTime, 0.0f, std::max(duration, 0.0f));
+      float clamped = std::min(duration, mAnimationTime);
+      if (clamped < 0.0f) {
+        clamped = 0.0f;
+      }
+      mAnimationTime = clamped;
     }
 
     const bool signaled = UpdateTriggeredState();
@@ -1582,7 +1668,14 @@ namespace moho
    */
   void CAnimationManipulator::SetAnimationResource(const AnimationResourceRef& resource, const bool looping)
   {
-    if (!resource.px) {
+    if (resource.px != nullptr) {
+      // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
+      // bone-name table, resolving each name against the owner's skeleton.
+      const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+      const auto* const resourceView = static_cast<const AnimationResourceView*>(resource.px);
+      const AnimationClipHeaderView* const clip = resourceView->mClipHeader;
+      const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
+      const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();
     }
 
@@ -1676,7 +1769,6 @@ namespace moho
   {
     mOverwriteMode = enabled;
   }
-
   /**
    * Address: 0x0063EF90 (FUN_0063EF90)
    *
