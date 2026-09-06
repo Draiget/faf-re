@@ -414,6 +414,17 @@ namespace moho
      */
     [[nodiscard]] bool HasPendingChanges() const;
 
+    /**
+     * Address: 0x00878CC0 (FUN_00878CC0, Moho::CDecalManager::Func27)
+     * Slot: 29 (`??_7CDecalManager@Moho@@6B@` + 0x74)
+     *
+     * What it does:
+     * Clears the pending-changes flag. The viewport render loop dispatches it
+     * once per frame after every world view has consumed the decal set
+     * (WRenViewport::Render, 0x007F9779..0x007F979C).
+     */
+    void ClearPendingChanges();
+
   public:
     /**
      * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)
