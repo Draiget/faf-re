@@ -124,7 +124,10 @@ namespace moho
     }
 
     if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-      mContext.reserved0x50_ = static_cast<std::uint32_t>(resources->GetSkipMipLevels());
+      // 0x0043DB16 `mov [esi+50h], eax` with esi = this: +0x50 of the resource is
+      // mContext + 0x44, the skip-mip-levels lane DeviceD3D9::CreateTexture folds into
+      // D3DX_SKIP_DDS_MIP_LEVELS (0x008EB40F reads [context+44h]).
+      mContext.reserved0x44_ = static_cast<std::uint32_t>(resources->GetSkipMipLevels());
     }
 
     if (device->GetDeviceD3D9() == nullptr) {

@@ -130,6 +130,10 @@ namespace
     return out;
   }
 
+  // gpg::gal::Math::rotationAxisY (0x009406F0) is D3DXMatrixRotationY: _13 = -sin, _31 = +sin.
+  // X/Z below already follow D3DXMatrixRotationX/Z; Y must match, otherwise the decal texture
+  // frame is mirrored against the XZ bounds ProjectDecalBoundsXZ (0x00778730) builds with a
+  // (cos, +sin) u-axis.
   [[nodiscard]] moho::VMatrix4 RotationAxisY(const float angle) noexcept
   {
     const float c = std::cos(angle);
@@ -137,8 +141,8 @@ namespace
 
     moho::VMatrix4 out = moho::VMatrix4::Identity();
     out.r[0].x = c;
-    out.r[0].z = s;
-    out.r[2].x = -s;
+    out.r[0].z = -s;
+    out.r[2].x = s;
     out.r[2].z = c;
     return out;
   }

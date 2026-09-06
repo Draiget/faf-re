@@ -647,7 +647,11 @@ namespace moho
       return false;
     }
 
-    if (static_cast<std::size_t>(digitIndex + 1) < textureName.size() && chars[digitIndex + 1] == '.') {
+    // 0x00422BC0: the digit run must sit directly before the extension (or at
+    // the very end) - `find_last_of("0123456789")`, then `buf[last + 1] != '.'`
+    // returns false. "flare_0001.dds" advances; "eg_boulder006_albedo.dds" is
+    // one frame, never an animation through its numbered siblings.
+    if (static_cast<std::size_t>(digitIndex + 1) < textureName.size() && chars[digitIndex + 1] != '.') {
       return false;
     }
 

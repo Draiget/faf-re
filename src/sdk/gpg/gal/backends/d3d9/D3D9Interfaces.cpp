@@ -7360,7 +7360,12 @@ namespace gpg::gal
             {
                 const unsigned int width = (context->width_ != 0U) ? context->width_ : kD3DXDefault;
                 const unsigned int height = (context->height_ != 0U) ? context->height_ : kD3DXDefault;
-                const unsigned int filter = ((context->reserved0x44_ & 0x1FU) << 26U) | 5U;
+                // 0x008EB42A..0x008EB455, read off the pushes (IDA applies the sixteen-parameter
+                // volume prototype here too, shifting every label from `format` on by one slot):
+                // Filter = D3DX_DEFAULT, MipFilter = D3DX_SKIP_DDS_MIP_LEVELS(skip) | D3DX_FILTER_BOX.
+                // Passing the skip mask as Filter and 0 as MipFilter leaves every mip below
+                // level 0 unfilled, which renders as opaque black at any minification.
+                const unsigned int mipFilter = ((context->reserved0x44_ & 0x1FU) << 26U) | 5U;
 
                 const HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
                     AsDeviceD3D9Runtime(*this).nativeDevice,
@@ -7372,8 +7377,8 @@ namespace gpg::gal
                     0U,
                     FormatGalToD3D(context->format_),
                     D3DPOOL_MANAGED,
-                    filter,
-                    0U,
+                    kD3DXDefault,
+                    mipFilter,
                     0U,
                     nullptr,
                     nullptr,

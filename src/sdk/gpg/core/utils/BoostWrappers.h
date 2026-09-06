@@ -2510,6 +2510,29 @@ namespace boost
         return out;
     }
 
+    /**
+     * Adopts an already-retained (px, pi) pair into a boost::shared_ptr without
+     * touching the count: the caller's reference becomes the shared_ptr's.
+     * Use it where the binary hands the pair straight to a shared_ptr result
+     * after a single add_ref (e.g. CAnimTexture::GetFrame -> CWldTerrainDecal::
+     * GetTexture, 0x0089DB50), where SharedPtrFromRawRetained would leak one
+     * reference per call.
+     */
+    template <class T>
+    [[nodiscard]] boost::shared_ptr<T> SharedPtrFromRawAdopt(const SharedPtrRaw<T>& source) noexcept
+    {
+        static_assert(
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
+        );
+
+        boost::shared_ptr<T> out{};
+        auto* const layout = reinterpret_cast<SharedPtrLayoutView<T>*>(&out);
+        layout->px = source.px;
+        layout->pi = source.pi;
+        return out;
+    }
+
     template <class T>
     [[nodiscard]] boost::shared_ptr<T> SharedPtrFromRawRetained(const SharedPtrRaw<T>& source) noexcept
     {
