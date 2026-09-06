@@ -368,34 +368,6 @@ namespace
       || moho::EntityTransformOrientationDiffers(lhsPayload, rhsPayload);
   }
 
-  struct SAniSkelBindPoseLaneView
-  {
-    const char* mBoneName;               // +0x00
-    std::int32_t mParentBoneIndex;       // +0x04
-    float mLocalOrientationX;            // +0x08
-    float mLocalOrientationY;            // +0x0C
-    float mLocalOrientationZ;            // +0x10
-    float mLocalOrientationW;            // +0x14
-    float mLocalPositionX;               // +0x18
-    float mLocalPositionY;               // +0x1C
-    float mLocalPositionZ;               // +0x20
-    std::uint8_t mReserved24_57[0x34]{}; // +0x24
-  };
-
-  static_assert(sizeof(SAniSkelBindPoseLaneView) == sizeof(moho::SAniSkelBone), "SAniSkelBindPoseLaneView size must match SAniSkelBone");
-  static_assert(
-    offsetof(SAniSkelBindPoseLaneView, mLocalOrientationX) == 0x08,
-    "SAniSkelBindPoseLaneView::mLocalOrientationX offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SAniSkelBindPoseLaneView, mLocalPositionX) == 0x18,
-    "SAniSkelBindPoseLaneView::mLocalPositionX offset must be 0x18"
-  );
-
-  [[nodiscard]] const SAniSkelBindPoseLaneView& BindPoseLaneView(const moho::SAniSkelBone& bone) noexcept
-  {
-    return reinterpret_cast<const SAniSkelBindPoseLaneView&>(bone);
-  }
 } // namespace
 
 namespace moho
@@ -736,11 +708,14 @@ namespace moho
           ? &bonesBegin[static_cast<std::uint32_t>(parentIndex)]
           : nullptr;
 
-      const Wm3::Vec3f& restOffset = skeletonBone->mBoneTransform.pos_;
-      poseBone.mLocalTransform.pos_.x = restOffset.x * scale;
-      poseBone.mLocalTransform.pos_.y = restOffset.y * scale;
-      poseBone.mLocalTransform.pos_.z = restOffset.z * scale;
-      poseBone.mLocalTransform.orient_ = skeletonBone->mBoneTransform.orient_;
+      // 0x0054B155..0x0054B17A: rest position from the skeleton bone at +0x18 scaled by
+      // `scale`, rest orientation at +0x08 verbatim -- the same +0x08 transform
+      // UpdateBones (0x0054B5F0) and MoveManipulator (0x0063FDD0) use.
+      const VTransform& rest = skeletonBone->mLocalTransform;
+      poseBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+      poseBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+      poseBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+      poseBone.mLocalTransform.orient_ = rest.orient_;
 
       poseBone.mCompositeDirty = 1u;
       poseBone.mCompositeIsLocal = 0u;
@@ -896,17 +871,14 @@ namespace moho
         continue;
       }
 
-      const SAniSkelBindPoseLaneView& bindLane = BindPoseLaneView(*skeletonBone);
+      // 0x0054B64A..0x0054B679: the skeleton bone's rest transform at +0x08 is copied lane
+      // for lane -- orientation verbatim, position scaled.
+      const VTransform& rest = skeletonBone->mLocalTransform;
       CAniPoseBone& destinationBone = destinationBegin[index];
-
-      destinationBone.mLocalTransform.pos_.x = bindLane.mLocalPositionX * scale;
-      destinationBone.mLocalTransform.pos_.y = bindLane.mLocalPositionY * scale;
-      destinationBone.mLocalTransform.pos_.z = bindLane.mLocalPositionZ * scale;
-
-      destinationBone.mLocalTransform.orient_.x = bindLane.mLocalOrientationX;
-      destinationBone.mLocalTransform.orient_.y = bindLane.mLocalOrientationY;
-      destinationBone.mLocalTransform.orient_.z = bindLane.mLocalOrientationZ;
-      destinationBone.mLocalTransform.orient_.w = bindLane.mLocalOrientationW;
+      destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+      destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+      destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+      destinationBone.mLocalTransform.orient_ = rest.orient_;
 
       destinationBone.mCompositeDirty = 1u;
       destinationBone.mSkipNextInterp = 0u;

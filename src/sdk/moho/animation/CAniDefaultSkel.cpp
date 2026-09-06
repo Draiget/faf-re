@@ -21,7 +21,7 @@ namespace moho
     SAniSkelBone rootBone{};
     rootBone.mBoneName = "Root";
     rootBone.mParentBoneIndex = -1;
-    rootBone.mLocalOffsetX = 1.0f;
+    rootBone.mLocalTransform.orient_.w = 1.0f;
     rootBone.mBoneTransform.orient_.w = 1.0f;
     mBones.push_back(rootBone);
 

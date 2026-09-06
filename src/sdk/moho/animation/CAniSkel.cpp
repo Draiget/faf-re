@@ -73,13 +73,13 @@ namespace
     float mRestPositionY;       // +0x34
     float mRestPositionZ;       // +0x38
     float mPad3C;               // +0x3C
-    float mChildStartIndex;     // +0x40 (copied verbatim as float bits)
-    float mChildCount;          // +0x44
-    float mFlags;               // +0x48
-    float mLocalOffsetX;        // +0x4C
-    float mLocalOffsetY;        // +0x50
-    float mLocalOffsetZ;        // +0x54
-    float mLocalScale;          // +0x58
+    float mLocalPositionX;      // +0x40 (bone position in parent space)
+    float mLocalPositionY;      // +0x44
+    float mLocalPositionZ;      // +0x48
+    float mLocalRotationW;      // +0x4C (bone rotation in parent space, w,x,y,z)
+    float mLocalRotationX;      // +0x50
+    float mLocalRotationY;      // +0x54
+    float mLocalRotationZ;      // +0x58
     std::uint8_t mUnknown5C[4]; // +0x5C
     std::int32_t mParentBoneIndex; // +0x60
     std::uint8_t mUnknown64[8]; // +0x64
@@ -89,11 +89,11 @@ namespace
   static_assert(offsetof(SScmBoneRecord, mBasisRow1) == 0x10, "SScmBoneRecord::mBasisRow1 offset must be 0x10");
   static_assert(offsetof(SScmBoneRecord, mBasisRow2) == 0x20, "SScmBoneRecord::mBasisRow2 offset must be 0x20");
   static_assert(offsetof(SScmBoneRecord, mRestPositionX) == 0x30, "SScmBoneRecord::mRestPositionX offset must be 0x30");
-  static_assert(offsetof(SScmBoneRecord, mChildStartIndex) == 0x40, "SScmBoneRecord::mChildStartIndex offset must be 0x40");
-  static_assert(offsetof(SScmBoneRecord, mChildCount) == 0x44, "SScmBoneRecord::mChildCount offset must be 0x44");
-  static_assert(offsetof(SScmBoneRecord, mFlags) == 0x48, "SScmBoneRecord::mFlags offset must be 0x48");
-  static_assert(offsetof(SScmBoneRecord, mLocalOffsetX) == 0x4C, "SScmBoneRecord::mLocalOffsetX offset must be 0x4C");
-  static_assert(offsetof(SScmBoneRecord, mLocalScale) == 0x58, "SScmBoneRecord::mLocalScale offset must be 0x58");
+  static_assert(offsetof(SScmBoneRecord, mLocalPositionX) == 0x40, "SScmBoneRecord::mLocalPositionX offset must be 0x40");
+  static_assert(offsetof(SScmBoneRecord, mLocalPositionY) == 0x44, "SScmBoneRecord::mLocalPositionY offset must be 0x44");
+  static_assert(offsetof(SScmBoneRecord, mLocalPositionZ) == 0x48, "SScmBoneRecord::mLocalPositionZ offset must be 0x48");
+  static_assert(offsetof(SScmBoneRecord, mLocalRotationW) == 0x4C, "SScmBoneRecord::mLocalRotationW offset must be 0x4C");
+  static_assert(offsetof(SScmBoneRecord, mLocalRotationZ) == 0x58, "SScmBoneRecord::mLocalRotationZ offset must be 0x58");
   static_assert(offsetof(SScmBoneRecord, mParentBoneIndex) == 0x60, "SScmBoneRecord::mParentBoneIndex offset must be 0x60");
   static_assert(sizeof(SScmBoneRecord) == 0x6C, "SScmBoneRecord size must be 0x6C");
 
@@ -951,13 +951,13 @@ namespace moho
 
       // The child-link and offset/scale lanes are copied as raw float bits in
       // the binary (fld/fstp), matching the on-disk record layout exactly.
-      std::memcpy(&bone.mChildStartIndex, &record.mChildStartIndex, sizeof(float));
-      std::memcpy(&bone.mChildCount, &record.mChildCount, sizeof(float));
-      std::memcpy(&bone.mFlags, &record.mFlags, sizeof(float));
-      bone.mLocalOffsetX = record.mLocalOffsetX;
-      bone.mLocalOffsetY = record.mLocalOffsetY;
-      bone.mLocalOffsetZ = record.mLocalOffsetZ;
-      bone.mLocalScale = record.mLocalScale;
+      bone.mLocalTransform.pos_.x = record.mLocalPositionX;
+      bone.mLocalTransform.pos_.y = record.mLocalPositionY;
+      bone.mLocalTransform.pos_.z = record.mLocalPositionZ;
+      bone.mLocalTransform.orient_.w = record.mLocalRotationW;
+      bone.mLocalTransform.orient_.x = record.mLocalRotationX;
+      bone.mLocalTransform.orient_.y = record.mLocalRotationY;
+      bone.mLocalTransform.orient_.z = record.mLocalRotationZ;
 
       // Convert the on-disk 3x4 basis to a quaternion. The binary passes the
       // three rows (first three floats of each) as the "columns" argument of

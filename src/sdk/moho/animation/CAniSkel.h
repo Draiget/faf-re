@@ -35,13 +35,14 @@ namespace moho
   {
     const char* mBoneName;         // +0x00
     std::int32_t mParentBoneIndex; // +0x04
-    float mLocalOffsetX;           // +0x08
-    float mLocalOffsetY;           // +0x0C
-    float mLocalOffsetZ;           // +0x10
-    float mLocalScale;             // +0x14
-    std::int32_t mChildStartIndex; // +0x18
-    std::int32_t mChildCount;      // +0x1C
-    std::int32_t mFlags;           // +0x20
+    // +0x08: the bone's rest transform in parent space. CAnimationManipulator::
+    // MoveManipulator (0x0063FDD0) inverts the VTransform at +0x08 (0x0063EE30 returns
+    // &skel->mBones[idx], the caller passes +8 to VTransform::Inverse), and
+    // CAniDefaultSkel seeds +0x08 with 1.0f = the identity quaternion's scalar lane.
+    // Layout is orient_ (w,x,y,z) at +0x08 and pos_ at +0x18, exactly the SCM bone
+    // record's rotation lanes (+0x4C..+0x58) followed by its position lanes
+    // (+0x40..+0x48), which CAniSkel's loader copies verbatim.
+    VTransform mLocalTransform;    // +0x08
     VTransform mBoneTransform;     // +0x24
     float mBoundsMinX;             // +0x40
     float mBoundsMinY;             // +0x44
@@ -53,13 +54,7 @@ namespace moho
 
   static_assert(offsetof(SAniSkelBone, mBoneName) == 0x00, "SAniSkelBone::mBoneName offset must be 0x00");
   static_assert(offsetof(SAniSkelBone, mParentBoneIndex) == 0x04, "SAniSkelBone::mParentBoneIndex offset must be 0x04");
-  static_assert(offsetof(SAniSkelBone, mLocalOffsetX) == 0x08, "SAniSkelBone::mLocalOffsetX offset must be 0x08");
-  static_assert(offsetof(SAniSkelBone, mLocalOffsetY) == 0x0C, "SAniSkelBone::mLocalOffsetY offset must be 0x0C");
-  static_assert(offsetof(SAniSkelBone, mLocalOffsetZ) == 0x10, "SAniSkelBone::mLocalOffsetZ offset must be 0x10");
-  static_assert(offsetof(SAniSkelBone, mLocalScale) == 0x14, "SAniSkelBone::mLocalScale offset must be 0x14");
-  static_assert(offsetof(SAniSkelBone, mChildStartIndex) == 0x18, "SAniSkelBone::mChildStartIndex offset must be 0x18");
-  static_assert(offsetof(SAniSkelBone, mChildCount) == 0x1C, "SAniSkelBone::mChildCount offset must be 0x1C");
-  static_assert(offsetof(SAniSkelBone, mFlags) == 0x20, "SAniSkelBone::mFlags offset must be 0x20");
+  static_assert(offsetof(SAniSkelBone, mLocalTransform) == 0x08, "SAniSkelBone::mLocalTransform offset must be 0x08");
   static_assert(offsetof(SAniSkelBone, mBoneTransform) == 0x24, "SAniSkelBone::mBoneTransform offset must be 0x24");
   static_assert(offsetof(SAniSkelBone, mBoundsMinX) == 0x40, "SAniSkelBone::mBoundsMinX offset must be 0x40");
   static_assert(offsetof(SAniSkelBone, mBoundsMinY) == 0x44, "SAniSkelBone::mBoundsMinY offset must be 0x44");
