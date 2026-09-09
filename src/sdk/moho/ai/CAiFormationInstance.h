@@ -44,6 +44,38 @@ namespace moho
     [[nodiscard]] static std::uint32_t* NextChainLinkSlot(std::uint32_t linkWord) noexcept;
   };
   static_assert(sizeof(SFormationLinkedUnitRef) == 0x08, "SFormationLinkedUnitRef size must be 0x08");
+} // namespace moho
+
+namespace gpg::core
+{
+  /**
+   * `SFormationLinkedUnitRef` is the same 8-byte intrusive weak-owner node
+   * `SWeakRefSlot` is -- `ownerChainHead`/`nextChainLink` alias
+   * `IntrusiveWeakLinkNode::ownerLinkSlot`/`nextInOwner` one for one -- so a
+   * vector of them has to splice each stored element into its unit's weak-owner
+   * chain instead of blitting two words.
+   *
+   * `CFormation::Finalize` (0x008382A0) proves the element is a real
+   * `Moho::WeakPtr_IUnit`: it links a stack temporary into the unit's chain,
+   * calls `gpg::fastvector_n4_WeakPtr_IUnit::push_back(&result, &temp)` -- whose
+   * copy-constructor links the *stored* copy -- and only then destroys the
+   * temporary, which unlinks it again. Without this specialization `push_back`
+   * took the raw-copy branch, so every stored element carried a chain head it
+   * had never been spliced into; the matching unlink then walked the unit's real
+   * chain looking for an address that was not on it, ran off the end, and wrote
+   * its next-word through whatever it landed on.
+   */
+  template <>
+  struct IsIntrusiveWeakRefSlot<::moho::SFormationLinkedUnitRef> : std::true_type
+  {};
+  static_assert(
+    sizeof(::moho::SFormationLinkedUnitRef) == sizeof(IntrusiveWeakLinkNode),
+    "SFormationLinkedUnitRef must alias IntrusiveWeakLinkNode layout for the relink lane"
+  );
+} // namespace gpg::core
+
+namespace moho
+{
 
   struct SFormationLaneUnitNode
   {

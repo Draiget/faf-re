@@ -4651,6 +4651,15 @@ namespace moho
    */
   void AppendLinkedUnitRef(SFormationLinkedUnitRefVec& destination, IUnit* const target)
   {
+    // 0x008382A0, the `CFormation::Finalize` collection loop: a stack weak-ref
+    // is linked into the unit's chain, handed to
+    // `gpg::fastvector_n4_WeakPtr_IUnit::push_back`, and destroyed. The
+    // push_back is what links the element that ends up in the vector -- it
+    // copy-constructs, and this element's copy-constructor splices the copy into
+    // the same chain. `SFormationLinkedUnitRef` now declares itself an intrusive
+    // weak-ref slot (see the `IsIntrusiveWeakRefSlot` specialization in the
+    // header), so `FastVectorN` performs that splice on every append and on
+    // every relocation the grow lane does.
     SFormationLinkedUnitRef temp{};
     if (target != nullptr) {
       auto* const ownerHead = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(target) + 0x4u);
