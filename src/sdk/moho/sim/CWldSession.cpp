@@ -1127,20 +1127,20 @@ namespace moho
   // Command-waypoint drawing parameters; see the declarations in CWldSession.h
   // for the per-symbol addresses. All seven are zero at image load and stay so
   // until `UICommandGraph::LoadWaypointParams` imports them.
-  std::int32_t ui_CurveSegments = 0;           // 0x00F57CC0
+  std::int32_t ui_CurveSegments = 20;          // 0x00F57CC0
 
   // Projectile strategic-icon CVars. None of these existed in the tree; the
   // addresses come from the store/compare operands in FUN_008621B0.
-  float UI_StrategicProjectileLOD = 0.0f;   // 0x00F57B20
+  float UI_StrategicProjectileLOD = 128.0f; // 0x00F57B20
   // 0x00F57A8E holds 0x01 in bin/2025.7.1/ForgedAlliance.exe's .data, so the
   // resource splats are on unless a console command turns them off.
   bool UI_RenResources = true;              // 0x00F57A8E
-  bool UI_RenProjectileIcons = false;       // 0x00F57A8F
-  bool UI_RenProjectileGlow = false;        // 0x00F57B24
-  bool UI_forceWeaponsToYellow = false;     // 0x00F57B25
-  float UI_RenProjectileGlowMin = 0.0f;     // 0x00F57B28
-  float UI_RenProjectileGlowMax = 0.0f;     // 0x00F57B2C
-  float UI_RenProjectileGlowPeriod = 0.0f;  // 0x00F57B30
+  bool UI_RenProjectileIcons = true;        // 0x00F57A8F
+  bool UI_RenProjectileGlow = true;         // 0x00F57B24
+  bool UI_forceWeaponsToYellow = true;      // 0x00F57B25
+  float UI_RenProjectileGlowMin = 0.01f;    // 0x00F57B28
+  float UI_RenProjectileGlowMax = 0.15f;    // 0x00F57B2C
+  float UI_RenProjectileGlowPeriod = 2.0f;  // 0x00F57B30
   float UI_CurGlowTime = 0.0f;              // 0x010A6460
 
   // Read once per deposit by `CWldSession::RenderResources` (0x00862E68). The
@@ -1153,31 +1153,38 @@ namespace moho
   // the tree; every address below is the absolute operand of the instruction
   // that reads it, taken from the `.asm` of the five functions that make up
   // the strategic-icon pass (0x0085B6E0, 0x0085CD40, 0x0085D9A0, 0x0085E0A0,
-  // 0x0085E3A0). All ship zeroed - the console/UI layer writes them.
-  bool ui_RenderUnitBars = false;                 // 0x00F57B26 (0x0085BFDB)
-  bool ui_RenderIcons = false;                    // 0x00F57B27 (0x0085C0B1)
-  float ui_lifebarHeight = 0.0f;                  // 0x00F57B6C (0x0085CDCB)
-  float ui_LifebarWidth = 0.0f;                   // 0x00F57B70 (0x0085CDB6)
-  float ui_LifebarLOD = 0.0f;                     // 0x00F57B74 (0x0085BFE8)
-  float ui_LifebarOffset = 0.0f;                  // 0x00F57B78 (0x0085CECE)
-  bool ui_NisRenderIcons = false;                 // 0x00F57B7C (0x0085C0A4)
-  bool ui_RenderCustomNames = false;              // 0x00F57B7D (0x0085E0BE)
-  bool ui_RenderSelectionSetNames = false;        // 0x00F57B7E (0x0085E3BE)
-  std::uint32_t ui_CustomNameColor = 0u;          // 0x00F57B80 (0x0085E2ED)
-  std::int32_t ui_CustomNameFontSize = 0;         // 0x00F57B84 (0x0085E145)
-  std::uint32_t ui_SelectionSetNamesColor = 0u;   // 0x00F57B88 (0x0085E72A)
-  float ui_StrategicIconBlinkRate = 0.0f;         // 0x00F57B8C (0x0085DC44)
-  float ui_FuelEmptyBlinkRate = 0.0f;             // 0x00F57B90 (0x0085D113)
-  float ui_StrategicIconBlinkDuration = 0.0f;     // 0x00F57B94 (0x0085DC22)
-  std::uint32_t ui_LifeBarGoodColor = 0u;         // 0x00F57B98 (0x0085D070)
-  std::uint32_t ui_LifeBarMedColor = 0u;          // 0x00F57B9C (0x0085D085)
-  std::uint32_t ui_LifeBarBadColor = 0u;          // 0x00F57BA0 (0x0085D065)
-  float ui_LifeBarGoodCutoff = 0.0f;              // 0x00F57BA4 (0x0085D05E)
-  float ui_LifeBarBadCutoff = 0.0f;               // 0x00F57BA8 (0x0085D07C)
-  std::uint32_t ui_FuelBarColor = 0u;             // 0x00F57BAC (0x0085D0EE)
-  std::uint32_t ui_FuelWarningColor = 0u;         // 0x00F57BB0 (0x0085D135)
-  std::uint32_t ui_ShieldBarColor = 0u;           // 0x00F57BB4 (0x0085D0DA)
-  std::uint32_t ui_ProgressBarColor = 0u;         // 0x00F57BB8 (0x0085D14B)
+  // 0x0085E3A0). An earlier note here said they all ship zeroed and left the
+  // console/UI layer to write them. They do not: every address in this block
+  // lands inside `.data`'s raw bytes in bin/2025.7.1/ForgedAlliance.exe and
+  // carries a real static initialiser, transcribed below. Shipping them zeroed
+  // turned the whole pass off - `ui_RenderIcons` false is the gate at
+  // 0x0085C0B1 that drops every collected strategic icon, and a 0.0f
+  // `ui_LifebarLOD` can never exceed the current zoom (0x0085BFE8), so no unit
+  // bar was ever collected either.
+  bool ui_RenderUnitBars = true;                  // 0x00F57B26 (0x0085BFDB)
+  bool ui_RenderIcons = true;                     // 0x00F57B27 (0x0085C0B1)
+  float ui_lifebarHeight = 0.125f;                // 0x00F57B6C (0x0085CDCB)
+  float ui_LifebarWidth = 1.5f;                   // 0x00F57B70 (0x0085CDB6)
+  float ui_LifebarLOD = 200.0f;                   // 0x00F57B74 (0x0085BFE8)
+  float ui_LifebarOffset = 0.1f;                  // 0x00F57B78 (0x0085CECE)
+  bool ui_NisRenderIcons = true;                  // 0x00F57B7C (0x0085C0A4)
+  bool ui_RenderCustomNames = true;               // 0x00F57B7D (0x0085E0BE)
+  bool ui_RenderSelectionSetNames = true;         // 0x00F57B7E (0x0085E3BE)
+  std::uint32_t ui_CustomNameColor = 0xFF00AA00u; // 0x00F57B80 (0x0085E2ED)
+  std::int32_t ui_CustomNameFontSize = 12;        // 0x00F57B84 (0x0085E145)
+  std::uint32_t ui_SelectionSetNamesColor = 0xFF00AA00u; // 0x00F57B88 (0x0085E72A)
+  float ui_StrategicIconBlinkRate = 0.6f;         // 0x00F57B8C (0x0085DC44)
+  float ui_FuelEmptyBlinkRate = 0.1f;             // 0x00F57B90 (0x0085D113)
+  float ui_StrategicIconBlinkDuration = 0.5f;     // 0x00F57B94 (0x0085DC22)
+  std::uint32_t ui_LifeBarGoodColor = 0xFF00FF00u; // 0x00F57B98 (0x0085D070)
+  std::uint32_t ui_LifeBarMedColor = 0xFFFFFF00u; // 0x00F57B9C (0x0085D085)
+  std::uint32_t ui_LifeBarBadColor = 0xFFFF0000u; // 0x00F57BA0 (0x0085D065)
+  float ui_LifeBarGoodCutoff = 0.75f;             // 0x00F57BA4 (0x0085D05E)
+  float ui_LifeBarBadCutoff = 0.25f;              // 0x00F57BA8 (0x0085D07C)
+  std::uint32_t ui_FuelBarColor = 0xFFF4EC4Du;    // 0x00F57BAC (0x0085D0EE)
+  std::uint32_t ui_FuelWarningColor = 0xFFFF0000u; // 0x00F57BB0 (0x0085D135)
+  std::uint32_t ui_ShieldBarColor = 0xFF00C3F7u;  // 0x00F57BB4 (0x0085D0DA)
+  std::uint32_t ui_ProgressBarColor = 0xFFFF9900u; // 0x00F57BB8 (0x0085D14B)
   msvc8::string ui_CustomNameFont{};              // 0x00F5B300 (0x0085E124)
   bool ui_ForceLifbarsOnEnemy = false;            // 0x010A644A (0x0085C031)
   bool ui_AlwaysRenderStrategicIcons = false;     // 0x010A644B (0x0085C148)
