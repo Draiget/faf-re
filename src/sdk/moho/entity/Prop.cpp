@@ -565,7 +565,12 @@ namespace moho
     AdvanceCoords();
     AdvanceCoords();
 
-    MaxHealth = blueprint->Defense.Health;
+    // 0x006F9EC5..0x006F9ECB: `fld [edi+1A0h]` / `fstp [ebp+90h]` -- `ebp` is the
+    // Prop `this` throughout this body (`mov esi, ebp; this` at 0x006F9EB2), and
+    // +0x90 is `mVarDat.mHealth`, not `mMaxHealth` at +0x94. Props keep a zero
+    // `MaxHealth`, which is what makes `UserEntity`'s health fraction fall back to
+    // 1.0f instead of computing `0 / health`.
+    Health = blueprint->Defense.Health;
     mReclaimMass = blueprint->Economy.ReclaimMassMax;
     mReclaimEnergy = blueprint->Economy.ReclaimEnergyMax;
 

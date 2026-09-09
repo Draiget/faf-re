@@ -2808,8 +2808,22 @@ namespace moho
     Position = {0.0f, 0.0f, 0.0f};
     PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
     PrevPosition = {0.0f, 0.0f, 0.0f};
-    mVelocityScale = 0.0f;
-    FractionCompleted = 0.0f;
+    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
+    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
+    // The binary reaches them through that block's own constructor (0x00558760,
+    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
+    // body stores to either offset directly. Because this reconstruction spells
+    // the block out as individual `Entity` fields, no such constructor runs here
+    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
+    // zero pinned every entity's inter-tick interpolation alpha at the start
+    // transform, and it drove the per-instance `parameter` vertex lane --
+    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
+    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
+    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
+    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
+    // alone.
+    mVelocityScale = 1.0f;
+    FractionCompleted = 1.0f;
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
@@ -2915,8 +2929,22 @@ namespace moho
     Position = {0.0f, 0.0f, 0.0f};
     PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
     PrevPosition = {0.0f, 0.0f, 0.0f};
-    mVelocityScale = 0.0f;
-    FractionCompleted = 0.0f;
+    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
+    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
+    // The binary reaches them through that block's own constructor (0x00558760,
+    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
+    // body stores to either offset directly. Because this reconstruction spells
+    // the block out as individual `Entity` fields, no such constructor runs here
+    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
+    // zero pinned every entity's inter-tick interpolation alpha at the start
+    // transform, and it drove the per-instance `parameter` vertex lane --
+    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
+    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
+    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
+    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
+    // alone.
+    mVelocityScale = 1.0f;
+    FractionCompleted = 1.0f;
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
@@ -3011,8 +3039,22 @@ namespace moho
     Position = {0.0f, 0.0f, 0.0f};
     PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
     PrevPosition = {0.0f, 0.0f, 0.0f};
-    mVelocityScale = 0.0f;
-    FractionCompleted = 0.0f;
+    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
+    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
+    // The binary reaches them through that block's own constructor (0x00558760,
+    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
+    // body stores to either offset directly. Because this reconstruction spells
+    // the block out as individual `Entity` fields, no such constructor runs here
+    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
+    // zero pinned every entity's inter-tick interpolation alpha at the start
+    // transform, and it drove the per-instance `parameter` vertex lane --
+    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
+    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
+    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
+    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
+    // alone.
+    mVelocityScale = 1.0f;
+    FractionCompleted = 1.0f;
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
@@ -3107,8 +3149,22 @@ namespace moho
     Position = {0.0f, 0.0f, 0.0f};
     PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
     PrevPosition = {0.0f, 0.0f, 0.0f};
-    mVelocityScale = 0.0f;
-    FractionCompleted = 0.0f;
+    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
+    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
+    // The binary reaches them through that block's own constructor (0x00558760,
+    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
+    // body stores to either offset directly. Because this reconstruction spells
+    // the block out as individual `Entity` fields, no such constructor runs here
+    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
+    // zero pinned every entity's inter-tick interpolation alpha at the start
+    // transform, and it drove the per-instance `parameter` vertex lane --
+    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
+    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
+    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
+    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
+    // alone.
+    mVelocityScale = 1.0f;
+    FractionCompleted = 1.0f;
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
