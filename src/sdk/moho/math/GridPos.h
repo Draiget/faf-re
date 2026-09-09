@@ -9,6 +9,15 @@ namespace moho
     int z;
 
     /**
+     * Declaring the world-position converting constructor below suppresses the
+     * implicit default constructor and makes `GridPos` a non-aggregate, so a
+     * brace-init such as `GridPos p{0, 0}` stops meaning "x = 0, z = 0" and
+     * silently resolves to that constructor with a NULL `wldPos`. Restore the
+     * default constructor so `GridPos p{}` value-initialises both lanes.
+     */
+    GridPos() noexcept = default;
+
+    /**
      * Address: 0x00506E20 (FUN_00506E20, ??0GridPos@Moho@@QAE@@Z)
      *
      * Wm3::Vector3f* wldPos, int gridSize
