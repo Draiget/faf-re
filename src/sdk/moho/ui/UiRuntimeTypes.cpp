@@ -22878,7 +22878,10 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
         searchCenter.x = searchCenter.x - (static_cast<float>(buildBlueprint->mFootprint.mSizeX) * 0.5f);
 
         GridPos searchFrom(&searchCenter, 1);
-        GridPos foundDeposit{0, 0};
+        // `{0, 0}` here selected GridPos's world-position constructor with a
+        // NULL Wm3::Vec3f* (GridPos is not an aggregate), so hovering with a
+        // mass-extractor build order dereferenced null in GridPos::GridPos.
+        GridPos foundDeposit{};
         auto* const simResources = mWldSession->mSimResources.px;
         if (simResources != nullptr &&
             simResources->FindClosestDeposit(&searchFrom, &foundDeposit, snapRadius, depositType)) {
