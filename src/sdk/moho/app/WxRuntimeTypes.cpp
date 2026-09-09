@@ -11,6 +11,8 @@
 #include <ole2.h>
 #include <objidl.h>
 
+#include <bit>
+
 #include <d3d9.h>
 
 #include <algorithm>
@@ -70795,16 +70797,26 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // wall-clock frame time while the bracket geometry interpolates on
     // `sDeltaFrame`.
     auto* const sessionView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
-    if (moho::ren_PlayableBoundary && sessionView->mSession != nullptr && worldView->view != nullptr) {
+    // The `ebx` these three gates test is NOT the `+0x2140` lane this file
+    // models as `mSession`. `+0x2140` is written once per loop iteration at
+    // 0x007F9379, alongside `mCam` at `+0x219C`, and both are cleared together
+    // at 0x007F9709 - it is the per-iteration current world view, and slot 0 is
+    // dispatched off it at 0x007F95EA. Nothing ever writes it as a session, so
+    // reading it here handed all three passes a permanent nullptr and the
+    // playable boundary, the UI selection pass and the fog of war never ran.
+    // The session the binary tests is the plain `sWldSession` global, cached
+    // into a stack local ahead of the loop (`v79 = Moho::sWldSession`).
+    moho::CWldSession* const renderSession = moho::WLD_GetActiveSession();
+    if (moho::ren_PlayableBoundary && renderSession != nullptr && worldView->view != nullptr) {
       moho::RenderPlayableBoundary(
-        static_cast<unsigned int>(head), sessionView->mBoundaryRenderer, *sessionView->mSession,
+        static_cast<unsigned int>(head), sessionView->mBoundaryRenderer, *renderSession,
         *runtime->mCam
       );
     }
 
     if (moho::ren_Ui) {
       moho::RenUI(
-        sessionView->mSession,
+        renderSession,
         runtime->mCam,
         runtime->mPrimBatcher.batcher,
         moho::REN_GetSimDeltaSeconds(),
@@ -70838,15 +70850,36 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     //   0x007F958E  <stencil clear through device slot +0x98>
     //
     // The stencil clear that follows the call is still unwired.
-    if (moho::ren_FogOfWar && sessionView->mSession != nullptr &&
-        sessionView->mSession->FocusArmy != -1) {
+    if (moho::ren_FogOfWar && renderSession != nullptr &&
+        renderSession->FocusArmy != -1) {
       moho::RenderFogOfWar(
-        *sessionView->mSession, sessionView->mVisionRenderer, static_cast<unsigned int>(head),
+        *renderSession, sessionView->mVisionRenderer, static_cast<unsigned int>(head),
         *runtime->mCam, moho::REN_GetSimDeltaSeconds()
       );
     }
 
     RenderRefractingEffects();
+
+    // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
+    // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
+    // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7
+    // as `sWeightedFrameRate` (pushed last, through the x87 stack), the raw
+    // `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`, `sCurGameTick`, and
+    // `sDeltaFrame` -- the last of those landing in the parameter the interface
+    // declares as `CWldMap* map` and `CWldSession::RenderStrategicIcons` reads
+    // back with `std::bit_cast<float>(map)` as its sub-tick interpolation
+    // fraction. This is the dispatch that draws the overlays for an ordinary
+    // perspective view; the one in `Cartographic::Render` only ever runs for a
+    // view whose orthographic flag is set, which is the minimap and whichever
+    // view the player has toggled into cartographic mode.
+    if (moho::ren_Ui && worldView->view != nullptr) {
+      worldView->view->Render(
+        runtime->mPrimBatcher.batcher,
+        static_cast<int>(moho::REN_GetGameTick()),
+        std::bit_cast<moho::CWldMap*>(moho::REN_GetSimDeltaSeconds()),
+        moho::REN_GetWeightedFrameSeconds()
+      );
+    }
 
     // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
     // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to

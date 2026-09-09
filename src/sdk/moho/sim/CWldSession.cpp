@@ -19926,7 +19926,10 @@ namespace moho
     aux.mAirIcons.clear();
     aux.mHighPriorityIcons.clear();
     aux.mSelectedIcons.clear();
-    // aux.mLifebarIcons collection deferred alongside the lifebar draw pass.
+    // The lifebar run is collected below whether or not the draw pass that
+    // consumes it is wired yet, so it has to be cleared here with the other
+    // four. Leaving it out made it grow by every visible unit every frame.
+    aux.mLifebarIcons.clear();
 
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
