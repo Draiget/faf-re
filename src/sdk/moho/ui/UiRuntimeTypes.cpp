@@ -2295,8 +2295,8 @@ namespace
     std::uint8_t mUnknown5CTo6F[0x14]{};
     moho::CScriptLazyVar_float mViewTop{};    // +0x70
     std::uint8_t mUnknown84To97[0x14]{};
-    moho::CScriptLazyVar_float mViewRight{};  // +0x98
-    moho::CScriptLazyVar_float mViewBottom{}; // +0xAC
+    moho::CScriptLazyVar_float mViewWidth{};  // +0x98
+    moho::CScriptLazyVar_float mViewHeight{}; // +0xAC
     std::uint8_t mUnknownC0To11B[0x5C]{};
     // +0x11C is not a stored pointer to a separately-allocated CRenderWorldView --
     // it is the vtable slot of the real, in-place `IRenderWorldView`/`CRenderWorldView`
@@ -2324,8 +2324,8 @@ namespace
     moho::CameraImpl* mCamera = nullptr; // +0x120
     float mCachedViewLeft = 0.0f;   // +0x124
     float mCachedViewTop = 0.0f;    // +0x128
-    float mCachedViewRight = 0.0f;  // +0x12C
-    float mCachedViewBottom = 0.0f; // +0x130
+    float mCachedViewWidth = 0.0f;  // +0x12C
+    float mCachedViewHeight = 0.0f; // +0x130
     std::uint8_t mUnknown134To135[0x2]{};
     std::uint8_t mEnableResourceRendering = 0; // +0x136
     std::uint8_t mUnknown137 = 0;
@@ -2359,10 +2359,10 @@ namespace
   );
   static_assert(offsetof(CUIWorldViewRuntimeView, mViewLeft) == 0x48, "CUIWorldViewRuntimeView::mViewLeft offset must be 0x48");
   static_assert(offsetof(CUIWorldViewRuntimeView, mViewTop) == 0x70, "CUIWorldViewRuntimeView::mViewTop offset must be 0x70");
-  static_assert(offsetof(CUIWorldViewRuntimeView, mViewRight) == 0x98, "CUIWorldViewRuntimeView::mViewRight offset must be 0x98");
+  static_assert(offsetof(CUIWorldViewRuntimeView, mViewWidth) == 0x98, "CUIWorldViewRuntimeView::mViewWidth offset must be 0x98");
   static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewBottom) == 0xAC,
-    "CUIWorldViewRuntimeView::mViewBottom offset must be 0xAC"
+    offsetof(CUIWorldViewRuntimeView, mViewHeight) == 0xAC,
+    "CUIWorldViewRuntimeView::mViewHeight offset must be 0xAC"
   );
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mCamera) == 0x120,
@@ -2377,12 +2377,12 @@ namespace
     "CUIWorldViewRuntimeView::mCachedViewTop offset must be 0x128"
   );
   static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewRight) == 0x12C,
-    "CUIWorldViewRuntimeView::mCachedViewRight offset must be 0x12C"
+    offsetof(CUIWorldViewRuntimeView, mCachedViewWidth) == 0x12C,
+    "CUIWorldViewRuntimeView::mCachedViewWidth offset must be 0x12C"
   );
   static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewBottom) == 0x130,
-    "CUIWorldViewRuntimeView::mCachedViewBottom offset must be 0x130"
+    offsetof(CUIWorldViewRuntimeView, mCachedViewHeight) == 0x130,
+    "CUIWorldViewRuntimeView::mCachedViewHeight offset must be 0x130"
   );
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mOverlayDrawToken) == 0x29C,
@@ -2449,8 +2449,8 @@ namespace
     moho::CameraImpl* mCamera;                          // +0x120
     float mCachedViewLeft;                              // +0x124
     float mCachedViewTop;                               // +0x128
-    float mCachedViewRight;                             // +0x12C
-    float mCachedViewBottom;                            // +0x130
+    float mCachedViewWidth;                             // +0x12C
+    float mCachedViewHeight;                            // +0x130
     std::uint8_t mCanShake;                             // +0x134
     std::uint8_t mIsMiniMap;                            // +0x135
     std::uint8_t mEnableResourceRendering;              // +0x136
@@ -20371,8 +20371,8 @@ moho::CUIWorldView::CUIWorldView(
     view->mCamera = nullptr;                              // +0x120
     view->mCachedViewLeft = -1.0f;                        // +0x124
     view->mCachedViewTop = -1.0f;                         // +0x128
-    view->mCachedViewRight = -1.0f;                       // +0x12C
-    view->mCachedViewBottom = -1.0f;                      // +0x130
+    view->mCachedViewWidth = -1.0f;                       // +0x12C
+    view->mCachedViewHeight = -1.0f;                      // +0x130
     view->mWorldViewDepth = depth;                        // +0x13C
     view->mCanShake = 0;                                  // +0x134
     view->mIsMiniMap = isMiniMap ? 1 : 0;                 // +0x135
@@ -22544,15 +22544,15 @@ void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std:
   if (drawMask == 1) {
     const float left = CScriptLazyVar_float::GetValue(&worldViewView->mViewLeft);
     const float top = CScriptLazyVar_float::GetValue(&worldViewView->mViewTop);
-    const float right = CScriptLazyVar_float::GetValue(&worldViewView->mViewRight);
-    const float bottom = CScriptLazyVar_float::GetValue(&worldViewView->mViewBottom);
+    const float width = CScriptLazyVar_float::GetValue(&worldViewView->mViewWidth);
+    const float height = CScriptLazyVar_float::GetValue(&worldViewView->mViewHeight);
 
     if (worldViewView->mCachedViewLeft != left || worldViewView->mCachedViewTop != top ||
-        worldViewView->mCachedViewRight != right || worldViewView->mCachedViewBottom != bottom) {
+        worldViewView->mCachedViewWidth != width || worldViewView->mCachedViewHeight != height) {
       worldViewView->mCachedViewLeft = left;
       worldViewView->mCachedViewTop = top;
-      worldViewView->mCachedViewRight = right;
-      worldViewView->mCachedViewBottom = bottom;
+      worldViewView->mCachedViewWidth = width;
+      worldViewView->mCachedViewHeight = height;
 
       // `mCamera` (+0x120) is the world view's own CameraImpl* -- see the
       // field's doc comment. This is the one and only place that pushes the
@@ -22564,10 +22564,18 @@ void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std:
       // MeshRenderer::Batch's frustum-volume query returned zero instances
       // every frame with the camera stuck at viewport width=1).
       if (moho::CameraImpl* const camera = worldViewView->mCamera; camera != nullptr) {
-        camera->CameraSetViewport(Wm3::Vector2f(left, top), Wm3::Vector2f(right - left, bottom - top));
+        // 0x0086EF40 passes the third and fourth lazy vars STRAIGHT THROUGH as the
+        // extent - it stores Left/Top into v11 and the +0x98/+0xAC values into v12
+        // and calls slot 3 with (v11, v12); there is no subtraction anywhere in the
+        // body. CameraSetViewport treats that second argument as a size (it derives
+        // the aspect as x/y and normalises row 1 by 1/x), so those two lanes are the
+        // control extent, not its right/bottom edges. The invented `right - left` /
+        // `bottom - top` gave the minimap a 228x19 viewport - a sliver a few pixels
+        // tall - instead of its real 253x211.
+        camera->CameraSetViewport(Wm3::Vector2f(left, top), Wm3::Vector2f(width, height));
         gpg::Warnf(
           "[MMDIAG] DoRender PUSHED this=%p isMiniMap=%d viewport=(%.1f,%.1f,%.1f,%.1f)",
-          static_cast<const void*>(this), static_cast<int>(this->IsMiniMap()), left, top, right - left, bottom - top
+          static_cast<const void*>(this), static_cast<int>(this->IsMiniMap()), left, top, width, height
         );
       }
     }
@@ -22693,8 +22701,10 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
         const REntityBlueprint* const blueprint = candidate->mParams.mBlueprint;
         if (blueprint->IsMobile() && blueprint->mUseOOBTestZoom > cameraZoom) {
           // Tight zoom on a mobile unit: exact oriented-mesh pick test
+        rejectProbe("dead");
           // against the camera's screen-point pick ray.
           const GeomLine3 pickRay = cameraView.Unproject(mouseScreenPos);
+      rejectProbe("step:alive");
           const Wm3::Line3f wmPickRay(pickRay.pos, pickRay.dir);
           mesh->UpdateInterpolatedFields();
           Wm3::IntrLine3Box3f intersector(wmPickRay, mesh->box);
@@ -22704,14 +22714,17 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
         } else {
           // Otherwise a cheap axis-aligned mesh-bounds test, adjusted by the
           // blueprint's selection-mesh top-weighting and X/Z rescale knobs.
+        rejectProbe("category");
           mesh->UpdateInterpolatedFields();
           float boxXMin = mesh->xMin;
           float boxXMax = mesh->xMax;
+      rejectProbe("step:category-ok");
           float boxYMin = mesh->yMin;
           float boxYMax = mesh->yMax;
           float boxZMin = mesh->zMin;
           float boxZMax = mesh->zMax;
 
+        rejectProbe("carrier");
           if (blueprint->mSelectionMeshUseTopAmount <= 0.0f) {
             boxYMax = boxYMax - ((boxYMax - boxYMin) * blueprint->mSelectionYOffset);
           } else {
@@ -22722,9 +22735,11 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
             const float halfX = (boxXMax - centerX) * blueprint->mSelectionMeshScaleX;
             boxXMax = centerX + halfX;
             boxXMin = centerX - halfX;
+        rejectProbe("intel-suppressed");
           }
           if (blueprint->mSelectionMeshScaleZ != 1.0f) {
             const float centerZ = (boxZMin + boxZMax) * 0.5f;
+      rejectProbe("step:intel-ok");
             const float halfZ = (boxZMax - centerZ) * blueprint->mSelectionMeshScaleZ;
             boxZMax = centerZ + halfZ;
             boxZMin = centerZ - halfZ;
@@ -22732,9 +22747,11 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
 
           const Wm3::AxisAlignedBox3f selectionBounds{{boxXMin, boxYMin, boxZMin}, {boxXMax, boxYMax, boxZMax}};
           if (!selectionSolid.Intersects(selectionBounds)) {
+        rejectProbe("army/playable");
             continue;
           }
         }
+      rejectProbe("step:army-ok");
       }
 
       // Interpolation alpha reads the still-zero (from entry) `mIsDragger`
@@ -22745,6 +22762,14 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
       const float dy = projected.y - mouseScreenPos.y;
       const float distSq = (dx * dx) + (dy * dy);
 
+            char extra[320];
+            (void)std::snprintf(extra, sizeof(extra),
+              "oob zoomThr=%.1f center=(%.2f,%.2f,%.2f) ext=(%.2f,%.2f,%.2f) ax0=(%.2f,%.2f,%.2f) ray=(%.1f,%.1f,%.1f)+(%.3f,%.3f,%.3f)",
+              blueprint->mUseOOBTestZoom, mesh->box.Center.X(), mesh->box.Center.Y(), mesh->box.Center.Z(),
+              mesh->box.Extent[0], mesh->box.Extent[1], mesh->box.Extent[2],
+              mesh->box.Axis[0].X(), mesh->box.Axis[0].Y(), mesh->box.Axis[0].Z(),
+              pickRay.pos.x, pickRay.pos.y, pickRay.pos.z, pickRay.dir.x, pickRay.dir.y, pickRay.dir.z);
+            rejectProbe("oob-miss", extra);
       const bool preferOverCurrentBest = bestCandidate != nullptr && bestCandidate->IsUserUnit() == nullptr &&
                                           candidateAsUnit != nullptr;
       if (bestDistSq > distSq || preferOverCurrentBest) {
@@ -22778,11 +22803,16 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
             }
           }
         }
+            char extra[200];
+            (void)std::snprintf(extra, sizeof(extra), "aabb=(%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f) zoomThr=%.1f",
+              boxXMin, boxYMin, boxZMin, boxXMax, boxYMax, boxZMax, blueprint->mUseOOBTestZoom);
+            rejectProbe("aabb-miss", extra);
       } else if (UserUnit* const attachmentParentAsUnit = attachmentParent->IsUserUnit()) {
         if (attachmentParentAsUnit->IsInCategory("TRANSPORTATION") &&
             (attachmentParentAsUnit->IsInCategory("FACTORY") ? false : true)) {
           // The binary re-evaluates TRANSPORTATION-then-FACTORY on the
           // attachment parent and, when it's a transport but not itself a
+      rejectProbe("step:mesh-ok");
           // factory, redirects hover to that attachment parent.
           bestCandidate = attachmentParent;
         }
@@ -22790,12 +22820,25 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
     }
   }
 
+      {
+        char extra[300];
+        (void)std::snprintf(extra, sizeof(extra),
+          "ipos=(%.2f,%.2f,%.2f) proj=(%.1f,%.1f) mouse=(%.1f,%.1f) distSq=%.2f lastInterp=%.3f last=(%.2f,%.2f,%.2f) cur=(%.2f,%.2f,%.2f) impact=%.3f best=%.2f",
+          interpolatedPosition.x, interpolatedPosition.y, interpolatedPosition.z, projected.x, projected.y,
+          mouseScreenPos.x, mouseScreenPos.y, distSq, candidate->mLastInterpAmt,
+          candidate->mVariableData.mLastTransform.pos_.x, candidate->mVariableData.mLastTransform.pos_.y,
+          candidate->mVariableData.mLastTransform.pos_.z, candidate->mVariableData.mCurTransform.pos_.x,
+          candidate->mVariableData.mCurTransform.pos_.y, candidate->mVariableData.mCurTransform.pos_.z,
+          candidate->mVariableData.mCurImpactValue, bestDistSq);
+        rejectProbe("step:dist", extra);
+      }
   // The rest of the frame's cursor-state update runs unconditionally,
   // whether or not the raycast landed on the world.
   CmdId highlightCommandId = -1;
   if (mHighlightEnabled && !mIsMiniMap) {
     highlightCommandId =
       ResolveCommandGraphCursorHighlightIfPresent(mComGraph.px, mCamera->CameraGetView(), mouseScreenPos);
+        rejectProbe("ACCEPT");
   }
   (void)highlightCommandId;
 

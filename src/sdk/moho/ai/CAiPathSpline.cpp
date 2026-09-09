@@ -1547,17 +1547,24 @@ void CAiPathSpline::Generate(
       turnLimit = turnLimit * 2.0f;
     }
 
+    // The limiter rotates its SOURCE (arg 3/4) toward its TARGET (arg 5/6):
+    // 0x005B2FF0 passes `mForwardXZ` as the source and `(mDeltaX, mDeltaZ)` as
+    // the target (and negates the FORWARD, not the delta, on the backup path).
+    // Swapping them turned every large course change into a near-instant snap:
+    // outside the limit it rotated the destination delta by one tick's worth,
+    // landing almost on the goal heading, and inside the limit it returned the
+    // current heading unchanged, so small corrections never happened at all.
     Wm3::Vector2f heading{};
     if (doBackup) {
       Wm3::Vector2f reversed{};
       (void)RotateDirectionTowardTargetLimited(
-        &reversed, turnLimit, -0.0f - params.mDeltaX, -0.0f - params.mDeltaZ, params.mForwardXZ.x, params.mForwardXZ.y
+        &reversed, turnLimit, -0.0f - params.mForwardXZ.x, -0.0f - params.mForwardXZ.y, params.mDeltaX, params.mDeltaZ
       );
       heading.x = -0.0f - reversed.x;
       heading.y = -0.0f - reversed.y;
     } else {
       (void)RotateDirectionTowardTargetLimited(
-        &heading, turnLimit, params.mDeltaX, params.mDeltaZ, params.mForwardXZ.x, params.mForwardXZ.y
+        &heading, turnLimit, params.mForwardXZ.x, params.mForwardXZ.y, params.mDeltaX, params.mDeltaZ
       );
     }
     forward = Wm3::Vector3f{heading.x, 0.0f, -0.0f - heading.y};
