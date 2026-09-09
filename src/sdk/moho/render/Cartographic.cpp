@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <bit>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -2396,13 +2397,33 @@ namespace moho
       kCartographicClearStencil
     );
 
-    // 0x007D1BB2 dispatches `IRenderWorldView` slot 0 here as
-    // `worldView->Render(primBatcher.get(), gameTick, deltaFrame, 0.0f)` -
-    // four stack dwords, the third of which the shipped code stores with
-    // `fstp` (0x007D1BAD), i.e. a float. The declaration in
-    // `moho/render/IRenderWorldView.h` currently types that third parameter
-    // `CWldMap*`, which no value here can satisfy; the call is left unwired
-    // until that header is corrected rather than misrepresented with a cast.
+    // 0x007D1BB2 dispatches `IRenderWorldView` slot 0 (`mov ecx, ebx` /
+    // `call edx` off `[[ebx]]`). The four argument dwords are laid down at
+    // 0x007D1B90..0x007D1BB1, in this order:
+    //   [esp+0x00] `edi`, the raw `CD3DPrimBatcher*` (`push edi`, 0x007D1BB1),
+    //   [esp+0x04] `eax` from `[esp+0A0h]` (`push eax`, 0x007D1BB0) -- the same
+    //              parameter slot `DeviceContext::GetHead` is called with at
+    //              0x007D1811, i.e. the head index,
+    //   [esp+0x08] this function's float parameter, moved through the x87 stack
+    //              (`fld` 0x007D1BA6 / `fstp` 0x007D1BAD),
+    //   [esp+0x0C] a literal `0.0f` (`fldz` at 0x007D1B90, stored 0x007D1BA0).
+    // The mangled name confirms the float: `...@@QAEX <shared_ptr> <shared_ptr>
+    // H H M <shared_ptr> PAVIRenderWorldView@2@ _N @Z` -- `M`, between the two
+    // `H`s and the batcher handle. It lands in the slot
+    // `IRenderWorldView::Render` declares as `CWldMap* map`, which is exactly
+    // the sub-tick interpolation fraction `CWldSession::RenderStrategicIcons`
+    // reads back out of that parameter with `std::bit_cast<float>(map)` (and
+    // which `CRenderWorldView::Render` loads with `fld [ebp+10h]` at
+    // 0x0086EE58). Nothing else drives slot 0, so leaving this call out left
+    // every world-space overlay the view owns unpainted: resource splats,
+    // strategic icons, projectile icons and arcs, mesh previews, command
+    // splats, the economy readout and the command graph.
+    worldView->Render(
+      primBatcher.get(),
+      static_cast<int>(headIndex),
+      std::bit_cast<CWldMap*>(deltaFrame),
+      0.0f
+    );
 
     REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
 
