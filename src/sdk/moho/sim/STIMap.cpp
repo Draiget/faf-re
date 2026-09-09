@@ -460,18 +460,6 @@ namespace
     return 2 * field.width * field.height;
   }
 
-  /**
-   * Address: 0x004784E0 (FUN_004784E0)
-   *
-   * What it does:
-   * Clears tier metadata lanes `{data1.width, data1.height, data2.data}`.
-   */
-  void ResetTierMetadata(moho::CHeightFieldTier& tier) noexcept
-  {
-    tier.data1.width = 0;
-    tier.data1.height = 0;
-    tier.data2.data = nullptr;
-  }
 
   /**
    * Address: 0x004785D0 (FUN_004785D0)
@@ -1995,9 +1983,17 @@ namespace moho
       const std::int32_t levelWidth = std::max(widthArg >> shift, 1);
 
       CHeightFieldTier& tier = mGrids[static_cast<std::size_t>(level)];
-      ZeroHeightFieldTier(tier);
+      // 0x00476090 does exactly two things per level: release+reallocate the
+      // min/max grid (delete[] data1.data, data1.data = 0, then
+      // func_iGridMakeData1), then the same for the error grid. The tiers
+      // arrive already zeroed from the zero-template vector fill, so there is
+      // no per-level clear. A ResetTierMetadata call sat between the two here
+      // and zeroed data1.width/height immediately after ResetMinMaxGrid had
+      // set them, leaving every tier with an allocated but 0x0 min/max grid:
+      // GetTierBoundsUWord then took its `data1.width <= 0` bail-out and
+      // reported {0, 0} for the whole field, so CHeightField::GetBounds3D
+      // returned an empty elevation range.
       ResetMinMaxGrid(tier.data1, levelWidth, levelHeight);
-      ResetTierMetadata(tier);
       (void)ResetHeightWordGrid(tier.data2, levelWidth, levelHeight);
     }
   }
