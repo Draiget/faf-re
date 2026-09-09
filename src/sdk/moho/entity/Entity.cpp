@@ -8797,45 +8797,14 @@ namespace moho
       (right.y * forward.x) - (forward.y * right.x),
     };
 
-    const float m00 = right.x;
-    const float m01 = right.y;
-    const float m02 = right.z;
-    const float m10 = up.x;
-    const float m11 = up.y;
-    const float m12 = up.z;
-    const float m20 = forward.x;
-    const float m21 = forward.y;
-    const float m22 = forward.z;
-
+    // 0x0050B480 hands the three rows (right, up, forward) to func_MatrixToQuat
+    // (0x004EB3F0), whose lane order is the engine's rows-as-axes convention
+    // (x = m12 - m21, y = m20 - m02, z = m01 - m10). The previous inline
+    // trace conversion used the column-vector signs and produced the conjugate,
+    // so every unit faced the mirror of its path heading while walking.
+    const Wm3::Vector3f rows[3] = {right, up, forward};
     Wm3::Quaternionf orientation{};
-    const float trace = m00 + m11 + m22;
-    if (trace > 0.0f) {
-      const float s = std::sqrt(trace + 1.0f) * 2.0f;
-      orientation.w = 0.25f * s;
-      orientation.x = (m21 - m12) / s;
-      orientation.y = (m02 - m20) / s;
-      orientation.z = (m10 - m01) / s;
-    } else if (m00 > m11 && m00 > m22) {
-      const float s = std::sqrt(1.0f + m00 - m11 - m22) * 2.0f;
-      orientation.w = (m21 - m12) / s;
-      orientation.x = 0.25f * s;
-      orientation.y = (m01 + m10) / s;
-      orientation.z = (m02 + m20) / s;
-    } else if (m11 > m22) {
-      const float s = std::sqrt(1.0f + m11 - m00 - m22) * 2.0f;
-      orientation.w = (m02 - m20) / s;
-      orientation.x = (m01 + m10) / s;
-      orientation.y = 0.25f * s;
-      orientation.z = (m12 + m21) / s;
-    } else {
-      const float s = std::sqrt(1.0f + m22 - m00 - m11) * 2.0f;
-      orientation.w = (m10 - m01) / s;
-      orientation.x = (m02 + m20) / s;
-      orientation.y = (m12 + m21) / s;
-      orientation.z = 0.25f * s;
-    }
-
-    (void)orientation.Normalize();
+    (void)MatrixToQuat(rows, &orientation);
     return orientation;
   }
 
