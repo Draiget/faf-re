@@ -393,6 +393,37 @@ namespace
   }
 
   /**
+   * Applies the defaults `SSTIEntityVariableData::SSTIEntityVariableData`
+   * (0x00558760) gives the lanes between +0xDC and +0x108 of the variable-data
+   * block the engine flattened into `Entity` at +0x78. Every binary `Entity`
+   * constructor gets them by calling that block's constructor outright
+   * (`Moho::SSTIEntityVariableData::SSTIEntityVariableData(&this->mVarDat)`);
+   * this reconstruction spells the rest of the block out as named `Entity`
+   * fields but leaves this run as a raw byte span, so nothing initialised it:
+   * the attachment-parent reference, the inline auxiliary-id vector and the four
+   * texture-scroll floats all started as whatever the allocator handed back.
+   * `UserEntity::Sync` copies those scroll floats straight into the mesh
+   * instance, and `Entity::SyncInterface` resizes the auxiliary vector through
+   * pointers that have to be the inline ones on the first call.
+   */
+  void ResetEntityVariableDataDefaults(moho::Entity& entity) noexcept
+  {
+    moho::SSTIEntityVariableData& varData = EntityVariableData(entity);
+
+    varData.mAttachmentParentRef = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
+
+    varData.mAuxValueVector.mInlineStorage0 =
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&varData.mAuxValueVector.mInlineStorage1));
+    varData.mAuxValueVector.mInlineStorage1 = 0u;
+    varData.mAuxValueVector.ResetToInlineStorage();
+
+    varData.mScroll0U = 0.0f;
+    varData.mScroll0V = 0.0f;
+    varData.mScroll1U = 0.0f;
+    varData.mScroll1V = 0.0f;
+  }
+
+  /**
    * Address: 0x00558EC0 (FUN_00558EC0, sub_558EC0) + 0x00559190 grow lane
    *
    * What it does:
@@ -2727,6 +2758,14 @@ namespace moho
     delete mPositionHistory;
     mPositionHistory = nullptr;
 
+    // The binary destructor ends the variable-data block by calling its own
+    // destructor (`Moho::SSTIEntityVariableData::~SSTIEntityVariableData(&this->
+    // mVarDat)`, FUN_006785D0 line 72). The one lane of that block this tree
+    // does not already tear down through a named `Entity` member is the inline
+    // auxiliary-id vector, which leaks its heap buffer once
+    // `Entity::SyncInterface` has grown it past the inline capacity.
+    EntityVariableData(*this).mAuxValueVector.ReleaseDynamicStorage();
+
     // Decrement the Entity instance-count stat (binary FUN_006785D0 line 73:
     // _InterlockedExchangeAdd(&InstanceCounter<Entity>::GetStatItem()->mCounter, -1)).
     // Each Entity constructor increments it by 1; the recovered dtor had dropped
@@ -2824,6 +2863,8 @@ namespace moho
     // alone.
     mVelocityScale = 1.0f;
     FractionCompleted = 1.0f;
+
+    ResetEntityVariableDataDefaults(*this);
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
@@ -2946,6 +2987,8 @@ namespace moho
     mVelocityScale = 1.0f;
     FractionCompleted = 1.0f;
 
+    ResetEntityVariableDataDefaults(*this);
+
     mVisibilityState = 0u;
     mFootprintLayer = 0;
     mCurrentLayer = LAYER_None;
@@ -3056,6 +3099,8 @@ namespace moho
     mVelocityScale = 1.0f;
     FractionCompleted = 1.0f;
 
+    ResetEntityVariableDataDefaults(*this);
+
     mVisibilityState = 0u;
     mFootprintLayer = 0;
     mCurrentLayer = LAYER_None;
@@ -3165,6 +3210,8 @@ namespace moho
     // alone.
     mVelocityScale = 1.0f;
     FractionCompleted = 1.0f;
+
+    ResetEntityVariableDataDefaults(*this);
 
     mVisibilityState = 0u;
     mFootprintLayer = 0;
