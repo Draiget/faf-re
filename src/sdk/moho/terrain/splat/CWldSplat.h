@@ -30,11 +30,19 @@ namespace moho
   class CWldSplat : public CWldTerrainDecal
   {
   public:
+    /**
+     * 28-byte terrain splat vertex. `CWldSplat::UpdateBatchTexture`
+     * (0x0089E1F0) writes the atlas UV pair at `[this + 0x17C]` / `[+0x180]`
+     * with the array at +0x170, so the texcoord sits at +0x0C - and the
+     * per-frame fade the terrain splat pass stores at +0x14
+     * (`*((float *)v + 5)` in HighFidelityTerrain::UpdateRenderContext,
+     * 0x008003E0) is its own lane, not part of the texcoord.
+     */
     struct SplatVertex
     {
       Wm3::Vec3f mPosition;       // +0x00
-      std::uint8_t mPad0C_0F[0x4];
-      Wm3::Vec2f mTexCoord;       // +0x10
+      Wm3::Vec2f mTexCoord;       // +0x0C
+      float mAlpha;               // +0x14
       std::uint8_t mPad18_1B[0x4];
     };
 
@@ -107,7 +115,8 @@ namespace moho
   };
 
   static_assert(offsetof(CWldSplat::SplatVertex, mPosition) == 0x00, "CWldSplat::SplatVertex::mPosition offset must be 0x00");
-  static_assert(offsetof(CWldSplat::SplatVertex, mTexCoord) == 0x10, "CWldSplat::SplatVertex::mTexCoord offset must be 0x10");
+  static_assert(offsetof(CWldSplat::SplatVertex, mTexCoord) == 0x0C, "CWldSplat::SplatVertex::mTexCoord offset must be 0x0C");
+  static_assert(offsetof(CWldSplat::SplatVertex, mAlpha) == 0x14, "CWldSplat::SplatVertex::mAlpha offset must be 0x14");
   static_assert(sizeof(CWldSplat::SplatVertex) == 0x1C, "CWldSplat::SplatVertex size must be 0x1C");
   static_assert(offsetof(CWldSplat, mSplatVertices) == 0x170, "CWldSplat::mSplatVertices offset must be 0x170");
   static_assert(offsetof(CWldSplat, mTex) == 0x1E0, "CWldSplat::mTex offset must be 0x1E0");
