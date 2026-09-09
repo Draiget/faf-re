@@ -70894,30 +70894,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // body, which orphaned `Moho::Cartographic::Render` (its sole caller).
   // The return value (outline-overlay draw count) is unused by this caller,
   // matching the binary (the pushed result is never read after the call).
-  // TEMPORARY PROBE (do not commit). The world pass is provably healthy
-  // (rectCacheCount=122..128, DrawNormals=1, target bound, camera over the map)
-  // yet the viewport is a flat fill. This pass runs right after the post-loop
-  // UpdateRenderViewportCoordinates(), which restores the FULL head rect, so
-  // anything it draws covers the whole screen. Report its overlay draw count
-  // and allow skipping it to see whether the terrain underneath appears.
-  {
-    static const bool skipCartographic = (getenv("FAF_SKIP_CARTOGRAPHIC") != nullptr);
-    if (!skipCartographic) {
-      const auto cartographicDraws = moho::REN_RenderCartographic(this, head, worldViewInfoVector);
-      static int sCartoBudget = 0;
-      if (sCartoBudget < 5) {
-        ++sCartoBudget;
-        gpg::Warnf("[CARTODIAG] REN_RenderCartographic drew=%d head=%d",
-                   static_cast<int>(cartographicDraws), head);
-      }
-    } else {
-      static bool sReportedSkip = false;
-      if (!sReportedSkip) {
-        sReportedSkip = true;
-        gpg::Warnf("[CARTODIAG] SKIPPED via FAF_SKIP_CARTOGRAPHIC");
-      }
-    }
-  }
+  (void)moho::REN_RenderCartographic(this, head, worldViewInfoVector);
 
   // Draw the UI control tree over the rendered viewport. The binary does this
   // at 0x007F97B7..0x007F97DD, immediately after the coordinate update and
