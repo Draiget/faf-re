@@ -1458,30 +1458,56 @@ namespace
     moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
+    // `EIntel` numbers the position-handle types from 1 (`INTEL_Vision`) up to
+    // 8 (`INTEL_CloakField`); 9 (`INTEL_Jammer`) and above are the toggle
+    // lanes, which have no handle. `CIntel::InitIntel` stores type N in
+    // `mIntelHandles[N - 1]` -- its `case 1` writes `mVisionGrid`, the union's
+    // slot 0, and binds it to `ReconGetVisionGrid()` -- so the lookup has to
+    // subtract the same one. Indexing straight by the enum returned the next
+    // type's handle to every caller: `EnableIntel('Vision')` enabled the
+    // water-vision handle and left the real vision handle disabled, so
+    // `CIntelPosHandle::UpdatePos` never rastered a unit's vision into the
+    // recon DB's vision grid.
     const int intelIndex = static_cast<int>(intelType);
-    if (intelIndex < 0 || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
-      return nullptr;
-    }
-    if (intelIndex >= static_cast<int>(moho::CIntel::kHandleCount)) {
+    if (intelIndex < static_cast<int>(moho::INTEL_Vision)
+        || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
       return nullptr;
     }
 
-    return intelManager.mIntelHandles[static_cast<std::size_t>(intelIndex)];
+    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex) - 1u;
+    if (handleSlot >= moho::CIntel::kHandleCount) {
+      return nullptr;
+    }
+
+    return intelManager.mIntelHandles[handleSlot];
   }
 
   [[nodiscard]] const moho::CIntelPosHandle* ResolveIntelPosHandleForType(
     const moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
+    // `EIntel` numbers the position-handle types from 1 (`INTEL_Vision`) up to
+    // 8 (`INTEL_CloakField`); 9 (`INTEL_Jammer`) and above are the toggle
+    // lanes, which have no handle. `CIntel::InitIntel` stores type N in
+    // `mIntelHandles[N - 1]` -- its `case 1` writes `mVisionGrid`, the union's
+    // slot 0, and binds it to `ReconGetVisionGrid()` -- so the lookup has to
+    // subtract the same one. Indexing straight by the enum returned the next
+    // type's handle to every caller: `EnableIntel('Vision')` enabled the
+    // water-vision handle and left the real vision handle disabled, so
+    // `CIntelPosHandle::UpdatePos` never rastered a unit's vision into the
+    // recon DB's vision grid.
     const int intelIndex = static_cast<int>(intelType);
-    if (intelIndex < 0 || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
-      return nullptr;
-    }
-    if (intelIndex >= static_cast<int>(moho::CIntel::kHandleCount)) {
+    if (intelIndex < static_cast<int>(moho::INTEL_Vision)
+        || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
       return nullptr;
     }
 
-    return intelManager.mIntelHandles[static_cast<std::size_t>(intelIndex)];
+    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex) - 1u;
+    if (handleSlot >= moho::CIntel::kHandleCount) {
+      return nullptr;
+    }
+
+    return intelManager.mIntelHandles[handleSlot];
   }
 
   [[nodiscard]] moho::CIntelToggleState* ResolveIntelToggleStateForType(
