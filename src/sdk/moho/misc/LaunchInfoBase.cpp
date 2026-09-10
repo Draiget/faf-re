@@ -766,23 +766,6 @@ namespace
   }
 
   /**
-   * Address: 0x00542C50 (FUN_00542C50)
-   */
-  [[maybe_unused]] std::int32_t* AssignIntLane(std::int32_t* const lane, const std::int32_t value)
-  {
-    *lane = value;
-    return lane;
-  }
-
-  /**
-   * Address: 0x00542E80 (FUN_00542E80)
-   */
-  [[maybe_unused]] std::int32_t* ClearSingleIntLane(std::int32_t* const lane)
-  {
-    return AssignIntLane(lane, 0);
-  }
-
-  /**
    * Address: 0x00542EA0 (FUN_00542EA0)
    */
   [[maybe_unused]] std::int32_t* ClearIntPairLanesPrimary(std::int32_t* const lanes)

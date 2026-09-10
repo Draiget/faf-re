@@ -319,17 +319,6 @@ namespace
     return outPointer;
   }
 
-  /**
-   * Address: 0x00497C80 (FUN_00497C80, sub_497C80)
-   *
-   * What it does:
-   * Reads one pointer-sized value from caller storage.
-   */
-  [[nodiscard]] const void* ReadPointerFromSlot(const void* const* const pointerSlot) noexcept
-  {
-    return *pointerSlot;
-  }
-
 } // namespace
 
 namespace moho

@@ -4904,18 +4904,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0068A020 (FUN_0068A020)
-   *
-   * What it does:
-   * Stores one max-health lane value and returns the entity pointer.
-   */
-  Entity* StoreEntityMaxHealthLane(Entity* const entity, const float maxHealth) noexcept
-  {
-    entity->MaxHealth = maxHealth;
-    return entity;
-  }
-
-  /**
    * Address: 0x00689F20 (FUN_00689F20, Moho::Entity::GetUniqueName)
    *
    * What it does:
@@ -6989,7 +6977,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       maxHealthArg.TypeError("number");
     }
-    (void)StoreEntityMaxHealthLane(entity, static_cast<float>(lua_tonumber(rawState, 2)));
+    entity->MaxHealth = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 
