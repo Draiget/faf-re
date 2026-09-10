@@ -67,61 +67,6 @@ namespace
   std::uint32_t gUiRuntimeScratchLaneA = 0u;
   std::uint32_t gUiRuntimeScratchLaneB = 0u;
 
-  /**
-   * Address: 0x0083C2A0 (FUN_0083C2A0)
-   *
-   * What it does:
-   * Returns the primary UI runtime scratch-lane owner pointer.
-   */
-  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryA(const int /*unused*/) noexcept
-  {
-    return &gUiRuntimeScratchLaneA;
-  }
-
-  /**
-   * Address: 0x0083C380 (FUN_0083C380)
-   *
-   * What it does:
-   * Returns the secondary UI runtime scratch-lane owner pointer.
-   */
-  [[maybe_unused]] void* GetUiRuntimeScratchLaneBEntryA(const int /*unused*/) noexcept
-  {
-    return &gUiRuntimeScratchLaneB;
-  }
-
-  /**
-   * Address: 0x0083C3C0 (FUN_0083C3C0)
-   *
-   * What it does:
-   * Secondary entry lane that returns the primary UI runtime scratch owner.
-   */
-  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryB(const int /*unused*/) noexcept
-  {
-    return GetUiRuntimeScratchLaneAEntryA(0);
-  }
-
-  /**
-   * Address: 0x0083C560 (FUN_0083C560)
-   *
-   * What it does:
-   * Secondary entry lane that returns the secondary UI runtime scratch owner.
-   */
-  [[maybe_unused]] void* GetUiRuntimeScratchLaneBEntryB(const int /*unused*/) noexcept
-  {
-    return GetUiRuntimeScratchLaneBEntryA(0);
-  }
-
-  /**
-   * Address: 0x0083C570 (FUN_0083C570)
-   *
-   * What it does:
-   * Third entry lane that returns the primary UI runtime scratch owner.
-   */
-  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryC(const int /*unused*/) noexcept
-  {
-    return GetUiRuntimeScratchLaneAEntryA(0);
-  }
-
   template <typename TCall>
   bool StartUIMainEntryWithState(
     LuaPlus::LuaState* const state,

@@ -31,16 +31,6 @@ namespace
     constexpr const char* kReadModeError = "Attempt to read from a file that isn't open for input.";
     constexpr const char* kWriteModeError = "Attempt to write to a file that isn't open for output.";
 
-    /**
-     * Address: 0x009557D0 (FUN_009557D0)
-     *
-     * What it does:
-     * Pass-through lane that returns the input 64-bit value unchanged.
-     */
-    [[maybe_unused]] [[nodiscard]] std::int64_t IdentityInt64StreamLane(const std::int64_t value) noexcept
-    {
-        return value;
-    }
 }
 
 /**

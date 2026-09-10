@@ -221,17 +221,6 @@ namespace
   }
 
   /**
-   * Address: 0x00514660 (FUN_00514660, nullsub_1066)
-   *
-   * What it does:
-   * Provides a no-op compatibility lane used by generated helper/vtable
-   * tables in the original binary.
-   */
-  [[maybe_unused]] void SNamedFootprintNoOpLane()
-  {
-  }
-
-  /**
    * Address: 0x00514670 (FUN_00514670)
    *
    * What it does:

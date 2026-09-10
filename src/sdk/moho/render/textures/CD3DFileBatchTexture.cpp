@@ -388,17 +388,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0044F080 (FUN_0044F080)
-     *
-     * What it does:
-     * Returns constant true.
-     */
-    [[maybe_unused]] [[nodiscard]] bool ReturnTrueLane()
-    {
-      return true;
-    }
-
-    /**
      * Address: 0x0044F090 (FUN_0044F090)
      * Address: 0x0044F0A0 (FUN_0044F0A0, clone lane)
      * Address: 0x0044F0B0 (FUN_0044F0B0, clone lane)

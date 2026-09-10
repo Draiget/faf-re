@@ -49,34 +49,6 @@ namespace
   }
 
   /**
-   * Address: 0x005098D0 (FUN_005098D0, nullsub_1052)
-   */
-  [[maybe_unused]] void noop_STIMapLaneVariant1()
-  {
-  }
-
-  /**
-   * Address: 0x00509900 (FUN_00509900, nullsub_1053)
-   */
-  [[maybe_unused]] void noop_STIMapLaneVariant2()
-  {
-  }
-
-  /**
-   * Address: 0x00509910 (FUN_00509910, nullsub_1054)
-   */
-  [[maybe_unused]] void noop_STIMapLaneVariant3()
-  {
-  }
-
-  /**
-   * Address: 0x00509A70 (FUN_00509A70, nullsub_1055)
-   */
-  [[maybe_unused]] void noop_STIMapLaneVariant4()
-  {
-  }
-
-  /**
    * Address: 0x005099E0 (FUN_005099E0, STIMap RRef fill helper)
    */
   [[maybe_unused]] gpg::RRef* FillSTIMapRef(moho::STIMap* const value, gpg::RRef* const outRef)

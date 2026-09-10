@@ -17,18 +17,6 @@ gpg::RType* IAiBuilder::sType = nullptr;
 IAiBuilder::IAiBuilder() = default;
 
 /**
- * Address: 0x0059FB70 (FUN_0059FB70)
- *
- * What it does:
- * Alternate in-place constructor adapter lane for one IAiBuilder interface
- * subobject.
- */
-[[maybe_unused]] IAiBuilder* InitializeIAiBuilderInterfaceLane(IAiBuilder* const objectStorage) noexcept
-{
-  return objectStorage;
-}
-
-/**
  * Address: 0x0059ED70 (FUN_0059ED70, scalar deleting thunk)
  */
 IAiBuilder::~IAiBuilder() = default;

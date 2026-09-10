@@ -798,22 +798,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x0053B470 (FUN_0053B470)
-   * Address: 0x0056FC70 (FUN_0056FC70)
-   * Address: 0x0056FC90 (FUN_0056FC90)
-   * Address: 0x0056FEA0 (FUN_0056FEA0)
-   * Address: 0x005703F0 (FUN_005703F0)
-   *
-   * What it does:
-   * Clears one single dword lane and returns the caller-owned output slot.
-   */
-  [[nodiscard]] std::uint32_t* ZeroDwordLane(std::uint32_t* const outLane) noexcept
-  {
-    *outLane = 0u;
-    return outLane;
-  }
-
-  /**
    * Address: 0x00539AD0 (FUN_00539AD0)
    *
    * What it does:

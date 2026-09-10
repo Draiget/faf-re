@@ -372,17 +372,6 @@ namespace
   }
 
   /**
-   * Address: 0x004AC080 (FUN_004AC080)
-   *
-   * What it does:
-   * Returns one raw dword lane from caller-provided storage.
-   */
-  std::uintptr_t ReadDwordSlot(const std::uintptr_t* const dwordSlot) noexcept
-  {
-    return *dwordSlot;
-  }
-
-  /**
    * Address: 0x004AC310 (FUN_004AC310)
    *
    * What it does:
@@ -905,17 +894,6 @@ namespace
   }
 
   /**
-   * Address: 0x004ADBE0 (FUN_004ADBE0)
-   *
-   * What it does:
-   * Reads one dword lane from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLane_004ADBE0(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
    * Address: 0x004ADBF0 (FUN_004ADBF0)
    *
    * What it does:
@@ -927,17 +905,6 @@ namespace
   ) noexcept
   {
     return StoreDwordLane_004ADB90(outValue, value);
-  }
-
-  /**
-   * Address: 0x004ADC00 (FUN_004ADC00)
-   *
-   * What it does:
-   * Duplicate lane that reads one dword from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLane_004ADC00(const std::uint32_t* const valueSlot) noexcept
-  {
-    return ReadDwordLane_004ADBE0(valueSlot);
   }
 
   /**
@@ -967,17 +934,6 @@ namespace
   ) noexcept
   {
     return StoreDwordLane_004ADB90(outValue, value);
-  }
-
-  /**
-   * Address: 0x004ADC80 (FUN_004ADC80)
-   *
-   * What it does:
-   * Duplicate lane that reads one dword from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLane_004ADC80(const std::uint32_t* const valueSlot) noexcept
-  {
-    return ReadDwordLane_004ADBE0(valueSlot);
   }
 
   /**
@@ -1108,17 +1064,6 @@ namespace
   }
 
   /**
-   * Address: 0x004ACBB0 (FUN_004ACBB0)
-   *
-   * What it does:
-   * Reads one dword lane from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLaneVariant1(const std::uint32_t* const dwordSlot) noexcept
-  {
-    return *dwordSlot;
-  }
-
-  /**
    * Address: 0x004ACC30 (FUN_004ACC30)
    *
    * What it does:
@@ -1129,28 +1074,6 @@ namespace
     const auto* const base = reinterpret_cast<const std::uint8_t*>(*slot);
     *slot = *reinterpret_cast<const std::uint32_t*>(base + 0x04);
     return slot;
-  }
-
-  /**
-   * Address: 0x004ACC40 (FUN_004ACC40)
-   *
-   * What it does:
-   * Reads one dword lane from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLaneVariant2(const std::uint32_t* const dwordSlot) noexcept
-  {
-    return *dwordSlot;
-  }
-
-  /**
-   * Address: 0x004ACC50 (FUN_004ACC50)
-   *
-   * What it does:
-   * Duplicate lane that reads one dword from caller-provided storage.
-   */
-  std::uint32_t ReadDwordLaneVariant3(const std::uint32_t* const dwordSlot) noexcept
-  {
-    return ReadDwordLaneVariant2(dwordSlot);
   }
 
   struct LegacyPointerHeader4_004ACC70

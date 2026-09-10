@@ -2130,18 +2130,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063C010 (FUN_0063C010)
-   *
-   * What it does:
-   * Writes one single-pointer slot lane.
-   */
-  PointerSlotRuntimeView* SetPointerSlotValue(PointerSlotRuntimeView* const slot, const std::uintptr_t value)
-  {
-    slot->mValue = value;
-    return slot;
-  }
-
-  /**
    * Address: 0x0062FC70 (FUN_0062FC70, ??1IAniManipulator@Moho@@UAE@XZ)
    */
   IAniManipulator::~IAniManipulator()
