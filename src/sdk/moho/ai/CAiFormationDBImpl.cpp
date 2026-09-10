@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -245,98 +246,6 @@ namespace
     return hasNonAirBucket ? 2 : 1;
   }
 
-  void UnlinkLinkedIUnitRef(SFormationLinkedUnitRef& linkRef) noexcept
-  {
-    if (!linkRef.ownerChainHead) {
-      return;
-    }
-
-    std::uint32_t* cursor = linkRef.ownerChainHead;
-    const std::uint32_t selfWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&linkRef));
-    while (*cursor != selfWord) {
-      cursor = SFormationLinkedUnitRef::NextChainLinkSlot(*cursor);
-    }
-
-    *cursor = linkRef.nextChainLink;
-    linkRef.ownerChainHead = nullptr;
-    linkRef.nextChainLink = 0;
-  }
-
-  class ScopedLinkedIUnitRefs final
-  {
-  public:
-    explicit ScopedLinkedIUnitRefs(const SWeakUnitRefList* const unitWeakSet)
-    {
-      if (!unitWeakSet) {
-        return;
-      }
-
-      const SFormationUnitWeakRef* const begin = unitWeakSet->begin();
-      const SFormationUnitWeakRef* const end = unitWeakSet->end();
-      if (!begin || begin == end) {
-        return;
-      }
-
-      const std::size_t count = static_cast<std::size_t>(end - begin);
-      mLinkedRefs.Reserve(count);
-      for (const SFormationUnitWeakRef* src = begin; src != end; ++src) {
-        SFormationLinkedUnitRef linkedValue{};
-        mLinkedRefs.Append(linkedValue);
-        SFormationLinkedUnitRef& linked = mLinkedRefs.back();
-        linked.ownerChainHead = src->DecodeOwnerChainHead();
-        if (!linked.ownerChainHead) {
-          linked.nextChainLink = 0;
-          continue;
-        }
-
-        linked.nextChainLink = *linked.ownerChainHead;
-        *linked.ownerChainHead = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&linked));
-      }
-    }
-
-    ~ScopedLinkedIUnitRefs()
-    {
-      for (SFormationLinkedUnitRef* it = mLinkedRefs.begin(); it != mLinkedRefs.end(); ++it) {
-        UnlinkLinkedIUnitRef(*it);
-      }
-    }
-
-    [[nodiscard]] const gpg::fastvector_n<SFormationLinkedUnitRef, 4>& refs() const noexcept
-    {
-      return mLinkedRefs;
-    }
-
-  private:
-    gpg::fastvector_n<SFormationLinkedUnitRef, 4> mLinkedRefs;
-  };
-
-  [[nodiscard]] CAiFormationInstance* TryConstructFormationInstance(
-    CAiFormationDBImpl& formationDb,
-    const char* scriptName,
-    const SCoordsVec2* formationCenter,
-    const float orientX,
-    const float orientY,
-    const float orientZ,
-    const float orientW,
-    const int commandType,
-    const gpg::fastvector_n<SFormationLinkedUnitRef, 4>& linkedUnits
-  )
-  {
-    (void)formationDb;
-    (void)scriptName;
-    (void)formationCenter;
-    (void)orientX;
-    (void)orientY;
-    (void)orientZ;
-    (void)orientW;
-    (void)commandType;
-    (void)linkedUnits;
-
-    // Full constructor lift remains blocked on unresolved CFormationInstance path:
-    // - FUN_005694B0 (constructor)
-    // - FUN_0056B200 and dependent container helpers it initializes.
-    return nullptr;
-  }
 } // namespace
 
 /**
@@ -842,7 +751,23 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void*
 }
 
 /**
- * Address: 0x0059C120 (FUN_0059C120)
+ * Address: 0x0059C120 (FUN_0059C120, Moho::CAiFormationDBImpl::NewFormation)
+ *
+ * IDA signature:
+ * Moho::CAiFormationInstance *__thiscall Moho::CAiFormationDBImpl::NewFormation(
+ *     Moho::CAiFormationDBImpl *this, int unitSet, char *name, Wm3::Vector3f *pos,
+ *     Wm3::Quaternionf ori, int commandType);
+ *
+ * What it does:
+ * Turns every word of the caller's unit set into a live `WeakPtr<IUnit>` in
+ * a transient `fastvector_n<WeakPtr<IUnit>,4>` (0x0059C168-0x0059C224: the
+ * temporary link at 0x0059C18A, its `push_back` through `sub_56B2F0` or the
+ * inline append, and its unlink), builds the formation on the sim's rules
+ * and Lua state (`::operator new(0x330)` plus the inlined
+ * `CAiFormationInstance` constructor at 0x0059C1F6-0x0059C22B), appends it
+ * to `mFormInstances` -- even a null one, exactly as the binary does -- and
+ * returns it. The transient set's destructor is the unlink loop and heap
+ * free at 0x0059C2FB-0x0059C32E.
  */
 CAiFormationInstance* CAiFormationDBImpl::NewFormation(
   const SWeakUnitRefList* const unitWeakSet,
@@ -855,13 +780,25 @@ CAiFormationInstance* CAiFormationDBImpl::NewFormation(
   const int commandType
 )
 {
-  ScopedLinkedIUnitRefs linkedUnits(unitWeakSet);
-  CAiFormationInstance* const formation = TryConstructFormationInstance(
-    *this, scriptName, formationCenter, orientX, orientY, orientZ, orientW, commandType, linkedUnits.refs()
-  );
-  if (!formation) {
-    return nullptr;
+  gpg::fastvector_n<WeakPtr<IUnit>, 4> units;
+  for (const SFormationUnitWeakRef& ref : *unitWeakSet) {
+    units.push_back(WeakPtr<IUnit>(WeakPtr<IUnit>::DecodeOwnerObject(ref.DecodeOwnerChainHead())));
   }
+
+  // The by-value `Wm3::Quaternionf` argument spreads over four stack slots
+  // in tuple (scalar-first) order; the caller-facing floats are its named
+  // lanes, so it is reassembled here.
+  const Wm3::Quatf orientation(orientW, orientX, orientY, orientZ);
+  auto* const formation = new (std::nothrow) CAiFormationInstance(
+    mSim,
+    mSim->mRules,
+    static_cast<EUnitCommandType>(commandType),
+    mSim->mLuaState,
+    units,
+    scriptName,
+    *formationCenter,
+    orientation
+  );
 
   CAiFormationInstance* formationForAppend = formation;
   mFormInstances.Append(formationForAppend);

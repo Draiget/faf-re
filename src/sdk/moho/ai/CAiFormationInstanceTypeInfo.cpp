@@ -5,51 +5,13 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiFormationInstance.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  class CAiFormationInstanceTypeInfoConstructShim final : public CAiFormationInstance
-  {
-  public:
-    SFormationLaneEntry* Func6(Unit*) override { return nullptr; }
-    SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit*, SFormationLaneEntry*) override { return dest; }
-    SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit*, SFormationLaneEntry*) override { return dest; }
-    SCoordsVec2* Func9(SCoordsVec2* dest, Unit*, SFormationLaneEntry*) override { return dest; }
-    Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit*, SFormationLaneEntry*) override { return out; }
-    float Func11(Unit*, SFormationLaneEntry*) override { return 0.0f; }
-    std::int32_t Func12(Unit*, SFormationLaneEntry*) override { return 1; }
-    float CalcFormationSpeed(Unit*, float* speedScaleOut, SFormationLaneEntry* laneEntry) override
-    {
-      if (speedScaleOut) {
-        *speedScaleOut = 0.0f;
-      }
-      return laneEntry ? laneEntry->preferredSpeed : 0.0f;
-    }
-    Unit* Func14(Unit* unit, SFormationLaneEntry*) override { return unit; }
-    void AddUnit(Unit*) override {}
-    void RemoveUnit(Unit*) override {}
-    bool Func17(Unit*, bool) const override { return false; }
-    void Update() override {}
-    Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit*) const override { return out; }
-    bool Func21(Unit*) const override { return true; }
-    SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit*) override
-    {
-      if (dest && pos) {
-        *dest = *pos;
-      }
-      return dest;
-    }
-  };
-
-  static_assert(
-    sizeof(CAiFormationInstanceTypeInfoConstructShim) == sizeof(CAiFormationInstance),
-    "CAiFormationInstanceTypeInfoConstructShim size must match CAiFormationInstance"
-  );
-
   alignas(CAiFormationInstanceTypeInfo)
   unsigned char gCAiFormationInstanceTypeInfoStorage[sizeof(CAiFormationInstanceTypeInfo)] = {};
   bool gCAiFormationInstanceTypeInfoConstructed = false;
@@ -192,25 +154,30 @@ gpg::RType* CAiFormationInstanceTypeInfo::InitializeAllocationCallbacks(gpg::RTy
 
 /**
  * Address: 0x0059D0F0 (FUN_0059D0F0, ??2CAiFormationInstance@Moho@@QAE@@Z_0)
+ *
+ * What it does:
+ * `::operator new(0x330)` followed by the inlined `CAiFormationInstance`
+ * default constructor (the base `CFormationInstance` state, the derived
+ * vtable and a null `mSim`), wrapped into a reflected reference.
  */
 gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
 {
-  auto* const object = new (std::nothrow) CAiFormationInstanceTypeInfoConstructShim();
-  if (object) {
-    object->mSim = nullptr;
-  }
+  auto* const object = new (std::nothrow) CAiFormationInstance();
   return MakeFormationInstanceRef(object);
 }
 
 /**
  * Address: 0x0059D1A0 (FUN_0059D1A0)
+ *
+ * What it does:
+ * The placement form of `NewRef`: runs the same default constructor on
+ * caller-provided storage.
  */
 gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const object = static_cast<CAiFormationInstanceTypeInfoConstructShim*>(objectStorage);
+  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
   if (object) {
-    new (object) CAiFormationInstanceTypeInfoConstructShim();
-    object->mSim = nullptr;
+    new (object) CAiFormationInstance();
   }
   return MakeFormationInstanceRef(object);
 }

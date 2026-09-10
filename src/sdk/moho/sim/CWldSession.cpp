@@ -19119,7 +19119,7 @@ namespace moho
         IUnit* const bridge = GetIUnitBridge(unit);
         Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
 
-        if (!bridge->IsDead() && instance->Func17(formationUnit, false)
+        if (!bridge->IsDead() && instance->Contains(formationUnit, false)
             && entity->GetAttachmentParent() == nullptr) {
           const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
           const RMeshBlueprint* const meshBlueprint = entity->mVariableData.mMeshBlueprint;

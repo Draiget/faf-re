@@ -235,6 +235,81 @@ namespace gpg::core
       }
       return resultLast;
     }
+
+    /**
+     * Element-lifetime primitives shared by `FastVector`, `FastVectorN` and the
+     * runtime-view helpers below.
+     *
+     * The shipped `gpg::fastvector` keeps only `[start_, end_)` as live objects:
+     * storage comes from a plain `operator new(count * sizeof(T))`, appended
+     * elements are copy-constructed in place (`_Ucopy`), dropped elements are
+     * destroyed (`_Destroy_range`) and the block goes back through
+     * `operator delete`. That is what lets a non-trivial element -- a
+     * `WeakPtr<T>` that splices itself into its target's chain, an
+     * `SOffsetInfo` that owns a map -- live in the container with no
+     * per-element bookkeeping at the call site: construction links, destruction
+     * unlinks, and nothing outside `[start_, end_)` is ever an object.
+     *
+     * Every allocation and release in this header goes through these two
+     * helpers so the block is always paired with the deallocation function it
+     * came from; never mix in `new T[]` / `delete[]`, which for a non-trivially
+     * destructible `T` hides an element-count cookie in front of the block.
+     */
+    template <class T>
+    [[nodiscard]] inline T* AllocateElements(const std::size_t count)
+    {
+      return static_cast<T*>(::operator new(count * sizeof(T)));
+    }
+
+    template <class T>
+    inline void FreeElements(T* const block) noexcept
+    {
+      ::operator delete(static_cast<void*>(block));
+    }
+
+    /**
+     * Address: 0x0056D620 (FUN_0056D620, `_Destroy_range` for
+     * `gpg::fastvector_n<Moho::SOffsetInfo, 2>` -- walks the 0x4C-byte
+     * elements forward calling `~SOffsetInfo` (0x00568360) on each; reached
+     * from that vector's destructor, `ResetStorageToInline` and the grow
+     * lane's old-range teardown)
+     * Address: 0x0056D3C0 (FUN_0056D3C0, `_Destroy_range` for
+     * `gpg::fastvector_n<Moho::WeakPtr<Moho::IUnit>, 4>` -- per element the
+     * inlined `~WeakPtr` splice-out of the owner chain; reached from every
+     * scope exit of `CFormationInstance::PreRunScript`/`Setup`/
+     * `UpdateFormation` and `CFormation::Finalize`, and from `~CFormationInstance`
+     * for `mUnits`)
+     *
+     * What it does:
+     * Destroys `[first, last)` in forward order. Nothing to do for a trivially
+     * destructible element, which is the shape every POD lane compiles to.
+     */
+    template <class T>
+    inline void DestroyRange(T* first, T* const last) noexcept
+    {
+      if constexpr (!std::is_trivially_destructible_v<T>) {
+        for (; first != last; ++first) {
+          first->~T();
+        }
+      }
+    }
+
+    /**
+     * Copy-constructs `[first, last)` into the raw storage at `dest` and returns
+     * the advanced cursor (`_Ucopy`). Advances without writing when `dest` is
+     * null, matching the binary's null-guarded lanes.
+     */
+    template <class T>
+    inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
+    {
+      for (; first != last; ++first) {
+        if (dest != nullptr) {
+          ::new (static_cast<void*>(dest)) T(*first);
+        }
+        ++dest;
+      }
+      return dest;
+    }
   } // namespace detail
 
   /**
@@ -279,9 +354,14 @@ namespace gpg::core
 
     FastVector() = default;
 
+    /**
+     * Destroys the live range and releases the block. `FastVectorN` nulls the
+     * three lanes before this runs, since its block may be the inline buffer.
+     */
     ~FastVector()
     {
-      delete[] start_;
+      detail::DestroyRange(start_, end_);
+      detail::FreeElements(start_);
     }
 
     /**
@@ -469,16 +549,17 @@ namespace gpg::core
       if (Capacity() >= n)
         return;
       const size_t oldSize = Size();
-      T* newBuf = new T[n];
+      T* newBuf = detail::AllocateElements<T>(n);
       // Trivially copyable path
       if constexpr (std::is_trivially_copyable_v<T>) {
         if (oldSize)
           std::memcpy(newBuf, start_, oldSize * elem_);
       } else {
         for (size_t i = 0; i < oldSize; ++i)
-          newBuf[i] = std::move(start_[i]);
+          ::new (static_cast<void*>(newBuf + i)) T(std::move(start_[i]));
+        detail::DestroyRange(start_, end_);
       }
-      delete[] start_;
+      detail::FreeElements(start_);
       start_ = newBuf;
       end_ = newBuf + oldSize;
       capacity_ = newBuf + n;
@@ -493,7 +574,8 @@ namespace gpg::core
         const size_t newCap = Capacity() ? Capacity() * 2 : 4;
         Reserve(newCap);
       }
-      *end_++ = v;
+      ::new (static_cast<void*>(end_)) T(v);
+      ++end_;
     }
 
     void reserve(const size_t n)
@@ -523,7 +605,9 @@ namespace gpg::core
     {
       const size_t current = Size();
       if (n <= current) {
-        end_ = ptr_at(start_, n);
+        T* const newEnd = ptr_at(start_, n);
+        detail::DestroyRange(newEnd, end_);
+        end_ = newEnd;
         return;
       }
 
@@ -532,7 +616,7 @@ namespace gpg::core
         std::memset(ptr_at(start_, current), 0, (n - current) * elem_);
       } else {
         for (size_t i = current; i < n; ++i) {
-          start_[i] = T{};
+          ::new (static_cast<void*>(start_ + i)) T();
         }
       }
       end_ = ptr_at(start_, n);
@@ -542,13 +626,15 @@ namespace gpg::core
     {
       const size_t current = Size();
       if (n <= current) {
-        end_ = ptr_at(start_, n);
+        T* const newEnd = ptr_at(start_, n);
+        detail::DestroyRange(newEnd, end_);
+        end_ = newEnd;
         return;
       }
 
       Reserve(n);
       for (size_t i = current; i < n; ++i) {
-        start_[i] = value;
+        ::new (static_cast<void*>(start_ + i)) T(value);
       }
       end_ = ptr_at(start_, n);
     }
@@ -558,6 +644,10 @@ namespace gpg::core
       return erase(pos, pos + 1);
     }
 
+    /**
+     * Address: 0x0056F0A0 (FUN_0056F0A0 -- `erase(first, last)` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): the assign-forward shift followed by the tail destroy, reached from that vector's shrinking `Resize`.)
+     * Address: 0x005716D0 (FUN_005716D0 -- the `std::copy` emission over `SOffsetInfo::operator=` that the shift loop below compiles to for that instantiation.)
+     */
     iterator erase(iterator first, iterator last)
     {
       if (!first || !last || first < start_ || first > end_ || last < first || last > end_) {
@@ -572,13 +662,15 @@ namespace gpg::core
       while (read != end_) {
         *write++ = std::move(*read++);
       }
+      detail::DestroyRange(write, end_);
       end_ = write;
       return first;
     }
 
-    /** Clears size to zero without releasing memory. */
+    /** Destroys every element; keeps the storage. */
     void Clear() noexcept
     {
+      detail::DestroyRange(start_, end_);
       end_ = start_;
     }
 
@@ -651,7 +743,8 @@ namespace gpg::core
     FastVector& operator=(FastVector&& other) noexcept
     {
       if (this != &other) {
-        delete[] start_;
+        detail::DestroyRange(start_, end_);
+        detail::FreeElements(start_);
         start_ = other.start_;
         end_ = other.end_;
         capacity_ = other.capacity_;
@@ -690,7 +783,24 @@ namespace gpg::core
 
   public:
     T* originalVec_{};
-    alignas(T) T inlineVec_[N];
+    /**
+     * The inline window is raw, suitably aligned storage -- not `T[N]`. Only
+     * `[start_, end_)` ever holds objects, exactly as in the shipped container:
+     * a slot past `end_` is bytes, whether it sits here or on the heap. That is
+     * what makes non-trivial elements (`WeakPtr<T>`, `SOffsetInfo`, strings)
+     * safe: an abandoned inline slot after a heap grow is not a live object
+     * whose destructor would run a second time.
+     */
+    alignas(T) std::byte inlineVec_[N * ElemSize];
+
+    [[nodiscard]] T* InlineStorage() noexcept
+    {
+      return reinterpret_cast<T*>(inlineVec_);
+    }
+    [[nodiscard]] const T* InlineStorage() const noexcept
+    {
+      return reinterpret_cast<const T*>(inlineVec_);
+    }
 
     /**
      * Address: 0x0047EF60 (FUN_0047EF60, fastvector_n64_char ctor lane)
@@ -702,10 +812,10 @@ namespace gpg::core
      */
     FastVectorN()
     {
-      this->start_ = inlineVec_;
-      this->end_ = inlineVec_;
-      this->capacity_ = inlineVec_ + N;
-      originalVec_ = inlineVec_;
+      this->start_ = InlineStorage();
+      this->end_ = InlineStorage();
+      this->capacity_ = InlineStorage() + N;
+      originalVec_ = InlineStorage();
       SaveInlineCapacity_();
     }
 
@@ -769,6 +879,7 @@ namespace gpg::core
      * mBuildTemplates;`, CWldSession.cpp) rather than placement-constructs,
      * reaching this same `ResetFrom` machinery through `operator=` instead
      * -- identical end state, without constructing over a live object.)
+     * Address: 0x0056B200 (FUN_0056B200, sub_56B200 -- the copy constructor of `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08): `mUnits(units)` in `CFormationInstance::CFormationInstance` (0x005694B0); each copied `WeakPtr<IUnit>` relinks into its unit's weak chain.)
      */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
@@ -820,7 +931,7 @@ namespace gpg::core
         other.RebindInlineNoFree();
       } else {
         this->ResetFrom(other);
-        other.end_ = other.start_;
+        other.ResetInline_();
       }
     }
 
@@ -838,8 +949,9 @@ namespace gpg::core
     {
       if (this != &other) {
         if (other.start_ != other.originalVec_) {
+          detail::DestroyRange(this->start_, this->end_);
           if (this->start_ != this->originalVec_) {
-            delete[] this->start_;
+            detail::FreeElements(this->start_);
           }
           this->start_ = other.start_;
           this->end_ = other.end_;
@@ -847,17 +959,26 @@ namespace gpg::core
           other.RebindInlineNoFree();
         } else {
           this->ResetFrom(other);
-          other.end_ = other.start_;
+          other.ResetInline_();
         }
       }
       return *this;
     }
 
+    /**
+     * Address: 0x00401DE0 (FUN_00401DE0, gpg::fastvector_n2_uint::~fastvector_n2_uint)
+     *
+     * What it does:
+     * Destroys the live range, releases the heap block when one is active (the
+     * inline buffer is never freed) and nulls the lanes so the base destructor
+     * has nothing left to do.
+     * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
+     */
     ~FastVectorN()
     {
-      // Free heap only; inline buffer must not be freed
+      detail::DestroyRange(this->start_, this->end_);
       if (this->start_ && this->start_ != originalVec_) {
-        delete[] this->start_;
+        detail::FreeElements(this->start_);
       }
       // Prevent Base dtor from touching inline storage
       this->start_ = this->end_ = this->capacity_ = nullptr;
@@ -995,6 +1116,7 @@ namespace gpg::core
      * grow-full arm forwards to `InsertAt` (0x006AEAD0). Reached from
      * `Moho::Unit::GetExtraData`'s `out->pairs.PushBack(pair)` calls,
      * Unit.cpp.)
+     * Address: 0x0056B590 (FUN_0056B590 -- `push_back` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): `mOffsetInfo[layerIndex].push_back(group)` at the end of `CFormationInstance::RunScript`.)
      */
     void push_back(const T& value)
     {
@@ -1022,7 +1144,7 @@ namespace gpg::core
       }
 
       if (this->end_ != nullptr) {
-        *this->end_ = value;
+        ::new (static_cast<void*>(this->end_)) T(value);
       }
       ++this->end_;
     }
@@ -1034,12 +1156,16 @@ namespace gpg::core
      * What it does:
      * Resizes logical element count, growing storage when needed and filling
      * appended slots with `fill`.
+     * Address: 0x0056D500 (FUN_0056D500 -- `Resize` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): `groups.Resize(count, SOffsetInfo())` in `SetFastVectorSOffsetInfoCount`/`LoadFastVectorSOffsetInfo` (CAiFormationInstance.cpp).)
+     * Address: 0x0056D650 (FUN_0056D650 -- `Resize` for `gpg::fastvector_n<moho::SAssignedLocInfo, 16>` (`CFormationInstance::mSlots`, element 0x10): `slots.Resize(count, SAssignedLocInfo{})` in `SetFastVectorSAssignedLocInfoCount`/`LoadFastVectorSAssignedLocInfo`; the trivially-copyable 0x10 element is filled as four raw dwords (0x0056D67F-0x0056D691).)
      */
     void Resize(size_t newSize, const T& fill = T{})
     {
       const size_t sz = this->Size();
       if (newSize < sz) {
-        this->end_ = this->start_ + newSize;
+        T* const newEnd = this->start_ + newSize;
+        detail::DestroyRange(newEnd, this->end_);
+        this->end_ = newEnd;
         return;
       }
       if (newSize == sz) {
@@ -1054,9 +1180,7 @@ namespace gpg::core
         T* const slot = this->end_;
         this->end_ = slot + 1;
         if (slot) {
-          if constexpr (std::is_copy_assignable_v<T>) {
-            *slot = fill;
-          } else if constexpr (std::is_copy_constructible_v<T>) {
+          if constexpr (std::is_copy_constructible_v<T>) {
             ::new (static_cast<void*>(slot)) T(fill);
           } else {
             ::new (static_cast<void*>(slot)) T();
@@ -1081,7 +1205,11 @@ namespace gpg::core
      * `push_back`/`InsertAt` under the same call convention as the other
      * pointer-element lanes cited above)
      * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
-     * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::SFormationLinkedUnitRef, 4>::InsertAt)
+     * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::WeakPtr<Moho::IUnit>, 4>::InsertAt --
+     * the `push_back` grow arm of `CFormationInstance::mUnits` and of the
+     * transient unit sets `PreRunScript`/`UpdateFormation`/`NewFormation`
+     * build; its per-element copies are the relinking `WeakPtr` copy
+     * constructor, so it takes the deep-copy path below)
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
      * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::InsertAt)
@@ -1121,11 +1249,12 @@ namespace gpg::core
      * Two distinct emissions share this template, gated on element triviality:
      *  - Trivially-relocatable T (char @0x0047C590; the pointer lanes Entity ptr
      *    @0x0057FE30 and UserEntity ptr @0x005050A0; and the POD structs
-     *    SAssignedLocInfo @0x0059CC10, SFormationLinkedUnitRef @0x0056B2F0) blit
+     *    SAssignedLocInfo @0x0059CC10) blit
      *    the tail with memcpy/memmove (the fast path below).
      *  - Deep-copy T (msvc8::string @0x0083B6F0, LuaPlus::LuaObject @0x004C7EB0,
      *    boost::shared_ptr<CMauiFrame> @0x0084E570, SFormationRunScriptCandidate
-     *    @0x0056E620) must NOT relocate raw bytes
+     *    @0x0056E620, WeakPtr<IUnit> @0x0056B2F0, SOffsetInfo @0x0056D3F0) must
+     *    NOT relocate raw bytes
      *    (that would shallow-copy owned heap pointers and double-free). Those
      *    emissions shift elements one at a time via copy-construct
      *    (UninitializedCopyForward, binary _Ucopy) into the freshly grown tail
@@ -1133,6 +1262,7 @@ namespace gpg::core
      *    live slots, mirroring std::vector::insert on a non-trivial value type.
      *    The branch structure (fits-in-tail vs. spills-past-end vs. grow) is
      *    identical across both emissions; only the per-element operation differs.
+     * Address: 0x0056D3F0 (FUN_0056D3F0 -- `InsertAt` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the grow arm of its `push_back`/`Resize`; deep-copy path.)
      */
     void InsertAt(T* pos, const T* insStart, const T* insEnd)
     {
@@ -1281,7 +1411,7 @@ namespace gpg::core
         this->InsertAt(this->end_, &o, &o + 1);
       } else {
         if (this->end_ != nullptr) {
-          *this->end_ = o;
+          ::new (static_cast<void*>(this->end_)) T(o);
         }
         ++this->end_;
       }
@@ -1329,6 +1459,7 @@ namespace gpg::core
         GrowToCapacity(sourceCount);
       }
 
+      detail::DestroyRange(this->start_, this->end_);
       this->end_ = this->start_;
       for (const T* it = source->start_; it != source->end_; ++it) {
         push_back(*it);
@@ -1388,10 +1519,10 @@ namespace gpg::core
      */
     void RebindInlineNoFree() noexcept
     {
-      originalVec_ = inlineVec_;
-      this->start_ = inlineVec_;
-      this->end_ = inlineVec_;
-      this->capacity_ = inlineVec_ + N;
+      originalVec_ = InlineStorage();
+      this->start_ = InlineStorage();
+      this->end_ = InlineStorage();
+      this->capacity_ = InlineStorage() + N;
     }
 
     /**
@@ -1540,6 +1671,8 @@ namespace gpg::core
      * `assign`s the source string; expressed here as placement-new copy so
      * owned heap buffers are deep-copied, never aliased. Advances without
      * writing when `dest == nullptr`, matching the binary's null-guarded lane.
+     * Address: 0x0056F1F0 (FUN_0056F1F0 -- `_Ucopy` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the copy-construct step of its `GrowInsertDeepCopy`/`InsertAt`.)
+     * Address: 0x0056D390 (FUN_0056D390 -- `_Ucopy` for `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08), the relinking copy-construct step of its `InsertAt` (0x0056B2F0).)
      */
     static T* UninitializedCopyForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
@@ -1582,6 +1715,8 @@ namespace gpg::core
      * takes the grow branch to `GrowInsertDeepCopy` instead) but is still
      * part of `InsertAt`'s one compiled body for this element type, which
      * this template reproduces branch-for-branch.)
+     * Address: 0x00571150 (FUN_00571150 -- `_Copy_backward` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the in-place tail shift of its `InsertAt`.)
+     * Address: 0x00571180 (FUN_00571180 -- a second, byte-identical emission of the same `_Copy_backward` the linker kept distinct.)
      */
     static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
     {
@@ -1608,7 +1743,7 @@ namespace gpg::core
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
 
-      T* const newBuffer = new T[newCapacity];
+      T* const newBuffer = detail::AllocateElements<T>(newCapacity);
 
       auto* const newBegin = reinterpret_cast<IntrusiveWeakLinkNode*>(newBuffer);
       const auto* const oldStartNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(oldStart);
@@ -1630,7 +1765,7 @@ namespace gpg::core
       if (oldStart == originalVec_) {
         SaveInlineCapacity_();
       } else {
-        delete[] oldStart;
+        detail::FreeElements(oldStart);
       }
 
       this->start_ = newBuffer;
@@ -1674,47 +1809,43 @@ namespace gpg::core
      *
      * What it does:
      * Deep-copy grow-and-insert for non-trivially-relocatable T (the reallocate
-     * arm of FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570). Allocates a typed
-     * `newCapacity` buffer and copy-ASSIGNS the three slices
-     * `[start, pos) + [insStart, insEnd) + [pos, end)` into it, so each element's
-     * owned storage is deep-copied (never aliased). The binary emits raw
-     * `operator new` + `_Ucopy` (construct) + `_Destroy_range`; in this typed
-      * reconstruction the `new T[]` slots are default-constructed and then
-      * copy-assigned. The old live range is destroyed immediately after the
-      * copies succeed (including inline-origin elements), matching the binary's
-      * `_Destroy_range`; inline C++ subobjects are reconstructed empty so the
-      * enclosing array remains safely destructible. A `unique_ptr` owns the
-      * replacement through every throwing copy, preserving unwind cleanup and
-      * leaving the vector unchanged until all copies complete.
+     * arm of FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570). Exactly the shipped
+     * shape: raw `operator new(newCapacity * sizeof(T))`, the three slices
+     * `[start, pos) + [insStart, insEnd) + [pos, end)` copy-CONSTRUCTED into it
+     * (`_Ucopy`), the old live range destroyed (`_Destroy_range`), and the old
+     * block released -- or, when the old range was the inline window, its
+     * capacity sentinel restamped. Should a copy throw, the elements already
+     * built in the new block are torn down, the block is freed and the vector
+     * is left untouched.
+     * Address: 0x0056F100 (FUN_0056F100 -- the reallocating insert for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): three `_Ucopy` passes (0x0056F1F0) into the new block, destroy of the old range (0x0056D620) and the inline-capacity save.)
      */
     void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
 
-      std::unique_ptr<T[]> replacement{new T[newCapacity]};
-      T* const newBuffer = replacement.get();
-      T* write = CopyRangeForward(newBuffer, oldStart, pos);
-      write = CopyRangeForward(write, insStart, insEnd);
-      write = CopyRangeForward(write, pos, oldEnd);
+      T* const newBuffer = detail::AllocateElements<T>(newCapacity);
+      T* write = newBuffer;
+      try {
+        write = UninitializedCopyForward(write, oldStart, pos);
+        write = UninitializedCopyForward(write, insStart, insEnd);
+        write = UninitializedCopyForward(write, pos, oldEnd);
+      } catch (...) {
+        detail::DestroyRange(newBuffer, write);
+        detail::FreeElements(newBuffer);
+        throw;
+      }
 
+      detail::DestroyRange(oldStart, oldEnd);
       if (oldStart == originalVec_) {
-        // The inline array remains a live C++ subobject after switching to heap
-        // storage. Destroy the displaced values now, exactly where the binary's
-        // `_Destroy_range` runs, then reconstruct empty slots so the enclosing
-        // array can still be destroyed safely at scope exit.
-        for (T* value = oldStart; value != oldEnd; ++value) {
-          value->~T();
-          ::new (static_cast<void*>(value)) T();
-        }
+        SaveInlineCapacity_();
       } else {
-        delete[] oldStart;
+        detail::FreeElements(oldStart);
       }
 
       this->start_ = newBuffer;
       this->end_ = write;
       this->capacity_ = newBuffer + newCapacity;
-      (void)replacement.release();
     }
 
     /**
@@ -1764,32 +1895,42 @@ namespace gpg::core
      * What it does:
      * Allocates `newCapacity` elements and materializes
      * `[start, pos) + [insStart, insEnd) + [pos, end)` in the new storage.
+     * A non-trivially-copyable element takes the construct-and-destroy lane
+     * (`GrowInsertDeepCopy`); the bitwise relocation below is the POD emission.
      */
     void GrowInsert(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
-      T* const newBuffer = new T[newCapacity];
-      T* write = CopyRangeForward(newBuffer, this->start_, pos);
-      write = CopyRangeForward(write, insStart, insEnd);
-      write = CopyRangeForward(write, pos, this->end_);
-
-      if (this->start_ == originalVec_) {
-        SaveInlineCapacity_();
+      if constexpr (!std::is_trivially_copyable_v<T>) {
+        GrowInsertDeepCopy(pos, newCapacity, insStart, insEnd);
+        return;
       } else {
-        delete[] this->start_;
-      }
+        T* const newBuffer = detail::AllocateElements<T>(newCapacity);
+        T* write = CopyRangeForward(newBuffer, this->start_, pos);
+        write = CopyRangeForward(write, insStart, insEnd);
+        write = CopyRangeForward(write, pos, this->end_);
 
-      this->start_ = newBuffer;
-      this->end_ = write;
-      this->capacity_ = newBuffer + newCapacity;
+        if (this->start_ == originalVec_) {
+          SaveInlineCapacity_();
+        } else {
+          detail::FreeElements(this->start_);
+        }
+
+        this->start_ = newBuffer;
+        this->end_ = write;
+        this->capacity_ = newBuffer + newCapacity;
+      }
     }
 
     /**
-     * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue)
+     * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue):
+     * destroy the live range, release the heap block if one is active and
+     * restore the inline window from its saved capacity sentinel.
      */
     void ResetInline_() noexcept
     {
+      detail::DestroyRange(this->start_, this->end_);
       if (this->start_ != originalVec_) {
-        delete[] this->start_;
+        detail::FreeElements(this->start_);
         this->start_ = originalVec_;
         this->capacity_ = InlineCapacityFromHeader_();
       }
@@ -1874,29 +2015,34 @@ namespace gpg::core
         return;
       }
 
+      // Callers reach here straight after `ResetInline_()`, so the live range is
+      // empty and every slot written below is raw storage to construct into.
       if (count <= N) {
         if constexpr (std::is_trivially_copyable_v<T>) {
           std::memcpy(this->start_, src, count * ElemSize);
         } else {
-          for (size_t i = 0; i < count; ++i)
-            this->start_[i] = src[i];
+          (void)detail::ConstructRangeForward(this->start_, src, src + count);
         }
         this->end_ = this->start_ + count;
         return;
       }
 
       // Need heap buffer of exact count (matches engine's "capacity_ = start_ + count")
-      T* p = new T[count];
+      T* p = detail::AllocateElements<T>(count);
       if constexpr (std::is_trivially_copyable_v<T>) {
         std::memcpy(p, src, count * ElemSize);
       } else {
-        for (size_t i = 0; i < count; ++i)
-          p[i] = src[i];
+        try {
+          (void)detail::ConstructRangeForward(p, src, src + count);
+        } catch (...) {
+          detail::FreeElements(p);
+          throw;
+        }
       }
 
       // Free previous heap buffer only if not using inline storage
       if (this->start_ && this->start_ != originalVec_) {
-        delete[] this->start_;
+        detail::FreeElements(this->start_);
       } else if (this->start_ == originalVec_) {
         SaveInlineCapacity_();
       }
@@ -1910,18 +2056,19 @@ namespace gpg::core
     void GrowToCapacity(size_t newCap)
     {
       const size_t sz = this->Size();
-      T* newBuf = new T[newCap];
+      T* newBuf = detail::AllocateElements<T>(newCap);
 
       if constexpr (std::is_trivially_copyable_v<T>) {
         if (sz)
           std::memcpy(newBuf, this->start_, sz * ElemSize);
       } else {
         for (size_t i = 0; i < sz; ++i)
-          newBuf[i] = std::move(this->start_[i]);
+          ::new (static_cast<void*>(newBuf + i)) T(std::move(this->start_[i]));
+        detail::DestroyRange(this->start_, this->end_);
       }
 
       if (this->start_ != originalVec_) {
-        delete[] this->start_;
+        detail::FreeElements(this->start_);
       } else {
         SaveInlineCapacity_();
       }
@@ -1973,10 +2120,10 @@ namespace gpg::core
     template <class T, std::size_t N>
     [[nodiscard]] inline FastVectorN<T, N>& InitializeInlineStorage(FastVectorN<T, N>& vec) noexcept
     {
-      vec.originalVec_ = vec.inlineVec_;
-      vec.start_ = vec.inlineVec_;
-      vec.end_ = vec.inlineVec_;
-      vec.capacity_ = vec.inlineVec_ + N;
+      vec.originalVec_ = vec.InlineStorage();
+      vec.start_ = vec.InlineStorage();
+      vec.end_ = vec.InlineStorage();
+      vec.capacity_ = vec.InlineStorage() + N;
       return vec;
     }
 
@@ -2144,7 +2291,7 @@ namespace gpg::core
         std::is_trivially_copyable_v<T>, "Legacy fastvector ABI helpers require trivially copyable element types."
       );
 
-      auto* const newStart = new T[requestedCapacity];
+      auto* const newStart = detail::AllocateElements<T>(requestedCapacity);
       T* cursor = newStart;
       cursor = CopyRangeForward(cursor, vec.start_, splitPos);
       cursor = CopyRangeForward(cursor, insertBegin, insertEnd);
@@ -2153,7 +2300,7 @@ namespace gpg::core
       if (inlineOrigin && vec.start_ == inlineOrigin) {
         *reinterpret_cast<T**>(inlineOrigin) = vec.capacity_;
       } else if (vec.start_) {
-        ::operator delete[](vec.start_);
+        detail::FreeElements(vec.start_);
       }
 
       vec.start_ = newStart;
@@ -2523,17 +2670,28 @@ namespace gpg
     T* const oldEnd = view.end;
     T* const oldCapacityEnd = view.capacityEnd;
 
-    T* const newBegin = new T[newCapacity];
+    T* const newBegin = core::detail::AllocateElements<T>(newCapacity);
     T* write = newBegin;
 
-    if (oldBegin && insertPos && insertPos >= oldBegin && insertPos <= oldEnd) {
-      write = FastVectorRuntimeCopyRange(write, oldBegin, insertPos);
-    }
-    write = FastVectorRuntimeCopyRange(write, sourceBegin, sourceEnd);
-    if (oldBegin && insertPos && insertPos >= oldBegin && insertPos <= oldEnd) {
-      write = FastVectorRuntimeCopyRange(write, insertPos, oldEnd);
+    const bool insertInsideOld = oldBegin && insertPos && insertPos >= oldBegin && insertPos <= oldEnd;
+    try {
+      if (insertInsideOld) {
+        write = FastVectorRuntimeCopyRange(write, oldBegin, insertPos);
+      }
+      write = FastVectorRuntimeCopyRange(write, sourceBegin, sourceEnd);
+      if (insertInsideOld) {
+        write = FastVectorRuntimeCopyRange(write, insertPos, oldEnd);
+      }
+    } catch (...) {
+      core::detail::DestroyRange(newBegin, write);
+      core::detail::FreeElements(newBegin);
+      throw;
     }
 
+    // The old range is dead once its values live in the new block (binary
+    // `_Destroy_range`), then the block is released or -- for the inline
+    // window -- its capacity sentinel is restamped before rebinding.
+    core::detail::DestroyRange(oldBegin, oldEnd);
     T* const inlineBegin = reinterpret_cast<T*>(view.metadata);
     if (oldBegin == inlineBegin) {
       // Binary path stores prior inline-capacity sentinel before rebinding.
@@ -2541,7 +2699,7 @@ namespace gpg
         *reinterpret_cast<T**>(inlineBegin) = oldCapacityEnd;
       }
     } else {
-      delete[] oldBegin;
+      core::detail::FreeElements(oldBegin);
     }
 
     view.begin = newBegin;
@@ -2696,10 +2854,21 @@ namespace gpg
       (source.begin && source.end) ? static_cast<std::size_t>(source.end - source.begin) : 0u;
 
     if (destinationSize >= sourceSize) {
+      // Overwrite the live prefix in place and drop the surplus tail: an
+      // element-wise assign for a value type that owns storage, a block move
+      // for a POD lane, then `_Destroy_range` over `[sourceSize, destinationSize)`.
       if (sourceSize > 0) {
-        std::memmove(destination.begin, source.begin, sourceSize * sizeof(T));
+        if constexpr (std::is_trivially_copyable_v<T>) {
+          std::memmove(destination.begin, source.begin, sourceSize * sizeof(T));
+        } else {
+          for (std::size_t index = 0; index < sourceSize; ++index) {
+            destination.begin[index] = source.begin[index];
+          }
+        }
       }
-      destination.end = destination.begin + sourceSize;
+      T* const newEnd = destination.begin + sourceSize;
+      core::detail::DestroyRange(newEnd, destination.end);
+      destination.end = newEnd;
       return &destination;
     }
 
@@ -2713,7 +2882,13 @@ namespace gpg
     }
 
     if (destinationSize > 0) {
-      std::memmove(destination.begin, source.begin, destinationSize * sizeof(T));
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(destination.begin, source.begin, destinationSize * sizeof(T));
+      } else {
+        for (std::size_t index = 0; index < destinationSize; ++index) {
+          destination.begin[index] = source.begin[index];
+        }
+      }
     }
 
     FastVectorRuntimeInsertRange(
@@ -2791,12 +2966,13 @@ namespace gpg
   {
     T* const currentBegin = view.begin;
     T* const inlineBegin = reinterpret_cast<T*>(view.metadata);
+    core::detail::DestroyRange(currentBegin, view.end);
     if (currentBegin == inlineBegin) {
       view.end = currentBegin;
       return;
     }
 
-    delete[] currentBegin;
+    core::detail::FreeElements(currentBegin);
     view.begin = inlineBegin;
     view.capacityEnd = inlineBegin ? *reinterpret_cast<T* const*>(inlineBegin) : nullptr;
     view.end = view.begin;
@@ -2812,10 +2988,10 @@ namespace gpg
   template <class T>
   [[nodiscard]] inline fastvector_n<T, 2>& FastVectorN2InitInlineNoHeader(fastvector_n<T, 2>& storage) noexcept
   {
-    storage.start_ = storage.inlineVec_;
-    storage.end_ = storage.inlineVec_;
-    storage.capacity_ = storage.inlineVec_ + 2;
-    storage.originalVec_ = storage.inlineVec_;
+    storage.start_ = storage.InlineStorage();
+    storage.end_ = storage.InlineStorage();
+    storage.capacity_ = storage.InlineStorage() + 2;
+    storage.originalVec_ = storage.InlineStorage();
     return storage;
   }
 
@@ -2864,7 +3040,9 @@ namespace gpg
     const std::size_t currentSize = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
 
     if (newSize < currentSize) {
-      view.end = view.begin + newSize;
+      T* const newEnd = view.begin + newSize;
+      core::detail::DestroyRange(newEnd, view.end);
+      view.end = newEnd;
       return;
     }
 
@@ -2877,9 +3055,7 @@ namespace gpg
       T* const slot = view.end;
       view.end = slot + 1;
       if (slot) {
-        if constexpr (std::is_copy_assignable_v<T>) {
-          *slot = fill;
-        } else if constexpr (std::is_copy_constructible_v<T>) {
+        if constexpr (std::is_copy_constructible_v<T>) {
           ::new (static_cast<void*>(slot)) T(fill);
         } else {
           ::new (static_cast<void*>(slot)) T();

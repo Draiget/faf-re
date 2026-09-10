@@ -1426,28 +1426,9 @@ namespace
     return reinterpret_cast<CEconomyEvent*>(rawNode - offsetof(CEconomyEvent, mUnitEventNode));
   }
 
-  /**
-   * Address: 0x00552C10 (FUN_00552C10, func_UnitStateIsBusy)
-   *
-   * What it does:
-   * Returns whether `commandType` is one of the movement/engagement command
-   * families that keep air-unit speed-through navigation active.
-   */
-  [[nodiscard]] bool IsSpeedThroughBusyCommandType(const EUnitCommandType commandType) noexcept
-  {
-    switch (commandType) {
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_Guard:
-        return true;
-      default:
-        return false;
-    }
-  }
+  // `IsSpeedThroughBusyCommandType` (0x00552C10, func_UnitStateIsBusy) lives
+  // in moho/command/SSTICommandVariableData.cpp next to the command type it
+  // classifies; the formation code calls it too.
 
   [[nodiscard]] gpg::RRef MakeUnitStateRef(EUnitState* const unitState)
   {
@@ -13174,7 +13155,7 @@ void Unit::UpdateGuardFormation()
     previousFormation->operator_delete(1);
   }
 
-  newFormation->Func22(1.0f);
+  newFormation->SetScale(1.0f);
 }
 
 /**
@@ -15351,7 +15332,7 @@ void Unit::UpdateBlipsInRange()
   // Guard (0x0F) anyway.
   float scanRadius = 0.0f;
   CUnitCommand* const headCommand = CommandQueue->GetCurrentCommand();
-  if (headCommand != nullptr && (headCommand->mVarDat.mEntIds.inlineVec_[1] & 0x30) != 0) {
+  if (headCommand != nullptr && (headCommand->mVarDat.mEntIds.InlineStorage()[1] & 0x30) != 0) {
     scanRadius = blueprint->AI.GuardScanRadius;
   }
 
@@ -15691,7 +15672,7 @@ Wm3::Vector3f Unit::GetFormationVector() const
 
   const auto* const formationLayer = reinterpret_cast<const CAiFormationInstance*>(mInfoCache.mFormationLayer);
   if (formationLayer != nullptr && formationLayer->CommandIsForm()) {
-    formationLayer->Func19(&result, const_cast<Unit*>(this));
+    formationLayer->GetForwardVector(&result, const_cast<Unit*>(this));
   }
 
   return result;
@@ -15720,7 +15701,7 @@ IFormationInstance* Unit::GetFormation() const
     CUnitCommand* const currentCommand = commandQueue->mCommandVec.front().GetObjectPtr();
     if (currentCommand != nullptr) {
       CAiFormationInstance* const commandFormation = currentCommand->mFormationInstance;
-      if (commandFormation != nullptr && commandFormation->Func17(const_cast<Unit*>(this), true)) {
+      if (commandFormation != nullptr && commandFormation->Contains(const_cast<Unit*>(this), true)) {
         return commandFormation;
       }
     }
@@ -15743,21 +15724,21 @@ void Unit::UpdateInfoCache()
   }
 
   CAiFormationInstance* const formation = reinterpret_cast<CAiFormationInstance*>(GetFormation());
-  SFormationLaneEntry* laneEntry = nullptr;
+  SOffsetInfo* offsetInfo = nullptr;
 
-  if (formation != nullptr && formation->CommandIsForm() && formation->Func17(this, false)) {
-    laneEntry = formation->Func6(this);
+  if (formation != nullptr && formation->CommandIsForm() && formation->Contains(this, false)) {
+    offsetInfo = formation->GetOffsetInfo(this);
     mInfoCache.mFormationLayer = reinterpret_cast<CFormationInstance*>(formation);
-    mInfoCache.mHasFormationSpeedData = formation->Func21(this);
+    mInfoCache.mHasFormationSpeedData = formation->IsInFormation(this);
 
-    Unit* const formationLead = formation->Func14(this, laneEntry);
+    Unit* const formationLead = formation->GetLeader(this, offsetInfo);
     mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().Set(formationLead);
 
     Wm3::Vec3f headingHint{};
-    formation->Func10(&headingHint, this, laneEntry);
+    formation->GetTargetPosition(&headingHint, this, offsetInfo);
     mInfoCache.mFormationHeadingHint = headingHint;
-    mInfoCache.mFormationDistanceMetric = formation->Func11(this, laneEntry);
-    mInfoCache.mFormationPriorityOrder = formation->Func12(this, laneEntry);
+    mInfoCache.mFormationDistanceMetric = formation->GetDistFromLeader(this, offsetInfo);
+    mInfoCache.mFormationPriorityOrder = formation->GetPriority(this, offsetInfo);
   } else {
     mInfoCache.mFormationLayer = nullptr;
     mInfoCache.mHasFormationSpeedData = true;
@@ -15783,8 +15764,8 @@ void Unit::UpdateInfoCache()
 
   float speedScale = 1.0f;
   float clampedFormationSpeed = topSpeed;
-  if (formation != nullptr && laneEntry != nullptr) {
-    const float formationSpeed = formation->CalcFormationSpeed(this, &speedScale, laneEntry);
+  if (formation != nullptr && offsetInfo != nullptr) {
+    const float formationSpeed = formation->CalcFormationSpeed(this, &speedScale, offsetInfo);
     if (formationSpeed > 0.0f) {
       clampedFormationSpeed = (formationSpeed > topSpeed) ? topSpeed : formationSpeed;
     }

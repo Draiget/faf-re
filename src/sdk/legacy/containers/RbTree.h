@@ -366,6 +366,7 @@ namespace msvc8
          * directly with no descent needed. Was previously duplicated as
          * `LeftmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
          * migration).
+         * Address: 0x0056CF50 (FUN_0056CF50, sub_56CF50 -- the `_Min` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`/`rb_increment` (CAiFormationInstance.cpp).)
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -582,6 +583,7 @@ namespace msvc8
          * `rb_decrement` above). Was previously duplicated as
          * `RightmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
          * migration).
+         * Address: 0x0056CF30 (FUN_0056CF30, sub_56CF30 -- the `_Max` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`.)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -958,6 +960,7 @@ namespace msvc8
          * `mPausedCategoryNames` sibling, that free function's own iterator-
          * stepping logic was correct, just a hand-rolled reimplementation
          * of this member rather than a call to it.
+         * Address: 0x0056D090 (FUN_0056D090, sub_56D090 -- the `_Inc` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); every `for (auto& [id, info] : mUnitOffsets)` walk in CAiFormationInstance.cpp (`SOffsetInfo::GetLeader`, `CAiFormationInstance::Update`, the map serializer) steps with it.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1272,6 +1275,8 @@ namespace msvc8
          * duplicated as `RetreatCategoryIterator` (`AudioEngine.cpp`, deleted
          * by this migration) -- like `rb_increment` above, that logic was
          * correct, just a hand-rolled reimplementation of this member.
+         * Address: 0x00570530 (FUN_00570530 -- the `_Dec` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), reached from that instantiation's `insert_unique` duplicate check.)
+         * Address: 0x00570640 (FUN_00570640 -- the `_Dec` emission for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), reached from that instantiation's `insert_hint`.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -1935,6 +1940,7 @@ namespace msvc8
              * "default-ctor emission" with a stale `CrtRuntimeHelpers.cpp`
              * source path -- both wrong: it is the copy constructor, not the
              * default constructor, and its real citation is this one.
+             * Address: 0x0056CC50 (FUN_0056CC50 -- the copy constructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `SOffsetInfo`'s implicit copy constructor (0x0056CAA0), i.e. `mOffsetInfo[layer].push_back(group)` in `CFormationInstance::RunScript`.)
              */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
@@ -1952,6 +1958,8 @@ namespace msvc8
 
             /**
              * Address: 0x0077E280 (FUN_0077E280, the decal bucket set's copy assign)
+             * Address: 0x00573390 (FUN_00573390 -- copy assignment for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `SOffsetInfo`'s implicit copy assignment (0x00573270), reached from the `fastvector_n<SOffsetInfo,2>` assign-shift lanes.)
+             * Address: 0x005733C0 (FUN_005733C0 -- a second, byte-identical emission of the same copy assignment the linker kept distinct.)
              */
             rb_tree& operator=(const rb_tree& other)
             {
@@ -2557,6 +2565,8 @@ namespace msvc8
              * warning on dead-but-plausible-looking scaffolding; correctly
              * has no source-level caller now that it has none in the binary
              * either.
+             * Address: 0x0056AC00 (FUN_0056AC00 -- the destructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `~SOffsetInfo` (0x00568360), i.e. every group teardown in `CleanupFormation`/`UpdateFormation`/`~CFormationInstance`.)
+             * Address: 0x00569470 (FUN_00569470, sub_569470 -- the destructor for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), `~CFormationInstance`'s member teardown of both caches.)
              */
             ~rb_tree()
             {
@@ -2827,6 +2837,7 @@ namespace msvc8
              * caller is this instantiation's `operator[]` emission
              * (`FUN_0057D910`), itself a RULE ONE compiler emission whose
              * written source is the `map[key]` expression at its call site.
+             * Address: 0x0056B7B0 (FUN_0056B7B0, sub_56B7B0 -- the lower-bound descent for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `try_get` cache lookups in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -3206,6 +3217,8 @@ namespace msvc8
              * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`.
              * Sole caller is `CDecalManager::FindGroupBySplatIndex`'s
              * `try_get(splatIndex)` (`CWldSplat.cpp`), same re-homing.
+             * Address: 0x0056AF80 (FUN_0056AF80 -- `find` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the `mUnitOffsets.find`/`try_get` of `RemoveUnit`.)
+             * Address: 0x0056AFE0 (FUN_0056AFE0, `std::map_EntId_SUnitOffsetInfo::find` -- the same `find` emission reached from eight further formation call sites: `GetOffsetInfo`, `GetFormationPosition`, `GetOffsetPosition`, `GetTargetPosition`, `Contains`, `CalcFormationSpeed`, `GetDistFromLeader`, `GetPriority` (CAiFormationInstance.cpp).)
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -3676,6 +3689,8 @@ namespace msvc8
              * `insert_hint`, exactly mirroring `FUN_0087AB70`/`FUN_0087B4F0`'s
              * own "reached only through this tree's own `insert_hint`" role
              * documented above for the `CDecalManager` instantiations.
+             * Address: 0x0056CCE0 (FUN_0056CCE0 -- `insert` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): the map serializer's `insert(value_type(key, value))` and `operator[]`'s miss path in `RunScript`.)
+             * Address: 0x0056F370 (FUN_0056F370, sub_56F370 -- `insert` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): `operator[]`'s miss path in the position caches.)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -4078,6 +4093,7 @@ namespace msvc8
              * `.memory/project_audiomap1_missing_rebalance_bug.md` for the
              * cross-instance pattern this is the seventh (and, per that
              * file's own tracking, final known) confirmed instance of.
+             * Address: 0x0056D790 (FUN_0056D790, sub_56D790 -- the hinted insert for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19).)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -4809,6 +4825,7 @@ namespace msvc8
              * own erase side was never the bug -- exactly mirroring the
              * `mPausedCategoryNames` finding that the insert side alone was
              * broken.
+             * Address: 0x0056AC60 (FUN_0056AC60, sub_56AC60 -- `erase(iterator)` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `info.mUnitOffsets.erase(it)` in `CFormationInstance::RemoveUnit`.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -5520,6 +5537,8 @@ namespace msvc8
              * citation above for the full EH-funclet-vs-happy-path shape.
              * Was previously duplicated as `EraseCategoryVolumeRange`
              * (`AudioEngine.cpp`, deleted by this migration).
+             * Address: 0x0056EB40 (FUN_0056EB40, sub_56EB40 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the whole-range erase of every `~SOffsetInfo`.)
+             * Address: 0x0056F430 (FUN_0056F430, sub_56F430 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the whole-range erase of the cache destructors; every reachable caller passes the full range, so the `clear()` fast path is the one taken.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -6091,6 +6110,7 @@ namespace msvc8
              * were previously duplicated as `AllocateCategoryNodeArrayChecked`/
              * `AllocateCategoryVolumeNodeStorage` (`AudioEngine.cpp`, deleted
              * by this migration).
+             * Address: 0x0056FE00 (FUN_0056FE00 -- the 68-byte node allocation for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), through the checked `operator new(68)` at 0x00571780.)
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -6456,6 +6476,7 @@ namespace msvc8
              * sentinel inline via `CreateMeshCacheTreeSentinel` directly,
              * confirmed not to route through this function) has not been
              * traced yet.
+             * Address: 0x00570300 (FUN_00570300 -- the head-sentinel allocation for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), both caches in the `CFormationInstance` constructors.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -6946,6 +6967,7 @@ namespace msvc8
              * `insert_at` emission (`FUN_004DCF90`, cited above). Was
              * previously duplicated as `ConstructCategoryVolumeNode`
              * (`AudioEngine.cpp`, deleted by this migration).
+             * Address: 0x0056FE40 (FUN_0056FE40 -- `_Buynode` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): allocates the 68-byte node and copy-constructs the `pair<const EntId, SUnitOffsetInfo>` (relinking the value's `mUnit` weak link).)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -7486,6 +7508,8 @@ namespace msvc8
              * this member's iterative-left-spine form; both destroy every
              * node exactly once and are output-equivalent, but only this
              * member's shape is what the compiler actually emitted here too.
+             * Address: 0x0056CE70 (FUN_0056CE70, sub_56CE70 -- `_Erase` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): destroys each node's `SUnitOffsetInfo` (unlinking its `mUnit`) and frees it; reached from `clear()` in `SOffsetInfo::SOffsetInfo` and the map serializer, and from `erase_range`'s full-range path.)
+             * Address: 0x0056D8E0 (FUN_0056D8E0, sub_56D8E0 -- `_Erase` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `clear()` in `CFormationInstance::ClearSlotCaches`.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -7937,6 +7961,7 @@ namespace msvc8
              * access instead of a call to it, only ever invoked from the
              * erase-fixup path (never from insert, which is the missing-
              * rebalance bug `insert_hint`'s citation above documents).
+             * Address: 0x0056CEE0 (FUN_0056CEE0, sub_56CEE0 -- `_Lrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -8216,6 +8241,7 @@ namespace msvc8
              * this migration), the mirror half of `RotateCategoryVolumeNodeLeft`
              * described on `rotate_left` above -- also byte-for-byte correct,
              * also only ever reached from the erase-fixup path.
+             * Address: 0x0056CF90 (FUN_0056CF90, sub_56CF90 -- `_Rrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -8689,6 +8715,9 @@ namespace msvc8
                 return fresh;
             }
 
+            /**
+             * Address: 0x0056ECA0 (FUN_0056ECA0 -- the link-and-rebalance half of `_Insert` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             */
             void link_and_rebalance(const bool addLeft, node_type* const where, node_type* const fresh) noexcept
             {
                 ++size_;

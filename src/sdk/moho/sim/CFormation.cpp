@@ -9,6 +9,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/IAiFormationDB.h"
@@ -442,11 +443,11 @@ namespace moho
     // `CFormation`'s own `+0x00`), which is why `PruneTombstonesAndFindLive`
     // is generalized over the shared `WeakEntitySetUserEntity` header rather
     // than reinterpret_cast-ed through the wrong set type here. The collected
-    // set feeds `CFormationInstance::Create`'s `mUnits` lane directly, so it
-    // is built as a `SFormationLinkedUnitRefVec` (via `AppendLinkedUnitRef`)
-    // rather than the `SFormationLayerUnitSet` shape `PreRunScript`/`Setup`/
-    // `UpdateFormation` use for their own transient candidate sets.
-    SFormationLinkedUnitRefVec collectedUnits{};
+    // set feeds `CFormationInstance::Create`'s `mUnits` directly; each
+    // `push_back` below is the binary's construct-a-`WeakPtr<IUnit>`, push,
+    // destroy-the-temporary sequence at 0x0083836D..0x008383B6, and the
+    // vector's destructor is the unlink-and-free at 0x00838464..0x008384A3.
+    gpg::fastvector_n<WeakPtr<IUnit>, 4> collectedUnits{};
 
     SSelectionNodeUserEntity* node = nullptr;
     (void)PruneTombstonesAndFindLive(mParticipants, &node, mParticipants.mHead->mLeft);
@@ -462,7 +463,7 @@ namespace moho
         UserUnit* const candidateUnit = reinterpret_cast<UserUnit*>(entity);
         IUnit* const iunitBridge = GetIUnitBridge(candidateUnit);
         if (!iunitBridge->IsDead() && !entity->IsBeingBuilt() && entity->GetAttachmentParent() == nullptr) {
-          AppendLinkedUnitRef(collectedUnits, iunitBridge);
+          collectedUnits.push_back(WeakPtr<IUnit>(iunitBridge));
         }
       }
 
@@ -484,8 +485,6 @@ namespace moho
     }
 
     mLastUpdate = gpg::time::GetSystemTimer().ElapsedSeconds();
-
-    ClearLinkedUnitRefs(collectedUnits);
   }
 
   /**

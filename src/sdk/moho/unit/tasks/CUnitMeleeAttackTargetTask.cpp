@@ -804,7 +804,7 @@ namespace moho
       SCoordsVec2 formationCenter{};
       formationCenter.x = targetPos.x;
       formationCenter.z = targetPos.z;
-      runtime->mFormation->Func3(formationCenter);
+      runtime->mFormation->SetCoords(formationCenter);
 
       SOCellPos adjustedPosition{};
       runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, AsCommandTask(runtime)->mUnit, nullptr);
@@ -1079,9 +1079,9 @@ namespace moho
       if (runtime->mHasMobileTarget) {
         UpdatePosition();
         const Wm3::Vector3f targetPos = runtime->mTarget.GetTargetPosGun(false);
-        runtime->mFormation->Func3(SCoordsVec2{targetPos.x, targetPos.z});
+        runtime->mFormation->SetCoords(SCoordsVec2{targetPos.x, targetPos.z});
       } else {
-        if (!runtime->mFormation->Func17(unit, true)) {
+        if (!runtime->mFormation->Contains(unit, true)) {
           gpg::Warnf(" formation does not contain attackin unit! ");
           gpg::Warnf(" -- Unit id = (%d) -- ", unit->id_);
         }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "moho/containers/TDatList.h"
 
@@ -12,12 +13,27 @@ namespace gpg
 namespace moho
 {
   enum ECommandEvent : int;
+  enum EFormationdStatus : std::int32_t;
   enum EUnitCommandQueueStatus : int;
   struct SNavPath;
 
   class Broadcaster : public TDatList<Broadcaster, void>
   {
   public:
+    /**
+     * Address: 0x0056B070 (FUN_0056B070,
+     * ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)
+     *
+     * What it does:
+     * Broadcasts one formation-status event to all linked listeners while
+     * preserving iteration safety when listeners relink/unlink during
+     * callback. Same intrusive-broadcast shape as the overloads below
+     * (distinct per-T body, not ICF-folded); the definition lives in
+     * CAiFormationInstance.cpp beside its only broadcaster,
+     * `CFormationInstance::mStatusListeners`.
+     */
+    void BroadcastEvent(EFormationdStatus event);
+
     /**
      * Address: 0x006E94A0 (FUN_006E94A0,
      * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)

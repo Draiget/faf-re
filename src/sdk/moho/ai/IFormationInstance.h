@@ -86,30 +86,42 @@ namespace moho
      * `_purecall`; only the deleting destructor at slot 0 (0x00565CA0) has a
      * body. `CFormationInstance` (0x00E18E0C) fills every one of them and adds
      * slot 25 (`FindSlotFor`); `CAiFormationInstance` (0x00E1B47C) overrides
-     * six and adds slot 26 (`Func27`). The order below is the binary slot
+     * six and adds slot 26 (`PosIsFree`). The order below is the binary slot
      * order and must not change.
+     *
+     * Slot names come from the FAF IDB where it carries one (`SetCoords`,
+     * `UnitCount`, `GetLayer`, `Contains`, `CommandIsForm`, `SetOrientation`,
+     * `GetOrientation`, `GetCommandType`, `PosIsFree`) and otherwise from the
+     * `SUnitOffsetInfo`/`SOffsetInfo` field each override provably reads:
+     * `GetOffsetInfo` returns the unit's `SOffsetInfo`, `GetOffsetPosition`
+     * is `mCoords + SUnitOffsetInfo::mOffset`, `GetTargetPosition` is
+     * `SUnitOffsetInfo::mTargetPos`, `GetDistFromLeader` is
+     * `SUnitOffsetInfo::mDistFromLeader`, `GetPriority` is derived from
+     * `SUnitOffsetInfo::mWeight`, `GetLeader` is `SOffsetInfo::GetLeader`,
+     * `GetForwardVector` is `mForwardVector`, `IsInFormation` is
+     * `SOffsetInfo::mInFormation` and `SetScale` writes `mScale`.
      */
-    virtual SCoordsVec2* Func2(SCoordsVec2* outCenter) const = 0;                                        // slot 1
-    virtual void Func3(const SCoordsVec2& center) = 0;                                                    // slot 2
+    virtual SCoordsVec2* GetCoords(SCoordsVec2* outCoords) const = 0;                                    // slot 1
+    virtual void SetCoords(const SCoordsVec2& coords) = 0;                                                // slot 2
     virtual int UnitCount() const = 0;                                                                    // slot 3
     virtual std::int32_t GetLayer(Unit* unit) const = 0;                                                  // slot 4
-    virtual SOffsetInfo* Func6(Unit* unit) = 0;                                                           // slot 5
-    virtual SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SOffsetInfo* laneEntry) = 0; // slot 6
-    virtual SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SOffsetInfo* laneEntry) = 0; // slot 7
-    virtual SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SOffsetInfo* laneEntry) = 0;               // slot 8
-    virtual Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SOffsetInfo* laneEntry) = 0;                 // slot 9
-    virtual float Func11(Unit* unit, SOffsetInfo* laneEntry) = 0;                                         // slot 10
-    virtual std::int32_t Func12(Unit* unit, SOffsetInfo* laneEntry) = 0;                                  // slot 11
-    virtual float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SOffsetInfo* laneEntry) = 0;       // slot 12
-    virtual Unit* Func14(Unit* unit, SOffsetInfo* laneEntry) = 0;                                         // slot 13
+    virtual SOffsetInfo* GetOffsetInfo(Unit* unit) = 0;                                                   // slot 5
+    virtual SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SOffsetInfo* info) = 0;      // slot 6
+    virtual SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SOffsetInfo* info) = 0;  // slot 7
+    virtual SCoordsVec2* GetOffsetPosition(SCoordsVec2* dest, Unit* unit, SOffsetInfo* info) = 0;         // slot 8
+    virtual Wm3::Vec3f* GetTargetPosition(Wm3::Vec3f* out, Unit* unit, SOffsetInfo* info) = 0;            // slot 9
+    virtual float GetDistFromLeader(Unit* unit, SOffsetInfo* info) = 0;                                   // slot 10
+    virtual std::int32_t GetPriority(Unit* unit, SOffsetInfo* info) = 0;                                  // slot 11
+    virtual float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SOffsetInfo* info) = 0;            // slot 12
+    virtual Unit* GetLeader(Unit* unit, SOffsetInfo* info) = 0;                                           // slot 13
     virtual void AddUnit(Unit* unit) = 0;                                                                 // slot 14
     virtual void RemoveUnit(Unit* unit) = 0;                                                              // slot 15
-    virtual bool Func17(Unit* unit, bool checkAll) const = 0;                                             // slot 16
+    virtual bool Contains(Unit* unit, bool checkAll) const = 0;                                           // slot 16
     virtual void Update() = 0;                                                                            // slot 17
-    virtual Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const = 0;                                    // slot 18
+    virtual Wm3::Vec3f* GetForwardVector(Wm3::Vec3f* out, Unit* unit) const = 0;                          // slot 18
     virtual bool CommandIsForm() const = 0;                                                               // slot 19
-    virtual bool Func21(Unit* unit) const = 0;                                                            // slot 20
-    virtual void Func22(float scale) = 0;                                                                 // slot 21
+    virtual bool IsInFormation(Unit* unit) const = 0;                                                     // slot 20
+    virtual void SetScale(float scale) = 0;                                                               // slot 21
     virtual void SetOrientation(const Wm3::Quatf& orientation) = 0;                                       // slot 22
     virtual Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const = 0;                             // slot 23
     virtual EUnitCommandType GetCommandType() const = 0;                                                  // slot 24

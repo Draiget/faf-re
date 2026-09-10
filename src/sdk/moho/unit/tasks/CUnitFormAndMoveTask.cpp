@@ -426,7 +426,7 @@ namespace moho
       return;
     }
 
-    if (!mFormation->Func21(mUnit)) {
+    if (!mFormation->IsInFormation(mUnit)) {
       return;
     }
 

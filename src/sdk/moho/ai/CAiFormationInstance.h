@@ -4,12 +4,13 @@
 #include <cstdint>
 
 #include "gpg/core/containers/FastVector.h"
-#include "moho/ai/IFormationInstance.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
+#include "moho/ai/EFormationdStatusTypeInfo.h"
+#include "moho/ai/IFormationInstance.h"
 #include "moho/containers/SCoordsVec2.h"
-#include "moho/containers/TDatList.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/unit/Broadcaster.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
@@ -30,97 +31,39 @@ namespace moho
   enum class EUnitCommandType : std::int32_t;
   class IUnit;
   class RRuleGameRules;
-  class RRuleGameRulesImpl;
   class Sim;
   struct SOCellPos;
-  struct SWeakRefSlot;
   class Unit;
 
-  struct SFormationLinkedUnitRef
-  {
-    std::uint32_t* ownerChainHead; // +0x00
-    std::uint32_t nextChainLink;   // +0x04
+  /// `Moho::EntId` is the 32-bit entity id `Entity.h` defines; restated here so
+  /// the map keys below do not drag the whole entity header into every
+  /// formation consumer.
+  typedef std::int32_t EntId;
 
-    [[nodiscard]] static std::uint32_t* NextChainLinkSlot(std::uint32_t linkWord) noexcept;
-  };
-  static_assert(sizeof(SFormationLinkedUnitRef) == 0x08, "SFormationLinkedUnitRef size must be 0x08");
-} // namespace moho
-
-namespace gpg::core
-{
   /**
-   * `SFormationLinkedUnitRef` is the same 8-byte intrusive weak-owner node
-   * `SWeakRefSlot` is -- `ownerChainHead`/`nextChainLink` alias
-   * `IntrusiveWeakLinkNode::ownerLinkSlot`/`nextInOwner` one for one -- so a
-   * vector of them has to splice each stored element into its unit's weak-owner
-   * chain instead of blitting two words.
+   * RTTI: `.?AUSUnitOffsetInfo@Moho@@` (dumps/rtti_dump_all.hpp).
    *
-   * `CFormation::Finalize` (0x008382A0) proves the element is a real
-   * `Moho::WeakPtr_IUnit`: it links a stack temporary into the unit's chain,
-   * calls `gpg::fastvector_n4_WeakPtr_IUnit::push_back(&result, &temp)` -- whose
-   * copy-constructor links the *stored* copy -- and only then destroys the
-   * temporary, which unlinks it again. Without this specialization `push_back`
-   * took the raw-copy branch, so every stored element carried a chain head it
-   * had never been spliced into; the matching unlink then walked the unit's real
-   * chain looking for an address that was not on it, ran off the end, and wrote
-   * its next-word through whatever it landed on.
+   * One unit's slot inside a formation group: the mapped value of
+   * `SOffsetInfo::mUnitOffsets`, keyed by the unit's entity id. `RunScript`
+   * (0x00567300, 0x00567EED-0x00567FA3) fills one on the stack per assigned
+   * candidate -- `mUnit` bound to the unit, `mLeaderPriority` from the running
+   * assignment counter, `mOffset` from the scored slot, `mTargetPos` zero,
+   * `mHeadingAngle` +inf, both distances zero, `mWeight` from the script slot
+   * -- and stores it with `mUnitOffsets[entityId] = info`. `Update`
+   * (0x0059AE80) then rewrites `mTargetPos`, `mHeadingAngle` and both
+   * distances every tick.
+   *
+   * The compiler-generated special members are all real binary functions:
+   *   - Address: 0x005683F0 (FUN_005683F0) copy constructor -- splices the
+   *     copy's `mUnit` into the source unit's weak chain, then copies the ten
+   *     remaining words;
+   *   - Address: 0x00568490 (FUN_00568490) copy assignment -- `mUnit`'s
+   *     relinking `operator=` followed by the same ten-word copy;
+   *   - Address: 0x00568450 (the `loc_568450` EH funclet target in
+   *     `RunScript`) destructor -- `~WeakPtr<IUnit>` unlinking `mUnit`.
+   * None of them has a source line of its own; `WeakPtr<IUnit>`'s members
+   * produce them.
    */
-  template <>
-  struct IsIntrusiveWeakRefSlot<::moho::SFormationLinkedUnitRef> : std::true_type
-  {};
-  static_assert(
-    sizeof(::moho::SFormationLinkedUnitRef) == sizeof(IntrusiveWeakLinkNode),
-    "SFormationLinkedUnitRef must alias IntrusiveWeakLinkNode layout for the relink lane"
-  );
-} // namespace gpg::core
-
-namespace moho
-{
-
-  struct SFormationLaneUnitNode
-  {
-    SFormationLaneUnitNode* left;   // +0x00
-    SFormationLaneUnitNode* parent; // +0x04
-    SFormationLaneUnitNode* right;  // +0x08
-    std::uint32_t unitEntityId;     // +0x0C
-    std::uint32_t linkedUnitOwnerWord; // +0x10
-    std::uint32_t linkedUnitNextWord;  // +0x14
-    std::int32_t leaderPriority;       // +0x18
-    float formationOffsetX;         // +0x1C
-    float formationOffsetZ;         // +0x20
-    Wm3::Vec3f formationVector;     // +0x24
-    float formationWeight;          // +0x30
-    float speedBandLow;             // +0x34
-    float speedBandMid;             // +0x38
-    float speedBandHigh;            // +0x3C
-    std::uint8_t color;             // +0x40
-    std::uint8_t isNil;             // +0x41
-    std::uint8_t pad42[2];          // +0x42
-  };
-  static_assert(sizeof(SFormationLaneUnitNode) == 0x44, "SFormationLaneUnitNode size must be 0x44");
-  static_assert(
-    offsetof(SFormationLaneUnitNode, formationOffsetX) == 0x1C,
-    "SFormationLaneUnitNode::formationOffsetX offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(SFormationLaneUnitNode, speedBandHigh) == 0x3C, "SFormationLaneUnitNode::speedBandHigh offset must be 0x3C"
-  );
-  static_assert(offsetof(SFormationLaneUnitNode, isNil) == 0x41, "SFormationLaneUnitNode::isNil offset must be 0x41");
-
-  struct SFormationLaneUnitMap
-  {
-    std::uint32_t allocatorCookie;  // +0x00
-    SFormationLaneUnitNode* head;   // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(sizeof(SFormationLaneUnitMap) == 0x0C, "SFormationLaneUnitMap size must be 0x0C");
-  static_assert(
-    offsetof(SFormationLaneUnitMap, head) == 0x04, "SFormationLaneUnitMap::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SFormationLaneUnitMap, size) == 0x08, "SFormationLaneUnitMap::size offset must be 0x08"
-  );
-
   struct SUnitOffsetInfo
   {
     inline static gpg::RType* sType = nullptr;
@@ -129,8 +72,8 @@ namespace moho
      * Address: 0x005707B0 (FUN_005707B0, Moho::SUnitOffsetInfo::MemberDeserialize)
      *
      * What it does:
-     * Loads unit weak-link lane plus formation offset/vector/speed metadata
-     * lanes from archive payload.
+     * Loads the unit weak-link, leader priority, offset, target position and
+     * the four trailing floats from archive payload.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
@@ -138,78 +81,96 @@ namespace moho
      * Address: 0x005708A0 (FUN_005708A0, Moho::SUnitOffsetInfo::MemberSerialize)
      *
      * What it does:
-     * Saves unit weak-link lane plus formation offset/vector/speed metadata
-     * lanes into archive payload.
+     * Saves the unit weak-link, leader priority, offset, target position and
+     * the four trailing floats into archive payload.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /// The unit this slot belongs to.
     WeakPtr<IUnit> mUnit;         // +0x00
+    /// Assignment rank handed out by `RunScript`; `SOffsetInfo::GetLeader`
+    /// picks the live unit with the highest one.
     std::int32_t mLeaderPriority; // +0x08
+    /// Slot offset from the formation centre (`RunScript` phase 7), already
+    /// scaled and rotated by `ComputeRunScriptOffset`.
     SCoordsVec2 mOffset;          // +0x0C
-    Wm3::Vec3f mDirection;        // +0x14
-    float mWeight;                // +0x20
-    float mSpeedBandLow;          // +0x24
-    float mSpeedBandMid;          // +0x28
-    float mSpeedBandHigh;         // +0x2C
+    /// Smoothed world-space position the unit is steering for
+    /// (`Update`, 0x0059AE90 onward); zero until the first update, which
+    /// is why `GetTargetPosition` falls back to the unit's own position.
+    Wm3::Vec3f mTargetPos;        // +0x14
+    /// Smoothed heading correction (radians) applied to the slot offset when
+    /// the leader is off its own slot; +inf until first computed.
+    float mHeadingAngle;          // +0x20
+    /// Distance from the unit to `mTargetPos` this tick; `CalcFormationSpeed`
+    /// compares it against `SOffsetInfo::mAvgDistToTarget` to speed
+    /// stragglers up and slow the leaders down.
+    float mDistToTarget;          // +0x24
+    /// Distance from this unit's slot position to the leader's;
+    /// `GetDistFromLeader` hands it to `Unit::UpdateInfoCache` as the unit's
+    /// formation ordering metric.
+    float mDistFromLeader;        // +0x28
+    /// The formation script's weight for the slot (`SFormationScriptSlot::
+    /// mWeight`); `GetPriority` turns it into the unit's integer priority.
+    float mWeight;                // +0x2C
   };
   static_assert(sizeof(SUnitOffsetInfo) == 0x30, "SUnitOffsetInfo size must be 0x30");
-  static_assert(
-    offsetof(SUnitOffsetInfo, mLeaderPriority) == 0x08,
-    "SUnitOffsetInfo::mLeaderPriority offset must be 0x08"
-  );
+  static_assert(offsetof(SUnitOffsetInfo, mLeaderPriority) == 0x08, "SUnitOffsetInfo::mLeaderPriority offset must be 0x08");
   static_assert(offsetof(SUnitOffsetInfo, mOffset) == 0x0C, "SUnitOffsetInfo::mOffset offset must be 0x0C");
-  static_assert(offsetof(SUnitOffsetInfo, mDirection) == 0x14, "SUnitOffsetInfo::mDirection offset must be 0x14");
-  static_assert(offsetof(SUnitOffsetInfo, mWeight) == 0x20, "SUnitOffsetInfo::mWeight offset must be 0x20");
-  static_assert(
-    offsetof(SUnitOffsetInfo, mSpeedBandLow) == 0x24, "SUnitOffsetInfo::mSpeedBandLow offset must be 0x24"
-  );
-  static_assert(
-    offsetof(SUnitOffsetInfo, mSpeedBandMid) == 0x28, "SUnitOffsetInfo::mSpeedBandMid offset must be 0x28"
-  );
-  static_assert(
-    offsetof(SUnitOffsetInfo, mSpeedBandHigh) == 0x2C, "SUnitOffsetInfo::mSpeedBandHigh offset must be 0x2C"
-  );
+  static_assert(offsetof(SUnitOffsetInfo, mTargetPos) == 0x14, "SUnitOffsetInfo::mTargetPos offset must be 0x14");
+  static_assert(offsetof(SUnitOffsetInfo, mHeadingAngle) == 0x20, "SUnitOffsetInfo::mHeadingAngle offset must be 0x20");
+  static_assert(offsetof(SUnitOffsetInfo, mDistToTarget) == 0x24, "SUnitOffsetInfo::mDistToTarget offset must be 0x24");
+  static_assert(offsetof(SUnitOffsetInfo, mDistFromLeader) == 0x28, "SUnitOffsetInfo::mDistFromLeader offset must be 0x28");
+  static_assert(offsetof(SUnitOffsetInfo, mWeight) == 0x2C, "SUnitOffsetInfo::mWeight offset must be 0x2C");
 
   /**
    * RTTI: `.?AUSOffsetInfo@Moho@@` (dumps/rtti_dump_all.hpp).
    *
-   * The formation lane entry. This one 0x4C object was modelled twice in this
-   * header until now -- once as `SOffsetInfo` (named from the binary's own RTTI
-   * type descriptor, with the +0x0C position and the +0x44 weak-link lane
-   * resolved) and once as `SFormationLaneEntry` (an invented name, but with the
-   * +0x18..+0x40 span resolved to real behaviour from
-   * `CAiFormationInstance::RunScript`). Neither name is a placeholder for the
-   * other: they are the same bytes.
+   * One formation group: every unit of one layer that a single
+   * `FORMATION_RunScript` pass placed, plus the group's bounding box, speed
+   * and cached leader. `CFormationInstance::mOffsetInfo[layer]` holds one
+   * vector of these per layer.
    *
-   * `SOffsetInfo` owns the definition because it is the name the shipped binary
-   * carries in RTTI; `SFormationLaneEntry` remains as a thin alias below. The
-   * field set is the union of what both models had proven:
+   * `mUnitOffsets` is the `std::map<EntId,SUnitOffsetInfo>` the binary's own
+   * reflection names (`preregister_RMapType_EntId_SUnitOffsetInfo`,
+   * 0x00571A70); its node is 0x44 bytes with the colour/nil pair at +0x40/+0x41,
+   * exactly `msvc8::detail::rb_node<std::pair<const EntId, SUnitOffsetInfo>>`.
    *
-   *   - `unitMap` @ +0x00 keeps the intrusive `SFormationLaneUnitMap` typing the
-   *     lane-map helpers in CAiFormationInstance.cpp operate on. It is the same
-   *     0x0C MSVC8 tree the reflected `map<EntId,SUnitOffsetInfo>` serializer
-   *     writes, which is why `MemberSerialize` hands it `this` rather than a
-   *     member address.
-   *   - `mPos` @ +0x0C resolves what `SFormationLaneEntry` carried as an opaque
-   *     `unknown0C[0xC]` span.
-   *   - +0x18..+0x40 keep the behaviour-derived names, retyped as `SCoordsVec2`
-   *     pairs so the reflected coordinate serializer can address them directly.
-   *   - +0x44 keeps the raw intrusive weak-link word pair the lane-relink
-   *     helpers manipulate; that 8-byte lane is the binary's `WeakPtr<IUnit>`,
-   *     and the serializer reads/writes it through the reflected
-   *     `WeakPtr<IUnit>` descriptor at `&linkedUnitBackLinkHeadWord`.
+   * The compiler-generated special members are all real binary functions and
+   * fall straight out of the member types:
+   *   - Address: 0x0056CAA0 (FUN_0056CAA0) copy constructor -- stands a fresh
+   *     map head up and clones the source tree (`0x0056CC50`, the
+   *     `_Tree(const _Tree&)` emission cited on `msvc8::detail::rb_tree`),
+   *     copies the scalar fields, then splices `mLeader` into the source
+   *     leader's weak chain;
+   *   - Address: 0x00573270 (FUN_00573270) copy assignment -- the map's
+   *     clear-and-clone `operator=`, the scalar copies, then `mLeader`'s
+   *     relinking `operator=`;
+   *   - Address: 0x00568360 (FUN_00568360) destructor -- unlinks `mLeader`,
+   *     erases the map's whole range and frees its head.
+   * Only the default constructor below has a body of its own.
    */
   struct SOffsetInfo
   {
     inline static gpg::RType* sType = nullptr;
 
     /**
+     * Address: 0x00565AB0 (FUN_00565AB0, Moho::SOffsetInfo::SOffsetInfo)
+     *
+     * What it does:
+     * Default state for a fresh group: empty unit map, zero position,
+     * centre and offsets, a 2x2 minimum extent, both flags clear, an
+     * unbounded speed (+inf, the identity for the min-reduction `RunScript`
+     * performs), zero average distance and no leader.
+     */
+    SOffsetInfo();
+
+    /**
      * Address: 0x00570B60 (FUN_00570B60, Moho::SOffsetInfo::MemberSerialize)
      *
      * What it does:
-     * Writes one offset-info payload: the whole unit-offset map, formation
-     * position, four 2D coordinate lanes, two flags, two scalars, and the
-     * owning unit weak-link.
+     * Writes one group: the whole unit map, position, the four coordinate
+     * pairs, both flags, both scalars and the leader weak-link, each through
+     * its reflected RTTI serializer.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
@@ -217,56 +178,75 @@ namespace moho
      * Address: 0x005709A0 (FUN_005709A0, Moho::SOffsetInfo::MemberDeserialize)
      *
      * What it does:
-     * Read mirror of `MemberSerialize`: reads the whole unit-offset map,
-     * formation position, four 2D coordinate lanes, two flags, two scalars,
-     * and the owning unit weak-link, each through its reflected RTTI serializer.
+     * Read mirror of `MemberSerialize`.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
-    SFormationLaneUnitMap unitMap;            // +0x00
-    Wm3::Vec3f mPos;                          // +0x0C
-    /// Mean XZ of the formation-script slot table, written by
-    /// `CAiFormationInstance::RunScript` (0x00567300, phase 5, the
-    /// `var_C08.m_next`/`m_state` sums divided by slot count at
-    /// 0x0056795C-0x005679D4).
-    SCoordsVec2 meanSlotOffset;               // +0x18
-    SCoordsVec2 overlapRadius;                // +0x20
-    SCoordsVec2 dynamicOffset;                // +0x28
-    SCoordsVec2 overlapAnchor;                // +0x30
-    std::uint8_t applyDynamicOffset;          // +0x38
-    std::uint8_t slotAvailable;               // +0x39
-    std::uint8_t pad3A[2];                    // +0x3A
-    float preferredSpeed;                     // +0x3C
-    float speedAnchor;                        // +0x40
-    std::uint32_t linkedUnitBackLinkHeadWord; // +0x44
-    std::uint32_t linkedUnitBackLinkNextWord; // +0x48
+    /**
+     * Address: 0x005688C0 (FUN_005688C0, sub_5688C0)
+     *
+     * What it does:
+     * True when this group's bounding box (`mCenter` +/- `mExtent`) overlaps
+     * `other`'s on both axes.
+     */
+    [[nodiscard]] bool Overlaps(const SOffsetInfo& other) const noexcept;
+
+    /**
+     * Address: 0x0059A300 (FUN_0059A300, sub_59A300)
+     *
+     * IDA signature:
+     * _DWORD *__thiscall sub_59A300(_DWORD *this);
+     *
+     * What it does:
+     * Returns the group's leader. When no leader is cached yet, walks the
+     * unit map for the live unit with the highest `mLeaderPriority`, binds
+     * `mLeader` to it and returns it.
+     */
+    [[nodiscard]] Unit* GetLeader();
+
+    /// The placed units of this group, keyed by entity id.
+    msvc8::map<EntId, SUnitOffsetInfo> mUnitOffsets; // +0x00
+    /// Zeroed by the constructor and copied by the special members; nothing
+    /// else in the binary writes it.
+    Wm3::Vec3f mPos;                                 // +0x0C
+    /// Mean of the script's slot offsets (`RunScript` phase 5).
+    SCoordsVec2 mSlotCenter;                         // +0x18
+    /// Mean unit position when the script ran; the centre of the overlap box.
+    SCoordsVec2 mCenter;                             // +0x20
+    /// Added to every slot offset while `mUseDynamicOffset` is set
+    /// (`GetFormationPosition`, `GetOffsetPosition`). No writer in the binary
+    /// beyond the constructor and the copy members, so it stays zero in the
+    /// shipped game.
+    SCoordsVec2 mDynamicOffset;                      // +0x28
+    /// Half-size of the overlap box: `max(2, slot span)` from `RunScript`,
+    /// raised to at least 10 when overlapping groups are merged.
+    SCoordsVec2 mExtent;                             // +0x30
+    bool mUseDynamicOffset;                          // +0x38
+    /// Set by `CAiFormationInstance::Update` once every unit is close enough
+    /// to its slot; `IsInFormation` reports it to the units.
+    bool mInFormation;                               // +0x39
+    /// Formation speed: the slowest unit's max speed times 0.85, reduced
+    /// further when overlapping groups are merged. `CalcFormationSpeed`
+    /// returns it.
+    float mSpeed;                                    // +0x3C
+    /// Midpoint of the smallest and largest `SUnitOffsetInfo::mDistToTarget`
+    /// this tick; the reference `CalcFormationSpeed` scales each unit's speed
+    /// against.
+    float mAvgDistToTarget;                          // +0x40
+    /// Cached leader, resolved lazily by `GetLeader`.
+    WeakPtr<IUnit> mLeader;                          // +0x44
   };
   static_assert(sizeof(SOffsetInfo) == 0x4C, "SOffsetInfo size must be 0x4C");
   static_assert(offsetof(SOffsetInfo, mPos) == 0x0C, "SOffsetInfo::mPos offset must be 0x0C");
-  static_assert(
-    offsetof(SOffsetInfo, meanSlotOffset) == 0x18, "SOffsetInfo::meanSlotOffset offset must be 0x18"
-  );
-  static_assert(offsetof(SOffsetInfo, overlapRadius) == 0x20, "SOffsetInfo::overlapRadius offset must be 0x20");
-  static_assert(offsetof(SOffsetInfo, dynamicOffset) == 0x28, "SOffsetInfo::dynamicOffset offset must be 0x28");
-  static_assert(offsetof(SOffsetInfo, overlapAnchor) == 0x30, "SOffsetInfo::overlapAnchor offset must be 0x30");
-  static_assert(
-    offsetof(SOffsetInfo, applyDynamicOffset) == 0x38, "SOffsetInfo::applyDynamicOffset offset must be 0x38"
-  );
-  static_assert(offsetof(SOffsetInfo, slotAvailable) == 0x39, "SOffsetInfo::slotAvailable offset must be 0x39");
-  static_assert(offsetof(SOffsetInfo, preferredSpeed) == 0x3C, "SOffsetInfo::preferredSpeed offset must be 0x3C");
-  static_assert(offsetof(SOffsetInfo, speedAnchor) == 0x40, "SOffsetInfo::speedAnchor offset must be 0x40");
-  static_assert(
-    offsetof(SOffsetInfo, linkedUnitBackLinkHeadWord) == 0x44,
-    "SOffsetInfo::linkedUnitBackLinkHeadWord offset must be 0x44"
-  );
-
-  /**
-   * Thin alias for the single owning `SOffsetInfo` definition above. Kept
-   * because the recovered lane-map / relink helpers and the
-   * `fastvector<SOffsetInfo>` reflection lane were all written against this
-   * name; the binary knows the object only as `Moho::SOffsetInfo`.
-   */
-  using SFormationLaneEntry = SOffsetInfo;
+  static_assert(offsetof(SOffsetInfo, mSlotCenter) == 0x18, "SOffsetInfo::mSlotCenter offset must be 0x18");
+  static_assert(offsetof(SOffsetInfo, mCenter) == 0x20, "SOffsetInfo::mCenter offset must be 0x20");
+  static_assert(offsetof(SOffsetInfo, mDynamicOffset) == 0x28, "SOffsetInfo::mDynamicOffset offset must be 0x28");
+  static_assert(offsetof(SOffsetInfo, mExtent) == 0x30, "SOffsetInfo::mExtent offset must be 0x30");
+  static_assert(offsetof(SOffsetInfo, mUseDynamicOffset) == 0x38, "SOffsetInfo::mUseDynamicOffset offset must be 0x38");
+  static_assert(offsetof(SOffsetInfo, mInFormation) == 0x39, "SOffsetInfo::mInFormation offset must be 0x39");
+  static_assert(offsetof(SOffsetInfo, mSpeed) == 0x3C, "SOffsetInfo::mSpeed offset must be 0x3C");
+  static_assert(offsetof(SOffsetInfo, mAvgDistToTarget) == 0x40, "SOffsetInfo::mAvgDistToTarget offset must be 0x40");
+  static_assert(offsetof(SOffsetInfo, mLeader) == 0x44, "SOffsetInfo::mLeader offset must be 0x44");
 
   /**
    * Static reflection serializer callback for `SOffsetInfo`.
@@ -279,8 +259,8 @@ namespace moho
      * What it does:
      * Reflection save-callback facade for `SOffsetInfo`. Forwards the
      * reflected object pointer to `SOffsetInfo::MemberSerialize`; `version`
-     * and the owner-ref lane are unused by the member (mirrors the binary
-     * tail call). Signature matches `gpg::RType::save_func_t` since this is
+     * and the owner-ref are unused by the member (mirrors the binary tail
+     * call). Signature matches `gpg::RType::save_func_t` since this is
      * stored directly into the reflected serializer helper's callback slot.
      */
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
@@ -291,13 +271,21 @@ namespace moho
      * What it does:
      * Reflection load-callback facade for `SOffsetInfo`. Forwards the
      * reflected object pointer to `SOffsetInfo::MemberDeserialize`; `version`
-     * and the owner-ref lane are unused by the member (mirrors the binary
-     * tail call). Signature matches `gpg::RType::load_func_t` since this is
+     * and the owner-ref are unused by the member (mirrors the binary tail
+     * call). Signature matches `gpg::RType::load_func_t` since this is
      * stored directly into the reflected serializer helper's callback slot.
      */
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
 
+  /**
+   * RTTI: `.?AUSAssignedLocInfo@Moho@@`.
+   *
+   * One slot `FindSlotFor` has already handed out this plan: the position,
+   * the footprint size it was reserved for and the layer it belongs to.
+   * `PosIsFree` scans them so two units of one layer never get overlapping
+   * slots.
+   */
   struct SAssignedLocInfo
   {
     /// Element-type reflection cache. The binary keeps this as the
@@ -311,9 +299,16 @@ namespace moho
     /// storage, so it does not affect the 0x10 layout below.
     inline static gpg::RType* sType = nullptr;
 
-    SCoordsVec2 position;      // +0x00
-    std::int32_t footprintSize; // +0x08
-    std::int32_t laneToken;     // +0x0C
+    SCoordsVec2 mPos;     // +0x00
+    /// Address: 0x0059C790 (FUN_0059C790) -- the compiler's out-of-line
+    /// `int* <- mSize` accessor emission for this field. It has no caller in
+    /// the shipped binary (`PosIsFree` reads the field inline; the emission
+    /// is an ICF twin of a dozen identical field readers), so it anchors on
+    /// the field rather than on a function.
+    std::int32_t mSize;   // +0x08
+    /// Address: 0x0059C7A0 (FUN_0059C7A0) -- the same caller-less accessor
+    /// emission for this field.
+    std::int32_t mLayer;  // +0x0C
 
     SAssignedLocInfo() = default;
 
@@ -321,17 +316,15 @@ namespace moho
      * Address: 0x0059A3F0 (FUN_0059A3F0)
      *
      * What it does:
-     * Initializes one occupied-slot payload from `(position, footprintSize,
-     * laneToken)`.
+     * Initializes one assigned slot from `(position, size, layer)`.
      */
-    SAssignedLocInfo(const SCoordsVec2& slotPosition, std::int32_t footprintSizeValue, std::int32_t laneTokenValue) noexcept;
+    SAssignedLocInfo(const SCoordsVec2& position, std::int32_t size, std::int32_t layer) noexcept;
 
     /**
      * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
      *
      * What it does:
-     * Loads one occupied-slot lane: assigned 2D position, footprint size, and
-     * lane token.
+     * Loads one assigned slot: position, footprint size and layer.
      */
     static void MemberDeserialize(SAssignedLocInfo* slot, gpg::ReadArchive* archive);
 
@@ -339,12 +332,19 @@ namespace moho
      * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
      *
      * What it does:
-     * Stores one occupied-slot lane: assigned 2D position, footprint size, and
-     * lane token.
+     * Stores one assigned slot: position, footprint size and layer.
      */
     static void MemberSerialize(const SAssignedLocInfo* slot, gpg::WriteArchive* archive);
   };
   static_assert(sizeof(SAssignedLocInfo) == 0x10, "SAssignedLocInfo size must be 0x10");
+  static_assert(offsetof(SAssignedLocInfo, mSize) == 0x08, "SAssignedLocInfo::mSize offset must be 0x08");
+  static_assert(offsetof(SAssignedLocInfo, mLayer) == 0x0C, "SAssignedLocInfo::mLayer offset must be 0x0C");
+
+  static_assert(sizeof(gpg::fastvector_n<WeakPtr<IUnit>, 4>) == 0x30, "fastvector_n<WeakPtr<IUnit>,4> size must be 0x30");
+  static_assert(sizeof(gpg::fastvector_n<SOffsetInfo, 2>) == 0xA8, "fastvector_n<SOffsetInfo,2> size must be 0xA8");
+  static_assert(sizeof(gpg::fastvector_n<SAssignedLocInfo, 16>) == 0x110, "fastvector_n<SAssignedLocInfo,16> size must be 0x110");
+  static_assert(sizeof(msvc8::map<EntId, SUnitOffsetInfo>) == 0x0C, "map<EntId,SUnitOffsetInfo> size must be 0x0C");
+  static_assert(sizeof(msvc8::map<EntId, SCoordsVec2>) == 0x0C, "map<EntId,SCoordsVec2> size must be 0x0C");
 
   /**
    * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
@@ -353,8 +353,7 @@ namespace moho
    * `RIndexed`-owning `SerLoad` callback body for `gpg::fastvector<SOffsetInfo>`
    * reflection. Exposed (not file-local) because
    * `gpg::RFastVectorType<Moho::SOffsetInfo>::Init` (FastVectorUIntReflection.cpp)
-   * stores this address into `serLoadFunc_`; the lane-entry default-prototype
-   * and resize helpers it needs are file-local to CAiFormationInstance.cpp.
+   * stores this address into `serLoadFunc_`.
    */
   void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
@@ -374,7 +373,7 @@ namespace moho
    * `RIndexed::SetCount` slot body for `gpg::fastvector<SOffsetInfo>`
    * reflection. Exposed for the same reason as `LoadFastVectorSOffsetInfo`.
    */
-  void SetFastVectorSOffsetInfoCount(void* laneVector, int count);
+  void SetFastVectorSOffsetInfoCount(void* vector, int count);
 
   /**
    * Address: 0x0056E000 (FUN_0056E000, gpg::RFastVectorType_SAssignedLocInfo::SerLoad)
@@ -404,136 +403,7 @@ namespace moho
    * `RIndexed::SetCount` slot body for `gpg::fastvector<SAssignedLocInfo>`
    * reflection. Exposed for the same reason as `LoadFastVectorSAssignedLocInfo`.
    */
-  void SetFastVectorSAssignedLocInfoCount(void* slotVector, int count);
-
-  /**
-   * Thin alias for the single owning `SAssignedLocInfo` definition above.
-   * `SAssignedLocInfo` is the name the shipped binary carries in RTTI
-   * (`.?AUSAssignedLocInfo@Moho@@`) and the name `Reflection.h` forward-
-   * declares for `RRef_SAssignedLocInfo`, which previously left it an
-   * incomplete type with no definition anywhere in the tree.
-   */
-  using SFormationOccupiedSlot = SAssignedLocInfo;
-  static_assert(
-    offsetof(SAssignedLocInfo, footprintSize) == 0x08, "SAssignedLocInfo::footprintSize offset must be 0x08"
-  );
-  static_assert(offsetof(SAssignedLocInfo, laneToken) == 0x0C, "SAssignedLocInfo::laneToken offset must be 0x0C");
-
-  struct SFormationCoordCacheNode
-  {
-    SFormationCoordCacheNode* left;   // +0x00
-    SFormationCoordCacheNode* parent; // +0x04
-    SFormationCoordCacheNode* right;  // +0x08
-    std::uint32_t unitEntityId;       // +0x0C
-    SCoordsVec2 position;             // +0x10
-    std::uint8_t color;               // +0x18
-    std::uint8_t isNil;               // +0x19
-    std::uint8_t pad1A[2];            // +0x1A
-  };
-  static_assert(sizeof(SFormationCoordCacheNode) == 0x1C, "SFormationCoordCacheNode size must be 0x1C");
-  static_assert(
-    offsetof(SFormationCoordCacheNode, unitEntityId) == 0x0C, "SFormationCoordCacheNode::unitEntityId offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SFormationCoordCacheNode, position) == 0x10, "SFormationCoordCacheNode::position offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SFormationCoordCacheNode, isNil) == 0x19, "SFormationCoordCacheNode::isNil offset must be 0x19"
-  );
-
-  struct SFormationCoordCacheMap
-  {
-    std::uint32_t allocatorCookie;   // +0x00
-    SFormationCoordCacheNode* head;  // +0x04
-    std::uint32_t size;              // +0x08
-  };
-  static_assert(sizeof(SFormationCoordCacheMap) == 0x0C, "SFormationCoordCacheMap size must be 0x0C");
-  static_assert(
-    offsetof(SFormationCoordCacheMap, head) == 0x04, "SFormationCoordCacheMap::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SFormationCoordCacheMap, size) == 0x08, "SFormationCoordCacheMap::size offset must be 0x08"
-  );
-
-  using SFormationLinkedUnitRefVec = gpg::fastvector_n<SFormationLinkedUnitRef, 4>;
-  using SFormationLaneVec = gpg::fastvector_n<SFormationLaneEntry, 2>;
-  using SAssignedLocInfoVec = gpg::fastvector_n<SAssignedLocInfo, 16>;
-  static_assert(sizeof(SFormationLinkedUnitRefVec) == 0x30, "SFormationLinkedUnitRefVec size must be 0x30");
-  static_assert(sizeof(SFormationLaneVec) == 0xA8, "SFormationLaneVec size must be 0xA8");
-  static_assert(sizeof(SAssignedLocInfoVec) == 0x110, "SAssignedLocInfoVec size must be 0x110");
-
-  /// Thin alias kept alongside `SFormationOccupiedSlot` for the same reason.
-  using SFormationOccupiedSlotVec = SAssignedLocInfoVec;
-
-  /**
-   * The transient "candidate unit set" `PreRunScript`/`Setup`/`RunScript`/
-   * `UpdateFormation` build and drain (IDA's own local type library names
-   * it `gpg::fastvector_n4_WeakPtr_IUnit`). The element is `SWeakRefSlot`
-   * (moho/unit/core/Unit.h) rather than `WeakPtr<IUnit>` itself: a slot is
-   * bound/queried through `SWeakRefSlot::AsWeakPtr<IUnit>()`, which is the
-   * exact same intrusive weak-link relink logic, but keeps the container's
-   * own element type POD/trivially-destructible. `WeakPtr<IUnit>` carries a
-   * real (non-trivial) unlink destructor; letting the compiler auto-invoke
-   * that on an abandoned inline slot after a heap grow (the growth path
-   * leaves stale, non-null link bytes in the old inline array, which stays
-   * a live C++ subobject) would re-walk an already-spliced chain and can
-   * run off its end. Every unlink in this family is therefore the explicit
-   * call the binary itself makes.
-   */
-  using SFormationLayerUnitSet = gpg::fastvector_n<SWeakRefSlot, 4>;
-
-  /**
-   * Binds one freshly-linked weak slot to `unit` and appends it to
-   * `destination`, matching the binary's inline construct-then-push dance
-   * used by every `SFormationLayerUnitSet` builder in the engine: `UpdateFormation`
-   * (0x00567F1D..0x00567F94), `PreRunScript`/`Setup` (CAiFormationInstance.cpp),
-   * and `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp) all
-   * inline this exact sequence -- construct a temporary bound to `unit`
-   * (linking it at the unit's real weak-chain head), push_back it (the
-   * relink-aware push steals the link for the new slot), then unlink the
-   * temporary, since the container's copy now owns the link going forward.
-   * Moved to external linkage (was file-local in CAiFormationInstance.cpp's
-   * anonymous namespace) so `CFormation::Finalize` can reuse it instead of
-   * duplicating the same intrusive-weak-guard dance.
-   */
-  void AppendLinkedUnitWeakSlot(SFormationLayerUnitSet& destination, Unit* unit);
-
-  /**
-   * Binds one freshly-linked `SFormationLinkedUnitRef` to `target` and appends
-   * it to `destination`, matching the same construct-then-push-then-unlink
-   * dance as `AppendLinkedUnitWeakSlot` above, but for the `mUnits` lane's own
-   * element type: link a temporary into `target`'s owner-chain head
-   * (`target + 0x04`, the `IUnit`/`WeakObject` chain head every `IUnit`
-   * sub-object carries, regardless of which concrete class it belongs to),
-   * push_back it (the copy steals the link), then unlink the now-redundant
-   * temporary. `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp)
-   * inlines exactly this sequence to collect its participant set into the
-   * `SFormationLinkedUnitRefVec` it hands to `CFormationInstance::Create`.
-   */
-  void AppendLinkedUnitRef(SFormationLinkedUnitRefVec& destination, IUnit* target);
-
-  /**
-   * Unlinks every slot in `container` from its target's real weak chain and
-   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed by
-   * the conditional `operator delete[]`, which every one of
-   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit --
-   * and which `CFormation::Finalize` (0x00838464..0x008384A3) inlines too, to
-   * release the transient participant collection it builds each call. Moved
-   * to external linkage for the same reason as `AppendLinkedUnitWeakSlot`
-   * above.
-   */
-  void ClearLinkedUnitWeakSlots(SFormationLayerUnitSet& container);
-
-  /**
-   * `SFormationLinkedUnitRefVec` counterpart of `ClearLinkedUnitWeakSlots`
-   * above: unlinks every slot in `container` from its unit's real owner-chain
-   * (mirroring `AppendLinkedUnitRef`'s own link mechanics) and resets storage
-   * to inline. `CFormation::Finalize` calls this on its transient participant
-   * collection after handing it to `CFormationInstance::Create` (whose ctor
-   * copy-constructs its own `mUnits` from the same elements, re-linking each
-   * one into the unit's chain independently).
-   */
-  void ClearLinkedUnitRefs(SFormationLinkedUnitRefVec& container);
+  void SetFastVectorSAssignedLocInfoCount(void* vector, int count);
 
   /**
    * The formation-instance state the binary keeps on `CFormationInstance`,
@@ -544,6 +414,21 @@ namespace moho
    * (0x0056A780) sets 808 = 0x328, and `CAiFormationInstanceTypeInfo::Init`
    * (0x0059BDE0) sets 816 = 0x330 - the 8-byte delta is `mSim` plus the
    * trailing word, which stay on the derived class.
+   *
+   * RTTI (`.?AVCFormationInstance@Moho@@`) lists the bases as
+   * `IFormationInstance` (mdisp 0), `Moho::CountedObject` (mdisp 0) and
+   * `Broadcaster<EFormationdStatus>` (mdisp 8): the two words right after the
+   * vtable are the counted-object reference count and the status-listener
+   * ring. `IFormationInstance` is still modelled as the bare 4-byte vtable
+   * carrier, so those two live here as `mSharedCount` and `mStatusListeners`
+   * until that base is split out.
+   *
+   * Member names follow the shipped symbol set the FAF IDB carries for this
+   * class (`mSharedCount`, `mState`, `mGamerules`, `mUnits`, `mOffsetInfo`,
+   * `mSlots`, `mOrientation`, `mPlanUpdate`, `mMaxSize`); the caches, the
+   * forward vector and the scale carry names taken from their proven
+   * readers and writers instead of the IDB's `mMap1`/`mPos1`/`mVal2`
+   * placeholders.
    *
    * `CFormationInstance::MemberSerialize` (0x005744E0) and
    * `MemberDeserialize` (0x005741D0) are methods on this class and touch
@@ -558,15 +443,17 @@ namespace moho
     inline static gpg::RType* sType = nullptr;
 
     /**
-     * No standalone binary address: purely a base-subobject default-init
-     * step. `CAiFormationInstance::CAiFormationInstance()` already
-     * re-assigns every one of these base fields itself right after the
-     * base subobject exists, so this default constructor's own
-     * member-default-initialization is always immediately overwritten
-     * there -- it exists only so the derived class's no-arg constructor
-     * has a base to default-construct.
+     * Address: 0x005692D0 (FUN_005692D0, Moho::CFormationInstance::CFormationInstance)
+     *
+     * What it does:
+     * The default state a reflection-constructed instance starts from:
+     * reference count zero, self-linked listener ring, no Lua state, rules
+     * or command, every container empty on its inline storage, both
+     * position caches with a fresh head, an empty script name, a NaN centre,
+     * no pending plan, zero max footprint and zero scale. The orientation
+     * lanes are left untouched, exactly as the binary leaves them.
      */
-    CFormationInstance() = default;
+    CFormationInstance();
 
     /**
      * Address: 0x005694B0 (FUN_005694B0, Moho::CFormationInstance::CFormationInstance)
@@ -574,27 +461,24 @@ namespace moho
      * IDA signature:
      * Moho::CAiFormationInstance *__fastcall Moho::CFormationInstance::CFormationInstance(
      *     Moho::RRuleGameRulesImpl *rules, int commandType, Moho::CFormationInstance *this,
-     *     LuaPlus::LuaState *state, gpg::fastvector_n<SFormationLinkedUnitRef, 4> *units,
+     *     LuaPlus::LuaState *state, gpg::fastvector_n<WeakPtr<IUnit>, 4> *units,
      *     const char *name, Moho::SCoordsVec2 *coords, Wm3::Quaternionf orientation);
      *
      * What it does:
-     * Self-links the intrusive unit-link list node, stamps the Lua state,
-     * game rules, and command type, copies the caller's initial unit-ref set
-     * into `mUnits`, default-constructs both lane vectors and the
-     * occupied-slot vector (implicit, matching the binary's inline
-     * `eh vector constructor iterator` + inline-buffer setup), eagerly
-     * builds both coord-cache head sentinels, sets the script name and
-     * formation center, and -- only when `coords` yields a valid flat
-     * ground-plane point -- derives the initial forward vector from
-     * `orientation` (same formula as `SetOrientation`), clears the occupied
-     * slots and both coord caches back to empty, and runs one
+     * Stamps the Lua state, game rules and command type, copies the caller's
+     * initial unit set into `mUnits` (the copy links every element into its
+     * unit's weak chain), default-constructs both group vectors, the assigned
+     * slot vector and both position caches, sets the script name and centre,
+     * and -- only when `coords` yields a valid flat ground-plane point --
+     * derives the initial forward vector from `orientation` (same formula as
+     * `SetOrientation`), clears the slot caches and runs one
      * `UpdateFormation` pass.
      */
     CFormationInstance(
-      RRuleGameRulesImpl* rules,
+      RRuleGameRules* rules,
       EUnitCommandType commandType,
       LuaPlus::LuaState* state,
-      const SFormationLinkedUnitRefVec& units,
+      const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
       const char* name,
       const SCoordsVec2& coords,
       const Wm3::Quatf& orientation
@@ -618,20 +502,18 @@ namespace moho
      * `UNITCOMMAND_None` (matching the binary's literal `push 0`), and returns
      * the constructed pointer (or `nullptr` if the allocation itself failed).
      * The decompiler's `Wm3::Vector3f *units` parameter typing is a type-
-     * confusion artifact (the same one documented on `CFormation::mParticipants`
-     * elsewhere in this tree) -- the binary's only caller, `CFormation::Finalize`
+     * confusion artifact -- the binary's only caller, `CFormation::Finalize`
      * (0x0083843B), actually passes the address of a transient
-     * `gpg::fastvector_n4_WeakPtr_IUnit`-shaped collector, matching
-     * `SFormationLinkedUnitRefVec`'s copy-constructing consumer in the base
-     * ctor above. The four trailing floats are the caller's `mDirection`
-     * quaternion, spread across contiguous stack slots by the by-value ABI;
-     * reconstructed here as a single `Wm3::Quatf` parameter for clarity, since
-     * both sides of the only real call site pass/consume it as one unit.
+     * `gpg::fastvector_n4_WeakPtr_IUnit` collector. The four trailing floats
+     * are the caller's `mDirection` quaternion, spread across contiguous
+     * stack slots by the by-value ABI; reconstructed here as a single
+     * `Wm3::Quatf` parameter for clarity, since both sides of the only real
+     * call site pass/consume it as one unit.
      */
     [[nodiscard]] static CFormationInstance* Create(
-      RRuleGameRulesImpl* rules,
+      RRuleGameRules* rules,
       LuaPlus::LuaState* state,
-      const SFormationLinkedUnitRefVec& units,
+      const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
       const char* name,
       const SCoordsVec2& coords,
       const Wm3::Quatf& orientation
@@ -641,8 +523,8 @@ namespace moho
      * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
      *
      * What it does:
-     * Reads the eighteen reflected lanes back in the order MemberSerialize
-     * wrote them. The Lua state and game-rules lanes come back through typed
+     * Reads the eighteen reflected fields back in the order MemberSerialize
+     * wrote them. The Lua state and game-rules fields come back through typed
      * pointer readers rather than a raw form.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
@@ -652,7 +534,7 @@ namespace moho
      *
      * What it does:
      * Writes the reflected base payload, the two owning pointers as unowned
-     * tracked references, then every formation lane. mSim and the trailing
+     * tracked references, then every formation field. mSim and the trailing
      * word are runtime-only and deliberately not written.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
@@ -678,56 +560,70 @@ namespace moho
      */
     void operator_delete(std::int32_t deleteFlags) override;
 
-    std::int32_t mUnitCount;                      // +0x04
-    TDatListItem<void, void> mUnitLinkListHead;   // +0x08
-    LuaPlus::LuaState* mLuaState;                 // +0x10
-    RRuleGameRules* mGameRules;                   // +0x14
-    EUnitCommandType mCommandType;                // +0x18
-    std::uint32_t mUnknown_0x01C;                 // +0x1C
-    SFormationLinkedUnitRefVec mUnits;            // +0x20
-    SFormationLaneVec mLanes[2];                  // +0x50
-    SAssignedLocInfoVec mOccupiedSlots;     // +0x1A0
-    SFormationCoordCacheMap mCoordCachePrimary;   // +0x2B0
-    SFormationCoordCacheMap mCoordCacheSecondary; // +0x2BC
-    Wm3::Vec3f mForwardVector;                    // +0x2C8
-    Wm3::Quatf mOrientation;                      // +0x2D4
-    Wm3::Quatf mOrientationBaseline;              // +0x2E4
-    msvc8::string mScriptName;                    // +0x2F4
-    SCoordsVec2 mFormationCenter;                 // +0x310
-    float mFormationUpdateScale;                  // +0x318
-    std::uint8_t mPlanUpdateRequested;            // +0x31C
-    std::uint8_t mPad_0x31D[3];                   // +0x31D
-    std::int32_t mMaxUnitSlotCount;               // +0x320
-    float mFormationUnitSpacingMultiplier;        // +0x324
+    /// `Moho::CountedObject`'s reference count (RTTI base at mdisp 0);
+    /// zeroed by the `IFormationInstance` constructor (0x00569450).
+    std::int32_t mSharedCount;                                // +0x04
+    /// `Broadcaster<EFormationdStatus>` (RTTI base at mdisp 8): the ring of
+    /// `Listener<EFormationdStatus>` nodes `BroadcastEvent` fans out to, and
+    /// the payload the reflected `Broadcaster<EFormationdStatus>` type
+    /// serializes at `IFormationInstance + 0x08`.
+    BroadcasterEventTag<EFormationdStatus> mStatusListeners;  // +0x08
+    LuaPlus::LuaState* mState;                                // +0x10
+    RRuleGameRules* mGamerules;                               // +0x14
+    EUnitCommandType mCommandType;                            // +0x18
+    /// Never written by any constructor or method in the binary.
+    std::uint32_t mUnknown_0x01C;                             // +0x1C
+    /// Every unit in the formation (IDA: `gpg::fastvector_n4_WeakPtr_IUnit`).
+    gpg::fastvector_n<WeakPtr<IUnit>, 4> mUnits;              // +0x20
+    /// The formation groups, one vector per layer (`GetLayer`: 0 ground, 1 air).
+    gpg::fastvector_n<SOffsetInfo, 2> mOffsetInfo[2];         // +0x50
+    /// Slots `FindSlotFor` has handed out for the current plan.
+    gpg::fastvector_n<SAssignedLocInfo, 16> mSlots;           // +0x1A0
+    /// `GetFormationPosition` results by entity id, valid until the centre
+    /// moves or the plan is rebuilt.
+    msvc8::map<EntId, SCoordsVec2> mFormationPosCache;        // +0x2B0
+    /// `GetOffsetPosition` results by entity id, same lifetime as
+    /// `mFormationPosCache`.
+    msvc8::map<EntId, SCoordsVec2> mOffsetPosCache;           // +0x2BC
+    Wm3::Vec3f mForwardVector;                                // +0x2C8
+    Wm3::Quatf mOrientation;                                  // +0x2D4
+    /// Rotation from the units' mean heading to the formation heading
+    /// (`UpdateFormation`); `RunScript` pre-rotates each unit's relative
+    /// position by it before matching slots.
+    Wm3::Quatf mOrientationChange;                            // +0x2E4
+    msvc8::string mScriptName;                                // +0x2F4
+    /// The formation centre (`GetCoords`/`SetCoords`).
+    SCoordsVec2 mCoords;                                      // +0x310
+    /// Multiplies every script offset (`ComputeRunScriptOffset`); `SetScale`.
+    float mScale;                                             // +0x318
+    /// Set whenever the plan must be rebuilt before it is next read.
+    std::uint8_t mPlanUpdate;                                 // +0x31C
+    std::uint8_t mPad_0x31D[3];                               // +0x31D
+    /// Largest footprint dimension among the formation's mobile units.
+    std::int32_t mMaxSize;                                    // +0x320
+    /// Never written by any constructor or method in the binary; no formation
+    /// code reads it either.
+    std::uint32_t mUnknown_0x324;                             // +0x324
 
   public:
     /**
-     * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
-     *
-     * IDA signature:
-     * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
-     *     Moho::CFormationInstance *this@<eax>);
-     *
-     * What it does:
-     * Resets transient formation-plan state: clears the occupied-slot vector to
-     * its inline buffer, resets both coord-cache RB-trees in place (keeping the
-     * head sentinel), zeroes the orientation-baseline quaternion, and tears down
-     * each of the two lane vectors (destroying every lane entry's unit map and
-     * unlinking its weak back-link words) before resetting them to inline.
-     */
-    /**
      * Address: 0x00569A10 (FUN_00569A10)
      * Slot: 1
-     * Demangled: Moho::CFormationInstance::Func2 (GetCenter)
+     *
+     * What it does:
+     * Copies the formation centre into `outCoords`.
      */
-    SCoordsVec2* Func2(SCoordsVec2* outCenter) const override;
+    SCoordsVec2* GetCoords(SCoordsVec2* outCoords) const override;
 
     /**
-     * Address: 0x00569A30 (FUN_00569A30)
+     * Address: 0x00569A30 (FUN_00569A30, Moho::CFormationInstance::SetCoords)
      * Slot: 2
-     * Demangled: Moho::CFormationInstance::Func3 (SetCenter)
+     *
+     * What it does:
+     * Moves the formation centre when the new one differs and is not NaN,
+     * dropping every assigned slot and both position caches.
      */
-    void Func3(const SCoordsVec2& center) override;
+    void SetCoords(const SCoordsVec2& coords) override;
 
     /**
      * Address: 0x0056A210 (FUN_0056A210)
@@ -744,7 +640,7 @@ namespace moho
      *
      * What it does:
      * Returns the formation layer this unit belongs to: `1` for air-motion
-     * blueprints, `0` for everything else. The result indexes `mLanes`.
+     * blueprints, `0` for everything else. The result indexes `mOffsetInfo`.
      * `PreRunScript` (0x00566B10) dispatches this through slot 4 and compares
      * the result against the layer being built, which is where the name comes
      * from.
@@ -757,61 +653,80 @@ namespace moho
     /**
      * Address: 0x005669A0 (FUN_005669A0)
      * Slot: 5
-     * Demangled: Moho::CFormationInstance::Func6
+     *
+     * What it does:
+     * The group `unit` was placed in: the first group of the unit's layer
+     * whose unit map holds its entity id. Warns and returns null when the
+     * unit is in no group.
      */
-    SFormationLaneEntry* Func6(Unit* unit) override;
+    SOffsetInfo* GetOffsetInfo(Unit* unit) override;
 
     /**
      * Address: 0x00569CB0 (FUN_00569CB0)
      * Slot: 6
      * Demangled: Moho::CFormationInstance::GetFormationPosition
      */
-    SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+    SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x00569EA0 (FUN_00569EA0)
      * Slot: 7
      * Demangled: Moho::CFormationInstance::GetAdjustedFormationPosition
      */
-    SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+    SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x00569F70 (FUN_00569F70)
      * Slot: 8
-     * Demangled: Moho::CFormationInstance::Func9
+     *
+     * What it does:
+     * The unit's raw slot position (`mCoords + mOffset`, no free-slot
+     * search), cached in `mOffsetPosCache`.
      */
-    SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry) override;
+    SCoordsVec2* GetOffsetPosition(SCoordsVec2* dest, Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0056A150 (FUN_0056A150)
      * Slot: 9
-     * Demangled: Moho::CFormationInstance::Func10
+     *
+     * What it does:
+     * The unit's smoothed `SUnitOffsetInfo::mTargetPos`, or its own position
+     * before the first update has produced one.
      */
-    Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SFormationLaneEntry* laneEntry) override;
+    Wm3::Vec3f* GetTargetPosition(Wm3::Vec3f* out, Unit* unit, SOffsetInfo* info) override;
 
     /**
-     * Address: 0x00566070 (FUN_00566070, Moho::CFormationInstance::Func11)
+     * Address: 0x00566070 (FUN_00566070)
      * Slot: 10
+     *
+     * What it does:
+     * Base implementation: no leader distance, always zero.
      */
-    float Func11(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    float GetDistFromLeader(Unit* unit, SOffsetInfo* info) override;
 
     /**
-     * Address: 0x00566080 (FUN_00566080, Moho::CFormationInstance::Func12)
+     * Address: 0x00566080 (FUN_00566080)
      * Slot: 11
+     *
+     * What it does:
+     * Base implementation: every unit has priority 1.
      */
-    std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    std::int32_t GetPriority(Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
      * Slot: 12
      */
-    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry) override;
+    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SOffsetInfo* info) override;
 
     /**
-     * Address: 0x0056A6E0 (FUN_0056A6E0, Moho::CFormationInstance::Func14)
+     * Address: 0x0056A6E0 (FUN_0056A6E0)
      * Slot: 13
+     *
+     * What it does:
+     * Base implementation: no leader, always null.
      */
-    Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    Unit* GetLeader(Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0056A220 (FUN_0056A220)
@@ -828,12 +743,29 @@ namespace moho
     void RemoveUnit(Unit* unit) override;
 
     /**
-     * Address: 0x0056A440 (FUN_0056A440)
+     * Address: 0x0056A440 (FUN_0056A440, Moho::CFormationInstance::Contains)
      * Slot: 16
-     * Demangled: Moho::CFormationInstance::Func17
+     *
+     * What it does:
+     * Membership test: placed in a group of the unit's layer, or (with
+     * `checkAll`) merely listed in `mUnits`.
      */
-    bool Func17(Unit* unit, bool checkAll) const override;
+    bool Contains(Unit* unit, bool checkAll) const override;
 
+    /**
+     * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
+     *
+     * IDA signature:
+     * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
+     *     Moho::CFormationInstance *this@<eax>);
+     *
+     * What it does:
+     * Resets transient formation-plan state: clears the assigned slots, both
+     * position caches (keeping their head sentinels) and the orientation
+     * change, then destroys every group of both layers -- each group's
+     * destructor unlinks its leader and frees its unit map -- and returns the
+     * group vectors to inline storage.
+     */
     void CleanupFormation();
 
     /**
@@ -853,9 +785,11 @@ namespace moho
     /**
      * Address: 0x00569B60 (FUN_00569B60)
      * Slot: 18
-     * Demangled: Moho::CFormationInstance::Func19
+     *
+     * What it does:
+     * The formation forward vector for a placed unit, zero otherwise.
      */
-    Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const override;
+    Wm3::Vec3f* GetForwardVector(Wm3::Vec3f* out, Unit* unit) const override;
 
     /**
      * Address: 0x00569BF0 (FUN_00569BF0)
@@ -867,16 +801,21 @@ namespace moho
     /**
      * Address: 0x00569C20 (FUN_00569C20)
      * Slot: 20
-     * Demangled: Moho::CFormationInstance::Func21
+     *
+     * What it does:
+     * The unit's group `mInFormation` flag, or every group's when no valid
+     * unit is given.
      */
-    bool Func21(Unit* unit) const override;
+    bool IsInFormation(Unit* unit) const override;
 
     /**
      * Address: 0x0056A4F0 (FUN_0056A4F0)
      * Slot: 21
-     * Demangled: Moho::CFormationInstance::Func22
+     *
+     * What it does:
+     * Stores a changed script-offset scale and requests a plan rebuild.
      */
-    void Func22(float scale) override;
+    void SetScale(float scale) override;
 
     /**
      * Address: 0x0056A520 (FUN_0056A520)
@@ -905,7 +844,7 @@ namespace moho
      *
      * What it does:
      * Base implementation: hands `pos` straight back through `dest`. It never
-     * consults the occupied-slot table; `CAiFormationInstance` overrides it
+     * consults the assigned-slot table; `CAiFormationInstance` overrides it
      * with the real slot search.
      */
     virtual SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit);
@@ -914,8 +853,8 @@ namespace moho
      * Address: 0x005691E0 (FUN_005691E0, Moho::CFormationInstance::RemoveDeadUnits)
      *
      * What it does:
-     * Removes null/dead/destroy-queued units from linked formation unit refs
-     * and reports whether `checkForUnit` remains live in the set.
+     * Erases every null, dead or destroy-queued unit from `mUnits` and
+     * reports whether `checkForUnit` is still in the set.
      */
     bool RemoveDeadUnits(Unit* checkForUnit);
 
@@ -944,7 +883,11 @@ namespace moho
      * never sees it again); units belonging to a different layer are left
      * in place.
      */
-    void PreRunScript(SFormationLayerUnitSet& layerUnitsOut, SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+    void PreRunScript(
+      gpg::fastvector_n<WeakPtr<IUnit>, 4>& layerUnitsOut,
+      gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits,
+      std::int32_t layerIndex
+    );
 
     /**
      * Address: 0x00568820 (FUN_00568820, Moho::CFormationInstance::Setup)
@@ -959,7 +902,7 @@ namespace moho
      * `PreRunScript`, runs the formation script over them via `RunScript`
      * when any were claimed, then releases the per-layer scratch list.
      */
-    void Setup(SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+    void Setup(gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits, std::int32_t layerIndex);
 
     /**
      * Address: 0x00567300 (FUN_00567300, Moho::CFormationInstance::RunScript)
@@ -977,28 +920,28 @@ namespace moho
      * Builds a Lua unit table from `units` and calls `Moho::FORMATION_RunScript`;
      * early-exits if it produced no slots. Computes the mean unit position,
      * builds one relative-position descriptor per unit (optionally rotated by
-     * `mOrientationBaseline`) while folding the lane's `preferredSpeed`,
-     * computes slot-table span/mean statistics, builds one scored candidate
-     * per (slot, unit) pair whose category matches and sorts them by squared
+     * `mOrientationChange`) while folding the group's speed, computes
+     * slot-table span/mean statistics, builds one scored candidate per
+     * (slot, unit) pair whose category matches and sorts them by squared
      * distance, then greedily assigns each candidate's nearest still-free
-     * unit into the new lane entry's `unitMap` (warning on duplicate
+     * unit into the new group's `mUnitOffsets` (warning on duplicate
      * assignment), calls `RemoveUnit` for anything left unassigned, and
-     * appends the finished lane entry to `mLanes[layerIndex]`.
+     * appends the finished group to `mOffsetInfo[layerIndex]`.
      */
-    void RunScript(SFormationLayerUnitSet& units, std::int32_t layerIndex);
+    void RunScript(gpg::fastvector_n<WeakPtr<IUnit>, 4>& units, std::int32_t layerIndex);
 
     /**
      * Address: 0x00568CA0 (FUN_00568CA0, Moho::CFormationInstance::UpdateFormation)
      *
      * What it does:
      * Snapshots every live, mobile, non-building, non-destroy-queued linked
-     * unit into a weak-slot scratch list, accumulates the formation's mean
+     * unit into a scratch unit set, accumulates the formation's mean
      * facing and each unit's max footprint size, refreshes
-     * `mOrientationChng` when the facing changed enough, then rebuilds each
-     * formation layer in turn: releases the previous lane entries for that
-     * layer and calls `Setup` to claim and script this layer's units. After
-     * both layers rebuild, merges overlapping lane bands for `Form*`
-     * commands and broadcasts `FORMATIONSTATUS_FormationUpdated`.
+     * `mOrientationChange` when the facing changed enough, then rebuilds each
+     * formation layer in turn: destroys the previous groups for that layer
+     * and calls `Setup` to claim and script this layer's units. After both
+     * layers rebuild, merges overlapping groups for `Form*` commands and
+     * broadcasts `FORMATIONSTATUS_FormationUpdated`.
      */
     void UpdateFormation();
 
@@ -1010,6 +953,18 @@ namespace moho
      * IFormationInstance base tear themselves down.
      */
     ~CFormationInstance();
+
+  private:
+    /**
+     * No standalone binary address: the three-step slot reset the binary
+     * inlines at 0x00569A30 (`SetCoords`), 0x005694B0 (the constructor tail)
+     * and 0x00568AC0 (the head of `CleanupFormation`).
+     *
+     * What it does:
+     * Drops every assigned slot back to inline storage and empties both
+     * position caches, keeping their head sentinels.
+     */
+    void ClearSlotCaches();
   };
 
   static_assert(sizeof(CFormationInstance) == 0x328, "CFormationInstance size must be 0x328");
@@ -1030,20 +985,42 @@ namespace moho
      * sequence inlined into `operator new` (0x0059D0F0).
      *
      * What it does:
-     * Runs the base `CFormationInstance` constructor (0x005692D0: formation
-     * intrusive links, lane vectors, coord-cache map heads, and default
-     * scalar state), then publishes the `CAiFormationInstance` vtable and
-     * clears the owning-`Sim` back-reference.
+     * Runs the base `CFormationInstance` constructor (0x005692D0: reference
+     * count, listener ring, empty containers, position-cache heads and
+     * default scalar state), then publishes the `CAiFormationInstance`
+     * vtable and clears the owning-`Sim` back-reference.
      */
     CAiFormationInstance();
+
+    /**
+     * No standalone binary address: inlined into
+     * `CAiFormationDBImpl::NewFormation` (0x0059C120, 0x0059C1F6-0x0059C22B),
+     * the only place the binary builds a formation from live units --
+     * `::operator new(0x330)`, the base constructor with the sim's rules and
+     * Lua state, the `CAiFormationInstance` vtable, then `mSim`.
+     *
+     * What it does:
+     * Builds a formation for `sim` over `units` (see the base constructor)
+     * and binds the owning sim.
+     */
+    CAiFormationInstance(
+      Sim* sim,
+      RRuleGameRules* rules,
+      EUnitCommandType commandType,
+      LuaPlus::LuaState* state,
+      const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
+      const char* name,
+      const SCoordsVec2& coords,
+      const Wm3::Quatf& orientation
+    );
 
     /**
      * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
      * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
      *
      * What it does:
-     * Tears down transient formation caches/lane state, unregisters this
-     * instance from the owning formation DB, then tears down unit-link lanes.
+     * Resets the transient plan, unregisters this instance from the owning
+     * formation DB, then lets `~CFormationInstance` tear the members down.
      */
     ~CAiFormationInstance();
 
@@ -1062,7 +1039,7 @@ namespace moho
      * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
      *
      * What it does:
-     * Reads serialized formation-instance members from archive lanes.
+     * Reads serialized formation-instance members from the archive.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
@@ -1070,45 +1047,56 @@ namespace moho
      * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
      *
      * What it does:
-     * Writes serialized formation-instance members to archive lanes.
+     * Writes serialized formation-instance members to the archive.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x0059A790 (FUN_0059A790)
      * Slot: 10
-     * Demangled: Moho::CAiFormationInstance::Func11
+     *
+     * What it does:
+     * The unit's `SUnitOffsetInfo::mDistFromLeader`, zero when it has no
+     * slot in `info`.
      */
-    float Func11(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    float GetDistFromLeader(Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0059A7D0 (FUN_0059A7D0)
      * Slot: 11
-     * Demangled: Moho::CAiFormationInstance::Func12
+     *
+     * What it does:
+     * The unit's priority order: `10 * (int)SUnitOffsetInfo::mWeight`,
+     * floored at 1; always 1 for guarding units and units without a slot.
      */
-    std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    std::int32_t GetPriority(Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0059A620 (FUN_0059A620)
      * Slot: 12
      * Demangled: Moho::CAiFormationInstance::CalcFormationSpeed
      */
-    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry) override;
+    float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0059A870 (FUN_0059A870)
      * Slot: 13
-     * Demangled: Moho::CAiFormationInstance::Func14
+     *
+     * What it does:
+     * The leader the unit follows: the guarded unit for guard commands, else
+     * its group's leader (air groups follow the first overlapping ground
+     * group's leader instead).
      */
-    Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry) override;
+    Unit* GetLeader(Unit* unit, SOffsetInfo* info) override;
 
     /**
      * Address: 0x0059AE80 (FUN_0059AE80, Moho::CAiFormationInstance::Update)
      *
      * What it does:
-     * Advances the active formation lanes, refreshes lane leaders, and
-     * dispatches the formation update event when the lane state becomes
-     * actionable.
+     * Advances every group of both layers: resolves the leader, refreshes
+     * each unit's target position and distances, and raises
+     * `mInFormation` (broadcasting `FORMATIONSTATUS_FormationAtGoal`) once
+     * every unit is close to its slot.
      * Slot: 17
      * Demangled: Moho::CAiFormationInstance::Update
      */
@@ -1120,45 +1108,44 @@ namespace moho
      * Demangled: Moho::CAiFormationInstance::FindSlotFor
      *
      * What it does:
-     * Resolves one free formation slot near `pos`, records the chosen occupied
-     * slot, and falls back to current unit position when no free slot can be
+     * Resolves one free formation slot near `pos`, records it in `mSlots`,
+     * and falls back to the current unit position when no free slot can be
      * found.
      */
     SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit) override;
 
     /**
-     * Address: 0x0059A570 (FUN_0059A570)
+     * Address: 0x0059A570 (FUN_0059A570, Moho::CAiFormationInstance::PosIsFree)
      * Slot: 26
-     * Demangled: Moho::CAiFormationInstance::Func27
+     *
+     * What it does:
+     * True when no assigned slot of `layer` overlaps `position` by `size`.
      */
-    virtual bool Func27(const SCoordsVec2& position, std::int32_t footprintSize, std::int32_t laneToken) const;
-
+    virtual bool PosIsFree(const SCoordsVec2& position, std::int32_t size, std::int32_t layer) const;
 
   public:
     Sim* mSim;                                    // +0x328
     std::uint32_t mUnknown_0x32C;                 // +0x32C
   };
 
-  static_assert(offsetof(CAiFormationInstance, mUnitCount) == 0x04, "CAiFormationInstance::mUnitCount offset must be 0x04");
+  static_assert(offsetof(CAiFormationInstance, mSharedCount) == 0x04, "CAiFormationInstance::mSharedCount offset must be 0x04");
   static_assert(
-    offsetof(CAiFormationInstance, mUnitLinkListHead) == 0x08, "CAiFormationInstance::mUnitLinkListHead offset must be 0x08"
+    offsetof(CAiFormationInstance, mStatusListeners) == 0x08, "CAiFormationInstance::mStatusListeners offset must be 0x08"
   );
-  static_assert(offsetof(CAiFormationInstance, mLuaState) == 0x10, "CAiFormationInstance::mLuaState offset must be 0x10");
+  static_assert(offsetof(CAiFormationInstance, mState) == 0x10, "CAiFormationInstance::mState offset must be 0x10");
+  static_assert(offsetof(CAiFormationInstance, mGamerules) == 0x14, "CAiFormationInstance::mGamerules offset must be 0x14");
   static_assert(
     offsetof(CAiFormationInstance, mCommandType) == 0x18, "CAiFormationInstance::mCommandType offset must be 0x18"
   );
   static_assert(offsetof(CAiFormationInstance, mUnits) == 0x20, "CAiFormationInstance::mUnits offset must be 0x20");
-  static_assert(offsetof(CAiFormationInstance, mLanes) == 0x50, "CAiFormationInstance::mLanes offset must be 0x50");
+  static_assert(offsetof(CAiFormationInstance, mOffsetInfo) == 0x50, "CAiFormationInstance::mOffsetInfo offset must be 0x50");
+  static_assert(offsetof(CAiFormationInstance, mSlots) == 0x1A0, "CAiFormationInstance::mSlots offset must be 0x1A0");
   static_assert(
-    offsetof(CAiFormationInstance, mOccupiedSlots) == 0x1A0, "CAiFormationInstance::mOccupiedSlots offset must be 0x1A0"
+    offsetof(CAiFormationInstance, mFormationPosCache) == 0x2B0,
+    "CAiFormationInstance::mFormationPosCache offset must be 0x2B0"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mCoordCachePrimary) == 0x2B0,
-    "CAiFormationInstance::mCoordCachePrimary offset must be 0x2B0"
-  );
-  static_assert(
-    offsetof(CAiFormationInstance, mCoordCacheSecondary) == 0x2BC,
-    "CAiFormationInstance::mCoordCacheSecondary offset must be 0x2BC"
+    offsetof(CAiFormationInstance, mOffsetPosCache) == 0x2BC, "CAiFormationInstance::mOffsetPosCache offset must be 0x2BC"
   );
   static_assert(
     offsetof(CAiFormationInstance, mForwardVector) == 0x2C8, "CAiFormationInstance::mForwardVector offset must be 0x2C8"
@@ -1167,26 +1154,18 @@ namespace moho
     offsetof(CAiFormationInstance, mOrientation) == 0x2D4, "CAiFormationInstance::mOrientation offset must be 0x2D4"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mOrientationBaseline) == 0x2E4,
-    "CAiFormationInstance::mOrientationBaseline offset must be 0x2E4"
+    offsetof(CAiFormationInstance, mOrientationChange) == 0x2E4,
+    "CAiFormationInstance::mOrientationChange offset must be 0x2E4"
   );
   static_assert(
     offsetof(CAiFormationInstance, mScriptName) == 0x2F4, "CAiFormationInstance::mScriptName offset must be 0x2F4"
   );
+  static_assert(offsetof(CAiFormationInstance, mCoords) == 0x310, "CAiFormationInstance::mCoords offset must be 0x310");
+  static_assert(offsetof(CAiFormationInstance, mScale) == 0x318, "CAiFormationInstance::mScale offset must be 0x318");
+  static_assert(offsetof(CAiFormationInstance, mPlanUpdate) == 0x31C, "CAiFormationInstance::mPlanUpdate offset must be 0x31C");
+  static_assert(offsetof(CAiFormationInstance, mMaxSize) == 0x320, "CAiFormationInstance::mMaxSize offset must be 0x320");
   static_assert(
-    offsetof(CAiFormationInstance, mFormationCenter) == 0x310, "CAiFormationInstance::mFormationCenter offset must be 0x310"
-  );
-  static_assert(
-    offsetof(CAiFormationInstance, mFormationUpdateScale) == 0x318,
-    "CAiFormationInstance::mFormationUpdateScale offset must be 0x318"
-  );
-  static_assert(
-    offsetof(CAiFormationInstance, mMaxUnitSlotCount) == 0x320,
-    "CAiFormationInstance::mMaxUnitSlotCount offset must be 0x320"
-  );
-  static_assert(
-    offsetof(CAiFormationInstance, mFormationUnitSpacingMultiplier) == 0x324,
-    "CAiFormationInstance::mFormationUnitSpacingMultiplier offset must be 0x324"
+    offsetof(CAiFormationInstance, mUnknown_0x324) == 0x324, "CAiFormationInstance::mUnknown_0x324 offset must be 0x324"
   );
   static_assert(offsetof(CAiFormationInstance, mSim) == 0x328, "CAiFormationInstance::mSim offset must be 0x328");
   static_assert(sizeof(CAiFormationInstance) == 0x330, "CAiFormationInstance size must be 0x330");
@@ -1250,13 +1229,4 @@ namespace moho
    * Constructs/preregisters RTTI metadata for `std::map<EntId,SCoordsVec2>`.
    */
   [[nodiscard]] gpg::RType* preregister_RMapType_EntId_SCoordsVec2();
-
-  /**
-   * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
-   *
-   * What it does:
-   * Represents the base-formation default speed stub lane used by
-   * `CFormationInstance` vftables; returns `0.0f`.
-   */
-  float CFormationInstanceCalcFormationSpeedFallback(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry);
 } // namespace moho
