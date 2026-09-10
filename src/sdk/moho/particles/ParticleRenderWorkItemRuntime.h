@@ -35,10 +35,7 @@ namespace moho
   struct ParticleRenderWorkItemRuntime
   {
     void* mParticleBuffer = nullptr;                              // +0x00
-    std::uint32_t mReserved04 = 0U;                               // +0x04
-    ParticleRenderIntervalRuntime* mIntervalsBegin = nullptr;     // +0x08
-    ParticleRenderIntervalRuntime* mIntervalsEnd = nullptr;       // +0x0C
-    ParticleRenderIntervalRuntime* mIntervalsCapacityEnd = nullptr; // +0x10
+    msvc8::vector<ParticleRenderIntervalRuntime> mIntervals;      // +0x04
     std::uint32_t mIntervalCursor = 0U;                           // +0x14
     std::uint32_t mRenderStartIndex = 0U;                         // +0x18
     std::uint32_t mIntervalCapacityHint = 0U;                     // +0x1C
@@ -49,16 +46,8 @@ namespace moho
     "ParticleRenderWorkItemRuntime::mParticleBuffer offset must be 0x00"
   );
   static_assert(
-    offsetof(ParticleRenderWorkItemRuntime, mIntervalsBegin) == 0x08,
-    "ParticleRenderWorkItemRuntime::mIntervalsBegin offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ParticleRenderWorkItemRuntime, mIntervalsEnd) == 0x0C,
-    "ParticleRenderWorkItemRuntime::mIntervalsEnd offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ParticleRenderWorkItemRuntime, mIntervalsCapacityEnd) == 0x10,
-    "ParticleRenderWorkItemRuntime::mIntervalsCapacityEnd offset must be 0x10"
+    offsetof(ParticleRenderWorkItemRuntime, mIntervals) == 0x04,
+    "ParticleRenderWorkItemRuntime::mIntervals offset must be 0x04"
   );
   static_assert(
     offsetof(ParticleRenderWorkItemRuntime, mIntervalCursor) == 0x14,

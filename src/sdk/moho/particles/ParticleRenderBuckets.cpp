@@ -57,24 +57,6 @@ namespace
 
   static_assert(sizeof(ParticleInstanceRuntime) == 0x5C, "ParticleInstanceRuntime size must be 0x5C");
 
-  template <typename TValue>
-  [[nodiscard]] std::size_t VectorCount(const moho::RenderBucketVectorRuntime<TValue>& vector) noexcept
-  {
-    if (vector.begin == nullptr || vector.end == nullptr || vector.end < vector.begin) {
-      return 0U;
-    }
-    return static_cast<std::size_t>(vector.end - vector.begin);
-  }
-
-  template <typename TValue>
-  [[nodiscard]] std::size_t VectorCapacity(const moho::RenderBucketVectorRuntime<TValue>& vector) noexcept
-  {
-    if (vector.begin == nullptr || vector.capacityEnd == nullptr || vector.capacityEnd < vector.begin) {
-      return 0U;
-    }
-    return static_cast<std::size_t>(vector.capacityEnd - vector.begin);
-  }
-
   [[nodiscard]] moho::ParticleBufferPoolListRuntime* ResolveOwnerBufferPool(moho::CWorldParticles* const owner) noexcept
   {
     if (owner == nullptr) {
@@ -297,20 +279,6 @@ namespace
   );
   static_assert(sizeof(LegacyForwardNodeRuntime) == 0x04, "LegacyForwardNodeRuntime size must be 0x04");
 
-  using IntervalVectorRuntimeView = moho::RenderBucketVectorRuntime<moho::ParticleRenderIntervalRuntime>;
-  using WorkItemPointerVectorRuntime = moho::RenderBucketVectorRuntime<moho::ParticleRenderWorkItemRuntime*>;
-
-  moho::ParticleRenderIntervalRuntime* InsertIntervalValueAtAndGrowDuplicate(
-    IntervalVectorRuntimeView& intervalVector,
-    moho::ParticleRenderIntervalRuntime* insertPosition,
-    const moho::ParticleRenderIntervalRuntime& value
-  );
-
-  [[nodiscard]] bool AppendWorkItemPointer(
-    WorkItemPointerVectorRuntime& vector,
-    moho::ParticleRenderWorkItemRuntime* workItem
-  );
-
   /**
    * Address: 0x00496710 (FUN_00496710, sub_496710)
    *
@@ -460,465 +428,12 @@ namespace
   }
 
   /**
-   * Address: 0x00496910 (FUN_00496910, sub_496910)
-   *
-   * What it does:
-   * Writes one interval-vector begin pointer lane into caller storage.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalVectorBeginPointer(
-    moho::ParticleRenderIntervalRuntime** const outBegin,
-    const IntervalVectorRuntimeView& intervalVector
-  ) noexcept
-  {
-    *outBegin = intervalVector.begin;
-    return outBegin;
-  }
-
-  /**
-   * Address: 0x00496920 (FUN_00496920, sub_496920)
-   *
-   * What it does:
-   * Writes one interval-vector end pointer lane into caller storage.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalVectorEndPointer(
-    moho::ParticleRenderIntervalRuntime** const outEnd,
-    const IntervalVectorRuntimeView& intervalVector
-  ) noexcept
-  {
-    *outEnd = intervalVector.end;
-    return outEnd;
-  }
-
-  /**
-   * Address: 0x0049AD70 (FUN_0049AD70, sub_49AD70)
-   *
-   * What it does:
-   * Writes one `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotD(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049AD80 (FUN_0049AD80, sub_49AD80)
-   *
-   * What it does:
-   * Returns the legacy max element-count lane for 8-byte vector storage.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyVectorMaxElementCount_0x1FFFFFFF() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
-
-  /**
    * Address: 0x0049AD90 (FUN_0049AD90, nullsub_594)
    *
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkAJ() noexcept {}
-
-  /**
-   * Address: 0x0049AFF0 (FUN_0049AFF0, sub_49AFF0)
-   *
-   * What it does:
-   * Throws the legacy vector-overflow error used by 8-byte vector grow paths.
-   */
-  [[noreturn]] void ThrowLegacyVectorTooLongDuplicateD()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0049E820 (FUN_0049E820, sub_49E820)
-   *
-   * What it does:
-   * Copies one interval range (`[sourceBegin, sourceEnd)`) into destination
-   * storage and returns the destination end pointer.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* CopyParticleIntervalRangeAndReturnEnd(
-    moho::ParticleRenderIntervalRuntime* destination,
-    const moho::ParticleRenderIntervalRuntime* sourceBegin,
-    const moho::ParticleRenderIntervalRuntime* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (destination != nullptr) {
-        *destination = *sourceBegin;
-      }
-      ++sourceBegin;
-      ++destination;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0049E850 (FUN_0049E850, sub_49E850)
-   *
-   * What it does:
-   * Copies one interval source value across one destination range.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* CopyParticleIntervalValueAcrossRangeA(
-    const moho::ParticleRenderIntervalRuntime& sourceValue,
-    moho::ParticleRenderIntervalRuntime* destinationBegin,
-    const moho::ParticleRenderIntervalRuntime* const destinationEnd
-  ) noexcept
-  {
-    moho::ParticleRenderIntervalRuntime* result = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      *destinationBegin = sourceValue;
-      result = destinationBegin;
-      ++destinationBegin;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0049E870 (FUN_0049E870, sub_49E870)
-   *
-   * What it does:
-   * Shifts one interval tail range right by one element using backward copy
-   * order and returns the write cursor after the shift.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* ShiftParticleIntervalRangeRightByOneAndReturnWriteCursorA(
-    moho::ParticleRenderIntervalRuntime* sourceLast,
-    moho::ParticleRenderIntervalRuntime* destinationEnd,
-    const moho::ParticleRenderIntervalRuntime* const stopAt
-  ) noexcept
-  {
-    while (sourceLast != stopAt) {
-      --sourceLast;
-      --destinationEnd;
-      *destinationEnd = *sourceLast;
-    }
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x0049E890 (FUN_0049E890, sub_49E890)
-   *
-   * What it does:
-   * Allocates one 8-byte interval array lane and throws `std::bad_alloc` on
-   * legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateParticleIntervalArrayOrThrowA(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kIntervalSize = sizeof(moho::ParticleRenderIntervalRuntime);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kIntervalSize) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kIntervalSize);
-  }
-
-  /**
-   * Address: 0x0049ADA0 (FUN_0049ADA0, sub_49ADA0)
-   *
-   * What it does:
-   * Inserts one interval payload at the requested position in one interval
-   * vector, growing storage when needed and returning the inserted lane.
-   */
-  moho::ParticleRenderIntervalRuntime* InsertIntervalValueAtAndGrow(
-    IntervalVectorRuntimeView& intervalVector,
-    moho::ParticleRenderIntervalRuntime* const insertPosition,
-    const moho::ParticleRenderIntervalRuntime& value
-  )
-  {
-    const std::size_t count = VectorCount(intervalVector);
-    const std::size_t capacity = VectorCapacity(intervalVector);
-    const std::size_t maxCount = GetLegacyVectorMaxElementCount_0x1FFFFFFF();
-
-    if (count >= maxCount) {
-      ThrowLegacyVectorTooLongDuplicateD();
-    }
-
-    std::size_t insertIndex = count;
-    if (intervalVector.begin != nullptr &&
-        intervalVector.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= intervalVector.begin &&
-        insertPosition <= intervalVector.end) {
-      insertIndex = static_cast<std::size_t>(insertPosition - intervalVector.begin);
-    }
-
-    if (count < capacity && intervalVector.begin != nullptr && intervalVector.end != nullptr) {
-      moho::ParticleRenderIntervalRuntime* const destination = intervalVector.begin + insertIndex;
-      if (destination != intervalVector.end) {
-        (void)ShiftParticleIntervalRangeRightByOneAndReturnWriteCursorA(
-          intervalVector.end - 1,
-          intervalVector.end,
-          destination
-        );
-      }
-      (void)CopyParticleIntervalValueAcrossRangeA(value, destination, destination + 1);
-      ++intervalVector.end;
-      return destination;
-    }
-
-    const std::size_t grown = ((maxCount - (count >> 1U)) >= count) ? (count + (count >> 1U)) : 0U;
-    std::size_t newCapacity = grown;
-    if (newCapacity < count + 1U) {
-      newCapacity = count + 1U;
-    }
-
-    auto* const newStorage = static_cast<moho::ParticleRenderIntervalRuntime*>(
-      AllocateParticleIntervalArrayOrThrowA(static_cast<std::uint32_t>(newCapacity))
-    );
-    moho::ParticleRenderIntervalRuntime* const inserted = newStorage + insertIndex;
-
-    if (insertIndex != 0U && intervalVector.begin != nullptr) {
-      (void)CopyParticleIntervalRangeAndReturnEnd(
-        newStorage,
-        intervalVector.begin,
-        intervalVector.begin + insertIndex
-      );
-    }
-
-    *inserted = value;
-
-    if ((count - insertIndex) != 0U && intervalVector.begin != nullptr) {
-      (void)CopyParticleIntervalRangeAndReturnEnd(
-        inserted + 1,
-        intervalVector.begin + insertIndex,
-        intervalVector.end
-      );
-    }
-
-    if (intervalVector.begin != nullptr) {
-      ::operator delete(intervalVector.begin);
-    }
-
-    intervalVector.begin = newStorage;
-    intervalVector.end = newStorage + count + 1U;
-    intervalVector.capacityEnd = newStorage + newCapacity;
-    return inserted;
-  }
-
-  /**
-   * Address: 0x00496950 (FUN_00496950, sub_496950)
-   *
-   * What it does:
-   * Appends one particle-render interval into a legacy debug-vector lane,
-   * growing the interval storage when required.
-   */
-  moho::ParticleRenderIntervalRuntime* AppendIntervalVectorValue(
-    IntervalVectorRuntimeView& intervalVector,
-    const moho::ParticleRenderIntervalRuntime& interval
-  )
-  {
-    if (intervalVector.begin != nullptr &&
-        intervalVector.end != nullptr &&
-        intervalVector.capacityEnd != nullptr &&
-        intervalVector.end < intervalVector.capacityEnd) {
-      moho::ParticleRenderIntervalRuntime* const appended = intervalVector.end;
-      *appended = interval;
-      ++intervalVector.end;
-      return appended;
-    }
-
-    return InsertIntervalValueAtAndGrow(intervalVector, intervalVector.end, interval);
-  }
-
-  /**
-   * Address: 0x004969C0 (FUN_004969C0, sub_4969C0)
-   *
-   * What it does:
-   * Clears one interval debug-vector lane by resetting `end` to `begin`.
-   */
-  void ClearIntervalVectorValues(IntervalVectorRuntimeView& intervalVector) noexcept
-  {
-    if (intervalVector.begin != intervalVector.end) {
-      intervalVector.end = intervalVector.begin;
-    }
-  }
-
-  /**
-   * Address: 0x00496C20 (FUN_00496C20, sub_496C20)
-   *
-   * What it does:
-   * Clears one work-item pointer debug-vector lane by resetting `end` to
-   * `begin`.
-   */
-  void ClearWorkItemPointerVector(WorkItemPointerVectorRuntime& workItems) noexcept
-  {
-    if (workItems.begin != workItems.end) {
-      workItems.end = workItems.begin;
-    }
-  }
-
-  /**
-   * Address: 0x0049DEA0 (FUN_0049DEA0, sub_49DEA0)
-   *
-   * What it does:
-   * Copies one pointer range (`[sourceBegin, sourceEnd)`) into destination
-   * storage and returns the destination end pointer.
-   */
-  [[nodiscard]] moho::ParticleRenderWorkItemRuntime** CopyWorkItemPointerRangeAndReturnEnd(
-    moho::ParticleRenderWorkItemRuntime* const* const sourceBegin,
-    moho::ParticleRenderWorkItemRuntime* const* const sourceEnd,
-    moho::ParticleRenderWorkItemRuntime** const destinationBegin
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(moho::ParticleRenderWorkItemRuntime*);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x0049DED0 (FUN_0049DED0, sub_49DED0)
-   *
-   * What it does:
-   * Duplicate pointer-range copy helper used by the work-item vector assign
-   * lane when copying the second segment into destination storage.
-   */
-  [[nodiscard]] moho::ParticleRenderWorkItemRuntime** CopyWorkItemPointerRangeAndReturnEndDuplicate(
-    moho::ParticleRenderWorkItemRuntime* const* const sourceBegin,
-    moho::ParticleRenderWorkItemRuntime* const* const sourceEnd,
-    moho::ParticleRenderWorkItemRuntime** const destinationBegin
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(moho::ParticleRenderWorkItemRuntime*);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x00496A30 (FUN_00496A30, sub_496A30)
-   *
-   * What it does:
-   * Assigns one work-item pointer vector into another using legacy debug-vector
-   * lanes (`proxy + begin/end/capacity`), reusing storage when possible.
-   */
-  WorkItemPointerVectorRuntime* AssignWorkItemPointerVector(
-    const WorkItemPointerVectorRuntime& source,
-    WorkItemPointerVectorRuntime& destination
-  )
-  {
-    if (&source == &destination) {
-      return &destination;
-    }
-
-    const std::size_t sourceCount = VectorCount(source);
-    if (sourceCount == 0U) {
-      ClearWorkItemPointerVector(destination);
-      return &destination;
-    }
-
-    const std::size_t destinationCount = VectorCount(destination);
-    const std::size_t destinationCapacity = VectorCapacity(destination);
-    if (sourceCount > destinationCapacity) {
-      if (destination.begin != nullptr) {
-        ::operator delete(destination.begin);
-      }
-      destination.begin = nullptr;
-      destination.end = nullptr;
-      destination.capacityEnd = nullptr;
-
-      if (sourceCount != 0U) {
-        if (sourceCount > (std::numeric_limits<std::size_t>::max() / sizeof(moho::ParticleRenderWorkItemRuntime*))) {
-          return &destination;
-        }
-
-        auto* const newStorage = static_cast<moho::ParticleRenderWorkItemRuntime**>(
-          ::operator new(sourceCount * sizeof(moho::ParticleRenderWorkItemRuntime*))
-        );
-        destination.begin = newStorage;
-        destination.end = newStorage;
-        destination.capacityEnd = newStorage + sourceCount;
-      }
-    }
-
-    if (sourceCount != 0U && destination.begin != nullptr && source.begin != nullptr && source.end != nullptr) {
-      const std::size_t firstSegmentCount = std::min(destinationCount, sourceCount);
-      auto* const splitSource = source.begin + firstSegmentCount;
-      moho::ParticleRenderWorkItemRuntime** writeCursor = destination.begin;
-      if (firstSegmentCount != 0U) {
-        writeCursor = CopyWorkItemPointerRangeAndReturnEnd(source.begin, splitSource, destination.begin);
-      }
-      destination.end = CopyWorkItemPointerRangeAndReturnEndDuplicate(splitSource, source.end, writeCursor);
-      return &destination;
-    }
-
-    destination.end = destination.begin + sourceCount;
-    return &destination;
-  }
-
-  /**
-   * Address: 0x00496B70 (FUN_00496B70, sub_496B70)
-   *
-   * What it does:
-   * Writes one work-item pointer-vector begin lane into caller storage.
-   */
-  moho::ParticleRenderWorkItemRuntime*** GetWorkItemPointerVectorBegin(
-    moho::ParticleRenderWorkItemRuntime*** const outBegin,
-    const WorkItemPointerVectorRuntime& workItems
-  ) noexcept
-  {
-    *outBegin = workItems.begin;
-    return outBegin;
-  }
-
-  /**
-   * Address: 0x00496B80 (FUN_00496B80, sub_496B80)
-   *
-   * What it does:
-   * Writes one work-item pointer-vector end lane into caller storage.
-   */
-  moho::ParticleRenderWorkItemRuntime*** GetWorkItemPointerVectorEnd(
-    moho::ParticleRenderWorkItemRuntime*** const outEnd,
-    const WorkItemPointerVectorRuntime& workItems
-  ) noexcept
-  {
-    *outEnd = workItems.end;
-    return outEnd;
-  }
-
-  /**
-   * Address: 0x00496BB0 (FUN_00496BB0, sub_496BB0)
-   *
-   * What it does:
-   * Computes one pointer to a work-item pointer element by index from one
-   * debug-vector begin lane.
-   */
-  [[nodiscard]] moho::ParticleRenderWorkItemRuntime** WorkItemPointerVectorElementAt(
-    const WorkItemPointerVectorRuntime& workItems,
-    const std::int32_t index
-  ) noexcept
-  {
-    return workItems.begin + index;
-  }
-
-  /**
-   * Address: 0x00496BD0 (FUN_00496BD0, sub_496BD0)
-   *
-   * What it does:
-   * Appends one work-item pointer from caller slot into one pointer vector
-   * lane, growing storage when required.
-   */
-  moho::ParticleRenderWorkItemRuntime* PushBackWorkItemPointerFromSlot(
-    const moho::ParticleRenderWorkItemRuntime* const* const valueSlot,
-    WorkItemPointerVectorRuntime& workItems
-  )
-  {
-    auto* const value = const_cast<moho::ParticleRenderWorkItemRuntime*>(*valueSlot);
-    if (AppendWorkItemPointer(workItems, value)) {
-      return value;
-    }
-    return nullptr;
-  }
 
   /**
    * Address: 0x00496C60 (FUN_00496C60, sub_496C60)
@@ -932,22 +447,6 @@ namespace
   }
 
   /**
-   * Address: 0x00496C80 (FUN_00496C80, sub_496C80)
-   *
-   * What it does:
-   * Computes one interval pointer at index from one base-interval pointer slot.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalPointerAtIndex(
-    moho::ParticleRenderIntervalRuntime** const outIntervalPointer,
-    moho::ParticleRenderIntervalRuntime* const* const basePointerSlot,
-    const std::int32_t index
-  ) noexcept
-  {
-    *outIntervalPointer = (*basePointerSlot) + index;
-    return outIntervalPointer;
-  }
-
-  /**
    * Address: 0x00496CA0 (FUN_00496CA0, sub_496CA0)
    *
    * What it does:
@@ -958,224 +457,7 @@ namespace
     return *pointerSlot;
   }
 
-  /**
-   * Address: 0x00496CE0 (FUN_00496CE0, sub_496CE0)
-   *
-   * What it does:
-   * Returns one 32-bit legacy vector proxy token from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadLegacyVectorProxyToken(const std::uint32_t* const tokenSlot) noexcept
-  {
-    return *tokenSlot;
-  }
 
-  /**
-   * Address: 0x00496D50 (FUN_00496D50, sub_496D50)
-   *
-   * What it does:
-   * Duplicate begin-pointer accessor thunk for one interval debug-vector lane.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalVectorBeginPointerDuplicate(
-    moho::ParticleRenderIntervalRuntime** const outBegin,
-    const IntervalVectorRuntimeView& intervalVector
-  ) noexcept
-  {
-    return GetIntervalVectorBeginPointer(outBegin, intervalVector);
-  }
-
-  /**
-   * Address: 0x00496D60 (FUN_00496D60, sub_496D60)
-   *
-   * What it does:
-   * Duplicate end-pointer accessor thunk for one interval debug-vector lane.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalVectorEndPointerDuplicate(
-    moho::ParticleRenderIntervalRuntime** const outEnd,
-    const IntervalVectorRuntimeView& intervalVector
-  ) noexcept
-  {
-    return GetIntervalVectorEndPointer(outEnd, intervalVector);
-  }
-
-  /**
-   * Address: 0x00496D90 (FUN_00496D90, sub_496D90)
-   *
-   * What it does:
-   * Appends one interval payload from caller pointer into one interval
-   * debug-vector lane, growing storage when needed.
-   */
-  moho::ParticleRenderIntervalRuntime* PushBackIntervalFromPointerSlot(
-    const moho::ParticleRenderIntervalRuntime* const intervalSlotValue,
-    IntervalVectorRuntimeView& intervalVector
-  )
-  {
-    if (intervalVector.begin != nullptr &&
-        intervalVector.end != nullptr &&
-        intervalVector.capacityEnd != nullptr &&
-        intervalVector.end < intervalVector.capacityEnd) {
-      moho::ParticleRenderIntervalRuntime* const appended = intervalVector.end;
-      *appended = *intervalSlotValue;
-      ++intervalVector.end;
-      return appended;
-    }
-
-    return InsertIntervalValueAtAndGrowDuplicate(intervalVector, intervalVector.end, *intervalSlotValue);
-  }
-
-  /**
-   * Address: 0x00496E00 (FUN_00496E00, sub_496E00)
-   *
-   * What it does:
-   * Duplicate clear thunk that resets one interval debug-vector `end` lane to
-   * `begin`.
-   */
-  void ClearIntervalVectorValuesDuplicate(IntervalVectorRuntimeView& intervalVector) noexcept
-  {
-    ClearIntervalVectorValues(intervalVector);
-  }
-
-  using UInt32VectorRuntimeView = moho::RenderBucketVectorRuntime<std::uint32_t>;
-
-  /**
-   * Address: 0x0049DF00 (FUN_0049DF00, sub_49DF00)
-   *
-   * What it does:
-   * Copies one `uint32_t` range (`[sourceBegin, sourceEnd)`) into destination
-   * storage and returns the destination end pointer.
-   */
-  [[nodiscard]] std::uint32_t* CopyUInt32RangeAndReturnEnd(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destinationBegin
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x0049DF30 (FUN_0049DF30, sub_49DF30)
-   *
-   * What it does:
-   * Duplicate `uint32_t` range copy helper used by the second copy segment in
-   * the legacy vector assignment lane.
-   */
-  [[nodiscard]] std::uint32_t* CopyUInt32RangeAndReturnEndDuplicate(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destinationBegin
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x00496E70 (FUN_00496E70, sub_496E70)
-   *
-   * What it does:
-   * Assigns one `uint32_t` debug-vector lane into another, clearing destination
-   * when source is empty and reusing storage when capacity is sufficient.
-   */
-  UInt32VectorRuntimeView* AssignUInt32VectorValues(
-    const UInt32VectorRuntimeView& source,
-    UInt32VectorRuntimeView& destination
-  )
-  {
-    if (&source == &destination) {
-      return &destination;
-    }
-
-    const std::size_t sourceCount = VectorCount(source);
-    if (sourceCount == 0U) {
-      destination.end = destination.begin;
-      return &destination;
-    }
-
-    const std::size_t destinationCount = VectorCount(destination);
-    const std::size_t destinationCapacity = VectorCapacity(destination);
-    if (sourceCount > destinationCount) {
-      if (sourceCount <= destinationCapacity) {
-        if (destination.begin != nullptr && source.begin != nullptr && source.end != nullptr) {
-          const std::size_t firstSegmentCount = destinationCount;
-          const std::uint32_t* const splitSource = source.begin + firstSegmentCount;
-          std::uint32_t* writeCursor = destination.begin;
-          if (firstSegmentCount != 0U) {
-            writeCursor = CopyUInt32RangeAndReturnEnd(source.begin, splitSource, destination.begin);
-          }
-          destination.end = CopyUInt32RangeAndReturnEndDuplicate(splitSource, source.end, writeCursor);
-          return &destination;
-        }
-        destination.end = destination.begin + sourceCount;
-        return &destination;
-      }
-
-      if (destination.begin != nullptr) {
-        ::operator delete(destination.begin);
-      }
-      destination.begin = nullptr;
-      destination.end = nullptr;
-      destination.capacityEnd = nullptr;
-
-      auto* const newStorage = static_cast<std::uint32_t*>(::operator new(sourceCount * sizeof(std::uint32_t)));
-      destination.begin = newStorage;
-      destination.end = newStorage;
-      destination.capacityEnd = newStorage + sourceCount;
-      if (source.begin != nullptr && source.end != nullptr) {
-        destination.end = CopyUInt32RangeAndReturnEndDuplicate(source.begin, source.end, destination.begin);
-        return &destination;
-      }
-      destination.end = destination.begin + sourceCount;
-      return &destination;
-    }
-
-    if (source.begin != nullptr && destination.begin != nullptr && source.end != nullptr) {
-      destination.end = CopyUInt32RangeAndReturnEnd(source.begin, source.end, destination.begin);
-      return &destination;
-    }
-    destination.end = destination.begin + sourceCount;
-    return &destination;
-  }
-
-  /**
-   * Address: 0x00496FB0 (FUN_00496FB0, sub_496FB0)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one `uint32_t` debug-vector into caller
-   * storage.
-   */
-  std::uint32_t** GetUInt32VectorBeginPointer(
-    std::uint32_t** const outBegin,
-    const UInt32VectorRuntimeView& values
-  ) noexcept
-  {
-    *outBegin = values.begin;
-    return outBegin;
-  }
-
-  /**
-   * Address: 0x00496FC0 (FUN_00496FC0, sub_496FC0)
-   *
-   * What it does:
-   * Writes the end-pointer lane of one `uint32_t` debug-vector into caller
-   * storage.
-   */
-  std::uint32_t** GetUInt32VectorEndPointer(
-    std::uint32_t** const outEnd,
-    const UInt32VectorRuntimeView& values
-  ) noexcept
-  {
-    *outEnd = values.end;
-    return outEnd;
-  }
 
   /**
    * Address: 0x0049B060 (FUN_0049B060, nullsub_595)
@@ -1186,56 +468,12 @@ namespace
   void NoOpHelperThunkAK() noexcept {}
 
   /**
-   * Address: 0x0049B0A0 (FUN_0049B0A0, sub_49B0A0)
-   *
-   * What it does:
-   * Returns the legacy max element-count lane for 4-byte vector storage.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyVectorMaxElementCount_0x3FFFFFFF() noexcept
-  {
-    return 0x3FFFFFFFU;
-  }
-
-  /**
    * Address: 0x0049B710 (FUN_0049B710, nullsub_598)
    *
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkAN() noexcept {}
-
-  /**
-   * Address: 0x0049B750 (FUN_0049B750, sub_49B750)
-   *
-   * What it does:
-   * Returns one duplicate legacy max element-count lane for 4-byte vectors.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyVectorMaxElementCount_0x3FFFFFFF_DuplicateA() noexcept
-  {
-    return 0x3FFFFFFFU;
-  }
-
-  /**
-   * Address: 0x0049B2C0 (FUN_0049B2C0, sub_49B2C0)
-   *
-   * What it does:
-   * Throws the legacy vector-overflow error used by 4-byte vector grow paths.
-   */
-  [[noreturn]] void ThrowLegacyVectorTooLongDuplicateE()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0049B9C0 (FUN_0049B9C0, sub_49B9C0)
-   *
-   * What it does:
-   * Throws one duplicate legacy vector-overflow error for 4-byte grow paths.
-   */
-  [[noreturn]] void ThrowLegacyVectorTooLongDuplicateG()
-  {
-    throw std::length_error("vector<T> too long");
-  }
 
   /**
    * Address: 0x0049B330 (FUN_0049B330, nullsub_596)
@@ -1254,141 +492,6 @@ namespace
   void NoOpHelperThunkAO() noexcept {}
 
   /**
-   * Address: 0x0049B370 (FUN_0049B370, sub_49B370)
-   *
-   * What it does:
-   * Writes one duplicate `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotE(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049B380 (FUN_0049B380, sub_49B380)
-   *
-   * What it does:
-   * Reads one duplicate `uint32_t` scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotD(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x0049B3C0 (FUN_0049B3C0, sub_49B3C0)
-   *
-   * What it does:
-   * Writes one duplicate `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotF(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049B3D0 (FUN_0049B3D0, sub_49B3D0)
-   *
-   * What it does:
-   * Reads one duplicate `uint32_t` scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotE(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x0049B3F0 (FUN_0049B3F0, sub_49B3F0)
-   *
-   * What it does:
-   * Computes one `uint32_t` element pointer from base-pointer slot and index.
-   */
-  std::uint32_t** GetUInt32PointerAtIndex(
-    std::uint32_t** const outValuePointer,
-    std::uint32_t* const* const basePointerSlot,
-    const std::int32_t index
-  ) noexcept
-  {
-    *outValuePointer = (*basePointerSlot) + index;
-    return outValuePointer;
-  }
-
-  /**
-   * Address: 0x0049B420 (FUN_0049B420, sub_49B420)
-   *
-   * What it does:
-   * Writes one duplicate `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotG(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BA70 (FUN_0049BA70, sub_49BA70)
-   *
-   * What it does:
-   * Writes one duplicate `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotH(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BA80 (FUN_0049BA80, sub_49BA80)
-   *
-   * What it does:
-   * Reads one duplicate `uint32_t` scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotF(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x0049BAC0 (FUN_0049BAC0, sub_49BAC0)
-   *
-   * What it does:
-   * Writes one duplicate `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotI(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BAD0 (FUN_0049BAD0, sub_49BAD0)
-   *
-   * What it does:
-   * Reads one duplicate `uint32_t` scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotG(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
    * What it does:
    * Small two-dword lane used by scalar helper-thunk copies.
    */
@@ -1403,594 +506,12 @@ namespace
   static_assert(sizeof(TwoUInt32Runtime) == 0x08, "TwoUInt32Runtime size must be 0x08");
 
   /**
-   * Address: 0x0049BAF0 (FUN_0049BAF0, sub_49BAF0)
-   *
-   * What it does:
-   * Computes one `uint32_t` element pointer from base-pointer slot and index.
-   */
-  std::uint32_t** GetUInt32PointerAtIndexDuplicateA(
-    std::uint32_t** const outValuePointer,
-    std::uint32_t* const* const basePointerSlot,
-    const std::int32_t index
-  ) noexcept
-  {
-    *outValuePointer = (*basePointerSlot) + index;
-    return outValuePointer;
-  }
-
-  /**
-   * Address: 0x0049BB20 (FUN_0049BB20, sub_49BB20)
-   *
-   * What it does:
-   * Writes one duplicate scalar `uint32_t` into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotJ(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BB30 (FUN_0049BB30, sub_49BB30)
-   *
-   * What it does:
-   * Copies one two-dword lane from source storage into destination storage.
-   */
-  TwoUInt32Runtime* CopyTwoUInt32RuntimeA(
-    TwoUInt32Runtime* const outValue,
-    const TwoUInt32Runtime& source
-  ) noexcept
-  {
-    outValue->first = source.first;
-    outValue->second = source.second;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BB40 (FUN_0049BB40, sub_49BB40)
-   *
-   * What it does:
-   * Duplicate two-dword copy thunk retained for binary parity.
-   */
-  TwoUInt32Runtime* CopyTwoUInt32RuntimeB(
-    TwoUInt32Runtime* const outValue,
-    const TwoUInt32Runtime& source
-  ) noexcept
-  {
-    return CopyTwoUInt32RuntimeA(outValue, source);
-  }
-
-  /**
-   * Address: 0x0049BB50 (FUN_0049BB50, sub_49BB50)
-   *
-   * What it does:
-   * Writes one duplicate scalar `uint32_t` into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotK(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0049BBC0 (FUN_0049BBC0, sub_49BBC0)
-   *
-   * What it does:
-   * Returns one scalar value and clears the source slot to zero.
-   */
-  [[nodiscard]] std::uint32_t ReadAndClearUInt32SlotA(std::uint32_t& valueSlot) noexcept
-  {
-    const std::uint32_t value = valueSlot;
-    valueSlot = 0U;
-    return value;
-  }
-
-  /**
-   * Address: 0x0049BBF0 (FUN_0049BBF0, sub_49BBF0)
-   *
-   * What it does:
-   * Duplicate read-and-clear scalar thunk retained for binary parity.
-   */
-  [[nodiscard]] std::uint32_t ReadAndClearUInt32SlotB(std::uint32_t& valueSlot) noexcept
-  {
-    return ReadAndClearUInt32SlotA(valueSlot);
-  }
-
-  /**
-   * Address: 0x0049B430 (FUN_0049B430, sub_49B430)
-   *
-   * What it does:
-   * Returns one duplicate legacy max element-count lane for 8-byte vectors.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyVectorMaxElementCount_0x1FFFFFFF_Duplicate() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
-
-  /**
    * Address: 0x0049B440 (FUN_0049B440, nullsub_597)
    *
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkAM() noexcept {}
-
-  /**
-   * Address: 0x0049B6A0 (FUN_0049B6A0, sub_49B6A0)
-   *
-   * What it does:
-   * Throws one duplicate legacy vector-overflow error used by 8-byte vector
-   * grow paths.
-   */
-  [[noreturn]] void ThrowLegacyVectorTooLongDuplicateF()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-
-  /**
-   * Address: 0x0049E9B0 (FUN_0049E9B0, sub_49E9B0)
-   *
-   * What it does:
-   * Copies one interval range (`[sourceBegin, sourceEnd)`) into destination
-   * storage and returns the destination end pointer.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* CopyParticleIntervalRangeAndReturnEndDuplicateB(
-    moho::ParticleRenderIntervalRuntime* destination,
-    const moho::ParticleRenderIntervalRuntime* sourceBegin,
-    const moho::ParticleRenderIntervalRuntime* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (destination != nullptr) {
-        *destination = *sourceBegin;
-      }
-      ++sourceBegin;
-      ++destination;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0049E9E0 (FUN_0049E9E0, sub_49E9E0)
-   *
-   * What it does:
-   * Copies one interval source value across one destination range.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* CopyParticleIntervalValueAcrossRangeB(
-    const moho::ParticleRenderIntervalRuntime& sourceValue,
-    moho::ParticleRenderIntervalRuntime* destinationBegin,
-    const moho::ParticleRenderIntervalRuntime* const destinationEnd
-  ) noexcept
-  {
-    moho::ParticleRenderIntervalRuntime* result = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      *destinationBegin = sourceValue;
-      result = destinationBegin;
-      ++destinationBegin;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0049EA00 (FUN_0049EA00, sub_49EA00)
-   *
-   * What it does:
-   * Shifts one interval tail range right by one element using backward copy
-   * order and returns the write cursor after the shift.
-   */
-  [[maybe_unused]] moho::ParticleRenderIntervalRuntime* ShiftParticleIntervalRangeRightByOneAndReturnWriteCursorB(
-    moho::ParticleRenderIntervalRuntime* sourceLast,
-    moho::ParticleRenderIntervalRuntime* destinationEnd,
-    const moho::ParticleRenderIntervalRuntime* const stopAt
-  ) noexcept
-  {
-    while (sourceLast != stopAt) {
-      --sourceLast;
-      --destinationEnd;
-      *destinationEnd = *sourceLast;
-    }
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x0049EA20 (FUN_0049EA20, sub_49EA20)
-   *
-   * What it does:
-   * Allocates one duplicate 8-byte interval array lane and throws
-   * `std::bad_alloc` on legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateParticleIntervalArrayOrThrowB(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kIntervalSize = sizeof(moho::ParticleRenderIntervalRuntime);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kIntervalSize) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kIntervalSize);
-  }
-
-  /**
-   * Address: 0x0049B450 (FUN_0049B450, sub_49B450)
-   *
-   * What it does:
-   * Duplicate insert-and-grow helper for 8-byte interval-like vector lanes.
-   */
-  moho::ParticleRenderIntervalRuntime* InsertIntervalValueAtAndGrowDuplicate(
-    IntervalVectorRuntimeView& intervalVector,
-    moho::ParticleRenderIntervalRuntime* const insertPosition,
-    const moho::ParticleRenderIntervalRuntime& value
-  )
-  {
-    const std::size_t count = VectorCount(intervalVector);
-    const std::size_t capacity = VectorCapacity(intervalVector);
-    const std::size_t maxCount = GetLegacyVectorMaxElementCount_0x1FFFFFFF_Duplicate();
-
-    if (count >= maxCount) {
-      ThrowLegacyVectorTooLongDuplicateF();
-    }
-
-    std::size_t insertIndex = count;
-    if (intervalVector.begin != nullptr &&
-        intervalVector.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= intervalVector.begin &&
-        insertPosition <= intervalVector.end) {
-      insertIndex = static_cast<std::size_t>(insertPosition - intervalVector.begin);
-    }
-
-    if (count < capacity && intervalVector.begin != nullptr && intervalVector.end != nullptr) {
-      moho::ParticleRenderIntervalRuntime* const destination = intervalVector.begin + insertIndex;
-      if (destination != intervalVector.end) {
-        (void)ShiftParticleIntervalRangeRightByOneAndReturnWriteCursorB(
-          intervalVector.end - 1,
-          intervalVector.end,
-          destination
-        );
-      }
-      (void)CopyParticleIntervalValueAcrossRangeB(value, destination, destination + 1);
-      ++intervalVector.end;
-      return destination;
-    }
-
-    const std::size_t grown = ((maxCount - (count >> 1U)) >= count) ? (count + (count >> 1U)) : 0U;
-    std::size_t newCapacity = grown;
-    if (newCapacity < count + 1U) {
-      newCapacity = count + 1U;
-    }
-
-    auto* const newStorage = static_cast<moho::ParticleRenderIntervalRuntime*>(
-      AllocateParticleIntervalArrayOrThrowB(static_cast<std::uint32_t>(newCapacity))
-    );
-    moho::ParticleRenderIntervalRuntime* const inserted = newStorage + insertIndex;
-
-    if (insertIndex != 0U && intervalVector.begin != nullptr) {
-      (void)CopyParticleIntervalRangeAndReturnEndDuplicateB(
-        newStorage,
-        intervalVector.begin,
-        intervalVector.begin + insertIndex
-      );
-    }
-
-    *inserted = value;
-
-    if ((count - insertIndex) != 0U && intervalVector.begin != nullptr) {
-      (void)CopyParticleIntervalRangeAndReturnEndDuplicateB(
-        inserted + 1,
-        intervalVector.begin + insertIndex,
-        intervalVector.end
-      );
-    }
-
-    if (intervalVector.begin != nullptr) {
-      ::operator delete(intervalVector.begin);
-    }
-
-    intervalVector.begin = newStorage;
-    intervalVector.end = newStorage + count + 1U;
-    intervalVector.capacityEnd = newStorage + newCapacity;
-    return inserted;
-  }
-
-  /**
-   * Address: 0x0049E8E0 (FUN_0049E8E0, sub_49E8E0)
-   *
-   * What it does:
-   * Copies one `uint32_t` range (`[sourceBegin, sourceEnd)`) into destination
-   * storage with memmove semantics and returns the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* CopyUInt32RangeAndReturnEndA(
-    std::uint32_t* destination,
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destination, sourceBegin, bytes);
-    }
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x0049E920 (FUN_0049E920, sub_49E920)
-   *
-   * What it does:
-   * Copies one `uint32_t` range (`[sourceBegin, sourceEndExclusive)`) into the
-   * tail-aligned destination ending at `destinationEnd`, returning the
-   * beginning of copied destination range.
-   */
-  [[maybe_unused]] std::uint32_t* CopyUInt32RangeToTailAndReturnBeginA(
-    const std::uint32_t* const sourceEndExclusive,
-    std::uint32_t* const destinationEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    const std::size_t count = sourceEndExclusive > sourceBegin
-      ? static_cast<std::size_t>(sourceEndExclusive - sourceBegin)
-      : 0U;
-    std::uint32_t* const destinationBegin = destinationEnd - static_cast<std::ptrdiff_t>(count);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0049E950 (FUN_0049E950, sub_49E950)
-   *
-   * What it does:
-   * Allocates one 4-byte scalar array lane and throws `std::bad_alloc` on
-   * legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateUInt32ArrayOrThrowA(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kUInt32Size = sizeof(std::uint32_t);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kUInt32Size) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kUInt32Size);
-  }
-
-  /**
-   * Address: 0x0049B0B0 (FUN_0049B0B0, sub_49B0B0)
-   *
-   * What it does:
-   * Inserts one `uint32_t` payload at the requested position in one scalar
-   * vector, growing storage when needed and returning the inserted lane.
-   */
-  std::uint32_t* InsertUInt32ValueAtAndGrow(
-    UInt32VectorRuntimeView& values,
-    std::uint32_t* const insertPosition,
-    const std::uint32_t value
-  )
-  {
-    const std::size_t count = VectorCount(values);
-    const std::size_t capacity = VectorCapacity(values);
-    const std::size_t maxCount = GetLegacyVectorMaxElementCount_0x3FFFFFFF();
-
-    if (count >= maxCount) {
-      ThrowLegacyVectorTooLongDuplicateE();
-    }
-
-    std::size_t insertIndex = count;
-    if (values.begin != nullptr &&
-        values.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= values.begin &&
-        insertPosition <= values.end) {
-      insertIndex = static_cast<std::size_t>(insertPosition - values.begin);
-    }
-
-    if (count < capacity && values.begin != nullptr && values.end != nullptr) {
-      std::uint32_t* const destination = values.begin + insertIndex;
-      if (destination != values.end) {
-        (void)CopyUInt32RangeAndReturnEndA(values.end, values.end - 1, values.end);
-        (void)CopyUInt32RangeToTailAndReturnBeginA(values.end - 1, values.end, destination);
-      }
-      *destination = value;
-      ++values.end;
-      return destination;
-    }
-
-    const std::size_t grown = ((maxCount - (count >> 1U)) >= count) ? (count + (count >> 1U)) : 0U;
-    std::size_t newCapacity = grown;
-    if (newCapacity < count + 1U) {
-      newCapacity = count + 1U;
-    }
-
-    auto* const newStorage = static_cast<std::uint32_t*>(
-      AllocateUInt32ArrayOrThrowA(static_cast<std::uint32_t>(newCapacity))
-    );
-    std::uint32_t* const inserted = newStorage + insertIndex;
-
-    if (insertIndex != 0U && values.begin != nullptr) {
-      (void)CopyUInt32RangeAndReturnEndA(newStorage, values.begin, values.begin + insertIndex);
-    }
-
-    *inserted = value;
-
-    if ((count - insertIndex) != 0U && values.begin != nullptr) {
-      (void)CopyUInt32RangeAndReturnEndA(inserted + 1, values.begin + insertIndex, values.end);
-    }
-
-    if (values.begin != nullptr) {
-      ::operator delete(values.begin);
-    }
-
-    values.begin = newStorage;
-    values.end = newStorage + count + 1U;
-    values.capacityEnd = newStorage + newCapacity;
-    return inserted;
-  }
-
-  /**
-   * Address: 0x0049EA70 (FUN_0049EA70, sub_49EA70)
-   *
-   * What it does:
-   * Duplicate `uint32_t` range copy helper with memmove semantics that returns
-   * the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* CopyUInt32RangeAndReturnEndB(
-    std::uint32_t* destination,
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destination, sourceBegin, bytes);
-    }
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x0049EAB0 (FUN_0049EAB0, sub_49EAB0)
-   *
-   * What it does:
-   * Duplicate tail-aligned `uint32_t` range copy helper returning destination
-   * range begin.
-   */
-  [[maybe_unused]] std::uint32_t* CopyUInt32RangeToTailAndReturnBeginB(
-    const std::uint32_t* const sourceEndExclusive,
-    std::uint32_t* const destinationEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    const std::size_t count = sourceEndExclusive > sourceBegin
-      ? static_cast<std::size_t>(sourceEndExclusive - sourceBegin)
-      : 0U;
-    std::uint32_t* const destinationBegin = destinationEnd - static_cast<std::ptrdiff_t>(count);
-    if (count != 0U) {
-      const std::size_t bytes = count * sizeof(std::uint32_t);
-      (void)std::memmove(destinationBegin, sourceBegin, bytes);
-    }
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0049EAE0 (FUN_0049EAE0, sub_49EAE0)
-   *
-   * What it does:
-   * Allocates one duplicate 4-byte scalar array lane and throws
-   * `std::bad_alloc` on legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateUInt32ArrayOrThrowB(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kUInt32Size = sizeof(std::uint32_t);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kUInt32Size) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kUInt32Size);
-  }
-
-
-
-
-  /**
-   * Address: 0x0049B7B0 (FUN_0049B7B0, sub_49B7B0)
-   *
-   * What it does:
-   * Duplicate insert-and-grow helper for 4-byte scalar vector lanes.
-   */
-  std::uint32_t* InsertUInt32ValueAtAndGrowDuplicate(
-    UInt32VectorRuntimeView& values,
-    std::uint32_t* const insertPosition,
-    const std::uint32_t value
-  )
-  {
-    const std::size_t count = VectorCount(values);
-    const std::size_t capacity = VectorCapacity(values);
-    const std::size_t maxCount = GetLegacyVectorMaxElementCount_0x3FFFFFFF_DuplicateA();
-
-    if (count >= maxCount) {
-      ThrowLegacyVectorTooLongDuplicateG();
-    }
-
-    std::size_t insertIndex = count;
-    if (values.begin != nullptr &&
-        values.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= values.begin &&
-        insertPosition <= values.end) {
-      insertIndex = static_cast<std::size_t>(insertPosition - values.begin);
-    }
-
-    if (count < capacity && values.begin != nullptr && values.end != nullptr) {
-      std::uint32_t* const destination = values.begin + insertIndex;
-      if (destination != values.end) {
-        (void)CopyUInt32RangeAndReturnEndB(values.end, values.end - 1, values.end);
-        (void)CopyUInt32RangeToTailAndReturnBeginB(values.end - 1, values.end, destination);
-      }
-      *destination = value;
-      ++values.end;
-      return destination;
-    }
-
-    const std::size_t grown = ((maxCount - (count >> 1U)) >= count) ? (count + (count >> 1U)) : 0U;
-    std::size_t newCapacity = grown;
-    if (newCapacity < count + 1U) {
-      newCapacity = count + 1U;
-    }
-
-    auto* const newStorage = static_cast<std::uint32_t*>(
-      AllocateUInt32ArrayOrThrowB(static_cast<std::uint32_t>(newCapacity))
-    );
-    std::uint32_t* const inserted = newStorage + insertIndex;
-
-    if (insertIndex != 0U && values.begin != nullptr) {
-      (void)CopyUInt32RangeAndReturnEndB(newStorage, values.begin, values.begin + insertIndex);
-    }
-
-    *inserted = value;
-
-    if ((count - insertIndex) != 0U && values.begin != nullptr) {
-      (void)CopyUInt32RangeAndReturnEndB(inserted + 1, values.begin + insertIndex, values.end);
-    }
-
-    if (values.begin != nullptr) {
-      ::operator delete(values.begin);
-    }
-
-    values.begin = newStorage;
-    values.end = newStorage + count + 1U;
-    values.capacityEnd = newStorage + newCapacity;
-    return inserted;
-  }
-
-  /**
-   * Address: 0x00497000 (FUN_00497000, sub_497000)
-   *
-   * What it does:
-   * Appends one `uint32_t` scalar from caller slot into one debug-vector lane,
-   * growing storage when required.
-   */
-  std::uint32_t PushBackUInt32ValueFromSlot(
-    const std::uint32_t* const valueSlot,
-    UInt32VectorRuntimeView& values
-  )
-  {
-    const std::uint32_t value = *valueSlot;
-    (void)InsertUInt32ValueAtAndGrowDuplicate(values, values.end, value);
-    return value;
-  }
 
   /**
    * Address: 0x00497080 (FUN_00497080, sub_497080)
@@ -2001,22 +522,6 @@ namespace
   [[nodiscard]] std::uint32_t ReadUint32SlotValueA(const std::uint32_t* const valueSlot) noexcept
   {
     return *valueSlot;
-  }
-
-  /**
-   * Address: 0x004970A0 (FUN_004970A0, sub_4970A0)
-   *
-   * What it does:
-   * Duplicate interval-pointer indexing thunk computed from one base-pointer
-   * slot and one element index.
-   */
-  moho::ParticleRenderIntervalRuntime** GetIntervalPointerAtIndexDuplicate(
-    moho::ParticleRenderIntervalRuntime** const outIntervalPointer,
-    moho::ParticleRenderIntervalRuntime* const* const basePointerSlot,
-    const std::int32_t index
-  ) noexcept
-  {
-    return GetIntervalPointerAtIndex(outIntervalPointer, basePointerSlot, index);
   }
 
   /**
@@ -2078,9 +583,10 @@ namespace
     moho::ParticleRenderWorkItemRuntime& workItem, const float beginFrame, const float lifeFrames
   )
   {
-    auto* const intervalVector = reinterpret_cast<IntervalVectorRuntimeView*>(&workItem.mReserved04);
+    // `msvc8::vector<ParticleRenderIntervalRuntime>::push_back` (0x00496950, cited on Vector.h).
     const moho::ParticleRenderIntervalRuntime intervalValue{beginFrame, lifeFrames};
-    return AppendIntervalVectorValue(*intervalVector, intervalValue) != nullptr;
+    workItem.mIntervals.push_back(intervalValue);
+    return true;
   }
 
   /**
@@ -2163,170 +669,7 @@ namespace
     outVertices[51] = trail[15];
   }
 
-  /**
-   * Address: 0x0049BC00 (FUN_0049BC00, ??0SWorldParticle@Moho@@QAE@@Z_0)
-   *
-   * What it does:
-   * Copies one world-particle payload lane with typed field assignment,
-   * reference-counted texture retention, and string copy semantics.
-   */
-  void CopyWorldParticleForVectorMove(
-    const moho::SWorldParticle& source, moho::SWorldParticle& destination
-  ) noexcept
-  {
-    destination.mEnabled = source.mEnabled;
-    destination.mResistance = source.mResistance;
-    destination.mPos = source.mPos;
-    destination.mDir = source.mDir;
-    destination.mAccel = source.mAccel;
-    destination.mInterop = source.mInterop;
-    destination.mLifetime = source.mLifetime;
-    destination.mFramerate = source.mFramerate;
-    destination.mValue1 = source.mValue1;
-    destination.mTextureSelection = source.mTextureSelection;
-    destination.mValue3 = source.mValue3;
-    destination.mRampSelection = source.mRampSelection;
-    destination.mBeginSize = source.mBeginSize;
-    destination.mEndSize = source.mEndSize;
-    destination.mAngle = source.mAngle;
-    destination.mRotationCurve = source.mRotationCurve;
-    destination.mReserved54 = source.mReserved54;
-    (void)moho::AssignCountedParticleTexturePtr(&destination.mTexture, source.mTexture.tex);
-    (void)moho::AssignCountedParticleTexturePtr(&destination.mRampTexture, source.mRampTexture.tex);
-    destination.mTypeTag.assign(source.mTypeTag, 0U, msvc8::string::npos);
-    destination.mArmyIndex = source.mArmyIndex;
-    destination.mBlendMode = source.mBlendMode;
-    destination.mZMode = source.mZMode;
-  }
 
-  /**
-   * Address: 0x0049BD30 (FUN_0049BD30, ??1SParticle@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Releases one world-particle tail payload lane (`typeTag` + both counted
-   * texture handles) during vector erase/reallocation paths.
-   */
-  void DestroyWorldParticleForVectorTail(moho::SWorldParticle& particle) noexcept
-  {
-    moho::ResetCountedParticleTexturePtr(particle.mTexture);
-    moho::ResetCountedParticleTexturePtr(particle.mRampTexture);
-    particle.mTypeTag.tidy(true, 0U);
-  }
-
-  void AssignTrailTextureLane(
-    moho::CParticleTexture*& destination, moho::CParticleTexture* const source
-  ) noexcept
-  {
-    if (destination != source) {
-      if (destination != nullptr) {
-        destination->ReleaseReferenceAtomic();
-      }
-      destination = source;
-      if (source != nullptr) {
-        source->AddReferenceAtomic();
-      }
-    }
-  }
-
-  /**
-   * Address: 0x0049BDD0 (FUN_0049BDD0, sub_49BDD0)
-   *
-   * What it does:
-   * Copies one trail-runtime payload lane, retaining both texture references.
-   */
-  void CopyTrailRuntimeViewForVectorMove(
-    const moho::TrailRuntimeView& source, moho::TrailRuntimeView& destination
-  ) noexcept
-  {
-    // Copy the 0x00..0x4F scalar-lane block (all float fields up to but not
-    // including the texture pointers at 0x50).
-    std::memcpy(&destination.prevPosX, &source.prevPosX, 0x50u);
-    AssignTrailTextureLane(destination.texture0, source.texture0);
-    AssignTrailTextureLane(destination.texture1, source.texture1);
-    destination.tag = source.tag;
-    destination.uvScalar = source.uvScalar;
-  }
-
-  /**
-   * Address: 0x0049BE90 (FUN_0049BE90, ??1STrail@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Releases the two intrusive trail texture lanes and nulls them on one trail
-   * runtime payload.
-   */
-  void DestroyTrailRuntimeViewForVectorTail(moho::TrailRuntimeView& trail) noexcept
-  {
-    AssignTrailTextureLane(trail.texture0, nullptr);
-    AssignTrailTextureLane(trail.texture1, nullptr);
-  }
-
-  void DestroyWorldParticleRange(
-    moho::SWorldParticle* begin,
-    moho::SWorldParticle* end
-  ) noexcept;
-
-  void DestroyTrailRuntimeRange(
-    moho::TrailRuntimeView* begin,
-    moho::TrailRuntimeView* end
-  ) noexcept;
-
-  /**
-   * Address: 0x00497200 (FUN_00497200, sub_497200)
-   *
-   * What it does:
-   * Duplicate end-pointer accessor thunk for one world-particle debug-vector
-   * lane.
-   */
-  moho::SWorldParticle** GetWorldParticleVectorEndPointerDuplicate(
-    moho::SWorldParticle** const outEnd,
-    const moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles
-  ) noexcept
-  {
-    *outEnd = pendingParticles.end;
-    return outEnd;
-  }
-
-  /**
-   * Address: 0x0049E400 (FUN_0049E400, sub_49E400)
-   *
-   * What it does:
-   * Copies one world-particle source value across one destination range.
-   */
-  [[maybe_unused]] moho::SWorldParticle* CopyWorldParticleValueAcrossRange(
-    const moho::SWorldParticle& sourceParticle,
-    moho::SWorldParticle* destinationBegin,
-    const moho::SWorldParticle* const destinationEnd
-  ) noexcept
-  {
-    moho::SWorldParticle* result = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      CopyWorldParticleForVectorMove(sourceParticle, *destinationBegin);
-      result = destinationBegin;
-      ++destinationBegin;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0049E430 (FUN_0049E430, sub_49E430)
-   *
-   * What it does:
-   * Shifts one world-particle tail range right by one element using backward
-   * copy order and returns the write cursor after the shift.
-   */
-  [[maybe_unused]] moho::SWorldParticle* ShiftWorldParticleRangeRightByOneAndReturnWriteCursor(
-    moho::SWorldParticle* sourceLast,
-    moho::SWorldParticle* destinationEnd,
-    const moho::SWorldParticle* const stopAt
-  ) noexcept
-  {
-    while (sourceLast != stopAt) {
-      --sourceLast;
-      --destinationEnd;
-      CopyWorldParticleForVectorMove(*sourceLast, *destinationEnd);
-    }
-    return destinationEnd;
-  }
 
   /**
    * Address: 0x0049E460 (FUN_0049E460, sub_49E460)
@@ -2348,71 +691,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049E4B0 (FUN_0049E4B0, sub_49E4B0)
-   *
-   * What it does:
-   * Copies one trail-runtime range (`[sourceBegin, sourceEnd)`) into
-   * destination storage and returns the destination end pointer.
-   */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyTrailRuntimeRangeAndReturnEnd(
-    moho::TrailRuntimeView* destination,
-    const moho::TrailRuntimeView* sourceBegin,
-    const moho::TrailRuntimeView* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (destination != nullptr) {
-        CopyTrailRuntimeViewForVectorMove(*sourceBegin, *destination);
-      }
-      ++sourceBegin;
-      ++destination;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0049E4E0 (FUN_0049E4E0, sub_49E4E0)
-   *
-   * What it does:
-   * Copies one trail-runtime source value across one destination range.
-   */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyTrailRuntimeValueAcrossRange(
-    const moho::TrailRuntimeView& sourceTrail,
-    moho::TrailRuntimeView* destinationBegin,
-    const moho::TrailRuntimeView* const destinationEnd
-  ) noexcept
-  {
-    moho::TrailRuntimeView* result = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      CopyTrailRuntimeViewForVectorMove(sourceTrail, *destinationBegin);
-      result = destinationBegin;
-      ++destinationBegin;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0049E500 (FUN_0049E500, sub_49E500)
-   *
-   * What it does:
-   * Shifts one trail-runtime tail range right by one element using backward
-   * copy order and returns the write cursor after the shift.
-   */
-  [[maybe_unused]] moho::TrailRuntimeView* ShiftTrailRuntimeRangeRightByOneAndReturnWriteCursor(
-    moho::TrailRuntimeView* sourceLast,
-    moho::TrailRuntimeView* destinationEnd,
-    const moho::TrailRuntimeView* const stopAt
-  ) noexcept
-  {
-    while (sourceLast != stopAt) {
-      --sourceLast;
-      --destinationEnd;
-      CopyTrailRuntimeViewForVectorMove(*sourceLast, *destinationEnd);
-    }
-    return destinationEnd;
-  }
-
-  /**
    * Address: 0x0049E530 (FUN_0049E530, sub_49E530)
    *
    * What it does:
@@ -2429,461 +707,6 @@ namespace
     }
 
     return ::operator new(static_cast<std::size_t>(elementCount) * kTrailRuntimeSize);
-  }
-
-  /**
-   * Address: 0x00499250 (FUN_00499250, sub_499250)
-   *
-   * What it does:
-   * Inserts one world-particle payload into a pending-particle debug-vector
-   * lane, growing storage when required.
-   */
-  void InsertWorldParticleValueAtAndGrow(
-    const moho::SWorldParticle& sourceParticle,
-    moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles,
-    moho::SWorldParticle* insertPosition
-  )
-  {
-    constexpr std::size_t kWorldParticleMaxCount = 0x01D41D41U;
-
-    alignas(moho::SWorldParticle) std::uint8_t temporaryStorage[sizeof(moho::SWorldParticle)]{};
-    auto* const temporaryParticle = new (temporaryStorage) moho::SWorldParticle{};
-    CopyWorldParticleForVectorMove(sourceParticle, *temporaryParticle);
-
-    try {
-      const std::size_t size = VectorCount(pendingParticles);
-      const std::size_t capacity = VectorCapacity(pendingParticles);
-
-      if (size >= kWorldParticleMaxCount) {
-        throw std::length_error("vector<T> too long");
-      }
-
-      if (pendingParticles.begin == nullptr || pendingParticles.end == nullptr || insertPosition == nullptr
-          || insertPosition < pendingParticles.begin || insertPosition > pendingParticles.end) {
-        insertPosition = pendingParticles.end;
-      }
-
-      std::size_t insertIndex = size;
-      if (pendingParticles.begin != nullptr && insertPosition != nullptr) {
-        insertIndex = static_cast<std::size_t>(insertPosition - pendingParticles.begin);
-      }
-      if (insertIndex > size) {
-        insertIndex = size;
-      }
-
-      if (capacity < (size + 1U)) {
-        std::size_t newCapacity = 0U;
-        if (kWorldParticleMaxCount - (capacity >> 1U) >= capacity) {
-          newCapacity = capacity + (capacity >> 1U);
-        }
-        if (newCapacity < (size + 1U)) {
-          newCapacity = size + 1U;
-        }
-
-        auto* const newStorage =
-          static_cast<moho::SWorldParticle*>(AllocateWorldParticleArrayOrThrow(static_cast<std::uint32_t>(newCapacity)));
-        std::size_t constructedCount = 0U;
-
-        try {
-          for (std::size_t index = 0U; index < insertIndex; ++index) {
-            new (newStorage + index) moho::SWorldParticle{};
-            CopyWorldParticleForVectorMove(pendingParticles.begin[index], newStorage[index]);
-            ++constructedCount;
-          }
-
-          new (newStorage + insertIndex) moho::SWorldParticle{};
-          CopyWorldParticleForVectorMove(*temporaryParticle, newStorage[insertIndex]);
-          ++constructedCount;
-
-          for (std::size_t index = insertIndex; index < size; ++index) {
-            new (newStorage + index + 1U) moho::SWorldParticle{};
-            CopyWorldParticleForVectorMove(pendingParticles.begin[index], newStorage[index + 1U]);
-            ++constructedCount;
-          }
-        } catch (...) {
-          DestroyWorldParticleRange(newStorage, newStorage + constructedCount);
-          ::operator delete(newStorage);
-          throw;
-        }
-
-        if (pendingParticles.begin != nullptr) {
-          DestroyWorldParticleRange(pendingParticles.begin, pendingParticles.end);
-          ::operator delete(pendingParticles.begin);
-        }
-
-        pendingParticles.begin = newStorage;
-        pendingParticles.end = newStorage + size + 1U;
-        pendingParticles.capacityEnd = newStorage + newCapacity;
-      } else {
-        moho::SWorldParticle* const oldEnd = pendingParticles.end;
-        new (oldEnd) moho::SWorldParticle{};
-
-        if (insertPosition == oldEnd) {
-          CopyWorldParticleForVectorMove(*temporaryParticle, oldEnd[0]);
-        } else {
-          CopyWorldParticleForVectorMove(oldEnd[-1], oldEnd[0]);
-          moho::SWorldParticle* const shiftedWriteCursor =
-            ShiftWorldParticleRangeRightByOneAndReturnWriteCursor(oldEnd - 1, oldEnd, insertPosition);
-          (void)CopyWorldParticleValueAcrossRange(*temporaryParticle, insertPosition, shiftedWriteCursor);
-        }
-
-        pendingParticles.end = oldEnd + 1;
-      }
-
-      DestroyWorldParticleForVectorTail(*temporaryParticle);
-    } catch (...) {
-      DestroyWorldParticleForVectorTail(*temporaryParticle);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x00497210 (FUN_00497210, sub_497210)
-   *
-   * What it does:
-   * Forwards one world-particle insert path and exports the iterator position
-   * that maps to the original insertion index.
-   */
-  moho::SWorldParticle** InsertOneWorldParticleAndExportIterator(
-    moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles,
-    moho::SWorldParticle** const outIterator,
-    moho::SWorldParticle* const insertPosition,
-    const moho::SWorldParticle* const sourceParticle
-  )
-  {
-    std::size_t index = 0U;
-    if (pendingParticles.begin != nullptr &&
-        pendingParticles.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= pendingParticles.begin &&
-        insertPosition <= pendingParticles.end &&
-        pendingParticles.begin != pendingParticles.end) {
-      index = static_cast<std::size_t>(insertPosition - pendingParticles.begin);
-    }
-
-    if (sourceParticle != nullptr) {
-      InsertWorldParticleValueAtAndGrow(*sourceParticle, pendingParticles, insertPosition);
-    }
-
-    if (pendingParticles.begin == nullptr) {
-      *outIterator = nullptr;
-      return outIterator;
-    }
-
-    const std::size_t count = VectorCount(pendingParticles);
-    if (index > count) {
-      index = count;
-    }
-    *outIterator = pendingParticles.begin + index;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x004972C0 (FUN_004972C0, sub_4972C0)
-   *
-   * What it does:
-   * Destroys one world-particle range used by vector erase/reallocation paths.
-   */
-  void DestroyWorldParticleRange(
-    moho::SWorldParticle* const begin,
-    moho::SWorldParticle* const end
-  ) noexcept
-  {
-    for (moho::SWorldParticle* particle = begin; particle != end; ++particle) {
-      DestroyWorldParticleForVectorTail(*particle);
-    }
-  }
-
-  /**
-   * Address: 0x004972E0 (FUN_004972E0, sub_4972E0)
-   *
-   * What it does:
-   * Releases one world-particle debug-vector lane (destroy payload range +
-   * free storage) and resets begin/end/capacity pointers.
-   */
-  void ResetWorldParticleVectorStorageDuplicate(
-    moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles
-  ) noexcept
-  {
-    if (pendingParticles.begin != nullptr) {
-      DestroyWorldParticleRange(pendingParticles.begin, pendingParticles.end);
-      ::operator delete(pendingParticles.begin);
-    }
-    pendingParticles.begin = nullptr;
-    pendingParticles.end = nullptr;
-    pendingParticles.capacityEnd = nullptr;
-  }
-
-
-  /**
-   * Address: 0x00497330 (FUN_00497330, sub_497330)
-   *
-   * What it does:
-   * Copy-constructs one world-particle range into uninitialized destination
-   * storage and rolls back constructed elements on failure.
-   */
-  void CopyConstructWorldParticleRange(
-    moho::SWorldParticle* const destination,
-    const std::size_t count,
-    const moho::SWorldParticle* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr || count == 0U) {
-      return;
-    }
-
-    std::size_t constructedCount = 0U;
-    try {
-      for (; constructedCount < count; ++constructedCount) {
-        new (destination + constructedCount) moho::SWorldParticle{};
-        CopyWorldParticleForVectorMove(source[constructedCount], destination[constructedCount]);
-      }
-    } catch (...) {
-      DestroyWorldParticleRange(destination, destination + constructedCount);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x00499630 (FUN_00499630, sub_499630)
-   *
-   * What it does:
-   * Inserts one trail-runtime payload into a pending-trail debug-vector lane,
-   * growing storage when required.
-   */
-  void InsertTrailValueAtAndGrow(
-    const moho::TrailRuntimeView& sourceTrail,
-    moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails,
-    moho::TrailRuntimeView* insertPosition
-  )
-  {
-    constexpr std::size_t kTrailMaxCount = 0x02AAAAAAU;
-
-    alignas(moho::TrailRuntimeView) std::uint8_t temporaryStorage[sizeof(moho::TrailRuntimeView)]{};
-    auto* const temporaryTrail = new (temporaryStorage) moho::TrailRuntimeView{};
-    CopyTrailRuntimeViewForVectorMove(sourceTrail, *temporaryTrail);
-
-    try {
-      const std::size_t size = VectorCount(pendingTrails);
-      const std::size_t capacity = VectorCapacity(pendingTrails);
-
-      if (size >= kTrailMaxCount) {
-        throw std::length_error("vector<T> too long");
-      }
-
-      if (pendingTrails.begin == nullptr || pendingTrails.end == nullptr || insertPosition == nullptr
-          || insertPosition < pendingTrails.begin || insertPosition > pendingTrails.end) {
-        insertPosition = pendingTrails.end;
-      }
-
-      std::size_t insertIndex = size;
-      if (pendingTrails.begin != nullptr && insertPosition != nullptr) {
-        insertIndex = static_cast<std::size_t>(insertPosition - pendingTrails.begin);
-      }
-      if (insertIndex > size) {
-        insertIndex = size;
-      }
-
-      if (capacity < (size + 1U)) {
-        std::size_t newCapacity = 0U;
-        if (kTrailMaxCount - (capacity >> 1U) >= capacity) {
-          newCapacity = capacity + (capacity >> 1U);
-        }
-        if (newCapacity < (size + 1U)) {
-          newCapacity = size + 1U;
-        }
-
-        auto* const newStorage =
-          static_cast<moho::TrailRuntimeView*>(AllocateTrailRuntimeArrayOrThrow(static_cast<std::uint32_t>(newCapacity)));
-        std::size_t constructedCount = 0U;
-
-        try {
-          for (std::size_t index = 0U; index < insertIndex; ++index) {
-            new (newStorage + index) moho::TrailRuntimeView{};
-            ++constructedCount;
-          }
-          if (insertIndex != 0U && pendingTrails.begin != nullptr) {
-            (void)CopyTrailRuntimeRangeAndReturnEnd(
-              newStorage,
-              pendingTrails.begin,
-              pendingTrails.begin + insertIndex
-            );
-          }
-
-          new (newStorage + insertIndex) moho::TrailRuntimeView{};
-          CopyTrailRuntimeViewForVectorMove(*temporaryTrail, newStorage[insertIndex]);
-          ++constructedCount;
-
-          for (std::size_t index = insertIndex; index < size; ++index) {
-            new (newStorage + index + 1U) moho::TrailRuntimeView{};
-            ++constructedCount;
-          }
-          if ((size - insertIndex) != 0U && pendingTrails.begin != nullptr) {
-            (void)CopyTrailRuntimeRangeAndReturnEnd(
-              newStorage + insertIndex + 1U,
-              pendingTrails.begin + insertIndex,
-              pendingTrails.end
-            );
-          }
-        } catch (...) {
-          DestroyTrailRuntimeRange(newStorage, newStorage + constructedCount);
-          ::operator delete(newStorage);
-          throw;
-        }
-
-        if (pendingTrails.begin != nullptr) {
-          DestroyTrailRuntimeRange(pendingTrails.begin, pendingTrails.end);
-          ::operator delete(pendingTrails.begin);
-        }
-
-        pendingTrails.begin = newStorage;
-        pendingTrails.end = newStorage + size + 1U;
-        pendingTrails.capacityEnd = newStorage + newCapacity;
-      } else {
-        moho::TrailRuntimeView* const oldEnd = pendingTrails.end;
-        new (oldEnd) moho::TrailRuntimeView{};
-
-        if (insertPosition == oldEnd) {
-          CopyTrailRuntimeViewForVectorMove(*temporaryTrail, oldEnd[0]);
-        } else {
-          CopyTrailRuntimeViewForVectorMove(oldEnd[-1], oldEnd[0]);
-          moho::TrailRuntimeView* const shiftedWriteCursor =
-            ShiftTrailRuntimeRangeRightByOneAndReturnWriteCursor(oldEnd - 1, oldEnd, insertPosition);
-          (void)CopyTrailRuntimeValueAcrossRange(*temporaryTrail, insertPosition, shiftedWriteCursor);
-        }
-
-        pendingTrails.end = oldEnd + 1;
-      }
-
-      DestroyTrailRuntimeViewForVectorTail(*temporaryTrail);
-    } catch (...) {
-      DestroyTrailRuntimeViewForVectorTail(*temporaryTrail);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x004973A0 (FUN_004973A0, sub_4973A0)
-   *
-   * What it does:
-   * Duplicate end-pointer accessor thunk for one trail debug-vector lane.
-   */
-  moho::TrailRuntimeView** GetTrailVectorEndPointerDuplicate(
-    moho::TrailRuntimeView** const outEnd,
-    const moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails
-  ) noexcept
-  {
-    *outEnd = pendingTrails.end;
-    return outEnd;
-  }
-
-  /**
-   * Address: 0x004973B0 (FUN_004973B0, sub_4973B0)
-   *
-   * What it does:
-   * Forwards one trail insert path and exports the iterator position that maps
-   * to the original insertion index.
-   */
-  moho::TrailRuntimeView** InsertOneTrailAndExportIterator(
-    moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails,
-    moho::TrailRuntimeView** const outIterator,
-    moho::TrailRuntimeView* const insertPosition,
-    const moho::TrailRuntimeView* const sourceTrail
-  )
-  {
-    std::size_t index = 0U;
-    if (pendingTrails.begin != nullptr &&
-        pendingTrails.end != nullptr &&
-        insertPosition != nullptr &&
-        insertPosition >= pendingTrails.begin &&
-        insertPosition <= pendingTrails.end &&
-        pendingTrails.begin != pendingTrails.end) {
-      index = static_cast<std::size_t>(insertPosition - pendingTrails.begin);
-    }
-
-    if (sourceTrail != nullptr) {
-      InsertTrailValueAtAndGrow(*sourceTrail, pendingTrails, insertPosition);
-    }
-
-    if (pendingTrails.begin == nullptr) {
-      *outIterator = nullptr;
-      return outIterator;
-    }
-
-    const std::size_t count = VectorCount(pendingTrails);
-    if (index > count) {
-      index = count;
-    }
-    *outIterator = pendingTrails.begin + index;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x00497470 (FUN_00497470, sub_497470)
-   *
-   * What it does:
-   * Destroys one trail range used by vector erase/reallocation paths.
-   */
-  void DestroyTrailRuntimeRange(
-    moho::TrailRuntimeView* const begin,
-    moho::TrailRuntimeView* const end
-  ) noexcept
-  {
-    for (moho::TrailRuntimeView* trail = begin; trail != end; ++trail) {
-      DestroyTrailRuntimeViewForVectorTail(*trail);
-    }
-  }
-
-  /**
-   * Address: 0x00497490 (FUN_00497490, sub_497490)
-   *
-   * What it does:
-   * Releases one trail debug-vector lane (destroy payload range + free storage)
-   * and resets begin/end/capacity pointers.
-   */
-  void ResetTrailRuntimeVectorStorageDuplicate(
-    moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails
-  ) noexcept
-  {
-    if (pendingTrails.begin != nullptr) {
-      DestroyTrailRuntimeRange(pendingTrails.begin, pendingTrails.end);
-      ::operator delete(pendingTrails.begin);
-    }
-    pendingTrails.begin = nullptr;
-    pendingTrails.end = nullptr;
-    pendingTrails.capacityEnd = nullptr;
-  }
-
-
-  /**
-   * Address: 0x004974E0 (FUN_004974E0, sub_4974E0)
-   *
-   * What it does:
-   * Copy-constructs one repeated trail payload into `count` contiguous
-   * destination slots and returns the resulting end pointer.
-   */
-  [[nodiscard]] moho::TrailRuntimeView* CopyConstructRepeatedTrailRuntimeAndReturnEnd(
-    moho::TrailRuntimeView* const destination,
-    const std::size_t count,
-    const moho::TrailRuntimeView* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr || count == 0U) {
-      return destination != nullptr ? destination + count : nullptr;
-    }
-
-    std::size_t constructedCount = 0U;
-    try {
-      for (; constructedCount < count; ++constructedCount) {
-        new (destination + constructedCount) moho::TrailRuntimeView{};
-        CopyTrailRuntimeViewForVectorMove(*source, destination[constructedCount]);
-      }
-    } catch (...) {
-      DestroyTrailRuntimeRange(destination, destination + constructedCount);
-      throw;
-    }
-
-    return destination + count;
   }
 
   /**
@@ -3020,227 +843,6 @@ namespace
    */
   void NoOpHelperThunkB(const std::uint32_t /*unused*/) noexcept {}
 
-  /**
-   * Address: 0x00498AA0 (FUN_00498AA0, non-canonical helper lane)
-   *
-   * What it does:
-   * Shifts one `uint32_t` vector tail left from `source` into `destination`,
-   * updates the vector end lane, and writes destination iterator to caller
-   * storage.
-   */
-  std::uint32_t** ShiftUInt32VectorTailLeftAndStoreDestination(
-    moho::RenderBucketVectorRuntime<std::uint32_t>& values,
-    std::uint32_t** const outIterator,
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    if (destination != source && values.end != nullptr && source != nullptr) {
-      const auto remainingCount = values.end - source;
-      std::uint32_t* const newEnd = destination + remainingCount;
-      if (remainingCount > 0) {
-        std::memmove(destination, source, static_cast<std::size_t>(remainingCount) * sizeof(std::uint32_t));
-      }
-      values.end = newEnd;
-    }
-
-    *outIterator = destination;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x0049B760 (FUN_0049B760, sub_49B760)
-   *
-   * What it does:
-   * Duplicate tail-shift helper for one `uint32_t` vector erase lane,
-   * exporting the post-shift iterator.
-   */
-  std::uint32_t** ShiftUInt32VectorTailLeftAndStoreDestinationDuplicate(
-    moho::RenderBucketVectorRuntime<std::uint32_t>& values,
-    std::uint32_t** const outIterator,
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    if (destination != source && values.end != nullptr && source != nullptr) {
-      const auto remainingCount = values.end - source;
-      std::uint32_t* const newEnd = destination + remainingCount;
-      if (remainingCount > 0) {
-        std::memmove(destination, source, static_cast<std::size_t>(remainingCount) * sizeof(std::uint32_t));
-      }
-      values.end = newEnd;
-    }
-
-    *outIterator = destination;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x00498AF0 (FUN_00498AF0, non-canonical helper lane)
-   *
-   * What it does:
-   * Initializes one `uint32_t` debug-vector storage lane with requested
-   * capacity, keeping begin/end/capacity equal when requested capacity is
-   * zero.
-   */
-  [[nodiscard]] bool InitializeUInt32VectorStorage(
-    moho::RenderBucketVectorRuntime<std::uint32_t>& values,
-    const std::uint32_t count
-  )
-  {
-    if (count > kLegacyListMaxSize) {
-      ThrowLegacyVectorTooLongDuplicateE();
-    }
-
-    if (count != 0U) {
-      auto* const storage = static_cast<std::uint32_t*>(::operator new(sizeof(std::uint32_t) * count));
-      values.begin = storage;
-      values.end = storage;
-      values.capacityEnd = storage + count;
-    } else {
-      auto* const emptyStorage = static_cast<std::uint32_t*>(::operator new(0));
-      values.begin = emptyStorage;
-      values.end = emptyStorage;
-      values.capacityEnd = emptyStorage;
-    }
-
-    return true;
-  }
-
-  /**
-   * Address: 0x00498B80 (FUN_00498B80, non-canonical helper lane)
-   *
-   * What it does:
-   * Fills one `uint32_t` range with scalar value from caller slot and returns
-   * one-past-end destination pointer.
-   */
-  std::uint32_t* FillUInt32RangeFromValueSlot(
-    const std::uint32_t* const valueSlot,
-    std::uint32_t* const destination,
-    const std::int32_t count
-  ) noexcept
-  {
-    for (std::int32_t index = 0; index < count; ++index) {
-      destination[index] = *valueSlot;
-    }
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x00498BE0 (FUN_00498BE0, non-canonical helper lane)
-   *
-   * What it does:
-   * Writes one `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotA(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00498BF0 (FUN_00498BF0, non-canonical helper lane)
-   *
-   * What it does:
-   * Reads one `uint32_t` scalar from caller-provided storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotA(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x00498C30 (FUN_00498C30, non-canonical helper lane)
-   *
-   * What it does:
-   * Writes one `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotB(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00498C40 (FUN_00498C40, non-canonical helper lane)
-   *
-   * What it does:
-   * Reads one `uint32_t` scalar from caller-provided storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotB(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x00498C80 (FUN_00498C80, non-canonical helper lane)
-   *
-   * What it does:
-   * Writes one `uint32_t` scalar into caller-provided output storage.
-   */
-  std::uint32_t* WriteUInt32ToOutputSlotC(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00498CA0 (FUN_00498CA0, non-canonical helper lane)
-   *
-   * What it does:
-   * Reads one `uint32_t` scalar from caller-provided storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUInt32FromSlotC(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  [[nodiscard]] bool AppendWorkItemPointer(
-    moho::RenderBucketVectorRuntime<moho::ParticleRenderWorkItemRuntime*>& vector,
-    moho::ParticleRenderWorkItemRuntime* const workItem
-  )
-  {
-    const std::size_t count = VectorCount(vector);
-    const std::size_t capacity = VectorCapacity(vector);
-
-    if (count >= capacity) {
-      std::size_t newCapacity = capacity != 0U ? capacity + (capacity / 2U) : 4U;
-      if (newCapacity < count + 1U) {
-        newCapacity = count + 1U;
-      }
-      if (newCapacity > (std::numeric_limits<std::size_t>::max() / sizeof(moho::ParticleRenderWorkItemRuntime*))) {
-        return false;
-      }
-
-      auto* const newStorage = static_cast<moho::ParticleRenderWorkItemRuntime**>(
-        ::operator new(newCapacity * sizeof(moho::ParticleRenderWorkItemRuntime*))
-      );
-      if (count != 0U && vector.begin != nullptr) {
-        std::memcpy(newStorage, vector.begin, count * sizeof(moho::ParticleRenderWorkItemRuntime*));
-      }
-      if (vector.begin != nullptr) {
-        ::operator delete(vector.begin);
-      }
-
-      vector.begin = newStorage;
-      vector.end = newStorage + count;
-      vector.capacityEnd = newStorage + newCapacity;
-    }
-
-    vector.end[count] = workItem;
-    vector.end = vector.begin + count + 1U;
-    return true;
-  }
-
   void ReleaseBeamTextureHandlesInRange(
     moho::SWorldBeam* const begin,
     moho::SWorldBeam* const end
@@ -3259,232 +861,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00495590 (FUN_00495590, sub_495590)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one world-particle render vector into
-   * caller-provided iterator storage.
-   */
-  SWorldParticle** GetWorldParticleVectorBeginPointer(
-    SWorldParticle** const outBeginPointer,
-    const RenderBucketVectorRuntime<SWorldParticle>& pendingParticles
-  ) noexcept
-  {
-    if (outBeginPointer != nullptr) {
-      *outBeginPointer = pendingParticles.begin;
-    }
-    return outBeginPointer;
-  }
-
-  /**
-   * Address: 0x004955A0 (FUN_004955A0, sub_4955A0)
-   *
-   * What it does:
-   * Returns the active world-particle element count from one render vector
-   * lane.
-   */
-  std::int32_t GetWorldParticleVectorCount(const RenderBucketVectorRuntime<SWorldParticle>& pendingParticles) noexcept
-  {
-    if (pendingParticles.begin == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(pendingParticles.end - pendingParticles.begin);
-  }
-
-  /**
-   * Address: 0x00495740 (FUN_00495740, sub_495740)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one trail render vector into
-   * caller-provided iterator storage.
-   */
-  TrailRuntimeView** GetTrailVectorBeginPointer(
-    TrailRuntimeView** const outBeginPointer,
-    const RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails
-  ) noexcept
-  {
-    if (outBeginPointer != nullptr) {
-      *outBeginPointer = pendingTrails.begin;
-    }
-    return outBeginPointer;
-  }
-
-  /**
-   * Address: 0x00495750 (FUN_00495750, sub_495750)
-   *
-   * What it does:
-   * Returns the active trail element count from one render vector lane.
-   */
-  std::int32_t GetTrailVectorCount(const RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails) noexcept
-  {
-    if (pendingTrails.begin == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(pendingTrails.end - pendingTrails.begin);
-  }
-
-  /**
-   * Address: 0x0049DE20 (FUN_0049DE20, sub_49DE20)
-   *
-   * What it does:
-   * Copies one contiguous world-particle range into destination storage and
-   * returns the destination end pointer.
-   */
-  [[nodiscard]] SWorldParticle* CopyWorldParticleRangeForErase(
-    const SWorldParticle* readBegin,
-    const SWorldParticle* const readEnd,
-    SWorldParticle* writeBegin
-  ) noexcept
-  {
-    for (const SWorldParticle* read = readBegin; read != readEnd; ++read, ++writeBegin) {
-      CopyWorldParticleForVectorMove(*read, *writeBegin);
-    }
-    return writeBegin;
-  }
-
-  /**
-   * Address: 0x004956B0 (FUN_004956B0, sub_4956B0)
-   *
-   * What it does:
-   * Erases one world-particle range from a pending vector lane by shifting the
-   * tail left with typed copy semantics and destroying trailing entries.
-   */
-  SWorldParticle** EraseWorldParticleVectorRange(
-    RenderBucketVectorRuntime<SWorldParticle>& pendingParticles,
-    SWorldParticle** const outBeginPointer,
-    SWorldParticle* const eraseBegin,
-    SWorldParticle* const eraseEnd
-  ) noexcept
-  {
-    SWorldParticle* begin = eraseBegin;
-    if (eraseBegin != eraseEnd) {
-      SWorldParticle* const oldEnd = pendingParticles.end;
-      SWorldParticle* const write = CopyWorldParticleRangeForErase(eraseEnd, oldEnd, eraseBegin);
-
-      for (SWorldParticle* tail = write; tail != oldEnd; ++tail) {
-        DestroyWorldParticleForVectorTail(*tail);
-      }
-
-      pendingParticles.end = write;
-      begin = eraseBegin;
-    }
-
-    if (outBeginPointer != nullptr) {
-      *outBeginPointer = begin;
-    }
-    return outBeginPointer;
-  }
-
-  /**
-   * Address: 0x00495850 (FUN_00495850, sub_495850)
-   *
-   * What it does:
-   * Erases one trail range from a pending vector lane by shifting the tail left
-   * with typed copy semantics and destroying trailing entries.
-   */
-  TrailRuntimeView** EraseTrailVectorRange(
-    RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails,
-    TrailRuntimeView** const outBeginPointer,
-    TrailRuntimeView* const eraseBegin,
-    TrailRuntimeView* const eraseEnd
-  ) noexcept
-  {
-    TrailRuntimeView* begin = eraseBegin;
-    if (eraseBegin != eraseEnd) {
-      TrailRuntimeView* const oldEnd = pendingTrails.end;
-      TrailRuntimeView* write = eraseBegin;
-
-      for (TrailRuntimeView* read = eraseEnd; read != oldEnd; ++read, ++write) {
-        CopyTrailRuntimeViewForVectorMove(*read, *write);
-      }
-
-      for (TrailRuntimeView* tail = write; tail != oldEnd; ++tail) {
-        DestroyTrailRuntimeViewForVectorTail(*tail);
-      }
-
-      pendingTrails.end = write;
-      begin = eraseBegin;
-    }
-
-    if (outBeginPointer != nullptr) {
-      *outBeginPointer = begin;
-    }
-    return outBeginPointer;
-  }
-
-  /**
-   * Address: 0x00495930 (FUN_00495930, sub_495930)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one beam vector into caller-provided
-   * iterator storage.
-   */
-  SWorldBeam** GetBeamVectorBeginPointer(
-    SWorldBeam** const outBeginPointer,
-    const RenderBucketVectorRuntime<SWorldBeam>& beams
-  ) noexcept
-  {
-    if (outBeginPointer != nullptr) {
-      *outBeginPointer = beams.begin;
-    }
-    return outBeginPointer;
-  }
-
-  /**
-   * Address: 0x00495940 (FUN_00495940, sub_495940)
-   *
-   * What it does:
-   * Writes the end-pointer lane of one beam vector into caller-provided
-   * iterator storage.
-   */
-  SWorldBeam** GetBeamVectorEndPointer(
-    SWorldBeam** const outEndPointer,
-    const RenderBucketVectorRuntime<SWorldBeam>& beams
-  ) noexcept
-  {
-    if (outEndPointer != nullptr) {
-      *outEndPointer = beams.end;
-    }
-    return outEndPointer;
-  }
-
-  /**
-   * Address: 0x00495950 (FUN_00495950, sub_495950)
-   *
-   * What it does:
-   * Returns the active beam element count from one beam vector lane.
-   */
-  std::int32_t GetBeamVectorCount(const RenderBucketVectorRuntime<SWorldBeam>& beams) noexcept
-  {
-    if (beams.begin == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(beams.end - beams.begin);
-  }
-
-  /**
-   * Address: 0x004958F0 (FUN_004958F0, sub_4958F0)
-   *
-   * What it does:
-   * Releases one beam-vector storage lane (including intrusive texture refs on
-   * each beam payload) and clears begin/end/capacity pointers.
-   */
-  void ResetBeamVectorStorage(RenderBucketVectorRuntime<SWorldBeam>& beams) noexcept
-  {
-    if (beams.begin != nullptr) {
-      ReleaseBeamTextureHandlesInRange(beams.begin, beams.end);
-      ::operator delete(beams.begin);
-    }
-
-    beams.begin = nullptr;
-    beams.end = nullptr;
-    beams.capacityEnd = nullptr;
-  }
-
   /**
    * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
    *
@@ -3569,8 +945,8 @@ namespace moho
     bucket.tag = msvc8::string{};
     bucket.blendMode = 0;
     bucket.zMode = 0;
-    bucket.pendingParticles = RenderBucketVectorRuntime<SWorldParticle>{};
-    bucket.activeWorkItems = RenderBucketVectorRuntime<ParticleRenderWorkItemRuntime*>{};
+    bucket.pendingParticles.clear();
+    bucket.activeWorkItems.clear();
     bucket.owner = owner;
 
     bucket.stateByte = particle.mEnabled;
@@ -3611,19 +987,19 @@ namespace moho
     bucket.tag = msvc8::string{};
     bucket.uvScalar = 0.0f;
     bucket.renderStartIndex = 0U;
-    bucket.pendingTrails = RenderBucketVectorRuntime<TrailRuntimeView>{};
-    bucket.activeWorkItems = RenderBucketVectorRuntime<ParticleRenderWorkItemRuntime*>{};
+    bucket.pendingTrails.clear();
+    bucket.activeWorkItems.clear();
     bucket.owner = owner;
 
     CParticleTexture::TextureResourceHandle texture0{};
-    if (trail.texture0 != nullptr) {
-      trail.texture0->GetTexture(texture0);
+    if (trail.texture0.tex != nullptr) {
+      trail.texture0.tex->GetTexture(texture0);
     }
     bucket.texture0 = texture0;
 
     CParticleTexture::TextureResourceHandle texture1{};
-    if (trail.texture1 != nullptr) {
-      trail.texture1->GetTexture(texture1);
+    if (trail.texture1.tex != nullptr) {
+      trail.texture1.tex->GetTexture(texture1);
     }
     bucket.texture1 = texture1;
 
@@ -3642,18 +1018,16 @@ namespace moho
   bool UploadPendingParticlesIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     const float frameDelta,
-    RenderBucketVectorRuntime<SWorldParticle>& pendingParticles
+    msvc8::vector<SWorldParticle>& pendingParticles
   )
   {
-    const std::size_t pendingCount = VectorCount(pendingParticles);
+    const std::size_t pendingCount = pendingParticles.size();
     if (pendingCount == 0U) {
       return false;
     }
 
     const std::size_t intervalCount =
-      (workItem.mIntervalsBegin != nullptr && workItem.mIntervalsEnd != nullptr && workItem.mIntervalsEnd >= workItem.mIntervalsBegin)
-      ? static_cast<std::size_t>(workItem.mIntervalsEnd - workItem.mIntervalsBegin)
-      : 0U;
+      workItem.mIntervals.size();
 
     std::size_t maxUploadCount = pendingCount;
     if (workItem.mIntervalCapacityHint > intervalCount) {
@@ -3668,16 +1042,10 @@ namespace moho
 
     auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem.mParticleBuffer);
     if (particleBuffer == nullptr) {
-      SWorldParticle* clearBegin = pendingParticles.begin;
-      (void)EraseWorldParticleVectorRange(
-        pendingParticles,
-        &clearBegin,
-        pendingParticles.begin,
-        pendingParticles.end
-      );
+      pendingParticles.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
-      workItem.mIntervalsEnd = workItem.mIntervalsBegin;
+      workItem.mIntervals.clear();
       return false;
     }
 
@@ -3689,21 +1057,15 @@ namespace moho
     }
 
     if (lockedInstances == nullptr) {
-      SWorldParticle* clearBegin = pendingParticles.begin;
-      (void)EraseWorldParticleVectorRange(
-        pendingParticles,
-        &clearBegin,
-        pendingParticles.begin,
-        pendingParticles.end
-      );
+      pendingParticles.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
-      workItem.mIntervalsEnd = workItem.mIntervalsBegin;
+      workItem.mIntervals.clear();
       return false;
     }
 
     for (std::size_t index = 0U; index < maxUploadCount; ++index) {
-      SWorldParticle& particle = pendingParticles.begin[index];
+      SWorldParticle& particle = pendingParticles[index];
       particle.mInterop += frameDelta;
       (void)AppendInterval(workItem, particle.mInterop, particle.mLifetime);
 
@@ -3737,9 +1099,8 @@ namespace moho
     }
 
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
-    SWorldParticle* eraseBegin = pendingParticles.begin;
-    SWorldParticle* const eraseEnd = pendingParticles.begin + maxUploadCount;
-    (void)EraseWorldParticleVectorRange(pendingParticles, &eraseBegin, eraseBegin, eraseEnd);
+    // `erase(first, last)` (0x004956B0, cited on Vector.h): the uploaded prefix goes.
+    (void)pendingParticles.erase(pendingParticles.begin(), pendingParticles.begin() + maxUploadCount);
     return particleBuffer->UnlockInstanceBuffer() != 0;
   }
 
@@ -3752,19 +1113,14 @@ namespace moho
    */
   void RecycleAndDestroyParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket)
   {
-    if (bucket.activeWorkItems.begin != nullptr && bucket.activeWorkItems.end != nullptr) {
-      for (ParticleRenderWorkItemRuntime** itemPtr = bucket.activeWorkItems.begin; itemPtr != bucket.activeWorkItems.end; ++itemPtr) {
-        ParticleRenderWorkItemRuntime* const workItem = *itemPtr;
-        if (workItem == nullptr) {
-          continue;
-        }
-
-        PushBackBufferToOwnerPool(bucket.owner, static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
-        (void)DestroyParticleRenderWorkItem(workItem);
+    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
+      if (workItem == nullptr) {
+        continue;
       }
+      PushBackBufferToOwnerPool(bucket.owner, static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
+      (void)DestroyParticleRenderWorkItem(workItem);
     }
-
-    bucket.activeWorkItems.end = bucket.activeWorkItems.begin;
+    bucket.activeWorkItems.clear();
   }
 
   /**
@@ -3777,20 +1133,9 @@ namespace moho
   void DestroyParticleRenderBucket(ParticleRenderBucketRuntime& bucket)
   {
     RecycleAndDestroyParticleBucketWorkItems(bucket);
-
-    if (bucket.activeWorkItems.begin != nullptr) {
-      ::operator delete(bucket.activeWorkItems.begin);
-    }
-    bucket.activeWorkItems.begin = nullptr;
-    bucket.activeWorkItems.end = nullptr;
-    bucket.activeWorkItems.capacityEnd = nullptr;
-
-    if (bucket.pendingParticles.begin != nullptr) {
-      ::operator delete(bucket.pendingParticles.begin);
-    }
-    bucket.pendingParticles.begin = nullptr;
-    bucket.pendingParticles.end = nullptr;
-    bucket.pendingParticles.capacityEnd = nullptr;
+    // The two vectors' `_Tidy` (0x004972E0 for the particles, cited on Vector.h).
+    bucket.activeWorkItems.tidy();
+    bucket.pendingParticles.tidy();
 
     bucket.tag.tidy(true, 0U);
     bucket.texture1.reset();
@@ -3806,16 +1151,10 @@ namespace moho
    */
   void RecycleAndDestroyTrailBucketWorkItems(TrailRenderBucketRuntime& bucket)
   {
-    if (bucket.activeWorkItems.begin == nullptr || bucket.activeWorkItems.end == nullptr) {
-      return;
-    }
-
-    for (ParticleRenderWorkItemRuntime** itemPtr = bucket.activeWorkItems.begin; itemPtr != bucket.activeWorkItems.end; ++itemPtr) {
-      ParticleRenderWorkItemRuntime* const workItem = *itemPtr;
+    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr) {
         continue;
       }
-
       if (bucket.owner != nullptr && workItem->mParticleBuffer != nullptr) {
         auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer);
         ReturnTrailSegmentBufferToOwnerPool(bucket.owner, segmentBuffer);
@@ -3824,8 +1163,7 @@ namespace moho
       ResetParticleRenderWorkItemIntervals(*workItem);
       ::operator delete(workItem);
     }
-
-    bucket.activeWorkItems.end = bucket.activeWorkItems.begin;
+    bucket.activeWorkItems.clear();
   }
 
   /**
@@ -3838,23 +1176,10 @@ namespace moho
   void DestroyTrailRenderBucket(TrailRenderBucketRuntime& bucket)
   {
     RecycleAndDestroyTrailBucketWorkItems(bucket);
-
-    if (bucket.activeWorkItems.begin != nullptr) {
-      ::operator delete(bucket.activeWorkItems.begin);
-    }
-    bucket.activeWorkItems.begin = nullptr;
-    bucket.activeWorkItems.end = nullptr;
-    bucket.activeWorkItems.capacityEnd = nullptr;
-
-    if (bucket.pendingTrails.begin != nullptr) {
-      for (TrailRuntimeView* trail = bucket.pendingTrails.begin; trail != bucket.pendingTrails.end; ++trail) {
-        DestroyTrailRuntimeViewForVectorTail(*trail);
-      }
-      ::operator delete(bucket.pendingTrails.begin);
-    }
-    bucket.pendingTrails.begin = nullptr;
-    bucket.pendingTrails.end = nullptr;
-    bucket.pendingTrails.capacityEnd = nullptr;
+    // The two vectors' `_Tidy` (0x00497490 for the trails: each trail's
+    // destructor releases its textures; cited on Vector.h).
+    bucket.activeWorkItems.tidy();
+    bucket.pendingTrails.tidy();
 
     bucket.tag.tidy(true, 0U);
     bucket.texture1.reset();
@@ -3870,12 +1195,11 @@ namespace moho
    */
   void PruneExpiredParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket, const float frameValue)
   {
-    if (bucket.activeWorkItems.begin == nullptr || bucket.activeWorkItems.end == nullptr) {
+    if (bucket.activeWorkItems.empty()) {
       return;
     }
-
-    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin;
-    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin; readIt != bucket.activeWorkItems.end; ++readIt) {
+    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin();
+    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
       ParticleRenderWorkItemRuntime* const workItem = *readIt;
       if (workItem == nullptr) {
         continue;
@@ -3891,7 +1215,8 @@ namespace moho
       ++writeIt;
     }
 
-    bucket.activeWorkItems.end = writeIt;
+    // Pointer elements: dropping the tail is `erase(writeIt, end())`.
+    (void)bucket.activeWorkItems.erase(writeIt, bucket.activeWorkItems.end());
   }
 
   /**
@@ -3903,19 +1228,19 @@ namespace moho
    */
   bool EnsureAndFillParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket, const float frameDelta)
   {
-    const std::size_t workItemCount = VectorCount(bucket.activeWorkItems);
+    const std::size_t workItemCount = bucket.activeWorkItems.size();
     if (workItemCount != 0U) {
-      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.end[-1];
+      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
         (void)UploadPendingParticlesIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingParticles);
       }
     }
 
-    while (VectorCount(bucket.pendingParticles) != 0U) {
+    while (!bucket.pendingParticles.empty()) {
       ParticleBuffer* const pooledBuffer = PopFrontBufferFromOwnerPool(bucket.owner);
       if (pooledBuffer == nullptr) {
         gpg::Logf(kParticleCapExceededLog);
-        bucket.pendingParticles.end = bucket.pendingParticles.begin;
+        bucket.pendingParticles.clear();
         return false;
       }
 
@@ -3926,12 +1251,7 @@ namespace moho
         pooledBuffer
       );
 
-      if (!AppendWorkItemPointer(bucket.activeWorkItems, newWorkItem)) {
-        PushBackBufferToOwnerPool(bucket.owner, pooledBuffer);
-        (void)DestroyParticleRenderWorkItem(newWorkItem);
-        bucket.pendingParticles.end = bucket.pendingParticles.begin;
-        return false;
-      }
+      bucket.activeWorkItems.push_back(newWorkItem);
 
       (void)UploadPendingParticlesIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingParticles);
     }
@@ -3951,7 +1271,7 @@ namespace moho
     PruneExpiredParticleBucketWorkItems(bucket, frameValue);
     (void)EnsureAndFillParticleBucketWorkItems(bucket, frameValue);
 
-    const std::size_t activeWorkItemCount = VectorCount(bucket.activeWorkItems);
+    const std::size_t activeWorkItemCount = bucket.activeWorkItems.size();
     if (activeWorkItemCount == 0U) {
       return false;
     }
@@ -3969,7 +1289,7 @@ namespace moho
     SelectParticleTechniqueWithDrag(selection);
 
     for (std::size_t index = activeWorkItemCount; index > 0U; --index) {
-      ParticleRenderWorkItemRuntime* const workItem = bucket.activeWorkItems.begin[index - 1U];
+      ParticleRenderWorkItemRuntime* const workItem = bucket.activeWorkItems[index - 1U];
       if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
         continue;
       }
@@ -3996,18 +1316,16 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     const float frameDelta,
-    RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails
+    msvc8::vector<TrailRuntimeView>& pendingTrails
   )
   {
-    const std::size_t pendingCount = VectorCount(pendingTrails);
+    const std::size_t pendingCount = pendingTrails.size();
     if (pendingCount == 0U) {
       return false;
     }
 
     const std::size_t intervalCount =
-      (workItem.mIntervalsBegin != nullptr && workItem.mIntervalsEnd != nullptr && workItem.mIntervalsEnd >= workItem.mIntervalsBegin)
-        ? static_cast<std::size_t>(workItem.mIntervalsEnd - workItem.mIntervalsBegin)
-        : 0U;
+      workItem.mIntervals.size();
 
     std::size_t maxUploadCount = pendingCount;
     if (workItem.mIntervalCapacityHint > intervalCount) {
@@ -4022,11 +1340,10 @@ namespace moho
 
     auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(workItem.mParticleBuffer);
     if (segmentBuffer == nullptr) {
-      TrailRuntimeView* clearBegin = pendingTrails.begin;
-      (void)EraseTrailVectorRange(pendingTrails, &clearBegin, pendingTrails.begin, pendingTrails.end);
+      pendingTrails.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
-      workItem.mIntervalsEnd = workItem.mIntervalsBegin;
+      workItem.mIntervals.clear();
       return false;
     }
 
@@ -4042,17 +1359,16 @@ namespace moho
     }
 
     if (lockedVertices == nullptr) {
-      TrailRuntimeView* clearBegin = pendingTrails.begin;
-      (void)EraseTrailVectorRange(pendingTrails, &clearBegin, pendingTrails.begin, pendingTrails.end);
+      pendingTrails.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
-      workItem.mIntervalsEnd = workItem.mIntervalsBegin;
+      workItem.mIntervals.clear();
       return false;
     }
 
     auto* const outVertices = static_cast<float*>(lockedVertices);
-    TrailRuntimeView* currentTrail = pendingTrails.begin;
-    TrailRuntimeView* const trailEnd = pendingTrails.begin + maxUploadCount;
+    TrailRuntimeView* currentTrail = pendingTrails.begin();
+    TrailRuntimeView* const trailEnd = pendingTrails.begin() + maxUploadCount;
     float* out = outVertices;
 
     while (currentTrail != trailEnd) {
@@ -4073,9 +1389,8 @@ namespace moho
     }
 
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
-    TrailRuntimeView* eraseBegin = pendingTrails.begin;
-    TrailRuntimeView* const eraseEnd = pendingTrails.begin + maxUploadCount;
-    (void)EraseTrailVectorRange(pendingTrails, &eraseBegin, eraseBegin, eraseEnd);
+    // `erase(first, last)` (0x00495850, cited on Vector.h): the uploaded prefix goes.
+    (void)pendingTrails.erase(pendingTrails.begin(), pendingTrails.begin() + maxUploadCount);
 
     if (segmentBuffer->mappedVertexData != nullptr) {
       if (moho::ID3DVertexStream* const vertexStream = segmentBuffer->vertexSheet->GetVertStream(0U); vertexStream != nullptr) {
@@ -4096,12 +1411,11 @@ namespace moho
    */
   void PruneExpiredTrailBucketWorkItems(TrailRenderBucketRuntime& bucket, const float frameValue)
   {
-    if (bucket.activeWorkItems.begin == nullptr || bucket.activeWorkItems.end == nullptr) {
+    if (bucket.activeWorkItems.empty()) {
       return;
     }
-
-    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin;
-    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin; readIt != bucket.activeWorkItems.end; ++readIt) {
+    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin();
+    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
       ParticleRenderWorkItemRuntime* const workItem = *readIt;
       if (workItem == nullptr) {
         continue;
@@ -4120,7 +1434,8 @@ namespace moho
       ++writeIt;
     }
 
-    bucket.activeWorkItems.end = writeIt;
+    // Pointer elements: dropping the tail is `erase(writeIt, end())`.
+    (void)bucket.activeWorkItems.erase(writeIt, bucket.activeWorkItems.end());
   }
 
   /**
@@ -4132,23 +1447,21 @@ namespace moho
    */
   bool EnsureAndFillTrailBucketWorkItems(TrailRenderBucketRuntime& bucket, const float frameDelta)
   {
-    const std::size_t workItemCount = VectorCount(bucket.activeWorkItems);
+    const std::size_t workItemCount = bucket.activeWorkItems.size();
     if (workItemCount != 0U) {
-      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.end[-1];
+      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
         (void)UploadPendingTrailsIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingTrails);
       }
     }
 
-    while (VectorCount(bucket.pendingTrails) != 0U) {
+    while (!bucket.pendingTrails.empty()) {
       TrailSegmentBufferRuntime* const pooledBuffer = AcquireTrailSegmentBufferFromOwnerPool(bucket.owner);
       if (pooledBuffer == nullptr) {
         gpg::Logf("Wow!  Ran out of segment buffers from the pool, discarding segments!\n");
-        TrailRuntimeView* clearBegin = bucket.pendingTrails.begin;
-        (void)EraseTrailVectorRange(bucket.pendingTrails, &clearBegin, bucket.pendingTrails.begin, bucket.pendingTrails.end);
+        bucket.pendingTrails.clear();
         return false;
       }
-
       auto* const newWorkItem = static_cast<ParticleRenderWorkItemRuntime*>(::operator new(sizeof(ParticleRenderWorkItemRuntime)));
       (void)InitializeParticleRenderWorkItem(
         *newWorkItem,
@@ -4156,13 +1469,7 @@ namespace moho
         pooledBuffer
       );
 
-      if (!AppendWorkItemPointer(bucket.activeWorkItems, newWorkItem)) {
-        ReturnTrailSegmentBufferToOwnerPool(bucket.owner, pooledBuffer);
-        (void)DestroyParticleRenderWorkItem(newWorkItem);
-        TrailRuntimeView* clearBegin = bucket.pendingTrails.begin;
-        (void)EraseTrailVectorRange(bucket.pendingTrails, &clearBegin, bucket.pendingTrails.begin, bucket.pendingTrails.end);
-        return false;
-      }
+      bucket.activeWorkItems.push_back(newWorkItem);
 
       (void)UploadPendingTrailsIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingTrails);
     }
@@ -4182,7 +1489,7 @@ namespace moho
     PruneExpiredTrailBucketWorkItems(bucket, frameValue);
     (void)EnsureAndFillTrailBucketWorkItems(bucket, frameValue);
 
-    const std::size_t activeWorkItemCount = VectorCount(bucket.activeWorkItems);
+    const std::size_t activeWorkItemCount = bucket.activeWorkItems.size();
     if (activeWorkItemCount == 0U || onlyTLight) {
       return false;
     }
@@ -4194,8 +1501,7 @@ namespace moho
     std::memcpy(&selection.blendMode, &bucket.uvScalar, sizeof(selection.blendMode));
     SelectParticleTechnique(selection);
 
-    for (ParticleRenderWorkItemRuntime** itemPtr = bucket.activeWorkItems.begin; itemPtr != bucket.activeWorkItems.end; ++itemPtr) {
-      ParticleRenderWorkItemRuntime* const workItem = *itemPtr;
+    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
         continue;
       }

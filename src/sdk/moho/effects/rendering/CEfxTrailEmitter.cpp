@@ -438,24 +438,12 @@ namespace moho
     TrailRuntimeView trail{};
     trail.sortScalar = mTrailBlueprint->SortOrder;
 
-    // Retain the repeat texture (mParticleTextures[0]) into texture0.
-    CParticleTexture* const repeatTexture = mParticleTextures.start_[0];
-    if (repeatTexture != nullptr) {
-      trail.texture0 = repeatTexture;
-      repeatTexture->AddReferenceAtomic();
-    }
-    // Swap the ramp texture (mParticleTextures[1]) into texture1 (release-old /
-    // retain-new; texture1 is null here so only the retain fires).
-    CParticleTexture* const rampTexture = mParticleTextures.start_[1];
-    if (trail.texture1 != rampTexture) {
-      if (trail.texture1 != nullptr) {
-        (void)trail.texture1->ReleaseReferenceAtomic();
-      }
-      trail.texture1 = rampTexture;
-      if (rampTexture != nullptr) {
-        rampTexture->AddReferenceAtomic();
-      }
-    }
+    // Retain the repeat texture (mParticleTextures[0]) into texture0 and the
+    // ramp texture (mParticleTextures[1]) into texture1: the counted handles'
+    // release-old / retain-new assignment (both are empty here, so only the
+    // retains fire).
+    (void)AssignCountedParticleTexturePtr(&trail.texture0, mParticleTextures.start_[0]);
+    (void)AssignCountedParticleTexturePtr(&trail.texture1, mParticleTextures.start_[1]);
 
     // Endpoints; emit position is the fresh direction on the first tick, else
     // the persisted trail position.

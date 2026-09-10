@@ -1,6 +1,7 @@
 #pragma once
 
 #include "legacy/containers/Set.h"
+#include "legacy/containers/Vector.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -15,44 +16,6 @@ namespace moho
   struct SWorldParticle;
   struct SWorldBeam;
   struct TrailRuntimeView;
-
-  /**
-   * What it does:
-   * Models one VC8 debug-vector lane (`_Myfirstiter + begin/end/capacity`) used
-   * by particle/trail render buckets.
-   *
-   * @warning RULE ONE debt, recorded here so the collapse is a mechanical job
-   * rather than a rediscovery. This is a **verbatim duplicate of
-   * `msvc8::vector<T>`**: that template lays out `first_` at +0x04, `last_` at
-   * +0x08 and `end_` at +0x0C behind the same 4-byte debug proxy at +0x00
-   * (`legacy/containers/Vector.h`), so the two are byte-identical, and the 55
-   * uses of this struct are an open-coded reimplementation of a container the
-   * tree already models -- growth policy and element-count ceiling included,
-   * both of which CLAUDE.md confines to the container's own members.
-   *
-   * That duplication is not cosmetic: it is what stopped the sim beating. One
-   * `msvc8::vector<SWorldParticle>` was filled through `push_back`, which
-   * copies with the implicit copy constructor and takes no reference, and
-   * emptied through the hand-rolled `DestroyWorldParticleForVectorTailLocal`,
-   * which releases one. `CParticleTexture` refcounts therefore fell below what
-   * was taken and `CWldSession::DoBeat` faulted on a freed texture every frame.
-   * Giving `CountedPtr<T>` real ownership balanced the two halves; collapsing
-   * these lanes onto `msvc8::vector` removes the possibility of the two halves
-   * disagreeing again. Do not add new call sites here.
-   */
-  template <typename TValue>
-  struct RenderBucketVectorRuntime
-  {
-    std::uint32_t iteratorProxy = 0U; // +0x00
-    TValue* begin = nullptr;          // +0x04
-    TValue* end = nullptr;            // +0x08
-    TValue* capacityEnd = nullptr;    // +0x0C
-  };
-
-  static_assert(
-    sizeof(RenderBucketVectorRuntime<std::uint32_t>) == 0x10,
-    "RenderBucketVectorRuntime size must be 0x10"
-  );
 
   /**
    * What it does:
@@ -168,8 +131,8 @@ namespace moho
     msvc8::string tag;                                         // +0x14
     std::int32_t blendMode = 0;                                // +0x30
     std::int32_t zMode = 0;                                    // +0x34
-    RenderBucketVectorRuntime<SWorldParticle> pendingParticles; // +0x38
-    RenderBucketVectorRuntime<ParticleRenderWorkItemRuntime*> activeWorkItems; // +0x48
+    msvc8::vector<SWorldParticle> pendingParticles; // +0x38
+    msvc8::vector<ParticleRenderWorkItemRuntime*> activeWorkItems; // +0x48
     CWorldParticles* owner = nullptr;                          // +0x58
   };
 
@@ -220,8 +183,8 @@ namespace moho
     msvc8::string tag;                                        // +0x10
     float uvScalar = 0.0f;                                    // +0x2C
     std::uint32_t renderStartIndex = 0U;                      // +0x30
-    RenderBucketVectorRuntime<TrailRuntimeView> pendingTrails; // +0x34
-    RenderBucketVectorRuntime<ParticleRenderWorkItemRuntime*> activeWorkItems; // +0x44
+    msvc8::vector<TrailRuntimeView> pendingTrails; // +0x34
+    msvc8::vector<ParticleRenderWorkItemRuntime*> activeWorkItems; // +0x44
     CWorldParticles* owner = nullptr;                         // +0x54
   };
 
@@ -252,122 +215,6 @@ namespace moho
   );
   static_assert(offsetof(TrailRenderBucketRuntime, owner) == 0x54, "TrailRenderBucketRuntime::owner offset must be 0x54");
   static_assert(sizeof(TrailRenderBucketRuntime) == 0x58, "TrailRenderBucketRuntime size must be 0x58");
-
-  /**
-   * Address: 0x00495590 (FUN_00495590, sub_495590)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one world-particle render vector into
-   * caller-provided iterator storage.
-   */
-  SWorldParticle** GetWorldParticleVectorBeginPointer(
-    SWorldParticle** outBeginPointer,
-    const RenderBucketVectorRuntime<SWorldParticle>& pendingParticles
-  ) noexcept;
-
-  /**
-   * Address: 0x004955A0 (FUN_004955A0, sub_4955A0)
-   *
-   * What it does:
-   * Returns the active world-particle element count from one render vector
-   * lane.
-   */
-  [[nodiscard]] std::int32_t GetWorldParticleVectorCount(
-    const RenderBucketVectorRuntime<SWorldParticle>& pendingParticles
-  ) noexcept;
-
-  /**
-   * Address: 0x00495740 (FUN_00495740, sub_495740)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one trail render vector into
-   * caller-provided iterator storage.
-   */
-  TrailRuntimeView** GetTrailVectorBeginPointer(
-    TrailRuntimeView** outBeginPointer,
-    const RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails
-  ) noexcept;
-
-  /**
-   * Address: 0x00495750 (FUN_00495750, sub_495750)
-   *
-   * What it does:
-   * Returns the active trail element count from one render vector lane.
-   */
-  [[nodiscard]] std::int32_t GetTrailVectorCount(
-    const RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails
-  ) noexcept;
-
-  /**
-   * Address: 0x004956B0 (FUN_004956B0, sub_4956B0)
-   *
-   * What it does:
-   * Erases one world-particle range from a pending vector lane by shifting the
-   * tail left with typed copy semantics and destroying trailing entries.
-   */
-  SWorldParticle** EraseWorldParticleVectorRange(
-    RenderBucketVectorRuntime<SWorldParticle>& pendingParticles,
-    SWorldParticle** outBeginPointer,
-    SWorldParticle* eraseBegin,
-    SWorldParticle* eraseEnd
-  ) noexcept;
-
-  /**
-   * Address: 0x00495850 (FUN_00495850, sub_495850)
-   *
-   * What it does:
-   * Erases one trail range from a pending vector lane by shifting the tail left
-   * with typed copy semantics and destroying trailing entries.
-   */
-  TrailRuntimeView** EraseTrailVectorRange(
-    RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails,
-    TrailRuntimeView** outBeginPointer,
-    TrailRuntimeView* eraseBegin,
-    TrailRuntimeView* eraseEnd
-  ) noexcept;
-
-  /**
-   * Address: 0x00495930 (FUN_00495930, sub_495930)
-   *
-   * What it does:
-   * Writes the begin-pointer lane of one beam vector into caller-provided
-   * iterator storage.
-   */
-  SWorldBeam** GetBeamVectorBeginPointer(
-    SWorldBeam** outBeginPointer,
-    const RenderBucketVectorRuntime<SWorldBeam>& beams
-  ) noexcept;
-
-  /**
-   * Address: 0x00495940 (FUN_00495940, sub_495940)
-   *
-   * What it does:
-   * Writes the end-pointer lane of one beam vector into caller-provided
-   * iterator storage.
-   */
-  SWorldBeam** GetBeamVectorEndPointer(
-    SWorldBeam** outEndPointer,
-    const RenderBucketVectorRuntime<SWorldBeam>& beams
-  ) noexcept;
-
-  /**
-   * Address: 0x00495950 (FUN_00495950, sub_495950)
-   *
-   * What it does:
-   * Returns the active beam element count from one beam vector lane.
-   */
-  [[nodiscard]] std::int32_t GetBeamVectorCount(
-    const RenderBucketVectorRuntime<SWorldBeam>& beams
-  ) noexcept;
-
-  /**
-   * Address: 0x004958F0 (FUN_004958F0, sub_4958F0)
-   *
-   * What it does:
-   * Releases one beam-vector storage lane (including intrusive texture refs on
-   * each beam payload) and clears begin/end/capacity pointers.
-   */
-  void ResetBeamVectorStorage(RenderBucketVectorRuntime<SWorldBeam>& beams) noexcept;
 
   /**
    * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
@@ -446,7 +293,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     float frameDelta,
-    RenderBucketVectorRuntime<TrailRuntimeView>& pendingTrails
+    msvc8::vector<TrailRuntimeView>& pendingTrails
   );
 
   /**
@@ -486,7 +333,7 @@ namespace moho
   bool UploadPendingParticlesIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     float frameDelta,
-    RenderBucketVectorRuntime<SWorldParticle>& pendingParticles
+    msvc8::vector<SWorldParticle>& pendingParticles
   );
 
   /**

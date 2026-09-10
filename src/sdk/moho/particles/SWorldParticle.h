@@ -47,6 +47,17 @@ namespace moho
      */
     SWorldParticle();
 
+    /**
+     * Address: 0x0049BC00 (FUN_0049BC00, `??0SWorldParticle@Moho@@QAE@@Z_0` -- the
+     * compiler-generated copy constructor: the scalar fields, both counted
+     * texture handles (retained by `CountedPtr`'s copy) and `mTypeTag`; emitted
+     * out of line for `msvc8::vector<SWorldParticle>`'s copy steps. Formerly
+     * transcribed as `CopyWorldParticleForVectorMove` in
+     * ParticleRenderBuckets.cpp, removed 2026-09-10.)
+     * Address: 0x0049BD30 (FUN_0049BD30, `??1SParticle@Moho@@QAE@@Z` -- the implicit
+     * destructor: `mTypeTag` then both counted handles. Formerly
+     * `DestroyWorldParticleForVectorTail`, removed.)
+     */
     bool mEnabled = false;                            // +0x00
     std::uint8_t mPadding01[3]{};                     // +0x01
     float mResistance = 0.0f;                         // +0x04

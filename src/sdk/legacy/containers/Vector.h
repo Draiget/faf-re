@@ -1489,6 +1489,10 @@ namespace msvc8
         /**
          * Address: 0x00508CB0 (FUN_00508CB0 -- `_Allocate` for the 20-byte `moho::SDelayedSubVizInfo` element (0xFFFFFFFF / 20 guard, `operator new`); callers 0x00507FF0 `_Buy`, 0x005082B0 `assign`, 0x00508480 `_Insert_n`. Formerly `AllocateDelayedSubVizElementStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x005087E0 (FUN_005087E0 -- `allocator<moho::SDelayedSubVizInfo>::allocate`: 0x00508CB0 for a non-zero count, `operator new(0)` otherwise; caller 0x00508F50 (the copy constructor). Formerly `AllocateDelayedSubVizStorage`.)
+         * Address: 0x0049E890 (FUN_0049E890 -- `_Allocate` for the 8-byte `ParticleRenderIntervalRuntime` element; callers 0x0049ADA0 and two unboxed chunks. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049EA20 (FUN_0049EA20 -- the same `_Allocate` for the ICF-separated insert 0x0049B450.)
+         * Address: 0x0049E950 (FUN_0049E950 -- `_Allocate` for the particle buckets' `msvc8::vector<std::uint32_t>`; callers 0x00498AF0, 0x0049B0B0.)
+         * Address: 0x0049EAE0 (FUN_0049EAE0 -- the same `uint32` `_Allocate` for 0x0049B7B0.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -1575,6 +1579,7 @@ namespace msvc8
         /**
          * Default constructor: empty
          * Address: 0x00507920 (FUN_00507920 -- the default constructor's three null stores for `msvc8::vector<moho::SDelayedSubVizInfo>` (the debug-proxy slot untouched); zero callers, unreachable. Formerly `ClearDelayedSubVizVectorLanes` in moho/sim/SDelayedSubVizInfoReflection.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00498AF0 (FUN_00498AF0 -- the default constructor's null triple for `msvc8::vector<std::uint32_t>` as emitted for the particle render buckets; caller 0x00496A30 (`operator=`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector() noexcept :
     		myProxy_{},
@@ -2228,6 +2233,8 @@ namespace msvc8
          * Address: 0x00628560 (FUN_00628560 -- `operator=` for the 12-byte `moho::SPickUpInfo` element (`WeakPtr<Unit>` + float). Zero callers, no xrefs, unreachable. Formerly `AssignPickUpInfoVectorPreservingWeakLinks` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00583A20 (FUN_00583A20 -- `operator=` for `msvc8::vector<int>` (the `SAttackVectorGridRow::mOccupancyWords` member, assigned per row by the fill step 0x00583850; empty-source arm `clear()` 0x00583C30, assign-over step `_Copy_opt` 0x00584480). Formerly the orphan `CopyAssignLegacyIntVector` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00509010 (FUN_00509010 -- `operator=` for `msvc8::vector<moho::SDelayedSubVizInfo>`: the four VC8 arms (`clear()` 0x005091D0, assign-over, assign-then-append through 0x00509850, `_Tidy` 0x00508050 + `assign` 0x005082B0); zero callers, unreachable. Formerly `AssignDelayedSubVizVector` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00496A30 (FUN_00496A30 -- `operator=` for `msvc8::vector<ParticleRenderWorkItemRuntime*>` (clear 0x00496C20, copies 0x0049DEA0 / 0x0049DED0, `_Tidy` + rebuy 0x00498AF0); caller 0x004937E0 (`PruneExpiredParticleBucketWorkItems`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496E70 (FUN_00496E70 -- `operator=` for the particle buckets' `msvc8::vector<std::uint32_t>` (copies 0x0049DF00 / 0x0049DF30); caller 0x00494480 (`PruneExpiredTrailBucketWorkItems`).)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2322,6 +2329,13 @@ namespace msvc8
          * Address: 0x00504EC0 (FUN_00504EC0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00507960 (FUN_00507960 -- `begin()` for `msvc8::vector<moho::SDelayedSubVizInfo>` returned through the hidden iterator slot; zero callers, unreachable. Formerly `ExportDelayedSubVizBeginLane` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x005091B0 (FUN_005091B0 -- a second `begin()` copy for the same instantiation; zero callers. Formerly `ExportDelayedSubVizBeginPointer`.)
+         * Address: 0x00496910 (FUN_00496910 -- `begin()` through the hidden iterator slot for `msvc8::vector<ParticleRenderIntervalRuntime>`; zero callers, unreachable. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496D50 (FUN_00496D50 -- a second copy of that `begin()`; zero callers.)
+         * Address: 0x00496B70 (FUN_00496B70 -- `begin()` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`; zero callers.)
+         * Address: 0x00496FB0 (FUN_00496FB0 -- `begin()` for the particle buckets' `msvc8::vector<std::uint32_t>`; zero callers.)
+         * Address: 0x00495590 (FUN_00495590 -- `begin()` for `msvc8::vector<SWorldParticle>`; zero callers.)
+         * Address: 0x00495740 (FUN_00495740 -- `begin()` for `msvc8::vector<TrailRuntimeView>`; zero callers.)
+         * Address: 0x00495930 (FUN_00495930 -- `begin()` for `msvc8::vector<SWorldBeam>`; zero callers.)
          */
         T* begin() const noexcept { return first_; }
 
@@ -2363,6 +2377,13 @@ namespace msvc8
          * Address: 0x00504ED0 (FUN_00504ED0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00507970 (FUN_00507970 -- `end()` for `msvc8::vector<moho::SDelayedSubVizInfo>` returned through the hidden iterator slot; zero callers, unreachable. Formerly `ExportDelayedSubVizEndLane` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x005091C0 (FUN_005091C0 -- a second `end()` copy for the same instantiation; zero callers. Formerly `ExportDelayedSubVizEndPointer`.)
+         * Address: 0x00496920 (FUN_00496920 -- `end()` through the hidden iterator slot for `msvc8::vector<ParticleRenderIntervalRuntime>`; zero callers, unreachable. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496D60 (FUN_00496D60 -- a second copy of that `end()`; zero callers.)
+         * Address: 0x00496B80 (FUN_00496B80 -- `end()` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`; zero callers.)
+         * Address: 0x00496FC0 (FUN_00496FC0 -- `end()` for the particle buckets' `msvc8::vector<std::uint32_t>`; zero callers.)
+         * Address: 0x00497200 (FUN_00497200 -- `end()` for `msvc8::vector<SWorldParticle>`; zero callers.)
+         * Address: 0x004973A0 (FUN_004973A0 -- `end()` for `msvc8::vector<TrailRuntimeView>`; zero callers.)
+         * Address: 0x00495940 (FUN_00495940 -- `end()` for `msvc8::vector<SWorldBeam>`; zero callers.)
          */
         T* end() const noexcept { return last_; }
         /**
@@ -2428,6 +2449,9 @@ namespace msvc8
          * Address: 0x00561130 (FUN_00561130 -- `size()` for the 568-byte `SUnitVariableUpdateEntry`.)
          * Address: 0x00561290 (FUN_00561290 -- `size()` for a 120-byte element.)
          * Address: 0x0077ACA0 (FUN_0077ACA0 -- `size()` for `msvc8::vector<moho::SDecalInfo>`; callers 0x0077B990 / 0x0077E100, the `RVectorType_SDecalInfo` reflection helpers cited on this header. Formerly `CountSDecalInfoVectorRuntimeUsed` in moho/render/CDecalTypes.cpp, removed 2026-09-10.)
+         * Address: 0x004955A0 (FUN_004955A0 -- `size()` for `msvc8::vector<SWorldParticle>`; caller 0x00499250 (`insert`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00495750 (FUN_00495750 -- `size()` for `msvc8::vector<TrailRuntimeView>`; caller 0x00499630 (`insert`).)
+         * Address: 0x00495950 (FUN_00495950 -- `size()` for `msvc8::vector<SWorldBeam>`; caller 0x00499A20 (BeamRenderHelpers.cpp).)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2495,6 +2519,11 @@ namespace msvc8
          * Address: 0x00A72510 (FUN_00A72510 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00507F70 (FUN_00507F70 -- `operator[]` (`first_ + index`) for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLanePointerAt` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508470 (FUN_00508470 -- a second copy of that subscript; zero callers. Formerly `DelayedSubVizVectorPointerAt`.)
+         * Address: 0x00496BB0 (FUN_00496BB0 -- `operator[]` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`; zero callers, unreachable. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496C80 (FUN_00496C80 -- `operator[]` for `msvc8::vector<ParticleRenderIntervalRuntime>`; zero callers.)
+         * Address: 0x004970A0 (FUN_004970A0 -- a second copy of that subscript; zero callers.)
+         * Address: 0x0049B3F0 (FUN_0049B3F0 -- `operator[]` for the particle buckets' `msvc8::vector<std::uint32_t>`; zero callers.)
+         * Address: 0x0049BAF0 (FUN_0049BAF0 -- a second copy of that subscript; zero callers.)
          */
         T& operator[](std::size_t i) const noexcept {
 	        return first_[i];
@@ -3046,6 +3075,9 @@ namespace msvc8
          * Address: 0x00583C30 (FUN_00583C30 -- `clear()` for `msvc8::vector<int>`, the empty-source arm of `operator=` 0x00583A20. Formerly the orphan `ClearLegacyIntVectorLogicalRange` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x0057D8B0 (FUN_0057D8B0 -- `clear()` for `msvc8::vector<moho::SPointVector>` (24-byte element), the empty-source arm of that vector's `operator=` 0x00582890. Formerly the orphan `ResetSPointVectorVectorEndToBegin` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x005091D0 (FUN_005091D0 -- `clear()` (`erase(begin(), end())`: a zero-length self copy then `last_ = first_`) for `moho::SDelayedSubVizInfo`, the empty-source arm of `operator=` 0x00509010. Formerly `NormalizeDelayedSubVizFinish` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x004969C0 (FUN_004969C0 -- `clear()` for `msvc8::vector<ParticleRenderIntervalRuntime>`; caller 0x00493210 (`workItem.mIntervals.clear()` in the particle upload). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496E00 (FUN_00496E00 -- the same `clear()` reached from the trail upload 0x00493DA0.)
+         * Address: 0x00496C20 (FUN_00496C20 -- `clear()` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`, the empty-source arm of `operator=` 0x00496A30.)
          */
         void clear() noexcept {
             destroy_all();
@@ -3103,6 +3135,11 @@ namespace msvc8
          * Address: 0x00580D10 (FUN_00580D10 -- the destroy step of `_Tidy` for `msvc8::vector<SAttackVectorGridRow>` (forwards to `_Destroy_range` 0x005837F0); reached only from the ICF-folded 0x00580D30. Was cited on the same removed CAiBrain.cpp orphan.)
          * Address: 0x005A07A0 (FUN_005A07A0 -- `_Tidy` for `msvc8::vector<moho::WeakPtr<CUnitCommand>>`: `_Destroy_range` 0x005A2270, free, null the triple; the catch arm of the copy constructor 0x005DB610. Formerly `ResetWeakPtrCUnitCommandVectorStorage` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508050 (FUN_00508050 -- `_Tidy` for `msvc8::vector<moho::SDelayedSubVizInfo>`: free, null the triple; `CIntelGrid::~CIntelGrid` 0x00508D80's member destructor and `operator=` 0x00509010's grow arm. Formerly `ReleaseDelayedSubVizVectorStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x004972E0 (FUN_004972E0 -- `_Tidy` for `msvc8::vector<SWorldParticle>` (`_Destroy_range` 0x004972C0, free, null the triple); callers 0x00493620 (`DestroyParticleRenderBucket`, now `bucket.pendingParticles.tidy()`), 0x00495580, 0x00756CC0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00497490 (FUN_00497490 -- `_Tidy` for `msvc8::vector<TrailRuntimeView>` (`_Destroy_range` 0x00497470); callers 0x004942E0 (`DestroyTrailRenderBucket`), 0x00495730, 0x00756CC0.)
+         * Address: 0x004958F0 (FUN_004958F0 -- `_Tidy` for `msvc8::vector<SWorldBeam>`; caller 0x00491540 (BeamRenderHelpers.cpp).)
+         * Address: 0x00493D20 (FUN_00493D20 -- `_Tidy` for `msvc8::vector<ParticleRenderIntervalRuntime>` (`ParticleRenderWorkItemRuntime::mIntervals`), the source call `workItem.mIntervals.tidy()` in `ResetParticleRenderWorkItemIntervals`.)
+         * Address: 0x00494900 (FUN_00494900 -- ICF-separated copy of that interval `_Tidy`.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3646,6 +3683,10 @@ namespace msvc8
          * Address: 0x00940230 (FUN_00940230 -- `push_back` for the 60-byte `gpg::gal::EffectMacro` element; capacity-full path is the single-value `insert` 0x009401C0 / `_Insert_n` 0x0093FEB0. Reached from `EffectContext::DefineMacro` 0x009402D0, which now calls `macros.push_back(newMacro)` directly; the former a per-type free function wrapper in gpg/gal/ContextInterfaces.cpp was removed 2026-09-10.)
          * Address: 0x006E9680 (FUN_006E9680 -- `push_back` for `moho::WeakPtr<CUnitCommand>`: in-place `_Ufill` 0x006EC5B0 (cited on WeakPtr.h `FillConstructRange`) when capacity remains, else `_Insert_n` 0x006EA440. Fourteen callers, e.g. 0x006E9000 (CUnitCommand.cpp), 0x006EDFC0 (CUnitCommandQueue.cpp), the reflection SerLoad 0x006EA8F0. `PushBackWeakPtrCUnitCommand` in CUnitCommandWeakPtrReflection.cpp is now a one-line forwarder kept for CUnitCommand.cpp's call site.)
          * Address: 0x005079C0 (FUN_005079C0 -- `push_back` for the 20-byte `moho::SDelayedSubVizInfo` element: in-place `_Ufill` when capacity remains, else `insert(end(), value)` 0x00507F80. Callers `CIntelGrid::DelayedSubtractCircle` 0x005076B0 (`mUpdateList.push_back(update)`) and the reflection SerLoad 0x005080C0. Formerly `PushBackDelayedSubVizInfo` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00496950 (FUN_00496950 -- `push_back` for the 8-byte `ParticleRenderIntervalRuntime` element (capacity-full path `insert` 0x0049ADA0); the source call is `AppendInterval` in ParticleRenderBuckets.cpp (`workItem.mIntervals.push_back(...)`), caller 0x00493210. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00496D90 (FUN_00496D90 -- the same `push_back` reached from the trail upload 0x00493DA0 (capacity-full path 0x0049B450).)
+         * Address: 0x00496BD0 (FUN_00496BD0 -- `push_back` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`; zero callers in the index, the source calls are `bucket.activeWorkItems.push_back(newWorkItem)` in the two `EnsureAndFill*` functions.)
+         * Address: 0x00497000 (FUN_00497000 -- `push_back` for the particle buckets' `msvc8::vector<std::uint32_t>` (capacity-full path 0x0049B7B0); zero callers.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4025,6 +4066,10 @@ namespace msvc8
          * Address: 0x0054D3F0 (FUN_0054D3F0 -- `erase(first, last)` for an 8-byte element (`CAniSkel`, 0x0054CB80).)
          * Address: 0x008D7AF0 (FUN_008D7AF0 -- `erase(first, last)` for a 12-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00508860 (FUN_00508860 -- `erase(first, last)` for `moho::SDelayedSubVizInfo`, the shrink arm of `resize` 0x005083C0 (result through the hidden iterator slot). Formerly `EraseDelayedSubVizVectorTail` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x004956B0 (FUN_004956B0 -- `erase(first, last)` for `SWorldParticle`: shift 0x0049DE20, destroy the vacated tail (0x0049BD30 per element), `last_` moves. Callers 0x00493210, 0x00493940 (the upload / ensure paths of ParticleRenderBuckets.cpp, now `pendingParticles.erase(...)` / `clear()`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00495850 (FUN_00495850 -- `erase(first, last)` for `TrailRuntimeView` (element copy 0x0049BDD0, destructor 0x0049BE90); callers 0x00493DA0, 0x004945C0.)
+         * Address: 0x00498AA0 (FUN_00498AA0 -- `erase(first, last)` for the particle buckets' `msvc8::vector<std::uint32_t>` (tail memmove, iterator through the hidden slot); zero callers, unreachable.)
+         * Address: 0x0049B760 (FUN_0049B760 -- ICF-separated copy of that `uint32` erase; zero callers.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5086,6 +5131,14 @@ namespace msvc8
          * mirrors the binary: on an empty vector `pos` may be null, so the
          * difference is never taken.
          * Address: 0x00507F80 (FUN_00507F80 -- single-value `insert(pos, value)` for `moho::SDelayedSubVizInfo`, the capacity-full path of `push_back` 0x005079C0 (computes the offset, `_Insert_n` 0x00508480, returns `begin() + offset`). Formerly `GrowAndInsertDelayedSubVizInfo` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x0049ADA0 (FUN_0049ADA0 -- single-value `insert(pos, value)` for the 8-byte `ParticleRenderIntervalRuntime` element: max_size 0x1FFFFFFF (throw 0x0049AFF0), in-place tail shift 0x0049E870 / fill 0x0049E850, grow arm through `_Allocate` 0x0049E890 and copy 0x0049E820. Callers 0x00496950 `push_back`, chunk 0x00498929. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049B450 (FUN_0049B450 -- ICF-separated copy of that insert (bridges 0x0049E9B0 / 0x0049E9E0 / 0x0049EA00 / 0x0049EA20, throw 0x0049B6A0); callers 0x00496D90, chunk 0x00498D19.)
+         * Address: 0x0049B0B0 (FUN_0049B0B0 -- single-value `insert(pos, value)` for the particle buckets' `msvc8::vector<std::uint32_t>` (max_size 0x3FFFFFFF, throw 0x0049B2C0, copies 0x0049E8E0 / 0x0049E920, `_Allocate` 0x0049E950, fill 0x00498B80); callers 0x004937E0, 0x00493940, 0x00496BD0.)
+         * Address: 0x0049B7B0 (FUN_0049B7B0 -- ICF-separated copy of that `uint32` insert (0x0049EA70 / 0x0049EAB0 / 0x0049EAE0, throw 0x0049B9C0); callers 0x00494480, 0x004945C0, 0x00497000.)
+         * Address: 0x00499250 (FUN_00499250 -- single-value `insert(pos, value)` for the 0x8C-byte `SWorldParticle` element (staged copy through the copy constructor 0x0049BC00, in-place shift 0x0049E430 / fill 0x0049E400, grow arm 0x00497330, `_Destroy_range` 0x004972C0); caller 0x00497210.)
+         * Address: 0x00497210 (FUN_00497210 -- the iterator-returning `insert(pos, value)` shell over 0x00499250 for `SWorldParticle`; caller 0x00495620 (BeamRenderHelpers.cpp).)
+         * Address: 0x00499630 (FUN_00499630 -- single-value `insert(pos, value)` for the 0x60-byte `TrailRuntimeView` element (copy constructor 0x0049BDD0, shift 0x0049E500 / fill 0x0049E4E0, grow copies 0x0049E4B0 / 0x004974E0, `_Destroy_range` 0x00497470); caller 0x004973B0.)
+         * Address: 0x004973B0 (FUN_004973B0 -- the iterator-returning `insert(pos, value)` shell over 0x00499630 for `TrailRuntimeView`; caller 0x004957C0 (BeamRenderHelpers.cpp).)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6170,6 +6223,10 @@ namespace msvc8
          * Address: 0x00509650 (FUN_00509650 -- the `std::fill(where, where + count, value)` gap-overwrite step of `_Insert_n` 0x00508480 for the 20-byte `moho::SDelayedSubVizInfo` element; zero callers in the index. Formerly `WriteRepeatedDelayedSubVizValue` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508C40 (FUN_00508C40 -- the same `std::fill` step as reached from 0x00508480. Formerly `FillDelayedSubVizInfoRange`.)
          * Address: 0x00508C10 (FUN_00508C10 -- `std::fill` with a value-initialised `SDelayedSubVizInfo`, the `resize(n)` flavour of that step. Formerly `ZeroFillDelayedSubVizInfoRange`.)
+         * Address: 0x0049E850 (FUN_0049E850 -- the `std::fill` seam step of the `ParticleRenderIntervalRuntime` insert 0x0049ADA0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E9E0 (FUN_0049E9E0 -- the same seam step for the ICF-separated insert 0x0049B450.)
+         * Address: 0x0049E400 (FUN_0049E400 -- the seam step of the `SWorldParticle` insert 0x00499250 (per-element copy through 0x0049BC00).)
+         * Address: 0x0049E4E0 (FUN_0049E4E0 -- the seam step of the `TrailRuntimeView` insert 0x00499630.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6648,6 +6705,8 @@ namespace msvc8
          * Address: 0x006DBE20 (FUN_006DBE20 -- jump thunk handing an empty `[cursor, cursor)` range to the `moho::SBlackListInfo` `_Destroy_range` 0x006DEAE0 (`WeakPtr<Entity>` unlink per element). Zero callers, no xrefs, unreachable. Formerly `UnlinkBlacklistWeakEntityRangeEmptyAtCursor` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          * Address: 0x005837F0 (FUN_005837F0 -- `_Destroy_range` for the 20-byte `SAttackVectorGridRow` element (`{int mNextColumn; msvc8::vector<int> mOccupancyWords;}`, CAiBrain.cpp): zeroes nothing the binary does not, runs the row's `vector<int>` destructor per element. Reached from `CAiBrain::ProcessAttackVectors` 0x0057BDB0's scope exit (the `grid` vector's destructor) and from the row vector's `_Tidy` 0x00580D10. Formerly the orphan `ResetSAttackVectorGridRowRange` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005A2270 (FUN_005A2270 -- `_Destroy_range` for `moho::WeakPtr<CUnitCommand>`: the element destructor unlinks each node from its owner chain. 23 callers -- every erase/clear/tidy of that instantiation (0x0059F9C0 CAiBuilderImpl.cpp, 0x005A07A0 `_Tidy`, ...). Formerly `DetachWeakPtrCUnitCommandRange` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x004972C0 (FUN_004972C0 -- `_Destroy_range` for `SWorldParticle` (destructor 0x0049BD30 per element); caller 0x00499250 (`insert`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00497470 (FUN_00497470 -- `_Destroy_range` for `TrailRuntimeView` (destructor 0x0049BE90 per element); caller 0x00499630.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -7417,6 +7476,16 @@ namespace msvc8
          * Address: 0x00509630 (FUN_00509630 -- mixed-order bridge into 0x00509CB0; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant8Adapter`.)
          * Address: 0x00509950 (FUN_00509950 -- zero-width copy through 0x00509CB0; zero callers. Formerly `ZeroWidthDelayedSubVizCopy`.)
          * Address: 0x00509A20 (FUN_00509A20 -- zero-width self copy through 0x00509CB0; zero callers. Formerly `ZeroWidthDelayedSubVizSelfCopy`.)
+         * Address: 0x0049E820 (FUN_0049E820 -- `_Ucopy` for `ParticleRenderIntervalRuntime`, the grow-arm copy of insert 0x0049ADA0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E9B0 (FUN_0049E9B0 -- the same `_Ucopy` for the ICF-separated insert 0x0049B450.)
+         * Address: 0x0049DEA0 (FUN_0049DEA0 -- `_Ucopy` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`, reached from `operator=` 0x00496A30.)
+         * Address: 0x0049DED0 (FUN_0049DED0 -- a second copy of that pointer `_Ucopy`, same caller.)
+         * Address: 0x0049DF00 (FUN_0049DF00 -- `_Ucopy` for the particle buckets' `msvc8::vector<std::uint32_t>`, reached from `operator=` 0x00496E70.)
+         * Address: 0x0049DF30 (FUN_0049DF30 -- a second copy of that `uint32` `_Ucopy`, same caller.)
+         * Address: 0x0049E8E0 (FUN_0049E8E0 -- the grow-arm `_Ucopy` of the `uint32` insert 0x0049B0B0.)
+         * Address: 0x0049EA70 (FUN_0049EA70 -- the grow-arm `_Ucopy` of the ICF-separated `uint32` insert 0x0049B7B0.)
+         * Address: 0x0049E4B0 (FUN_0049E4B0 -- `_Ucopy` for `TrailRuntimeView`, the grow-arm copy of insert 0x00499630.)
+         * Address: 0x00497330 (FUN_00497330 -- `_Ucopy` for `SWorldParticle` (copy constructor 0x0049BC00 per element, rollback through 0x004972C0), the grow-arm copy of insert 0x00499250.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8447,6 +8516,8 @@ namespace msvc8
          * Address: 0x00932F90 (FUN_00932F90 -- `_Ufill` for the 4-byte element of `_Insert_n` 0x00933640; was DB `skip` ("RULE ONE emission") with no anchor.)
          * Address: 0x005095C0 (FUN_005095C0 -- `_Uninit_fill_n` for `moho::SDelayedSubVizInfo` (per-slot copy of the value); callers 0x005079C0 `push_back`, 0x00508080, 0x00508480 `_Insert_n`. Formerly `CopyDelayedSubVizInfoRepeated` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508080 (FUN_00508080 -- the advance-returning `_Ufill` adapter over 0x005095C0 with a value-initialised element, called from `_Insert_n` 0x00508480. Formerly `FillDefaultDelayedSubVizInfoSpan`.)
+         * Address: 0x00498B80 (FUN_00498B80 -- `_Ufill` for the particle buckets' `msvc8::vector<std::uint32_t>`, reached from the insert 0x0049B0B0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004974E0 (FUN_004974E0 -- `_Ufill` for `TrailRuntimeView` (repeated copy construction), reached from the insert 0x00499630.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9216,6 +9287,7 @@ namespace msvc8
          * Address: 0x00584480 (FUN_00584480 -- `_Copy_opt` memmove for the 4-byte `int` element, the assign-over step of `vector<int>::operator=` 0x00583A20. Formerly the orphan `CopyLegacyIntRangeAndReturnEnd` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x005A2220 (FUN_005A2220 -- element-wise `_Copy` for `moho::WeakPtr<CUnitCommand>`: per node, unlink from the current owner chain when the owner differs, then relink at the source owner's head (`WeakPtr::operator=`). Five callers, e.g. 0x005FB910 (CUnitFerryTask.cpp) and the bridge 0x005A1D00. Formerly `MoveWeakPtrCUnitCommandRangeAndReturnEnd` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          * Address: 0x005A1D00 (FUN_005A1D00 -- end-first register bridge into that `_Copy`; caller 0x005FB910. Formerly `MoveWeakPtrCUnitCommandRangeAdapter`, removed.)
+         * Address: 0x0049DE20 (FUN_0049DE20 -- element-wise `_Copy` for `SWorldParticle` (assignment through the implicit `operator=`), the shift step of `erase(first, last)` 0x004956B0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9274,6 +9346,12 @@ namespace msvc8
          * Address: 0x00508C80 (FUN_00508C80 -- the memmove-shaped `_Copy_backward_opt` of the same instantiation, reached from `_Insert_n` 0x00508480. Formerly `MoveDelayedSubVizInfoRangeToEnd`.)
          * Address: 0x00508AA0 (FUN_00508AA0 -- the same backward move as reached from `operator=` 0x00509010. Formerly `MoveDelayedSubVizInfoSpanToEnd`.)
          * Address: 0x00509690 (FUN_00509690 -- stack-order bridge into 0x00509970; zero callers. Formerly `CopyDelayedSubVizInfoRangeBackwardAdapter`.)
+         * Address: 0x0049E870 (FUN_0049E870 -- `_Copy_backward` for `ParticleRenderIntervalRuntime`, the in-place tail shift of insert 0x0049ADA0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049EA00 (FUN_0049EA00 -- the same shift for the ICF-separated insert 0x0049B450.)
+         * Address: 0x0049E430 (FUN_0049E430 -- `_Copy_backward` for `SWorldParticle`, the in-place shift of insert 0x00499250.)
+         * Address: 0x0049E500 (FUN_0049E500 -- `_Copy_backward` for `TrailRuntimeView`, the in-place shift of insert 0x00499630.)
+         * Address: 0x0049E920 (FUN_0049E920 -- `_Copy_backward` for the particle buckets' `msvc8::vector<std::uint32_t>`, reached from insert 0x0049B0B0.)
+         * Address: 0x0049EAB0 (FUN_0049EAB0 -- the same `uint32` shift for the ICF-separated insert 0x0049B7B0.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9898,6 +9976,10 @@ namespace msvc8
          * Address: 0x00561ED0 (FUN_00561ED0 -- out-of-line `max_size()` for a 568-byte element (0x73615A); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00508460 (FUN_00508460 -- `max_size()` for the 20-byte `moho::SDelayedSubVizInfo` element (0x0CCCCCCC); zero callers, unreachable. Formerly `DelayedSubVizVectorMaxCountVariant2` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x005088A0 (FUN_005088A0 -- ICF-separated copy of that `max_size()`; zero callers. Formerly `DelayedSubVizVectorMaxCountVariant1`.)
+         * Address: 0x0049AD80 (FUN_0049AD80 -- `max_size()` for the 8-byte `ParticleRenderIntervalRuntime` element (0x1FFFFFFF); zero callers, unreachable. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049B430 (FUN_0049B430 -- ICF-separated copy of that `max_size()`; zero callers.)
+         * Address: 0x0049B0A0 (FUN_0049B0A0 -- `max_size()` for `msvc8::vector<std::uint32_t>` (0x3FFFFFFF); zero callers.)
+         * Address: 0x0049B750 (FUN_0049B750 -- ICF-separated copy of that `max_size()`; zero callers.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -10025,6 +10107,10 @@ namespace msvc8
          * Address: 0x00933470 (FUN_00933470 -- `_Xlen` of the 4-byte `_Insert_n` 0x00933640.)
          * Address: 0x005A0DD0 (FUN_005A0DD0 -- `_Xlen` for the 8-byte `moho::WeakPtr<CUnitCommand>` instantiation (max_size 0x1FFFFFFF), reached from `_Insert_n` 0x006EA440, the copy constructor 0x005DB610 and 0x005A0740. Formerly `ThrowWeakPtrVectorTooLong` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508740 (FUN_00508740 -- `_Xlen` for the 20-byte `moho::SDelayedSubVizInfo` instantiation; callers 0x00507FF0 `_Buy`, 0x005082B0 `assign`, 0x00508480 `_Insert_n`. Formerly `ThrowDelayedSubVizVectorTooLong` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x0049AFF0 (FUN_0049AFF0 -- `_Xlen` for the `ParticleRenderIntervalRuntime` instantiation (max_size 0x1FFFFFFF); callers 0x0049ADA0 and chunk 0x00498989. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049B6A0 (FUN_0049B6A0 -- `_Xlen` for the ICF-separated interval insert 0x0049B450.)
+         * Address: 0x0049B2C0 (FUN_0049B2C0 -- `_Xlen` for the particle buckets' `msvc8::vector<std::uint32_t>` (max_size 0x3FFFFFFF); callers 0x00498AF0, 0x0049B0B0.)
+         * Address: 0x0049B9C0 (FUN_0049B9C0 -- the same `uint32` `_Xlen` for 0x0049B7B0.)
          */
         [[noreturn]] static void throw_too_long()
         {

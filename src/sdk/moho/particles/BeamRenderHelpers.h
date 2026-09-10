@@ -9,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "moho/math/Vector4f.h"
 #include "moho/particles/SWorldBeam.h"
+#include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/particles/SWorldParticle.h"
 #include "moho/resource/CParticleTexture.h"
 #include "Wm3Vector3.h"
@@ -411,8 +412,19 @@ namespace moho
     float textureRepeatRateZ = 0.0f;    // +0x44  blueprint TextureRepeatRate * new length
     float sortScalar = 0.0f;            // +0x48  blueprint SortOrder
     float size = 0.0f;                  // +0x4C  blueprint StartSize
-    CParticleTexture* texture0 = nullptr; // +0x50
-    CParticleTexture* texture1 = nullptr; // +0x54
+    /**
+     * Address: 0x0049BDD0 (FUN_0049BDD0 -- the compiler-generated copy of this
+     * 0x60-byte trail record: the float block, then both counted texture
+     * handles retained through `CountedPtr`'s copy, then `tag`/`uvScalar`;
+     * emitted out of line for `msvc8::vector<TrailRuntimeView>`'s copy steps.
+     * Formerly transcribed as `CopyTrailRuntimeViewForVectorMove` in
+     * ParticleRenderBuckets.cpp, removed 2026-09-10.)
+     * Address: 0x0049BE90 (FUN_0049BE90, `??1STrail@Moho@@QAE@@Z` -- the implicit
+     * destructor: both `CountedPtr` handles release their texture. Formerly
+     * `DestroyTrailRuntimeViewForVectorTail`, removed.)
+     */
+    CountedPtr_CParticleTexture texture0; // +0x50
+    CountedPtr_CParticleTexture texture1; // +0x54
     const char* tag = nullptr;            // +0x58
     float uvScalar = 0.0f;                // +0x5C  blueprint BlendMode (raw dword, memcpy'd to key)
   };
