@@ -10814,8 +10814,14 @@ namespace moho
       const std::int32_t* mFallbackIdRunBegin = nullptr; // +0x40
       const std::int32_t* mFallbackIdRunEnd = nullptr;   // +0x44
       std::uint8_t mUnknown48_5B[0x14]{};
-      CommandGraphAnchorSampleRuntimeView mFallbackSample{}; // +0x5C
-      std::uint8_t mUnknown74_B8[0x44]{};
+      /// This is the helper's own `SSTICommandVariableData::mTarget1` -- an
+      /// `SSTITarget`, whose position sits at `+0x08` behind a single 4-byte
+      /// entity id, NOT the 0x18-byte anchor sample with its 8-byte weak-ref.
+      /// `sub_8BEC40` reads the source at `+0x08/+0x0C/+0x10` while writing the
+      /// destination at `+0x0C/+0x10/+0x14`, which is only consistent with the
+      /// two being different shapes.
+      SSTITarget mFallbackSample{}; // +0x5C
+      std::uint8_t mUnknown70_B8[0x48]{};
       // Search key `sub_8B4300` (`IsCandidateExcludedByCachedRelation` below)
       // looks up in each history entry's own per-entry relation tree
       // (0x008B430A/0x008B4310: `ebx = this + 0xB8`, then `*ebx` is forwarded
@@ -10832,6 +10838,10 @@ namespace moho
     static_assert(
       offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunBegin) == 0x40,
       "CommandGraphAnchorHistoryRuntimeView::mFallbackIdRunBegin offset must be 0x40"
+    );
+    static_assert(
+      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackSample) == 0x5C,
+      "CommandGraphAnchorHistoryRuntimeView::mFallbackSample offset must be 0x5C"
     );
     static_assert(
       offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunEnd) == 0x44,
@@ -10909,21 +10919,20 @@ namespace moho
      */
     [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveFallbackCommandGraphAnchorSample(
       CommandGraphAnchorSampleRuntimeView* const outSample,
-      const CommandGraphAnchorSampleRuntimeView* const fallbackSample
+      const SSTITarget* const fallbackSample
     ) noexcept
     {
       if (outSample == nullptr || fallbackSample == nullptr) {
         return outSample;
       }
 
-      outSample->mSampleKind = fallbackSample->mSampleKind;
+      outSample->mSampleKind = static_cast<std::int32_t>(fallbackSample->mType);
       outSample->mWeakRef.mOwnerLinkSlot = nullptr;
       outSample->mWeakRef.mNextOwner = nullptr;
 
       if (outSample->mSampleKind == 1) {
-        const std::uint32_t entityIdRaw = static_cast<std::uint32_t>(
-          reinterpret_cast<std::uintptr_t>(fallbackSample->mWeakRef.mOwnerLinkSlot)
-        );
+        // 0x008BEC5F: `a3 = *(a1 + 4)` -- the source's entity id, one dword.
+        const std::uint32_t entityIdRaw = fallbackSample->mEnt;
 
         UserEntity* entity = nullptr;
         moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
@@ -10941,7 +10950,12 @@ namespace moho
       }
 
       if (outSample->mSampleKind == 2) {
-        outSample->mWorldPosition = fallbackSample->mWorldPosition;
+        // 0x008BEC94..0x008BECAA: destination `+0x0C/+0x10/+0x14` from source
+        // `+0x08/+0x0C/+0x10`. The two shapes differ by one dword, so copying
+        // the source's `+0x0C` run instead handed the graph `(y, z, junk)`.
+        outSample->mWorldPosition.x = fallbackSample->mPos.x;
+        outSample->mWorldPosition.y = fallbackSample->mPos.y;
+        outSample->mWorldPosition.z = fallbackSample->mPos.z;
       }
 
       return outSample;
@@ -10960,10 +10974,16 @@ namespace moho
       CommandGraphAnchorHistoryRuntimeView* const history
     ) noexcept
     {
-      if (outSample == nullptr || history == nullptr || history->mEntries == nullptr) {
+      if (outSample == nullptr || history == nullptr) {
         return outSample;
       }
 
+      // No `mEntries == nullptr` guard: 0x008B4080 walks straight into the
+      // do-while, and an empty ring makes the very first `cursor ==
+      // mEntryStart` test fire, which is what routes a command with no history
+      // entry to its fallback target. Bailing out here instead left the sample
+      // kind at 0, so `ResolveCommandGraphAnchorSamplePositionAlias` answered
+      // the invalid-position sentinel and every order node was placed at NaN.
       std::uint32_t cursor = history->mEntryStart + history->mEntryCount;
       while (true) {
         if (cursor == history->mEntryStart) {
