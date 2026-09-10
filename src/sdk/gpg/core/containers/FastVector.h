@@ -914,6 +914,9 @@ namespace gpg::core
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
+    /**
+     * Address: 0x0092CCF0 (FUN_0092CCF0 -- the reallocate-and-split-copy an insert runs when the inline block is full for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x0092DAC5, 0x0092E410; formerly `ReallocateInlineBackedByteVectorWithSplitInsert` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     */
     void Reserve(const size_type n)
     {
       (void)gpg::FastVectorRuntimeEnsureCapacity<T>(n, gpg::AsFastVectorRuntimeView<T>(this));
@@ -932,6 +935,10 @@ namespace gpg::core
       );
     }
 
+    /**
+     * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0092E410 (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     */
     void resize(const size_type n, const T& value)
     {
       gpg::FastVectorRuntimeResizeFill<T>(
