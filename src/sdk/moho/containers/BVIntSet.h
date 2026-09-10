@@ -316,6 +316,10 @@ namespace moho
   static_assert(offsetof(BVIntSet, mReservedMetaWord) == 0x04, "BVIntSet::mReservedMetaWord offset must be 0x04");
   static_assert(offsetof(BVIntSet, mWords) == 0x08, "BVIntSet::mWords offset must be 0x08");
   static_assert(sizeof(BVIntSet) == 0x20, "BVIntSet size must be 0x20");
+  // Four-aligned, and pinned there: `SoundHandleIdPool` is
+  // `{BVIntSet mFreeIds; std::uint32_t mNextId;}` at 0x24 (CUserSoundManager.h),
+  // which only closes if this record does not round the struct up to eight.
+  static_assert(alignof(BVIntSet) == 4, "BVIntSet must be 4-aligned");
 
   /**
    * Address: 0x00401CA0 (FUN_00401CA0)

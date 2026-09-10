@@ -46,56 +46,47 @@ namespace moho
   class RRuleGameRulesImpl;
 
   /**
-   * `CategoryWordRangeView` given 8-byte alignment for exactly one purpose:
-   * matching the binary's node layout for the category-lookup map's tree
-   * embedded in `RRuleGameRulesImpl::mEntityCategoryLookup`
-   * (`EntityCategoryLookupTableRuntimeView::mCategoryMap` below). Direct
-   * evidence this node is 8-byte-aligned, not the usual 4-byte
-   * `msvc8::detail::rb_node<V>` shape -- independently re-verified against
-   * the raw IDA decompiles for every address cited below, not merely
-   * re-stated from the sibling `Sim.cpp` recovery this type was promoted
-   * from:
+   * The category-lookup map's node does not follow the usual "value starts at
+   * `node+0x0C`" shape: the key sits at `node+0x10`, the value at `node+0x30`,
+   * and colour/isNil at `node+0x58`/`node+0x59`, with the node allocator
+   * (`FUN_005579D0`) handing out `0x60` bytes apiece. That is what an
+   * 8-aligned value type produces, and the alignment belongs to
+   * `CategoryWordRangeView` itself:
    *
-   *   - `buy_node`'s emission for this instantiation (`FUN_005569C0`, cited
-   *     on `RbTree.h`'s `buy_node` member) places the value at `node+0x10`,
-   *     not the usual `node+0x0C`.
+   *   - `EntityCategoryLookupTableRuntimeView::FindOrFallback`
+   *     (`FUN_005552C0`) returns `lea eax,[esi+10h]` on its miss path, so the
+   *     plain `mCategoryFallback` **member** sits at +0x10 behind a 0x0C-byte
+   *     map -- nothing to do with tree nodes, and only reachable if the type
+   *     is 8-aligned. An earlier pass recorded this pin as missing and kept
+   *     the dword at +0x0C as an explicit `mCategoryMapReserved0C` field; it
+   *     is an alignment hole, and it is gone.
+   *   - `buy_node`'s emission (`FUN_005569C0`, cited on `RbTree.h`'s
+   *     `buy_node`) places the value at `node+0x10`, and the pair copy
+   *     (`FUN_00557310`) writes the set at `pair+0x20`, four bytes past the
+   *     0x1C-byte key.
    *   - `erase_node`'s emission (`FUN_00536010`, cited on `RbTree.h`'s
-   *     `erase_node` member) reads/writes colour at `[node+0x58]` (decimal
-   *     88, `*((_BYTE*)v3+88)`) and `isNil` at `[node+0x59]` (decimal 89,
-   *     `*(_BYTE*)(a2+89)`) throughout its transplant-and-rebalance body,
-   *     confirmed directly against the raw decompile.
-   *   - `destroy_subtree`'s emission (`FUN_005369D0`) tears each node down
-   *     as `_Myval.helper.first` (the `msvc8::string` key, at the usual
-   *     string-capacity-release shape) and `_Myval.helper.second.mSet.mUsed`
-   *     (the `CategoryWordRangeView` value's inline-SBO bit-vector release) --
-   *     IDA's own `helper` struct naming is this instantiation's
-   *     `pair<const msvc8::string, CategoryWordRangeView>` value_type, with
-   *     `.first`/`.second` exactly matching the key/value split.
+   *     `erase_node`) reads colour at `[node+0x58]` and `isNil` at
+   *     `[node+0x59]` throughout its transplant-and-rebalance body.
+   *   - `destroy_subtree`'s emission (`FUN_005369D0`) tears each node down as
+   *     `_Myval.helper.first` (the `msvc8::string` key) and
+   *     `_Myval.helper.second.mSet.mUsed` (the value's inline bit-vector) --
+   *     IDA's `helper` naming is this instantiation's
+   *     `pair<const msvc8::string, CategoryWordRangeView>` value_type.
    *
-   * All of this reproduces automatically, with the existing
-   * `rb_node<V>`/`rb_tree<Traits>` templates completely unmodified, once the
-   * value type is given `alignas(8)` (verified by compiling the layout in
-   * isolation with this project's MSVC toolchain -- see the commit that
-   * first introduced this type in `Sim.cpp` for the compiler-verification
-   * detail: `alignas` on a member overrides `RbTree.h`'s
-   * `#pragma pack(push, 4)` for that member). `CategoryLookupValue` is that
-   * `alignas(8)` wrapper.
+   * The alignment now lives on `moho::BVSet` itself (BVSet.h), which is what
+   * `CategoryWordRangeView` is. It is not on the `BVIntSet` that record
+   * embeds at +0x08: `SoundHandleIdPool` is `{BVIntSet, std::uint32_t}` at
+   * 0x24 (CUserSoundManager.h), so the set alone rounds nothing up to eight.
+   * `rb_node<V>` and `rb_tree<Traits>` reproduce the whole
+   * +0x10/+0x30/+0x58/+0x59/0x60 shape with no template change once `V` is
+   * 8-aligned.
    *
-   * Promoted here from `Sim.cpp`'s anonymous namespace, where it was
-   * previously a second, per-TU-only definition of this exact same binary
-   * object (internal linkage, so it could never actually be the same type
-   * as anything declared in this header). `RRuleGameRulesImpl::
-   * mEntityCategoryLookup` is a `new`'d/`delete`d owning pointer whose real
-   * owner is `RRuleGameRules.cpp`; `Sim.cpp` only reaches into the same live
-   * object (via this pointer) to register blueprint category membership.
-   * Giving both translation units one shared definition here, instead of
-   * two independently maintained layout copies reached by
-   * `reinterpret_cast`, is the CLAUDE.md duplicate-layout contract: "pick a
-   * single owning reconstructed definition."
+   * `CategoryLookupValue` used to be an `alignas(8)` wrapper subclass that
+   * carried the alignment on behalf of the map only, because the pin above
+   * had not been found yet and the type looked 4-aligned everywhere else. It
+   * is a plain alias now; `Sim.cpp` still spells it.
    */
-  struct alignas(8) CategoryLookupValue : CategoryWordRangeView
-  {
-  };
+  using CategoryLookupValue = CategoryWordRangeView;
   static_assert(sizeof(CategoryLookupValue) == 0x28, "CategoryLookupValue size must be 0x28");
   static_assert(alignof(CategoryLookupValue) == 8, "CategoryLookupValue alignment must be 8");
 
@@ -138,17 +129,29 @@ namespace moho
   struct EntityCategoryLookupTableRuntimeView
   {
     CategoryLookupMap mCategoryMap; // +0x00 (0x0C: {proxy, head, size})
-    /// Never read or written by any call site traced across either recovery
-    /// pass that has touched this type (the map header itself is only ever
-    /// touched at +0x00/+0x04/+0x08). Kept as an explicit gap rather than
-    /// folded into an assumed alignment: unlike the tree node's alignment
-    /// gap above, nothing pins this one to an alignment requirement of
-    /// `CategoryWordRangeView` itself (that type is 4-byte aligned
-    /// everywhere else it is used as a plain value).
-    std::uint32_t mCategoryMapReserved0C;    // +0x0C
+    // +0x0C is the alignment hole the 8-aligned fallback opens, not a field -
+    // see the evidence block above. The tail beyond +0x3C is the same.
     CategoryWordRangeView mCategoryFallback; // +0x10
     std::uint32_t mWordUniverseHandle;       // +0x38
-    std::uint8_t pad_003C_003F[0x04];        // +0x3C (binary leaves this unwritten; not initialized here either)
+
+    /**
+     * Address: 0x00555290 (FUN_00555290, sub_555290)
+     *
+     * What it does:
+     * The word range recorded for `categoryName`, or null when the name is
+     * not in the table.
+     */
+    [[nodiscard]] const CategoryWordRangeView* TryFind(const msvc8::string& categoryName) const;
+
+    /**
+     * Address: 0x005552C0 (FUN_005552C0, sub_5552C0)
+     *
+     * What it does:
+     * The word range recorded for `categoryName`, or the table's fallback
+     * range when the name is not in the table. This is the whole body of
+     * `RRuleGameRulesImpl::GetEntityCategory`.
+     */
+    [[nodiscard]] const CategoryWordRangeView* FindOrFallback(const msvc8::string& categoryName) const;
 
     /**
      * Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
