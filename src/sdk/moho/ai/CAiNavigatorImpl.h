@@ -13,27 +13,20 @@
 namespace moho
 {
   class CScrLuaInitForm;
-  /**
-   * Legacy 4-byte ownership slot between IAiNavigator and CTask subobjects.
-   *
-   * Evidence:
-   * - CAiNavigatorImpl type-info adds CTask base at +0x10 and CScriptObject base at +0x28 (0x005A38E0).
-   * - IAiNavigator size is 0x0C (0x005A31F0), so +0x0C..+0x0F is a distinct subobject slot.
-   */
-  struct CAiNavigatorImplLegacyPadBase
-  {
-    std::uint32_t mLegacyPadWord{0};
-  };
-  static_assert(
-    sizeof(CAiNavigatorImplLegacyPadBase) == 0x04, "CAiNavigatorImplLegacyPadBase size must be 0x04"
-  );
 
   /**
    * VFTABLE: 0x00E1BF14
    * COL:  0x00E71BD0
+   *
+   * The +0x0C..+0x0F slot between the `IAiNavigator` and `CTask` subobjects
+   * lives on `IAiNavigator` itself (`mPad0C`) rather than in a separate
+   * 4-byte base declared here. A modern MSVC sorts non-polymorphic bases
+   * behind every polymorphic one, so such a base is relocated to the tail and
+   * drags `CTask` to +0x0C and `CScriptObject` to +0x24 -- four bytes off the
+   * offsets the shipped `AddBase` calls register (0x005A7CBB stores 0x10,
+   * 0x005A7D1B stores 0x28). See the comment on `IAiNavigator::mPad0C`.
    */
   class CAiNavigatorImpl : public IAiNavigator,
-                           private CAiNavigatorImplLegacyPadBase,
                            public CTask,
                            public CScriptObject
   {

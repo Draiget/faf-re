@@ -93,7 +93,10 @@ void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* con
 
 void IAiNavigatorTypeInfo::Init()
 {
-  size_ = sizeof(IAiNavigator);
+  // 0x005A31F3 stores the literal 0x0C, which is `sizeof(IAiNavigator)` minus
+  // the trailing `mPad0C` slot the C++ model has to carry so that
+  // `CAiNavigatorImpl`'s CTask base lands at +0x10 (see IAiNavigator.h).
+  size_ = 0x0C;
   gpg::RType::Init();
   AddBase_Broadcaster_EAiNavigatorEvent(this);
   Finish();

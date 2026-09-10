@@ -318,6 +318,33 @@ namespace moho
     static gpg::RType* sType;
 
     TDatListItem<void, void> mListenerNode; // +0x04
+
+    /**
+     * Trailing slot at +0x0C that no `IAiNavigator` code ever touches: neither
+     * the interface ctor (0x005A2CF0, which writes only the vftable at +0x00
+     * and self-links `mListenerNode` at +0x04/+0x08) nor
+     * `CAiNavigatorImpl`'s ctor (0x005A33E0, same three stores inlined) ever
+     * initializes it. It exists because the shipped `CAiNavigatorImpl` puts
+     * its `CTask` base at **+0x10**, not +0x0C -- `lea esi, [ebp+10h]` at
+     * 0x005A3415, immediately before `mov [esi], offset ??_7CTask@Moho@@6B@`
+     * -- while `IAiNavigatorTypeInfo::Init` registers this interface's size as
+     * 0x0C (`mov dword ptr [esi+8], 0Ch` at 0x005A31F3), which is why
+     * `size_` below stays 0x0C rather than `sizeof(IAiNavigator)`.
+     *
+     * The slot used to be modelled as a separate 4-byte base
+     * (`CAiNavigatorImplLegacyPadBase`) declared between `IAiNavigator` and
+     * `CTask`. That does not survive a modern MSVC: it sorts non-polymorphic
+     * bases *after* every polymorphic one, so the pad landed at +0x58 and
+     * every base behind it slid down four bytes -- `CTask` to +0x0C and
+     * `CScriptObject` to +0x24, against the 0x10/0x28 the shipped
+     * `AddBase` calls register (0x005A7CBB, 0x005A7D1B). The reflection then
+     * subtracted 0x28 from a `CScriptObject*` that sat at +0x24, so every
+     * `SCR_FromLua_CAiNavigatorImpl` handed Lua a navigator pointer four
+     * bytes low and `navigator:AbortMove()` dispatched through a float.
+     * Carrying the slot here instead pins `CTask` at +0x10 with no base
+     * reordering to fight.
+     */
+    std::uint32_t mPad0C{0}; // +0x0C
   };
 
   /**
@@ -364,7 +391,9 @@ namespace moho
    */
   int register_RListenerRType_EAiNavigatorEvent();
 
-  static_assert(sizeof(IAiNavigator) == 0x0C, "IAiNavigator size must be 0x0C");
+  // 0x10, not the 0x0C `IAiNavigatorTypeInfo::Init` registers: see `mPad0C`.
+  static_assert(sizeof(IAiNavigator) == 0x10, "IAiNavigator size must be 0x10");
   static_assert(offsetof(IAiNavigator, mListenerNode) == 0x04, "IAiNavigator::mListenerNode offset must be 0x04");
+  static_assert(offsetof(IAiNavigator, mPad0C) == 0x0C, "IAiNavigator::mPad0C offset must be 0x0C");
 } // namespace moho
 
