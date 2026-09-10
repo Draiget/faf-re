@@ -12828,12 +12828,22 @@ namespace
 	 * Constructs one Lua call-frame view from a caller-supplied function
 	 * `LuaObject`: default-initializes the embedded function lane, links it
 	 * onto the source object's root-state live-object intrusive list with the
-	 * same tagged value via `AddToUsedObjectList`, captures the root
-	 * main-thread `LuaPlus::LuaState*` wrapper into `state`, asserts the
+	 * same tagged value via `AddToUsedObjectList`, captures the CURRENTLY
+	 * RUNNING thread's `LuaPlus::LuaState*` wrapper into `state`, asserts the
 	 * function slot is bound (`m_state` non-null), raises a Lua type error
 	 * when the payload is not callable (`tt | 1 != 7` ⇒ not `LUA_TFUNCTION`),
-	 * and records the current root stack top `+ 1` as `nextTopIndex` while
-	 * pushing the function onto that stack as the first call-frame slot.
+	 * and records that thread's current stack top `+ 1` as `nextTopIndex`
+	 * while pushing the function onto that stack as the first call-frame slot.
+	 *
+	 * The frame's thread is `l_G->lstate` (+0x44), not `l_G->mainthread`
+	 * (+0x40): the binary reads `[[[m_state]+0x10]+0x44]+0x44` at both the
+	 * `state` capture and the `luaG_typeerror` call. The two coincide only
+	 * while the main thread is the one running. Every UI/sim callback that
+	 * runs inside a coroutine (`ForkThread`) has `lstate != mainthread`, and
+	 * building the frame on the main thread there pushes the callable and its
+	 * arguments onto a stack `lua_call` is not run against, so the call
+	 * silently does nothing -- which is how `LuaObject::Insert` stopped
+	 * filling the table `EntityCategoryGetUnitList` returns.
 	 */
 	LuaCallFrameRuntimeView* ConstructLuaCallFrame(
 		LuaCallFrameRuntimeView* const frame,
@@ -12853,7 +12863,7 @@ namespace
 
 		frame->argumentCount = 0;
 		LuaState* const boundState = frame->function.m_state;
-		frame->state = boundState->m_state->l_G->mainthread->stateUserData;
+		frame->state = boundState->m_state->l_G->lstate->stateUserData;
 
 		if (frame->function.m_state == nullptr) {
 			throw LuaAssertion("m_state");
@@ -12862,7 +12872,7 @@ namespace
 		constexpr std::uint32_t kFunctionTagMask = 1u;
 		if ((static_cast<std::uint32_t>(frame->function.m_object.tt) | kFunctionTagMask) != 7u) {
 			luaG_typeerror(
-				frame->function.m_state->m_state->l_G->mainthread,
+				frame->function.m_state->m_state->l_G->lstate,
 				&frame->function.m_object,
 				"call"
 			);
@@ -21277,6 +21287,8 @@ namespace
 		LuaObject* const arg2 = nullptr
 	)
 	{
+		(void)activeState;
+
 		LuaCallFrameRuntimeView frame{};
 		(void)ConstructLuaCallFrame(&frame, &methodFunction);
 
@@ -21285,7 +21297,10 @@ namespace
 		}
 
 		if (pushNumericArg) {
-			lua_pushnumber(activeState->m_state, numericArg);
+			// 0x00909D9E: `lua_pushnumber(state->m_state, (float)key)` -- the
+			// number goes on the FRAME's thread, the same one every other
+			// argument and `lua_call` use, never on the caller's wrapper.
+			lua_pushnumber(frame.state->m_state, numericArg);
 			++frame.argumentCount;
 		}
 
