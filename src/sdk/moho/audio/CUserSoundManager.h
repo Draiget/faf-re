@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "legacy/containers/Set.h"
 #include <cstdint>
 #include <type_traits>
 
@@ -41,6 +42,13 @@ namespace moho
     std::uint32_t mNextId; // +0x20
   };
 
+  // The tracked-entity set the shipped record carries at +0x18: an 0x0C head
+  // over an 0x14 node holding the entity id at node+0x0C with the colour and
+  // nil pair at +0x10/+0x11.
+  using TrackedEntitySet = msvc8::set<std::int32_t>;
+
+  static_assert(sizeof(TrackedEntitySet) == 0x0C, "TrackedEntitySet size must be 0x0C");
+
   struct SoundHandleRecord
   {
     HSndEntityLoop* mOwnerHandle = nullptr;         // +0x00 (shared-ambient owner lane)
@@ -50,9 +58,7 @@ namespace moho
     std::uint16_t mAngleVariableIndex = 0xFFFFu;    // +0x10 (0xFFFF => no angle variable)
     std::uint16_t mReserved12 = 0u;                 // +0x12
     std::int32_t mLoopIndex = -1;                   // +0x14 (-1 when inactive)
-    void* mTrackedEntitySetProxy = nullptr;         // +0x18
-    void* mTrackedEntitySetHead = nullptr;          // +0x1C
-    std::uint32_t mTrackedEntityCount = 0u;         // +0x20
+    TrackedEntitySet mTrackedEntities;              // +0x18
     float mPlayingSeconds = 0.0f;                   // +0x24
   };
 
@@ -82,16 +88,8 @@ namespace moho
   );
   static_assert(offsetof(SoundHandleRecord, mLoopIndex) == 0x14, "SoundHandleRecord::mLoopIndex offset must be 0x14");
   static_assert(
-    offsetof(SoundHandleRecord, mTrackedEntitySetProxy) == 0x18,
-    "SoundHandleRecord::mTrackedEntitySetProxy offset must be 0x18"
-  );
-  static_assert(
-    offsetof(SoundHandleRecord, mTrackedEntitySetHead) == 0x1C,
-    "SoundHandleRecord::mTrackedEntitySetHead offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(SoundHandleRecord, mTrackedEntityCount) == 0x20,
-    "SoundHandleRecord::mTrackedEntityCount offset must be 0x20"
+    offsetof(SoundHandleRecord, mTrackedEntities) == 0x18,
+    "SoundHandleRecord::mTrackedEntities offset must be 0x18"
   );
   static_assert(
     offsetof(SoundHandleRecord, mPlayingSeconds) == 0x24, "SoundHandleRecord::mPlayingSeconds offset must be 0x24"

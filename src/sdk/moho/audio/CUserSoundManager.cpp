@@ -256,62 +256,13 @@ namespace
     return fallbackSet;
   }
 
-  struct EntityLoopTreeNode
-  {
-    EntityLoopTreeNode* mLeft; // +0x00
-    EntityLoopTreeNode* mParent; // +0x04
-    EntityLoopTreeNode* mRight; // +0x08
-    std::int32_t mEntityId; // +0x0C
-    std::uint8_t mColor; // +0x10 (0 = red, 1 = black)
-    std::uint8_t mIsSentinel; // +0x11
-    std::uint8_t pad_12[2];
-  };
-  static_assert(offsetof(EntityLoopTreeNode, mEntityId) == 0x0C, "EntityLoopTreeNode::mEntityId offset must be 0x0C");
-  static_assert(offsetof(EntityLoopTreeNode, mIsSentinel) == 0x11, "EntityLoopTreeNode::mIsSentinel offset must be 0x11");
 
-  /// Node colours as the release binary stores them in `EntityLoopTreeNode::mColor`.
-  constexpr std::uint8_t kEntityLoopTreeRed = 0u;
-  constexpr std::uint8_t kEntityLoopTreeBlack = 1u;
-
-  /**
-   * The 12-byte tracked-entity set object the release binary embeds inside
-   * every `SoundHandleRecord` at `+0x18`: an empty comparator/allocator lane,
-   * the sentinel head node and the element count. The tree helpers below take
-   * this object (not just the sentinel) whenever they have to reach the root
-   * through `mHead->mParent` or maintain `mSize`, which is exactly how the
-   * binary passes it (`lea eax, [record+18h]` at 0x008AC817).
-   */
-  struct EntityLoopTreeSet
-  {
-    void* mAllocatorProxy;     // +0x00
-    EntityLoopTreeNode* mHead; // +0x04
-    std::uint32_t mSize;       // +0x08
-  };
-  static_assert(offsetof(EntityLoopTreeSet, mHead) == 0x04, "EntityLoopTreeSet::mHead offset must be 0x04");
-  static_assert(offsetof(EntityLoopTreeSet, mSize) == 0x08, "EntityLoopTreeSet::mSize offset must be 0x08");
-  static_assert(sizeof(EntityLoopTreeSet) == 0x0C, "EntityLoopTreeSet size must be 0x0C");
 
   // The record's three tracked-entity lanes *are* the set object; keep the
   // aliasing view pinned to them so a layout change fails loudly here.
-  static_assert(
-    offsetof(moho::SoundHandleRecord, mTrackedEntitySetProxy) == 0x18,
-    "EntityLoopTreeSet must alias SoundHandleRecord::mTrackedEntitySetProxy at 0x18"
-  );
-  static_assert(
-    offsetof(moho::SoundHandleRecord, mTrackedEntitySetHead)
-      == offsetof(moho::SoundHandleRecord, mTrackedEntitySetProxy) + offsetof(EntityLoopTreeSet, mHead),
-    "EntityLoopTreeSet::mHead must alias SoundHandleRecord::mTrackedEntitySetHead"
-  );
-  static_assert(
-    offsetof(moho::SoundHandleRecord, mTrackedEntityCount)
-      == offsetof(moho::SoundHandleRecord, mTrackedEntitySetProxy) + offsetof(EntityLoopTreeSet, mSize),
-    "EntityLoopTreeSet::mSize must alias SoundHandleRecord::mTrackedEntityCount"
-  );
 
-  [[nodiscard]] EntityLoopTreeSet& TrackedEntitySetOf(moho::SoundHandleRecord& record) noexcept
-  {
-    return *reinterpret_cast<EntityLoopTreeSet*>(&record.mTrackedEntitySetProxy);
-  }
+
+
 
   struct SelfLinkedDwordNode12
   {
@@ -335,37 +286,6 @@ namespace
       node->mNext = node;
       node->mPrev = node;
     }
-    return node;
-  }
-
-  /**
-   * Address: 0x008AF620 (FUN_008AF620, sub_8AF620)
-   *
-   * What it does:
-   * Allocates one compact 20-byte tree node and seeds parent/child links plus
-   * payload and node-color lanes for red-black insert staging.
-   */
-  [[maybe_unused]] [[nodiscard]] EntityLoopTreeNode* CreateEntityLoopTreeNodeFromLinks(
-    EntityLoopTreeNode* const left,
-    EntityLoopTreeNode* const parent,
-    EntityLoopTreeNode* const right,
-    const std::int32_t* const payloadEntityId,
-    const std::uint8_t color
-  )
-  {
-    auto* const node = static_cast<EntityLoopTreeNode*>(::operator new(sizeof(EntityLoopTreeNode)));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->mLeft = left;
-    node->mParent = parent;
-    node->mRight = right;
-    node->mEntityId = payloadEntityId != nullptr ? *payloadEntityId : 0;
-    node->mColor = color;
-    node->mIsSentinel = 0u;
-    node->pad_12[0] = 0u;
-    node->pad_12[1] = 0u;
     return node;
   }
 
@@ -396,26 +316,6 @@ namespace
     }
     record->mOwnerHandle = nullptr;
     record->mOwnerNextInChain = nullptr;
-  }
-
-  /**
-   * Address: 0x008AFAC0 (FUN_008AFAC0)
-   *
-   * What it does:
-   * Allocates one entity-loop set sentinel node with nil/color flags initialized.
-   */
-  [[nodiscard]] EntityLoopTreeNode* CreateEntityLoopTreeSentinel()
-  {
-    auto* const node = static_cast<EntityLoopTreeNode*>(::operator new(sizeof(EntityLoopTreeNode)));
-    node->mLeft = nullptr;
-    node->mParent = nullptr;
-    node->mRight = nullptr;
-    node->mEntityId = 0;
-    node->mColor = 1u;
-    node->mIsSentinel = 0u;
-    node->pad_12[0] = 0u;
-    node->pad_12[1] = 0u;
-    return node;
   }
 
   struct UserSessionEntityMapNodeView
@@ -458,414 +358,6 @@ namespace
   static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
 
   /**
-   * Address: 0x008AEEC0 (FUN_008AEEC0)
-   *
-   * What it does:
-   * Recursively destroys one entity-loop RB-tree branch and releases each
-   * node payload, stopping on the sentinel/head lane.
-   */
-  void DestroyEntityLoopTree(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
-  {
-    if (node == nullptr || node == head || node->mIsSentinel != 0u) {
-      return;
-    }
-
-    DestroyEntityLoopTree(node->mLeft, head);
-    DestroyEntityLoopTree(node->mRight, head);
-    operator delete(node);
-  }
-
-  /**
-   * Address: 0x008AF130 (FUN_008AF130, sub_8AF130)
-   *
-   * What it does:
-   * Descends one entity-loop tree through left-child links and returns the
-   * minimum node reachable from the input lane.
-   */
-  [[nodiscard]] EntityLoopTreeNode* EntityLoopTreeMinimum(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
-  {
-    if (node == nullptr || node == head) {
-      return head;
-    }
-    while (node->mLeft != head) {
-      node = node->mLeft;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x008AF110 (FUN_008AF110, sub_8AF110)
-   *
-   * What it does:
-   * Descends one entity-loop tree through right-child links and returns the
-   * maximum node reachable from the input lane.
-   */
-  [[nodiscard]] EntityLoopTreeNode* EntityLoopTreeMaximum(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
-  {
-    if (node == nullptr || node == head) {
-      return head;
-    }
-    while (node->mRight != head) {
-      node = node->mRight;
-    }
-    return node;
-  }
-
-  void RefreshEntityLoopTreeBounds(EntityLoopTreeNode* const head)
-  {
-    EntityLoopTreeNode* const root = head->mParent;
-    if (root == nullptr || root == head || root->mIsSentinel != 0u) {
-      head->mLeft = head;
-      head->mParent = head;
-      head->mRight = head;
-      return;
-    }
-
-    head->mLeft = EntityLoopTreeMinimum(root, head);
-    head->mRight = EntityLoopTreeMaximum(root, head);
-  }
-
-  void RotateEntityLoopTreeLeft(EntityLoopTreeNode* const head, EntityLoopTreeNode* const node)
-  {
-    EntityLoopTreeNode* const pivot = node->mRight;
-    node->mRight = pivot->mLeft;
-    if (pivot->mLeft != head) {
-      pivot->mLeft->mParent = node;
-    }
-
-    pivot->mParent = node->mParent;
-    if (node == head->mParent) {
-      head->mParent = pivot;
-    } else if (node == node->mParent->mLeft) {
-      node->mParent->mLeft = pivot;
-    } else {
-      node->mParent->mRight = pivot;
-    }
-
-    pivot->mLeft = node;
-    node->mParent = pivot;
-  }
-
-  void RotateEntityLoopTreeRight(EntityLoopTreeNode* const head, EntityLoopTreeNode* const node)
-  {
-    EntityLoopTreeNode* const pivot = node->mLeft;
-    node->mLeft = pivot->mRight;
-    if (pivot->mRight != head) {
-      pivot->mRight->mParent = node;
-    }
-
-    pivot->mParent = node->mParent;
-    if (node == head->mParent) {
-      head->mParent = pivot;
-    } else if (node == node->mParent->mRight) {
-      node->mParent->mRight = pivot;
-    } else {
-      node->mParent->mLeft = pivot;
-    }
-
-    pivot->mRight = node;
-    node->mParent = pivot;
-  }
-
-  /**
-   * Address: 0x008AF6A0 (FUN_008AF6A0, sub_8AF6A0)
-   *
-   * IDA signature:
-   * void __usercall sub_8AF6A0(EntityLoopTreeNode **iteratorLane@<edx>);
-   *
-   * What it does:
-   * Advances one tracked-entity iterator to its in-order successor: descends to
-   * the minimum of the right subtree when that subtree exists, otherwise climbs
-   * parent links while the current node is a right child. The sentinel head is
-   * the natural stop, so a maximal node advances to the head (`end()`).
-   *
-   * The release binary keeps this both out-of-line (called from the erase path
-   * at 0x008AE710) and inlined into `CUserSoundManager::UpdateSoundRequests` at
-   * 0x008AC824; both sites resolve to this body.
-   */
-  [[nodiscard]] EntityLoopTreeNode* EntityLoopTreeSuccessor(EntityLoopTreeNode* node) noexcept
-  {
-    if (node->mIsSentinel != 0u) {
-      return node;
-    }
-
-    if (EntityLoopTreeNode* successor = node->mRight; successor->mIsSentinel == 0u) {
-      while (successor->mLeft->mIsSentinel == 0u) {
-        successor = successor->mLeft;
-      }
-      return successor;
-    }
-
-    EntityLoopTreeNode* parent = node->mParent;
-    while (parent->mIsSentinel == 0u && node == parent->mRight) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
-  /**
-   * Address: 0x008AE690 (FUN_008AE690, sub_8AE690)
-   *
-   * IDA signature:
-   * EntityLoopTreeNode **__stdcall sub_8AE690(EntityLoopTreeSet *set,
-   *                                           EntityLoopTreeNode **returnedIterator,
-   *                                           EntityLoopTreeNode *erased);
-   *
-   * What it does:
-   * Removes one tracked-entity node from a sound-handle record's entity set and
-   * returns the erased node's in-order successor. Throws
-   * `std::out_of_range("invalid map/set<T> iterator")` when handed the sentinel.
-   * Splices either the single child or the in-order successor into the erased
-   * slot, refreshes the head's leftmost/rightmost bounds, runs the red-black
-   * double-black repair (recolour plus left/right rotations) when the erased
-   * node was black, frees the node and decrements the element count.
-   */
-  EntityLoopTreeNode* EraseEntityLoopTreeNode(EntityLoopTreeSet& set, EntityLoopTreeNode* const erased)
-  {
-    if (erased->mIsSentinel != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    EntityLoopTreeNode* const head = set.mHead;
-    EntityLoopTreeNode* const next = EntityLoopTreeSuccessor(erased);
-
-    // Pick the node that takes the erased slot and the subtree that has to be
-    // re-attached one level up.
-    EntityLoopTreeNode* lifted = erased;
-    EntityLoopTreeNode* fixNode = nullptr;
-    if (erased->mLeft->mIsSentinel != 0u) {
-      fixNode = erased->mRight;
-    } else if (erased->mRight->mIsSentinel != 0u) {
-      fixNode = erased->mLeft;
-    } else {
-      lifted = next;
-      fixNode = lifted->mRight;
-    }
-
-    EntityLoopTreeNode* fixParent = nullptr;
-    if (lifted == erased) {
-      // At most one subtree: hoist it straight into the erased slot.
-      fixParent = erased->mParent;
-      if (fixNode->mIsSentinel == 0u) {
-        fixNode->mParent = fixParent;
-      }
-
-      if (head->mParent == erased) {
-        head->mParent = fixNode;
-      } else if (fixParent->mLeft == erased) {
-        fixParent->mLeft = fixNode;
-      } else {
-        fixParent->mRight = fixNode;
-      }
-
-      if (head->mLeft == erased) {
-        head->mLeft = fixNode->mIsSentinel != 0u ? fixParent : EntityLoopTreeMinimum(fixNode, head);
-      }
-      if (head->mRight == erased) {
-        head->mRight = fixNode->mIsSentinel != 0u ? fixParent : EntityLoopTreeMaximum(fixNode, head);
-      }
-    } else {
-      // Two subtrees: the in-order successor is lifted into the erased slot.
-      erased->mLeft->mParent = lifted;
-      lifted->mLeft = erased->mLeft;
-
-      if (lifted == erased->mRight) {
-        fixParent = lifted;
-      } else {
-        fixParent = lifted->mParent;
-        if (fixNode->mIsSentinel == 0u) {
-          fixNode->mParent = fixParent;
-        }
-        fixParent->mLeft = fixNode;
-        lifted->mRight = erased->mRight;
-        erased->mRight->mParent = lifted;
-      }
-
-      if (head->mParent == erased) {
-        head->mParent = lifted;
-      } else if (erased->mParent->mLeft == erased) {
-        erased->mParent->mLeft = lifted;
-      } else {
-        erased->mParent->mRight = lifted;
-      }
-
-      lifted->mParent = erased->mParent;
-      std::swap(lifted->mColor, erased->mColor);
-    }
-
-    if (erased->mColor == kEntityLoopTreeBlack) {
-      // Removing a black link shortened one path: push the extra black up the
-      // tree until it can be absorbed by a red node or a rotation.
-      while (fixNode != head->mParent && fixNode->mColor == kEntityLoopTreeBlack) {
-        if (fixNode == fixParent->mLeft) {
-          EntityLoopTreeNode* sibling = fixParent->mRight;
-          if (sibling->mColor == kEntityLoopTreeRed) {
-            sibling->mColor = kEntityLoopTreeBlack;
-            fixParent->mColor = kEntityLoopTreeRed;
-            RotateEntityLoopTreeLeft(head, fixParent);
-            sibling = fixParent->mRight;
-          }
-
-          if (sibling->mIsSentinel == 0u) {
-            if (
-              sibling->mLeft->mColor == kEntityLoopTreeBlack && sibling->mRight->mColor == kEntityLoopTreeBlack
-            ) {
-              sibling->mColor = kEntityLoopTreeRed;
-            } else {
-              if (sibling->mRight->mColor == kEntityLoopTreeBlack) {
-                sibling->mLeft->mColor = kEntityLoopTreeBlack;
-                sibling->mColor = kEntityLoopTreeRed;
-                RotateEntityLoopTreeRight(head, sibling);
-                sibling = fixParent->mRight;
-              }
-
-              sibling->mColor = fixParent->mColor;
-              fixParent->mColor = kEntityLoopTreeBlack;
-              sibling->mRight->mColor = kEntityLoopTreeBlack;
-              RotateEntityLoopTreeLeft(head, fixParent);
-              break;
-            }
-          }
-        } else {
-          EntityLoopTreeNode* sibling = fixParent->mLeft;
-          if (sibling->mColor == kEntityLoopTreeRed) {
-            sibling->mColor = kEntityLoopTreeBlack;
-            fixParent->mColor = kEntityLoopTreeRed;
-            RotateEntityLoopTreeRight(head, fixParent);
-            sibling = fixParent->mLeft;
-          }
-
-          if (sibling->mIsSentinel == 0u) {
-            if (
-              sibling->mRight->mColor == kEntityLoopTreeBlack && sibling->mLeft->mColor == kEntityLoopTreeBlack
-            ) {
-              sibling->mColor = kEntityLoopTreeRed;
-            } else {
-              if (sibling->mLeft->mColor == kEntityLoopTreeBlack) {
-                sibling->mRight->mColor = kEntityLoopTreeBlack;
-                sibling->mColor = kEntityLoopTreeRed;
-                RotateEntityLoopTreeLeft(head, sibling);
-                sibling = fixParent->mLeft;
-              }
-
-              sibling->mColor = fixParent->mColor;
-              fixParent->mColor = kEntityLoopTreeBlack;
-              sibling->mLeft->mColor = kEntityLoopTreeBlack;
-              RotateEntityLoopTreeRight(head, fixParent);
-              break;
-            }
-          }
-        }
-
-        fixNode = fixParent;
-        fixParent = fixParent->mParent;
-      }
-
-      fixNode->mColor = kEntityLoopTreeBlack;
-    }
-
-    ::operator delete(erased);
-    if (set.mSize > 0u) {
-      --set.mSize;
-    }
-
-    return next;
-  }
-
-  void RebalanceEntityLoopTreeAfterInsert(EntityLoopTreeNode* const head, EntityLoopTreeNode* node)
-  {
-    while (node->mParent->mColor == 0u) {
-      EntityLoopTreeNode* const parent = node->mParent;
-      EntityLoopTreeNode* const grandparent = parent->mParent;
-
-      if (parent == grandparent->mLeft) {
-        EntityLoopTreeNode* const uncle = grandparent->mRight;
-        if (uncle->mColor == 0u) {
-          parent->mColor = 1u;
-          uncle->mColor = 1u;
-          grandparent->mColor = 0u;
-          node = grandparent;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            RotateEntityLoopTreeLeft(head, node);
-          }
-          node->mParent->mColor = 1u;
-          node->mParent->mParent->mColor = 0u;
-          RotateEntityLoopTreeRight(head, node->mParent->mParent);
-        }
-      } else {
-        EntityLoopTreeNode* const uncle = grandparent->mLeft;
-        if (uncle->mColor == 0u) {
-          parent->mColor = 1u;
-          uncle->mColor = 1u;
-          grandparent->mColor = 0u;
-          node = grandparent;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            RotateEntityLoopTreeRight(head, node);
-          }
-          node->mParent->mColor = 1u;
-          node->mParent->mParent->mColor = 0u;
-          RotateEntityLoopTreeLeft(head, node->mParent->mParent);
-        }
-      }
-    }
-
-    head->mParent->mColor = 1u;
-    RefreshEntityLoopTreeBounds(head);
-  }
-
-  [[nodiscard]] bool InsertEntityIdIntoEntityLoopTree(EntityLoopTreeNode* const head, const std::int32_t entityId)
-  {
-    EntityLoopTreeNode* parent = head;
-    EntityLoopTreeNode* node = head->mParent;
-    bool shouldInsertLeft = true;
-
-    while (node != head) {
-      parent = node;
-      if (entityId < node->mEntityId) {
-        shouldInsertLeft = true;
-        node = node->mLeft;
-      } else if (entityId > node->mEntityId) {
-        shouldInsertLeft = false;
-        node = node->mRight;
-      } else {
-        return false;
-      }
-    }
-
-    auto* const insertedNode = CreateEntityLoopTreeSentinel();
-    insertedNode->mLeft = head;
-    insertedNode->mParent = parent;
-    insertedNode->mRight = head;
-    insertedNode->mEntityId = entityId;
-    insertedNode->mColor = 0u;
-    insertedNode->mIsSentinel = 0u;
-
-    if (parent == head) {
-      head->mParent = insertedNode;
-      head->mLeft = insertedNode;
-      head->mRight = insertedNode;
-    } else if (shouldInsertLeft) {
-      parent->mLeft = insertedNode;
-      if (head->mLeft == parent) {
-        head->mLeft = insertedNode;
-      }
-    } else {
-      parent->mRight = insertedNode;
-      if (head->mRight == parent) {
-        head->mRight = insertedNode;
-      }
-    }
-
-    RebalanceEntityLoopTreeAfterInsert(head, insertedNode);
-    return true;
-  }
-
-  /**
    * Address: 0x008AA340 (FUN_008AA340)
    *
    * What it does:
@@ -885,16 +377,12 @@ namespace
     record->mAngleVariableIndex = 0xFFFFu;
     record->mReserved12 = 0u;
     record->mLoopIndex = -1;
-    record->mTrackedEntitySetProxy = nullptr;
 
-    auto* const treeHead = CreateEntityLoopTreeSentinel();
-    treeHead->mIsSentinel = 1u;
-    treeHead->mLeft = treeHead;
-    treeHead->mParent = treeHead;
-    treeHead->mRight = treeHead;
-    record->mTrackedEntitySetHead = treeHead;
+    // The record lives in raw pooled storage, so its set is constructed here
+    // rather than by a member initialiser -- the shipped body buys the header
+    // sentinel at exactly this point.
+    new (&record->mTrackedEntities) moho::TrackedEntitySet();
 
-    record->mTrackedEntityCount = 0u;
     record->mPlayingSeconds = 0.0f;
   }
 
@@ -905,19 +393,7 @@ namespace
    * Inserts one entity id into a loop-handle tracked-entity tree and returns
    * whether this was a new key.
    */
-  [[nodiscard]] bool InsertTrackedEntityId(moho::SoundHandleRecord* const record, const std::int32_t entityId)
-  {
-    if (record == nullptr || record->mTrackedEntitySetHead == nullptr) {
-      return false;
-    }
 
-    auto* const treeHead = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
-    const bool inserted = InsertEntityIdIntoEntityLoopTree(treeHead, entityId);
-    if (inserted) {
-      ++record->mTrackedEntityCount;
-    }
-    return inserted;
-  }
 
   /**
    * Address: 0x008AA3B0 (FUN_008AA3B0)
@@ -939,7 +415,7 @@ namespace
     }
 
     record->mLoopIndex = loopIndex;
-    (void)InsertTrackedEntityId(record, entityId);
+    (void)record->mTrackedEntities.insert(entityId);
     record->mCue = cue;
     record->mAngleVariableIndex = cue != nullptr ? cue->GetVariableIndex(kAngleVariableName) : 0xFFFFu;
 
@@ -1147,13 +623,7 @@ namespace
       return;
     }
 
-    if (record->mTrackedEntitySetHead != nullptr) {
-      auto* const treeHead = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
-      DestroyEntityLoopTree(treeHead->mParent, treeHead);
-      ::operator delete(treeHead);
-      record->mTrackedEntitySetHead = nullptr;
-    }
-    record->mTrackedEntityCount = 0u;
+    record->mTrackedEntities.~set();
 
     UnlinkRecordFromOwnerChain(record);
   }
@@ -1198,20 +668,8 @@ namespace
       return;
     }
 
-    if (record->mTrackedEntitySetHead != nullptr) {
-      auto* const oldTree = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
-      DestroyEntityLoopTree(oldTree->mParent, oldTree);
-      ::operator delete(oldTree);
-    }
-
-    auto* const treeHead = CreateEntityLoopTreeSentinel();
-    treeHead->mIsSentinel = 1u;
-    treeHead->mLeft = treeHead;
-    treeHead->mParent = treeHead;
-    treeHead->mRight = treeHead;
-    record->mTrackedEntitySetHead = treeHead;
-
-    record->mTrackedEntityCount = 0u;
+    record->mTrackedEntities.~set();
+    new (&record->mTrackedEntities) moho::TrackedEntitySet();
   }
 
   moho::HSound* LoopOwnerFromNode(LoopNode* node)
@@ -1419,17 +877,12 @@ namespace
     moho::SoundHandleRecord* const record, moho::AudioEngine* const engine, const float interpolationAlpha
   )
   {
-    if (record == nullptr || engine == nullptr || record->mTrackedEntitySetHead == nullptr) {
+    if (record == nullptr || engine == nullptr || record->mTrackedEntities.empty()) {
       return;
     }
 
-    auto* const treeHead = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
-    if (treeHead == nullptr || treeHead->mLeft == nullptr || treeHead->mLeft == treeHead) {
-      return;
-    }
-
-    const EntityLoopTreeNode* const firstNode = treeHead->mLeft;
-    const std::int32_t entityId = firstNode->mEntityId;
+    // The first tracked entity spatialises the whole loop.
+    const std::int32_t entityId = *record->mTrackedEntities.begin();
 
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     moho::UserEntity* const entity = FindUserSessionEntityById(session, entityId);
@@ -1754,17 +1207,10 @@ namespace moho
     record->mLoopIndex = -1;
     record->mParams = nullptr;
 
-    if (record->mTrackedEntitySetHead != nullptr) {
-      auto* const treeHead = static_cast<EntityLoopTreeNode*>(record->mTrackedEntitySetHead);
-      DestroyEntityLoopTree(treeHead->mParent, treeHead);
-      treeHead->mLeft = treeHead;
-      treeHead->mParent = treeHead;
-      treeHead->mRight = treeHead;
-    }
+    record->mTrackedEntities.clear();
 
     record->mAngleVariableIndex = 0xFFFFu;
     record->mReserved12 = 0u;
-    record->mTrackedEntityCount = 0u;
     record->mPlayingSeconds = 0.0f;
 
     if (gEngineStatSoundActiveEntityLoops == nullptr) {
@@ -1983,15 +1429,14 @@ namespace moho
         continue;
       }
 
-      EntityLoopTreeSet& trackedSet = TrackedEntitySetOf(record);
-      EntityLoopTreeNode* const treeHead = trackedSet.mHead;
+      moho::TrackedEntitySet& trackedSet = record.mTrackedEntities;
       const CSndVar* const rpcLoopVariable = ReadSndParamsRpcLoopVariable(*record.mParams);
 
       if (rpcLoopVariable == nullptr || rpcLoopVariable->mState == 0xFFFFu) {
         // Ambient (non-RPC) loop at 0x008AC8C1: the first tracked entity alone
         // decides whether the whole loop keeps playing.
         UserEntity* const entity =
-          FindUserSessionEntityById(WLD_GetActiveSession(), treeHead->mLeft->mEntityId);
+          FindUserSessionEntityById(WLD_GetActiveSession(), *trackedSet.begin());
         const CSndParams* const ambientParams = entity != nullptr ? entity->mAmbientLoop.mParams : nullptr;
 
         EFilterType filterResult = EFilterType::Pass;
@@ -2024,8 +1469,8 @@ namespace moho
 
       // RPC loop at 0x008AC6D4: each tracked entity is filtered on its own and
       // culled from the set individually.
-      for (EntityLoopTreeNode* node = treeHead->mLeft; node != treeHead;) {
-        UserEntity* const entity = FindUserSessionEntityById(WLD_GetActiveSession(), node->mEntityId);
+      for (auto node = trackedSet.begin(); node != trackedSet.end();) {
+        UserEntity* const entity = FindUserSessionEntityById(WLD_GetActiveSession(), *node);
         const HSndEntityLoop* const entityLoop = entity != nullptr ? entity->mRumbleLoopHandle : nullptr;
 
         const bool keepEntity =
@@ -2038,7 +1483,7 @@ namespace moho
              ) == EFilterType::Pass;
 
         if (keepEntity) {
-          node = EntityLoopTreeSuccessor(node);
+          ++node;
           continue;
         }
 
@@ -2049,15 +1494,11 @@ namespace moho
         if (StopRPCEntityLoop(&record)) {
           // That was the final tracked entity: the cue is stopped and the whole
           // tracked-entity set is released in one shot (0x008AC882).
-          DestroyEntityLoopTree(treeHead->mParent, treeHead);
-          treeHead->mParent = treeHead;
-          trackedSet.mSize = 0u;
-          treeHead->mLeft = treeHead;
-          treeHead->mRight = treeHead;
+          trackedSet.clear();
           break;
         }
 
-        node = EraseEntityLoopTreeNode(trackedSet, node);
+        node = trackedSet.erase(node);
       }
     }
 
@@ -2124,9 +1565,9 @@ namespace moho
    */
   bool CUserSoundManager::StopRPCEntityLoop(SoundHandleRecord* const record)
   {
-    const float trackedCountMinusOne = static_cast<float>(static_cast<std::int32_t>(record->mTrackedEntityCount) - 1);
+    const float trackedCountMinusOne = static_cast<float>(static_cast<std::int32_t>(record->mTrackedEntities.size()) - 1);
     SND_SetGlobalFloat(ReadSndParamsRpcLoopVariable(*record->mParams)->mState, trackedCountMinusOne);
-    if (record->mTrackedEntityCount != 1u) {
+    if (record->mTrackedEntities.size() != 1u) {
       return false;
     }
 
@@ -2254,7 +1695,7 @@ namespace moho
 
       SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
       BindSoundHandleRecordRuntime(&record, cue, static_cast<std::int32_t>(handleIndex), loopHandle, entityId);
-      SND_SetGlobalFloat(rpcLoopVariable, static_cast<float>(record.mTrackedEntityCount));
+      SND_SetGlobalFloat(rpcLoopVariable, static_cast<float>(record.mTrackedEntities.size()));
       return;
     }
 
@@ -2263,8 +1704,8 @@ namespace moho
     }
 
     SoundHandleRecord& record = mSoundHandles.start_[loopHandle->mLoopIndex];
-    (void)InsertTrackedEntityId(&record, entityId);
-    SND_SetGlobalFloat(rpcLoopVariable, static_cast<float>(record.mTrackedEntityCount));
+    (void)record.mTrackedEntities.insert(entityId);
+    SND_SetGlobalFloat(rpcLoopVariable, static_cast<float>(record.mTrackedEntities.size()));
   }
 
   /**
