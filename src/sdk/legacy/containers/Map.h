@@ -78,6 +78,9 @@ namespace msvc8
 
         [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
 
+        /**
+         * Address: 0x007F1880 (FUN_007F1880 -- `size()` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `GetBlueprintExtractorRegistrySizeLane` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+         */
         [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
         /**
          * Address: 0x006E15A0 (FUN_006E15A0, `msvc8::map<Moho::CmdId,
@@ -190,6 +193,7 @@ namespace msvc8
          * helper is deleted and this member's real call sites (`.find()`)
          * are the recovery now (DB-integrity fix).
          * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007F01D0 (FUN_007F01D0 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007EDA40, 0x007EEE50, 0x007EF0B0; formerly `FindBlueprintExtractorRegistryEntry` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
@@ -476,6 +480,8 @@ namespace msvc8
          * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
          * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AC460 (FUN_004AC460 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9F30, 0x004AA090; formerly `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
+         * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
          */
         mapped_type& operator[](const key_type& k)
         {
