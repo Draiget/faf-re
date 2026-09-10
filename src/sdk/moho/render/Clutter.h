@@ -18,8 +18,8 @@ namespace moho
   struct ClutterRegion;
   struct ClutterRegionKey;
 
-  struct ClutterListNode;
-  struct ClutterRegionListNode;
+
+
 
   struct ClutterPayloadVTable
   {
@@ -168,44 +168,15 @@ namespace moho
     "ClutterSurfaceEntry::mSeeds offset must be 0x08"
   );
 
-  struct ClutterListNode
-  {
-    ClutterListNode* next; // +0x00
-    ClutterListNode* prev; // +0x04
-    void* payload; // +0x08
-  };
-  static_assert(sizeof(ClutterListNode) == 0x0C, "ClutterListNode size must be 0x0C");
+  // The three clutter lists are all MSVC8 `list` heads -- `{proxy, head, size}`
+  // at 0x0C with a `{next, prev, value}` node at 0x0C. `mList1` holds the
+  // 128-region pool blocks, `mList2` the recycle list, and each region's
+  // `mMap` the payloads that region owns.
+  using ClutterRegionList = msvc8::list<ClutterRegion*>;
+  using ClutterPayloadList = msvc8::list<void*>;
 
-  struct ClutterIntrusiveListState
-  {
-    void* lane00; // +0x00
-    ClutterListNode* head; // +0x04
-    std::uint32_t size; // +0x08
-  };
-  static_assert(sizeof(ClutterIntrusiveListState) == 0x0C, "ClutterIntrusiveListState size must be 0x0C");
-  static_assert(
-    offsetof(ClutterIntrusiveListState, head) == 0x04,
-    "ClutterIntrusiveListState::head offset must be 0x04"
-  );
 
-  struct ClutterRegionListNode
-  {
-    ClutterRegionListNode* next; // +0x00
-    ClutterRegionListNode* prev; // +0x04
-    ClutterRegion* value; // +0x08
-  };
-  static_assert(sizeof(ClutterRegionListNode) == 0x0C, "ClutterRegionListNode size must be 0x0C");
 
-  struct ClutterRegionListState
-  {
-    void* lane00; // +0x00
-    ClutterRegionListNode* head; // +0x04
-    std::uint32_t size; // +0x08
-  };
-  static_assert(sizeof(ClutterRegionListState) == 0x0C, "ClutterRegionListState size must be 0x0C");
-  static_assert(
-    offsetof(ClutterRegionListState, head) == 0x04, "ClutterRegionListState::head offset must be 0x04"
-  );
 
   /**
    * The region-key element of `Clutter::mKeys`. The vtable slot at +0x00 is a
@@ -271,13 +242,7 @@ namespace moho
     sizeof(ClutterRegionMapPayloadHeader) == 0x4, "ClutterRegionMapPayloadHeader size must be 0x4"
   );
 
-  struct ClutterRegionMapState
-  {
-    void* lane00; // +0x00
-    ClutterListNode* head; // +0x04
-    std::uint32_t size; // +0x08
-  };
-  static_assert(sizeof(ClutterRegionMapState) == 0x0C, "ClutterRegionMapState size must be 0x0C");
+
 
   struct ClutterRegion
   {
@@ -287,7 +252,7 @@ namespace moho
     std::int32_t mX; // +0x0C
     std::int32_t mZ; // +0x10
     Wm3::AxisAlignedBox3f mBox; // +0x14
-    ClutterRegionMapState mMap; // +0x2C
+    ClutterPayloadList mMap; // +0x2C
 
     /**
      * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
@@ -490,8 +455,8 @@ namespace moho
 
   public:
     std::uint8_t reserved00[0x04]; // +0x00 (vtable lane)
-    ClutterIntrusiveListState mList1; // +0x04
-    ClutterRegionListState mList2; // +0x10
+    ClutterRegionList mList1; // +0x04
+    ClutterRegionList mList2; // +0x10
     std::uint8_t mBuffer[0x100]; // +0x1C
     ClutterSurfaceEntry mSurfaces[256]; // +0x11C
     ClutterRegionKeySet mKeys; // +0x191C
@@ -512,11 +477,7 @@ namespace moho
    * What it does:
    * Walks one intrusive list lane and releases node payload storage.
    */
-  std::uint8_t ReleaseRegionListPayloads(
-    ClutterListNode* begin,
-    ClutterListNode* endSentinel,
-    std::uint8_t passthrough
-  );
+  std::uint8_t ReleaseRegionListPayloads(ClutterRegionList& poolBlocks, std::uint8_t passthrough);
 
   /**
    * Address: 0x007D5F80 (FUN_007D5F80)
@@ -525,25 +486,6 @@ namespace moho
    * Unlinks one region from the active chain, clears X/Z tags, and releases
    * map payload instances through the mesh-renderer destroy-instance lane.
    */
-  ClutterRegionMapState* ResetRegionRuntimeState(ClutterRegion* region);
+  ClutterPayloadList* ResetRegionRuntimeState(ClutterRegion* region);
 
-  /**
-   * Address: 0x007D8980 (FUN_007D8980)
-   *
-   * What it does:
-   * Allocates one region-list node and initializes `next/prev/value` lanes.
-   */
-  ClutterRegionListNode* __stdcall AllocateRegionListNode(
-    ClutterRegionListNode* next,
-    ClutterRegionListNode* prev,
-    ClutterRegion* const* valueRef
-  );
-
-  /**
-   * Address: 0x007D89C0 (FUN_007D89C0)
-   *
-   * What it does:
-   * Increments list size with the original `list<T> too long` overflow guard.
-   */
-  std::uint32_t IncrementListSizeChecked(ClutterRegionListState* listState);
 } // namespace moho

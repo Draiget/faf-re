@@ -11254,11 +11254,19 @@ namespace msvc8
             return *it;
         }
 
+        /**
+         * Address: 0x007D7A10 (FUN_007D7A10 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D60D0, 0x007D61E0, 0x007D7FF3; formerly `ClearIntrusiveListNodes` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7820 (FUN_007D7820 -- the region-map list's `clear()` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D5F20, 0x007D5F80, 0x007D7D23; formerly `ClearRegionMapList` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void clear()
         {
             _Tidy();
         }
 
+        /**
+         * Address: 0x007D7CD0 (FUN_007D7CD0 -- `push_back` -- `_Buynode` at the tail sentinel, `_Incsize`, then relink for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AppendPointerListTail` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7F70 (FUN_007D7F70 -- the region list's `push_back` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AppendRegionListTailLaneA` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void push_back(const value_type& v)
         {
             insert(end(), v);
@@ -11563,6 +11571,10 @@ namespace msvc8
          * Address: 0x0049A570 (FUN_0049A570 -- `list<ParticleBuffer*>::_Buynode(next, prev, value)` -- `CWorldParticles::Init` (0x004928A0) pushes the 400 pooled buffers through it, `RecycleAndDestroyParticleBucketWorkItems` (0x00493720) returns them; callers 0x004928A0, 0x00492CA0, 0x00493720; formerly `AllocateLegacyIntrusiveListNode` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          * Address: 0x0049E790 (FUN_0049E790 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(n)` (12-byte node, `bad_alloc` on overflow); callers 0x00497D00, 0x0049A570, 0x0049A670; formerly `AllocateLegacyIntrusiveListNodeStorageArrayOrThrow` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          * Address: 0x005D02F0 (FUN_005D02F0 -- `list<T>::_Buynode(next, prev, value)` for a 4-byte value; callers 0x005CEFC0, 0x005CFDEC, 0x005D0020; formerly `AllocateTripleIntNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D84D0 (FUN_007D84D0 -- `_Buynode(next, prev, value)` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D7430, 0x007D77FC, 0x007D7CD0; formerly `AllocatePointerListNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D9530 (FUN_007D9530 -- the node allocator `_Buynode` calls -- the checked `n * 0x0C` `operator new` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D7D00, 0x007D84D0, 0x007D85C0; formerly `AllocatePointerListStorageChecked` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D8980 (FUN_007D8980 -- the region list's `_Buynode(next, prev, value)` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D6E40, 0x007D7080, 0x007D79EC; formerly `AllocateRegionListNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D85C0 (FUN_007D85C0 -- the one-node tail call into that same node allocator for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AllocateSinglePointerListStorageCheckedAdapter` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -11601,6 +11613,8 @@ namespace msvc8
          * evaluated at `sizeof(value_type) == 4` (a raw pointer/scalar
          * `T`), not an independent fixed bound as previously documented.
          * Address: 0x0049A5B0 (FUN_0049A5B0 -- `list<ParticleBuffer*>::_Incsize` (0x3FFFFFFF guard); callers 0x004928A0, 0x00492CA0, 0x00493720; formerly `IncrementLegacyListSizeCheckedDuplicateC` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x007D89C0 (FUN_007D89C0 -- the region list's `_Incsize`, same guard for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D6E40, 0x007D7080, 0x007D79F5; formerly `IncrementListSizeChecked` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D8510 (FUN_007D8510 -- `_Incsize` with the 0x3FFFFFFF guard for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D7430, 0x007D7805, 0x007D7CD0; formerly `IncrementPointerListSizeChecked` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Incsize(size_type count)
         {
@@ -11637,6 +11651,8 @@ namespace msvc8
          * Address: 0x00497D00 (FUN_00497D00 -- `list<ParticleBuffer*>::_Buy_head` (12-byte self-linked sentinel bought by the member constructors of `CWorldParticles::mParticleBuffers` / `mAvailableParticleBuffers`; 0x00495E60 is an unreached twin caller); callers 0x004925E0, 0x00495E60; formerly `AllocateParticleBufferPoolHeadNode` in moho/particles/CWorldParticles.cpp, removed 2026-09-10.)
          * Address: 0x0049A670 (FUN_0049A670 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(1)` for the sentinel; zero callers, unreachable; formerly `AllocateSingleLegacyListNodeStorage` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          * Address: 0x00739E50 (FUN_00739E50 -- `list<T>::_Buynode()` of the self-linked head sentinel; callers 0x00737680, 0x00737B30, 0x00737ED0; formerly `AllocateSelfLinkedPairNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7FD0 (FUN_007D7FD0 -- `_Buy_head()` -- the self-linked sentinel for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D60D0, 0x007D7940; formerly `AllocateListSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7D00 (FUN_007D7D00 -- the same `_Buy_head()` for the region-map list for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D5EE0, 0x007D7790; formerly `AllocateRegionMapSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Buy_head()
         {
