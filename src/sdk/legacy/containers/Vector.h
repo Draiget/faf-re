@@ -1392,6 +1392,14 @@ namespace msvc8
          * Address: 0x0049D9B0 (FUN_0049D9B0 -- an empty `_Iterator_base`/`_Container_base` body of the release build for `?`; zero callers, unreachable; formerly `NoOpHelperThunkAO` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; No-op helper thunk retained for binary parity.)
          * Address: 0x0049D9C0 (FUN_0049D9C0 -- an empty `_Iterator_base`/`_Container_base` body of the release build for `?`; zero callers, unreachable; formerly `NoOpHelperThunkStdcallF` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; No-op stdcall helper thunk retained for binary parity.)
          * Address: 0x0049D9D0 (FUN_0049D9D0 -- an empty `_Iterator_base`/`_Container_base` body of the release build for `?`; zero callers, unreachable; formerly `NoOpHelperThunkStdcallG` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; No-op stdcall helper thunk retained for binary parity.)
+         * Address: 0x00497CB0 (FUN_00497CB0 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkA` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x00497D40 (FUN_00497D40 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkB` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049AD90 (FUN_0049AD90 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAJ` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049B060 (FUN_0049B060 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAK` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049B330 (FUN_0049B330 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAL` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049B440 (FUN_0049B440 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAM` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049B710 (FUN_0049B710 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAN` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
+         * Address: 0x0049BA30 (FUN_0049BA30 -- an empty `_Iterator_base`/`_Container_base` body of the release build; zero callers, unreachable; formerly `NoOpHelperThunkAO` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; No-op helper thunk retained for binary parity.)
          */
         struct NoDebugProxy {};
 
@@ -1582,6 +1590,8 @@ namespace msvc8
          * Address: 0x0049EAE0 (FUN_0049EAE0 -- the same `uint32` `_Allocate` for 0x0049B7B0.)
          * Address: 0x0049E630 (FUN_0049E630 -- `_Allocate` for the 0xCC-byte `moho::SWorldBeam` element; callers 0x00497530, 0x00499A20. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0049E720 (FUN_0049E720 -- `_Allocate` for the 0x38-byte `BeamRenderVertexRuntime` element; caller 0x0049A1D0.)
+         * Address: 0x0049E460 (FUN_0049E460 -- `allocator<SWorldParticle>::allocate` (140-byte element) for `msvc8::vector<SWorldParticle>`; callers 0x004972A2, 0x00499250, 0x0049960F; formerly `AllocateWorldParticleArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one world-particle array lane (`0x8C` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
+         * Address: 0x0049E530 (FUN_0049E530 -- `allocator<TrailRuntimeView>::allocate` (96-byte element) for `msvc8::vector<TrailRuntimeView>`; callers 0x00497451, 0x00499630, 0x004999BF; formerly `AllocateTrailRuntimeArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one trail-runtime array lane (`0x60` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -10588,6 +10598,10 @@ namespace msvc8
                 return &static_cast<_Node*>(_Ptr)->_Value;
             }
 
+            /**
+             * Address: 0x00495E30 (FUN_00495E30 -- `list<ParticleBuffer*>::iterator::operator++` (12-byte node); zero callers, unreachable; formerly `GetLegacyPoolNodeNext` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Returns the `next` lane from one legacy intrusive-list node.)
+             * Address: 0x004968A0 (FUN_004968A0 -- `list<ParticleBuffer*>::iterator::operator++` slot glue; zero callers, unreachable; formerly `AdvanceLegacyForwardListIterator` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Advances one intrusive forward-list iterator slot to `node->next`.)
+             */
             iterator& operator++()
             {
                 _Ptr = _Ptr->_Next;
@@ -10802,6 +10816,10 @@ namespace msvc8
             return _Mysize == 0;
         }
 
+        /**
+         * Address: 0x00495EC0 (FUN_00495EC0 -- `list<ParticleBuffer*>::size()`; zero callers, unreachable; formerly `GetLegacyPoolListSize` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Returns the node count from one legacy list header lane.)
+         * Address: 0x00495FF0 (FUN_00495FF0 -- `list<ParticleBuffer*>::size()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListSizeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate list-size accessor thunk for the same legacy list layout used by sibling pool lanes.)
+         */
         size_type size() const
         {
             return _Mysize;
@@ -10814,12 +10832,18 @@ namespace msvc8
          * `Address:` block (below) for the binary evidence this formula is
          * keyed on `sizeof(value_type)` and not a fixed bound shared by
          * every instantiation.
+         * Address: 0x0049A6B0 (FUN_0049A6B0 -- `list<ParticleBuffer*>::max_size()` (0xFFFFFFFF / 4); zero callers, unreachable; formerly `GetLegacyContainerMaxElementCount_0x3FFFFFFF` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x0049C5F0 (FUN_0049C5F0 -- `list<T*>::max_size()` (0xFFFFFFFF / 4); zero callers, unreachable; formerly `GetLegacyListMaxElementCount_0x3FFFFFFF_BeamA` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          */
         [[nodiscard]] static constexpr size_type max_size() noexcept
         {
             return static_cast<size_type>(0xFFFFFFFFu) / sizeof(value_type);
         }
 
+        /**
+         * Address: 0x00495EA0 (FUN_00495EA0 -- `list<ParticleBuffer*>::begin()`; zero callers, unreachable; formerly `GetLegacyPoolListBeginNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Writes the begin-node (`head->next`) from one legacy list header into caller storage.)
+         * Address: 0x00495FD0 (FUN_00495FD0 -- `list<ParticleBuffer*>::begin()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListBeginNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate begin-node accessor thunk for the same legacy list layout used by sibling pool lanes.)
+         */
         iterator begin()
         {
             return iterator(_Myhead->_Next);
@@ -10830,6 +10854,10 @@ namespace msvc8
             return const_iterator(_Myhead->_Next);
         }
 
+        /**
+         * Address: 0x00495EB0 (FUN_00495EB0 -- `list<ParticleBuffer*>::end()`; zero callers, unreachable; formerly `GetLegacyPoolListHeadNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Writes the head-sentinel node pointer from one legacy list header into caller storage.)
+         * Address: 0x00495FE0 (FUN_00495FE0 -- `list<ParticleBuffer*>::end()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListHeadNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate head-sentinel accessor thunk for the same legacy list layout used by sibling pool lanes.)
+         */
         iterator end()
         {
             return iterator(_Myhead);
@@ -10897,6 +10925,19 @@ namespace msvc8
         void push_front(const value_type& v)
         {
             insert(begin(), v);
+        }
+
+        /**
+         * Address: 0x004968B0 (FUN_004968B0 -- `list<ParticleBuffer*>::pop_front()` (erase of the head node) glue; zero callers, unreachable; formerly `PopLegacyForwardListHeadNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Pops the head node from one intrusive forward list and exports the removed node to caller storage.)
+         */
+        void pop_front()
+        {
+            erase(begin());
+        }
+
+        void pop_back()
+        {
+            erase(--end());
         }
 
         /**
@@ -11167,6 +11208,8 @@ namespace msvc8
          * factored by the compiler into a standalone body shared between
          * the single-value insert and the range-insert copy loop
          * (`FUN_00933CF0`, cited on `insert(pos, first, last)`).
+         * Address: 0x0049A570 (FUN_0049A570 -- `list<ParticleBuffer*>::_Buynode(next, prev, value)` -- `CWorldParticles::Init` (0x004928A0) pushes the 400 pooled buffers through it, `RecycleAndDestroyParticleBucketWorkItems` (0x00493720) returns them; callers 0x004928A0, 0x00492CA0, 0x00493720; formerly `AllocateLegacyIntrusiveListNode` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x0049E790 (FUN_0049E790 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(n)` (12-byte node, `bad_alloc` on overflow); callers 0x00497D00, 0x0049A570, 0x0049A670; formerly `AllocateLegacyIntrusiveListNodeStorageArrayOrThrow` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -11204,6 +11247,7 @@ namespace msvc8
          * v)`'s `0x3FFFFFFF` single-element cap is this same formula
          * evaluated at `sizeof(value_type) == 4` (a raw pointer/scalar
          * `T`), not an independent fixed bound as previously documented.
+         * Address: 0x0049A5B0 (FUN_0049A5B0 -- `list<ParticleBuffer*>::_Incsize` (0x3FFFFFFF guard); callers 0x004928A0, 0x00492CA0, 0x00493720; formerly `IncrementLegacyListSizeCheckedDuplicateC` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          */
         void _Incsize(size_type count)
         {
@@ -11237,6 +11281,8 @@ namespace msvc8
          * Address: 0x008C5E10 (FUN_008C5E10 -- `list<T>::_Buynode()` for a 12-byte node (`{next, prev, 4-byte value}`): `_Allocate(1)` then `_Next = _Prev = node`.)
          * Address: 0x006866E0 (FUN_006866E0 -- `list<T>::_Buynode()` for a 12-byte node (`{next, prev, 4-byte value}`): `_Allocate(1)` then `_Next = _Prev = node`.)
          * Address: 0x007AEFA0 (FUN_007AEFA0 -- `list<T>::_Buynode()` for a 16-byte node (`{next, prev, 8-byte value}`).)
+         * Address: 0x00497D00 (FUN_00497D00 -- `list<ParticleBuffer*>::_Buy_head` (12-byte self-linked sentinel bought by the member constructors of `CWorldParticles::mParticleBuffers` / `mAvailableParticleBuffers`; 0x00495E60 is an unreached twin caller); callers 0x004925E0, 0x00495E60; formerly `AllocateParticleBufferPoolHeadNode` in moho/particles/CWorldParticles.cpp, removed 2026-09-10.)
+         * Address: 0x0049A670 (FUN_0049A670 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(1)` for the sentinel; zero callers, unreachable; formerly `AllocateSingleLegacyListNodeStorage` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          */
         void _Buy_head()
         {
@@ -11259,6 +11305,9 @@ namespace msvc8
             _Myhead = 0;
         }
 
+        /**
+         * Address: 0x00495F30 (FUN_00495F30 -- `list<ParticleBuffer*>::_Tidy` (the clear / destructor walk; reached from `CWorldParticles::CWorldParticles`'s unwind funclet and `~CWorldParticles`); callers 0x004925E0, 0x00492780, 0x00497D23; formerly `ClearLegacyPoolListNodes` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Clears one legacy intrusive list by unlinking the head sentinel and freeing all non-sentinel nodes.)
+         */
         void _Tidy()
         {
             if (!_Myhead)

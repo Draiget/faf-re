@@ -19,32 +19,6 @@ namespace moho
 
   /**
    * What it does:
-   * One intrusive list node lane used by `CWorldParticles` particle-buffer pools.
-   */
-  struct ParticleBufferPoolNodeRuntime
-  {
-    ParticleBufferPoolNodeRuntime* next = nullptr; // +0x00
-    ParticleBufferPoolNodeRuntime* prev = nullptr; // +0x04
-    ParticleBuffer* value = nullptr;               // +0x08
-  };
-
-  static_assert(sizeof(ParticleBufferPoolNodeRuntime) == 0x0C, "ParticleBufferPoolNodeRuntime size must be 0x0C");
-
-  /**
-   * What it does:
-   * One VC8 debug-list lane used by the owner pool queue.
-   */
-  struct ParticleBufferPoolListRuntime
-  {
-    std::uint32_t iteratorProxy = 0U;                // +0x00
-    ParticleBufferPoolNodeRuntime* head = nullptr;   // +0x04
-    std::uint32_t size = 0U;                         // +0x08
-  };
-
-  static_assert(sizeof(ParticleBufferPoolListRuntime) == 0x0C, "ParticleBufferPoolListRuntime size must be 0x0C");
-
-  /**
-   * What it does:
    * One pooled trail-segment render buffer lane owned by `CWorldParticles`.
    */
   struct TrailSegmentBufferRuntime
@@ -84,38 +58,6 @@ namespace moho
   using TrailSegmentPoolRuntime = msvc8::set<TrailSegmentBufferRuntime*>;
 
   static_assert(sizeof(TrailSegmentPoolRuntime) == 0x0C, "TrailSegmentPoolRuntime size must be 0x0C");
-
-  /**
-   * What it does:
-   * Partial owner view exposing only the particle-buffer pool lane used by
-   * particle bucket work-item helpers.
-   */
-  struct CWorldParticlesParticlePoolRuntimeView
-  {
-    std::uint8_t unknown00_0F[0x10]{};               // +0x00
-    ParticleBufferPoolListRuntime availableBuffers;  // +0x10
-  };
-
-  static_assert(
-    offsetof(CWorldParticlesParticlePoolRuntimeView, availableBuffers) == 0x10,
-    "CWorldParticlesParticlePoolRuntimeView::availableBuffers offset must be 0x10"
-  );
-
-  /**
-   * What it does:
-   * Partial owner view exposing trail-segment pool lane used by trail
-   * work-item paths.
-   */
-  struct CWorldParticlesTrailSegmentPoolRuntimeView
-  {
-    std::uint8_t unknown00_1B[0x1C]{};        // +0x00
-    TrailSegmentPoolRuntime trailSegmentPool; // +0x1C
-  };
-
-  static_assert(
-    offsetof(CWorldParticlesTrailSegmentPoolRuntimeView, trailSegmentPool) == 0x1C,
-    "CWorldParticlesTrailSegmentPoolRuntimeView::trailSegmentPool offset must be 0x1C"
-  );
 
   /**
    * What it does:
@@ -215,38 +157,6 @@ namespace moho
   );
   static_assert(offsetof(TrailRenderBucketRuntime, owner) == 0x54, "TrailRenderBucketRuntime::owner offset must be 0x54");
   static_assert(sizeof(TrailRenderBucketRuntime) == 0x58, "TrailRenderBucketRuntime size must be 0x58");
-
-  /**
-   * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
-   *
-   * What it does:
-   * Appends one particle-buffer pointer into the owner available-buffer pool
-   * list.
-   */
-  std::uint32_t AppendParticleBufferToOwnerAvailablePool(
-    CWorldParticles* owner,
-    ParticleBuffer* particleBuffer
-  );
-
-  /**
-   * Address: 0x00492CE0 (FUN_00492CE0, sub_492CE0)
-   *
-   * What it does:
-   * Pops and returns one trail-segment buffer pointer from the owner pool.
-   * Returns `nullptr` when the pool is empty.
-   */
-  [[nodiscard]] TrailSegmentBufferRuntime* AcquireTrailSegmentBufferFromOwnerPool(CWorldParticles* owner);
-
-  /**
-   * Address: 0x00492D10 (FUN_00492D10, sub_492D10)
-   *
-   * What it does:
-   * Returns one trail-segment buffer pointer back into the owner pool.
-   */
-  void ReturnTrailSegmentBufferToOwnerPool(
-    CWorldParticles* owner,
-    TrailSegmentBufferRuntime* segmentBuffer
-  );
 
   /**
    * Address: 0x00493480 (FUN_00493480, sub_493480)

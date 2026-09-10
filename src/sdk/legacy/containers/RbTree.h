@@ -3251,7 +3251,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00496000 (FUN_00496000, the trail-segment pool's find-or-insert
-             * -- what `ReturnTrailSegmentBufferToOwnerPool` compiles to)
+             * -- what `CWorldParticles::ReleaseTrailSegmentBuffer` compiles to)
              * Address: 0x00497E50 (FUN_00497E50, its link half)
              */
             /**

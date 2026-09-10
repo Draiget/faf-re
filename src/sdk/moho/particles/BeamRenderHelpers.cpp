@@ -427,19 +427,6 @@ namespace
   }
 
   /**
-   * Address: 0x00497CD0 (FUN_00497CD0, sub_497CD0)
-   *
-   * What it does:
-   * Appends one value node to the tail of a legacy intrusive list and
-   * increments the owning list size lane.
-   */
-  [[nodiscard]] std::uint32_t AppendLegacyIntrusiveListNodeTail(
-    void* const* const valueSlot,
-    std::uint32_t* const listSizeSlot,
-    void* const listHeadNodeRaw
-  );
-
-  /**
    * Address: 0x00499DD0 (FUN_00499DD0, nullsub_582)
    *
    * What it does:
@@ -1106,8 +1093,6 @@ namespace
   );
   static_assert(sizeof(LegacyIntrusiveListNodeRuntime) == 0x0C, "LegacyIntrusiveListNodeRuntime size must be 0x0C");
 
-  [[nodiscard]] void* AllocateLegacyIntrusiveListNodeStorageArrayOrThrow(const std::uint32_t elementCount);
-
   /**
    * Address: 0x0049A4E0 (FUN_0049A4E0, nullsub_587)
    *
@@ -1130,47 +1115,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049A570 (FUN_0049A570, sub_49A570)
-   *
-   * What it does:
-   * Allocates one legacy intrusive-list node and initializes `(next, prev,
-   * value)` lanes from caller arguments.
-   */
-  [[nodiscard]] LegacyIntrusiveListNodeRuntime* AllocateLegacyIntrusiveListNode(
-    LegacyIntrusiveListNodeRuntime* const next,
-    LegacyIntrusiveListNodeRuntime* const prev,
-    void* const* const valueSlot
-  )
-  {
-    auto* const node = static_cast<LegacyIntrusiveListNodeRuntime*>(
-      AllocateLegacyIntrusiveListNodeStorageArrayOrThrow(1U)
-    );
-    node->next = next;
-    node->prev = prev;
-    node->value = valueSlot != nullptr ? *valueSlot : nullptr;
-    return node;
-  }
-
-  /**
-   * Address: 0x0049A5B0 (FUN_0049A5B0, sub_49A5B0)
-   *
-   * What it does:
-   * Increments one legacy list size lane with overflow guard.
-   */
-  [[nodiscard]] std::uint32_t IncrementLegacyListSizeCheckedDuplicateC(
-    std::uint32_t* const listSizeSlot
-  )
-  {
-    constexpr std::uint32_t kLegacyListMaxSize = 0x3FFFFFFFU;
-    if (*listSizeSlot == kLegacyListMaxSize) {
-      throw std::length_error("list<T> too long");
-    }
-
-    ++(*listSizeSlot);
-    return *listSizeSlot;
-  }
-
-  /**
    * Address: 0x0049A650 (FUN_0049A650, nullsub_588)
    *
    * What it does:
@@ -1187,34 +1131,12 @@ namespace
   void NoOpHelperThunkAF() noexcept {}
 
   /**
-   * Address: 0x0049A670 (FUN_0049A670, sub_49A670)
-   *
-   * What it does:
-   * Allocates storage for one legacy intrusive-list node lane.
-   */
-  [[nodiscard]] void* AllocateSingleLegacyListNodeStorage()
-  {
-    return AllocateLegacyIntrusiveListNodeStorageArrayOrThrow(1U);
-  }
-
-  /**
    * Address: 0x0049A690 (FUN_0049A690, nullsub_590)
    *
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkAG() noexcept {}
-
-  /**
-   * Address: 0x0049A6B0 (FUN_0049A6B0, sub_49A6B0)
-   *
-   * What it does:
-   * Returns the legacy maximum container element count constant (`0x3FFFFFFF`).
-   */
-  [[nodiscard]] std::uint32_t GetLegacyContainerMaxElementCount_0x3FFFFFFF() noexcept
-  {
-    return 0x3FFFFFFFU;
-  }
 
   /**
    * Address: 0x0049A7F0 (FUN_0049A7F0, nullsub_591)
@@ -1241,25 +1163,6 @@ namespace
   void NoOpHelperThunkAI() noexcept {}
 
   /**
-   * Address: 0x0049E790 (FUN_0049E790, sub_49E790)
-   *
-   * What it does:
-   * Allocates one legacy intrusive-list node storage lane (`0x0C` bytes per
-   * element) and throws `std::bad_alloc` on legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateLegacyIntrusiveListNodeStorageArrayOrThrow(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kLegacyListNodeSize = sizeof(LegacyIntrusiveListNodeRuntime);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kLegacyListNodeSize) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kLegacyListNodeSize);
-  }
-
-  /**
    * Address: 0x0049E7F0 (FUN_0049E7F0, nullsub_632)
    *
    * What it does:
@@ -1282,20 +1185,6 @@ namespace
    * No-op helper thunk retained for binary parity.
    */
   [[maybe_unused]] void NoOpHelperThunkAS() noexcept {}
-
-  [[nodiscard]] std::uint32_t AppendLegacyIntrusiveListNodeTail(
-    void* const* const valueSlot,
-    std::uint32_t* const listSizeSlot,
-    void* const listHeadNodeRaw
-  )
-  {
-    auto* const listHeadNode = static_cast<LegacyIntrusiveListNodeRuntime*>(listHeadNodeRaw);
-    auto* const node = AllocateLegacyIntrusiveListNode(listHeadNode, listHeadNode->prev, valueSlot);
-    const std::uint32_t newSize = IncrementLegacyListSizeCheckedDuplicateC(listSizeSlot);
-    listHeadNode->prev = node;
-    node->prev->next = node;
-    return newSize;
-  }
 
   [[nodiscard]] moho::ShaderVar& GetParticleTexture0ShaderVar()
   {
@@ -1503,17 +1392,6 @@ namespace moho
   [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x4444444_DuplicateA() noexcept
   {
     return 0x04444444U;
-  }
-
-  /**
-   * Address: 0x0049C5F0 (FUN_0049C5F0, sub_49C5F0)
-   *
-   * What it does:
-   * Returns one fixed legacy list-size cap constant.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyListMaxElementCount_0x3FFFFFFF_BeamA() noexcept
-  {
-    return 0x3FFFFFFFU;
   }
 
   /**

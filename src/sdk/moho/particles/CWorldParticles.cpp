@@ -47,7 +47,7 @@ namespace moho
 
 namespace
 {
-  constexpr std::uint32_t kLegacyListMaxSize = 0x3FFFFFFFU;
+
 
   constexpr int kPooledParticleBufferCount = 400;
   constexpr int kParticleBufferCapacity = 200;
@@ -420,35 +420,6 @@ namespace
     }
   }
 
-  void DestroyParticleBufferPoolListNodes(
-    moho::ParticleBufferPoolListRuntime& listRuntime,
-    const bool destroyValues
-  )
-  {
-    if (listRuntime.head == nullptr) {
-      listRuntime.size = 0U;
-      return;
-    }
-
-    auto* const head = listRuntime.head;
-    auto* node = head->next;
-    while (node != nullptr && node != head) {
-      auto* const next = node->next;
-      if (destroyValues && node->value != nullptr) {
-        delete node->value;
-        node->value = nullptr;
-      }
-
-      ::operator delete(node);
-      node = next;
-    }
-
-    head->next = head;
-    head->prev = head;
-    head->value = nullptr;
-    listRuntime.size = 0U;
-  }
-
   /**
    * Frees the buffers the pool owns. The binary recurses the tree and deletes
    * each node as it goes; with a real container the node teardown belongs to
@@ -465,37 +436,6 @@ namespace
       segmentBuffer->vertexSheet = nullptr;
       ::operator delete(segmentBuffer);
     }
-  }
-
-  void ResetTrailSegmentPool(moho::TrailSegmentPoolRuntime& poolRuntime) noexcept
-  {
-    ReleaseTrailSegmentPoolBuffers(poolRuntime);
-    poolRuntime.clear();
-  }
-
-  void ReleaseParticleBufferPoolListStorage(
-    moho::ParticleBufferPoolListRuntime& listRuntime
-  ) noexcept
-  {
-    if (listRuntime.head == nullptr) {
-      listRuntime.size = 0U;
-      return;
-    }
-
-    DestroyParticleBufferPoolListNodes(listRuntime, false);
-    ::operator delete(listRuntime.head);
-    listRuntime.head = nullptr;
-    listRuntime.size = 0U;
-  }
-
-  void ReleaseTrailSegmentPoolStorage(
-    moho::TrailSegmentPoolRuntime& poolRuntime
-  ) noexcept
-  {
-    // The binary frees the sentinel head too; that lifetime now belongs to
-    // the container, which releases it in its own destructor.
-    ReleaseTrailSegmentPoolBuffers(poolRuntime);
-    poolRuntime.clear();
   }
 
   /**
@@ -1020,24 +960,6 @@ namespace
   }
 
   /**
-   * Address: 0x00497D00 (FUN_00497D00, sub_497D00)
-   *
-   * What it does:
-   * Allocates one self-linked list-head node lane for legacy intrusive
-   * particle-buffer pools.
-   */
-  [[nodiscard]] moho::ParticleBufferPoolNodeRuntime* AllocateParticleBufferPoolHeadNode()
-  {
-    auto* const head = static_cast<moho::ParticleBufferPoolNodeRuntime*>(
-      ::operator new(sizeof(moho::ParticleBufferPoolNodeRuntime))
-    );
-    head->next = head;
-    head->prev = head;
-    head->value = nullptr;
-    return head;
-  }
-
-  /**
    * Address: 0x00498350 (FUN_00498350, sub_498350)
    *
    * What it does:
@@ -1292,29 +1214,6 @@ namespace
     head->color = 1U;
     head->isNil = 1U;
     return head;
-  }
-
-  void InitializeParticleBufferPoolList(moho::ParticleBufferPoolListRuntime& listRuntime)
-  {
-    if (listRuntime.head == nullptr) {
-      listRuntime.head = AllocateParticleBufferPoolHeadNode();
-    } else {
-      listRuntime.head->next = listRuntime.head;
-      listRuntime.head->prev = listRuntime.head;
-      listRuntime.head->value = nullptr;
-    }
-    listRuntime.size = 0U;
-  }
-
-  void InitializeTrailSegmentPool(moho::TrailSegmentPoolRuntime& poolRuntime)
-  {
-    // `msvc8::set`'s constructor seats the sentinel head and zeroes the
-    // size; the binary open-codes both branches of that here. Callers must
-    // ensure `poolRuntime` has already been through a real construction
-    // (placement-new or normal member init) before reaching this -- `clear()`
-    // dereferences `root() == head_->parent` unconditionally and does not
-    // tolerate a still-zeroed `head_`.
-    poolRuntime.clear();
   }
 
   void InitializeParticleBucketTree(moho::ParticleBucketTreeRuntime& treeRuntime)
@@ -3655,29 +3554,6 @@ namespace
     return std::memcmp(lhs.data(), rhs, rhsLength) != 0;
   }
 
-  void AppendParticleBufferToPoolList(
-    moho::ParticleBufferPoolListRuntime& poolRuntime,
-    moho::ParticleBuffer* const particleBuffer
-  )
-  {
-    if (poolRuntime.head == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::ParticleBufferPoolNodeRuntime*>(
-      ::operator new(sizeof(moho::ParticleBufferPoolNodeRuntime))
-    );
-    node->next = poolRuntime.head;
-    node->prev = poolRuntime.head->prev;
-    node->value = particleBuffer;
-
-    if (poolRuntime.size < kLegacyListMaxSize) {
-      ++poolRuntime.size;
-    }
-
-    poolRuntime.head->prev = node;
-    node->prev->next = node;
-  }
 } // namespace
 
 namespace moho
@@ -3790,18 +3666,11 @@ namespace moho
    */
   CWorldParticles::CWorldParticles()
   {
+    // mParticleBuffers, mAvailableParticleBuffers and mTrailSegmentPool are
+    // built by their member constructors: the binary buys the two list heads
+    // through 0x00497D00 (`_Buy_head`) and the set head through 0x0049C620
+    // before this body runs.
     auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
-
-    InitializeParticleBufferPoolList(runtime.allParticleBuffers);
-    InitializeParticleBufferPoolList(runtime.availableParticleBuffers);
-    // `trailSegmentPool` is a real `msvc8::set<TrailSegmentBufferRuntime*>`,
-    // reached here through `CWorldParticlesRuntimeView`'s reinterpret_cast
-    // over this object's raw storage -- unlike its POD `*Runtime` siblings
-    // above, its own constructor (which seats the sentinel head via
-    // `buy_head()`) never runs through that reach-in. Placement-construct
-    // it for real before any other code (including `InitializeTrailSegmentPool`
-    // itself, on a later `Init()` call) touches it.
-    new (&runtime.trailSegmentPool) moho::TrailSegmentPoolRuntime();
 
     InitializeParticleBucketTree(runtime.particleBuckets);
     InitializeParticleBucketTree(runtime.refractingParticleBuckets);
@@ -3839,10 +3708,66 @@ namespace moho
     ReleaseTrailBucketTreeStorage(runtime.trailBuckets);
     ReleaseParticleBucketTreeStorage(runtime.refractingParticleBuckets);
     ReleaseParticleBucketTreeStorage(runtime.particleBuckets);
+    // mTrailSegmentPool (`erase(begin(), end())` 0x0049A6C0 + head free),
+    // mAvailableParticleBuffers and mParticleBuffers (`_Tidy` 0x00495F30 +
+    // head free) are destroyed by their member destructors after this body.
+  }
 
-    ReleaseTrailSegmentPoolStorage(runtime.trailSegmentPool);
-    ReleaseParticleBufferPoolListStorage(runtime.availableParticleBuffers);
-    ReleaseParticleBufferPoolListStorage(runtime.allParticleBuffers);
+  ParticleBuffer* CWorldParticles::AcquireParticleBuffer()
+  {
+    if (mAvailableParticleBuffers.empty()) {
+      return nullptr;
+    }
+
+    ParticleBuffer* const particleBuffer = mAvailableParticleBuffers.front();
+    mAvailableParticleBuffers.pop_front();
+    return particleBuffer;
+  }
+
+  /**
+   * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
+   *
+   * What it does:
+   * Returns one particle buffer to the available pool
+   * (`mAvailableParticleBuffers.push_back`: `_Buynode` 0x0049A570 and
+   * `_Incsize` 0x0049A5B0 on Vector.h).
+   */
+  void CWorldParticles::ReleaseParticleBuffer(ParticleBuffer* const particleBuffer)
+  {
+    mAvailableParticleBuffers.push_back(particleBuffer);
+  }
+
+  /**
+   * Address: 0x00492CE0 (FUN_00492CE0, sub_492CE0)
+   *
+   * What it does:
+   * Takes the lowest-addressed pooled trail-segment buffer out of
+   * `mTrailSegmentPool`; `nullptr` when the pool is empty.
+   */
+  TrailSegmentBufferRuntime* CWorldParticles::AcquireTrailSegmentBuffer()
+  {
+    if (mTrailSegmentPool.empty()) {
+      return nullptr;
+    }
+
+    // The binary takes the leftmost node, keeps its buffer and erases it,
+    // discarding the successor the erase hands back.
+    const auto first = mTrailSegmentPool.begin();
+    TrailSegmentBufferRuntime* const segmentBuffer = *first;
+    (void)mTrailSegmentPool.erase(first);
+    return segmentBuffer;
+  }
+
+  /**
+   * Address: 0x00492D10 (FUN_00492D10, sub_492D10)
+   *
+   * What it does:
+   * Returns one trail-segment buffer to `mTrailSegmentPool`
+   * (`set::insert`, 0x00496000 on RbTree.h).
+   */
+  void CWorldParticles::ReleaseTrailSegmentBuffer(TrailSegmentBufferRuntime* const segmentBuffer)
+  {
+    (void)mTrailSegmentPool.insert(segmentBuffer);
   }
 
   /**
@@ -4206,11 +4131,6 @@ namespace moho
 
     mInstantiated = true;
 
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
-    InitializeParticleBufferPoolList(runtime.allParticleBuffers);
-    InitializeParticleBufferPoolList(runtime.availableParticleBuffers);
-    InitializeTrailSegmentPool(runtime.trailSegmentPool);
-
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
     CD3DVertexFormat* const trailVertexFormat = resources->GetVertexFormat(kTrailVertexFormatToken);
@@ -4220,8 +4140,8 @@ namespace moho
       particleBuffer->Shutdown();
       particleBuffer->mMaxParticles = kParticleBufferCapacity;
 
-      AppendParticleBufferToPoolList(runtime.availableParticleBuffers, particleBuffer);
-      AppendParticleBufferToPoolList(runtime.allParticleBuffers, particleBuffer);
+      mAvailableParticleBuffers.push_back(particleBuffer);
+      mParticleBuffers.push_back(particleBuffer);
     }
 
     for (int bufferIndex = 0; bufferIndex < kPooledTrailSegmentBufferCount; ++bufferIndex) {
@@ -4241,7 +4161,7 @@ namespace moho
         (void)RebuildSharedTrailQuadIndexSheet();
       }
 
-      ReturnTrailSegmentBufferToOwnerPool(this, segmentBuffer);
+      (void)mTrailSegmentPool.insert(segmentBuffer);
     }
   }
 
@@ -4317,24 +4237,17 @@ namespace moho
    */
   void DestroyWorldParticlesSingleton()
   {
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(sWorldParticles);
-
-    if (runtime.allParticleBuffers.head != nullptr) {
-      auto* const head = runtime.allParticleBuffers.head;
-      for (auto* node = head->next; node != nullptr && node != head; node = node->next) {
-        if (node->value != nullptr) {
-          delete node->value;
-          node->value = nullptr;
-        }
-      }
+    for (ParticleBuffer* const particleBuffer : sWorldParticles.mParticleBuffers) {
+      delete particleBuffer;
     }
+    sWorldParticles.mParticleBuffers.clear();
+    sWorldParticles.mAvailableParticleBuffers.clear();
 
-    DestroyParticleBufferPoolListNodes(runtime.availableParticleBuffers, false);
-    DestroyParticleBufferPoolListNodes(runtime.allParticleBuffers, false);
-    ResetTrailSegmentPool(runtime.trailSegmentPool);
+    ReleaseTrailSegmentPoolBuffers(sWorldParticles.mTrailSegmentPool);
+    sWorldParticles.mTrailSegmentPool.clear();
 
-    runtime.beatsSincePause = 0;
-    runtime.instantiated = false;
+    sWorldParticles.mBeatsSincePause = 0;
+    sWorldParticles.mInstantiated = false;
   }
 
   /**

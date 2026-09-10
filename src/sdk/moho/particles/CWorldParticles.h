@@ -128,8 +128,8 @@ namespace moho
   struct CWorldParticlesRuntimeView
   {
     void* vtable = nullptr;                                 // +0x00
-    ParticleBufferPoolListRuntime allParticleBuffers;       // +0x04
-    ParticleBufferPoolListRuntime availableParticleBuffers; // +0x10
+    msvc8::list<ParticleBuffer*> allParticleBuffers;       // +0x04
+    msvc8::list<ParticleBuffer*> availableParticleBuffers; // +0x10
     TrailSegmentPoolRuntime trailSegmentPool;               // +0x1C
     ParticleBucketTreeRuntime particleBuckets;              // +0x28
     ParticleBucketTreeRuntime refractingParticleBuckets;    // +0x34
@@ -226,6 +226,40 @@ namespace moho
     void Init();
 
     /**
+     * Pops the next free particle buffer from `mAvailableParticleBuffers`, or
+     * returns `nullptr` when the pool is empty. The binary inlines this
+     * `front()` / `pop_front()` pair into `EnsureAndFillParticleBucketWorkItems`
+     * (0x00493940).
+     */
+    [[nodiscard]] ParticleBuffer* AcquireParticleBuffer();
+
+    /**
+     * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
+     *
+     * What it does:
+     * Returns one particle buffer to the available pool
+     * (`mAvailableParticleBuffers.push_back`).
+     */
+    void ReleaseParticleBuffer(ParticleBuffer* particleBuffer);
+
+    /**
+     * Address: 0x00492CE0 (FUN_00492CE0, sub_492CE0)
+     *
+     * What it does:
+     * Takes the lowest-addressed pooled trail-segment buffer out of
+     * `mTrailSegmentPool`; `nullptr` when the pool is empty.
+     */
+    [[nodiscard]] TrailSegmentBufferRuntime* AcquireTrailSegmentBuffer();
+
+    /**
+     * Address: 0x00492D10 (FUN_00492D10, sub_492D10)
+     *
+     * What it does:
+     * Returns one trail-segment buffer to `mTrailSegmentPool`.
+     */
+    void ReleaseTrailSegmentBuffer(TrailSegmentBufferRuntime* segmentBuffer);
+
+    /**
      * Address: 0x00492D30 (FUN_00492D30)
      * Mangled: ?AddBeam@CWorldParticles@Moho@@UAEXPBUSWorldBeam@2@@Z
      *
@@ -312,6 +346,7 @@ namespace moho
 
   private:
     friend void ResetWorldParticlesRuntimeState(CWorldParticles& worldParticles);
+    friend void DestroyWorldParticlesSingleton();
 
     /**
      * Address: 0x00493090 (FUN_00493090, sub_493090)
@@ -322,7 +357,17 @@ namespace moho
      */
     void ShutdownBeamBuckets();
 
-    std::uint8_t mUnknown04_C3[0xC0]{};     // +0x04
+    /**
+     * Every pooled particle buffer (IDA: `mParticleBuffers`) and the subset not
+     * bound to a render work item. Both list heads are bought by the member
+     * constructors (`_Buy_head`, 0x00497D00) before the constructor body runs;
+     * `~CWorldParticles` tears them down through `_Tidy` (0x00495F30).
+     */
+    msvc8::list<ParticleBuffer*> mParticleBuffers;            // +0x04
+    msvc8::list<ParticleBuffer*> mAvailableParticleBuffers;   // +0x10
+    /** Pooled trail-segment vertex buffers (head bought through 0x0049C620). */
+    msvc8::set<TrailSegmentBufferRuntime*> mTrailSegmentPool; // +0x1C
+    std::uint8_t mUnknown28_C3[0x9C]{};     // +0x28  bucket maps + lookup keys, see CWorldParticlesRuntimeView
     std::int32_t mBeatsSincePause = 0;      // +0xC4
     bool mInstantiated = false;             // +0xC8
     std::uint8_t mPaddingC9_CB[0x03]{};     // +0xC9
