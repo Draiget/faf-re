@@ -543,7 +543,7 @@ namespace
      */
     static void Deserialize(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto& vec = *reinterpret_cast<gpg::fastvector<moho::SCondition>*>(objectPtr);
+      auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       unsigned int count = 0;
       archive->ReadUInt(&count);
 
@@ -565,7 +565,7 @@ namespace
      */
     static void Serialize(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto& vec = *reinterpret_cast<gpg::fastvector<moho::SCondition>*>(objectPtr);
+      auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       const unsigned int count = static_cast<unsigned int>(vec.size());
       archive->WriteUInt(count);
 
@@ -592,7 +592,7 @@ namespace
         return out;
       }
 
-      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
+      auto& vec = *static_cast<gpg::fastvector_n<moho::SCondition, 2>*>(obj);
       if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= vec.size()) {
         return out;
       }
@@ -607,7 +607,7 @@ namespace
         return 0u;
       }
 
-      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
+      auto& vec = *static_cast<gpg::fastvector_n<moho::SCondition, 2>*>(obj);
       return vec.size();
     }
 
@@ -624,7 +624,7 @@ namespace
         return;
       }
 
-      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
+      auto& vec = *static_cast<gpg::fastvector_n<moho::SCondition, 2>*>(obj);
       const moho::SCondition fill{};
       vec.Resize(static_cast<unsigned int>(count), fill);
     }
@@ -1483,58 +1483,6 @@ namespace
     return &gMapStringArmyStatItemPtrTypeInfo;
   }
 
-  /**
-   * Address: 0x0070FAD0 (FUN_0070FAD0, gpg::fastvector_SCondition::insert_range)
-   *
-   * IDA signature:
-   * void __stdcall sub_70FAD0(_DWORD *a1, int a2, int a3, int a4);
-   *
-   * What it does:
-   * Per-T named helper for the engine-instantiated
-   * `gpg::fastvector<moho::SCondition>::insert_range` emission (stride 56).
-   * Inserts the source range `[sourceBegin, sourceEnd)` into `view` at
-   * `insertPos`, growing storage when the active size would exceed capacity.
-   *
-   * The body forwards to the templated `gpg::FastVectorRuntimeInsertRange`
-   * specialized for `moho::SCondition`; the named per-T wrapper preserves
-   * the out-of-line symbol that the linker would otherwise drop when the
-   * caller-side `FastVectorRuntimeInsertRange<SCondition>(...)` call is
-   * inlined by modern compilers.
-   *
-   * Caller: `FastVectorSConditionPushBack` (FUN_0070E8F0) — the grow-path
-   * branch of the `gpg::fastvector<SCondition>::push_back` body.
-   */
-  void FastVectorSConditionInsertRange(
-    gpg::fastvector_runtime_view<moho::SCondition>& view,
-    moho::SCondition* const insertPos,
-    const moho::SCondition* const sourceBegin,
-    const moho::SCondition* const sourceEnd
-  )
-  {
-    (void)gpg::FastVectorRuntimeInsertRange(view, insertPos, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x0070E8F0 (FUN_0070E8F0, gpg::fastvector_SCondition::push_back)
-   *
-   * What it does:
-   * Appends one `SCondition` to the legacy fastvector lane. When the lane is
-   * full it grows through the per-T named insert-range helper (which keeps
-   * the FUN_0070FAD0 symbol bound); otherwise it copies into the current
-   * end slot and advances `end`.
-   */
-  void FastVectorSConditionPushBack(gpg::fastvector_runtime_view<moho::SCondition>& vector, const moho::SCondition& value)
-  {
-    if (vector.end == vector.capacityEnd) {
-      FastVectorSConditionInsertRange(vector, vector.end, &value, &value + 1);
-      return;
-    }
-
-    if (vector.end != nullptr) {
-      *vector.end = value;
-    }
-    ++vector.end;
-  }
 } // namespace
 
 namespace moho

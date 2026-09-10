@@ -1380,7 +1380,9 @@ namespace moho
     condition.mVal = triggerValue;
     condition.mOp = triggerOperator;
 
-    gpg::FastVectorRuntimeInsertRange(trigger->mConditions, trigger->mConditions.end, &condition, &condition + 1);
+    // `fastvector<SCondition>::push_back` (0x0070E8F0) and its grow arm
+    // `insert_range` (0x0070FAD0), both cited on FastVector.h.
+    trigger->mConditions.push_back(condition);
   }
 
   /**
@@ -1456,15 +1458,15 @@ namespace moho
         continue;
       }
 
-      auto& conditions = node->trigger->mConditions;
-      if (conditions.begin == nullptr || conditions.end == nullptr || conditions.begin == conditions.end) {
+      const auto& conditions = node->trigger->mConditions;
+      if (conditions.Empty()) {
         continue;
       }
 
       bool allConditionsSatisfied = true;
-      for (const SCondition* condition = conditions.begin; condition != conditions.end; ++condition) {
-        const float conditionValue = ResolveConditionValue(*condition);
-        if (!EvaluateCondition(*condition, conditionValue)) {
+      for (const SCondition& condition : conditions) {
+        const float conditionValue = ResolveConditionValue(condition);
+        if (!EvaluateCondition(condition, conditionValue)) {
           allConditionsSatisfied = false;
           break;
         }
