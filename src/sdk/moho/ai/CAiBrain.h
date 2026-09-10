@@ -2176,7 +2176,7 @@ namespace moho
    * id is unknown.
    */
   [[nodiscard]] Unit* FindAvailableFactory(
-    gpg::core::FastVector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
+    const msvc8::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
   );
 } // namespace moho
 

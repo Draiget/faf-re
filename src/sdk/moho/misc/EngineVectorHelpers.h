@@ -79,25 +79,7 @@ namespace moho
   void AssignCopyVectorUint32(msvc8::vector<std::uint32_t>& destination,
                               const msvc8::vector<std::uint32_t>& source);
 
-  /**
-   * Address: 0x0057E550 (FUN_0057E550, func_FastvecUnitToStdVec)
-   *
-   * IDA signature:
-   * std::vector_Unit *__thiscall func_FastvecUnitToStdVec(
-   *     gpg::fastvector_Unit *this, std::vector_Unit *a2);
-   *
-   * What it does:
-   * Engine helper that snapshots a `gpg::fastvector<Moho::Unit*>` lane into a
-   * fresh `std::vector<Moho::Unit*>`. Initializes the destination triplet to
-   * empty, then if the source is non-empty allocates fresh storage sized to
-   * the source's element count and bulk-copies the pointer range
-   * `[start_, end_)` into it.
-   *
-   * Caller: Moho::FindAvailableFactory (0x0057AC30) — the entry-point
-   * snapshot of the candidate list before the buildability scan.
-   */
-  void CopyFastvectorUnitToStdVector(const gpg::fastvector<Unit*>& source,
-                                     std::vector<Unit*>& destination);
+
 
   /**
    * Address: 0x007AE840 (FUN_007AE840, msvc8::vector<Moho::CameraImpl*>::vector(const vector&))
