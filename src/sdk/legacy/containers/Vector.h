@@ -3418,6 +3418,9 @@ namespace msvc8
          * Address: 0x005ECE80 (FUN_005ECE80 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00508B70 (FUN_00508B70 -- `swap` of the three pointers for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `SwapDelayedSubVizStoragePointersVariant1` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508DB0 (FUN_00508DB0 -- forwarding copy of that swap; zero callers. Formerly `SwapDelayedSubVizStoragePointersVariant2`.)
+         * Address: 0x00513940 (FUN_00513940 -- the packed-header half of that same element swap for `msvc8::vector<moho::SNamedFootprint>`'s element operations for the footprint scalar block; zero callers, unreachable; formerly `SwapFootprintPackedHeaderWord` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005133E0 (FUN_005133E0 -- the element-wise `swap` a sort runs over the footprint scalar block for `msvc8::vector<moho::SNamedFootprint>`'s element operations for the footprint scalar block; zero callers, unreachable; formerly `SwapFootprintScalarTailWordsA` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00513480 (FUN_00513480 -- a second emission of that element swap for `msvc8::vector<moho::SNamedFootprint>`'s element operations for the footprint scalar block; zero callers, unreachable; formerly `SwapFootprintScalarTailWordsB` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         void swap(vector& other) noexcept {
             T* const otherFirst = other.first_;
@@ -9848,6 +9851,8 @@ namespace msvc8
          * Address: 0x006ECA10 (FUN_006ECA10 -- the per-element `operator=` that move runs for `msvc8::vector<moho::SSTICommandConstantData>` (the command constant-data vector); zero callers, unreachable; formerly `CopySSTICommandConstantDataLane` in moho/command/SSTICommandConstantData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006ECA80 (FUN_006ECA80 -- the per-element `operator=` that move runs for `msvc8::vector<moho::SSTICommandConstantData>` (the command constant-data vector); zero callers, unreachable; formerly `CopySSTICommandConstantDataLane` in moho/command/SSTICommandConstantData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006ECB40 (FUN_006ECB40 -- the null-guarded form of that element assignment for `msvc8::vector<moho::SSTICommandConstantData>` (the command constant-data vector); zero callers, unreachable; formerly `CopySSTICommandConstantDataLaneIfPresent` in moho/command/SSTICommandConstantData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005145F0 (FUN_005145F0 -- the per-element assignment for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `CopySNamedFootprintIfTargetPresentA` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00514820 (FUN_00514820 -- a second emission of that assignment for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `CopySNamedFootprintIfTargetPresentB` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -11072,6 +11077,9 @@ namespace msvc8
              * Address: 0x00687860 (FUN_00687860 -- a second emission of that increment for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `AdvanceForwardLinkSlotSecondary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00687870 (FUN_00687870 -- an iterator reset to null for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ClearForwardLinkSlotPrimary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x006886B0 (FUN_006886B0 -- a second emission of that reset for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ClearForwardLinkSlotSecondary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005143B0 (FUN_005143B0 -- `operator++` for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `AdvanceSNamedFootprintNodeCursor` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00514480 (FUN_00514480 -- iterator assignment for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintNodeCursorA` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005145D0 (FUN_005145D0 -- a second emission of that assignment for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintNodeCursorB` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
              */
             iterator& operator++()
             {
@@ -11305,6 +11313,7 @@ namespace msvc8
          * every instantiation.
          * Address: 0x0049A6B0 (FUN_0049A6B0 -- `list<ParticleBuffer*>::max_size()` (0xFFFFFFFF / 4); zero callers, unreachable; formerly `GetLegacyContainerMaxElementCount_0x3FFFFFFF` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          * Address: 0x0049C5F0 (FUN_0049C5F0 -- `list<T*>::max_size()` (0xFFFFFFFF / 4); zero callers, unreachable; formerly `GetLegacyListMaxElementCount_0x3FFFFFFF_BeamA` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x00514670 (FUN_00514670 -- `max_size()` -- 0x05555555, i.e. 0xFFFFFFFF / 0x30 for this node for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `SNamedFootprintLegacyMarkerValue` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] static constexpr size_type max_size() noexcept
         {
@@ -11314,6 +11323,7 @@ namespace msvc8
         /**
          * Address: 0x00495EA0 (FUN_00495EA0 -- `list<ParticleBuffer*>::begin()`; zero callers, unreachable; formerly `GetLegacyPoolListBeginNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Writes the begin-node (`head->next`) from one legacy list header into caller storage.)
          * Address: 0x00495FD0 (FUN_00495FD0 -- `list<ParticleBuffer*>::begin()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListBeginNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate begin-node accessor thunk for the same legacy list layout used by sibling pool lanes.)
+         * Address: 0x005142F0 (FUN_005142F0 -- `begin()` written through a caller slot for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListBeginCursor` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator begin()
         {
@@ -11328,6 +11338,8 @@ namespace msvc8
         /**
          * Address: 0x00495EB0 (FUN_00495EB0 -- `list<ParticleBuffer*>::end()`; zero callers, unreachable; formerly `GetLegacyPoolListHeadNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Writes the head-sentinel node pointer from one legacy list header into caller storage.)
          * Address: 0x00495FE0 (FUN_00495FE0 -- `list<ParticleBuffer*>::end()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListHeadNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate head-sentinel accessor thunk for the same legacy list layout used by sibling pool lanes.)
+         * Address: 0x00514300 (FUN_00514300 -- `end()` written through a caller slot for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListSentinelCursorA` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00514400 (FUN_00514400 -- a second emission of that `end()` export for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListSentinelCursorB` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator end()
         {
@@ -11397,6 +11409,7 @@ namespace msvc8
         /**
          * Address: 0x007D7CD0 (FUN_007D7CD0 -- `push_back` -- `_Buynode` at the tail sentinel, `_Incsize`, then relink for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AppendPointerListTail` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D7F70 (FUN_007D7F70 -- the region list's `push_back` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AppendRegionListTailLaneA` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00514410 (FUN_00514410 -- `push_back` -- buy the node, link it before the sentinel, bump the size for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `InsertRuleFootprintBeforeSentinel` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         void push_back(const value_type& v)
         {
@@ -11709,6 +11722,7 @@ namespace msvc8
          * Address: 0x007D9530 (FUN_007D9530 -- the node allocator `_Buynode` calls -- the checked `n * 0x0C` `operator new` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D7D00, 0x007D84D0, 0x007D85C0; formerly `AllocatePointerListStorageChecked` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D8980 (FUN_007D8980 -- the region list's `_Buynode(next, prev, value)` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D6E40, 0x007D7080, 0x007D79EC; formerly `AllocateRegionListNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D85C0 (FUN_007D85C0 -- the one-node tail call into that same node allocator for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); zero callers, unreachable; formerly `AllocateSinglePointerListStorageCheckedAdapter` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005144A0 (FUN_005144A0 -- `_Buynode(next, prev, value)` for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x00514110, 0x0051431C, 0x00514410; formerly `CreateSRuleFootprintNode` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -11788,6 +11802,8 @@ namespace msvc8
          * Address: 0x007D7FD0 (FUN_007D7FD0 -- `_Buy_head()` -- the self-linked sentinel for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D60D0, 0x007D7940; formerly `AllocateListSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D7D00 (FUN_007D7D00 -- the same `_Buy_head()` for the region-map list for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D5EE0, 0x007D7790; formerly `AllocateRegionMapSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006858A0 (FUN_006858A0 -- the header sentinel's self-link, the second half of `_Buy_head` for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ResetListNodeSelfLinks` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0052CB30 (FUN_0052CB30 -- `_Buy_head()` -- the self-linked sentinel for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x00529120, 0x00529550, 0x0052BAC0; formerly `AllocateSelfLinkedSRuleFootprintSentinelNode` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00529550 (FUN_00529550 -- the list constructor that buys it for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `InitializeSRuleFootprintsBlueprintList` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Buy_head()
         {
@@ -11816,6 +11832,7 @@ namespace msvc8
          * Address: 0x00932760 (FUN_00932760 -- `list<T>::clear()` / `_Tidy`; callers 0x00932D40 (unreached); formerly `ClearIntrusiveNodeListRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004E5A00 (FUN_004E5A00 -- the detached-chain teardown: unlink every node, then free the head for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; zero callers, unreachable; formerly `DestroyDetachedSndVarChainHead` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004E2630 (FUN_004E2630 -- `~list()` -- `_Tidy` then free the header for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004E1A60; formerly `DestroySndVarListStorageAndReleaseHead` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00514340 (FUN_00514340 -- `clear()` / `_Tidy` -- relink the header, zero the size, free the nodes for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x00514110, 0x00529120, 0x00529700; formerly `ClearSNamedFootprintListNodeRing` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Tidy()
         {
