@@ -20487,6 +20487,13 @@ moho::CUIWorldView::~CUIWorldView()
 
   view->mCameraTrack = msvc8::string();
   view->mSubobject.~CUIWorldViewBuildDragRuntimeView();
+  // Owning handle, and this pair has no destructor - clearing the two words
+  // would leak the reference and with it the whole command graph, ghost meshes
+  // included. Same release `CRenderWorldView::RenderCommandGraph` performs when
+  // Shift comes up.
+  if (view->mComGraph.mControl != nullptr) {
+    view->mComGraph.mControl->release();
+  }
   view->mComGraph = {};
 
   view->mCommandData = {};

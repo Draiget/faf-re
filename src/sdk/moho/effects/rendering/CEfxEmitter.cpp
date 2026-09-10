@@ -518,8 +518,17 @@ namespace moho
    * Address: 0x0065C290 (FUN_0065C290, Moho::CEfxEmitter::UpdateCurveMask)
    *
    * What it does:
-   * Rebuilds packed Z-curve mask bits by scanning every second emitter curve
-   * lane and setting one bit when the lane has exactly one key and near-zero Z.
+   * Rebuilds packed Z-curve mask bits by scanning all 21 emitter curve lanes
+   * and setting one bit when the lane has exactly one key and near-zero Z.
+   *
+   * One lane per bit, not every second one: the loop cursor advances by 0x38 -
+   * one whole `SEfxCurve` - at 0x0065C304 and stops at 0x498 (0x0065C30A),
+   * which is exactly the 21 slots of the inline buffer. The decompile reads
+   * `v3[i]` with `i += 2` only because IDA has `SEfxCurve` typed at 28 bytes,
+   * half its real size; doubling the index here walked 42 slots, ran off the
+   * end of the buffer into `mBlueprint` and past it, and eventually found a
+   * "curve" whose key span divided to 1 with a null key pointer - a null
+   * dereference in the effects tick.
    */
   void CEfxEmitter::UpdateCurveMask()
   {
@@ -527,7 +536,7 @@ namespace moho
 
     SEfxCurve* const curves = mCurves.begin();
     for (std::uint32_t bitIndex = 0u; bitIndex < 21u; ++bitIndex) {
-      SEfxCurve& curve = curves[bitIndex * 2u];
+      SEfxCurve& curve = curves[bitIndex];
       if ((curve.mKeys.end() - curve.mKeys.begin()) != 1) {
         continue;
       }
@@ -545,11 +554,16 @@ namespace moho
    * Copies one source curve bounds lane into the destination emitter slot,
    * recomputes source-curve Y bounds from key payload, and invalidates one
    * emitter parameter lane.
+   *
+   * `paramIndex` indexes curves one-for-one: 0x0065C32E..0x0065C337 computes
+   * `curves + paramIndex * 0x38`, one whole `SEfxCurve` per step, the same
+   * stride `UpdateCurveMask` walks. IDA's half-size `SEfxCurve` is what makes
+   * its decompile look like every second slot.
    */
   void CEfxEmitter::SetCurveParam(const std::int32_t paramIndex, const void* const curveData)
   {
     const auto* const sourceCurve = static_cast<const SEfxCurve*>(curveData);
-    SEfxCurve& destinationCurve = mCurves.begin()[static_cast<std::size_t>(paramIndex) * 2u];
+    SEfxCurve& destinationCurve = mCurves.begin()[static_cast<std::size_t>(paramIndex)];
     destinationCurve.mBoundsMin = sourceCurve->mBoundsMin;
     destinationCurve.mBoundsMax = sourceCurve->mBoundsMax;
 
