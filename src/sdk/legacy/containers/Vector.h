@@ -2374,6 +2374,8 @@ namespace msvc8
          * Address: 0x0071DDC0 (FUN_0071DDC0 -- `operator=` for the 0x38-byte `moho::SThreat`; callers 0x0071E7B0, 0x0071EAA0, 0x0071ED10; formerly `AssignSThreatVector` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047D2D0 (FUN_0047D2D0 -- `operator=` for the `moho::SSendStamp` send-stamp vector -- `destination.items = source.items`; callers 0x0047D290 (unreached); formerly `CopyStampVectorOnly` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047D850 (FUN_0047D850 -- `operator=` from a fresh empty vector (`view.items = {}`) for the `moho::SSendStamp` send-stamp vector; callers 0x0047D2D0 (unreached); formerly `ClearStampStorage` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F76C0 (FUN_008F76C0 -- `operator=` from a fresh empty vector -- `~AdapterD3D10`'s `modes_ = {}` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008FF220; formerly `DestroyAdapterModeVectorStorage` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F7B30 (FUN_008F7B30 -- `operator=` from a fresh empty vector -- `~AdapterD3D10`'s `modes_ = {}` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x00900630, 0x00900A70; formerly `DestroyAdapterModeVectorStorage` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2614,6 +2616,7 @@ namespace msvc8
          * Address: 0x00852280 (FUN_00852280 -- `vector<T>::size()` for a 12-byte element; callers 0x008523C0; formerly `CountElement12VectorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008678E0 (FUN_008678E0 -- `vector<T>::size()` for a 12-byte element; callers 0x00868040; formerly `CountElement12VectorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00478560 (FUN_00478560 -- `size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `HeightFieldTierVectorSize` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F8AF0 (FUN_008F8AF0 -- `size()` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x00900630; formerly `CountEntriesStride13C` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -3885,6 +3888,9 @@ namespace msvc8
          * Address: 0x004957C0 (FUN_004957C0 -- `vector<TrailRuntimeView` (0x60-byte element; the trail emitter and `CWorldParticles::AddTrail` push through it); callers 0x00494730, 0x00494C20, 0x00671194; formerly `AppendTrailToVector` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006DB150 (FUN_006DB150 -- `vector<T>::push_back` for the 12-byte `{WeakPtr<CUnitCommand>, dword}` element (callers 0x006D77B0 / 0x006DC070); callers 0x006D77B0, 0x006DC070; formerly `AppendUnitCommandLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007C87E0 (FUN_007C87E0 -- `vector<T>::push_back` for a 16-byte element (in-place when capacity remains, else the `_Insert_n` growth path); callers 0x007BFB70; formerly `Append16ByteLaneWithGrowRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F7C50 (FUN_008F7C50 -- `push_back` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F7CF0; formerly `AppendAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F7230 (FUN_008F7230 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F7453, 0x008F7CF0; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F65B0 (FUN_008F65B0 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F6650, 0x008F6710, 0x008F7230; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -6950,6 +6956,9 @@ namespace msvc8
          * Address: 0x0071EA00 (FUN_0071EA00 -- `_Destroy_range` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); callers 0x00716140, 0x007163A0, 0x00719E80; formerly `DestroyInfluenceGridRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071B950 (FUN_0071B950 -- a `__thiscall` entry into `_Destroy_range` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); callers 0x0071B970, 0x0071E030; formerly `DestroyInfluenceGridRangeThiscallAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071D550 (FUN_0071D550 -- a register-shape entry into `_Destroy_range` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `DestroyInfluenceGridRangeDeleteAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F7550 (FUN_008F7550 -- `_Destroy_range` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F75F0, 0x008F7670, 0x008F76C0; formerly `DestroyAdapterModeRuntimeRange` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F75F0 (FUN_008F75F0 -- a register-shape entry into `_Destroy_range` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); zero callers, unreachable; formerly `DestroyAdapterModeRuntimeRangeAdapter` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008F7670 (FUN_008F7670 -- a register-shape entry into `_Destroy_range` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F7770, 0x008FF080; formerly `DestroyAdapterModeRuntimeRangeAdapterSecondary` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -9828,6 +9837,8 @@ namespace msvc8
          * Address: 0x0047E310 (FUN_0047E310 -- a register-shape entry into `_Copy_backward` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70; formerly `CopyStampRangeBackwardThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E580 (FUN_0047E580 -- a register-shape entry into `_Copy_backward` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeBackwardThunkAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E3B0 (FUN_0047E3B0 -- `_Copy_backward` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80; formerly `CopyBandwidthRangeBackward` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008FF330 (FUN_008FF330 -- `_Copy_backward` for `gpg::gal::AdapterD3D10`; callers 0x008FF430, 0x008FF4D0; formerly `CopyAssignAdapterRangeBackwardCore` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008FF430 (FUN_008FF430 -- a register-shape entry into `_Copy_backward` for `gpg::gal::AdapterD3D10`; zero callers, unreachable; formerly `CopyAssignAdapterRangeBackwardDispatch` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {

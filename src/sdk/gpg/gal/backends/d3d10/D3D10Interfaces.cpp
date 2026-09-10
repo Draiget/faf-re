@@ -2355,27 +2355,6 @@ namespace gpg::gal
       return outDesc;
     }
 
-    /**
-     * Address: 0x008F8AF0 (FUN_008F8AF0)
-     *
-     * void const *
-     *
-     * What it does:
-     * Returns `(end-begin)/0x13C` for one runtime span payload when the
-     * begin pointer lane is non-null.
-     */
-    int CountEntriesStride13C(const void* const runtimeSpan) noexcept
-    {
-      const auto* const lanes = reinterpret_cast<const std::uintptr_t*>(runtimeSpan);
-      const std::uintptr_t begin = lanes[1];
-      if (begin == 0U) {
-        return 0;
-      }
-
-      const std::uintptr_t end = lanes[2];
-      return static_cast<int>((end - begin) / 0x13CU);
-    }
-
     int ReleaseComSlotAndNull(void** const slot) noexcept
     {
       if (slot == nullptr) {
@@ -2681,71 +2660,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008F7550 (FUN_008F7550)
-     *
-     * What it does:
-     * Tears down per-mode dynamic storage lanes for each adapter-mode entry
-     * in `[begin, end)`.
-     */
-    void DestroyAdapterModeRuntimeRange(AdapterModeD3D10* begin, AdapterModeD3D10* const end)
-    {
-      // Each entry's inner mode vector gets VC8 _Tidy(): free and null the
-      // three lanes. The element type is trivially destructible, so there is
-      // no per-element sweep.
-      for (; begin != end; ++begin) {
-        begin->modes_ = decltype(begin->modes_){};
-      }
-    }
-
-    /**
-     * Address: 0x008F75F0 (FUN_008F75F0)
-     *
-     * What it does:
-     * Forwarding lane that routes one adapter-mode runtime teardown range into
-     * `FUN_008F7550`.
-     */
-    void DestroyAdapterModeRuntimeRangeAdapter(
-      AdapterModeD3D10* const begin,
-      AdapterModeD3D10* const end
-    )
-    {
-      DestroyAdapterModeRuntimeRange(begin, end);
-    }
-
-    /**
-     * Address: 0x008F7670 (FUN_008F7670)
-     *
-     * What it does:
-     * Secondary call-shape adapter that forwards one adapter-mode runtime range
-     * teardown into `FUN_008F7550`.
-     */
-    void DestroyAdapterModeRuntimeRangeAdapterSecondary(
-      AdapterModeD3D10* const begin,
-      AdapterModeD3D10* const end
-    )
-    {
-      DestroyAdapterModeRuntimeRange(begin, end);
-    }
-
-    /**
-     * Address: 0x008F76C0 (FUN_008F76C0)
-     * Address: 0x008F7B30 (FUN_008F7B30, gpg::gal::AdapterD3D10 destructor body)
-     *
-     * What it does:
-     * Destroys per-entry mode vectors, frees the outer adapter-mode storage,
-     * and clears begin/end/capacity lanes.
-     */
-    void DestroyAdapterModeVectorStorage(msvc8::vector<AdapterModeD3D10>& modes) noexcept
-    {
-      // Tear down each entry's inner vector first -- AdapterModeD3D10's
-      // destructor does not -- then _Tidy the outer one.
-      if (!modes.empty()) {
-        DestroyAdapterModeRuntimeRange(modes.begin(), modes.end());
-      }
-      modes = msvc8::vector<AdapterModeD3D10>{};
-    }
-
-    /**
      * Address: 0x008F71D0 (FUN_008F71D0)
      *
      * What it does:
@@ -2766,46 +2680,6 @@ namespace gpg::gal
         static_cast<void>(output->GetDesc(&entry->outputDesc_));
       }
       return entry;
-    }
-
-    /**
-     * Address: 0x008F7C50 (FUN_008F7C50)
-     *
-     * What it does:
-     * Appends one populated adapter-mode entry into the retained adapter mode
-     * vector.
-     */
-    void AppendAdapterModeEntry(msvc8::vector<AdapterModeD3D10>& modes, const AdapterModeD3D10& entry)
-    {
-      modes.push_back(entry);
-    }
-
-    /**
-     * Address: 0x008F7230 (FUN_008F7230, sub_8F7230)
-     * Address: 0x008F65B0 (FUN_008F65B0, the recovered byte-copy lane
-     * described below -- `msvc8::vector<DXGI_MODE_DESC>::push_back`'s
-     * in-place fast-path fill: `qmemcpy` of one 28-byte `DXGI_MODE_DESC`
-     * per call, `result += 28` stride, matching this method's
-     * `uninit_fill_n(dst, 1, value)` shape reproduced generically by
-     * `entry.modes_.push_back(mode)` below)
-     *
-     * IDA signature:
-     * int __thiscall sub_8F7230(_DWORD *this, int a2);
-     *
-     * What it does:
-     * Appends one `DXGI_MODE_DESC` into the inner mode-descriptor vector of
-     * an `AdapterModeD3D10` entry. When spare capacity already exists in the
-     * vector's triplet the helper writes the incoming record in-place via the
-     * recovered byte-copy lane (`FUN_008F65B0`) and advances the `end`
-     * pointer; otherwise it delegates to the reallocate-and-insert lane
-     * (`FUN_008F6FB0`) so the vector grows by the MSVC8 legacy growth policy.
-     * Matches the per-element push loop emitted by `AdapterD3D10::ProbeOutputsAndModes`.
-     */
-    void AppendDisplayModeToAdapterModeEntry(AdapterModeD3D10& entry, const DXGI_MODE_DESC& mode)
-    {
-      // push_back's capacity-full path is `msvc8::vector<DXGI_MODE_DESC>::insert`
-      // (FUN_008F6A50), reached through the single-value insert lane (FUN_008F6FB0).
-      entry.modes_.push_back(mode);
     }
 
     /**
@@ -4610,33 +4484,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008FF330 (FUN_008FF330, std::copy_backward<AdapterD3D10*, AdapterD3D10*>)
-     *
-     * What it does:
-     * Compiler-emitted `std::copy_backward<AdapterD3D10*>` inner helper used
-     * by `msvc8::vector<AdapterD3D10>::insert/push_back` slow paths. Copies
-     * the range `[sourceFirst, sourceLast)` backwards into `[..., destinationLast)`
-     * using `AdapterD3D10::operator=` per slot (316-byte stride).
-     *
-     * Implicitly re-emitted by the recovered `AppendBackendAdapter` ->
-     * `vector<AdapterD3D10>::push_back` template chain.
-     */
-    AdapterD3D10* CopyAssignAdapterRangeBackwardCore(
-      const AdapterD3D10* const sourceFirst,
-      const AdapterD3D10* sourceLast,
-      AdapterD3D10* destinationLast
-    )
-    {
-      while (sourceFirst != sourceLast) {
-        --sourceLast;
-        --destinationLast;
-        *destinationLast = *sourceLast;
-      }
-
-      return destinationLast;
-    }
-
-    /**
      * Address: 0x008FF3E0 (FUN_008FF3E0, std::fill<AdapterD3D10*, AdapterD3D10>)
      *
      * What it does:
@@ -4740,22 +4587,6 @@ namespace gpg::gal
     )
     {
       return UninitializedCopyAdapterRangeCore(sourceFirst, sourceLast, destinationBegin);
-    }
-
-    /**
-     * Address: 0x008FF430 (FUN_008FF430)
-     *
-     * What it does:
-     * Preserves one dispatch lane into backward copy-assignment over adapter
-     * ranges and returns the destination-begin lane.
-     */
-    AdapterD3D10* CopyAssignAdapterRangeBackwardDispatch(
-      const AdapterD3D10* const sourceFirst,
-      const AdapterD3D10* const sourceLast,
-      AdapterD3D10* const destinationLast
-    )
-    {
-      return CopyAssignAdapterRangeBackwardCore(sourceFirst, sourceLast, destinationLast);
     }
 
     /**
@@ -4981,13 +4812,13 @@ namespace gpg::gal
           static_cast<DXGI_MODE_DESC*>(::operator new(static_cast<std::size_t>(modeCount) * sizeof(DXGI_MODE_DESC)));
         if (output->GetDisplayModeList(format, 0U, &modeCount, scratch) >= 0) {
           for (UINT modeIndex = 0U; modeIndex < modeCount; ++modeIndex) {
-            AppendDisplayModeToAdapterModeEntry(modeEntry, scratch[modeIndex]);
+            modeEntry.modes_.push_back(scratch[modeIndex]);
           }
         }
         ::operator delete[](scratch);
       }
 
-      AppendAdapterModeEntry(modes_, modeEntry);
+      modes_.push_back(modeEntry);
     }
 
     return result;
@@ -5003,7 +4834,9 @@ namespace gpg::gal
   AdapterD3D10::~AdapterD3D10()
   {
     static_cast<void>(ReleaseAdapterOutputAndDeviceRefs(this));
-    DestroyAdapterModeVectorStorage(modes_);
+    // Each entry's inner mode vector goes with the outer one; both are real
+    // containers, so `modes_ = {}` is the whole teardown (0x008F76C0).
+    modes_ = msvc8::vector<AdapterModeD3D10>{};
   }
 
   /**
