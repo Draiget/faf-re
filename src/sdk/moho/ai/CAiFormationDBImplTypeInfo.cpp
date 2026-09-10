@@ -78,56 +78,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x0059CEB0 (FUN_0059CEB0)
-   *
-   * What it does:
-   * Binds one `fastvector` runtime-view header to caller-provided inline
-   * pointer storage with inline capacity for 10 pointer elements.
-   */
-  [[nodiscard]] gpg::fastvector_runtime_view<CAiFormationInstance*>* BindFormationInstanceInlineRuntimeView(
-    gpg::fastvector_runtime_view<CAiFormationInstance*>* const result,
-    CAiFormationInstance** const inlineOrigin
-  ) noexcept
-  {
-    result->begin = inlineOrigin;
-    result->end = inlineOrigin;
-    result->capacityEnd = inlineOrigin + 10;
-    result->metadata = inlineOrigin;
-    return result;
-  }
-
-  /**
-   * Address: 0x0059C890 (FUN_0059C890)
-   *
-   * What it does:
-   * Initializes `fastvector_n<CAiFormationInstance*,10>` header lanes so begin,
-   * end, and metadata point at inline storage, with capacity at `+0x28`.
-   */
-  [[nodiscard]] gpg::fastvector_n<CAiFormationInstance*, 10>* InitializeFormationInstanceInlineStorage(
-    gpg::fastvector_n<CAiFormationInstance*, 10>* const result
-  ) noexcept
-  {
-    // Inline-buffer (SBO) binding genuinely needs the runtime view: it seats
-    // the `metadata` lane at +0x0C, which no container accessor exposes.
-    auto& view = gpg::AsFastVectorRuntimeView<CAiFormationInstance*>(result);
-    auto* const inlineOrigin = reinterpret_cast<CAiFormationInstance**>(
-      reinterpret_cast<std::uint8_t*>(result) + 0x10u
-    );
-    (void)BindFormationInstanceInlineRuntimeView(&view, inlineOrigin);
-    return result;
-  }
-
-  void InitializeCAiFormationDBImpl(CAiFormationDBImpl* const object) noexcept
-  {
-    if (!object) {
-      return;
-    }
-
-    object->mSim = nullptr;
-    (void)InitializeFormationInstanceInlineStorage(&object->mFormInstances);
-  }
-
   [[nodiscard]] IFormationInstanceFastVectorTypeInfo* AcquireFastVectorIFormationInstanceType()
   {
     if (!gFastVectorIFormationInstanceTypeConstructed) {
@@ -503,13 +453,12 @@ gpg::RType* CAiFormationDBImplTypeInfo::InitializeAllocationCallbacks(gpg::RType
  * Address: 0x0059D390 (FUN_0059D390, Moho::CAiFormationDBImplTypeInfo::NewRef)
  *
  * What it does:
- * Allocates a reflected `CAiFormationDBImpl`, clears its owned AI-sim lane,
- * and returns the object as a typed `gpg::RRef`.
+ * Allocates a reflected `CAiFormationDBImpl` (its constructor nulls `mSim` and
+ * arms the inline `mFormInstances` storage) and returns it as a typed `gpg::RRef`.
  */
 gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
 {
   CAiFormationDBImpl* const object = new (std::nothrow) CAiFormationDBImpl();
-  InitializeCAiFormationDBImpl(object);
   return MakeCAiFormationDBImplRef(object);
 }
 
@@ -517,15 +466,14 @@ gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
  * Address: 0x0059D430 (FUN_0059D430, Moho::CAiFormationDBImplTypeInfo::CtrRef)
  *
  * What it does:
- * Placement-constructs one `CAiFormationDBImpl` in caller storage, resets its
- * owned sim lane, and returns a typed `gpg::RRef`.
+ * Placement-constructs one `CAiFormationDBImpl` in caller storage and returns
+ * a typed `gpg::RRef`.
  */
 gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
 {
   CAiFormationDBImpl* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
   if (object) {
     new (object) CAiFormationDBImpl();
-    InitializeCAiFormationDBImpl(object);
   }
 
   return MakeCAiFormationDBImplRef(object);

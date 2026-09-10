@@ -2210,6 +2210,8 @@ namespace msvc8
          * Address: 0x00752EA0 (FUN_00752EA0 -- `operator=` for a 40-byte element (buy 0x0074DA70, copy 0x00755D30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007525C0 (FUN_007525C0 -- `operator=` for a 28-byte seven-float element (copy 0x00755B30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005ED370 (FUN_005ED370 -- `vector<SAiReservedTransportBone>::operator=` (buy 0x005EA4E0, element destroy 0x005EE360, copy-construct bridge 0x005EE710); zero callers and unreachable, a linker-retained copy nothing runs.)
+         * Address: 0x006DE400 (FUN_006DE400 -- `operator=` for the 12-byte `moho::SBlackListInfo` element (`WeakPtr<Entity>` + int; the element-wise assign/copy-construct steps relink each weak reference through `WeakPtr<Entity>`'s own copy semantics). Zero callers, no xrefs, unreachable from every seeded root. Formerly the runtime-view transcription `AssignBlacklistInfoVectorPreservingWeakLinks` in moho/unit/core/UnitWeapon.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00628560 (FUN_00628560 -- `operator=` for the 12-byte `moho::SPickUpInfo` element (`WeakPtr<Unit>` + float). Zero callers, no xrefs, unreachable. Formerly `AssignPickUpInfoVectorPreservingWeakLinks` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2343,6 +2345,9 @@ namespace msvc8
          * Address: 0x00504ED0 (FUN_00504ED0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         T* end() const noexcept { return last_; }
+        /**
+         * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly `IsSDecalInfoVectorRuntimeEmpty` over a hand-rolled `SDecalInfoVectorRuntimeView` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
+         */
         [[nodiscard]] bool empty() const noexcept {
 	        return first_ == last_;
         }
@@ -2401,6 +2406,7 @@ namespace msvc8
          * Address: 0x00560FE0 (FUN_00560FE0 -- `size()` for a 216-byte element.)
          * Address: 0x00561130 (FUN_00561130 -- `size()` for the 568-byte `SUnitVariableUpdateEntry`.)
          * Address: 0x00561290 (FUN_00561290 -- `size()` for a 120-byte element.)
+         * Address: 0x0077ACA0 (FUN_0077ACA0 -- `size()` for `msvc8::vector<moho::SDecalInfo>`; callers 0x0077B990 / 0x0077E100, the `RVectorType_SDecalInfo` reflection helpers cited on this header. Formerly `CountSDecalInfoVectorRuntimeUsed` in moho/render/CDecalTypes.cpp, removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2454,6 +2460,7 @@ namespace msvc8
          * capacity check) now does.)
          *
          * Returns reserved element capacity from retained `[first_, end_)` range.
+         * Address: 0x0077AC70 (FUN_0077AC70 -- `capacity()` for `msvc8::vector<moho::SDecalInfo>`. Zero callers, no xrefs, unreachable. Formerly `CountSDecalInfoVectorRuntimeCapacity` in moho/render/CDecalTypes.cpp, removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
@@ -3068,6 +3075,7 @@ namespace msvc8
          * Address: 0x0078A270 (FUN_0078A270 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007C9310 (FUN_007C9310 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count, vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
+         * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a `LegacyWordVectorRuntimeView` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3818,6 +3826,8 @@ namespace msvc8
          * calls this method by name (`mMaps.erase(binding)`).)
          * Address: 0x0053FD00 (FUN_0053FD00 -- `erase(pos)` for an 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00936610 (FUN_00936610 -- `erase(pos)` for a 4-byte scalar element: memmove tail shift, `--last_`, iterator returned through the hidden result slot; zero callers, no xrefs, unreachable from every seeded root. Formerly `EraseDwordAtCursorAndReturnSlot` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006DB1E0 (FUN_006DB1E0 -- `erase(pos)` for the 12-byte `moho::SBlackListInfo` element: element-wise tail shift through the weak-link-aware assignment, unlink of the stale last slot, `--last_`. Zero callers, no xrefs, unreachable. Formerly `EraseBlacklistEntryShiftLeftRuntime` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
+         * Address: 0x00626EA0 (FUN_00626EA0 -- `erase(pos)` for the 12-byte `moho::SPickUpInfo` element (the range overload 0x006273B0 is the live one). Zero callers, no xrefs, unreachable. Formerly `ErasePickUpInfoAndStoreIterator` in moho/unit/tasks/CUnitLoadUnits.cpp, removed 2026-09-10.)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -6593,6 +6603,7 @@ namespace msvc8
          * The `moho::GeomCamera3` destroy emission, previously hand-written in
          * `GeomCamera3.cpp` as `DestroyGeomCameraRange` and orphaned.
          * Address: 0x007420F0 (FUN_007420F0 -- `_Destroy` for `SSyncData`'s 12-byte `{{dword, dword, shared-count control}}` element: releases each control block (`~SSyncData` 0x0073FC70, 0x00740E20).)
+         * Address: 0x006DBE20 (FUN_006DBE20 -- jump thunk handing an empty `[cursor, cursor)` range to the `moho::SBlackListInfo` `_Destroy_range` 0x006DEAE0 (`WeakPtr<Entity>` unlink per element). Zero callers, no xrefs, unreachable. Formerly `UnlinkBlacklistWeakEntityRangeEmptyAtCursor` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -9135,6 +9146,7 @@ namespace msvc8
          * Address: 0x008D7E20 (FUN_008D7E20 -- the same element-wise 4-byte forward copy for the `operator=` twin 0x008D77E0; formerly `CopyDwordRangeForwardLaneB`, removed.)
          * Address: 0x00935BD0 (FUN_00935BD0 -- `_Copy_opt` memmove for a 4-byte scalar element ([first, last) to dest, returns the destination end); zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneA` in LegacyContainerFillLanesB.cpp, removed.)
          * Address: 0x00936000 (FUN_00936000 -- identical 4-byte `_Copy_opt` memmove copy; zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneB`, removed.)
+         * Address: 0x006DDA00 (FUN_006DDA00 -- argument-order bridge into the element-wise `_Copy` for `moho::SBlackListInfo` (0x006DE7E0), reached only from the dead `operator=` 0x006DE400. Formerly `CopyBlacklistRangeAssignWeakLinksBridgeRuntime` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {

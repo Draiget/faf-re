@@ -852,6 +852,8 @@ namespace gpg::core
      * Address: 0x00576ED0 (FUN_00576ED0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x460`.)
      * Address: 0x0080F030 (FUN_0080F030 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x7EF40`.)
      * Address: 0x0080F1B0 (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.)
+     * Address: 0x0059C890 (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs, unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly `BindFormationInstanceInlineRuntimeView`, removed 2026-09-10.)
      */
     FastVectorN()
     {

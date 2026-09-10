@@ -307,87 +307,6 @@ namespace
     gTextureScrollerSerializer.ResetLinks();
   }
 
-  struct SDecalInfoListRuntimeView
-  {
-    void* mNodeProxy;      // +0x00
-    void* mSentinelNode;   // +0x04
-    std::uint32_t mCount;  // +0x08
-  };
-  static_assert(
-    offsetof(SDecalInfoListRuntimeView, mCount) == 0x08, "SDecalInfoListRuntimeView::mCount offset must be 0x08"
-  );
-  static_assert(sizeof(SDecalInfoListRuntimeView) == 0x0C, "SDecalInfoListRuntimeView size must be 0x0C");
-
-  [[nodiscard]] int CountSDecalInfoListElements(const void* const object) noexcept
-  {
-    if (object == nullptr) {
-      return 0;
-    }
-
-    const auto* const listView = static_cast<const SDecalInfoListRuntimeView*>(object);
-    return static_cast<int>(listView->mCount);
-  }
-
-  struct SDecalInfoVectorRuntimeView
-  {
-    void* lane00;               // +0x00
-    moho::SDecalInfo* begin;    // +0x04
-    moho::SDecalInfo* end;      // +0x08
-    moho::SDecalInfo* capacity; // +0x0C
-  };
-  static_assert(offsetof(SDecalInfoVectorRuntimeView, begin) == 0x04, "SDecalInfoVectorRuntimeView::begin offset must be 0x04");
-  static_assert(offsetof(SDecalInfoVectorRuntimeView, end) == 0x08, "SDecalInfoVectorRuntimeView::end offset must be 0x08");
-  static_assert(
-    offsetof(SDecalInfoVectorRuntimeView, capacity) == 0x0C,
-    "SDecalInfoVectorRuntimeView::capacity offset must be 0x0C"
-  );
-
-  /**
-   * Address: 0x0077A060 (FUN_0077A060)
-   *
-   * What it does:
-   * Returns true when one `SDecalInfo` vector-runtime lane has no used
-   * elements (`begin == 0` or `end == begin`).
-   */
-  [[maybe_unused]] bool IsSDecalInfoVectorRuntimeEmpty(const SDecalInfoVectorRuntimeView* const vectorView) noexcept
-  {
-    const moho::SDecalInfo* const begin = vectorView->begin;
-    if (begin == nullptr) {
-      return true;
-    }
-    return vectorView->end == begin;
-  }
-
-  /**
-   * Address: 0x0077ACA0 (FUN_0077ACA0)
-   *
-   * What it does:
-   * Returns used element count from one `SDecalInfo` vector-runtime lane.
-   */
-  [[maybe_unused]] int CountSDecalInfoVectorRuntimeUsed(const SDecalInfoVectorRuntimeView* const vectorView) noexcept
-  {
-    const moho::SDecalInfo* const begin = vectorView->begin;
-    if (begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(vectorView->end - begin);
-  }
-
-  /**
-   * Address: 0x0077AC70 (FUN_0077AC70)
-   *
-   * What it does:
-   * Returns capacity element count from one `SDecalInfo` vector-runtime lane.
-   */
-  [[maybe_unused]] int CountSDecalInfoVectorRuntimeCapacity(const SDecalInfoVectorRuntimeView* const vectorView) noexcept
-  {
-    const moho::SDecalInfo* const begin = vectorView->begin;
-    if (begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(vectorView->capacity - begin);
-  }
-
   /**
    * Address: 0x0077C9A0 (FUN_0077C9A0)
    *
@@ -552,7 +471,10 @@ const char* gpg::RListType_SDecalInfo::GetName() const
 msvc8::string gpg::RListType_SDecalInfo::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), CountSDecalInfoListElements(ref.mObj));
+  // `*(list + 8)` in the binary: the reflected object is the `msvc8::list<SDecalInfo>` itself.
+  return gpg::STR_Printf(
+    "%s, size=%d", base.c_str(), static_cast<int>(static_cast<const msvc8::list<moho::SDecalInfo>*>(ref.mObj)->size())
+  );
 }
 
 /**
