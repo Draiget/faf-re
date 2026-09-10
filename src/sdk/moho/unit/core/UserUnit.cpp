@@ -893,26 +893,27 @@ namespace
     weakRef.mNextOwner = nullptr;
   }
 
-  [[nodiscard]] SSelectionSetUserEntity BuildSelectionAdapterFromIssueWeakSet(
-    const UserCommandIssueWeakSetRuntimeView& set
-  ) noexcept
+  /**
+   * The helper's cursor list IS an engine weak-entity set:
+   * `UserCommandIssueWeakSetRuntimeView` and `WeakEntitySetUserEntity` are the
+   * same 12-byte `{proxy, head, size}` header, and `func_GetEntitiesUnderCursor`
+   * (0x008B43F0) hands `&helper->cursorEntitySet` (`v1 + 17`, the object at
+   * `helper+0xCC`) straight to the weak-set tidy and insert lanes.
+   *
+   * This has to be a reference to that object, never a copy.
+   * `WeakEntitySetUserEntity`'s destructor calls `ReleaseStorage()`, which
+   * erases every node AND frees the head sentinel -- so the stack copy these
+   * helpers used to build shared the helper's head node and freed it on the way
+   * out. Every later insert then walked a freed tree, which is the access
+   * violation the build-placement preview hit on its next frame.
+   *
+   * `mSizeMirrorOrUnused` (+0x0C) is deliberately never written through this
+   * reference: the helper's set is the bare 12-byte header (the helper is 0xD8
+   * bytes and the set ends it), so that word belongs to whatever follows.
+   */
+  [[nodiscard]] SSelectionSetUserEntity& IssueCursorWeakSet(UserCommandIssueWeakSetRuntimeView& set) noexcept
   {
-    SSelectionSetUserEntity adapter{};
-    adapter.mAllocProxy = set.allocatorProxy;
-    adapter.mHead = set.head;
-    adapter.mSize = set.size;
-    adapter.mSizeMirrorOrUnused = set.size;
-    return adapter;
-  }
-
-  void CommitSelectionAdapterToIssueWeakSet(
-    const SSelectionSetUserEntity& adapter,
-    UserCommandIssueWeakSetRuntimeView& set
-  ) noexcept
-  {
-    set.allocatorProxy = adapter.mAllocProxy;
-    set.head = adapter.mHead;
-    set.size = adapter.mSize;
+    return *reinterpret_cast<SSelectionSetUserEntity*>(&set);
   }
 
   [[nodiscard]] UserEntity* DecodeSelectionWeakOwnerUserEntity(
@@ -929,41 +930,39 @@ namespace
 
   void ClearIssueWeakSetKeepHead(UserCommandIssueWeakSetRuntimeView& set) noexcept
   {
-    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
-    if (adapter.mHead != nullptr) {
-      SSelectionNodeUserEntity* eraseCursor = adapter.mHead->mLeft;
-      (void)adapter.EraseRange(&eraseCursor, adapter.mHead->mLeft, adapter.mHead);
-      adapter.mSizeMirrorOrUnused = adapter.mSize;
+    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
+    if (tree.mHead == nullptr) {
+      return;
     }
-    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+
+    SSelectionNodeUserEntity* eraseCursor = tree.mHead->mLeft;
+    (void)tree.EraseRange(&eraseCursor, tree.mHead->mLeft, tree.mHead);
   }
 
   void PruneIssueWeakSetTombstones(UserCommandIssueWeakSetRuntimeView& set) noexcept
   {
-    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
-    if (adapter.mHead == nullptr) {
+    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
+    if (tree.mHead == nullptr) {
       return;
     }
 
-    SSelectionNodeUserEntity* cursor = adapter.mHead->mLeft;
-    cursor = *adapter.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != adapter.mHead) {
+    SSelectionNodeUserEntity* cursor = tree.mHead->mLeft;
+    cursor = *tree.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != tree.mHead) {
       SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&adapter, cursor, &cursor);
+      cursor = SSelectionSetUserEntity::find(&tree, cursor, &cursor);
     }
-
-    CommitSelectionAdapterToIssueWeakSet(adapter, set);
   }
 
   void AddIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
   {
-    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
-    if (entity != nullptr && adapter.mHead != nullptr) {
-      SSelectionSetUserEntity::AddResult addResult{};
-      (void)SSelectionSetUserEntity::Add(&addResult, &adapter, entity);
-      adapter.mSizeMirrorOrUnused = adapter.mSize;
+    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
+    if (entity == nullptr || tree.mHead == nullptr) {
+      return;
     }
-    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+
+    SSelectionSetUserEntity::AddResult addResult{};
+    (void)SSelectionSetUserEntity::Add(&addResult, &tree, entity);
   }
 
   void EraseIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
@@ -972,28 +971,25 @@ namespace
       return;
     }
 
-    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
-    if (adapter.mHead == nullptr) {
+    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
+    if (tree.mHead == nullptr) {
       return;
     }
 
     while (true) {
       SSelectionSetUserEntity::FindResult found{};
-      (void)SSelectionSetUserEntity::Find(&found, &adapter, entity);
-      if (found.mRes == adapter.mHead) {
+      (void)SSelectionSetUserEntity::Find(&found, &tree, entity);
+      if (found.mRes == tree.mHead) {
         break;
       }
 
       SSelectionNodeUserEntity* next = found.mRes;
       SSelectionSetUserEntity::Iterator_inc(&next);
-      next = SSelectionSetUserEntity::find(&adapter, next, &next);
+      next = SSelectionSetUserEntity::find(&tree, next, &next);
 
       SSelectionNodeUserEntity* eraseCursor = found.mRes;
-      (void)adapter.EraseRange(&eraseCursor, found.mRes, next);
-      adapter.mSizeMirrorOrUnused = adapter.mSize;
+      (void)tree.EraseRange(&eraseCursor, found.mRes, next);
     }
-
-    CommitSelectionAdapterToIssueWeakSet(adapter, set);
   }
 
   void MergeIssueWeakSetEntities(
@@ -1001,23 +997,21 @@ namespace
     UserCommandIssueWeakSetRuntimeView& source
   ) noexcept
   {
-    SSelectionSetUserEntity sourceAdapter = BuildSelectionAdapterFromIssueWeakSet(source);
-    if (sourceAdapter.mHead == nullptr) {
+    SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
+    if (sourceTree.mHead == nullptr) {
       return;
     }
 
-    SSelectionNodeUserEntity* cursor = sourceAdapter.mHead->mLeft;
-    cursor = *sourceAdapter.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != sourceAdapter.mHead) {
+    SSelectionNodeUserEntity* cursor = sourceTree.mHead->mLeft;
+    cursor = *sourceTree.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != sourceTree.mHead) {
       if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
         AddIssueWeakSetEntity(destination, entity);
       }
 
       SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&sourceAdapter, cursor, &cursor);
+      cursor = SSelectionSetUserEntity::find(&sourceTree, cursor, &cursor);
     }
-
-    CommitSelectionAdapterToIssueWeakSet(sourceAdapter, source);
   }
 
   void EraseIssueWeakSetEntities(
@@ -1025,23 +1019,21 @@ namespace
     UserCommandIssueWeakSetRuntimeView& source
   ) noexcept
   {
-    SSelectionSetUserEntity sourceAdapter = BuildSelectionAdapterFromIssueWeakSet(source);
-    if (sourceAdapter.mHead == nullptr) {
+    SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
+    if (sourceTree.mHead == nullptr) {
       return;
     }
 
-    SSelectionNodeUserEntity* cursor = sourceAdapter.mHead->mLeft;
-    cursor = *sourceAdapter.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != sourceAdapter.mHead) {
+    SSelectionNodeUserEntity* cursor = sourceTree.mHead->mLeft;
+    cursor = *sourceTree.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != sourceTree.mHead) {
       if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
         EraseIssueWeakSetEntity(destination, entity);
       }
 
       SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&sourceAdapter, cursor, &cursor);
+      cursor = SSelectionSetUserEntity::find(&sourceTree, cursor, &cursor);
     }
-
-    CommitSelectionAdapterToIssueWeakSet(sourceAdapter, source);
   }
 
   void DestroyCommandIssueWeakSetNodes(
