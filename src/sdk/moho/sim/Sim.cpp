@@ -9963,7 +9963,6 @@ Sim::Sim(LaunchInfoBase* const info)
       delete previousTables;
     }
   }
-    ProbeTerrainOccupancy(mOGrid, "after COGrid ctor");
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
   mRules->UpdateChecksum(&mContext, mLog);
@@ -9980,7 +9979,6 @@ Sim::Sim(LaunchInfoBase* const info)
  *
  * What it does:
  * New-game initialization pass, populating the subsystems the constructor left
-  ProbeTerrainOccupancy(mOGrid, "after PathTables ctor");
  * null and running the Lua `SetupSession`/`BeginSession` callbacks around
  * `CreateArmies`/`PostInitialize`. See the class declaration for the ordered
  * list of subsystems constructed here.
@@ -10065,7 +10063,6 @@ void Sim::Setup(LaunchInfoNew* const info)
     newFormationDB->mSim = this;
     CAiFormationDBImpl* const previousFormationDB = mFormationDB;
     mFormationDB = newFormationDB;
-    ProbeTerrainOccupancy(mOGrid, "after SetupSession");
     if (previousFormationDB) {
       delete previousFormationDB;
     }
@@ -10133,9 +10130,7 @@ void Sim::Setup(LaunchInfoNew* const info)
     }
   }
 
-  ProbeTerrainOccupancy(mOGrid, "before CreateArmies");
   // Spawn scenario props unless /noprops was requested. Each record's blueprint
-  ProbeTerrainOccupancy(mOGrid, "after CreateArmies");
   // id is resolved through the rules and instantiated at its stored transform.
   if (!CFG_GetArgOption("/noprops", 0u, nullptr)) {
     CWldProps* const props = info->mProps;
@@ -10172,7 +10167,6 @@ void Sim::Setup(LaunchInfoNew* const info)
  * What it does:
  * Load-game initialization pass. Deserializes this Sim from the saved archive,
  * refreshes heightfield bounds, re-arms every loaded unit's intel handles and
-  ProbeTerrainOccupancy(mOGrid, "after props");
  * re-binds each loaded prop into the entity DB bounded-prop queue, then re-syncs
  * the playable rectangle and fires the `OnPostLoad` Lua callback.
  */
@@ -10182,11 +10176,9 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
 
   // Deserialize this Sim instance from the saved archive.
   if (!Sim::sType) {
-  ProbeTerrainOccupancy(mOGrid, "after BeginSession");
     Sim::sType = gpg::LookupRType(typeid(Sim));
   }
   gpg::RRef ownerRef{};
-  ProbeTerrainOccupancy(mOGrid, "end of Sim::Setup");
   archive->Read(Sim::sType, this, ownerRef);
   archive->EndSection(false);
 
@@ -13862,6 +13854,11 @@ void moho::func_SC_CreateEntityDialog_chunk()
   REF_CreateEditDialog(blueprintRef, blueprint->mBlueprintId.c_str());
 }
 
+namespace
+{
+  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* state) noexcept;
+} // namespace
+
 /**
  * Address: 0x00528550 (FUN_00528550, cfunc_SpecFootprintsL)
  *
@@ -13923,11 +13920,6 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
 
     const LuaPlus::LuaObject maxSlopeObject = footprintObject.GetByName("MaxSlope");
     if (maxSlopeObject) {
-namespace
-{
-  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* state) noexcept;
-} // namespace
-
       footprint.mMaxSlope = static_cast<float>(maxSlopeObject.GetNumber());
     }
 
