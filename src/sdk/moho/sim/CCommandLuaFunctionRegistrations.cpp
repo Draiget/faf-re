@@ -3943,10 +3943,14 @@ namespace moho
     const std::uint32_t selectedColorPacked = moho::SCR_DecodeColor(state, selectedColorObject);
     const std::uint32_t buildColorPacked = moho::SCR_DecodeColor(state, buildColorObject);
 
+    // 0x00846EA9 / 0x00846EC6: the profile is applied to the active viewport's
+    // own range renderer (`ren_Viewport + 0x37C`). Passing null here registered
+    // every overlay profile into nothing, so `mRangeRenderer.mRangeProfiles`
+    // stayed empty and no weapon-range ring was ever drawn.
     moho::ApplyRangeProfileFilterToRenderer(
       highlightedColorPacked,
       categoryFilter,
-      nullptr,
+      moho::REN_GetViewportRangeRenderer(),
       profileName,
       buildColorPacked,
       selectedColorPacked,
