@@ -22,7 +22,15 @@
 
 namespace
 {
-  using BlueprintExtractorRegistry = std::map<std::string, std::unique_ptr<moho::RangeExtractor>>;
+  // The shipped registry is `Moho::sBlueprintExtractors`, an RB-tree whose node
+  // is 0x30 bytes: the key string's `_Bx` lands at node+0x10 and its `_Myres`
+  // at node+0x24 (0x007F2FA0 frees exactly those), the extractor pointer sits
+  // at node+0x28 (0x007ED9A0 reads it and runs the scalar deleting destructor
+  // through it), and the colour/nil pair follows at +0x2C/+0x2D. That is
+  // `pair<const msvc8::string, RangeExtractor*>` -- a raw pointer, so the
+  // `unique_ptr` this file used to hold was not a container substitution
+  // forced by the value type, it was an invented ownership model.
+  using BlueprintExtractorRegistry = msvc8::map<msvc8::string, moho::RangeExtractor*>;
 
   [[nodiscard]] BlueprintExtractorRegistry& GetBlueprintExtractorRegistry()
   {
@@ -31,235 +39,6 @@ namespace
   }
 
   bool gBlueprintExtractorsInitialized = false;
-
-  struct BlueprintExtractorTreeNodeRuntimeView
-  {
-    BlueprintExtractorTreeNodeRuntimeView* mLeft;   // +0x00
-    BlueprintExtractorTreeNodeRuntimeView* mParent; // +0x04
-    BlueprintExtractorTreeNodeRuntimeView* mRight;  // +0x08
-    std::uint32_t mUnknown0C = 0u;                  // +0x0C
-    msvc8::string mKeyStorage;                      // +0x10
-    std::uint8_t mColor = 0u;                       // +0x2C
-    std::uint8_t mIsSentinel = 0u;                  // +0x2D
-    std::uint8_t mPad2E[2]{};                       // +0x2E
-  };
-  static_assert(
-    offsetof(BlueprintExtractorTreeNodeRuntimeView, mKeyStorage) == 0x10,
-    "BlueprintExtractorTreeNodeRuntimeView::mKeyStorage offset must be 0x10"
-  );
-  static_assert(offsetof(BlueprintExtractorTreeNodeRuntimeView, mColor) == 0x2C, "BlueprintExtractorTreeNodeRuntimeView::mColor offset must be 0x2C");
-  static_assert(
-    offsetof(BlueprintExtractorTreeNodeRuntimeView, mIsSentinel) == 0x2D,
-    "BlueprintExtractorTreeNodeRuntimeView::mIsSentinel offset must be 0x2D"
-  );
-  static_assert(sizeof(BlueprintExtractorTreeNodeRuntimeView) == 0x30, "BlueprintExtractorTreeNodeRuntimeView size must be 0x30");
-
-  [[nodiscard]] BlueprintExtractorTreeNodeRuntimeView* ResolveBlueprintExtractorTreeHead(
-    BlueprintExtractorTreeNodeRuntimeView* node
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    BlueprintExtractorTreeNodeRuntimeView* parent = node->mParent;
-    while (parent != nullptr && parent->mIsSentinel == 0u) {
-      node = parent;
-      parent = node->mParent;
-    }
-    return parent;
-  }
-
-  /**
-   * Address: 0x007F2B00 (FUN_007F2B00, sub_7F2B00)
-   *
-   * What it does:
-   * Performs one left-rotation around `node` in the blueprint-extractor
-   * RB-tree, updating parent/head links.
-   */
-  [[maybe_unused]] BlueprintExtractorTreeNodeRuntimeView* RotateBlueprintExtractorTreeNodeLeft(
-    BlueprintExtractorTreeNodeRuntimeView* const node
-  ) noexcept
-  {
-    BlueprintExtractorTreeNodeRuntimeView* const rotated = node->mRight;
-    node->mRight = rotated->mLeft;
-    if (rotated->mLeft->mIsSentinel == 0u) {
-      rotated->mLeft->mParent = node;
-    }
-
-    rotated->mParent = node->mParent;
-
-    BlueprintExtractorTreeNodeRuntimeView* const head = ResolveBlueprintExtractorTreeHead(node);
-    if (head == nullptr) {
-      return rotated;
-    }
-
-    if (node == head->mParent) {
-      head->mParent = rotated;
-      rotated->mLeft = node;
-      node->mParent = rotated;
-    } else {
-      BlueprintExtractorTreeNodeRuntimeView* const parent = node->mParent;
-      if (node == parent->mLeft) {
-        parent->mLeft = rotated;
-      } else {
-        parent->mRight = rotated;
-      }
-      rotated->mLeft = node;
-      node->mParent = rotated;
-    }
-
-    return rotated;
-  }
-
-  /**
-   * Address: 0x007F2B60 (FUN_007F2B60, sub_7F2B60)
-   *
-   * What it does:
-   * Performs one right-rotation around `node` in the blueprint-extractor
-   * RB-tree, updating parent/head links.
-   */
-  [[maybe_unused]] BlueprintExtractorTreeNodeRuntimeView* RotateBlueprintExtractorTreeNodeRight(
-    BlueprintExtractorTreeNodeRuntimeView* const node
-  ) noexcept
-  {
-    BlueprintExtractorTreeNodeRuntimeView* const rotated = node->mLeft;
-    node->mLeft = node->mLeft->mRight;
-    if (rotated->mRight->mIsSentinel == 0u) {
-      rotated->mRight->mParent = node;
-    }
-
-    rotated->mParent = node->mParent;
-
-    BlueprintExtractorTreeNodeRuntimeView* const head = ResolveBlueprintExtractorTreeHead(node);
-    if (head == nullptr) {
-      return rotated;
-    }
-
-    if (node == head->mParent) {
-      head->mParent = rotated;
-      rotated->mRight = node;
-      node->mParent = rotated;
-    } else {
-      BlueprintExtractorTreeNodeRuntimeView* const parent = node->mParent;
-      if (node == parent->mRight) {
-        parent->mRight = rotated;
-      } else {
-        parent->mLeft = rotated;
-      }
-      rotated->mRight = node;
-      node->mParent = rotated;
-    }
-
-    return rotated;
-  }
-
-  /**
-   * Address: 0x007F2FA0 (FUN_007F2FA0, sub_7F2FA0)
-   *
-   * What it does:
-   * Destroys every non-sentinel node in one blueprint-extractor RB-tree
-   * subtree using right-recursive / left-linear traversal order.
-   */
-  [[maybe_unused]] void DestroyBlueprintExtractorTreeNodesRecursive(
-    BlueprintExtractorTreeNodeRuntimeView* node
-  ) noexcept
-  {
-    BlueprintExtractorTreeNodeRuntimeView* previous = node;
-    for (; previous != nullptr && previous->mIsSentinel == 0u; previous = node) {
-      DestroyBlueprintExtractorTreeNodesRecursive(node->mRight);
-      node = node->mLeft;
-      previous->mKeyStorage.tidy(true, 0u);
-      ::operator delete(previous);
-    }
-  }
-
-  /**
-   * Address: 0x007F2AC0 (FUN_007F2AC0, sub_7F2AC0)
-   *
-   * What it does:
-   * Clears one blueprint-extractor RB-tree lane, then resets head links
-   * (`parent/left/right`) and size metadata to empty.
-   */
-  [[maybe_unused]] BlueprintExtractorTreeNodeRuntimeView* ResetBlueprintExtractorTreeStorage(
-    BlueprintExtractorTreeNodeRuntimeView* const head,
-    std::uint32_t& sizeLane
-  ) noexcept
-  {
-    if (head == nullptr) {
-      sizeLane = 0u;
-      return nullptr;
-    }
-
-    DestroyBlueprintExtractorTreeNodesRecursive(head->mParent);
-    head->mParent = head;
-    sizeLane = 0u;
-    head->mLeft = head;
-    head->mRight = head;
-    return head;
-  }
-
-  /**
-   * Address: 0x007F1C50 (FUN_007F1C50, blueprint extractor map lower-bound lane)
-   *
-   * What it does:
-   * Returns one lower-bound iterator for `extractorName` in the global
-   * extractor registry map.
-   */
-  [[nodiscard]] BlueprintExtractorRegistry::iterator FindBlueprintExtractorLowerBound(
-    BlueprintExtractorRegistry& registry,
-    const std::string& extractorName
-  )
-  {
-    return registry.lower_bound(extractorName);
-  }
-
-  /**
-   * Address: 0x007F01D0 (FUN_007F01D0)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_7F01D0@<eax>(std::string *a1@<eax>, _DWORD *a2@<esi>);
-   *
-   * What it does:
-   * Runs `std::map<std::string, std::unique_ptr<RangeExtractor>>::find`
-   * for `extractorName` against `sBlueprintExtractors`: walks to the
-   * lower-bound node, then when the pivot is not the end sentinel tests
-   * `extractorName < pivot.key`; if that comparison succeeds the lookup
-   * returns the end sentinel, otherwise it returns the pivot iterator.
-   * The output slot `outIterator` receives either the resolved node or
-   * the end sentinel, matching the release binary's `{pivot, isEnd}`
-   * triplet used by callers in the range-extractor render and ranges
-   * paths.
-   */
-  BlueprintExtractorRegistry::iterator* FindBlueprintExtractorRegistryEntry(
-    BlueprintExtractorRegistry& registry,
-    const std::string& extractorName,
-    BlueprintExtractorRegistry::iterator* const outIterator
-  )
-  {
-    if (outIterator == nullptr) {
-      return nullptr;
-    }
-
-    const auto pivot = FindBlueprintExtractorLowerBound(registry, extractorName);
-    if (pivot == registry.end() || extractorName < pivot->first) {
-      *outIterator = registry.end();
-    } else {
-      *outIterator = pivot;
-    }
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x007F1880 (FUN_007F1880)
-   *
-   * What it does:
-   * Returns the current number of registered blueprint extractor entries.
-   */
-  [[maybe_unused]] [[nodiscard]] std::size_t GetBlueprintExtractorRegistrySizeLane() noexcept
-  {
-    return GetBlueprintExtractorRegistry().size();
-  }
 
   /**
    * Address: 0x007F00A0 (FUN_007F00A0, IDA's own demangled name:
@@ -295,38 +74,37 @@ namespace
   void RegisterExtractor(
     BlueprintExtractorRegistry& registry,
     const char* const blueprintRangeName,
-    std::unique_ptr<moho::RangeExtractor> extractor
+    moho::RangeExtractor* const extractor
   )
   {
-    if (!blueprintRangeName || !extractor) {
+    if (blueprintRangeName == nullptr || extractor == nullptr) {
       return;
     }
 
-    registry[blueprintRangeName] = std::move(extractor);
+    registry[msvc8::string(blueprintRangeName)] = extractor;
   }
 
-  [[nodiscard]] std::unique_ptr<moho::RangeExtractor>
-  CreateWeaponExtractor(const moho::UnitWeaponRangeCategory rangeCategory)
+  [[nodiscard]] moho::RangeExtractor* CreateWeaponExtractor(const moho::UnitWeaponRangeCategory rangeCategory)
   {
-    auto extractor = std::make_unique<moho::WeaponExtractor>();
+    auto* const extractor = new moho::WeaponExtractor();
     extractor->mRangeCategory = static_cast<std::int32_t>(rangeCategory);
     return extractor;
   }
 
   void PopulateBlueprintExtractors(BlueprintExtractorRegistry& registry)
   {
-    RegisterExtractor(registry, "AllMilitary", std::make_unique<moho::CombinedMilitaryExtractor>());
+    RegisterExtractor(registry, "AllMilitary", new moho::CombinedMilitaryExtractor());
     RegisterExtractor(registry, "DirectFire", CreateWeaponExtractor(moho::UWRC_DirectFire));
     RegisterExtractor(registry, "IndirectFire", CreateWeaponExtractor(moho::UWRC_IndirectFire));
     RegisterExtractor(registry, "AntiAir", CreateWeaponExtractor(moho::UWRC_AntiAir));
     RegisterExtractor(registry, "AntiNavy", CreateWeaponExtractor(moho::UWRC_AntiNavy));
-    RegisterExtractor(registry, "Defense", std::make_unique<moho::CountermeasureExtractor>());
-    RegisterExtractor(registry, "Miscellaneous", std::make_unique<moho::MiscellaneousExtractor>());
-    RegisterExtractor(registry, "AllIntel", std::make_unique<moho::IntelExtractor>());
-    RegisterExtractor(registry, "Radar", std::make_unique<moho::RadarExtractor>());
-    RegisterExtractor(registry, "Sonar", std::make_unique<moho::SonarExtractor>());
-    RegisterExtractor(registry, "Omni", std::make_unique<moho::OmniExtractor>());
-    RegisterExtractor(registry, "CounterIntel", std::make_unique<moho::CounterIntelExtractor>());
+    RegisterExtractor(registry, "Defense", new moho::CountermeasureExtractor());
+    RegisterExtractor(registry, "Miscellaneous", new moho::MiscellaneousExtractor());
+    RegisterExtractor(registry, "AllIntel", new moho::IntelExtractor());
+    RegisterExtractor(registry, "Radar", new moho::RadarExtractor());
+    RegisterExtractor(registry, "Sonar", new moho::SonarExtractor());
+    RegisterExtractor(registry, "Omni", new moho::OmniExtractor());
+    RegisterExtractor(registry, "CounterIntel", new moho::CounterIntelExtractor());
   }
 
   struct ExtractorVtableOnlyRuntimeView
@@ -641,6 +419,12 @@ namespace moho
     }
 
     BlueprintExtractorRegistry& registry = GetBlueprintExtractorRegistry();
+    // The shipped destructor walks the tree, runs each extractor's scalar
+    // deleting destructor through the pointer at node+0x28, and only then
+    // erases the whole range.
+    for (const auto& entry : registry) {
+      delete entry.second;
+    }
     registry.clear();
     gBlueprintExtractorsInitialized = false;
   }
@@ -665,17 +449,12 @@ namespace moho
     }
 
     BlueprintExtractorRegistry& registry = GetBlueprintExtractorRegistry();
-    const std::string rangeKey(extractorName.data(), extractorName.size());
 
-    // Mirror the release binary's `map::find` lane through the recovered
-    // helper so the lower-bound + "strictly less than" check sequence
-    // observed in FUN_007F01D0 stays invocable by name.
-    BlueprintExtractorRegistry::iterator foundEntry{};
-    (void)FindBlueprintExtractorRegistryEntry(registry, rangeKey, &foundEntry);
+    const auto foundEntry = registry.find(extractorName);
     if (foundEntry == registry.end()) {
       return nullptr;
     }
 
-    return foundEntry->second.get();
+    return foundEntry->second;
   }
 } // namespace moho
