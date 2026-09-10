@@ -40,28 +40,6 @@ namespace
     return lhs.mBoneIndex < rhs.mBoneIndex;
   }
 
-  struct HeapBackedRangeHandleRuntimeView
-  {
-    std::uint32_t reserved00; // +0x00
-    void* heapStorage;        // +0x04
-    void* rangeEnd;           // +0x08
-    void* rangeCapacityEnd;   // +0x0C
-  };
-
-  static_assert(
-    offsetof(HeapBackedRangeHandleRuntimeView, heapStorage) == 0x04,
-    "HeapBackedRangeHandleRuntimeView::heapStorage offset must be 0x04"
-  );
-  static_assert(
-    offsetof(HeapBackedRangeHandleRuntimeView, rangeEnd) == 0x08,
-    "HeapBackedRangeHandleRuntimeView::rangeEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(HeapBackedRangeHandleRuntimeView, rangeCapacityEnd) == 0x0C,
-    "HeapBackedRangeHandleRuntimeView::rangeCapacityEnd offset must be 0x0C"
-  );
-  static_assert(sizeof(HeapBackedRangeHandleRuntimeView) == 0x10, "HeapBackedRangeHandleRuntimeView size must be 0x10");
-
   /**
    * On-disk skeleton-bone record inside the SScmFile bone chunk.
    *
@@ -180,74 +158,6 @@ namespace
     }
 
     return outShared;
-  }
-
-  /**
-   * Address: 0x0054CA40 (FUN_0054CA40)
-   *
-   * What it does:
-   * Sets `vector<SAniSkelBone>` length to `requestedCount` by destroying tail
-   * lanes on shrink and value-initializing new lanes on growth.
-   */
-  [[nodiscard]] std::size_t ResizeAniSkelBoneVector(
-    msvc8::vector<moho::SAniSkelBone>& storage,
-    const std::size_t requestedCount
-  )
-  {
-    // Both arms are resize(): shrink destroys the surplus tail and rebases
-    // mLast, grow value-initialises the new slots.
-    storage.resize(requestedCount);
-    return requestedCount;
-  }
-
-  /**
-   * Address: 0x0054C080 (FUN_0054C080)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `(storage,count)` lane to the
-   * canonical `ResizeAniSkelBoneVector` implementation.
-   */
-  [[nodiscard]] std::uint32_t ResizeAniSkelBoneVectorRegisterAdapter(
-    msvc8::vector<moho::SAniSkelBone>& storage,
-    const std::uint32_t requestedCount
-  )
-  {
-    return static_cast<std::uint32_t>(ResizeAniSkelBoneVector(storage, requestedCount));
-  }
-
-  /**
-   * Address: 0x0054CB80 (FUN_0054CB80)
-   *
-   * What it does:
-   * Sets `vector<SAniSkelBoneNameIndex>` length to `requestedCount` using one
-   * caller-provided fill lane for growth.
-   */
-  [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithFill(
-    msvc8::vector<moho::SAniSkelBoneNameIndex>& storage,
-    const std::size_t requestedCount,
-    const moho::SAniSkelBoneNameIndex& fillValue
-  )
-  {
-    // Both arms are resize(n, val). SAniSkelBoneNameIndex is trivially
-    // destructible, which is why the binary's shrink is a bare mLast rebase.
-    storage.resize(requestedCount, fillValue);
-    return requestedCount;
-  }
-
-  /**
-   * Address: 0x0054C190 (FUN_0054C190)
-   *
-   * What it does:
-   * Resizes `vector<SAniSkelBoneNameIndex>` to `requestedCount` using one
-   * zero-initialized fill lane for growth.
-   */
-  [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithDefaultFill(
-    msvc8::vector<moho::SAniSkelBoneNameIndex>& storage,
-    const std::size_t requestedCount
-  )
-  {
-    const moho::SAniSkelBoneNameIndex defaultFill{};
-    return ResizeAniSkelBoneNameIndexVectorWithFill(storage, requestedCount, defaultFill);
   }
 
   /**
@@ -387,52 +297,6 @@ namespace
     return pointerSlot;
   }
 
-  void ResetHeapBackedRangeHandle(HeapBackedRangeHandleRuntimeView& view) noexcept
-  {
-    if (view.heapStorage != nullptr) {
-      ::operator delete(view.heapStorage);
-    }
-    view.heapStorage = nullptr;
-    view.rangeEnd = nullptr;
-    view.rangeCapacityEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x0054CB30 (FUN_0054CB30)
-   *
-   * What it does:
-   * Releases one heap-backed range-handle lane and clears all active range
-   * pointers.
-   */
-  void ResetHeapBackedRangeHandleLaneA(HeapBackedRangeHandleRuntimeView& view) noexcept
-  {
-    ResetHeapBackedRangeHandle(view);
-  }
-
-  /**
-   * Address: 0x0054CC40 (FUN_0054CC40)
-   *
-   * What it does:
-   * Secondary release/clear lane for the same heap-backed range-handle
-   * runtime shape.
-   */
-  void ResetHeapBackedRangeHandleLaneB(HeapBackedRangeHandleRuntimeView& view) noexcept
-  {
-    ResetHeapBackedRangeHandle(view);
-  }
-
-  /**
-   * Address: 0x0054CD70 (FUN_0054CD70)
-   *
-   * What it does:
-   * Third release/clear lane for the same heap-backed range-handle runtime
-   * shape.
-   */
-  void ResetHeapBackedRangeHandleLaneC(HeapBackedRangeHandleRuntimeView& view) noexcept
-  {
-    ResetHeapBackedRangeHandle(view);
-  }
-
   /**
    * Address: 0x0054D3B0 (FUN_0054D3B0)
    *
@@ -487,22 +351,6 @@ namespace
     return destination;
   }
 
-  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleValueNullable(
-    std::uint32_t count,
-    moho::SAniSkelBone* destination,
-    const moho::SAniSkelBone* const value
-  ) noexcept
-  {
-    while (count != 0u) {
-      if (destination != nullptr) {
-        (void)CopyAniSkelBone(destination, value);
-      }
-      --count;
-      ++destination;
-    }
-    return destination;
-  }
-
   /**
    * Address: 0x0054EC00 (FUN_0054EC00)
    *
@@ -528,22 +376,6 @@ namespace
   }
 
   /**
-   * Address: 0x0054E2D0 (FUN_0054E2D0)
-   *
-   * What it does:
-   * Register-shape adapter that fills one contiguous skeleton-bone lane range
-   * from a single source lane.
-   */
-  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeRegisterAdapter(
-    const moho::SAniSkelBone* const value,
-    moho::SAniSkelBone* const destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    return CopyAniSkelBoneCountedNullable(count, destination, value);
-  }
-
-  /**
    * Address: 0x0054E000 (FUN_0054E000)
    *
    * What it does:
@@ -563,27 +395,6 @@ namespace
     }
 
     return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0054E070 (FUN_0054E070)
-   *
-   * What it does:
-   * Fills one destination-bone range from a single template-bone lane using
-   * non-null copy semantics.
-   */
-  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleNonNull(
-    moho::SAniSkelBone* destinationBegin,
-    const moho::SAniSkelBone* const value,
-    const moho::SAniSkelBone* const destinationEnd
-  ) noexcept
-  {
-    moho::SAniSkelBone* result = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      result = CopyAniSkelBoneNonNull(destinationBegin, value);
-      ++destinationBegin;
-    }
-    return result;
   }
 
   /**
@@ -625,33 +436,6 @@ namespace
   {
     (void)CopyAniSkelBoneCountedNullable(count, destinationBegin, nullptr);
     return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x0054D050 (FUN_0054D050)
-   *
-   * What it does:
-   * Conditionally copies one source-tail range into destination storage,
-   * updates one runtime range-end lane, and stores the destination begin lane
-   * through one caller-provided pointer slot.
-   */
-  [[nodiscard]] moho::SAniSkelBone** CopyAniSkelBoneTailAndStoreDestinationBegin(
-    moho::SAniSkelBone** const outDestinationBegin,
-    HeapBackedRangeHandleRuntimeView* const rangeHandle,
-    moho::SAniSkelBone* const destinationBegin,
-    const moho::SAniSkelBone* const sourceBegin
-  ) noexcept
-  {
-    if (destinationBegin != sourceBegin) {
-      rangeHandle->rangeEnd = CopyAniSkelBoneRangeForwardNonNull(
-        sourceBegin,
-        destinationBegin,
-        static_cast<const moho::SAniSkelBone*>(rangeHandle->rangeEnd)
-      );
-    }
-
-    *outDestinationBegin = destinationBegin;
-    return outDestinationBegin;
   }
 
   /**
@@ -936,10 +720,8 @@ namespace moho
     msvc8::vector<const char*> boneNamePointers{};
     moho::scm_file::FillBoneNamePointers(scmFile, boneNamePointers);
 
-    (void)ResizeAniSkelBoneVector(mBones, boneCount);
-    (void)ResizeAniSkelBoneNameIndexVectorWithFill(
-      mBoneNameToIndex, boneCount, SAniSkelBoneNameIndex{nullptr, 0}
-    );
+    mBones.resize(boneCount);
+    mBoneNameToIndex.resize(boneCount, SAniSkelBoneNameIndex{nullptr, 0});
 
     const auto* const boneRecords = reinterpret_cast<const SScmBoneRecord*>(
       reinterpret_cast<const std::uint8_t*>(&scmFile) + scmFile.mBoneTableOffset
