@@ -1,6 +1,6 @@
 #include "moho/render/Clutter.h"
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
@@ -1002,9 +1002,7 @@ namespace
    */
   [[nodiscard]] moho::ClutterRegionKeyNode* AllocateRegionKeyNode()
   {
-    auto* const node = static_cast<moho::ClutterRegionKeyNode*>(
-      gpg::core::legacy::AllocateChecked28ByteLane(1u)
-    );
+    auto* const node = msvc8::detail::allocate_checked<moho::ClutterRegionKeyNode>(1u);
     node->left = nullptr;
     node->parent = nullptr;
     node->right = nullptr;

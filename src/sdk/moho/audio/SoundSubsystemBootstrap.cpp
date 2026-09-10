@@ -21,7 +21,7 @@
 #include <utility>
 
 #include "boost/mutex.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "moho/audio/CSndParams.h"
 
 namespace
@@ -127,7 +127,7 @@ namespace
   [[nodiscard]] SoundTreeHeadNode* AllocateSentinelTreeHead()
   {
     auto* const head =
-      static_cast<SoundTreeHeadNode*>(gpg::core::legacy::AllocateChecked24ByteLane(1u));
+      msvc8::detail::allocate_checked<SoundTreeHeadNode>(1u);
     if (head == nullptr) {
       return nullptr;
     }
@@ -153,7 +153,7 @@ namespace
   [[nodiscard]] SoundListNode* AllocateSelfLinkedListNode()
   {
     auto* const node =
-      static_cast<SoundListNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+      msvc8::detail::allocate_checked<SoundListNode>(1u);
     if (node == nullptr) {
       return nullptr;
     }

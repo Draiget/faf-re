@@ -28,7 +28,6 @@
 #include "legacy/containers/Vector.h"
 #include "legacy/containers/Map.h"
 #include "gpg/core/containers/BitArray2D.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"

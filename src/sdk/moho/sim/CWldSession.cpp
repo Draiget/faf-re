@@ -658,6 +658,46 @@ namespace
 // is msvc8::vector<void*>::throw_too_long and is cited there.
 [[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
 
+namespace
+{
+  /**
+   * Address: 0x00861DC0 (FUN_00861DC0)
+   *
+   * IDA signature:
+   * void* __cdecl sub_861DC0();
+   *
+   * What it does:
+   * Allocates one 3152-byte (0xC50) buffer through VC8's `_Allocate` with the
+   * count folded to the constant (0x008620F0, cited on
+   * `msvc8::detail::allocate_checked`), zeroes the first three dwords and marks
+   * a two-byte initialized / not-yet-flushed flag pair near the end
+   * (`+0xC48 = 1`, `+0xC49 = 0`).
+   *
+   * Reached directly from the CRT static-initializer table (`__xc_a`, depth
+   * 1): the constructor body of a namespace-scope static object with
+   * non-trivial construction. Its address neighbours (0x00861D70, then
+   * 0x00861EB0 in this file) place it in this translation unit; the owning
+   * global is not yet identified from the binary (its callers 0x00860DE0,
+   * 0x008614D0, 0x00861A60 and the `__xc_a` registrar 0x00BE5CF0 are
+   * unrecovered), so it stays a free function until that declaration lands.
+   */
+  [[maybe_unused]] void* AllocateAndTagStaticBootstrapBuffer3152()
+  {
+    void* const buffer = msvc8::detail::allocate_checked<std::uint8_t>(0xC50u);
+    if (buffer != nullptr) {
+      auto* const dwords = static_cast<std::uint32_t*>(buffer);
+      dwords[0] = 0u;
+      dwords[1] = 0u;
+      dwords[2] = 0u;
+
+      auto* const bytes = static_cast<std::uint8_t*>(buffer);
+      bytes[0xC48] = 1u;
+      bytes[0xC49] = 0u;
+    }
+    return buffer;
+  }
+} // namespace
+
 namespace moho
 {
   gpg::RType* SSessionSaveData::sType = nullptr;

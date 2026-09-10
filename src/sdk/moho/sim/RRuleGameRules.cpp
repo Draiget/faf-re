@@ -17,7 +17,7 @@
 #include "boost/thread.h"
 #include "../resource/RResId.h"
 #include "gpg/core/algorithms/MD5.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/time/Timer.h"
@@ -141,7 +141,7 @@ namespace moho
      */
     [[nodiscard]] BlueprintMapHeadNodeRuntimeView* AllocateBlueprintMapHeadNodeRuntime()
     {
-      auto* const node = static_cast<BlueprintMapHeadNodeRuntimeView*>(gpg::core::legacy::AllocateChecked48ByteLane(1u));
+      auto* const node = msvc8::detail::allocate_checked<BlueprintMapHeadNodeRuntimeView>(1u);
       if (node != nullptr) {
         node->parent = 0;
       }

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "Wm3IntrBox2Circle2.h"
 
 using namespace moho;
@@ -74,12 +74,11 @@ namespace
    */
   [[nodiscard]] VisionDbIntrusiveListNodeRuntime* VisionDbAllocateSelfLinkedListSentinel12()
   {
-    auto* const rawNode = static_cast<std::uint8_t*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
-    if (rawNode == nullptr) {
+    auto* const node = msvc8::detail::allocate_checked<VisionDbIntrusiveListNodeRuntime>(1u);
+    if (node == nullptr) {
       return nullptr;
     }
 
-    auto* const node = reinterpret_cast<VisionDbIntrusiveListNodeRuntime*>(rawNode);
     node->next = node;
     node->prev = node;
     return node;

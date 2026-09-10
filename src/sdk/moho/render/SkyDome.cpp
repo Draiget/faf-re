@@ -6,7 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/DrawContext.hpp"
@@ -144,9 +144,7 @@ namespace
     const void* const vertexData
   )
   {
-    auto* const node = static_cast<moho::SkyDomeDecalUploadNode*>(
-      gpg::core::legacy::AllocateChecked48ByteLane(1u)
-    );
+    auto* const node = msvc8::detail::allocate_checked<moho::SkyDomeDecalUploadNode>(1u);
 
     node->mNext = next;
     node->mPrev = prev;
@@ -185,9 +183,7 @@ namespace
    */
   [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadListSentinel()
   {
-    auto* const node = static_cast<moho::SkyDomeDecalUploadNode*>(
-      gpg::core::legacy::AllocateChecked48ByteLane(1u)
-    );
+    auto* const node = msvc8::detail::allocate_checked<moho::SkyDomeDecalUploadNode>(1u);
     node->mNext = node;
     node->mPrev = node;
     return node;

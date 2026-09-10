@@ -7,7 +7,7 @@
 
 #include <stdexcept>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/time/Timer.h"
@@ -206,9 +206,7 @@ namespace
       newCapacity = requiredSize;
     }
 
-    Generator* const newBuffer = static_cast<Generator*>(
-      gpg::core::legacy::AllocateCheckedDwordLaneOrEmpty(static_cast<std::uint32_t>(newCapacity))
-    );
+    Generator* const newBuffer = msvc8::detail::allocate_checked<Generator>(newCapacity);
 
     const std::size_t prefixCount = static_cast<std::size_t>(pos - start);
     if (prefixCount != 0u) {

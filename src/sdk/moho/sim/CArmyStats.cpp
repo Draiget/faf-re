@@ -23,7 +23,7 @@
 #include <intrin.h>
 #endif
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Logging.h"
@@ -354,7 +354,7 @@ namespace
   [[maybe_unused]] [[nodiscard]] ArmyTriggerSentinelRuntimeNode* AllocateSelfLinkedArmyTriggerSentinel()
   {
     auto* const node =
-      static_cast<ArmyTriggerSentinelRuntimeNode*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
+      msvc8::detail::allocate_checked<ArmyTriggerSentinelRuntimeNode>(1u);
     node->next = node;
     node->prev = node;
     return node;

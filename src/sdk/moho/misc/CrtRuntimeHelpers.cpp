@@ -5,7 +5,6 @@
 
 #include <Windows.h>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
