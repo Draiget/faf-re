@@ -267,6 +267,7 @@ namespace moho
      * present chain when they differ, then relinks at the new owner's head --
      * i.e. exactly `ResetFromOwnerLinkSlot(other.ownerLinkSlot)`, which is
      * why the two share one body in the binary.
+     * Address: 0x00836B90 (FUN_00836B90 -- `WeakPtr<T>::operator=` (unlink from the old owner chain, relink at `other.ownerLinkSlot`), 48-byte element; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0; callers 0x00835DF0; formerly `RelinkIntrusiveNodeViaIndirectOwner` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
      */
     WeakPtr<T>& operator=(const WeakPtr<T>& other) noexcept
     {
@@ -520,6 +521,9 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x00836BD0 (FUN_00836BD0 -- `WeakPtr<T>::ResetFromObject` (the owner's weak-link head at +0x08); `UserUnit::UpdateUnitData` 0x008C0750; callers 0x008C0750; formerly `RelinkIntrusiveNodeViaOwnerOffset08` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+     */
     void ResetFromObject(T* object) noexcept
     {
       ResetFromOwnerLinkSlot(EncodeOwnerLinkSlot(object));

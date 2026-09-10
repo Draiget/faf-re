@@ -1703,6 +1703,8 @@ namespace msvc8
          * Address: 0x00507920 (FUN_00507920 -- the default constructor's three null stores for `msvc8::vector<moho::SDelayedSubVizInfo>` (the debug-proxy slot untouched); zero callers, unreachable. Formerly `ClearDelayedSubVizVectorLanes` in moho/sim/SDelayedSubVizInfoReflection.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00498AF0 (FUN_00498AF0 -- the default constructor's null triple for `msvc8::vector<std::uint32_t>` as emitted for the particle render buckets; caller 0x00496A30 (`operator=`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00498ED0 (FUN_00498ED0 -- the default constructor's null triple for `std::uint32_t`; callers 0x00496E70; formerly `InitializeLegacyDwordVectorStorageB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate legacy `vector<uint32_t>` storage initializer with overflow guard.)
+         * Address: 0x008DCAD0 (FUN_008DCAD0 -- `vector<T>::vector()` null triple for a 20-byte element; zero callers, unreachable; formerly `InitializeElement20VectorStorage` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x008DCB20 (FUN_008DCB20 -- `vector<T>::vector()` null triple for a 4-byte element; zero callers, unreachable; formerly `InitializeDwordVectorStorage` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         vector() noexcept :
     		myProxy_{},
@@ -2513,6 +2515,7 @@ namespace msvc8
         /**
          * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly `IsSDecalInfoVectorRuntimeEmpty` over a hand-rolled `SDecalInfoVectorRuntimeView` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00507980 (FUN_00507980 -- `empty()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `IsDelayedSubVizLaneSpanEmpty` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00836E80 (FUN_00836E80 -- `vector<T>::empty()` for a 48-byte element (`_Myfirst == 0 || size() == 0`; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0 reads it); callers 0x00835DF0; formerly `IsElement48RangeEmpty` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         [[nodiscard]] bool empty() const noexcept {
 	        return first_ == last_;
@@ -2577,6 +2580,10 @@ namespace msvc8
          * Address: 0x00495750 (FUN_00495750 -- `size()` for `msvc8::vector<TrailRuntimeView>`; caller 0x00499630 (`insert`).)
          * Address: 0x00495950 (FUN_00495950 -- `size()` for `msvc8::vector<SWorldBeam>`; caller 0x00499A20 (BeamRenderHelpers.cpp).)
          * Address: 0x00495D60 (FUN_00495D60 -- `vector<BeamRenderVertexRuntime>::size()` (0x3C-byte element); callers 0x0049A1D0; formerly `GetBeamRenderVertexCount` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007EFF80 (FUN_007EFF80 -- `vector<SRangeRenderProfile>::size()` (136-byte element; `(last - first) / 136` via the 0x1E1E1E1F magic); callers 0x007F1490; formerly `CountElement136RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x00889C60 (FUN_00889C60 -- `vector<SRangeRenderProfile>::size()` (136-byte element; `(last - first) / 136` via the 0x1E1E1E1F magic); callers 0x0088A400 (unreached); formerly `CountElement136RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x007FAF90 (FUN_007FAF90 -- `vector<T>::size()` for a 20-byte element (`_Insert_n` 0x007FB060 reads it); callers 0x007FB060; formerly `CountElement20RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x008487F0 (FUN_008487F0 -- `vector<DockCandidate>::size()` (12-byte element; the `push_back` growth path 0x00849250 reads it); callers 0x00849250; formerly `CountElement12RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -3050,7 +3057,7 @@ namespace msvc8
          *
          * Address: 0x0082DB00 (FUN_0082DB00, `msvc8::vector<void*>::resize`
          * for the 4-byte pointer element -- shrinks via the destroy-range
-         * helper FUN_0082F750 (recovered, LegacyContainerRuntime.cpp) or
+         * helper FUN_0082F750 (cited on `erase(first, last)`) or
          * grows via the `_Insert_n` emission FUN_0082F7A0 (already cited on
          * this template, stride 4). Reached from `UICommandGraph::
          * ObtainHashListNodePair<TNode,TValue>`'s rehash-growth branch,
@@ -4200,6 +4207,9 @@ namespace msvc8
          * Address: 0x00495850 (FUN_00495850 -- `erase(first, last)` for `TrailRuntimeView` (element copy 0x0049BDD0, destructor 0x0049BE90); callers 0x00493DA0, 0x004945C0.)
          * Address: 0x00498AA0 (FUN_00498AA0 -- `erase(first, last)` for the particle buckets' `msvc8::vector<std::uint32_t>` (tail memmove, iterator through the hidden slot); zero callers, unreachable.)
          * Address: 0x0049B760 (FUN_0049B760 -- ICF-separated copy of that `uint32` erase; zero callers.)
+         * Address: 0x0082DE20 (FUN_0082DE20 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (UICommandGraph's hash-bucket vector, shrink path of `resize` 0x0082CBA0); callers 0x0082CBA0; formerly `MoveDwordTailLaneA` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x0082F1C0 (FUN_0082F1C0 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (second 4-byte instantiation, shrink path of 0x0082D820); callers 0x0082D820; formerly `MoveDwordTailLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x0082F750 (FUN_0082F750 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (third 4-byte instantiation, shrink path of 0x0082DB00); callers 0x0082DB00; formerly `MoveDwordTailLaneC` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6370,6 +6380,7 @@ namespace msvc8
          * Address: 0x0049F900 (FUN_0049F900 -- the `std::fill` seam step of `_Insert_n` for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueByEndPointerA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Writes one repeated dword source value into `[destinationBegin, destinationEnd)`.)
          * Address: 0x0049F980 (FUN_0049F980 -- the `std::fill` seam step of `_Insert_n` for `ParticleRenderIntervalRuntime`; zero callers, unreachable; formerly `FillDwordPairRangeFromSingleValueByEndPointerB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-pair fill helper using destination begin/end pointers.)
          * Address: 0x0049FA00 (FUN_0049FA00 -- the `std::fill` seam step of `_Insert_n` for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueByEndPointerB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword fill helper using destination begin/end pointers.)
+         * Address: 0x007F3530 (FUN_007F3530 -- the `std::fill` seam step of `_Insert_n` for a 16-byte element (0x007F1D50); callers 0x007F1D50; formerly `FillQuadWordBlocks` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -9578,6 +9589,10 @@ namespace msvc8
          * Address: 0x004A04A0 (FUN_004A04A0 -- `_Copy_backward` (the in-place tail shift) for `std::uint32_t`; zero callers, unreachable; formerly `MoveDwordRangeByEndPointerAndReturnEndDuplicateE` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range move-by-end-pointer helper.)
          * Address: 0x004A0510 (FUN_004A0510 -- `_Copy_backward` (the in-place tail shift) for `ParticleRenderIntervalRuntime`; zero callers, unreachable; formerly `CopyBackwardDwordPairRangeAndReturnBeginDuplicateD` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate backward dword-pair range copy helper.)
          * Address: 0x004A0530 (FUN_004A0530 -- `_Copy_backward` (the in-place tail shift) for `std::uint32_t`; zero callers, unreachable; formerly `MoveDwordRangeByEndPointerAndReturnEndDuplicateF` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range move-by-end-pointer helper.)
+         * Address: 0x00831690 (FUN_00831690 -- `_Copy_backward` for a 4-byte element (the `_Insert_n` seam shift of 0x0082DE90); callers 0x0082DE90; formerly `CopyDwordRangeBackwardLaneA` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x008318B0 (FUN_008318B0 -- `_Copy_backward` for a 4-byte element (the `_Insert_n` seam shift of 0x0082F210); callers 0x0082F210; formerly `CopyDwordRangeBackwardLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x00831960 (FUN_00831960 -- `_Copy_backward` for a 4-byte element (the `_Insert_n` seam shift of 0x0082F7A0); callers 0x0082F7A0; formerly `CopyDwordRangeBackwardLaneC` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x007F3560 (FUN_007F3560 -- `_Copy_backward` for a 16-byte element (the `_Insert_n` seam shift of 0x007F1D50); callers 0x007F1D50; formerly `CopyQuadWordBlocksBackward` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {

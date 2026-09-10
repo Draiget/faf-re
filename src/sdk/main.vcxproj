@@ -381,7 +381,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\containers\BVSet.cpp" />
     <ClCompile Include="moho\containers\BitStorage32.cpp" />
     <ClCompile Include="moho\containers\LegacyContainerFillLanes.cpp" />
-    <ClCompile Include="moho\containers\LegacyContainerRuntime.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorUIntReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorEntIdReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorIFormationInstanceReflection.cpp" />

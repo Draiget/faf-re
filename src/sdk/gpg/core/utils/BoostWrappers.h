@@ -329,6 +329,8 @@ namespace boost
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
          * on last use, and clears the borrowed raw-ptr lanes.
+         * Address: 0x007FAD40 (FUN_007FAD40 -- `shared_ptr<T>::reset()` (`px = 0; pn.release()`) as emitted for WRenViewport's device-resource handles (0x007F70F0); callers 0x007F70F0; formerly `ClearSharedOwnershipPairLaneA` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x007FADB0 (FUN_007FADB0 -- `shared_ptr<T>::reset()` (`px = 0; pn.release()`), the second handle type of 0x007F70F0; callers 0x007F70F0; formerly `ClearSharedOwnershipPairLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          */
         void release() noexcept {
             detail::sp_counted_base* const control = pi;

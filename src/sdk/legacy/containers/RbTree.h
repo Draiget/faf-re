@@ -1503,6 +1503,16 @@ namespace msvc8
              * member's plain `node_ = rb_increment(node_); return *this;`
              * is therefore byte-for-byte behaviorally equivalent to all
              * four checked emissions on every valid (non-`end()`) input.
+             * Address: 0x007F2640 (FUN_007F2640 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0xB9 (0xA8-byte value); callers 0x007F2210; formerly `AscendLink0ToOffsetB9Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F2F10 (FUN_007F2F10 -- the right-subtree-leftmost half of `rb_iterator::operator++` for a node whose nil byte sits at +0xB9; callers 0x007F2210; formerly `WalkLink8ToOffsetB9Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F3000 (FUN_007F3000 -- the right-subtree-leftmost half of `rb_iterator::operator++` for a node whose nil byte sits at +0x2D (0x1C-byte value); callers 0x007F27F0; formerly `WalkLink8ToOffset2DSentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F3020 (FUN_007F3020 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x2D; callers 0x007F27F0; formerly `AscendLink0ToOffset2DSentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B140 (FUN_0083B140 -- the right-subtree-leftmost half of `rb_iterator::operator++` over the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map); callers 0x0083A640; formerly `WalkLink8ToOffset2DSentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B160 (FUN_0083B160 -- the ascend half of `rb_iterator::operator++` over the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map); callers 0x0083A640; formerly `AscendLink0ToOffset2DSentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B510 (FUN_0083B510 -- the right-subtree-leftmost half of `rb_iterator::operator++` over the file-static map with a 4-byte mapped value at 0x010C3748 (`_Myhead` 0x010C374C, nil byte at node+0x15; UiRuntimeTypes.cpp's key-repeat map); callers 0x0083AA70; formerly `WalkLink8ToOffset15Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B530 (FUN_0083B530 -- the ascend half of `rb_iterator::operator++` over the file-static map with a 4-byte mapped value at 0x010C3748 (`_Myhead` 0x010C374C, nil byte at node+0x15; UiRuntimeTypes.cpp's key-repeat map); callers 0x0083AA70; formerly `AscendLink0ToOffset15Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00849860 (FUN_00849860 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x15 (4-byte value; caller 0x00898B10); callers 0x00898B10; formerly `AscendLink0ToOffset15SentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00849BF0 (FUN_00849BF0 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x39 (0x28-byte value; caller 0x00849900); callers 0x00849900; formerly `AscendLink0ToOffset39Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              */
             rb_iterator& operator++() noexcept
             {
@@ -2640,6 +2650,7 @@ namespace msvc8
              * `moho/containers/LegacyContainerRuntime.cpp` with zero
              * callers anywhere in `src/sdk`; not consolidated in this pass
              * (see the `header()` note above for why).
+             * Address: 0x0083A620 (FUN_0083A620 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `begin()` (`_Myhead->_Left` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerPointee` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
@@ -2653,6 +2664,7 @@ namespace msvc8
              * `moho/containers/LegacyContainerRuntime.cpp` with zero
              * callers anywhere in `src/sdk`; not consolidated in this pass
              * (see the `header()` note above for why).
+             * Address: 0x0083B840 (FUN_0083B840 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `size()` (`_Mysize` at 0x010C1AD8); zero callers, unreachable; formerly `ReadPrimaryGlobalScalarValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              */
             [[nodiscard]] size_type size() const noexcept { return size_; }
             [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
@@ -7962,6 +7974,7 @@ namespace msvc8
              * erase-fixup path (never from insert, which is the missing-
              * rebalance bug `insert_hint`'s citation above documents).
              * Address: 0x0056CEE0 (FUN_0056CEE0, sub_56CEE0 -- `_Lrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             * Address: 0x0083B0F0 (FUN_0083B0F0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_left`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeLeftViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -8242,6 +8255,7 @@ namespace msvc8
              * described on `rotate_left` above -- also byte-for-byte correct,
              * also only ever reached from the erase-fixup path.
              * Address: 0x0056CF90 (FUN_0056CF90, sub_56CF90 -- `_Rrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             * Address: 0x0083B1A0 (FUN_0083B1A0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_right`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeRightViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -8886,6 +8900,10 @@ namespace msvc8
              */
             // ---- 12-byte payload (x86); field order is ABI ---------------------
             _Container_proxy* proxy_; // +0x00
+            /**
+             * Address: 0x0083A630 (FUN_0083A630 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` (`_Myhead` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B0E0 (FUN_0083B0E0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` / the `_Myhead` read the rotations and lower_bound start from; zero callers, unreachable; formerly `ReadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             */
             node_type* head_;         // +0x04
             size_type size_;          // +0x08
         };
