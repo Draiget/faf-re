@@ -2714,6 +2714,11 @@ namespace moho
   {
     if (SimulationRef != nullptr && SimulationRef->mEntityDB != nullptr) {
       (void)SimulationRef->mEntityDB->ReleaseId(static_cast<std::uint32_t>(id_));
+      // ReleaseId untracks by id, which misses an entity whose id no longer
+      // matches (or was never released). The runtime entity list is a side
+      // structure this recovery maintains by hand, so drop the pointer on the
+      // one event that is always true - see CEntityDb::UntrackEntity.
+      SimulationRef->mEntityDB->UntrackEntity(this);
     }
 
     delete mMotor;

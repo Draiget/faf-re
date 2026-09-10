@@ -382,6 +382,21 @@ namespace moho
     [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;
 
     /**
+     * Drops one entity from the runtime entity list by pointer.
+     *
+     * Not a binary function: `Entities()` is a side list this recovery keeps
+     * because the shipped all-entity walk (0x006B6AA0 / 0x005C87A0) has not
+     * been recovered yet, and a side list has to be maintained by hand.
+     * `ReleaseId` already untracks by id, but that only works while the
+     * entity's `id_` still matches - anything that dies without its id being
+     * released, or whose id was reassigned first, leaves the raw pointer
+     * behind, and the next `AdvanceBeat` walk dereferences it. `~Entity`
+     * calls this so the pointer leaves the list on the one event that is
+     * always true: the object going away.
+     */
+    void UntrackEntity(const Entity* entity) noexcept;
+
+    /**
      * Address: 0x00679B80 (FUN_00679B80, the `Moho::Entity::OnDestroy` lane),
      * node buy at 0x0067DE00 (`std::list<Entity*>::_Buynode`), size bump at
      * `std::list::_Incsize`.
