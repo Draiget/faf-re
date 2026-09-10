@@ -540,7 +540,7 @@ namespace moho
     replayReader.ReadExact(armyCount);
 
     launchInfo->mArmyLaunchInfo.clear();
-    moho::ResizeArmyLaunchInfoVectorWithFill(launchInfo->mArmyLaunchInfo, armyCount, moho::ArmyLaunchInfo{});
+    launchInfo->mArmyLaunchInfo.resize(armyCount, moho::ArmyLaunchInfo{});
     launchInfo->mStrVec.clear();
     launchInfo->mStrVec.reserve(armyCount);
 
