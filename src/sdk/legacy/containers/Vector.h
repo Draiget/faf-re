@@ -1714,6 +1714,7 @@ namespace msvc8
          * Address: 0x008DCAD0 (FUN_008DCAD0 -- `vector<T>::vector()` null triple for a 20-byte element; zero callers, unreachable; formerly `InitializeElement20VectorStorage` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x008DCB20 (FUN_008DCB20 -- `vector<T>::vector()` null triple for a 4-byte element; zero callers, unreachable; formerly `InitializeDwordVectorStorage` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x00510430 (FUN_00510430 -- `vector()` -- null the three lanes; no vftable store, so this is the container and not the element's constructor for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly `ClearEmitterCurveKeyPayloadLanes` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007AE820 (FUN_007AE820 -- `vector()` -- null the three lanes on the static `RCamManager` storage's `mCams` for `msvc8::vector<moho::CameraImpl*>` (`RCamManager::mCams`); zero callers, unreachable; formerly `ResetStaticCamManagerStorageVectorLanes` in moho/render/RCamManager.cpp (RULE ONE), removed 2026-09-11.)
          */
         vector() noexcept :
     		myProxy_{},

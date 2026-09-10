@@ -2991,6 +2991,9 @@
     <ClInclude Include="legacy\algorithms\Sort.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="legacy\algorithms\Remove.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="legacy\containers\HashMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
