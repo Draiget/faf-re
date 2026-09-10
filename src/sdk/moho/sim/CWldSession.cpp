@@ -16191,8 +16191,14 @@ namespace moho
 
     // The command graph only gets marked here; the mesh rebuild it implies runs
     // back in `SessionFrame`.
-    if (const boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false); commandGraph.px != nullptr) {
-      commandGraph.px->MarkDirty();
+    {
+      // Owning handle - `SharedPtrRaw` has no destructor, so it has to be
+      // released by hand exactly where the binary open-codes the release.
+      boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
+      if (commandGraph.px != nullptr) {
+        commandGraph.px->MarkDirty();
+      }
+      commandGraph.release();
     }
 
     if (worldCamera != nullptr) {
@@ -16405,8 +16411,12 @@ namespace moho
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
     }
 
-    if (const boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false); commandGraph.px != nullptr) {
-      commandGraph.px->CreateMeshes();
+    {
+      boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
+      if (commandGraph.px != nullptr) {
+        commandGraph.px->CreateMeshes();
+      }
+      commandGraph.release();
     }
 
     // 0x00409AC0 - the binary names this `CTaskStage::DoFrame`; it is the same

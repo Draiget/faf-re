@@ -501,8 +501,11 @@ namespace moho
    */
   void DrawCommandGraph(CameraImpl* const camera, CUIWorldViewBuildDragRuntimeView& buildDrag, CD3DPrimBatcher* const batcher)
   {
-    const boost::SharedPtrRaw<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
+    // Owning handle: the binary releases it at 0x00853F0B, on the way out of
+    // this function, after the last `graphActive` read.
+    boost::SharedPtrRaw<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
     const bool graphActive = (graph.px != nullptr);
+    graph.release();
 
     if (buildDrag.mUnknown5D != graphActive) {
       buildDrag.mUnknown5D = graphActive;
@@ -570,14 +573,24 @@ namespace moho
   )
   {
     if (mIsMiniMap || !MAUI_KeyIsDown(MKEY_SHIFT)) {
-      mComGraph = boost::SharedPtrRaw<UICommandGraph>{};
+      // 0x0086ED0B drops the cached handle through the shared-count release,
+      // not by overwriting the (px, pi) pair. `SharedPtrRaw` is a layout
+      // mirror with no destructor, so an assignment here leaked the reference
+      // and the graph - with one live `UnitPlace` ghost mesh per queued build
+      // order hanging off its draw nodes - was never destroyed.
+      mComGraph.release();
     } else {
       if (mComGraph.px == nullptr) {
-        mComGraph = mWldSession->GetCommandGraph(/*allowCreate=*/true);
+        boost::SharedPtrRaw<UICommandGraph> created = mWldSession->GetCommandGraph(/*allowCreate=*/true);
+        mComGraph.reset_from(created);
+        created.release();
       }
 
-      const boost::SharedPtrRaw<UICommandGraph> graph = mWldSession->GetCommandGraph(/*allowCreate=*/false);
+      // Every `GetCommandGraph` hands back an owning reference; the binary
+      // releases this one at 0x0085AF60 before returning from `sub_85AF40`.
+      boost::SharedPtrRaw<UICommandGraph> graph = mWldSession->GetCommandGraph(/*allowCreate=*/false);
       DrawCommandGraphMeshIfPresent(graph.px, mCamera->CameraGetView(), *batcher, renderPass, deltaSeconds);
+      graph.release();
 
       DrawAllUnitSkirts(batcher, mWldSession, mCamera->CameraGetView());
     }
