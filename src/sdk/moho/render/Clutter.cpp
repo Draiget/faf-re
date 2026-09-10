@@ -24,10 +24,7 @@
 
 namespace
 {
-  struct RegionKeyVtableResetTag
-  {
-    virtual ~RegionKeyVtableResetTag() = default;
-  };
+
 
   struct RegionRuntimeVtableResetTag
   {
@@ -75,17 +72,12 @@ namespace
   static_assert(sizeof(CWldTerrainResRuntimeView) == 0x8, "CWldTerrainResRuntimeView size must be 0x8");
   static_assert(offsetof(CWldTerrainResRuntimeView, map) == 0x4, "CWldTerrainResRuntimeView::map offset must be 0x4");
 
-  RegionKeyVtableResetTag gRegionKeyVtableResetTag{};
+
   RegionRuntimeVtableResetTag gRegionRuntimeVtableResetTag{};
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
   UpdateInstanceVtableTag gUpdateInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
-
-  [[nodiscard]] void* RegionKeyVtableResetToken()
-  {
-    return *reinterpret_cast<void**>(&gRegionKeyVtableResetTag);
-  }
 
   [[nodiscard]] void* RegionRuntimeVtableResetToken()
   {
@@ -100,72 +92,6 @@ namespace
   [[nodiscard]] void* UpdateInstanceVtableToken()
   {
     return *reinterpret_cast<void**>(&gUpdateInstanceVtableTag);
-  }
-
-  /**
-   * Address: 0x007D5C90 (FUN_007D5C90)
-   *
-   * What it does:
-   * Initializes one region-key runtime lane from explicit `(x,z)` coordinates.
-   */
-  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromCoordinates(
-    moho::ClutterRegionKey* const outKey,
-    const std::int32_t x,
-    const std::int32_t z
-  ) noexcept
-  {
-    if (outKey == nullptr) {
-      return nullptr;
-    }
-
-    outKey->vtable = RegionKeyVtableResetToken();
-    outKey->mX = x;
-    outKey->mZ = z;
-    return outKey;
-  }
-
-  /**
-   * Address: 0x007D5CA0 (FUN_007D5CA0)
-   *
-   * What it does:
-   * Initializes one region-key runtime lane by copying `(x,z)` from one
-   * clutter-region lane.
-   */
-  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromRegion(
-    moho::ClutterRegionKey* const outKey,
-    const moho::ClutterRegion* const region
-  ) noexcept
-  {
-    if (outKey == nullptr) {
-      return nullptr;
-    }
-
-    outKey->vtable = RegionKeyVtableResetToken();
-    outKey->mX = region != nullptr ? region->mX : 0;
-    outKey->mZ = region != nullptr ? region->mZ : 0;
-    return outKey;
-  }
-
-  /**
-   * Address: 0x007D92A0 (FUN_007D92A0)
-   *
-   * What it does:
-   * Initializes one region-key runtime lane by copying coordinates from one
-   * source region-key lane.
-   */
-  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromSourceKey(
-    moho::ClutterRegionKey* const outKey,
-    const moho::ClutterRegionKey* const sourceKey
-  ) noexcept
-  {
-    if (outKey == nullptr) {
-      return nullptr;
-    }
-
-    outKey->vtable = RegionKeyVtableResetToken();
-    outKey->mX = sourceKey != nullptr ? sourceKey->mX : 0;
-    outKey->mZ = sourceKey != nullptr ? sourceKey->mZ : 0;
-    return outKey;
   }
 
   /**
@@ -303,30 +229,6 @@ namespace
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo32);
   }
 
-  [[nodiscard]] bool IsTreeNil(
-    const moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKeyNode* const node
-  )
-  {
-    return (node == nullptr) || (tree && tree->head && node == tree->head) || (node && node->isNil != 0u);
-  }
-
-  [[nodiscard]] bool IsTreeBlack(
-    const moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKeyNode* const node
-  )
-  {
-    return IsTreeNil(tree, node) || node->color == 1u;
-  }
-
-  [[nodiscard]] bool RegionKeyLess(
-    const moho::ClutterRegionKey& lhs,
-    const moho::ClutterRegionKey& rhs
-  )
-  {
-    return (lhs.mX < rhs.mX) || (lhs.mX == rhs.mX && lhs.mZ < rhs.mZ);
-  }
-
   [[nodiscard]] int AlignDownToEven(const int value) noexcept
   {
     return (value % 2 != 0) ? (value - 1) : value;
@@ -404,467 +306,6 @@ namespace
   }
 
   /**
-   * Address: 0x007D90E0 (FUN_007D90E0)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_7D90E0@<eax>(_DWORD *result@<eax>);
-   *
-   * What it does:
-   * `rb_tree<ClutterRegionKeyNode>::_Min`: walks `node->left` (offset +0x00)
-   * while the child's `isNil` byte (offset +0x19, matching
-   * `ClutterRegionKeyNode::isNil`) is clear, returning the leftmost
-   * descendant. Called from `EraseRegionKeyNode` (FUN_007D8AE0) both
-   * directly (successor lookup) and via `RefreshTreeEndpoints`'s
-   * head-endpoint recompute.
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* TreeMinimum(
-    const moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* node
-  )
-  {
-    while (!IsTreeNil(tree, node) && !IsTreeNil(tree, node->left)) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x007D90C0 (FUN_007D90C0)
-   *
-   * IDA signature:
-   * int __usercall sub_7D90C0@<eax>(int result@<eax>);
-   *
-   * What it does:
-   * `rb_tree<ClutterRegionKeyNode>::_Max`: mirror of `TreeMinimum`, walking
-   * `node->right` (offset +0x08) while the child's `isNil` byte is clear,
-   * returning the rightmost descendant. Called from `EraseRegionKeyNode`
-   * (FUN_007D8AE0) via `RefreshTreeEndpoints`'s head-endpoint recompute
-   * (the binary's inline cached-endpoint shortcut is expressed here as an
-   * unconditional recompute from root, which is behaviorally equivalent).
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* TreeMaximum(
-    const moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* node
-  )
-  {
-    while (!IsTreeNil(tree, node) && !IsTreeNil(tree, node->right)) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  void RefreshTreeEndpoints(moho::ClutterRegionKeyTreeState* const tree)
-  {
-    if (!tree || !tree->head) {
-      return;
-    }
-
-    moho::ClutterRegionKeyNode* const head = tree->head;
-    moho::ClutterRegionKeyNode* const root = head->parent;
-    if (IsTreeNil(tree, root)) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    root->parent = head;
-    head->left = TreeMinimum(tree, root);
-    head->right = TreeMaximum(tree, root);
-  }
-
-  /**
-   * Address: 0x007D8E20 (FUN_007D8E20, sub_7D8E20)
-   *
-   * What it does:
-   * `rb_tree<ClutterRegionKeyNode>::_Lrotate`: rotates `pivot`'s right child
-   * up into `pivot`'s slot, re-parenting the moved subtree and patching the
-   * tree head's root link when `pivot` was the root.
-   */
-  void RotateTreeLeft(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* const pivot
-  )
-  {
-    moho::ClutterRegionKeyNode* const right = pivot->right;
-    pivot->right = right->left;
-    if (!IsTreeNil(tree, right->left)) {
-      right->left->parent = pivot;
-    }
-
-    right->parent = pivot->parent;
-    if (pivot == tree->head->parent) {
-      tree->head->parent = right;
-    } else if (pivot == pivot->parent->left) {
-      pivot->parent->left = right;
-    } else {
-      pivot->parent->right = right;
-    }
-
-    right->left = pivot;
-    pivot->parent = right;
-  }
-
-  /**
-   * Address: 0x007D8E70 (FUN_007D8E70, sub_7D8E70)
-   *
-   * What it does:
-   * `rb_tree<ClutterRegionKeyNode>::_Rrotate`: mirror of `RotateTreeLeft`,
-   * lifting `pivot`'s left child into `pivot`'s slot.
-   */
-  void RotateTreeRight(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* const pivot
-  )
-  {
-    moho::ClutterRegionKeyNode* const left = pivot->left;
-    pivot->left = left->right;
-    if (!IsTreeNil(tree, left->right)) {
-      left->right->parent = pivot;
-    }
-
-    left->parent = pivot->parent;
-    if (pivot == tree->head->parent) {
-      tree->head->parent = left;
-    } else if (pivot == pivot->parent->right) {
-      pivot->parent->right = left;
-    } else {
-      pivot->parent->left = left;
-    }
-
-    left->right = pivot;
-    pivot->parent = left;
-  }
-
-  void ReplaceTreeNode(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* const target,
-    moho::ClutterRegionKeyNode* const replacement
-  )
-  {
-    if (target->parent == tree->head) {
-      tree->head->parent = replacement;
-    } else if (target == target->parent->left) {
-      target->parent->left = replacement;
-    } else {
-      target->parent->right = replacement;
-    }
-
-    if (!IsTreeNil(tree, replacement)) {
-      replacement->parent = target->parent;
-    }
-  }
-
-  void FixupAfterTreeErase(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* node,
-    moho::ClutterRegionKeyNode* parent
-  )
-  {
-    while (node != tree->head->parent && IsTreeBlack(tree, node)) {
-      if (parent == tree->head) {
-        break;
-      }
-
-      if (node == parent->left) {
-        moho::ClutterRegionKeyNode* sibling = parent->right;
-        if (!IsTreeBlack(tree, sibling)) {
-          sibling->color = 1;
-          parent->color = 0;
-          RotateTreeLeft(tree, parent);
-          sibling = parent->right;
-        }
-
-        const bool siblingLeftBlack = IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->left);
-        const bool siblingRightBlack = IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->right);
-        if (siblingLeftBlack && siblingRightBlack) {
-          if (!IsTreeNil(tree, sibling)) {
-            sibling->color = 0;
-          }
-          node = parent;
-          parent = parent->parent;
-        } else {
-          if (IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->right)) {
-            if (!IsTreeNil(tree, sibling->left)) {
-              sibling->left->color = 1;
-            }
-            if (!IsTreeNil(tree, sibling)) {
-              sibling->color = 0;
-            }
-            if (!IsTreeNil(tree, sibling)) {
-              RotateTreeRight(tree, sibling);
-            }
-            sibling = parent->right;
-          }
-
-          if (!IsTreeNil(tree, sibling)) {
-            sibling->color = parent->color;
-          }
-          parent->color = 1;
-          if (!IsTreeNil(tree, sibling->right)) {
-            sibling->right->color = 1;
-          }
-          RotateTreeLeft(tree, parent);
-          node = tree->head->parent;
-          break;
-        }
-      } else {
-        moho::ClutterRegionKeyNode* sibling = parent->left;
-        if (!IsTreeBlack(tree, sibling)) {
-          sibling->color = 1;
-          parent->color = 0;
-          RotateTreeRight(tree, parent);
-          sibling = parent->left;
-        }
-
-        const bool siblingRightBlack = IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->right);
-        const bool siblingLeftBlack = IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->left);
-        if (siblingRightBlack && siblingLeftBlack) {
-          if (!IsTreeNil(tree, sibling)) {
-            sibling->color = 0;
-          }
-          node = parent;
-          parent = parent->parent;
-        } else {
-          if (IsTreeNil(tree, sibling) || IsTreeBlack(tree, sibling->left)) {
-            if (!IsTreeNil(tree, sibling->right)) {
-              sibling->right->color = 1;
-            }
-            if (!IsTreeNil(tree, sibling)) {
-              sibling->color = 0;
-            }
-            if (!IsTreeNil(tree, sibling)) {
-              RotateTreeLeft(tree, sibling);
-            }
-            sibling = parent->left;
-          }
-
-          if (!IsTreeNil(tree, sibling)) {
-            sibling->color = parent->color;
-          }
-          parent->color = 1;
-          if (!IsTreeNil(tree, sibling->left)) {
-            sibling->left->color = 1;
-          }
-          RotateTreeRight(tree, parent);
-          node = tree->head->parent;
-          break;
-        }
-      }
-    }
-
-    if (!IsTreeNil(tree, node)) {
-      node->color = 1;
-    } else {
-      tree->head->color = 1;
-    }
-  }
-
-  /**
-   * Address: 0x007D8DE0 (FUN_007D8DE0)
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* FindLowerBound(
-    moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKey& key
-  )
-  {
-    moho::ClutterRegionKeyNode* result = tree->head;
-    moho::ClutterRegionKeyNode* node = tree->head->parent;
-
-    while (!IsTreeNil(tree, node)) {
-      if (RegionKeyLess(node->key, key)) {
-        node = node->right;
-      } else {
-        result = node;
-        node = node->left;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Address: 0x007D7C20 (FUN_007D7C20)
-   *
-   * What it does:
-   * Finds one exact region-key match and stores either that node or the tree
-   * head sentinel (miss) into `outNode`.
-   */
-  moho::ClutterRegionKeyNode** FindRegionKeyExactOrHead(
-    moho::ClutterRegionKeyNode** const outNode,
-    moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKey& key
-  )
-  {
-    if (outNode == nullptr || tree == nullptr || tree->head == nullptr) {
-      return outNode;
-    }
-
-    moho::ClutterRegionKeyNode* const candidate = FindLowerBound(tree, key);
-    if (candidate == tree->head || RegionKeyLess(key, candidate->key)) {
-      *outNode = tree->head;
-    } else {
-      *outNode = candidate;
-    }
-    return outNode;
-  }
-
-  /**
-   * Address: 0x007D9100 (FUN_007D9100)
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* FindUpperBound(
-    moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKey& key
-  )
-  {
-    moho::ClutterRegionKeyNode* result = tree->head;
-    moho::ClutterRegionKeyNode* node = tree->head->parent;
-
-    while (!IsTreeNil(tree, node)) {
-      if (RegionKeyLess(key, node->key)) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Address: 0x007D9340 (FUN_007D9340)
-   */
-  void AdvanceRegionKeyIterator(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode*& iteratorNode
-  )
-  {
-    if (IsTreeNil(tree, iteratorNode)) {
-      return;
-    }
-
-    if (!IsTreeNil(tree, iteratorNode->right)) {
-      iteratorNode = iteratorNode->right;
-      while (!IsTreeNil(tree, iteratorNode->left)) {
-        iteratorNode = iteratorNode->left;
-      }
-      return;
-    }
-
-    moho::ClutterRegionKeyNode* parent = iteratorNode->parent;
-    while (!IsTreeNil(tree, parent) && iteratorNode == parent->right) {
-      iteratorNode = parent;
-      parent = parent->parent;
-    }
-    iteratorNode = parent;
-  }
-
-  /**
-   * Address: 0x007D8AE0 (FUN_007D8AE0)
-   */
-  void EraseRegionKeyNode(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode* const eraseNode
-  )
-  {
-    moho::ClutterRegionKeyNode* target = eraseNode;
-    moho::ClutterRegionKeyNode* replacement = tree->head;
-    moho::ClutterRegionKeyNode* fixupParent = tree->head;
-    bool removedBlack = IsTreeBlack(tree, target);
-
-    if (IsTreeNil(tree, eraseNode->left)) {
-      replacement = eraseNode->right;
-      fixupParent = eraseNode->parent;
-      ReplaceTreeNode(tree, eraseNode, eraseNode->right);
-    } else if (IsTreeNil(tree, eraseNode->right)) {
-      replacement = eraseNode->left;
-      fixupParent = eraseNode->parent;
-      ReplaceTreeNode(tree, eraseNode, eraseNode->left);
-    } else {
-      target = TreeMinimum(tree, eraseNode->right);
-      removedBlack = IsTreeBlack(tree, target);
-      replacement = target->right;
-
-      if (target->parent == eraseNode) {
-        fixupParent = target;
-      } else {
-        fixupParent = target->parent;
-        ReplaceTreeNode(tree, target, target->right);
-        target->right = eraseNode->right;
-        target->right->parent = target;
-      }
-
-      ReplaceTreeNode(tree, eraseNode, target);
-      target->left = eraseNode->left;
-      target->left->parent = target;
-      target->color = eraseNode->color;
-    }
-
-    if (removedBlack) {
-      FixupAfterTreeErase(tree, replacement, fixupParent);
-    }
-
-    moho::ResetRegionKeyVtable(&eraseNode->key);
-    ::operator delete(eraseNode);
-    if (tree->size != 0u) {
-      --tree->size;
-    }
-
-    RefreshTreeEndpoints(tree);
-  }
-
-  /**
-   * Address: 0x007D80D0 (FUN_007D80D0)
-   */
-  moho::ClutterRegionKeyNode** __stdcall EraseRegionKeyNodeRange(
-    moho::ClutterRegionKeyTreeState* const tree,
-    moho::ClutterRegionKeyNode** const outNext,
-    moho::ClutterRegionKeyNode* first,
-    moho::ClutterRegionKeyNode* const last
-  )
-  {
-    moho::ClutterRegionKeyNode* const head = tree->head;
-    if (first == head->left && last == head) {
-      moho::DestroyRegionKeySubtree(nullptr, head->parent);
-      head->parent = head;
-      tree->size = 0;
-      head->left = head;
-      head->right = head;
-      *outNext = head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      moho::ClutterRegionKeyNode* const eraseNode = first;
-      if (first->isNil == 0u) {
-        AdvanceRegionKeyIterator(tree, first);
-      }
-      EraseRegionKeyNode(tree, eraseNode);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
-
-  /**
-   * Address: 0x007D7A80 (FUN_007D7A80)
-   *
-   * What it does:
-   * Erases all region-key nodes, releases the tree head sentinel lane, and
-   * resets the owner state to an empty/null tree.
-   */
-  std::int32_t ClearRegionKeyTreeStorageLaneA(moho::ClutterRegionKeyTreeState* const tree)
-  {
-    moho::ClutterRegionKeyNode* outNext = nullptr;
-    (void)EraseRegionKeyNodeRange(tree, &outNext, tree->head->left, tree->head);
-    ::operator delete(tree->head);
-    tree->head = nullptr;
-    tree->size = 0;
-    return 0;
-  }
-
-  /**
    * Address: 0x007D7A10 (FUN_007D7A10)
    */
   void ClearIntrusiveListNodes(moho::ClutterIntrusiveListState* const list)
@@ -880,18 +321,6 @@ namespace
       ::operator delete(node);
       node = next;
     }
-  }
-
-  /**
-   * Address: 0x007D61B0 (FUN_007D61B0)
-   */
-  void ClearRegionKeyTreeStorage(moho::ClutterRegionKeyTreeState* const tree)
-  {
-    moho::ClutterRegionKeyNode* iterator = nullptr;
-    (void)EraseRegionKeyNodeRange(tree, &iterator, tree->head->left, tree->head);
-    ::operator delete(tree->head);
-    tree->head = nullptr;
-    tree->size = 0;
   }
 
   /**
@@ -989,160 +418,6 @@ namespace
     node->prev = node;
     node->payload = nullptr;
     return node;
-  }
-
-  /**
-   * Address: 0x007D9140 (FUN_007D9140)
-   *
-   * What it does:
-   * Allocates one region-key RB-tree node through the checked 28-byte
-   * allocation lane (`AllocateChecked28ByteLane`, FUN_007D97A0) and
-   * initializes its parent/child links, key payload, and red/non-nil color
-   * flags.
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* AllocateRegionKeyNode()
-  {
-    auto* const node = msvc8::detail::allocate_checked<moho::ClutterRegionKeyNode>(1u);
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->key.vtable = nullptr;
-    node->key.mX = 0;
-    node->key.mZ = 0;
-    node->color = 1;
-    node->isNil = 0;
-    node->reserved1A[0] = 0;
-    node->reserved1A[1] = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x007D8EC0 (FUN_007D8EC0)
-   *
-   * What it does:
-   * Allocates one region-key RB-tree node and initializes parent/child links,
-   * key payload, and red/non-nil color flags.
-   */
-  [[nodiscard]] moho::ClutterRegionKeyNode* AllocateRegionKeyTreeNode(
-    moho::ClutterRegionKeyNode* const left,
-    moho::ClutterRegionKeyNode* const parent,
-    moho::ClutterRegionKeyNode* const right,
-    const moho::ClutterRegionKey& key
-  )
-  {
-    moho::ClutterRegionKeyNode* const node = AllocateRegionKeyNode();
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->key.vtable = RegionKeyVtableResetToken();
-    node->key.mX = key.mX;
-    node->key.mZ = key.mZ;
-    node->color = 0;
-    node->isNil = 0;
-    return node;
-  }
-
-  [[nodiscard]] bool InsertRegionKeyIntoTree(
-    moho::ClutterRegionKeyTreeState* const tree,
-    const moho::ClutterRegionKey& key
-  )
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return false;
-    }
-
-    constexpr std::uint32_t kMaxRegionKeyCount = 0x15555554u;
-    if (tree->size >= kMaxRegionKeyCount) {
-      throw std::length_error("map/set<T> too long");
-    }
-
-    moho::ClutterRegionKeyNode* parent = tree->head;
-    moho::ClutterRegionKeyNode* probe = tree->head->parent;
-    bool insertOnLeft = true;
-
-    while (!IsTreeNil(tree, probe)) {
-      parent = probe;
-      if (RegionKeyLess(key, probe->key)) {
-        probe = probe->left;
-        insertOnLeft = true;
-      } else if (RegionKeyLess(probe->key, key)) {
-        probe = probe->right;
-        insertOnLeft = false;
-      } else {
-        return false;
-      }
-    }
-
-    moho::ClutterRegionKeyNode* inserted =
-      AllocateRegionKeyTreeNode(tree->head, parent, tree->head, key);
-    if (inserted == nullptr) {
-      return false;
-    }
-
-    if (parent == tree->head) {
-      tree->head->parent = inserted;
-      tree->head->left = inserted;
-      tree->head->right = inserted;
-    } else if (insertOnLeft) {
-      parent->left = inserted;
-    } else {
-      parent->right = inserted;
-    }
-
-    ++tree->size;
-
-    while (inserted != tree->head->parent && !IsTreeBlack(tree, inserted->parent)) {
-      moho::ClutterRegionKeyNode* parentNode = inserted->parent;
-      moho::ClutterRegionKeyNode* grandParent = parentNode->parent;
-
-      if (parentNode == grandParent->left) {
-        moho::ClutterRegionKeyNode* const uncle = grandParent->right;
-        if (!IsTreeBlack(tree, uncle)) {
-          parentNode->color = 1;
-          uncle->color = 1;
-          grandParent->color = 0;
-          inserted = grandParent;
-        } else {
-          if (inserted == parentNode->right) {
-            inserted = parentNode;
-            RotateTreeLeft(tree, inserted);
-            parentNode = inserted->parent;
-            grandParent = parentNode->parent;
-          }
-
-          parentNode->color = 1;
-          grandParent->color = 0;
-          RotateTreeRight(tree, grandParent);
-        }
-      } else {
-        moho::ClutterRegionKeyNode* const uncle = grandParent->left;
-        if (!IsTreeBlack(tree, uncle)) {
-          parentNode->color = 1;
-          uncle->color = 1;
-          grandParent->color = 0;
-          inserted = grandParent;
-        } else {
-          if (inserted == parentNode->left) {
-            inserted = parentNode;
-            RotateTreeRight(tree, inserted);
-            parentNode = inserted->parent;
-            grandParent = parentNode->parent;
-          }
-
-          parentNode->color = 1;
-          grandParent->color = 0;
-          RotateTreeLeft(tree, grandParent);
-        }
-      }
-    }
-
-    tree->head->parent->color = 1;
-    RefreshTreeEndpoints(tree);
-    return true;
   }
 
   [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
@@ -1478,12 +753,6 @@ namespace moho
     // default-constructed automatically here, matching the real binary's
     // `` `eh vector constructor iterator' `` call in this constructor.
 
-    mKeys.head = AllocateRegionKeyNode();
-    mKeys.head->isNil = 1;
-    mKeys.head->parent = mKeys.head;
-    mKeys.head->left = mKeys.head;
-    mKeys.head->right = mKeys.head;
-    mKeys.size = 0;
     mCurRegion = nullptr;
 
     std::memset(mBuffer, 0, sizeof(mBuffer));
@@ -1500,9 +769,7 @@ namespace moho
   {
     Shutdown();
 
-    if (mKeys.head) {
-      ClearRegionKeyTreeStorage(&mKeys);
-    }
+
 
     // mSurfaces[256] (moho::ClutterSurfaceEntry, real dtor above) is
     // destroyed automatically as part of this destructor's implicit member
@@ -1704,22 +971,7 @@ namespace moho
    */
   bool Clutter::IsCluttered(const int x, const int z)
   {
-    ClutterRegionKey lookupKey{};
-    lookupKey.vtable = RegionKeyVtableResetToken();
-    lookupKey.mX = x;
-    lookupKey.mZ = z;
-
-    ClutterRegionKeyNode* candidate = mKeys.head;
-    (void)FindRegionKeyExactOrHead(&candidate, &mKeys, lookupKey);
-    return candidate != nullptr && candidate != mKeys.head;
-  }
-
-  /**
-   * Address: 0x007D5CC0 (FUN_007D5CC0)
-   */
-  void ResetRegionKeyVtable(ClutterRegionKey* const key)
-  {
-    key->vtable = RegionKeyVtableResetToken();
+    return mKeys.find(ClutterRegionKey(x, z)) != mKeys.end();
   }
 
   /**
@@ -1749,25 +1001,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007D81C0 (FUN_007D81C0)
-   */
-  void DestroyRegionKeySubtree(Clutter* const owner, ClutterRegionKeyNode* node)
-  {
-    (void)owner;
-
-    ClutterRegionKeyNode* deleteCursor = node;
-    ClutterRegionKeyNode* walk = node;
-
-    while (walk && walk->isNil == 0u) {
-      DestroyRegionKeySubtree(owner, walk->right);
-      walk = walk->left;
-      ResetRegionKeyVtable(&deleteCursor->key);
-      ::operator delete(deleteCursor);
-      deleteCursor = walk;
-    }
-  }
-
-  /**
    * Address: 0x007D5F80 (FUN_007D5F80)
    */
   ClutterRegionMapState* ResetRegionRuntimeState(ClutterRegion* const region)
@@ -1784,29 +1017,6 @@ namespace moho
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
     ApplyDestroyInstanceToRegionPayloads(region->mMap.head->next, region->mMap.head, destroyLane, meshRenderer);
     return ClearRegionMapList(&region->mMap);
-  }
-
-  /**
-   * Address: 0x007D7B90 (FUN_007D7B90)
-   */
-  std::uint32_t EraseRegionKeyRange(
-    ClutterRegionKey* const key,
-    ClutterRegionKeyTreeState* const tree
-  )
-  {
-    ClutterRegionKeyNode* const first = FindLowerBound(tree, *key);
-    ClutterRegionKeyNode* const end = FindUpperBound(tree, *key);
-    ClutterRegionKeyNode* countCursor = first;
-
-    std::uint32_t removedCount = 0;
-    while (countCursor != end) {
-      ++removedCount;
-      AdvanceRegionKeyIterator(tree, countCursor);
-    }
-
-    ClutterRegionKeyNode* outCursor = nullptr;
-    (void)EraseRegionKeyNodeRange(tree, &outCursor, first, end);
-    return removedCount;
   }
 
   /**
@@ -2047,11 +1257,7 @@ namespace moho
     region->mZ = z;
     region->mBox = box;
 
-    ClutterRegionKey regionKey{};
-    regionKey.vtable = RegionKeyVtableResetToken();
-    regionKey.mX = x;
-    regionKey.mZ = z;
-    (void)InsertRegionKeyIntoTree(&mKeys, regionKey);
+    (void)mKeys.insert(ClutterRegionKey(x, z));
 
     return region;
   }
@@ -2061,11 +1267,7 @@ namespace moho
    */
   void Clutter::DestroyRegion(ClutterRegion* const region)
   {
-    ClutterRegionKey regionKey{};
-    regionKey.vtable = RegionKeyVtableResetToken();
-    regionKey.mX = region->mX;
-    regionKey.mZ = region->mZ;
-    (void)EraseRegionKeyRange(&regionKey, &mKeys);
+    (void)mKeys.erase(ClutterRegionKey(*region));
 
     UnlinkRegion(region);
 
@@ -2091,16 +1293,7 @@ namespace moho
     }
     mCurRegion = nullptr;
 
-    if (!mKeys.head) {
-      mKeys.size = 0;
-      return;
-    }
-
-    DestroyRegionKeySubtree(this, mKeys.head->parent);
-    mKeys.head->parent = mKeys.head;
-    mKeys.size = 0;
-    mKeys.head->left = mKeys.head;
-    mKeys.head->right = mKeys.head;
+    mKeys.clear();
   }
 
   /**
@@ -2167,5 +1360,21 @@ namespace moho
       ::operator delete(node);
       node = nextNode;
     }
+  }
+} // namespace moho
+
+
+namespace moho
+{
+  /**
+   * Address: 0x007D5CA0 (FUN_007D5CA0)
+   *
+   * What it does:
+   * Builds one region key from a live region's grid coordinates.
+   */
+  ClutterRegionKey::ClutterRegionKey(const ClutterRegion& region) noexcept
+    : mX(region.mX)
+    , mZ(region.mZ)
+  {
   }
 } // namespace moho
