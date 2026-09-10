@@ -14437,7 +14437,13 @@ namespace moho
     CursorScreenPos.y = 0.0f;
     HighlightCommandId = -1;
 
-    mShowInvalidBuildPlacementPreview = false;
+    // 0x008934F1: `mov byte ptr [ebp+4D5h], 1`. Shipping this false made
+    // `SelectBuildPreviewColor` return the valid colour unconditionally, so a
+    // placement ghost stayed green everywhere -- a mass extractor looked
+    // buildable on bare ground, and the per-node gate in the build-drag
+    // preview (`canBuild || !mShowInvalidBuildPlacementPreview`) kept every
+    // rejected node visible too.
+    mShowInvalidBuildPlacementPreview = true;
     DisplayEconomyOverlay = false;
     mTeamColorMode = false;
 
