@@ -1791,7 +1791,7 @@ void gpg::WriteRawPointer(
     return;
   }
 
-  std::map<const void*, WriteArchive::TrackedPointerRecord>::iterator it = archive->mObjRefs.find(objectRef.mObj);
+  msvc8::map<const void*, WriteArchive::TrackedPointerRecord>::iterator it = archive->mObjRefs.find(objectRef.mObj);
   WriteArchive::TrackedPointerRecord* record = nullptr;
 
   if (it == archive->mObjRefs.end()) {
@@ -1800,7 +1800,7 @@ void gpg::WriteRawPointer(
     fresh.index = static_cast<int>(archive->mObjRefs.size());
     fresh.ownership = TrackedPointerState::Reserved;
 
-    const std::pair<std::map<const void*, WriteArchive::TrackedPointerRecord>::iterator, bool> inserted =
+    const std::pair<msvc8::map<const void*, WriteArchive::TrackedPointerRecord>::iterator, bool> inserted =
       archive->mObjRefs.insert(std::make_pair(objectRef.mObj, fresh));
     record = &inserted.first->second;
 

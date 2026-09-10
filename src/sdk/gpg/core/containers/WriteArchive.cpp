@@ -35,21 +35,7 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
-using TrackedPointerMap = std::map<const void*, WriteArchive::TrackedPointerRecord>;
-
-/**
- * Address: 0x0094FB40 (FUN_0094FB40)
- *
- * What it does:
- * Advances one tracked-pointer map iterator to the next in-order tree node.
- */
-[[maybe_unused]] TrackedPointerMap::const_iterator* AdvanceTrackedPointerMapIterator(
-    TrackedPointerMap::const_iterator* const cursor
-) noexcept
-{
-    ++(*cursor);
-    return cursor;
-}
+using TrackedPointerMap = msvc8::map<const void*, WriteArchive::TrackedPointerRecord>;
 
 class BinaryWriteArchive;
 
@@ -873,13 +859,13 @@ WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& 
  */
 void WriteArchive::WriteRefCounts(const RType* const type)
 {
-    const std::map<const RType*, int>::iterator it = mRefCounts.find(type);
+    const msvc8::map<const RType*, int>::iterator it = mRefCounts.find(type);
     if (it == mRefCounts.end()) {
         WriteInt(-1);
         msvc8::string typeName(type->GetName());
         WriteString(&typeName);
         WriteInt(type->version_);
-        mRefCounts.insert(std::make_pair(type, static_cast<int>(mRefCounts.size())));
+        (void)mRefCounts.insert({type, static_cast<int>(mRefCounts.size())});
         return;
     }
 
@@ -979,7 +965,7 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
     if (!skipOwnershipValidation) {
-        for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end();) {
+        for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
             const WriteArchive::TrackedPointerRecord& ptr = it->second;
             if (ptr.ownership == TrackedPointerState::Unowned) {
                 ThrowSerializationError(STR_Printf(
@@ -989,7 +975,6 @@ void WriteArchive::EndSection(const bool skipOwnershipValidation)
                 ));
             }
 
-            (void)AdvanceTrackedPointerMapIterator(&it);
         }
     }
 

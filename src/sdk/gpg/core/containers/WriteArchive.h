@@ -8,6 +8,7 @@
 #include <map>
 
 #include "ArchiveSerialization.h"
+#include "legacy/containers/Map.h"
 #include "boost/shared_ptr.h"
 
 namespace msvc8
@@ -274,8 +275,24 @@ namespace gpg
         WriteArchive* WriteCFunction(CClosure* closure, const gpg::RRef& ownerRef);
 
     protected:
-        std::map<const RType*, int> mRefCounts;   // +0x04
-        std::map<const void*, TrackedPointerRecord> mObjRefs;  // +0x10
+        /**
+         * Both are the legacy 12-byte `{proxy, head, size}` map heads, not the
+         * modern `std::map`. The ctor (0x00953BE0) constructs them at
+         * `[this+4]` and `[this+10h]`, twelve bytes apart, and both derived
+         * archives (0x00904740, 0x00939280) allocate 0x2C and start their own
+         * state at +0x20 -- which only closes if each head is 0x0C and the
+         * gap below it is one dword.
+         *
+         * `mObjRefs`'s node is 0x28 (allocator 0x009505D0) with colour/nil at
+         * `+0x24`/`+0x25`, and its insert guard (0x009512CC) compares against
+         * `0x0AAAAAA9` = `0xFFFFFFFF / 0x18 - 1`, so its `value_type` is 0x18.
+         * IDA types that tree `std::map_RRef_TrackedPointer`, and `RRef` is
+         * 0x08 -- so the shipped key is the whole `RRef`, not just its `mObj`,
+         * and the mapped record is 0x10 rather than the 0x0C modelled here.
+         * That correction touches every call site and is not made in this pass.
+         */
+        msvc8::map<const RType*, int> mRefCounts;                  // +0x04
+        msvc8::map<const void*, TrackedPointerRecord> mObjRefs;    // +0x10
 
         /**
          * One 4-byte slot at +0x1C that this class's own ctor and dtor never
@@ -302,12 +319,14 @@ namespace gpg
         friend void WriteRawPointer(WriteArchive* archive, const RRef& objectRef, TrackedPointerState state, const RRef& ownerRef);
     };
 
-    // NO size assert here on purpose. The binary's base is 0x20 (see
-    // field_0x1C above), but this class holds two std::maps and their size
-    // depends on the toolchain's iterator-debugging level, which differs
-    // between the isolated-TU check and the full Debug build. An exact sizeof
-    // gate on a std::map-bearing class therefore cannot hold in both, so the
-    // layout is documented on the members rather than asserted.
+    // The size gate holds now. It could not while the two members were
+    // `std::map`, whose size depends on the toolchain's iterator-debugging
+    // level and so differs between the isolated-TU check and the full Debug
+    // build; `msvc8::map` is the legacy 0x0C head in both, which is what the
+    // binary has, so the 0x20 base the two derived archives imply is now
+    // something the compiler can check.
+    static_assert(sizeof(msvc8::map<const RType*, int>) == 0x0C, "the legacy map head must be 0x0C");
+    static_assert(sizeof(WriteArchive) == 0x20, "gpg::WriteArchive size must be 0x20");
 
     /**
      * Address: import thunk used at 0x008812DC callsite
