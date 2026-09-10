@@ -3205,6 +3205,8 @@ namespace msvc8
          * Address: 0x00719DE0 (FUN_00719DE0 -- `resize(n, InfluenceGrid{})` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `ResizeInfluenceGridVectorWithDefaultFill` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071AEC0 (FUN_0071AEC0 -- `resize(n, value)` for the 0x38-byte `moho::SThreat`; callers 0x00719820; formerly `ResizeSThreatVectorWithFill` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00719820 (FUN_00719820 -- `resize(n, SThreat{})` for the 0x38-byte `moho::SThreat`; callers 0x007192E0; formerly `ResizeSThreatVectorWithZeroFill` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A8430 (FUN_008A8430 -- `resize(n, value)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); callers 0x008A54D0, 0x008A7C20; formerly `ResizeNormalMapHandleStorage` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A7C20 (FUN_008A7C20 -- `resize(n, value)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); zero callers, unreachable; formerly `ResizeNormalMapHandleStorage` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -4288,6 +4290,9 @@ namespace msvc8
          * Address: 0x004788C0 (FUN_004788C0 -- `erase(first, last)` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478700; formerly `EraseHeightFieldTierRange` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071E1C0 (FUN_0071E1C0 -- `erase(first, last)`'s tail move and `_Mylast` commit for the 0x38-byte `moho::SThreat`; zero callers, unreachable; formerly `MoveSThreatTailRangeAndUpdateOwnerEnd` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047DD40 (FUN_0047DD40 -- `erase(first, last)` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `EraseBandwidthSampleRange` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A8BC0 (FUN_008A8BC0 -- `erase(first, last)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); callers 0x008A8430; formerly `EraseNormalMapHandleRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A8B00 (FUN_008A8B00 -- `erase(first, last)` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; callers 0x008A1500, 0x008A83A0; formerly `EraseTerrainEnvironmentLookupPairRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A83A0 (FUN_008A83A0 -- `erase(begin(), end())` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; zero callers, unreachable; formerly `EraseAllTerrainEnvironmentLookupPairs` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -9716,6 +9721,7 @@ namespace msvc8
          * Address: 0x008503B0 (FUN_008503B0 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x0084FF80; formerly `CopyDwordRangeForwardRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00479300 (FUN_00479300 -- `_Copy_opt` (assign over live elements) for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940, 0x004790F0; formerly `CopyHeightFieldTierRangeToInitialized` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004790F0 (FUN_004790F0 -- a register-shape entry into `_Copy_opt` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `CopyHeightFieldTierRangeToInitializedThunk` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008A9E90 (FUN_008A9E90 -- `_Copy_opt` (assign over live elements) for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); callers 0x008A8BC0, 0x008A9B10; formerly `CopyAssignNormalMapHandleRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9839,6 +9845,7 @@ namespace msvc8
          * Address: 0x0047E3B0 (FUN_0047E3B0 -- `_Copy_backward` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80; formerly `CopyBandwidthRangeBackward` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008FF330 (FUN_008FF330 -- `_Copy_backward` for `gpg::gal::AdapterD3D10`; callers 0x008FF430, 0x008FF4D0; formerly `CopyAssignAdapterRangeBackwardCore` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008FF430 (FUN_008FF430 -- a register-shape entry into `_Copy_backward` for `gpg::gal::AdapterD3D10`; zero callers, unreachable; formerly `CopyAssignAdapterRangeBackwardDispatch` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008AA0B0 (FUN_008AA0B0 -- `_Copy_backward` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; callers 0x008A9BB0, 0x008A9FF0; formerly `CopyTerrainEnvironmentLookupPairRangeBackward` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
