@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "legacy/containers/Vector.h"
 #include <cstdint>
 
 #include "gpg/core/containers/String.h"
@@ -212,13 +213,12 @@ namespace moho
     virtual std::int32_t __stdcall GetGlobalVariable(std::uint16_t variableIndex, float* outValue) = 0; // +0x5C
   };
 
-  struct AudioPointerVectorStorage
-  {
-    void* mAllocatorCookie; // +0x00
-    void** mStart;          // +0x04
-    void** mFinish;         // +0x08
-    void** mEnd;            // +0x0C
-  };
+  // `{proxy, first, last, end}` at 0x10 is `msvc8::vector<void*>` itself: the
+  // bank and handle vectors hold opaque loader/handle pointers that the engine
+  // destroys through their own vtables before the storage is freed.
+  using AudioPointerVectorStorage = msvc8::vector<void*>;
+
+  static_assert(sizeof(AudioPointerVectorStorage) == 0x10, "AudioPointerVectorStorage size must be 0x10");
 
   struct Audio3DVector
   {
