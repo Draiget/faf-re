@@ -11547,6 +11547,7 @@ namespace msvc8
          * Address: 0x004E4A40 (FUN_004E4A40 -- the payload destructor pass a `clear()` runs over the range before freeing the nodes for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DF0E0; formerly `DestroyCSndVarPayloadRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005AAF60 (FUN_005AAF60 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<gpg::Rect2i>` (the reflected path-finder rect list; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x005AA000, 0x005AA310, 0x005AA576; formerly `ClearRect2iListStorage` in moho/ai/CAiPathFinderTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00702BB0 (FUN_00702BB0 -- `clear()` / `_Tidy` -- relink the header, zero the size, then walk the former payload nodes releasing each `shared_ptr`'s control block and freeing the node for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x007015C0, 0x007020B0, 0x00704A40; formerly `CArmyStats::ClearTriggerList` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005CFE10 (FUN_005CFE10 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CED30, 0x005CEDF0, 0x005CF130; formerly `ClearSiloTypeList` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          */
         void clear()
         {
@@ -11589,6 +11590,7 @@ namespace msvc8
 
         /**
          * Address: 0x004968B0 (FUN_004968B0 -- `list<ParticleBuffer*>::pop_front()` (erase of the head node) glue; zero callers, unreachable; formerly `PopLegacyForwardListHeadNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Pops the head node from one intrusive forward list and exports the removed node to caller storage.)
+         * Address: 0x005CFDB0 (FUN_005CFDB0 -- `pop_front()` -- unlink the node after the header, free it and drop the size for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CF1E0; formerly `PopFrontSiloType` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          */
         void pop_front()
         {
@@ -11977,6 +11979,7 @@ namespace msvc8
          * Address: 0x00529550 (FUN_00529550 -- the list constructor that buys it for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `InitializeSRuleFootprintsBlueprintList` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0081B790 (FUN_0081B790 -- `_Buy_head` -- allocate the 0x0C header sentinel and self-link its links for `msvc8::list<moho::VisionDB::Pool::PooledNode*>` (`VisionDB::Pool::mEntryBlocks` at +0x04 and `mFreeEntries` at +0x10; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x0081ACA0, 0x0081B5E0; formerly `VisionDbAllocateSelfLinkedListSentinel12` in moho/vision/VisionDB.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00702090 (FUN_00702090 -- `_Buy_head` -- allocate the 0x10 header sentinel and self-link its links for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x006FD7C0, 0x007015A0, 0x0070BEA0; formerly `AllocateSelfLinkedArmyTriggerSentinel` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005D01E0 (FUN_005D01E0 -- `_Buy_head` -- allocate the 0x0C header sentinel and self-link its links for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CED30, 0x005CF5B0, 0x005CFD20; formerly `AllocateSelfLinkedSiloTypeSentinel` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          */
         void _Buy_head()
         {

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
 #include "moho/ai/IAiSiloBuild.h"
 #include "moho/misc/CEconomyEvent.h"
 
@@ -52,19 +53,13 @@ namespace moho
     std::int32_t mMaxStorageCount; // +0x08
   };
 
-  struct SSiloTypeListNode
-  {
-    SSiloTypeListNode* mNext; // +0x00
-    SSiloTypeListNode* mPrev; // +0x04
-    ESiloType mValue;         // +0x08
-  };
-
-  struct SSiloTypeList
-  {
-    void* mProxyOrUnused;     // +0x00
-    SSiloTypeListNode* mHead; // +0x04
-    std::int32_t mSize;       // +0x08
-  };
+  /**
+   * The queued silo types. The 0x0C `{proxy, head, size}` head sits over a
+   * 0x0C `{next, prev, ESiloType}` node, which is `msvc8::list`'s node for a
+   * 4-byte element -- the same instantiation the reflection side
+   * (`CAiSiloBuildImplTypeInfo.cpp`) already names.
+   */
+  using SSiloTypeList = msvc8::list<ESiloType>;
 
   /**
    * VFTABLE: 0x00E1DDD4
@@ -222,7 +217,7 @@ namespace moho
   };
 
   static_assert(sizeof(SSiloBuildInfo) == 0x0C, "SSiloBuildInfo size must be 0x0C");
-  static_assert(sizeof(SSiloTypeListNode) == 0x0C, "SSiloTypeListNode size must be 0x0C");
+
   static_assert(sizeof(SSiloTypeList) == 0x0C, "SSiloTypeList size must be 0x0C");
   static_assert(offsetof(CAiSiloBuildImpl, mUnit) == 0x04, "CAiSiloBuildImpl::mUnit offset must be 0x04");
   static_assert(offsetof(CAiSiloBuildImpl, mSiloInfo) == 0x08, "CAiSiloBuildImpl::mSiloInfo offset must be 0x08");
