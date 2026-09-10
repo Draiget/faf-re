@@ -78,14 +78,18 @@ namespace moho
      */
     [[nodiscard]] bool Save(gpg::BinaryWriter& writer) const;
 
-    std::uint32_t mUnknown00;           // +0x00
-    CWldPropEntry* mEntriesBegin;       // +0x04
-    CWldPropEntry* mEntriesEnd;         // +0x08
-    CWldPropEntry* mEntriesCapacityEnd; // +0x0C
+    /**
+     * Address: 0x008916A0 (FUN_008916A0, Moho::CWldProps::~CWldProps,
+     * scalar-deleting variant)
+     *
+     * The whole object is one vector head: the proxy at `+0x00` and
+     * `{_Myfirst, _Mylast, _Myend}` at `+0x04`, `+0x08`, `+0x0C`. The growth
+     * cap the resize at 0x008922F0 checks is 0x04924924, which is
+     * `0xFFFFFFFF / 0x38` for this element. 0x008916A0 tidies it and frees
+     * the object: `delete props`.
+     */
+    msvc8::vector<CWldPropEntry> mEntries; // +0x00
   };
-  static_assert(offsetof(CWldProps, mEntriesBegin) == 0x04, "CWldProps::mEntriesBegin offset must be 0x04");
-  static_assert(offsetof(CWldProps, mEntriesEnd) == 0x08, "CWldProps::mEntriesEnd offset must be 0x08");
-  static_assert(offsetof(CWldProps, mEntriesCapacityEnd) == 0x0C, "CWldProps::mEntriesCapacityEnd offset must be 0x0C");
   static_assert(sizeof(CWldProps) == 0x10, "CWldProps size must be 0x10");
 
   /**

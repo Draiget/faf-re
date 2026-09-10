@@ -1369,129 +1369,9 @@ namespace
     }
   }
 
-  void DestroyPropsEntry(moho::CWldPropEntry& entry) noexcept
-  {
-    entry.mBlueprintPath.tidy(true, 0U);
-  }
-
-  /**
-   * Address: 0x00891700 (FUN_00891700, sub_891700)
-   *
-   * What it does:
-   * Destroys one contiguous CWldPropEntry string lane range in-place.
-   */
-  void DestroyPropsEntriesRange(moho::CWldPropEntry* const begin, moho::CWldPropEntry* const end) noexcept
-  {
-    for (auto* entry = begin; entry != end; ++entry) {
-      DestroyPropsEntry(*entry);
-    }
-  }
-
-  /**
-   * Address: 0x008915A0 (FUN_008915A0)
-   *
-   * What it does:
-   * Register-order adapter lane for prop-entry range destruction.
-   */
-  [[maybe_unused]] void DestroyPropsEntriesRangeRegisterAdapterLaneA(
-    moho::CWldPropEntry* const end,
-    moho::CWldPropEntry* const begin
-  ) noexcept
-  {
-    DestroyPropsEntriesRange(begin, end);
-  }
-
-  /**
-   * Address: 0x00891660 (FUN_00891660)
-   *
-   * What it does:
-   * Secondary register-order adapter lane for prop-entry range destruction.
-   */
-  [[maybe_unused]] void DestroyPropsEntriesRangeRegisterAdapterLaneB(
-    moho::CWldPropEntry* const end,
-    moho::CWldPropEntry* const begin
-  ) noexcept
-  {
-    DestroyPropsEntriesRange(begin, end);
-  }
-
-  void DestroyPropsEntries(moho::CWldPropEntry* const begin, moho::CWldPropEntry* const end) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end < begin) {
-      return;
-    }
-
-    DestroyPropsEntriesRange(begin, end);
-  }
-
-  void ClearOwnedWldPropsEntriesStorageCommon(moho::CWldProps* const props) noexcept
-  {
-    moho::CWldPropEntry* const begin = props->mEntriesBegin;
-    if (begin != nullptr) {
-      DestroyPropsEntriesRange(begin, props->mEntriesEnd);
-      operator delete(begin);
-    }
-
-    props->mEntriesBegin = nullptr;
-    props->mEntriesEnd = nullptr;
-    props->mEntriesCapacityEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x00890290 (FUN_00890290, sub_890290)
-   *
-   * What it does:
-   * Destroys and frees one CWldProps entry-storage block and clears all three
-   * entry pointer lanes.
-   */
-  void ClearOwnedWldPropsEntriesStorageLaneA(moho::CWldProps* const props) noexcept
-  {
-    ClearOwnedWldPropsEntriesStorageCommon(props);
-  }
-
-  /**
-   * Address: 0x008914F0 (FUN_008914F0, sub_8914F0)
-   *
-   * What it does:
-   * Duplicate cleanup lane that destroys/frees CWldProps entry storage and
-   * nulls begin/end/capacity pointers.
-   */
-  [[maybe_unused]] void ClearOwnedWldPropsEntriesStorageLaneB(moho::CWldProps* const props) noexcept
-  {
-    ClearOwnedWldPropsEntriesStorageCommon(props);
-  }
-
-  /**
-   * Address: 0x00891560 (FUN_00891560, sub_891560)
-   *
-   * What it does:
-   * Duplicate cleanup lane that destroys/frees CWldProps entry storage and
-   * nulls begin/end/capacity pointers.
-   */
-  [[maybe_unused]] void ClearOwnedWldPropsEntriesStorageLaneC(moho::CWldProps* const props) noexcept
-  {
-    ClearOwnedWldPropsEntriesStorageCommon(props);
-  }
-
-  /**
-   * Address: 0x008916A0 (FUN_008916A0, sub_8916A0)
-   *
-   * What it does:
-   * Destroys one CWldProps object and its entry storage lanes, then frees the
-   * owning CWldProps allocation.
-   */
-  void DestroyWldPropsOwned(moho::CWldProps* const props) noexcept
-  {
-    ClearOwnedWldPropsEntriesStorageLaneA(props);
-    operator delete(props);
-  }
-
   void DestroyWldProps(moho::CWldProps* const props) noexcept
   {
-    if (props == nullptr) {
-      return;
-    }
-    DestroyWldPropsOwned(props);
+    delete props;
   }
 
   /**
@@ -1508,9 +1388,7 @@ namespace
   {
     moho::CWldProps* const previous = *slot;
     *slot = replacement;
-    if (previous != nullptr) {
-      DestroyWldPropsOwned(previous);
-    }
+    delete previous;
     return slot;
   }
 
@@ -1523,9 +1401,7 @@ namespace
    */
   [[maybe_unused]] moho::CWldProps* DestroyWldPropsIfPresent(moho::CWldProps* const props) noexcept
   {
-    if (props != nullptr) {
-      DestroyWldPropsOwned(props);
-    }
+    delete props;
     return props;
   }
 
@@ -1683,57 +1559,10 @@ namespace
     return targetSlot;
   }
 
-  [[nodiscard]] std::size_t GetWldPropEntryCount(const moho::CWldProps& props) noexcept
-  {
-    if (props.mEntriesBegin == nullptr || props.mEntriesEnd == nullptr) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(props.mEntriesEnd - props.mEntriesBegin);
-  }
-
-  [[nodiscard]] std::size_t GetWldPropEntryCapacity(const moho::CWldProps& props) noexcept
-  {
-    if (props.mEntriesBegin == nullptr || props.mEntriesCapacityEnd == nullptr) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(props.mEntriesCapacityEnd - props.mEntriesBegin);
-  }
-
-  void ReserveWldPropsEntries(moho::CWldProps& props, const std::size_t requiredCount)
-  {
-    const std::size_t currentCapacity = GetWldPropEntryCapacity(props);
-    if (requiredCount <= currentCapacity) {
-      return;
-    }
-
-    const std::size_t currentCount = GetWldPropEntryCount(props);
-    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1u);
-    if (newCapacity < requiredCount) {
-      newCapacity = requiredCount;
-    }
-
-    auto* const storage = static_cast<moho::CWldPropEntry*>(::operator new(sizeof(moho::CWldPropEntry) * newCapacity));
-    moho::CWldPropEntry* it = storage;
-    try {
-      for (auto* src = props.mEntriesBegin; src != props.mEntriesEnd; ++src, ++it) {
-        new (it) moho::CWldPropEntry(*src);
-      }
-    } catch (...) {
-      while (it != storage) {
-        --it;
-        DestroyPropsEntry(*it);
-      }
-      ::operator delete(storage);
-      throw;
-    }
-
-    DestroyPropsEntries(props.mEntriesBegin, props.mEntriesEnd);
-    ::operator delete(props.mEntriesBegin);
-    props.mEntriesBegin = storage;
-    props.mEntriesEnd = storage + currentCount;
-    props.mEntriesCapacityEnd = storage + newCapacity;
-  }
-
+  /**
+   * The record `CWldProps::Load` grows its vector with: an empty blueprint
+   * path, an identity orientation and a zero position.
+   */
   [[nodiscard]] moho::CWldPropEntry MakeDefaultWldPropEntry()
   {
     moho::CWldPropEntry defaultEntry{};
@@ -1741,50 +1570,6 @@ namespace
     defaultEntry.mTransform.orient_ = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
     defaultEntry.mTransform.pos_ = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
     return defaultEntry;
-  }
-
-  /**
-   * Address: 0x008922F0 (FUN_008922F0, sub_8922F0)
-   *
-   * What it does:
-   * Resizes one `CWldProps` entry vector to a caller-requested count while
-   * preserving existing entries and using one caller-provided default record
-   * for appended lanes.
-   */
-  void ResizeWldPropsEntries(
-    moho::CWldProps& props,
-    const std::uint32_t entryCount,
-    const moho::CWldPropEntry& fillEntry
-  )
-  {
-    constexpr std::size_t kMaxEntryCount = 0x04924924u;
-    if (entryCount > kMaxEntryCount) {
-      throw std::length_error("CWldProps entry count exceeds legacy limit");
-    }
-
-    const std::size_t currentCount = GetWldPropEntryCount(props);
-    const std::size_t targetCount = static_cast<std::size_t>(entryCount);
-    if (currentCount < targetCount) {
-      ReserveWldPropsEntries(props, targetCount);
-
-      moho::CWldPropEntry* appendedEnd = props.mEntriesEnd;
-      try {
-        for (std::size_t index = currentCount; index < targetCount; ++index, ++appendedEnd) {
-          new (appendedEnd) moho::CWldPropEntry(fillEntry);
-        }
-      } catch (...) {
-        DestroyPropsEntriesRange(props.mEntriesEnd, appendedEnd);
-        throw;
-      }
-      props.mEntriesEnd = appendedEnd;
-      return;
-    }
-
-    if (props.mEntriesBegin != nullptr && targetCount < currentCount) {
-      moho::CWldPropEntry* const newEnd = props.mEntriesBegin + targetCount;
-      DestroyPropsEntriesRange(newEnd, props.mEntriesEnd);
-      props.mEntriesEnd = newEnd;
-    }
   }
 
   /**
@@ -1823,15 +1608,7 @@ namespace moho
    */
   CWldProps* WLD_CreateProps()
   {
-    auto* const rawStorage = static_cast<CWldProps*>(::operator new(sizeof(CWldProps), std::nothrow));
-    if (rawStorage == nullptr) {
-      return nullptr;
-    }
-
-    rawStorage->mEntriesBegin = nullptr;
-    rawStorage->mEntriesEnd = nullptr;
-    rawStorage->mEntriesCapacityEnd = nullptr;
-    return rawStorage;
+    return new (std::nothrow) CWldProps();
   }
 
   /**
@@ -1910,8 +1687,7 @@ namespace moho
     std::uint32_t entryCount = 0;
     reader.ReadExact(entryCount);
 
-    const CWldPropEntry defaultEntry = MakeDefaultWldPropEntry();
-    ResizeWldPropsEntries(*this, entryCount, defaultEntry);
+    mEntries.resize(entryCount, MakeDefaultWldPropEntry());
 
     for (std::uint32_t index = 0; index < entryCount; ++index) {
       msvc8::string blueprintPath;
@@ -1949,7 +1725,7 @@ namespace moho
       NormalizeQuaternionLanes(orientation);
       transform.orient_ = Wm3::Quatf{orientation.w, orientation.x, orientation.y, orientation.z};
 
-      PackWldPropEntry(mEntriesBegin[index], transform, blueprintPath);
+      PackWldPropEntry(mEntries[index], transform, blueprintPath);
     }
 
     return true;
@@ -1964,12 +1740,11 @@ namespace moho
    */
   bool CWldProps::Save(gpg::BinaryWriter& writer) const
   {
-    const std::int32_t propCount =
-      mEntriesBegin != nullptr ? static_cast<std::int32_t>(mEntriesEnd - mEntriesBegin) : 0;
+    const auto propCount = static_cast<std::int32_t>(mEntries.size());
     writer.Write(propCount);
 
     for (std::int32_t index = 0; index < propCount; ++index) {
-      const CWldPropEntry& entry = mEntriesBegin[index];
+      const CWldPropEntry& entry = mEntries[static_cast<std::size_t>(index)];
       writer.Write(entry.mBlueprintPath.c_str(), entry.mBlueprintPath.size() + 1u);
 
       writer.Write(entry.mTransform.pos_.x);
