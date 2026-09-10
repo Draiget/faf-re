@@ -102,7 +102,13 @@ namespace msvc8
          */
         [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
+        /**
+         * Address: 0x004AD790 (FUN_004AD790 -- `lower_bound` for `msvc8::set<moho::PrefetchRequestRuntime, PrefetchRequestLess>` (the prefetch-request tree, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9B0; formerly `LowerBoundPrefetchRequestEntry_004AD790` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         */
         [[nodiscard]] iterator lower_bound(const key_type& k) const { return iterator(tree_.lower_bound_node(k)); }
+        /**
+         * Address: 0x004AD800 (FUN_004AD800 -- `upper_bound` for `msvc8::set<moho::PrefetchRequestRuntime, PrefetchRequestLess>` (the prefetch-request tree, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9C0; formerly `UpperBoundPrefetchRequestEntry_004AD800` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         */
         [[nodiscard]] iterator upper_bound(const key_type& k) const { return iterator(tree_.upper_bound_node(k)); }
 
         /**
@@ -120,6 +126,10 @@ namespace msvc8
         // -------- modifiers --------
         void clear() MSVC8_SET_NOEXCEPT { tree_.clear(); }
 
+        /**
+         * Address: 0x004AC890 (FUN_004AC890 -- the caller-side half of that same `insert(value)` for `msvc8::set<moho::PrefetchRequestRuntime, PrefetchRequestLess>` (the prefetch-request tree, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AA220, 0x004AAC20; formerly `FindOrInsertPrefetchRequestEntry` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD5E0 (FUN_004AD5E0 -- `insert(value)` -- lower_bound, then `_Buynode` at that hint when the element is not already there for `msvc8::set<moho::PrefetchRequestRuntime, PrefetchRequestLess>` (the prefetch-request tree, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AC890; formerly `InsertPrefetchRequestEntry_004AD5E0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         */
         std::pair<iterator, bool> insert(const value_type& v)
         {
             const std::pair<typename tree_type::node_type*, bool> result = tree_.insert_unique(v);
@@ -163,6 +173,7 @@ namespace msvc8
          * this replaced agreed on the returned cursor, but it had no fast path:
          * clearing a whole tree ran one rebalancing erase per element instead of
          * the single recursive `_Erase` plus header reset the binary performs.
+         * Address: 0x004AE2B0 (FUN_004AE2B0 -- `erase(first, last)`, each element's request state released first for `msvc8::set<moho::PrefetchRequestRuntime, PrefetchRequestLess>` (the prefetch-request tree, node 0x50, value 0x40, isNil@+0x4D); callers 0x004A9C00, 0x004A9DD0, 0x004AC870; formerly `ErasePrefetchRequestEntryRange_004AE2B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last)
         {
