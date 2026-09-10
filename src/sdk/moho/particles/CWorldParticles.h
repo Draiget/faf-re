@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Map.h"
 #include "boost/weak_ptr.h"
 #include "moho/particles/ParticleRenderBuckets.h"
 #include "moho/particles/SParticleBuffer.h"
@@ -97,28 +98,42 @@ namespace moho
    * Legacy tree-map header lane (`proxy + head + size`) used by world-particle
    * bucket maps.
    */
-  struct ParticleBucketTreeRuntime
+  /**
+   * Ordering of the render buckets: ascending `sortScalar`, then the state
+   * byte, blend and z modes, the two texture handles and the tag. The binary's
+   * comparator is spelled as `rhs < lhs` (0x00492290), so the map's `Less` is
+   * that call with its arguments swapped.
+   */
+  struct ParticleBucketKeyLess
   {
-    std::uint32_t iteratorProxy = 0U;             // +0x00
-    ParticleBucketTreeNodeRuntime* head = nullptr; // +0x04
-    std::uint32_t size = 0U;                      // +0x08
+    [[nodiscard]] bool operator()(const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs) const noexcept
+    {
+      return IsParticleBucketKeyRhsLessThanLhs(rhs, lhs);
+    }
   };
 
-  static_assert(sizeof(ParticleBucketTreeRuntime) == 0x0C, "ParticleBucketTreeRuntime size must be 0x0C");
+  /** The render-bucket map: 0x0C of `{proxy, head, size}`, nodes at 0x50. */
+  using ParticleBucketMap = msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*, ParticleBucketKeyLess>;
+
+  static_assert(sizeof(ParticleBucketMap) == 0x0C, "ParticleBucketMap size must be 0x0C");
 
   /**
    * What it does:
    * Legacy tree-map header lane (`proxy + head + size`) used by world-trail
    * bucket maps.
    */
-  struct TrailBucketTreeRuntime
+  /** Same ordering for the trail buckets (comparator 0x00492520). */
+  struct TrailBucketKeyLess
   {
-    std::uint32_t iteratorProxy = 0U;          // +0x00
-    TrailBucketTreeNodeRuntime* head = nullptr; // +0x04
-    std::uint32_t size = 0U;                   // +0x08
+    [[nodiscard]] bool operator()(const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs) const noexcept
+    {
+      return IsTrailBucketKeyRhsLessThanLhs(rhs, lhs);
+    }
   };
 
-  static_assert(sizeof(TrailBucketTreeRuntime) == 0x0C, "TrailBucketTreeRuntime size must be 0x0C");
+  using TrailBucketMap = msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*, TrailBucketKeyLess>;
+
+  static_assert(sizeof(TrailBucketMap) == 0x0C, "TrailBucketMap size must be 0x0C");
 
   /**
    * What it does:
@@ -131,9 +146,9 @@ namespace moho
     msvc8::list<ParticleBuffer*> allParticleBuffers;       // +0x04
     msvc8::list<ParticleBuffer*> availableParticleBuffers; // +0x10
     TrailSegmentPoolRuntime trailSegmentPool;               // +0x1C
-    ParticleBucketTreeRuntime particleBuckets;              // +0x28
-    ParticleBucketTreeRuntime refractingParticleBuckets;    // +0x34
-    TrailBucketTreeRuntime trailBuckets;                    // +0x40
+    ParticleBucketMap particleBuckets;                      // +0x28
+    ParticleBucketMap refractingParticleBuckets;            // +0x34
+    TrailBucketMap trailBuckets;                            // +0x40
     ParticleBucketKeyRuntime particleBucketLookupKey;       // +0x4C
     ParticleRenderBucketRuntime* cachedParticleBucket = nullptr; // +0x88
     TrailBucketKeyRuntime trailBucketLookupKey;             // +0x8C
