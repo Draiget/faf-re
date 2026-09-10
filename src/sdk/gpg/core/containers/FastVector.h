@@ -642,6 +642,7 @@ namespace gpg::core
 
     /**
      * Address: 0x00657900 (FUN_00657900 -- `resize(n, fill)` for `moho::CountedPtr<CParticleTexture>` (4-byte refcounted element): shrinking erases the tail through 0x00657DB0 (each slot's destructor releases its texture), growing reserves and copy-constructs `fill` into the new slots (each retaining the texture). Callers: the `RFastVectorType<CountedPtr<CParticleTexture>>` SerLoad 0x0065A4C0 and `SetCount`. Formerly `ResizeFastVectorCountedPtrCParticleTexture` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0067C430 (FUN_0067C430 -- `resize(n, value)` itself -- trim by moving `end_` when shrinking, grow through 0x0067E190 otherwise. Reached from `Entity::GetTerrainCollisionGeom`'s `outSpheres.resize(n, Sphere3f{})` for `gpg::core::FastVector<Wm3::Sphere3f>` (the terrain-collision proxy sphere buffer `Entity::GetTerrainCollisionGeom` fills; the 16-byte element is trivially copyable); callers 0x0067AA50; formerly `ResizeTerrainCollisionSphereBuffer` in moho/entity/Entity.cpp (RULE ONE), removed 2026-09-11.)
      */
     void resize(const size_t n, const value_type& value)
     {
