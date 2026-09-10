@@ -77,283 +77,10 @@ namespace
   };
 
   [[nodiscard]]
-  int CompareCanonicalPathNoCase(const msvc8::string& lhs, const msvc8::string& rhs)
-  {
-    return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str());
-  }
-
   [[nodiscard]]
-  bool IsNameIndexMapSentinel(const moho::SZipFileNameIndexMapNode* const node)
-  {
-    return node == nullptr || node->mIsNil != 0;
-  }
-
-  void SetNameIndexMapNodeBlack(moho::SZipFileNameIndexMapNode* const node)
-  {
-    if (!IsNameIndexMapSentinel(node)) {
-      node->mColor = 1;
-    }
-  }
-
-  void SetNameIndexMapNodeRed(moho::SZipFileNameIndexMapNode* const node)
-  {
-    if (!IsNameIndexMapSentinel(node)) {
-      node->mColor = 0;
-    }
-  }
-
   [[nodiscard]]
-  moho::SZipFileNameIndexMapNode* NameIndexMapRoot(const moho::SZipFileNameIndexMap& map)
-  {
-    // The head node IS the nil sentinel - `InitializeNameIndexMap` builds it
-    // with `mIsNil = 1`, exactly as MSVC8's `_Myhead`. Testing it with
-    // `IsNameIndexMapSentinel` therefore always succeeded and this returned the
-    // head instead of `_Myhead->_Parent`, hiding the whole tree. Only a null
-    // map has no root.
-    if (map.mHead == nullptr) {
-      return nullptr;
-    }
-    return map.mHead->mParent;
-  }
-
-  void NameIndexMapRotateLeft(
-    moho::SZipFileNameIndexMap& map, moho::SZipFileNameIndexMapNode* const pivot
-  )
-  {
-    if (IsNameIndexMapSentinel(pivot) || IsNameIndexMapSentinel(pivot->mRight)) {
-      return;
-    }
-
-    moho::SZipFileNameIndexMapNode* const head = map.mHead;
-    moho::SZipFileNameIndexMapNode* const right = pivot->mRight;
-
-    pivot->mRight = right->mLeft;
-    if (!IsNameIndexMapSentinel(right->mLeft)) {
-      right->mLeft->mParent = pivot;
-    }
-
-    right->mParent = pivot->mParent;
-    if (IsNameIndexMapSentinel(pivot->mParent)) {
-      head->mParent = right;
-    } else if (pivot == pivot->mParent->mLeft) {
-      pivot->mParent->mLeft = right;
-    } else {
-      pivot->mParent->mRight = right;
-    }
-
-    right->mLeft = pivot;
-    pivot->mParent = right;
-  }
-
-  void NameIndexMapRotateRight(
-    moho::SZipFileNameIndexMap& map, moho::SZipFileNameIndexMapNode* const pivot
-  )
-  {
-    if (IsNameIndexMapSentinel(pivot) || IsNameIndexMapSentinel(pivot->mLeft)) {
-      return;
-    }
-
-    moho::SZipFileNameIndexMapNode* const head = map.mHead;
-    moho::SZipFileNameIndexMapNode* const left = pivot->mLeft;
-
-    pivot->mLeft = left->mRight;
-    if (!IsNameIndexMapSentinel(left->mRight)) {
-      left->mRight->mParent = pivot;
-    }
-
-    left->mParent = pivot->mParent;
-    if (IsNameIndexMapSentinel(pivot->mParent)) {
-      head->mParent = left;
-    } else if (pivot == pivot->mParent->mRight) {
-      pivot->mParent->mRight = left;
-    } else {
-      pivot->mParent->mLeft = left;
-    }
-
-    left->mRight = pivot;
-    pivot->mParent = left;
-  }
-
-  void NameIndexMapInsertFixup(
-    moho::SZipFileNameIndexMap& map, moho::SZipFileNameIndexMapNode* node
-  )
-  {
-    while (!IsNameIndexMapSentinel(node->mParent) && node->mParent->mColor == 0) {
-      moho::SZipFileNameIndexMapNode* const parent = node->mParent;
-      moho::SZipFileNameIndexMapNode* const grandparent = parent->mParent;
-      if (parent == grandparent->mLeft) {
-        moho::SZipFileNameIndexMapNode* uncle = grandparent->mRight;
-        if (!IsNameIndexMapSentinel(uncle) && uncle->mColor == 0) {
-          SetNameIndexMapNodeBlack(parent);
-          SetNameIndexMapNodeBlack(uncle);
-          SetNameIndexMapNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            NameIndexMapRotateLeft(map, node);
-          }
-          SetNameIndexMapNodeBlack(node->mParent);
-          SetNameIndexMapNodeRed(node->mParent->mParent);
-          NameIndexMapRotateRight(map, node->mParent->mParent);
-        }
-      } else {
-        moho::SZipFileNameIndexMapNode* uncle = grandparent->mLeft;
-        if (!IsNameIndexMapSentinel(uncle) && uncle->mColor == 0) {
-          SetNameIndexMapNodeBlack(parent);
-          SetNameIndexMapNodeBlack(uncle);
-          SetNameIndexMapNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            NameIndexMapRotateRight(map, node);
-          }
-          SetNameIndexMapNodeBlack(node->mParent);
-          SetNameIndexMapNodeRed(node->mParent->mParent);
-          NameIndexMapRotateLeft(map, node->mParent->mParent);
-        }
-      }
-    }
-
-    moho::SZipFileNameIndexMapNode* const root = NameIndexMapRoot(map);
-    SetNameIndexMapNodeBlack(root);
-    if (!IsNameIndexMapSentinel(root)) {
-      root->mParent = map.mHead;
-    }
-  }
-
-  void InitializeNameIndexMap(moho::SZipFileNameIndexMap& map)
-  {
-    moho::SZipFileNameIndexMapNode* const head = new moho::SZipFileNameIndexMapNode();
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mColor = 1;
-    head->mIsNil = 1;
-    map.mHead = head;
-    map.mSize = 0;
-  }
-
-  void DestroyNameIndexMapSubtree(
-    moho::SZipFileNameIndexMapNode* const node, moho::SZipFileNameIndexMapNode* const head
-  )
-  {
-    if (IsNameIndexMapSentinel(node) || node == head) {
-      return;
-    }
-
-    DestroyNameIndexMapSubtree(node->mLeft, head);
-    DestroyNameIndexMapSubtree(node->mRight, head);
-    node->mCanonicalPath.tidy(true, 0U);
-    delete node;
-  }
-
-  void ResetNameIndexMap(moho::SZipFileNameIndexMap& map)
-  {
-    moho::SZipFileNameIndexMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      map.mSize = 0;
-      return;
-    }
-
-    DestroyNameIndexMapSubtree(head->mParent, head);
-    head->mCanonicalPath.tidy(true, 0U);
-    delete head;
-    map.mHead = nullptr;
-    map.mSize = 0;
-  }
-
   [[nodiscard]]
-  bool InsertNameIndexMapEntry(
-    moho::SZipFileNameIndexMap& map, const msvc8::string& canonicalPath, const std::uint32_t entryIndex
-  )
-  {
-    // Same trap as `NameIndexMapRoot`: the head is the nil sentinel, so a
-    // sentinel test here rejected every insert. The map stayed empty, every
-    // archive entry was reported as a duplicate (tens of thousands of log lines
-    // per run), and `CZipFile::FindFile` could never resolve anything, because
-    // the tree it searches was never built.
-    moho::SZipFileNameIndexMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      return false;
-    }
-
-    moho::SZipFileNameIndexMapNode* parent = head;
-    moho::SZipFileNameIndexMapNode* node = head->mParent;
-    bool insertAsLeftChild = true;
-    while (!IsNameIndexMapSentinel(node)) {
-      parent = node;
-      const int cmp = CompareCanonicalPathNoCase(canonicalPath, node->mCanonicalPath);
-      if (cmp < 0) {
-        node = node->mLeft;
-        insertAsLeftChild = true;
-      } else if (cmp > 0) {
-        node = node->mRight;
-        insertAsLeftChild = false;
-      } else {
-        return false;
-      }
-    }
-
-    std::unique_ptr<moho::SZipFileNameIndexMapNode> insertedNodeOwner =
-      std::make_unique<moho::SZipFileNameIndexMapNode>();
-    moho::SZipFileNameIndexMapNode* const insertedNode = insertedNodeOwner.get();
-    insertedNode->mLeft = head;
-    insertedNode->mParent = parent;
-    insertedNode->mRight = head;
-    insertedNode->mCanonicalPath.assign_owned(canonicalPath.view());
-    insertedNode->mEntryIndex = entryIndex;
-    insertedNode->mColor = 0;
-    insertedNode->mIsNil = 0;
-
-    if (parent == head) {
-      head->mParent = insertedNode;
-      head->mLeft = insertedNode;
-      head->mRight = insertedNode;
-      insertedNode->mParent = head;
-    } else if (insertAsLeftChild) {
-      parent->mLeft = insertedNode;
-      if (head->mLeft == parent ||
-          CompareCanonicalPathNoCase(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0) {
-        head->mLeft = insertedNode;
-      }
-    } else {
-      parent->mRight = insertedNode;
-      if (head->mRight == parent ||
-          CompareCanonicalPathNoCase(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0) {
-        head->mRight = insertedNode;
-      }
-    }
-
-    ++map.mSize;
-    insertedNodeOwner.release();
-    NameIndexMapInsertFixup(map, insertedNode);
-    return true;
-  }
-
   [[nodiscard]]
-  const moho::SZipFileNameIndexMapNode* NameIndexMapLowerBound(
-    const moho::SZipFileNameIndexMap& map, const msvc8::string& canonicalPath
-  )
-  {
-    const moho::SZipFileNameIndexMapNode* result = map.mHead;
-    if (result == nullptr) {
-      return nullptr;
-    }
-
-    const moho::SZipFileNameIndexMapNode* parent = result->mParent;
-    while (!IsNameIndexMapSentinel(parent)) {
-      if (CompareCanonicalPathNoCase(parent->mCanonicalPath, canonicalPath) >= 0) {
-        result = parent;
-        parent = parent->mLeft;
-      } else {
-        parent = parent->mRight;
-      }
-    }
-    return result;
-  }
-
   /**
    * Address: 0x0046D960 (FUN_0046D960, std::map_string_uint::find)
    *
@@ -362,17 +89,6 @@ namespace
    * map head sentinel when no exact match exists.
    */
   [[nodiscard]]
-  const moho::SZipFileNameIndexMapNode* NameIndexMapFind(
-    const moho::SZipFileNameIndexMap& map, const msvc8::string& canonicalPath
-  )
-  {
-    const moho::SZipFileNameIndexMapNode* const lowerBound = NameIndexMapLowerBound(map, canonicalPath);
-    if (lowerBound == nullptr || lowerBound == map.mHead) {
-      return map.mHead;
-    }
-    return CompareCanonicalPathNoCase(canonicalPath, lowerBound->mCanonicalPath) < 0 ? map.mHead : lowerBound;
-  }
-
   [[nodiscard]]
   bool FindEndOfCentralDirectoryOffset(
     const std::vector<char>& tailBytes, std::size_t* const outOffsetInTail
@@ -494,7 +210,7 @@ namespace moho
   {
     const char* const archivePath = sourcePath != nullptr ? sourcePath : "";
     mPath.assign_owned(archivePath);
-    InitializeNameIndexMap(mEntryByCanonicalPath);
+
 
     std::unique_ptr<gpg::Stream> zipStream = OpenZipBackingStream(mPath);
     if (zipStream == nullptr) {
@@ -603,7 +319,7 @@ namespace moho
       cachedEntry.mEntry = parsedEntry;
       mEntries.push_back(cachedEntry);
 
-      if (!InsertNameIndexMapEntry(mEntryByCanonicalPath, parsedEntry->mName, newEntryIndex)) {
+      if (!mEntryByCanonicalPath.insert({parsedEntry->mName, newEntryIndex}).second) {
         gpg::Logf("%s: duplicate entries for %s.", archivePath, parsedEntry->mName.c_str());
       }
     }
@@ -617,7 +333,8 @@ namespace moho
    */
   CZipFile::~CZipFile()
   {
-    ResetNameIndexMap(mEntryByCanonicalPath);
+    // `mEntryByCanonicalPath`'s teardown is `~map()`, which MSVC emits for the
+    // member; only the two lanes with no destructor of their own are here.
     mEntries = msvc8::vector<SZipFileCachedEntry>();
     mPath.tidy(true, 0U);
   }
@@ -651,13 +368,8 @@ namespace moho
    */
   std::uint32_t CZipFile::FindFile(const msvc8::string& canonicalPath) const
   {
-    const msvc8::string lookupPath(canonicalPath);
-    const SZipFileNameIndexMapNode* const matchedNode = NameIndexMapFind(mEntryByCanonicalPath, lookupPath);
-    if (matchedNode == nullptr || matchedNode == mEntryByCanonicalPath.mHead) {
-      return kInvalidEntryIndex;
-    }
-
-    return matchedNode->mEntryIndex;
+    const SZipFileNameIndexMap::const_iterator matched = mEntryByCanonicalPath.find(canonicalPath);
+    return matched == mEntryByCanonicalPath.end() ? kInvalidEntryIndex : matched->second;
   }
 
   /**
