@@ -188,118 +188,6 @@ namespace
     return static_cast<std::size_t>(static_cast<std::int32_t>(type));
   }
 
-  [[nodiscard]] bool HasQueuedSiloTypes(const SSiloTypeList& list) noexcept
-  {
-    return list.mHead != nullptr && list.mHead->mNext != list.mHead && list.mSize > 0;
-  }
-
-  /**
-   * Address: 0x005D01E0 (FUN_005D01E0, silo-list sentinel allocator)
-   *
-   * What it does:
-   * Allocates one `SSiloTypeListNode` head sentinel and self-links its
-   * `{next,prev}` lanes for empty-list state.
-   */
-  [[nodiscard]] SSiloTypeListNode* AllocateSelfLinkedSiloTypeSentinel()
-  {
-    auto* const node = msvc8::detail::allocate_checked<SSiloTypeListNode>(1u);
-    node->mNext = node;
-    node->mPrev = node;
-    return node;
-  }
-
-  [[nodiscard]] ESiloType FrontSiloType(const SSiloTypeList& list) noexcept
-  {
-    return list.mHead->mNext->mValue;
-  }
-
-  [[nodiscard]] SSiloTypeListNode* AllocateSiloTypeNode(const ESiloType value)
-  {
-    auto* const node = static_cast<SSiloTypeListNode*>(::operator new(sizeof(SSiloTypeListNode)));
-    node->mNext = node;
-    node->mPrev = node;
-    node->mValue = value;
-    return node;
-  }
-
-  void InitializeSiloTypeList(SSiloTypeList& list)
-  {
-    list.mProxyOrUnused = nullptr;
-    list.mHead = AllocateSelfLinkedSiloTypeSentinel();
-    list.mHead->mValue = SILOTYPE_Tactical;
-    list.mSize = 0;
-  }
-
-  /**
-   * Address: 0x005CFE10 (FUN_005CFE10, sub_5CFE10)
-   */
-  void ClearSiloTypeList(SSiloTypeList& list)
-  {
-    if (!list.mHead) {
-      list.mSize = 0;
-      return;
-    }
-
-    SSiloTypeListNode* node = list.mHead->mNext;
-    list.mHead->mNext = list.mHead;
-    list.mHead->mPrev = list.mHead;
-    list.mSize = 0;
-
-    while (node != list.mHead) {
-      SSiloTypeListNode* const next = node->mNext;
-      ::operator delete(node);
-      node = next;
-    }
-  }
-
-  void DestroySiloTypeListStorage(SSiloTypeList& list)
-  {
-    if (!list.mHead) {
-      list.mSize = 0;
-      return;
-    }
-
-    ClearSiloTypeList(list);
-    ::operator delete(list.mHead);
-    list.mHead = nullptr;
-  }
-
-  /**
-   * Address: 0x005CFDB0 (FUN_005CFDB0, sub_5CFDB0)
-   */
-  void PopFrontSiloType(SSiloTypeList& list)
-  {
-    if (!list.mHead) {
-      return;
-    }
-
-    SSiloTypeListNode* const node = list.mHead->mNext;
-    if (node == list.mHead) {
-      return;
-    }
-
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    ::operator delete(node);
-    --list.mSize;
-  }
-
-  void PushBackSiloType(SSiloTypeList& list, const ESiloType value)
-  {
-    if (!list.mHead) {
-      return;
-    }
-
-    SSiloTypeListNode* const node = AllocateSiloTypeNode(value);
-    SSiloTypeListNode* const before = list.mHead;
-    SSiloTypeListNode* const prev = before->mPrev;
-    node->mNext = before;
-    node->mPrev = prev;
-    prev->mNext = node;
-    before->mPrev = node;
-    ++list.mSize;
-  }
-
   [[nodiscard]] SEconValue TakeGrantedResourcesAndReset(CEconRequest* const request)
   {
     SEconValue out{};
@@ -415,7 +303,6 @@ CAiSiloBuildImpl::CAiSiloBuildImpl()
 {
   ZeroSiloBuildInfoWords(&mSiloInfo[0]);
   ZeroSiloBuildInfoWords(&mSiloInfo[1]);
-  InitializeSiloTypeList(mSiloTypes);
 }
 
 /**
@@ -440,7 +327,6 @@ CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
 CAiSiloBuildImpl::~CAiSiloBuildImpl()
 {
   DestroyEconomyRequestPointer(mRequest);
-  DestroySiloTypeListStorage(mSiloTypes);
 }
 
 /**
@@ -592,10 +478,7 @@ void CAiSiloBuildImpl::SiloUpdateProjectileBlueprint()
  */
 bool CAiSiloBuildImpl::SiloIsBusy(const ESiloType type) const
 {
-  if (!HasQueuedSiloTypes(mSiloTypes)) {
-    return false;
-  }
-  return FrontSiloType(mSiloTypes) == type;
+  return !mSiloTypes.empty() && mSiloTypes.front() == type;
 }
 
 /**
@@ -612,13 +495,9 @@ bool CAiSiloBuildImpl::SiloIsFull(const ESiloType type) const
  */
 std::int32_t CAiSiloBuildImpl::SiloGetBuildCount(const ESiloType type) const
 {
-  if (!mSiloTypes.mHead) {
-    return 0;
-  }
-
   std::int32_t count = 0;
-  for (SSiloTypeListNode* node = mSiloTypes.mHead->mNext; node != mSiloTypes.mHead; node = node->mNext) {
-    if (node->mValue == type) {
+  for (const ESiloType queued : mSiloTypes) {
+    if (queued == type) {
       ++count;
     }
   }
@@ -666,7 +545,7 @@ bool CAiSiloBuildImpl::SiloAddBuild(const ESiloType type)
     mUnit->NeedSyncGameData = true;
   }
 
-  PushBackSiloType(mSiloTypes, type);
+  mSiloTypes.push_back(type);
   return true;
 }
 
@@ -728,7 +607,7 @@ void CAiSiloBuildImpl::SiloStopBuild()
   mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
   mUnit->WorkProgress = 0.0f;
   mState = SBS_Idle;
-  ClearSiloTypeList(mSiloTypes);
+  mSiloTypes.clear();
   mCurSegments = 0;
 }
 
@@ -751,7 +630,7 @@ void CAiSiloBuildImpl::SiloTick()
 
   switch (mState) {
   case SBS_Idle:
-    if (mSiloTypes.mSize != 0) {
+    if (!mSiloTypes.empty()) {
       mState = SBS_Prepare;
       return;
     }
@@ -767,17 +646,17 @@ void CAiSiloBuildImpl::SiloTick()
 
   case SBS_Prepare:
   {
-    if (!HasQueuedSiloTypes(mSiloTypes)) {
+    if (mSiloTypes.empty()) {
       mState = SBS_Idle;
       return;
     }
 
-    const ESiloType queuedType = FrontSiloType(mSiloTypes);
+    const ESiloType queuedType = mSiloTypes.front();
     UnitWeapon* const queuedWeapon = mSiloInfo[ToSiloIndex(queuedType)].mWeapon;
     auto* const weaponView = AsUnitWeaponRuntimeView(queuedWeapon);
     RProjectileBlueprint* const projectileBlueprint = weaponView ? weaponView->mProjectileBlueprint : nullptr;
     if (!weaponView || !projectileBlueprint) {
-      PopFrontSiloType(mSiloTypes);
+      mSiloTypes.pop_front();
       mState = SBS_Idle;
       return;
     }
@@ -827,8 +706,8 @@ void CAiSiloBuildImpl::SiloTick()
     mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
     mUnit->WorkProgress = 0.0f;
 
-    if (HasQueuedSiloTypes(mSiloTypes)) {
-      const ESiloType builtType = FrontSiloType(mSiloTypes);
+    if (!mSiloTypes.empty()) {
+      const ESiloType builtType = mSiloTypes.front();
       UnitWeapon* const builtWeapon = mSiloInfo[ToSiloIndex(builtType)].mWeapon;
       if (builtWeapon) {
         DispatchWeaponCallback(mUnit, "OnSiloBuildEnd", builtWeapon);
@@ -836,7 +715,7 @@ void CAiSiloBuildImpl::SiloTick()
       }
 
       SiloAdjustStorageCount(builtType, 1);
-      PopFrontSiloType(mSiloTypes);
+      mSiloTypes.pop_front();
       mCurSegments = 0;
     }
 
