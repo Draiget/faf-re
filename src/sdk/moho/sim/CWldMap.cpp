@@ -856,6 +856,14 @@ namespace
     return static_cast<std::int32_t>(std::ceil(static_cast<float>(coordinate) * 0.5f));
   }
 
+  /**
+   * Inlined block from FUN_008A5730 (0x008A576D..0x008A5793), the
+   * `mDebugDirtyRects.push_back(rect)` tail of `NotifyMapChange`.
+   *
+   * Node allocation and field stores are 0x005AB710; the size bump with its
+   * `0x0FFFFFFF` length check is 0x005AB760, which reads and writes only
+   * `_Mysize` at `+0x08`.
+   */
   void AppendTerrainDirtyRect(TerrainDirtyRectListRuntimeView& list, const gpg::Rect2i& rect)
   {
     auto* const node = static_cast<TerrainDirtyRectNodeRuntimeView*>(::operator new(sizeof(TerrainDirtyRectNodeRuntimeView)));
@@ -868,10 +876,12 @@ namespace
     }
     ++list.mSize;
 
-    if (list.mIteratorProxy != nullptr) {
-      list.mIteratorProxy->mFirstIterator = nullptr;
-    }
-
+    // No iterator-proxy write here: 0x005AB760 is the whole of what the binary
+    // does between building the node and relinking it, and it touches nothing
+    // but the size word. The `mIteratorProxy->mFirstIterator = nullptr` this
+    // used to perform was invented, and the lane it dereferenced is never
+    // initialised -- it only stayed harmless while `NotifyMapChange`'s
+    // mis-guarded `Finalize()` kept this line unreachable.
     list.mHead->mPrev = node;
     node->mPrev->mNext = node;
   }
@@ -1423,11 +1433,15 @@ namespace
 
     // Debug dirty-rect list: allocate the self-linked sentinel head node
     // (sub_5AB3A0 == list-node-new self-linked; empty list, size 0). The +0x00
-    // iterator-proxy lane is left untouched, matching the binary.
+    // lane is `std::list`'s own `_Container_base::_Myfirstiter`, which that
+    // base's constructor zeroes; leaving it as whatever the allocator handed
+    // back is what let `AppendTerrainDirtyRect` write through a garbage
+    // pointer the first time a map change actually reached it.
     auto* const dirtyRectHead =
       static_cast<TerrainDirtyRectNodeRuntimeView*>(::operator new(sizeof(TerrainDirtyRectNodeRuntimeView)));
     dirtyRectHead->mNext = dirtyRectHead;
     dirtyRectHead->mPrev = dirtyRectHead;
+    view.mDebugDirtyRects.mIteratorProxy = nullptr;
     view.mDebugDirtyRects.mHead = dirtyRectHead;
     view.mDebugDirtyRects.mSize = 0u;
 
