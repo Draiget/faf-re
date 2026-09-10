@@ -30,62 +30,8 @@
 
 namespace
 {
-  constexpr std::size_t kTerrainTypeCount = moho::TerrainTypesVectorN::kInlineCount;
-
-  /**
-   * Address: 0x004C80D0 (FUN_004C80D0, sub_4C80D0)
-   *
-   * What it does:
-   * Destroys one half-open LuaObject range `[first, last)`.
-   */
-  void DestroyLuaObjectRange(LuaPlus::LuaObject* first, LuaPlus::LuaObject* last)
-  {
-    while (first != last) {
-      first->~LuaObject();
-      ++first;
-    }
-  }
-
-  /**
-   * Address: 0x004C8120 (FUN_004C8120, func_LuaObjectRange)
-   *
-   * What it does:
-   * Copy-constructs LuaObjects from source range `[from, to)` into destination
-   * storage and returns the end pointer in destination range.
-   */
-  LuaPlus::LuaObject* CopyConstructLuaObjectRange(
-    const LuaPlus::LuaObject* from, LuaPlus::LuaObject* destination, const LuaPlus::LuaObject* to
-  )
-  {
-    while (from != to) {
-      if (destination != nullptr) {
-        ::new (static_cast<void*>(destination)) LuaPlus::LuaObject(*from);
-      }
-      ++from;
-      ++destination;
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x005792A0 (FUN_005792A0)
-   * Address: 0x00578EA0 (FUN_00578EA0)
-   * Address: 0x00579030 (FUN_00579030)
-   * Address: 0x00579170 (FUN_00579170)
-   *
-   * What it does:
-   * Preserves one duplicate Lua-object copy lane used by terrain-type vector
-   * growth paths and returns the destination end pointer.
-   */
-  LuaPlus::LuaObject* CopyConstructLuaObjectRangeLaneB(
-    const LuaPlus::LuaObject* from,
-    LuaPlus::LuaObject* destination,
-    const LuaPlus::LuaObject* to
-  )
-  {
-    return CopyConstructLuaObjectRange(from, destination, to);
-  }
+  // The inline block the shipped `fastvector_n` carries for terrain types.
+  constexpr std::size_t kTerrainTypeCount = 0x100u;
 
   /**
    * Address: 0x005786F0 (FUN_005786F0, sub_5786F0)
@@ -96,7 +42,7 @@ namespace
   void ShrinkTerrainTypesTail(moho::TerrainTypes& terrainTypes, LuaPlus::LuaObject* newFinish)
   {
     auto& terrainVec = terrainTypes.ttvec;
-    if (!terrainVec.IsInitialized()) {
+    if (terrainVec.begin() == nullptr) {
       return;
     }
 
@@ -107,8 +53,7 @@ namespace
       newFinish = terrainVec.end();
     }
 
-    DestroyLuaObjectRange(newFinish, terrainVec.end());
-    terrainVec.finish = newFinish;
+    terrainVec.resize(static_cast<std::size_t>(newFinish - terrainVec.begin()));
   }
 
   void ReserveTerrainTypes(moho::TerrainTypes& terrainTypes, const std::size_t newCapacity)
@@ -119,24 +64,8 @@ namespace
       return;
     }
 
-    auto* const newBuffer = static_cast<LuaPlus::LuaObject*>(::operator new(sizeof(LuaPlus::LuaObject) * newCapacity));
-    std::size_t copied = 0u;
-    try {
-      for (; copied < currentSize; ++copied) {
-        CopyConstructLuaObjectRange(terrainVec.begin() + copied, newBuffer + copied, terrainVec.begin() + copied + 1);
-      }
-    } catch (...) {
-      DestroyLuaObjectRange(newBuffer, newBuffer + copied);
-      ::operator delete(newBuffer);
-      throw;
-    }
-
-    DestroyLuaObjectRange(terrainVec.begin(), terrainVec.end());
-    if (!terrainVec.UsingInlineStorage()) {
-      ::operator delete(terrainVec.start);
-    }
-
-    terrainVec.BindHeapStorage(newBuffer, currentSize, newCapacity);
+    (void)currentSize;
+    terrainVec.Reserve(newCapacity);
   }
 
   /**
@@ -164,11 +93,7 @@ namespace
       ReserveTerrainTypes(terrainTypes, targetSize);
     }
 
-    auto* targetFinish = terrainVec.begin() + targetSize;
-    while (terrainVec.end() != targetFinish) {
-      ::new (static_cast<void*>(terrainVec.finish)) LuaPlus::LuaObject(fillValue);
-      ++terrainVec.finish;
-    }
+    terrainVec.resize(targetSize, fillValue);
   }
 
   /**
@@ -179,26 +104,13 @@ namespace
    */
   void InitTerrainTypes(moho::TerrainTypes& terrainTypes)
   {
-    auto& terrainVec = terrainTypes.ttvec;
-    terrainVec.BindInlineEmpty();
-
-    LuaPlus::LuaObject defaultObject{};
-    ConstructTerrainTypes(terrainTypes, 0u, defaultObject);
+    terrainTypes.ttvec.ResetStorageToInline();
   }
 
   void DestroyTerrainTypes(moho::TerrainTypes& terrainTypes)
   {
-    auto& terrainVec = terrainTypes.ttvec;
-    if (!terrainVec.IsInitialized()) {
-      return;
-    }
-
-    DestroyLuaObjectRange(terrainVec.begin(), terrainVec.end());
-    if (!terrainVec.UsingInlineStorage()) {
-      ::operator delete(terrainVec.start);
-    }
-
-    terrainVec.BindInlineEmpty();
+    terrainTypes.ttvec.resize(0u);
+    terrainTypes.ttvec.ResetStorageToInline();
   }
 
   /**
@@ -2806,7 +2718,7 @@ namespace moho
    */
   LuaPlus::LuaObject STIMap::GetTerrainType(const std::uint8_t typeIndex) const
   {
-    if (!mTerrainTypes.ttvec.IsInitialized()) {
+    if (mTerrainTypes.ttvec.begin() == nullptr) {
       return {};
     }
     return LuaPlus::LuaObject(mTerrainTypes.ttvec.begin()[typeIndex]);
