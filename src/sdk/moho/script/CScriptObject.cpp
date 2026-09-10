@@ -2515,7 +2515,7 @@ void CScriptObject::RunScriptEntityOnDamage(
  * Invokes `OnCollision(self, otherObject, a, b, c, d)` callback when present.
  */
 void CScriptObject::RunScriptOnCollision(
-  const LuaPlus::LuaObject& otherObject,
+  Unit* const otherUnit,
   const float collisionParamA,
   const float collisionParamB,
   const float collisionParamC,
@@ -2534,7 +2534,7 @@ void CScriptObject::RunScriptOnCollision(
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, otherObject, collisionParamA, collisionParamB, collisionParamC, collisionParamD);
+    fn(mLuaObj, otherUnit, collisionParamA, collisionParamB, collisionParamC, collisionParamD);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCollision, ex.what());
   } catch (...) {

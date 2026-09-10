@@ -540,10 +540,21 @@ namespace moho
      * Address: 0x00598660 (FUN_00598660, Moho::CScriptObject::RunScript_OnCollision)
      *
      * What it does:
-     * Invokes `OnCollision(self, otherObject, a, b, c, d)` callback when present.
+     * Invokes `OnCollision(self, other, a, b, c, d)` callback when present.
+     *
+     * `other` is the colliding unit, handed to `LuaFunction` the same way
+     * `RunScriptOnBeingBuiltProgress` hands it `sourceUnit`. The shipped call
+     * pushes exactly one dword for this argument (0x005986F5 `mov eax,[edx]`
+     * then `push eax` at 0x00598700, alongside `self` copied from `this+0x20`
+     * and the four floats), so a single object pointer is what the Lua side
+     * receives. It used to be typed as a `LuaObject` and the one call site
+     * reinterpreted a `Sim*` into one - `Sim` derives from `ICommandSink` and
+     * has nothing LuaObject-shaped at offset 0, so LuaPlus threw
+     * `state->l_G == m_state->m_state->l_G` on every prop collision and no
+     * prop ever ran its collision script.
      */
     void RunScriptOnCollision(
-      const LuaPlus::LuaObject& otherObject,
+      Unit* otherUnit,
       float collisionParamA,
       float collisionParamB,
       float collisionParamC,
