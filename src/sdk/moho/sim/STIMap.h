@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "gpg/core/containers/FastVector.h"
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
@@ -529,99 +530,9 @@ namespace moho
    * Inline storage is raw bytes so element lifetime is managed explicitly by
    * helper routines (construct/destroy loops), matching binary behavior.
    */
-  struct TerrainTypesVectorN
-  {
-    static constexpr std::size_t kInlineCount = 0x100;
-
-    LuaPlus::LuaObject* start;                                                                         // +0x0000
-    LuaPlus::LuaObject* finish;                                                                        // +0x0004
-    LuaPlus::LuaObject* capacity;                                                                      // +0x0008
-    LuaPlus::LuaObject* original;                                                                      // +0x000C
-    alignas(LuaPlus::LuaObject) std::uint8_t inlineStorage[sizeof(LuaPlus::LuaObject) * kInlineCount]; // +0x0010
-
-    [[nodiscard]]
-    LuaPlus::LuaObject* InlineBegin() noexcept
-    {
-      return reinterpret_cast<LuaPlus::LuaObject*>(&inlineStorage[0]);
-    }
-
-    [[nodiscard]]
-    const LuaPlus::LuaObject* InlineBegin() const noexcept
-    {
-      return reinterpret_cast<const LuaPlus::LuaObject*>(&inlineStorage[0]);
-    }
-
-    [[nodiscard]]
-    LuaPlus::LuaObject* begin() noexcept
-    {
-      return start;
-    }
-
-    [[nodiscard]]
-    const LuaPlus::LuaObject* begin() const noexcept
-    {
-      return start;
-    }
-
-    [[nodiscard]]
-    LuaPlus::LuaObject* end() noexcept
-    {
-      return finish;
-    }
-
-    [[nodiscard]]
-    const LuaPlus::LuaObject* end() const noexcept
-    {
-      return finish;
-    }
-
-    [[nodiscard]]
-    std::size_t Size() const noexcept
-    {
-      return start ? static_cast<std::size_t>(finish - start) : 0u;
-    }
-
-    [[nodiscard]]
-    std::size_t Capacity() const noexcept
-    {
-      return start ? static_cast<std::size_t>(capacity - start) : 0u;
-    }
-
-    [[nodiscard]]
-    bool IsInitialized() const noexcept
-    {
-      return start != nullptr;
-    }
-
-    [[nodiscard]]
-    bool Empty() const noexcept
-    {
-      return start == finish;
-    }
-
-    [[nodiscard]]
-    bool UsingInlineStorage() const noexcept
-    {
-      return start == InlineBegin();
-    }
-
-    void BindInlineEmpty() noexcept
-    {
-      auto* const inlineBegin = InlineBegin();
-      start = inlineBegin;
-      finish = inlineBegin;
-      capacity = inlineBegin + kInlineCount;
-      original = inlineBegin;
-    }
-
-    void BindHeapStorage(LuaPlus::LuaObject* buffer, const std::size_t size, const std::size_t cap) noexcept
-    {
-      start = buffer;
-      finish = buffer + size;
-      capacity = buffer + cap;
-      original = InlineBegin();
-    }
-  };
+  // `{start, end, capacity, inline}` at 0x10 followed by 256 inline elements
+  // is `gpg::core::FastVectorN<LuaPlus::LuaObject, 0x100>` itself.
+  using TerrainTypesVectorN = gpg::fastvector_n<LuaPlus::LuaObject, 0x100>;
 
   struct TerrainTypes
   {
@@ -635,17 +546,6 @@ namespace moho
     std::int32_t height; // +0x08
   };
 
-  static_assert(offsetof(TerrainTypesVectorN, start) == 0x0000, "TerrainTypesVectorN::start offset must be 0x0000");
-  static_assert(offsetof(TerrainTypesVectorN, finish) == 0x0004, "TerrainTypesVectorN::finish offset must be 0x0004");
-  static_assert(
-    offsetof(TerrainTypesVectorN, capacity) == 0x0008, "TerrainTypesVectorN::capacity offset must be 0x0008"
-  );
-  static_assert(
-    offsetof(TerrainTypesVectorN, original) == 0x000C, "TerrainTypesVectorN::original offset must be 0x000C"
-  );
-  static_assert(
-    offsetof(TerrainTypesVectorN, inlineStorage) == 0x0010, "TerrainTypesVectorN::inlineStorage offset must be 0x0010"
-  );
   static_assert(sizeof(TerrainTypesVectorN) == 0x1410, "TerrainTypesVectorN size must be 0x1410");
   static_assert(sizeof(TerrainTypes) == 0x1410, "TerrainTypes size must be 0x1410");
   static_assert(sizeof(TerrainTypeGrid) == 0x0C, "TerrainTypeGrid size must be 0x0C");
