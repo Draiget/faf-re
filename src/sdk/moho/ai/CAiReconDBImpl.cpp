@@ -302,58 +302,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x005C7780 (FUN_005C7780)
-   *
-   * What it does:
-   * Grows one recon-blip pointer vector by `appendCount`, filling new entries
-   * with null placeholders.
-   */
-  void GrowBlipPointerVector(msvc8::vector<ReconBlip*>& values, const std::size_t appendCount)
-  {
-    if (appendCount == 0u) {
-      return;
-    }
-    values.resize(values.size() + appendCount, nullptr);
-  }
-
-  /**
-   * Address: 0x005C4AB0 (FUN_005C4AB0)
-   *
-   * What it does:
-   * Pushes one `ReconBlip*` lane to the destination vector and grows storage
-   * through the canonical helper when capacity is exhausted.
-   */
-  [[maybe_unused]] ReconBlip* PushBackBlipPointerWithGrowth(
-    msvc8::vector<ReconBlip*>& values,
-    ReconBlip* const blip
-  )
-  {
-    // Grow when full, otherwise store at mLast and bump it: push_back.
-    values.push_back(blip);
-    return blip;
-  }
-
-  /**
-   * Address: 0x005C5DF0 (FUN_005C5DF0)
-   *
-   * What it does:
-   * Resizes one recon-blip pointer vector to `targetCount` by truncating tail
-   * entries or growing with null placeholders.
-   */
-  void ResizeBlipPointerVector(msvc8::vector<ReconBlip*>& values, const std::size_t targetCount)
-  {
-    const std::size_t currentCount = values.size();
-    if (targetCount < currentCount) {
-      values.erase(values.begin() + static_cast<std::ptrdiff_t>(targetCount), values.end());
-      return;
-    }
-
-    if (targetCount > currentCount) {
-      GrowBlipPointerVector(values, targetCount - currentCount);
-    }
-  }
-
   void RebuildBlipListFromMapAndOrphans(CAiReconDBImpl* const owner)
   {
     if (!owner) {
@@ -361,7 +309,7 @@ namespace
     }
 
     const std::size_t targetCount = owner->mBlipMap.size() + owner->mTempBlips.size();
-    ResizeBlipPointerVector(owner->mBblips, targetCount);
+    owner->mBblips.resize(targetCount, nullptr);
 
     std::size_t writeIndex = 0u;
     for (const auto& entry : owner->mBlipMap) {
@@ -378,7 +326,7 @@ namespace
       }
     }
 
-    ResizeBlipPointerVector(owner->mBblips, writeIndex);
+    owner->mBblips.resize(writeIndex, nullptr);
   }
 
   void AppendUniqueBlip(msvc8::vector<ReconBlip*>& values, ReconBlip* const blip)
