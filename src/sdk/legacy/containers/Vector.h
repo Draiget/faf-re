@@ -2784,6 +2784,13 @@ namespace msvc8
          * grow lane `_Insert_n` (FUN_005DD120, already cited above). Emitted via
          * view->mWeapons.push_back(weapon) in CAiAttackerImpl::CreateWeapon
          * (CAiAttackerImpl.cpp:973))
+         * Address: 0x006E1A10 (FUN_006E1A10, msvc8::vector<Moho::CmdId>::push_back
+         * for the 4-byte command-id element — fast path stores the id in place;
+         * capacity-full path tail-calls the insert(end(),1,value) grow lane
+         * (FUN_006E24D0). Emitted via pendingReleasedCmdIds.push_back(cmdId) in
+         * Moho::CCommandDb::RemoveCmd (CCommandDb.cpp), the retire path that
+         * hands a dead command's id to the UI through
+         * SSyncData::mPendingReleasedCommandIds)
          * Address: 0x008522A0 (FUN_008522A0, msvc8::vector<Wm3::Vector3f>::push_back
          * for the 12-byte `Wm3::Vector3f` element — fast path only (no grow-core
          * citation found). Emitted via attackIconPositions.push_back(targetPosition)

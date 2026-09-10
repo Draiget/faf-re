@@ -4939,42 +4939,16 @@ namespace
   }
 
   /**
-   * Address: 0x006E1A10 (FUN_006E1A10)
+   * The guarded shape of `CCommandDb::RemoveCmd` (0x006E0EC0, CCommandDb.cpp)
+   * that this file's issue paths need.
    *
-   * What it does:
-   * Appends one command id into `CCommandDb::pendingReleasedCmdIds`,
-   * growing vector storage when needed.
-   */
-  void AppendPendingReleasedCommandId(msvc8::vector<CmdId>& pendingReleasedCmdIds, const CmdId cmdId)
-  {
-    pendingReleasedCmdIds.push_back(cmdId);
-  }
-
-  /**
-   * Address: 0x006E0EC0 (FUN_006E0EC0, ?RemoveCmd@CCommandDB@Moho@@...)
-   *
-   * IDA signature:
-   * int __stdcall Moho::CCommandDB::RemoveCmd(Moho::CCommandDB *commandDb, Moho::CmdId cmdId);
-   *
-   * What it does:
-   * Removes one command-id entry from the command DB's `commands` map when
-   * present (`sub_6E1940`/`sub_6E1670`, `msvc8::map<CmdId,CUnitCommand*>::
-   * find`/`erase_node` for this instantiation, cited on `rb_tree::find_node`/
-   * `erase_node` in `RbTree.h`), records recycled low-24 ids in the rolling
-   * IdPool history slot for source-byte 0x80, and queues the id into the
-   * pending-release vector (`FUN_006E1A10`, `AppendPendingReleasedCommandId`).
-   *
-   * Used to reach into `commandDb` through a bespoke `CCommandDbRuntimeView`
-   * cast; `commands`/`pool`/`pendingReleasedCmdIds` are `CCommandDb`'s own
-   * real typed members (`CCommandDb.h`), so the cast is gone.
-   *
-   * The null-`commandDb` guard and the `(cmdId & 0xFF000000) == 0xFF000000`
-   * early-out are not present in `FUN_006E0EC0`'s own body -- the mask check
-   * is applied at its real call sites instead (e.g. `Moho::UNIT_IssueCommand`,
-   * FUN_006F12C0, guards the call with `(cmdId & 0xFF000000) != 0xFF000000`).
-   * Kept here defensively: a Sim.cpp call site deliberately passes a possibly
-   * null `mCommandDB` relying on this guard, and folding three call-site
-   * guards into one is behaviourally equivalent for every real caller.
+   * The retire body itself belongs to `CCommandDb` and lives there now -- it is
+   * called unconditionally from `~CUnitCommand` (0x006E8500), which is how a
+   * completed or cancelled order actually leaves the sim's command map. What
+   * stays here is the pair of call-site guards the binary applies around it:
+   * `Moho::UNIT_IssueCommand` (FUN_006F12C0) skips the call when the id is
+   * still the unresolved `0xFF......` sentinel, and one Sim.cpp path
+   * deliberately passes a possibly-null `mCommandDB`.
    */
   void ReleaseCommandIdIfUnconsumed(CCommandDb* commandDb, const CmdId cmdId)
   {
@@ -4986,19 +4960,7 @@ namespace
       return;
     }
 
-    const auto it = commandDb->commands.find(cmdId);
-    if (it != commandDb->commands.end()) {
-      commandDb->commands.erase(it);
-    }
-
-    const std::uint32_t commandType = static_cast<std::uint32_t>(cmdId) & 0xFF000000u;
-    if (commandType == 0x80000000u) {
-      const std::int32_t retireIndex = (commandDb->pool.mSubRes2.mEnd + 99) % 100;
-      SimSubRes3& retireSlot = commandDb->pool.mSubRes2.mData[retireIndex];
-      AsBitSet(retireSlot).Add(static_cast<std::uint32_t>(cmdId) & 0x00FFFFFFu);
-    }
-
-    AppendPendingReleasedCommandId(commandDb->pendingReleasedCmdIds, cmdId);
+    commandDb->RemoveCmd(cmdId);
   }
 
 } // namespace
@@ -5146,15 +5108,22 @@ namespace moho
    *
    * Real disassembly walks `mCommands` in ascending-key order via an inlined
    * successor step (the same walk `msvc8::map`'s iterator performs through
-   * `rb_increment`), calling `AdvanceLocalEventsToBeat` on each mapped
-   * helper; a plain range-for over the map is the same walk.
+   * `rb_increment`), calling `AdvanceLocalEventsToBeat` on each mapped helper.
+   *
+   * It reads the mapped helper *before* that successor step (0x008B5D08 loads
+   * it, and only 0x008B5D48 calls 0x008B4C20) because a helper whose due
+   * sequence has arrived destroys itself, and `~UserCommandIssueHelper`
+   * (0x008B3F80) erases its own node from this map. A range-for increments
+   * after the body, so it walked a freed node the moment any helper retired.
    */
   void AdvanceCommandIssueHelpersToBeat(
     CommandManager& commandManager,
     const std::int32_t beat
   ) noexcept
   {
-    for (auto& [commandId, helper] : commandManager.mCommands) {
+    for (auto entry = commandManager.mCommands.begin(); entry != commandManager.mCommands.end();) {
+      UserCommandIssueHelper* const helper = entry->second;
+      ++entry;
       helper->AdvanceLocalEventsToBeat(beat);
     }
 

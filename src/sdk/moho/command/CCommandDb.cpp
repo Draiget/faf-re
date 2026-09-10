@@ -204,8 +204,18 @@ namespace moho
    */
   void CCommandDb::PublishSyncData(SSyncData* const syncData, const bool forceRefresh)
   {
-    for (const auto& entry : commands) {
-      CUnitCommand* const command = entry.second;
+    // The iterator is advanced *before* the call, exactly as 0x006E0F67 does:
+    // it loads the mapped command into `ecx` first, then runs the successor
+    // walk, and only then calls 0x006E8DC0 at 0x006E0FA9. That order is load-bearing --
+    // `RefreshPublishedCommandEvent` deletes the command once its live-unit set
+    // empties, and `~CUnitCommand` erases its own node from this very map. A
+    // range-for increments after the body, so it stepped through a freed node
+    // the moment any command retired: the sim wedged on the first completed
+    // build order, and the ids that never reached `pendingReleasedCmdIds` left
+    // the UI's build ghosts on screen forever.
+    for (auto entry = commands.begin(); entry != commands.end();) {
+      CUnitCommand* const command = entry->second;
+      ++entry;
       if (command != nullptr) {
         command->RefreshPublishedCommandEvent(forceRefresh, syncData);
       }
@@ -213,6 +223,29 @@ namespace moho
 
     std::swap(pendingReleasedCmdIds, syncData->mPendingReleasedCommandIds);
     pool.Update();
+  }
+
+  /**
+   * Address: 0x006E0EC0 (FUN_006E0EC0, ?RemoveCmd@CCommandDB@Moho@@...)
+   *
+   * What it does:
+   * See the declaration. `msvc8::map<CmdId, CUnitCommand*>::find`/`erase_node`
+   * for this instantiation are `sub_6E1940`/`sub_6E1670`, address-cited on
+   * `rb_tree::find_node`/`erase_node` in `RbTree.h`; the recycle-bucket block
+   * at 0x006E0EF6 is `IdPool::QueueReleasedLowId` (0x004039F0) inlined, and the
+   * tail call is the `msvc8::vector<CmdId>::push_back` emission FUN_006E1A10.
+   */
+  void CCommandDb::RemoveCmd(const CmdId cmdId)
+  {
+    if (const auto it = commands.find(cmdId); it != commands.end()) {
+      commands.erase(it);
+    }
+
+    if ((static_cast<std::uint32_t>(cmdId) & 0xFF000000u) == 0x80000000u) {
+      (void)pool.QueueReleasedLowId(static_cast<std::uint32_t>(cmdId) & 0x00FFFFFFu);
+    }
+
+    pendingReleasedCmdIds.push_back(cmdId);
   }
 
   /**

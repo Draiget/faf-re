@@ -2047,6 +2047,22 @@ void CUnitCommand::DestroyInternal()
     sidecarLink.ClearLinkState();
   }
 
+  // 0x006E8574..0x006E85B4. The retire call is the one that matters outside
+  // this object: it drops the command from `CCommandDb::commands` and queues
+  // its id into `pendingReleasedCmdIds`, which the next `PublishSyncData` hands
+  // to the UI as `SSyncData::mPendingReleasedCommandIds`. `CWldSession::DoBeat`
+  // turns that list into `DeleteCommandIssueHelpers`, which is the *only* thing
+  // that ever removes a `UserCommandIssueHelper` from the client's command map.
+  // The recovery had dropped all three statements, so a finished build order
+  // stayed in both maps: its id was never recycled, the determinism hash lost a
+  // field the original stirs in on every command death, and the queued-build
+  // ghost `RefreshQueuedBuildGhosts` draws from that map hung on screen after
+  // the structure was complete.
+  const CmdId commandId = static_cast<CmdId>(mConstDat.cmd);
+  mSim->Logf("Deleting command 0x%08x\n", commandId);
+  mSim->mContext.Update(&commandId, sizeof(commandId));
+  mSim->mCommandDB->RemoveCmd(commandId);
+
   mArgs = LuaPlus::LuaObject{};
 
   // +0x148..+0x154: coordinating-order vector storage (8-byte owner-link elements).
@@ -2098,8 +2114,12 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
       mHasPublishedCommandEvent = false;
     }
 
-    // Empty live-unit set follows the binary delete-slot path from 0x006E8E39.
-    DestroyInternal();
+    // 0x006E8E39: `(*(this->vftable + 8))(this, 1)` -- the scalar deleting
+    // destructor with the delete flag set, i.e. `delete this`. This used to
+    // call `DestroyInternal` alone, which tears the members down but neither
+    // frees the object nor runs `~CUnitCommand`, so the command was left as a
+    // gutted zombie inside `CCommandDb::commands` for every later beat to walk.
+    delete this;
     return;
   }
 
