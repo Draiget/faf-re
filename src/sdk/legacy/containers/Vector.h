@@ -1616,6 +1616,7 @@ namespace msvc8
          * Address: 0x0049E460 (FUN_0049E460 -- `allocator<SWorldParticle>::allocate` (140-byte element) for `msvc8::vector<SWorldParticle>`; callers 0x004972A2, 0x00499250, 0x0049960F; formerly `AllocateWorldParticleArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one world-particle array lane (`0x8C` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
          * Address: 0x0049E530 (FUN_0049E530 -- `allocator<TrailRuntimeView>::allocate` (96-byte element) for `msvc8::vector<TrailRuntimeView>`; callers 0x00497451, 0x00499630, 0x004999BF; formerly `AllocateTrailRuntimeArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one trail-runtime array lane (`0x60` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
          * Address: 0x0084FA10 (FUN_0084FA10 -- `allocator<T>::allocate` for a 4-byte element (`bad_alloc` when `count * 4` overflows); callers 0x0084F180, 0x0084F200, 0x0084F4D0; formerly `AllocateCheckedDwordStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479130 (FUN_00479130 -- `allocator<T>::allocate` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004787E0, 0x00478940, 0x00478CEF; formerly `AllocateHeightFieldTierStorage` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -2595,6 +2596,7 @@ namespace msvc8
          * Address: 0x0085EEA0 (FUN_0085EEA0 -- `vector<T>::size()` for a 52-byte element; callers 0x0085F3F0; formerly `CountElement52VectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852280 (FUN_00852280 -- `vector<T>::size()` for a 12-byte element; callers 0x008523C0; formerly `CountElement12VectorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008678E0 (FUN_008678E0 -- `vector<T>::size()` for a 12-byte element; callers 0x00868040; formerly `CountElement12VectorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478560 (FUN_00478560 -- `size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `HeightFieldTierVectorSize` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2880,6 +2882,7 @@ namespace msvc8
          * `ReadUInt`. DB-integrity fix: was fake-recovered (batch r14/
          * codex-needs-evidence, zero real src/sdk citation for this token or
          * its caller `FUN_005C3EF0`).
+         * Address: 0x004787E0 (FUN_004787E0 -- `reserve()` / `_Grow_to` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (destroys the live range, buys a fresh block); zero callers, unreachable; formerly `ResetHeightFieldTierVectorStorage` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
@@ -3176,6 +3179,8 @@ namespace msvc8
          * referenced (but not independently cited) on `insert` above.)
          * Address: 0x006AF120 (FUN_006AF120 -- `vector<T>::resize(n, value)` for the 4-byte `ReconBlip*` element; callers 0x006AE780, 0x006AF530; formerly `ResizeReconBlipPointerVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00765130 (FUN_00765130 -- `vector<T>::resize(n, value)` for a 4-byte element (shrinks through the erase lane 0x00702730, grows through the fill); callers 0x00764A80, 0x007650E7; formerly `ResizeWordVectorWithFillByteRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478700 (FUN_00478700 -- `resize(n, value)` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00476090, 0x00478530; formerly `ResizeHeightFieldTierVector` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478530 (FUN_00478530 -- `mGrids.resize(numSubgrids, CHeightFieldTier{})` as written in `CHeightField::CHeightField` -- the temporary's destructor is the `delete[]` pair that follows the call; zero callers, unreachable; formerly `ResizeHeightFieldTierVectorWithZeroTemplate` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3305,6 +3310,7 @@ namespace msvc8
          * Address: 0x00740E20 (FUN_00740E20 -- `~vector<T>` / `_Tidy` for a 12-byte element holding a shared control block (each element released, then the block freed); callers 0x00752BA0 (unreached); formerly `DestroySharedControlRangeOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00740E90 (FUN_00740E90 -- `~vector<msvc8::string>` / `_Tidy`; callers 0x00753020 (unreached); formerly `DestroyStringRangeOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007424A0 (FUN_007424A0 -- `~vector<msvc8::string>` / `_Tidy` (second instantiation); callers 0x00741FC0; formerly `DestroyStringRangeOwnerRuntimeLegacy` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478830 (FUN_00478830 -- `_Tidy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (`~CHeightField` runs it before the member destructor); zero callers, unreachable; formerly `ReleaseHeightFieldTierVectorStorage` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -4251,6 +4257,7 @@ namespace msvc8
          * Address: 0x0092EA10 (FUN_0092EA10 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x0092FC60; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00933180 (FUN_00933180 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00934080; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x009331C0 (FUN_009331C0 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00934130; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004788C0 (FUN_004788C0 -- `erase(first, last)` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478700; formerly `EraseHeightFieldTierRange` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6427,6 +6434,7 @@ namespace msvc8
          * Address: 0x00688E20 (FUN_00688E20 -- the `std::fill` seam step of `_Insert_n` for a 20-byte `{WeakPtr, dword...}` element; callers 0x006882E0; formerly `FillPrefixedWeakPtrDwordLaneRangeFromSingleLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0084A510 (FUN_0084A510 -- the `std::fill` seam step of `_Insert_n` for a 12-byte element; callers 0x00849250; formerly `FillStride3DwordLaneRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852700 (FUN_00852700 -- the `std::fill` seam step of `_Insert_n` for a 12-byte float[3] element; callers 0x008523C0; formerly `FillStride3FloatLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478940 (FUN_00478940 -- `_Insert_n` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (1.5x growth, capped at `max_size`); callers 0x00478700; formerly `InsertHeightFieldTierCopies` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6910,6 +6918,8 @@ namespace msvc8
          * Address: 0x0049F120 (FUN_0049F120 -- `_Destroy_range` for `SWorldParticle`; zero callers, unreachable; formerly `DestroyWorldParticleRange` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Destroys one contiguous world-particle range.)
          * Address: 0x0049F1D0 (FUN_0049F1D0 -- `_Destroy_range` for `TrailRuntimeView`; zero callers, unreachable; formerly `DestroyTrailRuntimeViewRangeForVectorTail` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Destroys one contiguous trail-runtime range.)
          * Address: 0x0049F690 (FUN_0049F690 -- `_Destroy_range` for `SWorldBeam`; callers 0x00492200, 0x004958F0, 0x004976F0; formerly `DestroyWorldBeamRangeByTextureLaneReset` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Destroys one contiguous world-beam range by resetting both texture lanes.)
+         * Address: 0x00478910 (FUN_00478910 -- `_Destroy_range` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00476090, 0x00476220, 0x00478830; formerly `DestroyHeightFieldTierRangeVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479090 (FUN_00479090 -- `_Destroy_range` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (second copy); zero callers, unreachable; formerly `DestroyHeightFieldTierRangeVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -7744,6 +7754,13 @@ namespace msvc8
          * Address: 0x007D9AA0 (FUN_007D9AA0 -- a register-shape entry into the clutter seed `_Ucopy`; zero callers, unreachable; formerly `CopyClutterSeedRangeRuntimeAdapterB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D9B20 (FUN_007D9B20 -- a register-shape entry into the clutter seed `_Ucopy`; zero callers, unreachable; formerly `CopyClutterSeedRangeRuntimeAdapterC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0088AD60 (FUN_0088AD60 -- `_Ucopy` for the wave-parameters element; callers 0x0088A0C0 (unreached); formerly `CopyWaveParametersRangeForwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479260 (FUN_00479260 -- `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004788C0, 0x00479060; formerly `CopyHeightFieldTierRangeForward` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479060 (FUN_00479060 -- a register-shape entry into `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `CopyHeightFieldTierRangeForwardThunk` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004796D0 (FUN_004796D0 -- `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (the range-construct form); callers 0x00478940, 0x004790C0, 0x004792D0; formerly `ConstructHeightFieldTierRange` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004790C0 (FUN_004790C0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `ConstructHeightFieldTierRangeThunkVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004792D0 (FUN_004792D0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004795A0 (FUN_004795A0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant3` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004796A0 (FUN_004796A0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant4` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8813,6 +8830,9 @@ namespace msvc8
          * Address: 0x0085A7C0 (FUN_0085A7C0 -- a register-shape entry into the same 16-byte `_Ufill`; zero callers, unreachable; formerly `FillStride4DwordWithDualRefLaneRuntimeNullAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0076D150 (FUN_0076D150 -- `_Ufill` for the occupy-source binding element (installs the binding vtable per copy); callers 0x0076C490, 0x0076CBA0, 0x0076CEE0; formerly `FillOccupySourceBindingRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0076CEE0 (FUN_0076CEE0 -- a fastcall-shape entry into the occupy-source binding `_Ufill`; zero callers, unreachable; formerly `FillOccupySourceBindingRangeRuntimeAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479380 (FUN_00479380 -- `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940, 0x00478D30, 0x00478E30; formerly `ConstructHeightFieldTierFill` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478E30 (FUN_00478E30 -- a register-shape entry into `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `ConstructHeightFieldTierFillThunkVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479190 (FUN_00479190 -- a register-shape entry into `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierFillThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9592,6 +9612,8 @@ namespace msvc8
          * Address: 0x0067F650 (FUN_0067F650 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x00680210 (unreached); formerly `CopyPointerWordRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006E3580 (FUN_006E3580 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x006E2F30; formerly `CopyWordRangeForwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008503B0 (FUN_008503B0 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x0084FF80; formerly `CopyDwordRangeForwardRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479300 (FUN_00479300 -- `_Copy_opt` (assign over live elements) for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940, 0x004790F0; formerly `CopyHeightFieldTierRangeToInitialized` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004790F0 (FUN_004790F0 -- a register-shape entry into `_Copy_opt` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `CopyHeightFieldTierRangeToInitializedThunk` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9699,6 +9721,9 @@ namespace msvc8
          * Address: 0x00852720 (FUN_00852720 -- `_Copy_backward` for a 12-byte float[3] element; callers 0x008523C0; formerly `CopyStride3FloatRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0092DC80 (FUN_0092DC80 -- `_Copy_backward` for a 12-byte element; callers 0x0092F630; formerly `CopyStride3DwordRangeBackwardRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0092DFC0 (FUN_0092DFC0 -- `_Copy_backward` for a 12-byte element; callers 0x0092F240; formerly `CopyStride3DwordRangeBackwardRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004795D0 (FUN_004795D0 -- `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00479100, 0x00479350; formerly `CopyHeightFieldTierRangeBackward` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479100 (FUN_00479100 -- a register-shape entry into `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `CopyHeightFieldTierRangeBackwardThunkVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00479350 (FUN_00479350 -- a register-shape entry into `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `CopyHeightFieldTierRangeBackwardThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -10340,6 +10365,8 @@ namespace msvc8
          * Address: 0x0049C1E0 (FUN_0049C1E0 -- `vector<SWorldBeam>::max_size()` (0xFFFFFFFF / 0xCC); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x1414141` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0049A1B0 (FUN_0049A1B0 -- `vector<BeamRenderVertexRuntime>::max_size()` (0xFFFFFFFF / 0x3C); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x4444444` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0049C5B0 (FUN_0049C5B0 -- `vector<BeamRenderVertexRuntime>::max_size()` (0xFFFFFFFF / 0x3C, second copy); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x4444444_DuplicateA` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004788B0 (FUN_004788B0 -- `max_size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `HeightFieldTierVectorMaxCountVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00478E50 (FUN_00478E50 -- `max_size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (second copy); zero callers, unreachable; formerly `HeightFieldTierVectorMaxCountVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -10475,6 +10502,7 @@ namespace msvc8
          * Address: 0x00499560 (FUN_00499560 -- `_Xlen` for `?`; callers 0x0049728B, 0x00499250; formerly `ThrowLegacyVectorTooLong` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Throws `std::length_error` with the legacy vector overflow message.)
          * Address: 0x00499910 (FUN_00499910 -- `_Xlen` for `?`; callers 0x00497428, 0x00499630; formerly `ThrowLegacyVectorTooLongDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate vector-overflow throw helper retained for callsite parity.)
          * Address: 0x00499D50 (FUN_00499D50 -- `_Xlen` for `?`; callers 0x00497530, 0x004976BB, 0x00499A20; formerly `ThrowLegacyVectorTooLongDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate vector-overflow throw helper retained for callsite parity.)
+         * Address: 0x00478C50 (FUN_00478C50 -- `_Xlen` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004787E0, 0x00478940; formerly `ThrowHeightFieldTierVectorTooLong` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {
