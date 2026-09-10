@@ -1305,6 +1305,7 @@ namespace msvc8
          * Address: 0x00508A80 (FUN_00508A80 -- same.)
          * Address: 0x00508A90 (FUN_00508A90 -- same.)
          * Address: 0x00508B00 (FUN_00508B00 -- same.)
+         * Address: 0x0049E780 (FUN_0049E780 -- another empty `_Iterator_base` body of the release build, this one from the beam vertex vector; zero callers. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         struct NoDebugProxy {};
 
@@ -1493,6 +1494,8 @@ namespace msvc8
          * Address: 0x0049EA20 (FUN_0049EA20 -- the same `_Allocate` for the ICF-separated insert 0x0049B450.)
          * Address: 0x0049E950 (FUN_0049E950 -- `_Allocate` for the particle buckets' `msvc8::vector<std::uint32_t>`; callers 0x00498AF0, 0x0049B0B0.)
          * Address: 0x0049EAE0 (FUN_0049EAE0 -- the same `uint32` `_Allocate` for 0x0049B7B0.)
+         * Address: 0x0049E630 (FUN_0049E630 -- `_Allocate` for the 0xCC-byte `moho::SWorldBeam` element; callers 0x00497530, 0x00499A20. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E720 (FUN_0049E720 -- `_Allocate` for the 0x38-byte `BeamRenderVertexRuntime` element; caller 0x0049A1D0.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -1914,6 +1917,7 @@ namespace msvc8
          * Address: 0x00752DE0 (FUN_00752DE0 -- copy constructor for a 40-byte element (buy at 0x0074DA70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005DB610 (FUN_005DB610 -- copy constructor for the 8-byte `moho::WeakPtr<CUnitCommand>` element: null the triple, buy exactly `size()` slots (0x005A1D60), `_Ucopy` 0x005E1840 (each node relinks at its owner's chain head through `WeakPtr`'s copy constructor), `_Tidy` 0x005A07A0 on the throw path. Twelve callers, e.g. 0x005D7340 (CAiAttackerImpl.cpp), 0x005FA340 / 0x005FA550 (CFactoryBuildTask). Formerly `CopyWeakPtrCUnitCommandVector` in moho/unit/CUnitCommandWeakPtrReflection.cpp (RULE ONE); its callers now copy or assign the vector directly.)
          * Address: 0x00508F50 (FUN_00508F50 -- copy constructor for `moho::SDelayedSubVizInfo`: null the triple, allocate exactly `size()` slots (0x005087E0), copy through 0x00508BE0; zero callers, unreachable. Formerly `CopyDelayedSubVizStorageDeep` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00497530 (FUN_00497530 -- copy constructor for the 0xCC-byte `moho::SWorldBeam` element (max_size 0x1414141, buy exactly `size()` slots through 0x0049E630, per-element copy 0x0049BF10); callers 0x00495CC0, 0x0049CFD0 (the beam bucket entry copy, now `::new (&destination->beams) msvc8::vector<SWorldBeam>(source->beams)`). Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -3140,6 +3144,7 @@ namespace msvc8
          * Address: 0x004958F0 (FUN_004958F0 -- `_Tidy` for `msvc8::vector<SWorldBeam>`; caller 0x00491540 (BeamRenderHelpers.cpp).)
          * Address: 0x00493D20 (FUN_00493D20 -- `_Tidy` for `msvc8::vector<ParticleRenderIntervalRuntime>` (`ParticleRenderWorkItemRuntime::mIntervals`), the source call `workItem.mIntervals.tidy()` in `ResetParticleRenderWorkItemIntervals`.)
          * Address: 0x00494900 (FUN_00494900 -- ICF-separated copy of that interval `_Tidy`.)
+         * Address: 0x004976F0 (FUN_004976F0 -- `_Tidy` for `msvc8::vector<moho::SWorldBeam>` (destroy each beam's counted handles, free, null the triple); caller 0x00497530 (the copy constructor's catch arm). Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -5139,6 +5144,9 @@ namespace msvc8
          * Address: 0x00497210 (FUN_00497210 -- the iterator-returning `insert(pos, value)` shell over 0x00499250 for `SWorldParticle`; caller 0x00495620 (BeamRenderHelpers.cpp).)
          * Address: 0x00499630 (FUN_00499630 -- single-value `insert(pos, value)` for the 0x60-byte `TrailRuntimeView` element (copy constructor 0x0049BDD0, shift 0x0049E500 / fill 0x0049E4E0, grow copies 0x0049E4B0 / 0x004974E0, `_Destroy_range` 0x00497470); caller 0x004973B0.)
          * Address: 0x004973B0 (FUN_004973B0 -- the iterator-returning `insert(pos, value)` shell over 0x00499630 for `TrailRuntimeView`; caller 0x004957C0 (BeamRenderHelpers.cpp).)
+         * Address: 0x00499A20 (FUN_00499A20 -- single-value `insert(pos, value)` for the 0xCC-byte `moho::SWorldBeam` element (staged copy 0x0049BF10, in-place shift 0x0049E600 / fill 0x0049E5D0, grow arm 0x0049E5A0 with `_Allocate` 0x0049E630 and `_Ufill` 0x00497730); the source call is `bucket.beams.push_back(beam)` in BeamRenderHelpers.cpp. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00497640 (FUN_00497640 -- the pointer-argument shell over that insert; zero callers, unreachable.)
+         * Address: 0x00497B40 (FUN_00497B40 -- the capacity-full path of `push_back` for the 0x38-byte `BeamRenderVertexRuntime` element (`insert(end(), value)`, 1.5x growth, max_size 0x4444444); caller 0x00495DA0 (`AppendBeamRenderVertex`, `vertices.push_back(vertex)`).)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6227,6 +6235,9 @@ namespace msvc8
          * Address: 0x0049E9E0 (FUN_0049E9E0 -- the same seam step for the ICF-separated insert 0x0049B450.)
          * Address: 0x0049E400 (FUN_0049E400 -- the seam step of the `SWorldParticle` insert 0x00499250 (per-element copy through 0x0049BC00).)
          * Address: 0x0049E4E0 (FUN_0049E4E0 -- the seam step of the `TrailRuntimeView` insert 0x00499630.)
+         * Address: 0x0049A1D0 (FUN_0049A1D0 -- `_Insert_n` for the 0x38-byte `BeamRenderVertexRuntime` element (copies 0x0049E6B0 / 0x0049E6F0, fill 0x0049E6E0, `_Allocate` 0x0049E720, `_Xlen` 0x0049A470); caller 0x00497B40. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E5D0 (FUN_0049E5D0 -- the `std::fill` seam step of the `SWorldBeam` insert 0x00499A20.)
+         * Address: 0x0049E6E0 (FUN_0049E6E0 -- the `std::fill` seam step of the `BeamRenderVertexRuntime` `_Insert_n` 0x0049A1D0; zero callers.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7486,6 +7497,8 @@ namespace msvc8
          * Address: 0x0049EA70 (FUN_0049EA70 -- the grow-arm `_Ucopy` of the ICF-separated `uint32` insert 0x0049B7B0.)
          * Address: 0x0049E4B0 (FUN_0049E4B0 -- `_Ucopy` for `TrailRuntimeView`, the grow-arm copy of insert 0x00499630.)
          * Address: 0x00497330 (FUN_00497330 -- `_Ucopy` for `SWorldParticle` (copy constructor 0x0049BC00 per element, rollback through 0x004972C0), the grow-arm copy of insert 0x00499250.)
+         * Address: 0x0049E5A0 (FUN_0049E5A0 -- `_Ucopy` for `moho::SWorldBeam` (per-element copy 0x0049BF10), the grow-arm copy of insert 0x00499A20. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E6B0 (FUN_0049E6B0 -- `_Ucopy` for `BeamRenderVertexRuntime`, the grow-arm copy of `_Insert_n` 0x0049A1D0.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8518,6 +8531,7 @@ namespace msvc8
          * Address: 0x00508080 (FUN_00508080 -- the advance-returning `_Ufill` adapter over 0x005095C0 with a value-initialised element, called from `_Insert_n` 0x00508480. Formerly `FillDefaultDelayedSubVizInfoSpan`.)
          * Address: 0x00498B80 (FUN_00498B80 -- `_Ufill` for the particle buckets' `msvc8::vector<std::uint32_t>`, reached from the insert 0x0049B0B0. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004974E0 (FUN_004974E0 -- `_Ufill` for `TrailRuntimeView` (repeated copy construction), reached from the insert 0x00499630.)
+         * Address: 0x00497730 (FUN_00497730 -- `_Ufill` for `moho::SWorldBeam` (count copies of one beam), reached from the insert 0x00499A20. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9352,6 +9366,8 @@ namespace msvc8
          * Address: 0x0049E500 (FUN_0049E500 -- `_Copy_backward` for `TrailRuntimeView`, the in-place shift of insert 0x00499630.)
          * Address: 0x0049E920 (FUN_0049E920 -- `_Copy_backward` for the particle buckets' `msvc8::vector<std::uint32_t>`, reached from insert 0x0049B0B0.)
          * Address: 0x0049EAB0 (FUN_0049EAB0 -- the same `uint32` shift for the ICF-separated insert 0x0049B7B0.)
+         * Address: 0x0049E600 (FUN_0049E600 -- `_Copy_backward` for `moho::SWorldBeam`, the in-place shift of insert 0x00499A20; caller chunk 0x00499D02. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0049E6F0 (FUN_0049E6F0 -- `_Copy_backward` for `BeamRenderVertexRuntime`, the in-place shift of `_Insert_n` 0x0049A1D0.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -10111,6 +10127,7 @@ namespace msvc8
          * Address: 0x0049B6A0 (FUN_0049B6A0 -- `_Xlen` for the ICF-separated interval insert 0x0049B450.)
          * Address: 0x0049B2C0 (FUN_0049B2C0 -- `_Xlen` for the particle buckets' `msvc8::vector<std::uint32_t>` (max_size 0x3FFFFFFF); callers 0x00498AF0, 0x0049B0B0.)
          * Address: 0x0049B9C0 (FUN_0049B9C0 -- the same `uint32` `_Xlen` for 0x0049B7B0.)
+         * Address: 0x0049A470 (FUN_0049A470 -- `_Xlen` for the `BeamRenderVertexRuntime` instantiation; callers 0x0049A1D0 and chunk 0x00497BB9. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {

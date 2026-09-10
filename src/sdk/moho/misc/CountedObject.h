@@ -51,6 +51,12 @@ namespace moho
       Retain(tex);
     }
 
+    /**
+     * Address: 0x0049C1A0 (FUN_0049C1A0 -- `CountedPtr<CParticleTexture>::operator=`
+     * as emitted for the beam vector copies (retain the new texture, release the
+     * old one). Formerly `CopyCountedParticleTextureLaneRetain` in
+     * BeamRenderHelpers.cpp, removed 2026-09-10.)
+     */
     CountedPtr& operator=(const CountedPtr& other) noexcept
     {
       if (this != &other) {
