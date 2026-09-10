@@ -1497,6 +1497,10 @@ namespace gpg::core
      * Moho::CWldSession::ClearBuildTemplates -- the `SBuildTemplateInfo, 16>`
      * instantiation, recovered as `mBuildTemplates.ResetStorageToInline();`
      * at the call site (CWldSession.cpp).)
+     * Address: 0x00561D40 (FUN_00561D40,
+     * Moho::SSTIUnitVariableData::~SSTIUnitVariableData -- the
+     * `UnitWeaponInfo, 1>` instantiation, recovered as
+     * `mWeaponInfo.ResetStorageToInline();` at the call site (Unit.cpp).)
      *
      * What it does:
      * if heap-backed -> free heap and restore inline pointers from saved header;

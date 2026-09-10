@@ -12652,80 +12652,19 @@ SSTIUnitVariableData::SSTIUnitVariableData()
 }
 
 /**
- * Address: 0x00561D40 (FUN_00561D40, FastVectorN<UnitWeaponInfo,1>::ClearAndRebindToInline)
- *
- * IDA signature:
- * Moho::UnitWeaponInfo *__usercall sub_561D40@<eax>(int a1@<ebx>);
- *
- * What it does:
- * Destructs every active `UnitWeaponInfo` element in the weapon-info fast
- * vector lane (range [start_, end_)), then, if storage is heap-backed, frees
- * the heap buffer and rebinds all three lane pointers back onto the inline
- * buffer header stored at `originalVec_` (+0x0C in the FastVectorN layout),
- * producing the post-rebind invariant `start_ == end_ == originalVec_` and
- * `capacity_ = originalVec_ + N`. When already using inline storage the lane
- * simply collapses `end_ = start_` without freeing inline bytes.
- *
- * Two aliasing JMP thunks (at 0x00560CB0 and 0x00561430) forward here as part
- * of compiler-synthesized copy-assign prologues; the CALL from
- * `~SSTIUnitVariableData` at 0x00560561 runs the same teardown for the
- * destructor case. Recovered as an intent-named method on the fastvector
- * lane and invoked explicitly from `~SSTIUnitVariableData` below.
- */
-static void ClearWeaponInfoVectorAndRebindInline(moho::SSTIUnitWeaponInfoVector& vec) noexcept
-{
-  // If lanes currently reference heap storage (start_ differs from the
-  // inline-buffer header stored in originalVec_), release that heap block and
-  // restore pointer lanes to the inline buffer using the saved capacity
-  // header that was written into the first slot of inline storage at the
-  // most recent grow/init event.
-  //
-  // The deallocation MUST be the `delete[]` expression, not a direct
-  // `::operator delete[](start_)` call. `FastVectorN::GrowToCapacity` allocates
-  // this buffer with `new T[newCap]`, and `UnitWeaponInfo` has a non-trivial
-  // destructor, so the allocation carries a 4-byte array cookie and `start_`
-  // points at base+4. `delete[] p` subtracts that cookie before calling the
-  // deallocation function; calling `::operator delete[]` directly does not, so
-  // it handed the allocator a pointer 4 bytes past a real block. Caught live:
-  //
-  //   [BADFREE] ptr=5C665804 base=5C661000 kind=25 blockSize=768 delta=18436
-  //     operator delete[] <- ClearWeaponInfoVectorAndRebindInline
-  //     <- ~SSTIUnitVariableData <- ~SUnitVariableUpdateEntry
-  //     <- msvc8::vector<SUnitVariableUpdateEntry,1>::destroy_range
-  //
-  // (18436 == 24 * 768 + 4.) `GetPageOwner` still resolves that interior
-  // pointer, so the allocator linked base+4 onto a free lane and later handed
-  // it out as a block overlapping the real one - two owners, one buffer.
-  //
-  // `delete[]` also runs `~UnitWeaponInfo` for every element the matching
-  // `new T[newCap]` constructed, which is what releases the shared texture /
-  // blueprint references each weapon snapshot holds. The previous explicit
-  // `[start_, end_)` destructor loop is therefore redundant here (and would
-  // now double-destruct the live range), so it is gone: allocation and
-  // deallocation forms match, and the slots between end_ and capacity_ are no
-  // longer left undestructed.
-  if (vec.start_ != vec.originalVec_) {
-    delete[] vec.start_;
-    vec.start_ = vec.originalVec_;
-    vec.capacity_ = *reinterpret_cast<moho::UnitWeaponInfo**>(vec.start_);
-    vec.end_ = vec.start_;
-  } else {
-    vec.end_ = vec.start_;
-  }
-}
-
-/**
  * Address: 0x00560500 (FUN_00560500, ??1SSTIUnitVariableData@Moho@@QAE@XZ)
  *
  * What it does:
  * Releases dynamic sync lanes through member dtors (`string`, `shared_ptr`,
- * and fastvector_n payloads) and explicitly clears the weapon-info
- * fastvector lane back to inline storage so every `UnitWeaponInfo` element
- * destructor actually runs (`~FastVectorN` alone only frees heap bytes).
+ * and fastvector_n payloads) and clears the weapon-info fastvector lane
+ * back to inline storage, which destroys every live `UnitWeaponInfo`
+ * element before releasing the heap block (`~FastVectorN` alone only frees
+ * the bytes). That one call is the whole of `FUN_00561D40`, the
+ * `FastVectorN<UnitWeaponInfo, 1>` emission of `ResetStorageToInline`.
  */
 SSTIUnitVariableData::~SSTIUnitVariableData()
 {
-  ClearWeaponInfoVectorAndRebindInline(mWeaponInfo);
+  mWeaponInfo.ResetStorageToInline();
 }
 
 SSTIUnitVariableData::SSTIUnitVariableData(const SSTIUnitVariableData& other)
