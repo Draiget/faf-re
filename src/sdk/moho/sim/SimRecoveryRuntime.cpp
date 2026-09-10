@@ -6095,22 +6095,6 @@ std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeB(
 }
 
 /**
- * Address: 0x00932940 (FUN_00932940)
- *
- * What it does:
- * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
- * `destinationEnd` and returns the destination begin lane.
- */
-std::uint32_t* CopyDwordRangeBackwardRuntimeH(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destinationEnd
-)
-{
-  return CopyPointerWordRangeBackwardRuntime(sourceBegin, sourceEnd, destinationEnd);
-}
-
-/**
  * Address: 0x00932970 (FUN_00932970)
  *
  * What it does:

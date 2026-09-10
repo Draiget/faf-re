@@ -3817,6 +3817,7 @@ namespace msvc8
          * once `mMaps` became a real `msvc8::vector<T>`; `CancelExport` now
          * calls this method by name (`mMaps.erase(binding)`).)
          * Address: 0x0053FD00 (FUN_0053FD00 -- `erase(pos)` for an 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00936610 (FUN_00936610 -- `erase(pos)` for a 4-byte scalar element: memmove tail shift, `--last_`, iterator returned through the hidden result slot; zero callers, no xrefs, unreachable from every seeded root. Formerly `EraseDwordAtCursorAndReturnSlot` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -6113,6 +6114,10 @@ namespace msvc8
          * zero open callees and a recovered caller; not a layout gap.
          * Address: 0x007027A0 (FUN_007027A0 -- `vector<uint32>::_Insert_n` (`CArmyImpl::Func16` 0x006FE090 and the `resize` at 0x0074DC40); the 0x3FFFFFFF length guard throws through 0x007029C0.)
          * Address: 0x0067D660 (FUN_0067D660 -- `vector<EntId>::_Insert_n`, the slow arm of `push_back` at 0x0067B810.)
+         * Address: 0x00933640 (FUN_00933640 -- `_Insert_n` for a 4-byte element (max_size 0x3FFFFFFF, 1.5x growth): the gap-fill arm 0x00932490, the count fill `_Ufill` 0x00932F90, `_Umove` 0x00933250 (ICF twin 0x00933220), `copy_backward` 0x00932940 and `_Xlen` 0x00933470; reached from 0x00934080 / 0x00934010 / 0x00934300 in the cluster/path region. DB previously pointed at Cluster.cpp with no anchor anywhere.)
+         * Address: 0x00932490 (FUN_00932490 -- the `std::fill(where, where + count, value)` gap-overwrite step of the 4-byte `_Insert_n` 0x00933640; formerly `FillDwordRangeByEndLaneF` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008D9D10 (FUN_008D9D10 -- the `std::fill` gap-overwrite step for the 8-byte `gpg::REnumType::ROptionValue` element of `_Insert_n` 0x008DCB70; formerly `FillDwordPairRangeLaneB` in LegacyContainerFillLanesB.cpp, removed.)
+         * Address: 0x008D9230 (FUN_008D9230 -- ICF twin of 0x008D9D10 (identical function_sha256): zero callers, no xrefs, unreachable from every seeded root; a linker-retained copy nothing runs.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -8363,6 +8368,8 @@ namespace msvc8
          * Address: 0x004D4F50 (FUN_004D4F50 -- register bridge into the string-triple `_Fill` at 0x004D5390; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x006E2D40 (FUN_006E2D40 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x006E34E0 (FUN_006E34E0 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x008DB390 (FUN_008DB390 -- `_Ufill` (advance-returning `_Uninit_fill_n`) for the 4-byte `gpg::RType*` element of `_Insert_n` 0x008DD050 (`gpg::RType::RegisterType`'s TypeVec insert); formerly `FillDwordCountedLaneY` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00932F90 (FUN_00932F90 -- `_Ufill` for the 4-byte element of `_Insert_n` 0x00933640; was DB `skip` ("RULE ONE emission") with no anchor.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9124,6 +9131,10 @@ namespace msvc8
          * Address: 0x00754710 (FUN_00754710 -- `_Copy_opt` for a 28-byte seven-float element (the loop and its bridge), the copy step of `operator=` 0x007525C0.)
          * Address: 0x007548B0 (FUN_007548B0 -- register bridge into the `_Copy_opt` of `SSyncData`'s 12-byte shared-count element (`operator=` 0x00752C50).)
          * Address: 0x008A9B10 (FUN_008A9B10 -- register bridge into the 0x28 string-element `_Copy_opt` at 0x004FB510; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x008D7DC0 (FUN_008D7DC0 -- element-wise forward copy (`_Copy`/`_Ucopy` under VC8's non-scalar pointer category, i.e. a 4-byte class element rather than a memmove'd scalar) for the assign-over/append arms of `operator=` 0x008D76B0; formerly `CopyDwordRangeForwardLaneA` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008D7E20 (FUN_008D7E20 -- the same element-wise 4-byte forward copy for the `operator=` twin 0x008D77E0; formerly `CopyDwordRangeForwardLaneB`, removed.)
+         * Address: 0x00935BD0 (FUN_00935BD0 -- `_Copy_opt` memmove for a 4-byte scalar element ([first, last) to dest, returns the destination end); zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneA` in LegacyContainerFillLanesB.cpp, removed.)
+         * Address: 0x00936000 (FUN_00936000 -- identical 4-byte `_Copy_opt` memmove copy; zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneB`, removed.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9176,6 +9187,7 @@ namespace msvc8
          * Address: 0x0064FFB0 (FUN_0064FFB0 -- `_Copy_backward_opt` for `SDebugScreenText`, the tail shift of that vector's `_Insert_n` (0x0064E490).)
          * Address: 0x0064F760 (FUN_0064F760 -- `_Copy_backward_opt` for `SDebugScreenText`, the tail shift of that vector's `_Insert_n` (0x0064E490).)
          * Address: 0x0064FAC0 (FUN_0064FAC0 -- register bridge into the `SDebugScreenText` backward copy; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00932940 (FUN_00932940 -- `_Copy_backward_opt` for the 4-byte element of `_Insert_n` 0x00933640 (the in-place shift arm); formerly `CopyDwordRangeBackwardRuntimeH` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9921,6 +9933,7 @@ namespace msvc8
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
+         * Address: 0x00933470 (FUN_00933470 -- `_Xlen` of the 4-byte `_Insert_n` 0x00933640.)
          */
         [[noreturn]] static void throw_too_long()
         {
