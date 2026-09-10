@@ -4,7 +4,8 @@
 
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -45,8 +46,7 @@ namespace
   }
 
   class CUnitRepairTaskReflectionView final
-    : public moho::CCommandTask
-    , public moho::CUnitRepairTaskListenerPad
+    : public moho::CCommandTaskWithListenerSlot
     , public moho::Listener<moho::ECommandEvent>
   {
   public:
@@ -67,8 +67,7 @@ namespace
      * listener self-links, build-helper defaults, and weak-target slots.
      */
     CUnitRepairTaskReflectionView()
-      : CCommandTask()
-      , CUnitRepairTaskListenerPad{}
+      : CCommandTaskWithListenerSlot()
       , Listener<moho::ECommandEvent>()
       , mBuildHelper()
       , mCommand(nullptr)

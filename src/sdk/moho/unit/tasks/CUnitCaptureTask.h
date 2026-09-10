@@ -16,17 +16,11 @@ namespace moho
   class Entity;
   class Unit;
 
-  struct CUnitCaptureTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitCaptureTaskListenerPad) == 0x04, "CUnitCaptureTaskListenerPad size must be 0x04");
 
   /**
    * Runtime owner for unit-capture command task state.
    */
-  class CUnitCaptureTask : public CCommandTask, public CUnitCaptureTaskListenerPad, public Listener<ECommandEvent>
+  class CUnitCaptureTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
   {
   public:
     /**

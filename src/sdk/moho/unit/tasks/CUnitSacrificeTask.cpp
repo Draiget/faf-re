@@ -142,8 +142,7 @@ namespace moho
    * null current-command pointer, and cleared weak target lane.
    */
   CUnitSacrificeTask::CUnitSacrificeTask()
-    : CCommandTask()
-    , CUnitSacrificeTaskListenerPad{}
+    : CCommandTaskWithListenerSlot()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetUnit{}
@@ -162,8 +161,7 @@ namespace moho
    * payload ownership context.
    */
   CUnitSacrificeTask::CUnitSacrificeTask(CCommandTask* const parentTask, Unit* const targetUnit)
-    : CCommandTask(parentTask)
-    , CUnitSacrificeTaskListenerPad{}
+    : CCommandTaskWithListenerSlot(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetUnit{}

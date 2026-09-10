@@ -143,7 +143,7 @@ namespace moho
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
   CUnitRepairTask::CUnitRepairTask(IAiCommandDispatchImpl* const dispatchTask, Unit* const targetUnit, const bool isSiloBuild)
-    : CCommandTask(static_cast<CCommandTask*>(dispatchTask))
+    : CCommandTaskWithListenerSlot(static_cast<CCommandTask*>(dispatchTask))
     , Listener<ECommandEvent>()
     , mBuildHelper("Repair", mUnit)
     , mCommand(nullptr)

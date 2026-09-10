@@ -214,8 +214,7 @@ namespace moho
    * bookkeeping/economy lanes.
    */
   CUnitCaptureTask::CUnitCaptureTask()
-    : CCommandTask()
-    , CUnitCaptureTaskListenerPad{}
+    : CCommandTaskWithListenerSlot()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -239,8 +238,7 @@ namespace moho
    * target/listener ownership links, and seeds owner focus/target blip state.
    */
   CUnitCaptureTask::CUnitCaptureTask(CCommandTask* const parentTask, Entity* const targetEntity)
-    : CCommandTask(parentTask)
-    , CUnitCaptureTaskListenerPad{}
+    : CCommandTaskWithListenerSlot(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}

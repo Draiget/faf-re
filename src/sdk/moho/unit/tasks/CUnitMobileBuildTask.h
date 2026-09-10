@@ -20,17 +20,14 @@ namespace moho
   struct RUnitBlueprint;
   class Unit;
 
-  struct CUnitMobileBuildTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitMobileBuildTaskListenerPad) == 0x04, "CUnitMobileBuildTaskListenerPad size must be 0x04");
-
   /**
    * Runtime owner for mobile-build task command/listener lanes.
+   *
+   * The listener base sits at +0x34 (0x005F6A0B stores that offset), four
+   * bytes past the end of `CCommandTask`; `CCommandTaskWithListenerSlot`
+   * carries the gap.
    */
-  class CUnitMobileBuildTask : public CCommandTask, public CUnitMobileBuildTaskListenerPad, public Listener<ECommandEvent>
+  class CUnitMobileBuildTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
   {
   public:
     /**

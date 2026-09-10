@@ -16,17 +16,11 @@ namespace moho
   class CUnitCommand;
   class Entity;
 
-  struct CUnitReclaimTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitReclaimTaskListenerPad) == 0x04, "CUnitReclaimTaskListenerPad size must be 0x04");
 
   /**
    * Recovered runtime layout used by reclaim-task reflection constructors.
    */
-  class CUnitReclaimTask : public CCommandTask, public CUnitReclaimTaskListenerPad, public Listener<ECommandEvent>
+  class CUnitReclaimTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;

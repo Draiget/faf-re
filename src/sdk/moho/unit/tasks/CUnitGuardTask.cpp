@@ -509,8 +509,7 @@ namespace moho
    * resets target payload, and zeros guard-goal rectangle state.
    */
   CUnitGuardTask::CUnitGuardTask()
-    : CCommandTask()
-    , CUnitGuardTaskReservedSlot()
+    : CCommandTaskWithListenerSlot()
     , Listener<ECommandEvent>()
     , mCommandTask(nullptr)
     , mPrimaryCommandRef{}
@@ -593,8 +592,7 @@ namespace moho
    * and initial task state.
    */
   CUnitGuardTask::CUnitGuardTask(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
-    : CCommandTask(dispatch)
-    , CUnitGuardTaskReservedSlot()
+    : CCommandTaskWithListenerSlot(dispatch)
     , Listener<ECommandEvent>()
     , mCommandTask(dispatch)
     , mPrimaryCommandRef{}
