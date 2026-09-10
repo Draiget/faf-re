@@ -258,56 +258,6 @@ namespace
   ) noexcept;
 
   /**
-   * Address: 0x0071B860 (FUN_0071B860)
-   *
-   * IDA signature:
-   * void __usercall sub_71B860(unsigned int newCount@<ecx>,
-   *                            std::vector_InfluenceGrid *vec@<edx>,
-   *                            Moho::InfluenceGrid fillValue);
-   *
-   * What it does:
-   * The MSVC8 `vector<InfluenceGrid>::resize(size_type, _Ty _Val)` emission:
-   * appends `requestedCount - size()` copies of `fillValue` through
-   * `_Insert_n(end(), n, value)` (0x0071B8D9 -> FUN_0071B970) when growing, and
-   * erases the tail range `[begin() + requestedCount, end())` (0x0071B912) when
-   * shrinking. `fillValue` arrives by value (0x8C bytes, `retn 8Ch`) and is
-   * destroyed on the way out at 0x0071B924.
-   */
-  void ResizeInfluenceGridVectorWithFill(
-    InfluenceGridVector& storage,
-    const std::size_t requestedCount,
-    const moho::InfluenceGrid& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      // Growth path instantiates `msvc8::vector<InfluenceGrid>::insert` (FUN_0071B970).
-      storage.resize(requestedCount, fillValue);
-      return;
-    }
-
-    if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
-    }
-  }
-
-  /**
-   * Address: 0x00719DE0 (FUN_00719DE0)
-   *
-   * What it does:
-   * Resizes one `vector<InfluenceGrid>` to `requestedCount` using one default-
-   * constructed `InfluenceGrid` fill value for growth lanes.
-   */
-  void ResizeInfluenceGridVectorWithDefaultFill(
-    InfluenceGridVector& storage,
-    const unsigned int requestedCount
-  )
-  {
-    moho::InfluenceGrid fillValue{};
-    ResizeInfluenceGridVectorWithFill(storage, static_cast<std::size_t>(requestedCount), fillValue);
-  }
-
-  /**
    * Address: 0x00719790 (FUN_00719790)
    *
    * What it does:
@@ -317,18 +267,6 @@ namespace
   void ClearInfluenceGridEntryTree(InfluenceEntrySet& entries) noexcept
   {
     DestroyInfluenceEntryRange(entries, entries.begin(), entries.end());
-  }
-
-  /**
-   * Address: 0x00719F20 (FUN_00719F20)
-   *
-   * What it does:
-   * Clears one `vector<InfluenceGrid>` payload before the vector member
-   * releases its backing storage during destruction.
-   */
-  void ClearInfluenceGridVectorStorage(InfluenceGridVector& storage) noexcept
-  {
-    storage.clear();
   }
 
   struct LegacyMapRuntimeView
@@ -1986,48 +1924,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071AEC0 (FUN_0071AEC0)
-   *
-   * What it does:
-   * Resizes one `vector<SThreat>` with fill semantics, trimming or appending
-   * zeroed threat lanes as needed.
-   */
-  void ResizeSThreatVectorWithFill(
-    SThreatVector& storage,
-    const std::size_t requestedCount,
-    const moho::SThreat& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      // Growth path instantiates `msvc8::vector<SThreat>::insert` (FUN_0071AF90).
-      storage.resize(requestedCount, fillValue);
-      return;
-    }
-
-    if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
-    }
-  }
-
-  /**
-   * Address: 0x00719820 (FUN_00719820)
-   *
-   * What it does:
-   * Resizes one `vector<SThreat>` lane to `requestedCount` using a zeroed
-   * default fill value.
-   */
-  std::size_t ResizeSThreatVectorWithZeroFill(
-    SThreatVector& storage,
-    const std::size_t requestedCount
-  )
-  {
-    const moho::SThreat zeroFill{};
-    ResizeSThreatVectorWithFill(storage, requestedCount, zeroFill);
-    return storage.size();
-  }
-
-  /**
    * Address: 0x0071C6C0 (FUN_0071C6C0, sub_71C6C0)
    * Address: 0x0071C9A0 (FUN_0071C9A0, msvc8::_Tree<InfluenceMapEntry>::_Copy)
    *
@@ -2056,156 +1952,6 @@ namespace
     for (InfluenceEntrySet::const_iterator it = source.begin(); it != source.end(); ++it) {
       destination.insert(*it);
     }
-  }
-
-  /**
-   * Address: 0x0071AA60 (FUN_0071AA60, sub_71AA60)
-   *
-   * What it does:
-   * Rebuilds one `InfluenceGrid::entries` tree from a source grid by copying
-   * each stored `InfluenceMapEntry` into the destination set.
-   */
-  void CopyInfluenceGridEntries(const moho::InfluenceGrid& source, moho::InfluenceGrid& destination)
-  {
-    if (&source == &destination) {
-      return;
-    }
-
-    new (&destination.entries) decltype(destination.entries)();
-    CopyInfluenceEntryTreeStorage(destination.entries, source.entries);
-  }
-
-  /**
-   * Address: 0x0071C1F0 (FUN_0071C1F0, Moho::InfluenceGrid::CopyConstructEntries)
-   *
-   * IDA signature:
-   * Moho::InfluenceGrid *__stdcall sub_71C1F0(Moho::InfluenceGrid *a1, Moho::InfluenceGrid *a2);
-   *
-   * What it does:
-   * Initializes `destination.entries` as an empty legacy ordered set and then
-   * copies every `InfluenceMapEntry` node from `source.entries` into it.
-   *
-   * This is the *raw-storage* lane: it placement-news the set header, so it is
-   * only valid on memory whose `entries` member has not been constructed yet.
-   * Its single binary caller is `InfluenceGrid::Cpy` (0x0071C150, called at
-   * 0x0071C173), which C++ expresses as `InfluenceGrid`'s copy constructor —
-   * and there the `entries` member is already constructed by the member
-   * initialiser list, so the constructor uses `CopyInfluenceEntryTreeStorage`
-   * directly instead (calling this helper would leak the freshly allocated set
-   * header). No other source-level caller exists.
-   */
-  moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
-    moho::InfluenceGrid* const destination,
-    const moho::InfluenceGrid* const source
-  )
-  {
-    // Build a clean sentinel-only set header in destination.entries, then
-    // copy each node over. Placement-new on an ordered set produces the same
-    // sentinel layout the binary constructs inline at +0x00/+0x04/+0x08/+0x0C.
-    ::new (&destination->entries) decltype(destination->entries)();
-    CopyInfluenceEntryTreeStorage(destination->entries, source->entries);
-    return destination;
-  }
-
-  /**
-   * Address: 0x0071C350 (FUN_0071C350, vector_SThreat::Cpy)
-   *
-   * IDA signature:
-   * std::vector_SThreat *__thiscall vector_SThreat::Cpy(std::vector_SThreat *this, std::vector_SThreat *a2);
-   *
-   * What it does:
-   * Initializes `destination` as an empty `msvc8::vector<SThreat>` lane and,
-   * when `source` holds a non-empty range, allocates a matching contiguous
-   * SThreat array, points `{begin,end,cap}` at it, then copies the source
-   * range in via `CopySThreatRangeNullable`. Throws on `size()` overflow
-   * beyond the legacy `max_size()` bound.
-   *
-   * The binary treats `this` as source and `a2` as destination (copy-construct
-   * convention); mirrored here with modern names.
-   */
-  SThreatVector* CopyConstructSThreatVector(
-    SThreatVector* const destination,
-    const SThreatVector* const source
-  )
-  {
-    // Initialize destination as an empty vector (proxy/range lanes zeroed).
-    ::new (destination) SThreatVector();
-
-    const moho::SThreat* const srcBegin = source->begin();
-    const moho::SThreat* const srcEnd = source->end();
-    const std::size_t elementCount = (srcBegin != nullptr) ? static_cast<std::size_t>(srcEnd - srcBegin) : 0u;
-    if (elementCount == 0u) {
-      return destination;
-    }
-
-    // msvc8 legacy vector overflow guard: `(0x7FFFFFFF / sizeof(moho::SThreat)) == 0x4924924`.
-    constexpr std::size_t kSThreatMaxCount = 0x4924924u;
-    if (elementCount > kSThreatMaxCount) {
-      throw std::length_error("vector<SThreat> too long");
-    }
-
-    destination->reserve(elementCount);
-    for (const moho::SThreat* it = srcBegin; it != srcEnd; ++it) {
-      destination->push_back(*it);
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0071DDC0 (FUN_0071DDC0, msvc8::vector<SThreat>::operator=)
-   *
-   * IDA signature:
-   * int __userpurge sub_71DDC0@<eax>(int result@<eax>, int a2);
-   *
-   * What it does:
-   * Copy-assigns one `msvc8::vector<SThreat>` lane: self-assign short-circuit;
-   * when `source` is empty, delegates to `sub_71C430` (empty-source rebind);
-   * otherwise branches on size/capacity relationship:
-   *   * `srcSize > dstCapacity` — free old storage, allocate fresh, copy;
-   *   * `srcSize > dstSize` (but fits capacity) — copy-assign existing slots,
-   *     then uninitialized-copy tail past current end;
-   *   * `srcSize <= dstSize` — copy-assign up to srcSize then truncate end.
-   *
-   * `56` = `sizeof(SThreat)` (0x38). `0x4924924` is the msvc8 legacy vector
-   * max-size bound for this element size.
-   */
-  SThreatVector& AssignSThreatVector(
-    SThreatVector& destination,
-    const SThreatVector& source
-  )
-  {
-    if (&destination == &source) {
-      return destination;
-    }
-
-    const std::size_t srcSize = source.size();
-    if (srcSize == 0u) {
-      // Empty source: delegate to the vector range-assign helper which
-      // handles the proxy/range reset path.
-      destination.assign(source.begin(), 0u);
-      return destination;
-    }
-
-    const std::size_t dstSize = destination.size();
-    const std::size_t dstCapacity =
-      destination.begin() ? static_cast<std::size_t>(destination.capacity()) : 0u;
-
-    if (srcSize <= dstSize) {
-      // Shrinking assign: copy first srcSize slots, truncate to srcSize.
-      destination.assign(source.begin(), srcSize);
-      return destination;
-    }
-
-    if (srcSize > dstCapacity) {
-      // Reallocation required: free old storage and build fresh allocation.
-      destination.assign(source.begin(), srcSize);
-      return destination;
-    }
-
-    // Fits capacity: copy-assign the first dstSize slots, then
-    // uninitialized-copy the tail `[dstSize .. srcSize)` past `end`.
-    destination.assign(source.begin(), srcSize);
-    return destination;
   }
 
   /**
@@ -2243,17 +1989,6 @@ namespace
     }
 
     return it;
-  }
-
-  /**
-   * Address: 0x00719C00 (FUN_00719C00, sub_719C00)
-   *
-   * What it does:
-   * Releases the entries tree for one `InfluenceGrid`.
-   */
-  void DestroyInfluenceGridEntries(moho::InfluenceGrid& grid) noexcept
-  {
-    ClearInfluenceGridEntryTree(grid.entries);
   }
 
   /**
@@ -2668,8 +2403,7 @@ void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) 
     return;
   }
 
-  const moho::InfluenceGrid fillValue;
-  ResizeInfluenceGridVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
+  storage->resize(static_cast<std::size_t>(count), moho::InfluenceGrid{});
 }
 
 /**
@@ -2798,7 +2532,7 @@ void gpg::RVectorType_SThreat::SetCount(void* const obj, const int count) const
     return;
   }
 
-  (void)ResizeSThreatVectorWithZeroFill(*storage, static_cast<std::size_t>(count));
+  storage->resize(static_cast<std::size_t>(count), moho::SThreat{});
 }
 
 namespace moho
@@ -3109,145 +2843,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x0071E760 (FUN_0071E760, func_VectorCpy_SThreat)
-   *
-   * What it does:
-   * Copies one `SThreat` source value into `count` consecutive destination
-   * slots while preserving the original helper's per-iteration null check on
-   * the destination address.
-   */
-  void CopySThreatValueRange(SThreat* destination, std::uint32_t count, const SThreat* const source) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    while (count != 0u) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<SThreat*>(destinationAddress) = *source;
-      }
-      --count;
-      destinationAddress += sizeof(SThreat);
-    }
-  }
-
-  /**
-   * Address: 0x0071F6A0 (FUN_0071F6A0, func_VectorMemCpy_SThreat)
-   * Address: 0x0071EC00 (FUN_0071EC00)
-   *
-   * What it does:
-   * Copies one contiguous `SThreat` source range `[sourceBegin, sourceEnd)`
-   * into destination storage and returns one-past the last destination slot,
-   * preserving the helper's original per-iteration null-destination guard.
-   */
-  SThreat* CopySThreatRangeNullable(
-    SThreat* destination,
-    const SThreat* const sourceBegin,
-    const SThreat* const sourceEnd
-  ) noexcept
-  {
-    const SThreat* source = sourceBegin;
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    while (source != sourceEnd) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<SThreat*>(destinationAddress) = *source;
-      }
-
-      ++source;
-      destinationAddress += sizeof(SThreat);
-    }
-
-    return reinterpret_cast<SThreat*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x007199C0 (FUN_007199C0)
-   *
-   * What it does:
-   * Adapts one repeated-threat copy lane into `CopySThreatValueRange` and
-   * returns one-past the last written destination slot.
-   */
-  SThreat* CopySThreatValueRangeAndReturnEnd(
-    const SThreat* const source,
-    SThreat* const destination,
-    const std::uint32_t count
-  ) noexcept
-  {
-    CopySThreatValueRange(destination, count, source);
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x0071D180 (FUN_0071D180)
-   *
-   * What it does:
-   * Adapts one register-lane caller shape into the canonical repeated-value
-   * threat copy helper.
-   */
-  SThreat* CopySThreatValueRangeRegisterAdapter(
-    const std::uint32_t count,
-    const SThreat* const sourceValue,
-    SThreat* const destination
-  ) noexcept
-  {
-    return CopySThreatValueRangeAndReturnEnd(sourceValue, destination, count);
-  }
-
-  /**
-   * Address: 0x00720140 (FUN_00720140)
-   * Address: 0x0071E910 (FUN_0071E910)
-   * Address: 0x0071F4E0 (FUN_0071F4E0)
-   * Address: 0x0071FBE0 (FUN_0071FBE0)
-   *
-   * What it does:
-   * Copies one contiguous `SThreat` source range `[sourceBegin, sourceEnd)`
-   * into destination storage and returns one-past the last destination slot.
-   */
-  SThreat* CopySThreatRangeRawNullable(
-    SThreat* destination,
-    const SThreat* const sourceBegin,
-    const SThreat* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (const SThreat* source = sourceBegin; source != sourceEnd; ++source) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<SThreat*>(destinationAddress) = *source;
-      }
-      destinationAddress += sizeof(SThreat);
-    }
-
-    return reinterpret_cast<SThreat*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x0071D410 (FUN_0071D410)
-   *
-   * What it does:
-   * Thin call-shape adapter into `CopySThreatRangeRawNullable`.
-   */
-  SThreat* CopySThreatRangeRawNullableAdapter(
-    SThreat* const destination,
-    const SThreat* const sourceBegin,
-    const SThreat* const sourceEnd
-  ) noexcept
-  {
-    return CopySThreatRangeRawNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x0071D6D0 (FUN_0071D6D0)
-   *
-   * What it does:
-   * Thin stdcall adapter into `CopySThreatRangeNullable`.
-   */
-  SThreat* CopySThreatRangeNullableStdcallAdapter(
-    SThreat* const destination,
-    const SThreat* const sourceBegin,
-    const SThreat* const sourceEnd
-  ) noexcept
-  {
-    return CopySThreatRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
   struct SThreatMoveOwnerRuntime
   {
     SThreat* activeEnd;            // +0x00
@@ -3255,29 +2850,6 @@ namespace moho
     SThreat* moveSourceBegin;      // +0x08
   };
   static_assert(sizeof(SThreatMoveOwnerRuntime) == 0x0C, "SThreatMoveOwnerRuntime size must be 0x0C");
-
-  /**
-   * Address: 0x0071E1C0 (FUN_0071E1C0)
-   *
-   * What it does:
-   * Moves one tail `[moveSourceBegin,activeEnd)` `SThreat` range down to
-   * `moveDestinationBegin` and updates owner end to the compacted tail.
-   */
-  SThreat* MoveSThreatTailRangeAndUpdateOwnerEnd(SThreatMoveOwnerRuntime& owner) noexcept
-  {
-    SThreat* destination = owner.moveDestinationBegin;
-    SThreat* source = owner.moveSourceBegin;
-    if (destination != source) {
-      while (source != owner.activeEnd) {
-        *destination = *source;
-        ++destination;
-        ++source;
-      }
-      owner.activeEnd = destination;
-    }
-
-    return owner.moveDestinationBegin;
-  }
 
   /**
    * Address: 0x0071CD70 (FUN_0071CD70)
@@ -3323,61 +2895,6 @@ namespace moho
     archive->WriteFloat(threat.antiSubInfluence);
     archive->WriteFloat(threat.economyInfluence);
     archive->WriteFloat(threat.unknownInfluence);
-  }
-
-  /**
-   * Address: 0x0071D470 (FUN_0071D470)
-   * Address: 0x0071E970 (FUN_0071E970, ICF twin -- identical function_sha256.
-   *          Formerly duplicated in `LegacyContainerFillLanes.cpp` as
-   *          `FillPayload56Range` over an anonymous `Payload56RuntimeView`
-   *          [0x38-byte] offset struct; `SThreat` is field-for-field the
-   *          same 14-float/0x38-byte shape and this function is the real
-   *          recovery. That duplicate has been deleted.)
-   *
-   * What it does:
-   * Fills one `[destinationBegin, destinationEnd)` threat range from one
-   * source record.
-   */
-  SThreat* FillSThreatRange(
-    SThreat* destinationBegin,
-    SThreat* const destinationEnd,
-    const SThreat& source
-  ) noexcept
-  {
-    while (destinationBegin != destinationEnd) {
-      *destinationBegin = source;
-      ++destinationBegin;
-    }
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0071D490 (FUN_0071D490)
-   * Address: 0x0071E9B0 (FUN_0071E9B0, ICF twin -- identical function_sha256)
-   * Address: 0x0071F530 (FUN_0071F530, ICF twin -- identical function_sha256)
-   *
-   * What it does:
-   * Copies one threat range backward into destination storage.
-   *
-   * The two twin addresses above were formerly duplicated in
-   * `LegacyContainerFillLanes.cpp` as `CopyPayload56RangeBackward` and its
-   * `CopyPayload56RangeBackwardAliasA` forwarding wrapper, over the same
-   * anonymous `Payload56RuntimeView` [0x38-byte] offset struct described
-   * above. Both duplicates have been deleted; this function is their real
-   * recovery.
-   */
-  SThreat* CopySThreatRangeBackward(
-    SThreat* destinationEnd,
-    const SThreat* const sourceBegin,
-    const SThreat* sourceEnd
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
   }
 
   /**
@@ -3427,6 +2944,10 @@ namespace moho
    * This is the element copy lane the `msvc8::vector<InfluenceGrid>` growth and
    * fill paths use (`_Insert_n` at FUN_0071B970 takes its `_Tmp` copy through
    * it at 0x0071B9A2).
+   * Address: 0x0071EE20 (FUN_0071EE20 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` -- member-wise copy of the entry set and the threat vector; zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentPrimary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071F770 (FUN_0071F770 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` (second copy); zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentSecondary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071AA60 (FUN_0071AA60 -- the entry-set half of `InfluenceGrid`'s copy constructor; callers 0x00715440, 0x00716140, 0x00716350; formerly `CopyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071C1F0 (FUN_0071C1F0 -- the entry-set half of `InfluenceGrid`'s copy constructor (the placement-new form); callers 0x0071C150, 0x0071C1E0; formerly `CopyConstructInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    */
   InfluenceGrid::InfluenceGrid(const InfluenceGrid& other)
     : entries()
@@ -3441,69 +2962,13 @@ namespace moho
    * Address: 0x00716350 (FUN_00716350, ??1InfluenceGrid@Moho@@QAE@@Z)
    * Address: 0x0071EE70 (FUN_0071EE70)
    * Address: 0x0071F7C0 (FUN_0071F7C0)
+   * Address: 0x0071F7F0 (FUN_0071F7F0 -- `InfluenceGrid::~InfluenceGrid()` -- the entry set and the per-army threat vector released by their own destructors; zero callers, unreachable; formerly `DestroyInfluenceGridAndReturnSelf` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00719C00 (FUN_00719C00 -- the entry-set half of `InfluenceGrid`'s destructor; callers 0x00716140, 0x007163A0, 0x007186CC; formerly `DestroyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    */
   InfluenceGrid::~InfluenceGrid()
   {
     threats.clear();
-    DestroyInfluenceGridEntries(*this);
-  }
-
-  /**
-   * Address: 0x0071F7F0 (FUN_0071F7F0)
-   *
-   * What it does:
-   * Runs one `InfluenceGrid` destructor lane and returns the same object
-   * pointer for caller chaining.
-   */
-  InfluenceGrid* DestroyInfluenceGridAndReturnSelf(InfluenceGrid* const grid)
-  {
-    grid->~InfluenceGrid();
-    return grid;
-  }
-
-  /**
-   * Address: 0x0071EA00 (FUN_0071EA00, std::vector_InfluenceGrid::~vector_InfluenceGrid)
-   *
-   * What it does:
-   * Destroys one contiguous range of `InfluenceGrid` elements by releasing
-   * per-grid threat vectors and entry maps.
-   */
-  static void DestroyInfluenceGridRange(InfluenceGrid* const start, InfluenceGrid* const end)
-  {
-    for (InfluenceGrid* cursor = start; cursor != end; ++cursor) {
-      cursor->threats.clear();
-      cursor->entries.clear();
-    }
-  }
-
-  /**
-   * Address: 0x0071B950 (FUN_0071B950)
-   *
-   * What it does:
-   * Adapts one thiscall range-destroy lane into the canonical
-   * `DestroyInfluenceGridRange(begin, end)` helper.
-   */
-  [[maybe_unused]] static void DestroyInfluenceGridRangeThiscallAdapter(
-    InfluenceGrid* const rangeEnd,
-    InfluenceGrid* const rangeBegin
-  )
-  {
-    DestroyInfluenceGridRange(rangeBegin, rangeEnd);
-  }
-
-  /**
-   * Address: 0x0071D550 (FUN_0071D550)
-   *
-   * What it does:
-   * Adapts one scalar-delete caller lane into
-   * `DestroyInfluenceGridRange(begin, end)`.
-   */
-  [[maybe_unused]] static void DestroyInfluenceGridRangeDeleteAdapter(
-    InfluenceGrid* const rangeBegin,
-    InfluenceGrid* const rangeEnd
-  ) noexcept
-  {
-    DestroyInfluenceGridRange(rangeBegin, rangeEnd);
+    entries.clear();
   }
 
   /**
@@ -3564,360 +3029,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071EAA0 (FUN_0071EAA0, fill_InfluenceGrid_range)
-   *
-   * What it does:
-   * Assigns one shared `InfluenceGrid` value across `[destinationBegin,
-   * destinationEnd)` by cloning entries, per-army threats, and aggregate/decay
-   * threat lanes into each destination element.
-   */
-  static void FillInfluenceGridRange(
-    InfluenceGrid* const destinationBegin,
-    InfluenceGrid* const destinationEnd,
-    const InfluenceGrid& fillValue
-  )
-  {
-    for (InfluenceGrid* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
-      AssignInfluenceGridValue(*cursor, fillValue);
-    }
-  }
-
-  /**
-   * Address: 0x0071D5A0 (FUN_0071D5A0)
-   *
-   * What it does:
-   * Adapts one register-lane caller shape into
-   * `FillInfluenceGridRange(destinationBegin, destinationEnd, fillValue)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* FillInfluenceGridRangeRegisterAdapter(
-    const InfluenceGrid& fillValue,
-    InfluenceGrid* const destinationBegin,
-    InfluenceGrid* const destinationEnd
-  ) noexcept
-  {
-    FillInfluenceGridRange(destinationBegin, destinationEnd, fillValue);
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0071F5B0 (FUN_0071F5B0, copy_InfluenceGrid_range_backward)
-   * Address: 0x0071EB20 (FUN_0071EB20)
-   *
-   * What it does:
-   * Copies one `InfluenceGrid` range backward from `[sourceBegin, sourceEnd)`
-   * into the destination range ending at `destinationEnd`, preserving overlap
-   * semantics used by legacy vector insert/shift lanes.
-   */
-  static InfluenceGrid* CopyInfluenceGridRangeBackward(
-    InfluenceGrid* const sourceEnd,
-    InfluenceGrid* const sourceBegin,
-    InfluenceGrid* const destinationEnd
-  )
-  {
-    InfluenceGrid* sourceCursor = sourceEnd;
-    InfluenceGrid* destinationCursor = destinationEnd;
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-
-      AssignInfluenceGridValue(*destinationCursor, *sourceCursor);
-    }
-
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x0071D5B0 (FUN_0071D5B0)
-   *
-   * What it does:
-   * Adapts one legacy call-convention lane into
-   * `CopyInfluenceGridRangeBackward`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeBackwardAdapter(
-    InfluenceGrid* const sourceEnd,
-    InfluenceGrid* const sourceBegin,
-    InfluenceGrid* const destinationEnd
-  ) noexcept
-  {
-    return CopyInfluenceGridRangeBackward(sourceEnd, sourceBegin, destinationEnd);
-  }
-
-  /**
-   * Address: 0x0071E7B0 (FUN_0071E7B0, Moho::InfluenceGrid::PopulateEntries)
-   *
-   * What it does:
-   * Copies one contiguous `InfluenceGrid` range into destination storage for
-   * vector relocation/copy lanes, preserving per-grid entry map, threat vector,
-   * aggregate threat, and decay state. Per-element body is the same assign
-   * shape as `AssignInfluenceGridValue` (0x0071ED10), inlined here for the
-   * range-walk case; also the tail-shift step `msvc8::vector<InfluenceGrid>::
-   * erase(iterator, iterator)` (`legacy/containers/Vector.h`, 0x00719E80)
-   * folds into when relocating the surviving tail down over an erased span.
-   */
-  static InfluenceGrid*
-  CopyInfluenceGridRange(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
-  {
-    for (const InfluenceGrid* source = start; source != end; ++source, ++dest) {
-      if (dest != source) {
-        CopyInfluenceGridEntries(*source, *dest);
-        new (&dest->threats) decltype(dest->threats)();
-        for (const SThreat* it = source->threats.begin(); it != source->threats.end(); ++it) {
-          dest->threats.push_back(*it);
-        }
-      }
-      dest->threat = source->threat;
-      dest->decay = source->decay;
-    }
-    return dest;
-  }
-
-  /**
-   * Address: 0x0071D1B0 (FUN_0071D1B0)
-   *
-   * What it does:
-   * Adapts one register-lane caller shape into
-   * `CopyInfluenceGridRange(sourceBegin, sourceEnd, destinationBegin)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeRegisterAdapter(
-    const InfluenceGrid* const sourceBegin,
-    const InfluenceGrid* const sourceEnd,
-    InfluenceGrid* const destinationBegin
-  )
-  {
-    return CopyInfluenceGridRange(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00720180 (FUN_00720180, copy_InfluenceGrid_range_with_rollback)
-   * Address: 0x0071E9D0 (FUN_0071E9D0)
-   * Address: 0x0071F550 (FUN_0071F550)
-   * Address: 0x0071FC10 (FUN_0071FC10)
-   *
-   * What it does:
-   * Copy-constructs one contiguous `InfluenceGrid` range into destination
-   * storage and destroys already-constructed grids before rethrowing if a copy
-   * step throws.
-   */
-  static InfluenceGrid*
-  CopyInfluenceGridRangeWithRollback(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
-  {
-    InfluenceGrid* cursor = dest;
-    try {
-      for (const InfluenceGrid* source = start; source != end; ++source, ++cursor) {
-        if (cursor != source) {
-          CopyInfluenceGridEntries(*source, *cursor);
-          new (&cursor->threats) decltype(cursor->threats)();
-          for (const SThreat* it = source->threats.begin(); it != source->threats.end(); ++it) {
-            cursor->threats.push_back(*it);
-          }
-        }
-        cursor->threat = source->threat;
-        cursor->decay = source->decay;
-      }
-      return cursor;
-    } catch (...) {
-      for (InfluenceGrid* destroyCursor = dest; destroyCursor != cursor; ++destroyCursor) {
-        destroyCursor->~InfluenceGrid();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x0071D520 (FUN_0071D520)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into
-   * `CopyInfluenceGridRangeWithRollback(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackRegisterAdapter(
-    const InfluenceGrid* const sourceBegin,
-    const InfluenceGrid* const sourceEnd,
-    InfluenceGrid* const destination
-  )
-  {
-    return CopyInfluenceGridRangeWithRollback(sourceBegin, sourceEnd, destination);
-  }
-
-  /**
-   * Address: 0x0071E840 (FUN_0071E840, copy_InfluenceGrid_counted_range_with_rollback)
-   *
-   * What it does:
-   * Copy-constructs `count` contiguous `InfluenceGrid` elements from `source`
-   * into destination storage and destroys already-constructed lanes before
-   * rethrowing if a copy step throws.
-   */
-  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollback(
-    const std::uint32_t count,
-    InfluenceGrid* const destination,
-    const InfluenceGrid* const source
-  )
-  {
-    if (count == 0u) {
-      return destination;
-    }
-
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    return CopyInfluenceGridRangeWithRollback(source, source + count, destination);
-  }
-
-  /**
-   * Address: 0x0071D1E0 (FUN_0071D1E0)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into
-   * `CopyInfluenceGridCountedRangeWithRollback(count, destination, source)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackRegisterAdapter(
-    const std::uint32_t count,
-    InfluenceGrid* const destination,
-    const InfluenceGrid* const source
-  )
-  {
-    return CopyInfluenceGridCountedRangeWithRollback(count, destination, source);
-  }
-
-  /**
-   * Address: 0x00719F60 (FUN_00719F60)
-   *
-   * What it does:
-   * Adapts one counted rollback-copy lane and returns one-past the last copied
-   * `InfluenceGrid` destination slot.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackAdapter(
-    const InfluenceGrid* const sourceBegin,
-    InfluenceGrid* const destinationBegin,
-    const std::uint32_t count
-  )
-  {
-    (void)CopyInfluenceGridCountedRangeWithRollback(count, destinationBegin, sourceBegin);
-    return destinationBegin + count;
-  }
-
-  /**
-   * Address: 0x0071FCA0 (FUN_0071FCA0, copy_InfluenceGrid_range_with_rollback_alt)
-   * Address: 0x0071ECB0 (FUN_0071ECB0)
-   * Address: 0x0071F6F0 (FUN_0071F6F0)
-   *
-   * What it does:
-   * Alternate guarded contiguous `InfluenceGrid` range-copy lane that copies
-   * `[sourceBegin, sourceEnd)` into destination storage and destroys already
-   * constructed grids before rethrowing on copy failure.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackAlt(
-    const InfluenceGrid* const sourceBegin,
-    const InfluenceGrid* const sourceEnd,
-    InfluenceGrid* const destinationBegin
-  )
-  {
-    InfluenceGrid* destinationCursor = destinationBegin;
-    try {
-      for (const InfluenceGrid* sourceCursor = sourceBegin;
-           sourceCursor != sourceEnd;
-           ++sourceCursor, ++destinationCursor) {
-        if (destinationCursor != nullptr) {
-          (void)CopyInfluenceGridRange(sourceCursor, sourceCursor + 1, destinationCursor);
-        }
-      }
-      return destinationCursor;
-    } catch (...) {
-      for (InfluenceGrid* destroyCursor = destinationBegin;
-           destroyCursor != destinationCursor;
-           ++destroyCursor) {
-        destroyCursor->~InfluenceGrid();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x0071FD40 (FUN_0071FD40, copy_InfluenceGrid_counted_range)
-   * Address: 0x0071EA70 (FUN_0071EA70)
-   * Address: 0x0071F580 (FUN_0071F580)
-   * Address: 0x0071F720 (FUN_0071F720)
-   *
-   * What it does:
-   * Copies `count` contiguous `InfluenceGrid` elements from `source` into
-   * `destination` using the recovered range-copy helper.
-   */
-  void CopyInfluenceGridCountedRange(
-    InfluenceGrid* const destination,
-    const InfluenceGrid* const source,
-    const int count
-  )
-  {
-    if (destination == nullptr || source == nullptr || count <= 0) {
-      return;
-    }
-
-    (void)CopyInfluenceGridRange(source, source + count, destination);
-  }
-
-  /**
-   * Address: 0x0071ECE0 (FUN_0071ECE0)
-   *
-   * What it does:
-   * Adapts one fastcall register lane into `CopyInfluenceGridCountedRange`
-   * using the register-provided element count and pointer arguments.
-   */
-  void CopyInfluenceGridCountedRangeFastcallAdapter(
-    InfluenceGrid* const unusedThisLane,
-    const int count,
-    InfluenceGrid* const destination,
-    const InfluenceGrid* const source
-  ) noexcept
-  {
-    CopyInfluenceGridCountedRange(destination, source, count);
-  }
-
-  [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresent(
-    moho::InfluenceGrid* const destination,
-    const moho::InfluenceGrid* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    ::new (destination) moho::InfluenceGrid();
-    AssignInfluenceGridValue(*destination, *source);
-    return destination;
-  }
-
-  /**
-   * Address: 0x0071EE20 (FUN_0071EE20)
-   *
-   * What it does:
-   * Primary adapter lane for nullable `InfluenceGrid` copy-construction into
-   * caller-provided storage.
-   */
-  [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentPrimary(
-    moho::InfluenceGrid* const destination,
-    const moho::InfluenceGrid* const source
-  )
-  {
-    return CopyConstructInfluenceGridIfPresent(destination, source);
-  }
-
-  /**
-   * Address: 0x0071F770 (FUN_0071F770)
-   *
-   * What it does:
-   * Secondary adapter lane for nullable `InfluenceGrid` copy-construction into
-   * caller-provided storage.
-   */
-  [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentSecondary(
-    moho::InfluenceGrid* const destination,
-    const moho::InfluenceGrid* const source
-  )
-  {
-    return CopyConstructInfluenceGridIfPresent(destination, source);
-  }
-
-  /**
    * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
    *
    * What it does:
@@ -3972,38 +3083,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071B300 (FUN_0071B300)
-   *
-   * What it does:
-   * Allocates one checked `SThreat[count]` raw lane when `count != 0`; falls
-   * back to `operator new(0)` for zero-count call sites.
-   */
-  SThreat* AllocateSThreatArrayOrZeroSizeBlock(const unsigned int count)
-  {
-    if (count != 0u) {
-      return func_NewArray_SThreat(count);
-    }
-
-    return static_cast<SThreat*>(::operator new(0));
-  }
-
-  /**
-   * Address: 0x0071BD40 (FUN_0071BD40)
-   *
-   * What it does:
-   * Allocates one checked `InfluenceGrid[count]` raw lane when `count != 0`;
-   * falls back to `operator new(0)` for zero-count call sites.
-   */
-  moho::InfluenceGrid* AllocateInfluenceGridArrayOrZeroSizeBlock(const unsigned int count)
-  {
-    if (count != 0u) {
-      return func_NewArray_InfluenceMap(count);
-    }
-
-    return static_cast<moho::InfluenceGrid*>(::operator new(0));
-  }
-
-  /**
    * Address: 0x00715750 (FUN_00715750, ?GetThreat@InfluenceGrid@Moho@@QBEMW4EThreatType@2@H@Z)
    */
   float InfluenceGrid::GetThreat(const EThreatType threatType, const int army) const
@@ -4034,8 +3113,7 @@ namespace moho
 
   void InfluenceGrid::EnsureThreatSlots(const std::size_t armyCount)
   {
-    const moho::SThreat fillValue{};
-    ResizeSThreatVectorWithFill(threats, armyCount, fillValue);
+    threats.resize(armyCount, moho::SThreat{});
   }
 
   void InfluenceGrid::ClearPerArmyThreats()
@@ -4139,7 +3217,7 @@ namespace moho
    */
   CInfluenceMap::~CInfluenceMap()
   {
-    ClearInfluenceGridVectorStorage(mMapEntries);
+    mMapEntries.clear();
     ReleaseBlipCellSet(mBlipCells);
   }
 
