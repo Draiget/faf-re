@@ -84,27 +84,6 @@ namespace gpg::gal
         static_assert(sizeof(EffectContextRuntimeView) == 0x64, "EffectContextRuntimeView size must be 0x64");
 
         /**
-         * Address: 0x008FE700 (FUN_008FE700, msvc8::vector<gpg::gal::EffectMacro>::vector(const vector&))
-         *
-         * What it does:
-         * Per-T named helper binding the engine-instantiated
-         * `msvc8::vector<gpg::gal::EffectMacro>::vector(const vector&)`
-         * copy-construction body (60-byte elements). Default-zeros the
-         * destination's `_Myfirst/_Mylast/_Myend` triplet (caller has
-         * already initialized to all-null), then placement-new-copy-constructs
-         * the vector from `source` so the per-T template emission symbol
-         * shape is preserved across both `EffectContext` copy-ctor sites
-         * that previously used the inline `::new (...) vector<EffectMacro>(*src)`
-         * form.
-         */
-        void CopyConstructEffectMacroVector(
-            msvc8::vector<EffectMacro>* destination,
-            const msvc8::vector<EffectMacro>& source)
-        {
-            ::new (static_cast<void*>(destination)) msvc8::vector<EffectMacro>(source);
-        }
-
-        /**
          * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
          *
          * What it does:
@@ -148,53 +127,6 @@ namespace gpg::gal
                 *outPosition = cursor;
             }
             return outPosition;
-        }
-
-        /**
-         * Address: 0x0093F7C0 (FUN_0093F7C0, effect-macro backward assign lane)
-         *
-         * What it does:
-         * Assigns one already-constructed macro range backward
-         * (`[first,last) -> ending at outLast`) while preserving the original
-         * `msvc8::string::assign` per-field behavior.
-         */
-        [[maybe_unused]] EffectMacro* AssignEffectMacroRangeBackward(
-            EffectMacro* const first,
-            EffectMacro* last,
-            EffectMacro* outLast
-        ) noexcept
-        {
-            if (first == last)
-            {
-                return outLast;
-            }
-
-            EffectMacro* source = last;
-            EffectMacro* destination = outLast;
-            do
-            {
-                --source;
-                --destination;
-                destination->keyText_.assign(source->keyText_, 0U, msvc8::string::npos);
-                destination->valueText_.assign(source->valueText_, 0U, msvc8::string::npos);
-            } while (source != first);
-            return destination;
-        }
-
-        /**
-         * Address: 0x0093FB00 (FUN_0093FB00)
-         *
-         * What it does:
-         * Dispatch adapter lane into the backward effect-macro range assign
-         * helper.
-         */
-        [[maybe_unused]] EffectMacro* AssignEffectMacroRangeBackwardDispatchA(
-            EffectMacro* const first,
-            EffectMacro* const last,
-            EffectMacro* const outLast
-        ) noexcept
-        {
-            return AssignEffectMacroRangeBackward(first, last, outLast);
         }
 
         /**
@@ -830,10 +762,7 @@ namespace gpg::gal
                 runtime->sourceBufferBegin = sourceRuntime->sourceBufferBegin;
                 runtime->sourceBufferEnd = sourceRuntime->sourceBufferEnd;
 
-                // Route per-T copy-construction through the canonical helper
-                // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
-                // template emission symbol is preserved.
-                CopyConstructEffectMacroVector(&runtime->macros, sourceRuntime->macros);
+                ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>(sourceRuntime->macros);
             }
             catch (...)
             {
@@ -901,10 +830,7 @@ namespace gpg::gal
                 runtime->sourceBufferBegin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mBegin));
                 runtime->sourceBufferEnd = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mEnd));
 
-                // Route per-T copy-construction through the canonical helper
-                // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
-                // template emission symbol is preserved.
-                CopyConstructEffectMacroVector(&runtime->macros, macros);
+                ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>(macros);
             }
             catch (...)
             {
