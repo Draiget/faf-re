@@ -609,7 +609,7 @@ namespace
       return;
     }
 
-    ResizeArmyLaunchInfoVectorWithFill(*vectorStorage, static_cast<std::size_t>(count), moho::ArmyLaunchInfo{});
+    vectorStorage->resize(static_cast<std::size_t>(count), moho::ArmyLaunchInfo{});
   }
 
   /**
@@ -786,59 +786,6 @@ namespace
   }
 
   /**
-   * Address: 0x00545130 (FUN_00545130)
-   * Address: 0x00544770 (FUN_00544770)
-   *
-   * What it does:
-   * Copy-constructs `count` contiguous `BVIntSet` lanes from one source set.
-   * On failure, it resets already-constructed lanes to inline storage and
-   * rethrows.
-   */
-  [[maybe_unused]] void CopyConstructBVIntSetFillRange(
-    const moho::BVIntSet& source, moho::BVIntSet* const destination, std::size_t count
-  )
-  {
-    if (destination == nullptr || count == 0u) {
-      return;
-    }
-
-    moho::BVIntSet* write = destination;
-    try {
-      while (count != 0u) {
-        write->mFirstWordIndex = source.mFirstWordIndex;
-        write->mWords.RebindInlineNoFree();
-        (void)gpg::core::legacy::CopyFrom(
-          write->mWords, source.mWords, write->mWords.originalVec_
-        );
-        --count;
-        ++write;
-      }
-    } catch (...) {
-      write->mWords.ResetStorageToInline();
-      for (moho::BVIntSet* constructed = destination; constructed != write; ++constructed) {
-        constructed->mWords.ResetStorageToInline();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x00544060 (FUN_00544060)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one counted contiguous `BVIntSet`
-   * copy-construction lane into the canonical rollback helper.
-   */
-  [[maybe_unused]] void CopyConstructBVIntSetFillRangeRegisterAdapter(
-    const moho::BVIntSet* const source,
-    const std::size_t count,
-    moho::BVIntSet* const destination
-  )
-  {
-    CopyConstructBVIntSetFillRange(*source, destination, count);
-  }
-
-  /**
    * Address: 0x00545230 (FUN_00545230)
    * Address: 0x00545250 (FUN_00545250)
    *
@@ -925,45 +872,6 @@ namespace
   }
 
   // Defined below, next to the other per-type ArmyLaunchInfo range lanes.
-  moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
-    moho::ArmyLaunchInfo* begin,
-    moho::ArmyLaunchInfo* end
-  );
-
-  /**
-   * Address: 0x00543A50 (FUN_00543A50)
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_543A50@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
-   *
-   * What it does:
-   * `msvc8::vector<ArmyLaunchInfo>::erase(first, last)`: assigns the surviving
-   * tail down over the erased window, releases the elements left stranded past
-   * the new end, and rewinds `_Mylast`. An empty window is a no-op.
-   *
-   * Written against the two per-type lanes the binary calls (0x00544C20 and
-   * 0x00544E20) rather than the generic vector::erase: the generic path assigns
-   * elements through BVIntSet::operator=, which also writes the reserved
-   * meta-word and self-guards, while the binary lane touches only the universe
-   * and word-list fields.
-   */
-  moho::ArmyLaunchInfo* EraseArmyLaunchInfoRange(
-    ArmyLaunchInfoVector& storage,
-    moho::ArmyLaunchInfo* const first,
-    moho::ArmyLaunchInfo* const last
-  )
-  {
-    if (first == last) {
-      return first;
-    }
-
-    moho::ArmyLaunchInfo* const oldEnd = storage.end();
-    moho::ArmyLaunchInfo* const newEnd = CopyAssignArmyLaunchInfoRange(last, oldEnd, first);
-    (void)ResetArmyLaunchInfoUnitSourcesRange(newEnd, oldEnd);
-    storage.resize(static_cast<std::size_t>(newEnd - storage.begin()));
-    return first;
-  }
-
   /**
    * Address: 0x00542CD0 (FUN_00542CD0)
    *
@@ -982,7 +890,7 @@ namespace
     const std::size_t sourceSize = source.size();
     if (sourceSize == 0u) {
       // 0x00542CF3: an empty source clears the destination outright.
-      (void)EraseArmyLaunchInfoRange(destination, destination.begin(), destination.end());
+      (void)destination.erase(destination.begin(), destination.end());
       return destination;
     }
 
@@ -990,7 +898,7 @@ namespace
       // 0x00542D25: assign onto the live elements, then drop the surplus tail.
       moho::ArmyLaunchInfo* const assignedEnd =
         CopyAssignArmyLaunchInfoRange(source.begin(), source.end(), destination.begin());
-      (void)EraseArmyLaunchInfoRange(destination, assignedEnd, destination.end());
+      (void)destination.erase(assignedEnd, destination.end());
       return destination;
     }
 
@@ -1004,55 +912,6 @@ namespace
     // binary's per-element `BVIntSet` rebuild exactly.
     destination = source;
     return destination;
-  }
-
-  /**
-   * Address: 0x00513AD0 (FUN_00513AD0, msvc8::vector<std::string>::_Ucopy)
-   *
-   * IDA signature:
-   * void __cdecl sub_513AD0(std::string *sourceEnd, std::string *destBegin);
-   *
-   * What it does:
-   * MSVC8 typed uninitialized-copy loop body invoked by
-   * `vector<string>::operator=` (FUN_005135C0) when the destination needs to
-   * grow into freshly-allocated storage. For each source string `*src` in
-   * `[sourceBegin..sourceEnd)`, default-constructs the corresponding dest
-   * slot (empty SSO: `_Myres=15, _Mysize=0, _Bx._Buf[0]=0`) and then
-   * `string::assign(dest, src, 0, 0xFFFFFFFF)` copies the source contents
-   * in. The compiler-emitted SEH funclet (0x00B90B90) destroys partial
-   * constructions on exception via `func_DestroyStringsRange` (FUN_0040D5B0)
-   * and rethrows. Recovered here as a per-T named free helper so the
-   * linker preserves the binary's 1:1 symbol shape for the
-   * `T = msvc8::string` instantiation; callers (notably
-   * `LaunchInfoNew::Create`) invoke it by name to bind the engine
-   * template emission.
-   */
-  void CopyConstructStringVectorRange(
-    const msvc8::string* const sourceBegin,
-    const msvc8::string* const sourceEnd,
-    msvc8::string* const destBegin)
-  {
-    msvc8::string* dest = destBegin;
-    const msvc8::string* src = sourceBegin;
-    try {
-      while (src != sourceEnd) {
-        // Default-construct the dest slot in place (empty SSO triplet).
-        ::new (static_cast<void*>(dest)) msvc8::string();
-        // string::assign(source, 0, npos) copies the entire source content
-        // into the dest slot. Matches the binary's call shape.
-        dest->assign(*src, 0u, static_cast<std::size_t>(-1));
-        ++dest;
-        ++src;
-      }
-    } catch (...) {
-      // Release any partially-copied destination heap allocations before
-      // rethrow. Matches the FUN_00513AD0 EH funclet which calls
-      // `func_DestroyStringsRange` (FUN_0040D5B0) on [destBegin..dest).
-      for (msvc8::string* it = destBegin; it != dest; ++it) {
-        it->tidy(true, 0u);
-      }
-      throw;
-    }
   }
 
   /**
@@ -1083,55 +942,10 @@ namespace moho
     armyLaunchInfo.push_back(entry);
   }
 
-  /**
-   * Address: 0x00543910 (FUN_00543910)
-   *
-   * IDA signature:
-   * void __thiscall sub_543910(std::vector_ArmyLaunchInfo *this@<ecx>, unsigned int newSize, ArmyLaunchInfo fill);
-   *
-   * What it does:
-   * Out-of-line specialization of
-   * `msvc8::vector<ArmyLaunchInfo>::resize(size_type newSize, const ArmyLaunchInfo& fill)`.
-   * When `newSize <= current size`, erases the trailing entries via the inner
-   * range-erase helper (FUN_00543A50). When `newSize > current size`, forwards to
-   * the `_Insert_n` reallocation/grow path (FUN_00543DB0) with the prefilled
-   * value. Each `ArmyLaunchInfo` slot is 32 bytes (`>> 5` size arithmetic in the
-   * decompiler).
-   *
-   * Wired through `ResizeArmyLaunchInfoVectorWithFill` so the linker preserves
-   * the binary's per-type resize-with-fill symbol shape; the natural
-   * `vec.resize(n)` idiom may inline differently in modern toolchains.
-   */
-  void ResizeArmyLaunchInfoVectorWithFill(
-    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
-    const std::size_t newSize,
-    const ArmyLaunchInfo& fillValue
-  )
-  {
-    armyLaunchInfo.resize(newSize, fillValue);
-  }
 } // namespace moho
 
 namespace
 {
-
-  /**
-   * Address: 0x00544E20 (FUN_00544E20)
-   *
-   * What it does:
-   * Rewinds one half-open ArmyLaunchInfo range by releasing heap-backed
-   * `BVIntSet::mWords` storage and restoring inline fastvector lanes.
-   */
-  moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
-    moho::ArmyLaunchInfo* const begin,
-    moho::ArmyLaunchInfo* const end
-  )
-  {
-    for (moho::ArmyLaunchInfo* cursor = begin; cursor != end; ++cursor) {
-      cursor->mUnitSources.mWords.ResetStorageToInline();
-    }
-    return begin;
-  }
 
   // RULE ONE cleanup (DB-integrity pass): 0x005454A0, 0x00544C60, 0x00545090,
   // 0x00545580, 0x005457A0, 0x00545880, 0x00545200, 0x005445E0, 0x00544E60,
@@ -1241,58 +1055,6 @@ namespace
       ? adapterIndex
       : 0u;
     return kArmyLaunchInfoBackwardCopyAdapters[boundedIndex](destinationEnd, sourceEnd, sourceBegin);
-  }
-
-  /**
-   * Address: 0x00543410 (FUN_00543410)
-   *
-   * What it does:
-   * Resets one legacy `vector<ArmyLaunchInfo>` lane by clearing each element's
-   * unit-source storage, releasing the heap buffer, and nulling begin/end/
-   * capacity pointers.
-   */
-  [[maybe_unused]] void ResetArmyLaunchInfoVectorStorage(ArmyLaunchInfoVector& storage)
-  {
-    // Element cleanup sweep, then VC8 _Tidy(): free and null the three lanes.
-    if (!storage.empty()) {
-      (void)ResetArmyLaunchInfoUnitSourcesRange(storage.begin(), storage.end());
-    }
-    storage = ArmyLaunchInfoVector{};
-  }
-
-  /**
-   * Address: 0x00544EA0 (FUN_00544EA0)
-   * Address: 0x00544660 (FUN_00544660)
-   *
-   * What it does:
-   * Rewinds one half-open command-source range by releasing heap-backed
-   * name-string storage and restoring empty SSO lanes for each entry.
-   */
-  [[maybe_unused]] void ResetCommandSourceNameRange(
-    moho::SSTICommandSource* const begin,
-    moho::SSTICommandSource* const end
-  )
-  {
-    for (moho::SSTICommandSource* cursor = begin; cursor != end; ++cursor) {
-      cursor->mName.tidy(true, 0U);
-    }
-  }
-
-  /**
-   * Address: 0x005434D0 (FUN_005434D0)
-   *
-   * What it does:
-   * Resets one legacy `vector<SSTICommandSource>` lane by clearing each
-   * command-source name, releasing the heap buffer, and nulling begin/end/
-   * capacity pointers.
-   */
-  [[maybe_unused]] void ResetCommandSourceVectorStorage(msvc8::vector<moho::SSTICommandSource>& storage)
-  {
-    // Element cleanup sweep, then VC8 _Tidy(): free and null the three lanes.
-    if (!storage.empty()) {
-      (void)ResetCommandSourceNameRange(storage.begin(), storage.end());
-    }
-    storage = msvc8::vector<moho::SSTICommandSource>{};
   }
 
   void EnsureLaunchInfoNewTypeInfoConstructed()
@@ -1679,11 +1441,6 @@ namespace moho
     // delegating the copy to the canonical `operator=`. The empty-range
     // call carries no observable cost and ensures the per-T helper
     // survives DCE so it matches the binary's 1:1 emission shape.
-    {
-      msvc8::string* const liveDest = createdInfo->mStrVec.data();
-      const msvc8::string* const liveSrc = mStrVec.data();
-      CopyConstructStringVectorRange(liveSrc, liveSrc, liveDest);
-    }
     createdInfo->mStrVec = mStrVec;
     createdInfo->mInitSeed = static_cast<std::int32_t>(gpg::time::GetSystemTimer().ElapsedCycles());
 

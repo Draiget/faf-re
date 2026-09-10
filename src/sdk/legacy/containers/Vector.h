@@ -3226,6 +3226,7 @@ namespace msvc8
          * Address: 0x0054C190 (FUN_0054C190 -- the default-filled form of that same `resize(n, value)` for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); zero callers, unreachable; formerly `ResizeAniSkelBoneNameIndexVectorWithDefaultFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054CB80 (FUN_0054CB80 -- `resize(n, value)` -- the shrink is a bare `mLast` rebase because the element is trivially destructible for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); callers 0x0054A0A0, 0x0054A390, 0x0054C190; formerly `ResizeAniSkelBoneNameIndexVectorWithFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A2FF0 (FUN_004A2FF0 -- `resize(n, value)` for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); callers 0x004A1F10, 0x004A2D40, 0x004A2FE0; formerly `ResizeLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00543910 (FUN_00543910 -- `resize(n, value)` for `msvc8::vector<moho::ArmyLaunchInfo>` (`LaunchInfoNew::mArmies`); callers 0x005430E0, 0x00543310, 0x008765E0; formerly `ResizeArmyLaunchInfoVectorWithFill` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3364,6 +3365,8 @@ namespace msvc8
          * Address: 0x0054CB30 (FUN_0054CB30 -- `tidy()` -- free the block and null the triple for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneA` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054CC40 (FUN_0054CC40 -- a second emission of that `tidy()` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneB` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054CD70 (FUN_0054CD70 -- a third emission of that `tidy()` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneC` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00543410 (FUN_00543410 -- `~vector` / `tidy` -- the element sweep, then free and null the triple for `msvc8::vector<moho::ArmyLaunchInfo>` (`LaunchInfoNew::mArmies`); callers 0x00544930 (unreached); formerly `ResetArmyLaunchInfoVectorStorage` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005434D0 (FUN_005434D0 -- a second emission of `~vector` / `tidy` for `msvc8::vector<moho::SSTICommandSource>` (the command-source vector in this file); callers 0x0074C500; formerly `ResetCommandSourceVectorStorage` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -4322,6 +4325,7 @@ namespace msvc8
          * Address: 0x008A8B00 (FUN_008A8B00 -- `erase(first, last)` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; callers 0x008A1500, 0x008A83A0; formerly `EraseTerrainEnvironmentLookupPairRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008A83A0 (FUN_008A83A0 -- `erase(begin(), end())` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; zero callers, unreachable; formerly `EraseAllTerrainEnvironmentLookupPairs` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AD040 (FUN_004AD040 -- `erase(first, last)`'s tail move and `_Mylast` commit for a 4-byte element; zero callers, unreachable; formerly `MoveDwordVectorTailAndExportDestinationVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00543A50 (FUN_00543A50 -- `erase(first, last)` -- shift the survivors down, destroy the vacated tail, rebase the end for `msvc8::vector<moho::ArmyLaunchInfo>` (`LaunchInfoNew::mArmies`); callers 0x00542CD0, 0x00543391, 0x00543910; formerly `EraseArmyLaunchInfoRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6998,6 +7002,9 @@ namespace msvc8
          * Address: 0x008F75F0 (FUN_008F75F0 -- a register-shape entry into `_Destroy_range` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); zero callers, unreachable; formerly `DestroyAdapterModeRuntimeRangeAdapter` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F7670 (FUN_008F7670 -- a register-shape entry into `_Destroy_range` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F7770, 0x008FF080; formerly `DestroyAdapterModeRuntimeRangeAdapterSecondary` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00561590 (FUN_00561590 -- `_Destroy_range` for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); callers 0x00560D60, 0x0074EB00; formerly `DestroySSTIArmyVariableDataRange` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00544E20 (FUN_00544E20 -- `destroy_range` -- each element's inline set storage released for `msvc8::vector<moho::ArmyLaunchInfo>` (`LaunchInfoNew::mArmies`); callers 0x005423B0, 0x00542460, 0x00542CD0; formerly `ResetArmyLaunchInfoUnitSourcesRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00544EA0 (FUN_00544EA0 -- `destroy_range` -- each element's name string tidied for `msvc8::vector<moho::SSTICommandSource>` (the command-source vector in this file); callers 0x00542460, 0x005434D0, 0x00543B70; formerly `ResetCommandSourceNameRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00544660 (FUN_00544660 -- `destroy_range` -- each element's name string tidied for `msvc8::vector<moho::SSTICommandSource>` (the command-source vector in this file); zero callers, unreachable; formerly `ResetCommandSourceNameRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -7904,6 +7911,7 @@ namespace msvc8
          * Address: 0x0093FC90 (FUN_0093FC90 -- a fifth emission of `uninit_copy_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); zero callers, unreachable; formerly `UninitializedCopyEffectMacroRangeDispatchC` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0093FE80 (FUN_0093FE80 -- a sixth emission of `uninit_copy_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); callers 0x0093FEB0; formerly `UninitializedCopyEffectMacroRangeDispatchD` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054D050 (FUN_0054D050 -- the tail copy `uninit_copy_n` performs during a grow, writing the new end back into the head for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `CopyAniSkelBoneTailAndStoreDestinationBegin` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00513AD0 (FUN_00513AD0 -- `uninit_copy_n` -- placement-construct then assign, with the EH funclet that tidies the partial range for `msvc8::vector<msvc8::string>` (`LaunchInfoNew::mStrVec`); callers 0x00513950, 0x00513AA0; formerly `CopyConstructStringVectorRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8999,6 +9007,9 @@ namespace msvc8
          * Address: 0x0093FB50 (FUN_0093FB50 -- a third emission of `uninit_fill_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); zero callers, unreachable; formerly `UninitializedFillEffectMacroRangeDispatchB` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054E070 (FUN_0054E070 -- `uninit_fill_n` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); callers 0x0054D090; formerly `FillAniSkelBoneRangeFromSingleNonNull` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054E2D0 (FUN_0054E2D0 -- the register-shape adapter over `uninit_fill_n` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `FillAniSkelBoneRangeRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00545130 (FUN_00545130 -- `uninit_fill_n` -- the per-element inline-storage rebind and copy, with the EH funclet that resets what it built for `msvc8::vector<moho::BVIntSet>` (the unit-source sets these launch infos carry); callers 0x00402220, 0x00529C30, 0x00529F70; formerly `CopyConstructBVIntSetFillRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00544770 (FUN_00544770 -- `uninit_fill_n` -- the per-element inline-storage rebind and copy, with the EH funclet that resets what it built for `msvc8::vector<moho::BVIntSet>` (the unit-source sets these launch infos carry); zero callers, unreachable; formerly `CopyConstructBVIntSetFillRange` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00544060 (FUN_00544060 -- the register-shape adapter over that same `uninit_fill_n` for `msvc8::vector<moho::BVIntSet>` (the unit-source sets these launch infos carry); callers 0x00543DB0; formerly `CopyConstructBVIntSetFillRangeRegisterAdapter` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
