@@ -1558,6 +1558,21 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
             const std::uint32_t kind = GetSmallBlockIndex(size);
             ThreadSmallBlockLane& lane = GetLane(threadCache, kind);
 
+            // A lane that reports free blocks but has no chain to hand them out
+            // from is a state the free lists can only reach through corruption:
+            // `PopLaneNode` sets `head = node->next` and decrements the count by
+            // one, so a freed block whose first word is overwritten truncates the
+            // chain and strands the remaining count. The count is then non-zero
+            // forever, the refill below never runs again, and every subsequent
+            // request for this size class returns null - which the callers report
+            // as an out-of-memory failure while the heap still has hundreds of
+            // megabytes free. Resynchronise the count to the chain that actually
+            // exists so the refill path can recover the lane.
+            if (lane.head == nullptr && lane.count != 0) {
+                lane.count = 0;
+                lane.lowWatermark = 0;
+            }
+
             if (lane.count == 0) {
                 ::EnterCriticalSection(&gAllocatorSentinel);
                 AllocateSmallBlocksAmount(reinterpret_cast<SmallBlockRequestLane*>(&lane), kind, 16, true);
