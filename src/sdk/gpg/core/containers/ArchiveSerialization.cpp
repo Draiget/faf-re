@@ -849,10 +849,15 @@ namespace gpg
       return;
     }
 
-    const auto& view =
-      gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)));
-    const unsigned int count = view.begin != nullptr ? static_cast<unsigned int>(view.end - view.begin) : 0u;
-    SaveContiguousArchiveVectorPayload(archive, view.begin, count, CachedCompatRType<moho::UnitWeaponInfo>(), ownerRef ? *ownerRef : gpg::RRef{});
+    const auto& weapons =
+      *reinterpret_cast<const gpg::core::FastVector<moho::UnitWeaponInfo>*>(static_cast<std::uintptr_t>(objectPtr));
+    SaveContiguousArchiveVectorPayload(
+      archive,
+      weapons.Data(),
+      static_cast<unsigned int>(weapons.Size()),
+      CachedCompatRType<moho::UnitWeaponInfo>(),
+      ownerRef ? *ownerRef : gpg::RRef{}
+    );
   }
 
   // DB-integrity fix: this file previously carried two more unwired
