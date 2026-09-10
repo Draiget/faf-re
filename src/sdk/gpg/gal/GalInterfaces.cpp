@@ -5380,26 +5380,7 @@ namespace gpg::gal
       error->runtimeMessage_.tidy(true, 0U);
     }
 
-    /**
-     * Address: 0x00437850 (FUN_00437850)
-     *
-     * What it does:
-     * Applies legacy `_Tidy(true, 0)` teardown to one contiguous
-     * `HeadSampleOption` label-string range.
-     */
-    void DestroyHeadSampleOptionRange(HeadSampleOption* begin, HeadSampleOption* const end) noexcept
-    {
-      for (; begin != end; ++begin) {
-        begin->label.tidy(true, 0U);
-      }
-    }
 
-    template <class T>
-    void ReleaseVectorStorage(msvc8::vector<T>& vector) noexcept
-    {
-      // Free the block and null all three lanes: VC8 _Tidy().
-      vector = msvc8::vector<T>{};
-    }
 
     /**
      * Address: 0x008E70B0 (FUN_008E70B0)
@@ -5779,15 +5760,6 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x008E6EA0 (FUN_008E6EA0, gpg::gal::Head::~Head)
-   * Address: 0x00436990 (FUN_00436990)
-   *
-   * What it does:
-   * Tears down all retained `Head` vector/string payload lanes in-place;
-   * `0x00436990` is the scalar-deleting thunk that dispatches here and
-   * conditionally frees `this`.
-   */
-  /**
    * Address: 0x008E68E0 (FUN_008E68E0, gpg::gal::Head::HasCapability1)
    *
    * IDA signature:
@@ -5815,19 +5787,18 @@ namespace gpg::gal
     return std::ranges::find(validFormats2, format) != validFormats2.end();
   }
 
-  Head::~Head()
-  {
-    ReleaseVectorStorage(validFormats1);
-    ReleaseVectorStorage(validFormats2);
-    ReleaseVectorStorage(adapterModes);
-
-    // Element sweep first -- HeadSampleOption's destructor is trivial -- then
-    // VC8 _Tidy(): free the block and null the three lanes.
-    if (!mStrs.empty()) {
-      DestroyHeadSampleOptionRange(mStrs.begin(), mStrs.end());
-    }
-    mStrs = decltype(mStrs){};
-
-    name.tidy(true, 0U);
-  }
+  /**
+   * Address: 0x008E6EA0 (FUN_008E6EA0, gpg::gal::Head::~Head)
+   * Address: 0x00436990 (FUN_00436990)
+   *
+   * What it does:
+   * Nothing of its own. Everything 0x008E6EA0 runs after the vftable store is
+   * a member destructor MSVC emits in reverse declaration order: the three
+   * `msvc8::vector` `_Tidy`s at `+0x74`, `+0x64` and `+0x54`, then
+   * `~vector<HeadSampleOption>` at `+0x40` (its `destroy_range` at 0x00437850
+   * tidies each element's 0x1C label string, then the block is freed), then
+   * `~string` at `+0x24`. `0x00436990` is the scalar-deleting thunk that
+   * dispatches here and conditionally frees `this`.
+   */
+  Head::~Head() = default;
 } // namespace gpg::gal
