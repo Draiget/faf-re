@@ -23,57 +23,6 @@ namespace
 constexpr std::size_t kPipeChunkSize = 0x1000;
 constexpr std::size_t kDebugOutputPayloadSize = 0x100;
 
-struct IntrusiveLinkNodeRuntime
-{
-    IntrusiveLinkNodeRuntime* prev;
-    IntrusiveLinkNodeRuntime* next;
-};
-static_assert(sizeof(IntrusiveLinkNodeRuntime) == 0x08, "IntrusiveLinkNodeRuntime size must be 0x08");
-
-[[nodiscard]] IntrusiveLinkNodeRuntime* UnlinkIntrusiveNodeAndReturnNext(
-    IntrusiveLinkNodeRuntime* const node
-)
-{
-    if (node == nullptr || node->prev == nullptr || node->next == nullptr) {
-        return nullptr;
-    }
-
-    IntrusiveLinkNodeRuntime* const next = node->next;
-    node->prev->next = next;
-    next->prev = node->prev;
-    node->prev = node;
-    node->next = node;
-    return next;
-}
-
-/**
- * Address: 0x009064B0 (FUN_009064B0)
- *
- * What it does:
- * Unlinks one intrusive chunk-list node and self-links it as a singleton,
- * returning the previous forward-link successor lane.
- */
-[[maybe_unused]] IntrusiveLinkNodeRuntime* UnlinkPipeChunkNodeAndReturnNextRuntime(
-    IntrusiveLinkNodeRuntime* const node
-)
-{
-    return UnlinkIntrusiveNodeAndReturnNext(node);
-}
-
-/**
- * Address: 0x00936200 (FUN_00936200)
- *
- * What it does:
- * Unlinks one intrusive log-target node and self-links it as a singleton,
- * returning the previous forward-link successor lane.
- */
-[[maybe_unused]] IntrusiveLinkNodeRuntime* UnlinkLogTargetNodeAndReturnNextRuntime(
-    IntrusiveLinkNodeRuntime* const node
-)
-{
-    return UnlinkIntrusiveNodeAndReturnNext(node);
-}
-
 class HistoryLogTarget final : public gpg::LogTarget
 {
 public:

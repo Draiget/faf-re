@@ -95,6 +95,8 @@ namespace moho
      *
      * What it does:
      * Unlinks this node from its current ring and resets it to singleton state.
+     * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils: unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
      */
     item_t* ListUnlink() noexcept
     {
