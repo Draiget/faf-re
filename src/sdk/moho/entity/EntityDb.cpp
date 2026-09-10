@@ -3368,6 +3368,27 @@ namespace moho
     return gRuntimeEntityLists[this];
   }
 
+  void CEntityDb::UntrackEntity(const Entity* const entity) noexcept
+  {
+    if (entity == nullptr) {
+      return;
+    }
+
+    const auto tracked = gRuntimeEntityLists.find(this);
+    if (tracked == gRuntimeEntityLists.end()) {
+      return;
+    }
+
+    msvc8::list<Entity*>& entities = tracked->second;
+    for (auto it = entities.begin(); it != entities.end();) {
+      if (*it == entity) {
+        it = entities.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
   const msvc8::list<Entity*>& CEntityDb::Entities() const noexcept
   {
     const auto it = gRuntimeEntityLists.find(this);
