@@ -237,6 +237,7 @@ namespace moho
      *
      * What it does:
      * Unlinks this node from its current ring and inserts it directly before `that`.
+     * Address: 0x00761CE0 (FUN_00761CE0 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for `moho::TDatListItem<moho::HSound, void>` (`HSound::mSimLoopLink`, the sound manager's active-loop ring); callers 0x008AB2B0; formerly `AppendSoundToList` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
      */
     item_t* ListLinkBefore(item_t* that) noexcept
     {

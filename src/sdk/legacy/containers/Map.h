@@ -690,6 +690,9 @@ namespace msvc8
         }
         size_type erase(const key_type& k) { return tree_.erase(k); }
 
+        /**
+         * Address: 0x008AF890 (FUN_008AF890 -- `clear()` -- free every node from `_Myhead->_Next`, then self-link the header and zero the size for `msvc8::set<moho::IXACTCue*>` (`CUserSoundManager::mPendingDestroyCues`); callers 0x008AA800, 0x008AAA10, 0x008AF3C3; formerly `ClearPendingDestroyCueSet` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
+         */
         void clear() noexcept { tree_.clear(); }
         void swap(multimap& other) noexcept { tree_.swap(other.tree_); }
 

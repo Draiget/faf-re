@@ -563,23 +563,6 @@ namespace
     return next;
   }
 
-  /**
-   * Address: 0x008AF890 (FUN_008AF890)
-   *
-   * What it does:
-   * Tidies one `msvc8::set<IXACTCue*>` lane (pending-destroy cue set) in
-   * place: walks every node starting from `_Myhead->_Next`, deletes each
-   * node via `operator delete`, then rebinds the head sentinel to a
-   * self-linked empty state (head->next = head; head->prev = head) and
-   * zeroes `_Mysize`. Matches the standard MSVC8 `std::set` tidy/clear
-   * lane; expressed here as the typed `msvc8::set::clear()` call so
-   * callers bind to a named, ABI-preserving surface.
-   */
-  void ClearPendingDestroyCueSet(msvc8::set<moho::IXACTCue*>& pendingCues) noexcept
-  {
-    pendingCues.clear();
-  }
-
   // Forward declaration: `ReleaseSoundHandleRecordRuntime` is defined just
   // below `ClearSoundHandleVector` for source ordering / readability, but
   // `ClearSoundHandleVector` calls it inside its loop, so the compiler needs
@@ -675,20 +658,6 @@ namespace
   moho::HSound* LoopOwnerFromNode(LoopNode* node)
   {
     return LoopList::owner_from_member_node<moho::HSound, &moho::HSound::mSimLoopLink>(node);
-  }
-
-  /**
-   * Address: 0x00761CE0 (FUN_00761CE0, func_AppendSoundToList)
-   *
-   * What it does:
-   * Unlinks one `HSound` loop node from its current intrusive ring and inserts
-   * it before the supplied list-head sentinel.
-   */
-  [[nodiscard]] LoopNode* AppendSoundToList(moho::HSound* const sound, LoopNode* const listHead)
-  {
-    LoopNode* const loopNode = &sound->mSimLoopLink;
-    loopNode->ListLinkBefore(listHead);
-    return loopNode;
   }
 
   bool IsSndVarReady(const moho::CSndVar& value)
@@ -1079,7 +1048,7 @@ namespace moho
     mActiveLoops.ListUnlink();
     UnlinkArmyHook(mListenerArmyHook);
 
-    ClearPendingDestroyCueSet(mPendingDestroyCues);
+    mPendingDestroyCues.clear();
     ClearSoundHandleVector(mSoundHandles);
   }
 
@@ -1994,7 +1963,7 @@ namespace moho
     }
 
     HSound* const sound = new HSound(params);
-    (void)AppendSoundToList(sound, reinterpret_cast<LoopNode*>(&mActiveLoops));
+    sound->mSimLoopLink.ListLinkBefore(reinterpret_cast<LoopNode*>(&mActiveLoops));
     (void)WriteSoundLoopCue(sound, cue);
     return sound;
   }
