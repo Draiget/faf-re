@@ -4152,13 +4152,14 @@ namespace moho
    *
    * What it does:
    * Queues this entity's id (`id_`, +0x68) onto the sync packet's delete-id lane
-   * (`SSyncData::mDeleteIds`, +0x168) via the canonical push_back-shape helper
-   * (`PushBackDeleteEntId`, FUN_0067B810, `call sub_67B810` at 0x0067A27A), then
-   * clears the interface-created flag (`mInterfaceCreated`, +0x1EC).
+   * (`SSyncData::mDeleteIds`, +0x168) -- `msvc8::vector<EntId>::push_back`
+   * emitted out of line as FUN_0067B810 (`call sub_67B810` at 0x0067A27A),
+   * cited on Vector.h's `push_back` -- then clears the interface-created
+   * flag (`mInterfaceCreated`, +0x1EC).
    */
   void Entity::DestroyInterface(SSyncData* const syncData)
   {
-    PushBackDeleteEntId(syncData->mDeleteIds, id_);
+    syncData->mDeleteIds.push_back(id_);
     mInterfaceCreated = 0u;
   }
 

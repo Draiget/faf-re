@@ -78061,6 +78061,9 @@ void* wxCreateBitmapButtonRuntimeClassInstance()
 
 /**
  * Address: 0x004FBAE0 (FUN_004FBAE0)
+ * Address: 0x004FBC10 (FUN_004FBC10, the one-instruction `jmp` thunk into
+ * this body that `WBitmapCheckBox::WBitmapCheckBox` (0x004FBE30) reaches;
+ * it carried a stale `Vector.cpp` source path in the progress DB)
  *
  * What it does:
  * Runs non-deleting `wxBitmapButtonBase` teardown by destroying four embedded

@@ -809,6 +809,11 @@ namespace gpg::core
      * What it does:
      * Initializes vector pointer lanes to the inline storage window and
      * records inline-origin metadata.
+     * Address: 0x005FBC10 (FUN_005FBC10 -- `fastvector_n<uint32, 5>` default constructor (inline storage armed); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+     * Address: 0x00605390 (FUN_00605390 -- `fastvector_n<uint32, 15>` default constructor; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+     * Address: 0x00578750 (FUN_00578750 -- `FastVectorN` constructor for a 20-byte element rebinding to a caller-provided block of `count` slots; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+     * Address: 0x005B4680 (FUN_005B4680 -- `FastVectorN` default constructor for a 0x230-byte inline block (at `this + 0x10`, or a caller-provided base); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+     * Address: 0x005B4E30 (FUN_005B4E30 -- `FastVectorN` default constructor for a 0x230-byte inline block (at `this + 0x10`, or a caller-provided base); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
      */
     FastVectorN()
     {

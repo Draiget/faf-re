@@ -888,9 +888,9 @@ namespace moho
         // terminated (reclaimed/killed) prop is erased immediately, otherwise
         // it is queued for deferred deletion.
         if (mReclaimTerminated) {
-          PushBackDeleteEntId(syncData->mEraseIds, id_);
+          syncData->mEraseIds.push_back(id_);
         } else {
-          PushBackDeleteEntId(syncData->mDeleteIds, id_);
+          syncData->mDeleteIds.push_back(id_);
         }
         mInterfaceCreated = 0u;
       }

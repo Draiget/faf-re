@@ -5629,7 +5629,7 @@ namespace moho
     if (bucket.mEdges.data() != nullptr) {
       ::operator delete(bucket.mEdges.data());
     }
-    bucket.mEdges.reset_range_lanes_preserve_proxy();
+    bucket.mEdges.release_storage_without_free();
     bucket.mTexture.release();
   }
 
@@ -13932,7 +13932,7 @@ namespace moho
   SSelectionNodeUserEntity* WeakEntitySetUserEntity::BuyNode()
   {
     auto* const node =
-      static_cast<SSelectionNodeUserEntity*>(msvc8::detail::AllocateChecked28ByteElements(1u));
+      msvc8::detail::allocate_checked<SSelectionNodeUserEntity>(1u);
     node->mLeft = nullptr;
     node->mParent = nullptr;
     node->mRight = nullptr;

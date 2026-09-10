@@ -324,7 +324,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="legacy\containers\String.cpp">
       <ObjectFileName>$(IntDir)legacy_containers_String.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="legacy\containers\Vector.cpp" />
     <ClCompile Include="lua\LuaAssertion.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d10\D3D10Interfaces.cpp" />
     <ClCompile Include="gpg\core\reflection\Reflection.cpp" />

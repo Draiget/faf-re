@@ -160,7 +160,7 @@ namespace
   };
   static_assert(sizeof(TerrainDirtyRectListRuntimeView) == 0x0C, "TerrainDirtyRectListRuntimeView size must be 0x0C");
 
-  using TerrainEditWordBufferRuntimeView = msvc8::detail::dword_lane_vector_view;
+  using TerrainEditWordBufferRuntimeView = msvc8::detail::vector_bool_storage;
   static_assert(sizeof(TerrainEditWordBufferRuntimeView) == 0x10, "TerrainEditWordBufferRuntimeView size must be 0x10");
 
   struct TerrainNormalEncodeBlock
@@ -1009,12 +1009,12 @@ namespace
     };
 
     auto growWords = [&throwTooLong, &allocateWords](
-                       msvc8::detail::dword_lane_vector_view* const view,
+                       msvc8::detail::vector_bool_storage* const view,
                        std::uint32_t* const insertAt,
                        const std::size_t count,
                        const std::uint32_t value
                      ) {
-      (void)msvc8::detail::InsertFillWordsIntoLanes(
+      (void)msvc8::detail::InsertFillWords(
         view,
         insertAt,
         count,
@@ -1025,7 +1025,7 @@ namespace
     };
 
     auto eraseWords = [](
-                        msvc8::detail::dword_lane_vector_view* const view,
+                        msvc8::detail::vector_bool_storage* const view,
                         std::uint32_t* const first,
                         std::uint32_t* const last
                       ) {
@@ -1041,7 +1041,7 @@ namespace
       view->end -= static_cast<std::ptrdiff_t>(last - first);
     };
 
-    (void)msvc8::detail::EnsureWordCountInLanes(
+    (void)msvc8::detail::ResizeWordStorage(
       &editWordBuffer,
       desiredWordCount,
       fillWord,

@@ -499,7 +499,7 @@ namespace msvc8
          *   +0x08: end
          *   +0x0C: capacity end
          */
-        struct dword_lane_vector_view
+        struct vector_bool_storage
         {
             std::uint32_t prefix;
             std::uint32_t* begin;
@@ -507,7 +507,7 @@ namespace msvc8
             std::uint32_t* capacityEnd;
         };
 
-        static_assert(sizeof(dword_lane_vector_view) == 0x10, "dword_lane_vector_view size must be 0x10");
+        static_assert(sizeof(vector_bool_storage) == 0x10, "vector_bool_storage size must be 0x10");
 
         /**
          * Address: 0x00443C10 (FUN_00443C10)
@@ -518,8 +518,8 @@ namespace msvc8
          * Initializes begin/end/capacity dword lanes for one requested word count.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
-        [[nodiscard]] inline bool InitializeDwordLanes(
-            dword_lane_vector_view* const view,
+        [[nodiscard]] inline bool InitializeWordStorage(
+            vector_bool_storage* const view,
             const std::size_t wordCount,
             ThrowTooLongFn throwTooLong,
             AllocateWordsFn allocateWords
@@ -547,8 +547,8 @@ namespace msvc8
          * lane vector, preserving VC8 growth/shift behavior.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
-        [[nodiscard]] inline std::uint32_t* InsertFillWordsIntoLanes(
-            dword_lane_vector_view* const view,
+        [[nodiscard]] inline std::uint32_t* InsertFillWords(
+            vector_bool_storage* const view,
             std::uint32_t* insertAt,
             const std::size_t count,
             const std::uint32_t fillValue,
@@ -619,15 +619,15 @@ namespace msvc8
          * Inserts one word value at `insertAt` in one legacy dword lane vector.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
-        [[nodiscard]] inline std::uint32_t* InsertOneWordIntoLanes(
-            dword_lane_vector_view* const view,
+        [[nodiscard]] inline std::uint32_t* InsertWord(
+            vector_bool_storage* const view,
             std::uint32_t* const insertAt,
             const std::uint32_t value,
             ThrowTooLongFn throwTooLong,
             AllocateWordsFn allocateWords
         )
         {
-            return InsertFillWordsIntoLanes(view, insertAt, 1u, value, throwTooLong, allocateWords);
+            return InsertFillWords(view, insertAt, 1u, value, throwTooLong, allocateWords);
         }
 
         /**
@@ -639,7 +639,7 @@ namespace msvc8
          */
         template <class EraseWordRangeFn>
         [[nodiscard]] inline std::uint32_t NormalizeBitCountAndTrimTail(
-            dword_lane_vector_view* const view,
+            vector_bool_storage* const view,
             const std::uint32_t bitCount,
             EraseWordRangeFn eraseWordRange
         )
@@ -668,8 +668,8 @@ namespace msvc8
          * preserving legacy pointer-lane update ordering.
          */
         template <class GrowWordsFn, class EraseWordRangeFn>
-        [[nodiscard]] inline std::size_t EnsureWordCountInLanes(
-            dword_lane_vector_view* const view,
+        [[nodiscard]] inline std::size_t ResizeWordStorage(
+            vector_bool_storage* const view,
             const std::size_t desiredWordCount,
             const std::uint32_t fillWord,
             GrowWordsFn growWords,
@@ -1007,7 +1007,7 @@ namespace msvc8
         template <class InsertAtWordFn>
         [[nodiscard]] inline std::uint32_t** RebindWordPointerAfterInsert(
             std::uint32_t** const outPointer,
-            dword_lane_vector_view* const view,
+            vector_bool_storage* const view,
             std::uint32_t* const sourceWord,
             InsertAtWordFn insertAtWord
         )
@@ -1119,9 +1119,9 @@ namespace msvc8
          * Swaps two 32-bit word lanes in place.
          */
         template <class WordT>
-        [[nodiscard]] inline WordT* SwapWordLanes(WordT* const lhs, WordT* const rhs) noexcept
+        [[nodiscard]] inline WordT* SwapWords(WordT* const lhs, WordT* const rhs) noexcept
         {
-            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "SwapWordLanes expects 32-bit words");
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "SwapWords expects 32-bit words");
             const WordT tmp = *lhs;
             *lhs = *rhs;
             *rhs = tmp;
@@ -1299,7 +1299,46 @@ namespace msvc8
          * `[[msvc::no_unique_address]]` lets the compiler fully elide this
          * tag's storage, dropping the class from 16 to 12 bytes.
          */
-        struct NoDebugProxyLane {};
+        struct NoDebugProxy {};
+
+        /**
+         * VC8's `_Allocate(count, (T*)0)` from `<xmemory>`: refuses a count
+         * whose byte size would wrap 32 bits with `bad_alloc`, otherwise one
+         * raw `operator new`. Every `msvc8::vector<T>` buys its storage
+         * through it (`allocate_slots_checked` below) and so does every
+         * `std::_Tree` node purchase, which is why the binary carries one
+         * copy of this body per element width.
+         */
+        /**
+         * Address: 0x00571780 (FUN_00571780 -- `_Allocate` for the 68-byte `std::_Tree` node of `map<EntId, SUnitOffsetInfo>`, reached from that map's `alloc_raw` (0x0056FE00, RbTree.h).)
+         * Address: 0x00712A70 (FUN_00712A70 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
+         * Address: 0x0077DB80 (FUN_0077DB80 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
+         * Address: 0x007B4E50 (FUN_007B4E50 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
+         * Address: 0x007CC1C0 (FUN_007CC1C0 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
+         * Address: 0x004E50A0 (FUN_004E50A0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x004E5160 (FUN_004E5160 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x004E51F0 (FUN_004E51F0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x004E9B70 (FUN_004E9B70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x00594230 (FUN_00594230 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x00688D70 (FUN_00688D70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x006E2D90 (FUN_006E2D90 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x0083C6E0 (FUN_0083C6E0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x00571800 (FUN_00571800 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
+         * Address: 0x007B1420 (FUN_007B1420 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
+         * Address: 0x007B4FA0 (FUN_007B4FA0 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
+         * Address: 0x007B4CF0 (FUN_007B4CF0 -- `mov ecx,1; jmp` adapter that always buys one 28-byte node; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007B4EF0 (FUN_007B4EF0 -- `_Allocate` for a 32-byte `std::_Tree` node (0x007B4410, RbTree.h).)
+         * Address: 0x00582460 (FUN_00582460 -- `_Allocate` for a 40-byte `std::_Tree` node (RbTree.h buyers).)
+         * Address: 0x00831D10 (FUN_00831D10 -- `_Allocate` for a 40-byte `std::_Tree` node (RbTree.h buyers).)
+         */
+        template <class T>
+        [[nodiscard]] inline T* allocate_checked(const std::size_t count)
+        {
+            if (count != 0 && (static_cast<std::size_t>(0xFFFFFFFFu) / count) < sizeof(T)) {
+                throw std::bad_alloc();
+            }
+            return static_cast<T*>(::operator new(count * sizeof(T)));
+        }
     } // namespace detail
 
     /**
@@ -1341,11 +1380,35 @@ namespace msvc8
         // typedefs publicly. Purely a visibility fix: both aliases already
         // existed with this exact meaning, just unreachable from outside the
         // class.
+        /**
+         * Address: 0x00A72140 (FUN_00A72140 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72170 (FUN_00A72170 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72640 (FUN_00A72640 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72670 (FUN_00A72670 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72560 (FUN_00A72560 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A725A0 (FUN_00A725A0 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72B80 (FUN_00A72B80 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72BC0 (FUN_00A72BC0 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72F90 (FUN_00A72F90 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72FC0 (FUN_00A72FC0 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72FF0 (FUN_00A72FF0 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73020 (FUN_00A73020 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FDD50 (FUN_004FDD50 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005440B0 (FUN_005440B0 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00544120 (FUN_00544120 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005485B0 (FUN_005485B0 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00548650 (FUN_00548650 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FDDA0 (FUN_004FDDA0 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00524700 (FUN_00524700 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00524E20 (FUN_00524E20 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005251E0 (FUN_005251E0 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00525250 (FUN_00525250 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         */
         using iterator = T*;
         using const_iterator = const T*;
 
     private:
-        [[msvc::no_unique_address]] std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxyLane> myProxy_; // +0x0 when present (opaque _Container_proxy*)
+        [[msvc::no_unique_address]] std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxy> myProxy_; // +0x0 when present (opaque _Container_proxy*)
         T* first_;      // +0x4 (+0x0 when HasDebugProxy=false)
         T* last_;       // +0x8 (+0x4 when HasDebugProxy=false)
         T* end_;        // +0xC (+0x8 when HasDebugProxy=false)
@@ -1360,21 +1423,6 @@ namespace msvc8
     		last_(nullptr),
     		end_(nullptr)
     	{
-        }
-
-        /**
-         * Address: 0x00442B50 (FUN_00442B50)
-         * Address: 0x00443090 (FUN_00443090)
-         * Address: 0x00443290 (FUN_00443290)
-         * Address: 0x00443390 (FUN_00443390)
-         *
-         * What it does:
-         * Resets data-range pointer lanes while preserving allocator/proxy lane.
-         */
-        void reset_range_lanes_preserve_proxy() noexcept {
-            first_ = nullptr;
-            last_ = nullptr;
-            end_ = nullptr;
         }
 
         /**
@@ -1432,6 +1480,9 @@ namespace msvc8
          * value)` below with a default-constructed temporary (see the
          * addresses above), so this delegates the same way rather than
          * modelling a distinct value-construct-in-place mechanic.
+         * Address: 0x00A744F0 (FUN_00A744F0 -- `vector(count)` for an 8-byte element, a zero temporary forwarded into 0x00A74370; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A74520 (FUN_00A74520 -- `vector(count)` for a 16-byte element, forwarded into 0x00A74430; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0053FDA0 (FUN_0053FDA0 -- `vector<uint32>(count)`, a zero temporary forwarded into 0x005400A0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         explicit vector(std::size_t count) : vector(count, T()) {
         }
@@ -1447,10 +1498,22 @@ namespace msvc8
          * overwritten in place with its decoded value afterward).
          *
          * Construct with count copies of value
+         * Address: 0x007402B0 (FUN_007402B0 -- `vector<float>(count, value)`: `CSimDriver::DrawNetworkStats` (0x0073DFE0, SimDriver.cpp).)
+         * Address: 0x005400A0 (FUN_005400A0 -- `vector<uint32>(count, value)`: `CClientManagerImpl::CClientManagerImpl` (0x0053DF20).)
+         * Address: 0x00A74370 (FUN_00A74370 -- `vector(count, value)` for an 8-byte element (buy at 0x00A72080, fill at 0x00A72C30).)
+         * Address: 0x00A74430 (FUN_00A74430 -- `vector(count, value)` for a 16-byte element (buy at 0x00A720E0, fill at 0x00A72C70).)
          */
         vector(std::size_t count, const T& value) : vector() {
-            if (count) {
-                insert(first_, count, value);
+            // VC8: `if (_Buy(count)) { try { _Mylast = _Ufill(_Myfirst, count,
+            // value); } catch (...) { _Tidy(); throw; } }`.
+            if (buy(count)) {
+                try {
+                    uninit_fill_n(first_, count, value);
+                    last_ = first_ + count;
+                } catch (...) {
+                    tidy();
+                    throw;
+                }
             }
         }
 
@@ -1682,13 +1745,22 @@ namespace msvc8
          * `moho/resource/blueprints/RUnitBlueprint.cpp` as a `CopyOccupyRects`
          * free function driving two `AsVectorRuntimeView` reach-ins, with no
          * call site anywhere in the tree.
+         * Address: 0x007529A0 (FUN_007529A0 -- copy constructor for an 8-byte element (buy at 0x0074D800); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00752BA0 (FUN_00752BA0 -- copy constructor for the 12-byte `{dword, dword, shared-count control}` element of `SSyncData` (buy at 0x0074D8C0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00752DE0 (FUN_00752DE0 -- copy constructor for a 40-byte element (buy at 0x0074DA70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         vector(const vector& other) : vector() {
+            // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
+            // catch (...) { _Tidy(); throw; } }`.
             const std::size_t n = other.size();
-            if (n) {
-                reserve(n);
-                uninit_copy_n(other.first_, n, first_);
-                last_ = first_ + n;
+            if (buy(n)) {
+                try {
+                    uninit_copy_n(other.first_, n, first_);
+                    last_ = first_ + n;
+                } catch (...) {
+                    tidy();
+                    throw;
+                }
             }
         }
 
@@ -1981,10 +2053,43 @@ namespace msvc8
          * callee chain, and the confirmed real xref.
          *
          * Copy assignment (strong exception safety)
+         * Address: 0x00526870 (FUN_00526870 -- `vector<uint32>::operator=` (its two `memmove` steps are 0x005275F0/0x00754A30 on `copy_or_move_assign`, its reallocating buy 0x00523940).)
+         * Address: 0x00753240 (FUN_00753240 -- `vector<uint32>::operator=`, a second emission; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0051A900 (FUN_0051A900 -- `vector<RMeshBlueprintLOD>::operator=` (buy 0x00519570, copy-construct 0x0051B3D0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00526A90 (FUN_00526A90 -- `vector<RUnitBlueprintWeapon>::operator=` (buy 0x00523A00, copy-construct 0x00527DD0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00582890 (FUN_00582890 -- `vector<SPointVector>::operator=` (24-byte, buy 0x0057EE70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00704D80 (FUN_00704D80 -- `vector<SEntitySetTemplateUnit>::operator=` (buy 0x00702590, element assign 0x007056A0, copy-construct 0x00706900); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00752C50 (FUN_00752C50 -- `operator=` for the 12-byte shared-count element of `SSyncData` (buy 0x0074D8C0, release 0x007420F0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00752EA0 (FUN_00752EA0 -- `operator=` for a 40-byte element (buy 0x0074DA70, copy 0x00755D30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007525C0 (FUN_007525C0 -- `operator=` for a 28-byte seven-float element (copy 0x00755B30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005ED370 (FUN_005ED370 -- `vector<SAiReservedTransportBone>::operator=` (buy 0x005EA4E0, element destroy 0x005EE360, copy-construct bridge 0x005EE710); zero callers and unreachable, a linker-retained copy nothing runs.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
-            assign(rhs.first_, rhs.size());
+            // VC8's four arms: empty source clears; a source that fits the
+            // live range assigns over it and destroys the excess; one that
+            // fits the capacity assigns the live prefix and copy-constructs
+            // the rest; anything larger tears the old block down and buys a
+            // fresh one of exactly the source's size.
+            const std::size_t n = rhs.size();
+            if (n == 0) {
+                clear();
+            } else if (n <= size()) {
+                copy_or_move_assign(first_, rhs.first_, n);
+                destroy_range(first_ + n, last_);
+                last_ = first_ + n;
+            } else if (n <= capacity()) {
+                const std::size_t cur = size();
+                copy_or_move_assign(first_, rhs.first_, cur);
+                uninit_copy_n(rhs.first_ + cur, n - cur, first_ + cur);
+                last_ = first_ + n;
+            } else {
+                tidy();
+                if (buy(n)) {
+                    uninit_copy_n(rhs.first_, n, first_);
+                    last_ = first_ + n;
+                }
+            }
             return *this;
         }
 
@@ -2032,6 +2137,24 @@ namespace msvc8
          *
          * What it does:
          * Returns the first element pointer lane (`first_`).
+         * Address: 0x00523890 (FUN_00523890 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005249F0 (FUN_005249F0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005438F0 (FUN_005438F0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005449D0 (FUN_005449D0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00547F10 (FUN_00547F10 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00549040 (FUN_00549040 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0053FC40 (FUN_0053FC40 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005612C0 (FUN_005612C0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561560 (FUN_00561560 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561670 (FUN_00561670 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561790 (FUN_00561790 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005618B0 (FUN_005618B0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00578940 (FUN_00578940 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591C40 (FUN_00591C40 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591DC0 (FUN_00591DC0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591E90 (FUN_00591E90 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FD980 (FUN_004FD980 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00504EC0 (FUN_00504EC0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         T* begin() const noexcept { return first_; }
 
@@ -2052,6 +2175,25 @@ namespace msvc8
          *
          * What it does:
          * Returns the one-past-end pointer lane (`last_`).
+         * Address: 0x005238A0 (FUN_005238A0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00524A00 (FUN_00524A00 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00543900 (FUN_00543900 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005449E0 (FUN_005449E0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00547AF0 (FUN_00547AF0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00549050 (FUN_00549050 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0053FF90 (FUN_0053FF90 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005612D0 (FUN_005612D0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561570 (FUN_00561570 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561680 (FUN_00561680 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005617A0 (FUN_005617A0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005618C0 (FUN_005618C0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005786E0 (FUN_005786E0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005787C0 (FUN_005787C0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005815F0 (FUN_005815F0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591C50 (FUN_00591C50 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591DD0 (FUN_00591DD0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FD750 (FUN_004FD750 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00504ED0 (FUN_00504ED0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         T* end() const noexcept { return last_; }
         [[nodiscard]] bool empty() const noexcept {
@@ -2083,6 +2225,35 @@ namespace msvc8
          * msvc8::vector<Moho::SAniSkelBoneNameIndex>::size)
          *
          * Returns element count from retained `[first_, last_)` range.
+         * Address: 0x00507F50 (FUN_00507F50 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x0053FBC0 (FUN_0053FBC0 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x00547710 (FUN_00547710 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x00578620 (FUN_00578620 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x0057F9D0 (FUN_0057F9D0 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x00686890 (FUN_00686890 -- `size()` for a 20-byte element (`CClientBase::Process` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x005191E0 (FUN_005191E0 -- `size()` for the 204-byte `RMeshBlueprintLOD`.)
+         * Address: 0x0057ED80 (FUN_0057ED80 -- `size()` for the 24-byte `SPointVector`.)
+         * Address: 0x005C3C70 (FUN_005C3C70 -- `size()` for the 52-byte `SPerArmyReconInfo`.)
+         * Address: 0x00591C60 (FUN_00591C60 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x005C4C70 (FUN_005C4C70 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x00627310 (FUN_00627310 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x0067C6A0 (FUN_0067C6A0 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x0069ED20 (FUN_0069ED20 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x006DBCD0 (FUN_006DBCD0 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x0074D8A0 (FUN_0074D8A0 -- `size()` for a 12-byte element (`CAiReconDBImpl::GenerateNewBlips`, `CUnitLoadUnits`, `UnitWeapon` and the `_Insert_n` bodies cited on `insert`).)
+         * Address: 0x005C50E0 (FUN_005C50E0 -- `size()` for a 28-byte element.)
+         * Address: 0x00692840 (FUN_00692840 -- `size()` for a 28-byte element.)
+         * Address: 0x00702570 (FUN_00702570 -- `size()` for a 40-byte element.)
+         * Address: 0x0074D9E0 (FUN_0074D9E0 -- `size()` for a 40-byte element.)
+         * Address: 0x007198B0 (FUN_007198B0 -- `size()` for a 56-byte element (`CInfluenceMap`).)
+         * Address: 0x008A8A60 (FUN_008A8A60 -- `size()` for a 56-byte element (`CInfluenceMap`).)
+         * Address: 0x0074C5C0 (FUN_0074C5C0 -- `size()` for the 36-byte `SNetCommandArg` (`cfunc_SessionGetCommandSourceNamesL`).)
+         * Address: 0x00523090 (FUN_00523090 -- `size()` for the 388-byte `RUnitBlueprintWeapon` (`CPlatoon::FindClosestUnitToPos`, the weapon vector reflection).)
+         * Address: 0x0054C0F0 (FUN_0054C0F0 -- `size()` for an 88-byte element.)
+         * Address: 0x00560E90 (FUN_00560E90 -- `size()` for a 352-byte element.)
+         * Address: 0x00560FE0 (FUN_00560FE0 -- `size()` for a 216-byte element.)
+         * Address: 0x00561130 (FUN_00561130 -- `size()` for the 568-byte `SUnitVariableUpdateEntry`.)
+         * Address: 0x00561290 (FUN_00561290 -- `size()` for a 120-byte element.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2140,6 +2311,13 @@ namespace msvc8
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
         }
+        /**
+         * Address: 0x00549090 (FUN_00549090 -- out-of-line `operator[]` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00547730 (FUN_00547730 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00547740 (FUN_00547740 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A724E0 (FUN_00A724E0 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72510 (FUN_00A72510 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         */
         T& operator[](std::size_t i) const noexcept {
 	        return first_[i];
         }
@@ -2151,6 +2329,17 @@ namespace msvc8
          *
          * What it does:
          * Returns raw pointer to element slot at `index` in the active range.
+         * Address: 0x004FDD60 (FUN_004FDD60 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00524E10 (FUN_00524E10 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00585980 (FUN_00585980 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0053FE90 (FUN_0053FE90 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00591C80 (FUN_00591C80 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005485C0 (FUN_005485C0 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00578D30 (FUN_00578D30 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005784F0 (FUN_005784F0 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00578640 (FUN_00578640 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054DD80 (FUN_0054DD80 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054DDB0 (FUN_0054DDB0 -- checked-iterator `operator+`/`operator+=` emissions (`first_ + index` for 4-, 8-, 12-, 20- and 88-byte elements); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         T* ptr_at(std::size_t index) const noexcept {
             return first_ + index;
@@ -2177,6 +2366,8 @@ namespace msvc8
          * body this trivial. Do not add new bespoke per-type `front()`
          * free functions if more of these twins surface -- they are this
          * member, dead-COMDAT-classified, nothing further to write.
+         * Address: 0x00592220 (FUN_00592220 -- out-of-line `front()` (`*first_`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00592410 (FUN_00592410 -- out-of-line `front()` (`*first_`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         T& front() const noexcept { return *first_; }
 
@@ -2667,6 +2858,16 @@ namespace msvc8
          * array -- a no-op on the freshly-default-constructed vector the
          * `WavePattern(LuaObject&)` constructor path always starts from, but
          * present in the binary because the helper is written generically.)
+         * Address: 0x00523020 (FUN_00523020 -- `clear()` for a trivially destructible element (`last_ = first_`), the empty-source arm of `operator=` (0x00526870/0x008D76B0/0x008D77E0).)
+         * Address: 0x005C4B30 (FUN_005C4B30 -- `clear()` for a trivially destructible element (`last_ = first_`), the empty-source arm of `operator=` (0x00526870/0x008D76B0/0x008D77E0).)
+         * Address: 0x00753530 (FUN_00753530 -- `clear()` for a trivially destructible element (`last_ = first_`), the empty-source arm of `operator=` (0x00526870/0x008D76B0/0x008D77E0).)
+         * Address: 0x008D79D0 (FUN_008D79D0 -- `clear()` for a trivially destructible element (`last_ = first_`), the empty-source arm of `operator=` (0x00526870/0x008D76B0/0x008D77E0).)
+         * Address: 0x008D7A20 (FUN_008D7A20 -- `clear()` for a trivially destructible element (`last_ = first_`), the empty-source arm of `operator=` (0x00526870/0x008D76B0/0x008D77E0).)
+         * Address: 0x005E0170 (FUN_005E0170 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
+         * Address: 0x005E01D0 (FUN_005E01D0 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
+         * Address: 0x005ED4C0 (FUN_005ED4C0 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
+         * Address: 0x0078A070 (FUN_0078A070 -- `clear()` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00703040 (FUN_00703040 -- `clear()` for `SEntitySetTemplateUnit` (destroy the range at 0x007056D0, then `last_ = first_`), the empty-source arm of `operator=` (0x00704D80) and `resize` (0x00702450).)
          */
         void clear() noexcept {
             destroy_all();
@@ -2695,6 +2896,31 @@ namespace msvc8
          * the `assign(9, sentinel)` MapD emission FUN_0082FB80 -- its
          * `catch (...) { tidy(); throw; }` funclet calls this address when
          * the fill after `operator new(9 * 4)` throws.)
+         * Address: 0x00547C00 (FUN_00547C00 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00561340 (FUN_00561340 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x0057EEC0 (FUN_0057EEC0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x0057F830 (FUN_0057F830 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x005C5F60 (FUN_005C5F60 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x005DC910 (FUN_005DC910 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x005DCAB0 (FUN_005DCAB0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x005EA9E0 (FUN_005EA9E0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x0067CB50 (FUN_0067CB50 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00701F70 (FUN_00701F70 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00719990 (FUN_00719990 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00740D90 (FUN_00740D90 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00740DC0 (FUN_00740DC0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00740DF0 (FUN_00740DF0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00740E60 (FUN_00740E60 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x007AF380 (FUN_007AF380 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x007AF5F0 (FUN_007AF5F0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x007DA1A0 (FUN_007DA1A0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x007E37C0 (FUN_007E37C0 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00523980 (FUN_00523980 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x0053FF20 (FUN_0053FF20 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x00767710 (FUN_00767710 -- `_Tidy` for a trivially destructible element: free the block and null the three pointers (callers include `vector<SAttachPoint>` 0x005E9700, `vector<GeomCamera3>` 0x007AEBC0, `MeshBatchKey` 0x007E41A0, `CopyOccupyRects` 0x005267A0).)
+         * Address: 0x0078A270 (FUN_0078A270 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007C9310 (FUN_007C9310 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count, vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -2714,6 +2940,26 @@ namespace msvc8
          * 0x0071A44E / 0x0071A458 / 0x0071A45F while the destination's previous
          * `{first, last}` pair is kept in registers and torn down by the
          * scratch's scope-exit teardown at 0x0071A477 / 0x0071A47D.
+         * Address: 0x0051A6A0 (FUN_0051A6A0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005262E0 (FUN_005262E0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00526310 (FUN_00526310 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00544570 (FUN_00544570 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005447D0 (FUN_005447D0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005489C0 (FUN_005489C0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00548CE0 (FUN_00548CE0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00581EA0 (FUN_00581EA0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00582570 (FUN_00582570 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005845F0 (FUN_005845F0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005C9B90 (FUN_005C9B90 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005C9C10 (FUN_005C9C10 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005CA4C0 (FUN_005CA4C0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005CA5F0 (FUN_005CA5F0 -- `swap`: exchange `first_`/`last_`/`end_` and leave both proxies in place; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005EC680 (FUN_005EC680 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005EC6F0 (FUN_005EC6F0 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005EC7A0 (FUN_005EC7A0 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005ECC10 (FUN_005ECC10 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005ECE50 (FUN_005ECE50 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005ECE80 (FUN_005ECE80 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         void swap(vector& other) noexcept {
             T* const otherFirst = other.first_;
@@ -3199,6 +3445,10 @@ namespace msvc8
          *
          * Named here so the operation has a verb, instead of call sites
          * reaching through `AsVectorRuntimeView` to write the lanes by hand.
+         * Address: 0x00442B50 (FUN_00442B50 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
+         * Address: 0x00443090 (FUN_00443090 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
+         * Address: 0x00443290 (FUN_00443290 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
+         * Address: 0x00443390 (FUN_00443390 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          */
         void release_storage_without_free() noexcept {
             first_ = nullptr;
@@ -3206,6 +3456,10 @@ namespace msvc8
             end_ = nullptr;
         }
 
+        /**
+         * Address: 0x004FD660 (FUN_004FD660 -- `vector<int*>::push_back`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0067B810 (FUN_0067B810 -- `vector<EntId>::push_back` for `SSyncData::mDeleteIds`/`mEraseIds` (`Entity::DestroyInterface` 0x0067A260, `Prop::Sync` 0x006FA2A0); the capacity-full arm calls the `_Insert_n` at 0x0067D660.)
+         */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
             // line: when a slot is already spare it fills in place, otherwise
@@ -3415,6 +3669,7 @@ namespace msvc8
          * `RRuleGameRulesLuaExportBindingArray`'s raw fields -- removed
          * once `mMaps` became a real `msvc8::vector<T>`; `CancelExport` now
          * calls this method by name (`mMaps.erase(binding)`).)
+         * Address: 0x0053FD00 (FUN_0053FD00 -- `erase(pos)` for an 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -3560,6 +3815,24 @@ namespace msvc8
          * a `CompactLegacyArmyVariableDataVectorTail` free function in
          * `moho/sim/SimDriver.cpp` with no source-level caller of its own --
          * collapsed into this template instantiation, RULE ONE.
+         * Address: 0x005AFF30 (FUN_005AFF30 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x005C5EC0 (FUN_005C5EC0 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x005DD0C0 (FUN_005DD0C0 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x005DD510 (FUN_005DD510 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x0074F820 (FUN_0074F820 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x0076C7F0 (FUN_0076C7F0 -- `erase(first, last)` for a 4-byte element: `memmove` the tail down and drop `last_` (`HPathCellVectorReflection`, `CAiReconDBImpl`, `IAiAttacker`, `PathTables` callers).)
+         * Address: 0x0078A1D0 (FUN_0078A1D0 -- `erase(first, last)` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x006E30F0 (FUN_006E30F0 -- `erase(first, last)` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0057FF40 (FUN_0057FF40 -- `erase(first, last)` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004DC780 (FUN_004DC780 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x00504DE0 (FUN_00504DE0 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x00504F50 (FUN_00504F50 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x005238F0 (FUN_005238F0 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x00537C10 (FUN_00537C10 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x0074F880 (FUN_0074F880 -- `erase(first, last)` for a pointer element (`Mesh.cpp`, `RUnitBlueprintNestedTypeInfo.cpp`, `vector_CSimConVarInstanceBase::resize`).)
+         * Address: 0x00652220 (FUN_00652220 -- `erase(first, last)` for a pointer element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054D3F0 (FUN_0054D3F0 -- `erase(first, last)` for an 8-byte element (`CAniSkel`, 0x0054CB80).)
+         * Address: 0x008D7AF0 (FUN_008D7AF0 -- `erase(first, last)` for a 12-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5691,6 +5964,8 @@ namespace msvc8
          * instantiation's in-place branch above. DB-integrity fix: was
          * `blocked` (`owner_layout`) with a stale note -- the graph shows
          * zero open callees and a recovered caller; not a layout gap.
+         * Address: 0x007027A0 (FUN_007027A0 -- `vector<uint32>::_Insert_n` (`CArmyImpl::Func16` 0x006FE090 and the `resize` at 0x0074DC40); the 0x3FFFFFFF length guard throws through 0x007029C0.)
+         * Address: 0x0067D660 (FUN_0067D660 -- `vector<EntId>::_Insert_n`, the slow arm of `push_back` at 0x0067B810.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -5718,14 +5993,9 @@ namespace msvc8
                     // Move the trailing `count` elements into uninitialized
                     // slots past the live range.
                     uninit_move_n(oldLast - count, count, oldLast);
-                    // Shift the remaining tail elements in-place to the right.
-                    if constexpr (std::is_trivially_copyable_v<T>) {
-                        std::memmove(insertAt + count, insertAt, (tail - count) * sizeof(T));
-                    } else {
-                        for (std::size_t i = tail - count; i > 0; --i) {
-                            insertAt[count + i - 1] = std::move(insertAt[i - 1]);
-                        }
-                    }
+                    // Shift the remaining tail elements in-place to the right
+                    // (VC8: `copy_backward(_Where, _Oldend - _Count, _Oldend)`).
+                    copy_backward_assign(insertAt, oldLast - count, oldLast);
                     // Overwrite the gap with copies of `value`.
                     for (std::size_t i = 0; i < count; ++i) {
                         insertAt[i] = localValue;
@@ -6170,6 +6440,7 @@ namespace msvc8
          *
          * The `moho::GeomCamera3` destroy emission, previously hand-written in
          * `GeomCamera3.cpp` as `DestroyGeomCameraRange` and orphaned.
+         * Address: 0x007420F0 (FUN_007420F0 -- `_Destroy` for `SSyncData`'s 12-byte `{{dword, dword, shared-count control}}` element: releases each control block (`~SSyncData` 0x0073FC70, 0x00740E20).)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -6897,6 +7168,28 @@ namespace msvc8
          * called by nothing. That is the compiler's output, not the
          * programmer's input; the source line is the container operation that
          * instantiates this template.
+         * Address: 0x005EFF70 (FUN_005EFF70 -- `_Uninit_copy` for `SAiReservedTransportBone` (element copy constructor 0x005EAC50), the copy-construct step of that vector's `resize` (0x005EA590).)
+         * Address: 0x005EC830 (FUN_005EC830 -- EH-shaped bridges into the `SAiReservedTransportBone` `_Uninit_copy` at 0x005EFF70.)
+         * Address: 0x005EE710 (FUN_005EE710 -- EH-shaped bridges into the `SAiReservedTransportBone` `_Uninit_copy` at 0x005EFF70.)
+         * Address: 0x00706210 (FUN_00706210 -- EH-shaped bridge into the `SEntitySetTemplateUnit` `_Uninit_copy` at 0x00706900; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007548E0 (FUN_007548E0 -- register bridge into the `_Uninit_copy` of `SSyncData`'s 12-byte shared-count element (retains each control block; `operator=` 0x00752C50).)
+         * Address: 0x0051B3D0 (FUN_0051B3D0 -- `_Uninit_copy` for the 204-byte `RMeshBlueprintLOD` (`RMeshBlueprintLODTypeInfo` 0x00519D90, `operator=` 0x0051A900).)
+         * Address: 0x0051A5B0 (FUN_0051A5B0 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy` at 0x0051B3D0.)
+         * Address: 0x0051B050 (FUN_0051B050 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy` at 0x0051B3D0.)
+         * Address: 0x0051AED0 (FUN_0051AED0 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0051B1C0 (FUN_0051B1C0 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0051B250 (FUN_0051B250 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00527DD0 (FUN_00527DD0 -- `_Uninit_copy` for the 388-byte `RUnitBlueprintWeapon`, two emissions (`RUnitBlueprintWeaponVectorReflection` 0x00524AD0/0x00524380, `operator=` 0x00526A90).)
+         * Address: 0x00527F20 (FUN_00527F20 -- `_Uninit_copy` for the 388-byte `RUnitBlueprintWeapon`, two emissions (`RUnitBlueprintWeaponVectorReflection` 0x00524AD0/0x00524380, `operator=` 0x00526A90).)
+         * Address: 0x005261A0 (FUN_005261A0 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`.)
+         * Address: 0x00527650 (FUN_00527650 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`.)
+         * Address: 0x00526030 (FUN_00526030 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005271D0 (FUN_005271D0 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00527320 (FUN_00527320 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005279F0 (FUN_005279F0 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00527A70 (FUN_00527A70 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00527BA0 (FUN_00527BA0 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00527C50 (FUN_00527C50 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -7897,6 +8190,32 @@ namespace msvc8
          * The `moho::GeomCamera3` fill emissions, previously hand-written in
          * `GeomCamera3.cpp` as `FillGeomCameraRangeFromPrototype` and its
          * `...LaneA` twin, both orphaned.
+         * Address: 0x0076B0E0 (FUN_0076B0E0 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
+         * Address: 0x0075F2B0 (FUN_0075F2B0 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
+         * Address: 0x00769D70 (FUN_00769D70 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
+         * Address: 0x00594120 (FUN_00594120 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
+         * Address: 0x005CA0D0 (FUN_005CA0D0 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
+         * Address: 0x00540F40 (FUN_00540F40 -- `_Fill_n` for a 4-byte element with VC8's null-destination guard (`func_ArraySet`; the `_Insert_n` bodies at 0x0067D660 and 0x006E24D0).)
+         * Address: 0x00680A10 (FUN_00680A10 -- `_Fill_n` for a 4-byte element with VC8's null-destination guard (`func_ArraySet`; the `_Insert_n` bodies at 0x0067D660 and 0x006E24D0).)
+         * Address: 0x006E3490 (FUN_006E3490 -- `_Fill_n` for a 4-byte element with VC8's null-destination guard (`func_ArraySet`; the `_Insert_n` bodies at 0x0067D660 and 0x006E24D0).)
+         * Address: 0x00765630 (FUN_00765630 -- `_Fill_n` for a 4-byte element with VC8's null-destination guard (`func_ArraySet`; the `_Insert_n` bodies at 0x0067D660 and 0x006E24D0).)
+         * Address: 0x00540BB0 (FUN_00540BB0 -- `_Fill_n` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0067F770 (FUN_0067F770 -- `_Fill_n` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054EC30 (FUN_0054EC30 -- `_Uninit_fill_n` for an 8-byte element (`vector(count, value)` at 0x00A74370).)
+         * Address: 0x00A72C30 (FUN_00A72C30 -- `_Uninit_fill_n` for an 8-byte element (`vector(count, value)` at 0x00A74370).)
+         * Address: 0x0054DCC0 (FUN_0054DCC0 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054E2F0 (FUN_0054E2F0 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73060 (FUN_00A73060 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73D50 (FUN_00A73D50 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A72C70 (FUN_00A72C70 -- `_Uninit_fill_n` for a 16-byte element (`vector(count, value)` at 0x00A74430).)
+         * Address: 0x00A730A0 (FUN_00A730A0 -- cdecl/stdcall bridges into the 16-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73DA0 (FUN_00A73DA0 -- cdecl/stdcall bridges into the 16-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00AC3AE0 (FUN_00AC3AE0 -- `_Fill`/`_Fill_n` for a 4-byte element (0x00AC4110).)
+         * Address: 0x00AC3E90 (FUN_00AC3E90 -- `_Fill`/`_Fill_n` for a 4-byte element (0x00AC4110).)
+         * Address: 0x004D5390 (FUN_004D5390 -- `_Fill` for a 0x54 `{{msvc8::string x3}}` element (`WxRuntimeTypes`, 0x004D45B0).)
+         * Address: 0x004D4F50 (FUN_004D4F50 -- register bridge into the string-triple `_Fill` at 0x004D5390; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x006E2D40 (FUN_006E2D40 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x006E34E0 (FUN_006E34E0 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -8604,12 +8923,123 @@ namespace msvc8
          * `FUN_00755DE0` -- reached from `operator=`'s
          * source-longer-than-capacity branch to assign over the retained
          * prefix before uninit-copying the excess tail)
+         * Address: 0x00582270 (FUN_00582270 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005C9A70 (FUN_005C9A70 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005C9FD0 (FUN_005C9FD0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005CC540 (FUN_005CC540 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005DF340 (FUN_005DF340 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005DF380 (FUN_005DF380 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005DF470 (FUN_005DF470 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005DF4B0 (FUN_005DF4B0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005E1220 (FUN_005E1220 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005E1280 (FUN_005E1280 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x005EE6B0 (FUN_005EE6B0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x00652880 (FUN_00652880 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0066AE50 (FUN_0066AE50 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0067FB00 (FUN_0067FB00 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x00681120 (FUN_00681120 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x006F90D0 (FUN_006F90D0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x007044C0 (FUN_007044C0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x00751CC0 (FUN_00751CC0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0076CE20 (FUN_0076CE20 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0078AE00 (FUN_0078AE00 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x007B11D0 (FUN_007B11D0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x007B1320 (FUN_007B1320 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x007DA5F0 (FUN_007DA5F0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x007E54C0 (FUN_007E54C0 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0087D250 (FUN_0087D250 -- `_Copy_opt` for a 4-byte element: one `memmove`, the forward copy step of `_Insert_n`/`erase`/`operator=` (`vector<CWldTerrainDecal*>` 0x0087A830, `Entity` 0x0067DB40, `CAiReconDBImpl` 0x005C7780, `IAiAttacker` 0x005DD570, `PathTables` 0x0076C850).)
+         * Address: 0x0078B390 (FUN_0078B390 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078B550 (FUN_0078B550 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078BA30 (FUN_0078BA30 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007BCBB0 (FUN_007BCBB0 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078ADA0 (FUN_0078ADA0 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078B580 (FUN_0078B580 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078B340 (FUN_0078B340 -- `_Copy_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00AC3D60 (FUN_00AC3D60 -- `_Copy_opt` for a 4-byte element (0x00AC4110).)
+         * Address: 0x0054F6B0 (FUN_0054F6B0 -- `_Copy_opt` for a 4-byte element with VC8's null-destination guard (`std::vector<int>` copy at 0x0054C380).)
+         * Address: 0x0054DEF0 (FUN_0054DEF0 -- calling-convention bridges into the 4-byte `_Copy_opt` at 0x0054F6B0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0054E660 (FUN_0054E660 -- calling-convention bridges into the 4-byte `_Copy_opt` at 0x0054F6B0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005275F0 (FUN_005275F0 -- the two `memmove` steps of `vector<uint32>::operator=` (0x00526870).)
+         * Address: 0x00754A30 (FUN_00754A30 -- the two `memmove` steps of `vector<uint32>::operator=` (0x00526870).)
+         * Address: 0x008D7D60 (FUN_008D7D60 -- `_Copy_opt` for a 12-byte element (0x008D7550).)
+         * Address: 0x0054E110 (FUN_0054E110 -- `_Copy_opt` for an 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FB510 (FUN_004FB510 -- `_Copy_opt` for a 0x28 `{{3 dwords, msvc8::string}}` element (`WxAppVectorHelpers`, 0x004FA880); the first is the loop, the second its register bridge.)
+         * Address: 0x004FB190 (FUN_004FB190 -- `_Copy_opt` for a 0x28 `{{3 dwords, msvc8::string}}` element (`WxAppVectorHelpers`, 0x004FA880); the first is the loop, the second its register bridge.)
+         * Address: 0x00653BC0 (FUN_00653BC0 -- `_Copy_opt` for `SDebugWorldText` (0x00653380).)
+         * Address: 0x00653A10 (FUN_00653A10 -- register bridge into the `SDebugWorldText` copy at 0x00653BC0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0064FA40 (FUN_0064FA40 -- `_Copy_opt` for `SDebugScreenText`, the assign step of that vector's `_Insert_n` (0x0064E490).)
+         * Address: 0x0064F750 (FUN_0064F750 -- register bridge into the `SDebugScreenText` copy at 0x0064FA40; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007056A0 (FUN_007056A0 -- `_Copy_opt` for `SEntitySetTemplateUnit` (each element `operator=` reduces to `mVec.AddAll`), reached from `operator=` 0x00704D80 and `clear` 0x00703040 through the 0x00704670 bridge.)
+         * Address: 0x00755D30 (FUN_00755D30 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
+         * Address: 0x00754940 (FUN_00754940 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
+         * Address: 0x00754970 (FUN_00754970 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
+         * Address: 0x00755B30 (FUN_00755B30 -- `_Copy_opt` for a 28-byte seven-float element (the loop and its bridge), the copy step of `operator=` 0x007525C0.)
+         * Address: 0x00754710 (FUN_00754710 -- `_Copy_opt` for a 28-byte seven-float element (the loop and its bridge), the copy step of `operator=` 0x007525C0.)
+         * Address: 0x007548B0 (FUN_007548B0 -- register bridge into the `_Copy_opt` of `SSyncData`'s 12-byte shared-count element (`operator=` 0x00752C50).)
+         * Address: 0x008A9B10 (FUN_008A9B10 -- register bridge into the 0x28 string-element `_Copy_opt` at 0x004FB510; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
-                std::memcpy(dst, src, n * sizeof(T));
+                // VC8 `_Copy_opt` over scalar pointers is one `memmove`.
+                std::memmove(dst, src, n * sizeof(T));
             } else {
                 for (std::size_t i = 0; i < n; ++i) dst[i] = src[i];
+            }
+        }
+
+        /**
+         * VC8's `_Copy_backward_opt` (`std::copy_backward(first, last,
+         * destLast)`): the in-place right shift `_Insert_n` performs when the
+         * hole is smaller than the live tail. Scalar element types collapse
+         * to one `memmove`; everything else is the element `operator=`
+         * walked from the back.
+         * Address: 0x005822B0 (FUN_005822B0 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x005CA010 (FUN_005CA010 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x005DF3C0 (FUN_005DF3C0 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x005DF4F0 (FUN_005DF4F0 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x006528C0 (FUN_006528C0 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0066AE90 (FUN_0066AE90 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0067FA60 (FUN_0067FA60 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x006F9110 (FUN_006F9110 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x00704500 (FUN_00704500 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x00751D70 (FUN_00751D70 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0076CE60 (FUN_0076CE60 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0078AE40 (FUN_0078AE40 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x007B1210 (FUN_007B1210 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x007B1360 (FUN_007B1360 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x007DA630 (FUN_007DA630 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x007E5500 (FUN_007E5500 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0087D290 (FUN_0087D290 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0087D360 (FUN_0087D360 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0087D430 (FUN_0087D430 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0088AF20 (FUN_0088AF20 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
+         * Address: 0x0078B3E0 (FUN_0078B3E0 -- `_Copy_backward_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0059DC90 (FUN_0059DC90 -- `_Copy_backward_opt` for a 16-byte element (`FastVector.h` 0x0059CC10 and the `double` sort at 0x00A73BD0).)
+         * Address: 0x00A72A90 (FUN_00A72A90 -- `_Copy_backward_opt` for a 16-byte element (`FastVector.h` 0x0059CC10 and the `double` sort at 0x00A73BD0).)
+         * Address: 0x00A72EC0 (FUN_00A72EC0 -- register bridge into the 16-byte `_Copy_backward_opt` at 0x00A72A90; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00594140 (FUN_00594140 -- `_Copy_backward_opt` for a 12-byte element (0x00592460, 0x005C7B10).)
+         * Address: 0x005CA0F0 (FUN_005CA0F0 -- `_Copy_backward_opt` for a 12-byte element (0x00592460, 0x005C7B10).)
+         * Address: 0x008DA320 (FUN_008DA320 -- `_Copy_backward_opt` for an 8-byte element (0x008DCB70).)
+         * Address: 0x006E3510 (FUN_006E3510 -- `_Copy_backward_opt` for a 4-byte element as an element loop; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004D5AD0 (FUN_004D5AD0 -- `_Copy_backward_opt` for a 0x54 `{{msvc8::string x3}}` element (`WxRuntimeTypes`, 0x004D5ED0): the loop, its register bridge and a variant that also stores the destination begin.)
+         * Address: 0x004D4F60 (FUN_004D4F60 -- `_Copy_backward_opt` for a 0x54 `{{msvc8::string x3}}` element (`WxRuntimeTypes`, 0x004D5ED0): the loop, its register bridge and a variant that also stores the destination begin.)
+         * Address: 0x004D6750 (FUN_004D6750 -- `_Copy_backward_opt` for a 0x54 `{{msvc8::string x3}}` element (`WxRuntimeTypes`, 0x004D5ED0): the loop, its register bridge and a variant that also stores the destination begin.)
+         * Address: 0x004D5400 (FUN_004D5400 -- register bridges into the 0x54 string-triple `_Copy_backward_opt`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004D6430 (FUN_004D6430 -- register bridges into the 0x54 string-triple `_Copy_backward_opt`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0064FFB0 (FUN_0064FFB0 -- `_Copy_backward_opt` for `SDebugScreenText`, the tail shift of that vector's `_Insert_n` (0x0064E490).)
+         * Address: 0x0064F760 (FUN_0064F760 -- `_Copy_backward_opt` for `SDebugScreenText`, the tail shift of that vector's `_Insert_n` (0x0064E490).)
+         * Address: 0x0064FAC0 (FUN_0064FAC0 -- register bridge into the `SDebugScreenText` backward copy; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         */
+        static void copy_backward_assign(const T* first, const T* last, T* destLast) {
+            if constexpr (std::is_trivially_copy_assignable_v<T>) {
+                const std::size_t n = static_cast<std::size_t>(last - first);
+                std::memmove(destLast - n, first, n * sizeof(T));
+            } else {
+                while (last != first) {
+                    --last;
+                    --destLast;
+                    *destLast = *last;
+                }
             }
         }
 
@@ -8752,6 +9182,10 @@ namespace msvc8
          *
          * What it does:
          * Releases one heap block through the legacy VC8 delete lane.
+         * Address: 0x00537F70 (FUN_00537F70 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x006DC9C0 (FUN_006DC9C0 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078A5C0 (FUN_0078A5C0 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0078B5B0 (FUN_0078B5B0 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         static void delete_heap_block(void* const ptr) noexcept
         {
@@ -9141,14 +9575,58 @@ namespace msvc8
          * constructs elements through `sub_5813C0` rather than the
          * LuaObject ctor, so this is a separate instantiation of the same
          * template, not an ICF twin of it.
+         * Address: 0x0054E0C0 (FUN_0054E0C0 -- `_Allocate` for an 88-byte element.)
+         * Address: 0x007F3670 (FUN_007F3670 -- `_Allocate` for a 192-byte element.)
+         * Address: 0x00A72080 (FUN_00A72080 -- `_Allocate` for an 8-byte element, the buy step of `vector(count, value)` at 0x00A74370.)
+         * Address: 0x00A720E0 (FUN_00A720E0 -- `_Allocate` for a 16-byte element, the buy step of `vector(count, value)` at 0x00A74430.)
+         * Address: 0x00525FE0 (FUN_00525FE0 -- `_Allocate` for a 4-byte element.)
+         * Address: 0x005628C0 (FUN_005628C0 -- `_Allocate` for a 4-byte element.)
+         * Address: 0x005822E0 (FUN_005822E0 -- `_Allocate` for a 4-byte element.)
+         * Address: 0x006E2CB0 (FUN_006E2CB0 -- `_Allocate` for a 4-byte element.)
+         * Address: 0x00768EB0 (FUN_00768EB0 -- `_Allocate` for a 4-byte element.)
+         * Address: 0x006E2480 (FUN_006E2480 -- `_Allocate` for a 4-byte element with the `count == 0 -> operator new(0)` shortcut inlined; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FA720 (FUN_004FA720 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x004FA7E0 (FUN_004FA7E0 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x0054E1B0 (FUN_0054E1B0 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x006D25B0 (FUN_006D25B0 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x00733AF0 (FUN_00733AF0 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x0075FD60 (FUN_0075FD60 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x00813EB0 (FUN_00813EB0 -- `_Allocate` for an 8-byte element.)
+         * Address: 0x006D1DB0 (FUN_006D1DB0 -- `_Allocate` for an 8-byte element, zero-count shortcut inlined; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00628260 (FUN_00628260 -- `_Allocate` for a 12-byte element.)
+         * Address: 0x006DDD70 (FUN_006DDD70 -- `_Allocate` for a 12-byte element.)
+         * Address: 0x00627BC0 (FUN_00627BC0 -- `_Allocate` for a 12-byte element, zero-count shortcut inlined; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005111C0 (FUN_005111C0 -- `_Allocate` for a 16-byte element.)
+         * Address: 0x00548B80 (FUN_00548B80 -- `_Allocate` for a 20-byte element.)
+         * Address: 0x00688E80 (FUN_00688E80 -- `_Allocate` for a 20-byte element.)
+         * Address: 0x00798B60 (FUN_00798B60 -- `_Allocate` for a 20-byte element.)
+         * Address: 0x007FB9B0 (FUN_007FB9B0 -- `_Allocate` for a 20-byte element.)
+         * Address: 0x008317B0 (FUN_008317B0 -- `_Allocate` for a 20-byte element.)
+         * Address: 0x007B3FA0 (FUN_007B3FA0 -- `mov ecx,1; jmp` adapter that always buys one 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005821F0 (FUN_005821F0 -- `_Allocate` for a 24-byte element (`vector<SPointVector>` and its siblings).)
+         * Address: 0x005CA1E0 (FUN_005CA1E0 -- `_Allocate` for a 28-byte element.)
+         * Address: 0x00693190 (FUN_00693190 -- `_Allocate` for a 28-byte element.)
+         * Address: 0x00692D30 (FUN_00692D30 -- `_Allocate` for a 28-byte element, zero-count shortcut inlined; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004E8170 (FUN_004E8170 -- `_Allocate` for a 32-byte element.)
+         * Address: 0x00544610 (FUN_00544610 -- `_Allocate` for a 32-byte element.)
+         * Address: 0x005CA280 (FUN_005CA280 -- `_Allocate` for a 32-byte element.)
+         * Address: 0x005EC960 (FUN_005EC960 -- `_Allocate` for a 32-byte element.)
+         * Address: 0x007B4B60 (FUN_007B4B60 -- `mov ecx,1; jmp` adapter that always buys one 32-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004FA650 (FUN_004FA650 -- `_Allocate` for a 40-byte element.)
+         * Address: 0x006DDC80 (FUN_006DDC80 -- `_Allocate` for a 40-byte element.)
+         * Address: 0x00751B60 (FUN_00751B60 -- `_Allocate` for a 40-byte element.)
+         * Address: 0x007BF120 (FUN_007BF120 -- `_Allocate` for a 40-byte element.)
+         * Address: 0x006DC9D0 (FUN_006DC9D0 -- `_Allocate` for a 40-byte element, zero-count shortcut inlined; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x006EBC60 (FUN_006EBC60 -- `_Allocate` for a 60-byte element.)
+         * Address: 0x0084A5F0 (FUN_0084A5F0 -- `_Allocate` for a 60-byte element.)
+         * Address: 0x00562770 (FUN_00562770 -- `_Allocate` for a 216-byte element.)
+         * Address: 0x00562700 (FUN_00562700 -- `_Allocate` for a 352-byte element.)
+         * Address: 0x005627E0 (FUN_005627E0 -- `_Allocate` for the 568-byte `SUnitVariableUpdateEntry`, the grow step of `InsertUnitVariableUpdateEntry`'s `_Insert_n` (Unit.cpp).)
+         * Address: 0x007419E0 (FUN_007419E0 -- `_Allocate` for the 712-byte `GeomCamera3` element (0x007AEA30, GeomCamera3.cpp).)
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {
-            if (count > max_size()) {
-                throw std::bad_alloc();
-            }
-
-            return static_cast<T*>(::operator new(sizeof(T) * count));
+            return detail::allocate_checked<T>(count);
         }
 
         /**
@@ -9168,6 +9646,10 @@ namespace msvc8
          * immediate; every other element width appears inline in its owning
          * `_Insert_n` / `reserve` body as a folded `0xFFFFFFFF / sizeof(T)`
          * constant (see the per-`T` `Address:` lines on `insert`).
+         * Address: 0x00561580 (FUN_00561580 -- out-of-line `max_size()` for a 352-byte element (0xBA2E8B); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561EB0 (FUN_00561EB0 -- out-of-line `max_size()` for a 352-byte element (0xBA2E8B); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005617B0 (FUN_005617B0 -- out-of-line `max_size()` for a 568-byte element (0x73615A); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00561ED0 (FUN_00561ED0 -- out-of-line `max_size()` for a 568-byte element (0x73615A); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -9364,6 +9846,79 @@ namespace msvc8
             last_ = newLast;
             end_ = newFirst + newCap;
         }
+
+        /**
+         * VC8's `_Buy(count)`: null the three storage pointers, refuse a zero
+         * count without allocating, throw `length_error` past `max_size()`,
+         * otherwise allocate exactly `count` slots and arm `first_ = last_`,
+         * `end_ = first_ + count`. The copy constructor, `vector(count,
+         * value)` and the reallocating arm of `operator=` are its callers,
+         * which is why the binary keeps one out-of-line body per element
+         * width; the addresses below are those bodies.
+         * Address: 0x00561300 (FUN_00561300 -- `_Buy` for a 4-byte element.)
+         * Address: 0x005C5F10 (FUN_005C5F10 -- `_Buy` for a 4-byte element.)
+         * Address: 0x005DC8D0 (FUN_005DC8D0 -- `_Buy` for a 4-byte element.)
+         * Address: 0x005DCA70 (FUN_005DCA70 -- `_Buy` for a 4-byte element.)
+         * Address: 0x0067CB00 (FUN_0067CB00 -- `_Buy` for a 4-byte element.)
+         * Address: 0x006E2140 (FUN_006E2140 -- `_Buy` for a 4-byte element.)
+         * Address: 0x00701F30 (FUN_00701F30 -- `_Buy` for a 4-byte element.)
+         * Address: 0x0074D730 (FUN_0074D730 -- `_Buy` for a 4-byte element.)
+         * Address: 0x00523940 (FUN_00523940 -- `_Buy` for a 4-byte element.)
+         * Address: 0x0074D800 (FUN_0074D800 -- `_Buy` for a 8-byte element.)
+         * Address: 0x00627410 (FUN_00627410 -- `_Buy` for a 12-byte element.)
+         * Address: 0x006DBDD0 (FUN_006DBDD0 -- `_Buy` for a 12-byte element.)
+         * Address: 0x0074D790 (FUN_0074D790 -- `_Buy` for a 12-byte element.)
+         * Address: 0x0074D8C0 (FUN_0074D8C0 -- `_Buy` for a 12-byte element.)
+         * Address: 0x00510850 (FUN_00510850 -- `_Buy` for a 16-byte element.)
+         * Address: 0x00507FF0 (FUN_00507FF0 -- `_Buy` for a 20-byte element.)
+         * Address: 0x00547BB0 (FUN_00547BB0 -- `_Buy` for a 20-byte element.)
+         * Address: 0x0057EE70 (FUN_0057EE70 -- `_Buy` for a 24-byte element.)
+         * Address: 0x005433A0 (FUN_005433A0 -- `_Buy` for a 32-byte element.)
+         * Address: 0x005EA4E0 (FUN_005EA4E0 -- `_Buy` for a 32-byte element.)
+         * Address: 0x00543480 (FUN_00543480 -- `_Buy` for a 36-byte element.)
+         * Address: 0x006DBBB0 (FUN_006DBBB0 -- `_Buy` for a 40-byte element.)
+         * Address: 0x00702590 (FUN_00702590 -- `_Buy` for a 40-byte element.)
+         * Address: 0x0074DA70 (FUN_0074DA70 -- `_Buy` for a 40-byte element.)
+         * Address: 0x005C5530 (FUN_005C5530 -- `_Buy` for a 52-byte element.)
+         * Address: 0x00719950 (FUN_00719950 -- `_Buy` for a 56-byte element.)
+         * Address: 0x00719EE0 (FUN_00719EE0 -- `_Buy` for a 140-byte element.)
+         * Address: 0x0074D6C0 (FUN_0074D6C0 -- `_Buy` for a 144-byte element.)
+         * Address: 0x007406A0 (FUN_007406A0 -- `_Buy` for a 712-byte element.)
+         * Address: 0x00540270 (FUN_00540270 -- `_Buy` for a 4-byte element (`CClientManagerImpl`'s and `Sim`'s `vector<uint32>` constructions).)
+         * Address: 0x00540640 (FUN_00540640 -- `_Buy` for a 4-byte element (`CClientManagerImpl`'s and `Sim`'s `vector<uint32>` constructions).)
+         * Address: 0x00848B70 (FUN_00848B70 -- `_Buy` for a 4-byte element (`CClientManagerImpl`'s and `Sim`'s `vector<uint32>` constructions).)
+         * Address: 0x00741270 (FUN_00741270 -- `_Buy` for a 16-byte element.)
+         * Address: 0x00519570 (FUN_00519570 -- `_Buy` for the 204-byte `RMeshBlueprintLOD` (max count 0x1414141), the reallocating arm of that vector's `operator=` (0x0051A900).)
+         * Address: 0x00523A00 (FUN_00523A00 -- `_Buy` for the 388-byte `RUnitBlueprintWeapon` (max count 0xA8E83F), the reallocating arm of that vector's `operator=` (0x00526A90).)
+         * Address: 0x006F8720 (FUN_006F8720 -- `_Buy` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007335A0 (FUN_007335A0 -- `_Buy` for a 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D390 (FUN_0074D390 -- `_Buy` for a 352-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D3F0 (FUN_0074D3F0 -- `_Buy` for a 12-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D460 (FUN_0074D460 -- `_Buy` for a 28-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D4C0 (FUN_0074D4C0 -- `_Buy` for a 216-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D520 (FUN_0074D520 -- `_Buy` for a 568-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D580 (FUN_0074D580 -- `_Buy` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D5E0 (FUN_0074D5E0 -- `_Buy` for a 60-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x0074D640 (FUN_0074D640 -- `_Buy` for a 120-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00783190 (FUN_00783190 -- `_Buy` for a 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007983B0 (FUN_007983B0 -- `_Buy` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x007C92B0 (FUN_007C92B0 -- `_Buy` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         */
+        bool buy(const std::size_t count) {
+            first_ = nullptr;
+            last_ = nullptr;
+            end_ = nullptr;
+            if (count == 0) {
+                return false;
+            }
+            if (count > max_size()) {
+                throw_too_long();
+            }
+            first_ = allocate_slots_checked(count);
+            last_ = first_;
+            end_ = first_ + count;
+            return true;
+        }
     };
     static_assert(sizeof(vector<int>) == 16, "msvc8::set must be 16 bytes on x86");
     static_assert(
@@ -9401,50 +9956,6 @@ namespace msvc8
     {
         return *reinterpret_cast<const vector_runtime_view<T>*>(&vec);
     }
-
-    namespace detail
-    {
-        /**
-         * Address: 0x007027A0 (FUN_007027A0)
-         *
-         * Slow-path body the legacy MSVC8 STL emitted for
-         * `std::vector<T,A>::_Insert_n` when `sizeof(T) == sizeof(void*)`.
-         * Inserts `count` copies of `*valuePtr` into the dword-element vector
-         * referenced by `vectorStorage`, at logical position `insertPosition`,
-         * growing the buffer when capacity is exhausted. The IDA shape is:
-         *
-         *   void __userpurge sub_7027A0@<eax>(int* a1@<eax>,
-         *                                     unsigned ecx,
-         *                                     int* a3,
-         *                                     _DWORD* Source);
-         *
-         * Where `a1` carries the value lane pointer, `ecx` carries `count`,
-         * `a3` is the vector pointer (`{proxy, _Myfirst, _Mylast, _Myend}`),
-         * and `Source` is the `_Mylast` insert iterator.
-         *
-         * The function dispatches between the in-place tail-shift path and the
-         * grow-and-copy reallocation path exactly as MSVC8 emitted, reusing the
-         * recovered helpers `MoveDwordRangeToEnd`, `MoveDwordRangeAndReturnEnd`,
-         * and `moho::runtime::RuntimeThrowVectorTooLongBW`. The inline counted
-         * fills match the body the binary reaches through `FUN_00701FA0`.
-         */
-        void LegacyVectorDwordInsertN(
-            vector_runtime_view<std::uint32_t>& vectorStorage,
-            std::uint32_t* insertPosition,
-            std::uint32_t count,
-            const std::uint32_t* valuePtr) noexcept;
-
-        /**
-         * Address: 0x007B4FA0 (FUN_007B4FA0), among others -- see the
-         * definition in Vector.cpp for the full address list.
-         *
-         * VC8's `_Allocate(count, (_Node*)0)` for the 28-byte red-black tree
-         * node, overflow guard included. Declared here so tree code outside
-         * this translation unit can buy nodes through the same checked lane
-         * the binary uses instead of open-coding `operator new`.
-         */
-        void* AllocateChecked28ByteElements(std::uint32_t count);
-    } // namespace detail
 
     /**
 	 * Small-vector with inline storage and heap fallback (non-owning SDK view).
@@ -10262,24 +10773,4 @@ namespace msvc8
     	void* tail;
     };
     static_assert(sizeof(linked_list<int>) == 8, "linked_list<int> == 8");
-
-    namespace detail
-    {
-        // `StringIntHeapLane` (`{const char* key; std::int32_t value;}`, defined in
-        // Vector.cpp) is the layout twin of SimRecoveryRuntime.cpp's
-        // `StringRankLaneRuntime` -- both are the 8-byte shape MSVC8's `std::sort`
-        // instantiated for the `(string,rank)` bone-name-index sort recovered as
-        // `Moho::CAniSkel::CAniSkel`'s `SortStringRankLaneRuntimeRange`
-        // (FUN_0054E4B0). Forward-declared here (full definition stays local to
-        // Vector.cpp) so that recovered driver can call these already-recovered
-        // heap/insertion-sort fallbacks by name instead of duplicating them.
-        struct StringIntHeapLane;
-
-        // Address: 0x0054F990 (FUN_0054F990, sub_54F990) -- Floyd `make_heap`.
-        const char* MakeHeapOverStringIntHeapLaneRange(StringIntHeapLane* first, StringIntHeapLane* last, int userTagArg) noexcept;
-        // Address: 0x0054F9E0 (FUN_0054F9E0, sub_54F9E0) -- `sort_heap` via repeated `pop_heap`.
-        std::int32_t SortHeapStringIntHeapLaneRange(StringIntHeapLane* first, StringIntHeapLane* last, int userTagArg) noexcept;
-        // Address: 0x0054F290 (FUN_0054F290, sub_54F290) -- small-range insertion sort.
-        char InsertionSortStringIntHeapLaneRangeAscending(StringIntHeapLane* first, StringIntHeapLane* last) noexcept;
-    } // namespace detail
 }

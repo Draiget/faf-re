@@ -15,6 +15,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "legacy/algorithms/Sort.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/IAiNavigator.h"
@@ -1751,6 +1752,27 @@ namespace
    */
   struct SFormationRunScriptCandidate
   {
+    SFormationRunScriptCandidate() = default;
+
+    /**
+     * Address: 0x0056CB60 (FUN_0056CB60 -- the compiler-generated copy
+     * constructor: six floats and the `weight`, then the
+     * `EntityCategorySet` member's copy, whose own body writes the universe
+     * word and the bit set but leaves the two reserved words at +0x24 and
+     * +0x2C untouched. Reached from the `fastvector_n<Candidate,16>` grow
+     * path (0x0056C940, FastVector.h) and from the temporaries `std::sort`'s
+     * `iter_swap` (0x00575210) and `pop_heap` (0x00575490/0x00575660) make.)
+     */
+    SFormationRunScriptCandidate(const SFormationRunScriptCandidate&) = default;
+
+    /**
+     * Address: 0x00573340 (FUN_00573340 -- the compiler-generated copy
+     * assignment, same field profile as the copy constructor above. Reached
+     * from `std::sort`'s `iter_swap` (0x00575210) and `_Pop_heap` hole write
+     * (0x00575950); see legacy/algorithms/Sort.h.)
+     */
+    SFormationRunScriptCandidate& operator=(const SFormationRunScriptCandidate&) = default;
+
     Wm3::Vec3f position;                  // +0x00
     Wm3::Vec3f anchorDelta;               // +0x0C
     float distanceSq;                     // +0x18 (sort key)
@@ -1760,32 +1782,30 @@ namespace
   static_assert(sizeof(SFormationRunScriptCandidate) == 0x48, "SFormationRunScriptCandidate size must be 0x48");
 
   /**
-   * Comparator for the `std::sort(candidates.begin(), candidates.end(), ...)`
-   * call in `RunScript` phase 6 below.
+   * Comparator for the `msvc8::sort(candidates.begin(), candidates.end(), ...)`
+   * call in `RunScript` phase 6 below: candidates are ordered by *decreasing*
+   * squared distance, the far slots first.
    *
-   * Address: 0x00572350 (FUN_00572350, sub_572350 -- msvc8 STL's
-   * `std::sort<Cand72*>` introsort entry for this instantiation) and its own
-   * callees, all sub-parts of that same compiler-emitted `std::sort` body and
-   * not independent engine functions:
-   *   - Address: 0x005734F0 (FUN_005734F0, 809 instructions) -- the
-   *     introsort main loop (partition + recurse, falling back to heapsort
-   *     past the recursion-depth limit).
-   *   - Address: 0x00574170 (FUN_00574170) -- reads `elem+0x18` (`distanceSq`)
-   *     as the partition pivot comparison, confirming the sort key offset.
-   *   - Address: 0x00574A30 / 0x00574B40 (FUN_00574A30 / FUN_00574B40) --
-   *     `std::_Med3`/`std::_Insertion_sort`-shaped helpers for the same
-   *     instantiation.
-   * A real `std::sort` call over `Cand72*` iterators with this comparator
-   * (below) is the direct, natural C++ source for exactly this family of
-   * out-of-line bodies -- RULE ONE in CLAUDE.md: recover the container/
-   * algorithm operation, not the compiler's internal decomposition of it.
+   * The direction is read off the instantiation's `_Insertion_sort`
+   * (0x00574170): it rotates an element to the front when its `+0x18` key is
+   * greater than `*first`'s and scans back while the key is greater than the
+   * predecessor's, which is VC8's `pred(*next, *first)` / `pred(*next, *--first1)`
+   * with `pred = greater`; `_Adjust_heap` (0x00575280) picks the child whose
+   * key is greater the same way. The whole `std::sort<SFormationRunScriptCandidate*>`
+   * family -- the entry (0x00572350), the introsort driver (0x005734F0),
+   * `_Unguarded_partition`/`_Median`/`_Med3` (0x00574830/0x005751C0),
+   * `_Insertion_sort` and its `_Rotate` (0x00574170/0x00575690), `make_heap`,
+   * `sort_heap`, `_Adjust_heap`, `_Push_heap` and `_Pop_heap`
+   * (0x00574A30/0x00574B40/0x00575280/0x00575500/0x00575950) and the element
+   * swap (0x00575210) -- is cited on legacy/algorithms/Sort.h; this call is the
+   * source line that instantiates it.
    */
   [[nodiscard]] bool CompareRunScriptCandidateByDistanceSq(
     const SFormationRunScriptCandidate& lhs,
     const SFormationRunScriptCandidate& rhs
   ) noexcept
   {
-    return lhs.distanceSq < rhs.distanceSq;
+    return lhs.distanceSq > rhs.distanceSq;
   }
 } // namespace
 
@@ -3211,7 +3231,7 @@ namespace moho
     group.mSpeed = groupSpeed;
 
     // Phase 6 (0x00567A40-0x00567C71): one candidate per script slot,
-    // sorted ascending by squared distance from the formation mean.
+    // sorted by decreasing squared distance from the formation mean.
     // `gpg::fastvector_n<Cand72,16>` is the local's real binary shape, per
     // the escalation doc's funclet table (0x00BADE47, D=0x364); `push_back`'s
     // grow lane is FUN_0056C940 / FUN_0056E620 / FUN_0056FAB0 / FUN_0056FB90 /
@@ -3231,7 +3251,7 @@ namespace moho
       candidate.category = slot.mCategory;
       candidates.push_back(candidate);
     }
-    std::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
+    msvc8::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
 
     // Phase 7 (0x00567D97-0x00568280): greedy nearest-unit assignment. The
     // per-assignment `SUnitOffsetInfo` is the stack value filled at

@@ -31,6 +31,24 @@ namespace moho
   {
     static gpg::RType* sType;
 
+    SAiReservedTransportBone() = default;
+
+    /**
+     * Address: 0x005EAC50 (FUN_005EAC50,
+     * Moho::SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBone&))
+     *
+     * What it does:
+     * The copy constructor: copies both bone indices, links `reservedUnit`
+     * into the owner chain `other.reservedUnit` sits in, and copy-constructs
+     * `reservedBones`. It is the element constructor that
+     * `msvc8::vector<SAiReservedTransportBone>`'s `_Uninit_copy`
+     * (0x005EFF70, cited on `uninit_copy_n` in Vector.h) and its
+     * `resize`/`_Insert_n` paths (0x005EA590, cited on `resize`) run per
+     * element; an earlier `Vector.cpp` transcription had folded it into a
+     * default-construct-then-assign helper (`CopyAssignReservedTransportBoneLane`).
+     */
+    SAiReservedTransportBone(const SAiReservedTransportBone& other);
+
     /**
      * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
      *

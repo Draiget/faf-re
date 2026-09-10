@@ -552,9 +552,6 @@
     <ClCompile Include="moho\sim\CArmyImplTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="legacy\containers\Vector.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="legacy\containers\String.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -1530,7 +1530,7 @@ namespace moho
       TeardownEntitySetRange(categorySetsBegin, UnitCategorySets.end());
       operator delete(categorySetsBegin);
     }
-    UnitCategorySets.reset_range_lanes_preserve_proxy();
+    UnitCategorySets.release_storage_without_free();
 
     DestroyPlatoonPool(PlatoonPool);
     UnknownShared220.release();

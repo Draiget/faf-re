@@ -15013,7 +15013,7 @@ moho::CMauiItemList::CMauiItemList(LuaPlus::LuaObject* const luaObject, CMauiCon
   itemListView->mSelectedBackgroundColor = 0xFF808080u;
   itemListView->mHighlightForegroundColor = 0xFFA0A0A0u;
   itemListView->mHighlightBackgroundColor = 0xFF202020u;
-  itemListView->mItems.reset_range_lanes_preserve_proxy();
+  itemListView->mItems.release_storage_without_free();
   itemListView->mCurSelection = -1;
   itemListView->mHoverItem = -1;
   itemListView->mShowSelection = true;
