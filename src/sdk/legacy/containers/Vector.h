@@ -11440,6 +11440,25 @@ namespace msvc8
             insert(begin(), v);
         }
 
+        template <class... Args>
+        reference emplace_back(Args&&... args)
+        {
+            insert(end(), value_type(std::forward<Args>(args)...));
+            return back();
+        }
+
+        /**
+         * `_Swap_all` -- the three head words change places and nothing else
+         * moves, which is why the deserializers that build a fresh list and
+         * hand it over cost no element copies.
+         */
+        void swap(list& other) noexcept
+        {
+            std::swap(this->_Myproxy, other._Myproxy);
+            std::swap(_Myhead, other._Myhead);
+            std::swap(_Mysize, other._Mysize);
+        }
+
         /**
          * Address: 0x004968B0 (FUN_004968B0 -- `list<ParticleBuffer*>::pop_front()` (erase of the head node) glue; zero callers, unreachable; formerly `PopLegacyForwardListHeadNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Pops the head node from one intrusive forward list and exports the removed node to caller storage.)
          */
