@@ -2605,6 +2605,149 @@ void gpg::ReadPointerShared_STrigger(
 namespace
 {
   template <class TValue>
+  /**
+   * Address: 0x004E5920 (FUN_004E5920 -- `WriteRawPointer` of a `moho::HSound` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromHSoundSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004E65F0 (FUN_004E65F0 -- `WriteRawPointer` of a `moho::HSound` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromHSoundValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00511070 (FUN_00511070 -- `WriteRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRRuleGameRulesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005118A0 (FUN_005118A0 -- `WriteRawPointer` of a `moho::RRuleGameRules` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRRuleGameRulesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00525DD0 (FUN_00525DD0 -- `WriteRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRUnitBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00527590 (FUN_00527590 -- `WriteRawPointer` of a `moho::RUnitBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRUnitBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00541AD0 (FUN_00541AD0 -- `WriteRawPointer` of a `moho::IUnit` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00541F10 (FUN_00541F10 -- `WriteRawPointer` of a `moho::IUnit` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A260 (FUN_0055A260 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A300 (FUN_0055A300 -- `WriteRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A7B0 (FUN_0055A7B0 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055AA30 (FUN_0055AA30 -- `WriteRawPointer` of a `moho::CSndParams` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCSndParamsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055EF50 (FUN_0055EF50 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055FB70 (FUN_0055FB70 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromCAniPoseSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584720 (FUN_00584720 -- `WriteRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584750 (FUN_00584750 -- `WriteRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584E40 (FUN_00584E40 -- `WriteRawPointer` of a `moho::SimArmy` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584F80 (FUN_00584F80 -- `WriteRawPointer` of a `moho::CAiPersonality` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPersonalityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00599E00 (FUN_00599E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00599FE0 (FUN_00599FE0 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A2710 (FUN_005A2710 -- `WriteRawPointer` of a `moho::Unit` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A2A10 (FUN_005A2A10 -- `WriteRawPointer` of a `moho::Unit` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A9550 (FUN_005A9550 -- `WriteRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A99B0 (FUN_005A99B0 -- `WriteRawPointer` of a `moho::CAiPathNavigator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathNavigatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005AC5A0 (FUN_005AC5A0 -- `WriteRawPointer` of a `moho::PathQueue` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005AC5D0 (FUN_005AC5D0 -- `WriteRawPointer` of a `moho::COGrid` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCOGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005ACAB0 (FUN_005ACAB0 -- `WriteRawPointer` of a `moho::PathQueue` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005ACBF0 (FUN_005ACBF0 -- `WriteRawPointer` of a `moho::COGrid` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCOGridValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005B1820 (FUN_005B1820 -- `WriteRawPointer` of a `moho::CAiPathFinder` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathFinderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005B1B60 (FUN_005B1B60 -- `WriteRawPointer` of a `moho::CAiPathFinder` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathFinderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005C9C40 (FUN_005C9C40 -- `WriteRawPointer` of a `moho::ReconBlip` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromReconBlipSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CC480 (FUN_005CC480 -- `WriteRawPointer` of a `moho::ReconBlip` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromReconBlipValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CD950 (FUN_005CD950 -- `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CE1F0 (FUN_005CE1F0 -- `WriteRawPointer` of a `moho::CInfluenceMap` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCInfluenceMapValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D0CD0 (FUN_005D0CD0 -- `WriteRawPointer` of a `moho::UnitWeapon` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D14F0 (FUN_005D14F0 -- `WriteRawPointer` of a `moho::UnitWeapon` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D4E50 (FUN_005D4E50 -- `WriteRawPointer` of a `moho::CAiPathSpline` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D4E80 (FUN_005D4E80 -- `WriteRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D50F0 (FUN_005D50F0 -- `WriteRawPointer` of a `moho::CAiPathSpline` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D5230 (FUN_005D5230 -- `WriteRawPointer` of a `moho::CUnitMotion` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005DF2A0 (FUN_005DF2A0 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005E11C0 (FUN_005E11C0 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005E1AC0 (FUN_005E1AC0 -- `WriteRawPointer` of a `moho::CAiAttackerImpl` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiAttackerImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005E22E0 (FUN_005E22E0 -- `WriteRawPointer` of a `moho::CAiAttackerImpl` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiAttackerImplValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005F5090 (FUN_005F5090 -- `WriteRawPointer` of a `moho::CUnitCommand` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005F5210 (FUN_005F5210 -- `WriteRawPointer` of a `moho::CUnitCommand` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0060D6D0 (FUN_0060D6D0 -- `WriteRawPointer` of a `moho::EAiResult` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEAiResultSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0060DA50 (FUN_0060DA50 -- `WriteRawPointer` of a `moho::EAiResult` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEAiResultValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005DEBD0 (FUN_005DEBD0 -- `WriteRawPointer` of a `moho::UnitWeapon` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromUnitWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005DEC00 (FUN_005DEC00 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005DF200 (FUN_005DF200 -- `WriteRawPointer` of a `moho::Listener_EAiAttackerEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_EAiAttackerEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005EC650 (FUN_005EC650 -- `WriteRawPointer` of a `moho::Listener_EAiTransportEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_EAiTransportEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063CB30 (FUN_0063CB30 -- `WriteRawPointer` of a `moho::IAniManipulator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAniManipulatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063D790 (FUN_0063D790 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063E640 (FUN_0063E640 -- `WriteRawPointer` of a `moho::CAniPose` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniPoseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063E900 (FUN_0063E900 -- `WriteRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063ED80 (FUN_0063ED80 -- `WriteRawPointer` of a `moho::CAniActor` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006605A0 (FUN_006605A0 -- `WriteRawPointer` of a `moho::REmitterBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromREmitterBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006608C0 (FUN_006608C0 -- `WriteRawPointer` of a `moho::REmitterBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromREmitterBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00672950 (FUN_00672950 -- `WriteRawPointer` of a `moho::RTrailBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRTrailBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00672AD0 (FUN_00672AD0 -- `WriteRawPointer` of a `moho::RTrailBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRTrailBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0067F890 (FUN_0067F890 -- `WriteRawPointer` of a `moho::Entity` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006810C0 (FUN_006810C0 -- `WriteRawPointer` of a `moho::Entity` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682110 (FUN_00682110 -- `WriteRawPointer` of a `moho::PositionHistory` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPositionHistorySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682140 (FUN_00682140 -- `WriteRawPointer` of a `moho::CColPrimitiveBase` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006821F0 (FUN_006821F0 -- `WriteRawPointer` of a `moho::CIntel` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCIntelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682250 (FUN_00682250 -- `WriteRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysBodySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682280 (FUN_00682280 -- `WriteRawPointer` of a `moho::Motor` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromMotorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682B00 (FUN_00682B00 -- `WriteRawPointer` of a `moho::PositionHistory` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPositionHistoryValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682C40 (FUN_00682C40 -- `WriteRawPointer` of a `moho::CColPrimitiveBase` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCColPrimitiveBaseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682D80 (FUN_00682D80 -- `WriteRawPointer` of a `moho::CIntel` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCIntelValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00683000 (FUN_00683000 -- `WriteRawPointer` of a `moho::SPhysBody` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysBodyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00683140 (FUN_00683140 -- `WriteRawPointer` of a `moho::Motor` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromMotorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00688BE0 (FUN_00688BE0 -- `WriteRawPointer` of a `moho::EntitySetBase` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySetBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006896B0 (FUN_006896B0 -- `WriteRawPointer` of a `moho::EntitySetBase` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySetBaseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B40D0 (FUN_006B40D0 -- `WriteRawPointer` of a `moho::IAiSteering` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4100 (FUN_006B4100 -- `WriteRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4130 (FUN_006B4130 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B41C0 (FUN_006B41C0 -- `WriteRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B41F0 (FUN_006B41F0 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4220 (FUN_006B4220 -- `WriteRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4250 (FUN_006B4250 -- `WriteRawPointer` of a `moho::IAiNavigator` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4280 (FUN_006B4280 -- `WriteRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B42B0 (FUN_006B42B0 -- `WriteRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B42E0 (FUN_006B42E0 -- `WriteRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4B80 (FUN_006B4B80 -- `WriteRawPointer` of a `moho::IAiSteering` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4CC0 (FUN_006B4CC0 -- `WriteRawPointer` of a `moho::CUnitMotion` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4E00 (FUN_006B4E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B51C0 (FUN_006B51C0 -- `WriteRawPointer` of a `moho::CAniActor` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B5300 (FUN_006B5300 -- `WriteRawPointer` of a `moho::IAiAttacker` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B5440 (FUN_006B5440 -- `WriteRawPointer` of a `moho::IAiCommandDispatch` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiCommandDispatchValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B5580 (FUN_006B5580 -- `WriteRawPointer` of a `moho::IAiNavigator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B56C0 (FUN_006B56C0 -- `WriteRawPointer` of a `moho::IAiBuilder` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiBuilderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B5800 (FUN_006B5800 -- `WriteRawPointer` of a `moho::IAiSiloBuild` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B5940 (FUN_006B5940 -- `WriteRawPointer` of a `moho::IAiTransport` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiTransportValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006DFE60 (FUN_006DFE60 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006DFED0 (FUN_006DFED0 -- `WriteRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCFireWeaponTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006E0610 (FUN_006E0610 -- `WriteRawPointer` of a `moho::IAiAttacker` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006E0750 (FUN_006E0750 -- `WriteRawPointer` of a `moho::CFireWeaponTask` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCFireWeaponTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006E2B00 (FUN_006E2B00 -- `WriteRawPointer` of a `moho::CUnitCommand` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006EB980 (FUN_006EB980 -- `WriteRawPointer` of a `moho::Listener_ECommandEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_ECommandEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706650 (FUN_00706650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706680 (FUN_00706680 -- `WriteRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007066E0 (FUN_007066E0 -- `WriteRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706710 (FUN_00706710 -- `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706740 (FUN_00706740 -- `WriteRawPointer` of a `moho::PathQueue` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706F30 (FUN_00706F30 -- `WriteRawPointer` of a `moho::CAiBrain` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiBrainValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00707070 (FUN_00707070 -- `WriteRawPointer` of a `moho::IAiReconDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiReconDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007072F0 (FUN_007072F0 -- `WriteRawPointer` of a `moho::CArmyStats` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCArmyStatsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00707430 (FUN_00707430 -- `WriteRawPointer` of a `moho::CInfluenceMap` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCInfluenceMapValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00707570 (FUN_00707570 -- `WriteRawPointer` of a `moho::PathQueue` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPathQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00712650 (FUN_00712650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00712980 (FUN_00712980 -- `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromSTriggerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00714040 (FUN_00714040 -- `WriteRawPointer` of a `moho::CAiBrain` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007144D0 (FUN_007144D0 -- `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromSTriggerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00750FA0 (FUN_00750FA0 -- `WriteRawPointer` of a `moho::SimArmy` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSimArmyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00751870 (FUN_00751870 -- `WriteRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007546B0 (FUN_007546B0 -- `WriteRawPointer` of a `moho::Shield` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromShieldValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756460 (FUN_00756460 -- `WriteRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756490 (FUN_00756490 -- `WriteRawPointer` of a `moho::SPhysConstants` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756500 (FUN_00756500 -- `WriteRawPointer` of a `moho::IAiFormationDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756530 (FUN_00756530 -- `WriteRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromISimResourcesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756560 (FUN_00756560 -- `WriteRawPointer` of a `moho::CCommandDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCCommandDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756590 (FUN_00756590 -- `WriteRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007565C0 (FUN_007565C0 -- `WriteRawPointer` of a `moho::IEffectManager` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007565F0 (FUN_007565F0 -- `WriteRawPointer` of a `moho::ISoundManager` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756660 (FUN_00756660 -- `WriteRawPointer` of a `moho::EntityDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromEntityDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757650 (FUN_00757650 -- `WriteRawPointer` of a `moho::CRandomStream` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCRandomStreamValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757790 (FUN_00757790 -- `WriteRawPointer` of a `moho::SPhysConstants` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysConstantsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007578D0 (FUN_007578D0 -- `WriteRawPointer` of a `moho::IAiFormationDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiFormationDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757AE0 (FUN_00757AE0 -- `WriteRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromISimResourcesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757C20 (FUN_00757C20 -- `WriteRawPointer` of a `moho::CCommandDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCCommandDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757D60 (FUN_00757D60 -- `WriteRawPointer` of a `moho::CDecalBuffer` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCDecalBufferValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757EA0 (FUN_00757EA0 -- `WriteRawPointer` of a `moho::IEffectManager` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIEffectManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757FE0 (FUN_00757FE0 -- `WriteRawPointer` of a `moho::ISoundManager` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromISoundManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00758120 (FUN_00758120 -- `WriteRawPointer` of a `moho::EntityDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromEntityDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00763D90 (FUN_00763D90 -- `WriteRawPointer` of a `moho::Listener_NavPath` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_NavPathValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00768C10 (FUN_00768C10 -- `WriteRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076A4E0 (FUN_0076A4E0 -- `WriteRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076A9F0 (FUN_0076A9F0 -- `WriteRawPointer` of a `moho::IPathTraveler` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076B2D0 (FUN_0076B2D0 -- `WriteRawPointer` of a `moho::PathTables` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathTablesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
   [[nodiscard]] gpg::WriteArchive* WriteTrackedPointerFromRefBuilder(
     gpg::WriteArchive* const archive,
     gpg::RRef* (*const buildRef)(gpg::RRef*, TValue),
@@ -2619,6 +2762,112 @@ namespace
   }
 
   template <class TValue>
+  /**
+   * Address: 0x004E5B00 (FUN_004E5B00 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004E5B40 (FUN_004E5B40 -- `SaveRawPointer` of a `moho::HSound` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromHSoundSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00511220 (FUN_00511220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00526650 (FUN_00526650 -- `SaveRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00541BC0 (FUN_00541BC0 -- `SaveRawPointer` of a `moho::IUnit` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A3C0 (FUN_0055A3C0 -- `SaveRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromRScmResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A4A0 (FUN_0055A4A0 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055F4F0 (FUN_0055F4F0 -- `SaveRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005849F0 (FUN_005849F0 -- `SaveRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSimArmySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584A50 (FUN_00584A50 -- `SaveRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00599EA0 (FUN_00599EA0 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A27D0 (FUN_005A27D0 -- `SaveRawPointer` of a `moho::Unit` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005A9750 (FUN_005A9750 -- `SaveRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005AC770 (FUN_005AC770 -- `SaveRawPointer` of a `moho::PathQueue` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005AC7B0 (FUN_005AC7B0 -- `SaveRawPointer` of a `moho::COGrid` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCOGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005B1930 (FUN_005B1930 -- `SaveRawPointer` of a `moho::CAiPathFinder` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathFinderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CA720 (FUN_005CA720 -- `SaveRawPointer` of a `moho::ReconBlip` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromReconBlipSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CDE00 (FUN_005CDE00 -- `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D1050 (FUN_005D1050 -- `SaveRawPointer` of a `moho::UnitWeapon` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromUnitWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D4F10 (FUN_005D4F10 -- `SaveRawPointer` of a `moho::CAiPathSpline` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathSplineSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D4F50 (FUN_005D4F50 -- `SaveRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005DFB60 (FUN_005DFB60 -- `SaveRawPointer` of a `moho::CAcquireTargetTask` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005E1F00 (FUN_005E1F00 -- `SaveRawPointer` of a `moho::CAiAttackerImpl` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAiAttackerImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005F50D0 (FUN_005F50D0 -- `SaveRawPointer` of a `moho::CUnitCommand` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitCommandSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0060D770 (FUN_0060D770 -- `SaveRawPointer` of a `moho::EAiResult` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromEAiResultSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005332D0 (FUN_005332D0 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00537220 (FUN_00537220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055A400 (FUN_0055A400 -- `SaveRawPointer` of a `moho::RMeshBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRMeshBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055F290 (FUN_0055F290 -- `SaveRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00633F20 (FUN_00633F20 -- `SaveRawPointer` of a `moho::RUnitBlueprintWeapon` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00633F60 (FUN_00633F60 -- `SaveRawPointer` of a `moho::RProjectileBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRProjectileBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063DAD0 (FUN_0063DAD0 -- `SaveRawPointer` of a `moho::CAniPose` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0063EA00 (FUN_0063EA00 -- `SaveRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006606E0 (FUN_006606E0 -- `SaveRawPointer` of a `moho::REmitterBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromREmitterBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00672990 (FUN_00672990 -- `SaveRawPointer` of a `moho::RTrailBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRTrailBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682520 (FUN_00682520 -- `SaveRawPointer` of a `moho::PositionHistory` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPositionHistorySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682570 (FUN_00682570 -- `SaveRawPointer` of a `moho::CColPrimitiveBase` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006826A0 (FUN_006826A0 -- `SaveRawPointer` of a `moho::CIntel` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCIntelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682750 (FUN_00682750 -- `SaveRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromSPhysBodySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006827B0 (FUN_006827B0 -- `SaveRawPointer` of a `moho::Motor` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromMotorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689160 (FUN_00689160 -- `SaveRawPointer` of a `moho::EntitySetBase` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromEntitySetBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006988B0 (FUN_006988B0 -- `SaveRawPointer` of a `moho::SPhysConstants` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4450 (FUN_006B4450 -- `SaveRawPointer` of a `moho::IAiSteering` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSteeringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B44B0 (FUN_006B44B0 -- `SaveRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4510 (FUN_006B4510 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4630 (FUN_006B4630 -- `SaveRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4680 (FUN_006B4680 -- `SaveRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B46D0 (FUN_006B46D0 -- `SaveRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4720 (FUN_006B4720 -- `SaveRawPointer` of a `moho::IAiNavigator` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4770 (FUN_006B4770 -- `SaveRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B47C0 (FUN_006B47C0 -- `SaveRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSiloBuildSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4810 (FUN_006B4810 -- `SaveRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006BBF70 (FUN_006BBF70 -- `SaveRawPointer` of a `moho::CPathPoint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCPathPointSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006E0210 (FUN_006E0210 -- `SaveRawPointer` of a `moho::IAiAttacker` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006E02C0 (FUN_006E02C0 -- `SaveRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCFireWeaponTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706A80 (FUN_00706A80 -- `SaveRawPointer` of a `moho::CAiBrain` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706AD0 (FUN_00706AD0 -- `SaveRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706B90 (FUN_00706B90 -- `SaveRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706BF0 (FUN_00706BF0 -- `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00712FD0 (FUN_00712FD0 -- `SaveRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00713100 (FUN_00713100 -- `SaveRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromSTriggerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007523F0 (FUN_007523F0 -- `SaveRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756E20 (FUN_00756E20 -- `SaveRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756E70 (FUN_00756E70 -- `SaveRawPointer` of a `moho::SPhysConstants` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756F20 (FUN_00756F20 -- `SaveRawPointer` of a `moho::IAiFormationDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756F60 (FUN_00756F60 -- `SaveRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromISimResourcesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00756FC0 (FUN_00756FC0 -- `SaveRawPointer` of a `moho::CCommandDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCCommandDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757020 (FUN_00757020 -- `SaveRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757070 (FUN_00757070 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007570D0 (FUN_007570D0 -- `SaveRawPointer` of a `moho::ISoundManager` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00757190 (FUN_00757190 -- `SaveRawPointer` of a `moho::EntityDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromEntityDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00769220 (FUN_00769220 -- `SaveRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIPathTravelerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00769260 (FUN_00769260 -- `SaveRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIPathTravelerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076ABD0 (FUN_0076ABD0 -- `SaveRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076EBF0 (FUN_0076EBF0 -- `SaveRawPointer` of a `moho::CIntelPosHandle` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCIntelPosHandleSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00770310 (FUN_00770310 -- `SaveRawPointer` of a `moho::IAiReconDB` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00771520 (FUN_00771520 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00883A40 (FUN_00883A40 -- `SaveRawPointer` of a `moho::SSessionSaveData` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromSSessionSaveDataSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00921210 (FUN_00921210 -- `SaveRawPointer` of a `moho::TString` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromTStringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0054FBA0 (FUN_0054FBA0 -- `SaveRawPointer` of a `moho::CAniSkel` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCAniSkelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00551AF0 (FUN_00551AF0 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00554C30 (FUN_00554C30 -- `SaveRawPointer` of a `moho::REntityBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromREntityBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055F390 (FUN_0055F390 -- `SaveRawPointer` of a `moho::Stats_StatItem` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromStats_StatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584B50 (FUN_00584B50 -- `SaveRawPointer` of a `moho::Sim` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSimSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00584BB0 (FUN_00584BB0 -- `SaveRawPointer` of a `moho::CTaskStage` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCTaskStageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0059DF70 (FUN_0059DF70 -- `SaveRawPointer` of a `moho::IFormationInstance` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CDE40 (FUN_005CDE40 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005D1A00 (FUN_005D1A00 -- `SaveRawPointer` of a `moho::CEconRequest` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005F2140 (FUN_005F2140 -- `SaveRawPointer` of a `moho::CCommandTask` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCCommandTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00642ED0 (FUN_00642ED0 -- `SaveRawPointer` of a `moho::RScaResource` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromRScaResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00675B40 (FUN_00675B40 -- `SaveRawPointer` of a `moho::IEffect` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00682700 (FUN_00682700 -- `SaveRawPointer` of a `moho::CTextureScroller` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCTextureScrollerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B4560 (FUN_006B4560 -- `SaveRawPointer` of a `moho::IFormationInstance` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006B45D0 (FUN_006B45D0 -- `SaveRawPointer` of a `moho::CEconStorage` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00706B30 (FUN_00706B30 -- `SaveRawPointer` of a `moho::CEconomy` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00713080 (FUN_00713080 -- `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007130C0 (FUN_007130C0 -- `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0072AED0 (FUN_0072AED0 -- `SaveRawPointer` of a `moho::CSquad` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSquadSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007689D0 (FUN_007689D0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076A450 (FUN_0076A450 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076ADA0 (FUN_0076ADA0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0076B490 (FUN_0076B490 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane4` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007744E0 (FUN_007744E0 -- `SaveRawPointer` of a `moho::CEconRequest` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x008847C0 (FUN_008847C0 -- `SaveRawPointer` of a `moho::LaunchInfoBase` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromLaunchInfoBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
   void SaveTrackedPointerFromRefBuilder(
     gpg::WriteArchive* const archive,
     gpg::RRef* (*const buildRef)(gpg::RRef*, TValue),
@@ -3106,50 +3355,6 @@ namespace
   }
 
   /**
-   * Address: 0x004E5920 (FUN_004E5920)
-   *
-   * What it does:
-   * Writes one reflected `RRef_HSound` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromHSoundSlotLane1(moho::HSound** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_HSound, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x004E5B00 (FUN_004E5B00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CSndParams` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCSndParamsSlotLane1(moho::CSndParams** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x004E5B40 (FUN_004E5B40)
-   *
-   * What it does:
-   * Writes one reflected `RRef_HSound` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromHSoundSlotLane1(moho::HSound** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_HSound, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x004E65F0 (FUN_004E65F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_HSound` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromHSoundValueLane1(moho::HSound* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_HSound, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x0050D2D0 (FUN_0050D2D0)
    *
    * What it does:
@@ -3209,955 +3414,9 @@ namespace
     archive->Write(objectType, objectSlot, *ownerRef);
   }
 
-  /**
-   * Address: 0x00511070 (FUN_00511070)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RRuleGameRules` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRRuleGameRulesSlotLane1(moho::RRuleGameRules** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00511220 (FUN_00511220)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RRuleGameRules` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRRuleGameRulesSlotLane1(moho::RRuleGameRules** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005118A0 (FUN_005118A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RRuleGameRules` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRRuleGameRulesValueLane1(moho::RRuleGameRules* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00525DD0 (FUN_00525DD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RUnitBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintSlotLane1(moho::RUnitBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00526650 (FUN_00526650)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RUnitBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRUnitBlueprintSlotLane1(moho::RUnitBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00527590 (FUN_00527590)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RUnitBlueprint` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintValueLane1(moho::RUnitBlueprint* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00541AD0 (FUN_00541AD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IUnit` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIUnitSlotLane1(moho::IUnit** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IUnit, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00541BC0 (FUN_00541BC0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IUnit` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIUnitSlotLane1(moho::IUnit** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IUnit, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00541F10 (FUN_00541F10)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IUnit` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIUnitValueLane1(moho::IUnit* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IUnit, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055A260 (FUN_0055A260)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RScmResource` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromRScmResourceSlotLane1(moho::RScmResource** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RScmResource, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x0055A300 (FUN_0055A300)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CSndParams` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCSndParamsSlotLane1(moho::CSndParams** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055A3C0 (FUN_0055A3C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RScmResource` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromRScmResourceSlotLane1(moho::RScmResource** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RScmResource, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x0055A4A0 (FUN_0055A4A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CSndParams` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCSndParamsSlotLane2(moho::CSndParams** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055A7B0 (FUN_0055A7B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RScmResource` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromRScmResourceSlotLane2(moho::RScmResource** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RScmResource, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x0055AA30 (FUN_0055AA30)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CSndParams` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCSndParamsValueLane1(moho::CSndParams* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055EF50 (FUN_0055EF50)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromCAniPoseSlotLane1(moho::CAniPose** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x0055F4F0 (FUN_0055F4F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromCAniPoseSlotLane1(moho::CAniPose** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x0055FB70 (FUN_0055FB70)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromCAniPoseSlotLane2(moho::CAniPose** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00584720 (FUN_00584720)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SimArmy` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromSimArmySlotLane1(moho::SimArmy** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SimArmy, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00584750 (FUN_00584750)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPersonality` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPersonalitySlotLane1(moho::CAiPersonality** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPersonality, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005849F0 (FUN_005849F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SimArmy` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromSimArmySlotLane1(moho::SimArmy** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_SimArmy, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00584A50 (FUN_00584A50)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPersonality` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAiPersonalitySlotLane1(moho::CAiPersonality** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPersonality, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00584E40 (FUN_00584E40)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SimArmy` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromSimArmyValueLane1(moho::SimArmy* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SimArmy, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00584F80 (FUN_00584F80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPersonality` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPersonalityValueLane1(moho::CAiPersonality* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPersonality, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00599E00 (FUN_00599E00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitCommandQueueSlotLane1(moho::CUnitCommandQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00599EA0 (FUN_00599EA0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCUnitCommandQueueSlotLane1(moho::CUnitCommandQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00599FE0 (FUN_00599FE0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitCommandQueueValueLane1(moho::CUnitCommandQueue* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005A2710 (FUN_005A2710)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Unit` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromUnitSlotLane1(moho::Unit** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Unit, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005A27D0 (FUN_005A27D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Unit` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromUnitSlotLane1(moho::Unit** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Unit, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005A2A10 (FUN_005A2A10)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Unit` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromUnitValueLane1(moho::Unit* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Unit, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005A9550 (FUN_005A9550)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathNavigator` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathNavigatorSlotLane1(moho::CAiPathNavigator** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathNavigator, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005A9750 (FUN_005A9750)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathNavigator` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAiPathNavigatorSlotLane1(moho::CAiPathNavigator** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathNavigator, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005A99B0 (FUN_005A99B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathNavigator` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathNavigatorValueLane1(moho::CAiPathNavigator* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathNavigator, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005AC5A0 (FUN_005AC5A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathQueue` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromPathQueueSlotLane1(moho::PathQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005AC5D0 (FUN_005AC5D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_COGrid` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCOGridSlotLane1(moho::COGrid** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_COGrid, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005AC770 (FUN_005AC770)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathQueue` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromPathQueueSlotLane1(moho::PathQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005AC7B0 (FUN_005AC7B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_COGrid` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCOGridSlotLane1(moho::COGrid** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_COGrid, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005ACAB0 (FUN_005ACAB0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathQueue` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromPathQueueValueLane1(moho::PathQueue* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005ACBF0 (FUN_005ACBF0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_COGrid` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCOGridValueLane1(moho::COGrid* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_COGrid, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005B1820 (FUN_005B1820)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathFinder` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathFinderSlotLane1(moho::CAiPathFinder** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathFinder, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005B1930 (FUN_005B1930)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathFinder` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAiPathFinderSlotLane1(moho::CAiPathFinder** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathFinder, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005B1B60 (FUN_005B1B60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathFinder` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathFinderValueLane1(moho::CAiPathFinder* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathFinder, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005C9C40 (FUN_005C9C40)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ReconBlip` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromReconBlipSlotLane1(moho::ReconBlip** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ReconBlip, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005CA720 (FUN_005CA720)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ReconBlip` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromReconBlipSlotLane1(moho::ReconBlip** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_ReconBlip, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005CC480 (FUN_005CC480)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ReconBlip` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromReconBlipValueLane1(moho::ReconBlip* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ReconBlip, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005CD950 (FUN_005CD950)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCInfluenceMapSlotLane1(moho::CInfluenceMap** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005CDE00 (FUN_005CDE00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCInfluenceMapSlotLane1(moho::CInfluenceMap** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005CE1F0 (FUN_005CE1F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCInfluenceMapValueLane1(moho::CInfluenceMap* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D0CD0 (FUN_005D0CD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_UnitWeapon` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromUnitWeaponSlotLane1(moho::UnitWeapon** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_UnitWeapon, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D1050 (FUN_005D1050)
-   *
-   * What it does:
-   * Writes one reflected `RRef_UnitWeapon` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromUnitWeaponSlotLane1(moho::UnitWeapon** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_UnitWeapon, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D14F0 (FUN_005D14F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_UnitWeapon` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromUnitWeaponValueLane1(moho::UnitWeapon* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_UnitWeapon, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D4E50 (FUN_005D4E50)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathSpline` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathSplineSlotLane1(moho::CAiPathSpline** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathSpline, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005D4E80 (FUN_005D4E80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitMotionSlotLane1(moho::CUnitMotion** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D4F10 (FUN_005D4F10)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathSpline` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAiPathSplineSlotLane1(moho::CAiPathSpline** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathSpline, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005D4F50 (FUN_005D4F50)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCUnitMotionSlotLane1(moho::CUnitMotion** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005D50F0 (FUN_005D50F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiPathSpline` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiPathSplineValueLane1(moho::CAiPathSpline* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiPathSpline, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005D5230 (FUN_005D5230)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitMotionValueLane1(moho::CUnitMotion* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005DF2A0 (FUN_005DF2A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAcquireTargetTask` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAcquireTargetTaskSlotLane1(moho::CAcquireTargetTask** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAcquireTargetTask, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005DFB60 (FUN_005DFB60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAcquireTargetTask` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCAcquireTargetTaskSlotLane1(moho::CAcquireTargetTask** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAcquireTargetTask, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005E11C0 (FUN_005E11C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAcquireTargetTask` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAcquireTargetTaskValueLane1(moho::CAcquireTargetTask* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAcquireTargetTask, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005E1AC0 (FUN_005E1AC0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiAttackerImpl` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAiAttackerImplSlotLane1(moho::CAiAttackerImpl** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005E1F00 (FUN_005E1F00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiAttackerImpl` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCAiAttackerImplSlotLane1(moho::CAiAttackerImpl** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005E22E0 (FUN_005E22E0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiAttackerImpl` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAiAttackerImplValueLane1(moho::CAiAttackerImpl* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005F5090 (FUN_005F5090)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommand` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitCommandSlotLane1(moho::CUnitCommand** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommand, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005F50D0 (FUN_005F50D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommand` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCUnitCommandSlotLane1(moho::CUnitCommand** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommand, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005F5210 (FUN_005F5210)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommand` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCUnitCommandValueLane1(moho::CUnitCommand* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommand, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0060D6D0 (FUN_0060D6D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EAiResult` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEAiResultSlotLane1(moho::EAiResult** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EAiResult, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0060D770 (FUN_0060D770)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EAiResult` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromEAiResultSlotLane1(moho::EAiResult** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_EAiResult, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0060DA50 (FUN_0060DA50)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EAiResult` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEAiResultValueLane1(moho::EAiResult* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EAiResult, value, gpg::TrackedPointerState::Unowned);
-  }
-
 } // namespace
 namespace
 {
-  /**
-   * Address: 0x005332D0 (FUN_005332D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RRuleGameRules` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRRuleGameRulesSlotLane2(gpg::WriteArchive* archive, moho::RRuleGameRules** valueSlot)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00537220 (FUN_00537220)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RRuleGameRules` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRRuleGameRulesSlotLane3(moho::RRuleGameRules** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055A400 (FUN_0055A400)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RMeshBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRMeshBlueprintSlotLane1(moho::RMeshBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RMeshBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0055F290 (FUN_0055F290)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RUnitBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRUnitBlueprintSlotLane2(moho::RUnitBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005DEBD0 (FUN_005DEBD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_UnitWeapon` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromUnitWeaponValueLane1(moho::UnitWeapon* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_UnitWeapon, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005DEC00 (FUN_005DEC00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAcquireTargetTask` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAcquireTargetTaskValueLane1(moho::CAcquireTargetTask* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAcquireTargetTask, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x005DF200 (FUN_005DF200)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Listener_EAiAttackerEvent` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromListener_EAiAttackerEventValueLane1(moho::Listener<moho::EAiAttackerEvent>* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_EAiAttackerEvent, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x005EC650 (FUN_005EC650)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Listener_EAiTransportEvent` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromListener_EAiTransportEventValueLane1(moho::Listener<moho::EAiTransportEvent>* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_EAiTransportEvent, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00633F20 (FUN_00633F20)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RUnitBlueprintWeapon` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1(moho::RUnitBlueprintWeapon** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprintWeapon, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00633F60 (FUN_00633F60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RProjectileBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRProjectileBlueprintSlotLane1(moho::RProjectileBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RProjectileBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063CB30 (FUN_0063CB30)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAniManipulator` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAniManipulatorValueLane1(moho::IAniManipulator* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAniManipulator, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x0063D790 (FUN_0063D790)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAniPoseSlotLane1(moho::CAniPose** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063DAD0 (FUN_0063DAD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCAniPoseSlotLane1(moho::CAniPose** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063E640 (FUN_0063E640)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniPose` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAniPoseValueLane1(moho::CAniPose* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniPose, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063E900 (FUN_0063E900)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAniActorSlotLane1(moho::CAniActor** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063EA00 (FUN_0063EA00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCAniActorSlotLane1(moho::CAniActor** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0063ED80 (FUN_0063ED80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAniActorValueLane1(moho::CAniActor* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, value, gpg::TrackedPointerState::Unowned);
-  }
-
   /**
    * Address: 0x0064A040 (FUN_0064A040)
    *
@@ -4363,39 +3622,6 @@ namespace
   }
 
   /**
-   * Address: 0x006605A0 (FUN_006605A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_REmitterBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromREmitterBlueprintSlotLane1(moho::REmitterBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REmitterBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006606E0 (FUN_006606E0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_REmitterBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromREmitterBlueprintSlotLane1(moho::REmitterBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_REmitterBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006608C0 (FUN_006608C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_REmitterBlueprint` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromREmitterBlueprintValueLane1(moho::REmitterBlueprint* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REmitterBlueprint, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x006608F0 (FUN_006608F0)
    *
    * What it does:
@@ -4406,39 +3632,6 @@ namespace
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveREmitterBlueprintArchiveAdapterType());
     return static_cast<moho::REmitterBlueprint*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00672950 (FUN_00672950)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RTrailBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRTrailBlueprintSlotLane1(moho::RTrailBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RTrailBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00672990 (FUN_00672990)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RTrailBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromRTrailBlueprintSlotLane1(moho::RTrailBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RTrailBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00672AD0 (FUN_00672AD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_RTrailBlueprint` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromRTrailBlueprintValueLane1(moho::RTrailBlueprint* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RTrailBlueprint, value, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -4495,204 +3688,6 @@ namespace
   }
 
   /**
-   * Address: 0x0067F890 (FUN_0067F890)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Entity` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEntitySlotLane1(moho::Entity** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Entity, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006810C0 (FUN_006810C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Entity` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEntityValueLane1(moho::Entity* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Entity, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00682110 (FUN_00682110)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PositionHistory` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromPositionHistorySlotLane1(moho::PositionHistory** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PositionHistory, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682140 (FUN_00682140)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CColPrimitiveBase` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCColPrimitiveBaseSlotLane1(moho::CColPrimitiveBase** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CColPrimitiveBase, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006821F0 (FUN_006821F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CIntel` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCIntelSlotLane1(moho::CIntel** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntel, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682250 (FUN_00682250)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysBody` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromSPhysBodySlotLane1(moho::SPhysBody** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysBody, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682280 (FUN_00682280)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Motor` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromMotorSlotLane1(moho::EntityMotor** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Motor, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682520 (FUN_00682520)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PositionHistory` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromPositionHistorySlotLane1(moho::PositionHistory** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PositionHistory, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682570 (FUN_00682570)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CColPrimitiveBase` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCColPrimitiveBaseSlotLane1(moho::CColPrimitiveBase** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CColPrimitiveBase, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006826A0 (FUN_006826A0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CIntel` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCIntelSlotLane1(moho::CIntel** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntel, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682750 (FUN_00682750)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysBody` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromSPhysBodySlotLane1(moho::SPhysBody** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysBody, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006827B0 (FUN_006827B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Motor` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromMotorSlotLane1(moho::EntityMotor** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Motor, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682B00 (FUN_00682B00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PositionHistory` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromPositionHistoryValueLane1(moho::PositionHistory* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PositionHistory, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682C40 (FUN_00682C40)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CColPrimitiveBase` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCColPrimitiveBaseValueLane1(moho::CColPrimitiveBase* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CColPrimitiveBase, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00682D80 (FUN_00682D80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CIntel` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCIntelValueLane1(moho::CIntel* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntel, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00683000 (FUN_00683000)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysBody` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromSPhysBodyValueLane1(moho::SPhysBody* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysBody, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00683140 (FUN_00683140)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Motor` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromMotorValueLane1(moho::EntityMotor* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Motor, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00688BE0 (FUN_00688BE0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntitySetBase` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEntitySetBaseSlotLane1(moho::EntitySetBase** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EntitySetBase, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x00688C50 (FUN_00688C50)
    *
    * What it does:
@@ -4729,17 +3724,6 @@ namespace
   }
 
   /**
-   * Address: 0x00689160 (FUN_00689160)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntitySetBase` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromEntitySetBaseSlotLane1(moho::EntitySetBase** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_EntitySetBase, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x00689190 (FUN_00689190)
    *
    * What it does:
@@ -4771,17 +3755,6 @@ namespace
   {
     gpg::RType* const objectType = ResolveIdPoolArchiveAdapterType();
     archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x006896B0 (FUN_006896B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntitySetBase` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromEntitySetBaseValueLane1(moho::EntitySetBase* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EntitySetBase, value, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -4969,361 +3942,9 @@ namespace
     archive->Write(objectType, objectSlot, ownerRef);
   }
 
-  /**
-   * Address: 0x006988B0 (FUN_006988B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysConstants` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromSPhysConstantsSlotLane1(moho::SPhysConstants** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006B40D0 (FUN_006B40D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSteering` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiSteeringSlotLane1(moho::IAiSteering** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSteering, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4100 (FUN_006B4100)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCUnitMotionSlotLane1(moho::CUnitMotion** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4130 (FUN_006B4130)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCUnitCommandQueueSlotLane1(moho::CUnitCommandQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B41C0 (FUN_006B41C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAniActorSlotLane1(moho::CAniActor** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B41F0 (FUN_006B41F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiAttackerSlotLane1(moho::IAiAttacker** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4220 (FUN_006B4220)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiCommandDispatch` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiCommandDispatchSlotLane1(moho::IAiCommandDispatch** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiCommandDispatch, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4250 (FUN_006B4250)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiNavigator` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiNavigatorSlotLane1(moho::IAiNavigator** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiNavigator, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4280 (FUN_006B4280)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiBuilder` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiBuilderSlotLane1(moho::IAiBuilder** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiBuilder, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B42B0 (FUN_006B42B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSiloBuild` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiSiloBuildSlotLane1(moho::IAiSiloBuild** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSiloBuild, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B42E0 (FUN_006B42E0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiTransport` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiTransportSlotLane1(moho::IAiTransport** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiTransport, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4450 (FUN_006B4450)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSteering` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiSteeringSlotLane1(moho::IAiSteering** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSteering, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B44B0 (FUN_006B44B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCUnitMotionSlotLane1(moho::CUnitMotion** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4510 (FUN_006B4510)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCUnitCommandQueueSlotLane1(moho::CUnitCommandQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4630 (FUN_006B4630)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAniActorSlotLane1(moho::CAniActor** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4680 (FUN_006B4680)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiAttackerSlotLane1(moho::IAiAttacker** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B46D0 (FUN_006B46D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiCommandDispatch` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiCommandDispatchSlotLane1(moho::IAiCommandDispatch** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiCommandDispatch, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4720 (FUN_006B4720)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiNavigator` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiNavigatorSlotLane1(moho::IAiNavigator** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiNavigator, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4770 (FUN_006B4770)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiBuilder` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiBuilderSlotLane1(moho::IAiBuilder** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiBuilder, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B47C0 (FUN_006B47C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSiloBuild` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiSiloBuildSlotLane1(moho::IAiSiloBuild** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSiloBuild, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4810 (FUN_006B4810)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiTransport` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiTransportSlotLane1(moho::IAiTransport** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiTransport, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4B80 (FUN_006B4B80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSteering` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiSteeringValueLane1(moho::IAiSteering* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSteering, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4CC0 (FUN_006B4CC0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitMotion` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCUnitMotionValueLane1(moho::CUnitMotion* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitMotion, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B4E00 (FUN_006B4E00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommandQueue` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCUnitCommandQueueValueLane1(moho::CUnitCommandQueue* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommandQueue, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B51C0 (FUN_006B51C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAniActor` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAniActorValueLane1(moho::CAniActor* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniActor, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B5300 (FUN_006B5300)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiAttackerValueLane1(moho::IAiAttacker* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B5440 (FUN_006B5440)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiCommandDispatch` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiCommandDispatchValueLane1(moho::IAiCommandDispatch* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiCommandDispatch, value, gpg::TrackedPointerState::Owned);
-  }
-
 } // namespace
 namespace
 {
-  /**
-   * Address: 0x006B5580 (FUN_006B5580)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiNavigator` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiNavigatorValueLane1(moho::IAiNavigator* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiNavigator, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B56C0 (FUN_006B56C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiBuilder` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiBuilderValueLane1(moho::IAiBuilder* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiBuilder, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B5800 (FUN_006B5800)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiSiloBuild` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiSiloBuildValueLane1(moho::IAiSiloBuild* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiSiloBuild, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B5940 (FUN_006B5940)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiTransport` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiTransportValueLane1(moho::IAiTransport* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiTransport, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006BBF70 (FUN_006BBF70)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CPathPoint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCPathPointSlotLane1(moho::CPathPoint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CPathPoint, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
   /**
    * Address: 0x006DFDB0 (FUN_006DFDB0)
    *
@@ -5381,358 +4002,6 @@ namespace
       delete previousValue;
     }
     return result;
-  }
-
-  /**
-   * Address: 0x006DFE60 (FUN_006DFE60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIAiAttackerSlotLane1(moho::IAiAttacker** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006DFED0 (FUN_006DFED0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CFireWeaponTask` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCFireWeaponTaskSlotLane1(moho::CFireWeaponTask** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CFireWeaponTask, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006E0210 (FUN_006E0210)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIAiAttackerSlotLane1(moho::IAiAttacker** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006E02C0 (FUN_006E02C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CFireWeaponTask` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCFireWeaponTaskSlotLane1(moho::CFireWeaponTask** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CFireWeaponTask, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006E0610 (FUN_006E0610)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiAttacker` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIAiAttackerValueLane1(moho::IAiAttacker* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiAttacker, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x006E0750 (FUN_006E0750)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CFireWeaponTask` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCFireWeaponTaskValueLane1(moho::CFireWeaponTask* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CFireWeaponTask, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006E2B00 (FUN_006E2B00)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CUnitCommand` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCUnitCommandValueLane1(moho::CUnitCommand* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommand, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006EB980 (FUN_006EB980)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Listener_ECommandEvent` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromListener_ECommandEventValueLane1(moho::Listener<moho::ECommandEvent>* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_ECommandEvent, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00706650 (FUN_00706650)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiBrainSlotLane1(moho::CAiBrain** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706680 (FUN_00706680)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiReconDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiReconDBSlotLane1(moho::IAiReconDB** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007066E0 (FUN_007066E0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CArmyStats` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCArmyStatsSlotLane1(moho::CArmyStats** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CArmyStats, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706710 (FUN_00706710)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCInfluenceMapSlotLane1(moho::CInfluenceMap** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706740 (FUN_00706740)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathQueue` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromPathQueueSlotLane1(moho::PathQueue** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706A80 (FUN_00706A80)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCAiBrainSlotLane1(moho::CAiBrain** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706AD0 (FUN_00706AD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiReconDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiReconDBSlotLane1(moho::IAiReconDB** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706B90 (FUN_00706B90)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CArmyStats` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCArmyStatsSlotLane1(moho::CArmyStats** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CArmyStats, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706BF0 (FUN_00706BF0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCInfluenceMapSlotLane1(moho::CInfluenceMap** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00706F30 (FUN_00706F30)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCAiBrainValueLane1(moho::CAiBrain* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00707070 (FUN_00707070)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiReconDB` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiReconDBValueLane1(moho::IAiReconDB* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007072F0 (FUN_007072F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CArmyStats` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCArmyStatsValueLane1(moho::CArmyStats* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CArmyStats, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00707430 (FUN_00707430)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CInfluenceMap` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCInfluenceMapValueLane1(moho::CInfluenceMap* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CInfluenceMap, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00707570 (FUN_00707570)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathQueue` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromPathQueueValueLane1(moho::PathQueue* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00712650 (FUN_00712650)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAiBrainSlotLane1(moho::CAiBrain** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00712980 (FUN_00712980)
-   *
-   * What it does:
-   * Writes one reflected `RRef_STrigger` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromSTriggerSlotLane1(moho::STrigger** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_STrigger, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00712FD0 (FUN_00712FD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCAiBrainSlotLane1(moho::CAiBrain** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00713100 (FUN_00713100)
-   *
-   * What it does:
-   * Writes one reflected `RRef_STrigger` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromSTriggerSlotLane1(moho::STrigger** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_STrigger, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00714040 (FUN_00714040)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CAiBrain` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromCAiBrainValueLane1(moho::CAiBrain* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x007144D0 (FUN_007144D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_STrigger` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromSTriggerSlotLane2(moho::STrigger** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_STrigger, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00750FA0 (FUN_00750FA0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SimArmy` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromSimArmyValueLane1(moho::SimArmy* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SimArmy, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00751870 (FUN_00751870)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Shield` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromShieldSlotLane1(moho::Shield** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Shield, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x007523F0 (FUN_007523F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Shield` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromShieldSlotLane1(moho::Shield** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Shield, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x007546B0 (FUN_007546B0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Shield` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromShieldValueLane1(moho::Shield* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Shield, value, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -5914,149 +4183,6 @@ namespace
   }
 
   /**
-   * Address: 0x00756460 (FUN_00756460)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CRandomStream` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCRandomStreamSlotLane1(moho::CRandomStream** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CRandomStream, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756490 (FUN_00756490)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysConstants` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromSPhysConstantsSlotLane1(moho::SPhysConstants** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756500 (FUN_00756500)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiFormationDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiFormationDBSlotLane1(moho::IAiFormationDB** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiFormationDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756530 (FUN_00756530)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISimResources` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromISimResourcesSlotLane1(moho::ISimResources** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ISimResources, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00756560 (FUN_00756560)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CCommandDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCCommandDBSlotLane1(moho::CCommandDb** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CCommandDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756590 (FUN_00756590)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CDecalBuffer` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCDecalBufferSlotLane1(moho::CDecalBuffer** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CDecalBuffer, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007565C0 (FUN_007565C0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IEffectManager` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIEffectManagerSlotLane1(moho::IEffectManager** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffectManager, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007565F0 (FUN_007565F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISoundManager` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromISoundManagerSlotLane1(moho::ISoundManager** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ISoundManager, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756660 (FUN_00756660)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntityDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromEntityDBSlotLane1(moho::CEntityDb** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EntityDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756E20 (FUN_00756E20)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CRandomStream` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCRandomStreamSlotLane1(moho::CRandomStream** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CRandomStream, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756E70 (FUN_00756E70)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysConstants` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromSPhysConstantsSlotLane1(moho::SPhysConstants** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756F20 (FUN_00756F20)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiFormationDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIAiFormationDBSlotLane1(moho::IAiFormationDB** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiFormationDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00756F60 (FUN_00756F60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISimResources` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromISimResourcesSlotLane1(moho::ISimResources** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_ISimResources, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
    * Address: 0x00756F90 (FUN_00756F90)
    *
    * What it does:
@@ -6076,17 +4202,6 @@ namespace
       previousValue->~CCommandDb();
       ::operator delete(previousValue);
     }
-  }
-
-  /**
-   * Address: 0x00756FC0 (FUN_00756FC0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CCommandDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCCommandDBSlotLane1(moho::CCommandDb** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CCommandDB, *valueSlot, gpg::TrackedPointerState::Owned);
   }
 
   /**
@@ -6112,39 +4227,6 @@ namespace
   }
 
   /**
-   * Address: 0x00757020 (FUN_00757020)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CDecalBuffer` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCDecalBufferSlotLane1(moho::CDecalBuffer** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CDecalBuffer, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757070 (FUN_00757070)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IEffectManager` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIEffectManagerSlotLane1(moho::IEffectManager** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffectManager, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007570D0 (FUN_007570D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISoundManager` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromISoundManagerSlotLane1(moho::ISoundManager** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_ISoundManager, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x00757160 (FUN_00757160)
    *
    * What it does:
@@ -6164,204 +4246,6 @@ namespace
       previousValue->~CEntityDb();
       ::operator delete(previousValue);
     }
-  }
-
-  /**
-   * Address: 0x00757190 (FUN_00757190)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntityDB` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromEntityDBSlotLane1(moho::CEntityDb** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_EntityDB, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757650 (FUN_00757650)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CRandomStream` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCRandomStreamValueLane1(moho::CRandomStream* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CRandomStream, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757790 (FUN_00757790)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SPhysConstants` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromSPhysConstantsValueLane1(moho::SPhysConstants* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007578D0 (FUN_007578D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiFormationDB` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIAiFormationDBValueLane1(moho::IAiFormationDB* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiFormationDB, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757AE0 (FUN_00757AE0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISimResources` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteSharedRawPointerFromISimResourcesSlotLane2(moho::ISimResources** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ISimResources, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
-   * Address: 0x00757C20 (FUN_00757C20)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CCommandDB` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCCommandDBValueLane1(moho::CCommandDb* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CCommandDB, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757D60 (FUN_00757D60)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CDecalBuffer` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromCDecalBufferValueLane1(moho::CDecalBuffer* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CDecalBuffer, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757EA0 (FUN_00757EA0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IEffectManager` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromIEffectManagerValueLane1(moho::IEffectManager* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffectManager, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00757FE0 (FUN_00757FE0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_ISoundManager` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromISoundManagerValueLane1(moho::ISoundManager* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ISoundManager, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00758120 (FUN_00758120)
-   *
-   * What it does:
-   * Writes one reflected `RRef_EntityDB` value as `owned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteOwnedRawPointerFromEntityDBValueLane1(moho::CEntityDb* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_EntityDB, value, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x00763D90 (FUN_00763D90)
-   *
-   * What it does:
-   * Writes one reflected `RRef_Listener_NavPath` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromListener_NavPathValueLane1(moho::Listener<const moho::SNavPath&>* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_NavPath, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00768C10 (FUN_00768C10)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IPathTraveler` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIPathTravelerSlotLane1(moho::IPathTraveler** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00769220 (FUN_00769220)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IPathTraveler` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIPathTravelerSlotLane1(moho::IPathTraveler** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00769260 (FUN_00769260)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IPathTraveler` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIPathTravelerSlotLane2(moho::IPathTraveler** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0076A4E0 (FUN_0076A4E0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathTables` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromPathTablesSlotLane1(moho::PathTables** valueSlot, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathTables, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0076A9F0 (FUN_0076A9F0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IPathTraveler` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromIPathTravelerValueLane1(moho::IPathTraveler* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, value, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0076ABD0 (FUN_0076ABD0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathTables` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromPathTablesSlotLane1(moho::PathTables** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathTables, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x0076B2D0 (FUN_0076B2D0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_PathTables` value as `unowned` tracked-pointer state into one write archive lane.
-   */
-  gpg::WriteArchive* WriteUnownedRawPointerFromPathTablesValueLane1(moho::PathTables* value, gpg::WriteArchive* archive)
-  {
-    return WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathTables, value, gpg::TrackedPointerState::Unowned);
   }
 
 } // namespace
@@ -6891,17 +4775,6 @@ namespace
   }
 
   /**
-   * Address: 0x0076EBF0 (FUN_0076EBF0)
-   *
-   * What it does:
-   * Writes one reflected `RRef_CIntelPosHandle` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCIntelPosHandleSlotLane1(moho::CIntelPosHandle** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelPosHandle, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x0076ED40 (FUN_0076ED40)
    *
    * What it does:
@@ -6926,17 +4799,6 @@ namespace
   }
 
   /**
-   * Address: 0x00770310 (FUN_00770310)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IAiReconDB` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIAiReconDBSlotLane1(moho::IAiReconDB** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x007704B0 (FUN_007704B0)
    *
    * What it does:
@@ -6946,17 +4808,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x00771520 (FUN_00771520)
-   *
-   * What it does:
-   * Writes one reflected `RRef_IEffectManager` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIEffectManagerSlotLane1(moho::IEffectManager** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffectManager, *valueSlot, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -7005,17 +4856,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SSessionSaveData, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x00883A40 (FUN_00883A40)
-   *
-   * What it does:
-   * Writes one reflected `RRef_SSessionSaveData` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromSSessionSaveDataSlotLane1(moho::SSessionSaveData** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_SSessionSaveData, *valueSlot, gpg::TrackedPointerState::Shared);
   }
 
   /**
@@ -7096,17 +4936,6 @@ namespace
   }
 
   /**
-   * Address: 0x00921210 (FUN_00921210)
-   *
-   * What it does:
-   * Writes one reflected `RRef_TString` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromTStringSlotLane1(gpg::WriteArchive* archive, TString** valueSlot)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_TString, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x00921420 (FUN_00921420)
    *
    * What it does:
@@ -7156,17 +4985,6 @@ namespace
   }
 
   /**
-   * Address: 0x0054FBA0 (FUN_0054FBA0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CAniSkel` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromCAniSkelSlotLane1(moho::CAniSkel** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniSkel, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
    * Address: 0x00550100 (FUN_00550100)
    *
    * What it does:
@@ -7193,17 +5011,6 @@ namespace
   }
 
   /**
-   * Address: 0x00551AF0 (FUN_00551AF0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CIntelGrid` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromCIntelGridSlotLane1(moho::CIntelGrid** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelGrid, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
    * Address: 0x00551EA0 (FUN_00551EA0)
    *
    * What it does:
@@ -7227,17 +5034,6 @@ namespace
     (void)a5;
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REntityBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x00554C30 (FUN_00554C30)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_REntityBlueprint` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromREntityBlueprintSlotLane1(moho::REntityBlueprint** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_REntityBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -7322,17 +5118,6 @@ namespace
   }
 
   /**
-   * Address: 0x0055F390 (FUN_0055F390)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_Stats_StatItem` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromStats_StatItemSlotLane1(moho::Stats_StatItem** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Stats_StatItem, *valueSlot, gpg::TrackedPointerState::Shared);
-  }
-
-  /**
    * Address: 0x0055F960 (FUN_0055F960)
    *
    * What it does:
@@ -7381,28 +5166,6 @@ namespace
   }
 
   /**
-   * Address: 0x00584B50 (FUN_00584B50)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_Sim` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromSimSlotLane1(moho::Sim** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
-   * Address: 0x00584BB0 (FUN_00584BB0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CTaskStage` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCTaskStageSlotLane1(moho::CTaskStage** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CTaskStage, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x005850C0 (FUN_005850C0)
    *
    * What it does:
@@ -7439,17 +5202,6 @@ namespace
   }
 
   /**
-   * Address: 0x0059DF70 (FUN_0059DF70)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_IFormationInstance` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIFormationInstanceSlotLane1(moho::IFormationInstance** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IFormationInstance, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x0059E920 (FUN_0059E920)
    *
    * What it does:
@@ -7471,17 +5223,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelGrid, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x005CDE40 (FUN_005CDE40)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CIntelGrid` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromCIntelGridSlotLane2(moho::CIntelGrid** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelGrid, *valueSlot, gpg::TrackedPointerState::Shared);
   }
 
   /**
@@ -7509,17 +5250,6 @@ namespace
   }
 
   /**
-   * Address: 0x005D1A00 (FUN_005D1A00)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CEconRequest` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCEconRequestSlotLane1(moho::CEconRequest** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x005D1BE0 (FUN_005D1BE0)
    *
    * What it does:
@@ -7544,17 +5274,6 @@ namespace
   }
 
   /**
-   * Address: 0x005F2140 (FUN_005F2140)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CCommandTask` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCCommandTaskSlotLane1(moho::CCommandTask** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CCommandTask, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x005F2280 (FUN_005F2280)
    *
    * What it does:
@@ -7576,17 +5295,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RScaResource, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x00642ED0 (FUN_00642ED0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_RScaResource` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromRScaResourceSlotLane1(moho::RScaResource** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_RScaResource, *valueSlot, gpg::TrackedPointerState::Shared);
   }
 
   /**
@@ -7703,17 +5411,6 @@ namespace
   }
 
   /**
-   * Address: 0x00675B40 (FUN_00675B40)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_IEffect` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromIEffectSlotLane1(moho::IEffect** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffect, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x006762C0 (FUN_006762C0)
    *
    * What it does:
@@ -7735,17 +5432,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CTextureScroller, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x00682700 (FUN_00682700)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CTextureScroller` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCTextureScrollerSlotLane1(moho::CTextureScroller** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CTextureScroller, *valueSlot, gpg::TrackedPointerState::Owned);
   }
 
   /**
@@ -8250,28 +5936,6 @@ namespace
   }
 
   /**
-   * Address: 0x006B4560 (FUN_006B4560)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_IFormationInstance` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromIFormationInstanceSlotLane1(moho::IFormationInstance** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_IFormationInstance, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x006B45D0 (FUN_006B45D0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CEconStorage` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCEconStorageSlotLane1(moho::CEconStorage** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconStorage, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x006B4590 (FUN_006B4590)
    *
    * What it does:
@@ -8536,17 +6200,6 @@ namespace
   }
 
   /**
-   * Address: 0x00706B30 (FUN_00706B30)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CEconomy` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCEconomySlotLane1(moho::CEconomy** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomy, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x00706B00 (FUN_00706B00)
    *
    * What it does:
@@ -8719,28 +6372,6 @@ namespace
   }
 
   /**
-   * Address: 0x00713080 (FUN_00713080)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CArmyStatItem` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromCArmyStatItemSlotLane1(moho::CArmyStatItem** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CArmyStatItem, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x007130C0 (FUN_007130C0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CArmyStatItem` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCArmyStatItemSlotLane1(moho::CArmyStatItem** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CArmyStatItem, *valueSlot, gpg::TrackedPointerState::Unowned);
-  }
-
-  /**
    * Address: 0x00714180 (FUN_00714180)
    *
    * What it does:
@@ -8786,17 +6417,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSquad, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x0072AED0 (FUN_0072AED0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CSquad` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCSquadSlotLane1(moho::CSquad** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CSquad, *valueSlot, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -8853,39 +6473,6 @@ namespace
   }
 
   /**
-   * Address: 0x007689D0 (FUN_007689D0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_PathQueue_Impl` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromPathQueue_ImplSlotLane1(gpg::WriteArchive* archive, moho::PathQueue::Impl** valueSlot)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue_Impl, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x0076A450 (FUN_0076A450)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_PathQueue_Impl` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromPathQueue_ImplSlotLane2(gpg::WriteArchive* archive, moho::PathQueue::Impl** valueSlot)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue_Impl, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
-   * Address: 0x0076ADA0 (FUN_0076ADA0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_PathQueue_Impl` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromPathQueue_ImplSlotLane3(moho::PathQueue::Impl** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue_Impl, *valueSlot, gpg::TrackedPointerState::Owned);
-  }
-
-  /**
    * Address: 0x0076B330 (FUN_0076B330)
    *
    * What it does:
@@ -8895,17 +6482,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue_Impl, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x0076B490 (FUN_0076B490)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_PathQueue_Impl` slot as `owned` tracked-pointer state into one write archive lane.
-   */
-  void SaveOwnedRawPointerFromPathQueue_ImplSlotLane4(moho::PathQueue::Impl** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_PathQueue_Impl, *valueSlot, gpg::TrackedPointerState::Owned);
   }
 
   /**
@@ -8931,17 +6507,6 @@ namespace
     (void)a5;
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x007744E0 (FUN_007744E0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_CEconRequest` slot as `unowned` tracked-pointer state into one write archive lane.
-   */
-  void SaveUnownedRawPointerFromCEconRequestSlotLane1(moho::CEconRequest** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, *valueSlot, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -9020,17 +6585,6 @@ namespace
   {
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_LaunchInfoBase, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x008847C0 (FUN_008847C0)
-   *
-   * What it does:
-   * Writes one reflected `gpg::RRef_LaunchInfoBase` slot as `shared` tracked-pointer state into one write archive lane.
-   */
-  void SaveSharedRawPointerFromLaunchInfoBaseSlotLane1(moho::LaunchInfoBase** valueSlot, gpg::WriteArchive* archive)
-  {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_LaunchInfoBase, *valueSlot, gpg::TrackedPointerState::Shared);
   }
 
   /**
