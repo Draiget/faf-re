@@ -370,7 +370,7 @@ namespace
         if (entityBlueprint) {
           const LuaPlus::LuaObject blueprintLua =
             unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
-          if (unit->RunScript("CheckBuildRestriction", blueprintLua).GetBoolean()) {
+          if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
             CFactoryBuildTask::Create(dispatch, unitBlueprint, command, nullptr);
           }
         }
@@ -385,7 +385,7 @@ namespace
           if (unit->CanBuild(unitBlueprint)) {
             const LuaPlus::LuaObject blueprintLua =
               unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
-            if (unit->RunScript("CheckBuildRestriction", blueprintLua).GetBoolean()) {
+            if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
               const Wm3::Vector3f buildDirection = command->mVarDat.mTarget2.mPos;
               const Wm3::Quatf buildOrientation = command->mConstDat.origin;
               const Wm3::Vector3f buildPosition = command->mTarget.GetTargetPosGun(false);
