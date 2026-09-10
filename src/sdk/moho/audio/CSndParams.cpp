@@ -55,7 +55,12 @@ namespace
 
   std::recursive_mutex gSndParamsRegistryMutex;
   msvc8::list<moho::CSndParams*> gSndParamsRegistry;
-  std::unordered_multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
+  // Keyed on the salted parameter hash, and a multimap: the shipped insert
+  // (0x004E1FD0) descends `key < node->key ? left : right` with no
+  // equivalence probe at all before linking, which is `insert_equal`. Node
+  // 0x18, key at node+0x0C, the descriptor pointer at node+0x10, colour/nil
+  // at +0x14/+0x15 -- read off that insert and off `_Lbound` (0x004E2030).
+  msvc8::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
   // The shipped cache is an RB-tree keyed on the descriptor pointer: node
   // 0x18, the mapped handle at node+0x10 and the colour/nil pair at +0x14/+0x15
   // (0x004DF2B0 reads `[found+0x10]` and compares the result against the
@@ -280,7 +285,7 @@ namespace
    */
   void InsertSndParamsCacheEntryLocked(const std::uint32_t hash, moho::CSndParams* const params)
   {
-    gSndParamsHashCache.emplace(hash, params);
+    (void)gSndParamsHashCache.insert({hash, params});
   }
 
   struct TwoWordRuntimeState
