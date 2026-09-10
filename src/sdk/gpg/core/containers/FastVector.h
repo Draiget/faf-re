@@ -1780,6 +1780,9 @@ namespace gpg::core
      * whose word lane has to be rebound to its own inline run.)
      */
     // Reset to inline storage and copy from a plain FastVector view
+    /**
+     * Address: 0x0065FED0 (FUN_0065FED0 -- the per-element assignment a range copy runs for `gpg::core::FastVector<moho::SEfxCurve>` (the reflected curve vector; the 0x38 element's assignment copies both bound vectors then hands its key vector to `ResetFrom`, which is the emission at 0x0065F240); callers 0x0065F330, 0x0065FA80; formerly `CopyAssignSEfxCurveRangeRuntime` in moho/effects/rendering/SEfxCurve.cpp (RULE ONE), removed 2026-09-11.)
+     */
     void ResetFrom(const FastVector<T>& src)
     {
       this->ResetInline_();
