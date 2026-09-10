@@ -32,20 +32,25 @@ namespace moho
   struct GeomCamera3;
   struct WRenViewport;
 
-  struct SkyDomeDecalUploadNode
+  /**
+   * The packed vertex block one cumulus decal uploads: four vertices the
+   * decal draw memcpy's straight into its dynamic buffer.
+   */
+  struct SkyDomeDecalVertices
   {
-    SkyDomeDecalUploadNode* mNext;     // +0x00
-    SkyDomeDecalUploadNode* mPrev;     // +0x04
-    std::uint8_t mVertexData[0x28];    // +0x08
+    std::uint8_t mBytes[0x28];
   };
 
-  static_assert(sizeof(SkyDomeDecalUploadNode) == 0x30, "SkyDomeDecalUploadNode size must be 0x30");
-  static_assert(offsetof(SkyDomeDecalUploadNode, mNext) == 0x00, "SkyDomeDecalUploadNode::mNext offset must be 0x00");
-  static_assert(offsetof(SkyDomeDecalUploadNode, mPrev) == 0x04, "SkyDomeDecalUploadNode::mPrev offset must be 0x04");
-  static_assert(
-    offsetof(SkyDomeDecalUploadNode, mVertexData) == 0x08,
-    "SkyDomeDecalUploadNode::mVertexData offset must be 0x08"
-  );
+  /**
+   * The pending decal uploads. The 0x0C `{proxy, head, size}` head at `+0xB4`
+   * sits over a 0x30 `{next, prev, vertices}` node, and the size guard the
+   * append checks is 107374182 -- `0xFFFFFFFF / 0x28`, this list's own
+   * `max_size`.
+   */
+  using SkyDomeDecalUploadList = msvc8::list<SkyDomeDecalVertices>;
+
+  static_assert(sizeof(SkyDomeDecalVertices) == 0x28, "SkyDomeDecalVertices size must be 0x28");
+  static_assert(sizeof(SkyDomeDecalUploadList) == 0x0C, "SkyDomeDecalUploadList size must be 0x0C");
 
   /**
    * VFTABLE: 0x00E422A0
@@ -347,9 +352,7 @@ namespace moho
     float mHorizonBlend = 0.1f;                                   // +0x78
     msvc8::string mAtmosphereTexPath;                              // +0x7C
     msvc8::string mAtmosphereTexPath2;                             // +0x98
-    std::uint8_t mPadB4[0x04];                                    // +0xB4
-    SkyDomeDecalUploadNode* mDecalUploadHead = nullptr;            // +0xB8
-    std::int32_t mDecalUploadCount = 0;                            // +0xBC
+    SkyDomeDecalUploadList mDecalUploads;                          // +0xB4
     msvc8::string mDecalTexPath1;                                  // +0xC0
     msvc8::string mDecalTexPath2;                                  // +0xDC
     msvc8::string mDecalTexPath3;                                  // +0xF8
