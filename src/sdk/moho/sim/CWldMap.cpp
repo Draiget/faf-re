@@ -263,12 +263,16 @@ namespace
     "TerrainVisualResourceRuntimeView::mDecalManager offset must be 0xC30"
   );
 
-  struct TerrainNormalMapHandleArray
-  {
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* mBegin;       // +0x00
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* mEnd;         // +0x04
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* mCapacityEnd; // +0x08
-  };
+  /**
+   * The per-tile normal-map sheets: `{begin, end, capacityEnd}` at +0x948 of
+   * the terrain resource, i.e. an `msvc8::vector` of texture handles. Its
+   * emissions (`_Tidy`, `size`, `capacity`, `reserve`, `_Copy_opt`, `erase`,
+   * `resize`) are cited on the Vector.h members. The release build strips the
+   * debug proxy for this lane, so the triple is 0x0C and the second template
+   * argument is `false`.
+   * `resize`) are cited on the Vector.h members.
+   */
+  using TerrainNormalMapHandleArray = msvc8::vector<boost::shared_ptr<moho::CD3DDynamicTextureSheet>, false>;
   static_assert(sizeof(TerrainNormalMapHandleArray) == 0x0C, "TerrainNormalMapHandleArray size must be 0x0C");
 
   struct TerrainNormalMapRuntimeView
@@ -559,71 +563,6 @@ namespace
     out.Min.y = minY;
     out.Max.y = maxY;
     return out;
-  }
-
-  /**
-   * Address: 0x008AA0B0 (FUN_008AA0B0, sub_8AA0B0)
-   *
-   * What it does:
-   * Copies one range of environment-lookup string pairs backward via member
-   * string `assign` lanes and returns the first written destination lane.
-   */
-  [[nodiscard]] moho::TerrainEnvironmentLookupPair* CopyTerrainEnvironmentLookupPairRangeBackward(
-    moho::TerrainEnvironmentLookupPair* destinationEnd,
-    const moho::TerrainEnvironmentLookupPair* sourceEnd,
-    const moho::TerrainEnvironmentLookupPair* sourceBegin
-  )
-  {
-    moho::TerrainEnvironmentLookupPair* destination = destinationEnd;
-    const moho::TerrainEnvironmentLookupPair* source = sourceEnd;
-    while (source != sourceBegin) {
-      --destination;
-      --source;
-      destination->first.assign(source->first, 0u, static_cast<std::size_t>(-1));
-      destination->second.assign(source->second, 0u, static_cast<std::size_t>(-1));
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x008A8B00 (FUN_008A8B00, sub_8A8B00)
-   *
-   * What it does:
-   * Erases one half-open pair range from a terrain environment-lookup vector
-   * by shifting tail values into the erase slot and destroying the old tail
-   * range, then stores the resulting iterator lane in `outResult`.
-   */
-  moho::TerrainEnvironmentLookupPair** EraseTerrainEnvironmentLookupPairRange(
-    moho::TerrainEnvironmentLookupPairs& pairs,
-    moho::TerrainEnvironmentLookupPair** const outResult,
-    moho::TerrainEnvironmentLookupPair* const eraseFirst,
-    moho::TerrainEnvironmentLookupPair* const eraseLast
-  )
-  {
-    if (eraseFirst != eraseLast) {
-      // Shift the survivors down over [eraseFirst, eraseLast), then destroy
-      // and drop the vacated tail: erase(first, last).
-      (void)pairs.erase(eraseFirst, eraseLast);
-    }
-
-    *outResult = eraseFirst;
-    return outResult;
-  }
-
-  /**
-   * Address: 0x008A83A0 (FUN_008A83A0, sub_8A83A0)
-   *
-   * What it does:
-   * Erases the full pair range from one terrain environment-lookup vector and
-   * returns the resulting iterator lane.
-   */
-  [[maybe_unused]] moho::TerrainEnvironmentLookupPair* EraseAllTerrainEnvironmentLookupPairs(
-    moho::TerrainEnvironmentLookupPairs& pairs
-  )
-  {
-    moho::TerrainEnvironmentLookupPair* result = nullptr;
-    (void)EraseTerrainEnvironmentLookupPairRange(pairs, &result, pairs.begin(), pairs.end());
-    return result;
   }
 
   void SaveStratumLayer(gpg::BinaryWriter& writer, const moho::CStratumMaterial& layer)
@@ -1050,186 +989,6 @@ namespace
     );
   }
 
-  void DestroyNormalMapHandleStorage(TerrainNormalMapHandleArray& handles) noexcept
-  {
-    if (handles.mBegin == nullptr) {
-      handles.mEnd = nullptr;
-      handles.mCapacityEnd = nullptr;
-      return;
-    }
-
-    for (auto* it = handles.mBegin; it != handles.mEnd; ++it) {
-      std::destroy_at(it);
-    }
-
-    ::operator delete(handles.mBegin);
-    handles.mBegin = nullptr;
-    handles.mEnd = nullptr;
-    handles.mCapacityEnd = nullptr;
-  }
-
-  [[nodiscard]] std::size_t GetNormalMapHandleCount(const TerrainNormalMapHandleArray& handles) noexcept
-  {
-    if (handles.mBegin == nullptr || handles.mEnd == nullptr) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(handles.mEnd - handles.mBegin);
-  }
-
-  [[nodiscard]] std::size_t GetNormalMapHandleCapacity(const TerrainNormalMapHandleArray& handles) noexcept
-  {
-    if (handles.mBegin == nullptr || handles.mCapacityEnd == nullptr) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(handles.mCapacityEnd - handles.mBegin);
-  }
-
-  void ReserveNormalMapHandleStorage(TerrainNormalMapHandleArray& handles, const std::size_t requiredCount)
-  {
-    const std::size_t currentCapacity = GetNormalMapHandleCapacity(handles);
-    if (requiredCount <= currentCapacity) {
-      return;
-    }
-
-    const std::size_t currentCount = GetNormalMapHandleCount(handles);
-    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1u);
-    if (newCapacity < requiredCount) {
-      newCapacity = requiredCount;
-    }
-
-    auto* const storage = static_cast<boost::shared_ptr<moho::CD3DDynamicTextureSheet>*>(
-      ::operator new(sizeof(boost::shared_ptr<moho::CD3DDynamicTextureSheet>) * newCapacity)
-    );
-
-    auto* it = storage;
-    try {
-      for (auto* src = handles.mBegin; src != handles.mEnd; ++src, ++it) {
-        new (it) boost::shared_ptr<moho::CD3DDynamicTextureSheet>(*src);
-      }
-    } catch (...) {
-      while (it != storage) {
-        --it;
-        std::destroy_at(it);
-      }
-      ::operator delete(storage);
-      throw;
-    }
-
-    DestroyNormalMapHandleStorage(handles);
-    handles.mBegin = storage;
-    handles.mEnd = storage + currentCount;
-    handles.mCapacityEnd = storage + newCapacity;
-  }
-
-  /**
-   * Address: 0x008A9E90 (FUN_008A9E90)
-   *
-   * What it does:
-   * Copy-assigns one half-open normal-map handle range into destination
-   * storage, preserving shared-pointer reference-count semantics lane by lane.
-   */
-  [[maybe_unused]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>* CopyAssignNormalMapHandleRange(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* destinationBegin,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>* sourceBegin,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>* sourceEnd
-  )
-  {
-    auto* destination = destinationBegin;
-    const auto* source = sourceBegin;
-    while (source != sourceEnd) {
-      *destination = *source;
-      ++destination;
-      ++source;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x008A8BC0 (FUN_008A8BC0)
-   *
-   * What it does:
-   * Erases one half-open normal-map handle range, compacts trailing elements,
-   * destroys vacated shared-pointer lanes, updates vector end, and returns the
-   * legacy erase iterator result.
-   */
-  [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>** EraseNormalMapHandleRange(
-    TerrainNormalMapHandleArray& handles,
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>** const outIterator,
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* const first,
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* const last
-  )
-  {
-    if (first != last) {
-      auto* const newEnd = CopyAssignNormalMapHandleRange(first, last, handles.mEnd);
-      for (auto* it = newEnd; it != handles.mEnd; ++it) {
-        std::destroy_at(it);
-      }
-      handles.mEnd = newEnd;
-    }
-
-    *outIterator = first;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x008A8430 (FUN_008A8430, sub_8A8430)
-   *
-   * What it does:
-   * Resizes normal-map texture-handle storage to one target element count
-   * while preserving existing handles and filling newly appended lanes with
-   * one caller-provided shared-pointer value.
-   */
-  void ResizeNormalMapHandleStorage(
-    TerrainNormalMapHandleArray& handles,
-    const std::size_t tileCount,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& fillValue
-  )
-  {
-    constexpr std::size_t kMaxHandleCount = 0x1FFFFFFFu;
-    if (tileCount > kMaxHandleCount) {
-      throw std::length_error("CWldTerrainRes normal-map handle count exceeds legacy limit");
-    }
-
-    const std::size_t currentCount = GetNormalMapHandleCount(handles);
-    if (currentCount < tileCount) {
-      ReserveNormalMapHandleStorage(handles, tileCount);
-
-      auto* appendedEnd = handles.mEnd;
-      try {
-        for (std::size_t index = currentCount; index < tileCount; ++index, ++appendedEnd) {
-          new (appendedEnd) boost::shared_ptr<moho::CD3DDynamicTextureSheet>(fillValue);
-        }
-      } catch (...) {
-        while (appendedEnd != handles.mEnd) {
-          --appendedEnd;
-          std::destroy_at(appendedEnd);
-        }
-        throw;
-      }
-      handles.mEnd = appendedEnd;
-      return;
-    }
-
-    if (handles.mBegin != nullptr && tileCount < currentCount) {
-      auto* const newEnd = handles.mBegin + tileCount;
-      boost::shared_ptr<moho::CD3DDynamicTextureSheet>* eraseResult = nullptr;
-      (void)EraseNormalMapHandleRange(handles, &eraseResult, newEnd, handles.mEnd);
-    }
-  }
-
-  /**
-   * Address: 0x008A7C20 (FUN_008A7C20)
-   *
-   * What it does:
-   * Thin overload lane that zero-initializes one empty shared-pointer fill
-   * value and forwards resize work into the canonical 3-argument helper.
-   */
-  void ResizeNormalMapHandleStorage(TerrainNormalMapHandleArray& handles, const std::size_t tileCount)
-  {
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> fillValue;
-    ResizeNormalMapHandleStorage(handles, tileCount, fillValue);
-  }
-
   [[nodiscard]] std::uint8_t EncodeNormalLaneByte(const float lane) noexcept
   {
     int encoded = static_cast<int>((lane + 1.0f) * 128.0f);
@@ -1405,9 +1164,7 @@ namespace
     new (&view.mWaterShaderProperties) moho::CWaterShaderProperties();
     new (&view.mStrata) moho::StratumMaterial();
 
-    view.mNormalMap.mBegin = nullptr;
-    view.mNormalMap.mEnd = nullptr;
-    view.mNormalMap.mCapacityEnd = nullptr;
+    new (&view.mNormalMap) TerrainNormalMapHandleArray();
 
     new (&view.mBackgroundFile) msvc8::string();
     new (&view.mBackgroundTexture) moho::ID3DDeviceResources::TextureResourceHandle();
@@ -1525,15 +1282,7 @@ namespace
 
     // Normal-map handle array: destroy each shared_ptr element (sub_424DC0)
     // then free the backing storage.
-    if (view.mNormalMap.mBegin != nullptr) {
-      for (auto* it = view.mNormalMap.mBegin; it != view.mNormalMap.mEnd; ++it) {
-        it->~shared_ptr();
-      }
-      ::operator delete(view.mNormalMap.mBegin);
-    }
-    view.mNormalMap.mBegin = nullptr;
-    view.mNormalMap.mEnd = nullptr;
-    view.mNormalMap.mCapacityEnd = nullptr;
+    view.mNormalMap.tidy();
 
     view.mStrata.~StratumMaterial();
     view.mWaterShaderProperties.~CWaterShaderProperties();
@@ -2715,8 +2464,7 @@ namespace moho
    */
   void IWldTerrainRes::EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const
   {
-    moho::TerrainEnvironmentLookupPair* eraseResult = nullptr;
-    (void)EraseTerrainEnvironmentLookupPairRange(outPairs, &eraseResult, outPairs.begin(), outPairs.end());
+    (void)outPairs.erase(outPairs.begin(), outPairs.end());
 
     const TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
     for (const auto& [key, value] : map) {
@@ -2968,10 +2716,10 @@ namespace moho
   std::int32_t IWldTerrainRes::GetNormalMapCount()
   {
     const auto* const view = AsTerrainRuntimeView(this);
-    if (view->mNormalMap.mBegin == nullptr) {
+    if (view->mNormalMap.begin() == nullptr) {
       return 0;
     }
-    return static_cast<std::int32_t>(view->mNormalMap.mEnd - view->mNormalMap.mBegin);
+    return static_cast<std::int32_t>(view->mNormalMap.size());
   }
 
   /**
@@ -3696,7 +3444,7 @@ namespace moho
     normalView->mNormalMapHeight = tileHeight;
 
     if (tileWidth <= 0 || tileHeight <= 0 || widthMinusOne <= 0 || heightMinusOne <= 0) {
-      ResizeNormalMapHandleStorage(normalView->mNormalMap, 0u);
+      normalView->mNormalMap.resize(0u, boost::shared_ptr<CD3DDynamicTextureSheet>{});
       return;
     }
 
@@ -3704,7 +3452,7 @@ namespace moho
     const std::size_t tileCountY = static_cast<std::size_t>((tileHeight + heightMinusOne - 1) / tileHeight);
     const std::size_t tileCount = tileCountX * tileCountY;
 
-    ResizeNormalMapHandleStorage(normalView->mNormalMap, tileCount);
+    normalView->mNormalMap.resize(tileCount, boost::shared_ptr<CD3DDynamicTextureSheet>{});
 
     // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
     {
@@ -3728,8 +3476,8 @@ namespace moho
         (void)resources->NewDynamicTextureSheet(texture, tileWidth, tileHeight, 12);
       }
 
-      normalView->mNormalMap.mBegin[i] = texture;
-      if (normalView->mNormalMap.mBegin[i].get() == nullptr) {
+      normalView->mNormalMap[i] = texture;
+      if (normalView->mNormalMap[i].get() == nullptr) {
         // Original binary at 0x008A5715 constructs one default-shaped
         // gpg::gal::Error via the 0x00940560 ctor then `_CxxThrowException`s it.
         throw gpg::gal::Error{};
@@ -3862,7 +3610,7 @@ namespace moho
       return;
     }
 
-    const std::size_t tileCount = static_cast<std::size_t>(normalView->mNormalMap.mEnd - normalView->mNormalMap.mBegin);
+    const std::size_t tileCount = normalView->mNormalMap.size();
     std::size_t tileIndex = 0u;
 
     for (std::int32_t tileZBase = 0; tileZBase < field->height - 1; tileZBase += tileHeight) {
@@ -3896,7 +3644,7 @@ namespace moho
           continue;
         }
 
-        boost::shared_ptr<CD3DDynamicTextureSheet> texture = normalView->mNormalMap.mBegin[tileIndex];
+        boost::shared_ptr<CD3DDynamicTextureSheet> texture = normalView->mNormalMap[tileIndex];
         CD3DDynamicTextureSheet* const sheet = texture.get();
         if (sheet == nullptr) {
           continue;
@@ -4253,7 +4001,7 @@ namespace moho
 
     outInfo.mTileOriginX = static_cast<float>(view->mNormalMapWidth) * static_cast<float>(tileIndexX);
     outInfo.mTileOriginY = static_cast<float>(view->mNormalMapHeight) * static_cast<float>(tileIndexY);
-    outInfo.mTexture = view->mNormalMap.mBegin[index];
+    outInfo.mTexture = view->mNormalMap[index];
 
     outInfo.mXResolution =
       static_cast<float>(static_cast<double>(static_cast<std::uint32_t>(mapWidthMinusOne)) / view->mNormalMapWidth);
@@ -4420,11 +4168,10 @@ namespace moho
     writer.Write(view.mNormalMapHeight);
 
     const TerrainNormalMapHandleArray& normalMap = normalView.mNormalMap;
-    const std::int32_t normalMapSheetCount =
-      normalMap.mBegin != nullptr ? static_cast<std::int32_t>(normalMap.mEnd - normalMap.mBegin) : 0;
+    const std::int32_t normalMapSheetCount = static_cast<std::int32_t>(normalMap.size());
     writer.Write(normalMapSheetCount);
     for (std::int32_t sheetIndex = 0; sheetIndex < normalMapSheetCount; ++sheetIndex) {
-      SaveTerrainSheetToArchive(writer, normalMap.mBegin[sheetIndex].get(), kTerrainRawSheetFormat);
+      SaveTerrainSheetToArchive(writer, normalMap[sheetIndex].get(), kTerrainRawSheetFormat);
     }
 
     SaveTerrainSheetToArchive(writer, normalView.mStratumMask0.get(), kTerrainMaskSheetFormat);
