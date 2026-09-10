@@ -33,7 +33,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
-#include "moho/misc/EngineVectorHelpers.h"
+
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
@@ -2846,20 +2846,16 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
  * blueprint identified by `blueprintId`. Returns null when the blueprint
  * cannot be resolved or no matching builder exists.
  *
- * The candidate-list parameter arrives as a `gpg::fastvector<Unit*>`; the
- * 2007 source first eagerly copied it to a local `std::vector<Unit*>` via
- * `moho::CopyFastvectorUnitToStdVector` (FUN_0057E550) so the iteration
- * loop could iterate the standard container.
+ * The candidate list is copied once on entry (0x0057E550 is that copy
+ * constructor: the caller's vector in `ecx`, the local in the stack slot),
+ * because an empty list is refilled from the army below and the caller's
+ * must not grow.
  */
 moho::Unit* moho::FindAvailableFactory(
-  gpg::core::FastVector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
+  const msvc8::vector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
 )
 {
-  // Eagerly snapshot the fastvector candidates into a std::vector<Unit*>
-  // following the 2007 layout. The per-T named copy helper preserves the
-  // engine-emitted FUN_0057E550 symbol shape.
-  std::vector<Unit*> stdCandidates;
-  moho::CopyFastvectorUnitToStdVector(candidateList, stdCandidates);
+  msvc8::vector<Unit*> candidates(candidateList);
 
   // Resolve target blueprint once (by normalized filename).
   RResId blueprintResId{};
@@ -2876,7 +2872,7 @@ moho::Unit* moho::FindAvailableFactory(
 
   // If caller didn't pre-populate `candidateList`, harvest all static
   // factories owned by this brain's army into the local std::vector copy.
-  if (stdCandidates.empty()) {
+  if (candidates.empty()) {
     const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
     const CategoryWordRangeView* const factoryCategory = rules->GetEntityCategory("FACTORY");
 
@@ -2894,13 +2890,13 @@ moho::Unit* moho::FindAvailableFactory(
     for (Entity* const* slot = foundFactories.mVec.begin(); slot != foundFactories.mVec.end(); ++slot) {
       Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
       if (unit != nullptr) {
-        stdCandidates.push_back(unit);
+        candidates.push_back(unit);
       }
     }
   }
 
   // Linear walk for the first builder that passes every buildability gate.
-  for (Unit* const candidate : stdCandidates) {
+  for (Unit* const candidate : candidates) {
     if (candidate == nullptr) {
       continue;
     }
@@ -8835,7 +8831,7 @@ int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  gpg::core::FastVector<Unit*> candidateFactories;
+  msvc8::vector<Unit*> candidateFactories;
 
   if (argumentCount > 2) {
     const LuaPlus::LuaObject suggestedObject(LuaPlus::LuaStackObject(state, 3));
@@ -8847,15 +8843,14 @@ int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
     for (int row = 1; row <= suggestedCount; ++row) {
       const LuaPlus::LuaObject rowObject = suggestedObject[row];
       if (Unit* const unit = SCR_GetUnitOptional(rowObject); unit != nullptr) {
-        candidateFactories.PushBack(unit);
+        candidateFactories.push_back(unit);
       }
     }
 
-    // Binary preserves a "no usable slots" bail here. In modern terms, this
-    // translates to an empty candidate list once filtering is done.
-    const std::size_t candidateSize = static_cast<std::size_t>(candidateFactories.end_ - candidateFactories.start_);
-    const std::size_t candidateCap = static_cast<std::size_t>(candidateFactories.capacity_ - candidateFactories.start_);
-    if (candidateSize == 0u || candidateSize == candidateCap) {
+    // A suggested list that filtered down to nothing bails with nil
+    // (0x0058C1BB: `if (_Myfirst) { if ((_Mylast - _Myfirst) >> 2) goto
+    // haveCandidates; }`).
+    if (candidateFactories.empty()) {
       lua_pushnil(rawState);
       (void)lua_gettop(rawState);
       return 1;

@@ -28,33 +28,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0057E550 (FUN_0057E550, func_FastvecUnitToStdVec)
-   *
-   * What it does:
-   * Per-T named helper that captures the engine-instantiated conversion body
-   * `gpg::fastvector<Moho::Unit*>` → `std::vector<Moho::Unit*>`. Initializes
-   * the destination triplet to empty, then if the source range contains
-   * elements, reserves capacity and bulk-inserts the source pointers in order.
-   */
-  void CopyFastvectorUnitToStdVector(const gpg::fastvector<Unit*>& source,
-                                     std::vector<Unit*>& destination)
-  {
-    destination.clear();
-
-    if (source.start_ == nullptr || source.end_ == nullptr) {
-      return;
-    }
-
-    const auto count = static_cast<std::size_t>(source.end_ - source.start_);
-    if (count == 0u) {
-      return;
-    }
-
-    destination.reserve(count);
-    destination.insert(destination.end(), source.start_, source.end_);
-  }
-
-  /**
    * Address: 0x007AE840 (FUN_007AE840, msvc8::vector<Moho::CameraImpl*>::vector(const vector&))
    *
    * What it does:
