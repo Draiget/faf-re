@@ -1623,7 +1623,7 @@ namespace moho
      * One drawn segment of a queued-order "orderline" - the ribbon connecting
      * two command-graph draw nodes. `mGraphRuntimeTree` buckets these by
      * texture: each tree node's `mPayload` holds a
-     * `{boost::SharedPtrRaw<CD3DBatchTexture>, msvc8::vector<CommandGraphEdge*>}`
+     * `{boost::SharedPtrRaw<ID3DTextureSheet>, msvc8::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
      * `mEdge` sits at offset +0x10 of the 0x2C-byte `HashListNode2C` that
@@ -1702,7 +1702,14 @@ namespace moho
      */
     struct CommandGraphTreeBucket
     {
-      boost::SharedPtrRaw<CD3DBatchTexture> mTexture;   // +0x00
+      /// An `ID3DTextureSheet`, not a `CD3DBatchTexture`. `orderline_texture`
+      /// is loaded through `ID3DDeviceResources::GetTexture`, which hands back
+      /// an `RD3DTextureResource` -- and that derives from `ID3DTextureSheet`.
+      /// The binary agrees from the consuming side: the two orderline passes
+      /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
+      /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
+      /// the `CD3DBatchTexture` overload.
+      boost::SharedPtrRaw<ID3DTextureSheet> mTexture;   // +0x00
       msvc8::vector<CommandGraphEdge*> mEdges;          // +0x08
     };
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
@@ -2261,7 +2268,7 @@ namespace moho
      * vector.
      */
     static CommandGraphTreeBucket* InitCommandGraphTreeBucketValue(
-      CommandGraphTreeBucket* destination, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+      CommandGraphTreeBucket* destination, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -2301,7 +2308,7 @@ namespace moho
      * explicitly via `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
      */
     static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAt(
-      CommandGraphTree& tree, bool addLeft, CommandGraphTreeNode* where, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+      CommandGraphTree& tree, bool addLeft, CommandGraphTreeNode* where, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -2316,7 +2323,7 @@ namespace moho
      * for this map instantiation.
      */
     static CommandGraphTreeNode*
-      AttachGraphRuntimeTreeNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture);
+      AttachGraphRuntimeTreeNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
@@ -2332,7 +2339,7 @@ namespace moho
      * `lower_bound` result feeding straight back in as the hint.
      */
     static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAtHint(
-      CommandGraphTree& tree, CommandGraphTreeNode* hint, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+      CommandGraphTree& tree, CommandGraphTreeNode* hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -2349,7 +2356,7 @@ namespace moho
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
     static msvc8::vector<CommandGraphEdge*>&
-      FindOrInsertGraphRuntimeTreeBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture);
+      FindOrInsertGraphRuntimeTreeBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)
@@ -5654,7 +5661,7 @@ namespace moho
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeBucket* UICommandGraph::InitCommandGraphTreeBucketValue(
-    CommandGraphTreeBucket* const destination, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    CommandGraphTreeBucket* const destination, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     ::new (static_cast<void*>(destination)) CommandGraphTreeBucket();
@@ -5713,14 +5720,14 @@ namespace moho
   /**
    * Address: 0x0082E320 (FUN_0082E320, sub_82E320) - see the declaration's
    * doc comment. `0xAAAAAA9u` is this map's own `max_size() - 1u` bound for
-   * its 0x18-byte `pair<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`
+   * its 0x18-byte `pair<shared_ptr<ID3DTextureSheet>, vector<CommandGraphEdge*>>`
    * value_type (`0xFFFFFFFF / 0x18 - 1 == 0xAAAAAA9`), already confirmed
    * against this exact instantiation in `legacy/containers/RbTree.h`'s
    * `insert_at` citation.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAt(
     CommandGraphTree& tree, const bool addLeft, CommandGraphTreeNode* const where,
-    const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     if (0xAAAAAA9u <= tree.mSize) {
@@ -5806,7 +5813,7 @@ namespace moho
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeUnique(
-    CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* where = tree.mHead;
@@ -5836,7 +5843,7 @@ namespace moho
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAtHint(
-    CommandGraphTree& tree, CommandGraphTreeNode* const hint, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    CommandGraphTree& tree, CommandGraphTreeNode* const hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     if (tree.mSize == 0u) {
@@ -5874,7 +5881,7 @@ namespace moho
    * doc comment.
    */
   msvc8::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
-    CommandGraphTree& tree, const boost::SharedPtrRaw<CD3DBatchTexture>& texture
+    CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* candidate = tree.mHead;
@@ -14851,8 +14858,8 @@ namespace moho
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
       const UICommandGraph::CommandGraphNode& style = graph.mNodes[static_cast<std::size_t>(commandType)];
 
-      const boost::shared_ptr<CD3DBatchTexture> texture = boost::SharedPtrFromRawRetained(
-        reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(style.mOrderlineTexture)
+      const boost::shared_ptr<ID3DTextureSheet> texture = boost::SharedPtrFromRawRetained(
+        reinterpret_cast<const boost::SharedPtrRaw<ID3DTextureSheet>&>(style.mOrderlineTexture)
       );
       if (texture) {
         msvc8::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
@@ -14955,7 +14962,17 @@ namespace moho
     if (queue == nullptr) {
       return;
     }
-    if (queue->resolvedLinks.begin == queue->resolvedLinks.end) {
+
+    // 0x00826173 / 0x008261A2: the binary asks the queue for its live link run
+    // twice -- `struct_UserUnitManager::Get(a3)` -- once for the emptiness test
+    // and once for the head entry. That accessor answers `primaryLinks` while
+    // no issue is pending and only falls back to the rebuilt `resolvedLinks`
+    // view when the pending-issue ring has something in it. Reading
+    // `resolvedLinks` directly, as this did, sees an empty run in the steady
+    // state, so no unit ever contributed a node and the whole shift-held
+    // command graph drew nothing.
+    UserCommandQueueLinkVector* const queueLinks = GetUserUnitManagerQueueLinks(queue);
+    if (queueLinks == nullptr || queueLinks->begin == queueLinks->end) {
       return;
     }
 
@@ -14974,8 +14991,8 @@ namespace moho
     };
     static_assert(sizeof(UserCommandQueueEntryView) == 0x08, "UserCommandQueueEntryView size must be 0x08");
 
-    auto* const entries = reinterpret_cast<UserCommandQueueEntryView*>(queue->resolvedLinks.begin);
-    auto* const entriesEnd = reinterpret_cast<UserCommandQueueEntryView*>(queue->resolvedLinks.end);
+    auto* const entries = reinterpret_cast<UserCommandQueueEntryView*>(queueLinks->begin);
+    auto* const entriesEnd = reinterpret_cast<UserCommandQueueEntryView*>(queueLinks->end);
 
     // Queue-head node: keyed by the first resolved link's helper pointer,
     // accumulates every unit sharing this queue's centroid.

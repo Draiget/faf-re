@@ -3836,6 +3836,11 @@ namespace moho
    * Rebuilds/resolves one user-unit command queue and returns whether it
    * currently contains the supplied command-issue helper.
    */
+  UserCommandQueueLinkVector* GetUserUnitManagerQueueLinks(UserCommandQueue* const manager) noexcept
+  {
+    return RebuildAndGetUserUnitManagerQueue(manager);
+  }
+
   bool UserUnitManagerContainsCommandIssueHelper(
     UserCommandQueue* const manager,
     const UserCommandIssueHelper* const helper
