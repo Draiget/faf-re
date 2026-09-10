@@ -1,3 +1,4 @@
+#include "legacy/containers/Map.h"
 #include "moho/sim/CSimConCommand.h"
 
 #include <algorithm>
@@ -8,82 +9,32 @@
 
 namespace
 {
+  /**
+   * Command names compare case-insensitively: every descent in `sSimConList`
+   * ends in `gpg::STR_CompareNoCase` on the two `c_str()`s.
+   */
   struct SimConCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(const std::string& lhs, const std::string& rhs) const noexcept
+    bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const noexcept
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
   };
 
   /**
-   * Address: 0x007357C0 (FUN_007357C0)
-   * Address: 0x00735D40 (FUN_00735D40)
-   * Address: 0x00736390 (FUN_00736390)
-   *
-   * What it does:
-   * `SimConCommandRegistry` is `sSimConList`'s replacement in this
-   * recovery. It is declared with the current toolchain's own `std::map`
-   * rather than a legacy ABI container because it is a process-local
-   * static that never crosses the binary's serialized surface.
-   *
-   * The three addresses above are `sSimConList`'s own binary bookkeeping,
-   * inlined directly into the teardown caller at 0x00734720 (see
-   * `DestroySimConRegistryStorageLaneA` below), fully covered by
-   * `registry.clear()` in `DestroySimConRegistryStorage` below -- there is
-   * nothing further to hand-write for those three addresses.
+   * `Moho::sSimConList` at 0x010C7884: the 0x0C `{proxy, head, size}` head,
+   * node 0x30 with the key at `node+0x0C` (the lower bound at 0x007355F0
+   * reads `_Bx` at `node+0x10` and `_Myres` at `node+0x24`, the plain 0x1C
+   * layout), the command pointer at `node+0x28` and colour/nil at
+   * `+0x2C`/`+0x2D`.
    */
-  using SimConCommandRegistry = std::map<std::string, moho::CSimConCommand*, SimConCommandNameLess>;
+  using SimConCommandRegistry = msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>;
 
   [[nodiscard]] SimConCommandRegistry& GetSimConCommandRegistry()
   {
     static SimConCommandRegistry sRegistry;
     return sRegistry;
-  }
-
-  /**
-   * Address: 0x007362C0 (FUN_007362C0)
-   *
-   * What it does:
-   * Returns the process-static sim-command registry map storage lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry* GetSimConRegistryStorageLaneA(const int) noexcept
-  {
-    return &GetSimConCommandRegistry();
-  }
-
-  /**
-   * Address: 0x00736640 (FUN_00736640)
-   *
-   * What it does:
-   * Returns the process-static sim-command registry map storage lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry* GetSimConRegistryStorageLaneB(const int) noexcept
-  {
-    return &GetSimConCommandRegistry();
-  }
-
-  /**
-   * Address: 0x007366C0 (FUN_007366C0)
-   *
-   * What it does:
-   * Returns the process-static sim-command registry map storage lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry* GetSimConRegistryStorageLaneC(const int) noexcept
-  {
-    return &GetSimConCommandRegistry();
-  }
-
-  /**
-   * Address: 0x00736820 (FUN_00736820)
-   *
-   * What it does:
-   * Returns the process-static sim-command registry map storage lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry* GetSimConRegistryStorageLaneD(const int) noexcept
-  {
-    return &GetSimConCommandRegistry();
   }
 
   /**
@@ -94,26 +45,9 @@ namespace
    * sim-command registry tree.
    */
   [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConLowerBound(SimConCommandRegistry& registry, const std::string& commandName)
+  FindSimConLowerBound(SimConCommandRegistry& registry, const msvc8::string& commandName)
   {
     return registry.lower_bound(commandName);
-  }
-
-  /**
-   * Address: 0x00735880 (FUN_00735880)
-   *
-   * What it does:
-   * Resolves one lower-bound iterator for `commandName` and stores it into the
-   * caller-provided iterator slot.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry::iterator* StoreSimConLowerBoundIterator(
-    SimConCommandRegistry& registry,
-    const std::string& commandName,
-    SimConCommandRegistry::iterator* const outIterator
-  )
-  {
-    *outIterator = FindSimConLowerBound(registry, commandName);
-    return outIterator;
   }
 
   /**
@@ -124,7 +58,7 @@ namespace
    * exact case-insensitive match for `commandName`; otherwise returns `end()`.
    */
   [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConExactOrEnd(SimConCommandRegistry& registry, const std::string& commandName)
+  FindSimConExactOrEnd(SimConCommandRegistry& registry, const msvc8::string& commandName)
   {
     const auto candidate = FindSimConLowerBound(registry, commandName);
     if (candidate == registry.end()) {
@@ -136,27 +70,7 @@ namespace
       : candidate;
   }
 
-  using SimConIteratorRange =
-    std::pair<SimConCommandRegistry::iterator, SimConCommandRegistry::iterator>;
 
-  /**
-   * Address: 0x007358A0 (FUN_007358A0)
-   *
-   * What it does:
-   * Builds one case-insensitive equal-range iterator pair for `commandName`
-   * inside the sim-command registry and stores it into `outRange`.
-   */
-  [[maybe_unused]] SimConIteratorRange* BuildSimConEqualRange(
-    SimConCommandRegistry& registry,
-    const std::string& commandName,
-    SimConIteratorRange* const outRange
-  )
-  {
-    const SimConIteratorRange range = registry.equal_range(commandName);
-    outRange->first = range.first;
-    outRange->second = range.second;
-    return outRange;
-  }
 
   /**
    * Address: 0x00735290 (FUN_00735290, sub_735290)
@@ -195,7 +109,7 @@ namespace
    */
   int RemoveSimConCommandEntriesByName(
     SimConCommandRegistry& registry,
-    const std::string& commandName
+    const msvc8::string& commandName
   )
   {
     const auto lowerBound = FindSimConExactOrEnd(registry, commandName);
@@ -216,19 +130,6 @@ namespace
   }
 
   /**
-   * Address: 0x00736070 (FUN_00736070)
-   *
-   * What it does:
-   * Forces construction of the static sim-command registry tree header/sentinel
-   * storage and returns the initialized registry lane.
-   */
-  [[maybe_unused]] SimConCommandRegistry* InitializeSimConRegistryTreeHeadLane()
-  {
-    SimConCommandRegistry& registry = GetSimConCommandRegistry();
-    return &registry;
-  }
-
-  /**
    * Address: 0x00735130 (FUN_00735130, func_InitSimConList)
    *
    * What it does:
@@ -237,21 +138,7 @@ namespace
    */
   void InitSimConList()
   {
-    (void)InitializeSimConRegistryTreeHeadLane();
-  }
-
-  /**
-   * Address: 0x007355B0 (FUN_007355B0)
-   *
-   * What it does:
-   * Reinitializes the global sim-command registry to an empty tree-header
-   * state and returns the registry storage lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SimConCommandRegistry* InitializeSimConRegistryTreeHeaderLaneLegacy()
-  {
-    SimConCommandRegistry& registry = GetSimConCommandRegistry();
-    registry.clear();
-    return &registry;
+    (void)GetSimConCommandRegistry();
   }
 
   int DestroySimConRegistryStorage(void* const /*ownerContext*/)
@@ -261,41 +148,6 @@ namespace
     return 0;
   }
 
-  /**
-   * Address: 0x00734720 (FUN_00734720)
-   *
-   * What it does:
-   * Clears and releases one static sim-command registry storage lane for the
-   * legacy startup/teardown callback chain.
-   */
-  [[maybe_unused]] int DestroySimConRegistryStorageLaneA(void* const ownerContext)
-  {
-    return DestroySimConRegistryStorage(ownerContext);
-  }
-
-  /**
-   * Address: 0x00735240 (FUN_00735240)
-   *
-   * What it does:
-   * Clears and releases one static sim-command registry storage lane for the
-   * legacy startup/teardown callback chain.
-   */
-  [[maybe_unused]] int DestroySimConRegistryStorageLaneB(void* const ownerContext)
-  {
-    return DestroySimConRegistryStorage(ownerContext);
-  }
-
-  /**
-   * Address: 0x007358C0 (FUN_007358C0)
-   *
-   * What it does:
-   * Clears and releases one static sim-command registry storage lane for the
-   * legacy startup/teardown callback chain.
-   */
-  [[maybe_unused]] int DestroySimConRegistryStorageLaneC(void* const ownerContext)
-  {
-    return DestroySimConRegistryStorage(ownerContext);
-  }
 } // namespace
 
 namespace moho
@@ -352,7 +204,7 @@ namespace moho
       return;
     }
 
-    GetSimConCommandRegistry()[mName] = this;
+    GetSimConCommandRegistry()[msvc8::string(mName)] = this;
   }
 
   /**
@@ -364,9 +216,7 @@ namespace moho
       return;
     }
 
-    auto& registry = GetSimConCommandRegistry();
-    const std::string commandName = mName;
-    (void)RemoveSimConCommandEntriesByName(registry, commandName);
+    (void)RemoveSimConCommandEntriesByName(GetSimConCommandRegistry(), msvc8::string(mName));
   }
 
   /**
@@ -386,7 +236,7 @@ namespace moho
     }
 
     auto& registry = GetSimConCommandRegistry();
-    const auto it = FindSimConExactOrEnd(registry, commandName);
+    const auto it = FindSimConExactOrEnd(registry, msvc8::string(commandName.c_str()));
     if (it == registry.end()) {
       return nullptr;
     }

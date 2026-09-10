@@ -243,6 +243,7 @@ namespace msvc8
          * instantiation -- the same shared `_Tree::equal_range` member `map`
          * and `set` both compile down to) -- see that citation for the full
          * evidence trail.
+         * Address: 0x007358A0 (FUN_007358A0 -- `equal_range` -- both descents, written into the caller's pair for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `BuildSimConEqualRange` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k)
         {
