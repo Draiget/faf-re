@@ -676,6 +676,7 @@ namespace gpg::core
      * Address: 0x007654F0 (FUN_007654F0 -- tail relocation of `erase` for a 4-byte element (calling-convention bridge); Copies one dword lane range `[sourceBegin, sourceEnd)` into destination storage starting at `sourceEnd`.)
      * Address: 0x00658800 (FUN_00658800 -- the shift step of `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: per slot a refcounted assignment (release the old texture, retain the new one) rather than a raw copy; its one caller 0x00657DB0 always passes an empty source range. Formerly `RelinkCountedTextureSlotsForward` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00657DB0 (FUN_00657DB0 -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here), release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.)
+     * Address: 0x00954510 (FUN_00954510 -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      */
     iterator erase(iterator first, iterator last)
     {
@@ -880,6 +881,7 @@ namespace gpg::core
      * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
      * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00954550 (FUN_00954550 -- `FastVectorInline<T>::ResetStorageToInline` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharReleaseHeapStorage` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetStorageToInline() noexcept
     {

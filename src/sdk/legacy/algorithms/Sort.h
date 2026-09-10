@@ -198,6 +198,9 @@ namespace msvc8
          * Address: 0x0054F8A0 (FUN_0054F8A0 -- `_Median` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x0092E050 (FUN_0092E050 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering above it -- for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E6E0; formerly `OrderU16PivotSamples` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void select_ninther(T* const first, T* const middle, T* const last, Compare comp)
         {
             const std::ptrdiff_t step = (last - first) / 8;
@@ -415,6 +418,7 @@ namespace msvc8
          * Address: 0x0084C280 (FUN_0084C280 -- `_Push_heap` (settle-upward) for a 12-byte scored element; callers 0x0084BF30; formerly `SiftHeapEntry12ByScoreRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0084C460 (FUN_0084C460 -- `_Push_heap` (settle-upward) for a 12-byte element ordered by `(tie, score)`; callers 0x0084C130; formerly `SiftHeapEntry12ByScoreAndTieRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007CEDB0 (FUN_007CEDB0 -- `_Push_heap` (settle-upward) for the 24-byte `(priority, LuaObject)` element; callers 0x007CE9D0; formerly `InsertLuaHeapPairRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092D760 (FUN_0092D760 -- `_Adjust_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D89F, 0x0092E1C0, 0x0092E2A0; formerly `SiftDownAndInsertU16HeapTail` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
          */
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -467,6 +471,10 @@ namespace msvc8
          * Address: 0x0054F990 (FUN_0054F990 -- `make_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x0092E1C0 (FUN_0092E1C0 -- `_Make_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E850, 0x0092F4E0; formerly `BuildU16MaxHeapFromRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E850 (FUN_0092E850 -- `_Make_heap`'s two-element guard for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `BuildU16HeapIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void make_heap(T* const first, T* const last, Compare comp)
         {
             const std::ptrdiff_t count = last - first;
@@ -534,6 +542,10 @@ namespace msvc8
          * Address: 0x00734210 (FUN_00734210 -- `_Sort_heap` for an 8-byte `(id, key)` element; callers 0x00733B40, 0x00733F50; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00733F50 (FUN_00733F50 -- `_Sort_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007608A0 (FUN_007608A0 -- `_Pop_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `PopElement8TailIntoRootAndSiftRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092EC40 (FUN_0092EC40 -- `_Sort_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092EEE0, 0x0092F4E0; formerly `HeapSortU16Range` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092EEE0 (FUN_0092EEE0 -- the `jmp` thunk into `_Sort_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `HeapSortU16RangeThunk` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E2A0 (FUN_0092E2A0 -- `_Pop_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootWithTailAndSift` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E8E0 (FUN_0092E8E0 -- `_Pop_heap`'s two-element guard for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
          */
         void sort_heap(T* const first, T* last, Compare comp)
         {
@@ -602,6 +614,9 @@ namespace msvc8
          * Address: 0x0054EE30 (FUN_0054EE30 -- `_Unguarded_partition` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x0092E6E0 (FUN_0092E6E0 -- `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092F4E0; formerly `PartitionU16RangeWithEqualBands` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         */
         std::pair<T*, T*> unguarded_partition(T* const first, T* const last, Compare comp)
         {
             T* const middle = first + (last - first) / 2;
@@ -745,6 +760,9 @@ namespace msvc8
          * Address: 0x0054E4B0 (FUN_0054E4B0 -- `_Sort` driver for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp) (0x0054A32C).)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x0092F4E0 (FUN_0092F4E0 -- `_Sort` -- the introsort driver: partition while the budget lasts, `_Insertion_sort` under 32 elements, `_Make_heap` + `_Sort_heap` when the budget runs out -- for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092FC41, 0x0092FE30, 0x009550E0; formerly `IntroSortU16RangeWithBudget` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void sort_impl(T* first, T* last, std::ptrdiff_t ideal, Compare comp)
         {
             while (kInsertionSortMax < last - first && ideal > 0) {
