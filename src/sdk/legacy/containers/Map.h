@@ -473,6 +473,7 @@ namespace msvc8
          * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
          * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
          * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC460 (FUN_004AC460 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9F30, 0x004AA090; formerly `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         mapped_type& operator[](const key_type& k)
         {
@@ -500,6 +501,7 @@ namespace msvc8
          * `_SECURE_SCL` checked-iterator guard is on a REACHED code path;
          * it just never trips, since `position` is always a live, valid
          * cursor from the enclosing walk.
+         * Address: 0x004AC520 (FUN_004AC520 -- `erase(const_iterator)` with the invalid-iterator throw for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9FC0, 0x004AE0D0; formerly `EraseFactoryRegistrationAtIterator` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 

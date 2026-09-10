@@ -1,4 +1,6 @@
 #include "moho/resource/ResourceManager.h"
+
+#include "legacy/containers/Set.h"
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/resource/ResourceFactory.h"
 #include "moho/resource/PrefetchRuntime.h"
@@ -2481,181 +2483,82 @@ namespace
   // Matches `CResourceManager::ActiveFactoryRegistrations` (private there).
   using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>;
 
-  [[nodiscard]] ActiveFactoryRegistrations::iterator LowerBoundFactoryRegistrationKey(
-    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
-    const unsigned int registrationKey
-  )
-  {
-    return activeFactoryRegistrationsByKey.lower_bound(registrationKey);
-  }
-
-  struct FactoryRegistrationLookupResult_004AC460
-  {
-    ActiveFactoryRegistrations::iterator iterator;
-    bool inserted;
-  };
-
-  /**
-   * Address: 0x004AC460 (FUN_004AC460)
-   *
-   * What it does:
-   * Finds or inserts one active-factory map entry for registration key.
-   */
-  [[nodiscard]] FactoryRegistrationLookupResult_004AC460 FindOrInsertFactoryRegistrationKey(
-    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
-    const unsigned int registrationKey
-  )
-  {
-    const auto lowerBound =
-      LowerBoundFactoryRegistrationKey(activeFactoryRegistrationsByKey, registrationKey);
-    if (lowerBound == activeFactoryRegistrationsByKey.end() || registrationKey < lowerBound->first) {
-      const auto insertedIt =
-        activeFactoryRegistrationsByKey.insert(lowerBound, {registrationKey, nullptr});
-      return {insertedIt, true};
-    }
-    return {lowerBound, false};
-  }
-
-  /**
-   * Address: 0x004AC520 (FUN_004AC520)
-   *
-   * What it does:
-   * Erases one active-factory map iterator and throws on invalid end-iterator.
-   */
-  ActiveFactoryRegistrations::iterator EraseFactoryRegistrationAtIterator(
-    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
-    const ActiveFactoryRegistrations::iterator eraseIt
-  )
-  {
-    if (eraseIt == activeFactoryRegistrationsByKey.end()) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-    return activeFactoryRegistrationsByKey.erase(eraseIt);
-  }
-
-  /**
-   * Address: 0x004AE0D0 (FUN_004AE0D0)
-   *
-   * What it does:
-   * Erases one iterator range from the active-factory keyed registry and
-   * returns the next iterator through caller-provided output storage.
-   */
-  ActiveFactoryRegistrations::iterator*
-  EraseFactoryRegistrationRange_004AE0D0(
-    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
-    ActiveFactoryRegistrations::iterator* const outNext,
-    ActiveFactoryRegistrations::iterator first,
-    const ActiveFactoryRegistrations::iterator last
-  )
-  {
-    if (first == activeFactoryRegistrationsByKey.begin() && last == activeFactoryRegistrationsByKey.end()) {
-      activeFactoryRegistrationsByKey.clear();
-      *outNext = activeFactoryRegistrationsByKey.begin();
-      return outNext;
-    }
-
-    while (first != last) {
-      first = EraseFactoryRegistrationAtIterator(activeFactoryRegistrationsByKey, first);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
-
-  struct PrefetchRequestKey;
-
   /**
    * Address: 0x004AD8B0 (FUN_004AD8B0)
    *
    * What it does:
-   * Orders prefetch-request keys by case-insensitive path, then by type lane.
+   * Orders prefetch requests by case-insensitive resource id, then by the
+   * resource-type pointer. This is the tree's comparator, read off the shipped
+   * body: `_stricmp` over the two `RResId` strings, then an unsigned compare
+   * of the two `gpg::RType*` slots at `+0x1C`.
    */
-  [[nodiscard]] bool IsPrefetchRequestKeyLess_004AD8B0(
-    const PrefetchRequestKey& lhs,
-    const PrefetchRequestKey& rhs
-  ) noexcept;
-
-  struct PrefetchRequestKey
+  struct PrefetchRequestLess
   {
-    std::string canonicalPath;
-    const gpg::RType* resourceType = nullptr;
-
-    [[nodiscard]] bool operator<(const PrefetchRequestKey& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const PrefetchRequestRuntime& lhs,
+      const PrefetchRequestRuntime& rhs
+    ) const noexcept
     {
-      return IsPrefetchRequestKeyLess_004AD8B0(*this, rhs);
+      const int compare = _stricmp(lhs.mResourceId.name.c_str(), rhs.mResourceId.name.c_str());
+      return (compare < 0) || (compare == 0 && lhs.mResourceType < rhs.mResourceType);
     }
   };
 
-  struct PrefetchRequestEntry
+  // The node is 0x50 with the colour byte at +0x4C, so the value is the whole
+  // 0x40 `PrefetchRequestRuntime`: the request *is* the element, keyed on the
+  // id and type stored inside it. `lower_bound` reads the candidate's string
+  // through `[node+0x10]` / `[node+0x24]` and its type through `[node+0x28]`,
+  // i.e. value+0x04 / value+0x18 / value+0x1C (0x004AD790).
+  using PrefetchRequestSet = msvc8::set<PrefetchRequestRuntime, PrefetchRequestLess>;
+  static_assert(sizeof(PrefetchRequestSet) == 0x0C, "PrefetchRequestSet size must be 0x0C");
+
+  PrefetchRequestSet sPrefetchRequests{};
+
+  /**
+   * MSVC8's `std::set<T>::iterator` was mutable -- the const-element rule
+   * arrived with C++11 -- and the shipped code updates request state in place
+   * through it. `msvc8::set` follows the modern rule, so the writes go through
+   * this one accessor instead of a cast at every site; the two ordering fields
+   * are never touched.
+   */
+  [[nodiscard]] PrefetchRequestRuntime& MutableRequest(const PrefetchRequestSet::iterator it) noexcept
   {
-    PrefetchRequestRuntime runtime{};
-    boost::weak_ptr<moho::PrefetchData> weakPayload{};
+    return const_cast<PrefetchRequestRuntime&>(*it);
+  }
+
+  /**
+   * The probe element a lookup needs. MSVC8's `std::set` keys on the whole
+   * element, and the shipped call sites build exactly this 0x40 temporary in a
+   * stack slot before `lower_bound` and tear it down straight afterwards
+   * (`0x004AB7EC` / `0x004AB804` around `0x004AD790`).
+   */
+  struct PrefetchRequestProbe
+  {
+    PrefetchRequestProbe(const char* const canonicalPath, gpg::RType* const resourceType)
+    {
+      (void)InitializePrefetchRequestFromPath(&mRequest, canonicalPath, resourceType);
+    }
+
+    ~PrefetchRequestProbe() { (void)DestroyPrefetchRequestRuntime(&mRequest); }
+
+    PrefetchRequestProbe(const PrefetchRequestProbe&) = delete;
+    PrefetchRequestProbe& operator=(const PrefetchRequestProbe&) = delete;
+
+    [[nodiscard]] const PrefetchRequestRuntime& get() const noexcept { return mRequest; }
+
+    PrefetchRequestRuntime mRequest{};
   };
 
-  using PrefetchRequestEntryMap = std::map<PrefetchRequestKey, PrefetchRequestEntry>;
-  PrefetchRequestEntryMap sPrefetchRequestEntries{};
-
   /**
-   * Address: 0x004AE2B0 (FUN_004AE2B0)
-   *
-   * What it does:
-   * Erases one iterator range from the prefetch-request entry map and
-   * returns the next iterator through caller-provided output storage.
+   * `mPrefetch` is the payload handle; `boost::SharedCountPair` is the same
+   * `{px, pn}` pair a `weak_ptr` is, and the shipped code locks it here
+   * (`0x004AC1C0` tests the strong count at `[pn+4]` before retaining).
    */
-  PrefetchRequestEntryMap::iterator* ErasePrefetchRequestEntryRange_004AE2B0(
-    PrefetchRequestEntryMap& requestEntries,
-    PrefetchRequestEntryMap::iterator* const outNext,
-    PrefetchRequestEntryMap::iterator first,
-    const PrefetchRequestEntryMap::iterator last
-  )
+  [[nodiscard]] boost::shared_ptr<moho::PrefetchData> LockPrefetchPayload(
+    const PrefetchRequestRuntime& request
+  ) noexcept
   {
-    if (first == requestEntries.begin() && last == requestEntries.end()) {
-      for (auto it = requestEntries.begin(); it != requestEntries.end(); ++it) {
-        (void)DestroyPrefetchRequestRuntime(&it->second.runtime);
-      }
-      requestEntries.clear();
-      *outNext = requestEntries.begin();
-      return outNext;
-    }
-
-    while (first != last) {
-      if (first == requestEntries.end()) {
-        throw std::out_of_range("invalid map/set<T> iterator");
-      }
-      (void)DestroyPrefetchRequestRuntime(&first->second.runtime);
-      first = requestEntries.erase(first);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
-
-  /**
-   * Address: 0x004AD790 (FUN_004AD790)
-   *
-   * What it does:
-   * Returns lower-bound iterator for one prefetch-request key.
-   */
-  PrefetchRequestEntryMap::iterator LowerBoundPrefetchRequestEntry_004AD790(
-    PrefetchRequestEntryMap& requestEntries,
-    const PrefetchRequestKey& key
-  )
-  {
-    return requestEntries.lower_bound(key);
-  }
-
-  /**
-   * Address: 0x004AD800 (FUN_004AD800)
-   *
-   * What it does:
-   * Returns upper-bound iterator for one prefetch-request key.
-   */
-  PrefetchRequestEntryMap::iterator UpperBoundPrefetchRequestEntry_004AD800(
-    PrefetchRequestEntryMap& requestEntries,
-    const PrefetchRequestKey& key
-  )
-  {
-    return requestEntries.upper_bound(key);
+    return reinterpret_cast<const boost::weak_ptr<moho::PrefetchData>&>(request.mPrefetch).lock();
   }
 
   /**
@@ -2673,61 +2576,6 @@ namespace
    * No-op helper thunk retained for callsite parity.
    */
   void NoOpHelperThunk_004AD8A0() noexcept {}
-
-  [[nodiscard]] bool IsPrefetchRequestKeyLess_004AD8B0(
-    const PrefetchRequestKey& lhs,
-    const PrefetchRequestKey& rhs
-  ) noexcept
-  {
-    const int compare = _stricmp(lhs.canonicalPath.c_str(), rhs.canonicalPath.c_str());
-    return (compare < 0) || (compare == 0 && lhs.resourceType < rhs.resourceType);
-  }
-
-  struct PrefetchRequestLookupResult_004AC890
-  {
-    PrefetchRequestEntryMap::iterator iterator;
-    bool inserted;
-  };
-
-  struct PrefetchRequestInsertResult_004AD5E0
-  {
-    PrefetchRequestEntryMap::iterator iterator;
-    bool inserted;
-  };
-
-  /**
-   * Address: 0x004AD5E0 (FUN_004AD5E0)
-   *
-   * What it does:
-   * Inserts one prefetch-request entry by key and returns iterator + inserted
-   * status after map rebalancing.
-   */
-  PrefetchRequestInsertResult_004AD5E0 InsertPrefetchRequestEntry_004AD5E0(
-    PrefetchRequestEntryMap& requestEntries,
-    const PrefetchRequestKey& key
-  )
-  {
-    auto lowerBound = LowerBoundPrefetchRequestEntry_004AD790(requestEntries, key);
-    if (lowerBound == requestEntries.end() || IsPrefetchRequestKeyLess_004AD8B0(key, lowerBound->first)) {
-      lowerBound = requestEntries.emplace_hint(lowerBound, key, PrefetchRequestEntry{});
-      return {lowerBound, true};
-    }
-    return {lowerBound, false};
-  }
-
-  /**
-   * Address: 0x004AC890 (FUN_004AC890)
-   *
-   * What it does:
-   * Finds or inserts one prefetch-request runtime map entry by key.
-   */
-  [[nodiscard]] PrefetchRequestLookupResult_004AC890 FindOrInsertPrefetchRequestEntry(
-    const PrefetchRequestKey& key
-  )
-  {
-    const auto insertResult = InsertPrefetchRequestEntry_004AD5E0(sPrefetchRequestEntries, key);
-    return {insertResult.iterator, insertResult.inserted};
-  }
 
   [[nodiscard]] msvc8::string ResolvePrefetchPath(const char* const path)
   {
@@ -3074,25 +2922,20 @@ void moho::ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
 {
   boost::recursive_mutex::scoped_lock workerLock(mWorkerLock);
 
-  PrefetchRequestKey rangeBeginKey{};
-  rangeBeginKey.canonicalPath = std::string(event.mPath.c_str());
-  rangeBeginKey.resourceType = nullptr;
+  const PrefetchRequestProbe rangeBeginProbe(event.mPath.c_str(), nullptr);
+  const auto rangeBegin = sPrefetchRequests.lower_bound(rangeBeginProbe.get());
 
-  const auto rangeBegin = LowerBoundPrefetchRequestEntry_004AD790(sPrefetchRequestEntries, rangeBeginKey);
-
-  PrefetchRequestKey rangeEndKey{};
-  rangeEndKey.canonicalPath = rangeBeginKey.canonicalPath;
-  rangeEndKey.resourceType = reinterpret_cast<const gpg::RType*>(static_cast<std::uintptr_t>(~0u));
-
-  const auto rangeEnd = UpperBoundPrefetchRequestEntry_004AD800(sPrefetchRequestEntries, rangeEndKey);
+  const PrefetchRequestProbe rangeEndProbe(
+    event.mPath.c_str(), reinterpret_cast<gpg::RType*>(static_cast<std::uintptr_t>(~0u))
+  );
+  const auto rangeEnd = sPrefetchRequests.upper_bound(rangeEndProbe.get());
   if (rangeBegin == rangeEnd) {
     return;
   }
 
   std::vector<PrefetchWatchNode*> changedWatchNodes{};
   for (auto requestIt = rangeBegin; requestIt != rangeEnd; ++requestIt) {
-    PrefetchRequestEntry& entry = requestIt->second;
-    PrefetchRequestRuntime& request = entry.runtime;
+    PrefetchRequestRuntime& request = MutableRequest(requestIt);
 
     if (request.mIsLoading != 0) {
       request.mLoadWakePending = 1;
@@ -3102,7 +2945,7 @@ void moho::ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
     (void)ReleaseWeakControlFromPair(&request.mResolved);
     request.mHadLoadFailure = 0;
 
-    boost::shared_ptr<PrefetchData> payload = entry.weakPayload.lock();
+    boost::shared_ptr<PrefetchData> payload = LockPrefetchPayload(request);
     if (payload) {
       (void)ResetSharedPairReleaseControl(&payload->mResolved);
       (void)ResetSharedPairReleaseControl(&payload->mPrefetch);
@@ -3156,9 +2999,7 @@ void moho::ResourceManager::ActivatePendingFactories()
   for (ResourceFactoryBase* const factory : mPendingFactoryRegistrations) {
     factory->Init();
     const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-    const auto registrationResult =
-      FindOrInsertFactoryRegistrationKey(mActiveFactoryRegistrationsByKey, registrationKey);
-    registrationResult.iterator->second = factory;
+    mActiveFactoryRegistrationsByKey[registrationKey] = factory;
   }
 
   mPendingFactoryRegistrations.clear();
@@ -3181,9 +3022,7 @@ void moho::ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
   }
 
   const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-  const auto registrationResult =
-    FindOrInsertFactoryRegistrationKey(mActiveFactoryRegistrationsByKey, registrationKey);
-  registrationResult.iterator->second = factory;
+  mActiveFactoryRegistrationsByKey[registrationKey] = factory;
 }
 
 /**
@@ -3199,10 +3038,9 @@ void moho::ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
 
   RemovePendingFactory(mPendingFactoryRegistrations, factory);
   const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-  const auto activeFactoryIt =
-    LowerBoundFactoryRegistrationKey(mActiveFactoryRegistrationsByKey, registrationKey);
+  const auto activeFactoryIt = mActiveFactoryRegistrationsByKey.lower_bound(registrationKey);
   if (activeFactoryIt != mActiveFactoryRegistrationsByKey.end() && activeFactoryIt->first == registrationKey) {
-    (void)EraseFactoryRegistrationAtIterator(mActiveFactoryRegistrationsByKey, activeFactoryIt);
+    (void)mActiveFactoryRegistrationsByKey.erase(activeFactoryIt);
   }
 }
 
@@ -3214,7 +3052,7 @@ void moho::ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
  */
 moho::ResourceFactoryBase* moho::ResourceManager::FindFactoryByRegistrationKey(const unsigned int registrationKey)
 {
-  const auto it = LowerBoundFactoryRegistrationKey(mActiveFactoryRegistrationsByKey, registrationKey);
+  const auto it = mActiveFactoryRegistrationsByKey.lower_bound(registrationKey);
   if (it == mActiveFactoryRegistrationsByKey.end()) {
     return nullptr;
   }
@@ -3424,31 +3262,27 @@ boost::shared_ptr<moho::PrefetchData>* moho::ResourceManager::CreatePrefetchData
     return outPrefetchData;
   }
 
-  PrefetchRequestKey key{};
-  key.canonicalPath = std::string(canonicalPath.c_str());
-  key.resourceType = resourceType;
-
-  const auto requestLookup = FindOrInsertPrefetchRequestEntry(key);
-  PrefetchRequestEntry& entry = requestLookup.iterator->second;
-  if (requestLookup.inserted || entry.runtime.mResourceId.name.empty()) {
-    (void)InitializePrefetchRequestFromPath(&entry.runtime, canonicalPath.c_str(), resourceType);
+  const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
+  const auto requestLookup = sPrefetchRequests.insert(probe.get());
+  PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
+  if (requestLookup.second || request.mResourceId.name.empty()) {
+    (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
   }
 
-  boost::shared_ptr<PrefetchData> payload = entry.weakPayload.lock();
+  boost::shared_ptr<PrefetchData> payload = LockPrefetchPayload(request);
   if (!payload) {
     payload.reset(new PrefetchData{});
-    payload->mRequest = &entry.runtime;
+    payload->mRequest = &request;
     (void)ResetSharedPairToNullVariant1(&payload->mResolved);
     (void)ResetSharedPairToNullVariant3(&payload->mPrefetch);
 
-    (void)ReleaseWeakControlFromPair(&entry.runtime.mPrefetch);
+    (void)ReleaseWeakControlFromPair(&request.mPrefetch);
     const auto* const payloadSharedPair = reinterpret_cast<const boost::SharedCountPair*>(&payload);
-    (void)BuildWeakPairFromLiveSharedVariant2(payloadSharedPair, &entry.runtime.mPrefetch);
-    entry.weakPayload = payload;
+    (void)BuildWeakPairFromLiveSharedVariant2(payloadSharedPair, &request.mPrefetch);
   }
 
   boost::SharedCountPair resolvedWeak{};
-  (void)BuildWeakPairFromLiveSharedVariant1(&entry.runtime.mResolved, &resolvedWeak);
+  (void)BuildWeakPairFromLiveSharedVariant1(&request.mResolved, &resolvedWeak);
   const bool requestHasResolvedResource = (resolvedWeak.px != nullptr);
   (void)ReleaseWeakControlFromPair(&resolvedWeak);
 
@@ -3639,16 +3473,14 @@ boost::SharedCountPair* moho::ResourceManager::GetResource(
     return outResource;
   }
 
-  PrefetchRequestKey key{};
-  key.canonicalPath = std::string(canonicalPath.c_str());
-  key.resourceType = resourceType;
-
-  const auto requestLookup = FindOrInsertPrefetchRequestEntry(key);
-  PrefetchRequestEntry& entry = requestLookup.iterator->second;
-  if (requestLookup.inserted || entry.runtime.mResourceId.name.empty()) {
-    (void)InitializePrefetchRequestFromPath(&entry.runtime, canonicalPath.c_str(), resourceType);
+  const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
+  const auto requestLookup = sPrefetchRequests.insert(probe.get());
+  PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
+  if (requestLookup.second || request.mResourceId.name.empty()) {
+    // Built from the path, never copied: `mWaiterListHead` is self-linked, so
+    // a member-wise copy would leave the node's list pointing at the probe.
+    (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
   }
-  PrefetchRequestRuntime& request = entry.runtime;
 
   if (resourceWatcher != nullptr && !HasWatcherNodeForRequest(request, resourceWatcher)) {
     auto* const watchNode = static_cast<PrefetchWatchNode*>(::operator new(sizeof(PrefetchWatchNode)));
