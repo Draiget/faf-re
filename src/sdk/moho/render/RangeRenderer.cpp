@@ -69,81 +69,6 @@ namespace
   }
 
   /**
-   * Address: 0x007F0310 (FUN_007F0310, sub_7F0310)
-   *
-   * What it does:
-   * Appends one ring extraction payload (`worldX`, `worldZ`, `innerRadius`,
-   * `outerRadius`) to the active payload vector, growing storage when needed.
-   *
-   * This is stock engine code with eight direct callers, byte-verified as
-   * `E8 rel32` call sites: 0x007EDCD6, 0x007EDD12 and 0x007EDD52 (in
-   * `sub_7EDC80`), 0x007EEFB4 (`func_RenderBuildRings`), 0x007EF19E
-   * (`func_ExtractRanges`), 0x007EF26D, 0x007EF3D2 and 0x007EF551.
-   */
-  [[nodiscard]] moho::SRangeExtractionPayload* AppendRangeExtractionPayload(
-    RangeExtractionPayloadVector& payloads,
-    const moho::SRangeExtractionPayload& payload
-  )
-  {
-    payloads.push_back(payload);
-    return payloads.end();
-  }
-
-  /**
-   * Address: 0x007F39B0 (FUN_007F39B0)
-   *
-   * What it does:
-   * Writes one repeated range-extraction payload lane into `count` contiguous
-   * destination entries.
-   */
-  [[maybe_unused]] moho::SRangeExtractionPayload* FillRangeExtractionPayloadSpan(
-    moho::SRangeExtractionPayload* destination,
-    const moho::SRangeExtractionPayload* const sourcePayload,
-    std::uint32_t count
-  )
-  {
-    while (count != 0u) {
-      if (destination != nullptr && sourcePayload != nullptr) {
-        *destination = *sourcePayload;
-        ++destination;
-      }
-      --count;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x007F33B0 (FUN_007F33B0)
-   *
-   * What it does:
-   * Register-shape adapter lane for `FillRangeExtractionPayloadSpan(...)`.
-   */
-  [[maybe_unused]] moho::SRangeExtractionPayload* FillRangeExtractionPayloadSpanAdapterA(
-    moho::SRangeExtractionPayload* const destination,
-    const moho::SRangeExtractionPayload* const sourcePayload,
-    const std::uint32_t count
-  )
-  {
-    return FillRangeExtractionPayloadSpan(destination, sourcePayload, count);
-  }
-
-  /**
-   * Address: 0x007F0D20 (FUN_007F0D20)
-   *
-   * What it does:
-   * Alias lane of `FillRangeExtractionPayloadSpan`; fills `count` entries with
-   * one repeated payload value and returns one-past-end destination.
-   */
-  [[maybe_unused]] moho::SRangeExtractionPayload* FillRangeExtractionPayloadSpanLaneB(
-    moho::SRangeExtractionPayload* const destination,
-    const moho::SRangeExtractionPayload& payloadValue,
-    const std::uint32_t count
-  )
-  {
-    return FillRangeExtractionPayloadSpan(destination, &payloadValue, count);
-  }
-
-  /**
    * Address: 0x007F03D0 (FUN_007F03D0, sub_7F03D0)
    *
    * `sub_7F03D0`'s only real caller in this binary is `RangeRenderer::Render`
@@ -246,16 +171,16 @@ namespace
     fillPayload.innerRadius =
       (sourcePayload.innerRadius <= 0.0f) ? 0.0f : (sourcePayload.innerRadius + state.innerThicknessOffset);
     fillPayload.outerRadius = sourcePayload.outerRadius - state.outerThicknessOffset;
-    (void)AppendRangeExtractionPayload(*state.fillPayloads, fillPayload);
+    state.fillPayloads->push_back(fillPayload);
 
     moho::SRangeExtractionPayload innerEdgePayload = sourcePayload;
     innerEdgePayload.outerRadius = sourcePayload.innerRadius + state.innerThicknessOffset;
-    (void)AppendRangeExtractionPayload(*state.edgePayloads, innerEdgePayload);
+    state.edgePayloads->push_back(innerEdgePayload);
 
     moho::SRangeExtractionPayload outerEdgePayload = sourcePayload;
     outerEdgePayload.innerRadius = sourcePayload.outerRadius - state.outerThicknessOffset;
     outerEdgePayload.outerRadius = sourcePayload.outerRadius;
-    (void)AppendRangeExtractionPayload(*state.edgePayloads, outerEdgePayload);
+    state.edgePayloads->push_back(outerEdgePayload);
   }
 
   /**
@@ -273,99 +198,6 @@ namespace
     for (const moho::SRangeExtractionPayload* entry = entryBegin; entry != entryEnd; ++entry) {
       BuildRingPayloadEntry(state, *entry);
     }
-  }
-
-  /**
-   * Address: 0x007EE860 (FUN_007EE860, sub_7EE860)
-   *
-   * What it does:
-   * Resets one range-profile payload lane by freeing heap-backed category-word
-   * storage (if active), rebinding to inline storage, and tidying the extractor
-   * string back to empty SSO state.
-   */
-  [[maybe_unused]] std::int32_t ResetRangeRenderProfileTransientState(moho::SRangeRenderProfile* const profile) noexcept
-  {
-    profile->mCategoryFilter.mBits.mWords.ResetStorageToInline();
-    profile->mExtractorName.tidy(true, 0u);
-    return 0;
-  }
-
-  // Addresses 0x007F3C80/0x007F3DC0 (the "ThunkA"/"ThunkB" profile-reset
-  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
-  // for both, and no source-level caller anywhere in src/sdk/**.
-  // ResetRangeRenderProfileTransientState above is the real body -- it is
-  // called from DestroyRangeRenderProfileTransientStateRange below, which
-  // itself has 9 real callers in the binary.
-
-  /**
-   * Address: 0x007F39E0 (FUN_007F39E0, sub_7F39E0)
-   * Address: 0x007F1470 (FUN_007F1470) - linker-emitted __thiscall
-   *          calling-convention trampoline into this body; no separate
-   *          logic of its own.
-   *
-   * What it does:
-   * Destroys one half-open range of `SRangeRenderProfile` lanes by resetting
-   * each profile's transient string/category-word storage back to empty inline
-   * state.
-   */
-  [[maybe_unused]] void DestroyRangeRenderProfileTransientStateRange(
-    moho::SRangeRenderProfile* const begin,
-    moho::SRangeRenderProfile* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || begin == end) {
-      return;
-    }
-
-    for (moho::SRangeRenderProfile* it = begin; it != end; ++it) {
-      (void)ResetRangeRenderProfileTransientState(it);
-    }
-  }
-
-  /**
-   * Address: 0x007EE8B0 (FUN_007EE8B0, ??0struct_a1@@QAE@@Z)
-   *
-   * What it does:
-   * Copies one initialized range-profile payload lane, including extractor
-   * string text, category-word set runtime lanes, and ring color/radius values.
-   */
-  [[maybe_unused]] moho::SRangeRenderProfile* CopyRangeRenderProfileTransientState(
-    moho::SRangeRenderProfile* const destination,
-    const moho::SRangeRenderProfile* const source
-  )
-  {
-    destination->mExtractorName.assign_owned(source->mExtractorName.view());
-    destination->mCategoryFilter.mUniverse = source->mCategoryFilter.mUniverse;
-    destination->mCategoryFilter.mBits.mFirstWordIndex = source->mCategoryFilter.mBits.mFirstWordIndex;
-    destination->mCategoryFilter.mBits.mWords.ResetFrom(source->mCategoryFilter.mBits.mWords);
-    destination->mBuildRingColor = source->mBuildRingColor;
-    destination->mSelectedRingColor = source->mSelectedRingColor;
-    destination->mHighlightedRingColor = source->mHighlightedRingColor;
-    destination->mInnerRingParams = source->mInnerRingParams;
-    destination->mOuterRingParams = source->mOuterRingParams;
-    return destination;
-  }
-
-  /**
-   * Address: 0x007F3330 (FUN_007F3330, range-profile uninitialized copy helper)
-   *
-   * What it does:
-   * Copy-constructs one half-open `SRangeRenderProfile` range into contiguous
-   * destination storage and returns one-past-last written element.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SRangeRenderProfile* CopyConstructRangeRenderProfileRange(
-    const moho::SRangeRenderProfile* sourceBegin,
-    const moho::SRangeRenderProfile* sourceEnd,
-    moho::SRangeRenderProfile* destination
-  )
-  {
-    while (sourceBegin != sourceEnd) {
-      new (destination) moho::SRangeRenderProfile{};
-      (void)CopyRangeRenderProfileTransientState(destination, sourceBegin);
-      ++destination;
-      ++sourceBegin;
-    }
-    return destination;
   }
 
   struct RangeDynamicVertexAllocatorVTable
@@ -853,7 +685,7 @@ namespace
       }
 
       scratchPayload.clear();
-      (void)AppendRangeExtractionPayload(scratchPayload, payload);
+      scratchPayload.push_back(payload);
       RenderRingBatch(
         profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mBuildRingColor, profile.mInnerRingParams,
         scratchPayload
@@ -925,7 +757,7 @@ namespace
 
       moho::SRangeExtractionPayload payload{};
       if (extractor->Extract(&payload, unit, alpha)) {
-        (void)AppendRangeExtractionPayload(outPayloads, payload);
+        outPayloads.push_back(payload);
       }
     }
   }
@@ -1004,7 +836,7 @@ namespace
       }
 
       scratchPayload.clear();
-      (void)AppendRangeExtractionPayload(scratchPayload, payload);
+      scratchPayload.push_back(payload);
       RenderRingBatch(
         profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mHighlightedRingColor,
         profile.mInnerRingParams, scratchPayload
@@ -1036,7 +868,6 @@ namespace moho
    */
   RangeRenderer::~RangeRenderer()
   {
-    DestroyRangeRenderProfileTransientStateRange(mVisibleProfiles.begin(), mVisibleProfiles.end());
     mVisibleProfiles.clear();
     ResetRenderResources();
   }
@@ -1228,7 +1059,6 @@ namespace moho
    */
   void RangeRenderer::MoveCategories(const msvc8::vector<msvc8::string>& categories)
   {
-    DestroyRangeRenderProfileTransientStateRange(mVisibleProfiles.begin(), mVisibleProfiles.end());
     mVisibleProfiles.clear();
 
     for (const msvc8::string& category : categories) {
@@ -1280,7 +1110,7 @@ namespace moho
     profile.mInnerRingParams = innerRingParams;
     profile.mOuterRingParams = outerRingParams;
 
-    (void)CopyRangeRenderProfileTransientState(&rangeRenderer->mRangeProfiles[extractorKey], &profile);
+    rangeRenderer->mRangeProfiles[extractorKey] = profile;
   }
 
   /**

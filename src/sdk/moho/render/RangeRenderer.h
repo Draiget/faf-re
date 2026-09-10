@@ -47,6 +47,8 @@ namespace moho
    * name's `_Tidy`-then-assign, the category filter's word-vector rebind, and
    * a straight copy of the three colours and two radius pairs. No source line
    * of its own - `mRangeProfiles[name] = profile` is what reaches it.
+   * Address: 0x007EE860 (FUN_007EE860 -- the implicit destructor: the category-word set rebinds to its inline block and the extractor string tidies. Twelve callers, every erase and tidy of the two containers that hold one; callers 0x007EE5A0, 0x007EFD00, 0x007F1490; formerly `ResetRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+   * Address: 0x007EE8B0 (FUN_007EE8B0 -- the copy constructor: the string is assigned, the category-word set rebinds through `ResetFrom`, the colours and radii copy field by field. Eight callers; callers 0x007EE5A0, 0x007F3330, 0x007F3430; formerly `CopyRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
    */
   struct SRangeRenderProfile
   {
