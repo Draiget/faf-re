@@ -1834,6 +1834,8 @@ namespace gpg::core
      * Address: 0x0071F6D0 (FUN_0071F6D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
      * Address: 0x0071EC30 (FUN_0071EC30 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
      * Address: 0x0071EC90 (FUN_0071EC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element (calling-convention bridge); Register-shape adapter lane that forwards one 56-byte source-first copy into `CopyForward56ByteLaneSourceFirst`.)
+     * Address: 0x00754830 (FUN_00754830 -- forward copy for an 8-byte element (eax=dest, edx=end, ecx=begin register convention), the copy step of `fastvector::operator=` 0x00752A70; formerly `CopyDwordPairRangeLaneA` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x007547A0 (FUN_007547A0 -- forward copy for a 12-byte element, the copy step of `fastvector::operator=` 0x00752830; formerly `CopyDwordTripleRangeLaneA`, removed.)
      */
     static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
     {

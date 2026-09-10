@@ -1800,9 +1800,6 @@
     <ClCompile Include="moho\containers\LegacyContainerFillLanes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\containers\LegacyContainerFillLanesB.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\containers\LegacyContainerRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
