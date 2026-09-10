@@ -105,17 +105,14 @@ namespace moho
    * Address: 0x0051A3B0 (FUN_0051A3B0, sub_51A3B0)
    *
    * What it does:
-   * Deletes one constructed `RMeshBlueprint`. The LOD vector storage is
-   * explicitly torn down via `ClearAndFreeMeshBlueprintLodVectorStorage`
-   * (`FUN_005195B0`) so the blueprint destructor flow matches the binary's
-   * `RMeshBlueprint::dtr` (`FUN_00528410`) shape before releasing the
-   * blueprint object block.
+   * Deletes one constructed `RMeshBlueprint`. `~RMeshBlueprint` tears the
+   * LOD vector down on its own (0x005195B0 is that member's `_Tidy`), so the
+   * body is the destructor call and the block release.
    */
   void Delete_RMeshBlueprint(void* const objectPtr)
   {
     auto* const object = static_cast<RMeshBlueprint*>(objectPtr);
     if (object != nullptr) {
-      moho::ClearAndFreeMeshBlueprintLodVectorStorage(&object->mLods);
       object->~RMeshBlueprint();
       ::operator delete(object);
     }

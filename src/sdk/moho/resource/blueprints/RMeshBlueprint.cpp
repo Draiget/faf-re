@@ -442,13 +442,11 @@ namespace moho
    * Address: 0x00528440 (FUN_00528440, complete-object destructor, D1 variant)
    *
    * What it does:
-   * Tears down `mLods`' backing storage then chains into the `RBlueprint`
-   * base destructor.
+   * Nothing of its own: `~vector<RMeshBlueprintLOD>` (0x005195B0) runs on
+   * `mLods` and the `RBlueprint` base destructor chains after it, both
+   * emitted by MSVC.
    */
-  RMeshBlueprint::~RMeshBlueprint()
-  {
-    ClearAndFreeMeshBlueprintLodVectorStorage(&mLods);
-  }
+  RMeshBlueprint::~RMeshBlueprint() = default;
 
   /**
    * Address: 0x005183D0 (FUN_005183D0)

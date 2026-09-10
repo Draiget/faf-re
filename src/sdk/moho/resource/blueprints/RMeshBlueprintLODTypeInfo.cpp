@@ -296,114 +296,6 @@ namespace
   }
 
   /**
-   * Address: 0x00519D40 (FUN_00519D40)
-   *
-   * IDA signature:
-   * _DWORD *__stdcall sub_519D40(int a1, _DWORD *a2, int a3, int a4);
-   *
-   * What it does:
-   * Destroys the trailing `[eraseFirst, eraseLast)` range of a
-   * `msvc8::vector<RMeshBlueprintLOD>` in-place (invoking `~RMeshBlueprintLOD()`
-   * / FUN_00519800 per element to release each LOD's seven legacy string
-   * lanes), rewinds the vector's
-   * logical end pointer to `eraseFirst`, and stores `eraseFirst` into `*out`.
-   * This is the emitted specialization of
-   * `std::vector<RMeshBlueprintLOD>::erase(iter, iter)` that the binary uses
-   * for erase-to-end (`resize(newSize < oldSize)`) operations.
-   */
-  moho::RMeshBlueprintLOD** EraseTrailingLodRange(
-    LODVector* const storage,
-    moho::RMeshBlueprintLOD** const out,
-    moho::RMeshBlueprintLOD* const eraseFirst,
-    moho::RMeshBlueprintLOD* const eraseLast
-  )
-  {
-    if (eraseFirst != eraseLast) {
-      const auto newSize = static_cast<std::size_t>(eraseFirst - storage->begin());
-      // `resize(newSize)` with newSize < current size destroys the tail range
-      // in-place and rewinds the logical end pointer, matching the binary's
-      // per-element destroy loop + `last_` rewind shape.
-      storage->resize(newSize);
-    }
-    *out = eraseFirst;
-    return out;
-  }
-
-  /**
-   * Address: 0x00519D90 (FUN_00519D90, msvc8::vector<moho::RMeshBlueprintLOD>::_Insert_n)
-   *
-   * IDA signature:
-   * void __thiscall __noreturn sub_519D90(
-   *     Moho::RMeshBlueprintLOD *a2, _DWORD *arg0, int arg4, unsigned int a4);
-   *
-   * What it does:
-   * Engine-instantiated body of `msvc8::vector<RMeshBlueprintLOD>::_Insert_n`,
-   * the slow-path insert-N-copies lane backing `vector::resize(n, value)`
-   * growth. Constructs a default-initialized `RMeshBlueprintLOD` on the stack
-   * (`Moho::RMeshBlueprintLOD::RMeshBlueprintLOD`, FUN_005183D0), then either
-   * extends the live range in place when spare capacity is sufficient
-   * (geometric-grown copy of the suffix via `FUN_0051A5B0` /
-   * `CopyMeshBlueprintLodRange`) or allocates a fresh storage block via
-   * `AllocateMeshBlueprintLodArrayOrThrow` (`FUN_0051A530`) and rebuilds the
-   * triplet via `FUN_0051B3D0`. The `__noreturn` decoration in the
-   * decompiler output reflects the SEH unwind tail; the body returns through
-   * the normal exit path.
-   *
-   * Per-T named free helper preserves the MSVC8 out-of-line symbol shape for
-   * `vector<RMeshBlueprintLOD>::_Insert_n`. Callers route growth through this
-   * name instead of `storage.resize(n, value)` so the compiler emits a real
-   * call site that resolves to this body.
-   */
-  void InsertNCopiesMeshBlueprintLodVector(
-    LODVector& storage,
-    moho::RMeshBlueprintLOD* const insertPosition,
-    const unsigned int insertCount,
-    const moho::RMeshBlueprintLOD& fillValue
-  )
-  {
-    if (insertCount == 0u) {
-      return;
-    }
-
-    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
-    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
-  }
-
-  /**
-   * Address: 0x00519A10 (FUN_00519A10)
-   *
-   * What it does:
-   * Adjusts one `vector<RMeshBlueprintLOD>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth. Routes growth through the
-   * canonical `vector<RMeshBlueprintLOD>::_Insert_n` lane (`FUN_00519D90`,
-   * `InsertNCopiesMeshBlueprintLodVector`) to preserve the MSVC8 per-T symbol
-   * shape; the shrink path erases the tail range via the canonical
-   * `EraseTrailingLodRange` lane (`FUN_00519D40`).
-   */
-  [[nodiscard]] std::size_t ResizeMeshBlueprintLodVectorWithFill(
-    LODVector& storage,
-    const std::size_t requestedCount,
-    const moho::RMeshBlueprintLOD& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      const auto growBy = static_cast<unsigned int>(requestedCount - currentCount);
-      InsertNCopiesMeshBlueprintLodVector(storage, storage.end(), growBy, fillValue);
-      return requestedCount;
-    }
-
-    if (requestedCount < currentCount) {
-      moho::RMeshBlueprintLOD* const eraseFirst = storage.begin() + static_cast<std::ptrdiff_t>(requestedCount);
-      moho::RMeshBlueprintLOD* const eraseLast = storage.end();
-      moho::RMeshBlueprintLOD* sink = nullptr;
-      (void)EraseTrailingLodRange(&storage, &sink, eraseFirst, eraseLast);
-    }
-
-    return requestedCount;
-  }
-
-  /**
    * Address: 0x005193D0 (FUN_005193D0, gpg::RVectorType_RMeshBlueprintLOD::SetCount)
    */
   void VectorTypeInfo::SetCount(void* const obj, const int count) const
@@ -412,9 +304,7 @@ namespace
       return;
     }
 
-    auto* const storage = static_cast<LODVector*>(obj);
-    const moho::RMeshBlueprintLOD fillValue{};
-    (void)ResizeMeshBlueprintLodVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
+    static_cast<LODVector*>(obj)->resize(static_cast<std::size_t>(count));
   }
 
   [[nodiscard]] TypeInfo& AcquireRMeshBlueprintLODTypeInfo()
@@ -482,60 +372,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x005195B0 (FUN_005195B0)
-   *
-   * IDA signature:
-   * void __usercall sub_5195B0(int a1@<ebx>);
-   *
-   * What it does:
-   * Releases a `msvc8::vector<RMeshBlueprintLOD>` instance's backing storage:
-   * destroys each live element (invoking `FUN_00519800` per LOD to tear down
-   * the seven legacy string lanes), calls `operator delete` on the shared
-   * storage block, then zeroes `first_/last_/end_` on the container lanes.
-   * The binary corresponds to the emitted specialization of
-   * `std::vector<RMeshBlueprintLOD>::_Tidy()` invoked by
-   * `RMeshBlueprint::~RMeshBlueprint()` (`FUN_00528410`) and by the
-   * `RMeshBlueprintConstruct` deletion lane.
-   */
-  void ClearAndFreeMeshBlueprintLodVectorStorage(msvc8::vector<RMeshBlueprintLOD>* const storage)
-  {
-    if (storage == nullptr) {
-      return;
-    }
-    // `msvc8::vector<T>::~vector()` destroys each element in-place via each
-    // `RMeshBlueprintLOD::~RMeshBlueprintLOD()` (= `FUN_00519800` shape) then
-    // releases the retained heap block. Re-placement-new reinstates the
-    // container's cleared invariant (all three pointer lanes null) so the
-    // caller's implicit destructor chain stays correct.
-    storage->~vector();
-    ::new (storage) msvc8::vector<RMeshBlueprintLOD>();
-  }
-
-  /**
-   * Address: 0x0051A530 (FUN_0051A530)
-   *
-   * IDA signature:
-   * void * __usercall sub_51A530@<eax>(unsigned int count@<ecx>);
-   *
-   * What it does:
-   * Allocates one contiguous block of `count * sizeof(RMeshBlueprintLOD)` bytes
-   * (`0xCC` per element) for a `msvc8::vector<RMeshBlueprintLOD>` storage lane,
-   * raising `std::bad_alloc` on the legacy VC8 32-bit overflow guard. The
-   * binary corresponds to the typed `_Allocate(count, RMeshBlueprintLOD*)`
-   * specialization emitted for the LOD vector instantiation; the ECX-only
-   * register convention keeps this a leaf helper of `_Buy`.
-   */
-  void* AllocateMeshBlueprintLodArrayOrThrow(const unsigned int count)
-  {
-    constexpr unsigned int kElementSize = static_cast<unsigned int>(sizeof(RMeshBlueprintLOD));
-    GPG_ASSERT(count != 0u);
-    if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kElementSize) {
-      throw std::bad_alloc{};
-    }
-    return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(kElementSize));
-  }
-
   /**
    * Address: 0x00518460 (FUN_00518460, Moho::RMeshBlueprintLODTypeInfo::RMeshBlueprintLODTypeInfo)
    *

@@ -132,7 +132,7 @@ namespace moho
      * Address: 0x00528440 (FUN_00528440, complete-object destructor, D1 variant)
      *
      * What it does:
-     * Tears down `mLods`' backing storage (`ClearAndFreeMeshBlueprintLodVectorStorage`,
+     * Tears down `mLods`' backing storage (`~vector<RMeshBlueprintLOD>`,
      * destroying each live `RMeshBlueprintLOD` element first), then chains into
      * the `RBlueprint` base destructor. The D0 variant additionally frees `this`
      * when the low bit of its `deleteFlag` argument is set (ordinary C++ `delete`
