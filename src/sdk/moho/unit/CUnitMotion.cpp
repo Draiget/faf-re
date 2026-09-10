@@ -4075,6 +4075,14 @@ namespace moho
 
     ProcessFuelLevels();
 
+    // 0x006B9D10: one shared out-lane, seeded to 1.0 before the state switch.
+    // The CalcMove* steps only overwrite it when the unit actually moved, so an
+    // idle unit still hands MoveTo a whole-tick fraction. MoveTo divides by it
+    // to derive the transform interpolation rate; a zero here (the previous
+    // per-case `= 0.0f` seed) produced an infinite rate and NaN-poisoned every
+    // interpolated user-side transform.
+    float moveTimeFraction = 1.0f;
+
     switch (mMotionState) {
       case kUnitMotionStateAttached: {
         mVelocity = Wm3::Vector3f::ZERO;
@@ -4120,14 +4128,6 @@ namespace moho
           MoveTo(transform, moveTimeFraction);
           return TASKSTATUS_Wait;
         }
-    // 0x006B9D10: one shared out-lane, seeded to 1.0 before the state switch.
-    // The CalcMove* steps only overwrite it when the unit actually moved, so an
-    // idle unit still hands MoveTo a whole-tick fraction. MoveTo divides by it
-    // to derive the transform interpolation rate; a zero here (the previous
-    // per-case `= 0.0f` seed) produced an infinite rate and NaN-poisoned every
-    // interpolated user-side transform.
-    float moveTimeFraction = 1.0f;
-
 
         if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->StunnedState) {
           mFollowingWaypoint = nullptr;

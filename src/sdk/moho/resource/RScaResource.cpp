@@ -646,8 +646,6 @@ void register_RScaResourceAnimPrefetchType()
 
 namespace
 {
-  struct RScaResourcePrefetchBootstrap
-  {
   /**
    * Address: 0x00BF3DA0 (FUN_00BF3DA0)
    *
@@ -664,10 +662,11 @@ namespace
       manager->DetachFactory(&ScaResourceFactorySingleton());
     }
   }
+
+  struct RScaResourcePrefetchBootstrap
+  {
     RScaResourcePrefetchBootstrap()
     {
-      moho::register_RScaResourceAnimPrefetchType();
-    }
       // 0x00BC9260 (static initialiser, `__xc_a`): construct the SCA factory
       // singleton and attach it to the resource manager (0x0053AA40), then
       // register the process-exit detach (0x00BF3DA0). Without this attach
@@ -676,6 +675,8 @@ namespace
       // is the next initialiser in the same table.
       (void)moho::construct_CScaResourceFactoryPreload();
       (void)std::atexit(&DetachScaResourceFactoryAtExit);
+      moho::register_RScaResourceAnimPrefetchType();
+    }
   };
 
   RScaResourcePrefetchBootstrap gRScaResourcePrefetchBootstrap;
