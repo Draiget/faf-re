@@ -597,22 +597,6 @@ namespace moho
   void AddBeamToTextureBuckets(BeamTextureBucketMapRuntime& buckets, const SWorldBeam& beam);
 
   /**
-   * Address: 0x00495620 (FUN_00495620, std::vector_SWorldParticle::push_back)
-   *
-   * What it does:
-   * Appends one world-particle payload into a world-particle vector lane.
-   */
-  void AppendWorldParticleToVector(msvc8::vector<SWorldParticle>& particles, const SWorldParticle& particle);
-
-  /**
-   * Address: 0x004957C0 (FUN_004957C0, std::vector_STrail::push_back)
-   *
-   * What it does:
-   * Appends one world-trail payload into a trail vector lane.
-   */
-  void AppendTrailToVector(msvc8::vector<TrailRuntimeView>& trails, const TrailRuntimeView& trail);
-
-  /**
    * Address: 0x00494740 (FUN_00494740, func_ParticleSelectTechnique)
    *
    * What it does:

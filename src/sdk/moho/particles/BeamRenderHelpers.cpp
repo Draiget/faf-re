@@ -182,29 +182,6 @@ namespace
   };
 
   /**
-   * Address: 0x00495A30 (FUN_00495A30, sub_495A30)
-   *
-   * What it does:
-   * Returns the pointer value stored in one opaque pointer slot.
-   */
-  [[nodiscard]] void* ReadOpaquePointerSlotValue(void* const* const pointerSlot) noexcept
-  {
-    return *pointerSlot;
-  }
-
-  /**
-   * Address: 0x00495A40 (FUN_00495A40, sub_495A40)
-   *
-   * What it does:
-   * Converts one opaque pointer-slot presence check into the legacy
-   * `0`/`-1` integer mask shape used by VC8 helper paths.
-   */
-  [[nodiscard]] int ComputeOpaquePointerSlotNullMask(void* const* const pointerSlot) noexcept
-  {
-    return ReadOpaquePointerSlotValue(pointerSlot) != nullptr ? 0 : -1;
-  }
-
-  /**
    * Address: 0x00495AC0 (FUN_00495AC0, sub_495AC0)
    *
    * What it does:
@@ -312,63 +289,6 @@ namespace
   }
 
   /**
-   * Address: 0x00495D60 (FUN_00495D60)
-   *
-   * IDA signature:
-   * int __thiscall sub_495D60(int *this)
-   *
-   * What it does:
-   * Returns the active beam-render-vertex count from one packed 0x3C-stride
-   * vector lane.
-   */
-  [[nodiscard]] std::int32_t GetBeamRenderVertexCount(
-    const moho::BeamRenderVertexArrayRuntime& vertices
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(vertices.size());
-  }
-
-  /**
-   * Address: 0x00495DA0 (FUN_00495DA0)
-   *
-   * IDA signature:
-   * int __usercall sub_495DA0@<eax>(_DWORD *a1@<eax>, int a2@<ecx>)
-   *
-   * What it does:
-   * Appends one packed beam-render vertex into the vertex lane, growing the
-   * underlying storage when needed.
-   */
-  moho::BeamRenderVertexRuntime* AppendBeamRenderVertex(
-    moho::BeamRenderVertexArrayRuntime& vertices,
-    const moho::BeamRenderVertexRuntime& vertex
-  )
-  {
-    vertices.push_back(vertex);
-    return &vertices.back();
-  }
-
-  /**
-   * What it does:
-   * Legacy VC8 debug-vector lane (`proxy + begin/end/capacity`) used by
-   * low-level helper thunks around beam/trail/particle vector operations.
-   */
-  /**
-   * Address: 0x0049E690 (FUN_0049E690, nullsub_629)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAN() noexcept {}
-
-  /**
-   * Address: 0x0049E6A0 (FUN_0049E6A0, nullsub_630)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAO() noexcept {}
-
-  /**
    * Address: 0x00497800 (FUN_00497800, sub_497800)
    *
    * What it does:
@@ -427,14 +347,6 @@ namespace
   }
 
   /**
-   * Address: 0x00499DD0 (FUN_00499DD0, nullsub_582)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAA() noexcept {}
-
-  /**
    * Address: 0x00499E40 (FUN_00499E40, sub_499E40)
    *
    * What it does:
@@ -443,39 +355,6 @@ namespace
   [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x71C71C7() noexcept
   {
     return 0x071C71C7U;
-  }
-
-  /**
-   * Address: 0x0049C1C0 (FUN_0049C1C0, sub_49C1C0)
-   *
-   * What it does:
-   * Returns one fixed legacy magic constant used by adjacent division helpers.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x1D41D41() noexcept
-  {
-    return 0x01D41D41U;
-  }
-
-  /**
-   * Address: 0x0049C1D0 (FUN_0049C1D0, sub_49C1D0)
-   *
-   * What it does:
-   * Returns one fixed legacy magic constant used by adjacent division helpers.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x2AAAAAA() noexcept
-  {
-    return 0x02AAAAAAU;
-  }
-
-  /**
-   * Address: 0x0049C1E0 (FUN_0049C1E0, sub_49C1E0)
-   *
-   * What it does:
-   * Returns one fixed legacy magic constant used by adjacent division helpers.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x1414141() noexcept
-  {
-    return 0x01414141U;
   }
 
   /**
@@ -531,43 +410,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049A0D0 (FUN_0049A0D0, nullsub_583)
-   *
-   * What it does:
-   * No-op stdcall helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkStdcallA(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x0049A0E0 (FUN_0049A0E0, nullsub_584)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAB() noexcept {}
-
-  /**
-   * Address: 0x0049A110 (FUN_0049A110, nullsub_585)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAC() noexcept {}
-
-  /**
-   * Address: 0x0049A120 (FUN_0049A120, sub_49A120)
-   *
-   * What it does:
-   * Writes one 32-bit scalar value into caller-provided slot and returns that
-   * slot pointer.
-   */
-  std::uint32_t* WriteScalarDwordSlotG(std::uint32_t* const outValueSlot, const std::uint32_t value) noexcept
-  {
-    *outValueSlot = value;
-    return outValueSlot;
-  }
-
-  /**
    * What it does:
    * Compact two-dword lane used by adjacent slot-export helper thunks.
    */
@@ -582,22 +424,6 @@ namespace
     "LegacyTwoDwordRuntime::value1 offset must be 0x04"
   );
   static_assert(sizeof(LegacyTwoDwordRuntime) == 0x08, "LegacyTwoDwordRuntime size must be 0x08");
-
-  /**
-   * Address: 0x0049A1A0 (FUN_0049A1A0, sub_49A1A0)
-   *
-   * What it does:
-   * Exports the second dword lane (`+0x04`) from one two-dword runtime block
-   * into caller storage.
-   */
-  std::uint32_t* ExportLegacyTwoDwordValue1(
-    std::uint32_t* const outValueSlot,
-    const LegacyTwoDwordRuntime& source
-  ) noexcept
-  {
-    *outValueSlot = source.value1;
-    return outValueSlot;
-  }
 
   /**
    * Address: 0x0049A150 (FUN_0049A150, sub_49A150)
@@ -637,25 +463,6 @@ namespace
     *inOutNodeSlot = result;
     return result;
   }
-
-  /**
-   * Address: 0x0049A1B0 (FUN_0049A1B0, sub_49A1B0)
-   *
-   * What it does:
-   * Returns one fixed legacy magic constant used by adjacent division helpers.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x4444444() noexcept
-  {
-    return 0x04444444U;
-  }
-
-  /**
-   * Address: 0x0049A1C0 (FUN_0049A1C0, nullsub_586)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAD() noexcept {}
 
   /**
    * What it does:
@@ -976,74 +783,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049CF70 (FUN_0049CF70, nullsub_609)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAJ() noexcept {}
-
-  /**
-   * Address: 0x0049CF80 (FUN_0049CF80, nullsub_610)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAK() noexcept {}
-
-  /**
-   * Address: 0x0049CF90 (FUN_0049CF90, sub_49CF90)
-   *
-   * What it does:
-   * Writes one `(dword pointer lane, byte flag lane)` pair from source slots
-   * into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* WritePointerBytePairFromSlotsA(
-    std::uint32_t* const outStorage,
-    const std::uint32_t* const pointerSlot,
-    const std::uint8_t* const flagSlot
-  ) noexcept
-  {
-    outStorage[0] = pointerSlot != nullptr ? *pointerSlot : 0U;
-    *(reinterpret_cast<std::uint8_t*>(outStorage) + 4) = flagSlot != nullptr ? *flagSlot : 0U;
-    return outStorage;
-  }
-
-  /**
-   * Address: 0x0049CFA0 (FUN_0049CFA0, nullsub_611)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAL() noexcept {}
-
-  /**
-   * Address: 0x0049CFB0 (FUN_0049CFB0, nullsub_612)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAM() noexcept {}
-
-  /**
-   * Address: 0x0049CFC0 (FUN_0049CFC0, sub_49CFC0)
-   *
-   * What it does:
-   * Duplicate `(dword pointer lane, byte flag lane)` writer retained for
-   * adjacent helper parity.
-   */
-  [[maybe_unused]] std::uint32_t* WritePointerBytePairFromSlotsB(
-    std::uint32_t* const outStorage,
-    const std::uint32_t* const pointerSlot,
-    const std::uint8_t* const flagSlot
-  ) noexcept
-  {
-    outStorage[0] = pointerSlot != nullptr ? *pointerSlot : 0U;
-    *(reinterpret_cast<std::uint8_t*>(outStorage) + 4) = flagSlot != nullptr ? *flagSlot : 0U;
-    return outStorage;
-  }
-
-  /**
    * Address: 0x0049D030 (FUN_0049D030, sub_49D030)
    *
    * What it does:
@@ -1065,17 +804,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049A470 (FUN_0049A470, sub_49A470)
-   *
-   * What it does:
-   * Duplicate vector-overflow throw helper retained for callsite parity.
-   */
-  [[noreturn]] void ThrowLegacyVectorTooLongDuplicateC()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-  /**
    * What it does:
    * One legacy intrusive list node lane (`next/prev/value`) used by pooled
    * particle-buffer list helper thunks.
@@ -1092,99 +820,6 @@ namespace
     "LegacyIntrusiveListNodeRuntime::value offset must be 0x08"
   );
   static_assert(sizeof(LegacyIntrusiveListNodeRuntime) == 0x0C, "LegacyIntrusiveListNodeRuntime size must be 0x0C");
-
-  /**
-   * Address: 0x0049A4E0 (FUN_0049A4E0, nullsub_587)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAE() noexcept {}
-
-  /**
-   * Address: 0x0049A550 (FUN_0049A550, sub_49A550)
-   *
-   * What it does:
-   * Writes one 32-bit scalar value into caller-provided slot and returns that
-   * slot pointer.
-   */
-  std::uint32_t* WriteScalarDwordSlotH(std::uint32_t* const outValueSlot, const std::uint32_t value) noexcept
-  {
-    *outValueSlot = value;
-    return outValueSlot;
-  }
-
-  /**
-   * Address: 0x0049A650 (FUN_0049A650, nullsub_588)
-   *
-   * What it does:
-   * No-op stdcall helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkStdcallB(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x0049A660 (FUN_0049A660, nullsub_589)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAF() noexcept {}
-
-  /**
-   * Address: 0x0049A690 (FUN_0049A690, nullsub_590)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAG() noexcept {}
-
-  /**
-   * Address: 0x0049A7F0 (FUN_0049A7F0, nullsub_591)
-   *
-   * What it does:
-   * No-op stdcall helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkStdcallC(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x0049A800 (FUN_0049A800, nullsub_592)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAH() noexcept {}
-
-  /**
-   * Address: 0x0049A810 (FUN_0049A810, nullsub_593)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAI() noexcept {}
-
-  /**
-   * Address: 0x0049E7F0 (FUN_0049E7F0, nullsub_632)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAQ() noexcept {}
-
-  /**
-   * Address: 0x0049E800 (FUN_0049E800, nullsub_633)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAR() noexcept {}
-
-  /**
-   * Address: 0x0049E810 (FUN_0049E810, nullsub_634)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkAS() noexcept {}
 
   [[nodiscard]] moho::ShaderVar& GetParticleTexture0ShaderVar()
   {
@@ -1357,14 +992,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0049C510 (FUN_0049C510, nullsub_600)
-   *
-   * What it does:
-   * No-op stdcall helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkBeamMapA(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
    * Address: 0x0049C520 (FUN_0049C520, sub_49C520)
    *
    * What it does:
@@ -1382,25 +1009,6 @@ namespace moho
    * Allocates one beam-bucket tree node lane via the shared array allocator.
    */
   [[nodiscard]] BeamBucketTreeNodeRuntime* AllocateSingleBeamBucketTreeNodeArray() { return AllocateBeamBucketTreeNodes(1U); }
-
-  /**
-   * Address: 0x0049C5B0 (FUN_0049C5B0, sub_49C5B0)
-   *
-   * What it does:
-   * Returns one fixed legacy division magic constant.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyDivisionMagicConstant_0x4444444_DuplicateA() noexcept
-  {
-    return 0x04444444U;
-  }
-
-  /**
-   * Address: 0x0049C600 (FUN_0049C600, nullsub_601)
-   *
-   * What it does:
-   * No-op stdcall helper thunk retained for binary parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunkBeamMapB(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004914B0 (FUN_004914B0, sub_4914B0)
@@ -1516,28 +1124,6 @@ namespace moho
     if (insertPosition.iterator != buckets.end()) {
       insertPosition.iterator->second.push_back(beam);
     }
-  }
-
-  /**
-   * Address: 0x00495620 (FUN_00495620, std::vector_SWorldParticle::push_back)
-   *
-   * What it does:
-   * Appends one world-particle payload into a world-particle vector lane.
-   */
-  void AppendWorldParticleToVector(msvc8::vector<SWorldParticle>& particles, const SWorldParticle& particle)
-  {
-    particles.push_back(particle);
-  }
-
-  /**
-   * Address: 0x004957C0 (FUN_004957C0, std::vector_STrail::push_back)
-   *
-   * What it does:
-   * Appends one world-trail payload into a trail vector lane.
-   */
-  void AppendTrailToVector(msvc8::vector<TrailRuntimeView>& trails, const TrailRuntimeView& trail)
-  {
-    trails.push_back(trail);
   }
 
   /**
@@ -1717,7 +1303,7 @@ namespace moho
         EmitInterpolatedBeamQuadVertices(beam, frameAlpha, vertices);
       }
 
-      const std::int32_t totalVertices = GetBeamRenderVertexCount(vertices);
+      const std::int32_t totalVertices = static_cast<std::int32_t>(vertices.size());
       if (totalVertices <= 0) {
         continue;
       }

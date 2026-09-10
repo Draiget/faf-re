@@ -1139,7 +1139,7 @@ namespace moho
         }
 
         Sim* const sim = mManager->GetSim();
-        AppendWorldParticleToVector(sim->GetParticleBuffer()->mParticles, particle);
+        sim->GetParticleBuffer()->mParticles.push_back(particle);
       }
 
       emissionCursor += emissionStep;

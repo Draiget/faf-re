@@ -487,7 +487,7 @@ namespace moho
 
     Sim* const sim = mManager->GetSim();
     SParticleBuffer* const particleBuffer = sim->GetParticleBuffer();
-    AppendTrailToVector(particleBuffer->mTrails, trail);
+    particleBuffer->mTrails.push_back(trail);
 
     if (dbg_Trail) {
       CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();

@@ -90,6 +90,6 @@ namespace moho
    */
   void AppendTrailToBucketEntry(const TrailRuntimeView& trail, TrailBucketEntryRuntime& bucketEntry)
   {
-    AppendTrailToVector(bucketEntry.mTrails, trail);
+    bucketEntry.mTrails.push_back(trail);
   }
 } // namespace moho

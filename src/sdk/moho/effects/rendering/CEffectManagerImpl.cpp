@@ -513,7 +513,7 @@ namespace moho
       return;
     }
 
-    AppendWorldParticleToVector(submitBuffer->mParticles, particle);
+    submitBuffer->mParticles.push_back(particle);
   }
 
   /**
