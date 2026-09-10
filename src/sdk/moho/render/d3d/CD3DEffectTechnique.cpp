@@ -35,58 +35,18 @@ namespace moho
 
     using IntAnnotationTree = Implementation::IntAnnotationTree;
     using StringAnnotationTree = Implementation::StringAnnotationTree;
-    using TechniqueNode = CD3DEffect::TechniqueNode;
-    using TechniqueTree = CD3DEffect::TechniqueTree;
+    using TechniqueSet = CD3DEffect::TechniqueSet;
 
-    template <typename T>
-    struct PointerFlagPair
+    /**
+     * MSVC8's `std::set` handed out a mutable iterator, so the shipped code
+     * edits a technique's implementation lanes in place through one. This
+     * container follows the modern rule and makes the element const, so the
+     * edit needs saying out loud - the key the tree orders on is `mName`, and
+     * nothing below touches it.
+     */
+    [[nodiscard]] CD3DEffect::Technique& MutableTechnique(const TechniqueSet::iterator it) noexcept
     {
-      T* pointer;               // +0x00
-      std::uint8_t boolTag;     // +0x04
-    };
-
-    static_assert(sizeof(PointerFlagPair<void>) == 0x08, "PointerFlagPair size must be 0x08");
-
-    [[nodiscard]] int CompareStringViews(const std::string_view lhs, const std::string_view rhs) noexcept
-    {
-      const std::size_t commonCount = (lhs.size() < rhs.size()) ? lhs.size() : rhs.size();
-      const int prefixCompare = std::char_traits<char>::compare(lhs.data(), rhs.data(), commonCount);
-      if (prefixCompare != 0) {
-        return prefixCompare;
-      }
-
-      if (lhs.size() < rhs.size()) {
-        return -1;
-      }
-      if (lhs.size() > rhs.size()) {
-        return 1;
-      }
-      return 0;
-    }
-
-    [[nodiscard]] int CompareLegacyStrings(const msvc8::string& lhs, const msvc8::string& rhs) noexcept
-    {
-      return CompareStringViews(lhs.view(), rhs.view());
-    }
-
-    template <typename NodeT>
-    [[nodiscard]] NodeT* FindTreeMinNode(NodeT* node) noexcept
-    {
-      NodeT* current = node;
-      while (current != nullptr && current->mLeft != nullptr && current->mLeft->mIsNil == 0u) {
-        current = current->mLeft;
-      }
-      return current;
-    }
-
-    template <typename NodeT>
-    [[nodiscard]] NodeT* FindTreeMaxNode(NodeT* node) noexcept
-    {
-      NodeT* current = node;
-      while (current != nullptr && current->mRight != nullptr && current->mRight->mIsNil == 0u) {
-        current = current->mRight;
-      }
-      return current;
+      return const_cast<CD3DEffect::Technique&>(*it);
     }
 
     /**
@@ -143,24 +103,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0042C320 (FUN_0042C320)
-     *
-     * What it does:
-     * Writes one `{pointer, bool-tag}` pair and returns the output lane.
-     */
-    template <typename T>
-    [[nodiscard]] PointerFlagPair<T>* InitializePointerFlagPair(
-      PointerFlagPair<T>* const outPair,
-      const bool boolTag,
-      T* const pointer
-    ) noexcept
-    {
-      outPair->pointer = pointer;
-      outPair->boolTag = static_cast<std::uint8_t>(boolTag ? 1u : 0u);
-      return outPair;
-    }
-
-    /**
      * Address family:
      * - 0x0042C240 (FUN_0042C240)
      * - 0x0042C280 (FUN_0042C280)
@@ -178,130 +120,7 @@ namespace moho
       return 0;
     }
 
-    [[nodiscard]] TechniqueNode* AllocateTechniqueSentinel()
-    {
-      void* const storage = ::operator new(sizeof(TechniqueNode));
-      auto* const head = static_cast<TechniqueNode*>(storage);
-      head->mLeft = nullptr;
-      head->mParent = nullptr;
-      head->mRight = nullptr;
-      head->mColor = 1;
-      head->mIsNil = 0;
-      return head;
-    }
 
-    void InitializeTechniqueTree(TechniqueTree& tree, TechniqueNode* const head) noexcept
-    {
-      tree.mHead = head;
-      head->mIsNil = 1;
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      tree.mSize = 0;
-    }
-
-    void DestroyTechniqueTreeNodes(TechniqueNode* node) noexcept
-    {
-      TechniqueNode* current = node;
-      while (current != nullptr && current->mIsNil == 0u) {
-        DestroyTechniqueTreeNodes(current->mRight);
-        TechniqueNode* const next = current->mLeft;
-        current->mTechnique.~Technique();
-        ::operator delete(current);
-        current = next;
-      }
-    }
-
-    /**
-     * Address: 0x0042C4B0 (FUN_0042C4B0)
-     *
-     * What it does:
-     * Destroys one effect technique-definition tree and clears tree header storage.
-     */
-    int DestroyTechniqueTreeStorage(TechniqueTree& tree) noexcept
-    {
-      TechniqueNode* const head = tree.mHead;
-      if (head != nullptr) {
-        PointerFlagPair<TechniqueNode> beginCursor{};
-        (void)InitializePointerFlagPair(&beginCursor, false, head->mLeft);
-        DestroyTechniqueTreeNodes(head->mParent);
-        ::operator delete(head);
-      }
-
-      tree.mHead = nullptr;
-      tree.mSize = 0;
-      return 0;
-    }
-
-    /**
-     * Address: 0x00434500 (FUN_00434500)
-     *
-     * What it does:
-     * Walks the technique-definition red-black tree by name and returns the
-     * lower-bound node (first node whose name is not less than the search key).
-     */
-    [[nodiscard]] TechniqueNode* LowerBoundTechniqueNode(
-      const TechniqueTree& tree,
-      const msvc8::string& techniqueName
-    ) noexcept
-    {
-      TechniqueNode* const head = tree.mHead;
-      TechniqueNode* result = head;
-      TechniqueNode* node = head->mParent;
-      while (node != nullptr && node->mIsNil == 0u) {
-        if (CompareLegacyStrings(node->mTechnique.mName, techniqueName) >= 0) {
-          result = node;
-          node = node->mLeft;
-        } else {
-          node = node->mRight;
-        }
-      }
-      return result;
-    }
-
-    [[nodiscard]] TechniqueNode* FindTechniqueNode(
-      const TechniqueTree& tree,
-      const msvc8::string& techniqueName
-    ) noexcept
-    {
-      TechniqueNode* const head = tree.mHead;
-      TechniqueNode* const lowerBound = LowerBoundTechniqueNode(tree, techniqueName);
-      if (lowerBound == nullptr || lowerBound == head || CompareLegacyStrings(techniqueName, lowerBound->mTechnique.mName) < 0) {
-        return head;
-      }
-      return lowerBound;
-    }
-
-    /**
-     * Address: 0x00432B10 (FUN_00432B10)
-     *
-     * What it does:
-     * Destroys all non-sentinel fidelity-definition nodes and restores the tree
-     * to the empty sentinel-only state.
-     */
-    void ClearTechniqueTreeNodes(TechniqueTree& tree) noexcept
-    {
-      TechniqueNode* const head = tree.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      DestroyTechniqueTreeNodes(head->mParent);
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      tree.mSize = 0;
-    }
-
-    constexpr std::uint8_t kTreeColorRed = 0;
-    constexpr std::uint8_t kTreeColorBlack = 1;
-    constexpr std::uint32_t kMaxTechniqueTreeNodeCount = 0x0147AE12;
-    constexpr std::uint32_t kMaxAnnotationTreeNodeCount = 0x07FFFFFD;
-
-    [[noreturn]] void ThrowMapSetTooLong()
-    {
-      throw std::length_error("map/set<T> too long");
-    }
 
     /**
      * Address family:
@@ -311,29 +130,6 @@ namespace moho
      * What it does:
      * Performs one left rotation around the provided tree node.
      */
-    template <typename TreeT, typename NodeT>
-    void RotateTreeLeft(TreeT& tree, NodeT* const pivot) noexcept
-    {
-      NodeT* const head = tree.mHead;
-      NodeT* const right = pivot->mRight;
-      pivot->mRight = right->mLeft;
-      if (right->mLeft->mIsNil == 0u) {
-        right->mLeft->mParent = pivot;
-      }
-
-      right->mParent = pivot->mParent;
-      if (pivot == head->mParent) {
-        head->mParent = right;
-      } else if (pivot == pivot->mParent->mLeft) {
-        pivot->mParent->mLeft = right;
-      } else {
-        pivot->mParent->mRight = right;
-      }
-
-      right->mLeft = pivot;
-      pivot->mParent = right;
-    }
-
     /**
      * Address family:
      * - 0x00434550 (FUN_00434550)
@@ -342,29 +138,6 @@ namespace moho
      * What it does:
      * Performs one right rotation around the provided tree node.
      */
-    template <typename TreeT, typename NodeT>
-    void RotateTreeRight(TreeT& tree, NodeT* const pivot) noexcept
-    {
-      NodeT* const head = tree.mHead;
-      NodeT* const left = pivot->mLeft;
-      pivot->mLeft = left->mRight;
-      if (left->mRight->mIsNil == 0u) {
-        left->mRight->mParent = pivot;
-      }
-
-      left->mParent = pivot->mParent;
-      if (pivot == head->mParent) {
-        head->mParent = left;
-      } else if (pivot == pivot->mParent->mRight) {
-        pivot->mParent->mRight = left;
-      } else {
-        pivot->mParent->mLeft = left;
-      }
-
-      left->mRight = pivot;
-      pivot->mParent = left;
-    }
-
     /**
      * Address family:
      * - 0x00432B60 (FUN_00432B60)
@@ -373,152 +146,6 @@ namespace moho
      * What it does:
      * Restores red-black invariants after linking one freshly allocated node.
      */
-    template <typename TreeT, typename NodeT>
-    void RebalanceTreeAfterInsert(TreeT& tree, NodeT* inserted) noexcept
-    {
-      NodeT* node = inserted;
-      while (node->mParent->mColor == kTreeColorRed) {
-        if (node->mParent == node->mParent->mParent->mLeft) {
-          NodeT* const uncle = node->mParent->mParent->mRight;
-          if (uncle->mColor == kTreeColorRed) {
-            node->mParent->mColor = kTreeColorBlack;
-            uncle->mColor = kTreeColorBlack;
-            node->mParent->mParent->mColor = kTreeColorRed;
-            node = node->mParent->mParent;
-          } else {
-            if (node == node->mParent->mRight) {
-              node = node->mParent;
-              RotateTreeLeft(tree, node);
-            }
-            node->mParent->mColor = kTreeColorBlack;
-            node->mParent->mParent->mColor = kTreeColorRed;
-            RotateTreeRight(tree, node->mParent->mParent);
-          }
-        } else {
-          NodeT* const uncle = node->mParent->mParent->mLeft;
-          if (uncle->mColor == kTreeColorRed) {
-            node->mParent->mColor = kTreeColorBlack;
-            uncle->mColor = kTreeColorBlack;
-            node->mParent->mParent->mColor = kTreeColorRed;
-            node = node->mParent->mParent;
-          } else {
-            if (node == node->mParent->mLeft) {
-              node = node->mParent;
-              RotateTreeRight(tree, node);
-            }
-            node->mParent->mColor = kTreeColorBlack;
-            node->mParent->mParent->mColor = kTreeColorRed;
-            RotateTreeLeft(tree, node->mParent->mParent);
-          }
-        }
-      }
-
-      tree.mHead->mParent->mColor = kTreeColorBlack;
-    }
-
-    template <typename TreeT, typename NodeT>
-    void LinkInsertedTreeNode(TreeT& tree, NodeT* const parent, NodeT* const inserted, const bool insertLeft) noexcept
-    {
-      NodeT* const head = tree.mHead;
-      if (parent == head) {
-        head->mParent = inserted;
-        head->mLeft = inserted;
-        head->mRight = inserted;
-      } else if (insertLeft) {
-        parent->mLeft = inserted;
-        if (parent == head->mLeft) {
-          head->mLeft = inserted;
-        }
-      } else {
-        parent->mRight = inserted;
-        if (parent == head->mRight) {
-          head->mRight = inserted;
-        }
-      }
-
-      RebalanceTreeAfterInsert(tree, inserted);
-      ++tree.mSize;
-    }
-
-    /**
-     * Address family:
-     * - 0x00431B00 (FUN_00431B00)
-     * - 0x00432B60 (FUN_00432B60)
-     *
-     * What it does:
-     * Inserts one technique definition node into the fidelity-definition tree.
-     */
-    TechniqueNode* InsertTechniqueNode(TechniqueTree& tree, const msvc8::string& techniqueName)
-    {
-      if (tree.mSize > kMaxTechniqueTreeNodeCount) {
-        ThrowMapSetTooLong();
-      }
-
-      TechniqueNode* const head = tree.mHead;
-      TechniqueNode* parent = head;
-      TechniqueNode* node = head->mParent;
-      bool insertLeft = true;
-      while (node != nullptr && node->mIsNil == 0u) {
-        parent = node;
-        if (CompareLegacyStrings(techniqueName, node->mTechnique.mName) < 0) {
-          insertLeft = true;
-          node = node->mLeft;
-        } else {
-          insertLeft = false;
-          node = node->mRight;
-        }
-      }
-
-      void* const storage = ::operator new(sizeof(TechniqueNode));
-      auto* const inserted = static_cast<TechniqueNode*>(storage);
-      inserted->mLeft = head;
-      inserted->mParent = parent;
-      inserted->mRight = head;
-      inserted->mColor = kTreeColorRed;
-      inserted->mIsNil = 0;
-      inserted->mPadD6[0] = 0;
-      inserted->mPadD6[1] = 0;
-      try {
-        ::new (static_cast<void*>(&inserted->mTechnique)) CD3DEffect::Technique(techniqueName);
-      } catch (...) {
-        ::operator delete(inserted);
-        throw;
-      }
-
-      LinkInsertedTreeNode(tree, parent, inserted, insertLeft);
-      return inserted;
-    }
-
-    /**
-     * Address family:
-     * - 0x00431B00 (FUN_00431B00)
-     * - 0x00431C60 (FUN_00431C60)
-     *
-     * What it does:
-     * Returns one exact-match technique-definition node and inserts a new node
-     * when that definition is currently missing.
-     */
-    TechniqueNode* FindOrInsertTechniqueNode(TechniqueTree& tree, const msvc8::string& techniqueName)
-    {
-      TechniqueNode* const existing = FindTechniqueNode(tree, techniqueName);
-      if (existing != tree.mHead) {
-        return existing;
-      }
-
-      return InsertTechniqueNode(tree, techniqueName);
-    }
-
-    void FinalizeTechniqueDefinitionsInOrder(TechniqueNode* const node, TechniqueNode* const head)
-    {
-      if (node == nullptr || node == head || node->mIsNil != 0u) {
-        return;
-      }
-
-      FinalizeTechniqueDefinitionsInOrder(node->mLeft, head);
-      node->mTechnique.FinalizeMissingImplementations();
-      FinalizeTechniqueDefinitionsInOrder(node->mRight, head);
-    }
-
     [[nodiscard]] bool IsDiskFileInfoNotOlder(const SDiskFileInfo& lhs, const SDiskFileInfo& rhs) noexcept
     {
       const LONG comparison = ::CompareFileTime(&lhs.mLastWriteTime, &rhs.mLastWriteTime);
@@ -751,8 +378,7 @@ namespace moho
     , mEffect{}
     , mCurrentTechnique{}
   {
-    TechniqueNode* const techniqueHead = AllocateTechniqueSentinel();
-    InitializeTechniqueTree(mTechniques, techniqueHead);
+
   }
 
   /**
@@ -772,7 +398,7 @@ namespace moho
     mFile.tidy(true, 0U);
     mName.tidy(true, 0U);
 
-    (void)DestroyTechniqueTreeStorage(mTechniques);
+
 
     while (mAttachedLinks != nullptr) {
       AttachedLink* const detached = mAttachedLinks;
@@ -919,7 +545,7 @@ namespace moho
       );
       SharedHandleAsBoost(mEffect) = effectHandle;
 
-      ClearTechniqueTreeNodes(mTechniques);
+      mTechniques.clear();
 
       msvc8::vector<msvc8::string> techniqueImplementationNames{};
       EnumerateValidTechniques(techniqueImplementationNames);
@@ -930,8 +556,8 @@ namespace moho
           abstractTechniqueName.assign(implementationName, 0U, msvc8::string::npos);
         }
 
-        TechniqueNode* const definition = FindOrInsertTechniqueNode(mTechniques, abstractTechniqueName);
-        Technique::Implementation* const lanes = definition->mTechnique.GetImplementationLanes();
+        const TechniqueSet::iterator definition = mTechniques.emplace(abstractTechniqueName).first;
+        Technique::Implementation* const lanes = MutableTechnique(definition).GetImplementationLanes();
         if (HasConstructedLaneName(lanes[0]) && HasConstructedLaneName(lanes[1]) && HasConstructedLaneName(lanes[2])) {
           gpg::Warnf(
             "technique %s in effect %s has been finalized (attempt to define a redundant fidelity)",
@@ -941,7 +567,7 @@ namespace moho
           continue;
         }
 
-        if (CompareLegacyStrings(abstractTechniqueName, implementationName) == 0) {
+        if (abstractTechniqueName == implementationName) {
           Technique::Implementation implementation(abstractTechniqueName);
           lanes[0] = implementation;
           lanes[1] = implementation;
@@ -974,7 +600,9 @@ namespace moho
         lanes[fidelityIndex] = implementation;
       }
 
-      FinalizeTechniqueDefinitionsInOrder(mTechniques.mHead->mParent, mTechniques.mHead);
+      for (TechniqueSet::iterator it = mTechniques.begin(); it != mTechniques.end(); ++it) {
+        MutableTechnique(it).FinalizeMissingImplementations();
+      }
       return true;
     } catch (const std::exception& exception) {
       gpg::Warnf("%s: %s", effectFilePath, exception.what());
@@ -990,14 +618,9 @@ namespace moho
    * What it does:
    * Resolves one exact fidelity-definition node for the supplied technique.
    */
-  CD3DEffect::TechniqueNode* CD3DEffect::GetFidelityDefinitions(const Technique& technique)
+  CD3DEffect::TechniqueSet::iterator CD3DEffect::GetFidelityDefinitions(const Technique& technique)
   {
-    TechniqueNode* const lowerBound = LowerBoundTechniqueNode(mTechniques, technique.mName);
-    if (lowerBound == mTechniques.mHead || CompareLegacyStrings(technique.mName, lowerBound->mTechnique.mName) < 0) {
-      return mTechniques.mHead;
-    }
-
-    return lowerBound;
+    return mTechniques.find(technique);
   }
 
   /**
@@ -1027,7 +650,7 @@ namespace moho
   {
     const msvc8::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
     const Technique lookupTechnique(lookupName);
-    TechniqueNode* const definition = GetFidelityDefinitions(lookupTechnique);
+    const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
 
     auto& effect = SharedHandleAsBoost(mEffect);
     auto selectAndWarnInvalid = [&]() {
@@ -1039,13 +662,13 @@ namespace moho
       );
     };
 
-    if (definition == mTechniques.mHead) {
+    if (definition == mTechniques.end()) {
       selectAndWarnInvalid();
       return;
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation* const lanes = definition->mTechnique.GetImplementationLanes();
+    Technique::Implementation* const lanes = MutableTechnique(definition).GetImplementationLanes();
     Technique::Implementation& selectedLane = lanes[fidelityIndex];
     if (!HasConstructedLaneName(selectedLane)) {
       selectAndWarnInvalid();
@@ -1100,14 +723,14 @@ namespace moho
     }
 
     const Technique lookupTechnique(techniqueName);
-    TechniqueNode* const definition = GetFidelityDefinitions(lookupTechnique);
-    if (definition == mTechniques.mHead) {
+    const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
+    if (definition == mTechniques.end()) {
       gpg::Warnf("attempt to retrieve annotation from unknown technique %s", techniqueName.c_str());
       return resolvedValue;
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation& lane = definition->mTechnique.GetImplementationLanes()[fidelityIndex];
+    Technique::Implementation& lane = MutableTechnique(definition).GetImplementationLanes()[fidelityIndex];
     if (!lane.TryGetIntegerAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
       lane.mIntegerAnnotations[annotationName] = resolvedValue;
@@ -1161,14 +784,14 @@ namespace moho
     }
 
     const Technique lookupTechnique(techniqueName);
-    TechniqueNode* const definition = GetFidelityDefinitions(lookupTechnique);
-    if (definition == mTechniques.mHead) {
+    const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
+    if (definition == mTechniques.end()) {
       gpg::Warnf("attempt to retrieve annotation from unknown technique %s", techniqueName.c_str());
       return resolvedValue;
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation& lane = definition->mTechnique.GetImplementationLanes()[fidelityIndex];
+    Technique::Implementation& lane = MutableTechnique(definition).GetImplementationLanes()[fidelityIndex];
     if (!lane.TryGetStringAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
       lane.mStringAnnotations[annotationName] = resolvedValue;

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstddef>
+#include "legacy/containers/Set.h"
 #include "legacy/containers/Map.h"
 #include <cstdint>
 
@@ -173,24 +174,31 @@ namespace moho
       alignas(Implementation) std::uint8_t mImplementationStorage[sizeof(Implementation) * 3]; // +0x20
     };
 
-    struct TechniqueNode
+    /**
+     * The whole `Technique` is the element and its name is the key, which is
+     * why the node is 0xD8 rather than a pair's worth of bytes: `_Lbound`
+     * (0x00434500) reads the node's key at `node+0x10`, four past the value
+     * start, because `Technique` is polymorphic and its `mName` follows the
+     * vptr. Colour and nil sit at `+0xD4`/`+0xD5`, so the node is links (0x0C)
+     * plus the 0xC8 element plus two bytes, rounded to 0xD8.
+     *
+     * `GetFidelityDefinitions` takes a `const Technique&` in the binary too --
+     * its callers build one from the name and hand it in, which is what a
+     * `set` keyed on a member forces.
+     */
+    struct TechniqueNameLess
     {
-      TechniqueNode* mLeft;    // +0x00
-      TechniqueNode* mParent;  // +0x04
-      TechniqueNode* mRight;   // +0x08
-      Technique mTechnique;    // +0x0C
-      std::uint8_t mColor;     // +0xD4
-      std::uint8_t mIsNil;     // +0xD5
-      std::uint8_t mPadD6[0x2];// +0xD6
+      [[nodiscard]] bool operator()(const Technique& lhs, const Technique& rhs) const
+      {
+        return lhs.mName < rhs.mName;
+      }
     };
 
-    using TechniqueTree = TreeMap<TechniqueNode>;
+    using TechniqueSet = msvc8::set<Technique, TechniqueNameLess>;
 
-    static_assert(sizeof(TechniqueTree) == 0x0C, "CD3DEffect::TechniqueTree size must be 0x0C");
-    static_assert(offsetof(TechniqueNode, mTechnique) == 0x0C, "CD3DEffect::TechniqueNode::mTechnique offset must be 0x0C");
-    static_assert(offsetof(TechniqueNode, mColor) == 0xD4, "CD3DEffect::TechniqueNode::mColor offset must be 0xD4");
-    static_assert(offsetof(TechniqueNode, mIsNil) == 0xD5, "CD3DEffect::TechniqueNode::mIsNil offset must be 0xD5");
-    static_assert(sizeof(TechniqueNode) == 0xD8, "CD3DEffect::TechniqueNode size must be 0xD8");
+    static_assert(sizeof(TechniqueSet) == 0x0C, "CD3DEffect::TechniqueSet size must be 0x0C");
+    static_assert(sizeof(Technique) == 0xC8, "CD3DEffect::Technique size must be 0xC8");
+
 
     /**
      * Address: 0x0042C430 (FUN_0042C430)
@@ -246,7 +254,7 @@ namespace moho
      * Resolves one fidelity-definition node by technique name, returning the
      * tree sentinel when no exact match exists.
      */
-    [[nodiscard]] TechniqueNode* GetFidelityDefinitions(const Technique& technique);
+    [[nodiscard]] TechniqueSet::iterator GetFidelityDefinitions(const Technique& technique);
 
     /**
      * Address: 0x0042D290 (FUN_0042D290, ?SetTechnique@CD3DEffect@Moho@@QAEXPBD@Z)
@@ -330,7 +338,7 @@ namespace moho
 
   public:
     AttachedLink* mAttachedLinks; // +0x00
-    TechniqueTree mTechniques;    // +0x04
+    TechniqueSet mTechniques;     // +0x04
     msvc8::string mName;          // +0x10
     msvc8::string mFile;          // +0x2C
     SharedHandle<gpg::gal::EffectD3D9> mEffect;                     // +0x48
