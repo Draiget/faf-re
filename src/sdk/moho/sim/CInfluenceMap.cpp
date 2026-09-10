@@ -234,41 +234,6 @@ namespace
   using InfluenceEntryIterator = InfluenceEntrySet::iterator;
   using InfluenceMapCellIterator = InfluenceMapCellSet::iterator;
 
-  template <typename TSet>
-  struct LegacySetStorageRuntimeView
-  {
-    void* proxy;
-    void* head;
-    std::uint32_t size;
-  };
-
-  static_assert(
-    sizeof(LegacySetStorageRuntimeView<InfluenceEntrySet>) == sizeof(InfluenceEntrySet),
-    "InfluenceEntrySet runtime view size must match legacy set storage"
-  );
-  static_assert(
-    sizeof(LegacySetStorageRuntimeView<InfluenceMapCellSet>) == sizeof(InfluenceMapCellSet),
-    "InfluenceMapCellSet runtime view size must match legacy set storage"
-  );
-
-  void DestroyInfluenceEntryRange(
-    InfluenceEntrySet& entries,
-    InfluenceEntryIterator first,
-    InfluenceEntryIterator last
-  ) noexcept;
-
-  /**
-   * Address: 0x00719790 (FUN_00719790)
-   *
-   * What it does:
-   * Destroys one `InfluenceGrid::entries` tree payload before the set object's
-   * own storage release runs at scope teardown.
-   */
-  void ClearInfluenceGridEntryTree(InfluenceEntrySet& entries) noexcept
-  {
-    DestroyInfluenceEntryRange(entries, entries.begin(), entries.end());
-  }
-
   struct LegacyMapRuntimeView
   {
     void* allocProxy;
@@ -1235,78 +1200,12 @@ namespace
     SerializeInfluenceMapEntryRecord(archive, objectPtr, version, ownerRef);
   }
 
-  /**
-   * Address: 0x0071BE10 (FUN_0071BE10, sub_71BE10)
-   *
-   * What it does:
-   * Advances one `InfluenceGrid::entries` iterator to its in-order successor.
-   */
-  void AdvanceInfluenceEntryIterator(InfluenceEntryIterator& it, const InfluenceEntryIterator end) noexcept
-  {
-    if (it != end) {
-      ++it;
-    }
-  }
-
   // Addresses 0x007189D0/0x0071A0C0 (the "ThunkA"/"ThunkB" iterator-advance
   // duplicates formerly modeled here) are dead: zero data_refs/call_edges
   // for both, and no source-level caller anywhere in src/sdk/**.
   // AdvanceInfluenceEntryIterator above is the real body, used directly by
   // EraseInfluenceEntryAndAdvance and DestroyInfluenceEntryRange below
   // (both confirmed real via multiple binary callers).
-
-  /**
-   * Address: 0x00717EF0 (FUN_00717EF0, sub_717EF0)
-   *
-   * What it does:
-   * Erases one `InfluenceGrid::entries` node and returns the successor iterator.
-   */
-  [[nodiscard]] InfluenceEntryIterator EraseInfluenceEntryAndAdvance(
-    moho::InfluenceGrid& grid,
-    const InfluenceEntryIterator current
-  )
-  {
-    if (current == grid.entries.end()) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    InfluenceEntryIterator next = current;
-    AdvanceInfluenceEntryIterator(next, grid.entries.end());
-    grid.entries.erase(current);
-    return next;
-  }
-
-  /**
-   * Address: 0x0071C280 (FUN_0071C280, sub_71C280)
-   *
-   * What it does:
-   * Destroys one ordered range of `InfluenceGrid::entries` nodes.
-   */
-  void DestroyInfluenceEntryRange(
-    InfluenceEntrySet& entries,
-    InfluenceEntryIterator first,
-    const InfluenceEntryIterator last
-  ) noexcept
-  {
-    while (first != last) {
-      const InfluenceEntryIterator eraseIt = first;
-      AdvanceInfluenceEntryIterator(first, last);
-      entries.erase(eraseIt);
-    }
-  }
-
-  /**
-   * Address: 0x0071C590 (FUN_0071C590, sub_71C590)
-   *
-   * What it does:
-   * Advances one `CInfluenceMap::mBlipCells` iterator to its in-order successor.
-   */
-  void AdvanceBlipCellIterator(InfluenceMapCellIterator& it, const InfluenceMapCellIterator end) noexcept
-  {
-    if (it != end) {
-      ++it;
-    }
-  }
 
   // Address 0x0071A060 (the "ThunkA" iterator-advance duplicate formerly
   // modeled here) is dead: zero data_refs/call_edges and no source-level
@@ -1315,78 +1214,12 @@ namespace
   // via multiple binary callers).
 
   /**
-   * Address: 0x0071B420 (FUN_0071B420, sub_71B420)
-   *
-   * What it does:
-   * Erases one `mBlipCells` iterator range and returns the first non-erased
-   * successor.
-   */
-  [[nodiscard]] InfluenceMapCellIterator EraseBlipCellRange(
-    InfluenceMapCellSet& blipCells,
-    InfluenceMapCellIterator first,
-    const InfluenceMapCellIterator last
-  ) noexcept
-  {
-    if (first == blipCells.begin() && last == blipCells.end()) {
-      blipCells.clear();
-      return blipCells.begin();
-    }
-
-    while (first != last) {
-      const InfluenceMapCellIterator eraseIt = first;
-      AdvanceBlipCellIterator(first, last);
-      blipCells.erase(eraseIt);
-    }
-
-    return first;
-  }
-
-  /**
-   * Address: 0x0071D7B0 (FUN_0071D7B0, sub_71D7B0)
-   *
-   * What it does:
-   * Allocates legacy red-black-tree node storage for blip-cell set lanes with
-   * VC8-style overflow guard semantics (`0x18` bytes per node).
-   */
-  void* AllocateBlipCellNodeBlock(const unsigned int count)
-  {
-    constexpr unsigned int kNodeBytes = 0x18u;
-    if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kNodeBytes) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(kNodeBytes));
-  }
-
-  /**
-   * Address: 0x0071C790 (FUN_0071C790)
-   *
-   * What it does:
-   * Allocates one legacy `mBlipCells` tree-node lane (`0x18` bytes).
-   */
-  void* AllocateSingleBlipCellNode() { return AllocateBlipCellNodeBlock(1u); }
-
-  /**
    * Address: 0x0071C750 (FUN_0071C750)
    *
    * What it does:
    * Allocates one fixed `0x40`-byte runtime node lane.
    */
   void* AllocateSingle64ByteNode() { return ::operator new(0x40u); }
-
-  struct BlipCellTreeNodeRuntime
-  {
-    BlipCellTreeNodeRuntime* left;   // +0x00
-    BlipCellTreeNodeRuntime* parent; // +0x04
-    BlipCellTreeNodeRuntime* right;  // +0x08
-    std::uint32_t entityId;          // +0x0C
-    std::int32_t cellIndex;          // +0x10
-    std::uint8_t color;              // +0x14
-    std::uint8_t isNil;              // +0x15
-    std::uint8_t pad16;              // +0x16
-    std::uint8_t pad17;              // +0x17
-  };
-  static_assert(sizeof(BlipCellTreeNodeRuntime) == 0x18, "BlipCellTreeNodeRuntime size must be 0x18");
 
 #pragma pack(push, 1)
   struct InfluenceNodeFlag61Runtime
@@ -1487,33 +1320,6 @@ namespace
     }
     *iteratorSlot = left;
     return result;
-  }
-
-  /**
-   * Address: 0x0071B4E0 (FUN_0071B4E0)
-   *
-   * What it does:
-   * Seeds one legacy set runtime header with a self-linked sentinel node and
-   * zero element count.
-   */
-  void* ConstructBlipCellSetHeaderFromSentinel(
-    LegacySetStorageRuntimeView<InfluenceMapCellSet>& setStorage
-  )
-  {
-    auto* const sentinel = static_cast<BlipCellTreeNodeRuntime*>(AllocateBlipCellNodeBlock(1u));
-    setStorage.head = sentinel;
-
-    sentinel->left = sentinel;
-    sentinel->parent = sentinel;
-    sentinel->right = sentinel;
-    sentinel->entityId = 0u;
-    sentinel->cellIndex = 0;
-    sentinel->color = 1u;
-    sentinel->isNil = 1u;
-    sentinel->pad16 = 0u;
-    sentinel->pad17 = 0u;
-    setStorage.size = 0u;
-    return sentinel;
   }
 
   /**
@@ -1712,37 +1518,6 @@ namespace
       cursor = head->left;
     } while (cursor->isNil21 == 0u);
     return head;
-  }
-
-  /**
-   * Address: 0x0071C4E0 (FUN_0071C4E0)
-   *
-   * What it does:
-   * Allocates one blip-cell tree node and seeds links, key lanes, and
-   * red-black marker bytes.
-   */
-  BlipCellTreeNodeRuntime* AllocateBlipCellTreeNode(
-    const moho::InfluenceMapCellIndex& key,
-    BlipCellTreeNodeRuntime* const left,
-    BlipCellTreeNodeRuntime* const parent,
-    BlipCellTreeNodeRuntime* const right
-  )
-  {
-    auto* const node = static_cast<BlipCellTreeNodeRuntime*>(AllocateBlipCellNodeBlock(1u));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->entityId = key.entityId;
-    node->cellIndex = key.cellIndex;
-    node->color = 0u;
-    node->isNil = 0u;
-    node->pad16 = 0u;
-    node->pad17 = 0u;
-    return node;
   }
 
   /**
@@ -1989,81 +1764,6 @@ namespace
     }
 
     return it;
-  }
-
-  /**
-   * Address: 0x00717EA0 (FUN_00717EA0)
-   *
-   * What it does:
-   * Destroys one `InfluenceGrid::entries` tree payload, releases its legacy
-   * set-header sentinel storage, and zeros `{head,size}` lanes.
-   */
-  int ReleaseInfluenceEntrySetStorage(moho::InfluenceGrid& grid) noexcept
-  {
-    ClearInfluenceGridEntryTree(grid.entries);
-
-    auto& runtime = reinterpret_cast<LegacySetStorageRuntimeView<InfluenceEntrySet>&>(grid.entries);
-    if (runtime.head != nullptr) {
-      ::operator delete(runtime.head);
-    }
-    runtime.head = nullptr;
-    runtime.size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x007183D0 (FUN_007183D0)
-   *
-   * What it does:
-   * Releases one `mBlipCells` set payload, deletes the legacy set-header
-   * sentinel storage, and zeros `{head,size}` lanes.
-   */
-  int ReleaseBlipCellSetStorageLaneA(InfluenceMapCellSet& blipCells) noexcept
-  {
-    blipCells.clear();
-
-    auto& runtime = reinterpret_cast<LegacySetStorageRuntimeView<InfluenceMapCellSet>&>(blipCells);
-    if (runtime.head != nullptr) {
-      ::operator delete(runtime.head);
-    }
-    runtime.head = nullptr;
-    runtime.size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x00719D50 (FUN_00719D50)
-   *
-   * What it does:
-   * Duplicate release lane for one `mBlipCells` set payload: clears tree
-   * nodes, frees set-header sentinel storage, and zeros `{head,size}`.
-   */
-  int ReleaseBlipCellSetStorageLaneB(InfluenceMapCellSet& blipCells) noexcept
-  {
-    return ReleaseBlipCellSetStorageLaneA(blipCells);
-  }
-
-  /**
-   * Address: 0x0071C4A0 (FUN_0071C4A0, sub_71C4A0)
-   *
-   * What it does:
-   * Initializes the legacy blip-cell set into the empty-tree state used by
-   * the constructor lane.
-   */
-  void InitializeBlipCellSet(InfluenceMapCellSet& blipCells) noexcept
-  {
-    (void)EraseBlipCellRange(blipCells, blipCells.begin(), blipCells.end());
-  }
-
-  /**
-   * Address: 0x00715C30 (FUN_00715C30, sub_715C30)
-   *
-   * What it does:
-   * Releases the legacy blip-cell set from the destructor lane.
-   */
-  void ReleaseBlipCellSet(InfluenceMapCellSet& blipCells) noexcept
-  {
-    (void)EraseBlipCellRange(blipCells, blipCells.begin(), blipCells.end());
   }
 
   /**
@@ -3172,7 +2872,7 @@ namespace moho
     , mBlipCells()
     , mMapEntries()
   {
-    InitializeBlipCellSet(mBlipCells);
+    mBlipCells.clear();
     mMapEntries.clear();
   }
 
@@ -3189,7 +2889,7 @@ namespace moho
     , mMapEntries()
   {
     mMapEntries.clear();
-    InitializeBlipCellSet(mBlipCells);
+    mBlipCells.clear();
 
     const STIMap* const mapData = sim ? sim->mMapData : nullptr;
     const CHeightField* const heightField = mapData ? mapData->mHeightField.get() : nullptr;
@@ -3218,7 +2918,7 @@ namespace moho
   CInfluenceMap::~CInfluenceMap()
   {
     mMapEntries.clear();
-    ReleaseBlipCellSet(mBlipCells);
+    mBlipCells.clear();
   }
 
   /**
@@ -3535,7 +3235,7 @@ namespace moho
         if (entry.threatStrength <= 0.0f) {
           const float threatStrengthChecksum = entry.threatStrength;
           RemoveBlipCell(entry.entityId);
-          it = EraseInfluenceEntryAndAdvance(*cell, it);
+          it = cell->entries.erase(it);
           if (sim) {
             sim->mContext.Update(&threatStrengthChecksum, sizeof(threatStrengthChecksum));
           }
