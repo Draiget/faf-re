@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <concepts>
 #include <type_traits>
 #include "lua/LuaRuntimeTypes.h"
 
@@ -1326,6 +1327,34 @@ namespace LuaPlus
 	inline void LuaPush(lua_State* L, double v)
 	{
 		lua_pushnumber(L, static_cast<lua_Number>(v));
+	}
+
+	/**
+	 * Engine objects go across as their Lua peer, never as a raw pointer.
+	 *
+	 * Without this, `Unit*` had no viable overload of its own and bound to the
+	 * `bool` one above through a boolean conversion, so every callback that
+	 * hands a unit to a script -- `OnStartBuild`, `OnAdjacentTo`,
+	 * `RunScriptUnit`'s whole family -- pushed the literal `true` in its place.
+	 * The binary passes the object: `CScriptObject::RunScript_OnStartBuild`
+	 * (0x005FC8E0) calls `LuaFunction::Call_ObjectUnitString(self, unit, str)`,
+	 * whose middle argument is the unit's Lua object.
+	 *
+	 * Being an exact match, this template outranks that boolean conversion; the
+	 * non-template `LuaObject*` / `const char*` overloads still outrank it in
+	 * turn, so only engine objects with a Lua peer land here.
+	 */
+	template <class T>
+		requires requires(T* p) {
+			{ p->GetLuaObject() } -> std::same_as<LuaPlus::LuaObject>;
+		}
+	inline void LuaPush(lua_State* L, T* obj)
+	{
+		if (obj == nullptr) {
+			lua_pushnil(L);
+			return;
+		}
+		obj->GetLuaObject().PushStack(L);
 	}
 
 	template<class Ret = void>
