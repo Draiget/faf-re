@@ -127,34 +127,6 @@ boost::shared_ptr<moho::AudioEngine>* ConstructSharedAudioEngineFromRaw(
   return lastControlAddress;
 }
 
-/**
- * Address: 0x004DE4C0 (FUN_004DE4C0)
- *
- * What it does:
- * Fills one destination `AudioEngineRef` range from one source pair and
- * retains the copied shared-control lane for each written element.
- */
-void FillAudioEngineRefRangeFromSingleSource(
-  std::int32_t count,
-  moho::AudioEngineRef* destination,
-  const moho::AudioEngineRef* const source
-) noexcept
-{
-  for (; count > 0; --count, ++destination) {
-    if (destination == nullptr) {
-      continue;
-    }
-
-    destination->mEngine = source != nullptr ? source->mEngine : nullptr;
-    destination->mControl = source != nullptr ? source->mControl : nullptr;
-
-    auto* const control = destination->mControl;
-    if (control != nullptr) {
-      control->add_ref_copy();
-    }
-  }
-}
-
 namespace
 {
   struct SpCountedImplAudioEngineRuntimeView
@@ -526,16 +498,16 @@ namespace
 
   [[nodiscard]] AudioSoundBankLoader* FindBankLoader(moho::AudioEngineImpl* impl, const std::uint16_t bankId)
   {
-    if (impl == nullptr || impl->mBanks.mStart == nullptr || impl->mBanks.mFinish == nullptr) {
+    if (impl == nullptr || impl->mBanks.empty()) {
       return nullptr;
     }
 
-    const std::size_t bankCount = static_cast<std::size_t>(impl->mBanks.mFinish - impl->mBanks.mStart);
+    const std::size_t bankCount = impl->mBanks.size();
     if (static_cast<std::size_t>(bankId) >= bankCount) {
       return nullptr;
     }
 
-    return static_cast<AudioSoundBankLoader*>(impl->mBanks.mStart[bankId]);
+    return static_cast<AudioSoundBankLoader*>(impl->mBanks.begin()[bankId]);
   }
 
   [[nodiscard]] std::uint32_t ResolveDstChannelCount(const moho::SoundConfiguration* configuration)
@@ -1259,162 +1231,6 @@ namespace
     }
   }
 
-  struct AudioPointerVectorStorageRuntimeView
-  {
-    std::uint32_t allocatorProxy = 0; // +0x00
-    void** begin = nullptr;           // +0x04
-    void** end = nullptr;             // +0x08
-    void** capacity = nullptr;        // +0x0C
-  };
-  static_assert(
-    offsetof(AudioPointerVectorStorageRuntimeView, begin) == 0x04,
-    "AudioPointerVectorStorageRuntimeView::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(AudioPointerVectorStorageRuntimeView, end) == 0x08,
-    "AudioPointerVectorStorageRuntimeView::end offset must be 0x08"
-  );
-  static_assert(
-    offsetof(AudioPointerVectorStorageRuntimeView, capacity) == 0x0C,
-    "AudioPointerVectorStorageRuntimeView::capacity offset must be 0x0C"
-  );
-
-  [[nodiscard]] void** AppendNonNullAudioPointerVectorEntry(
-    AudioPointerVectorStorageRuntimeView& vectorRuntime,
-    void* const entry
-  )
-  {
-    if (entry == nullptr) {
-      throw boost::bad_pointer();
-    }
-
-    moho::CWaitHandle waitHandleStorage{};
-    waitHandleStorage.begin = reinterpret_cast<HANDLE*>(vectorRuntime.begin);
-    waitHandleStorage.end = reinterpret_cast<HANDLE*>(vectorRuntime.end);
-    waitHandleStorage.cap = reinterpret_cast<HANDLE*>(vectorRuntime.capacity);
-
-    const HANDLE handleEntry = static_cast<HANDLE>(entry);
-    if (waitHandleStorage.begin == nullptr || waitHandleStorage.size() >= waitHandleStorage.capacity()) {
-      HANDLE* const appendedEnd = waitHandleStorage.AppendHandle(waitHandleStorage.end, 1u, &handleEntry);
-      vectorRuntime.begin = reinterpret_cast<void**>(waitHandleStorage.begin);
-      vectorRuntime.end = reinterpret_cast<void**>(appendedEnd);
-      vectorRuntime.capacity = reinterpret_cast<void**>(waitHandleStorage.cap);
-      return vectorRuntime.end;
-    }
-
-    *waitHandleStorage.end = handleEntry;
-    ++waitHandleStorage.end;
-    vectorRuntime.end = reinterpret_cast<void**>(waitHandleStorage.end);
-    return vectorRuntime.end;
-  }
-
-  /**
-   * Address: 0x004DB2A0 (FUN_004DB2A0)
-   *
-   * What it does:
-   * Pushes one non-null pointer lane into one vector-like handle set used by
-   * sound-path loading, growing the backing storage through the canonical
-   * wait-handle append helper when the current capacity is exhausted.
-   */
-  [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryA(
-    AudioPointerVectorStorageRuntimeView& vectorRuntime,
-    void* const entry
-  )
-  {
-    return AppendNonNullAudioPointerVectorEntry(vectorRuntime, entry);
-  }
-
-  /**
-   * Address: 0x004DB440 (FUN_004DB440)
-   *
-   * What it does:
-   * Secondary non-null pointer push-back lane with the same growth and
-   * `boost::bad_pointer` throw semantics as `FUN_004DB2A0`.
-   */
-  [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryB(
-    AudioPointerVectorStorageRuntimeView& vectorRuntime,
-    void* const entry
-  )
-  {
-    return AppendNonNullAudioPointerVectorEntry(vectorRuntime, entry);
-  }
-
-  /**
-   * Address: 0x004DB370 (FUN_004DB370)
-   *
-   * What it does:
-   * Destroys all sound-bank loader pointers stored in one vector-like storage
-   * lane, then releases the pointer-array buffer and clears begin/end/capacity.
-   */
-  [[maybe_unused]] void ResetAudioSoundBankLoaderPointerVectorStorageRuntime(
-    AudioPointerVectorStorageRuntimeView* const vectorRuntime
-  ) noexcept
-  {
-    if (vectorRuntime == nullptr) {
-      return;
-    }
-
-    DestroyAudioSoundBankLoaderRange(vectorRuntime->begin, vectorRuntime->end);
-    if (vectorRuntime->begin != nullptr) {
-      operator delete(vectorRuntime->begin);
-    }
-
-    vectorRuntime->begin = nullptr;
-    vectorRuntime->end = nullptr;
-    vectorRuntime->capacity = nullptr;
-  }
-
-  /**
-   * Address: 0x004DB500 (FUN_004DB500)
-   *
-   * What it does:
-   * Destroys all runtime-handle pointers stored in one vector-like storage
-   * lane, then releases the pointer-array buffer and clears begin/end/capacity.
-   */
-  [[maybe_unused]] void ResetAudioRuntimeHandlePointerVectorStorageRuntime(
-    AudioPointerVectorStorageRuntimeView* const vectorRuntime
-  ) noexcept
-  {
-    if (vectorRuntime == nullptr) {
-      return;
-    }
-
-    DestroyAudioRuntimeHandleRange(vectorRuntime->begin, vectorRuntime->end);
-    if (vectorRuntime->begin != nullptr) {
-      operator delete(vectorRuntime->begin);
-    }
-
-    vectorRuntime->begin = nullptr;
-    vectorRuntime->end = nullptr;
-    vectorRuntime->capacity = nullptr;
-  }
-
-  /**
-   * Address: 0x004DA280 (FUN_004DA280)
-   *
-   * What it does:
-   * Pure jump-thunk adapter into `ResetAudioSoundBankLoaderPointerVectorStorageRuntime`.
-   */
-  [[maybe_unused]] void ResetAudioSoundBankLoaderPointerVectorStorageRuntimeThunk(
-    AudioPointerVectorStorageRuntimeView* const vectorRuntime
-  ) noexcept
-  {
-    ResetAudioSoundBankLoaderPointerVectorStorageRuntime(vectorRuntime);
-  }
-
-  /**
-   * Address: 0x004DA290 (FUN_004DA290)
-   *
-   * What it does:
-   * Pure jump-thunk adapter into `ResetAudioRuntimeHandlePointerVectorStorageRuntime`.
-   */
-  [[maybe_unused]] void ResetAudioRuntimeHandlePointerVectorStorageRuntimeThunk(
-    AudioPointerVectorStorageRuntimeView* const vectorRuntime
-  ) noexcept
-  {
-    ResetAudioRuntimeHandlePointerVectorStorageRuntime(vectorRuntime);
-  }
-
   [[nodiscard]] Wm3::Vec3f NormalizeOrDefault(Wm3::Vec3f value, const Wm3::Vec3f& fallback)
   {
     if (Wm3::Vec3f::LengthSq(value) <= 1.0e-8f) {
@@ -1729,7 +1545,7 @@ namespace moho
     msvc8::vector<msvc8::string> waveBankPaths{};
     waitHandleSet->mHandle->EnumerateFiles(voicePath, "*.xwb", false, &waveBankPaths);
 
-    auto& waveBankStorage = reinterpret_cast<AudioPointerVectorStorageRuntimeView&>(impl->mHandles);
+
     for (const msvc8::string& waveBankPath : waveBankPaths) {
       const bool streamingWaveBank = IsStreamingWaveBank(waveBankPath.c_str());
       gpg::Logf(
@@ -1746,7 +1562,7 @@ namespace moho
       }
 
       if (waveBankLoader != nullptr && waveBankLoader->Load(waveBankPath.c_str())) {
-        PushBackNonNullAudioHandleStorageEntryB(waveBankStorage, waveBankLoader);
+        impl->mHandles.push_back(waveBankLoader);
         waveBankLoader = nullptr;
       }
 
@@ -1761,7 +1577,7 @@ namespace moho
     msvc8::vector<msvc8::string> soundBankPaths{};
     waitHandleSet->mHandle->EnumerateFiles(voicePath, "*.xsb", false, &soundBankPaths);
 
-    auto& soundBankStorage = reinterpret_cast<AudioPointerVectorStorageRuntimeView&>(impl->mBanks);
+
     for (const msvc8::string& soundBankPath : soundBankPaths) {
       auto* soundBankLoader = new (std::nothrow) AudioSoundBankLoader{};
       if (soundBankLoader != nullptr) {
@@ -1769,7 +1585,7 @@ namespace moho
       }
 
       if (soundBankLoader != nullptr && soundBankLoader->Load(soundBankPath.c_str())) {
-        PushBackNonNullAudioHandleStorageEntryA(soundBankStorage, soundBankLoader);
+        impl->mBanks.push_back(soundBankLoader);
         soundBankLoader = nullptr;
       }
 
@@ -2460,15 +2276,14 @@ namespace moho
     for (std::size_t engineIndex = 0; engineIndex < engineCount; ++engineIndex) {
       const AudioEngineRef& engineRef = configuration->mEngines.mStart[engineIndex];
       AudioEngine* const engine = engineRef.mEngine;
-      if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mBanks.mStart == nullptr ||
-          engine->mImpl->mBanks.mFinish == nullptr) {
+      if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mBanks.empty()) {
         continue;
       }
 
       const std::size_t bankCount =
-        static_cast<std::size_t>(engine->mImpl->mBanks.mFinish - engine->mImpl->mBanks.mStart);
+        engine->mImpl->mBanks.size();
       for (std::size_t bankIndex = 0; bankIndex < bankCount; ++bankIndex) {
-        auto* const loader = static_cast<AudioSoundBankLoader*>(engine->mImpl->mBanks.mStart[bankIndex]);
+        auto* const loader = static_cast<AudioSoundBankLoader*>(engine->mImpl->mBanks.begin()[bankIndex]);
         if (loader == nullptr || ::_stricmp(bankName, loader->mName.c_str()) != 0) {
           continue;
         }
@@ -2671,15 +2486,7 @@ namespace moho
     , mEmitter{}
     , mAudioHandle{}
   {
-    mBanks.mAllocatorCookie = nullptr;
-    mBanks.mStart = nullptr;
-    mBanks.mFinish = nullptr;
-    mBanks.mEnd = nullptr;
 
-    mHandles.mAllocatorCookie = nullptr;
-    mHandles.mStart = nullptr;
-    mHandles.mFinish = nullptr;
-    mHandles.mEnd = nullptr;
 
     // mPausedCategoryNames (msvc8::set<msvc8::string>) and mCategoryVolumes
     // (msvc8::map<std::uint16_t, float>) both construct themselves via their
@@ -2729,21 +2536,11 @@ namespace moho
     delete[] mSettings.mMatrixCoefficients;
     mSettings.mMatrixCoefficients = nullptr;
 
-    if (mHandles.mStart != nullptr) {
-      DestroyAudioRuntimeHandleRange(mHandles.mStart, mHandles.mFinish);
-      operator delete(mHandles.mStart);
-    }
-    mHandles.mStart = nullptr;
-    mHandles.mFinish = nullptr;
-    mHandles.mEnd = nullptr;
+    DestroyAudioRuntimeHandleRange(mHandles.begin(), mHandles.end());
+    mHandles.tidy();
 
-    if (mBanks.mStart != nullptr) {
-      DestroyAudioSoundBankLoaderRange(mBanks.mStart, mBanks.mFinish);
-      operator delete(mBanks.mStart);
-    }
-    mBanks.mStart = nullptr;
-    mBanks.mFinish = nullptr;
-    mBanks.mEnd = nullptr;
+    DestroyAudioSoundBankLoaderRange(mBanks.begin(), mBanks.end());
+    mBanks.tidy();
 
     // mCategoryVolumes (msvc8::map<std::uint16_t, float>) and
     // mPausedCategoryNames (msvc8::set<msvc8::string>) both tear themselves
@@ -2815,14 +2612,13 @@ namespace moho
    */
   bool AudioEngine::GetBankIndex(const gpg::StrArg bankName, std::uint16_t* const outBankId)
   {
-    if (bankName == nullptr || outBankId == nullptr || mImpl == nullptr || mImpl->mBanks.mStart == nullptr ||
-        mImpl->mBanks.mFinish == nullptr) {
+    if (bankName == nullptr || outBankId == nullptr || mImpl == nullptr || mImpl->mBanks.empty()) {
       return false;
     }
 
-    const std::size_t bankCount = static_cast<std::size_t>(mImpl->mBanks.mFinish - mImpl->mBanks.mStart);
+    const std::size_t bankCount = mImpl->mBanks.size();
     for (std::size_t bankIndex = 0; bankIndex < bankCount; ++bankIndex) {
-      auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.mStart[bankIndex]);
+      auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.begin()[bankIndex]);
       if (loader == nullptr || ::_stricmp(loader->mName.c_str(), bankName) != 0) {
         continue;
       }
@@ -2844,17 +2640,16 @@ namespace moho
    */
   bool AudioEngine::GetCueIndex(const gpg::StrArg cueName, const std::uint16_t bankId, std::uint16_t* const outCueId)
   {
-    if (cueName == nullptr || outCueId == nullptr || mImpl == nullptr || mImpl->mBanks.mStart == nullptr ||
-        mImpl->mBanks.mFinish == nullptr) {
+    if (cueName == nullptr || outCueId == nullptr || mImpl == nullptr || mImpl->mBanks.empty()) {
       return false;
     }
 
-    const std::size_t bankCount = static_cast<std::size_t>(mImpl->mBanks.mFinish - mImpl->mBanks.mStart);
+    const std::size_t bankCount = mImpl->mBanks.size();
     if (static_cast<std::size_t>(bankId) >= bankCount) {
       return false;
     }
 
-    auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.mStart[bankId]);
+    auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.begin()[bankId]);
     if (loader == nullptr || loader->mBank == nullptr) {
       return false;
     }
