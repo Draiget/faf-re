@@ -40,37 +40,6 @@ namespace
 
   bool gBlueprintExtractorsInitialized = false;
 
-  /**
-   * Address: 0x007F00A0 (FUN_007F00A0, IDA's own demangled name:
-   * `std::map_string_RangeExtractor::find`)
-   * Address: 0x007F0960 (FUN_007F0960, this `find` emission's insert-if-
-   * absent fallback core -- reached when the lower-bound candidate
-   * (`sub_7F1C50`, cited above on `FindBlueprintExtractorLowerBound`)
-   * doesn't compare equal, matching `operator[]`'s real semantics: find
-   * first, then buy/insert a new node holding a default-constructed
-   * `std::unique_ptr<RangeExtractor>` on miss)
-   *
-   * Both are generic Dinkumware `std::_Tree` internals for
-   * `BlueprintExtractorRegistry` (`std::map<std::string,
-   * std::unique_ptr<RangeExtractor>>`, real `std::map` per this map's own
-   * "container substitution note" above -- `unique_ptr` can't live in the
-   * project's `msvc8::map`). `registry[blueprintRangeName] =
-   * std::move(extractor)` below is `operator[]`'s real source-level
-   * invocation, which the compiler expands to exactly this `find`-then-
-   * insert-on-miss pair; called 12x from `InitializeBlueprintExtractors`'s
-   * `RegisterExtractor` calls (one per registered extractor type),
-   * confirmed via `FUN_007F00A0`'s own 12 real callers all owned by
-   * `FUN_007ED4B0` (`InitializeBlueprintExtractors`, already recovered
-   * above).
-   *
-   * Address: 0x007F1890 (FUN_007F1890) -- the same instantiation's
-   * `_Tree::_Buynode`-shaped node allocate-and-link step: walks
-   * `Moho::sBlueprintExtractors._Myhead`'s parent/leftmost-descent chain
-   * to find the real insertion point, allocates and links the fresh
-   * `pair<const std::string, std::unique_ptr<RangeExtractor>>` node.
-   * Called directly from `FUN_007F0960` above (`*a2 =
-   * *(DWORD*)sub_7F1890();`), the same `operator[]` insert-on-miss path.
-   */
   void RegisterExtractor(
     BlueprintExtractorRegistry& registry,
     const char* const blueprintRangeName,
