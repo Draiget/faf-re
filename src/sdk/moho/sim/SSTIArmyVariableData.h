@@ -69,6 +69,9 @@ namespace moho
    * Network/sync variable payload for per-army runtime state.
    * Field coverage follows FA + Moho serializer/copy evidence; unresolved sub-ranges
    * remain explicit offset-scoped runtime blocks.
+   * Address: 0x00563590 (FUN_00563590 -- `SSTIArmyVariableData`'s copy constructor, guarded on a null destination, as emitted for its vector's `_Ucopy`; zero callers, unreachable; formerly `CopyConstructSSTIArmyVariableDataIfPresentPrimary` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00563790 (FUN_00563790 -- `SSTIArmyVariableData`'s copy constructor (second copy); zero callers, unreachable; formerly `CopyConstructSSTIArmyVariableDataIfPresentSecondary` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x008B17D0 (FUN_008B17D0 -- `SSTIArmyVariableData::operator=` into an owner-embedded slot; zero callers, unreachable; formerly `AssignSSTIArmyVariableDataIntoEmbeddedOwnerSlot` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct SSTIArmyVariableData
   {
