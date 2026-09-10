@@ -11,47 +11,7 @@ namespace moho
   gpg::RType* REmitterBlueprintCurve::sType = nullptr;
   gpg::RType* REmitterBlueprint::sType = nullptr;
 
-  std::size_t REmitterCurveKeyListStorage::Count() const noexcept
-  {
-    if (!mBegin || !mEnd || mEnd < mBegin) {
-      return 0U;
-    }
-    return static_cast<std::size_t>(mEnd - mBegin);
-  }
 
-  bool REmitterCurveKeyListStorage::Empty() const noexcept
-  {
-    return Count() == 0U;
-  }
-
-  /**
-   * Address: 0x005108A0 (FUN_005108A0)
-   *
-   * What it does:
-   * Destroys each curve-key entry in the half-open `[begin,end)` lane, frees
-   * the backing payload, and resets begin/end/capacity pointers to null.
-   */
-  void ResetEmitterCurveKeyStorageRuntime(REmitterCurveKeyListStorage* const storage)
-  {
-    if (storage == nullptr) {
-      return;
-    }
-
-    REmitterCurveKey* cursor = storage->mBegin;
-    if (cursor != nullptr) {
-      const REmitterCurveKey* const end = storage->mEnd;
-      while (cursor != end) {
-        cursor->~REmitterCurveKey();
-        ++cursor;
-      }
-
-      ::operator delete(storage->mBegin);
-    }
-
-    storage->mBegin = nullptr;
-    storage->mEnd = nullptr;
-    storage->mCapacityEnd = nullptr;
-  }
 
   /**
    * Address: 0x00514B30 (FUN_00514B30)
@@ -134,14 +94,10 @@ namespace moho
    * Address: 0x0050E5A0 (FUN_0050E5A0, base dtor thunk lane)
    *
    * What it does:
-   * Releases key-storage payload for this curve instance; shared dtor thunks
-   * at both addresses funnel through this same teardown lane.
+   * Nothing of its own: `~vector<REmitterCurveKey>` is the whole teardown,
+   * and MSVC emits it. Both thunks funnel here.
    */
-  REmitterBlueprintCurve::~REmitterBlueprintCurve()
-  {
-    ResetEmitterCurveKeyStorageRuntime(&Keys);
-    Keys.mAllocProxy = nullptr;
-  }
+  REmitterBlueprintCurve::~REmitterBlueprintCurve() = default;
 
   /**
    * Address: 0x0050E750 (FUN_0050E750)

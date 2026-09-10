@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
 #include "legacy/containers/String.h"
 #include "moho/resource/blueprints/REffectBlueprint.h"
 
@@ -56,32 +57,14 @@ namespace moho
   };
 
   /**
-   * Legacy vector-like storage used by `REmitterBlueprintCurve::Keys`.
-   *
-   * Evidence:
-   * - field registration at `REmitterBlueprintCurve + 0x08` uses
-   *   `std::vector` RTTI (`FUN_00516F20`).
-   * - ctor/dtor chains initialize/free begin/end/capacity at +0x0C/+0x10/+0x14.
+   * `REmitterBlueprintCurve::Keys`. The field registration at
+   * `REmitterBlueprintCurve + 0x08` uses `std::vector` RTTI (`FUN_00516F20`),
+   * and the 0x10 head is the ordinary `{proxy, first, last, end}`: the
+   * `_Tidy` at 0x005108A0 destroys each element through its virtual
+   * destructor slot at a 0x10 stride, frees the block, and nulls `+0x04`,
+   * `+0x08` and `+0x0C`.
    */
-  struct REmitterCurveKeyListStorage
-  {
-    void* mAllocProxy{nullptr};              // +0x00
-    REmitterCurveKey* mBegin{nullptr};       // +0x04
-    REmitterCurveKey* mEnd{nullptr};         // +0x08
-    REmitterCurveKey* mCapacityEnd{nullptr}; // +0x0C
-
-    [[nodiscard]] std::size_t Count() const noexcept;
-    [[nodiscard]] bool Empty() const noexcept;
-  };
-
-  /**
-   * Address: 0x005108A0 (FUN_005108A0)
-   *
-   * What it does:
-   * Destroys all `REmitterCurveKey` entries in one storage lane, frees the
-   * backing allocation, and clears begin/end/capacity pointers.
-   */
-  void ResetEmitterCurveKeyStorageRuntime(REmitterCurveKeyListStorage* storage);
+  using REmitterCurveKeyListStorage = msvc8::vector<REmitterCurveKey>;
 
   /**
    * Address: 0x00515460 (FUN_00515460)
@@ -259,16 +242,7 @@ namespace moho
   static_assert(offsetof(REmitterCurveKey, X) == 0x04, "REmitterCurveKey::X offset must be 0x04");
   static_assert(offsetof(REmitterCurveKey, Y) == 0x08, "REmitterCurveKey::Y offset must be 0x08");
   static_assert(offsetof(REmitterCurveKey, Z) == 0x0C, "REmitterCurveKey::Z offset must be 0x0C");
-  static_assert(
-    offsetof(REmitterCurveKeyListStorage, mBegin) == 0x04, "REmitterCurveKeyListStorage::mBegin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(REmitterCurveKeyListStorage, mEnd) == 0x08, "REmitterCurveKeyListStorage::mEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(REmitterCurveKeyListStorage, mCapacityEnd) == 0x0C,
-    "REmitterCurveKeyListStorage::mCapacityEnd offset must be 0x0C"
-  );
+
   static_assert(offsetof(REmitterBlueprintCurve, XRange) == 0x04, "REmitterBlueprintCurve::XRange offset must be 0x04");
   static_assert(offsetof(REmitterBlueprintCurve, Keys) == 0x08, "REmitterBlueprintCurve::Keys offset must be 0x08");
 

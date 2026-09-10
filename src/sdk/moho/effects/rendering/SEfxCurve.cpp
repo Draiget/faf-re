@@ -463,8 +463,8 @@ namespace moho
   {
     destination.mKeys.ResetStorageToInline();
 
-    if (!source.Keys.Empty()) {
-      for (const REmitterCurveKey* key = source.Keys.mBegin; key != source.Keys.mEnd; ++key) {
+    if (!source.Keys.empty()) {
+      for (const REmitterCurveKey* key = source.Keys.begin(); key != source.Keys.end(); ++key) {
         InsertEmitterCurveKey(destination, Wm3::Vector3f(key->X, key->Y, key->Z));
       }
 

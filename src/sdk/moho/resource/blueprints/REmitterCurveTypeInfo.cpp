@@ -104,23 +104,6 @@ namespace
     return moho::REmitterBlueprintCurve::sType;
   }
 
-  /**
-   * Address: 0x00510430 (FUN_00510430)
-   *
-   * What it does:
-   * Clears one `REmitterCurveKey` payload lane (`X/Y/Z`) while preserving the
-   * base-object lane at offset `+0x00`.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* ClearEmitterCurveKeyPayloadLanes(
-    moho::REmitterCurveKey* const result
-  ) noexcept
-  {
-    result->X = 0.0f;
-    result->Y = 0.0f;
-    result->Z = 0.0f;
-    return result;
-  }
-
   [[nodiscard]] gpg::RType* CachedEmitterCurveKeyVectorType()
   {
     static gpg::RType* cached = nullptr;
@@ -468,315 +451,6 @@ namespace
   }
 
   /**
-   * Address: 0x005182D0 (FUN_005182D0)
-   *
-   * What it does:
-   * Copies one half-open source lane range `[sourceBegin, sourceEnd)` into
-   * contiguous `REmitterCurveKey` destination storage, reading each source
-   * element at a stride of 4 floats and writing destination `vtable/X/Y/Z`.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeFromLaneArray(
-    moho::REmitterCurveKey* destinationBegin,
-    const float* sourceBegin,
-    const float* sourceEnd
-  )
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (const float* sourceCursor = sourceBegin;
-      sourceCursor != sourceEnd;
-      sourceCursor += 4, destinationCursor += sizeof(moho::REmitterCurveKey)) {
-      if (destinationCursor == 0U) {
-        continue;
-      }
-
-      auto* const destination = reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-      (void)InitializeEmitterCurveRObjectLane(static_cast<gpg::RObject*>(destination));
-      ::new (static_cast<void*>(destination)) moho::REmitterCurveKey();
-      destination->X = sourceCursor[1];
-      destination->Y = sourceCursor[2];
-      destination->Z = sourceCursor[3];
-    }
-
-    return reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-  }
-
-  /**
-   * Address: 0x005171A0 (FUN_005171A0)
-   * Address: 0x006DEF90 (FUN_006DEF90)
-   *
-   * What it does:
-   * Stdcall adapter lane that forwards one source-lane range into the
-   * canonical emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneA(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00517CF0 (FUN_00517CF0)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one source-lane range into the canonical
-   * emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneA(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00517FF0 (FUN_00517FF0)
-   *
-   * What it does:
-   * Stdcall adapter lane that forwards one source-lane range into the
-   * canonical emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneB(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005181A0 (FUN_005181A0)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one source-lane range into the canonical
-   * emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneB(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00518220 (FUN_00518220)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one source-lane range into the canonical
-   * emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneC(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00518290 (FUN_00518290)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one source-lane range into the canonical
-   * emitter-curve key range copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneD(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRangeFromLaneArray(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00517FA0 (FUN_00517FA0)
-   *
-   * What it does:
-   * Initializes `count` contiguous `REmitterCurveKey` records from one source
-   * lane tuple, writing vtable/X/Y/Z for each 0x10-byte element stride.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeFromLaneTuple(
-    moho::REmitterCurveKey* destinationBegin,
-    const float* sourceLanes,
-    int count
-  )
-  {
-    const float x = sourceLanes != nullptr ? sourceLanes[1] : 0.0f;
-    const float y = sourceLanes != nullptr ? sourceLanes[2] : 0.0f;
-    const float z = sourceLanes != nullptr ? sourceLanes[3] : 0.0f;
-
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (; count > 0; --count, destinationCursor += sizeof(moho::REmitterCurveKey)) {
-      if (destinationCursor == 0U) {
-        continue;
-      }
-
-      auto* const destination = reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-      ::new (static_cast<void*>(destination)) moho::REmitterCurveKey();
-      destination->X = x;
-      destination->Y = y;
-      destination->Z = z;
-    }
-
-    return reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-  }
-
-  /**
-   * Address: 0x00510440 (FUN_00510440)
-   *
-   * What it does:
-   * Thunk lane used by emitter-curve vector deserialization to clear one key
-   * storage payload by forwarding to the canonical storage reset helper.
-   */
-  void ClearEmitterCurveKeyStorageThunk(moho::REmitterCurveKeyListStorage* const storage)
-  {
-    moho::ResetEmitterCurveKeyStorageRuntime(storage);
-  }
-
-  /**
-   * Address: 0x00516C20 (FUN_00516C20)
-   *
-   * What it does:
-   * Initializes `count` contiguous `REmitterCurveKey` records with zero
-   * coordinate lanes and returns one-past-last destination element.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeWithZeroTuple(
-    moho::REmitterCurveKey* const destinationBegin,
-    const int count
-  )
-  {
-    return InitializeEmitterCurveKeyRangeFromLaneTuple(destinationBegin, nullptr, count);
-  }
-
-  /**
-   * Address: 0x00518310 (FUN_00518310)
-   *
-   * What it does:
-   * Copy-constructs one half-open `REmitterCurveKey` range into caller
-   * storage and returns one-past-last destination slot.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRange(
-    moho::REmitterCurveKey* const destinationBegin,
-    const moho::REmitterCurveKey* sourceBegin,
-    const moho::REmitterCurveKey* sourceEnd
-  )
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (const moho::REmitterCurveKey* sourceCursor = sourceBegin;
-      sourceCursor != sourceEnd;
-      ++sourceCursor, destinationCursor += sizeof(moho::REmitterCurveKey)) {
-      if (destinationCursor == 0U) {
-        continue;
-      }
-
-      auto* const destinationCursorTyped = reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-      ::new (static_cast<void*>(destinationCursorTyped)) moho::REmitterCurveKey();
-      destinationCursorTyped->X = sourceCursor->X;
-      destinationCursorTyped->Y = sourceCursor->Y;
-      destinationCursorTyped->Z = sourceCursor->Z;
-    }
-
-    return reinterpret_cast<moho::REmitterCurveKey*>(destinationCursor);
-  }
-
-  /**
-   * Address: 0x00517270 (FUN_00517270)
-   *
-   * What it does:
-   * Assigns one source key payload (`X/Y/Z`) into every destination key in the
-   * half-open range `[destinationBegin, destinationEnd)`.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* FillEmitterCurveKeyPayloadRange(
-    moho::REmitterCurveKey* const destinationBegin,
-    moho::REmitterCurveKey* const destinationEnd,
-    const moho::REmitterCurveKey* const sourceKey
-  )
-  {
-    if (destinationBegin == nullptr || destinationEnd == nullptr || sourceKey == nullptr) {
-      return destinationBegin;
-    }
-
-    for (moho::REmitterCurveKey* key = destinationBegin; key != destinationEnd; ++key) {
-      key->X = sourceKey->X;
-      key->Y = sourceKey->Y;
-      key->Z = sourceKey->Z;
-    }
-
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x005172A0 (FUN_005172A0)
-   *
-   * What it does:
-   * Copies emitter-curve key payload lanes (`X/Y/Z`) backward from
-   * `[sourceBegin, sourceEnd)` into destination storage ending at
-   * `destinationEnd`.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyPayloadRangeBackward(
-    moho::REmitterCurveKey* const destinationEnd,
-    const moho::REmitterCurveKey* const sourceEnd,
-    const moho::REmitterCurveKey* const sourceBegin
-  )
-  {
-    if (destinationEnd == nullptr || sourceEnd == nullptr || sourceBegin == nullptr) {
-      return destinationEnd;
-    }
-
-    moho::REmitterCurveKey* write = destinationEnd;
-    const moho::REmitterCurveKey* read = sourceEnd;
-    while (read != sourceBegin) {
-      --read;
-      --write;
-      write->X = read->X;
-      write->Y = read->Y;
-      write->Z = read->Z;
-    }
-    return write;
-  }
-
-  /**
-   * Address: 0x00517240 (FUN_00517240)
-   *
-   * What it does:
-   * Adapts one register-lane caller shape into the canonical emitter-curve key
-   * range-copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneA(
-    const moho::REmitterCurveKey* const sourceBegin,
-    const moho::REmitterCurveKey* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRange(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00518020 (FUN_00518020)
-   *
-   * What it does:
-   * Adapts one register-lane caller shape into the canonical emitter-curve key
-   * range-copy helper.
-   */
-  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneB(
-    const moho::REmitterCurveKey* const sourceBegin,
-    const moho::REmitterCurveKey* const sourceEnd,
-    moho::REmitterCurveKey* const destinationBegin
-  )
-  {
-    return CopyEmitterCurveKeyRange(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x00517570 (FUN_00517570, gpg::RVectorType_REmitterCurveKey::dtr)
    */
   CurveKeyVectorTypeInfo::~CurveKeyVectorTypeInfo() = default;
@@ -832,77 +506,6 @@ namespace
     serSaveFunc_ = &CurveKeyVectorTypeInfo::SerSave;
   }
 
-  void AppendLoadedEmitterCurveKey(
-    CurveKeyVector& storage,
-    const moho::REmitterCurveKey& element
-  );
-
-  /**
-   * Address: 0x00516310 (FUN_00516310, msvc8::vector<moho::REmitterCurveKey>::reserve)
-   *
-   * IDA signature:
-   * unsigned int __thiscall sub_516310(int *this, unsigned int a2);
-   *
-   * What it does:
-   * Engine-instantiated body of `msvc8::vector<REmitterCurveKey>::reserve`.
-   * If `requestedCapacity` exceeds the current capacity, allocates a fresh
-   * storage block via the legacy `_Allocate` lane (`FUN_005111C0`), copies the
-   * live `[_Myfirst, _Mylast)` range into it via `FUN_00518370`
-   * (`CopyEmitterCurveKeyRange`-shape), then releases the previous block. The
-   * SEH guard frame at `FUN_00BA0B60` rolls back the partial copy if the
-   * element copy chain throws. No-op when `requestedCapacity <= capacity()`.
-   *
-   * This per-T named free helper preserves the MSVC8 out-of-line symbol
-   * for `vector<REmitterCurveKey>::reserve` — the inline `storage.reserve(n)`
-   * spelling is elided by the optimizer, so callers route through this name.
-   */
-  [[nodiscard]] unsigned int ReserveEmitterCurveKeyVector(
-    CurveKeyVector& storage,
-    const unsigned int requestedCapacity
-  )
-  {
-    const unsigned int previousCapacity = static_cast<unsigned int>(storage.capacity());
-    if (previousCapacity < requestedCapacity) {
-      storage.reserve(static_cast<std::size_t>(requestedCapacity));
-    }
-    return previousCapacity;
-  }
-
-  /**
-   * Address: 0x00516970 (FUN_00516970, msvc8::vector<moho::REmitterCurveKey>::_Insert_n)
-   *
-   * IDA signature:
-   * int __stdcall sub_516970(int *a1, int a2, unsigned int a3, _DWORD *a4);
-   *
-   * What it does:
-   * Engine-instantiated body of `msvc8::vector<REmitterCurveKey>::_Insert_n`.
-   * Inserts `insertCount` copies of `*fillValue` at `insertPosition`. When the
-   * vector's spare capacity is sufficient and the insert tail fits in place,
-   * the body shifts the suffix in place via `FUN_00517240`
-   * (`CopyEmitterCurveKeyRangeRegisterAdapterLaneA`) and fills the gap with
-   * the source key. Otherwise it allocates a new geometrically-grown block
-   * (`previousSize + previousSize/2`, clamped to 0x0FFFFFFF), copy-constructs
-   * the prefix range, fills the insert window with `insertCount` copies of
-   * the source key (`FUN_00517FA0`), and copy-constructs the suffix before
-   * freeing the previous block. The MSVC8 `_Insert_n` body backs both
-   * `vector::resize(n, value)` growth and `vector::push_back(x)` slow-path
-   * append.
-   */
-  void InsertNCopiesEmitterCurveKeyVector(
-    CurveKeyVector& storage,
-    moho::REmitterCurveKey* const insertPosition,
-    const unsigned int insertCount,
-    const moho::REmitterCurveKey& fillValue
-  )
-  {
-    if (insertCount == 0u) {
-      return;
-    }
-
-    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
-    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
-  }
-
   /**
    * Address: 0x00516100 (FUN_00516100, gpg::RVectorType_REmitterCurveKey::SerLoad)
    *
@@ -923,40 +526,17 @@ namespace
     archive->ReadUInt(&count);
 
     CurveKeyVector loaded;
-    (void)ReserveEmitterCurveKeyVector(loaded, count);
+    loaded.reserve(count);
 
     gpg::RType* const elementType = CachedEmitterCurveKeyType();
     for (unsigned int index = 0u; index < count; ++index) {
       moho::REmitterCurveKey key{};
       gpg::RRef elementOwner{};
       archive->Read(elementType, &key, elementOwner);
-      AppendLoadedEmitterCurveKey(loaded, key);
+      loaded.push_back(key);
     }
 
     *destination = loaded;
-  }
-
-  /**
-   * Address: 0x005164D0 (FUN_005164D0)
-   *
-   * What it does:
-   * Appends one deserialized `REmitterCurveKey` element into the destination
-   * vector, preserving the legacy append-and-grow lane used by `SerLoad`. The
-   * push reaches the canonical `vector<REmitterCurveKey>::_Insert_n` slow-path
-   * (`FUN_00516970`, `InsertNCopiesEmitterCurveKeyVector`) when the vector's
-   * spare capacity is exhausted and a single-element copy is appended at the
-   * tail — the MSVC8 emission shape mirrored by the binary.
-   */
-  void AppendLoadedEmitterCurveKey(
-    CurveKeyVector& storage,
-    const moho::REmitterCurveKey& element
-  )
-  {
-    if (storage.size() == storage.capacity()) {
-      InsertNCopiesEmitterCurveKeyVector(storage, storage.end(), 1u, element);
-    } else {
-      storage.push_back(element);
-    }
   }
 
   /**
@@ -1012,60 +592,6 @@ namespace
   }
 
   /**
-   * Address: 0x00516410 (FUN_00516410)
-   *
-   * What it does:
-   * Adjusts one `vector<REmitterCurveKey>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth. Routes growth through the
-   * canonical `vector<REmitterCurveKey>::_Insert_n` lane (`FUN_00516970`,
-   * `InsertNCopiesEmitterCurveKeyVector`) to preserve the MSVC8 per-T symbol
-   * shape; shrink routes through `storage.resize(requestedCount)` below,
-   * whose MSVC8 emission is the sibling truncate-tail lane at 0x00516910
-   * (`FUN_00516910`, `vector<REmitterCurveKey>::_Assign_n_reuse_storage`
-   * shape): destroys `[_Myfirst + 16*requestedCount, _Myfinish)` via the
-   * element's vtable dtor slot, confirmed by the direct call site at
-   * 0x0051649C inside this function's own disassembly. No separate engine-T
-   * free helper is authored for FUN_00516910 — it is `resize()`'s own
-   * shrink-path emission, the shrink-side counterpart to
-   * `InsertNCopiesEmitterCurveKeyVector` above.
-   */
-  [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithFill(
-    CurveKeyVector& storage,
-    const std::size_t requestedCount,
-    const moho::REmitterCurveKey& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      const auto growBy = static_cast<unsigned int>(requestedCount - currentCount);
-      InsertNCopiesEmitterCurveKeyVector(storage, storage.end(), growBy, fillValue);
-      return requestedCount;
-    }
-
-    if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
-    }
-
-    return requestedCount;
-  }
-
-  /**
-   * Address: 0x00515DE0 (FUN_00515DE0)
-   *
-   * What it does:
-   * Builds one default `REmitterCurveKey` fill lane (`X/Y/Z = 0`) and forwards
-   * to the canonical vector-resize helper.
-   */
-  [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithDefaultFillAdapter(
-    CurveKeyVector& storage,
-    const std::size_t requestedCount
-  )
-  {
-    const moho::REmitterCurveKey fillValue{};
-    return ResizeEmitterCurveKeyVectorWithFill(storage, requestedCount, fillValue);
-  }
-
-  /**
    * Address: 0x00515D20 (FUN_00515D20, gpg::RVectorType_REmitterCurveKey::SetCount)
    */
   void CurveKeyVectorTypeInfo::SetCount(void* const obj, const int count) const
@@ -1074,9 +600,7 @@ namespace
       return;
     }
 
-    auto* const storage = static_cast<CurveKeyVector*>(obj);
-    const moho::REmitterCurveKey fillValue{};
-    (void)ResizeEmitterCurveKeyVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
+    static_cast<CurveKeyVector*>(obj)->resize(static_cast<std::size_t>(count));
   }
 
   [[nodiscard]] CurveTypeInfo& AcquireREmitterBlueprintCurveTypeInfo()
