@@ -1326,25 +1326,21 @@ namespace
 
   [[nodiscard]] bool RemoveGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit) noexcept
   {
-    if (guardUnit == nullptr || guardedByList.mSlots.begin == nullptr || guardedByList.mSlots.end == nullptr) {
+    if (guardUnit == nullptr || guardedByList.mSlots.begin() == nullptr) {
       return false;
     }
 
     const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(EncodeGuardedByOwnerSlot(guardUnit));
-    SGuardedByWeakOwnerSlot* cursor = guardedByList.mSlots.begin;
-    while (cursor != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*cursor) < targetSlotWord) {
+    SGuardedByWeakOwnerSlot* cursor = guardedByList.mSlots.begin();
+    while (cursor != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*cursor) < targetSlotWord) {
       ++cursor;
     }
 
-    if (cursor == guardedByList.mSlots.end || GuardedByOwnerSlotWord(*cursor) != targetSlotWord) {
+    if (cursor == guardedByList.mSlots.end() || GuardedByOwnerSlotWord(*cursor) != targetSlotWord) {
       return false;
     }
 
-    const std::size_t tailCount = static_cast<std::size_t>(guardedByList.mSlots.end - (cursor + 1));
-    if (tailCount != 0u) {
-      std::memmove(cursor, cursor + 1, tailCount * sizeof(SGuardedByWeakOwnerSlot));
-    }
-    --guardedByList.mSlots.end;
+    (void)guardedByList.mSlots.erase(cursor);
     return true;
   }
 
@@ -1357,21 +1353,16 @@ namespace
     const SGuardedByWeakOwnerSlot targetSlot = EncodeGuardedByOwnerSlot(guardUnit);
     const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(targetSlot);
 
-    SGuardedByWeakOwnerSlot* insertPos = guardedByList.mSlots.begin;
-    while (insertPos != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*insertPos) < targetSlotWord) {
+    SGuardedByWeakOwnerSlot* insertPos = guardedByList.mSlots.begin();
+    while (insertPos != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*insertPos) < targetSlotWord) {
       ++insertPos;
     }
 
-    if (insertPos != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*insertPos) == targetSlotWord) {
+    if (insertPos != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*insertPos) == targetSlotWord) {
       return;
     }
 
-    gpg::FastVectorRuntimeInsertRange(
-      guardedByList.mSlots,
-      insertPos,
-      &targetSlot,
-      &targetSlot + 1
-    );
+    (void)guardedByList.mSlots.InsertRange(insertPos, &targetSlot, &targetSlot + 1);
   }
 
   void ClearGuardFormation(Unit* const unit)
@@ -4319,10 +4310,9 @@ int moho::cfunc_UnitGetGuardsL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject guardsTable{};
   guardsTable.AssignNewTable(state, 0, 0);
 
-  const gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> guardedBySlots = unit->GuardedByList.mSlots;
   int guardIndex = 1;
-  for (const SGuardedByWeakOwnerSlot* slot = guardedBySlots.begin; slot != guardedBySlots.end; ++slot) {
-    Entity* const guardEntity = DecodeGuardedByOwnerSlot(*slot);
+  for (const SGuardedByWeakOwnerSlot& guardSlot : unit->GuardedByList.mSlots) {
+    Entity* const guardEntity = DecodeGuardedByOwnerSlot(guardSlot);
     if (guardEntity == nullptr) {
       continue;
     }
@@ -11672,10 +11662,9 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   dest->GuardedPos = source->GuardedPos;
 
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
-  const gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> guardSlots = source->GuardedByList.mSlots;
   msvc8::vector<Unit*> guards;
-  for (const SGuardedByWeakOwnerSlot* slot = guardSlots.begin; slot != guardSlots.end; ++slot) {
-    guards.push_back(reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(*slot)));
+  for (const SGuardedByWeakOwnerSlot& slot : source->GuardedByList.mSlots) {
+    guards.push_back(reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(slot)));
   }
   for (Unit* const guard : guards) {
     if (guard != nullptr) {
@@ -12857,13 +12846,11 @@ namespace
   void ClearGuardedByOwners(Unit& unit)
   {
     std::vector<Unit*> guardedByUnits;
-    if (unit.GuardedByList.mSlots.begin != nullptr && unit.GuardedByList.mSlots.end != nullptr) {
-      guardedByUnits.reserve(gpg::FastVectorRuntimeCount(unit.GuardedByList.mSlots));
+    if (!unit.GuardedByList.mSlots.empty()) {
+      guardedByUnits.reserve(unit.GuardedByList.mSlots.Size());
 
-      for (const SGuardedByWeakOwnerSlot* slot = unit.GuardedByList.mSlots.begin;
-           slot != unit.GuardedByList.mSlots.end;
-           ++slot) {
-        auto* const guardedByUnit = reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(*slot));
+      for (const SGuardedByWeakOwnerSlot& slot : unit.GuardedByList.mSlots) {
+        auto* const guardedByUnit = reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(slot));
         if (guardedByUnit != nullptr) {
           guardedByUnits.push_back(guardedByUnit);
         }
@@ -12874,7 +12861,7 @@ namespace
       guardedByUnit->SetGuardedUnit(nullptr);
     }
 
-    gpg::FastVectorRuntimeResetToInline(unit.GuardedByList.mSlots);
+    unit.GuardedByList.mSlots.ResetStorageToInline();
     unit.GuardedByList.mOwnerNode.ListUnlinkSelf();
     unit.SetGuardedUnit(nullptr);
   }
@@ -13242,12 +13229,9 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   GuardedPos.z = 0.0f;
 
   // GuardedByList.mOwnerNode self-links via its TDatListItem ctor (member init).
-  // Point the fastvector runtime view at its own inline small-buffer: empty
-  // (begin == end) with capacity for four slots ending at GuardFormation.
-  GuardedByList.mSlots.begin = GuardedByList.mInlineSlots;
-  GuardedByList.mSlots.end = GuardedByList.mInlineSlots;
-  GuardedByList.mSlots.capacityEnd = GuardedByList.mInlineSlots + 4;
-  GuardedByList.mSlots.metadata = GuardedByList.mInlineSlots;
+  // Bind the slot lane to its own inline small-buffer: empty, with capacity for
+  // four slots ending at GuardFormation.
+  GuardedByList.mSlots.BindInlineStorage(GuardedByList.mInlineSlots, 4);
 
   GuardFormation = nullptr;
   mNeedsKillCleanup = false;
@@ -13388,10 +13372,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   GuardedPos.y = 0.0f;
   GuardedPos.z = 0.0f;
 
-  GuardedByList.mSlots.begin = GuardedByList.mInlineSlots;
-  GuardedByList.mSlots.end = GuardedByList.mInlineSlots;
-  GuardedByList.mSlots.capacityEnd = GuardedByList.mInlineSlots + 4;
-  GuardedByList.mSlots.metadata = GuardedByList.mInlineSlots;
+  GuardedByList.mSlots.BindInlineStorage(GuardedByList.mInlineSlots, 4);
 
   GuardFormation = nullptr;
   mNeedsKillCleanup = false;

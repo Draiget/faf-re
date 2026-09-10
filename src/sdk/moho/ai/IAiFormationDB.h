@@ -67,12 +67,12 @@ namespace moho
    */
   struct SWeakUnitRefList
   {
-    TDatListItem<void, void> mOwnerNode;                        // +0x00
-    gpg::fastvector_runtime_view<SFormationUnitWeakRef> mSlots; // +0x08
+    TDatListItem<void, void> mOwnerNode;                             // +0x00
+    gpg::core::FastVectorInline<SFormationUnitWeakRef> mSlots;       // +0x08
 
-    [[nodiscard]] const SFormationUnitWeakRef* begin() const noexcept { return mSlots.begin; }
-    [[nodiscard]] const SFormationUnitWeakRef* end() const noexcept { return mSlots.end; }
-    [[nodiscard]] bool empty() const noexcept { return mSlots.begin == mSlots.end; }
+    [[nodiscard]] const SFormationUnitWeakRef* begin() const noexcept { return mSlots.begin(); }
+    [[nodiscard]] const SFormationUnitWeakRef* end() const noexcept { return mSlots.end(); }
+    [[nodiscard]] bool empty() const noexcept { return mSlots.empty(); }
   };
   static_assert(sizeof(SWeakUnitRefList) == 0x18, "SWeakUnitRefList size must be 0x18");
   static_assert(offsetof(SWeakUnitRefList, mSlots) == 0x08, "SWeakUnitRefList::mSlots offset must be 0x08");
@@ -88,17 +88,13 @@ namespace moho
 
     SFormationUnitWeakRefSet() noexcept
     {
-      mSlots.begin = mInlineSlots;
-      mSlots.end = mInlineSlots;
-      mSlots.capacityEnd = mInlineSlots + 8;
-      mSlots.metadata = mInlineSlots;
+      mSlots.BindInlineStorage(mInlineSlots, 8);
     }
 
     /// Append one reference, spilling to the heap once the inline run is full.
     void Append(const SFormationUnitWeakRef& ref)
     {
-      // Returns the insertion point, which a plain append has no use for.
-      (void)gpg::FastVectorRuntimeInsertRange(mSlots, mSlots.end, &ref, &ref + 1);
+      mSlots.PushBack(ref);
     }
   };
   static_assert(sizeof(SFormationUnitWeakRefSet) == 0x38, "SFormationUnitWeakRefSet size must be 0x38");
