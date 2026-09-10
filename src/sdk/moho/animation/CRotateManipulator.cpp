@@ -485,11 +485,11 @@ moho::CRotateManipulator::CRotateManipulator(
  */
 bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
 {
-  if (mOwnerActor == nullptr || mOwnerActor->mPose.px == nullptr || mWatchBones.mBegin == nullptr) {
+  if (mOwnerActor == nullptr || mOwnerActor->mPose.px == nullptr || mWatchBones.begin() == nullptr) {
     return false;
   }
 
-  const std::int32_t watchedBoneIndex = mWatchBones.mBegin->mBoneIndex;
+  const std::int32_t watchedBoneIndex = mWatchBones.begin()->mBoneIndex;
   moho::CAniPoseBone* const watchedBone = ResolvePoseBone(mOwnerActor, watchedBoneIndex);
   if (watchedBone == nullptr) {
     return false;
@@ -535,7 +535,7 @@ void moho::CRotateManipulator::SetFollowBoneTarget(const int followBoneIndex) no
  */
 bool moho::CRotateManipulator::ManipulatorUpdate()
 {
-  const SAniManipBinding* const watchedBinding = mWatchBones.mBegin;
+  const SAniManipBinding* const watchedBinding = mWatchBones.begin();
   if (watchedBinding == nullptr || (watchedBinding->mFlags & kWatchBoneActiveFlag) == 0u) {
     return false;
   }

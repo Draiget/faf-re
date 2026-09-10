@@ -91,11 +91,11 @@ namespace
     moho::CBuilderArmManipulator* const manipulator, const std::size_t watchSlot
   ) noexcept
   {
-    if (manipulator->mWatchBones.mBegin == nullptr) {
+    if (manipulator->mWatchBones.begin() == nullptr) {
       return nullptr;
     }
 
-    return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones.mBegin[watchSlot].mBoneIndex);
+    return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchSlot].mBoneIndex);
   }
 
   [[nodiscard]] float ComputePitchRadians(const Wm3::Vector3f& vector) noexcept

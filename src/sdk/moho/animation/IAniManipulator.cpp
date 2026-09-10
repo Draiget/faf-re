@@ -92,50 +92,9 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] moho::SAniManipBinding* InlineWatchBoneStorage(moho::IAniManipulator* const manipulator) noexcept
-  {
-    return &manipulator->mWatchBones.mInlineEntries[0];
-  }
-
-  [[nodiscard]] std::int32_t BindingPointerToInt32(const moho::SAniManipBinding* const binding) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(binding));
-  }
-
-  [[nodiscard]] moho::SAniManipBinding* Int32ToBindingPointer(const std::int32_t value) noexcept
-  {
-    return reinterpret_cast<moho::SAniManipBinding*>(static_cast<std::uintptr_t>(value));
-  }
-
-  [[maybe_unused]] moho::SAniManipBindingStorage*
-  InitializeWatchBoneStorageInline(moho::SAniManipBindingStorage* storage) noexcept;
-
   [[maybe_unused]] moho::IAniManipulator* ManipulatorFromActorOrderLinkSlot(
     moho::TDatListItem<moho::IAniManipulator, void>* const* linkSlot
   ) noexcept;
-
-  void InitializeWatchBoneStorage(moho::IAniManipulator* const manipulator)
-  {
-    (void)InitializeWatchBoneStorageInline(&manipulator->mWatchBones);
-  }
-
-  /**
-   * Address: 0x0063C070 (FUN_0063C070)
-   *
-   * What it does:
-   * Initializes one `SAniManipBindingStorage` to its inline two-element
-   * storage window (`begin=end=inline`, `capacity=inline+2`).
-   */
-  [[maybe_unused]] moho::SAniManipBindingStorage*
-  InitializeWatchBoneStorageInline(moho::SAniManipBindingStorage* const storage) noexcept
-  {
-    auto* const inlineStorage = &storage->mInlineEntries[0];
-    storage->mBegin = inlineStorage;
-    storage->mEnd = inlineStorage;
-    storage->mCapacityEnd = inlineStorage + 2;
-    storage->mInlineStorage = inlineStorage;
-    return storage;
-  }
 
   /**
    * Address: 0x0063C030 (FUN_0063C030)
@@ -733,119 +692,6 @@ namespace
   }
 
   /**
-   * Address: 0x0063CA20 (FUN_0063CA20)
-   *
-   * What it does:
-   * Copies `[sourceBegin, sourceEnd)` watch-bone bindings into `destination`
-   * element-by-element and returns the destination end pointer; a null
-   * destination becomes a dry-run pointer advance.
-   */
-  [[nodiscard]] moho::SAniManipBinding* CopyBindingRange(
-    moho::SAniManipBinding* destination,
-    const moho::SAniManipBinding* sourceEnd,
-    const moho::SAniManipBinding* sourceBegin
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (destination) {
-        *destination = *sourceBegin;
-      }
-      ++destination;
-      ++sourceBegin;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0063C950 (FUN_0063C950, sub_63C950)
-   *
-   * What it does:
-   * Allocates a new watch-bone buffer, inserts one contiguous range at
-   * `insertPosition`, then updates/cleans old storage and writes the new
-   * `{begin,end,capacity}` triple.
-   */
-  std::int32_t ReallocateWatchBoneStorageForInsert(
-    moho::SAniManipBinding* const insertPosition,
-    moho::SAniManipBindingStorage* const storage,
-    std::int32_t newCapacity,
-    const moho::SAniManipBinding* const insertBegin,
-    const moho::SAniManipBinding* const insertEnd
-  )
-  {
-    auto* const newStorage = new moho::SAniManipBinding[newCapacity];
-    auto* const afterPrefix = CopyBindingRange(newStorage, insertPosition, storage->mBegin);
-    auto* const afterInserted = CopyBindingRange(afterPrefix, insertEnd, insertBegin);
-    auto* const newEnd = CopyBindingRange(afterInserted, storage->mEnd, insertPosition);
-
-    if (storage->mBegin == storage->mInlineStorage) {
-      // Mirrors the inline-buffer sentinel write in FUN_0063C950.
-      storage->mInlineStorage->mBoneIndex = BindingPointerToInt32(storage->mCapacityEnd);
-    } else {
-      delete[] storage->mBegin;
-    }
-
-    storage->mBegin = newStorage;
-    storage->mEnd = newEnd;
-    storage->mCapacityEnd = newStorage + newCapacity;
-    return newCapacity;
-  }
-
-  /**
-   * Address: 0x0063C5F0 (FUN_0063C5F0, func_AppendBone)
-   *
-   * What it does:
-   * Appends one binding and grows storage with the original doubling policy
-   * when the watch-bone buffer is full.
-   */
-  void AppendWatchBoneBinding(moho::SAniManipBindingStorage* const storage, const moho::SAniManipBinding& binding)
-  {
-    auto* const end = storage->mEnd;
-    if (end == storage->mCapacityEnd) {
-      const auto currentSize = static_cast<std::int32_t>(storage->mEnd - storage->mBegin);
-      const auto currentCapacity = static_cast<std::int32_t>(storage->mCapacityEnd - storage->mBegin);
-      std::int32_t newCapacity = currentSize + 1;
-      const std::int32_t doubledCapacity = currentCapacity * 2;
-      if (newCapacity < doubledCapacity) {
-        newCapacity = doubledCapacity;
-      }
-
-      ReallocateWatchBoneStorageForInsert(end, storage, newCapacity, &binding, &binding + 1);
-      return;
-    }
-
-    if (end) {
-      *end = binding;
-    }
-    ++storage->mEnd;
-  }
-
-  /**
-   * Address: 0x0063C090 (FUN_0063C090)
-   *
-   * What it does:
-   * Appends one watch-bone binding from `bindingSource`, growing storage with
-   * the standard append helper when capacity is exhausted.
-   */
-  [[maybe_unused]] moho::SAniManipBinding* AppendWatchBoneBindingFromPointer(
-    moho::SAniManipBindingStorage* const storage,
-    const moho::SAniManipBinding* const bindingSource
-  )
-  {
-    auto* const end = storage->mEnd;
-
-    if (end == storage->mCapacityEnd) {
-      AppendWatchBoneBinding(storage, *bindingSource);
-      return end;
-    }
-
-    if (end != nullptr) {
-      *end = *bindingSource;
-    }
-    ++storage->mEnd;
-    return end;
-  }
-
-  /**
    * Address: 0x0063ACE0 (FUN_0063ACE0, sub_63ACE0)
    *
    * What it does:
@@ -1317,7 +1163,7 @@ namespace moho
     , mOwnerSim(nullptr)
     , mPrecedence(0)
   {
-    InitializeWatchBoneStorage(this);
+    // mWatchBones arms its own inline window in its constructor.
   }
 
   /**
@@ -1329,7 +1175,6 @@ namespace moho
     , mPrecedence(precedence)
   {
     mEnabled = true;
-    InitializeWatchBoneStorage(this);
     RegisterWithOwnerActorOrderList(ownerActor, this);
   }
 
@@ -1432,7 +1277,7 @@ namespace moho
     if (CAniActor* const actor = mOwnerActor; actor != nullptr && actor->mPose.px != nullptr) {
       CAniPose* const pose = actor->mPose.px;
       const std::size_t boneCount = pose->mBones.end() - pose->mBones.begin();
-      const SAniManipBinding* const watchBegin = mWatchBones.mBegin;
+      const SAniManipBinding* const watchBegin = mWatchBones.begin();
       const std::uint32_t footIndex = watchBegin != nullptr
         ? static_cast<std::uint32_t>(watchBegin[0].mBoneIndex)
         : std::numeric_limits<std::uint32_t>::max();
@@ -1579,7 +1424,7 @@ namespace moho
 
     if (markSkipInterp) {
       if (CAniPoseBone* const watchedBone =
-            ResolvePoseBoneByIndex(mOwnerActor->mPose.px, mWatchBones.mBegin->mBoneIndex);
+            ResolvePoseBoneByIndex(mOwnerActor->mPose.px, mWatchBones.begin()->mBoneIndex);
           watchedBone != nullptr) {
         watchedBone->mSkipNextInterp = 1;
       }
@@ -1638,7 +1483,7 @@ namespace moho
     }
 
     CAniPose* const pose = mOwnerActor->mPose.px;
-    const SAniManipBinding* const watchBones = mWatchBones.mBegin;
+    const SAniManipBinding* const watchBones = mWatchBones.begin();
     CAniPoseBone* const footBone = ResolvePoseBoneByIndex(pose, watchBones[0].mBoneIndex);
     CAniPoseBone* const kneeBone = ResolvePoseBoneByIndex(pose, watchBones[1].mBoneIndex);
     CAniPoseBone* const hipBone = ResolvePoseBoneByIndex(pose, watchBones[2].mBoneIndex);
@@ -1794,7 +1639,7 @@ namespace moho
         pose->mMaxOffset = displacement;
       }
 
-      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.mBegin->mBoneIndex);
+      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.begin()->mBoneIndex);
           bone != nullptr) {
         bone->mCompositeIsLocal = 1;
         bone->mPose->MarkBoneDirty(bone->mIdx);
@@ -1804,7 +1649,7 @@ namespace moho
         bone->mPose->MarkBoneDirty(bone->mIdx);
       }
     } else {
-      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.mBegin->mBoneIndex);
+      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.begin()->mBoneIndex);
           bone != nullptr) {
         bone->mLocalTransform.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
         bone->mLocalTransform.pos_ = Wm3::Vec3f(0.0f, -10000.0f, 0.0f);
@@ -1835,7 +1680,7 @@ namespace moho
     }
 
     const SAniSkelBone* const bone =
-      skel->GetBone(static_cast<std::uint32_t>(mWatchBones.mBegin->mBoneIndex));
+      skel->GetBone(static_cast<std::uint32_t>(mWatchBones.begin()->mBoneIndex));
     if (bone == nullptr) {
       return;
     }
@@ -2329,8 +2174,8 @@ namespace moho
     SAniManipBinding watchBone{};
     watchBone.mBoneIndex = boneIndex;
     watchBone.mFlags = kWatchBoneActiveFlag;
-    (void)AppendWatchBoneBindingFromPointer(&mWatchBones, &watchBone);
-    return static_cast<int>(mWatchBones.mEnd - mWatchBones.mBegin - 1);
+    mWatchBones.PushBack(watchBone);
+    return static_cast<int>(mWatchBones.Size()) - 1;
   }
 
   /**
@@ -2578,15 +2423,7 @@ namespace moho
 
   void IAniManipulator::ResetWatchBoneStorage()
   {
-    auto& storage = mWatchBones;
-    auto* const inlineStorage = storage.mInlineStorage;
-    if (storage.mBegin != inlineStorage) {
-      delete[] storage.mBegin;
-      storage.mBegin = inlineStorage;
-      storage.mCapacityEnd = Int32ToBindingPointer(inlineStorage->mBoneIndex);
-    }
-
-    storage.mEnd = storage.mBegin;
+    mWatchBones.ResetStorageToInline();
   }
 
   /**

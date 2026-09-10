@@ -479,11 +479,11 @@ namespace
   ) noexcept
   {
     CAimManipulatorBaseRuntimeView* const baseView = AimManipulatorBaseView(manipulator);
-    if (baseView->mWatchBones.mBegin == nullptr) {
+    if (baseView->mWatchBones.begin() == nullptr) {
       return nullptr;
     }
 
-    return ResolvePoseBone(baseView->mOwnerActor, baseView->mWatchBones.mBegin[watchIndex].mBoneIndex);
+    return ResolvePoseBone(baseView->mOwnerActor, baseView->mWatchBones[watchIndex].mBoneIndex);
   }
 
   [[nodiscard]] std::string ToStdString(const msvc8::string& value)
@@ -1556,8 +1556,8 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
   const float toleranceRadians = firingTolerance * kFiringToleranceToRadians;
 
   std::uint8_t trackingResult = 0u;
-  const bool useSharedBoneTracking = baseView->mWatchBones.mBegin != nullptr &&
-                                     baseView->mWatchBones.mBegin[1].mBoneIndex == baseView->mWatchBones.mBegin[0].mBoneIndex &&
+  const bool useSharedBoneTracking = baseView->mWatchBones.begin() != nullptr &&
+                                     baseView->mWatchBones[1].mBoneIndex == baseView->mWatchBones[0].mBoneIndex &&
                                      runtimeView->mUnknownBoolE1;
 
   if (useSharedBoneTracking) {

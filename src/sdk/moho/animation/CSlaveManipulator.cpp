@@ -408,7 +408,7 @@ void moho::CSlaveManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
  */
 bool moho::CSlaveManipulator::ManipulatorUpdate()
 {
-  const SAniManipBinding* const watchedBinding = mWatchBones.mBegin;
+  const SAniManipBinding* const watchedBinding = mWatchBones.begin();
   if (watchedBinding == nullptr || (watchedBinding->mFlags & 0x8000) == 0) {
     return false;
   }

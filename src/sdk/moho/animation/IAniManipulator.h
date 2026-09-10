@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/FastVector.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -30,30 +32,16 @@ namespace moho
   static_assert(offsetof(SAniManipBinding, mFlags) == 0x04, "SAniManipBinding::mFlags offset must be 0x04");
   static_assert(sizeof(SAniManipBinding) == 0x08, "SAniManipBinding size must be 0x08");
 
-  struct SAniManipBindingStorage
-  {
-    SAniManipBinding* mBegin;           // +0x00
-    SAniManipBinding* mEnd;             // +0x04
-    SAniManipBinding* mCapacityEnd;     // +0x08
-    SAniManipBinding* mInlineStorage;   // +0x0C
-    SAniManipBinding mInlineEntries[2]; // +0x10
-  };
+  /**
+   * Two bindings live inline before the lane spills to the heap: the
+   * `{begin, end, capacityEnd, originalVec}` head at +0x00 followed by the
+   * inline run at +0x10 is `gpg::fastvector_n<SAniManipBinding, 2>`.
+   */
+  using SAniManipBindingStorage = gpg::fastvector_n<SAniManipBinding, 2>;
 
-  static_assert(
-    offsetof(SAniManipBindingStorage, mBegin) == 0x00, "SAniManipBindingStorage::mBegin offset must be 0x00"
-  );
-  static_assert(offsetof(SAniManipBindingStorage, mEnd) == 0x04, "SAniManipBindingStorage::mEnd offset must be 0x04");
-  static_assert(
-    offsetof(SAniManipBindingStorage, mCapacityEnd) == 0x08, "SAniManipBindingStorage::mCapacityEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SAniManipBindingStorage, mInlineStorage) == 0x0C,
-    "SAniManipBindingStorage::mInlineStorage offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SAniManipBindingStorage, mInlineEntries) == 0x10,
-    "SAniManipBindingStorage::mInlineEntries offset must be 0x10"
-  );
+  // {begin, end, capacityEnd, originalVec} at +0x00..+0x0F, the two inline
+  // bindings at +0x10; `offsetof` cannot name the container's members, so the
+  // size assert carries the layout.
   static_assert(sizeof(SAniManipBindingStorage) == 0x20, "SAniManipBindingStorage size must be 0x20");
 
   class IAniManipulator : public CScriptEvent
