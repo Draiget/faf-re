@@ -40,13 +40,27 @@ namespace gpg
          */
         WriteArchive();
 
+        /**
+         * The mapped half of one tracked-pointer entry. The type is not in
+         * here: it is in the key, because the tree is keyed on the whole
+         * `RRef` -- IDA names the instantiation `std::map_RRef_TrackedPointer`,
+         * `_Lbound` (0x0094FA20) orders on `mType` first and `mObj` second,
+         * and the insert guard (0x009512CC) gives `0x0AAAAAA9` =
+         * `0xFFFFFFFF / 0x18 - 1`, so with an 0x08 key the record is 0x10.
+         *
+         * The trailing `{px, pn}` pair is the shared owner the write path
+         * parks on an entry; it is modelled raw here, as `TrackedPointerInfo`
+         * models the read side's, so no refcount moves with a copy. That gap
+         * is the same one on both sides and wants one fix, not two.
+         */
         struct TrackedPointerRecord
         {
-            RType* type = nullptr;
-            int index = -1;
-            TrackedPointerState ownership = TrackedPointerState::Reserved;
+            int index = -1;                                          // +0x00
+            TrackedPointerState ownership = TrackedPointerState::Reserved; // +0x04
+            void* sharedObject = nullptr;                            // +0x08
+            boost::detail::sp_counted_base* sharedControl = nullptr;  // +0x0C
         };
-        static_assert(sizeof(TrackedPointerRecord) == 0x0C, "TrackedPointerRecord size must be 0x0C");
+        static_assert(sizeof(TrackedPointerRecord) == 0x10, "TrackedPointerRecord size must be 0x10");
 
     public:
         /**
@@ -287,12 +301,10 @@ namespace gpg
          * `+0x24`/`+0x25`, and its insert guard (0x009512CC) compares against
          * `0x0AAAAAA9` = `0xFFFFFFFF / 0x18 - 1`, so its `value_type` is 0x18.
          * IDA types that tree `std::map_RRef_TrackedPointer`, and `RRef` is
-         * 0x08 -- so the shipped key is the whole `RRef`, not just its `mObj`,
-         * and the mapped record is 0x10 rather than the 0x0C modelled here.
-         * That correction touches every call site and is not made in this pass.
+         * 0x08 -- so the key is the whole `RRef` and the record is 0x10.
          */
         msvc8::map<const RType*, int> mRefCounts;                  // +0x04
-        msvc8::map<const void*, TrackedPointerRecord> mObjRefs;    // +0x10
+        msvc8::map<RRef, TrackedPointerRecord, RRefCompare> mObjRefs; // +0x10
 
         /**
          * One 4-byte slot at +0x1C that this class's own ctor and dtor never

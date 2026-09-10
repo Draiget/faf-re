@@ -36,6 +36,25 @@ namespace gpg
   class RType;
 
   /**
+   * Strict weak ordering for reflected references.
+   *
+   * The binary compares the reflected type lane first and only falls back to
+   * the underlying object pointer when the type lanes match.
+   */
+  struct RRefCompare
+  {
+    /**
+     * Address: 0x0094F730 (FUN_0094F730, gpg::RRefCompare::operator())
+     *
+     * What it does:
+     * Orders two reflected references lexicographically by reflected type lane
+     * and then by object pointer lane.
+     */
+    [[nodiscard]] bool operator()(const RRef& lhs, const RRef& rhs) const noexcept;
+  };
+  static_assert(sizeof(RRefCompare) == 0x1, "RRefCompare size must be 0x1");
+
+  /**
    * Address context:
    * - 0x00953CA0 (WriteArchive::Write)
    * - 0x00953DA0 (ReadArchive::Read)
