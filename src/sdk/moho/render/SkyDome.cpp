@@ -131,105 +131,6 @@ namespace
   static_assert(sizeof(kSkyDomeCirrusRuntimeTable) == 0x50,
     "SkyDome cirrus runtime table must be 0x50 bytes");
 
-  /**
-   * Address: 0x0081A590 (FUN_0081A590)
-   *
-   * What it does:
-   * Allocates one decal-upload node and initializes link lanes plus the
-   * 0x28-byte packed decal-vertex payload.
-   */
-  [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadNode(
-    moho::SkyDomeDecalUploadNode* const next,
-    moho::SkyDomeDecalUploadNode* const prev,
-    const void* const vertexData
-  )
-  {
-    auto* const node = msvc8::detail::allocate_checked<moho::SkyDomeDecalUploadNode>(1u);
-
-    node->mNext = next;
-    node->mPrev = prev;
-    if (vertexData != nullptr) {
-      std::memcpy(node->mVertexData, vertexData, sizeof(node->mVertexData));
-    } else {
-      std::memset(node->mVertexData, 0, sizeof(node->mVertexData));
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x0081A5D0 (FUN_0081A5D0)
-   *
-   * What it does:
-   * The size increment MSVC emits for the decal-upload list. The ceiling is
-   * the list's own max_size - how many 40-byte payloads a 32-bit size can
-   * address - and overflowing it is reported the way the standard library
-   * reports it.
-   */
-  [[nodiscard]] std::int32_t BumpSkyDomeDecalUploadCount(const std::int32_t currentCount)
-  {
-    constexpr std::int32_t kMaxDecalUploadRecords = 107374182;
-    if (currentCount == kMaxDecalUploadRecords) {
-      throw std::length_error("list<T> too long");
-    }
-    return currentCount + 1;
-  }
-
-  /**
-   * Address: 0x0081A440 (FUN_0081A440)
-   *
-   * What it does:
-   * Allocates one 48-byte sky-decal upload sentinel and self-links
-   * `next/prev`.
-   */
-  [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadListSentinel()
-  {
-    auto* const node = msvc8::detail::allocate_checked<moho::SkyDomeDecalUploadNode>(1u);
-    node->mNext = node;
-    node->mPrev = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x0081A550 (FUN_0081A550)
-   *
-   * What it does:
-   * Clears one intrusive sky-decal upload list by unlinking all payload nodes,
-   * preserving the head sentinel, and releasing removed nodes.
-   */
-  /**
-   * Address: 0x0081A550 (FUN_0081A550)
-   *
-   * What it does:
-   * Empties one decal upload list: re-self-links the head sentinel, resets the
-   * count, then frees every detached payload node. The sentinel itself is kept
-   * -- callers that are tearing the owner down free it separately.
-   *
-   * Takes the head *and* the count because the emission does: it reads the
-   * head from `[arg+4]` and stores zero to `[arg+8]`, which on `SkyDome` are
-   * `mDecalUploadHead` (+0xB8) and `mDecalUploadCount` (+0xBC). An earlier
-   * version took only the node and left the count stale.
-   */
-  void ClearSkyDomeDecalUploadList(
-    moho::SkyDomeDecalUploadNode* const listHead,
-    std::int32_t& uploadCount
-  ) noexcept
-  {
-    if (listHead == nullptr) {
-      uploadCount = 0;
-      return;
-    }
-
-    moho::SkyDomeDecalUploadNode* node = listHead->mNext;
-    listHead->mNext = listHead;
-    listHead->mPrev = listHead;
-    uploadCount = 0;
-
-    while (node != listHead) {
-      moho::SkyDomeDecalUploadNode* const next = node->mNext;
-      ::operator delete(node);
-      node = next;
-    }
-  }
 } // namespace
 
 namespace moho
@@ -261,8 +162,6 @@ namespace moho
     // end - see CResourceWatcher::CResourceWatcher for the same idiom.
     auto** const inlineSlots = reinterpret_cast<void**>(mWatchedInline);
     inlineSlots[0] = mWatchedStorageEnd;
-
-    mDecalUploadHead = AllocateSkyDomeDecalUploadListSentinel();
   }
 
   /**
@@ -383,13 +282,6 @@ namespace moho
   {
     Reset();
 
-    ClearSkyDomeDecalUploadList(mDecalUploadHead, mDecalUploadCount);
-
-    // The list head is a sentinel the constructor allocated; clearing the list
-    // deliberately keeps it, so the owner frees it here.
-    ::operator delete(mDecalUploadHead);
-    mDecalUploadHead = nullptr;
-
     if (mWatchedBegin != mWatchedEnd) {
       if (ResourceManager* const manager = RES_GetResourceManager(); manager != nullptr) {
         manager->ManageWatchedResources(reinterpret_cast<CResourceWatcher*>(this));
@@ -479,15 +371,9 @@ namespace moho
     std::int32_t cloudRecordCount = 0;
     reader.ReadExact(cloudRecordCount);
     for (std::int32_t record = 0; record < cloudRecordCount; ++record) {
-      std::uint8_t vertexData[sizeof(SkyDomeDecalUploadNode::mVertexData)]{};
-      reader.Read(reinterpret_cast<char*>(vertexData), sizeof(vertexData));
-
-      SkyDomeDecalUploadNode* const tail = mDecalUploadHead->mPrev;
-      SkyDomeDecalUploadNode* const node =
-        AllocateSkyDomeDecalUploadNode(mDecalUploadHead, tail, vertexData);
-      mDecalUploadCount = BumpSkyDomeDecalUploadCount(mDecalUploadCount);
-      tail->mNext = node;
-      mDecalUploadHead->mPrev = node;
+      SkyDomeDecalVertices vertices{};
+      reader.Read(reinterpret_cast<char*>(vertices.mBytes), sizeof(vertices.mBytes));
+      mDecalUploads.push_back(vertices);
     }
 
     reader.ReadString(&scratch);
@@ -553,12 +439,9 @@ namespace moho
     // payload in list order. The binary walks `mDecalUploadHead->mNext` until it
     // comes back round to the sentinel and writes from node + 8, i.e. straight
     // past the two link pointers (0x008167xx, `memcpy(..., v27 + 2, 0x28)`).
-    writer.Write(mDecalUploadCount);
-    if (mDecalUploadHead != nullptr) {
-      for (const SkyDomeDecalUploadNode* node = mDecalUploadHead->mNext; node != mDecalUploadHead;
-           node = node->mNext) {
-        writer.Write(reinterpret_cast<const char*>(node->mVertexData), sizeof(node->mVertexData));
-      }
+    writer.Write(static_cast<std::int32_t>(mDecalUploads.size()));
+    for (const SkyDomeDecalVertices& vertices : mDecalUploads) {
+      writer.Write(reinterpret_cast<const char*>(vertices.mBytes), sizeof(vertices.mBytes));
     }
 
     writer.WriteString(mDecalTexPath1);
@@ -589,7 +472,7 @@ namespace moho
    */
 void SkyDome::Destroy()
 {
-    ClearSkyDomeDecalUploadList(mDecalUploadHead, mDecalUploadCount);
+    mDecalUploads.clear();
     mHorizonLookupTex = {};
     mCirrusTex = {};
     mDecalTex3 = {};
@@ -914,10 +797,9 @@ void SkyDome::Destroy()
     std::uint8_t* writeCursor =
       static_cast<std::uint8_t*>(mDecalVertBuf2->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0)));
 
-    SkyDomeDecalUploadNode* const listHead = mDecalUploadHead;
-    for (SkyDomeDecalUploadNode* node = listHead->mNext; node != listHead; node = node->mNext) {
-      std::memcpy(writeCursor, node->mVertexData, sizeof(node->mVertexData));
-      writeCursor += sizeof(node->mVertexData);
+    for (const SkyDomeDecalVertices& vertices : mDecalUploads) {
+      std::memcpy(writeCursor, vertices.mBytes, sizeof(vertices.mBytes));
+      writeCursor += sizeof(vertices.mBytes);
     }
 
     mDecalVertBuf2->Unlock();
@@ -1132,7 +1014,7 @@ void SkyDome::Destroy()
    */
   void SkyDome::RenderDecals(const GeomCamera3& cam)
   {
-    if (mDecalUploadCount == 0 || !mAtmosphereTex || !mAtmosphereTex2) {
+    if (mDecalUploads.empty() || !mAtmosphereTex || !mAtmosphereTex2) {
       return;
     }
 
@@ -1143,7 +1025,7 @@ void SkyDome::Destroy()
     boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Decal");
 
     device->SetVertexDeclaration(mDecalFormat1->mFormat);
-    device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(mDecalUploadCount), 0);
+    device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(mDecalUploads.size()), 0);
     device->SetVertexBuffer(1u, mDecalVertBuf2, 1, 0);
     device->SetBufferIndices(mDecalIndexBuf);
 
