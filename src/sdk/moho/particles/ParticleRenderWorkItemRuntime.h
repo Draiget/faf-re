@@ -10,6 +10,10 @@ namespace moho
   /**
    * What it does:
    * One time-interval lane consumed by the particle render work-item cursor.
+   * Address: 0x004A00A0 (FUN_004A00A0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `ParticleRenderIntervalRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A00C0 (FUN_004A00C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `ParticleRenderIntervalRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A06D0 (FUN_004A06D0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `ParticleRenderIntervalRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A06F0 (FUN_004A06F0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `ParticleRenderIntervalRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateC` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct ParticleRenderIntervalRuntime
   {

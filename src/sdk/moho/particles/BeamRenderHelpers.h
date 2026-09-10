@@ -300,6 +300,9 @@ namespace moho
    * `msvc8::vector<BeamRenderVertexRuntime>`'s copy steps. Formerly transcribed
    * as `CopyBeamRenderVertexLanePacked` in BeamRenderHelpers.cpp, removed
    * 2026-09-10.)
+   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct BeamRenderVertexRuntime
   {
@@ -429,6 +432,12 @@ namespace moho
      * Address: 0x0049BE90 (FUN_0049BE90, `??1STrail@Moho@@QAE@@Z` -- the implicit
      * destructor: both `CountedPtr` handles release their texture. Formerly
      * `DestroyTrailRuntimeViewForVectorTail`, removed.)
+     * Address: 0x0049FBF0 (FUN_0049FBF0 -- the compiler-generated copy assignment of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; callers 0x00495850, 0x0049DE60, 0x0049E4E0; formerly `CopyAssignTrailRuntimeAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FFB0 (FUN_0049FFB0 -- the compiler-generated copy assignment of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyAssignTrailRuntimeIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FFC0 (FUN_0049FFC0 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0620 (FUN_004A0620 -- the compiler-generated copy constructor (placement copy into a raw slot) of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyConstructTrailRuntimeIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0630 (FUN_004A0630 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0720 (FUN_004A0720 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      */
     CountedPtr_CParticleTexture texture0; // +0x50
     CountedPtr_CParticleTexture texture1; // +0x54
