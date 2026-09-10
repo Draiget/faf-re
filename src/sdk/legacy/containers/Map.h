@@ -62,6 +62,11 @@ namespace msvc8
          * walk of the source, shared with `msvc8::set` through `rb_tree`.
          */
         map(const map& o) : tree_(o.tree_) {}
+        /**
+         * Address: 0x0042C2C0 (FUN_0042C2C0 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432690 (FUN_00432690 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042C1D0, 0x0042C2C0, 0x004318B0; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0042C2F0 (FUN_0042C2F0 -- the string map's `operator=` for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignStringAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         */
         map& operator=(const map& o)
         {
             tree_ = o.tree_;
@@ -138,6 +143,7 @@ namespace msvc8
          * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AD1F0 (FUN_004AD1F0 -- `begin()` written through a caller-supplied iterator slot for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AD5D0 (FUN_004AD5D0 -- the second emission of that same `begin()` export for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant2` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432430 (FUN_00432430 -- `begin()` -- the header's left link for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeBegin` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
@@ -145,6 +151,7 @@ namespace msvc8
 
         /**
          * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432440 (FUN_00432440 -- `end()` -- the header sentinel itself for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeHead` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
         [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
@@ -194,6 +201,7 @@ namespace msvc8
          * are the recovery now (DB-integrity fix).
          * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007F01D0 (FUN_007F01D0 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007EDA40, 0x007EEE50, 0x007EF0B0; formerly `FindBlueprintExtractorRegistryEntry` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432680 (FUN_00432680 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss -- for `msvc8::map<msvc8::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `FindIntAnnotationNodeBridge` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }

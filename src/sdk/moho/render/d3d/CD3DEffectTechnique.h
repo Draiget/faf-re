@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstddef>
+#include "legacy/containers/Map.h"
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
@@ -51,52 +52,14 @@ namespace moho
       class Implementation
       {
       public:
-        struct IntAnnotationNode
-        {
-          IntAnnotationNode* mLeft;      // +0x00
-          IntAnnotationNode* mParent;    // +0x04
-          IntAnnotationNode* mRight;     // +0x08
-          msvc8::string mKey;            // +0x0C
-          std::int32_t mValue;           // +0x28
-          std::uint8_t mColor;           // +0x2C
-          std::uint8_t mIsNil;           // +0x2D
-          std::uint8_t mPad2E[0x2];      // +0x2E
-        };
-
-        static_assert(offsetof(IntAnnotationNode, mKey) == 0x0C, "CD3DEffect::Technique::Implementation::IntAnnotationNode::mKey offset must be 0x0C");
-        static_assert(offsetof(IntAnnotationNode, mValue) == 0x28, "CD3DEffect::Technique::Implementation::IntAnnotationNode::mValue offset must be 0x28");
-        static_assert(offsetof(IntAnnotationNode, mColor) == 0x2C, "CD3DEffect::Technique::Implementation::IntAnnotationNode::mColor offset must be 0x2C");
-        static_assert(offsetof(IntAnnotationNode, mIsNil) == 0x2D, "CD3DEffect::Technique::Implementation::IntAnnotationNode::mIsNil offset must be 0x2D");
-        static_assert(sizeof(IntAnnotationNode) == 0x30, "CD3DEffect::Technique::Implementation::IntAnnotationNode size must be 0x30");
-
-        struct StringAnnotationNode
-        {
-          StringAnnotationNode* mLeft;    // +0x00
-          StringAnnotationNode* mParent;  // +0x04
-          StringAnnotationNode* mRight;   // +0x08
-          msvc8::string mKey;             // +0x0C
-          msvc8::string mValue;           // +0x28
-          std::uint8_t mColor;            // +0x44
-          std::uint8_t mIsNil;            // +0x45
-          std::uint8_t mPad46[0x2];       // +0x46
-        };
-
-        static_assert(offsetof(StringAnnotationNode, mKey) == 0x0C, "CD3DEffect::Technique::Implementation::StringAnnotationNode::mKey offset must be 0x0C");
-        static_assert(offsetof(StringAnnotationNode, mValue) == 0x28, "CD3DEffect::Technique::Implementation::StringAnnotationNode::mValue offset must be 0x28");
-        static_assert(offsetof(StringAnnotationNode, mColor) == 0x44, "CD3DEffect::Technique::Implementation::StringAnnotationNode::mColor offset must be 0x44");
-        static_assert(offsetof(StringAnnotationNode, mIsNil) == 0x45, "CD3DEffect::Technique::Implementation::StringAnnotationNode::mIsNil offset must be 0x45");
-        static_assert(sizeof(StringAnnotationNode) == 0x48, "CD3DEffect::Technique::Implementation::StringAnnotationNode size must be 0x48");
-
-        template <typename NodeT>
-        struct AnnotationTreeMap
-        {
-          void* mAllocatorProxy;  // +0x00
-          NodeT* mHead;           // +0x04
-          std::uint32_t mSize;    // +0x08
-        };
-
-        using IntAnnotationTree = AnnotationTreeMap<IntAnnotationNode>;
-        using StringAnnotationTree = AnnotationTreeMap<StringAnnotationNode>;
+        // The two annotation trees. Node geometry names both element types:
+        // the integer node is 0x30 with the colour byte at +0x2C, so its value
+        // is `pair<const msvc8::string, std::int32_t>` (the key's `_Bx` at
+        // node+0x10, the int at node+0x28 -- 0x0042BDC0 reads exactly that);
+        // the string node is 0x48 with the colour at +0x44, so its value is
+        // `pair<const msvc8::string, msvc8::string>`.
+        using IntAnnotationTree = msvc8::map<msvc8::string, std::int32_t>;
+        using StringAnnotationTree = msvc8::map<msvc8::string, msvc8::string>;
 
         static_assert(sizeof(IntAnnotationTree) == 0x0C, "CD3DEffect::Technique::Implementation::IntAnnotationTree size must be 0x0C");
         static_assert(sizeof(StringAnnotationTree) == 0x0C, "CD3DEffect::Technique::Implementation::StringAnnotationTree size must be 0x0C");
