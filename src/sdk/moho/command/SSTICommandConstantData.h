@@ -16,7 +16,17 @@ namespace moho
     static gpg::RType* sType;
 
     int32_t cmd;
-    void* unk0;
+    /**
+     * Formation-script selector, `-1` when the order carries no formation.
+     * `CUnitCommand::CUnitCommand` (0x006E82AE) copies it in as a plain dword
+     * from the issue payload, `CUnitCommand::SetFormation` (0x006E8?) resets it
+     * to `0xFFFFFFFF`, and `CUnitCommand::Move` (0x006E88F5) tests
+     * `cmp dword ptr [ebp+48h], 0FFFFFFFFh / jle` before handing it to
+     * `CAiFormationDBImpl::GetScriptName(scriptIndex, unitSet)`. It was typed
+     * `void*` here, which forced its readers to go looking for an int lane in
+     * the variable-data payload instead.
+     */
+    int32_t mFormationScriptIndex;
     Wm3::Quatf origin;
     float unk1;
     REntityBlueprint* blueprint;
@@ -95,7 +105,7 @@ namespace moho
   };
 
   static_assert(offsetof(SSTICommandConstantData, cmd) == 0x00, "SSTICommandConstantData::cmd offset must be 0x00");
-  static_assert(offsetof(SSTICommandConstantData, unk0) == 0x04, "SSTICommandConstantData::unk0 offset must be 0x04");
+  static_assert(offsetof(SSTICommandConstantData, mFormationScriptIndex) == 0x04, "SSTICommandConstantData::mFormationScriptIndex offset must be 0x04");
   static_assert(
     offsetof(SSTICommandConstantData, origin) == 0x08, "SSTICommandConstantData::origin offset must be 0x08"
   );

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/command/SSTITarget.h"
@@ -25,23 +26,40 @@ namespace moho
   struct SSTICommandIssueData;
   using EntId = std::int32_t;
 
+  /**
+   * Both element lists are `gpg::fastvector_n`, not `msvc8::vector`. The
+   * constructor at 0x00552A00 binds four pointer lanes per list to an inline
+   * window that sits inside the payload:
+   *
+   *   lea ecx,[eax+10h]  mov [eax],ecx  mov [eax+4],ecx  mov [eax+0Ch],ecx
+   *   lea edx,[ecx+8]    mov [eax+8],edx
+   *
+   * i.e. `start_ +0x00`, `end_ +0x04`, `capacity_ +0x08`, `originalVec_ +0x0C`
+   * and two inline elements at +0x10, with the same shape repeated at +0x48 for
+   * the cell list (inline window at +0x58). `MemberDeserialize` (0x00554760)
+   * confirms the element type from the other side: it looks up
+   * `gpg::fastvector<Moho::EntId>` and `gpg::fastvector<Moho::SOCellPos>`.
+   *
+   * Modelling these as `msvc8::vector` kept the struct the right SIZE while
+   * shifting every lane one word: the debug-proxy word landed on `start_`, so
+   * anything reading the list through the binary's own offsets -- e.g.
+   * `func_GetEntitiesUnderCursor` (0x008B43F0), which iterates
+   * `[helper+0x40, helper+0x44)` -- read a null begin against a live end and
+   * walked from address zero.
+   */
   struct SSTICommandVariableData
   {
     static gpg::RType* sType;
 
-    msvc8::vector<EntId> mEntIds;
-    std::int32_t v1;
-    std::int32_t v2;
-    EUnitCommandType mCmdType;
-    SSTITarget mTarget1;
-    SSTITarget mTarget2;
-    std::int32_t v14;
-    msvc8::vector<SOCellPos> mCells;
-    std::int32_t v19;
-    std::int32_t v20;
-    std::int32_t mMaxCount;
-    std::int32_t mCount;
-    std::uint32_t v23;
+    gpg::fastvector_n<EntId, 2> mEntIds;    // +0x00
+    EUnitCommandType mCmdType;              // +0x18
+    SSTITarget mTarget1;                    // +0x1C
+    SSTITarget mTarget2;                    // +0x30
+    std::int32_t v14;                       // +0x44 (ctor leaves this lane unwritten)
+    gpg::fastvector_n<SOCellPos, 2> mCells; // +0x48
+    std::int32_t mMaxCount;                 // +0x60
+    std::int32_t mCount;                    // +0x64
+    std::uint32_t v23;                      // +0x68
 
     /**
      * Address: 0x00552A00 (FUN_00552A00, Moho::SSTICommandVariableData::SSTICommandVariableData)
@@ -165,33 +183,32 @@ namespace moho
     gpg::RType::save_func_t mSerSaveFunc; // +0x10
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSTICommandVariableData, mEntIds) == 0x00, "SSTICommandVariableData::mEntIds offset must be 0x00");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSTICommandVariableData, v1) == 0x10, "SSTICommandVariableData::v1 offset must be 0x10");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSTICommandVariableData, v2) == 0x14, "SSTICommandVariableData::v2 offset must be 0x14");
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  // Offsets below are read straight out of FUN_00552A00 (the ctor asm quoted
+  // above); every one of them is a literal displacement in that body.
+  static_assert(offsetof(SSTICommandVariableData, mEntIds) == 0x00, "SSTICommandVariableData::mEntIds offset must be 0x00");
+  static_assert(sizeof(gpg::fastvector_n<EntId, 2>) == 0x18, "SSTICommandVariableData::mEntIds size must be 0x18");
+  static_assert(
     offsetof(SSTICommandVariableData, mCmdType) == 0x18, "SSTICommandVariableData::mCmdType offset must be 0x18"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  static_assert(
     offsetof(SSTICommandVariableData, mTarget1) == 0x1C, "SSTICommandVariableData::mTarget1 offset must be 0x1C"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  static_assert(
     offsetof(SSTICommandVariableData, mTarget2) == 0x30, "SSTICommandVariableData::mTarget2 offset must be 0x30"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSTICommandVariableData, v14) == 0x44, "SSTICommandVariableData::v14 offset must be 0x44"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  static_assert(offsetof(SSTICommandVariableData, v14) == 0x44, "SSTICommandVariableData::v14 offset must be 0x44");
+  static_assert(
     offsetof(SSTICommandVariableData, mCells) == 0x48, "SSTICommandVariableData::mCells offset must be 0x48"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  static_assert(sizeof(gpg::fastvector_n<SOCellPos, 2>) == 0x18, "SSTICommandVariableData::mCells size must be 0x18");
+  static_assert(
     offsetof(SSTICommandVariableData, mMaxCount) == 0x60, "SSTICommandVariableData::mMaxCount offset must be 0x60"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
+  static_assert(
     offsetof(SSTICommandVariableData, mCount) == 0x64, "SSTICommandVariableData::mCount offset must be 0x64"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSTICommandVariableData, v23) == 0x68, "SSTICommandVariableData::v23 offset must be 0x68"
-  );
+  static_assert(offsetof(SSTICommandVariableData, v23) == 0x68, "SSTICommandVariableData::v23 offset must be 0x68");
+  static_assert(sizeof(SSTICommandVariableData) == 0x6C, "SSTICommandVariableData size must be 0x6C");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSTICommandVariableDataSerializer, mSerLoadFunc) == 0x0C,
     "SSTICommandVariableDataSerializer::mSerLoadFunc offset must be 0x0C"

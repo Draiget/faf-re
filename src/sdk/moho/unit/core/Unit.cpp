@@ -15338,11 +15338,20 @@ void Unit::UpdateBlipsInRange()
   const RUnitBlueprint* const blueprint = GetBlueprint();
   CAiAttackerImpl* const attacker = AiAttacker;
 
-  // Guard-scan radius: zero unless the head command is a guard/patrol command
-  // (mVarDat flag bits 0x30), in which case use the blueprint guard-scan radius.
+  // Guard-scan radius: zero unless the head command passes FAF's patched gate.
+  //
+  // That gate (0x0128C956, inside the `// patched` block the decompiler marks in
+  // FUN_006ACC60) is `mov edi,[edi+94h] / and edi,30h`. `CUnitCommand::mVarDat`
+  // is constructed at `+0x80` (0x006E82E8 `lea ecx,[ebp+80h]`) and the ent-id
+  // list's inline window is `+0x10..+0x17`, so `+0x94` is the list's SECOND
+  // inline slot -- not a flag word. Retail's own variable-data constructor never
+  // writes it, so this reads whatever the last published ent-id pair left there.
+  // Kept at the same lane rather than reinterpreted as a command-type test:
+  // `mCmdType` is at `+0x98`, and masking it with 0x30 would not select
+  // Guard (0x0F) anyway.
   float scanRadius = 0.0f;
   CUnitCommand* const headCommand = CommandQueue->GetCurrentCommand();
-  if (headCommand != nullptr && (headCommand->mVarDat.v2 & 0x30) != 0) {
+  if (headCommand != nullptr && (headCommand->mVarDat.mEntIds.inlineVec_[1] & 0x30) != 0) {
     scanRadius = blueprint->AI.GuardScanRadius;
   }
 

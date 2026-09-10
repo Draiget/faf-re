@@ -831,7 +831,7 @@ namespace moho
   )
   {
     destination->cmd = issueData->nextCommandId;
-    destination->unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(issueData->unk38));
+    destination->mFormationScriptIndex = static_cast<std::int32_t>(issueData->unk38);
     destination->origin = issueData->mOri;
     destination->unk1 = issueData->unk4C;
     destination->blueprint = static_cast<REntityBlueprint*>(issueData->mBlueprint);
@@ -871,7 +871,7 @@ namespace
   )
   {
     destination.cmd = source.cmd;
-    destination.unk0 = source.unk0;
+    destination.mFormationScriptIndex = source.mFormationScriptIndex;
     destination.origin = source.origin;
     destination.unk1 = source.unk1;
     destination.blueprint = source.blueprint;
@@ -924,7 +924,7 @@ namespace
    * the grow path of `msvc8::vector<SSTICommandConstantData>::push_back`
    * / `insert_n`: it runs one uninitialized-fill lane (stride
    * `sizeof(SSTICommandConstantData)=0x3C`) that copy-constructs each
-   * descriptor by blitting the first `0x20` trivial bytes (cmd/unk0/
+   * descriptor by blitting the first `0x20` trivial bytes (cmd/mFormationScriptIndex/
    * origin/unk1/blueprint), placement-constructs an empty `msvc8::string`
    * at `+0x20`, and copy-assigns `unk2` from the source. On partial-fill
    * failure (e.g. string allocation throw), its SEH funclet runs the
@@ -1273,7 +1273,7 @@ CUnitCommand::CUnitCommand()
   mNext = this;
 
   mConstDat.cmd = -1;
-  mConstDat.unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0xFFFFFFFFu));
+  mConstDat.mFormationScriptIndex = -1;
   mConstDat.origin = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
   mConstDat.unk1 = 0.0f;
   mConstDat.blueprint = nullptr;
@@ -1840,7 +1840,7 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
     return;
   }
 
-  if (command->mUnitSet.mVec.size() <= 1u || command->mVarDat.v2 < 0) {
+  if (command->mUnitSet.mVec.size() <= 1u || command->mConstDat.mFormationScriptIndex < 0) {
     return;
   }
 
@@ -1862,7 +1862,8 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
   // The formation bucket is chosen from the command unit set's composition
   // (air / non-air / mixed) inside GetScriptName -- not from a single unit's
   // layer -- so pass the unit set directly, matching the binary.
-  const char* const scriptName = formationDb->GetScriptName(command->mVarDat.v2, &command->mUnitSet);
+  const char* const scriptName =
+    formationDb->GetScriptName(command->mConstDat.mFormationScriptIndex, &command->mUnitSet);
   if (!scriptName) {
     return;
   }
@@ -2102,7 +2103,7 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
     return;
   }
 
-  publishedUnitEntityIds = msvc8::vector<EntId>{};
+  publishedUnitEntityIds.clear();
   for (CScriptObject* const entry : mUnitSet.mVec) {
     if (!IsUsableCommandUnitEntry(entry)) {
       continue;

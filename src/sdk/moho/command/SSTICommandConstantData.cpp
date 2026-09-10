@@ -52,7 +52,7 @@ namespace
   {
     for (moho::SSTICommandConstantData* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
       cursor->cmd = fillValue.cmd;
-      cursor->unk0 = fillValue.unk0;
+      cursor->mFormationScriptIndex = fillValue.mFormationScriptIndex;
       cursor->origin = fillValue.origin;
       cursor->unk1 = fillValue.unk1;
       cursor->blueprint = fillValue.blueprint;
@@ -116,7 +116,7 @@ namespace
       --destinationCurrent;
 
       destinationCurrent->cmd = sourceCurrent->cmd;
-      destinationCurrent->unk0 = sourceCurrent->unk0;
+      destinationCurrent->mFormationScriptIndex = sourceCurrent->mFormationScriptIndex;
       destinationCurrent->origin = sourceCurrent->origin;
       destinationCurrent->unk1 = sourceCurrent->unk1;
       destinationCurrent->blueprint = sourceCurrent->blueprint;
@@ -144,7 +144,7 @@ namespace
     moho::SSTICommandConstantData* destination = destinationBegin;
     for (const moho::SSTICommandConstantData* source = sourceBegin; source != sourceEnd; ++source, ++destination) {
       destination->cmd = source->cmd;
-      destination->unk0 = source->unk0;
+      destination->mFormationScriptIndex = source->mFormationScriptIndex;
       destination->origin = source->origin;
       destination->unk1 = source->unk1;
       destination->blueprint = source->blueprint;
@@ -184,7 +184,7 @@ namespace
    * helper:
    *   1) default-primes the trailing `unk2` string lane (`_Myres=15`,
    *      `_Bx._Buf[0]=0`, `_Mysize=0`)
-   *   2) byte-copies the fixed-size prefix (cmd/unk0/origin/unk1/blueprint)
+   *   2) byte-copies the fixed-size prefix (cmd/mFormationScriptIndex/origin/unk1/blueprint)
    *   3) calls `std::string::assign(src.unk2, 0, npos)` to clone the string
    *
    * On exception, destroys the already-constructed destination prefix (via
@@ -206,7 +206,7 @@ namespace
         ::new (&destination->unk2) msvc8::string{};
 
         destination->cmd = sourceBegin->cmd;
-        destination->unk0 = sourceBegin->unk0;
+        destination->mFormationScriptIndex = sourceBegin->mFormationScriptIndex;
         destination->origin = sourceBegin->origin;
         destination->unk1 = sourceBegin->unk1;
         destination->blueprint = sourceBegin->blueprint;
@@ -263,7 +263,7 @@ namespace
     }
 
     destination->cmd = source->cmd;
-    destination->unk0 = source->unk0;
+    destination->mFormationScriptIndex = source->mFormationScriptIndex;
     destination->origin = source->origin;
     destination->unk1 = source->unk1;
     destination->blueprint = source->blueprint;
