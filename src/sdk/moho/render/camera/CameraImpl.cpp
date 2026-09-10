@@ -2448,12 +2448,11 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::InsertRange(
       reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(insertionPos),
       reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mFinish)
     );
-    auto* const assignedEnd = moho::AssignWeakPtrRangeBackward(
-      reinterpret_cast<WeakPtr<void>*>(mFinish),
+    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
       reinterpret_cast<const WeakPtr<void>*>(first),
-      reinterpret_cast<const WeakPtr<void>*>(midSplit)
+      reinterpret_cast<const WeakPtr<void>*>(midSplit),
+      reinterpret_cast<WeakPtr<void>*>(mFinish)
     );
-    (void)assignedEnd;
     mFinish = reinterpret_cast<CameraUserEntityWeakRef*>(relinkCursor);
   } else {
     // Case B: the existing tail fully absorbs the insert. Construct the
@@ -2466,18 +2465,16 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::InsertRange(
       reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(splitPoint),
       reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mFinish)
     );
-    auto* const shiftedEnd = moho::AssignWeakPtrRangeBackward(
-      reinterpret_cast<WeakPtr<void>*>(mFinish),
+    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
       reinterpret_cast<const WeakPtr<void>*>(insertionPos),
-      reinterpret_cast<const WeakPtr<void>*>(splitPoint)
+      reinterpret_cast<const WeakPtr<void>*>(splitPoint),
+      reinterpret_cast<WeakPtr<void>*>(mFinish)
     );
-    (void)shiftedEnd;
-    auto* const gapEnd = moho::AssignWeakPtrRangeBackward(
-      reinterpret_cast<WeakPtr<void>*>(insertionPos + insertCount),
+    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
       reinterpret_cast<const WeakPtr<void>*>(first),
-      reinterpret_cast<const WeakPtr<void>*>(last)
+      reinterpret_cast<const WeakPtr<void>*>(last),
+      reinterpret_cast<WeakPtr<void>*>(insertionPos + insertCount)
     );
-    (void)gapEnd;
     mFinish = reinterpret_cast<CameraUserEntityWeakRef*>(relinkCursor);
   }
 
@@ -2501,12 +2498,11 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
 
   if (destSize >= sourceSize) {
     // Truncate: assign the retained prefix, detach and drop the excess tail.
-    auto* const assignedEnd = moho::AssignWeakPtrRangeForward(
+    msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
       reinterpret_cast<WeakPtr<void>*>(mStart),
       reinterpret_cast<const WeakPtr<void>*>(other.mStart),
-      reinterpret_cast<const WeakPtr<void>*>(other.mFinish)
+      sourceSize
     );
-    (void)assignedEnd;
 
     CameraUserEntityWeakRef* const newFinish = mStart + sourceSize;
     gpg::core::detail::UnlinkIntrusiveWeakRefRange(
@@ -2526,12 +2522,11 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
     (void)reserved;
   }
 
-  auto* const assignedPrefixEnd = moho::AssignWeakPtrRangeForward(
+  msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
     reinterpret_cast<WeakPtr<void>*>(mStart),
     reinterpret_cast<const WeakPtr<void>*>(other.mStart),
-    reinterpret_cast<const WeakPtr<void>*>(other.mStart + destSize)
+    destSize
   );
-  (void)assignedPrefixEnd;
 
   auto* const insertedEnd = InsertRange(
     mFinish,

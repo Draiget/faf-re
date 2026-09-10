@@ -68,10 +68,7 @@ SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedT
   transportBoneIndex = other.transportBoneIndex;
   attachBoneIndex = other.attachBoneIndex;
 
-  AssignWeakPtrLaneWithRelink(
-    reinterpret_cast<WeakPtr<void>&>(reservedUnit),
-    reinterpret_cast<const WeakPtr<void>&>(other.reservedUnit)
-  );
+  reservedUnit = other.reservedUnit;
 
   reservedBones = other.reservedBones;
   return *this;
