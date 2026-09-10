@@ -99,16 +99,32 @@ namespace moho
 
   int snd_index = 0;
 
-  float cam_NearZoom = 10.0f;
-  float cam_NearPitch = 35.0f;
+  // The world camera's tuning block sits contiguously at 0x00F57FC4..0x00F57FF8
+  // in the shipped image's `.data`, and each address below is the operand of a
+  // real `movss` against that symbol in the camera code -- not adjacency
+  // guesswork. Every value here is the initialiser read straight out of that
+  // block; the ones that were wrong are why the world view sat at a shallow,
+  // oblique angle instead of looking down the way the original does.
+  /// Address: 0x00F57FC4 (?cam_NearZoom@Moho@@3MA)
+  float cam_NearZoom = 5.0f;
+  /// Address: 0x00F57FD0 (?cam_NearPitch@Moho@@3MA) -- pitch at full zoom-in.
+  float cam_NearPitch = 40.0f;
   float cam_ZoomAmount = 0.05f;
   float cam_ZoomSpeedLarge = 8.0f;
   float cam_ZoomSpeedSmall = 1.0f;
-  float cam_NearFOV = 45.0f;
-  float cam_FarFOV = 80.0f;
-  float cam_FarPitch = 60.0f;
-  float cam_SpinSpeed = 1.0f;
-  float cam_MinSpinPitch = -89.0f;
+  /// Address: 0x00F57FC8 (?cam_NearFOV@Moho@@3MA)
+  float cam_NearFOV = 65.0f;
+  /// Address: 0x00F57FCC (?cam_FarFOV@Moho@@3MA)
+  float cam_FarFOV = 60.0f;
+  /// Address: 0x00F57FD4 (?cam_FarPitch@Moho@@3MA) -- pitch at full zoom-out.
+  /// 89.9 degrees, i.e. all but straight down. At the 60 this carried, the
+  /// zoomed-out view stayed steeply oblique and the map read as tilted.
+  float cam_FarPitch = 89.9f;
+  /// Address: 0x00F57FE8 (?cam_SpinSpeed@Moho@@3MA) -- degrees, not a factor.
+  float cam_SpinSpeed = 360.0f;
+  /// Address: 0x00F57FF8 (?cam_MinSpinPitch@Moho@@3MA) -- a floor just above
+  /// zero, so a spin cannot drop the camera through the horizon.
+  float cam_MinSpinPitch = 0.1f;
   // Address: 0x00F57FF0 (?cam_ShakeMult@Moho@@3MA) — per-frame camera-shake scale.
   float cam_ShakeMult = 1.0f;
   // Address: 0x00F57FEC (?cam_PanSpeed@Moho@@3MA) — ground-plane pan speed scale.
