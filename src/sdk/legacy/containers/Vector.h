@@ -4293,6 +4293,7 @@ namespace msvc8
          * Address: 0x008A8BC0 (FUN_008A8BC0 -- `erase(first, last)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); callers 0x008A8430; formerly `EraseNormalMapHandleRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008A8B00 (FUN_008A8B00 -- `erase(first, last)` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; callers 0x008A1500, 0x008A83A0; formerly `EraseTerrainEnvironmentLookupPairRange` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008A83A0 (FUN_008A83A0 -- `erase(begin(), end())` for the 0x38-byte `moho::TerrainEnvironmentLookupPair`; zero callers, unreachable; formerly `EraseAllTerrainEnvironmentLookupPairs` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD040 (FUN_004AD040 -- `erase(first, last)`'s tail move and `_Mylast` commit for a 4-byte element; zero callers, unreachable; formerly `MoveDwordVectorTailAndExportDestinationVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5367,6 +5368,7 @@ namespace msvc8
          * Address: 0x00497B40 (FUN_00497B40 -- the capacity-full path of `push_back` for the 0x38-byte `BeamRenderVertexRuntime` element (`insert(end(), value)`, 1.5x growth, max_size 0x4444444); caller 0x00495DA0 (`AppendBeamRenderVertex`, `vertices.push_back(vertex)`).)
          * Address: 0x00692870 (FUN_00692870 -- `vector<T>::insert(pos, value)` for a 28-byte float[7] element (iterator returned through the hidden result slot); callers 0x00692700; formerly `InsertFloat7LaneAndRebaseCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852350 (FUN_00852350 -- `vector<T>::insert(pos, value)` for a 12-byte element; callers 0x008522A0; formerly `InsertElement12LaneAndStoreRebasedCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADDE0 (FUN_004ADDE0 -- `insert(pos, value)` for a 4-byte element; callers 0x004AC330, 0x004AD027; formerly `InsertSingleDwordIntoLegacyVector_004ADDE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6473,6 +6475,8 @@ namespace msvc8
          * Address: 0x0047DA70 (FUN_0047DA70 -- `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D780; formerly `InsertStampAt` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047D780 (FUN_0047D780 -- a register-shape entry into `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D500; formerly `InsertStampAtAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047DD80 (FUN_0047DD80 -- `_Insert_n` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `InsertBandwidthSampleCopies` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADCE0 (FUN_004ADCE0 -- `_Insert_n`'s reallocating branch (buy, copy the prefix, splice the inserted run, copy the suffix, free the old block) for a 4-byte element; callers 0x004ACD80; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ACD80 (FUN_004ACD80 -- `insert(pos, first, last)` for a 4-byte element; callers 0x004AA220, 0x004AB780, 0x004AC050; formerly `InsertDwordRangeIntoVectorRuntime` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -10493,6 +10497,10 @@ namespace msvc8
          * Address: 0x0047DD10 (FUN_0047DD10 -- `max_size()` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `MaxStampVectorCountAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E050 (FUN_0047E050 -- `max_size()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `MaxBandwidthSampleVectorCount` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E190 (FUN_0047E190 -- `max_size()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `MaxBandwidthSampleVectorCountAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADDD0 (FUN_004ADDD0 -- `max_size()` for a 4-byte element; zero callers, unreachable; formerly `ReadLegacyDwordGrowthMax_004ADDD0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AE7B0 (FUN_004AE7B0 -- `max_size()` for a 4-byte element (second copy); zero callers, unreachable; formerly `ReadLegacyDwordGrowthMax_004AE7B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AEBC0 (FUN_004AEBC0 -- `max_size()` for a 4-byte element (third copy); zero callers, unreachable; formerly `ReadLegacyDwordGrowthMax_004AEBC0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AE0C0 (FUN_004AE0C0 -- `max_size()` for an 8-byte node element; zero callers, unreachable; formerly `ReadLegacyNodeVectorGrowthMax_004AE0C0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -10631,6 +10639,7 @@ namespace msvc8
          * Address: 0x00478C50 (FUN_00478C50 -- `_Xlen` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004787E0, 0x00478940; formerly `ThrowHeightFieldTierVectorTooLong` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047D8A0 (FUN_0047D8A0 -- `_Xlen` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D3C0, 0x0047D7F0, 0x0047DA70; formerly `ThrowStampVectorTooLong` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E090 (FUN_0047E090 -- `_Xlen` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x007F4C49; formerly `ThrowBandwidthSampleVectorTooLong` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADFF0 (FUN_004ADFF0 -- `_Xlen` for a 4-byte element; callers 0x004AD098, 0x004ADDE0; formerly `ThrowVectorTooLong_004ADFF0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {

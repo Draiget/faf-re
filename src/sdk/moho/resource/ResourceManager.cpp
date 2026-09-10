@@ -994,35 +994,6 @@ namespace
     return StoreDwordLane_004ADB90(outValue, value);
   }
 
-  struct LegacyDwordSpliceRuntime4_004ADCE0
-  {
-    std::uint32_t* begin;            // +0x00
-    std::uint32_t* end;              // +0x04
-    std::uint32_t* capacityEnd;      // +0x08
-    std::uint32_t** storageOwnerSlot; // +0x0C
-  };
-
-  static_assert(
-    offsetof(LegacyDwordSpliceRuntime4_004ADCE0, begin) == 0x00,
-    "LegacyDwordSpliceRuntime4_004ADCE0::begin offset must be 0x00"
-  );
-  static_assert(
-    offsetof(LegacyDwordSpliceRuntime4_004ADCE0, end) == 0x04,
-    "LegacyDwordSpliceRuntime4_004ADCE0::end offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyDwordSpliceRuntime4_004ADCE0, capacityEnd) == 0x08,
-    "LegacyDwordSpliceRuntime4_004ADCE0::capacityEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacyDwordSpliceRuntime4_004ADCE0, storageOwnerSlot) == 0x0C,
-    "LegacyDwordSpliceRuntime4_004ADCE0::storageOwnerSlot offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(LegacyDwordSpliceRuntime4_004ADCE0) == 0x10,
-    "LegacyDwordSpliceRuntime4_004ADCE0 size must be 0x10"
-  );
-
   /**
    * Address: 0x004ADDB0 (FUN_004ADDB0)
    *
@@ -1047,106 +1018,12 @@ namespace
   }
 
   /**
-   * Address: 0x004ADCE0 (FUN_004ADCE0)
-   *
-   * What it does:
-   * Reallocates one dword vector lane and splices `[spliceBegin,spliceEnd)`
-   * into the stream at `insertPosition`.
-   */
-  std::uint32_t ReallocateAndSpliceDwordRange_004ADCE0(
-    LegacyDwordSpliceRuntime4_004ADCE0& vectorRuntime,
-    std::uint32_t* const insertPosition,
-    const std::uint32_t newElementCount,
-    const std::uint32_t* const spliceBegin,
-    const std::uint32_t* const spliceEnd
-  )
-  {
-    auto* const newBegin = static_cast<std::uint32_t*>(
-      ::operator new(static_cast<std::size_t>(newElementCount) * sizeof(std::uint32_t))
-    );
-
-    std::uint32_t* writeCursor = newBegin;
-    writeCursor = CopyDwordRangeForward_004ADDB0(writeCursor, vectorRuntime.begin, insertPosition);
-    writeCursor = CopyDwordRangeForward_004ADDB0(writeCursor, spliceBegin, spliceEnd);
-    writeCursor = CopyDwordRangeForward_004ADDB0(writeCursor, insertPosition, vectorRuntime.end);
-
-    if (vectorRuntime.begin == reinterpret_cast<std::uint32_t*>(vectorRuntime.storageOwnerSlot)) {
-      *vectorRuntime.storageOwnerSlot = vectorRuntime.capacityEnd;
-    } else {
-      ::operator delete[](vectorRuntime.begin);
-    }
-
-    vectorRuntime.end = writeCursor;
-    vectorRuntime.begin = newBegin;
-    vectorRuntime.capacityEnd = newBegin + newElementCount;
-    return newElementCount;
-  }
-
-  /**
-   * Address: 0x004ADDD0 (FUN_004ADDD0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for dword ring/vector growth lanes.
-   */
-  std::uint32_t ReadLegacyDwordGrowthMax_004ADDD0() noexcept
-  {
-    return 0x3FFFFFFFU;
-  }
-
-  struct LegacyDwordVectorContainer4_004ADDE0
-  {
-    std::uint32_t reserved00;     // +0x00
-    std::uint32_t* begin;         // +0x04
-    std::uint32_t* end;           // +0x08
-    std::uint32_t* capacityEnd;   // +0x0C
-  };
-
-  static_assert(
-    offsetof(LegacyDwordVectorContainer4_004ADDE0, begin) == 0x04,
-    "LegacyDwordVectorContainer4_004ADDE0::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyDwordVectorContainer4_004ADDE0, end) == 0x08,
-    "LegacyDwordVectorContainer4_004ADDE0::end offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacyDwordVectorContainer4_004ADDE0, capacityEnd) == 0x0C,
-    "LegacyDwordVectorContainer4_004ADDE0::capacityEnd offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(LegacyDwordVectorContainer4_004ADDE0) == 0x10,
-    "LegacyDwordVectorContainer4_004ADDE0 size must be 0x10"
-  );
-
-  /**
-   * Address: 0x004ADFF0 (FUN_004ADFF0)
-   *
-   * What it does:
-   * Throws the legacy "vector<T> too long" length-error path.
-   */
-  void ThrowVectorTooLong_004ADFF0()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-  /**
    * Address: 0x004AE070 (FUN_004AE070, nullsub_708)
    *
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
   void NoOpHelperThunk_004AE070() noexcept {}
-
-  /**
-   * Address: 0x004AE0C0 (FUN_004AE0C0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for 0x18-byte node vectors.
-   */
-  std::uint32_t ReadLegacyNodeVectorGrowthMax_004AE0C0() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
 
   /**
    * Address: 0x004AE230 (FUN_004AE230, nullsub_709)
@@ -1211,98 +1088,6 @@ namespace
   std::uint32_t ReadLegacyWideNodeGrowthMax_004AE2A0() noexcept
   {
     return 0x03FFFFFFU;
-  }
-
-  /**
-   * Address: 0x004ADDE0 (FUN_004ADDE0)
-   *
-   * What it does:
-   * Inserts one dword value into a legacy vector container at a target slot,
-   * growing storage when capacity is exhausted.
-   */
-  std::uint32_t* InsertSingleDwordIntoLegacyVector_004ADDE0(
-    const std::uint32_t* const valueSlot,
-    LegacyDwordVectorContainer4_004ADDE0& vectorRuntime,
-    std::uint32_t* const insertionPosition
-  )
-  {
-    const std::uint32_t value = valueSlot != nullptr ? *valueSlot : 0U;
-    const std::uint32_t* const begin = vectorRuntime.begin;
-    const std::uint32_t* const end = vectorRuntime.end;
-    const std::uint32_t* const capacityEnd = vectorRuntime.capacityEnd;
-
-    const std::uint32_t capacity =
-      (begin != nullptr && capacityEnd != nullptr && capacityEnd >= begin)
-        ? static_cast<std::uint32_t>(capacityEnd - begin)
-        : 0U;
-    const std::uint32_t size =
-      (begin != nullptr && end != nullptr && end >= begin)
-        ? static_cast<std::uint32_t>(end - begin)
-        : 0U;
-
-    if (size == 0x3FFFFFFFU) {
-      ThrowVectorTooLong_004ADFF0();
-    }
-
-    std::uint32_t insertIndex = size;
-    if (begin != nullptr && insertionPosition != nullptr
-        && insertionPosition >= begin && insertionPosition <= end) {
-      insertIndex = static_cast<std::uint32_t>(insertionPosition - begin);
-    }
-
-    if (capacity >= size + 1U) {
-      std::uint32_t* const writeAt = vectorRuntime.begin + insertIndex;
-      if (writeAt != vectorRuntime.end) {
-        std::memmove(
-          writeAt + 1,
-          writeAt,
-          static_cast<std::size_t>(vectorRuntime.end - writeAt) * sizeof(std::uint32_t)
-        );
-      }
-      *writeAt = value;
-      ++vectorRuntime.end;
-      return vectorRuntime.begin;
-    }
-
-    std::uint32_t newCapacity = 0U;
-    if (0x3FFFFFFFU - (capacity >> 1U) >= capacity) {
-      newCapacity = capacity + (capacity >> 1U);
-    }
-    if (newCapacity < size + 1U) {
-      newCapacity = size + 1U;
-    }
-
-    auto* const newBegin = static_cast<std::uint32_t*>(
-      newCapacity != 0U
-        ? ::operator new(static_cast<std::size_t>(newCapacity) * sizeof(std::uint32_t))
-        : ::operator new(0U)
-    );
-
-    std::uint32_t* const newInsert = newBegin + insertIndex;
-    if (insertIndex > 0U) {
-      std::memmove(
-        newBegin,
-        vectorRuntime.begin,
-        static_cast<std::size_t>(insertIndex) * sizeof(std::uint32_t)
-      );
-    }
-    *newInsert = value;
-
-    if (size > insertIndex) {
-      std::memmove(
-        newInsert + 1,
-        vectorRuntime.begin + insertIndex,
-        static_cast<std::size_t>(size - insertIndex) * sizeof(std::uint32_t)
-      );
-    }
-
-    if (vectorRuntime.begin != nullptr) {
-      ::operator delete(vectorRuntime.begin);
-    }
-    vectorRuntime.begin = newBegin;
-    vectorRuntime.end = newBegin + size + 1U;
-    vectorRuntime.capacityEnd = newBegin + newCapacity;
-    return vectorRuntime.begin;
   }
 
   /**
@@ -1410,151 +1195,6 @@ namespace
     return lhsPairStorage;
   }
 
-  struct LegacyDwordVectorRuntime3_004ACD80
-  {
-    std::uint32_t* begin;       // +0x00
-    std::uint32_t* end;         // +0x04
-    std::uint32_t* capacityEnd; // +0x08
-  };
-
-  static_assert(
-    offsetof(LegacyDwordVectorRuntime3_004ACD80, begin) == 0x00,
-    "LegacyDwordVectorRuntime3_004ACD80::begin offset must be 0x00"
-  );
-  static_assert(
-    offsetof(LegacyDwordVectorRuntime3_004ACD80, end) == 0x04,
-    "LegacyDwordVectorRuntime3_004ACD80::end offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyDwordVectorRuntime3_004ACD80, capacityEnd) == 0x08,
-    "LegacyDwordVectorRuntime3_004ACD80::capacityEnd offset must be 0x08"
-  );
-  static_assert(
-    sizeof(LegacyDwordVectorRuntime3_004ACD80) == 0x0C,
-    "LegacyDwordVectorRuntime3_004ACD80 size must be 0x0C"
-  );
-
-  /**
-   * Address: 0x004ACD80 (FUN_004ACD80)
-   *
-   * What it does:
-   * Inserts one dword range into one legacy 3-lane vector runtime at a target
-   * insertion position, growing storage as needed.
-   */
-  int InsertDwordRangeIntoVectorRuntime(
-    LegacyDwordVectorRuntime3_004ACD80& vectorRuntime,
-    std::uint32_t* const insertionPosition,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  )
-  {
-    if (sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd < sourceBegin) {
-      return 0;
-    }
-
-    const std::size_t insertCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    if (insertCount == 0U) {
-      return 0;
-    }
-
-    const std::size_t currentSize =
-      (vectorRuntime.begin != nullptr && vectorRuntime.end != nullptr && vectorRuntime.end >= vectorRuntime.begin)
-        ? static_cast<std::size_t>(vectorRuntime.end - vectorRuntime.begin)
-        : 0U;
-    const std::size_t currentCapacity =
-      (vectorRuntime.begin != nullptr && vectorRuntime.capacityEnd != nullptr
-       && vectorRuntime.capacityEnd >= vectorRuntime.begin)
-        ? static_cast<std::size_t>(vectorRuntime.capacityEnd - vectorRuntime.begin)
-        : 0U;
-    const std::size_t insertIndex =
-      (vectorRuntime.begin != nullptr && insertionPosition != nullptr && insertionPosition >= vectorRuntime.begin)
-        ? static_cast<std::size_t>(insertionPosition - vectorRuntime.begin)
-        : currentSize;
-    const std::size_t clampedInsertIndex = std::min(insertIndex, currentSize);
-    const std::size_t requiredSize = currentSize + insertCount;
-
-    if (requiredSize > currentCapacity) {
-      std::size_t newCapacity = currentCapacity * 2U;
-      if (newCapacity < requiredSize) {
-        newCapacity = requiredSize;
-      }
-
-      std::uint32_t* const newBegin =
-        static_cast<std::uint32_t*>(::operator new(newCapacity * sizeof(std::uint32_t), std::nothrow));
-      if (newBegin == nullptr) {
-        throw std::bad_alloc();
-      }
-
-      if (clampedInsertIndex > 0U) {
-        std::memmove(
-          newBegin,
-          vectorRuntime.begin,
-          clampedInsertIndex * sizeof(std::uint32_t)
-        );
-      }
-
-      std::memmove(
-        newBegin + clampedInsertIndex,
-        sourceBegin,
-        insertCount * sizeof(std::uint32_t)
-      );
-
-      const std::size_t tailCount = currentSize - clampedInsertIndex;
-      if (tailCount > 0U) {
-        std::memmove(
-          newBegin + clampedInsertIndex + insertCount,
-          vectorRuntime.begin + clampedInsertIndex,
-          tailCount * sizeof(std::uint32_t)
-        );
-      }
-
-      ::operator delete(vectorRuntime.begin);
-      vectorRuntime.begin = newBegin;
-      vectorRuntime.end = newBegin + requiredSize;
-      vectorRuntime.capacityEnd = newBegin + newCapacity;
-      return 0;
-    }
-
-    std::uint32_t* const insertAt = vectorRuntime.begin + clampedInsertIndex;
-    std::uint32_t* const oldEnd = vectorRuntime.end;
-    if (insertAt + insertCount <= oldEnd) {
-      std::uint32_t* const tailCopyBegin = oldEnd - insertCount;
-      if (insertCount > 0U) {
-        std::memmove(oldEnd, tailCopyBegin, insertCount * sizeof(std::uint32_t));
-      }
-
-      vectorRuntime.end = oldEnd + insertCount;
-
-      const std::size_t shiftedMiddleCount = static_cast<std::size_t>(tailCopyBegin - insertAt);
-      if (shiftedMiddleCount > 0U) {
-        std::memmove(oldEnd - shiftedMiddleCount, insertAt, shiftedMiddleCount * sizeof(std::uint32_t));
-      }
-
-      std::memmove(
-        insertAt,
-        sourceBegin,
-        insertCount * sizeof(std::uint32_t)
-      );
-      return 0;
-    }
-
-    const std::size_t leftCount = static_cast<std::size_t>(oldEnd - insertAt);
-    if (leftCount > 0U) {
-      std::memmove(oldEnd, insertAt, leftCount * sizeof(std::uint32_t));
-    }
-
-    const std::size_t rightCount = insertCount - leftCount;
-    std::uint32_t* writeCursor = oldEnd + leftCount;
-    if (rightCount > 0U) {
-      std::memmove(writeCursor, sourceBegin + leftCount, rightCount * sizeof(std::uint32_t));
-      writeCursor += rightCount;
-    }
-
-    std::memmove(insertAt, sourceBegin, leftCount * sizeof(std::uint32_t));
-    vectorRuntime.end = writeCursor;
-    return 0;
-  }
-
   struct LegacyDwordPointerWindow4_004ACE90
   {
     std::uint32_t* lane0;
@@ -1618,32 +1258,6 @@ namespace
   ) noexcept
   {
     return SwapTwoDwordLanesVariant1(lhsPairStorage, rhsPairStorage);
-  }
-
-  /**
-   * Address: 0x004AD040 (FUN_004AD040)
-   *
-   * What it does:
-   * Moves one dword tail range in a legacy vector runtime and exports the
-   * destination iterator into output storage.
-   */
-  std::uint32_t** MoveDwordVectorTailAndExportDestinationVariant1(
-    LegacyDwordVectorRuntime3_004ACD80& vectorRuntime,
-    std::uint32_t** const outIterator,
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    if (destination != source) {
-      const std::size_t copyCount = static_cast<std::size_t>(vectorRuntime.end - source);
-      if (copyCount > 0U) {
-        std::memmove(destination, source, copyCount * sizeof(std::uint32_t));
-      }
-      vectorRuntime.end = destination + copyCount;
-    }
-
-    *outIterator = destination;
-    return outIterator;
   }
 
   /**
@@ -2375,17 +1989,6 @@ namespace
   }
 
   /**
-   * Address: 0x004AE7B0 (FUN_004AE7B0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for dword lane growth.
-   */
-  std::uint32_t ReadLegacyDwordGrowthMax_004AE7B0() noexcept
-  {
-    return 0x3FFFFFFFU;
-  }
-
-  /**
    * Address: 0x004AE7F0 (FUN_004AE7F0)
    *
    * What it does:
@@ -2501,17 +2104,6 @@ namespace
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
   void NoOpHelperThunk_004AEBB0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEBC0 (FUN_004AEBC0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for dword lane growth.
-   */
-  std::uint32_t ReadLegacyDwordGrowthMax_004AEBC0() noexcept
-  {
-    return 0x03FFFFFFU;
-  }
 
   /**
    * Address: 0x004AEBD0 (FUN_004AEBD0)
