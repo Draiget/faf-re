@@ -509,33 +509,6 @@ namespace
     (void)CopySSTIArmyVariableDataRangeWithRollbackAlt(sourceBegin, sourceEnd, sourceEnd);
   }
 
-  struct LegacyWordVectorRuntimeView
-  {
-    void* mAllocProxy;           // +0x00
-    std::uint32_t* mBegin;       // +0x04
-    std::uint32_t* mEnd;         // +0x08
-    std::uint32_t* mCapacityEnd; // +0x0C
-  };
-
-  static_assert(sizeof(LegacyWordVectorRuntimeView) == 0x10, "LegacyWordVectorRuntimeView size must be 0x10");
-
-  /**
-   * Address: 0x0055FE70 (FUN_0055FE70)
-   *
-   * What it does:
-   * Releases one legacy word-vector backing allocation and clears the
-   * begin/end/capacity lanes to the empty-state shape.
-   */
-  void ResetLegacyWordVectorStorage(LegacyWordVectorRuntimeView* const vectorRuntime)
-  {
-    if (vectorRuntime->mBegin != nullptr) {
-      ::operator delete(vectorRuntime->mBegin);
-    }
-    vectorRuntime->mBegin = nullptr;
-    vectorRuntime->mEnd = nullptr;
-    vectorRuntime->mCapacityEnd = nullptr;
-  }
-
   /**
    * Address: 0x00754200 (FUN_00754200, fill_SSTIArmyVariableData_count_with_rollback)
    *
