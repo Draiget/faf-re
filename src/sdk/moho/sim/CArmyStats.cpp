@@ -327,13 +327,7 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::ArmyTriggerNode* CreateTriggerListSentinel()
-  {
-    auto* const head = new moho::ArmyTriggerNode{};
-    head->next = head;
-    head->prev = head;
-    return head;
-  }
+
 
   struct ArmyTriggerSentinelRuntimeNode
   {
@@ -377,13 +371,7 @@ namespace
   };
   static_assert(sizeof(ArmyNameIndexMapRuntime) == 0x0C, "ArmyNameIndexMapRuntime size must be 0x0C");
 
-  struct ArmyTriggerListRuntime
-  {
-    void* proxy;
-    moho::ArmyTriggerNode* head;
-    std::uint32_t size;
-  };
-  static_assert(sizeof(ArmyTriggerListRuntime) == 0x0C, "ArmyTriggerListRuntime size must be 0x0C");
+
 
   [[nodiscard]] ArmyNameIndexMapRuntime* NameIndexMapRuntimeView(moho::CArmyStats* const object)
   {
@@ -395,74 +383,7 @@ namespace
     return reinterpret_cast<const ArmyNameIndexMapRuntime*>(&object->mNameIndex);
   }
 
-  [[nodiscard]] ArmyTriggerListRuntime* TriggerListRuntimeView(moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<ArmyTriggerListRuntime*>(&object->mAuxProxy);
-  }
 
-  [[nodiscard]] const ArmyTriggerListRuntime* TriggerListRuntimeView(const moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mAuxProxy);
-  }
-
-  /**
-   * Address: 0x007020B0 (FUN_007020B0)
-   *
-   * What it does:
-   * Clears one trigger-list payload, frees the list-header sentinel node, and
-   * zeros `{head,size}` lanes.
-   */
-  [[maybe_unused]] void ReleaseArmyTriggerListStorage(ArmyTriggerListRuntime& triggerListRuntime) noexcept
-  {
-    if (triggerListRuntime.head != nullptr) {
-      moho::ArmyTriggerNode* node = triggerListRuntime.head->next;
-      while (node != triggerListRuntime.head) {
-        moho::ArmyTriggerNode* const next = node->next;
-        delete node;
-        node = next;
-      }
-
-      delete triggerListRuntime.head;
-    }
-
-    triggerListRuntime.head = nullptr;
-    triggerListRuntime.size = 0u;
-  }
-
-  /**
-   * Address: 0x0070E460 (FUN_0070E460)
-   *
-   * What it does:
-   * Erases one trigger-list node, updates list links and size, and stores the
-   * following iterator node in `outNext`.
-   */
-  [[nodiscard]] moho::ArmyTriggerNode** EraseTriggerListNodeAndAdvance(
-    ArmyTriggerListRuntime* const listRuntime,
-    moho::ArmyTriggerNode** const outNext,
-    moho::ArmyTriggerNode* const node
-  )
-  {
-    if (outNext == nullptr || listRuntime == nullptr || listRuntime->head == nullptr || node == nullptr) {
-      return outNext;
-    }
-
-    moho::ArmyTriggerNode* const head = listRuntime->head;
-    moho::ArmyTriggerNode* const next = node->next;
-    if (node == head) {
-      *outNext = next;
-      return outNext;
-    }
-
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-    delete node;
-    if (listRuntime->size > 0u) {
-      --listRuntime->size;
-    }
-
-    *outNext = next;
-    return outNext;
-  }
 
   gpg::RType* gArmyStatsBaseType = nullptr;
   gpg::RType* gArmyNameIndexType = nullptr;
@@ -811,12 +732,10 @@ namespace moho
   CArmyStats::CArmyStats(CAiBrain* ownerArmy)
     : mOwnerArmy(ownerArmy)
     , mNameIndex{}
-    , mAuxProxy(nullptr)
-    , mAuxHead(CreateTriggerListSentinel())
-    , mAuxSize(0)
+    , mTriggers{}
   {
-    // `msvc8::map`'s own constructor builds the head sentinel and zeroes the
-    // size, which is what the binary open-codes for the tree lanes here.
+    // Both members build their own header sentinel and zero their own size,
+    // which is what the binary open-codes here.
   }
 
   /**
@@ -836,7 +755,8 @@ namespace moho
    */
   CArmyStats::~CArmyStats()
   {
-    DestroyAuxList();
+    // `~list` (0x007015C0) and `~rb_tree` run on the two members; the body
+    // says nothing.
   }
 
   /**
@@ -874,7 +794,7 @@ namespace moho
     const gpg::RRef owner{};
     archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
     archive->Read(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
-    archive->Read(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListRuntimeView(this), owner);
+    archive->Read(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -900,7 +820,7 @@ namespace moho
       owner
     );
     archive->Write(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
-    archive->Write(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListRuntimeView(this), owner);
+    archive->Write(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -1337,10 +1257,9 @@ namespace moho
    */
   boost::shared_ptr<STrigger>* CArmyStats::GetTrigger(boost::shared_ptr<STrigger>* outTrigger, const char* triggerName)
   {
-    ArmyTriggerNode* const head = mAuxHead;
-    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
-      if (_stricmp(node->trigger->mName.c_str(), triggerName) == 0) {
-        *outTrigger = node->trigger;
+    for (const boost::shared_ptr<STrigger>& trigger : mTriggers) {
+      if (_stricmp(trigger->mName.c_str(), triggerName) == 0) {
+        *outTrigger = trigger;
         return outTrigger;
       }
     }
@@ -1390,11 +1309,6 @@ namespace moho
    */
   void CArmyStats::EnsureTriggerExists(const char* const triggerName)
   {
-    if (mAuxHead == nullptr) {
-      mAuxHead = CreateTriggerListSentinel();
-      mAuxSize = 0u;
-    }
-
     boost::shared_ptr<STrigger> trigger;
     GetTrigger(&trigger, triggerName);
     if (trigger) {
@@ -1408,14 +1322,7 @@ namespace moho
     ConstructSharedSTriggerFromRaw(created, new STrigger());
     created->mName = triggerName ? triggerName : "";
 
-    ArmyTriggerNode* const head = mAuxHead;
-    auto* const node = new ArmyTriggerNode{};
-    node->trigger = created;
-    node->next = head;
-    node->prev = head->prev;
-    head->prev->next = node;
-    head->prev = node;
-    ++mAuxSize;
+    mTriggers.push_back(created);
   }
 
   /**
@@ -1423,17 +1330,9 @@ namespace moho
    */
   void CArmyStats::RemoveArmyStatsTrigger(const char* const triggerName)
   {
-    ArmyTriggerListRuntime* const triggerRuntime = TriggerListRuntimeView(this);
-    ArmyTriggerNode* const head = (triggerRuntime != nullptr) ? triggerRuntime->head : nullptr;
-    if (head == nullptr) {
-      return;
-    }
-
-    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
-      if (node->trigger && _stricmp(node->trigger->mName.c_str(), triggerName) == 0) {
-        ArmyTriggerNode* nextNode = nullptr;
-        (void)EraseTriggerListNodeAndAdvance(triggerRuntime, &nextNode, node);
-        (void)nextNode;
+    for (ArmyTriggerList::iterator it = mTriggers.begin(); it != mTriggers.end(); ++it) {
+      if (*it && _stricmp((*it)->mName.c_str(), triggerName) == 0) {
+        (void)mTriggers.erase(it);
         return;
       }
     }
@@ -1448,17 +1347,16 @@ namespace moho
    */
   void CArmyStats::Update()
   {
-    ArmyTriggerNode* const head = mAuxHead;
-    if (head == nullptr || mOwnerArmy == nullptr) {
+    if (mOwnerArmy == nullptr) {
       return;
     }
 
-    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
-      if (node->trigger == nullptr) {
+    for (const boost::shared_ptr<STrigger>& trigger : mTriggers) {
+      if (trigger == nullptr) {
         continue;
       }
 
-      const auto& conditions = node->trigger->mConditions;
+      const auto& conditions = trigger->mConditions;
       if (conditions.Empty()) {
         continue;
       }
@@ -1476,7 +1374,7 @@ namespace moho
         continue;
       }
 
-      (void)mOwnerArmy->RunScript(kOnStatsTriggerScriptName, node->trigger->mName.c_str());
+      (void)mOwnerArmy->RunScript(kOnStatsTriggerScriptName, trigger->mName.c_str());
     }
   }
 
@@ -1513,65 +1411,6 @@ namespace moho
       item->mType = EStatType::kString;
     }
     item->SetValue(value);
-  }
-
-  /**
-   * Address: 0x00702BB0 (FUN_00702BB0, std::list<shared_ptr<STrigger>>::clear inlined helper)
-   *
-   * IDA signature:
-   * void __usercall sub_702BB0(int a1@<ebx>);
-   *
-   * What it does:
-   * Clears one sentinel-headed trigger-node list in-place: resets the sentinel
-   * head's next/prev to itself, zeroes the size lane, then walks each former
-   * payload node, releases its intrusive `boost::shared_ptr<STrigger>` control
-   * block (matched add_ref/release pair at +0x0C), and frees the node storage.
-   *
-   * This is the MSVC8 std::list<boost::shared_ptr<STrigger>>::clear expansion
-   * used by both the auxiliary `mAuxHead` lane on CArmyStats and by
-   * reflection-driven SerLoad helpers that reuse the same node ABI.
-   */
-  void CArmyStats::ClearTriggerList()
-  {
-    ArmyTriggerNode* const head = mAuxHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    // Detach the circular list from its payload: sentinel head becomes empty
-    // (next = prev = head), size lane is reset, matching FUN_00702BB0's prologue
-    // exactly so re-entrancy during node destruction cannot observe stale links.
-    ArmyTriggerNode* node = head->next;
-    head->next = head;
-    head->prev = head;
-    mAuxSize = 0;
-
-    while (node != head) {
-      ArmyTriggerNode* const next = node->next;
-      // ArmyTriggerNode's `boost::shared_ptr<STrigger>` member destructor runs
-      // here and performs the interlocked shared_count/weak_count release pair
-      // (ref_count::release + ref_count::weak_release) that the decompiler
-      // rendered as inlined lock-xadd sequences at +0x0C/+0x10.
-      delete node;
-      node = next;
-    }
-  }
-
-  /**
-   * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
-   *
-   * What it does:
-   * Destroys all trigger-list nodes via `ClearTriggerList`, frees the sentinel
-   * head allocation, and clears the auxiliary-list runtime pointer lane.
-   */
-  void CArmyStats::DestroyAuxList()
-  {
-    ClearTriggerList();
-
-    if (ArmyTriggerNode* const head = mAuxHead) {
-      delete head;
-      mAuxHead = nullptr;
-    }
   }
 
   /**

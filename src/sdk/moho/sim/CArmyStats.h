@@ -68,23 +68,22 @@ namespace moho
    * `msvc8::map` lays out for a 0x20-byte `value_type`.
    *
    * The header is 0x0C, not the 0x10 this was modelled as. The fourth dword
-   * belonged to the trigger list that follows: `TriggerListRuntimeView` was
-   * reinterpreting `&mNameIndex.metaC` as a `{proxy, head, size}` triple
-   * whose second and third words are `mAuxHead` and `mAuxSize`. Modelled
-   * properly as `mAuxProxy` below; 0x14 + 0x0C = 0x20 and the three trigger
-   * words then run 0x20..0x2B, which is `sizeof(CArmyStats) == 0x2C`.
+   * belonged to the trigger list that follows: 0x14 + 0x0C = 0x20, and the
+   * trigger list's own 0x0C head then runs 0x20..0x2B, which is
+   * `sizeof(CArmyStats) == 0x2C`.
    */
   using ArmyNameIndexTree = msvc8::map<msvc8::string, CArmyStatItem*>;
 
   static_assert(sizeof(ArmyNameIndexTree) == 0x0C, "ArmyNameIndexTree size must be 0x0C");
 
-  struct ArmyTriggerNode
-  {
-    ArmyTriggerNode* next;                // +0x00
-    ArmyTriggerNode* prev;                // +0x04
-    boost::shared_ptr<STrigger> trigger;  // +0x08
-  };
-  static_assert(sizeof(ArmyTriggerNode) == 0x10, "ArmyTriggerNode size must be 0x10");
+  /**
+   * The army's triggers. The 0x0C `{proxy, head, size}` head at `+0x20` sits
+   * over a 0x10 `{next, prev, shared_ptr<STrigger>}` node, which is exactly
+   * `msvc8::list`'s node for an 8-byte element: the sentinel allocator at
+   * 0x00702090 asks for 16 bytes and self-links `{next, prev}`.
+   */
+  using ArmyTriggerList = msvc8::list<boost::shared_ptr<STrigger>>;
+  static_assert(sizeof(ArmyTriggerList) == 0x0C, "ArmyTriggerList size must be 0x0C");
 
   class CArmyStatItem : public StatItem
   {
@@ -395,39 +394,16 @@ namespace moho
     // (cited on `~rb_tree()`/`erase_range` in RbTree.h) -- there is no
     // separate "destroy the name index" symbol anywhere in this binary.
 
-    /**
-     * Address: 0x00702BB0 (FUN_00702BB0, std::list<shared_ptr<STrigger>>::clear inlined helper)
-     *
-     * What it does:
-     * Clears every node from the sentinel-headed trigger list in place without
-     * freeing the sentinel head, matching the binary layout used by the
-     * auxiliary `mAuxHead` lane and by reflection-driven SerLoad helpers.
-     */
-    void ClearTriggerList();
 
-    /**
-     * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
-     *
-     * What it does:
-     * Destroys all trigger-list nodes, frees the sentinel head, and resets the
-     * auxiliary trigger runtime lane.
-     */
-    void DestroyAuxList();
 
   public:
     CAiBrain* mOwnerArmy;         // +0x10
     ArmyNameIndexTree mNameIndex; // +0x14
-    /// Allocator proxy of the trigger list at +0x20; `mAuxHead` and
-    /// `mAuxSize` below are that same list's head and count.
-    void* mAuxProxy;              // +0x20
-    ArmyTriggerNode* mAuxHead;    // +0x24
-    std::uint32_t mAuxSize;       // +0x28
+    ArmyTriggerList mTriggers;    // +0x20
   };
   static_assert(offsetof(CArmyStats, mOwnerArmy) == 0x10, "CArmyStats::mOwnerArmy offset must be 0x10");
   static_assert(offsetof(CArmyStats, mNameIndex) == 0x14, "CArmyStats::mNameIndex offset must be 0x14");
-  static_assert(offsetof(CArmyStats, mAuxProxy) == 0x20, "CArmyStats::mAuxProxy offset must be 0x20");
-  static_assert(offsetof(CArmyStats, mAuxHead) == 0x24, "CArmyStats::mAuxHead offset must be 0x24");
-  static_assert(offsetof(CArmyStats, mAuxSize) == 0x28, "CArmyStats::mAuxSize offset must be 0x28");
+  static_assert(offsetof(CArmyStats, mTriggers) == 0x20, "CArmyStats::mTriggers offset must be 0x20");
   static_assert(sizeof(CArmyStats) == 0x2C, "CArmyStats size must be 0x2C");
 
   /**
