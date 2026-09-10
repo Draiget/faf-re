@@ -9744,6 +9744,8 @@ namespace msvc8
          * Address: 0x00753C80 (FUN_00753C80 -- a register-shape entry into `_Copy_opt` for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); zero callers, unreachable; formerly `CopySSTIArmyVariableDataRangeForwardAssignThunkA` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00751A00 (FUN_00751A00 -- `std::fill`'s assign form (the `_Insert_n` seam step) for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); callers 0x0074EB00; formerly `FillSSTIArmyVariableDataRangeAssignReturnLastWritten` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00753CE0 (FUN_00753CE0 -- a register-shape entry into that fill for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); zero callers, unreachable; formerly `FillSSTIArmyVariableDataRangeAssignReturnLastWrittenThunkA` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004DD290 (FUN_004DD290 -- `AudioEngineRef`'s element assignment (engine pointer + shared-count control) as emitted for its vector's `_Copy_opt`; zero callers, unreachable; formerly `AssignAudioEngineRefLaneA` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004DD2A0 (FUN_004DD2A0 -- `AudioEngineRef`'s element assignment (second copy); zero callers, unreachable; formerly `AssignAudioEngineRefLaneB` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
