@@ -687,9 +687,6 @@
     <ClCompile Include="moho\misc\EngineStatsCleanup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\misc\EngineVectorHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\projectile\Projectile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3100,9 +3097,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\EngineStatsCleanup.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\misc\EngineVectorHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\projectile\CProjectileAttributes.h">

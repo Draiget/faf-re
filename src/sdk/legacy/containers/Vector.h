@@ -2051,6 +2051,9 @@ namespace msvc8
          * Address: 0x0084F4D0 (FUN_0084F4D0 -- `vector<T>::vector(const vector&)` for a 4-byte element; callers 0x0084EE20, 0x0084FE00, 0x0084FF00; formerly `CloneDwordVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071C350 (FUN_0071C350 -- `vector(const vector&)` for the 0x38-byte `moho::SThreat`; callers 0x0071C150; formerly `CopyConstructSThreatVector` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0057E550 (FUN_0057E550 -- `vector<T>::vector(const vector&)` for the 4-byte `moho::Unit*` element: null the triple, `_Xlen` 0x00580BB0 above 0x3FFFFFFF, buy exactly `size()` slots (0x005822E0), `_Ucopy` 0x00584180, `_Tidy` 0x0057F830 on the throw path. Reached from `moho::FindAvailableFactory` 0x0057AC30, which copies its candidate list on entry because an empty one is refilled from the army; callers 0x0057AC30; formerly `CopyFastvectorUnitToStdVector` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00560A90 (FUN_00560A90 -- `vector<T>::vector(const vector&)` for a 4-byte `std::uint32_t` element (`_Xlen` 0x005619C0): reached from `SArmyVectorWithMeta`'s copy constructor 0x0055FF80, which copies `mWords` in its member-init list; callers 0x0055FF80, 0x00560134; formerly `AssignCopyVectorUint32` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007AE840 (FUN_007AE840 -- `vector<T>::vector(const vector&)` for the 4-byte `moho::CameraImpl*` element (`_Xlen` 0x007AFF20, buy 0x007B1240, `_Ucopy` 0x007B1B70, `_Tidy` 0x007AF380 on the throw path): reached from `RCamManager::GetAllCameras` 0x007AAB60's `return mCams;`; callers 0x007AAB60; formerly `CopyConstructVectorOfCameraImplPtr` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007BAFE0 (FUN_007BAFE0 -- `vector<T>::vector(const vector&)` for the 0x24-byte `moho::SNetCommandArg` element: reached from both `SNetCommand` constructors (0x007B6720, 0x007BCE70), which copy `mArgs` in the member-init list; callers 0x007B6720, 0x007BCE70; formerly `CopyConstructVectorOfSNetCommandArg` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -3069,8 +3072,7 @@ namespace msvc8
          * call only computes the advance). This is the old-range-into-new-
          * buffer copy step of the `_Insert_n` grow body FUN_00547FE0 and is
          * also reached directly from `push_back`'s capacity-full path
-         * (FUN_00547750, cited on `PushBackVector<ResourceDeposit>` in
-         * moho/misc/EngineVectorHelpers.h) — same family, same caller chain
+         * (FUN_00547750, cited on `push_back` above) — same family, same caller chain
          * as the resize entry above.)
          * Address: 0x0082CBA0 (FUN_0082CBA0, `msvc8::vector<void*>::resize`
          * for one of `Moho::UICommandGraph`'s hash-bucket vectors -- `size()`
@@ -3943,6 +3945,8 @@ namespace msvc8
          * Address: 0x004DB2A0 (FUN_004DB2A0 -- `push_back` -- the grow-or-place tail append for `msvc8::vector<void*>` (`AudioEngineImpl::mBanks` at +0x08 and `mHandles` at +0x18; the 0x10 `{proxy, first, last, end}` head); callers 0x004DA500; formerly `PushBackNonNullAudioHandleStorageEntryA` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004DB440 (FUN_004DB440 -- a second emission of that `push_back` for `msvc8::vector<void*>` (`AudioEngineImpl::mBanks` at +0x08 and `mHandles` at +0x18; the 0x10 `{proxy, first, last, end}` head); callers 0x004DA500; formerly `PushBackNonNullAudioHandleStorageEntryB` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005C4AB0 (FUN_005C4AB0 -- `push_back` -- store at the end and bump it, growing when full for `msvc8::vector<moho::ReconBlip*>` (`CAiReconDBImpl::mBblips`, the by-index blip table); zero callers, unreachable; formerly `PushBackBlipPointerWithGrowth` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00547750 (FUN_00547750 -- `push_back` for the 20-byte `moho::ResourceDeposit` element: store at `_Mylast` and bump it, or `insert(end(), 1, value)` (0x00547B40, grow core 0x00547FE0) when full. Reached from `CSimResources::AddDeposit` 0x00545F10's `deposits_.push_back(deposit)` and from `RVectorType_ResourceDeposit::SerLoad` 0x00547950; callers 0x00545F10, 0x00547950; formerly `PushBackVector<ResourceDeposit>` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007AE990 (FUN_007AE990 -- a second emission of `push_back` for the 4-byte `moho::CameraImpl*` element, delegating to `_Insert_n` 0x007AFD10 when full; zero callers -- `RCamManager::CreateCamera` inlined its fast path and calls the grow half directly; zero callers, unreachable; formerly `AppendCameraImplPtr` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -6534,6 +6538,7 @@ namespace msvc8
          * Address: 0x008E71D0 (FUN_008E71D0 -- `insert(pos, count, value)` -- the `_Insert_n` grow body: 1.5x growth floored to `size + count`, capped at 0x1FFFFFF for `msvc8::vector<gpg::gal::Head>` (`DeviceContext::mHeads`; the element is a non-trivial 0x80-byte `Head`, so every copy routes through its copy ctor at 0x004368B0); callers 0x008E748E, 0x008E7530; formerly `InsertNCopiesHeadVector` in gpg/gal/Device.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008E6F90 (FUN_008E6F90 -- that insert's spare-capacity fast path, the uninitialized fill it outlines for `msvc8::vector<gpg::gal::Head>` (`DeviceContext::mHeads`; the element is a non-trivial 0x80-byte `Head`, so every copy routes through its copy ctor at 0x004368B0); callers 0x008E7080, 0x008E7130, 0x008E7530; formerly `InsertNCopiesHeadVector` in gpg/gal/Device.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00578ED0 (FUN_00578ED0 -- the gap fill-assign sub-step (`insertAt[i] = localValue` for each of `count`, VC8's `std::fill`) for `msvc8::vector<LuaPlus::LuaObject>` (the 0x14 element; `STIMap::LoadTerrainTypes`'s `parsedEntries`, whose `push_back` is 0x00578650 and whose `insert` is 0x00578980); callers 0x00578980; formerly `AssignLuaObjectRangeForward` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007AFD10 (FUN_007AFD10 -- `_Insert_n` for the 4-byte `moho::CameraImpl*` element -- shift the tail right and fill the gap in place, or allocate 1.5x (`_Allocate` 0x007B1240), move head and tail (0x007B11D0 / 0x007B1210), fill the gap (0x007AF3B0) and free the old block; `_Xlen` 0x007AFF20. Reached from `RCamManager::CreateCamera` 0x007AA9C0 (0x007AAA68), which is `mCams.push_back(camera)` with its fast path inlined; callers 0x007AA9C0, 0x007AE990, 0x007AF317; formerly `InsertNCopiesCameraImplPtrVector` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -8708,10 +8713,10 @@ namespace msvc8
          * reached from `Moho::CMauiControl::Render` (0x00786FA0).)
          * Address: 0x007AF3B0 (FUN_007AF3B0, `msvc8::vector<Moho::
          * CameraImpl*>::uninit_fill_n` for the 4-byte pointer element.
-         * Reached from the recovered `InsertNCopiesCameraImplPtrVector`
-         * (EngineVectorHelpers.cpp:74, `msvc8::vector<CameraImpl*>::
-         * _Insert_n` per-T binding for `FUN_007AFD10`), which forwards to
-         * `storage.insert(pos, count, fillValue)` by name.)
+         * Reached from this instantiation's `_Insert_n` (FUN_007AFD10,
+         * cited on `insert(pos, count, value)`), which
+         * `RCamManager::CreateCamera`'s `mCams.push_back(camera)` compiles
+         * to on the capacity-full path.)
          * Address: 0x007AF620 (FUN_007AF620, `msvc8::vector<Moho::
          * RCamCamera*>::uninit_fill_n` for the same 4-byte pointer element
          * as the entry immediately above (`RCamCamera` is the public alias

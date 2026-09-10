@@ -4,7 +4,7 @@
 #include <limits>
 #include <new>
 
-#include "moho/misc/EngineVectorHelpers.h"
+
 
 namespace
 {
@@ -88,7 +88,7 @@ namespace moho
     ResourceDeposit deposit{};
     deposit.footprintRect = *pos;
     deposit.depositType = type;
-    moho::PushBackVector(deposits_, deposit);
+    deposits_.push_back(deposit);
   }
 
   /**
