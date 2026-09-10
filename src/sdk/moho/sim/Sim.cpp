@@ -29250,13 +29250,26 @@ void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFast
       continue;
     }
 
-    // Props receive their OnCollision Lua callback (self, owner, dir, depth);
-    // the "otherObject" argument is the raw first-arg (Sim) slot the binary
-    // reinterprets as a LuaObject (asm 0x597E50-0x597E9A + FUN_00598660). This
-    // is an original-source type-pun; reproduce it exactly for 1:1 behavior.
+    // Props receive their OnCollision Lua callback (self, other, dir, depth).
+    // `other` is the colliding unit: 0x00598660 pushes exactly one dword for
+    // that argument (0x005986F5 `mov eax,[edx]` then `push eax` at
+    // 0x00598700), alongside `self` copied from `this+0x20` and the four
+    // floats, so what the Lua side receives is a single object pointer.
+    //
+    // This used to pass `*(const LuaPlus::LuaObject*)sim`, on the reading that
+    // the shipped call's first argument slot holds the `Sim*`. It cannot:
+    // `Sim` derives from `ICommandSink` and has nothing LuaObject-shaped at
+    // offset 0, so `m_state` came out as the vtable pointer and LuaPlus threw
+    // `state->l_G == m_state->m_state->l_G` on every prop collision - caught
+    // and logged by `RunScriptOnCollision`, so the only symptom was that no
+    // prop ever ran its collision script. IDA names that slot `a1` after
+    // `DoCollisionsFor`'s first parameter, but MSVC reuses a dead argument
+    // slot for a local and the decompile of this function is not reliable
+    // enough to say which local; the Lua contract
+    // `Prop:OnCollision(other, x, y, z, depth)` is.
     if (contact->IsProp() != nullptr) {
       contact->RunScriptOnCollision(
-        *reinterpret_cast<const LuaPlus::LuaObject*>(sim),
+        owner,
         hit.direction.x,
         hit.direction.y,
         hit.direction.z,
