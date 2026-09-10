@@ -38,85 +38,6 @@ namespace gpg::gal
             return static_cast<int>(heads.end() - start);
         }
 
-        /**
-         * Address: 0x008D7C20 (FUN_008D7C20)
-         *
-         * What it does:
-         * Copy-constructs one `Head` range into uninitialized destination
-         * storage and, on exception, destroys the partially constructed prefix
-         * before rethrowing.
-         *
-         * The release binary additionally exposes four linker-emitted
-         * calling-convention trampolines that forward unmodified to this body
-         * (`FUN_008D6E00`, `FUN_008E7110`, `FUN_008E7170`, `FUN_008E71A0`)
-         * for cross-TU references with `__cdecl` and `__stdcall` callsites.
-         * No separate source code is emitted for those trampolines; the
-         * compiler/linker re-synthesizes them automatically when this single
-         * recovered body is referenced from differently-conventioned callers.
-         */
-        [[nodiscard]] Head* CopyConstructHeadRangeIntoUninitializedStorageOrRethrow(
-            const Head* const sourceBegin,
-            const Head* const sourceEnd,
-            Head* const destinationBegin
-        )
-        {
-            Head* destinationCursor = destinationBegin;
-            try
-            {
-                for (const Head* sourceCursor = sourceBegin; sourceCursor != sourceEnd; ++sourceCursor, ++destinationCursor)
-                {
-                    new (destinationCursor) Head(*sourceCursor);
-                }
-                return destinationCursor;
-            }
-            catch (...)
-            {
-                for (Head* unwindCursor = destinationBegin; unwindCursor != destinationCursor; ++unwindCursor)
-                {
-                    unwindCursor->~Head();
-                }
-                throw;
-            }
-        }
-
-        /**
-         * Address: 0x008E71D0 (FUN_008E71D0, msvc8::vector<gpg::gal::Head>::_Insert_n)
-         * Address: 0x008E6F90 (FUN_008E6F90, the std::_Uninitialized_fill_n<Head>
-         *          fast-path primitive the same insert() outlines when spare
-         *          capacity is available — folded here per the canonical-body rule)
-         *
-         * IDA signature:
-         * void __thiscall sub_8E71D0(_DWORD *this, int pos, unsigned int count, int value);
-         *
-         * What it does:
-         * Per-`Head` `msvc8::vector<Head>::insert(pos, count, value)` — the single
-         * source-level call `DeviceContext::AddHead` makes. MSVC8 outlines it into
-         * the fast-path uninitialized fill (`FUN_008E6F90`, when spare capacity
-         * exists) plus the `_Insert_n` grow body (`FUN_008E71D0`): when there is
-         * room it shifts the live tail right by `count` and copy-assigns the gap
-         * in place; otherwise it reallocates (MSVC8 1.5x growth `oldCap + oldCap/2`,
-         * floored to `size + count`, capped at 0x1FFFFFF elements,
-         * `std::length_error` on overflow), copy-constructs the head prefix into
-         * the new buffer via the recovered
-         * `CopyConstructHeadRangeIntoUninitializedStorageOrRethrow` (`FUN_008D7C20`,
-         * reached through the `FUN_008E71A0` trampoline), fill-constructs the
-         * inserted `Head`, moves the tail, frees the old buffer via
-         * `operator delete` and rebinds the pointer triplet. `Head` is a
-         * non-trivial 0x80-byte element, so every element copy routes through the
-         * recovered `Head` copy-ctor (`FUN_004368B0`) — never a raw byte copy. The
-         * canonical `_Insert_n` body lives in `msvc8::vector<T>::insert`
-         * (legacy/containers/Vector.h); this per-`Head` wrapper is the by-name
-         * invocation that keeps the emitted symbols in the binary.
-         */
-        void InsertNCopiesHeadVector(
-            msvc8::vector<Head>& heads,
-            Head* const insertPosition,
-            const std::size_t insertCount,
-            const Head& fillValue
-        )
-        {
-            heads.insert(insertPosition, insertCount, fillValue);
-        }
     }
 
     /**
@@ -352,19 +273,17 @@ namespace gpg::gal
      * What it does:
      * Appends one head descriptor to the retained head vector — a single
      * `mHeads.insert(end, 1, head)`. The release binary outlines this one
-     * `insert(end(),1,value)` into a conditional fast-path uninitialized fill
+     * `insert(end(), 1, value)` into a conditional fast-path uninitialized fill
      * (`FUN_008E6F90`, taken when `size < capacity`) plus the `_Insert_n` grow
-     * body (`FUN_008E71D0`); together they add exactly one element (the fill
-     * constructs the trailing slot, the body advances the end pointer — it does
-     * NOT re-construct). Expressed as the single `InsertNCopiesHeadVector`
-     * (== `msvc8::vector<Head>::insert`) call so the element is constructed
-     * exactly once (a two-step fill-then-insert would double-construct and leak
-     * the non-trivial 0x80-byte `Head`). `Head` copies route through the
-     * recovered `Head` copy-ctor (`FUN_004368B0`), never a raw byte copy.
+     * body (`FUN_008E71D0`); together they add exactly one element. Both cite
+     * `msvc8::vector<T>::insert` in Vector.h, along with the copy-construct
+     * range (`FUN_008D7C20`) and its four calling-convention trampolines.
+     * `Head` copies route through the recovered `Head` copy-ctor
+     * (`FUN_004368B0`), never a raw byte copy.
      */
     void DeviceContext::AddHead(const Head& head)
     {
-        InsertNCopiesHeadVector(mHeads, mHeads.end(), 1U, head);
+        mHeads.insert(mHeads.end(), 1U, head);
     }
 
     /**
