@@ -92,9 +92,9 @@ namespace moho
 
     msvc8::string mName;                                    // +0x00
     std::uint32_t mUnk1C;                                   // +0x1C
-    gpg::fastvector_runtime_view<SCondition> mConditions;   // +0x20
-    std::uint8_t mPad30[0x70];                              // +0x30
+    gpg::fastvector_n<SCondition, 2> mConditions;           // +0x20 (0x10 header + two inline conditions)
   };
+  static_assert(sizeof(gpg::fastvector_n<SCondition, 2>) == 0x80, "fastvector_n<SCondition, 2> size must be 0x80");
 
   static_assert(sizeof(SCondition) == 0x38, "SCondition size must be 0x38");
   static_assert(offsetof(SCondition, mItem) == 0x00, "SCondition::mItem offset must be 0x00");

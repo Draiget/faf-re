@@ -284,6 +284,9 @@ namespace gpg::core
      * Destroys `[first, last)` in forward order. Nothing to do for a trivially
      * destructible element, which is the shape every POD lane compiles to.
      */
+    /**
+     * Address: 0x00711B80 (FUN_00711B80 -- `_Destroy_range` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38): each `~SCondition` releases the category set's word storage; reached from `~STrigger` (0x00711A90) through `ResetStorageToInline`.)
+     */
     template <class T>
     inline void DestroyRange(T* first, T* const last) noexcept
     {
@@ -1122,6 +1125,7 @@ namespace gpg::core
      * `Moho::Unit::GetExtraData`'s `out->pairs.PushBack(pair)` calls,
      * Unit.cpp.)
      * Address: 0x0056B590 (FUN_0056B590 -- `push_back` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): `mOffsetInfo[layerIndex].push_back(group)` at the end of `CFormationInstance::RunScript`.)
+     * Address: 0x0070E8F0 (FUN_0070E8F0 -- `push_back` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38): `CArmyStats::AddTriggerCondition`'s `trigger->mConditions.push_back(condition)` (CArmyStats.cpp); the full arm calls the `InsertAt` at 0x0070FAD0.)
      */
     void push_back(const T& value)
     {
@@ -1268,6 +1272,7 @@ namespace gpg::core
      *    The branch structure (fits-in-tail vs. spills-past-end vs. grow) is
      *    identical across both emissions; only the per-element operation differs.
      * Address: 0x0056D3F0 (FUN_0056D3F0 -- `InsertAt` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the grow arm of its `push_back`/`Resize`; deep-copy path.)
+     * Address: 0x0070FAD0 (FUN_0070FAD0 -- `insert_range` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38), the grow arm of `push_back` 0x0070E8F0; its tail shift is the `_Copy_backward` at 0x00714850.)
      */
     void InsertAt(T* pos, const T* insStart, const T* insEnd)
     {
@@ -1726,6 +1731,10 @@ namespace gpg::core
      * this template reproduces branch-for-branch.)
      * Address: 0x00571150 (FUN_00571150 -- `_Copy_backward` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the in-place tail shift of its `InsertAt`.)
      * Address: 0x00571180 (FUN_00571180 -- a second, byte-identical emission of the same `_Copy_backward` the linker kept distinct.)
+     * Address: 0x00714850 (FUN_00714850 -- `_Copy_backward` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38), the in-place tail shift of `InsertAt` 0x0070FAD0; element `operator=` copies `mItem`, `mOp`, `mCat` and `mVal`.)
+     * Address: 0x00713950 (FUN_00713950 -- a second emission of the same `SCondition` `_Copy_backward`.)
+     * Address: 0x00712840 (FUN_00712840 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
+     * Address: 0x00712870 (FUN_00712870 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
      */
     static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
     {

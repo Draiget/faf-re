@@ -25,28 +25,6 @@ namespace
   gpg::RType* gSConditionCategorySetType = nullptr;
   gpg::RType* gFastVectorSConditionType = nullptr;
 
-  constexpr std::size_t kTriggerInlineConditionCount = 2u;
-
-  [[nodiscard]] moho::SCondition* InlineConditionBuffer(moho::STrigger* const trigger) noexcept
-  {
-    return reinterpret_cast<moho::SCondition*>(trigger->mPad30);
-  }
-
-  void DestroyConditionCategoryBits(moho::SCondition& condition)
-  {
-    // Address: 0x00711B80 (FUN_00711B80, sub_711B80) inner lane.
-    condition.mCat.mBits.mWords.ResetStorageToInline();
-  }
-
-  void DestroyConditionRange(moho::SCondition* begin, moho::SCondition* end)
-  {
-    // Address: 0x00711B80 (FUN_00711B80, sub_711B80).
-    while (begin && end && begin != end) {
-      DestroyConditionCategoryBits(*begin);
-      ++begin;
-    }
-  }
-
   void DestroySTriggerState(moho::STrigger* const trigger)
   {
     // Alias of FUN_00711A90 (non-canonical helper lane).
@@ -54,15 +32,10 @@ namespace
       return;
     }
 
-    DestroyConditionRange(trigger->mConditions.begin, trigger->mConditions.end);
-
-    moho::SCondition* const inlineBegin = reinterpret_cast<moho::SCondition*>(trigger->mConditions.metadata);
-    if (trigger->mConditions.begin != inlineBegin) {
-      delete[] trigger->mConditions.begin;
-      trigger->mConditions.begin = inlineBegin;
-      trigger->mConditions.capacityEnd = inlineBegin ? *reinterpret_cast<moho::SCondition* const*>(inlineBegin) : nullptr;
-    }
-    trigger->mConditions.end = trigger->mConditions.begin;
+    // Destroys every live condition (`_Destroy_range`, 0x00711B80, cited on
+    // FastVector.h's `DestroyRange`), releases a heap block the way the
+    // vector allocated it and rebinds the inline window, then the name.
+    trigger->mConditions.ResetStorageToInline();
     trigger->mName.tidy(true, 0U);
   }
 
@@ -83,56 +56,11 @@ namespace
     ::operator delete(trigger);
   }
 
-  /**
-   * Address: 0x00713950 (FUN_00713950)
-   *
-   * What it does:
-   * Backward-copies one `SCondition` range into potentially overlapping
-   * destination storage and returns the new destination begin iterator.
-   */
-  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRange(
-    moho::SCondition* sourceCurrent,
-    const moho::SCondition* const sourceBegin,
-    moho::SCondition* destinationCurrent
-  )
-  {
-    while (sourceCurrent != sourceBegin) {
-      --sourceCurrent;
-      --destinationCurrent;
-
-      destinationCurrent->mItem = sourceCurrent->mItem;
-      destinationCurrent->mOp = sourceCurrent->mOp;
-      destinationCurrent->mCat = sourceCurrent->mCat;
-      destinationCurrent->mVal = sourceCurrent->mVal;
-      std::memcpy(destinationCurrent->mPad34, sourceCurrent->mPad34, sizeof(destinationCurrent->mPad34));
-    }
-
-    return destinationCurrent;
-  }
-
-  /**
-   * Address: 0x007138C0 (FUN_007138C0)
-   *
-   * What it does:
-   * Secondary lane for backward-copying one `SCondition` range into
-   * potentially overlapping destination storage.
-   */
-  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeLaneA(
-    moho::SCondition* sourceCurrent,
-    const moho::SCondition* const sourceBegin,
-    moho::SCondition* destinationCurrent
-  )
-  {
-    return CopyBackwardSConditionRange(sourceCurrent, sourceBegin, destinationCurrent);
-  }
-
-  // Addresses 0x00712840 ("ThunkA") and 0x00712870 ("ThunkB") -- jump-thunk
-  // aliases formerly modeled here -- are dead: zero incoming call_edges for
-  // both, and no source-level caller anywhere in src/sdk/**. Unlike these
-  // two, CopyBackwardSConditionRangeLaneA and CopyBackwardSConditionRange
-  // above are NOT dead: both have a real, confirmed caller (FUN_0070FAD0,
-  // itself reachable) via two direct call_edges each -- so both are kept
-  // as-is.
+  // The `_Copy_backward` emissions for `SCondition` (0x00714850, 0x00713950)
+  // and the jump thunks 0x00712840/0x00712870 are the tail-shift step of
+  // `fastvector_n<SCondition, 2>::InsertAt` (0x0070FAD0); they are cited on
+  // FastVector.h's `CopyBackwardAssign`, and `STrigger::mConditions` reaches
+  // them through the template instead of a per-type copy here.
 } // namespace
 
 namespace moho
@@ -203,14 +131,11 @@ namespace moho
    */
   STrigger::STrigger()
     : mName()
-    , mConditions{}
+    , mConditions()
   {
-    // Address: 0x00711030 (FUN_00711030) / 0x007110F0 (FUN_00711030 / FUN_007110F0).
-    SCondition* const inlineBegin = InlineConditionBuffer(this);
-    mConditions.begin = inlineBegin;
-    mConditions.end = inlineBegin;
-    mConditions.capacityEnd = inlineBegin + kTriggerInlineConditionCount;
-    mConditions.metadata = inlineBegin;
+    // Address: 0x00711030 (FUN_00711030) / 0x007110F0 (FUN_00711030 / FUN_007110F0):
+    // the empty name and the condition vector armed on its two inline slots,
+    // which is `fastvector_n<SCondition, 2>`'s own constructor.
   }
 
   /**
