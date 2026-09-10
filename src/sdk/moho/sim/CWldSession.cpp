@@ -4989,10 +4989,19 @@ namespace moho
       auto* const rehashBucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
       const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
       HashListNode88* node = rehashBucketSlots[splitBucketIndex];
-      HashListNode88* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
-
-      if (splitBucketEnd != node) {
-        for (;;) {
+      // The loop condition re-reads the split bucket's END slot on every pass:
+      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
+      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
+      // is the point -- the splice below rewrites those slots.
+      //
+      // Hoisting it into a `const` and running `for (;;)` instead left the
+      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
+      // with no way out: once a run of keys all rehashed back into the split
+      // bucket, `node` walked past the sentinel and around the circular list
+      // forever. Queueing several buildings in one shift-drag is exactly that
+      // burst, and it hung the main thread inside `CreateMeshes`.
+      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
+        do {
           // Raw masked hash WITHOUT the wraparound adjustment
           // HashKeyToBucketIndex applies elsewhere: the binary compares
           // this directly against splitBucketIndex, which by construction
@@ -5052,7 +5061,7 @@ namespace moho
             }
             node = next;
           }
-        }
+        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
       }
 
       ++table.mBucketCount;
@@ -5141,10 +5150,19 @@ namespace moho
       auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
       const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
       TNode* node = rehashBucketSlots[splitBucketIndex];
-      TNode* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
-
-      if (splitBucketEnd != node) {
-        for (;;) {
+      // The loop condition re-reads the split bucket's END slot on every pass:
+      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
+      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
+      // is the point -- the splice below rewrites those slots.
+      //
+      // Hoisting it into a `const` and running `for (;;)` instead left the
+      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
+      // with no way out: once a run of keys all rehashed back into the split
+      // bucket, `node` walked past the sentinel and around the circular list
+      // forever. Queueing several buildings in one shift-drag is exactly that
+      // burst, and it hung the main thread inside `CreateMeshes`.
+      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
+        do {
           const std::ldiv_t split = std::ldiv(static_cast<long>(node->mKey ^ 0xDEADBEEFu), 127773L);
           long scrambled = 16807L * split.rem - 2836L * split.quot;
           if (scrambled < 0) {
@@ -5192,7 +5210,7 @@ namespace moho
             }
             node = next;
           }
-        }
+        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
       }
 
       ++table.mBucketCount;
@@ -5285,10 +5303,19 @@ namespace moho
       auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
       const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
       TNode* node = rehashBucketSlots[splitBucketIndex];
-      TNode* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
-
-      if (splitBucketEnd != node) {
-        for (;;) {
+      // The loop condition re-reads the split bucket's END slot on every pass:
+      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
+      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
+      // is the point -- the splice below rewrites those slots.
+      //
+      // Hoisting it into a `const` and running `for (;;)` instead left the
+      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
+      // with no way out: once a run of keys all rehashed back into the split
+      // bucket, `node` walked past the sentinel and around the circular list
+      // forever. Queueing several buildings in one shift-drag is exactly that
+      // burst, and it hung the main thread inside `CreateMeshes`.
+      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
+        do {
           const std::ldiv_t split = std::ldiv(
             static_cast<long>(3863u * node->mKeyLow + 7919u * node->mKeyHigh + 53849u * (node->mKeyLow ^ node->mKeyHigh)),
             127773L
@@ -5339,7 +5366,7 @@ namespace moho
             }
             node = next;
           }
-        }
+        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
       }
 
       ++table.mBucketCount;
@@ -6656,8 +6683,17 @@ namespace moho
 
     const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
 
-    float size = (drawNode.mUnitCountScale * styleScale) / depthW;
-    size = std::clamp(size, ui_MinWaypointSize, ui_MaxWaypointSize);
+    // The clamp is in SCREEN units, the quad is in world units. 0x008282B0
+    // divides the style scale by the projected depth, clamps that against
+    // `ui_MinWaypointSize`/`ui_MaxWaypointSize` (7 and 100 pixels, from
+    // `/lua/ui/game/commandwaypoint.lua`), and then multiplies the clamped
+    // value BACK by the same depth to get the world half-extent
+    // (`v21 * v20` at 0x0082838E..0x008283C4). Without that second multiply
+    // the marker was drawn at its pixel size in world units, so the minimum
+    // clamp alone made every waypoint tens of map units across.
+    const float screenSize =
+      std::clamp((drawNode.mUnitCountScale * styleScale) / depthW, ui_MinWaypointSize, ui_MaxWaypointSize);
+    const float size = screenSize * depthW;
 
     batcher.SetTexture(texture);
 
