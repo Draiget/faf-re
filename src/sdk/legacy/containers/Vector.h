@@ -7761,6 +7761,7 @@ namespace msvc8
          * Address: 0x004792D0 (FUN_004792D0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004795A0 (FUN_004795A0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant3` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004796A0 (FUN_004796A0 -- a register-shape entry into the range-construct `_Ucopy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierRangeThunkVariant4` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071D200 (FUN_0071D200 -- a register-shape entry into `_Ucopy` for the 0x10-byte `moho::SPositionThreat`; zero callers, unreachable; formerly `CopyFloatQuadCountLaneAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8833,6 +8834,7 @@ namespace msvc8
          * Address: 0x00479380 (FUN_00479380 -- `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940, 0x00478D30, 0x00478E30; formerly `ConstructHeightFieldTierFill` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00478E30 (FUN_00478E30 -- a register-shape entry into `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `ConstructHeightFieldTierFillThunkVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00479190 (FUN_00479190 -- a register-shape entry into `_Ufill` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `ConstructHeightFieldTierFillThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071D660 (FUN_0071D660 -- `_Ufill` for the 0x10-byte `moho::SPositionThreat`; callers 0x0071BEE0; formerly `FillFloat4LaneRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9724,6 +9726,7 @@ namespace msvc8
          * Address: 0x004795D0 (FUN_004795D0 -- `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00479100, 0x00479350; formerly `CopyHeightFieldTierRangeBackward` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00479100 (FUN_00479100 -- a register-shape entry into `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `CopyHeightFieldTierRangeBackwardThunkVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00479350 (FUN_00479350 -- a register-shape entry into `_Copy_backward` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `CopyHeightFieldTierRangeBackwardThunkVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071EBC0 (FUN_0071EBC0 -- `_Copy_backward` for the 0x10-byte `moho::SPositionThreat`; callers 0x0071D690; formerly `CopyFloat4LaneRangeBackward` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
