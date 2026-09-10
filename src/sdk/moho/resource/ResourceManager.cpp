@@ -57,6 +57,7 @@ namespace
 
   using WeakSharedPair = boost::SharedCountPair;
   using PrefetchRequestRuntime = moho::PrefetchRequestRuntime;
+  using PrefetchWeakPairRingQueueRuntime = moho::PrefetchWeakPairRingQueueRuntime;
 
   struct DualSharedPairCleanupView
   {
@@ -215,28 +216,16 @@ namespace
     return reinterpret_cast<const FactoryRegistrationView*>(factory)->registrationKey;
   }
 
-  void RemovePendingFactory(std::vector<moho::ResourceFactoryBase*>& pendingFactories,
+  // Matches `CResourceManager::PendingFactoryRegistrations` (private there).
+  using PendingFactoryRegistrations = msvc8::vector<moho::ResourceFactoryBase*, false>;
+
+  void RemovePendingFactory(PendingFactoryRegistrations& pendingFactories,
                             const moho::ResourceFactoryBase* factory)
   {
     const auto factoryIt = std::find(pendingFactories.begin(), pendingFactories.end(), factory);
     if (factoryIt != pendingFactories.end()) {
       pendingFactories.erase(factoryIt);
     }
-  }
-
-  /**
-   * Address: 0x004AC330 (FUN_004AC330)
-   *
-   * What it does:
-   * Appends one factory pointer into the pending registration vector.
-   */
-  moho::ResourceFactoryBase* AppendPendingFactoryRegistration(
-    std::vector<moho::ResourceFactoryBase*>& pendingFactories,
-    moho::ResourceFactoryBase* const factory
-  )
-  {
-    pendingFactories.push_back(factory);
-    return factory;
   }
 
   [[nodiscard]] boost::SharedCountPair* ResetSharedPairToNullCore(boost::SharedCountPair* const pair) noexcept
@@ -417,32 +406,7 @@ namespace
     return CopyDwordFromOffset4Variant1(outValue, source);
   }
 
-  struct PrefetchWeakPairRingQueueRuntime
-  {
-    std::uint32_t mReserved00;                    // +0x00
-    boost::SharedCountPair** mChunkPairBlocks;    // +0x04
-    std::uint32_t mChunkCount;                    // +0x08
-    std::uint32_t mReadCursor;                    // +0x0C
-    std::uint32_t mQueuedCount;                   // +0x10
-  };
 
-  static_assert(
-    offsetof(PrefetchWeakPairRingQueueRuntime, mChunkPairBlocks) == 0x04,
-    "PrefetchWeakPairRingQueueRuntime::mChunkPairBlocks offset must be 0x04"
-  );
-  static_assert(
-    offsetof(PrefetchWeakPairRingQueueRuntime, mChunkCount) == 0x08,
-    "PrefetchWeakPairRingQueueRuntime::mChunkCount offset must be 0x08"
-  );
-  static_assert(
-    offsetof(PrefetchWeakPairRingQueueRuntime, mReadCursor) == 0x0C,
-    "PrefetchWeakPairRingQueueRuntime::mReadCursor offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(PrefetchWeakPairRingQueueRuntime, mQueuedCount) == 0x10,
-    "PrefetchWeakPairRingQueueRuntime::mQueuedCount offset must be 0x10"
-  );
-  static_assert(sizeof(PrefetchWeakPairRingQueueRuntime) == 0x14, "PrefetchWeakPairRingQueueRuntime size must be 0x14");
 
   constexpr std::uint32_t kPrefetchWeakPairRingMaxChunkCount_004AD900 = 0x0FFFFFFFU;
 
@@ -758,8 +722,7 @@ namespace
     CleanupPrefetchWeakPairRingQueue_004ADA70(queue);
   }
 
-  PrefetchWeakPairRingQueueRuntime sPrefetchPayloadQueue_004AB180{};
-  std::chrono::steady_clock::time_point sLastResourceResolveTime_004AA690{};
+
 
   [[nodiscard]] boost::SharedCountPair SharedPairBorrowFromPrefetchShared(
     const boost::shared_ptr<moho::PrefetchData>& sharedPayload
@@ -783,7 +746,10 @@ namespace
     (void)ReleaseWeakControlFromPair(&liveWeak);
   }
 
-  void EnqueuePrefetchPayloadBack_004AB180(const boost::shared_ptr<moho::PrefetchData>& payload)
+  void EnqueuePrefetchPayloadBack_004AB180(
+    moho::PrefetchWeakPairRingQueueRuntime& queue,
+    const boost::shared_ptr<moho::PrefetchData>& payload
+  )
   {
     if (!payload) {
       return;
@@ -792,11 +758,14 @@ namespace
     const boost::SharedCountPair sharedPayloadPair = SharedPairBorrowFromPrefetchShared(payload);
     boost::SharedCountPair weakPayloadPair{};
     (void)boost::AssignWeakPairFromShared(&weakPayloadPair, &sharedPayloadPair);
-    (void)PushPrefetchWeakPairRingBack(&sPrefetchPayloadQueue_004AB180, &weakPayloadPair);
+    (void)PushPrefetchWeakPairRingBack(&queue, &weakPayloadPair);
     (void)ReleaseWeakControlFromPair(&weakPayloadPair);
   }
 
-  void EnqueuePrefetchPayloadFront_004AB180(const boost::shared_ptr<moho::PrefetchData>& payload)
+  void EnqueuePrefetchPayloadFront_004AB180(
+    moho::PrefetchWeakPairRingQueueRuntime& queue,
+    const boost::shared_ptr<moho::PrefetchData>& payload
+  )
   {
     if (!payload) {
       return;
@@ -805,20 +774,22 @@ namespace
     const boost::SharedCountPair sharedPayloadPair = SharedPairBorrowFromPrefetchShared(payload);
     boost::SharedCountPair weakPayloadPair{};
     (void)boost::AssignWeakPairFromShared(&weakPayloadPair, &sharedPayloadPair);
-    (void)PushPrefetchWeakPairRingFront(&sPrefetchPayloadQueue_004AB180, &weakPayloadPair);
+    (void)PushPrefetchWeakPairRingFront(&queue, &weakPayloadPair);
     (void)ReleaseWeakControlFromPair(&weakPayloadPair);
   }
 
-  [[nodiscard]] boost::shared_ptr<moho::PrefetchData> PopQueuedPrefetchPayload_004AB180()
+  [[nodiscard]] boost::shared_ptr<moho::PrefetchData> PopQueuedPrefetchPayload_004AB180(
+    moho::PrefetchWeakPairRingQueueRuntime& queue
+  )
   {
     boost::shared_ptr<moho::PrefetchData> payload{};
-    if (sPrefetchPayloadQueue_004AB180.mQueuedCount == 0U) {
+    if (queue.mQueuedCount == 0U) {
       return payload;
     }
 
     const boost::SharedCountPair* const frontSlot = GetPrefetchWeakPairRingSlot(
-      &sPrefetchPayloadQueue_004AB180,
-      sPrefetchPayloadQueue_004AB180.mReadCursor,
+      &queue,
+      queue.mReadCursor,
       false
     );
     if (frontSlot != nullptr && frontSlot->px != nullptr && frontSlot->pi != nullptr
@@ -828,7 +799,7 @@ namespace
       layout->pi = frontSlot->pi;
     }
 
-    (void)PopPrefetchWeakPairRingFront(&sPrefetchPayloadQueue_004AB180);
+    (void)PopPrefetchWeakPairRingFront(&queue);
     return payload;
   }
 
@@ -2483,36 +2454,8 @@ namespace
   // Matches `CResourceManager::ActiveFactoryRegistrations` (private there).
   using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>;
 
-  /**
-   * Address: 0x004AD8B0 (FUN_004AD8B0)
-   *
-   * What it does:
-   * Orders prefetch requests by case-insensitive resource id, then by the
-   * resource-type pointer. This is the tree's comparator, read off the shipped
-   * body: `_stricmp` over the two `RResId` strings, then an unsigned compare
-   * of the two `gpg::RType*` slots at `+0x1C`.
-   */
-  struct PrefetchRequestLess
-  {
-    [[nodiscard]] bool operator()(
-      const PrefetchRequestRuntime& lhs,
-      const PrefetchRequestRuntime& rhs
-    ) const noexcept
-    {
-      const int compare = _stricmp(lhs.mResourceId.name.c_str(), rhs.mResourceId.name.c_str());
-      return (compare < 0) || (compare == 0 && lhs.mResourceType < rhs.mResourceType);
-    }
-  };
 
-  // The node is 0x50 with the colour byte at +0x4C, so the value is the whole
-  // 0x40 `PrefetchRequestRuntime`: the request *is* the element, keyed on the
-  // id and type stored inside it. `lower_bound` reads the candidate's string
-  // through `[node+0x10]` / `[node+0x24]` and its type through `[node+0x28]`,
-  // i.e. value+0x04 / value+0x18 / value+0x1C (0x004AD790).
-  using PrefetchRequestSet = msvc8::set<PrefetchRequestRuntime, PrefetchRequestLess>;
-  static_assert(sizeof(PrefetchRequestSet) == 0x0C, "PrefetchRequestSet size must be 0x0C");
 
-  PrefetchRequestSet sPrefetchRequests{};
 
   /**
    * MSVC8's `std::set<T>::iterator` was mutable -- the const-element rule
@@ -2521,7 +2464,7 @@ namespace
    * this one accessor instead of a cast at every site; the two ordering fields
    * are never touched.
    */
-  [[nodiscard]] PrefetchRequestRuntime& MutableRequest(const PrefetchRequestSet::iterator it) noexcept
+  [[nodiscard]] PrefetchRequestRuntime& MutableRequest(const moho::PrefetchRequestSet::iterator it) noexcept
   {
     return const_cast<PrefetchRequestRuntime&>(*it);
   }
@@ -2856,10 +2799,8 @@ namespace
  */
 moho::ResourceManager::ResourceManager()
   : CDiskWatchListener(nullptr)
-  , mFactoryMutex()
+  , mLock()
   , mFactoriesActivated(false)
-  , mWorkerLock()
-  , mWorkerRunning(false)
   , mWorkerWakeCondition()
   , mWorkerIdleCondition()
   , mWorkerThread(nullptr)
@@ -2874,7 +2815,7 @@ moho::ResourceManager::ResourceManager()
 moho::ResourceManager::~ResourceManager()
 {
   ShutdownBackgroundThread();
-  CleanupPrefetchWeakPairRingQueue_004ADA70(&sPrefetchPayloadQueue_004AB180);
+  CleanupPrefetchWeakPairRingQueue_004ADA70(&mPrefetchPayloadQueue);
 }
 
 /**
@@ -2920,15 +2861,15 @@ bool moho::ResourceManager::FilterEvent(const SDiskWatchEvent& event)
  */
 void moho::ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
 {
-  boost::recursive_mutex::scoped_lock workerLock(mWorkerLock);
+  boost::recursive_mutex::scoped_lock workerLock(mLock);
 
   const PrefetchRequestProbe rangeBeginProbe(event.mPath.c_str(), nullptr);
-  const auto rangeBegin = sPrefetchRequests.lower_bound(rangeBeginProbe.get());
+  const auto rangeBegin = mPrefetchRequests.lower_bound(rangeBeginProbe.get());
 
   const PrefetchRequestProbe rangeEndProbe(
     event.mPath.c_str(), reinterpret_cast<gpg::RType*>(static_cast<std::uintptr_t>(~0u))
   );
-  const auto rangeEnd = sPrefetchRequests.upper_bound(rangeEndProbe.get());
+  const auto rangeEnd = mPrefetchRequests.upper_bound(rangeEndProbe.get());
   if (rangeBegin == rangeEnd) {
     return;
   }
@@ -2989,7 +2930,7 @@ void moho::ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
  */
 void moho::ResourceManager::ActivatePendingFactories()
 {
-  boost::recursive_mutex::scoped_lock lock(mFactoryMutex);
+  boost::recursive_mutex::scoped_lock lock(mLock);
   mFactoriesActivated = true;
 
   if (mPendingFactoryRegistrations.empty()) {
@@ -3014,10 +2955,10 @@ void moho::ResourceManager::ActivatePendingFactories()
  */
 void moho::ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
 {
-  boost::recursive_mutex::scoped_lock lock(mFactoryMutex);
+  boost::recursive_mutex::scoped_lock lock(mLock);
 
   if (!mFactoriesActivated) {
-    (void)AppendPendingFactoryRegistration(mPendingFactoryRegistrations, factory);
+    mPendingFactoryRegistrations.push_back(factory);
     return;
   }
 
@@ -3034,7 +2975,7 @@ void moho::ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
  */
 void moho::ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
 {
-  boost::recursive_mutex::scoped_lock lock(mFactoryMutex);
+  boost::recursive_mutex::scoped_lock lock(mLock);
 
   RemovePendingFactory(mPendingFactoryRegistrations, factory);
   const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
@@ -3072,7 +3013,7 @@ void moho::ResourceManager::ManageWatchedResources(CResourceWatcher* const watch
     return;
   }
 
-  boost::recursive_mutex::scoped_lock lock(mFactoryMutex);
+  boost::recursive_mutex::scoped_lock lock(mLock);
   auto** watchedBegin = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedBegin);
   auto** watchedEnd = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedEnd);
   if (watchedBegin != nullptr && watchedEnd != nullptr) {
@@ -3115,8 +3056,8 @@ void moho::ResourceManager::ShutdownBackgroundThread()
 {
   boost::thread* workerToDestroy = nullptr;
   {
-    boost::recursive_mutex::scoped_lock lock(mWorkerLock);
-    mWorkerRunning = false;
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    mFactoriesActivated = false;
 
     if (mWorkerThread != nullptr) {
       mWorkerWakeCondition.notify_all();
@@ -3148,9 +3089,9 @@ void moho::ResourceManager::PrefetchThreadMain()
   gpg::SetThreadName(0xFFFFFFFFU, "Prefetcher thread.");
   (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
-  boost::recursive_mutex::scoped_lock workerLock(mWorkerLock);
+  boost::recursive_mutex::scoped_lock workerLock(mLock);
 
-  while (mWorkerRunning) {
+  while (mFactoriesActivated) {
     if (!moho::res_EnablePrefetching) {
       workerLock.unlock();
       std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -3158,7 +3099,7 @@ void moho::ResourceManager::PrefetchThreadMain()
       continue;
     }
 
-    if (sPrefetchPayloadQueue_004AB180.mQueuedCount == 0U) {
+    if (mPrefetchPayloadQueue.mQueuedCount == 0U) {
       mWorkerWakeCondition.wait(workerLock);
       continue;
     }
@@ -3170,7 +3111,7 @@ void moho::ResourceManager::PrefetchThreadMain()
 
     if (moho::res_PrefetcherActivityDelay > 0) {
       const auto nextAllowed =
-        sLastResourceResolveTime_004AA690 + std::chrono::seconds(moho::res_PrefetcherActivityDelay);
+        mLastResolveTime + std::chrono::seconds(moho::res_PrefetcherActivityDelay);
       const auto now = std::chrono::steady_clock::now();
       if (now < nextAllowed) {
         workerLock.unlock();
@@ -3180,7 +3121,7 @@ void moho::ResourceManager::PrefetchThreadMain()
       }
     }
 
-    boost::shared_ptr<PrefetchData> payload = PopQueuedPrefetchPayload_004AB180();
+    boost::shared_ptr<PrefetchData> payload = PopQueuedPrefetchPayload_004AB180(mPrefetchPayloadQueue);
     if (!payload || payload->mRequest == nullptr) {
       continue;
     }
@@ -3221,7 +3162,7 @@ void moho::ResourceManager::PrefetchThreadMain()
 
     if (request->mLoadWakePending != 0) {
       request->mLoadWakePending = 0;
-      EnqueuePrefetchPayloadFront_004AB180(payload);
+      EnqueuePrefetchPayloadFront_004AB180(mPrefetchPayloadQueue, payload);
     }
 
     request->mIsLoading = 0;
@@ -3254,7 +3195,7 @@ boost::shared_ptr<moho::PrefetchData>* moho::ResourceManager::CreatePrefetchData
     return nullptr;
   }
 
-  boost::recursive_mutex::scoped_lock lock(mWorkerLock);
+  boost::recursive_mutex::scoped_lock lock(mLock);
   outPrefetchData->reset();
 
   const msvc8::string canonicalPath = ResolvePrefetchPath(path);
@@ -3263,7 +3204,7 @@ boost::shared_ptr<moho::PrefetchData>* moho::ResourceManager::CreatePrefetchData
   }
 
   const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
-  const auto requestLookup = sPrefetchRequests.insert(probe.get());
+  const auto requestLookup = mPrefetchRequests.insert(probe.get());
   PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
   if (requestLookup.second || request.mResourceId.name.empty()) {
     (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
@@ -3287,11 +3228,10 @@ boost::shared_ptr<moho::PrefetchData>* moho::ResourceManager::CreatePrefetchData
   (void)ReleaseWeakControlFromPair(&resolvedWeak);
 
   if (!requestHasResolvedResource) {
-    EnqueuePrefetchPayloadBack_004AB180(payload);
+    EnqueuePrefetchPayloadBack_004AB180(mPrefetchPayloadQueue, payload);
     if (mWorkerThread != nullptr) {
       mWorkerWakeCondition.notify_all();
     } else {
-      mWorkerRunning = true;
       mWorkerThread = new boost::thread(boost::bind(&moho::ResourceManager::PrefetchThreadMain, this));
     }
   }
@@ -3429,7 +3369,7 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
     if (mActiveLoadCount > 0U) {
       --mActiveLoadCount;
     }
-    sLastResourceResolveTime_004AA690 = std::chrono::steady_clock::now();
+    mLastResolveTime = std::chrono::steady_clock::now();
     mWorkerIdleCondition.notify_all();
   }
 
@@ -3457,7 +3397,7 @@ boost::SharedCountPair* moho::ResourceManager::GetResource(
     return nullptr;
   }
 
-  boost::recursive_mutex::scoped_lock workerLock(mWorkerLock);
+  boost::recursive_mutex::scoped_lock workerLock(mLock);
 
   (void)ResetSharedPairToNullVariant1(outResource);
 
@@ -3474,7 +3414,7 @@ boost::SharedCountPair* moho::ResourceManager::GetResource(
   }
 
   const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
-  const auto requestLookup = sPrefetchRequests.insert(probe.get());
+  const auto requestLookup = mPrefetchRequests.insert(probe.get());
   PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
   if (requestLookup.second || request.mResourceId.name.empty()) {
     // Built from the path, never copied: `mWaiterListHead` is self-linked, so
@@ -3494,7 +3434,7 @@ boost::SharedCountPair* moho::ResourceManager::GetResource(
 
 bool moho::ResourceManager::AreFactoriesActivated() const
 {
-  boost::recursive_mutex::scoped_lock lock(mFactoryMutex);
+  boost::recursive_mutex::scoped_lock lock(mLock);
   return mFactoriesActivated;
 }
 

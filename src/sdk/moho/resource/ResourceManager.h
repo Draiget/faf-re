@@ -1,8 +1,12 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+
 #include "legacy/containers/Map.h"
-#include <vector>
+#include "legacy/containers/Set.h"
+#include "legacy/containers/Vector.h"
+#include "moho/resource/PrefetchRuntime.h"
 
 #include "boost/condition.h"
 #include "boost/recursive_mutex.h"
@@ -20,8 +24,70 @@ namespace moho
 {
   class CResourceWatcher;
   class PrefetchData;
-  struct PrefetchRequestRuntime;
   class ResourceFactoryBase;
+
+  /**
+   * Address: 0x004AD8B0 (FUN_004AD8B0)
+   *
+   * What it does:
+   * Orders prefetch requests by case-insensitive resource id, then by the
+   * resource-type pointer -- `_stricmp` over the two `RResId` strings, then an
+   * unsigned compare of the two `gpg::RType*` slots at `+0x1C`.
+   */
+  struct PrefetchRequestLess
+  {
+    [[nodiscard]] bool operator()(
+      const PrefetchRequestRuntime& lhs,
+      const PrefetchRequestRuntime& rhs
+    ) const noexcept
+    {
+      const int compare = _stricmp(lhs.mResourceId.name.c_str(), rhs.mResourceId.name.c_str());
+      return (compare < 0) || (compare == 0 && lhs.mResourceType < rhs.mResourceType);
+    }
+  };
+
+  // The node is 0x50 with the colour byte at +0x4C, so the value is the whole
+  // 0x40 `PrefetchRequestRuntime`: the request *is* the element, keyed on the
+  // id and type stored inside it (0x004AD790 reads the candidate's string
+  // through value+0x04 / value+0x18 and its type through value+0x1C).
+  using PrefetchRequestSet = msvc8::set<PrefetchRequestRuntime, PrefetchRequestLess>;
+  static_assert(sizeof(PrefetchRequestSet) == 0x0C, "PrefetchRequestSet size must be 0x0C");
+
+  /**
+   * What it does:
+   * The prefetch worker's weak-pair ring: a block table plus a read cursor and
+   * a queued count. `PrefetchThreadMain` reaches it as `[this+0x7C]`
+   * (`0x004AB34A`) and reads the block count through `[this+0x84]`.
+   */
+  struct PrefetchWeakPairRingQueueRuntime
+  {
+    std::uint32_t mReserved00 = 0U;                       // +0x00
+    boost::SharedCountPair** mChunkPairBlocks = nullptr;   // +0x04
+    std::uint32_t mChunkCount = 0U;                        // +0x08
+    std::uint32_t mReadCursor = 0U;                        // +0x0C
+    std::uint32_t mQueuedCount = 0U;                       // +0x10
+  };
+
+  static_assert(
+    offsetof(PrefetchWeakPairRingQueueRuntime, mChunkPairBlocks) == 0x04,
+    "PrefetchWeakPairRingQueueRuntime::mChunkPairBlocks offset must be 0x04"
+  );
+  static_assert(
+    offsetof(PrefetchWeakPairRingQueueRuntime, mChunkCount) == 0x08,
+    "PrefetchWeakPairRingQueueRuntime::mChunkCount offset must be 0x08"
+  );
+  static_assert(
+    offsetof(PrefetchWeakPairRingQueueRuntime, mReadCursor) == 0x0C,
+    "PrefetchWeakPairRingQueueRuntime::mReadCursor offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(PrefetchWeakPairRingQueueRuntime, mQueuedCount) == 0x10,
+    "PrefetchWeakPairRingQueueRuntime::mQueuedCount offset must be 0x10"
+  );
+  static_assert(
+    sizeof(PrefetchWeakPairRingQueueRuntime) == 0x14,
+    "PrefetchWeakPairRingQueueRuntime size must be 0x14"
+  );
 
   /**
    * VFTABLE: 0x00E07604
@@ -176,19 +242,53 @@ namespace moho
       boost::recursive_mutex::scoped_lock& workerLock
     );
 
-    using PendingFactoryRegistrations = std::vector<ResourceFactoryBase*>;
+    using PendingFactoryRegistrations = msvc8::vector<ResourceFactoryBase*, false>;
     using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, ResourceFactoryBase*>;
 
-    mutable boost::recursive_mutex mFactoryMutex;
-    bool mFactoriesActivated = false;
+    // Shipped layout, read out of the constructor (0x004A9DD0, writing into
+    // `Moho::sResourceManager` at 0x01104160) and out of the methods that reach
+    // these fields directly:
+    //
+    //   +0x00  CDiskWatchListener base
+    //   +0x30  boost::recursive_mutex -- ONE lock. 0x004A9F30, 0x004AA090,
+    //          0x004AA160, 0x004AA220 and 0x004AB780 all lock this same
+    //          object, and the constructor runs exactly one
+    //          `recursive_mutex::recursive_mutex`, so there is no separate
+    //          factory lock and worker lock.
+    //   +0x40  mPendingFactoryRegistrations -- {first, last, end}, no proxy
+    //          word, so the no-debug-proxy vector.
+    //   +0x4C  mActiveFactoryRegistrationsByKey (0x004AB600: `add ecx, 4Ch`,
+    //          then the mapped value at node+0x10).
+    //   +0x58  mFactoriesActivated -- ONE byte. 0x004AA090 sets it, 0x004AA160
+    //          clears it, and `PrefetchThreadMain`'s loop condition
+    //          (0x004AB1E4) reads it: the worker runs exactly while the
+    //          factories are up.
+    //   +0x5C  mActiveLoadCount (0x004AA690: `add [edi+5Ch], 1` on entry and
+    //          `add [esi+5Ch], -1` on the way out).
+    //   +0x60  the last-resolve timestamp -- a 0x10-byte `boost::xtime` that
+    //          `xtime_get` fills (0x004A9EE5, 0x004AAB40).
+    //   +0x70  mPrefetchRequests (0x004AB780: `add edi, 70h`).
+    //   +0x7C  mPrefetchPayloadQueue (0x004AB34A: `lea ebp, [ebx+7Ch]`), 0x14
+    //          bytes, ending exactly where the first condition begins.
+    //   +0x90  mWorkerWakeCondition, +0xA8 mWorkerIdleCondition (both notified
+    //          from 0x004AA160).
+    //   +0xC0  mWorkerThread (0x004AA160 joins and frees it).
+    //
+    // No offset asserts here: the boost members come from the modern vendored
+    // boost, whose `recursive_mutex` and `condition` are not the 2007 sizes, so
+    // an assert would pin this build's layout rather than the shipped one. The
+    // timestamp stays a `steady_clock::time_point` for the same reason.
+    mutable boost::recursive_mutex mLock;
     PendingFactoryRegistrations mPendingFactoryRegistrations;
     ActiveFactoryRegistrations mActiveFactoryRegistrationsByKey;
-    boost::recursive_mutex mWorkerLock;
-    bool mWorkerRunning = false;
+    bool mFactoriesActivated = false;
+    std::uint32_t mActiveLoadCount = 0;
+    std::chrono::steady_clock::time_point mLastResolveTime{};
+    PrefetchRequestSet mPrefetchRequests;
+    PrefetchWeakPairRingQueueRuntime mPrefetchPayloadQueue{};
     boost::condition mWorkerWakeCondition;
     boost::condition mWorkerIdleCondition;
     boost::thread* mWorkerThread = nullptr;
-    std::uint32_t mActiveLoadCount = 0;
   };
 
   /**
