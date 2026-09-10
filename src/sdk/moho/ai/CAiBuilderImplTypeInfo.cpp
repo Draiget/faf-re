@@ -43,176 +43,7 @@ namespace
   unsigned char gCAiBuilderRebuildMapTypeInfoStorage[sizeof(CAiBuilderRebuildMapTypeInfo)] = {};
   bool gCAiBuilderRebuildMapTypeInfoConstructed = false;
 
-  struct RebuildMapIteratorRuntimeLane final
-  {
-    SBuilderRebuildNode* node = nullptr; // +0x00
-  };
 
-  struct RebuildMapInsertResultRuntimeLane final
-  {
-    SBuilderRebuildNode* node = nullptr; // +0x00
-    std::uint8_t inserted = 0U;          // +0x04
-    std::uint8_t pad05[3]{};             // +0x05
-  };
-
-  struct RebuildMapKeyValueRuntimeLane final
-  {
-    std::uint32_t key = 0U;                // +0x00
-    const RUnitBlueprint* blueprint = nullptr; // +0x04
-  };
-
-  static_assert(
-    offsetof(RebuildMapIteratorRuntimeLane, node) == 0x00,
-    "RebuildMapIteratorRuntimeLane::node offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RebuildMapInsertResultRuntimeLane, node) == 0x00,
-    "RebuildMapInsertResultRuntimeLane::node offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RebuildMapInsertResultRuntimeLane, inserted) == 0x04,
-    "RebuildMapInsertResultRuntimeLane::inserted offset must be 0x04"
-  );
-  static_assert(offsetof(RebuildMapKeyValueRuntimeLane, key) == 0x00, "RebuildMapKeyValueRuntimeLane::key offset must be 0x00");
-  static_assert(
-    offsetof(RebuildMapKeyValueRuntimeLane, blueprint) == 0x04,
-    "RebuildMapKeyValueRuntimeLane::blueprint offset must be 0x04"
-  );
-  static_assert(sizeof(RebuildMapIteratorRuntimeLane) == 0x04, "RebuildMapIteratorRuntimeLane size must be 0x04");
-  static_assert(sizeof(RebuildMapInsertResultRuntimeLane) == 0x08, "RebuildMapInsertResultRuntimeLane size must be 0x08");
-  static_assert(sizeof(RebuildMapKeyValueRuntimeLane) == 0x08, "RebuildMapKeyValueRuntimeLane size must be 0x08");
-
-  [[nodiscard]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLane(
-    RebuildMapIteratorRuntimeLane* const outLane,
-    SBuilderRebuildNode* const node
-  ) noexcept
-  {
-    outLane->node = node;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x005A0BB0 (FUN_005A0BB0)
-   *
-   * What it does:
-   * Adapter lane that stores one rebuild-map node pointer into iterator output.
-   */
-  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterA(
-    RebuildMapIteratorRuntimeLane* const outLane,
-    SBuilderRebuildNode* const node
-  ) noexcept
-  {
-    return StoreRebuildIteratorNodeLane(outLane, node);
-  }
-
-  /**
-   * Address: 0x005A0C00 (FUN_005A0C00)
-   *
-   * What it does:
-   * Secondary adapter lane that stores one rebuild-map node pointer into
-   * iterator output.
-   */
-  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterB(
-    RebuildMapIteratorRuntimeLane* const outLane,
-    SBuilderRebuildNode* const node
-  ) noexcept
-  {
-    return StoreRebuildIteratorNodeLane(outLane, node);
-  }
-
-  /**
-   * Address: 0x005A0C50 (FUN_005A0C50)
-   *
-   * What it does:
-   * Builds one `(key, blueprint)` value lane from split key/value source
-   * pointers.
-   */
-  [[maybe_unused]] RebuildMapKeyValueRuntimeLane* BuildRebuildMapKeyValueLane(
-    RebuildMapKeyValueRuntimeLane* const outLane,
-    const std::uint32_t* const keySource,
-    const RUnitBlueprint* const* const blueprintSource
-  ) noexcept
-  {
-    outLane->key = *keySource;
-    outLane->blueprint = *blueprintSource;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x005A1280 (FUN_005A1280)
-   *
-   * What it does:
-   * Tertiary adapter lane that stores one rebuild-map node pointer into
-   * iterator output.
-   */
-  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterC(
-    RebuildMapIteratorRuntimeLane* const outLane,
-    SBuilderRebuildNode* const node
-  ) noexcept
-  {
-    return StoreRebuildIteratorNodeLane(outLane, node);
-  }
-
-  /**
-   * Address: 0x005A1290 (FUN_005A1290)
-   *
-   * What it does:
-   * Clears one rebuild-map iterator node lane to null.
-   */
-  [[maybe_unused]] RebuildMapIteratorRuntimeLane* ClearRebuildIteratorNodeLane(
-    RebuildMapIteratorRuntimeLane* const outLane
-  ) noexcept
-  {
-    outLane->node = nullptr;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x005A12B0 (FUN_005A12B0)
-   *
-   * What it does:
-   * Quaternary adapter lane that stores one rebuild-map node pointer into
-   * iterator output.
-   */
-  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterD(
-    RebuildMapIteratorRuntimeLane* const outLane,
-    SBuilderRebuildNode* const node
-  ) noexcept
-  {
-    return StoreRebuildIteratorNodeLane(outLane, node);
-  }
-
-  /**
-   * Address: 0x005A14C0 (FUN_005A14C0)
-   *
-   * What it does:
-   * Clears one rebuild-map insert-result node lane to null.
-   */
-  [[maybe_unused]] RebuildMapInsertResultRuntimeLane* ClearRebuildInsertResultNodeLane(
-    RebuildMapInsertResultRuntimeLane* const outLane
-  ) noexcept
-  {
-    outLane->node = nullptr;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x005A14E0 (FUN_005A14E0)
-   *
-   * What it does:
-   * Builds one `(node, inserted)` insert-result lane from split source
-   * pointers.
-   */
-  [[maybe_unused]] RebuildMapInsertResultRuntimeLane* BuildRebuildInsertResultLane(
-    RebuildMapInsertResultRuntimeLane* const outLane,
-    SBuilderRebuildNode* const* const nodeSource,
-    const std::uint8_t* const insertedSource
-  ) noexcept
-  {
-    outLane->node = *nodeSource;
-    outLane->inserted = *insertedSource;
-    return outLane;
-  }
 
   msvc8::string gCAiBuilderRebuildMapTypeName;
   bool gCAiBuilderRebuildMapTypeNameInitialized = false;
@@ -401,227 +232,6 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  void DestroyRebuildSubtree(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
-  {
-    if (!node || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    DestroyRebuildSubtree(node->left, head);
-    DestroyRebuildSubtree(node->right, head);
-    ::operator delete(node);
-  }
-
-  void ClearRebuildMapStorage(SBuilderRebuildMap* map)
-  {
-    if (!map) {
-      return;
-    }
-
-    if (!map->mHead) {
-      map->mSize = 0u;
-      return;
-    }
-
-    DestroyRebuildSubtree(map->mHead->parent, map->mHead);
-    map->mHead->parent = map->mHead;
-    map->mHead->left = map->mHead;
-    map->mHead->right = map->mHead;
-    map->mSize = 0u;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode*
-  AllocateRebuildMapNode(SBuilderRebuildNode* head, SBuilderRebuildNode* parent, unsigned int key, const RUnitBlueprint* blueprint)
-  {
-    auto* const node = static_cast<SBuilderRebuildNode*>(::operator new(sizeof(SBuilderRebuildNode)));
-    node->left = head;
-    node->parent = parent;
-    node->right = head;
-    node->key = key;
-    node->blueprint = blueprint;
-    node->color = 1u;
-    node->isNil = 0u;
-    node->pad16[0] = 0u;
-    node->pad16[1] = 0u;
-    return node;
-  }
-
-  void InsertRebuildMapEntry(SBuilderRebuildMap* map, const unsigned int key, const RUnitBlueprint* blueprint)
-  {
-    if (!map || !map->mHead) {
-      return;
-    }
-
-    SBuilderRebuildNode* const head = map->mHead;
-    SBuilderRebuildNode* parent = head;
-    SBuilderRebuildNode* cursor = head->parent;
-    bool placeLeft = true;
-
-    while (cursor && cursor != head && cursor->isNil == 0u) {
-      parent = cursor;
-      if (key < cursor->key) {
-        cursor = cursor->left;
-        placeLeft = true;
-      } else if (key > cursor->key) {
-        cursor = cursor->right;
-        placeLeft = false;
-      } else {
-        cursor->blueprint = blueprint;
-        return;
-      }
-    }
-
-    SBuilderRebuildNode* const node = AllocateRebuildMapNode(head, parent, key, blueprint);
-    if (parent == head) {
-      head->parent = node;
-      head->left = node;
-      head->right = node;
-    } else if (placeLeft) {
-      parent->left = node;
-      if (head->left == head || key < head->left->key) {
-        head->left = node;
-      }
-    } else {
-      parent->right = node;
-      if (head->right == head || key > head->right->key) {
-        head->right = node;
-      }
-    }
-
-    ++map->mSize;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* LeftmostNode(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
-  {
-    while (node && node->left != head && node->left && node->left->isNil == 0u) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* NextRebuildMapNode(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
-  {
-    if (!node || !head) {
-      return head;
-    }
-
-    if (node->right != head && node->right && node->right->isNil == 0u) {
-      return LeftmostNode(node->right, head);
-    }
-
-    SBuilderRebuildNode* parent = node->parent;
-    while (parent != head && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* RebuildMapRightmostNode(SBuilderRebuildNode* node, SBuilderRebuildNode* const head)
-  {
-    while (node && node != head && node->isNil == 0u && node->right && node->right != head && node->right->isNil == 0u) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* RebuildMapPredecessor(SBuilderRebuildNode* node, SBuilderRebuildNode* const head)
-  {
-    if (!node || !head) {
-      return head;
-    }
-    if (node == head) {
-      return head->right;
-    }
-    if (node->left && node->left != head && node->left->isNil == 0u) {
-      return RebuildMapRightmostNode(node->left, head);
-    }
-
-    SBuilderRebuildNode* parent = node->parent;
-    while (parent && parent != head && node == parent->left) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent ? parent : head;
-  }
-
-  /**
-   * Address: 0x005A0EA0 (FUN_005A0EA0, sub_5A0EA0)
-   *
-   * IDA signature:
-   * int **__userpurge sub_5A0EA0@<eax>(int a1@<eax>, int *a2@<ebx>, int **a3);
-   *
-   * What it does:
-   * Performs one lower-bound traversal of the rebuild-map red-black tree for
-   * `key` and, when the key is missing, inserts a fresh node via the shared
-   * `InsertRebuildMapEntry` lane at the appropriate edge. The `output` slot
-   * receives the matched or newly inserted node pointer in the first word and
-   * a `found` flag in byte +4, matching the 2-byte-packed
-   * `std::pair<iterator,bool>` return the MSVC8 `std::map::insert` emits.
-   *
-   * This is the CAiBuilder-specialized sibling of
-   * `LowerBoundOrInsertCoordCacheNode` in the AI-formation subsystem; both
-   * lanes are per-value-type instantiations of `_Tree::_Insert_node` that the
-   * release binary emits separately because the map value types differ.
-   */
-  [[nodiscard]] SBuilderRebuildNode* LowerBoundOrInsertRebuildMapNode(
-    SBuilderRebuildMap* const map,
-    const std::uint32_t key,
-    const RUnitBlueprint* const blueprint
-  )
-  {
-    if (!map || !map->mHead) {
-      return nullptr;
-    }
-
-    SBuilderRebuildNode* const head = map->mHead;
-    SBuilderRebuildNode* parent = head;
-    SBuilderRebuildNode* cursor = head->parent;
-    bool insertLeft = true;
-
-    while (cursor && cursor != head && cursor->isNil == 0u) {
-      parent = cursor;
-      if (key < cursor->key) {
-        insertLeft = true;
-        cursor = cursor->left;
-      } else if (cursor->key < key) {
-        insertLeft = false;
-        cursor = cursor->right;
-      } else {
-        // Found: binary returns the matched node without touching storage.
-        return cursor;
-      }
-    }
-
-    // Key is absent. Pick the correct edge to insert at by consulting the
-    // immediate predecessor when the walk ended on a left branch.
-    if (insertLeft) {
-      if (parent == head->left) {
-        InsertRebuildMapEntry(map, key, blueprint);
-        return head->left;
-      }
-      parent = RebuildMapPredecessor(parent, head);
-    }
-
-    if (!parent || parent == head || parent->key < key) {
-      const unsigned int priorSize = map->mSize;
-      InsertRebuildMapEntry(map, key, blueprint);
-      if (map->mSize == priorSize) {
-        return nullptr;
-      }
-      // The caller sees the newly inserted node via a subsequent lookup; the
-      // binary stores it in the hint slot but the AI-builder deserializer
-      // path does not reuse the iterator.
-      SBuilderRebuildNode* candidate = parent;
-      if (!candidate || candidate == head) {
-        candidate = head->left;
-      }
-      return candidate;
-    }
-
-    return parent;
-  }
-
   /**
    * Address: 0x005A0C60 (FUN_005A0C60)
    *
@@ -646,18 +256,14 @@ namespace
 
     unsigned int count = 0u;
     archive->ReadUInt(&count);
-    ClearRebuildMapStorage(map);
+    map->clear();
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       unsigned int key = 0u;
       archive->ReadUInt(&key);
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-      // Mirror the binary's per-entry `_Tree::insert` lane (recovered as
-      // `LowerBoundOrInsertRebuildMapNode`): returns the existing node when
-      // the key already lives in the tree, otherwise routes through the
-      // shared `InsertRebuildMapEntry` edge lane.
-      (void)LowerBoundOrInsertRebuildMapNode(map, key, DecodeTrackedBlueprintPointer(tracked));
+      (void)map->insert({key, DecodeTrackedBlueprintPointer(tracked)});
     }
   }
 
@@ -682,17 +288,17 @@ namespace
     const auto* const map = reinterpret_cast<const SBuilderRebuildMap*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
-    const unsigned int count = map ? map->mSize : 0u;
+    const unsigned int count = map ? static_cast<unsigned int>(map->size()) : 0u;
     archive->WriteUInt(count);
 
-    if (!map || !map->mHead || map->mHead->left == map->mHead) {
+    if (!map || map->empty()) {
       return;
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (SBuilderRebuildNode* node = map->mHead->left; node != map->mHead; node = NextRebuildMapNode(node, map->mHead)) {
-      archive->WriteUInt(node->key);
-      gpg::WriteRawPointer(archive, MakeBlueprintObjectRef(node->blueprint), gpg::TrackedPointerState::Unowned, owner);
+    for (const auto& [key, blueprint] : *map) {
+      archive->WriteUInt(key);
+      gpg::WriteRawPointer(archive, MakeBlueprintObjectRef(blueprint), gpg::TrackedPointerState::Unowned, owner);
     }
   }
 
@@ -799,7 +405,7 @@ msvc8::string CAiBuilderRebuildMapTypeInfo::GetLexical(const gpg::RRef& ref) con
 {
   const msvc8::string lexical = gpg::RType::GetLexical(ref);
   const auto* const map = static_cast<const SBuilderRebuildMap*>(ref.mObj);
-  const unsigned int count = map ? map->mSize : 0u;
+  const unsigned int count = map ? static_cast<unsigned int>(map->size()) : 0u;
   return gpg::STR_Printf("%s, size=%d", lexical.c_str(), static_cast<int>(count));
 }
 

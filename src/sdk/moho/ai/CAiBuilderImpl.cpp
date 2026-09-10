@@ -193,559 +193,7 @@ namespace
     return cellPos;
   }
 
-  struct BuilderFieldCopyRuntime final
-  {
-    std::uint32_t lane00 = 0U; // +0x00
-    std::uint32_t lane04 = 0U; // +0x04
-    std::uint32_t lane08 = 0U; // +0x08
-  };
 
-  struct BuilderPointerFieldCopyRuntime final
-  {
-    std::uint32_t lane00 = 0U;              // +0x00
-    const std::uint32_t* lane04 = nullptr;  // +0x04
-  };
-
-  static_assert(offsetof(BuilderFieldCopyRuntime, lane00) == 0x00, "BuilderFieldCopyRuntime::lane00 offset must be 0x00");
-  static_assert(offsetof(BuilderFieldCopyRuntime, lane04) == 0x04, "BuilderFieldCopyRuntime::lane04 offset must be 0x04");
-  static_assert(offsetof(BuilderFieldCopyRuntime, lane08) == 0x08, "BuilderFieldCopyRuntime::lane08 offset must be 0x08");
-  static_assert(sizeof(BuilderFieldCopyRuntime) == 0x0C, "BuilderFieldCopyRuntime size must be 0x0C");
-
-  static_assert(
-    offsetof(BuilderPointerFieldCopyRuntime, lane00) == 0x00,
-    "BuilderPointerFieldCopyRuntime::lane00 offset must be 0x00"
-  );
-  static_assert(
-    offsetof(BuilderPointerFieldCopyRuntime, lane04) == 0x04,
-    "BuilderPointerFieldCopyRuntime::lane04 offset must be 0x04"
-  );
-  static_assert(sizeof(BuilderPointerFieldCopyRuntime) == 0x08, "BuilderPointerFieldCopyRuntime size must be 0x08");
-
-  [[nodiscard]] std::uint32_t* CopyBuilderLane04ToOut(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime& runtime
-  ) noexcept
-  {
-    *outValue = runtime.lane04;
-    return outValue;
-  }
-
-  [[nodiscard]] std::uint32_t* CopyBuilderLane08ToOut(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime& runtime
-  ) noexcept
-  {
-    *outValue = runtime.lane08;
-    return outValue;
-  }
-
-  [[nodiscard]] std::uint32_t* CopyDereferencedBuilderLane04ToOut(
-    std::uint32_t* const outValue,
-    const BuilderPointerFieldCopyRuntime& runtime
-  ) noexcept
-  {
-    *outValue = *runtime.lane04;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0059FF80 (FUN_0059FF80)
-   *
-   * What it does:
-   * Adapter lane that copies one 32-bit field at `+0x04` into caller output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterA(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyBuilderLane04ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x0059FF90 (FUN_0059FF90)
-   *
-   * What it does:
-   * Adapter lane that copies one 32-bit field at `+0x08` into caller output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyBuilderLane08ToOutAdapter(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyBuilderLane08ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x005A00E0 (FUN_005A00E0)
-   *
-   * What it does:
-   * Adapter lane that dereferences one pointer field at `+0x04` and copies the
-   * 32-bit pointee value into caller output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDereferencedBuilderLane04ToOutAdapterA(
-    std::uint32_t* const outValue,
-    const BuilderPointerFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyDereferencedBuilderLane04ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x005A00F0 (FUN_005A00F0)
-   *
-   * What it does:
-   * Secondary adapter lane that copies one 32-bit field at `+0x04` into caller
-   * output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterB(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyBuilderLane04ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x005A0E80 (FUN_005A0E80)
-   *
-   * What it does:
-   * Secondary adapter lane that dereferences one pointer field at `+0x04` and
-   * copies the 32-bit pointee value into caller output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDereferencedBuilderLane04ToOutAdapterB(
-    std::uint32_t* const outValue,
-    const BuilderPointerFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyDereferencedBuilderLane04ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x005A0E90 (FUN_005A0E90)
-   *
-   * What it does:
-   * Tertiary adapter lane that copies one 32-bit field at `+0x04` into caller
-   * output.
-   */
-  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterC(
-    std::uint32_t* const outValue,
-    const BuilderFieldCopyRuntime* const runtime
-  ) noexcept
-  {
-    return CopyBuilderLane04ToOut(outValue, *runtime);
-  }
-
-  /**
-   * Address: 0x005A1410 (FUN_005A1410, func_NewMapNodeRUnitBlueprint)
-   *
-   * What it does:
-   * Allocates and initializes one rebuild-map RB-tree node lane.
-   *
-   * Note: original binary allocates the 24-byte node through
-   * `FUN_005A1DF0`/`Create2LinkedListN`, which is one address slot of the
-   * canonical checked 24-byte allocator lane
-   * (`gpg::core::legacy::AllocateChecked24ByteLane`).
-   */
-  [[nodiscard]] SBuilderRebuildNode* CreateRebuildMapNode() noexcept
-  {
-    static_assert(sizeof(SBuilderRebuildNode) == 24, "SBuilderRebuildNode must be 24 bytes");
-    auto* const node = msvc8::detail::allocate_checked<SBuilderRebuildNode>(1u);
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->key = 0;
-    node->blueprint = nullptr;
-    node->color = 1;
-    node->isNil = 0;
-    node->pad16[0] = 0;
-    node->pad16[1] = 0;
-    return node;
-  }
-
-  void InitializeRebuildMap(SBuilderRebuildMap& map)
-  {
-    map.mMeta00 = 0;
-    map.mHead = CreateRebuildMapNode();
-    if (map.mHead == nullptr) {
-      map.mSize = 0;
-      return;
-    }
-
-    map.mHead->isNil = 1;
-    map.mHead->parent = map.mHead;
-    map.mHead->left = map.mHead;
-    map.mHead->right = map.mHead;
-    map.mSize = 0;
-  }
-
-  /**
-   * Address: 0x005A0A00 (FUN_005A0A00)
-   *
-   * What it does:
-   * Recursively releases one rebuild-structure RB-tree branch rooted at
-   * `node`, stopping on sentinel/head lanes.
-   */
-  void DestroyRebuildTree(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
-  {
-    if (!node || node == head || node->isNil != 0) {
-      return;
-    }
-
-    DestroyRebuildTree(node->left, head);
-    DestroyRebuildTree(node->right, head);
-    ::operator delete(node);
-  }
-
-  void ClearRebuildMapNodes(SBuilderRebuildMap& map)
-  {
-    if (!map.mHead) {
-      map.mSize = 0;
-      return;
-    }
-
-    DestroyRebuildTree(map.mHead->parent, map.mHead);
-    map.mHead->parent = map.mHead;
-    map.mHead->left = map.mHead;
-    map.mHead->right = map.mHead;
-    map.mSize = 0;
-  }
-
-  void RemoveRebuildNode(SBuilderRebuildMap& map, SBuilderRebuildNode* node);
-
-  /**
-   * Address: 0x005A0F60 (FUN_005A0F60, rebuild-map erase-range helper)
-   *
-   * What it does:
-   * Erases one half-open iterator range from the rebuild-structure RB tree
-   * and returns/stores the successor iterator after the erased range.
-   */
-  SBuilderRebuildNode* EraseRebuildMapNodeRange(
-    SBuilderRebuildMap& map,
-    SBuilderRebuildNode*& outIterator,
-    SBuilderRebuildNode* first,
-    SBuilderRebuildNode* last
-  )
-  {
-    SBuilderRebuildNode* const head = map.mHead;
-    SBuilderRebuildNode* cursor = first;
-
-    if (cursor == head->left && last == head) {
-      ClearRebuildMapNodes(map);
-      outIterator = head->left;
-      return outIterator;
-    }
-
-    while (cursor != last) {
-      SBuilderRebuildNode* const current = cursor;
-      if (current == nullptr || current == head) {
-        cursor = last;
-        break;
-      }
-
-      if (current->isNil == 0u) {
-        SBuilderRebuildNode* next = current->right;
-        if (next->isNil != 0u) {
-          SBuilderRebuildNode* parent = current->parent;
-          while (parent->isNil == 0u) {
-            if (cursor != parent->right) {
-              break;
-            }
-            cursor = parent;
-            parent = parent->parent;
-          }
-          cursor = parent;
-        } else {
-          cursor = next;
-          while (cursor->left->isNil == 0u) {
-            cursor = cursor->left;
-          }
-        }
-      }
-
-      RemoveRebuildNode(map, current);
-    }
-
-    outIterator = cursor;
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x0059FB80 (FUN_0059FB80)
-   *
-   * What it does:
-   * Clears all rebuild-map nodes, frees header storage, and resets map header
-   * lanes to the empty state.
-   */
-  void DestroyRebuildMap(SBuilderRebuildMap& map)
-  {
-    if (!map.mHead) {
-      map.mSize = 0;
-      return;
-    }
-
-    SBuilderRebuildNode* eraseResult = map.mHead;
-    (void)EraseRebuildMapNodeRange(map, eraseResult, map.mHead->left, map.mHead);
-    ::operator delete(map.mHead);
-    map.mHead = nullptr;
-    map.mSize = 0;
-    map.mMeta00 = 0;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* FindRebuildNode(const SBuilderRebuildMap& map, const std::uint32_t key)
-  {
-    SBuilderRebuildNode* node = map.mHead ? map.mHead->parent : nullptr;
-    while (node && node != map.mHead && node->isNil == 0) {
-      if (key < node->key) {
-        node = node->left;
-      } else if (key > node->key) {
-        node = node->right;
-      } else {
-        return node;
-      }
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x005A0400 (FUN_005A0400)
-   *
-   * What it does:
-   * Performs one lower-bound walk in the rebuild-map RB tree and returns the
-   * exact-key node when present, otherwise the map head sentinel.
-   */
-  [[nodiscard]] SBuilderRebuildNode* FindRebuildNodeForEraseOrHead(
-    const SBuilderRebuildMap& map, const std::uint32_t key
-  )
-  {
-    SBuilderRebuildNode* const head = map.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    SBuilderRebuildNode* candidate = head;
-    SBuilderRebuildNode* cursor = head->parent;
-    while (cursor && cursor != head && cursor->isNil == 0) {
-      if (cursor->key >= key) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-
-    if (candidate == head || key < candidate->key) {
-      return head;
-    }
-
-    return candidate;
-  }
-
-  void RefreshRebuildMapExtremes(SBuilderRebuildMap& map)
-  {
-    if (!map.mHead) {
-      return;
-    }
-
-    SBuilderRebuildNode* const head = map.mHead;
-    SBuilderRebuildNode* root = head->parent;
-    if (!root || root == head || root->isNil != 0 || map.mSize == 0) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      map.mSize = 0;
-      return;
-    }
-
-    SBuilderRebuildNode* minNode = root;
-    while (minNode->left != head && minNode->left && minNode->left->isNil == 0) {
-      minNode = minNode->left;
-    }
-
-    SBuilderRebuildNode* maxNode = root;
-    while (maxNode->right != head && maxNode->right && maxNode->right->isNil == 0) {
-      maxNode = maxNode->right;
-    }
-
-    head->left = minNode;
-    head->right = maxNode;
-  }
-
-  [[nodiscard]] SBuilderRebuildNode* MinimumNode(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
-  {
-    SBuilderRebuildNode* current = node;
-    while (current && current->left != head && current->left && current->left->isNil == 0) {
-      current = current->left;
-    }
-    return current;
-  }
-
-  void TransplantNode(SBuilderRebuildMap& map, SBuilderRebuildNode* oldNode, SBuilderRebuildNode* newNode)
-  {
-    SBuilderRebuildNode* const head = map.mHead;
-    if (!oldNode || !head) {
-      return;
-    }
-
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (newNode && newNode != head) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  void RemoveRebuildNode(SBuilderRebuildMap& map, SBuilderRebuildNode* node)
-  {
-    if (!map.mHead || !node || node == map.mHead || node->isNil != 0) {
-      return;
-    }
-
-    SBuilderRebuildNode* const head = map.mHead;
-
-    if (node->left == head) {
-      TransplantNode(map, node, node->right);
-    } else if (node->right == head) {
-      TransplantNode(map, node, node->left);
-    } else {
-      SBuilderRebuildNode* successor = MinimumNode(node->right, head);
-      if (successor && successor->parent != node) {
-        TransplantNode(map, successor, successor->right);
-        successor->right = node->right;
-        if (successor->right && successor->right != head) {
-          successor->right->parent = successor;
-        }
-      }
-
-      TransplantNode(map, node, successor);
-      if (successor) {
-        successor->left = node->left;
-        if (successor->left && successor->left != head) {
-          successor->left->parent = successor;
-        }
-      }
-    }
-
-    ::operator delete(node);
-    if (map.mSize > 0) {
-      --map.mSize;
-    }
-    RefreshRebuildMapExtremes(map);
-  }
-
-  /**
-   * Absorbs binary helper:
-   * Address: 0x005A0040 (FUN_005A0040, msvc8::map<uint, RUnitBlueprint*>::operator[])
-   * Address: 0x005A08B0 (FUN_005A08B0, RB-tree node allocate-and-link inner
-   * helper for the operator[] emission above)
-   * Address: 0x005A19B0 (FUN_005A19B0, `rb_increment` -- the in-order
-   * successor walk, isNil@+0x15, same shape as `legacy/containers/
-   * RbTree.h`'s `rb_increment` member. `FUN_005A08B0` calls it once, with
-   * its argument elided from the decompiled pseudocode (line "a2 ==
-   * *(DWORD*)v6 ... || (sub_5A19B0(), ...)"), to validate an `operator[]`
-   * insertion hint the classic MSVC8 way: increment the hint iterator and
-   * check the new key still compares less than the successor's key before
-   * trusting the hint, falling back to a full tree search otherwise.)
-   *
-   * The binary's `BuilderAddRebuildStructure` used the MSVC8
-   * `map<uint, RUnitBlueprint*>::operator[]` template emission to
-   * find-or-default-insert a rebuild entry by encoded cell key, then
-   * assigned the blueprint to the returned value slot. The recovered
-   * `AddOrUpdateRebuildNode` expresses the same find-or-insert
-   * semantics through the typed `SBuilderRebuildMap` (a recovered
-   * RB-tree layout with named fields and head sentinel) plus the
-   * named `FindRebuildNode` / `CreateRebuildMapNode` helpers, so the
-   * binary's `_Tree::operator[]` template emission -- including its
-   * hint-validation fast path through `rb_increment` -- is absorbed by
-   * the modern hand-coded RB-tree insert path, which finds the
-   * insertion point directly instead of validating a hint. Observable
-   * behavior is identical (existing key updates blueprint in place; new
-   * key allocates a node, links left/right under the parent walk, and
-   * refreshes head leftmost/rightmost extrema). The inner allocate-
-   * and-link helper `FUN_005A08B0` (116 instr, RB-tree node insert +
-   * parent-walk + leftmost/rightmost update) corresponds to the
-   * node-allocation and parent-walk block below, expressed through
-   * `CreateRebuildMapNode`/the explicit parent walk in this function.
-   */
-  void AddOrUpdateRebuildNode(SBuilderRebuildMap& map, const std::uint32_t key, const RUnitBlueprint* blueprint)
-  {
-    if (!map.mHead) {
-      InitializeRebuildMap(map);
-    }
-
-    SBuilderRebuildNode* const existing = FindRebuildNode(map, key);
-    if (existing) {
-      existing->blueprint = blueprint;
-      return;
-    }
-
-    SBuilderRebuildNode* const head = map.mHead;
-    SBuilderRebuildNode* parent = head;
-    SBuilderRebuildNode* node = head->parent;
-    bool placeLeft = true;
-
-    while (node && node != head && node->isNil == 0) {
-      parent = node;
-      if (key < node->key) {
-        node = node->left;
-        placeLeft = true;
-      } else {
-        node = node->right;
-        placeLeft = false;
-      }
-    }
-
-    SBuilderRebuildNode* const inserted = CreateRebuildMapNode();
-    if (inserted == nullptr) {
-      return;
-    }
-
-    inserted->key = key;
-    inserted->blueprint = blueprint;
-    inserted->left = head;
-    inserted->right = head;
-    inserted->parent = parent;
-
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-    } else if (placeLeft) {
-      parent->left = inserted;
-      if (head->left == head || key < head->left->key) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (head->right == head || key > head->right->key) {
-        head->right = inserted;
-      }
-    }
-
-    ++map.mSize;
-  }
-
-  template <typename Fn>
-  void ForEachRebuildNode(SBuilderRebuildNode* node, SBuilderRebuildNode* head, Fn&& fn)
-  {
-    if (!node || node == head || node->isNil != 0) {
-      return;
-    }
-
-    ForEachRebuildNode(node->left, head, fn);
-    fn(*node);
-    ForEachRebuildNode(node->right, head, fn);
-  }
 
   [[nodiscard]] bool HasSeabedOccupancy(const SFootprint& footprint) noexcept
   {
@@ -796,7 +244,7 @@ CAiBuilderImpl::CAiBuilderImpl()
   , mRebuildStructures{}
   , mFactoryCommands()
 {
-  InitializeRebuildMap(mRebuildStructures);
+
 }
 
 /**
@@ -812,7 +260,7 @@ CAiBuilderImpl::CAiBuilderImpl(Unit* const unit)
   , mRebuildStructures{}
   , mFactoryCommands()
 {
-  InitializeRebuildMap(mRebuildStructures);
+
 }
 
 /**
@@ -822,7 +270,7 @@ CAiBuilderImpl::CAiBuilderImpl(Unit* const unit)
 CAiBuilderImpl::~CAiBuilderImpl()
 {
   BuilderClearFactoryCommandQueue();
-  DestroyRebuildMap(mRebuildStructures);
+  // `mRebuildStructures`' teardown is `~map()`, which MSVC emits for the member.
 }
 
 /**
@@ -1186,7 +634,7 @@ bool CAiBuilderImpl::BuilderGetOnTarget() const
  */
 void CAiBuilderImpl::BuilderAddRebuildStructure(const SOCellPos& cellPos, const RUnitBlueprint* const blueprint)
 {
-  AddOrUpdateRebuildNode(mRebuildStructures, EncodeRebuildKey(cellPos), blueprint);
+  mRebuildStructures[EncodeRebuildKey(cellPos)] = blueprint;
 }
 
 /**
@@ -1194,13 +642,7 @@ void CAiBuilderImpl::BuilderAddRebuildStructure(const SOCellPos& cellPos, const 
  */
 void CAiBuilderImpl::BuilderRemoveRebuildStructure(const SOCellPos& cellPos)
 {
-  const std::uint32_t key = EncodeRebuildKey(cellPos);
-  SBuilderRebuildNode* const node = FindRebuildNodeForEraseOrHead(mRebuildStructures, key);
-  if (node == mRebuildStructures.mHead) {
-    return;
-  }
-
-  RemoveRebuildNode(mRebuildStructures, node);
+  (void)mRebuildStructures.erase(EncodeRebuildKey(cellPos));
 }
 
 /**
@@ -1208,7 +650,7 @@ void CAiBuilderImpl::BuilderRemoveRebuildStructure(const SOCellPos& cellPos)
  */
 void CAiBuilderImpl::BuilderClearRebuildStructure()
 {
-  ClearRebuildMapNodes(mRebuildStructures);
+  mRebuildStructures.clear();
 }
 
 /**
@@ -1218,7 +660,7 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
 {
   outCellPos = {0, 0};
 
-  if (!mOwnerUnit || !mRebuildStructures.mHead || mRebuildStructures.mSize == 0) {
+  if (!mOwnerUnit || mRebuildStructures.empty()) {
     return nullptr;
   }
 
@@ -1231,13 +673,12 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
   SOCellPos bestCell{0, 0};
   float bestDist = std::numeric_limits<float>::infinity();
 
-  ForEachRebuildNode(mRebuildStructures.mHead->parent, mRebuildStructures.mHead, [&](SBuilderRebuildNode& node) {
-    const RUnitBlueprint* const blueprint = node.blueprint;
+  for (const auto& [encodedCell, blueprint] : mRebuildStructures) {
     if (!blueprint) {
-      return;
+      continue;
     }
 
-    const SOCellPos cellPos = DecodeRebuildKey(node.key);
+    const SOCellPos cellPos = DecodeRebuildKey(encodedCell);
     const float centerX = static_cast<float>(cellPos.x) + static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f;
     const float centerZ = static_cast<float>(cellPos.z) + static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f;
 
@@ -1256,22 +697,22 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
     const float distSq = (dx * dx) + (dy * dy) + (dz * dz);
 
     if (distSq >= bestDist) {
-      return;
+      continue;
     }
 
     if (!sim || !sim->mOGrid) {
-      return;
+      continue;
     }
 
     if (OCCUPY_FootprintFits(*sim->mOGrid, cellPos, blueprint->mFootprint, EOccupancyCaps::OC_ANY) ==
         static_cast<EOccupancyCaps>(0u)) {
-      return;
+      continue;
     }
 
     bestDist = distSq;
     bestBlueprint = blueprint;
     bestCell = cellPos;
-  });
+  }
 
   outCellPos = bestCell;
   return bestBlueprint;
