@@ -3939,10 +3939,26 @@ namespace moho
    * For one terrain map-change rectangle, updates normal-map content,
    * appends the rect into the debug dirty-rect list, and marks the
    * half-resolution dirty area in the debug terrain bit-array.
+   *
+   * The guard is the *ready* flag, not edit mode: 0x008A573E dispatches
+   * vtable slot 1, which the RTTI dump gives as 0x008A1030
+   * (`CWldTerrainRes::GetBool`, `return this->mBool` at `+0x08`) -- the lane
+   * `Finalize` clears on entry and sets on success. So the terrain is
+   * finalized once, and every later map change takes the cheap
+   * `UpdateNormalMap(rect)` path.
+   *
+   * This used to call `IsInEditMode()` (0x008A6E80, a different virtual on a
+   * different field). `mEditMode` is 0 throughout normal play, and
+   * `Finalize` cycles `EnterEditMode`/`ExitEditMode` internally, so it never
+   * latched: every playable-rect update from the sim re-ran the whole
+   * finalize -- three fresh dynamic texture sheets, a 1025x1025
+   * `InitNormalMap`, and a full water-map rebuild. Placing a building while
+   * one was already under construction stalled the render thread for around
+   * a minute inside `CWldSession::DoBeat`.
    */
   void IWldTerrainRes::NotifyMapChange(const gpg::Rect2i& rect)
   {
-    if (!IsInEditMode() && Finalize()) {
+    if (!GetBool() && Finalize()) {
       return;
     }
 
