@@ -1895,6 +1895,7 @@ namespace msvc8
          * Address: 0x007529A0 (FUN_007529A0 -- copy constructor for an 8-byte element (buy at 0x0074D800); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752BA0 (FUN_00752BA0 -- copy constructor for the 12-byte `{dword, dword, shared-count control}` element of `SSyncData` (buy at 0x0074D8C0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752DE0 (FUN_00752DE0 -- copy constructor for a 40-byte element (buy at 0x0074DA70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005DB610 (FUN_005DB610 -- copy constructor for the 8-byte `moho::WeakPtr<CUnitCommand>` element: null the triple, buy exactly `size()` slots (0x005A1D60), `_Ucopy` 0x005E1840 (each node relinks at its owner's chain head through `WeakPtr`'s copy constructor), `_Tidy` 0x005A07A0 on the throw path. Twelve callers, e.g. 0x005D7340 (CAiAttackerImpl.cpp), 0x005FA340 / 0x005FA550 (CFactoryBuildTask). Formerly `CopyWeakPtrCUnitCommandVector` in moho/unit/CUnitCommandWeakPtrReflection.cpp (RULE ONE); its callers now copy or assign the vector directly.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -2705,15 +2706,10 @@ namespace msvc8
          * — specialized "resize from empty" fast path: unconditionally allocates a
          * fresh `newSize`-element block with no prior-buffer check, matching this
          * method's grow branch when `cur == 0`. Every real call site reaches it with
-         * a genuinely empty destination: `CopyWeakPtrCUnitCommandVector`'s own
-         * `destination.resize(sourceSize)` call is only ever made on a freshly
-         * constructed local vector or one just emptied by
-         * `ResetWeakPtrCUnitCommandVectorStorage` (see
-         * `CFactoryBuildTask.cpp`'s `SnapshotFactoryCommandQueue`, which resets
-         * `commands` between its two copy calls for exactly this reason) —
-         * `CopyWeakPtrCUnitCommandVector` is itself called from
-         * `CFactoryBuildTask::InheritQueuedCommandsTo`, `CUnitFerryTask::GetUnitCommands`,
-         * and `ReplaceWithRouteCommandsIfAny`)
+         * a genuinely empty destination: the copy construction of a fresh
+         * `msvc8::vector<WeakPtr<CUnitCommand>>` (0x005DB610, cited on the copy
+         * constructor) in `CFactoryBuildTask::InheritQueuedCommandsTo`,
+         * `CUnitFerryTask::GetUnitCommands` and `ReplaceWithRouteCommandsIfAny`)
          *
          * What it does:
          * Resizes logical element count to `newSize` by erasing tail elements when
@@ -2769,6 +2765,7 @@ namespace msvc8
          * Previously mis-tracked `skip` as a generic RULE ONE boilerplate
          * note with no caller evidence; this pass supplies the concrete
          * caller chain.
+         * Address: 0x006EA710 (FUN_006EA710 -- the `_Ufill` grow step of `resize(n)` (`_Insert_n(end(), n - size(), T())`) for `moho::WeakPtr<CUnitCommand>`, materialising the value-initialised temporary; source call `RVectorType<WeakPtr<CUnitCommand>>::SetCount` 0x006E9D10. Zero callers in the index (folded into its caller), unreachable.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3080,6 +3077,7 @@ namespace msvc8
          * Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count, vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
          * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a `LegacyWordVectorRuntimeView` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00580D10 (FUN_00580D10 -- the destroy step of `_Tidy` for `msvc8::vector<SAttackVectorGridRow>` (forwards to `_Destroy_range` 0x005837F0); reached only from the ICF-folded 0x00580D30. Was cited on the same removed CAiBrain.cpp orphan.)
+         * Address: 0x005A07A0 (FUN_005A07A0 -- `_Tidy` for `msvc8::vector<moho::WeakPtr<CUnitCommand>>`: `_Destroy_range` 0x005A2270, free, null the triple; the catch arm of the copy constructor 0x005DB610. Formerly `ResetWeakPtrCUnitCommandVectorStorage` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3619,6 +3617,7 @@ namespace msvc8
          * Address: 0x004FD660 (FUN_004FD660 -- `vector<int*>::push_back`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0067B810 (FUN_0067B810 -- `vector<EntId>::push_back` for `SSyncData::mDeleteIds`/`mEraseIds` (`Entity::DestroyInterface` 0x0067A260, `Prop::Sync` 0x006FA2A0); the capacity-full arm calls the `_Insert_n` at 0x0067D660.)
          * Address: 0x00940230 (FUN_00940230 -- `push_back` for the 60-byte `gpg::gal::EffectMacro` element; capacity-full path is the single-value `insert` 0x009401C0 / `_Insert_n` 0x0093FEB0. Reached from `EffectContext::DefineMacro` 0x009402D0, which now calls `macros.push_back(newMacro)` directly; the former a per-type free function wrapper in gpg/gal/ContextInterfaces.cpp was removed 2026-09-10.)
+         * Address: 0x006E9680 (FUN_006E9680 -- `push_back` for `moho::WeakPtr<CUnitCommand>`: in-place `_Ufill` 0x006EC5B0 (cited on WeakPtr.h `FillConstructRange`) when capacity remains, else `_Insert_n` 0x006EA440. Fourteen callers, e.g. 0x006E9000 (CUnitCommand.cpp), 0x006EDFC0 (CUnitCommandQueue.cpp), the reflection SerLoad 0x006EA8F0. `PushBackWeakPtrCUnitCommand` in CUnitCommandWeakPtrReflection.cpp is now a one-line forwarder kept for CUnitCommand.cpp's call site.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -6135,6 +6134,8 @@ namespace msvc8
          * Address: 0x008D9230 (FUN_008D9230 -- ICF twin of 0x008D9D10 (identical function_sha256): zero callers, no xrefs, unreachable from every seeded root; a linker-retained copy nothing runs.)
          * Address: 0x00583850 (FUN_00583850 -- the `std::fill(where, where + count, value)` gap-overwrite step of `_Insert_n` for the 20-byte `SAttackVectorGridRow` element: per row, copy the cursor and assign the `vector<int>` through `operator=` 0x00583A20. Formerly the orphan `FillScalarAndIntVectorRangeFromPrototype` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00582380 (FUN_00582380 -- register-order bridge into that same fill step; zero callers, unreachable. Formerly `FillScalarAndIntVectorRangeFromPrototypeSourceFirstAdapter` in CAiBrain.cpp, removed.)
+         * Address: 0x006EA440 (FUN_006EA440 -- `_Insert_n` for the 8-byte `moho::WeakPtr<CUnitCommand>` element (max_size 0x1FFFFFFF, throw 0x005A0DD0): the staged by-value copy of `value` relinks at the owner head for the duration of the call, the in-place arm shifts with `_Ucopy` 0x005FF400 / `_Copy_backward` 0x006EB820 and fills the seam with `std::fill` 0x006EC520, the grow arm re-copies through 0x006EB7F0. Callers 0x006E9680 `push_back`, 0x006E96F0 (CUnitCommand.cpp). Formerly `GrowAndFillWeakPtrCUnitCommandVector` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x006EC520 (FUN_006EC520 -- the `std::fill(where, where + count, value)` seam step of that `_Insert_n`: assignment with relink per node (`WeakPtr::operator=`). Formerly `AssignFillWeakPtrCUnitCommandLanes`, removed.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6612,6 +6613,7 @@ namespace msvc8
          * Address: 0x007420F0 (FUN_007420F0 -- `_Destroy` for `SSyncData`'s 12-byte `{{dword, dword, shared-count control}}` element: releases each control block (`~SSyncData` 0x0073FC70, 0x00740E20).)
          * Address: 0x006DBE20 (FUN_006DBE20 -- jump thunk handing an empty `[cursor, cursor)` range to the `moho::SBlackListInfo` `_Destroy_range` 0x006DEAE0 (`WeakPtr<Entity>` unlink per element). Zero callers, no xrefs, unreachable. Formerly `UnlinkBlacklistWeakEntityRangeEmptyAtCursor` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          * Address: 0x005837F0 (FUN_005837F0 -- `_Destroy_range` for the 20-byte `SAttackVectorGridRow` element (`{int mNextColumn; msvc8::vector<int> mOccupancyWords;}`, CAiBrain.cpp): zeroes nothing the binary does not, runs the row's `vector<int>` destructor per element. Reached from `CAiBrain::ProcessAttackVectors` 0x0057BDB0's scope exit (the `grid` vector's destructor) and from the row vector's `_Tidy` 0x00580D10. Formerly the orphan `ResetSAttackVectorGridRowRange` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005A2270 (FUN_005A2270 -- `_Destroy_range` for `moho::WeakPtr<CUnitCommand>`: the element destructor unlinks each node from its owner chain. 23 callers -- every erase/clear/tidy of that instantiation (0x0059F9C0 CAiBuilderImpl.cpp, 0x005A07A0 `_Tidy`, ...). Formerly `DetachWeakPtrCUnitCommandRange` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -7361,6 +7363,12 @@ namespace msvc8
          * Address: 0x00527A70 (FUN_00527A70 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00527BA0 (FUN_00527BA0 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00527C50 (FUN_00527C50 -- EH-shaped bridges into the `RUnitBlueprintWeapon` `_Uninit_copy`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005FF400 (FUN_005FF400 -- `_Ucopy` for `moho::WeakPtr<CUnitCommand>`: copy-construct each node into fresh storage, relinking it at the source owner's chain head (no unlink, the destination holds no prior membership). Six callers, e.g. 0x006EA440 `_Insert_n`. Formerly `CopyWeakPtrCUnitCommandRangeAndReturnEnd` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005FD580 (FUN_005FD580 -- source-first register bridge into that `_Ucopy`; caller 0x005FB910 (CUnitFerryTask.cpp). Formerly `CopyWeakPtrCUnitCommandRangeAdapter`, removed.)
+         * Address: 0x006EB7F0 (FUN_006EB7F0 -- the same bridge as reached from `_Insert_n` 0x006EA440.)
+         * Address: 0x006EC500 (FUN_006EC500 -- ICF-separated copy of that bridge; zero callers, unreachable.)
+         * Address: 0x006ED0D0 (FUN_006ED0D0 -- ICF-separated copy of that bridge; zero callers, unreachable.)
+         * Address: 0x005E1840 (FUN_005E1840 -- the `_Ucopy` step of the copy constructor 0x005DB610 for `moho::WeakPtr<CUnitCommand>`; DB carried it as recovered with no source path.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -9156,6 +9164,8 @@ namespace msvc8
          * Address: 0x00936000 (FUN_00936000 -- identical 4-byte `_Copy_opt` memmove copy; zero callers, no xrefs, unreachable. Formerly a sibling per-type free function, removed.)
          * Address: 0x006DDA00 (FUN_006DDA00 -- argument-order bridge into the element-wise `_Copy` for `moho::SBlackListInfo` (0x006DE7E0), reached only from the dead `operator=` 0x006DE400. Formerly `CopyBlacklistRangeAssignWeakLinksBridgeRuntime` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          * Address: 0x00584480 (FUN_00584480 -- `_Copy_opt` memmove for the 4-byte `int` element, the assign-over step of `vector<int>::operator=` 0x00583A20. Formerly the orphan `CopyLegacyIntRangeAndReturnEnd` in CAiBrain.cpp, removed 2026-09-10.)
+         * Address: 0x005A2220 (FUN_005A2220 -- element-wise `_Copy` for `moho::WeakPtr<CUnitCommand>`: per node, unlink from the current owner chain when the owner differs, then relink at the source owner's head (`WeakPtr::operator=`). Five callers, e.g. 0x005FB910 (CUnitFerryTask.cpp) and the bridge 0x005A1D00. Formerly `MoveWeakPtrCUnitCommandRangeAndReturnEnd` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005A1D00 (FUN_005A1D00 -- end-first register bridge into that `_Copy`; caller 0x005FB910. Formerly `MoveWeakPtrCUnitCommandRangeAdapter`, removed.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9209,6 +9219,7 @@ namespace msvc8
          * Address: 0x0064F760 (FUN_0064F760 -- `_Copy_backward_opt` for `SDebugScreenText`, the tail shift of that vector's `_Insert_n` (0x0064E490).)
          * Address: 0x0064FAC0 (FUN_0064FAC0 -- register bridge into the `SDebugScreenText` backward copy; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00932940 (FUN_00932940 -- `_Copy_backward_opt` for the 4-byte element of `_Insert_n` 0x00933640 (the in-place shift arm); formerly `CopyDwordRangeBackwardRuntimeH` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006EB820 (FUN_006EB820 -- `_Copy_backward` for `moho::WeakPtr<CUnitCommand>`, the in-place tail shift of `_Insert_n` 0x006EA440; a trampoline into the generic relinking core 0x006ED0F0 cited on WeakPtr.h. Formerly `AssignWeakPtrCUnitCommandRangeBackward` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9955,6 +9966,7 @@ namespace msvc8
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
          * Address: 0x00933470 (FUN_00933470 -- `_Xlen` of the 4-byte `_Insert_n` 0x00933640.)
+         * Address: 0x005A0DD0 (FUN_005A0DD0 -- `_Xlen` for the 8-byte `moho::WeakPtr<CUnitCommand>` instantiation (max_size 0x1FFFFFFF), reached from `_Insert_n` 0x006EA440, the copy constructor 0x005DB610 and 0x005A0740. Formerly `ThrowWeakPtrVectorTooLong` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {

@@ -163,10 +163,6 @@ namespace
     ScopedRouteCommandVector(const ScopedRouteCommandVector&) = delete;
     ScopedRouteCommandVector& operator=(const ScopedRouteCommandVector&) = delete;
 
-    ~ScopedRouteCommandVector()
-    {
-      moho::ResetWeakPtrCUnitCommandVectorStorage(commands);
-    }
   };
 
   /**
@@ -188,7 +184,7 @@ namespace
       return;
     }
 
-    (void)moho::CopyWeakPtrCUnitCommandVector(source, destination);
+    destination = source;
   }
 
 
@@ -655,7 +651,7 @@ namespace moho
    */
   void CUnitFerryTask::GetUnitCommands(msvc8::vector<WeakPtr<CUnitCommand>>& outCommands)
   {
-    (void)CopyWeakPtrCUnitCommandVector(mUnit->CommandQueue->mCommandVec, outCommands);
+    outCommands = mUnit->CommandQueue->mCommandVec;
 
     if (mFerryUnit.HasValue()) {
       // The binary reads the builder queue without a null guard right after

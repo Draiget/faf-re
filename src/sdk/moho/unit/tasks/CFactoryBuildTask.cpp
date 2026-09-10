@@ -292,11 +292,12 @@ namespace moho
       Unit* const factoryUnit, WeakPtr<Unit>& rallyPointUnit,
       msvc8::vector<WeakPtr<CUnitCommand>>& commands)
     {
-      CopyWeakPtrCUnitCommandVector(factoryUnit->AiBuilder->BuilderGetFactoryCommandQueue(), commands);
+      // `msvc8::vector<WeakPtr<CUnitCommand>>`'s copy (0x005DB610) and, between
+      // the two copies, its `_Tidy` (0x005A07A0): both cited on Vector.h.
+      commands = factoryUnit->AiBuilder->BuilderGetFactoryCommandQueue();
       if (Unit* const rallyUnit = rallyPointUnit.GetObjectPtr();
           rallyUnit != nullptr && rallyUnit->AiBuilder != nullptr) {
-        ResetWeakPtrCUnitCommandVectorStorage(commands);
-        CopyWeakPtrCUnitCommandVector(rallyUnit->AiBuilder->BuilderGetFactoryCommandQueue(), commands);
+        commands = rallyUnit->AiBuilder->BuilderGetFactoryCommandQueue();
       }
     }
   } // namespace

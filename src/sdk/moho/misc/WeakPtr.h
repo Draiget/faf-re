@@ -73,9 +73,10 @@ namespace moho
   struct WeakPtr
   {
     /**
-     * Address: 0x006EC5B0 (FUN_006EC5B0, `FillConstructWeakPtrCUnitCommandLanes`
-     * in CUnitCommandWeakPtrReflection.h/.cpp -- the `WeakPtr<CUnitCommand>`-typed
-     * sibling emission of this same body)
+     * Address: 0x006EC5B0 (FUN_006EC5B0, the `WeakPtr<CUnitCommand>`-typed
+     * sibling emission of this same body -- `msvc8::vector<WeakPtr<CUnitCommand>>`'s
+     * `_Ufill`, reached from its `_Insert_n` 0x006EA440 and `push_back`
+     * 0x006E9680, both cited on Vector.h)
      * Address: 0x007A5FE0 (FUN_007A5FE0, ICF twin, identical `function_sha256`
      * to FUN_006EC5B0. Reached from `GrowAndInsertInputCaptureWeakRef`
      * (`FUN_007A5A70`, UiRuntimeTypes.cpp): the reallocation branch fill-
