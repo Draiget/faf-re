@@ -1540,6 +1540,7 @@ namespace msvc8
              * Address: 0x004AEC60 (FUN_004AEC60 -- `rb_iterator::operator++` for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520, 0x004ADBB2, 0x004AE6A2; formerly `AdvanceTreeIterator_004AEC60` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AE710 (FUN_004AE710 -- `rb_iterator::operator++` for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004ACC02, 0x004ADC72, 0x004AE860; formerly `AdvanceWideTreeIterator_004AE710` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D9340 (FUN_007D9340 -- `rb_iterator::operator++` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D8AE0, 0x007D8FA4; formerly `AdvanceRegionKeyIterator` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C7A90 (FUN_005C7A90 -- `rb_iterator::operator++` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C05A0, 0x005C0C40, 0x005C14E0; formerly `MapNext` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_iterator& operator++() noexcept
             {
@@ -2656,6 +2657,7 @@ namespace msvc8
              * Address: 0x007D7A80 (FUN_007D7A80 -- `~rb_tree()` -- erase the range, free the header, null `head_`/`size_` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); zero callers, unreachable; formerly `ClearRegionKeyTreeStorageLaneA` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0042C150 (FUN_0042C150 -- `~rb_tree()` -- erase the range, then free the header for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042BB80, 0x0042BC10, 0x0042BCB0; formerly `DestroyIntegerAnnotationTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0042C180 (FUN_0042C180 -- the string map's `~rb_tree()` for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x007DB3A0; formerly `DestroyStringAnnotationTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C2330 (FUN_005C2330 -- `~rb_tree()` -- clear, then free the header for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005BFF90, 0x005C0290, 0x005C23F0; formerly `DestroyReconMapStorage` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             ~rb_tree()
             {
@@ -2747,6 +2749,8 @@ namespace msvc8
              * Address: 0x004AD460 (FUN_004AD460 -- `_Min` (descend left) for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520; formerly `FindLeftmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AEB50 (FUN_004AEB50 -- `_Min` (descend left) for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE860; formerly `FindWideTreeLeftmostDescendant_004AEB50` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D90E0 (FUN_007D90E0 -- `_Min` (descend left) for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8AE0; formerly `TreeMinimum` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5CC0 (FUN_005C5CC0 -- `_Min` (descend left) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580; formerly `TreeMin` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6BD0 (FUN_008D6BD0 -- `_Min` (descend left) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x008D6650; formerly `TreeMin` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             /**
@@ -2763,6 +2767,8 @@ namespace msvc8
              * Address: 0x008B6510 (FUN_008B6510 -- `_Max` (descend right) for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x008B5EB0; formerly `FindRightmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AEE80 (FUN_004AEE80 -- `_Max` (descend right) for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE860; formerly `FindWideTreeRightmostDescendant_004AEE80` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D90C0 (FUN_007D90C0 -- `_Max` (descend right) for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8AE0; formerly `TreeMaximum` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5CA0 (FUN_005C5CA0 -- `_Max` (descend right) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580; formerly `TreeMax` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6BB0 (FUN_008D6BB0 -- `_Max` (descend right) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x008D6650; formerly `TreeMax` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
 
@@ -2971,6 +2977,7 @@ namespace msvc8
              * Address: 0x007F1C50 (FUN_007F1C50 -- `_Lbound` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0, 0x007F01D0, 0x007F0AD0; formerly `FindBlueprintExtractorLowerBound` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D8DE0 (FUN_007D8DE0 -- `_Lbound` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D7C20, 0x007D8190; formerly `FindLowerBound` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00432450 (FUN_00432450 -- `_Lbound` for `msvc8::map<msvc8::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004317C0; formerly `LowerBoundIntAnnotationNode` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4950 (FUN_005C4950 -- `_Lbound` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C15A0; formerly `LowerBoundByEntityId` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -3001,6 +3008,7 @@ namespace msvc8
              * duplicated as `UpperBoundPausedCategoryNode` (`AudioEngine.cpp`,
              * deleted by this migration).
              * Address: 0x007D9100 (FUN_007D9100 -- `_Ubound` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D81A6, 0x007D8DA0; formerly `FindUpperBound` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C49B0 (FUN_005C49B0 -- `_Ubound` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C0C40, 0x005C20C0; formerly `UpperBoundByEntityId` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* upper_bound_node(const key_type& k) const
             {
@@ -3844,6 +3852,35 @@ namespace msvc8
              * Address: 0x004981C0 (FUN_004981C0 -- `_Insert` unique for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494930, 0x004963D5; formerly `InsertOwnedParticleBucketByKey` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00498470 (FUN_00498470 -- `_Insert` unique for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494C20, 0x00496585; formerly `InsertOwnedTrailBucketByKey` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              */
+            /**
+             * Address: 0x005C5AF0 (FUN_005C5AF0 -- `insert_equal` for `msvc8::multimap<
+             * moho::SReconKey, moho::ReconBlip*>` (`CAiReconDBImpl::mBlipMap` at +0x04,
+             * node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at
+             * +0x1C/+0x1D). The shipped body descends with the comparator and links at
+             * the leaf without ever testing equivalence, which is what separates a
+             * multimap's insert from a map's; the deserialize path (0x005C6210) calls it
+             * straight after reading a key and a blip, with no lookup in between.
+             * Formerly `InsertMapNodeBySourceEntityId` in moho/ai/CAiReconDBImpl.cpp
+             * (RULE ONE), removed 2026-09-10.)
+             *
+             * Equivalent-key insert: descend to the leaf the comparator picks and link
+             * there. Unlike `insert_unique` there is no equivalence probe, so equal keys
+             * accumulate in insertion order.
+             * Address: 0x005C44F0 (FUN_005C44F0 -- the out-parameter shape of that same `insert_equal` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); zero callers, unreachable; formerly `InsertMapNodeBySourceEntityIdNodeOutAdapter` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             */
+            node_type* insert_equal(const value_type& v)
+            {
+                node_type* where = head_;
+                bool addLeft = true;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    where = n;
+                    addLeft = this->comp()(Traits::key_of(v), Traits::key_of(n->value));
+                    n = addLeft ? n->left : n->right;
+                }
+
+                return insert_at(addLeft, where, v);
+            }
+
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
                 node_type* where = head_;
@@ -4987,6 +5024,7 @@ namespace msvc8
              * Address: 0x0049C1F0 (FUN_0049C1F0 -- `erase(const_iterator)` -- unlink, lift the successor, free the node for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00499E50; formerly `EraseOneBeamBucketIteratorAndExportSuccessor` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AE860 (FUN_004AE860 -- `_Erase(node)` -- unlink, lift the successor, recolour, free for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE2B0; formerly `EraseWideTreeNode_004AE860` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D8AE0 (FUN_007D8AE0 -- `_Erase(node)` -- unlink, lift the successor, run the colour fixup, free for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D80D0; formerly `EraseRegionKeyNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4580 (FUN_005C4580 -- `_Erase(node)` -- unlink, lift the successor, run the colour fixup, free for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C05A0, 0x005C0C40, 0x005C1F80; formerly `EraseMapNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -5983,6 +6021,7 @@ namespace msvc8
              * of calling this member.
              * Address: 0x0077C520 (FUN_0077C520 -- `clear()` for a compact tree (`_Erase(root)`, head relinked, size zeroed); zero callers, unreachable; formerly `ResetCompactTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2AC0 (FUN_007F2AC0 -- `clear()` -- teardown, then the header relinked to itself and the size zeroed for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1990; formerly `ResetBlueprintExtractorTreeStorage` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4860 (FUN_005C4860 -- `clear()` -- teardown, header relinked, size zeroed for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C2230, 0x005C2330, 0x005C23F0; formerly `ClearMap` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             void clear() noexcept
             {
@@ -6656,6 +6695,7 @@ namespace msvc8
              * Address: 0x004AE7F0 (FUN_004AE7F0 -- `_Buynode()` for the header sentinel -- links nulled, colour black for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004A9DD0, 0x004AC3F0, 0x004AD1C0; formerly `AllocateBlackTreeNode_004AE7F0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AEB70 (FUN_004AEB70 -- `_Buynode()` for the header sentinel -- links nulled, colour black for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004A9DD0, 0x004AC830, 0x004AD5A0; formerly `AllocateBlackWideTreeNode_004AEB70` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D9140 (FUN_007D9140 -- `_Buynode()` for the header sentinel for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D60D0, 0x007D7A50, 0x007D8090; formerly `AllocateRegionKeyNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C8800 (FUN_005C8800 -- `_Buynode()` for the header sentinel for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005BFF90, 0x005C0290, 0x005C44C0; formerly `AllocateReconMapHeadNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -7174,6 +7214,7 @@ namespace msvc8
              * Address: 0x004AED80 (FUN_004AED80 -- `_Buynode(links, value)` -- the node's `PrefetchRequestRuntime` built in place from the key for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE460; formerly `InitializePrefetchRequestWideNode_004AED80` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F1890 (FUN_007F1890 -- `_Buynode` for that insert -- descend to the insertion point, then allocate and link the fresh node for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F0960; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
              * Address: 0x007D8EC0 (FUN_007D8EC0 -- `_Buynode(links, value)` -- the key copied into the fresh node for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200; formerly `AllocateRegionKeyTreeNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C8840 (FUN_005C8840 -- `_Buynode(links, value)` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C7430; formerly `AllocateMapNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -7732,6 +7773,7 @@ namespace msvc8
              * Address: 0x004AEE40 (FUN_004AEE40 -- `_Erase(root)` -- the recursive teardown for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE2B0, 0x004AEB2C; formerly `DestroyWideTreeNodeSubtree_004AEE40` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2FA0 (FUN_007F2FA0 -- `_Erase(root)` -- the recursive teardown, freeing each key string before the node for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F2AC0; formerly `DestroyBlueprintExtractorTreeNodesRecursive` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D81C0 (FUN_007D81C0 -- `_Erase(root)` -- the recursive teardown, each key destroyed before its node for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D63A0, 0x007D7BFC, 0x007D80D0; formerly `DestroyRegionKeySubtree` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5BE0 (FUN_005C5BE0 -- `_Erase(root)` -- the recursive teardown for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C0370, 0x005C4860, 0x005C492C; formerly `DestroyReconMapSubtree` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -8193,6 +8235,7 @@ namespace msvc8
              * Address: 0x004AE3B0 (FUN_004AE3B0 -- `_Lrotate` for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AD5E0, 0x004AE860; formerly `RotateWideSubtreeLeft_004AE3B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2B00 (FUN_007F2B00 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1A70, 0x007F27F0; formerly `RotateBlueprintExtractorTreeNodeLeft` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D8E20 (FUN_007D8E20 -- `_Lrotate` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200, 0x007D8AE0; formerly `RotateTreeLeft` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5C50 (FUN_005C5C50 -- `_Lrotate` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580, 0x005C7430; formerly `RotateLeft` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -8481,6 +8524,7 @@ namespace msvc8
              * Address: 0x004AE410 (FUN_004AE410 -- `_Rrotate` for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AD5E0, 0x004AE860; formerly `RotateWideSubtreeRight_004AE410` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2B60 (FUN_007F2B60 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1A70, 0x007F27F0; formerly `RotateBlueprintExtractorTreeNodeRight` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007D8E70 (FUN_007D8E70 -- `_Rrotate` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200, 0x007D8AE0; formerly `RotateTreeRight` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5D00 (FUN_005C5D00 -- `_Rrotate` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580, 0x005C7430; formerly `RotateRight` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -8943,6 +8987,7 @@ namespace msvc8
              * `insert_hint`'s own citation above for why the previously-
              * recovered `FindOrInsertCategoryVolumeNode` never reached this
              * address (or `insert_hint`/`insert_unique` above it) at all.
+             * Address: 0x005C7430 (FUN_005C7430 -- `_Insert(addLeft, where, value)` -- link at the chosen leaf, then the recolour/rotate fixup for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C5AF0; formerly `InsertMapNodeWithHint` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {

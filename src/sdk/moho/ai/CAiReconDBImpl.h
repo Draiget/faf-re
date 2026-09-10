@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "legacy/containers/Map.h"
 #include <cstdint>
 #include <vector>
 
@@ -30,14 +31,29 @@ namespace moho
    * - ctor: 0x005BFF90 writes head at +0x08 and size at +0x0C
    * - dtor: 0x005C23F0 tears down tree via helper + operator delete(head)
    */
-  struct SReconBlipMapStorage
+  class ReconBlip;
+  struct SReconKey;
+
+  /**
+   * Ordering for the recon-blip map: the source entity id alone. The weak
+   * source-unit handle rides along in the key but takes no part in the
+   * compare, which is why one source entity can hold several blips and why
+   * the lookups come in `lower_bound`/`upper_bound` pairs.
+   */
+  struct SReconKeyLess
   {
-    void* mAllocProxy; // +0x00
-    void* mHead;       // +0x04
-    std::uint32_t mSize; // +0x08
+    [[nodiscard]] bool operator()(const SReconKey& lhs, const SReconKey& rhs) const noexcept;
   };
 
-  static_assert(sizeof(SReconBlipMapStorage) == 0x0C, "SReconBlipMapStorage size must be 0x0C");
+  // Node 0x20: the 0x0C key at node+0x0C, the blip pointer at node+0x18 and
+  // the colour/nil pair at +0x1C/+0x1D, so the value is
+  // `pair<const SReconKey, ReconBlip*>` (0x10) -- and the recovered size guard
+  // 0x0FFFFFFE is `0xFFFFFFFF / 0x10 - 1`, that value type's `max_size`. The
+  // insert (0x005C5AF0) links at the leaf without an equivalence probe, so
+  // this is a multimap, not a map.
+  using ReconBlipMap = msvc8::multimap<SReconKey, ReconBlip*, SReconKeyLess>;
+
+  static_assert(sizeof(ReconBlipMap) == 0x0C, "ReconBlipMap size must be 0x0C");
 
   /**
    * Key payload used by `CAiReconDBImpl::mBlipMap` multimap.
@@ -513,7 +529,7 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    SReconBlipMapStorage mBlipMap;      // +0x04
+    ReconBlipMap mBlipMap;      // +0x04
     msvc8::vector<ReconBlip*> mBblips;  // +0x10
     msvc8::vector<ReconBlip*> mTempBlips; // +0x20
     CArmyImpl* mArmy;                   // +0x30

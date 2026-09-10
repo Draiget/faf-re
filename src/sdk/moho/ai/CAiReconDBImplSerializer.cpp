@@ -96,10 +96,10 @@ namespace
   [[nodiscard]] gpg::RType* ResolveReconBlipMapStorageType()
   {
     if (!gReconBlipMapStorageType) {
-      gReconBlipMapStorageType = gpg::LookupRType(typeid(SReconBlipMapStorage));
+      gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
       if (!gReconBlipMapStorageType) {
         (void)moho::register_RMultiMapType_SReconKey_ReconBlipPtr();
-        gReconBlipMapStorageType = gpg::LookupRType(typeid(SReconBlipMapStorage));
+        gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
       }
     }
     return gReconBlipMapStorageType;
