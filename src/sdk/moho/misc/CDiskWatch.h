@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Sync.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
@@ -141,24 +142,17 @@ namespace moho
   class CDiskWatch
   {
   public:
-    struct DiskWatchMapNode
-    {
-      DiskWatchMapNode* mLeft;      // +0x00
-      DiskWatchMapNode* mParent;    // +0x04
-      DiskWatchMapNode* mRight;     // +0x08
-      msvc8::string mDirectoryPath; // +0x0C
-      CDiskDirWatch* mDirWatch;     // +0x28
-      std::uint8_t mColor;          // +0x2C
-      std::uint8_t mIsNil;          // +0x2D
-      std::uint16_t mPadding2E;     // +0x2E
-    };
-
-    struct DiskWatchMap
-    {
-      void* mAllocProxy;          // +0x00
-      DiskWatchMapNode* mHead;    // +0x04
-      std::uint32_t mNodeCount;   // +0x08
-    };
+    /**
+     * Lower-cased directory path -> the watcher reading that directory.
+     *
+     * The node is 0x30 (allocator 0x00465920, `lea edx,[ecx+ecx*2]; shl edx,4`)
+     * with the key at `node+0x0C` -- `_Lbound` (0x00465010) hands `node+0x0C`
+     * to the comparison as `this` -- the watcher pointer at `node+0x28` and
+     * colour/nil at `+0x2C`/`+0x2D`. `_Insert`'s length guard (0x00464488)
+     * compares against `0x7FFFFFE` = `0xFFFFFFFF / 0x20 - 1`, so the pair is
+     * 0x20 and nothing here is padded.
+     */
+    using DiskWatchMap = msvc8::map<msvc8::string, CDiskDirWatch*>;
 
     /**
      * Address: 0x004627C0 (FUN_004627C0, ??0CDiskWatch@Moho@@QAE@XZ)
@@ -287,24 +281,14 @@ namespace moho
   static_assert(offsetof(CDiskWatchListener, mWatch) == 0x0C, "CDiskWatchListener::mWatch offset must be 0x0C");
   static_assert(offsetof(CDiskWatchListener, mEvents) == 0x10, "CDiskWatchListener::mEvents offset must be 0x10");
   static_assert(offsetof(CDiskWatchListener, mPatterns) == 0x20, "CDiskWatchListener::mPatterns offset must be 0x20");
-  static_assert(
-    offsetof(CDiskWatch::DiskWatchMapNode, mDirectoryPath) == 0x0C,
-    "CDiskWatch::DiskWatchMapNode::mDirectoryPath offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CDiskWatch::DiskWatchMapNode, mDirWatch) == 0x28,
-    "CDiskWatch::DiskWatchMapNode::mDirWatch offset must be 0x28"
-  );
-  static_assert(
-    offsetof(CDiskWatch::DiskWatchMapNode, mIsNil) == 0x2D,
-    "CDiskWatch::DiskWatchMapNode::mIsNil offset must be 0x2D"
-  );
-  static_assert(sizeof(CDiskWatch::DiskWatchMapNode) == 0x30, "CDiskWatch::DiskWatchMapNode size must be 0x30");
+
+
+
   static_assert(sizeof(CDiskWatch::DiskWatchMap) == 0x0C, "CDiskWatch::DiskWatchMap size must be 0x0C");
   static_assert(
-    offsetof(CDiskWatch::DiskWatchMap, mHead) == 0x04,
-    "CDiskWatch::DiskWatchMap::mHead offset must be 0x04"
+    sizeof(CDiskWatch::DiskWatchMap::value_type) == 0x20, "CDiskWatch::DiskWatchMap::value_type size must be 0x20"
   );
+
   static_assert(sizeof(CDiskWatch) == 0x24, "CDiskWatch size must be 0x24");
   static_assert(offsetof(CDiskWatch, mLock) == 0x0C, "CDiskWatch::mLock offset must be 0x0C");
   static_assert(

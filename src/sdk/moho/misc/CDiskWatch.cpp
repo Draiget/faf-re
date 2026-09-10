@@ -47,6 +47,8 @@ namespace
   CDiskWatchListener* LinkOwnerFromNode(TDatListItem<CDiskWatchListener, void>* node);
 
   [[nodiscard]]
+  [[nodiscard]]
+  [[nodiscard]]
   int ComparePathViews(const std::string_view lhs, const std::string_view rhs)
   {
     const std::size_t sharedCount = std::min(lhs.size(), rhs.size());
@@ -254,511 +256,16 @@ namespace
   }
 
   [[nodiscard]]
-  bool IsWatchMapSentinel(const CDiskWatch::DiskWatchMapNode* const node)
-  {
-    return node == nullptr || node->mIsNil != 0u;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapHead(const CDiskWatch::DiskWatchMap& map)
-  {
-    return map.mHead;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapRoot(const CDiskWatch::DiskWatchMap& map)
-  {
-    CDiskWatch::DiskWatchMapNode* const head = WatchMapHead(map);
-    if (IsWatchMapSentinel(head)) {
-      return head;
-    }
-    return head->mParent;
-  }
-
-  void EnsureDiskWatchMapInitialized(CDiskWatch::DiskWatchMap& map)
-  {
-    if (map.mHead != nullptr) {
-      return;
-    }
-
-    CDiskWatch::DiskWatchMapNode* const head = new CDiskWatch::DiskWatchMapNode();
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mDirectoryPath.clear();
-    head->mDirWatch = nullptr;
-    head->mColor = 1;
-    head->mIsNil = 1;
-    head->mPadding2E = 0;
-    map.mAllocProxy = nullptr;
-    map.mHead = head;
-    map.mNodeCount = 0;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapLowerBound(
-    const CDiskWatch::DiskWatchMap& map, const msvc8::string& directoryPath
-  )
-  {
-    CDiskWatch::DiskWatchMapNode* result = WatchMapHead(map);
-    if (result == nullptr) {
-      return nullptr;
-    }
-
-    CDiskWatch::DiskWatchMapNode* node = result->mParent;
-    while (!IsWatchMapSentinel(node)) {
-      if (CompareDirectoryKeys(node->mDirectoryPath, directoryPath) >= 0) {
-        result = node;
-        node = node->mLeft;
-      } else {
-        node = node->mRight;
-      }
-    }
-
-    return result;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapFind(const CDiskWatch::DiskWatchMap& map, const msvc8::string& directoryPath)
-  {
-    CDiskWatch::DiskWatchMapNode* const lowerBound = WatchMapLowerBound(map, directoryPath);
-    if (lowerBound == nullptr || lowerBound == map.mHead) {
-      return map.mHead;
-    }
-
-    return CompareDirectoryKeys(directoryPath, lowerBound->mDirectoryPath) < 0 ? map.mHead : lowerBound;
-  }
-
-  void WatchMapRotateLeft(CDiskWatch::DiskWatchMap& map, CDiskWatch::DiskWatchMapNode* const pivot)
-  {
-    if (IsWatchMapSentinel(pivot) || IsWatchMapSentinel(pivot->mRight)) {
-      return;
-    }
-
-    CDiskWatch::DiskWatchMapNode* const head = WatchMapHead(map);
-    CDiskWatch::DiskWatchMapNode* const right = pivot->mRight;
-
-    pivot->mRight = right->mLeft;
-    if (!IsWatchMapSentinel(right->mLeft)) {
-      right->mLeft->mParent = pivot;
-    }
-
-    right->mParent = pivot->mParent;
-    if (IsWatchMapSentinel(pivot->mParent)) {
-      head->mParent = right;
-    } else if (pivot == pivot->mParent->mLeft) {
-      pivot->mParent->mLeft = right;
-    } else {
-      pivot->mParent->mRight = right;
-    }
-
-    right->mLeft = pivot;
-    pivot->mParent = right;
-  }
-
-  void WatchMapRotateRight(CDiskWatch::DiskWatchMap& map, CDiskWatch::DiskWatchMapNode* const pivot)
-  {
-    if (IsWatchMapSentinel(pivot) || IsWatchMapSentinel(pivot->mLeft)) {
-      return;
-    }
-
-    CDiskWatch::DiskWatchMapNode* const head = WatchMapHead(map);
-    CDiskWatch::DiskWatchMapNode* const left = pivot->mLeft;
-
-    pivot->mLeft = left->mRight;
-    if (!IsWatchMapSentinel(left->mRight)) {
-      left->mRight->mParent = pivot;
-    }
-
-    left->mParent = pivot->mParent;
-    if (IsWatchMapSentinel(pivot->mParent)) {
-      head->mParent = left;
-    } else if (pivot == pivot->mParent->mRight) {
-      pivot->mParent->mRight = left;
-    } else {
-      pivot->mParent->mLeft = left;
-    }
-
-    left->mRight = pivot;
-    pivot->mParent = left;
-  }
-
-  void WatchMapInsertFixup(CDiskWatch::DiskWatchMap& map, CDiskWatch::DiskWatchMapNode* node)
-  {
-    while (!IsWatchMapSentinel(node->mParent) && node->mParent->mColor == 0u) {
-      CDiskWatch::DiskWatchMapNode* const parent = node->mParent;
-      CDiskWatch::DiskWatchMapNode* const grandparent = parent->mParent;
-
-      if (parent == grandparent->mLeft) {
-        CDiskWatch::DiskWatchMapNode* uncle = grandparent->mRight;
-        if (!IsWatchMapSentinel(uncle) && uncle->mColor == 0u) {
-          parent->mColor = 1;
-          uncle->mColor = 1;
-          grandparent->mColor = 0;
-          node = grandparent;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            WatchMapRotateLeft(map, node);
-          }
-          node->mParent->mColor = 1;
-          node->mParent->mParent->mColor = 0;
-          WatchMapRotateRight(map, node->mParent->mParent);
-        }
-      } else {
-        CDiskWatch::DiskWatchMapNode* uncle = grandparent->mLeft;
-        if (!IsWatchMapSentinel(uncle) && uncle->mColor == 0u) {
-          parent->mColor = 1;
-          uncle->mColor = 1;
-          grandparent->mColor = 0;
-          node = grandparent;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            WatchMapRotateRight(map, node);
-          }
-          node->mParent->mColor = 1;
-          node->mParent->mParent->mColor = 0;
-          WatchMapRotateLeft(map, node->mParent->mParent);
-        }
-      }
-    }
-
-    CDiskWatch::DiskWatchMapNode* const root = WatchMapRoot(map);
-    if (!IsWatchMapSentinel(root)) {
-      root->mColor = 1;
-      root->mParent = WatchMapHead(map);
-    }
-  }
-
   [[nodiscard]]
-  bool WatchMapInsert(CDiskWatch::DiskWatchMap& map, const msvc8::string& directoryPath, CDiskDirWatch* const dirWatch)
-  {
-    EnsureDiskWatchMapInitialized(map);
-    CDiskWatch::DiskWatchMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      return false;
-    }
-
-    if (WatchMapFind(map, directoryPath) != head) {
-      return false;
-    }
-
-    std::unique_ptr<CDiskWatch::DiskWatchMapNode> insertedOwner = std::make_unique<CDiskWatch::DiskWatchMapNode>();
-    CDiskWatch::DiskWatchMapNode* const insertedNode = insertedOwner.get();
-    insertedNode->mLeft = head;
-    insertedNode->mParent = head;
-    insertedNode->mRight = head;
-    insertedNode->mDirectoryPath.assign_owned(directoryPath.view());
-    insertedNode->mDirWatch = dirWatch;
-    insertedNode->mColor = 0;
-    insertedNode->mIsNil = 0;
-    insertedNode->mPadding2E = 0;
-
-    CDiskWatch::DiskWatchMapNode* parent = head;
-    CDiskWatch::DiskWatchMapNode* node = head->mParent;
-    bool insertAsLeftChild = true;
-    while (!IsWatchMapSentinel(node)) {
-      parent = node;
-      if (CompareDirectoryKeys(directoryPath, node->mDirectoryPath) < 0) {
-        node = node->mLeft;
-        insertAsLeftChild = true;
-      } else {
-        node = node->mRight;
-        insertAsLeftChild = false;
-      }
-    }
-
-    insertedNode->mParent = parent;
-    if (parent == head) {
-      head->mParent = insertedNode;
-      head->mLeft = insertedNode;
-      head->mRight = insertedNode;
-      insertedNode->mParent = head;
-    } else if (insertAsLeftChild) {
-      parent->mLeft = insertedNode;
-      if (head->mLeft == parent || CompareDirectoryKeys(insertedNode->mDirectoryPath, head->mLeft->mDirectoryPath) < 0) {
-        head->mLeft = insertedNode;
-      }
-    } else {
-      parent->mRight = insertedNode;
-      if (head->mRight == parent || CompareDirectoryKeys(insertedNode->mDirectoryPath, head->mRight->mDirectoryPath) > 0) {
-        head->mRight = insertedNode;
-      }
-    }
-
-    ++map.mNodeCount;
-    insertedOwner.release();
-    WatchMapInsertFixup(map, insertedNode);
-    return true;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* NextWatchMapNode(
-    CDiskWatch::DiskWatchMapNode* node, const CDiskWatch::DiskWatchMapNode* const head
-  )
-  {
-    if (node == nullptr || head == nullptr) {
-      return nullptr;
-    }
-
-    if (node->mRight != nullptr && node->mRight->mIsNil == 0u) {
-      node = node->mRight;
-      while (node->mLeft != nullptr && node->mLeft->mIsNil == 0u) {
-        node = node->mLeft;
-      }
-      return node;
-    }
-
-    CDiskWatch::DiskWatchMapNode* parent = node->mParent;
-    while (parent != nullptr && parent->mIsNil == 0u && node == parent->mRight) {
-      node = parent;
-      parent = parent->mParent;
-    }
-
-    return parent;
-  }
-
   [[nodiscard]]
-  bool IsWatchMapNodeBlack(const CDiskWatch::DiskWatchMapNode* const node)
-  {
-    return IsWatchMapSentinel(node) || node->mColor == kWatchMapColorBlack;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapMinimumNode(CDiskWatch::DiskWatchMapNode* node)
-  {
-    while (!IsWatchMapSentinel(node->mLeft)) {
-      node = node->mLeft;
-    }
-    return node;
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapMaximumNode(CDiskWatch::DiskWatchMapNode* node)
-  {
-    while (!IsWatchMapSentinel(node->mRight)) {
-      node = node->mRight;
-    }
-    return node;
-  }
-
-  void WatchMapEraseFixup(
-    CDiskWatch::DiskWatchMap& map,
-    CDiskWatch::DiskWatchMapNode* node,
-    CDiskWatch::DiskWatchMapNode* parent
-  )
-  {
-    CDiskWatch::DiskWatchMapNode* const head = WatchMapHead(map);
-
-    while (node != head->mParent && IsWatchMapNodeBlack(node)) {
-      if (node == parent->mLeft) {
-        CDiskWatch::DiskWatchMapNode* sibling = parent->mRight;
-
-        if (!IsWatchMapSentinel(sibling) && sibling->mColor == kWatchMapColorRed) {
-          sibling->mColor = kWatchMapColorBlack;
-          parent->mColor = kWatchMapColorRed;
-          WatchMapRotateLeft(map, parent);
-          sibling = parent->mRight;
-        }
-
-        if (IsWatchMapSentinel(sibling)) {
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsWatchMapNodeBlack(sibling->mLeft) && IsWatchMapNodeBlack(sibling->mRight)) {
-          sibling->mColor = kWatchMapColorRed;
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsWatchMapNodeBlack(sibling->mRight)) {
-          if (!IsWatchMapSentinel(sibling->mLeft)) {
-            sibling->mLeft->mColor = kWatchMapColorBlack;
-          }
-          sibling->mColor = kWatchMapColorRed;
-          WatchMapRotateRight(map, sibling);
-          sibling = parent->mRight;
-        }
-
-        sibling->mColor = parent->mColor;
-        parent->mColor = kWatchMapColorBlack;
-        if (!IsWatchMapSentinel(sibling->mRight)) {
-          sibling->mRight->mColor = kWatchMapColorBlack;
-        }
-        WatchMapRotateLeft(map, parent);
-      } else {
-        CDiskWatch::DiskWatchMapNode* sibling = parent->mLeft;
-
-        if (!IsWatchMapSentinel(sibling) && sibling->mColor == kWatchMapColorRed) {
-          sibling->mColor = kWatchMapColorBlack;
-          parent->mColor = kWatchMapColorRed;
-          WatchMapRotateRight(map, parent);
-          sibling = parent->mLeft;
-        }
-
-        if (IsWatchMapSentinel(sibling)) {
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsWatchMapNodeBlack(sibling->mRight) && IsWatchMapNodeBlack(sibling->mLeft)) {
-          sibling->mColor = kWatchMapColorRed;
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsWatchMapNodeBlack(sibling->mLeft)) {
-          if (!IsWatchMapSentinel(sibling->mRight)) {
-            sibling->mRight->mColor = kWatchMapColorBlack;
-          }
-          sibling->mColor = kWatchMapColorRed;
-          WatchMapRotateLeft(map, sibling);
-          sibling = parent->mLeft;
-        }
-
-        sibling->mColor = parent->mColor;
-        parent->mColor = kWatchMapColorBlack;
-        if (!IsWatchMapSentinel(sibling->mLeft)) {
-          sibling->mLeft->mColor = kWatchMapColorBlack;
-        }
-        WatchMapRotateRight(map, parent);
-      }
-
-      break;
-    }
-
-    if (!IsWatchMapSentinel(node)) {
-      node->mColor = kWatchMapColorBlack;
-    }
-  }
-
   [[nodiscard]]
-  CDiskWatch::DiskWatchMapNode* WatchMapEraseNode(
-    CDiskWatch::DiskWatchMap& map, CDiskWatch::DiskWatchMapNode* const eraseTarget
-  )
-  {
-    CDiskWatch::DiskWatchMapNode* const head = map.mHead;
-    if (IsWatchMapSentinel(eraseTarget) || IsWatchMapSentinel(head)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    CDiskWatch::DiskWatchMapNode* const next = NextWatchMapNode(eraseTarget, head);
-    CDiskWatch::DiskWatchMapNode* fixupNode = nullptr;
-    CDiskWatch::DiskWatchMapNode* fixupParent = nullptr;
-
-    if (IsWatchMapSentinel(eraseTarget->mLeft)) {
-      fixupNode = eraseTarget->mRight;
-      fixupParent = eraseTarget->mParent;
-      if (!IsWatchMapSentinel(fixupNode)) {
-        fixupNode->mParent = fixupParent;
-      }
-
-      if (head->mParent == eraseTarget) {
-        head->mParent = fixupNode;
-      } else if (fixupParent->mLeft == eraseTarget) {
-        fixupParent->mLeft = fixupNode;
-      } else {
-        fixupParent->mRight = fixupNode;
-      }
-
-      if (head->mLeft == eraseTarget) {
-        head->mLeft = IsWatchMapSentinel(fixupNode) ? fixupParent : WatchMapMinimumNode(fixupNode);
-      }
-      if (head->mRight == eraseTarget) {
-        head->mRight = IsWatchMapSentinel(fixupNode) ? fixupParent : WatchMapMaximumNode(fixupNode);
-      }
-    } else if (IsWatchMapSentinel(eraseTarget->mRight)) {
-      fixupNode = eraseTarget->mLeft;
-      fixupParent = eraseTarget->mParent;
-      if (!IsWatchMapSentinel(fixupNode)) {
-        fixupNode->mParent = fixupParent;
-      }
-
-      if (head->mParent == eraseTarget) {
-        head->mParent = fixupNode;
-      } else if (fixupParent->mLeft == eraseTarget) {
-        fixupParent->mLeft = fixupNode;
-      } else {
-        fixupParent->mRight = fixupNode;
-      }
-
-      if (head->mLeft == eraseTarget) {
-        head->mLeft = IsWatchMapSentinel(fixupNode) ? fixupParent : WatchMapMinimumNode(fixupNode);
-      }
-      if (head->mRight == eraseTarget) {
-        head->mRight = IsWatchMapSentinel(fixupNode) ? fixupParent : WatchMapMaximumNode(fixupNode);
-      }
-    } else {
-      CDiskWatch::DiskWatchMapNode* const successor = next;
-      fixupNode = successor->mRight;
-
-      if (successor == eraseTarget->mRight) {
-        fixupParent = successor;
-      } else {
-        fixupParent = successor->mParent;
-        if (!IsWatchMapSentinel(fixupNode)) {
-          fixupNode->mParent = fixupParent;
-        }
-        fixupParent->mLeft = fixupNode;
-
-        successor->mRight = eraseTarget->mRight;
-        successor->mRight->mParent = successor;
-      }
-
-      if (head->mParent == eraseTarget) {
-        head->mParent = successor;
-      } else if (eraseTarget->mParent->mLeft == eraseTarget) {
-        eraseTarget->mParent->mLeft = successor;
-      } else {
-        eraseTarget->mParent->mRight = successor;
-      }
-
-      successor->mParent = eraseTarget->mParent;
-      successor->mLeft = eraseTarget->mLeft;
-      successor->mLeft->mParent = successor;
-      std::swap(successor->mColor, eraseTarget->mColor);
-    }
-
-    if (eraseTarget->mColor == kWatchMapColorBlack) {
-      WatchMapEraseFixup(map, fixupNode, fixupParent);
-    }
-
-    delete eraseTarget;
-    if (map.mNodeCount > 0u) {
-      --map.mNodeCount;
-    }
-
-    return next;
-  }
-
-  void DestroyDiskWatchMap(CDiskWatch::DiskWatchMap& map)
-  {
-    CDiskWatch::DiskWatchMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    CDiskWatch::DiskWatchMapNode* node = head->mLeft;
-    while (!IsWatchMapSentinel(node) && node != head) {
-      CDiskWatch::DiskWatchMapNode* const next = NextWatchMapNode(node, head);
-      delete node->mDirWatch;
-      node->mDirWatch = nullptr;
-      delete node;
-      node = next;
-    }
-
-    delete head;
-    map.mAllocProxy = nullptr;
-    map.mHead = nullptr;
-    map.mNodeCount = 0;
-  }
-
   /**
    * Address: 0x00463220 (FUN_00463220, disk-watch singleton init helper)
    *
@@ -1122,7 +629,7 @@ CDiskWatch::~CDiskWatch()
     node = next;
   }
 
-  DestroyDiskWatchMap(mDirWatchMap);
+  // The map's own teardown is `~map()`, which MSVC emits for the member.
 }
 
 /**
@@ -1168,8 +675,7 @@ bool CDiskWatch::AddDirectory(const gpg::StrArg directoryPath)
     return false;
   }
 
-  EnsureDiskWatchMapInitialized(mDirWatchMap);
-  if (WatchMapFind(mDirWatchMap, normalizedPath) != mDirWatchMap.mHead) {
+  if (mDirWatchMap.find(normalizedPath) != mDirWatchMap.end()) {
     gpg::Warnf("CDiskWatch::AddDirectory(): Attempting to add \"%s\" multiple times.", normalizedPath.c_str());
     gpg::core::func_UnlockShared(&mLock);
     return false;
@@ -1181,7 +687,7 @@ bool CDiskWatch::AddDirectory(const gpg::StrArg directoryPath)
     return false;
   }
 
-  if (!WatchMapInsert(mDirWatchMap, normalizedPath, dirWatch.get())) {
+  if (!mDirWatchMap.insert({normalizedPath, dirWatch.get()}).second) {
     gpg::core::func_UnlockShared(&mLock);
     return false;
   }
@@ -1199,17 +705,16 @@ bool CDiskWatch::RemoveDirectoryW(const gpg::StrArg directoryPath)
   gpg::core::func_LockShared(&mLock);
 
   const msvc8::string normalizedPath = gpg::STR_ToLower(directoryPath);
-  DiskWatchMapNode* const head = mDirWatchMap.mHead;
-  DiskWatchMapNode* const node = head != nullptr ? WatchMapFind(mDirWatchMap, normalizedPath) : nullptr;
-  if (node == nullptr || node == head) {
+  const DiskWatchMap::iterator watched = mDirWatchMap.find(normalizedPath);
+  if (watched == mDirWatchMap.end()) {
     gpg::Warnf("CDiskWatch::RemoveDirectory(): \"%s\" not being watched.", normalizedPath.c_str());
     gpg::core::func_UnlockShared(&mLock);
     return false;
   }
 
-  delete node->mDirWatch;
-  node->mDirWatch = nullptr;
-  (void)WatchMapEraseNode(mDirWatchMap, node);
+  delete watched->second;
+  watched->second = nullptr;
+  (void)mDirWatchMap.erase(watched);
 
   gpg::core::func_UnlockShared(&mLock);
   return true;
@@ -1272,13 +777,9 @@ void CDiskWatch::WatchQuery()
 {
   gpg::core::func_LockShared(&mLock);
 
-  DiskWatchMapNode* const head = mDirWatchMap.mHead;
-  if (head != nullptr) {
-    for (DiskWatchMapNode* node = head->mLeft; node != nullptr && node != head; node = NextWatchMapNode(node, head)) {
-      CDiskDirWatch* const dirWatch = node->mDirWatch;
-      if (dirWatch != nullptr) {
-        dirWatch->Update();
-      }
+  for (const auto& [directoryPath, dirWatch] : mDirWatchMap) {
+    if (dirWatch != nullptr) {
+      dirWatch->Update();
     }
   }
 
