@@ -294,6 +294,13 @@ namespace moho
    * What it does:
    * One packed beam-vertex lane emitted by beam interpolation helper paths.
    */
+  /**
+   * Address: 0x0049C0E0 (FUN_0049C0E0 -- the compiler-generated copy of this
+   * 0x38-byte vertex record, emitted out of line for
+   * `msvc8::vector<BeamRenderVertexRuntime>`'s copy steps. Formerly transcribed
+   * as `CopyBeamRenderVertexLanePacked` in BeamRenderHelpers.cpp, removed
+   * 2026-09-10.)
+   */
   struct BeamRenderVertexRuntime
   {
     Wm3::Vector3<float> worldPosition;   // +0x00

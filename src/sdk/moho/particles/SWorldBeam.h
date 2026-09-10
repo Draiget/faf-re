@@ -39,6 +39,13 @@ namespace moho
      */
     SWorldBeam();
 
+    /**
+     * Address: 0x0049BF10 (FUN_0049BF10 -- the compiler-generated copy of this
+     * 0xCC-byte beam record (transforms, endpoints, colours, both counted texture
+     * handles retained through `CountedPtr`'s copy, the UV lanes); emitted out
+     * of line for `msvc8::vector<SWorldBeam>`'s copy steps. Formerly transcribed
+     * as `CopyWorldBeamForVectorMove` in BeamRenderHelpers.cpp, removed 2026-09-10.)
+     */
     VTransform mCurStart;                    // +0x00
     VTransform mLastStart;                   // +0x1C
     bool mFromStart = false;                 // +0x38
