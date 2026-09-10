@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Map.h"
 #include "moho/ai/IAiBuilder.h"
 
 namespace gpg
@@ -15,24 +16,15 @@ namespace moho
 {
   class Unit;
 
-  struct SBuilderRebuildNode
-  {
-    SBuilderRebuildNode* left;            // +0x00
-    SBuilderRebuildNode* parent;          // +0x04
-    SBuilderRebuildNode* right;           // +0x08
-    std::uint32_t key;                    // +0x0C (x*10000 + z)
-    const RUnitBlueprint* blueprint;      // +0x10
-    std::uint8_t color;                   // +0x14
-    std::uint8_t isNil;                   // +0x15
-    std::uint8_t pad16[2];                // +0x16
-  };
-
-  struct SBuilderRebuildMap
-  {
-    std::uint32_t mMeta00;         // +0x00
-    SBuilderRebuildNode* mHead;    // +0x04 (RB-tree sentinel)
-    std::uint32_t mSize;           // +0x08
-  };
+  /**
+   * The rebuild queue: encoded cell position (`x * 10000 + z`) -> the blueprint
+   * to rebuild there.
+   *
+   * IDA types the emissions `msvc8::map<uint, RUnitBlueprint*>`; the node is
+   * 0x18 with the key at `node+0x0C`, the blueprint at `node+0x10` and
+   * colour/nil at `+0x14`/`+0x15`.
+   */
+  using SBuilderRebuildMap = msvc8::map<std::uint32_t, const RUnitBlueprint*>;
 
   /**
    * VFTABLE: 0x00E1B73C
@@ -252,21 +244,16 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> mFactoryCommands;  // +0x24
   };
 
-  static_assert(sizeof(SBuilderRebuildNode) == 0x18, "SBuilderRebuildNode size must be 0x18");
-  static_assert(offsetof(SBuilderRebuildNode, key) == 0x0C, "SBuilderRebuildNode::key offset must be 0x0C");
-  static_assert(
-    offsetof(SBuilderRebuildNode, blueprint) == 0x10, "SBuilderRebuildNode::blueprint offset must be 0x10"
-  );
-  static_assert(offsetof(SBuilderRebuildNode, color) == 0x14, "SBuilderRebuildNode::color offset must be 0x14");
-  static_assert(offsetof(SBuilderRebuildNode, isNil) == 0x15, "SBuilderRebuildNode::isNil offset must be 0x15");
+
+
+
 
   static_assert(sizeof(SBuilderRebuildMap) == 0x0C, "SBuilderRebuildMap size must be 0x0C");
   static_assert(
-    offsetof(SBuilderRebuildMap, mHead) == 0x04, "SBuilderRebuildMap::mHead offset must be 0x04"
+    sizeof(SBuilderRebuildMap::value_type) == 0x08, "SBuilderRebuildMap::value_type size must be 0x08"
   );
-  static_assert(
-    offsetof(SBuilderRebuildMap, mSize) == 0x08, "SBuilderRebuildMap::mSize offset must be 0x08"
-  );
+
+
 
   static_assert(sizeof(CAiBuilderImpl) == 0x34, "CAiBuilderImpl size must be 0x34");
   static_assert(offsetof(CAiBuilderImpl, mOwnerUnit) == 0x04, "CAiBuilderImpl::mOwnerUnit offset must be 0x04");
