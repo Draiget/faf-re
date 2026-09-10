@@ -7572,6 +7572,7 @@ namespace moho
   class IRenderWorldView;
   class TerrainCommon;
   class IWldTerrainRes;
+  class RangeRenderer;
   class ID3DTextureSheet;
 
   /**
@@ -8901,6 +8902,18 @@ namespace moho
 
   // 0x010A6428 in FA.
   extern WRenViewport* ren_Viewport;
+
+  /**
+   * Returns the active viewport's range-ring renderer, or null when no
+   * viewport is bound.
+   *
+   * `WRenViewport::mRangeRenderer` sits at +0x37C, and the callers that need
+   * it live in other translation units, where the viewport's runtime overlay
+   * is not visible. `cfunc_SetOverlayFilterL` (0x00846BE0) reaches it as
+   * `mov ecx, Moho__ren_Viewport` / `add ecx, 37Ch` (0x00846EA9, 0x00846EC6)
+   * before calling `ApplyRangeProfileFilterToRenderer` at 0x00846ED4.
+   */
+  [[nodiscard]] RangeRenderer* REN_GetViewportRangeRenderer() noexcept;
 
   /**
    * Entry stored in the legacy `managedWindows` / `managedFrames` vectors.

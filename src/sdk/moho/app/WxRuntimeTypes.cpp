@@ -68350,6 +68350,26 @@ moho::IWldTerrainRes* moho::REN_GetTerrainRes()
 }
 
 /**
+ * What it does:
+ * Hands out the active viewport's range-ring renderer. The viewport's runtime
+ * overlay is file-local, so translation units that need `mRangeRenderer`
+ * (+0x37C) go through here rather than re-deriving the offset. The binary
+ * inlines the same two steps at every such site, e.g. in
+ * `cfunc_SetOverlayFilterL` (0x00846BE0):
+ *   0x00846EA9  mov ecx, Moho__ren_Viewport
+ *   0x00846EC6  add ecx, 37Ch
+ *   0x00846ED4  call sub_7EE5A0   ; ApplyRangeProfileFilterToRenderer
+ */
+moho::RangeRenderer* moho::REN_GetViewportRangeRenderer() noexcept
+{
+  if (moho::ren_Viewport == nullptr) {
+    return nullptr;
+  }
+
+  return &reinterpret_cast<WRenViewportDestroyRuntimeView*>(moho::ren_Viewport)->mRangeRenderer;
+}
+
+/**
  * Address: 0x007FA230 (FUN_007FA230, Moho::REN_CreateGameViewport)
  * Mangled: ?REN_CreateGameViewport@Moho@@YAPAVWD3DViewport@1@PAVwxWindow@@VStrArg@gpg@@ABV?$IVector2@H@Wm3@@_N@Z
  *
