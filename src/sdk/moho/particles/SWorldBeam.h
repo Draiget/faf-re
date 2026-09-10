@@ -45,6 +45,12 @@ namespace moho
      * handles retained through `CountedPtr`'s copy, the UV lanes); emitted out
      * of line for `msvc8::vector<SWorldBeam>`'s copy steps. Formerly transcribed
      * as `CopyWorldBeamForVectorMove` in BeamRenderHelpers.cpp, removed 2026-09-10.)
+     * Address: 0x0049FCF0 (FUN_0049FCF0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; callers 0x0049E5D0, 0x0049E600, 0x0049F6F0; formerly `CopyAssignWorldBeamAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FFD0 (FUN_0049FFD0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyAssignWorldBeamIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0020 (FUN_004A0020 -- the implicit destructor of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; callers 0x0049F270, 0x004A0150, 0x004A0CE0; formerly `DestroyWorldBeamTextureLanesInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0640 (FUN_004A0640 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldBeamIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0690 (FUN_004A0690 -- the implicit destructor of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldBeamTextureLanesInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0730 (FUN_004A0730 -- the implicit destructor of `SWorldBeam` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldBeamTextureLanesInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      */
     VTransform mCurStart;                    // +0x00
     VTransform mLastStart;                   // +0x1C
