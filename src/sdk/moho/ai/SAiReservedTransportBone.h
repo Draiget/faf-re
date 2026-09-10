@@ -104,35 +104,13 @@ namespace moho
   static_assert(offsetof(SAiReservedTransportBone, reservedBones) == 0x10, "SAiReservedTransportBone::reservedBones offset must be 0x10");
 
   /**
-   * Address: 0x005E8230 (FUN_005E8230, sub_5E8230)
+   * Address: 0x005E8230 (FUN_005E8230, Moho::SAiReservedTransportBone::~SAiReservedTransportBone)
    *
-   * What it does:
-   * Releases one reserved-bones vector heap payload, clears the vector lanes,
-   * and unlinks the reserved-unit weak node from its owner chain.
+   * The implicit destructor: `reservedBones`' `_Tidy` frees the block and
+   * nulls its lanes, then `~WeakPtr<Unit>` walks the owner chain to this node
+   * and unlinks it. Eleven callers -- every erase, tidy and range destroy of
+   * the vector that holds one. The two jump-only alias lanes at 0x005EE820
+   * and 0x005EF8B0 are dead: zero data_refs and zero call_edges for both, and
+   * no source-level caller anywhere in `src/sdk/**`.
    */
-  [[nodiscard]] void* ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone);
-
-  // Addresses 0x005EE820/0x005EF8B0 (the "ThunkA"/"ThunkB" jump-only alias
-  // lanes formerly declared here) are dead duplicate forwards to
-  // ResetReservedTransportBoneEntry above -- zero data_refs/call_edges, no
-  // source-level caller anywhere in src/sdk/**. See
-  // SAiReservedTransportBoneSerializer.cpp.
-
-  /**
-   * Address: 0x005EA550 (FUN_005EA550, std::vector_SAiReservedTransportBone::reset_storage)
-   *
-   * What it does:
-   * Destroys one `vector<SAiReservedTransportBone>` payload, frees the backing
-   * heap block, and clears the vector storage lanes to empty.
-   */
-  void ResetReservedTransportBoneVectorStorage(msvc8::vector<SAiReservedTransportBone>& storage);
-
-  /**
-   * Address: 0x005EE360 (FUN_005EE360, destroy_SAiReservedTransportBone_range)
-   *
-   * What it does:
-   * Destroys one half-open SAiReservedTransportBone range by freeing each
-   * reserved-bone vector heap block and unlinking each weak-unit node.
-   */
-  [[nodiscard]] void* DestroyReservedTransportBoneRange(SAiReservedTransportBone* begin, SAiReservedTransportBone* end);
 } // namespace moho
