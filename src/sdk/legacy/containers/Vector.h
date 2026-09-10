@@ -1619,6 +1619,9 @@ namespace msvc8
          * Address: 0x00479130 (FUN_00479130 -- `allocator<T>::allocate` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004787E0, 0x00478940, 0x00478CEF; formerly `AllocateHeightFieldTierStorage` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071B300 (FUN_0071B300 -- `allocator<T>::allocate` for the 0x38-byte `moho::SThreat`; zero callers, unreachable; formerly `AllocateSThreatArrayOrZeroSizeBlock` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071BD40 (FUN_0071BD40 -- `allocator<T>::allocate` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `AllocateInfluenceGridArrayOrZeroSizeBlock` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D7F0 (FUN_0047D7F0 -- `allocator<T>::allocate` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D2D0 (unreached); formerly `AllocateStampStorage` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E270 (FUN_0047E270 -- `allocator<T>::allocate` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D3C0, 0x0047D7F0, 0x0047D96F; formerly `AllocateStampArray` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E400 (FUN_0047E400 -- `allocator<T>::allocate` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x0047E11F, 0x007F4C6E; formerly `AllocateBandwidthSampleArray` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -2369,6 +2372,8 @@ namespace msvc8
          * Address: 0x00496E70 (FUN_00496E70 -- `operator=` for the particle buckets' `msvc8::vector<std::uint32_t>` (copies 0x0049DF00 / 0x0049DF30); caller 0x00494480 (`PruneExpiredTrailBucketWorkItems`).)
          * Address: 0x00740F00 (FUN_00740F00 -- `vector<T>::operator=` for the `GeomCamera3` element (assign over the common prefix, destroy the surplus tail); callers 0x0073F630, 0x0074068F; formerly `CopyGeomCameraRangeAndPruneTailRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071DDC0 (FUN_0071DDC0 -- `operator=` for the 0x38-byte `moho::SThreat`; callers 0x0071E7B0, 0x0071EAA0, 0x0071ED10; formerly `AssignSThreatVector` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D2D0 (FUN_0047D2D0 -- `operator=` for the `moho::SSendStamp` send-stamp vector -- `destination.items = source.items`; callers 0x0047D290 (unreached); formerly `CopyStampVectorOnly` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D850 (FUN_0047D850 -- `operator=` from a fresh empty vector (`view.items = {}`) for the `moho::SSendStamp` send-stamp vector; callers 0x0047D2D0 (unreached); formerly `ClearStampStorage` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2470,6 +2475,14 @@ namespace msvc8
          * Address: 0x00495590 (FUN_00495590 -- `begin()` for `msvc8::vector<SWorldParticle>`; zero callers.)
          * Address: 0x00495740 (FUN_00495740 -- `begin()` for `msvc8::vector<TrailRuntimeView>`; zero callers.)
          * Address: 0x00495930 (FUN_00495930 -- `begin()` for `msvc8::vector<SWorldBeam>`; zero callers.)
+         * Address: 0x0047D730 (FUN_0047D730 -- `begin()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleBegin` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D740 (FUN_0047D740 -- `begin()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleBeginAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D750 (FUN_0047D750 -- `end()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleEnd` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D760 (FUN_0047D760 -- `end()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleEndAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DD20 (FUN_0047DD20 -- `begin()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleBeginAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DD30 (FUN_0047DD30 -- `end()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleEndAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DFF0 (FUN_0047DFF0 -- `_Vector_iterator` base + index arithmetic for the `moho::SSendStamp` send-stamp vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `StampPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E020 (FUN_0047E020 -- `_Vector_iterator` base + index arithmetic for the 8-byte `moho::SBandwidthUsageSample` series vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `BandwidthPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         T* begin() const noexcept { return first_; }
 
@@ -4268,6 +4281,7 @@ namespace msvc8
          * Address: 0x009331C0 (FUN_009331C0 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00934130; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004788C0 (FUN_004788C0 -- `erase(first, last)` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478700; formerly `EraseHeightFieldTierRange` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071E1C0 (FUN_0071E1C0 -- `erase(first, last)`'s tail move and `_Mylast` commit for the 0x38-byte `moho::SThreat`; zero callers, unreachable; formerly `MoveSThreatTailRangeAndUpdateOwnerEnd` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DD40 (FUN_0047DD40 -- `erase(first, last)` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `EraseBandwidthSampleRange` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6445,6 +6459,9 @@ namespace msvc8
          * Address: 0x0084A510 (FUN_0084A510 -- the `std::fill` seam step of `_Insert_n` for a 12-byte element; callers 0x00849250; formerly `FillStride3DwordLaneRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852700 (FUN_00852700 -- the `std::fill` seam step of `_Insert_n` for a 12-byte float[3] element; callers 0x008523C0; formerly `FillStride3FloatLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00478940 (FUN_00478940 -- `_Insert_n` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (1.5x growth, capped at `max_size`); callers 0x00478700; formerly `InsertHeightFieldTierCopies` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DA70 (FUN_0047DA70 -- `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D780; formerly `InsertStampAt` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D780 (FUN_0047D780 -- a register-shape entry into `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D500; formerly `InsertStampAtAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DD80 (FUN_0047DD80 -- `_Insert_n` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `InsertBandwidthSampleCopies` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7801,6 +7818,27 @@ namespace msvc8
          * Address: 0x0071E9D0 (FUN_0071E9D0 -- `_Ucopy` with the destroy-on-throw rollback for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `CopyInfluenceGridRangeWithRollback` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071F550 (FUN_0071F550 -- `_Ucopy` with the destroy-on-throw rollback for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `CopyInfluenceGridRangeWithRollback` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071FC10 (FUN_0071FC10 -- `_Ucopy` with the destroy-on-throw rollback for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `CopyInfluenceGridRangeWithRollback` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D880 (FUN_0047D880 -- `_Ucopy` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70; formerly `CopyStampAndAdvance` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E700 (FUN_0047E700 -- `_Ucopy` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D2D0, 0x0047E1E0, 0x0047E450 (unreached); formerly `CopyStampRangeForward` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E940 (FUN_0047E940 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D3C0, 0x0047E210, 0x0047E480; formerly `CopyStampRangeForwardAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E990 (FUN_0047E990 -- `_Ucopy` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70, 0x0047E2D0, 0x0047E510; formerly `CopyStampRangeForwardFromCurrent` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E9D0 (FUN_0047E9D0 -- `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x0047E360, 0x0047E5F0; formerly `CopyBandwidthRangeForwardFromCurrent` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E1E0 (FUN_0047E1E0 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E210 (FUN_0047E210 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardThunkAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E2D0 (FUN_0047E2D0 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70; formerly `CopyStampRangeForwardFromCurrentThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E360 (FUN_0047E360 -- a register-shape entry into `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80; formerly `CopyBandwidthRangeForwardFromCurrentThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E450 (FUN_0047E450 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardThunkAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E480 (FUN_0047E480 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardAliasThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E510 (FUN_0047E510 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardFromCurrentThunkAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E5F0 (FUN_0047E5F0 -- a register-shape entry into `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `CopyBandwidthRangeForwardFromCurrentThunkAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E750 (FUN_0047E750 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardAliasThunk2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E780 (FUN_0047E780 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardFromCurrentThunkAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E7E0 (FUN_0047E7E0 -- a register-shape entry into `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `CopyBandwidthRangeForwardFromCurrentThunkAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E8C0 (FUN_0047E8C0 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardAliasThunk3` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E8F0 (FUN_0047E8F0 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardFromCurrentThunkAlias3` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005411B0 (FUN_005411B0 -- a register-shape entry into `_Ucopy` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeForwardFromCurrentThunkAlias3` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E910 (FUN_0047E910 -- a register-shape entry into `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `CopyBandwidthRangeForwardFromCurrentThunkAlias3` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00518250 (FUN_00518250 -- a register-shape entry into `_Ucopy` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `CopyBandwidthRangeForwardFromCurrentThunkAlias3` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8881,6 +8919,13 @@ namespace msvc8
          * Address: 0x0071E970 (FUN_0071E970 -- `_Ufill` (the `[first, last)` form) for the 0x38-byte `moho::SThreat`; zero callers, unreachable; formerly `FillSThreatRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071EAA0 (FUN_0071EAA0 -- `_Ufill` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); callers 0x0071B970, 0x0071D5A0; formerly `FillInfluenceGridRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071D5A0 (FUN_0071D5A0 -- a register-shape entry into `_Ufill` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `FillInfluenceGridRangeRegisterAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E4D0 (FUN_0047E4D0 -- `_Ufill` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D500, 0x0047D880, 0x0047DA70; formerly `CopyStampCountFromValue` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E670 (FUN_0047E670 -- `_Ufill` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x0047E081, 0x0047E3E0; formerly `CopyBandwidthCountFromValue` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E530 (FUN_0047E530 -- `_Ufill` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70, 0x0047E300; formerly `FillStampRangeWithValue` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E250 (FUN_0047E250 -- a register-shape entry into `_Ufill` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampCountThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E300 (FUN_0047E300 -- a register-shape entry into `_Ufill` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `FillStampRangeWithValueThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E3E0 (FUN_0047E3E0 -- a register-shape entry into `_Ufill` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `CopyBandwidthCountThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E390 (FUN_0047E390 -- `_Ufill` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80; formerly `FillBandwidthRangeWithValue` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9779,6 +9824,10 @@ namespace msvc8
          * Address: 0x0071F5B0 (FUN_0071F5B0 -- `_Copy_backward` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); callers 0x0071D5B0, 0x0071EB20; formerly `CopyInfluenceGridRangeBackward` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071EB20 (FUN_0071EB20 -- `_Copy_backward` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); zero callers, unreachable; formerly `CopyInfluenceGridRangeBackward` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071D5B0 (FUN_0071D5B0 -- a register-shape entry into `_Copy_backward` for the 0x8C-byte `moho::InfluenceGrid` (each element owns an entry set and a per-army threat vector); callers 0x0071B970; formerly `CopyInfluenceGridRangeBackwardAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E7A0 (FUN_0047E7A0 -- `_Copy_backward` for the `moho::SSendStamp` send-stamp vector; callers 0x0047E310, 0x0047E580; formerly `CopyStampRangeBackward` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E310 (FUN_0047E310 -- a register-shape entry into `_Copy_backward` for the `moho::SSendStamp` send-stamp vector; callers 0x0047DA70; formerly `CopyStampRangeBackwardThunk` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E580 (FUN_0047E580 -- a register-shape entry into `_Copy_backward` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `CopyStampRangeBackwardThunkAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E3B0 (FUN_0047E3B0 -- `_Copy_backward` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80; formerly `CopyBandwidthRangeBackward` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -10422,6 +10471,10 @@ namespace msvc8
          * Address: 0x0049C5B0 (FUN_0049C5B0 -- `vector<BeamRenderVertexRuntime>::max_size()` (0xFFFFFFFF / 0x3C, second copy); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x4444444_DuplicateA` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004788B0 (FUN_004788B0 -- `max_size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); zero callers, unreachable; formerly `HeightFieldTierVectorMaxCountVariant1` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00478E50 (FUN_00478E50 -- `max_size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (second copy); zero callers, unreachable; formerly `HeightFieldTierVectorMaxCountVariant2` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D770 (FUN_0047D770 -- `max_size()` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `MaxStampVectorCount` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047DD10 (FUN_0047DD10 -- `max_size()` for the `moho::SSendStamp` send-stamp vector; zero callers, unreachable; formerly `MaxStampVectorCountAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E050 (FUN_0047E050 -- `max_size()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `MaxBandwidthSampleVectorCount` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E190 (FUN_0047E190 -- `max_size()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `MaxBandwidthSampleVectorCountAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -10558,6 +10611,8 @@ namespace msvc8
          * Address: 0x00499910 (FUN_00499910 -- `_Xlen` for `?`; callers 0x00497428, 0x00499630; formerly `ThrowLegacyVectorTooLongDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate vector-overflow throw helper retained for callsite parity.)
          * Address: 0x00499D50 (FUN_00499D50 -- `_Xlen` for `?`; callers 0x00497530, 0x004976BB, 0x00499A20; formerly `ThrowLegacyVectorTooLongDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate vector-overflow throw helper retained for callsite parity.)
          * Address: 0x00478C50 (FUN_00478C50 -- `_Xlen` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x004787E0, 0x00478940; formerly `ThrowHeightFieldTierVectorTooLong` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047D8A0 (FUN_0047D8A0 -- `_Xlen` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D3C0, 0x0047D7F0, 0x0047DA70; formerly `ThrowStampVectorTooLong` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0047E090 (FUN_0047E090 -- `_Xlen` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x007F4C49; formerly `ThrowBandwidthSampleVectorTooLong` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {
