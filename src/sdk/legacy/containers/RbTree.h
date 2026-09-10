@@ -1513,6 +1513,23 @@ namespace msvc8
              * Address: 0x0083B530 (FUN_0083B530 -- the ascend half of `rb_iterator::operator++` over the file-static map with a 4-byte mapped value at 0x010C3748 (`_Myhead` 0x010C374C, nil byte at node+0x15; UiRuntimeTypes.cpp's key-repeat map); callers 0x0083AA70; formerly `AscendLink0ToOffset15Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              * Address: 0x00849860 (FUN_00849860 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x15 (4-byte value; caller 0x00898B10); callers 0x00898B10; formerly `AscendLink0ToOffset15SentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              * Address: 0x00849BF0 (FUN_00849BF0 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x39 (0x28-byte value; caller 0x00849900); callers 0x00849900; formerly `AscendLink0ToOffset39Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00570410 (FUN_00570410 -- `rb_iterator::operator++` (nil byte at node+0x19); callers 0x0056D790, 0x0056E220, 0x0056FCA2; formerly `AdvanceTreeIteratorFlag25Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x006B02E0 (FUN_006B02E0 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x006AEDD0, 0x006AF390, 0x006AFDC2; formerly `AdvanceTreeIteratorFlag45RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0083C0B0 (FUN_0083C0B0 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x00839DC0, 0x0083A640, 0x0083ADD2; formerly `AdvanceTreeIteratorFlag45RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00899940 (FUN_00899940 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x008958B0, 0x00899042, 0x00899B20; formerly `AdvanceTreeIteratorFlag45RuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CA280 (FUN_007CA280 -- `rb_iterator::operator++` (nil byte at node+0x15); callers 0x007C2950, 0x007C7C10, 0x007C8E30; formerly `AdvanceMapIteratorFlag21RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008495B0 (FUN_008495B0 -- `rb_iterator::operator++` (nil byte at node+0x15, the entity map); callers 0x00840A70, 0x008488C2, 0x00848E02; formerly `AdvanceMapIteratorFlag21RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D99F0 (FUN_008D99F0 -- `rb_iterator::operator++` (nil byte at node+0x15); callers 0x008DA093, 0x008DA7A3, 0x008DA929; formerly `AdvanceMapIteratorFlag21RuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C8E30 (FUN_007C8E30 -- a hidden-result-slot entry into `rb_iterator::operator++` (nil byte at node+0x15); zero callers, unreachable; formerly `AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9770 (FUN_007C9770 -- a hidden-result-slot entry into `rb_iterator::operator++` (nil byte at node+0x15); zero callers, unreachable; formerly `AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2CD0 (FUN_007F2CD0 -- `rb_iterator::operator++` (nil byte at node+0x2D, the string map); callers 0x007ED9A0, 0x007F0254, 0x007F0960; formerly `AdvanceRangeExtractorIteratorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CB230 (FUN_007CB230 -- `rb_iterator::operator++` (nil byte at node+0x0E); callers 0x007CAC80, 0x007CAFD4, 0x007CB1E2; formerly `AdvanceTreeIteratorFlag14Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007E5100 (FUN_007E5100 -- `rb_iterator::operator++` (nil byte at node+0x25); callers 0x007E4430, 0x007E4D84, 0x007E5012; formerly `AdvanceTreeIteratorFlag37Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00849D90 (FUN_00849D90 -- the descend-right half of `rb_iterator::operator++` (nil byte at node+0x39); callers 0x00849900; formerly `AdvanceTreeIteratorFlag57Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00861D10 (FUN_00861D10 -- `rb_iterator::operator++` (nil byte at node+0xC49); callers 0x008600E0, 0x00860FB0, 0x008613C2; formerly `AdvanceTreeIteratorFlag3145Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087CEC0 (FUN_0087CEC0 -- `rb_iterator::operator++` (nil byte at node+0x11); callers 0x0087C6B0, 0x0087C9F4, 0x0087CC92; formerly `AdvanceTreeIteratorFlag17RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF6A0 (FUN_008AF6A0 -- `rb_iterator::operator++` (nil byte at node+0x11); callers 0x008AE690, 0x008AE982, 0x008AF262; formerly `AdvanceTreeIteratorFlag17RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6C90 (FUN_008D6C90 -- `rb_iterator::operator++` (nil byte at node+0x1D); callers 0x008D6650, 0x008D69B4, 0x008D6C22; formerly `AdvanceTreeIteratorFlag29RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_iterator& operator++() noexcept
             {
@@ -1630,6 +1647,23 @@ namespace msvc8
              * non-null container, valid non-`end()`/non-`begin()` node --
              * produces the identical result this member's plain
              * `node_ = rb_decrement(node_); return *this;` already computes.
+             * Address: 0x007B4BE0 (FUN_007B4BE0 -- `rb_iterator::operator--` (nil byte at node+0x1D); callers 0x007B2DF0, 0x007B3760, 0x007B3BC0; formerly `RetreatTreeIteratorFlag29RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B3BC0 (FUN_007B3BC0 -- a hidden-result-slot entry into `rb_iterator::operator--` (nil byte at node+0x1D); zero callers, unreachable; formerly `RetreatTreeIteratorFlag29RuntimeASlotAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B4580 (FUN_007B4580 -- a hidden-result-slot entry into `rb_iterator::operator--` (nil byte at node+0x1D); zero callers, unreachable; formerly `RetreatTreeIteratorFlag29RuntimeASlotAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F30B0 (FUN_007F30B0 -- `rb_iterator::operator--` (nil byte at node+0x2D); callers 0x007F0960, 0x007F1890, 0x007F1D12; formerly `RetreatTreeIteratorFlag45RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0083C460 (FUN_0083C460 -- `rb_iterator::operator--` (nil byte at node+0x2D); callers 0x0083AF20, 0x0083B850, 0x0083C082; formerly `RetreatTreeIteratorFlag45RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F3110 (FUN_007F3110 -- `rb_iterator::operator--` (nil byte at node+0xB9); callers 0x007F05A0, 0x007F1010, 0x007F20D2; formerly `RetreatTreeIteratorFlag185Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008309D0 (FUN_008309D0 -- `rb_iterator::operator--` (nil byte at node+0x25); callers 0x0082CC80, 0x0082E170, 0x0082EBE2; formerly `RetreatTreeIteratorFlag37Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00861FA0 (FUN_00861FA0 -- `rb_iterator::operator--` (nil byte at node+0xC49); callers 0x00861510, 0x00861930, 0x00861CF2; formerly `RetreatTreeIteratorFlag3145Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008CBEC0 (FUN_008CBEC0 -- `rb_iterator::operator--` (nil byte at node+0x39); callers 0x008CB860, 0x008CBA70, 0x008CBDC2; formerly `RetreatTreeIteratorFlag57Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D8E50 (FUN_008D8E50 -- `rb_iterator::operator--` (nil byte at node+0x15); callers 0x008D9C23, 0x008DA153, 0x008DCE80; formerly `RetreatMapIteratorFlag21RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948870 (FUN_00948870 -- `rb_iterator::operator--` (nil byte at node+0x15); callers 0x00948BA0, 0x00948C90, 0x009494A0; formerly `RetreatMapIteratorFlag21RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BA0 (FUN_00948BA0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BB0 (FUN_00948BB0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BC0 (FUN_00948BC0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948C90 (FUN_00948C90 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948CA0 (FUN_00948CA0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneE` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948CB0 (FUN_00948CB0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_iterator& operator--() noexcept
             {
@@ -1799,6 +1833,7 @@ namespace msvc8
              * rolled this same construction over a `CommandDbMapStorageView`/
              * `CCommandDbRuntimeView` reach-in instead of relying on the
              * member's default construction.)
+             * Address: 0x007AE180 (FUN_007AE180 -- `rb_tree()` for the command-mode tree (head sentinel bought, size zeroed); callers 0x0081FCD0, 0x00841C10, 0x00863870; formerly `InitializeCommandModeTreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
 
@@ -2577,6 +2612,11 @@ namespace msvc8
              * either.
              * Address: 0x0056AC00 (FUN_0056AC00 -- the destructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `~SOffsetInfo` (0x00568360), i.e. every group teardown in `CleanupFormation`/`UpdateFormation`/`~CFormationInstance`.)
              * Address: 0x00569470 (FUN_00569470, sub_569470 -- the destructor for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), `~CFormationInstance`'s member teardown of both caches.)
+             * Address: 0x007B2560 (FUN_007B2560 -- `~rb_tree` (clear + head freed) for a tree with the nil byte at node+0x11; callers 0x007B22B0; formerly `ClearTreeStorageLaneA17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B2590 (FUN_007B2590 -- `~rb_tree` (clear + head freed) for a map with the nil byte at node+0x11; callers 0x008704B0; formerly `ClearTreeStorageLaneB17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9010 (FUN_007C9010 -- `~rb_tree` (clear + head freed) of an owner-embedded tree; callers 0x007CD990; formerly `ClearOwnedTreeStorageLaneARuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9950 (FUN_007C9950 -- `~rb_tree` (clear + head freed) of an owner-embedded tree; callers 0x007CC2F0; formerly `ClearOwnedTreeStorageLaneBRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CF8C0 (FUN_007CF8C0 -- `~rb_tree` (clear + head freed) of an owner-embedded tree, returning the owner; callers 0x007CF830; formerly `ClearOwnedTreeStorageLaneAndReturnOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             ~rb_tree()
             {
@@ -2651,8 +2691,22 @@ namespace msvc8
              * callers anywhere in `src/sdk`; not consolidated in this pass
              * (see the `header()` note above for why).
              * Address: 0x0083A620 (FUN_0083A620 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `begin()` (`_Myhead->_Left` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerPointee` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007B35E0 (FUN_007B35E0 -- `_Min` (descend left to the leftmost node; nil byte at node+0x11); callers 0x007B46A0; formerly `DescendLeftUntilFlag17SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00856810 (FUN_00856810 -- `_Min` (nil byte at node+0x15); callers 0x008B5EB0; formerly `DescendLeftUntilFlag21SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00856D40 (FUN_00856D40 -- `_Min` (nil byte at node+0x19); callers 0x00856950; formerly `DescendLeftUntilFlag25SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008616D0 (FUN_008616D0 -- `_Min` (nil byte at node+0xC49); callers 0x00860FB0; formerly `DescendLeftUntilFlag3145SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C300 (FUN_0087C300 -- `_Min` (nil byte at node+0x15); callers 0x0087AC30; formerly `DescendLeftUntilFlag21SentinelRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C540 (FUN_0087C540 -- `_Min` (nil byte at node+0x15); callers 0x0087B5B0; formerly `DescendLeftUntilFlag21SentinelRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00711EC0 (FUN_00711EC0 -- `_Lmost` / `begin()` (nil byte at node+0x11); callers 0x00711BE0; formerly `FindTreeLeftmostNodeFlag17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
+            /**
+             * Address: 0x00856D20 (FUN_00856D20 -- `_Max` (descend right to the rightmost node; nil byte at node+0x19); callers 0x00856950; formerly `DescendRightUntilFlag25SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008616B0 (FUN_008616B0 -- `_Max` (nil byte at node+0xC49); callers 0x00860FB0; formerly `DescendRightUntilFlag3145SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C2E0 (FUN_0087C2E0 -- `_Max` (nil byte at node+0x15); callers 0x0087AC30; formerly `DescendRightUntilFlag21SentinelRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C520 (FUN_0087C520 -- `_Max` (nil byte at node+0x15); callers 0x0087B5B0; formerly `DescendRightUntilFlag21SentinelRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007120D0 (FUN_007120D0 -- `_Rmost` (nil byte at node+0x11); callers 0x00711BE0; formerly `FindTreeRightmostNodeFlag17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             */
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
 
             /**
@@ -2850,6 +2904,7 @@ namespace msvc8
              * (`FUN_0057D910`), itself a RULE ONE compiler emission whose
              * written source is the `map[key]` expression at its call site.
              * Address: 0x0056B7B0 (FUN_0056B7B0, sub_56B7B0 -- the lower-bound descent for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `try_get` cache lookups in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
+             * Address: 0x00861C70 (FUN_00861C70 -- `_Lbound` over a file-static tree with 0xC49-byte-offset nil flag (LTCG clone with `this` folded); callers 0x00860E20, 0x00861320, 0x00861640; formerly `FindLowerBoundInGlobalFlag3145TreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -3231,6 +3286,7 @@ namespace msvc8
              * `try_get(splatIndex)` (`CWldSplat.cpp`), same re-homing.
              * Address: 0x0056AF80 (FUN_0056AF80 -- `find` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the `mUnitOffsets.find`/`try_get` of `RemoveUnit`.)
              * Address: 0x0056AFE0 (FUN_0056AFE0, `std::map_EntId_SUnitOffsetInfo::find` -- the same `find` emission reached from eight further formation call sites: `GetOffsetInfo`, `GetFormationPosition`, `GetOffsetPosition`, `GetTargetPosition`, `Contains`, `CalcFormationSpeed`, `GetDistFromLeader`, `GetPriority` (CAiFormationInstance.cpp).)
+             * Address: 0x00855320 (FUN_00855320 -- `find` (nil byte at node+0x19); callers 0x008534F0; formerly `FindExactMapNodeFlag25RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -3703,6 +3759,12 @@ namespace msvc8
              * documented above for the `CDecalManager` instantiations.
              * Address: 0x0056CCE0 (FUN_0056CCE0 -- `insert` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): the map serializer's `insert(value_type(key, value))` and `operator[]`'s miss path in `RunScript`.)
              * Address: 0x0056F370 (FUN_0056F370, sub_56F370 -- `insert` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): `operator[]`'s miss path in the position caches.)
+             * Address: 0x00685350 (FUN_00685350 -- `_Insert` unique by `EntId` (the entity db tree); callers 0x00684480, 0x00684AA0; formerly `FindOrInsertEntityNodeByIdRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007108D0 (FUN_007108D0 -- `_Insert` unique by key (the army-stats tree); callers 0x0070F6C0, 0x0070FE00; formerly `FindOrInsertArmyStatsNodeByKeyRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071A9A0 (FUN_0071A9A0 -- `_Insert` unique (influence map, nil byte at node+0x3D); callers 0x00719520, 0x0071A530; formerly `FindOrInsertInfluenceNodeWideRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071B360 (FUN_0071B360 -- `_Insert` unique (influence map, nil byte at node+0x15); callers 0x00719AB0, 0x0071A220; formerly `FindOrInsertInfluenceNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B3760 (FUN_007B3760 -- `_Insert` unique by `unsigned int` key (nil byte at node+0x1D); callers 0x007B2DF0; formerly `FindOrInsertMapNodeNil29Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CDED0 (FUN_007CDED0 -- `_Insert` unique for `set<char>`; callers 0x007CD990; formerly `FindOrInsertSetCharNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -5828,6 +5890,7 @@ namespace msvc8
              * against the deleted `TerrainEnvironmentLookupMapRuntimeView`/
              * `TerrainEnvironmentLookupNodeRuntimeView` struct pair instead
              * of calling this member.
+             * Address: 0x0077C520 (FUN_0077C520 -- `clear()` for a compact tree (`_Erase(root)`, head relinked, size zeroed); zero callers, unreachable; formerly `ResetCompactTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             void clear() noexcept
             {
@@ -6489,6 +6552,10 @@ namespace msvc8
              * confirmed not to route through this function) has not been
              * traced yet.
              * Address: 0x00570300 (FUN_00570300 -- the head-sentinel allocation for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), both caches in the `CFormationInstance` constructors.)
+             * Address: 0x00739B50 (FUN_00739B50 -- `_Buynode()` of the head sentinel + `_Mysize = 0` (the `_Init` of a tree); zero callers, unreachable; formerly `InitializeLinearTreeStorageHeadAndSize` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077BE50 (FUN_0077BE50 -- `_Buynode()` of the head sentinel for the decal-buffer tree (nil byte at node+0x1D); zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077A220 (FUN_0077A220 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077AEF0 (FUN_0077AEF0 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -6980,6 +7047,14 @@ namespace msvc8
              * previously duplicated as `ConstructCategoryVolumeNode`
              * (`AudioEngine.cpp`, deleted by this migration).
              * Address: 0x0056FE40 (FUN_0056FE40 -- `_Buynode` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): allocates the 68-byte node and copy-constructs the `pair<const EntId, SUnitOffsetInfo>` (relinking the value's `mUnit` weak link).)
+             * Address: 0x00686FE0 (FUN_00686FE0 -- `_Buynode` for a 24-byte node (12-byte key/value payload); callers 0x00686190; formerly `AllocatePriorityQueueNode24Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005A1450 (FUN_005A1450 -- `_Buynode` for a 24-byte node (second instantiation); callers 0x005A1050; formerly `AllocatePriorityQueueNode24RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C300 (FUN_0071C300 -- `_Buynode` + value construction for the influence map node; callers 0x0071AB80, 0x0071C9A0; formerly `AllocateInfluenceNodeAndInitRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00530D30 (FUN_00530D30 -- `_Buynode` with null links for the rule tree node; callers 0x00529120, 0x0052C480, 0x0052D4B0; formerly `AllocateRuleTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00703A10 (FUN_00703A10 -- `_Buynode` with null links for the army-stats tree node; callers 0x006FD7C0, 0x00701540, 0x00702020; formerly `AllocateArmyStatsTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00711EE0 (FUN_00711EE0 -- `_Buynode` with null links for a compact tree node; callers 0x0070CC40, 0x0070EFC0, 0x00710000; formerly `AllocateCompactTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0076A2E0 (FUN_0076A2E0 -- `_Buynode` copying a `{int, int, float[7]}` value; callers 0x007692F0, 0x00769B00, 0x00769E20; formerly `AllocateFloatPayloadNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077CAA0 (FUN_0077CAA0 -- `_Buynode` with null links for the decal-buffer tree node; callers 0x00779170, 0x0077A220, 0x0077AEF0; formerly `AllocateDecalBufferTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -7522,6 +7597,10 @@ namespace msvc8
              * member's shape is what the compiler actually emitted here too.
              * Address: 0x0056CE70 (FUN_0056CE70, sub_56CE70 -- `_Erase` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): destroys each node's `SUnitOffsetInfo` (unlinking its `mUnit`) and frees it; reached from `clear()` in `SOffsetInfo::SOffsetInfo` and the map serializer, and from `erase_range`'s full-range path.)
              * Address: 0x0056D8E0 (FUN_0056D8E0, sub_56D8E0 -- `_Erase` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `clear()` in `CFormationInstance::ClearSlotCaches`.)
+             * Address: 0x00530FA0 (FUN_00530FA0 -- `_Erase(root)` for the rule tree (each node's string value destroyed); callers 0x0052DF70, 0x0052F6DC, 0x007035F0; formerly `DestroyRuleTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005812C0 (FUN_005812C0 -- `_Erase(root)` for a tree whose nodes hold two weak links (each node's `~WeakPtr` unlinks its chain; nil byte at node+0x25); callers 0x0057F480, 0x00580600, 0x005806CC; formerly `DestroyLinkedTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00703C30 (FUN_00703C30 -- `_Erase(root)` for the army-stats tree (each node's string value destroyed); callers 0x00702A70, 0x007039EC, 0x00710460; formerly `DestroyArmyStatsTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077CC20 (FUN_0077CC20 -- `_Erase(root)` for a compact tree (nil byte at node+0x1D); callers 0x0077B4F0, 0x0077C520, 0x0077D090; formerly `DestroyCompactTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -7641,6 +7720,7 @@ namespace msvc8
              * separate instantiations first. Left as-is rather than guessed
              * at; flagged for whoever picks up `FUN_00530EE0`/`FUN_007CC3B0`/
              * `FUN_007B4980` next.
+             * Address: 0x0056EC00 (FUN_0056EC00 -- the tail of `_Copy` (root/size copied, leftmost/rightmost recomputed; nil byte at node+0x41); callers 0x0056CC50, 0x00573270, 0x00573390; formerly `CopyMapHeaderAndExtremaFlag65Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              */
             void copy_from(const rb_tree& other)
             {
