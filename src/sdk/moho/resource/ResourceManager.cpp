@@ -1231,316 +1231,7 @@ namespace
    */
   void NoOpHelperThunkVariant5() noexcept {}
 
-  struct RedBlackTreeNodeRuntime_004AD230
-  {
-    RedBlackTreeNodeRuntime_004AD230* left;   // +0x00
-    RedBlackTreeNodeRuntime_004AD230* parent; // +0x04
-    RedBlackTreeNodeRuntime_004AD230* right;  // +0x08
-    std::uint32_t keyLane;                    // +0x0C
-    std::uint32_t valueLane;                  // +0x10
-    std::uint8_t color;                       // +0x14
-    std::uint8_t isNil;                       // +0x15
-    std::uint8_t pad16[2];
-  };
 
-  static_assert(
-    offsetof(RedBlackTreeNodeRuntime_004AD230, left) == 0x00,
-    "RedBlackTreeNodeRuntime_004AD230::left offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RedBlackTreeNodeRuntime_004AD230, parent) == 0x04,
-    "RedBlackTreeNodeRuntime_004AD230::parent offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RedBlackTreeNodeRuntime_004AD230, right) == 0x08,
-    "RedBlackTreeNodeRuntime_004AD230::right offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RedBlackTreeNodeRuntime_004AD230, color) == 0x14,
-    "RedBlackTreeNodeRuntime_004AD230::color offset must be 0x14"
-  );
-  static_assert(
-    offsetof(RedBlackTreeNodeRuntime_004AD230, isNil) == 0x15,
-    "RedBlackTreeNodeRuntime_004AD230::isNil offset must be 0x15"
-  );
-  static_assert(
-    sizeof(RedBlackTreeNodeRuntime_004AD230) == 0x18,
-    "RedBlackTreeNodeRuntime_004AD230 size must be 0x18"
-  );
-
-  struct RedBlackTreeRuntime_004AD230
-  {
-    std::uint32_t reserved00;                 // +0x00
-    RedBlackTreeNodeRuntime_004AD230* head;   // +0x04
-    std::uint32_t nodeCount;                  // +0x08
-  };
-
-  static_assert(
-    offsetof(RedBlackTreeRuntime_004AD230, head) == 0x04,
-    "RedBlackTreeRuntime_004AD230::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RedBlackTreeRuntime_004AD230, nodeCount) == 0x08,
-    "RedBlackTreeRuntime_004AD230::nodeCount offset must be 0x08"
-  );
-  static_assert(
-    sizeof(RedBlackTreeRuntime_004AD230) == 0x0C,
-    "RedBlackTreeRuntime_004AD230 size must be 0x0C"
-  );
-
-  constexpr std::uint8_t kRedBlackTreeColorRed_004AD230 = 0;
-  constexpr std::uint8_t kRedBlackTreeColorBlack_004AD230 = 1;
-
-  /**
-   * Address: 0x004AD1F0 (FUN_004AD1F0)
-   *
-   * What it does:
-   * Copies one tree-head leftmost-node pointer into caller-provided storage.
-   */
-  RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant1(
-    RedBlackTreeNodeRuntime_004AD230** const outNode,
-    const RedBlackTreeRuntime_004AD230& tree
-  ) noexcept
-  {
-    *outNode = tree.head->left;
-    return outNode;
-  }
-
-  [[nodiscard]] RedBlackTreeNodeRuntime_004AD230* RotateSubtreeLeft(
-    RedBlackTreeNodeRuntime_004AD230* pivot,
-    RedBlackTreeRuntime_004AD230& tree
-  ) noexcept;
-
-  [[nodiscard]] RedBlackTreeNodeRuntime_004AD230* RotateSubtreeRight(
-    RedBlackTreeNodeRuntime_004AD230* pivot,
-    RedBlackTreeRuntime_004AD230& tree
-  ) noexcept;
-
-  /**
-   * Address: 0x004AE1F0 (FUN_004AE1F0)
-   *
-   * What it does:
-   * Allocates one 0x18-byte red-black-tree node and seeds `{left,parent,right}`
-   * plus one `{key,value}` payload pair.
-   */
-  [[nodiscard]] RedBlackTreeNodeRuntime_004AD230* AllocateTreeNodeFromPair_004AE1F0(
-    RedBlackTreeNodeRuntime_004AD230* const head,
-    RedBlackTreeNodeRuntime_004AD230* const parentHint,
-    const std::uint32_t* const keyValuePair
-  )
-  {
-    auto* const node = static_cast<RedBlackTreeNodeRuntime_004AD230*>(
-      ::operator new(sizeof(RedBlackTreeNodeRuntime_004AD230))
-    );
-    node->left = head;
-    node->parent = parentHint;
-    node->right = head;
-    node->keyLane = keyValuePair != nullptr ? keyValuePair[0] : 0U;
-    node->valueLane = keyValuePair != nullptr ? keyValuePair[1] : 0U;
-    node->color = kRedBlackTreeColorRed_004AD230;
-    node->isNil = 0;
-    node->pad16[0] = 0;
-    node->pad16[1] = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x004AD230 (FUN_004AD230)
-   *
-   * What it does:
-   * Inserts one node into one red-black tree runtime and rebalances the tree.
-   */
-  RedBlackTreeNodeRuntime_004AD230** InsertTreeNodeAndRebalance(
-    RedBlackTreeRuntime_004AD230& tree,
-    RedBlackTreeNodeRuntime_004AD230** const outInsertedNode,
-    const bool insertToLeftOfParent,
-    RedBlackTreeNodeRuntime_004AD230* const parentNode,
-    const std::uint32_t* const keyValuePair
-  )
-  {
-    if (tree.nodeCount >= 0x1FFFFFFEU) {
-      throw std::length_error("map/set<T> too long");
-    }
-
-    RedBlackTreeNodeRuntime_004AD230* const head = tree.head;
-    RedBlackTreeNodeRuntime_004AD230* insertedNode =
-      AllocateTreeNodeFromPair_004AE1F0(head, parentNode, keyValuePair);
-    ++tree.nodeCount;
-
-    if (parentNode == head) {
-      head->parent = insertedNode;
-      head->left = insertedNode;
-      head->right = insertedNode;
-    } else if (!insertToLeftOfParent) {
-      parentNode->right = insertedNode;
-      if (parentNode == head->right) {
-        head->right = insertedNode;
-      }
-    } else {
-      parentNode->left = insertedNode;
-      if (parentNode == head->left) {
-        head->left = insertedNode;
-      }
-    }
-
-    RedBlackTreeNodeRuntime_004AD230* rebalanceNode = insertedNode;
-    while (rebalanceNode->parent->color == kRedBlackTreeColorRed_004AD230) {
-      RedBlackTreeNodeRuntime_004AD230* const parent = rebalanceNode->parent;
-      RedBlackTreeNodeRuntime_004AD230* const grandParent = parent->parent;
-      if (parent == grandParent->left) {
-        RedBlackTreeNodeRuntime_004AD230* const uncle = grandParent->right;
-        if (uncle->color == kRedBlackTreeColorRed_004AD230) {
-          parent->color = kRedBlackTreeColorBlack_004AD230;
-          uncle->color = kRedBlackTreeColorBlack_004AD230;
-          grandParent->color = kRedBlackTreeColorRed_004AD230;
-          rebalanceNode = grandParent;
-        } else {
-          if (rebalanceNode == parent->right) {
-            rebalanceNode = parent;
-            (void)RotateSubtreeLeft(rebalanceNode, tree);
-          }
-          rebalanceNode->parent->color = kRedBlackTreeColorBlack_004AD230;
-          rebalanceNode->parent->parent->color = kRedBlackTreeColorRed_004AD230;
-          (void)RotateSubtreeRight(rebalanceNode->parent->parent, tree);
-        }
-      } else {
-        RedBlackTreeNodeRuntime_004AD230* const uncle = grandParent->left;
-        if (uncle->color == kRedBlackTreeColorRed_004AD230) {
-          parent->color = kRedBlackTreeColorBlack_004AD230;
-          uncle->color = kRedBlackTreeColorBlack_004AD230;
-          grandParent->color = kRedBlackTreeColorRed_004AD230;
-          rebalanceNode = grandParent;
-        } else {
-          if (rebalanceNode == parent->left) {
-            rebalanceNode = parent;
-            (void)RotateSubtreeRight(rebalanceNode, tree);
-          }
-          rebalanceNode->parent->color = kRedBlackTreeColorBlack_004AD230;
-          rebalanceNode->parent->parent->color = kRedBlackTreeColorRed_004AD230;
-          (void)RotateSubtreeLeft(rebalanceNode->parent->parent, tree);
-        }
-      }
-    }
-
-    tree.head->parent->color = kRedBlackTreeColorBlack_004AD230;
-    *outInsertedNode = insertedNode;
-    return outInsertedNode;
-  }
-
-  /**
-   * Address: 0x004AD3E0 (FUN_004AD3E0)
-   *
-   * What it does:
-   * Returns one node's parent pointer.
-   */
-  RedBlackTreeNodeRuntime_004AD230* ReadTreeNodeParent(
-    RedBlackTreeNodeRuntime_004AD230* const node
-  ) noexcept
-  {
-    return node->parent;
-  }
-
-  /**
-   * Address: 0x004AD3F0 (FUN_004AD3F0)
-   *
-   * What it does:
-   * Performs one left rotation around a red-black tree node.
-   */
-  [[nodiscard]] RedBlackTreeNodeRuntime_004AD230* RotateSubtreeLeft(
-    RedBlackTreeNodeRuntime_004AD230* const pivot,
-    RedBlackTreeRuntime_004AD230& tree
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* const newRoot = pivot->right;
-    pivot->right = newRoot->left;
-    if (newRoot->left->isNil == 0) {
-      newRoot->left->parent = pivot;
-    }
-
-    newRoot->parent = pivot->parent;
-    RedBlackTreeNodeRuntime_004AD230* const head = tree.head;
-    if (pivot == head->parent) {
-      head->parent = newRoot;
-    } else if (pivot == pivot->parent->left) {
-      pivot->parent->left = newRoot;
-    } else {
-      pivot->parent->right = newRoot;
-    }
-
-    newRoot->left = pivot;
-    pivot->parent = newRoot;
-    return newRoot;
-  }
-
-  /**
-   * Address: 0x004AD440 (FUN_004AD440)
-   * Address: 0x00899690 (FUN_00899690)
-   * Address: 0x008B6510 (FUN_008B6510)
-   *
-   * What it does:
-   * Walks to the rightmost descendant while skipping the sentinel node.
-   */
-  RedBlackTreeNodeRuntime_004AD230* FindRightmostDescendant(
-    RedBlackTreeNodeRuntime_004AD230* node
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* cursor = node->right;
-    while (cursor->isNil == 0) {
-      node = cursor;
-      cursor = node->right;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x004AD460 (FUN_004AD460)
-   *
-   * What it does:
-   * Walks to the leftmost descendant while skipping the sentinel node.
-   */
-  RedBlackTreeNodeRuntime_004AD230* FindLeftmostDescendant(
-    RedBlackTreeNodeRuntime_004AD230* node
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* cursor = node->left;
-    while (cursor->isNil == 0) {
-      node = cursor;
-      cursor = node->left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x004AD4A0 (FUN_004AD4A0)
-   *
-   * What it does:
-   * Performs one right rotation around a red-black tree node.
-   */
-  [[nodiscard]] RedBlackTreeNodeRuntime_004AD230* RotateSubtreeRight(
-    RedBlackTreeNodeRuntime_004AD230* const pivot,
-    RedBlackTreeRuntime_004AD230& tree
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* const newRoot = pivot->left;
-    pivot->left = newRoot->right;
-    if (newRoot->right->isNil == 0) {
-      newRoot->right->parent = pivot;
-    }
-
-    newRoot->parent = pivot->parent;
-    RedBlackTreeNodeRuntime_004AD230* const head = tree.head;
-    if (pivot == head->parent) {
-      head->parent = newRoot;
-    } else if (pivot == pivot->parent->right) {
-      pivot->parent->right = newRoot;
-    } else {
-      pivot->parent->left = newRoot;
-    }
-
-    newRoot->right = pivot;
-    pivot->parent = newRoot;
-    return newRoot;
-  }
 
   /**
    * Address: 0x004AD520 (FUN_004AD520, nullsub_700)
@@ -1573,157 +1264,6 @@ namespace
    * No-op helper thunk retained for callsite parity.
    */
   void NoOpHelperThunkVariant9() noexcept {}
-
-  /**
-   * Address: 0x004AD5D0 (FUN_004AD5D0)
-   *
-   * What it does:
-   * Duplicate lane that copies the tree-head leftmost-node pointer.
-   */
-  RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant2(
-    RedBlackTreeNodeRuntime_004AD230** const outNode,
-    const RedBlackTreeRuntime_004AD230& tree
-  ) noexcept
-  {
-    return CopyTreeHeadLeftmostNodeVariant1(outNode, tree);
-  }
-
-  struct RedBlackTreeWideNodeRuntime_004AE3B0
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* left;   // +0x00
-    RedBlackTreeWideNodeRuntime_004AE3B0* parent; // +0x04
-    RedBlackTreeWideNodeRuntime_004AE3B0* right;  // +0x08
-    PrefetchRequestRuntime runtime;               // +0x0C
-    std::uint8_t color;                           // +0x4C
-    std::uint8_t isNil;                           // +0x4D
-    std::uint8_t pad4E[2];
-  };
-
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, left) == 0x00,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::left offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, parent) == 0x04,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::parent offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, right) == 0x08,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::right offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, runtime) == 0x0C,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::runtime offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, color) == 0x4C,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::color offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideNodeRuntime_004AE3B0, isNil) == 0x4D,
-    "RedBlackTreeWideNodeRuntime_004AE3B0::isNil offset must be 0x4D"
-  );
-  static_assert(
-    sizeof(RedBlackTreeWideNodeRuntime_004AE3B0) == 0x50,
-    "RedBlackTreeWideNodeRuntime_004AE3B0 size must be 0x50"
-  );
-
-  struct RedBlackTreeWideRuntime_004AE3B0
-  {
-    std::uint32_t reserved00;                      // +0x00
-    RedBlackTreeWideNodeRuntime_004AE3B0* head;    // +0x04
-    std::uint32_t nodeCount;                       // +0x08
-  };
-
-  static_assert(
-    offsetof(RedBlackTreeWideRuntime_004AE3B0, head) == 0x04,
-    "RedBlackTreeWideRuntime_004AE3B0::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RedBlackTreeWideRuntime_004AE3B0, nodeCount) == 0x08,
-    "RedBlackTreeWideRuntime_004AE3B0::nodeCount offset must be 0x08"
-  );
-  static_assert(
-    sizeof(RedBlackTreeWideRuntime_004AE3B0) == 0x0C,
-    "RedBlackTreeWideRuntime_004AE3B0 size must be 0x0C"
-  );
-
-  /**
-   * Address: 0x004AE3A0 (FUN_004AE3A0)
-   *
-   * What it does:
-   * Returns one wide red-black-tree node parent lane.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* ReadWideTreeNodeParent_004AE3A0(
-    const RedBlackTreeWideNodeRuntime_004AE3B0* const node
-  ) noexcept
-  {
-    return node != nullptr ? node->parent : nullptr;
-  }
-
-  /**
-   * Address: 0x004AE3B0 (FUN_004AE3B0)
-   *
-   * What it does:
-   * Performs one left rotation around a wide red-black-tree node.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeLeft_004AE3B0(
-    RedBlackTreeWideNodeRuntime_004AE3B0* const pivot,
-    RedBlackTreeWideRuntime_004AE3B0& tree
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* const newRoot = pivot->right;
-    pivot->right = newRoot->left;
-    if (newRoot->left->isNil == 0) {
-      newRoot->left->parent = pivot;
-    }
-
-    newRoot->parent = pivot->parent;
-    RedBlackTreeWideNodeRuntime_004AE3B0* const head = tree.head;
-    if (pivot == head->parent) {
-      head->parent = newRoot;
-    } else if (pivot == pivot->parent->left) {
-      pivot->parent->left = newRoot;
-    } else {
-      pivot->parent->right = newRoot;
-    }
-
-    newRoot->left = pivot;
-    pivot->parent = newRoot;
-    return newRoot;
-  }
-
-  /**
-   * Address: 0x004AE410 (FUN_004AE410)
-   *
-   * What it does:
-   * Performs one right rotation around a wide red-black-tree node.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeRight_004AE410(
-    RedBlackTreeWideNodeRuntime_004AE3B0* const pivot,
-    RedBlackTreeWideRuntime_004AE3B0& tree
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* const newRoot = pivot->left;
-    pivot->left = newRoot->right;
-    if (newRoot->right->isNil == 0) {
-      newRoot->right->parent = pivot;
-    }
-
-    newRoot->parent = pivot->parent;
-    RedBlackTreeWideNodeRuntime_004AE3B0* const head = tree.head;
-    if (pivot == head->parent) {
-      head->parent = newRoot;
-    } else if (pivot == pivot->parent->right) {
-      pivot->parent->right = newRoot;
-    } else {
-      pivot->parent->left = newRoot;
-    }
-
-    newRoot->right = pivot;
-    pivot->parent = newRoot;
-    return newRoot;
-  }
 
   /**
    * Address: 0x004AE4F0 (FUN_004AE4F0, nullsub_712)
@@ -1844,43 +1384,6 @@ namespace
   }
 
   /**
-   * Address: 0x004AE710 (FUN_004AE710)
-   *
-   * What it does:
-   * Advances one wide red-black-tree iterator to its in-order successor.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* AdvanceWideTreeIterator_004AE710(
-    RedBlackTreeWideNodeRuntime_004AE3B0*& iterator
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* result = iterator;
-    if (result != nullptr && result->isNil == 0) {
-      RedBlackTreeWideNodeRuntime_004AE3B0* right = result->right;
-      if (right->isNil != 0) {
-        result = result->parent;
-        while (result->isNil == 0) {
-          if (iterator != result->right) {
-            break;
-          }
-          iterator = result;
-          result = result->parent;
-        }
-        iterator = result;
-      } else {
-        result = right->left;
-        if (right->left->isNil == 0) {
-          do {
-            right = result;
-            result = result->left;
-          } while (result->isNil == 0);
-        }
-        iterator = right;
-      }
-    }
-    return result;
-  }
-
-  /**
    * Address: 0x004AE760 (FUN_004AE760)
    *
    * What it does:
@@ -1912,26 +1415,6 @@ namespace
   }
 
   /**
-   * Address: 0x004AE7F0 (FUN_004AE7F0)
-   *
-   * What it does:
-   * Allocates one 0x18-byte red-black-tree node and seeds zero links with
-   * black color in legacy constructor lanes.
-   */
-  RedBlackTreeNodeRuntime_004AD230* AllocateBlackTreeNode_004AE7F0()
-  {
-    auto* const node = static_cast<RedBlackTreeNodeRuntime_004AD230*>(
-      ::operator new(sizeof(RedBlackTreeNodeRuntime_004AD230))
-    );
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = kRedBlackTreeColorBlack_004AD230;
-    node->isNil = 0;
-    return node;
-  }
-
-  /**
    * Address: 0x004AE830 (FUN_004AE830, nullsub_718)
    *
    * What it does:
@@ -1951,95 +1434,12 @@ namespace
   }
 
   /**
-   * Address: 0x004AE850 (FUN_004AE850)
-   *
-   * What it does:
-   * Allocates raw storage for one 0x18-byte red-black-tree node lane.
-   */
-  RedBlackTreeNodeRuntime_004AD230* AllocateRawTreeNodeStorage_004AE850()
-  {
-    return static_cast<RedBlackTreeNodeRuntime_004AD230*>(
-      ::operator new(sizeof(RedBlackTreeNodeRuntime_004AD230))
-    );
-  }
-
-  /**
-   * Address: 0x004AEB50 (FUN_004AEB50)
-   *
-   * What it does:
-   * Walks one wide tree node down its left chain to the leftmost descendant.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeLeftmostDescendant_004AEB50(
-    RedBlackTreeWideNodeRuntime_004AE3B0* node
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* cursor = node->left;
-    if (cursor->isNil == 0) {
-      do {
-        node = cursor;
-        cursor = cursor->left;
-      } while (cursor->isNil == 0);
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x004AEE80 (FUN_004AEE80)
-   *
-   * What it does:
-   * Walks one wide tree node down its right chain to the rightmost descendant.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeRightmostDescendant_004AEE80(
-    RedBlackTreeWideNodeRuntime_004AE3B0* node
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* cursor = node->right;
-    while (cursor->isNil == 0) {
-      node = cursor;
-      cursor = node->right;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x004AEB70 (FUN_004AEB70)
-   *
-   * What it does:
-   * Allocates one wide tree node with cleared link lanes and black color.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* AllocateBlackWideTreeNode_004AEB70()
-  {
-    auto* const node = static_cast<RedBlackTreeWideNodeRuntime_004AE3B0*>(
-      ::operator new(sizeof(RedBlackTreeWideNodeRuntime_004AE3B0))
-    );
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = kRedBlackTreeColorBlack_004AD230;
-    node->isNil = 0;
-    return node;
-  }
-
-  /**
    * Address: 0x004AEBB0 (FUN_004AEBB0, nullsub_719)
    *
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
   void NoOpHelperThunk_004AEBB0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEBD0 (FUN_004AEBD0)
-   *
-   * What it does:
-   * Allocates raw storage for one wide (0x50-byte) tree node lane.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* AllocateRawWideTreeNodeStorage_004AEBD0()
-  {
-    return static_cast<RedBlackTreeWideNodeRuntime_004AE3B0*>(
-      ::operator new(sizeof(RedBlackTreeWideNodeRuntime_004AE3B0))
-    );
-  }
 
   /**
    * Address: 0x004AEBE0 (FUN_004AEBE0)
@@ -2050,132 +1450,6 @@ namespace
   std::uint32_t ReadLegacyWideNodeGrowthMax_004AEBE0() noexcept
   {
     return 0x1FFFFFFFU;
-  }
-
-  /**
-   * Address: 0x004AEC00 (FUN_004AEC00)
-   *
-   * What it does:
-   * Moves one narrow red-black-tree iterator to its in-order predecessor.
-   */
-  RedBlackTreeNodeRuntime_004AD230* RetreatTreeIterator_004AEC00(
-    RedBlackTreeNodeRuntime_004AD230*& iterator
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* result = iterator;
-    if (result->isNil != 0) {
-      result = result->right;
-      iterator = result;
-      return result;
-    }
-
-    RedBlackTreeNodeRuntime_004AD230* left = result->left;
-    if (left->isNil != 0) {
-      result = result->parent;
-      while (result->isNil == 0) {
-        if (iterator != result->left) {
-          break;
-        }
-        iterator = result;
-        result = result->parent;
-      }
-
-      if (iterator->isNil == 0) {
-        iterator = result;
-      }
-      return result;
-    }
-
-    result = left->right;
-    while (result->isNil == 0) {
-      left = result;
-      result = result->right;
-    }
-    iterator = left;
-    return result;
-  }
-
-  /**
-   * Address: 0x004AEC60 (FUN_004AEC60)
-   *
-   * What it does:
-   * Advances one narrow red-black-tree iterator to its in-order successor.
-   */
-  RedBlackTreeNodeRuntime_004AD230* AdvanceTreeIterator_004AEC60(
-    RedBlackTreeNodeRuntime_004AD230*& iterator
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* result = iterator;
-    if (result->isNil != 0) {
-      return result;
-    }
-
-    RedBlackTreeNodeRuntime_004AD230* right = result->right;
-    if (right->isNil != 0) {
-      result = result->parent;
-      while (result->isNil == 0) {
-        if (iterator != result->right) {
-          break;
-        }
-        iterator = result;
-        result = result->parent;
-      }
-      iterator = result;
-      return result;
-    }
-
-    result = right->left;
-    if (right->left->isNil == 0) {
-      do {
-        right = result;
-        result = result->left;
-      } while (result->isNil == 0);
-    }
-    iterator = right;
-    return result;
-  }
-
-  /**
-   * Address: 0x004AECE0 (FUN_004AECE0)
-   *
-   * What it does:
-   * Moves one wide red-black-tree iterator to its in-order predecessor.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* RetreatWideTreeIterator_004AECE0(
-    RedBlackTreeWideNodeRuntime_004AE3B0*& iterator
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* result = iterator;
-    if (result->isNil != 0) {
-      result = result->right;
-      iterator = result;
-      return result;
-    }
-
-    RedBlackTreeWideNodeRuntime_004AE3B0* left = result->left;
-    if (left->isNil != 0) {
-      result = result->parent;
-      while (result->isNil == 0) {
-        if (iterator != result->left) {
-          break;
-        }
-        iterator = result;
-        result = result->parent;
-      }
-
-      if (iterator->isNil == 0) {
-        iterator = result;
-      }
-      return result;
-    }
-
-    result = left->right;
-    while (result->isNil == 0) {
-      left = result;
-      result = result->right;
-    }
-    iterator = left;
-    return result;
   }
 
   /**
@@ -2196,62 +1470,12 @@ namespace
   }
 
   /**
-   * Address: 0x004AEDE0 (FUN_004AEDE0)
-   *
-   * What it does:
-   * Recursively destroys one narrow-tree node subtree (right branch first),
-   * then deletes each traversed node while walking left links.
-   */
-  void DestroyTreeNodeSubtree_004AEDE0(
-    RedBlackTreeNodeRuntime_004AD230* node
-  ) noexcept
-  {
-    RedBlackTreeNodeRuntime_004AD230* current = node;
-    if (current->isNil != 0) {
-      return;
-    }
-
-    do {
-      DestroyTreeNodeSubtree_004AEDE0(current->right);
-      RedBlackTreeNodeRuntime_004AD230* const next = current->left;
-      ::operator delete(current);
-      current = next;
-    } while (current->isNil == 0);
-  }
-
-  /**
    * Address: 0x004AEE20 (FUN_004AEE20, nullsub_720)
    *
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
   void NoOpHelperThunk_004AEE20(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEE40 (FUN_004AEE40)
-   *
-   * What it does:
-   * Recursively destroys one wide-tree node subtree (right branch first),
-   * destroys each node runtime payload, then deletes each traversed node while
-   * walking left links.
-   */
-  void DestroyWideTreeNodeSubtree_004AEE40(
-    RedBlackTreeWideNodeRuntime_004AE3B0* node
-  ) noexcept
-  {
-    RedBlackTreeWideNodeRuntime_004AE3B0* current = node;
-    if (current->isNil != 0) {
-      return;
-    }
-
-    do {
-      DestroyWideTreeNodeSubtree_004AEE40(current->right);
-      RedBlackTreeWideNodeRuntime_004AE3B0* const next = current->left;
-      (void)DestroyPrefetchRequestRuntime(&current->runtime);
-      ::operator delete(current);
-      current = next;
-    } while (current->isNil == 0);
-  }
 
   /**
    * Address: 0x004AEEA0 (FUN_004AEEA0, nullsub_721)
@@ -3249,179 +2473,16 @@ namespace
   }
 
   /**
-   * Address: 0x004AE860 (FUN_004AE860)
-   *
-   * What it does:
-   * Erases one wide red-black-tree node, rebalances colors/rotations, and
-   * returns the successor iterator through caller-provided output storage.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0** EraseWideTreeNode_004AE860(
-    RedBlackTreeWideRuntime_004AE3B0& tree,
-    RedBlackTreeWideNodeRuntime_004AE3B0** const outNext,
-    RedBlackTreeWideNodeRuntime_004AE3B0* eraseNode
-  )
-  {
-    if (eraseNode->isNil != 0) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    RedBlackTreeWideNodeRuntime_004AE3B0* successor = eraseNode;
-    (void)AdvanceWideTreeIterator_004AE710(successor);
-
-    RedBlackTreeWideNodeRuntime_004AE3B0* replacement = nullptr;
-    RedBlackTreeWideNodeRuntime_004AE3B0* fixupParent = nullptr;
-    RedBlackTreeWideNodeRuntime_004AE3B0* const head = tree.head;
-
-    if (eraseNode->left->isNil != 0) {
-      replacement = eraseNode->right;
-      fixupParent = eraseNode->parent;
-    } else if (eraseNode->right->isNil != 0) {
-      replacement = eraseNode->left;
-      fixupParent = eraseNode->parent;
-    } else {
-      RedBlackTreeWideNodeRuntime_004AE3B0* const spliceNode = successor;
-      replacement = spliceNode->right;
-
-      eraseNode->left->parent = spliceNode;
-      spliceNode->left = eraseNode->left;
-
-      if (spliceNode == eraseNode->right) {
-        fixupParent = spliceNode;
-      } else {
-        fixupParent = spliceNode->parent;
-        if (replacement->isNil == 0) {
-          replacement->parent = fixupParent;
-        }
-        fixupParent->left = replacement;
-        spliceNode->right = eraseNode->right;
-        eraseNode->right->parent = spliceNode;
-      }
-
-      if (head->parent == eraseNode) {
-        head->parent = spliceNode;
-      } else if (eraseNode->parent->left == eraseNode) {
-        eraseNode->parent->left = spliceNode;
-      } else {
-        eraseNode->parent->right = spliceNode;
-      }
-
-      spliceNode->parent = eraseNode->parent;
-      std::swap(spliceNode->color, eraseNode->color);
-      goto fixup_after_transplant;
-    }
-
-    if (replacement->isNil == 0) {
-      replacement->parent = fixupParent;
-    }
-
-    if (head->parent == eraseNode) {
-      head->parent = replacement;
-    } else if (fixupParent->left == eraseNode) {
-      fixupParent->left = replacement;
-    } else {
-      fixupParent->right = replacement;
-    }
-
-    if (head->left == eraseNode) {
-      head->left = (replacement->isNil != 0)
-        ? fixupParent
-        : FindWideTreeLeftmostDescendant_004AEB50(replacement);
-    }
-
-    if (head->right == eraseNode) {
-      head->right = (replacement->isNil != 0)
-        ? fixupParent
-        : FindWideTreeRightmostDescendant_004AEE80(replacement);
-    }
-
-fixup_after_transplant:
-    if (eraseNode->color == kRedBlackTreeColorBlack_004AD230) {
-      if (replacement != head->parent) {
-        while (replacement->color == kRedBlackTreeColorBlack_004AD230) {
-          RedBlackTreeWideNodeRuntime_004AE3B0* sibling = nullptr;
-          if (replacement == fixupParent->left) {
-            sibling = fixupParent->right;
-            if (sibling->color == kRedBlackTreeColorRed_004AD230) {
-              sibling->color = kRedBlackTreeColorBlack_004AD230;
-              fixupParent->color = kRedBlackTreeColorRed_004AD230;
-              (void)RotateWideSubtreeLeft_004AE3B0(fixupParent, tree);
-              sibling = fixupParent->right;
-            }
-
-            if (sibling->isNil == 0) {
-              if (sibling->left->color != kRedBlackTreeColorBlack_004AD230
-                  || sibling->right->color != kRedBlackTreeColorBlack_004AD230) {
-                if (sibling->right->color == kRedBlackTreeColorBlack_004AD230) {
-                  sibling->left->color = kRedBlackTreeColorBlack_004AD230;
-                  sibling->color = kRedBlackTreeColorRed_004AD230;
-                  (void)RotateWideSubtreeRight_004AE410(sibling, tree);
-                  sibling = fixupParent->right;
-                }
-                sibling->color = fixupParent->color;
-                fixupParent->color = kRedBlackTreeColorBlack_004AD230;
-                sibling->right->color = kRedBlackTreeColorBlack_004AD230;
-                (void)RotateWideSubtreeLeft_004AE3B0(fixupParent, tree);
-                break;
-              }
-              sibling->color = kRedBlackTreeColorRed_004AD230;
-            }
-          } else {
-            sibling = fixupParent->left;
-            if (sibling->color == kRedBlackTreeColorRed_004AD230) {
-              sibling->color = kRedBlackTreeColorBlack_004AD230;
-              fixupParent->color = kRedBlackTreeColorRed_004AD230;
-              (void)RotateWideSubtreeRight_004AE410(fixupParent, tree);
-              sibling = fixupParent->left;
-            }
-
-            if (sibling->isNil == 0) {
-              if (sibling->right->color != kRedBlackTreeColorBlack_004AD230
-                  || sibling->left->color != kRedBlackTreeColorBlack_004AD230) {
-                if (sibling->left->color == kRedBlackTreeColorBlack_004AD230) {
-                  sibling->right->color = kRedBlackTreeColorBlack_004AD230;
-                  sibling->color = kRedBlackTreeColorRed_004AD230;
-                  (void)RotateWideSubtreeLeft_004AE3B0(sibling, tree);
-                  sibling = fixupParent->left;
-                }
-                sibling->color = fixupParent->color;
-                fixupParent->color = kRedBlackTreeColorBlack_004AD230;
-                sibling->left->color = kRedBlackTreeColorBlack_004AD230;
-                (void)RotateWideSubtreeRight_004AE410(fixupParent, tree);
-                break;
-              }
-              sibling->color = kRedBlackTreeColorRed_004AD230;
-            }
-          }
-
-          replacement = fixupParent;
-          const bool reachedRoot = (fixupParent == head->parent);
-          fixupParent = fixupParent->parent;
-          if (reachedRoot) {
-            break;
-          }
-        }
-      }
-      replacement->color = kRedBlackTreeColorBlack_004AD230;
-    }
-
-    (void)DestroyPrefetchRequestRuntime(&eraseNode->runtime);
-    ::operator delete(eraseNode);
-    if (tree.nodeCount > 0U) {
-      --tree.nodeCount;
-    }
-
-    *outNext = successor;
-    return outNext;
-  }
-
-  /**
    * Address: 0x004AC7D0 (FUN_004AC7D0)
    *
    * What it does:
    * Returns lower-bound iterator for one factory registration key.
    */
-  [[nodiscard]] std::map<unsigned int, moho::ResourceFactoryBase*>::iterator LowerBoundFactoryRegistrationKey(
-    std::map<unsigned int, moho::ResourceFactoryBase*>& activeFactoryRegistrationsByKey,
+  // Matches `CResourceManager::ActiveFactoryRegistrations` (private there).
+  using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>;
+
+  [[nodiscard]] ActiveFactoryRegistrations::iterator LowerBoundFactoryRegistrationKey(
+    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
     const unsigned int registrationKey
   )
   {
@@ -3430,7 +2491,7 @@ fixup_after_transplant:
 
   struct FactoryRegistrationLookupResult_004AC460
   {
-    std::map<unsigned int, moho::ResourceFactoryBase*>::iterator iterator;
+    ActiveFactoryRegistrations::iterator iterator;
     bool inserted;
   };
 
@@ -3441,7 +2502,7 @@ fixup_after_transplant:
    * Finds or inserts one active-factory map entry for registration key.
    */
   [[nodiscard]] FactoryRegistrationLookupResult_004AC460 FindOrInsertFactoryRegistrationKey(
-    std::map<unsigned int, moho::ResourceFactoryBase*>& activeFactoryRegistrationsByKey,
+    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
     const unsigned int registrationKey
   )
   {
@@ -3449,7 +2510,7 @@ fixup_after_transplant:
       LowerBoundFactoryRegistrationKey(activeFactoryRegistrationsByKey, registrationKey);
     if (lowerBound == activeFactoryRegistrationsByKey.end() || registrationKey < lowerBound->first) {
       const auto insertedIt =
-        activeFactoryRegistrationsByKey.emplace_hint(lowerBound, registrationKey, nullptr);
+        activeFactoryRegistrationsByKey.insert(lowerBound, {registrationKey, nullptr});
       return {insertedIt, true};
     }
     return {lowerBound, false};
@@ -3461,9 +2522,9 @@ fixup_after_transplant:
    * What it does:
    * Erases one active-factory map iterator and throws on invalid end-iterator.
    */
-  std::map<unsigned int, moho::ResourceFactoryBase*>::iterator EraseFactoryRegistrationAtIterator(
-    std::map<unsigned int, moho::ResourceFactoryBase*>& activeFactoryRegistrationsByKey,
-    const std::map<unsigned int, moho::ResourceFactoryBase*>::iterator eraseIt
+  ActiveFactoryRegistrations::iterator EraseFactoryRegistrationAtIterator(
+    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
+    const ActiveFactoryRegistrations::iterator eraseIt
   )
   {
     if (eraseIt == activeFactoryRegistrationsByKey.end()) {
@@ -3479,12 +2540,12 @@ fixup_after_transplant:
    * Erases one iterator range from the active-factory keyed registry and
    * returns the next iterator through caller-provided output storage.
    */
-  std::map<unsigned int, moho::ResourceFactoryBase*>::iterator*
+  ActiveFactoryRegistrations::iterator*
   EraseFactoryRegistrationRange_004AE0D0(
-    std::map<unsigned int, moho::ResourceFactoryBase*>& activeFactoryRegistrationsByKey,
-    std::map<unsigned int, moho::ResourceFactoryBase*>::iterator* const outNext,
-    std::map<unsigned int, moho::ResourceFactoryBase*>::iterator first,
-    const std::map<unsigned int, moho::ResourceFactoryBase*>::iterator last
+    ActiveFactoryRegistrations& activeFactoryRegistrationsByKey,
+    ActiveFactoryRegistrations::iterator* const outNext,
+    ActiveFactoryRegistrations::iterator first,
+    const ActiveFactoryRegistrations::iterator last
   )
   {
     if (first == activeFactoryRegistrationsByKey.begin() && last == activeFactoryRegistrationsByKey.end()) {
@@ -3533,60 +2594,6 @@ fixup_after_transplant:
 
   using PrefetchRequestEntryMap = std::map<PrefetchRequestKey, PrefetchRequestEntry>;
   PrefetchRequestEntryMap sPrefetchRequestEntries{};
-
-  /**
-   * Address: 0x004AED80 (FUN_004AED80)
-   *
-   * What it does:
-   * Initializes one wide prefetch-request tree node from link lanes and key.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* InitializePrefetchRequestWideNode_004AED80(
-    RedBlackTreeWideNodeRuntime_004AE3B0* const node,
-    RedBlackTreeWideNodeRuntime_004AE3B0* const left,
-    RedBlackTreeWideNodeRuntime_004AE3B0* const right,
-    RedBlackTreeWideNodeRuntime_004AE3B0* const parent,
-    const PrefetchRequestKey& key
-  )
-  {
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    (void)InitializePrefetchRequestFromPath(
-      &node->runtime,
-      key.canonicalPath.c_str(),
-      const_cast<gpg::RType*>(key.resourceType)
-    );
-    node->color = kRedBlackTreeColorRed_004AD230;
-    node->isNil = 0;
-    node->pad4E[0] = 0;
-    node->pad4E[1] = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x004AE460 (FUN_004AE460)
-   *
-   * What it does:
-   * Allocates one wide prefetch-request tree node and seeds its runtime
-   * payload from the request key.
-   */
-  RedBlackTreeWideNodeRuntime_004AE3B0* AllocatePrefetchRequestTreeNode_004AE460(
-    RedBlackTreeWideNodeRuntime_004AE3B0* const head,
-    RedBlackTreeWideNodeRuntime_004AE3B0* const parentHint,
-    const PrefetchRequestKey& key
-  )
-  {
-    auto* const node = static_cast<RedBlackTreeWideNodeRuntime_004AE3B0*>(
-      ::operator new(sizeof(RedBlackTreeWideNodeRuntime_004AE3B0))
-    );
-    return InitializePrefetchRequestWideNode_004AED80(
-      node,
-      head,
-      head,
-      parentHint,
-      key
-    );
-  }
 
   /**
    * Address: 0x004AE2B0 (FUN_004AE2B0)
@@ -3666,22 +2673,6 @@ fixup_after_transplant:
    * No-op helper thunk retained for callsite parity.
    */
   void NoOpHelperThunk_004AD8A0() noexcept {}
-
-  /**
-   * Address: 0x004AD8F0 (FUN_004AD8F0)
-   *
-   * What it does:
-   * Stores one tree-node pointer and its key lane into output pair storage.
-   */
-  std::uintptr_t* StoreNodePointerAndKeyLane_004AD8F0(
-    std::uintptr_t* const outPair,
-    const RedBlackTreeNodeRuntime_004AD230* const node
-  ) noexcept
-  {
-    outPair[0] = reinterpret_cast<std::uintptr_t>(node);
-    outPair[1] = node != nullptr ? static_cast<std::uintptr_t>(node->keyLane) : 0U;
-    return outPair;
-  }
 
   [[nodiscard]] bool IsPrefetchRequestKeyLess_004AD8B0(
     const PrefetchRequestKey& lhs,

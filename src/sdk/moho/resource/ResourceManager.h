@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <map>
+#include "legacy/containers/Map.h"
 #include <vector>
 
 #include "boost/condition.h"
@@ -177,7 +177,7 @@ namespace moho
     );
 
     using PendingFactoryRegistrations = std::vector<ResourceFactoryBase*>;
-    using ActiveFactoryRegistrations = std::map<unsigned int, ResourceFactoryBase*>;
+    using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, ResourceFactoryBase*>;
 
     mutable boost::recursive_mutex mFactoryMutex;
     bool mFactoriesActivated = false;
