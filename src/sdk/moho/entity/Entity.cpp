@@ -1765,7 +1765,8 @@ namespace
   );
 
   /**
-   * Address: 0x00679550 (FUN_00679550, inlined block)
+   * An inlined block inside `Entity::AttachTo` (0x00679550), not a function of
+   * its own.
    *
    * What it does:
    * Relinks an attached runtime node back to its owner list when it is marked queued.
@@ -4204,64 +4205,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067DB40 (FUN_0067DB40, msvc8::vector<Moho::Entity*>::_Insert_n)
-   *
-   * IDA signature:
-   * char *__userpurge sub_67DB40@<eax>(int *value@<eax>, unsigned int count@<ecx>, int *vec, char *pos);
-   *
-   * What it does:
-   * Engine-instantiated body of `msvc8::vector<Moho::Entity*>::_Insert_n`.
-   * Inserts `insertCount` copies of `fillValue` at `insertPosition`. When spare
-   * capacity is sufficient the live tail `[pos, end)` is shifted right by
-   * `insertCount` slots and the gap is filled with the pointer value; otherwise
-   * a 1.5x-grown buffer is allocated, the head is moved, the insert window is
-   * fill-constructed, the tail is moved, and the previous block is freed. This
-   * canonical MSVC8 `_Insert_n` lane backs the `push_back(this)` slow-path append
-   * used by `Entity::AttachTo` for the parent attached-entities vector; the body
-   * itself lives in `msvc8::vector<T>::insert` (legacy/containers/Vector.h) and
-   * this per-T free helper is the source-level by-name invocation that keeps the
-   * emitted symbol.
-   */
-  void InsertNCopiesEntityPtrVector(
-    msvc8::vector<Entity*>& storage,
-    Entity** const insertPosition,
-    const unsigned int insertCount,
-    Entity* const fillValue)
-  {
-    if (insertCount == 0u) {
-      return;
-    }
-
-    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
-    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
-  }
-
-  /**
-   * Address: 0x0067961C (Moho::Entity::AttachTo attached-entities append lane, FUN_00679550)
-   *
-   * What it does:
-   * Appends one child `Entity*` into the parent attached-entities vector,
-   * mirroring the MSVC8 inlined `push_back` shape used by the binary AttachTo
-   * body: when the reserved capacity is exhausted the append reaches the
-   * canonical `vector<Entity*>::_Insert_n` slow-path
-   * (`InsertNCopiesEntityPtrVector`, FUN_0067DB40, `call sub_67DB40` at
-   * 0x0067961C); otherwise it is a fast-path in-place store.
-   */
-  void AppendAttachedEntity(msvc8::vector<Entity*>& storage, Entity* const value)
-  {
-    if (storage.size() == storage.capacity()) {
-      InsertNCopiesEntityPtrVector(storage, storage.end(), 1u, value);
-    } else {
-      storage.push_back(value);
-    }
-  }
-
-  /**
-    * Alias of FUN_00679550 (non-canonical helper lane).
+   * Address: 0x00679550 (FUN_00679550, Moho::Entity::AttachTo)
+   * Mangled: ?AttachTo@Entity@Moho@@UAE_NABUSEntAttachInfo@2@@Z
    *
    * What it does:
    * Validates parent attach chain, appends this entity to parent attached-list,
    * repairs queued runtime-link state, then applies attach payload into `mAttachInfo`.
+   * MSVC inlines the `parentChildren.push_back(this)` fast path here and calls
+   * `msvc8::vector<Entity*>::_Insert_n` (0x0067DB40) directly at 0x0067961C for
+   * the capacity-full arm, so no out-of-line `push_back` exists for this element.
    */
   bool Entity::AttachTo(const SEntAttachInfo& attachInfo)
   {
@@ -4288,7 +4240,7 @@ namespace moho
       return false;
     }
 
-    AppendAttachedEntity(parentChildren, this);
+    parentChildren.push_back(this);
     ResetAttachRuntimeNodeIfQueued(this);
     ApplyAttachInfo(mAttachInfo, attachInfo);
     return true;
@@ -4668,62 +4620,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067E190 (FUN_0067E190)
-   *
-   * IDA signature:
-   * int __fastcall sub_67E190(byte *splitPosition, unsigned int newCapacity,
-   *   gpg::fastvector<Wm3::Sphere3f> *vec, const Sphere3f *insertSrcBegin,
-   *   const Sphere3f *insertSrcEnd);
-   *
-   * What it does:
-   * Out-of-line specialization of
-   * `gpg::fastvector<Wm3::Sphere3f>::_Insert_n_grow` (16-byte element stride).
-   * Forwards the grow-and-insert request to the typed fastvector's resize-
-   * with-fill path; the natural caller chain enters this helper only when
-   * the vector lacks capacity headroom for `targetCount` elements.
-   *
-   * Wired through `GrowInsertSphere3fFastVector` so the linker preserves the
-   * binary's `fastvector<Sphere3f>::_Insert_n_grow` symbol shape per the
-   * STL-template-emission policy; the natural `vec.resize(n, fill)` idiom
-   * may inline the grow path differently in modern toolchains.
-   */
-  void GrowInsertSphere3fFastVector(
-    gpg::fastvector<Wm3::Sphere3f>& spheres,
-    const std::size_t targetCount,
-    const Wm3::Sphere3f& fillValue
-  )
-  {
-    spheres.resize(targetCount, fillValue);
-  }
-
-  /**
-   * Address: 0x0067C430 (FUN_0067C430)
-   *
-   * What it does:
-   * Resizes one terrain-collision sphere vector to `targetCount`, preserving
-   * existing entries, trimming when shrinking, and fill-constructing new
-   * lanes from `fillValue` when growing. The grow path defers to the typed
-   * `_Insert_n_grow` helper `GrowInsertSphere3fFastVector` (FUN_0067E190) so
-   * the binary symbol is preserved when reallocation is required.
-   */
-  void ResizeTerrainCollisionSphereBuffer(
-    gpg::fastvector<Wm3::Sphere3f>& spheres,
-    const std::size_t targetCount,
-    const Wm3::Sphere3f& fillValue
-  )
-  {
-    const std::size_t currentCount = spheres.size();
-    if (targetCount < currentCount) {
-      spheres.resize(targetCount);
-      return;
-    }
-
-    if (targetCount > currentCount) {
-      GrowInsertSphere3fFastVector(spheres, targetCount, fillValue);
-    }
-  }
-
-  /**
    * Address: 0x0067AA50 (FUN_0067AA50, ?GetTerrainCollisionGeom@Entity@Moho@@QBEXAAV?$fastvector@V?$Sphere3@M@Wm3@@@gpg@@@Z)
    *
    * What it does:
@@ -4744,7 +4640,7 @@ namespace moho
       const float minZ = center.z - box->Extent[2];
       const float maxZ = center.z + box->Extent[2];
 
-      ResizeTerrainCollisionSphereBuffer(outSpheres, 8u, Wm3::Sphere3f{});
+      outSpheres.resize(8u, Wm3::Sphere3f{});
       outSpheres[0].Center = Wm3::Vec3f(minX, minY, minZ);
       outSpheres[0].Radius = 0.0f;
       outSpheres[1].Center = Wm3::Vec3f(maxX, minY, minZ);
@@ -4765,7 +4661,7 @@ namespace moho
     }
 
     if (const Wm3::Sphere3f* const sphere = CollisionExtents->GetSphere(); sphere != nullptr) {
-      ResizeTerrainCollisionSphereBuffer(outSpheres, 1u, Wm3::Sphere3f{});
+      outSpheres.resize(1u, Wm3::Sphere3f{});
       outSpheres[0].Center = center;
       outSpheres[0].Radius = sphere->Radius;
     }
