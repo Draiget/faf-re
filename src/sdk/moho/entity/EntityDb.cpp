@@ -1,3 +1,4 @@
+#include "legacy/containers/Vector.h"
 #include "EntityDb.h"
 
 #include <cstdlib>
@@ -1154,7 +1155,7 @@ namespace
   {
     gpg::RType* type = gLegacyEntityDbEntityListType;
     if (!type) {
-      type = gpg::LookupRType(typeid(std::list<moho::Entity*>));
+      type = gpg::LookupRType(typeid(msvc8::list<moho::Entity*>));
       gLegacyEntityDbEntityListType = type;
     }
     return type;
@@ -2382,7 +2383,7 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const list = static_cast<const std::list<moho::Entity*>*>(ref.mObj);
+      const auto* const list = static_cast<const msvc8::list<moho::Entity*>*>(ref.mObj);
       const int size = list ? static_cast<int>(list->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
@@ -2396,7 +2397,7 @@ namespace
      */
     void Init() override
     {
-      size_ = sizeof(std::list<moho::Entity*>);
+      size_ = sizeof(msvc8::list<moho::Entity*>);
       version_ = 1;
       serLoadFunc_ = &EntityDbEntityListTypeInfo::SerLoad;
       serSaveFunc_ = &EntityDbEntityListTypeInfo::SerSave;
@@ -2443,7 +2444,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    auto* const list = reinterpret_cast<std::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const list = reinterpret_cast<msvc8::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
     if (archive == nullptr || list == nullptr) {
       return;
     }
@@ -2474,7 +2475,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const list = reinterpret_cast<const std::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
+    const auto* const list = reinterpret_cast<const msvc8::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
     if (archive == nullptr) {
       return;
     }
@@ -3424,7 +3425,7 @@ namespace moho
     // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
     // use the dedicated resolver rather than the by-name fallback.
     if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
-      std::list<Entity*> serializedEntities;
+      msvc8::list<Entity*> serializedEntities;
       archive->Read(entityListType, &serializedEntities, NullOwnerRef());
 
       msvc8::list<Entity*>& runtimeEntities = Entities();
@@ -3464,7 +3465,7 @@ namespace moho
     // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
     // use the dedicated resolver rather than the by-name fallback.
     if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
-      std::list<Entity*> serializedEntities;
+      msvc8::list<Entity*> serializedEntities;
       for (Entity* const entity : Entities()) {
         if (!entity) {
           continue;
@@ -3647,7 +3648,7 @@ namespace moho
   gpg::RType* preregister_EntityDbEntityListTypeInfo()
   {
     EntityDbEntityListTypeInfo& typeInfo = AcquireEntityDbEntityListTypeInfo();
-    gpg::PreRegisterRType(typeid(std::list<moho::Entity*>), &typeInfo);
+    gpg::PreRegisterRType(typeid(msvc8::list<moho::Entity*>), &typeInfo);
     return &typeInfo;
   }
 
