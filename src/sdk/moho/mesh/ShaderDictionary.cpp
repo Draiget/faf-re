@@ -57,13 +57,10 @@ namespace moho
    */
   ShaderDictionary::~ShaderDictionary()
   {
-    // Reverse construction order: drop the remap entries (binary
-    // container at +0x10) before clearing the generation marker
-    // (binary container at +0x04). std::unordered_map::clear() invokes
-    // each ShaderDictionaryEntry's destructor and releases bucket
-    // storage, mirroring the binary's range-erase + head-sentinel free.
-    mEntries.clear();
-    mCurrentGeneration = 0;
+    // Both members' `~rb_tree()` runs here, in reverse declaration order,
+    // and MSVC emits both calls - which is what 0x007DBD10 does at
+    // 0x007DBD3D (`mRemaps`) and 0x007DBD6B (`mDeprecatedNames`). The body
+    // itself says nothing.
   }
 
   ShaderDictionary& ShaderDictionary::Instance() noexcept
@@ -76,19 +73,15 @@ namespace moho
     return instance;
   }
 
-  std::int32_t ShaderDictionary::CurrentGeneration() const noexcept
+  const msvc8::string* ShaderDictionary::Lookup(const msvc8::string& requestedShaderName) const
   {
-    return mCurrentGeneration;
+    const msvc8::map<msvc8::string, msvc8::string>::const_iterator it = mRemaps.find(requestedShaderName);
+    return it == mRemaps.end() ? nullptr : &it->second;
   }
 
-  const ShaderDictionaryEntry* ShaderDictionary::Lookup(const msvc8::string& requestedShaderName) const
+  bool ShaderDictionary::IsDeprecated(const msvc8::string& shaderName) const
   {
-    const auto it = mEntries.find(NormalizeKey(requestedShaderName));
-    if (it == mEntries.end()) {
-      return nullptr;
-    }
-
-    return &it->second;
+    return mDeprecatedNames.find(shaderName) != mDeprecatedNames.end();
   }
 
   /**
@@ -104,36 +97,31 @@ namespace moho
     const msvc8::string& remappedShaderName
   )
   {
-    ShaderDictionaryEntry& entry = mEntries[NormalizeKey(legacyShaderName)];
-    entry.remappedShaderName = remappedShaderName;
-    entry.sourceGeneration = mCurrentGeneration;
+    mRemaps[legacyShaderName] = remappedShaderName;
   }
 
   /**
    * Address: 0x007DBDB0 (FUN_007DBDB0, sub_7DBDB0)
    *
    * What it does:
-   * Resolves one shader annotation through the shader remap dictionary,
-   * falling back to the caller-provided text (or the constant "Unit" when
-   * empty). Emits a `Use of 'old' shader: %s` warning when the entry's
-   * stored generation no longer matches the dictionary's current marker.
+   * Resolves one shader annotation through the shader remap dictionary. A
+   * name the dictionary does not know comes back unchanged, or as "Unit"
+   * when it is empty. A name in the deprecated set warns first - a branch
+   * that cannot be taken in this binary, because nothing inserts into that
+   * set.
    */
   msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName)
   {
     const ShaderDictionary& dictionary = ShaderDictionary::Instance();
-    const ShaderDictionaryEntry* const dictionaryEntry = dictionary.Lookup(shaderName);
-    if (!dictionaryEntry) {
-      if (shaderName.empty()) {
-        return msvc8::string("Unit");
-      }
-
-      return msvc8::string(shaderName.view());
+    const msvc8::string* const remapped = dictionary.Lookup(shaderName);
+    if (remapped == nullptr) {
+      return shaderName.empty() ? msvc8::string("Unit") : msvc8::string(shaderName.view());
     }
 
-    if (dictionaryEntry->sourceGeneration != dictionary.CurrentGeneration()) {
+    if (dictionary.IsDeprecated(shaderName)) {
       gpg::Warnf("Use of 'old' shader: %s", shaderName.raw_data_unsafe());
     }
 
-    return msvc8::string(dictionaryEntry->remappedShaderName.view());
+    return msvc8::string(remapped->view());
   }
 } // namespace moho

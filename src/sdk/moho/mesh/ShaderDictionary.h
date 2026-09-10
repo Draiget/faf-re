@@ -1,32 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
-#include <string_view>
-#include <unordered_map>
 
+#include "legacy/containers/Map.h"
+#include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 
 namespace moho
 {
-  /**
-   * One entry value stored inside the shader-remap dictionary:
-   *   - the modern shader/material name the legacy annotation maps to,
-   *   - the dictionary generation at which the entry was last (re-)written.
-   *
-   * The binary keeps the same payload distributed across two intrusive
-   * `std::map` containers (one mapping legacy-key -> remapped-name and one
-   * tracking the "current" set of valid keys). The modern absorption fuses
-   * both lanes into a single map keyed by normalized legacy name, with the
-   * generation lane stored alongside the value so stale-entry detection
-   * still functions for `ResolveShaderAnnotationName`.
-   */
-  struct ShaderDictionaryEntry
-  {
-    msvc8::string remappedShaderName;
-    std::int32_t sourceGeneration;
-  };
-
   /**
    * Polymorphic global shader-remap dictionary used by mesh material
    * creation. The binary instantiates exactly one of these (singleton-
@@ -83,18 +64,20 @@ namespace moho
     [[nodiscard]] static ShaderDictionary& Instance() noexcept;
 
     /**
-     * Returns the current dictionary generation marker. Each
-     * `AssignRemap` stamps the inserted entry with this value;
-     * `ResolveShaderAnnotationName` warns on lookups whose stored
-     * generation no longer matches.
+     * The modern name `requestedShaderName` remaps to, or null when the
+     * dictionary does not know it.
      */
-    [[nodiscard]] std::int32_t CurrentGeneration() const noexcept;
+    [[nodiscard]] const msvc8::string* Lookup(const msvc8::string& requestedShaderName) const;
 
     /**
-     * Looks up one shader annotation by key. Returns nullptr if the key
-     * is not present in the dictionary.
+     * Whether `shaderName` is one of the names a lookup warns about.
+     *
+     * Nothing in this binary ever puts a name in that set, so the warning
+     * `ResolveShaderAnnotationName` guards with this never fires. The set is
+     * real - the constructor buys its header sentinel (0x004DD460) and the
+     * destructor frees it - so it is kept rather than folded away.
      */
-    [[nodiscard]] const ShaderDictionaryEntry* Lookup(const msvc8::string& requestedShaderName) const;
+    [[nodiscard]] bool IsDeprecated(const msvc8::string& shaderName) const;
 
     /**
      * Address: 0x007DBE90 (FUN_007DBE90, sub_7DBE90)
@@ -106,16 +89,27 @@ namespace moho
     void AssignRemap(const msvc8::string& legacyShaderName, const msvc8::string& remappedShaderName);
 
   private:
-    template <class TString>
-    [[nodiscard]] static std::string NormalizeKey(const TString& value)
-    {
-      const std::string_view view = value.view();
-      return std::string(view.begin(), view.end());
-    }
+    /**
+     * The names a lookup warns about. Node 0x2C -- the constructor's header
+     * allocation (0x004DD460) marks nil at `+0x29`, so the value is the bare
+     * 0x1C key with colour/nil at `+0x28`/`+0x29`, which is a set and not a
+     * map. Never inserted into anywhere in this binary.
+     */
+    msvc8::set<msvc8::string> mDeprecatedNames{};                  // +0x04
 
-    std::int32_t mCurrentGeneration = 0;
-    std::unordered_map<std::string, ShaderDictionaryEntry> mEntries{};
+    /**
+     * Legacy annotation -> modern shader name. Node 0x48 -- its header
+     * allocation (0x00434CF0) marks nil at `+0x45`, so the pair at `node+0x0C`
+     * is 0x38, two 0x1C strings. `ResolveShaderAnnotationName` reads the
+     * mapped name at `node+0x28`, which is exactly `pair::second`.
+     */
+    msvc8::map<msvc8::string, msvc8::string> mRemaps{};             // +0x10
+
+    static_assert(sizeof(msvc8::set<msvc8::string>) == 0x0C, "the legacy set head is 0x0C");
+    static_assert(sizeof(msvc8::map<msvc8::string, msvc8::string>) == 0x0C, "the legacy map head is 0x0C");
   };
+
+  static_assert(sizeof(ShaderDictionary) == 0x1C, "ShaderDictionary size must be 0x1C");
 
   /**
    * Address: 0x007DBDB0 (FUN_007DBDB0, sub_7DBDB0)
