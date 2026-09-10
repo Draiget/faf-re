@@ -306,56 +306,16 @@ namespace
   }
 
   /**
-   * Address: 0x007D7A10 (FUN_007D7A10)
-   */
-  void ClearIntrusiveListNodes(moho::ClutterIntrusiveListState* const list)
-  {
-    moho::ClutterListNode* const head = list->head;
-    moho::ClutterListNode* node = head->next;
-    head->next = head;
-    head->prev = head;
-    list->size = 0;
-
-    while (node != head) {
-      moho::ClutterListNode* const next = node->next;
-      ::operator delete(node);
-      node = next;
-    }
-  }
-
-  /**
-   * Address: 0x007D7820 (FUN_007D7820)
-   */
-  moho::ClutterRegionMapState* ClearRegionMapList(moho::ClutterRegionMapState* const map)
-  {
-    moho::ClutterListNode* const head = map->head;
-    moho::ClutterListNode* node = head->next;
-
-    head->next = head;
-    head->prev = head;
-    map->size = 0;
-
-    while (node != head) {
-      moho::ClutterListNode* const next = node->next;
-      ::operator delete(node);
-      node = next;
-    }
-
-    return map;
-  }
-
-  /**
    * Address: 0x007D9390 (FUN_007D9390)
    */
   void ApplyDestroyInstanceToRegionPayloads(
-    moho::ClutterListNode* begin,
-    moho::ClutterListNode* const endSentinel,
+    moho::ClutterPayloadList& payloads,
     DestroyInstanceRuntimeLane& destroyLane,
     moho::MeshRenderer* const instance
   )
   {
-    for (moho::ClutterListNode* node = begin; node != endSentinel; node = node->next) {
-      auto* const payload = static_cast<moho::ClutterRegionMapPayloadHeader*>(node->payload);
+    for (void* const entry : payloads) {
+      auto* const payload = static_cast<moho::ClutterRegionMapPayloadHeader*>(entry);
       payload->vtable->destroy(payload, 1);
     }
 
@@ -372,8 +332,7 @@ namespace
    */
   UpdateInstanceRuntimeLane* BindRegionMeshInstancesToOwner(
     UpdateInstanceRuntimeLane* const lane,
-    moho::ClutterListNode* begin,
-    moho::ClutterListNode* const endSentinel,
+    moho::ClutterPayloadList& payloads,
     const std::int32_t ownerToken
   ) noexcept
   {
@@ -381,43 +340,13 @@ namespace
       return nullptr;
     }
 
-    for (moho::ClutterListNode* node = begin; node != endSentinel; node = node->next) {
-      auto* const meshInstance = static_cast<moho::MeshInstance*>(node->payload);
-      meshInstance->unk24 = ownerToken;
+    for (void* const entry : payloads) {
+      static_cast<moho::MeshInstance*>(entry)->unk24 = ownerToken;
     }
 
     lane->ownerToken = ownerToken;
     lane->vtable = UpdateInstanceVtableToken();
     return lane;
-  }
-
-  [[nodiscard]] void* AllocatePointerListStorageChecked(std::uint32_t count);
-
-  /**
-   * Address: 0x007D7D00 (FUN_007D7D00)
-   *
-   * What it does:
-   * Allocates one 12-byte intrusive-list sentinel node and self-links its
-   * `next/prev` lanes.
-   */
-  [[nodiscard]] moho::ClutterListNode* AllocateRegionMapSentinelNode()
-  {
-    auto* const node = static_cast<moho::ClutterListNode*>(AllocatePointerListStorageChecked(1u));
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x007D7FD0 (FUN_007D7FD0)
-   */
-  [[nodiscard]] moho::ClutterListNode* AllocateListSentinelNode()
-  {
-    auto* const node = static_cast<moho::ClutterListNode*>(::operator new(sizeof(moho::ClutterListNode)));
-    node->next = node;
-    node->prev = node;
-    node->payload = nullptr;
-    return node;
   }
 
   [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
@@ -447,75 +376,6 @@ namespace
     }
 
     return regionBase;
-  }
-
-  /**
-   * Address: 0x007D9530 (FUN_007D9530)
-   */
-  [[nodiscard]] void* AllocatePointerListStorageChecked(const std::uint32_t count)
-  {
-    if (count != 0u && (0xFFFFFFFFu / count) < sizeof(moho::ClutterListNode)) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(sizeof(moho::ClutterListNode) * count);
-  }
-
-  /**
-   * Address: 0x007D85C0 (FUN_007D85C0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one clutter list node storage
-   * record through the checked allocator.
-   */
-  [[maybe_unused]] [[nodiscard]] void* AllocateSinglePointerListStorageCheckedAdapter()
-  {
-    return AllocatePointerListStorageChecked(1u);
-  }
-
-  /**
-   * Address: 0x007D84D0 (FUN_007D84D0)
-   */
-  moho::ClutterListNode* __stdcall AllocatePointerListNode(
-    moho::ClutterListNode* const next,
-    moho::ClutterListNode* const prev,
-    void* const* const valueRef
-  )
-  {
-    auto* const node = static_cast<moho::ClutterListNode*>(AllocatePointerListStorageChecked(1u));
-    node->next = next;
-    node->prev = prev;
-    node->payload = *valueRef;
-    return node;
-  }
-
-  /**
-   * Address: 0x007D8510 (FUN_007D8510)
-   */
-  std::uint32_t IncrementPointerListSizeChecked(moho::ClutterIntrusiveListState* const listState)
-  {
-    if (listState->size == 0x3FFFFFFFu) {
-      throw std::length_error("list<T> too long");
-    }
-
-    ++listState->size;
-    return listState->size;
-  }
-
-  /**
-   * Address: 0x007D7CD0 (FUN_007D7CD0)
-   */
-  std::uint32_t __stdcall AppendPointerListTail(
-    void* const* const valueRef,
-    moho::ClutterIntrusiveListState* const listState,
-    moho::ClutterListNode* const tailSentinel
-  )
-  {
-    moho::ClutterListNode* const node =
-      AllocatePointerListNode(tailSentinel, tailSentinel->prev, valueRef);
-    const std::uint32_t nextSize = IncrementPointerListSizeChecked(listState);
-    tailSentinel->prev = node;
-    node->prev->next = node;
-    return nextSize;
   }
 
   /**
@@ -672,9 +532,6 @@ namespace moho
     mPrev = nullptr;
     mX = -1;
     mZ = -1;
-    mMap.lane00 = nullptr;
-    mMap.head = AllocateRegionMapSentinelNode();
-    mMap.size = 0;
   }
 
   /**
@@ -688,9 +545,6 @@ namespace moho
   {
     vtable = RegionRuntimeVtableResetToken();
     (void)ResetRegionRuntimeState(this);
-    (void)ClearRegionMapList(&mMap);
-    ::operator delete(mMap.head);
-    mMap.head = nullptr;
   }
 
   /**
@@ -743,11 +597,7 @@ namespace moho
    */
   Clutter::Clutter()
   {
-    mList1.head = AllocateListSentinelNode();
-    mList1.size = 0;
 
-    mList2.head = reinterpret_cast<ClutterRegionListNode*>(AllocateListSentinelNode());
-    mList2.size = 0;
 
     // mSurfaces[256] (moho::ClutterSurfaceEntry, real ctor above) is
     // default-constructed automatically here, matching the real binary's
@@ -776,17 +626,7 @@ namespace moho
     // teardown, matching the real binary's `` `eh vector destructor
     // iterator' `` call in `~Clutter`.
 
-    if (mList2.head) {
-      ClearIntrusiveListNodes(reinterpret_cast<ClutterIntrusiveListState*>(&mList2));
-      ::operator delete(mList2.head);
-      mList2.head = nullptr;
-    }
 
-    if (mList1.head) {
-      ClearIntrusiveListNodes(&mList1);
-      ::operator delete(mList1.head);
-      mList1.head = nullptr;
-    }
   }
 
   /**
@@ -957,10 +797,9 @@ namespace moho
   {
     (void)camera;
 
-    ClutterListNode* const head = region->mMap.head;
     UpdateInstanceRuntimeLane updateLane{};
     const auto ownerToken = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(this));
-    (void)BindRegionMeshInstancesToOwner(&updateLane, head->next, head, ownerToken);
+    (void)BindRegionMeshInstancesToOwner(&updateLane, region->mMap, ownerToken);
   }
 
   /**
@@ -978,13 +817,12 @@ namespace moho
    * Address: 0x007D9400 (FUN_007D9400)
    */
   std::uint8_t ReleaseRegionListPayloads(
-    ClutterListNode* begin,
-    ClutterListNode* const endSentinel,
+    ClutterRegionList& poolBlocks,
     const std::uint8_t passthrough
   )
   {
-    for (ClutterListNode* it = begin; it != endSentinel; it = it->next) {
-      auto* const payload = static_cast<ClutterPayloadHeader*>(it->payload);
+    for (ClutterRegion* const block : poolBlocks) {
+      auto* const payload = reinterpret_cast<ClutterPayloadHeader*>(block);
       if (!payload) {
         continue;
       }
@@ -1003,7 +841,7 @@ namespace moho
   /**
    * Address: 0x007D5F80 (FUN_007D5F80)
    */
-  ClutterRegionMapState* ResetRegionRuntimeState(ClutterRegion* const region)
+  ClutterPayloadList* ResetRegionRuntimeState(ClutterRegion* const region)
   {
     region->mPrev = nullptr;
     region->mNext = nullptr;
@@ -1015,52 +853,9 @@ namespace moho
     destroyLane.instance = nullptr;
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
-    ApplyDestroyInstanceToRegionPayloads(region->mMap.head->next, region->mMap.head, destroyLane, meshRenderer);
-    return ClearRegionMapList(&region->mMap);
-  }
-
-  /**
-   * Address: 0x007D8980 (FUN_007D8980)
-   */
-  ClutterRegionListNode* __stdcall AllocateRegionListNode(
-    ClutterRegionListNode* const next,
-    ClutterRegionListNode* const prev,
-    ClutterRegion* const* const valueRef
-  )
-  {
-    return reinterpret_cast<ClutterRegionListNode*>(AllocatePointerListNode(
-      reinterpret_cast<ClutterListNode*>(next),
-      reinterpret_cast<ClutterListNode*>(prev),
-      reinterpret_cast<void* const*>(valueRef)
-    ));
-  }
-
-  /**
-   * Address: 0x007D89C0 (FUN_007D89C0)
-   */
-  std::uint32_t IncrementListSizeChecked(ClutterRegionListState* const listState)
-  {
-    return IncrementPointerListSizeChecked(reinterpret_cast<ClutterIntrusiveListState*>(listState));
-  }
-
-  /**
-   * Address: 0x007D7F70 (FUN_007D7F70)
-   *
-   * What it does:
-   * Allocates one region-list node at the tail sentinel position, increments
-   * list size with VC8 overflow semantics, and links the new tail node.
-   */
-  std::uint32_t __stdcall AppendRegionListTailLaneA(
-    ClutterRegion* const* const valueRef,
-    ClutterRegionListState* const sizeState,
-    ClutterRegionListState* const linkState
-  )
-  {
-    ClutterRegionListNode* const node = AllocateRegionListNode(linkState->head, linkState->head->prev, valueRef);
-    const std::uint32_t nextSize = IncrementListSizeChecked(sizeState);
-    linkState->head->prev = node;
-    node->prev->next = node;
-    return nextSize;
+    ApplyDestroyInstanceToRegionPayloads(region->mMap, destroyLane, meshRenderer);
+    region->mMap.clear();
+    return &region->mMap;
   }
 
   /**
@@ -1177,11 +972,7 @@ namespace moho
         meshInstance->SetStance(stance, stance);
         meshInstance->unk24 = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&heightField));
 
-        (void)AppendPointerListTail(
-          reinterpret_cast<void* const*>(&meshInstance),
-          reinterpret_cast<ClutterIntrusiveListState*>(&region->mMap),
-          region->mMap.head
-        );
+        region->mMap.push_back(meshInstance);
         break;
       }
     }
@@ -1222,29 +1013,21 @@ namespace moho
   {
     constexpr std::uint32_t kRegionPoolCount = 128u;
 
-    if (mList2.size == 0u) {
+    if (mList2.empty()) {
       ClutterRegion* const regionPool = AllocateRegionPoolBlock();
-      (void)AppendPointerListTail(reinterpret_cast<void* const*>(&regionPool), &mList1, mList1.head);
+      mList1.push_back(regionPool);
 
       for (std::uint32_t index = 0; index < kRegionPoolCount; ++index) {
-        ClutterRegion* regionValue = regionPool + index;
-        (void)AppendRegionListTailLaneA(&regionValue, &mList2, &mList2);
+        mList2.push_back(regionPool + index);
       }
     }
 
-    ClutterRegionListNode* const recycleHead = mList2.head;
-    ClutterRegionListNode* const recycleNode = recycleHead->next;
-    if (recycleNode == recycleHead) {
+    if (mList2.empty()) {
       return nullptr;
     }
 
-    ClutterRegion* const region = recycleNode->value;
-    recycleNode->prev->next = recycleNode->next;
-    recycleNode->next->prev = recycleNode->prev;
-    ::operator delete(recycleNode);
-    if (mList2.size != 0u) {
-      --mList2.size;
-    }
+    ClutterRegion* const region = mList2.front();
+    mList2.pop_front();
 
     region->mNext = nullptr;
     region->mPrev = mCurRegion;
@@ -1273,11 +1056,7 @@ namespace moho
 
     (void)ResetRegionRuntimeState(region);
 
-    (void)AppendPointerListTail(
-      reinterpret_cast<void* const*>(&region),
-      reinterpret_cast<ClutterIntrusiveListState*>(&mList2),
-      reinterpret_cast<ClutterListNode*>(mList2.head)
-    );
+    mList2.push_back(region);
   }
 
   /**
@@ -1327,39 +1106,12 @@ namespace moho
       surface.mSeeds.clear();
     }
 
-    if (mList2.head) {
-      ClutterRegionListNode* node = mList2.head->next;
-      mList2.head->next = mList2.head;
-      mList2.head->prev = mList2.head;
-      mList2.size = 0;
+    mList2.clear();
 
-      while (node != mList2.head) {
-        ClutterRegionListNode* const nextNode = node->next;
-        ::operator delete(node);
-        node = nextNode;
-      }
-    } else {
-      mList2.size = 0;
-    }
-
-    if (!mList1.head) {
-      mList1.size = 0;
-      return;
-    }
-
-    ClutterListNode* const head = mList1.head;
-    ClutterListNode* node = head->next;
-    (void)ReleaseRegionListPayloads(node, head, 0);
-
-    head->next = head;
-    head->prev = head;
-    mList1.size = 0;
-
-    while (node != head) {
-      ClutterListNode* const nextNode = node->next;
-      ::operator delete(node);
-      node = nextNode;
-    }
+    // Each entry is a 128-region pool block; release the blocks before the
+    // nodes that point at them.
+    (void)ReleaseRegionListPayloads(mList1, 0);
+    mList1.clear();
   }
 } // namespace moho
 
