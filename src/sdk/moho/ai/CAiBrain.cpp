@@ -437,95 +437,39 @@ namespace
     return path;
   }
 
-  /**
-   * Address: 0x0057C9F0 (FUN_0057C9F0, func_CopySPointVector)
-   *
-   * What it does:
-   * Copies one `SPointVector` payload into destination storage and returns
-   * the destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SPointVector* CopySPointVectorAndReturnDestination(
-    SPointVector* const destination,
-    const SPointVector* const source
-  ) noexcept
+  struct SAttackVectorGridRow
   {
-    destination->point = source->point;
-    destination->vector = source->vector;
-    return destination;
-  }
-
-  /**
-   * Address: 0x0057D8B0 (FUN_0057D8B0)
-   *
-   * What it does:
-   * Resets one `vector<SPointVector>` logical size to zero while preserving the
-   * current allocation block.
-   */
-  [[maybe_unused]] [[nodiscard]] SPointVector* ResetSPointVectorVectorEndToBegin(
-    msvc8::vector<SPointVector>& storage
-  ) noexcept
-  {
-    // Erasing [begin, end) leaves the run empty with capacity retained:
-    // clear(). The binary's self-range copy moves nothing.
-    storage.clear();
-    return storage.end();
-  }
-
-  /**
-   * Address: 0x00583A20 (FUN_00583A20, vector-int assign lane)
-   *
-   * What it does:
-   * Copy-assigns one legacy `msvc8::vector<int>` lane into destination and
-   * returns destination.
-   */
-  [[maybe_unused]] [[nodiscard]] msvc8::vector<int>* CopyAssignLegacyIntVector(
-    msvc8::vector<int>* const destination,
-    const msvc8::vector<int>* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    if (destination != source) {
-      *destination = *source;
-    }
-    return destination;
-  }
-
-  struct ScalarAndIntVectorLane
-  {
-    std::int32_t mScalar = 0;
-    msvc8::vector<int> mValues{};
+    std::int32_t mNextColumn = 0;         // +0x00 next cell to record
+    msvc8::vector<int> mOccupancyWords{}; // +0x04 one bit per column
   };
-  static_assert(sizeof(ScalarAndIntVectorLane) == 0x14, "ScalarAndIntVectorLane size must be 0x14");
+  static_assert(sizeof(SAttackVectorGridRow) == 0x14, "SAttackVectorGridRow size must be 0x14");
 
   /**
    * Records whether one grid cell holds enemy units, advancing the row's
-   * next-cell cursor. `row.mValues` holds the row's occupancy flags packed
+   * next-cell cursor. `row.mOccupancyWords` holds the row's occupancy flags packed
    * one bit per 32-bit word; growing it one `int` word at a time via the
    * container's own `push_back` is the faithful modern expression of the
    * inlined bit-insert-and-grow mechanic `CAiBrain::ProcessAttackVectors`
    * (0x0057BDB0) performs once per grid column via `sub_57FB30`/`sub_443D90`
    * (the same insert-one-bit + word-array-grow shape already recovered
    * generically as `VectorBoolInsertOneBit`/`VectorBoolReserveWordCapacity`
-   * in ManipulatorStartupRegistrations.cpp). `row.mValues` is proven to be
-   * the binary's per-row payload by `sub_5837F0`'s cleanup shape, see
-   * `ResetScalarAndIntVectorLaneRange` above.
+   * in ManipulatorStartupRegistrations.cpp). `row.mOccupancyWords` is proven to be
+   * the binary's per-row payload by `sub_5837F0`'s cleanup shape (the row
+   * vector's `_Destroy_range`, cited on Vector.h).
    */
-  void MarkGridCellEnemyPresence(ScalarAndIntVectorLane& row, const bool hasEnemyUnits)
+  void MarkGridCellEnemyPresence(SAttackVectorGridRow& row, const bool hasEnemyUnits)
   {
-    const auto cellIndex = static_cast<std::uint32_t>(row.mScalar);
+    const auto cellIndex = static_cast<std::uint32_t>(row.mNextColumn);
     const std::uint32_t wordIndex = cellIndex >> 5;
-    if (wordIndex >= row.mValues.size()) {
-      row.mValues.push_back(0);
+    if (wordIndex >= row.mOccupancyWords.size()) {
+      row.mOccupancyWords.push_back(0);
     }
 
     if (hasEnemyUnits) {
-      row.mValues[wordIndex] |= (1 << (cellIndex & 0x1Fu));
+      row.mOccupancyWords[wordIndex] |= (1 << (cellIndex & 0x1Fu));
     }
 
-    ++row.mScalar;
+    ++row.mNextColumn;
   }
 
   /**
@@ -534,118 +478,18 @@ namespace
    * word) reads as empty, matching the binary's zero-filled tail-word
    * semantics.
    */
-  [[nodiscard]] bool GridCellHasEnemyPresence(const ScalarAndIntVectorLane& row, const std::int32_t column)
+  [[nodiscard]] bool GridCellHasEnemyPresence(const SAttackVectorGridRow& row, const std::int32_t column)
   {
     if (column < 0) {
       return false;
     }
 
     const auto wordIndex = static_cast<std::uint32_t>(column) >> 5;
-    if (wordIndex >= row.mValues.size()) {
+    if (wordIndex >= row.mOccupancyWords.size()) {
       return false;
     }
 
-    return (row.mValues[wordIndex] & (1 << (column & 0x1F))) != 0;
-  }
-
-  /**
-   * Address: 0x005837F0 (FUN_005837F0, scalar+vector reset range lane)
-   * Address: 0x00580D10 (FUN_00580D10)
-   *
-   * What it does:
-   * Resets each scalar lane to zero and releases each backing int-vector
-   * allocation in one half-open `[begin, end)` range.
-   */
-  [[maybe_unused]] void ResetScalarAndIntVectorLaneRange(
-    ScalarAndIntVectorLane* begin,
-    ScalarAndIntVectorLane* const end
-  ) noexcept
-  {
-    while (begin != end) {
-      begin->mScalar = 0;
-
-      // Free the block and null all three lanes: VC8 _Tidy().
-      begin->mValues = decltype(begin->mValues){};
-
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x00583C30 (FUN_00583C30, vector-int clear logical range lane)
-   *
-   * What it does:
-   * Clears one legacy int-vector logical range while retaining capacity.
-   */
-  [[maybe_unused]] void ClearLegacyIntVectorLogicalRange(msvc8::vector<int>* const storage) noexcept
-  {
-    if (storage != nullptr) {
-      storage->clear();
-    }
-  }
-
-  /**
-   * Address: 0x00584480 (FUN_00584480, copy int range lane)
-   *
-   * What it does:
-   * Copies one half-open int range into `destination` and returns the
-   * one-past-end destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] int* CopyLegacyIntRangeAndReturnEnd(
-    int* const destination,
-    const int* const sourceBegin,
-    const int* const sourceEnd
-  ) noexcept
-  {
-    if (destination == nullptr || sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd <= sourceBegin) {
-      return destination;
-    }
-
-    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    std::memmove(destination, sourceBegin, count * sizeof(int));
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x00583850 (FUN_00583850, scalar+vector fill-copy range lane)
-   *
-   * What it does:
-   * Fills one half-open destination range by copying the scalar lane and
-   * legacy int-vector lane from a single prototype element.
-   */
-  [[maybe_unused]] [[nodiscard]] ScalarAndIntVectorLane* FillScalarAndIntVectorRangeFromPrototype(
-    ScalarAndIntVectorLane* destinationBegin,
-    ScalarAndIntVectorLane* const destinationEnd,
-    const ScalarAndIntVectorLane& prototype
-  )
-  {
-    while (destinationBegin != destinationEnd) {
-      destinationBegin->mScalar = prototype.mScalar;
-      (void)CopyAssignLegacyIntVector(&destinationBegin->mValues, &prototype.mValues);
-      ++destinationBegin;
-    }
-
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x00582380 (FUN_00582380)
-   *
-   * What it does:
-   * Source-first register adapter for one scalar+legacy-int-vector
-   * fill-from-prototype range-copy lane.
-   */
-  [[maybe_unused]] [[nodiscard]] ScalarAndIntVectorLane* FillScalarAndIntVectorRangeFromPrototypeSourceFirstAdapter(
-    const ScalarAndIntVectorLane* const prototype,
-    ScalarAndIntVectorLane* const destinationEnd,
-    ScalarAndIntVectorLane* const destinationBegin
-  )
-  {
-    if (prototype == nullptr) {
-      return destinationBegin;
-    }
-
-    return FillScalarAndIntVectorRangeFromPrototype(destinationBegin, destinationEnd, *prototype);
+    return (row.mOccupancyWords[wordIndex] & (1 << (column & 0x1F))) != 0;
   }
 
   struct CSquadUnitsRuntimeView
@@ -2314,9 +2158,8 @@ namespace moho
                       : std::numeric_limits<float>::infinity();
           }
           if (bestScore > score || bestScore < 0.0f) {
-            (void)CopySPointVectorAndReturnDestination(
-              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
-            );
+            // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
+            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
             bestScore = score;
           }
           break;
@@ -2333,9 +2176,8 @@ namespace moho
                       : std::numeric_limits<float>::infinity();
           }
           if (score > bestScore || bestScore < 0.0f) {
-            (void)CopySPointVectorAndReturnDestination(
-              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
-            );
+            // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
+            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
             bestScore = score;
           }
           break;
@@ -2364,9 +2206,8 @@ namespace moho
             keep = keptOriginDist > candidateDist;
           }
           if (keep) {
-            (void)CopySPointVectorAndReturnDestination(
-              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
-            );
+            // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
+            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
             bestScore = score;
           }
           break;
@@ -2379,9 +2220,8 @@ namespace moho
             static_cast<float>((nearbyUnits.mVec.end() - nearbyUnits.mVec.begin()));
 
           if (score > bestScore || bestScore < 0.0f) {
-            (void)CopySPointVectorAndReturnDestination(
-              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
-            );
+            // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
+            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
             bestScore = score;
           }
           break;
@@ -2754,7 +2594,7 @@ bool CAiBrain::BuildUnit(const char* const blueprintId, CAiBrain* const brain, U
  * 0x8C, `CArmyImpl::CountUnitsInBoundsXZ`) tests whether any unit from the
  * enemy army's `mBuildCategoryRange`-filtered unit set falls inside that
  * cell's XZ bounds; the result is recorded into a per-row growable bitset
- * (`grid`, one `ScalarAndIntVectorLane` per row). A second pass walks every
+ * (`grid`, one `SAttackVectorGridRow` per row). A second pass walks every
  * cell whose bit is clear (no enemy presence) and, for each of its up-to-3x3
  * edge-clamped neighbor cells whose bit IS set, appends one
  * `SAiAttackVectorDebug` arrow that starts at the empty cell and points
@@ -2784,12 +2624,12 @@ void CAiBrain::ProcessAttackVectors()
 
   // One growable per-row bitset, one bit per column: bit set means the
   // enemy has at least one unit inside that grid cell.
-  msvc8::vector<ScalarAndIntVectorLane> grid;
+  msvc8::vector<SAttackVectorGridRow> grid;
 
   float cellZ = halfCell;
   for (std::int32_t row = 0; row < rowCount; ++row, cellZ += static_cast<float>(kAiDebugGridStep)) {
-    grid.push_back(ScalarAndIntVectorLane{});
-    ScalarAndIntVectorLane& gridRow = grid.back();
+    grid.push_back(SAttackVectorGridRow{});
+    SAttackVectorGridRow& gridRow = grid.back();
 
     float cellX = halfCell;
     for (std::int32_t col = 0; col < colCount; ++col, cellX += static_cast<float>(kAiDebugGridStep)) {

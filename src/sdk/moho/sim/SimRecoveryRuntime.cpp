@@ -5896,32 +5896,6 @@ float* CopyStride3FloatRangeBackwardRuntime(
 }
 
 /**
- * Address: 0x00855150 (FUN_00855150)
- *
- * What it does:
- * Appends one dword lane to a legacy vector and returns the appended value.
- */
-std::uint32_t AppendDwordLaneRuntime(
-  const std::uint32_t* const valueLane,
-  LegacyVectorStorageRuntime<std::uint32_t>* const vector
-)
-{
-  const std::uint32_t value = valueLane != nullptr ? *valueLane : 0u;
-  if (vector == nullptr) {
-    return value;
-  }
-
-  const std::size_t currentSize = VectorSize(*vector);
-  if (!ReserveTrivialVector(vector, currentSize + 1u)) {
-    return value;
-  }
-
-  vector->begin[currentSize] = value;
-  vector->end = vector->begin + currentSize + 1u;
-  return value;
-}
-
-/**
  * Address: 0x00855320 (FUN_00855320)
  *
  * What it does:

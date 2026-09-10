@@ -24,14 +24,6 @@ namespace gpg::gal
 {
     namespace
     {
-        struct EffectMacroVectorRuntime final
-        {
-            void* proxy = nullptr;        // +0x00
-            EffectMacro* first = nullptr; // +0x04
-            EffectMacro* last = nullptr;  // +0x08
-            EffectMacro* end = nullptr;   // +0x0C
-        };
-
         struct DepthStencilTargetOwnerRuntimeView final
         {
             void* vftable = nullptr;                      // +0x00
@@ -78,7 +70,7 @@ namespace gpg::gal
             boost::detail::sp_counted_base* sourceBufferCount = nullptr; // +0x48
             std::uint32_t sourceBufferBegin = 0U;                    // +0x4C
             std::uint32_t sourceBufferEnd = 0U;                      // +0x50
-            EffectMacroVectorRuntime macros;                         // +0x54
+            msvc8::vector<EffectMacro> macros;                       // +0x54
         };
 
         static_assert(offsetof(EffectContextRuntimeView, sourcePath) == 0x0C, "EffectContextRuntimeView::sourcePath offset must be 0x0C");
@@ -88,17 +80,8 @@ namespace gpg::gal
             "EffectContextRuntimeView::sourceBufferCount offset must be 0x48"
         );
         static_assert(offsetof(EffectContextRuntimeView, macros) == 0x54, "EffectContextRuntimeView::macros offset must be 0x54");
-        static_assert(sizeof(EffectMacroVectorRuntime) == 0x10, "EffectMacroVectorRuntime size must be 0x10");
+        static_assert(sizeof(msvc8::vector<EffectMacro>) == 0x10, "msvc8::vector<EffectMacro> size must be 0x10");
         static_assert(sizeof(EffectContextRuntimeView) == 0x64, "EffectContextRuntimeView size must be 0x64");
-
-        void DestroyEffectMacroRange(EffectMacro* first, EffectMacro* last) noexcept
-        {
-            while (first != last)
-            {
-                first->~EffectMacro();
-                ++first;
-            }
-        }
 
         /**
          * Address: 0x008FE700 (FUN_008FE700, msvc8::vector<gpg::gal::EffectMacro>::vector(const vector&))
@@ -119,20 +102,6 @@ namespace gpg::gal
             const msvc8::vector<EffectMacro>& source)
         {
             ::new (static_cast<void*>(destination)) msvc8::vector<EffectMacro>(source);
-        }
-
-        void DestroyEffectMacroStorage(EffectMacroVectorRuntime& runtime) noexcept
-        {
-            if (runtime.first != nullptr)
-            {
-                DestroyEffectMacroRange(runtime.first, runtime.last);
-                ::operator delete(static_cast<void*>(runtime.first));
-            }
-
-            runtime.first = nullptr;
-            runtime.last = nullptr;
-            runtime.end = nullptr;
-            runtime.proxy = nullptr;
         }
 
         /**
@@ -242,28 +211,6 @@ namespace gpg::gal
                 line,
                 msvc8::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
             );
-        }
-
-        /**
-         * Address: 0x00940230 (FUN_00940230, msvc8::vector<EffectMacro>::push_back_one)
-         *
-         * What it does:
-         * Appends one copy-constructed `EffectMacro` to the back of the
-         * macro vector lane, dispatching the per-T MSVC8 grow-and-insert
-         * helpers (`_Insert_n` / `_Insert`) that the binary emitted for
-         * `msvc8::vector<EffectMacro>`. Preserves the original "fill one
-         * then bind" two-step pattern via the recovered modern
-         * `msvc8::vector` API.
-         */
-        void PushBackEffectMacroIntoLane(
-            EffectMacroVectorRuntime& runtime,
-            const EffectMacro& source
-        )
-        {
-            auto* const vec = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime);
-            // push_back's capacity-full path is `msvc8::vector<EffectMacro>::insert`
-            // (FUN_0093FEB0), reached through the single-value insert lane (FUN_009401C0).
-            vec->push_back(source);
         }
 
         void AssignSharedCount(
@@ -840,10 +787,7 @@ namespace gpg::gal
         runtime->sourceBufferBegin = 0U;
         runtime->sourceBufferEnd = 0U;
 
-        runtime->macros.proxy = nullptr;
-        runtime->macros.first = nullptr;
-        runtime->macros.last = nullptr;
-        runtime->macros.end = nullptr;
+        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
     }
 
     /**
@@ -865,10 +809,7 @@ namespace gpg::gal
         runtime->sourceBufferCount = nullptr;
         runtime->sourceBufferBegin = 0U;
         runtime->sourceBufferEnd = 0U;
-        runtime->macros.proxy = nullptr;
-        runtime->macros.first = nullptr;
-        runtime->macros.last = nullptr;
-        runtime->macros.end = nullptr;
+        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
 
         ::new (static_cast<void*>(&runtime->sourcePath)) msvc8::string();
         try
@@ -889,12 +830,10 @@ namespace gpg::gal
                 runtime->sourceBufferBegin = sourceRuntime->sourceBufferBegin;
                 runtime->sourceBufferEnd = sourceRuntime->sourceBufferEnd;
 
-                auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
-                const auto* const sourceMacros = reinterpret_cast<const msvc8::vector<EffectMacro>*>(&sourceRuntime->macros);
                 // Route per-T copy-construction through the canonical helper
                 // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
                 // template emission symbol is preserved.
-                CopyConstructEffectMacroVector(destinationMacros, *sourceMacros);
+                CopyConstructEffectMacroVector(&runtime->macros, sourceRuntime->macros);
             }
             catch (...)
             {
@@ -939,10 +878,7 @@ namespace gpg::gal
         runtime->sourceBufferCount = nullptr;
         runtime->sourceBufferBegin = 0U;
         runtime->sourceBufferEnd = 0U;
-        runtime->macros.proxy = nullptr;
-        runtime->macros.first = nullptr;
-        runtime->macros.last = nullptr;
-        runtime->macros.end = nullptr;
+        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
 
         const char* const sourcePathText = (sourcePath != nullptr) ? sourcePath : "";
         const char* const cachePathText = (cachePath != nullptr) ? cachePath : "";
@@ -965,11 +901,10 @@ namespace gpg::gal
                 runtime->sourceBufferBegin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mBegin));
                 runtime->sourceBufferEnd = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mEnd));
 
-                auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
                 // Route per-T copy-construction through the canonical helper
                 // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
                 // template emission symbol is preserved.
-                CopyConstructEffectMacroVector(destinationMacros, macros);
+                CopyConstructEffectMacroVector(&runtime->macros, macros);
             }
             catch (...)
             {
@@ -1002,7 +937,8 @@ namespace gpg::gal
     {
         auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
 
-        DestroyEffectMacroStorage(runtime->macros);
+        // `~vector<EffectMacro>`: destroy the macros, free the block, null the triple.
+        runtime->macros.~vector();
 
         if (runtime->sourceBufferCount != nullptr)
         {
@@ -1047,14 +983,14 @@ namespace gpg::gal
                 nameText, static_cast<unsigned int>(std::strlen(nameText))
             );
 
-            EffectMacro* foundPosition = runtime->macros.last;
+            EffectMacro* foundPosition = runtime->macros.end();
             (void)FindEffectMacroByKeyInRange(
                 &foundPosition,
-                runtime->macros.first,
-                runtime->macros.last,
+                runtime->macros.begin(),
+                runtime->macros.end(),
                 needleKey
             );
-            isDuplicate = (foundPosition != runtime->macros.last);
+            isDuplicate = (foundPosition != runtime->macros.end());
         }
 
         if (isDuplicate)
@@ -1067,7 +1003,9 @@ namespace gpg::gal
         }
 
         const EffectMacro newMacro(nameText, valueText);
-        PushBackEffectMacroIntoLane(runtime->macros, newMacro);
+        // `msvc8::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
+        // its capacity-full path is the single-value `insert` 0x009401C0.
+        runtime->macros.push_back(newMacro);
     }
 
     /**

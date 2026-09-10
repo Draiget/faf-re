@@ -69,7 +69,7 @@ namespace msvc8
              * Address: 0x00446A40 (FUN_00446A40)
              *
              * What it does:
-             * Advances one bit, carrying to the next word when the bit lane reaches 31.
+             * Advances one bit, carrying to the next word when the bit index reaches 31.
              */
             vector_bool_word_cursor& Increment() noexcept
             {
@@ -88,7 +88,7 @@ namespace msvc8
              * Address: 0x00446A20 (FUN_00446A20)
              *
              * What it does:
-             * Moves one bit backward, borrowing from the previous word when bit lane is 0.
+             * Moves one bit backward, borrowing from the previous word when bit index is 0.
              */
             vector_bool_word_cursor& Decrement() noexcept
             {
@@ -108,7 +108,7 @@ namespace msvc8
          * Address: 0x00446830 (FUN_00446830)
          *
          * What it does:
-         * Returns cursor inequality by comparing both word and bit lanes.
+         * Returns cursor inequality by comparing both word and bit positions.
          */
         [[nodiscard]] inline bool CursorNotEqual(
             const vector_bool_word_cursor& lhs,
@@ -122,7 +122,7 @@ namespace msvc8
          * Address: 0x00446A00 (FUN_00446A00)
          *
          * What it does:
-         * Returns cursor equality by comparing both word and bit lanes.
+         * Returns cursor equality by comparing both word and bit positions.
          */
         [[nodiscard]] inline bool CursorEqual(
             const vector_bool_word_cursor& lhs,
@@ -445,7 +445,7 @@ namespace msvc8
          * Address: 0x004C6A70 (FUN_004C6A70)
          *
          * What it does:
-         * Returns the high-byte lane from one 32-bit word.
+         * Returns the high byte from one 32-bit word.
          */
         [[nodiscard]] inline std::uint8_t HighByteOfWord(const std::uint32_t value) noexcept
         {
@@ -491,10 +491,10 @@ namespace msvc8
         }
 
         /**
-         * Runtime dword-lane view with one leading 32-bit metadata lane.
+         * Runtime dword view with one leading 32-bit metadata word.
          *
          * Layout:
-         *   +0x00: metadata/prefix lane
+         *   +0x00: metadata word
          *   +0x04: begin
          *   +0x08: end
          *   +0x0C: capacity end
@@ -515,7 +515,7 @@ namespace msvc8
          * Address: 0x00444050 (FUN_00444050)
          *
          * What it does:
-         * Initializes begin/end/capacity dword lanes for one requested word count.
+         * Initializes begin/end/capacity dwords for one requested word count.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
         [[nodiscard]] inline bool InitializeWordStorage(
@@ -544,7 +544,7 @@ namespace msvc8
          *
          * What it does:
          * Inserts `count` copies of `fillValue` at `insertAt` in one legacy dword
-         * lane vector, preserving VC8 growth/shift behavior.
+         * vector, preserving VC8 growth/shift behavior.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
         [[nodiscard]] inline std::uint32_t* InsertFillWords(
@@ -616,7 +616,7 @@ namespace msvc8
          * Address: 0x00444AC0 (FUN_00444AC0)
          *
          * What it does:
-         * Inserts one word value at `insertAt` in one legacy dword lane vector.
+         * Inserts one word value at `insertAt` in one legacy dword vector.
          */
         template <class ThrowTooLongFn, class AllocateWordsFn>
         [[nodiscard]] inline std::uint32_t* InsertWord(
@@ -665,7 +665,7 @@ namespace msvc8
          *
          * What it does:
          * Ensures logical word count by delegating grow/erase operations while
-         * preserving legacy pointer-lane update ordering.
+         * preserving legacy pointer update ordering.
          */
         template <class GrowWordsFn, class EraseWordRangeFn>
         [[nodiscard]] inline std::size_t ResizeWordStorage(
@@ -692,7 +692,7 @@ namespace msvc8
          * Address: 0x00444E80 (FUN_00444E80)
          *
          * What it does:
-         * Copies one 32-bit word-pointer lane from a source slot into destination.
+         * Copies one 32-bit word-pointer from a source slot into destination.
          */
         [[nodiscard]] inline std::uint32_t** CopyWordPointerSlot(
             std::uint32_t** const destination,
@@ -719,7 +719,7 @@ namespace msvc8
          * Address: 0x00537FE0 (FUN_00537FE0)
          *
          * What it does:
-         * Stores one 32-bit word pointer lane and returns the destination slot.
+         * Stores one 32-bit word pointer and returns the destination slot.
          */
         [[nodiscard]] inline std::uint32_t** SetWordPointer(
             std::uint32_t** const destination,
@@ -805,7 +805,7 @@ namespace msvc8
          * Address: 0x00445360 (FUN_00445360)
          *
          * What it does:
-         * Initializes a vector<bool>-style cursor from a word pointer and clears bit lane.
+         * Initializes a vector<bool>-style cursor from a word pointer and clears bit index.
          */
         [[nodiscard]] inline vector_bool_word_cursor* SetCursorWordAndClearBit(
             vector_bool_word_cursor* const cursor,
@@ -821,7 +821,7 @@ namespace msvc8
          * Address: 0x00443CA0 (FUN_00443CA0)
          *
          * What it does:
-         * Loads one source word slot into a cursor and clears its bit lane.
+         * Loads one source word slot into a cursor and clears its bit index.
          */
         [[nodiscard]] inline vector_bool_word_cursor* SetCursorFromWordSlotAndClearBit(
             vector_bool_word_cursor* const cursor,
@@ -837,7 +837,7 @@ namespace msvc8
          * Address: 0x004467B0 (FUN_004467B0)
          *
          * What it does:
-         * Copies one source cursor bit value into destination cursor bit lane.
+         * Copies one source cursor bit value into destination cursor bit index.
          */
         [[nodiscard]] inline vector_bool_word_cursor* CopyBitAtCursor(
             vector_bool_word_cursor* const destination,
@@ -1001,7 +1001,7 @@ namespace msvc8
          * Address: 0x00443FC0 (FUN_00443FC0)
          *
          * What it does:
-         * Executes one insertion lane and then rebinds output pointer to the same
+         * Executes one insertion and then rebinds output pointer to the same
          * logical word offset in possibly reallocated storage.
          */
         template <class InsertAtWordFn>
@@ -1069,7 +1069,7 @@ namespace msvc8
          * Address: 0x00445480 (FUN_00445480)
          *
          * What it does:
-         * Returns pointer equality for one-word iterator lanes.
+         * Returns pointer equality for one-word iterators.
          */
         [[nodiscard]] inline bool WordPointerEqual(
             const std::uint32_t* const lhs,
@@ -1083,7 +1083,7 @@ namespace msvc8
          * Address: 0x00446F90 (FUN_00446F90)
          *
          * What it does:
-         * Returns pointer-lane strict-less relation.
+         * Returns pointer strict-less relation.
          */
         [[nodiscard]] inline bool WordPointerLess(
             const std::uint32_t* const lhs,
@@ -1098,7 +1098,7 @@ namespace msvc8
          * Address: 0x004453F0 (FUN_004453F0)
          *
          * What it does:
-         * Returns pointer inequality for one-word iterator lanes.
+         * Returns pointer inequality for one-word iterators.
          */
         [[nodiscard]] inline bool WordPointerNotEqual(
             const std::uint32_t* const lhs,
@@ -1116,7 +1116,7 @@ namespace msvc8
          * Address: 0x00445A60 (FUN_00445A60)
          *
          * What it does:
-         * Swaps two 32-bit word lanes in place.
+         * Swaps two 32-bit words in place.
          */
         template <class WordT>
         [[nodiscard]] inline WordT* SwapWords(WordT* const lhs, WordT* const rhs) noexcept
@@ -1160,7 +1160,7 @@ namespace msvc8
          * Address: 0x00443CB0 (FUN_00443CB0)
          *
          * What it does:
-         * Loads one source word slot into a cursor, clears bit lane, then advances
+         * Loads one source word slot into a cursor, clears bit index, then advances
          * by signed bit delta.
          */
         [[nodiscard]] inline vector_bool_word_cursor* SetCursorFromWordSlotAndAdvanceBits(
@@ -1260,7 +1260,7 @@ namespace msvc8
          * Address: 0x00444FB0 (FUN_00444FB0)
          *
          * What it does:
-         * Returns the legacy `-1` sentinel lane used by VC8 vector<bool> helpers.
+         * Returns the legacy `-1` sentinel used by VC8 vector<bool> helpers.
          */
         [[nodiscard]] inline int NegativeOneSentinel() noexcept
         {
@@ -1294,7 +1294,7 @@ namespace msvc8
     {
         /**
          * Empty tag type standing in for `myProxy_` when a `vector<T,
-         * HasDebugProxy>` instantiation carries no VC8 debug-iterator lane at
+         * HasDebugProxy>` instantiation carries no VC8 debug-iterator proxy at
          * all -- see `vector`'s `HasDebugProxy` template parameter below.
          * `[[msvc::no_unique_address]]` lets the compiler fully elide this
          * tag's storage, dropping the class from 16 to 12 bytes.
@@ -1581,7 +1581,7 @@ namespace msvc8
          * forwards `(count, that temporary)` into the exact same
          * allocate-then-fill path as `vector(count, value)` below --
          * confirmed from this address's own raw disassembly: it zeroes
-         * `last_`/`end_` on entry (leaving the debug-proxy lane at `+0x0`
+         * `last_`/`end_` on entry (leaving the debug-proxy slot at `+0x0`
          * alone), and when `count != 0` calls `FUN_007E4370` (cited just
          * below) followed by `FUN_007E6460` (`uninit_fill_n`, cited above
          * on that member) to broadcast-copy the temporary into the
@@ -1601,7 +1601,7 @@ namespace msvc8
          * a sibling caller is still open).
          *
          * Address: 0x007E4370 (FUN_007E4370) -- this instantiation's fused
-         * allocate-and-arm-the-triplet lane, called only from
+         * allocate-and-arm-the-triplet step, called only from
          * `FUN_007E3730` above. Takes `(unused register, output vector*,
          * count)`; the first parameter is loaded but never read in the
          * body. Guards `count > 0x15555555` (`max_size()` for a 12-byte
@@ -1837,7 +1837,7 @@ namespace msvc8
          * -- SEH-guarded copy constructor, `.asm`-confirmed: `(mLast-mFirst)
          * >> 5` element count, `if(n){ zero the triple; buy(n); uninit_copy;
          * }` shape matching this constructor exactly. Its fused
-         * allocate-and-arm-the-triplet lane (the `reserve(n)` guard +
+         * allocate-and-arm-the-triplet step (the `reserve(n)` guard +
          * `reallocate_to(n)` steps fused into one out-of-line body, same
          * pattern as `FUN_007E4370`/`FUN_008F69A0` above) is `FUN_0074DBA0`:
          * guards `count > 0x7FFFFFF` (`max_size()` for this element) and
@@ -1883,8 +1883,8 @@ namespace msvc8
           */
         /**
          * Address: 0x005267A0 (FUN_005267A0, `msvc8::vector<float>` -- the
-         * occupancy-rect lane on `RUnitBlueprint`). Nulls the destination's
-         * three lanes (it is raw memory, so there is nothing to free), checks
+         * occupancy rect on `RUnitBlueprint`). Nulls the destination's
+         * three pointers (it is raw memory, so there is nothing to free), checks
          * `max_size()`, allocates exactly the source's element count and
          * copies `[begin, end)`. That is this constructor, not an assignment.
          *
@@ -1930,7 +1930,7 @@ namespace msvc8
          * Address: 0x005C5580 (FUN_005C5580,
          * msvc8::vector<Moho::SPerArmyReconInfo>::~vector -- VC8's `_Tidy()`:
          * destroys `[mFirst, mLast)` then `operator delete`s the block and nulls
-         * all three pointer lanes. MSVC emits the call automatically because
+         * all three pointers. MSVC emits the call automatically because
          * `mReconDat` is `Moho::ReconBlip`'s last-declared member, which is why
          * it is the first teardown step of `~ReconBlip` at 0x005BECBB.)
          * Address: 0x005C3C10 (FUN_005C3C10, the calling-convention thunk MSVC
@@ -1941,7 +1941,7 @@ namespace msvc8
          * ~vector for the 136-byte polymorphic element -- same `_Tidy()` shape
          * as the SPerArmyReconInfo instantiation above: `for (it = myFirst;
          * it != myLast; it += 34 dwords) (**it)(it, 0)` then
-         * `operator delete(myFirst)` and null all three pointer lanes. The
+         * `operator delete(myFirst)` and null all three pointers. The
          * per-element teardown dispatches through `WaveParameters`'s own
          * vtable slot 0 (the `(**it)(it, 0)` call, `0` = "don't free, this is
          * placement destroy only" per the standard MSVC deleting-destructor
@@ -1963,11 +1963,11 @@ namespace msvc8
          * subsystem): destroys each element through `FUN_00859E90` (dual
          * `_InterlockedExchangeAdd` release at elem+4/elem+12, confirming
          * the two handle pairs) then frees the buffer and nulls the three
-         * pointer lanes at file-scope globals `dword_10C425C`/`_4260`/
+         * pointers at file-scope globals `dword_10C425C`/`_4260`/
          * `_4264` -- a global instance, not a class member. Real caller is
          * `FUN_00C06B20`, a one-instruction `jmp` thunk (`sub_85A1F0();
          * return;`) address-taken into the CRT static-teardown table by
-         * `FUN_00BE52F0` (an `__xc_a`-lane registrar, the same shape as 327
+         * `FUN_00BE52F0` (an `__xc_a` registrar, the same shape as 327
          * sibling atexit cleanup thunks already `skip`-tagged in this
          * codebase) -- a known linker-emitted bridge citing this body's own
          * evidence, not an independent function.
@@ -2078,7 +2078,7 @@ namespace msvc8
          * Address: 0x00548ED0 (FUN_00548ED0,
          * msvc8::vector<Moho::ResourceDeposit>::operator=(const vector&) for
          * the 20-byte element -- 148 instructions carrying the same VC8 assign
-         * shape, calling the `std::copy` lane FUN_00548C00 three times, once
+         * shape, calling the `std::copy` step FUN_00548C00 three times, once
          * per branch. Reached from `RVectorType_ResourceDeposit::SerLoad`'s
          * closing `*storage = loaded;`.)
          * Address: 0x008F6DD0 (FUN_008F6DD0, `msvc8::vector<DXGI_MODE_DESC>::
@@ -2089,7 +2089,7 @@ namespace msvc8
          * it, the returned iterator discarded; source longer but fits in
          * capacity -> assign-over the retained prefix (`FUN_008F64A0`,
          * `copy_or_move_assign` shape, already recovered as
-         * `CopyForward28ByteLaneSourceFirst` in
+         * the former 28-byte source-first copy in
          * `gpg/core/containers/FastVectorInsertLanes.cpp`) then
          * uninitialized-copy the excess tail (`FUN_008F66E0` -> `FUN_008F64D0`,
          * `uninit_copy_n` shape, already recovered in the same file --
@@ -2136,7 +2136,7 @@ namespace msvc8
          * expressions once `T = AdapterD3D9` -- the real binary keeps the
          * tail-shift loop out of line as `FUN_008EFCD0` (112-byte element,
          * reverse pointer-walk, bridged through `FUN_008F0380` from the
-         * `_Insert_n`-shaped grow/shift lane `FUN_008F1890`), while this
+         * `_Insert_n`-shaped grow/shift body `FUN_008F1890`), while this
          * template inlines the equivalent loop directly into `insert`.
          * Empirically confirmed, not just theorized: compiling
          * `D3D9Interfaces.cpp` (tucheck, unchanged by this pass) and
@@ -2212,6 +2212,7 @@ namespace msvc8
          * Address: 0x005ED370 (FUN_005ED370 -- `vector<SAiReservedTransportBone>::operator=` (buy 0x005EA4E0, element destroy 0x005EE360, copy-construct bridge 0x005EE710); zero callers and unreachable, a linker-retained copy nothing runs.)
          * Address: 0x006DE400 (FUN_006DE400 -- `operator=` for the 12-byte `moho::SBlackListInfo` element (`WeakPtr<Entity>` + int; the element-wise assign/copy-construct steps relink each weak reference through `WeakPtr<Entity>`'s own copy semantics). Zero callers, no xrefs, unreachable from every seeded root. Formerly the runtime-view transcription `AssignBlacklistInfoVectorPreservingWeakLinks` in moho/unit/core/UnitWeapon.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00628560 (FUN_00628560 -- `operator=` for the 12-byte `moho::SPickUpInfo` element (`WeakPtr<Unit>` + float). Zero callers, no xrefs, unreachable. Formerly `AssignPickUpInfoVectorPreservingWeakLinks` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00583A20 (FUN_00583A20 -- `operator=` for `msvc8::vector<int>` (the `SAttackVectorGridRow::mOccupancyWords` member, assigned per row by the fill step 0x00583850; empty-source arm `clear()` 0x00583C30, assign-over step `_Copy_opt` 0x00584480). Formerly the orphan `CopyAssignLegacyIntVector` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2273,7 +2274,7 @@ namespace msvc8
          * `FUN_0054C170` above (`*outBinding = bindingArray->first_; return
          * outBinding;`). Previously modeled in RRuleGameRules.cpp as a
          * bespoke pair of wrapper functions
-         * (`StoreLuaExportBindingBeginLane`/`...Adapter`) reaching into a
+         * (a per-type begin-pointer store and its adapter) reaching into a
          * hand-rolled `RRuleGameRulesLuaExportBindingArray` struct's raw
          * `mBegin` field -- removed once that field became a real
          * `msvc8::vector<T>` and this member's own `begin()` covers it
@@ -2285,7 +2286,7 @@ namespace msvc8
          * now do by name.)
          *
          * What it does:
-         * Returns the first element pointer lane (`first_`).
+         * Returns the first element pointer (`first_`).
          * Address: 0x00523890 (FUN_00523890 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005249F0 (FUN_005249F0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005438F0 (FUN_005438F0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -2317,13 +2318,13 @@ namespace msvc8
          * Address: 0x0052BE30 (FUN_0052BE30, `msvc8::vector<
          * Moho::RRuleGameRulesLuaExportBinding>::end` sibling of
          * `FUN_0052BE20` above -- same out-pointer form, same removed
-         * `StoreLuaExportBindingEndLane`/`...Adapter` wrapper pair. Reached
+         * per-type end-pointer store/adapter wrapper pair. Reached
          * transitively once real code calls `mMaps.end()`, which
          * `FindExportBinding`/`ExportBindingCount`/
          * `RegisterBlueprintInCategoryMaps` now do by name.)
          *
          * What it does:
-         * Returns the one-past-end pointer lane (`last_`).
+         * Returns the one-past-end pointer (`last_`).
          * Address: 0x005238A0 (FUN_005238A0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00524A00 (FUN_00524A00 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00543900 (FUN_00543900 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -2360,7 +2361,7 @@ namespace msvc8
          *   `weapon->mTargetPriorities.size()` in CAiAttackerImpl.cpp)
          * Address: 0x008F5E00 (FUN_008F5E00, msvc8::vector<DXGI_MODE_DESC>::size
          *   for the 0x1C-byte element -- `this->first_ ? (this->last_-
-         *   this->first_)/28 : 0`. Reached from the `_Insert_n` grow lane
+         *   this->first_)/28 : 0`. Reached from the `_Insert_n` grow body
          *   `FUN_008F6A50` (cited below on `insert`) and from `operator=`
          *   (`FUN_008F6DD0`, cited above). `StartupHelpers.cpp` previously
          *   mis-attributed this token to `AllowedProtocolsCountUnsafe`
@@ -2434,12 +2435,12 @@ namespace msvc8
          * `recommended_capacity` input but never gave it a formal Address
          * block until now.)
          * Address: 0x0092BCA0 (FUN_0092BCA0, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::capacity` for the 12-byte
+         * ClusterSearchEdge>::capacity` for the 12-byte
          * element -- `first_ ? (end_-first_)/12 : 0`. Reached from the
          * `_Insert_n` growth-branch capacity check `FUN_0092F630` (cited
          * above on `insert`).)
          * Address: 0x0092C280 (FUN_0092C280, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchOpenHeapEntryRuntime>::capacity` for the sibling
+         * ClusterSearchOpenHeapEntry>::capacity` for the sibling
          * 12-byte open-heap-entry instantiation -- same shape, reached from
          * that element's own `_Insert_n` growth check `FUN_0092F240`.)
          * Address: 0x0052CFB0 (FUN_0052CFB0, `msvc8::vector<
@@ -2449,8 +2450,8 @@ namespace msvc8
          * `(end_-first_)/sizeof(T)` fold as `FUN_008F5D90`/`FUN_0092BCA0`
          * above, just computed in raw byte terms via `reinterpret_cast`
          * rather than `T*` pointer subtraction. Previously modeled in
-         * RRuleGameRules.cpp as `ComputeLuaExportBindingCapacityLane`/
-         * `GetLuaExportBindingCapacityLane`, reaching into the hand-rolled
+         * RRuleGameRules.cpp as two per-type capacity
+         * helpers, reaching into the hand-rolled
          * `RRuleGameRulesLuaExportBindingArray`'s raw `mBegin`/
          * `mCapacityEnd` fields -- removed once that field became a real
          * `msvc8::vector<T>` and this member's own `capacity()` covers it
@@ -2563,7 +2564,7 @@ namespace msvc8
          * out-of-line emission for the 0x8C-byte non-trivial element. Unlike the
          * `_Insert_n` bodies it opens with a bare `count > max_size()` test
          * (`cmp esi, 1D41D41h` at 0x0071B750 — 0xFFFFFFFF/140 — then
-         * `call FUN_0071BCA0`, the `vector<T> too long` throw lane), takes a single
+         * `call FUN_0071BCA0`, the `vector<T> too long` throw helper), takes a single
          * stack argument (`retn 4`), performs no tail shift and no fill: it moves the
          * live range into the fresh block (0x0071B7C3), destroys and frees the old
          * one, then rebases `{first,last,end}` (0x0071B82A-0x0071B830). Emitted by
@@ -2577,13 +2578,13 @@ namespace msvc8
          * msvc8::vector<Moho::SDelayedSubVizInfo>::reserve -- exact-capacity
          * grow: max_size guard, one `operator new(requiredCapacity * 0x18)`,
          * element-wise copy of the live range into it, free the old block,
-         * rebase all three lanes. Reached from the delayed-sub-viz reflection
+         * rebase all three pointers. Reached from the delayed-sub-viz reflection
          * loader and from `operator=`'s _Buy path.)
          * Address: 0x00547E00 (FUN_00547E00,
          * msvc8::vector<Moho::ResourceDeposit>::reserve -- opens with the
          * max_size guard against 0x0CCCCCCC, which is exactly
          * `0xFFFFFFFF / 0x14`, then allocates, uninit-copies the live range
-         * through FUN_00549BC0, frees the old block and rebases the lanes.
+         * through FUN_00549BC0, frees the old block and rebases the pointers.
          * Reached from `RVectorType_ResourceDeposit::SerLoad` (0x00547950),
          * which reserves the archived count before filling.)
          * Address: 0x00560D60 (FUN_00560D60,
@@ -2592,7 +2593,7 @@ namespace msvc8
          * (`0xFFFFFFFF / 0x160`), allocates via the checked allocator
          * FUN_00562700, uninit-copies the live range through FUN_005632D0
          * (both already recovered), frees the old block implicitly and
-         * rebases the lanes. Reached from `Moho::SSyncData::ReserveSizes`
+         * rebases the pointers. Reached from `Moho::SSyncData::ReserveSizes`
          * (FUN_00560A00) as `syncData->mArmyUpdates.reserve(sizes->mArmyData)`
          * -- recovered as `ReserveSyncDataSizes` in Sim.cpp, called from
          * `Sim::Sync` right after `SnapshotSyncReserveCounts`.)
@@ -2603,7 +2604,7 @@ namespace msvc8
          * against 0x12F684B (`0xFFFFFFFF / 0xD8`), allocates via the checked
          * allocator FUN_00562770, uninit-copies the live range through
          * FUN_00563380 (both already recovered), frees the old block
-         * implicitly and rebases the lanes. Reached from
+         * implicitly and rebases the pointers. Reached from
          * `Moho::SSyncData::ReserveSizes` (FUN_00560A00) as
          * `syncData->mEntityUpdates.reserve(sizes->mEntityData)` -- recovered
          * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
@@ -2611,22 +2612,22 @@ namespace msvc8
          * Address: 0x00561000 (FUN_00561000,
          * msvc8::vector<Moho::SUnitVariableUpdateEntry>::reserve --
          * exact-capacity grow for the 0x238-byte element: max_size guard
-         * against 0xB60B60 (`0xFFFFFFFF / 0x238`, throw lane FUN_005617E0,
+         * against 0xB60B60 (`0xFFFFFFFF / 0x238`, throw helper FUN_005617E0,
          * already cited as this specialization's `throw_too_long`),
          * allocates via the checked allocator FUN_005627E0, uninit-copies
          * the live range through FUN_00563430 (the `uninit_copy_n` range
          * form cited above), frees the old block implicitly and rebases the
-         * lanes. Reached from `Moho::SSyncData::ReserveSizes` (FUN_00560A00)
+         * pointers. Reached from `Moho::SSyncData::ReserveSizes` (FUN_00560A00)
          * as `syncData->mUnitUpdates.reserve(sizes->mUnitData)` -- recovered
          * as `ReserveSyncDataSizes` in Sim.cpp, same call site as
          * `mArmyUpdates.reserve`/`mEntityUpdates.reserve` above.)
          * Address: 0x00561160 (FUN_00561160,
          * msvc8::vector<Moho::SSyncPublishedCommandPacket>::reserve --
          * exact-capacity grow for the 0x78-byte element: max_size guard
-         * against 0x2222222 (`0xFFFFFFFF / 0x78`, throw lane FUN_00561900),
+         * against 0x2222222 (`0xFFFFFFFF / 0x78`, throw helper FUN_00561900),
          * allocates via the checked allocator FUN_00562850, uninit-copies
          * the live range through FUN_005634F0, frees the old block
-         * implicitly and rebases the lanes. Reached from
+         * implicitly and rebases the pointers. Reached from
          * `Moho::SSyncData::ReserveSizes` (FUN_00560A00) as
          * `syncData->mPublishedCommandPackets.reserve(sizes->mCommandData)`
          * -- recovered as `ReserveSyncDataSizes` in Sim.cpp, same call site
@@ -2651,10 +2652,10 @@ namespace msvc8
          * `msvc8::vector<Moho::ReconBlip*>::reserve` for the 4-byte pointer
          * element (`Moho::CAiReconDBImpl::mBblips`/`mTempBlips`,
          * `CAiReconDBImpl.h`). Opens with the max_size guard against
-         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw lane `FUN_005C79A0`), allocates
+         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw helper `FUN_005C79A0`), allocates
          * via `FUN_005CA040`, uninit-copies the live range through
          * `FUN_005CE060` (cited below on `uninit_copy_n`), frees the old
-         * block and rebases the three lanes -- confirmed against the `.asm`.
+         * block and rebases the three pointers -- confirmed against the `.asm`.
          * Reached from `DeserializeReconBlipPointerVector`'s (`FUN_005C58E0`,
          * `CAiReconDBImplTypeInfo.cpp`, already recovered) `storage->
          * reserve(count)` call, made immediately after reading the archived
@@ -2668,13 +2669,13 @@ namespace msvc8
          * SPerArmyReconInfo>::reserve for the 52-byte element) -- exact
          * shape of this member: early return when `newCap <= capacity()`
          * (`result < a2` guard on the current `(myEnd-myFirst)/52` capacity),
-         * max_size guard against `0x4EC4EC4` (`0xFFFFFFFF/52`, throw lane
+         * max_size guard against `0x4EC4EC4` (`0xFFFFFFFF/52`, throw helper
          * `FUN_005C7290`, cited on `throw_too_long` above), checked
          * allocation via `FUN_005C9F40` (cited below on
          * `allocate_slots_checked`), uninit-copies the live range through
          * `FUN_005CE020` (a separate compiled `uninit_copy_n` copy for this
          * call site, cited below), then destroys and frees the old buffer
-         * and rebases the three lanes. Reached from `LoadVectorSPerArmyReconInfo`
+         * and rebases the three pointers. Reached from `LoadVectorSPerArmyReconInfo`
          * (`FUN_005C5700`, `ArchiveSerialization.cpp`) as `loaded.reserve(
          * count)`, called immediately after reading the archived element
          * count and before the per-element read loop -- confirmed against
@@ -2694,10 +2695,10 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x004430D0 (FUN_004430D0, forwarding lane)
+         * Address: 0x004430D0 (FUN_004430D0, forwarding thunk)
          * Address: 0x00443B80 (FUN_00443B80)
          * Address: 0x0074DC40 (FUN_0074DC40, msvc8::vector<Moho::CArmyImpl*>::resize)
-         * Address: 0x005EA3F0 (FUN_005EA3F0, SEH-wrapped entry lane)
+         * Address: 0x005EA3F0 (FUN_005EA3F0, SEH-wrapped entry point)
          * Address: 0x005EAF30 (FUN_005EAF30, msvc8::vector<Moho::SAiReservedTransportBone>::resize)
          * Address: 0x005EA590 (FUN_005EA590, grow/insert-tail helper)
          * Address: 0x005A0740 (FUN_005A0740, msvc8::vector<Moho::WeakPtr<Moho::CUnitCommand>>::resize
@@ -2722,7 +2723,7 @@ namespace msvc8
          * (line `mArmiesList.resize(...)`) and `Moho::Sim::CreateArmies` — these
          * sites invoke this method by name through the `msvc8::vector<T>` API. The
          * 0x20-byte stride specialization at `0x005EAF30` (`SAiReservedTransportBone`,
-         * reached through the SEH-wrapped call-site lane at `0x005EA3F0`) is the
+         * reached through the SEH-wrapped call site at `0x005EA3F0`) is the
          * `RVectorType<SAiReservedTransportBone>` reflection SetCount emission; its
          * own grow path (`0x005EA590`) matches this method's grow branch exactly
          * (same 1.5x growth and value-initialized new slots), just compiled with
@@ -2778,41 +2779,41 @@ namespace msvc8
         /**
          * Address: 0x0082D820 (FUN_0082D820, msvc8::vector<void*>::resize for
          * UICommandGraph's hash-bucket vector -- grows through the `_Insert_n`
-         * lane FUN_0082F210, shrinks by rebasing `mLast` (the erase call
+         * body FUN_0082F210, shrinks by rebasing `mLast` (the erase call
          * degenerates to a pointer update because the element is trivially
          * destructible). Reached from the bucket-table rehash path.)
          * Address: 0x005083C0 (FUN_005083C0,
          * msvc8::vector<Moho::SDelayedSubVizInfo>::resize -- grows through the
-         * `_Insert_n` lane FUN_00508480 at `end()`, shrinks by erasing the
+         * `_Insert_n` body FUN_00508480 at `end()`, shrinks by erasing the
          * `[begin() + n, end())` tail. Reached from the reflection SetCount
-         * lane, which passes a value-initialised fill.)
+         * body, which passes a value-initialised fill.)
          * Address: 0x005C5460 (FUN_005C5460,
          * msvc8::vector<Moho::SPerArmyReconInfo>::resize for the 52-byte element
          * -- `size()` computed with the 4EC4EC4Fh/`sar 4` divide-by-0x34 magic
-         * pair at 0x005C5497, growth tail-calling the `_Insert_n` lane
+         * pair at 0x005C5497, growth tail-calling the `_Insert_n` body
          * FUN_005C6F90 at 0x005C54D1 with `(mLast, newSize - size())`, shrink
          * tail-calling `erase(begin() + newSize, end())` (FUN_005C6F00) at
          * Address: 0x006DC4E0 (FUN_006DC4E0,
          * msvc8::vector<Moho::EntityCategorySet>::resize for the 0x28-byte
-         * element -- growth through the `_Insert_n` lane FUN_006DC600, shrink
-         * through the destroy lane FUN_006DBB50. Reached from
+         * element -- growth through the `_Insert_n` body FUN_006DC600, shrink
+         * through the `_Destroy_range` body FUN_006DBB50. Reached from
          * `RVectorType<EntityCategorySet>::SetCount` (0x006DB410).)
          * 0x005C54F6. Reached from `Moho::CReconBlipManagerImpl`'s per-army
          * table sizing.)
          * Address: 0x00547F20 (FUN_00547F20,
          * msvc8::vector<Moho::ResourceDeposit>::resize for the 20-byte element
          * -- `size()` via the 66666667h/`sar 3` divide-by-0x14 magic pair,
-         * growing through the `_Insert_n` lane FUN_00547FE0 and shrinking by
-         * recomputing `_Mylast` through the copy lane FUN_00548C00. Its
+         * growing through the `_Insert_n` body FUN_00547FE0 and shrinking by
+         * recomputing `_Mylast` through the copy step FUN_00548C00. Its
          * caller `RVectorType_ResourceDeposit::SetCount` (0x00547650) shows the
          * one-argument overload inlined into it: it reserves 0x14 stack bytes,
          * zeroes all five dwords to build the `ResourceDeposit()` temporary,
          * loads `edi`/`ebx` with the vector and the new count and falls into
          * this body, which pops the by-value `_Val` with `retn 14h`.)
-         * Address: 0x00547FE0 (FUN_00547FE0, the `_Insert_n` grow lane
+         * Address: 0x00547FE0 (FUN_00547FE0, the `_Insert_n` grow body
          * described above for `msvc8::vector<Moho::ResourceDeposit>`)
          * Address: 0x00547C30 (FUN_00547C30, the advance-returning fill/copy
-         * adapter this grow lane calls: pushes a zeroed dummy byte twice as
+         * adapter this grow body calls: pushes a zeroed dummy byte twice as
          * stack args, calls the count-based forward copy primitive
          * FUN_005493B0 (`dest=edi`, `count=esi`, cited below), then computes
          * and returns `dest + count*20` (`lea edx,[esi+esi*4]` / `lea
@@ -2824,7 +2825,7 @@ namespace msvc8
          * `_Count` elements from `edx` into `eax` (5-dword field copy per
          * iteration, `add eax,14h` stride, null-guarded so a `dest==nullptr`
          * call only computes the advance). This is the old-range-into-new-
-         * buffer copy step of the `_Insert_n` grow lane FUN_00547FE0 and is
+         * buffer copy step of the `_Insert_n` grow body FUN_00547FE0 and is
          * also reached directly from `push_back`'s capacity-full path
          * (FUN_00547750, cited on `PushBackVector<ResourceDeposit>` in
          * moho/misc/EngineVectorHelpers.h) — same family, same caller chain
@@ -2832,8 +2833,8 @@ namespace msvc8
          * Address: 0x0082CBA0 (FUN_0082CBA0, `msvc8::vector<void*>::resize`
          * for one of `Moho::UICommandGraph`'s hash-bucket vectors -- `size()`
          * via a plain `(finish - start) >> 2` (4-byte pointer stride),
-         * shrinking through the erase lane FUN_0082DE20, growing through the
-         * `_Insert_n` lane FUN_0082DE90 (both cited on their own members).
+         * shrinking through the erase body FUN_0082DE20, growing through the
+         * `_Insert_n` body FUN_0082DE90 (both cited on their own members).
          * Reached from `InsertOrFindHashListNode` FUN_0082B5E0, the sibling
          * of the `HashListNode10`/`HashListNode2C` insert helper
          * CWldSession.cpp's `AddCommandQueueToCommandGraph` reconstruction
@@ -2845,7 +2846,7 @@ namespace msvc8
          * const_reference) for the 12-byte-stride selection-priority bucket
          * vector -- computes `size()` via the exact `(mLast-mFirst)/12` shape
          * this template's `size()` already produces, tail-calls the
-         * `_Insert_n` grow lane FUN_00868040 at `end()` when growing, `erase`
+         * `_Insert_n` grow body FUN_00868040 at `end()` when growing, `erase`
          * (FUN_00867FC0) when shrinking, and always destroys the by-value
          * `_Val` temporary on exit (`sub_7AF740` + `operator delete`, matching
          * `WeakEntitySetUserEntity`'s new destructor in WeakEntitySet.h) --
@@ -2855,15 +2856,15 @@ namespace msvc8
          * Address: 0x00702450 (FUN_00702450,
          * msvc8::vector<SEntitySetTemplateUnit>::resize for the 0x28-byte
          * element -- `size()` via `(mLast-mFirst)/40`, growth tail-calling
-         * the `_Insert_n` lane FUN_007030C0 at `end()`, shrink tail-calling
-         * the erase lane FUN_00703040. Reached from
+         * the `_Insert_n` body FUN_007030C0 at `end()`, shrink tail-calling
+         * the erase body FUN_00703040. Reached from
          * `InitializeArmyUnitCategorySets` (CArmyImpl.cpp), the one-argument
          * overload above inlined into `CArmyImpl::CArmyImpl` at 0x006FF2E1,
          * which builds the default `SEntitySetTemplateUnit()` value on the
          * stack before the call -- VC8's `resize(_Newsize, _Ty())` shape.)
          *
          * What it does:
-         * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
+         * The VC8 `vector<T>::resize(_Newsize, _Val)` body: grows by inserting
          * `_Newsize - size()` copies of `_Val` at `end()`, shrinks by erasing
          * the `[begin() + _Newsize, end())` tail, and does nothing when the
          * sizes already match.
@@ -2904,8 +2905,8 @@ namespace msvc8
          * `msvc8::vector<Moho::CSimConVarInstanceBase*>::resize(newSize,
          * nullptr)` for the 4-byte pointer element -- compares `newSize`
          * against `size()` (not `capacity()`, ruling out a real `reserve`),
-         * no-ops when equal, tail-calls the shrink erase lane `sub_74F880`
-         * when `newSize < size()`, tail-calls the grow `_Insert_n` lane
+         * no-ops when equal, tail-calls the shrink erase body `sub_74F880`
+         * when `newSize < size()`, tail-calls the grow `_Insert_n` body
          * FUN_0074F8E0 (cited on `insert(pos,count,value)` below) with
          * `count = newSize - size()` otherwise. Was wrongly classified
          * `external_dependency` ("STL template instantiation / codec helper")
@@ -2964,7 +2965,7 @@ namespace msvc8
          * OccupationCacheKey, Cluster::Data*>>::iterator` element as
          * `insert`'s `FUN_0092F9E0` above. Grows via that
          * `insert(last_, newSize-cur, val)` call; shrinks via the erase
-         * lane `FUN_0092EA10` (not part of this pass). Reached from
+         * body `FUN_0092EA10` (not part of this pass). Reached from
          * `hash_map<OccupationCacheKey,...>::insert(value)`'s inlined
          * `_Grow()` (`FUN_00930890`, IDA-named
          * `std::hash_map_unk_unk::insert`, sole caller per
@@ -3022,6 +3023,8 @@ namespace msvc8
          * Address: 0x005ED4C0 (FUN_005ED4C0 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
          * Address: 0x0078A070 (FUN_0078A070 -- `clear()` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00703040 (FUN_00703040 -- `clear()` for `SEntitySetTemplateUnit` (destroy the range at 0x007056D0, then `last_ = first_`), the empty-source arm of `operator=` (0x00704D80) and `resize` (0x00702450).)
+         * Address: 0x00583C30 (FUN_00583C30 -- `clear()` for `msvc8::vector<int>`, the empty-source arm of `operator=` 0x00583A20. Formerly the orphan `ClearLegacyIntVectorLogicalRange` in CAiBrain.cpp, removed 2026-09-10.)
+         * Address: 0x0057D8B0 (FUN_0057D8B0 -- `clear()` for `msvc8::vector<moho::SPointVector>` (24-byte element), the empty-source arm of that vector's `operator=` 0x00582890. Formerly the orphan `ResetSPointVectorVectorEndToBegin` in CAiBrain.cpp, removed 2026-09-10.)
          */
         void clear() noexcept {
             destroy_all();
@@ -3034,7 +3037,7 @@ namespace msvc8
          * What it does:
          * Full teardown while leaving the vector reusable: destroys the live
          * element range, releases the storage block, and clears the
-         * `{first_, last_, end_}` triplet. The debug-iterator proxy lane
+         * `{first_, last_, end_}` triplet. The debug-iterator proxy slot
          * (`myProxy_`) is deliberately left alone, matching the binary. This is
          * the destructor's own body (`~vector() { destroy_all(); deallocate_all(); }`)
          * exposed as a callable member for the ctor-rollback `catch (...) { _Tidy(); throw; }`
@@ -3076,6 +3079,7 @@ namespace msvc8
          * Address: 0x007C9310 (FUN_007C9310 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count, vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
          * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a `LegacyWordVectorRuntimeView` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00580D10 (FUN_00580D10 -- the destroy step of `_Tidy` for `msvc8::vector<SAttackVectorGridRow>` (forwards to `_Destroy_range` 0x005837F0); reached only from the ICF-folded 0x00580D30. Was cited on the same removed CAiBrain.cpp orphan.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3086,12 +3090,12 @@ namespace msvc8
          * Exchange contents with another vector.
          *
          * What it does:
-         * Swaps the three data-range lanes `{first_, last_, end_}` with `other`.
-         * The VC8 debug-iterator lane (`myProxy_`) is intentionally left in
+         * Swaps the three data-range pointers `{first_, last_, end_}` with `other`.
+         * The VC8 debug-iterator proxy (`myProxy_`) is intentionally left in
          * place: release builds never populate it, and the binary's swap sites
-         * touch only the three range lanes — see the tail of
+         * touch only the three range pointers — see the tail of
          * `moho::LoadInfluenceGridVectorArchive` (FUN_0071A330), where the
-         * scratch vector's lanes are stored into the destination at
+         * scratch vector's pointers are stored into the destination at
          * 0x0071A44E / 0x0071A458 / 0x0071A45F while the destination's previous
          * `{first, last}` pair is kept in registers and torn down by the
          * scratch's scope-exit teardown at 0x0071A477 / 0x0071A47D.
@@ -3144,7 +3148,7 @@ namespace msvc8
          * Address: 0x00769D00 (FUN_00769D00, msvc8::vector<gpg::AStarOpenHeap<TCell>::Entry>::insert
          * iterator-returning wrapper — gpg::AStarSearch.h's AStarOpenHeap::Push calls
          * mEntries.push_back(entry) by name; the 12-byte Entry stride routes through
-         * this insert(end(),1,value)-shaped lane on the capacity-full path. Grow core
+         * this insert(end(),1,value)-shaped body on the capacity-full path. Grow core
          * at 0x00769F60)
          * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back
          * — its own capacity-full path routes through the 36-byte insert-return
@@ -3152,13 +3156,13 @@ namespace msvc8
          * Address: 0x006D1960 (FUN_006D1960, msvc8::vector<moho::SUpgradeNotifyPair>::push_back
          * for the 8-byte `{mSourceId, mDestId}` element — `sar 3` stride at 0x006D1974
          * and 0x006D1980. The fast path copies the two dwords through FUN_006D2730
-         * (0x006D19A0); the capacity-full path tail-calls the `_Insert_n` grow lane
+         * (0x006D19A0); the capacity-full path tail-calls the `_Insert_n` grow body
          * FUN_006D1A90 at 0x006D19BA, skipping the iterator-returning wrapper because
          * push_back discards the iterator. A 16-byte linker-emitted bridge (FUN_006C38E0)
          * whose whole body is `call sub_6D1960` at 0x006C38E9 folds onto this same
          * symbol, so both addresses resolve here. Emitted via
          * globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
-         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
+         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner is
          * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
          * Address: 0x0057E6A0 (FUN_0057E6A0, msvc8::vector<Moho::Unit*>::push_back
          * — fast path only (no grow-core citation found); emitted via
@@ -3168,10 +3172,10 @@ namespace msvc8
          * splitter for the 12-byte `{EntId, boost::shared_ptr<CAniPose>}` element —
          * fast path copies one element in place via `uninit_copy_n`'s per-T emission
          * (FUN_0075FEA0, refcount-bumping copy of the `shared_ptr<CAniPose>` tail);
-         * capacity-full path tail-calls the insert(end(),1,value) grow lane
+         * capacity-full path tail-calls the insert(end(),1,value) grow body
          * (FUN_0075F240 → `_Insert_n` core FUN_0075F4B0). Emitted via
          * sim->mPendingPoseCopies.push_back(entry) in cfunc_TryCopyPoseL
-         * (Sim.cpp), whose owner lane is Moho::Sim::mPendingPoseCopies at Sim+0x9E8)
+         * (Sim.cpp), whose owner is Moho::Sim::mPendingPoseCopies at Sim+0x9E8)
          * Address: 0x0067B780 (FUN_0067B780, msvc8::vector<Moho::SEntityVariableUpdateEntry>::push_back
          * for the 0xD8-byte `{EntId, reserved, SSTIEntityVariableData}` record —
          * IDA's own type library names the element `pair_EntId_SSTIEntityVariableData`,
@@ -3182,12 +3186,12 @@ namespace msvc8
          * Address: 0x005DBD90 (FUN_005DBD90, msvc8::vector<Moho::UnitWeapon*>::push_back
          * for `CAiAttackerImplRuntimeView::mWeapons` — fast path appends the raw
          * pointer in place; capacity-full path tail-calls the insert(end(),1,value)
-         * grow lane `_Insert_n` (FUN_005DD120, already cited above). Emitted via
+         * grow body `_Insert_n` (FUN_005DD120, already cited above). Emitted via
          * view->mWeapons.push_back(weapon) in CAiAttackerImpl::CreateWeapon
          * (CAiAttackerImpl.cpp:973))
          * Address: 0x006E1A10 (FUN_006E1A10, msvc8::vector<Moho::CmdId>::push_back
          * for the 4-byte command-id element — fast path stores the id in place;
-         * capacity-full path tail-calls the insert(end(),1,value) grow lane
+         * capacity-full path tail-calls the insert(end(),1,value) grow body
          * (FUN_006E24D0). Emitted via pendingReleasedCmdIds.push_back(cmdId) in
          * Moho::CCommandDb::RemoveCmd (CCommandDb.cpp), the retire path that
          * hands a dead command's id to the UI through
@@ -3210,15 +3214,15 @@ namespace msvc8
          * insert(end(),1,value) grow-core (IDA's own type library names the
          * element `std::vector_CMauiControl`, i.e. this exact instantiation) —
          * the capacity-full path of `mRenderedChildren.push_back(controlCursor)`
-         * in RebuildRenderedChildrenLane (UiRuntimeTypes.cpp), reached from
+         * in the rendered-children rebuild (UiRuntimeTypes.cpp), reached from
          * Moho::CMauiControl::Render (0x00786FA0))
-         * Address: 0x0057E880 (FUN_0057E880, msvc8::vector<ScalarAndIntVectorLane>::
+         * Address: 0x0057E880 (FUN_0057E880, msvc8::vector<SAttackVectorGridRow>::
          * push_back for the 0x14-byte `{int mScalar; vector<int> mValues}`
          * element — `(a1[2]-a1[1])/20` and `(a1[3]-a1[1])/20` at 0x0057E895/
          * 0x0057E8A8 are the size/capacity element counts for this 20-byte
          * stride; fast path copies the zero-initialized row in place via
          * `sub_583210`, capacity-full path tail-calls the insert(end(),1,value)
-         * grow lane `sub_57F9F0`. Emitted via `grid.push_back(ScalarAndIntVectorLane{})`
+         * grow body `sub_57F9F0`. Emitted via `grid.push_back(SAttackVectorGridRow{})`
          * in CAiBrain::ProcessAttackVectors (CAiBrain.cpp), once per heightfield
          * grid row, building the per-row enemy-occupancy bitset array)
          *
@@ -3261,7 +3265,7 @@ namespace msvc8
          * `WaveParameters` instantiation immediately above (coincidental shape
          * match from the identical 136-byte stride -- confirmed as a distinct
          * type via the per-element copy body cited below, which touches
-         * `mExtractorName`/`mCategoryFilter`/three packed ring-color lanes,
+         * `mExtractorName`/`mCategoryFilter`/three packed ring-color words,
          * not `WaveParameters`'s layout). Fast path (`size() < capacity()`)
          * copy-constructs the pushed value directly at `last_` via the
          * `uninit_fill_n` emission FUN_007F38D0 (cited below on
@@ -3315,23 +3319,23 @@ namespace msvc8
          * the `gpg::PriorityQueue<SPropPriorityInfo, WeakPtr<Prop>>::Insert`
          * member reached from `Moho::EntityDB::AddBoundedProp`.)
          * Address: 0x009302E0 (FUN_009302E0, msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::push_back for the 12-byte
+         * ClusterSearchEdge>::push_back for the 12-byte
          * `{mAccumulatedCost, mPackedNodeCoordinate, mTraversalCost}` element
          * -- checked-capacity fast append, else tail-calls the single-value
          * `insert(pos, value)` overload FUN_00930000, whose own grow core is
          * the `_Insert_n` emission FUN_0092F630 (cited below on `insert`).
-         * Emitted via `outEdgeLanes.push_back(lane)` in
+         * Emitted via `outEdges.push_back(edge)` in
          * `ExpandClusterSearchFrontierEdges` (Cluster.cpp), the per-boundary-
          * edge scratch vector `gpg::HaStar::ClusterBuild`'s open-frontier
          * search (`ProcessClusterSearchOpenFrontier`, FUN_00930D60) refills
          * every time it expands a node. The prior per-type
-         * `AppendClusterSearchEdgeTraversalLane` wrapper this token was
+         * per-type append wrapper this token was
          * attributed to was a `RULE ONE`-violating reach-in copy of exactly
          * this member -- collapsed onto this citation instead of kept as a
          * forked free function.)
          * Address: 0x00930190 (FUN_00930190, `std::vector_Ha5::push_back` per
          * IDA's own signature recognition -- `msvc8::vector<gpg::HaStar::
-         * ClusterSearchOpenHeapEntryRuntime>::push_back` for the 12-byte
+         * ClusterSearchOpenHeapEntry>::push_back` for the 12-byte
          * `{mCost, mNode, mHandle}` open-heap entry element. Checked-capacity
          * fast append, else tail-calls `insert(pos, value)` FUN_0092FCD0,
          * whose grow core is the `_Insert_n` emission FUN_0092F240 (cited
@@ -3364,7 +3368,7 @@ namespace msvc8
          * grow core is the count=1-specialized `_Insert_n` emission
          * FUN_0074F060 (cited alongside it). Emitted via
          * `mDesyncs.push_back(desync)` in `Sim::VerifyChecksum`
-         * (FUN_007487C0, already recovered, `Sim.cpp`) -- the only lane this
+         * (FUN_007487C0, already recovered, `Sim.cpp`) -- the only path this
          * element type is ever appended through. DB-integrity fix: was
          * mis-tagged `external_dependency` ("External library:
          * std::vector_SDesyncInfo::push_back") -- despite the IDA-inferred
@@ -3545,9 +3549,9 @@ namespace msvc8
          * ...})` when the projectile's blueprint sets
          * `Display.CameraFollowsProjectile`. Migrated off a RULE ONE
          * offset-magic cluster in `SimRecoveryRuntime.cpp`
-         * (`AppendProjectileLaneRuntime` at this same address,
-         * `InsertElement12LaneAndRebaseCursorRuntime` at `0x0069ED40`
-         * cited below, and a third adapter `AppendProjectileLaneFromOwnerOffsetRuntime`
+         * (a per-type append wrapper at this same address,
+         * a per-type insert-and-rebase wrapper at `0x0069ED40`
+         * cited below, and a third owner-offset adapter
          * at `0x0069A490` that reached into `ownerBase + 0x9B8` -- that
          * third address has zero real xrefs anywhere in the binary,
          * confirmed dead, `skip`'d rather than migrated) that duplicated
@@ -3589,7 +3593,7 @@ namespace msvc8
          * the linker uses to keep the symbol shape in the recovered binary.
          */
         /**
-         * Drops the storage lanes WITHOUT destroying elements or freeing the
+         * Drops the storage pointers WITHOUT destroying elements or freeing the
          * block -- the container stops owning what it points at.
          *
          * This is not a `_Tidy()` and must not become one. `RUnitBlueprint`'s
@@ -3599,7 +3603,7 @@ namespace msvc8
          * there would add a free the binary never performs.
          *
          * Named here so the operation has a verb, instead of call sites
-         * reaching through `AsVectorRuntimeView` to write the lanes by hand.
+         * reaching through `AsVectorRuntimeView` to write the pointers by hand.
          * Address: 0x00442B50 (FUN_00442B50 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443090 (FUN_00443090 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443290 (FUN_00443290 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
@@ -3614,6 +3618,7 @@ namespace msvc8
         /**
          * Address: 0x004FD660 (FUN_004FD660 -- `vector<int*>::push_back`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0067B810 (FUN_0067B810 -- `vector<EntId>::push_back` for `SSyncData::mDeleteIds`/`mEraseIds` (`Entity::DestroyInterface` 0x0067A260, `Prop::Sync` 0x006FA2A0); the capacity-full arm calls the `_Insert_n` at 0x0067D660.)
+         * Address: 0x00940230 (FUN_00940230 -- `push_back` for the 60-byte `gpg::gal::EffectMacro` element; capacity-full path is the single-value `insert` 0x009401C0 / `_Insert_n` 0x0093FEB0. Reached from `EffectContext::DefineMacro` 0x009402D0, which now calls `macros.push_back(newMacro)` directly; the former a per-type free function wrapper in gpg/gal/ContextInterfaces.cpp was removed 2026-09-10.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -3679,7 +3684,7 @@ namespace msvc8
          * constructor.
          *
          * The mirror of `pop_back_no_destroy`, for the other half of the same
-         * binary idiom: several recovered lanes reserve exact capacity, fill
+         * binary idiom: several recovered call sites reserve exact capacity, fill
          * the reserved slots through a per-type uninitialised-copy helper, and
          * then advance `_Mylast` with a bare store to publish the new size (see
          * the factory build-queue publish path at 0x00836DBF/0x00836DEC).
@@ -3715,7 +3720,7 @@ namespace msvc8
 
         /**
          * Address: 0x00899880 (FUN_00899880, msvc8::vector<moho::UserArmy*>::assign
-         * -- nulls the three lanes, returns early on `_Count == 0`, guards
+         * -- nulls the three pointers, returns early on `_Count == 0`, guards
          * `0xFFFFFFFF / 4 < _Count` with a `vector<T> too long` throw, then makes
          * one exact-size `operator new(_Count * 4)` and fills every slot from the
          * by-ref value. Reached from `CWldSession`'s session-init path, which
@@ -3756,7 +3761,7 @@ namespace msvc8
          * match this fused compiled shape and the proven idiom.)
          *
          * What it does:
-         * The VC8 `vector<T>::assign(_Count, _Val)` lane: copies `_Val` into a
+         * The VC8 `vector<T>::assign(_Count, _Val)` body: copies `_Val` into a
          * local, empties the vector, then inserts `_Count` copies at `begin()`.
          * On an empty vector that lands as a single exact-size allocation --
          * which is why the three emissions above show a bare
@@ -3864,10 +3869,10 @@ namespace msvc8
          * Address: 0x005C6F00 (FUN_005C6F00,
          * msvc8::vector<Moho::SPerArmyReconInfo>::erase(first, last) for the
          * 52-byte element -- copy-assigns the `[last, mLast)` tail down over the
-         * gap, destroys the vacated tail slots through the range-destroy lane
+         * gap, destroys the vacated tail slots through the `_Destroy_range` body
          * FUN_005C6F70, and rebases `mLast`. Reached from `resize`'s shrink
          * branch (FUN_005C5460) and from the recon-info vector copy-assign
-         * lane's empty-source path in ReconBlip.cpp.)
+         * body's empty-source path in ReconBlip.cpp.)
          *
          * Erase a range [first,last). Returns iterator to the position that
          * now contains the element that followed the last erased element.
@@ -4028,27 +4033,27 @@ namespace msvc8
          * std::move(insertAt[i-1])` branch below, walking backward so overlapping
          * source/destination ranges never clobber an unread element (position/
          * style/depth as raw field copies, `text` reassigned via `assign`). Reached
-         * via the thin dispatcher FUN_00653A20 from the `_Insert_n` grow lane
+         * via the thin dispatcher FUN_00653A20 from the `_Insert_n` grow body
          * FUN_00653380, already cited below).
          * Address: 0x008DD050 (FUN_008DD050, msvc8::vector<gpg::RType*>::_Insert_n
-         * grow lane for the global reflection TypeVec; the recovered caller
+         * grow body for the global reflection TypeVec; the recovered caller
          * gpg::RType::RegisterType invokes insert(end(), 1, this) by name so this
          * per-T symbol is emitted).
          * Address: 0x006E24D0 (FUN_006E24D0, msvc8::vector<Moho::CmdId>::_Insert_n
-         * scalar-int32 grow lane; emitted via AppendPendingReleasedCommandId
+         * scalar-int32 grow body; emitted via AppendPendingReleasedCommandId
          * push_back (Sim.cpp:5045)).
          * Address: 0x00692930 (FUN_00692930, msvc8::vector<Moho::SyncCameraShakeRequest>::_Insert_n
-         * grow lane; emitted via mSyncCamShake.push_back (Entity.cpp:879)).
+         * grow body; emitted via mSyncCamShake.push_back (Entity.cpp:879)).
          * Address: 0x006928E0 (FUN_006928E0, sibling emission in the same
          * SyncCameraShakeRequest _Insert_n family: computes the destination
          * slot `base + 28*index` for the 28-byte element and forwards to the
          * per-element field-copy loop FUN_00693200, i.e. the tail-shift/copy
-         * sub-step this grow lane calls into).
+         * sub-step this grow body calls into).
          * Address: 0x00940D40 (FUN_00940D40, msvc8::vector<gpg::gal::AdapterModeD3D9>::_Insert_n
-         * 16-byte-element grow lane; emitted via PushBackAdapterModeD3D9 modes.push_back
+         * 16-byte-element grow body; emitted via PushBackAdapterModeD3D9 modes.push_back
          * (D3D9Interfaces.cpp:3258)).
          * Address: 0x00882BA0 (FUN_00882BA0, msvc8::vector<msvc8::string>::_Insert_n
-         * grow-and-fill lane; emitted via ResizeLegacyStringVectorExact
+         * grow-and-fill body; emitted via ResizeLegacyStringVectorExact
          * outStrings.resize(n, fillValue) (CSaveGameRequestImpl.cpp:125)).
          * Address: 0x00883820 (FUN_00883820, this instantiation's forward
          * fill-via-assign sub-step -- walks `[dst, dstEnd)` calling
@@ -4061,20 +4066,20 @@ namespace msvc8
          * this member's in-place branch. Reached from `FUN_00882BA0`
          * above.)
          * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
-         * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
+         * grow body for CAiAttackerImpl::mWeapons; the recovered caller
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
          * — MSVC8's push_back (FUN_005DBD90) is insert(end(),1,value) when full —
          * so this per-T pointer symbol is emitted).
          * Address: 0x005DD570 (FUN_005DD570, msvc8::vector<moho::CAcquireTargetTask*>::_Insert_n
-         * grow lane for the AiAttacker CAcquireTargetTask* reflection vector; the
+         * grow body for the AiAttacker CAcquireTargetTask* reflection vector; the
          * recovered helper InsertNCopiesCAcquireTargetTaskPtrVector (IAiAttacker.cpp)
          * invokes storage.insert(begin()+offset, count, value) by name, and both
          * RVectorType_CAcquireTargetTaskPtr::SerLoad (FUN_005DC660) and
          * ResizeCAcquireTargetTaskPointerVector (FUN_005DC9B0) route their
-         * append/grow lanes through it, so this per-T 4-byte pointer symbol is
+         * append/grow paths through it, so this per-T 4-byte pointer symbol is
          * emitted).
          * Address: 0x0067DB40 (FUN_0067DB40, msvc8::vector<Moho::Entity*>::_Insert_n
-         * grow lane for Moho::Entity::mAttachedEntities @+0x17C; the recovered
+         * grow body for Moho::Entity::mAttachedEntities @+0x17C; the recovered
          * helper InsertNCopiesEntityPtrVector (Entity.cpp) invokes
          * storage.insert(begin()+offset, count, value) by name, and
          * Moho::Entity::AttachTo (FUN_00679550) routes its attached-entities
@@ -4084,7 +4089,7 @@ namespace msvc8
          * is emitted. Shared by 7 vector<Entity*> _Insert_n sites in the Entity
          * subsystem, all folding to this emission).
          * Address: 0x00543DB0 (FUN_00543DB0, msvc8::vector<moho::ArmyLaunchInfo>::_Insert_n
-         * grow lane for the 0x20-byte non-trivial ArmyLaunchInfo element (element
+         * grow body for the 0x20-byte non-trivial ArmyLaunchInfo element (element
          * copies route through the BVIntSet copy-ctor FUN_00545130, never a raw
          * byte copy); the recovered helper moho::AppendArmyLaunchInfo
          * (LaunchInfoBase.cpp) invokes armyLaunchInfo.push_back(value) by name from
@@ -4092,7 +4097,7 @@ namespace msvc8
          * push_back is insert(end(),1,value) on the capacity-full path — pos is
          * _Mylast=end() (append, verified), so this per-T 0x20-byte symbol is emitted).
          * Address: 0x0087A830 (FUN_0087A830, msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n
-         * grow lane for Moho::CDecalManager::mDecals @+0x10; the recovered helper
+         * grow body for Moho::CDecalManager::mDecals @+0x10; the recovered helper
          * InsertNCopiesCWldTerrainDecalPtrVector (CWldSplat.cpp) invokes
          * storage.insert(begin()+offset, count, value) by name, and
          * CDecalManager::LoadDecal / NewSplat route their mDecals append through the
@@ -4100,7 +4105,7 @@ namespace msvc8
          * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
          * pointer symbol is emitted).
          * Address: 0x0087BB40 (FUN_0087BB40, msvc8::vector<Moho::CWldSplat*>::_Insert_n
-         * grow lane for Moho::CDecalManager::mSplats @+0x48; the recovered helper
+         * grow body for Moho::CDecalManager::mSplats @+0x48; the recovered helper
          * InsertNCopiesCWldSplatPtrVector (CWldSplat.cpp) invokes
          * storage.insert(begin()+offset, count, value) by name, and
          * CDecalManager::NewSplat routes its mSplats append through the
@@ -4110,42 +4115,42 @@ namespace msvc8
          * both are 4-byte trivially-copyable pointer instantiations sharing this
          * canonical template method).
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
-         * grow lane for Moho::Shoreline::mCells; the recovered caller
+         * grow body for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
          * by name — MSVC8's push_back (FUN_008135A0) is insert(end(),1,value) when
          * full — so this per-T 8-byte shared_ptr symbol is emitted).
          * Address: 0x008EF500 (FUN_008EF500, msvc8::vector<std::int32_t>::_Insert_n
-         * grow lane for gpg::gal::Head::validFormats1 @+0x70; the recovered caller
+         * grow body for gpg::gal::Head::validFormats1 @+0x70; the recovered caller
          * gpg::gal::DeviceD3D9::BuildDeviceCapabilities appends valid texture formats
          * and, on the capacity-full path, invokes validFormats1.insert(end(),1,token)
          * by name (MSVC8's push_back is insert(end(),1,value) when full), so this
          * per-T scalar-int32 symbol is emitted).
          * Address: 0x008EF2B0 (FUN_008EF2B0, msvc8::vector<std::int32_t>::_Insert_n
-         * grow lane for gpg::gal::Head::validFormats2 @+0x60; the same recovered
+         * grow body for gpg::gal::Head::validFormats2 @+0x60; the same recovered
          * caller appends valid GAL-format tokens and invokes
          * validFormats2.insert(end(),1,token) by name, so this per-T scalar-int32
          * symbol is emitted).
          * Address: 0x008DCB70 (FUN_008DCB70, msvc8::vector<gpg::REnumType::ROptionValue>::_Insert_n
-         * grow/insert lane for the 8-byte enum-option element {int mValue; const char* mName;};
+         * grow/insert body for the 8-byte enum-option element {int mValue; const char* mName;};
          * the recovered caller gpg::AppendEnumOptionValue (Reflection.cpp) invokes
          * options.insert(options.end(), 1, value) by name (MSVC8's push_back at FUN_008DF290
          * is insert(end(),1,value) on the capacity-full path), so this per-T 8-byte
          * trivially-copyable symbol is emitted).
          * Address: 0x007B0340 (FUN_007B0340, msvc8::vector<Moho::RCamCamera*>::_Insert_n
-         * grow lane for the 4-byte camera-pointer element; the recovered caller
+         * grow body for the 4-byte camera-pointer element; the recovered caller
          * Moho::CAM_GetAllRCamCameras (FUN_007AADE0, RCamManager.cpp) copies the
          * manager's temporary camera vector into the returned result via
          * result.push_back(cam) by name — MSVC8's push_back is insert(end(),1,value)
          * on the capacity-full path — so this per-T 4-byte pointer symbol is
          * emitted. RCamCamera is the public alias of CameraImpl).
          * Address: 0x0075F810 (FUN_0075F810, msvc8::vector<Moho::Sim::DumpUnitsCountEntry>::_Insert_n
-         * grow lane for the 8-byte trivially-copyable element {const RUnitBlueprint* blueprint; int count};
+         * grow body for the 8-byte trivially-copyable element {const RUnitBlueprint* blueprint; int count};
          * >>3 stride, 0x1FFFFFFF max, 1.5x growth. Sim::DumpUnits invokes
          * counts.push_back({blueprint,1}) by name — MSVC8's push_back (FUN_0075F1A0)
          * is insert(end(),1,value) on the capacity-full path — so this per-T 8-byte
          * symbol is emitted).
          * Address: 0x0071AF90 (FUN_0071AF90, msvc8::vector<moho::SThreat>::_Insert_n
-         * grow-and-fill lane for the 0x38-byte element (stride divide by the
+         * grow-and-fill body for the 0x38-byte element (stride divide by the
          * 92492493h/`sar 5` magic pair, max_size 0x4924924 = 0xFFFFFFFF/56, overflow
          * throw through FUN_0071B260, 1.5x growth with clamp-to-zero at
          * 0x0071B051-0x0071B067). The value arrives by pointer in edx and is copied
@@ -4153,7 +4158,7 @@ namespace msvc8
          * moho::ResizeSThreatVectorWithFill's storage.resize(requestedCount, fillValue)
          * (CInfluenceMap.cpp:1972)).
          * Address: 0x0071B970 (FUN_0071B970, msvc8::vector<moho::InfluenceGrid>::_Insert_n
-         * grow-and-fill lane for the 0x8C-byte non-trivial element (stride divide by
+         * grow-and-fill body for the 0x8C-byte non-trivial element (stride divide by
          * the EA0EA0EBh/`sar 7` magic pair, max_size 0x1D41D41 = 0xFFFFFFFF/140,
          * overflow throw through FUN_0071BCA0, 1.5x growth with clamp-to-zero at
          * 0x0071BA35-0x0071BA46). Element copies route through
@@ -4163,12 +4168,12 @@ namespace msvc8
          * storage.resize(requestedCount, fillValue) (CInfluenceMap.cpp:219), which is
          * the binary's own call at 0x0071B8D9).
          * Address: 0x0071BEE0 (FUN_0071BEE0, msvc8::vector<moho::SPositionThreat>::_Insert_n
-         * grow lane for the 0x10-byte element (`sar 4` stride, max_size 0xFFFFFFF =
+         * grow body for the 0x10-byte element (`sar 4` stride, max_size 0xFFFFFFF =
          * 0xFFFFFFFF/16, overflow throw through FUN_00592830). `_Count` is folded to
          * the constant 1 (`cmp edx, 1` at 0x0071BF57) because both binary callers are
-         * single-element append lanes: MSVC8's push_back (FUN_00718A40, tail-calling
+         * single-element append paths: MSVC8's push_back (FUN_00718A40, tail-calling
          * it at 0x00718A9A on the capacity-full path) and the single-value insert
-         * lane FUN_0071A1B0 (0x0071A1D9); the value's four floats are copied into a local
+         * body FUN_0071A1B0 (0x0071A1D9); the value's four floats are copied into a local
          * `_Tmp` by the movss block at 0x0071BEFE-0x0071BF2D. Emitted via
          * out.push_back(sample) in Moho::CInfluenceMap::GetThreatsAroundPosition
          * (CInfluenceMap.cpp:4906)).
@@ -4182,35 +4187,35 @@ namespace msvc8
          * block copy described above -- a plain forward per-element 16-byte
          * copy loop, called from FUN_0071A1F0's `uninit_copy_n` sibling)
          * Address: 0x00535D60 (FUN_00535D60, msvc8::vector<Moho::RBlueprint*>::_Insert_n
-         * grow lane for the 4-byte pointer element (`sar 2` stride, max_size 0x3FFFFFFF
+         * grow body for the 4-byte pointer element (`sar 2` stride, max_size 0x3FFFFFFF
          * = 0xFFFFFFFF/4 loaded at 0x00535D96, overflow test `max_size() - size() < 1`
-         * then the `vector<T> too long` throw lane FUN_0052EC30 at 0x00535DA2).
+         * then the `vector<T> too long` throw helper FUN_0052EC30 at 0x00535DA2).
          * `_Count` is folded to the constant 1 (`add ecx, 1` / `cmp edx, ecx` at
-         * 0x00535DB7) because both of its callers are single-element lanes: MSVC8's
+         * 0x00535DB7) because both of its callers are single-element paths: MSVC8's
          * push_back at FUN_005347A0, which reaches it at 0x005347DC on the
          * capacity-full path, and the `insert(iterator, const T&)` overload of the
          * same instantiation — an IDA-unclassified chunk at 0x005355E0-0x00535619
-         * that computes `_Off`, calls this lane at 0x00535607, and returns
-         * `begin() + _Off`. Growth is the 1.5x lane with clamp-to-zero at
+         * that computes `_Off`, calls this body at 0x00535607, and returns
+         * `begin() + _Off`. Growth is the 1.5x growth with clamp-to-zero at
          * 0x00535DC2-0x00535DDD, and the value arrives by pointer in eax
          * (`mov ecx, [eax]` at 0x00535D63). Emitted via
          * rules.mBlueprintsByOrdinal.push_back(...) in moho::AppendBlueprintOrdinal
          * (Sim.cpp:14253), whose registry lives at `rules + 0xB4` — the operand of
          * `add ecx, 0B4h` at 0x00531FE9 in func_CreateRUnitBlueprint)
          * Address: 0x006D1A90 (FUN_006D1A90, msvc8::vector<moho::SUpgradeNotifyPair>::_Insert_n
-         * grow lane for the 8-byte `{mSourceId, mDestId}` element (`sar 3` stride,
+         * grow body for the 8-byte `{mSourceId, mDestId}` element (`sar 3` stride,
          * max_size 0x1FFFFFFF = 0xFFFFFFFF/8 at 0x006D1AE6, overflow throw through
          * FUN_006D1D30). `_Count` is folded to the constant 1 (`cmp edi, 1` at
          * 0x006D1AED, `mov ecx, 1` at 0x006D1BB6) — the element is copied two dwords
          * at a time by FUN_006D2730 with no destroy pass, so the element is trivially
          * copyable. Its live caller is MSVC8's push_back at FUN_006D1960, which skips
          * the iterator-returning wrapper (FUN_006D1A20, itself xref-less) and tail-calls
-         * this lane directly at 0x006D19BA because push_back discards the iterator.
+         * this body directly at 0x006D19BA because push_back discards the iterator.
          * Emitted via globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
-         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
+         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner is
          * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
          * Address: 0x00540330 (FUN_00540330, msvc8::vector<Moho::SEjectRequest>::_Insert_n
-         * grow lane for the 8-byte `{const CClientBase* mRequester, int mAfterBeat}`
+         * grow body for the 8-byte `{const CClientBase* mRequester, int mAfterBeat}`
          * element (`sar 3` stride, max_size 0x1FFFFFFF = 0xFFFFFFFF/8, overflow
          * throw through FUN_00540580). `_Count` is folded to the constant 1 — the
          * value arrives by pointer and is copied two dwords at a time with no
@@ -4218,37 +4223,37 @@ namespace msvc8
          * `SUpgradeNotifyPair` sibling above. In-place growth shifts the tail
          * through FUN_00540BD0/FUN_00540C20/FUN_00540E80 and returns the iterator
          * via FUN_00540C00; the realloc path allocates through the checked
-         * 8-byte lane FUN_00540C40. Reached from push_back's capacity-full path
+         * 8-byte body FUN_00540C40. Reached from push_back's capacity-full path
          * (FUN_0053FC90, already cited above). Emitted via
          * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
          * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
          * Address: 0x00653380 (FUN_00653380, msvc8::vector<moho::SDebugWorldText>::_Insert_n
-         * grow lane for the 0x30-byte (48) non-trivial element (`{Wm3::Vec3f
+         * grow body for the 0x30-byte (48) non-trivial element (`{Wm3::Vec3f
          * position; msvc8::string text; int32_t style; uint32_t depth;}`,
          * stride divide by 48, max_size 0x5555555 = 0xFFFFFFFF/48, overflow
          * throw through FUN_00653860). `_Count` is folded to the constant 1 --
-         * both binary callers are single-element lanes. The reallocation
+         * both binary callers are single-element paths. The reallocation
          * path's by-ref value is copy-constructed into a local `_Tmp` (zeroed
          * to empty SSO state then `text.assign(...)`) before the old range
          * moves, so a reallocation cannot invalidate it; tail-shift and
          * prefix/suffix range mechanics route through FUN_006539E0/
          * FUN_00653A20/FUN_00653AD0/FUN_00653F40/FUN_00653330, and allocation
-         * through the checked 48-byte lane FUN_00653A80 (already cited in
+         * through the checked 48-byte allocation FUN_00653A80 (already cited in
          * CheckedArrayAllocationLanes.cpp). Reached from the single-element
          * `insert(iterator, const T&)` overload FUN_006532C0, already cited
          * above, under `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
          * (Sim.cpp) -- called from Moho::RDebugWeapons::Tick.)
          * Address: 0x006DC600 (FUN_006DC600, msvc8::vector<moho::EntityCategorySet>::_Insert_n
-         * grow-and-fill lane for the 0x28-byte non-trivial element (stride divide by
+         * grow-and-fill body for the 0x28-byte non-trivial element (stride divide by
          * the 66666667h/`sar 4` magic pair, max_size 0x6666666 = 0xFFFFFFFF/40 at
          * 0x006DC68B, overflow throw through FUN_006DC930 which pushes the
          * `vector<T> too long` literal at 0x006DC950). `_Count` is a live parameter
          * with a `test esi, esi` zero early-out at 0x006DC665. Element copies route
          * through the EntityCategorySet copy path — the inlined temp ctor at
          * 0x006DC61B copies mUniverse (+0x00), the first-word index (+0x08) and deep-
-         * copies the fastvector_n<uint,2> word lane (+0x10..+0x28) — and the old range
+         * copies the fastvector_n<uint,2> word (+0x10..+0x28) — and the old range
          * is torn down by FUN_006DEB80 before the buffer is freed, never a raw byte
-         * copy. Two binary lanes reach it: push_back (FUN_006DB010) through
+         * copy. Two binary paths reach it: push_back (FUN_006DB010) through
          * insert(end(),1,val) (FUN_006DBAE0), and the by-value
          * resize(n, EntityCategorySet) emission FUN_006DC4E0 at 0x006DC554. Emitted via
          * storage->resize(count, zeroFill) in
@@ -4256,7 +4261,7 @@ namespace msvc8
          * (EntityCategorySetVectorReflection.cpp:467), a slot of the reflection type
          * that register_EntityCategorySetVectorType actually constructs)
          * Address: 0x008F6A50 (FUN_008F6A50, msvc8::vector<DXGI_MODE_DESC>::_Insert_n
-         * grow lane for the 0x1C-byte POD element (stride divide by the
+         * grow body for the 0x1C-byte POD element (stride divide by the
          * 92492493h/`add`/`sar 4` magic triple at 0x008F6A90, max_size 0x9249249 =
          * 0xFFFFFFFF/28 at 0x008F6ACF, overflow throw through FUN_008F6890 which
          * pushes the `vector<T> too long` literal). `_Count` is a live parameter with
@@ -4266,9 +4271,9 @@ namespace msvc8
          * Reached from insert(end(),val) (FUN_008F6FB0) under push_back (FUN_008F7230).
          * Emitted via entry.modes_.push_back(mode) in
          * gpg::gal::AppendDisplayModeToAdapterModeEntry (D3D10Interfaces.cpp:2809),
-         * whose owner lane is AdapterModeD3D10::modes_ at +0x64)
+         * whose owner is AdapterModeD3D10::modes_ at +0x64)
          * Address: 0x00900630 (FUN_00900630, msvc8::vector<gpg::gal::AdapterD3D10>::_Insert_n
-         * grow lane for the 0x13C-byte polymorphic element (stride divide by the
+         * grow body for the 0x13C-byte polymorphic element (stride divide by the
          * 67B23A55h/`sar 7` magic pair at 0x0090069E with explicit `imul reg, 13Ch`
          * multiply-back at 0x009007FB, max_size 0xCF6474 = 0xFFFFFFFF/316 at
          * 0x009006D8 — IDA misprints that literal as an `__xc_a` offset — overflow
@@ -4280,10 +4285,10 @@ namespace msvc8
          * destroyed by FUN_008FA890 before the buffer is freed. Reached from
          * insert(end(),val) (FUN_00900960) under push_back (FUN_009009D0). Emitted via
          * adapters.push_back(adapter) in gpg::gal::AppendBackendAdapter
-         * (D3D10Interfaces.cpp:2837), whose owner lane is
+         * (D3D10Interfaces.cpp:2837), whose owner is
          * DeviceD3D10BackendObject::adapters_ at +0x94)
          * Address: 0x0093FEB0 (FUN_0093FEB0, msvc8::vector<gpg::gal::EffectMacro>::_Insert_n
-         * grow lane for the 0x3C-byte element (stride divide by the
+         * grow body for the 0x3C-byte element (stride divide by the
          * 88888889h/`add`/`sar 5` magic triple at 0x0093FEF3 with the
          * `shl ecx,4; sub ecx,ebx; lea edx,[eax+ecx*4]` multiply-back at 0x00940059,
          * max_size 0x4444444 = 0xFFFFFFFF/60 at 0x0093FF30, overflow throw through
@@ -4294,15 +4299,15 @@ namespace msvc8
          * at 0x0094019C, and the old range is destroyed by FUN_004331C0 before the
          * buffer is freed. Reached from insert(end(),val) (FUN_009401C0) under
          * push_back (FUN_00940230). Emitted via vec->push_back(source) in
-         * gpg::gal::PushBackEffectMacroIntoLane (ContextInterfaces.cpp:266), whose
-         * owner lane is EffectContext's macro vector at +0x54)
+         * `EffectContext::DefineMacro` (ContextInterfaces.cpp), whose
+         * owner is EffectContext's macro vector at +0x54)
          * Address: 0x007F1D50 (FUN_007F1D50, msvc8::vector<moho::SRangeExtractionPayload>::_Insert_n
-         * grow lane for the 0x10-byte `{centerX,centerZ,innerRadius,outerRadius}` element
+         * grow body for the 0x10-byte `{centerX,centerZ,innerRadius,outerRadius}` element
          * (`sar 4` stride, max_size 0xFFFFFFF = 0xFFFFFFFF/16 at 0x007F1DB0, overflow
          * throw through FUN_007F1F90, which raises `std::length_error("vector<T> too
          * long")`). `_Count` is folded to the constant 1 (`cmp esi,ecx` against
          * `size+1` at 0x007F1DD4) because its only reachable caller is a
-         * single-element append lane: MSVC8's push_back tail-calls it at 0x007F036A
+         * single-element append path: MSVC8's push_back tail-calls it at 0x007F036A
          * on the capacity-full path (FUN_007F0310, recovered as
          * AppendRangeExtractionPayload). The value's four floats are copied into a
          * local `_Tmp` by the dword-move block at 0x007F1D6B-0x007F1D8F up front, so
@@ -4337,35 +4342,35 @@ namespace msvc8
          * path of FUN_007F1D50 (cited above), which is itself only reachable
          * through push_back — same load-bearing caller chain.)
          * Address: 0x006DBAE0 (FUN_006DBAE0, msvc8::vector<moho::EntityCategorySet>::insert
-         * single-value lane — `insert(end(), 1, val)` for the 0x28-byte element. Computes
+         * single-value insert — `insert(end(), 1, val)` for the 0x28-byte element. Computes
          * the insert offset twice with the 66666667h/`sar 4` magic pair (0x006DBAF8 and
-         * 0x006DBB13 — 0xFFFFFFFF/40) and tail-calls the `_Insert_n` grow lane
+         * 0x006DBB13 — 0xFFFFFFFF/40) and tail-calls the `_Insert_n` grow body
          * FUN_006DC600 at 0x006DBB2D. Its only code xref is 0x006DB08B inside
-         * msvc8::vector<EntityCategorySet>::push_back (FUN_006DB010), so the lane is
+         * msvc8::vector<EntityCategorySet>::push_back (FUN_006DB010), so the body is
          * reached only through push_back. Emitted via destination.push_back(value) in
          * moho::PushBackEntityCategorySetVector
          * (EntityCategorySetVectorReflection.cpp:591), whose own callers are
          * UnitWeapon::cfunc_UnitWeaponSetTargetingPrioritiesL and
          * CPlatoon::cfunc_CPlatoonSetPrioritizedTargetListL)
          * Address: 0x008F6FB0 (FUN_008F6FB0, msvc8::vector<DXGI_MODE_DESC>::insert
-         * single-value lane for the 0x1C-byte POD element (92492493h/`sar 4` magic pair
+         * single-value insert for the 0x1C-byte POD element (92492493h/`sar 4` magic pair
          * at 0x008F6FC5 and 0x008F6FE2 — 0xFFFFFFFF/28), tail-calling the `_Insert_n`
-         * grow lane FUN_008F6A50 at 0x008F6FFF. Emitted via entry.modes_.push_back(mode)
+         * grow body FUN_008F6A50 at 0x008F6FFF. Emitted via entry.modes_.push_back(mode)
          * in gpg::gal::AppendDisplayModeToAdapterModeEntry (D3D10Interfaces.cpp:2809),
-         * whose owner lane is AdapterModeD3D10::modes_ at +0x64)
+         * whose owner is AdapterModeD3D10::modes_ at +0x64)
          * Address: 0x00900960 (FUN_00900960, msvc8::vector<gpg::gal::AdapterD3D10>::insert
-         * single-value lane for the 0x13C-byte polymorphic element (67B23A55h/`sar 7`
+         * single-value insert for the 0x13C-byte polymorphic element (67B23A55h/`sar 7`
          * magic pair at 0x00900975 and 0x00900990 — 0xFFFFFFFF/316), tail-calling the
-         * `_Insert_n` grow lane FUN_00900630 at 0x009009AB. Emitted via
+         * `_Insert_n` grow body FUN_00900630 at 0x009009AB. Emitted via
          * adapters.push_back(adapter) in gpg::gal::AppendBackendAdapter
-         * (D3D10Interfaces.cpp:2837), whose owner lane is
+         * (D3D10Interfaces.cpp:2837), whose owner is
          * DeviceD3D10BackendObject::adapters_ at +0x94)
          * Address: 0x009401C0 (FUN_009401C0, msvc8::vector<gpg::gal::EffectMacro>::insert
-         * single-value lane for the 0x3C-byte element owning two msvc8::strings
+         * single-value insert for the 0x3C-byte element owning two msvc8::strings
          * (88888889h/`sar 5` magic pair at 0x009401D5 and 0x009401F2 — 0xFFFFFFFF/60),
-         * tail-calling the `_Insert_n` grow lane FUN_0093FEB0 at 0x0094020F. Emitted via
-         * vec->push_back(source) in gpg::gal::PushBackEffectMacroIntoLane
-         * (ContextInterfaces.cpp:266), whose owner lane is EffectContext's macro
+         * tail-calling the `_Insert_n` grow body FUN_0093FEB0 at 0x0094020F. Emitted via
+         * `macros.push_back(newMacro)` in `EffectContext::DefineMacro`
+         * (ContextInterfaces.cpp:266), whose owner is EffectContext's macro
          * vector at +0x54)
          * Address: 0x0075F240 (FUN_0075F240, msvc8::vector<Moho::SPendingPoseCopy>::insert
          * iterator-rebasing wrapper for the 12-byte element — converts the
@@ -4386,7 +4391,7 @@ namespace msvc8
          * value can differ from the original binary)
          *
          * Address: 0x00951F30 (FUN_00951F30, msvc8::vector<gpg::TypeHandle>::_Insert_n
-         * grow lane for the 8-byte `{type,version}` element (`sar 3` stride, max_size
+         * grow body for the 8-byte `{type,version}` element (`sar 3` stride, max_size
          * 0x1FFFFFFF, overflow throw through FUN_009514A0's `std::length_error("vector<T>
          * too long")`). Its only reachable caller is `gpg::AppendTypeHandle` (FUN_00952C90,
          * ReadArchive.cpp), which always calls it as a single-element append at `mLast`
@@ -4398,7 +4403,7 @@ namespace msvc8
          * Address: 0x005C68E0 (FUN_005C68E0,
          * msvc8::vector<Moho::SUnitVariableUpdateEntry>::_Insert_n for the
          * 568-byte (0x238) element -- max_size 0xFFFFFFFF/568, 1.5x growth,
-         * allocation through the checked 568-byte lane, with a reallocate
+         * allocation through the checked 568-byte allocation, with a reallocate
          * branch, an in-place tail-shift branch, and a pure-append fast path.
          * Reached through the position-preserving wrapper FUN_005C51B0, which
          * converts the insert position to an index before the call because a
@@ -4407,7 +4412,7 @@ namespace msvc8
          * Address: 0x005C51B0 (FUN_005C51B0, that wrapper)
          * Address: 0x00508480 (FUN_00508480,
          * msvc8::vector<Moho::SDelayedSubVizInfo>::_Insert_n for the 0x18-byte
-         * element -- max_size guard through FUN_00507F80's throw lane, in-place
+         * element -- max_size guard through FUN_00507F80's throw helper, in-place
          * tail shift when capacity allows, otherwise 1.5x growth
          * (`cap + (cap >> 1)`, floored to size + count) with head/gap/tail
          * rebuilt into the fresh block. Reached from `resize` (FUN_005083C0)
@@ -4415,7 +4420,7 @@ namespace msvc8
          * Address: 0x00524780 (FUN_00524780, msvc8::vector<float>::_Insert_n --
          * max_size 0x3FFFFFFF, in-place tail-shift when capacity covers the new
          * size, otherwise geometric grow. Reached from push_back in the
-         * reflected vector<float> SerLoad lane. Its in-place tail-shift step is
+         * reflected vector<float> SerLoad body. Its in-place tail-shift step is
          * FUN_005260D0, the memmove_s-based dword-range relocate for this
          * 4-byte element.)
          * Address: 0x005260D0 (FUN_005260D0, the in-place tail-shift relocate
@@ -4437,7 +4442,7 @@ namespace msvc8
          * in CCommandLuaFunctionRegistrations.cpp.)
          * Address: 0x0066A860 (FUN_0066A860, msvc8::vector<moho::WCurveEditorPanel*>::
          * _Insert_n -- same 4-byte-pointer shape, max_size 0x3FFFFFFF checked via
-         * `cur == max_size` folded for `count == 1` (throw lane FUN_0066AA70,
+         * `cur == max_size` folded for `count == 1` (throw helper FUN_0066AA70,
          * already cited as the VC8 length_error closure in
          * CrtRuntimeHelpers.cpp). The in-place shift sub-path (`pos != end()`)
          * moves the single trailing element past the old end and shifts
@@ -4460,7 +4465,7 @@ namespace msvc8
          * and directly from `Moho::WEmitterWx::WEmitterWx` (0x00666EBE, inside
          * FUN_00663900, already cited in WEmitterWx.cpp) -- the compiled ctor
          * inlines push_back's capacity check and calls straight through to this
-         * grow lane on `mCurvePanels.push_back(curvePanel)`'s capacity-full turn,
+         * grow body on `mCurvePanels.push_back(curvePanel)`'s capacity-full turn,
          * one of 5 iterations building the curve-editor notebook tabs. A third
          * code xref at 0x0066A3C7 sits in an anonymous, IDA-unclassified chunk
          * this pass could not trace to a named owner.)
@@ -4483,7 +4488,7 @@ namespace msvc8
          * `mEntityUpdates.push_back(...)`'s capacity-full branch grows the
          * vector instead of filling in place.)
          * Address: 0x005C6F90 (FUN_005C6F90, msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n
-         * grow lane for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
+         * grow body for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
          * magic pair, max_size 0x4EC4EC4 = 0xFFFFFFFF/52, overflow throw through
          * FUN_005C7290 at 0x005C7014, 1.5x growth `shr eax,1`/`add edi,eax` at
          * 0x005C7043-0x005C705C clamped by FUN_005C3C70, allocation via
@@ -4492,15 +4497,15 @@ namespace msvc8
          * so a reallocation cannot invalidate it. Range mechanics route through
          * `uninit_copy_n` (FUN_005CDAE0 / FUN_005C9EC0), `uninit_fill_n`
          * (FUN_005CC2D0, and its advance-returning adapter FUN_005C8720), and the
-         * forward/backward copy-assign lanes FUN_005C9EF0 / FUN_005C9F10. Reached
+         * forward/backward copy-assign steps FUN_005C9EF0 / FUN_005C9F10. Reached
          * from `resize` (FUN_005C5460) and the single-append adapter FUN_005C86B0.)
          *
-         * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
+         * Mirrors the MSVC8 STL `vector::_Insert_n` body: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
          * slots and the gap is filled with copies of `value`; when capacity
          * is insufficient, a reallocated buffer of 1.5x-or-needed size is
          * built up by moving the head, fill-constructing the gap, and moving
-         * the tail. The recovered per-T resize/insert helper lanes
+         * the tail. The recovered per-T resize/insert helpers
          * (`InsertNCopies*Vector`) call this method by name through the
          * `msvc8::vector<T>` API surface, which is the source-level
          * invocation that keeps the canonical symbol shape in the recovered
@@ -4511,7 +4516,7 @@ namespace msvc8
          * msvc8::vector<Moho::SEntityVariableUpdateEntry>::insert(iterator,
          * const T&) for the 0xD8-byte element -- recovers the insertion index
          * with the 4BDA12F7h/`sar 6` divide-by-0xD8 magic pair *before* the
-         * insert, tail-calls the `_Insert_n` lane at 0x0067D320 with a count
+         * insert, tail-calls the `_Insert_n` body at 0x0067D320 with a count
          * of one, then rebuilds the iterator as `first_ + off * 0xD8` because
          * the insert may have reallocated. Reached from the grow half of
          * `push_back` at 0x0067B780.)
@@ -4519,7 +4524,7 @@ namespace msvc8
          * msvc8::vector<moho::SDebugWorldText>::insert(iterator, const T&) for
          * the 0x30-byte element -- recovers the insertion index via
          * `(pos - mFirst) / 48` *before* the insert, tail-calls the
-         * `_Insert_n` lane at 0x00653380 with a count of one, then rebuilds
+         * `_Insert_n` body at 0x00653380 with a count of one, then rebuilds
          * the iterator as `mFirst + off * 48` because the insert may have
          * reallocated. Reached from the grow half of `push_back`, itself
          * reached from `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
@@ -4528,13 +4533,13 @@ namespace msvc8
          * msvc8::vector<moho::SAiAttackVectorDebug>::insert(iterator, const T&)
          * for the 0x18-byte element -- recovers the insertion index via
          * `(pos - mFirst) / 24` *before* the insert, tail-calls the `_Insert_n`
-         * lane at 0x00580150 (already `skip`-classified as this template's
+         * body at 0x00580150 (already `skip`-classified as this template's
          * generic body) with a count of one, then rebuilds the iterator as
          * `mFirst + off * 24` because the insert may have reallocated. Reached
          * from the grow half of `push_back` (FUN_0057D820, already cited above
          * on `push_back`) when `mAttackVectors` is at capacity -- emitted via
          * `CAiBrain`'s `mAttackVectors.push_back(...)` call sites (CAiBrain.cpp),
-         * the only lane this element type is appended through.)
+         * the only path this element type is appended through.)
          * Address: 0x00592460 (FUN_00592460, `msvc8::vector<T>::insert(iterator,
          * const T&)` for a 12-byte three-float element (`imul` by `2AAAAAABh`
          * then `sar 1` is the divide-by-3 dword-stride calc). The reallocation
@@ -4575,7 +4580,7 @@ namespace msvc8
          * grow path, FUN_0064E1B0, cited above.)
          * Address: 0x0064E770 (FUN_0064E770, the `_Insert_n` grow core this
          * `insert` tail-calls -- `max_size` guard `0x4EC4EC4`
-         * (`0xFFFFFFFF/52`), throw lane FUN_0064EEE0 (cited on
+         * (`0xFFFFFFFF/52`), throw helper FUN_0064EEE0 (cited on
          * `throw_too_long` below), 1.5x growth falling back to `size()+1`
          * through the size thunk FUN_004521B0, checked 52-byte allocation
          * FUN_0064F8C0, memberwise `_Tmp` copy since `SDebugDecal` is
@@ -4682,16 +4687,16 @@ namespace msvc8
          * `mEdges` vector is at capacity.)
          *
          * Address: 0x00930000 (FUN_00930000, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::insert(iterator, const T&)`
-         * for the 12-byte edge-traversal-lane element -- offset captured up
+         * ClusterSearchEdge>::insert(iterator, const T&)`
+         * for the 12-byte edge-traversal element -- offset captured up
          * front (`(pos-first_)/12`), tail-calls the `_Insert_n` grow core
          * `FUN_0092F630` with `count = 1`, rebuilds the returned iterator as
          * `first_ + offset`. Reached from this element's `push_back`
          * (`FUN_009302E0`, cited above) capacity-full path.)
          * Address: 0x0092FCD0 (FUN_0092FCD0, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchOpenHeapEntryRuntime>::insert(iterator, const T&)` for
+         * ClusterSearchOpenHeapEntry>::insert(iterator, const T&)` for
          * the 12-byte open-heap-entry element -- same offset-capture/tail-
-         * call/iterator-rebuild shape as the edge-lane instantiation
+         * call/iterator-rebuild shape as the edge-traversal instantiation
          * immediately above, tail-calling its own private `_Insert_n` grow
          * core `FUN_0092F240` with `count = 1`. Reached from this element's
          * `push_back` (`FUN_00930190`, cited above) capacity-full path.)
@@ -4753,7 +4758,7 @@ namespace msvc8
          * for the 8-byte `{Unit*, float}` element (`CPlatoon.cpp`'s
          * `AppendPlatoonUnitSearchEntry`/`cfunc_CPlatoonFormPlatoonL`
          * nearest-first candidate scratch vector). `max_size` folds to
-         * 0x1FFFFFFF (`0xFFFFFFFF / 8`, throw lane `FUN_00733910`). Unlike
+         * 0x1FFFFFFF (`0xFFFFFFFF / 8`, throw helper `FUN_00733910`). Unlike
          * this member's usual "capture offset, tail-call the count-form
          * with `count=1`" shape, this emission is fully fused in place --
          * like `FUN_0084F200` above -- with no separate `_Insert_n(pos, 1,
@@ -4826,7 +4831,7 @@ namespace msvc8
          * capacity-full path (FUN_0074C060, cited above on `push_back`)
          * with `pos = _Mylast`/`end()`, itself reached only from
          * `Sim::VerifyChecksum`'s `mDesyncs.push_back(desync)` (already
-         * recovered, `Sim.cpp`) -- the only lane this element type is ever
+         * recovered, `Sim.cpp`) -- the only path this element type is ever
          * inserted through.)
          * Address: 0x0074F060 (FUN_0074F060, the count=1-specialized
          * `_Insert_n` core this `insert` tail-calls for the same
@@ -4848,21 +4853,21 @@ namespace msvc8
          * `push_back`) shifts the current last element and the remaining
          * tail through FUN_00751AF0/FUN_00751B30, already `recovered` as
          * the generic by-stride `CopyForward40ByteTailRangeAdapter`/
-         * `CopyBackward40ByteLaneSourceFirstNullScratchAdapterB` in
+         * the former 40-byte backward-copy adapter in
          * `gpg/core/containers/FastVectorInsertLanes.cpp`. Both
          * capacity-available sub-branches converge on a shared finishing
          * call, FUN_00753D60 (grouped with FUN_00756990 below as the same
-         * `CopyForward40ByteLaneSourceFirst` shape in that same file),
+         * 40-byte forward copy in that same file),
          * which performs the gap-fill assignment the not-at-end branch
          * still needs and is a harmless same-value rewrite on the at-end
          * branch already constructed via FUN_0074DAC0. The reallocation
          * branch grows through the by-stride size helper FUN_0074D9E0
-         * (`Count40ByteElementVectorLanes`, `Vector.cpp`, this method's own
+         * (the former 40-byte element count in `Vector.cpp`, this method's own
          * `size()` reuse) with a 1.5x/`size()+1` fallback, allocates
          * through the checked 40-byte allocator FUN_00751B60
          * (`AllocateChecked40ByteElements`, `Vector.cpp`, this method's own
          * `allocate_slots_checked`), and relocates the pre-/post-insertion
-         * spans through two calls into the shared forward-copy lane
+         * spans through two calls into the shared forward-copy step
          * FUN_00756990. FUN_00751AF0/FUN_00751B30/FUN_00751B60/
          * FUN_00756990/FUN_00753D60/FUN_0074D9E0 are pre-existing
          * RULE-ONE-flagged generic by-stride emissions (not per-element-type),
@@ -5019,7 +5024,7 @@ namespace msvc8
          * confirmed): this instantiation's own `push_back` (`FUN_0069E6D0`,
          * cited above) on its capacity-exhausted branch. Migrated off the
          * same `SimRecoveryRuntime.cpp` RULE ONE cluster documented on
-         * `push_back` above (`InsertElement12LaneAndRebaseCursorRuntime`
+         * `push_back` above (the per-type insert-and-rebase wrapper
          * at this address).
          *
          * Address: 0x00591F40 (FUN_00591F40, `msvc8::vector<SDepositCandidate>::
@@ -5039,7 +5044,7 @@ namespace msvc8
          * named above via `candidates.push_back(SDepositCandidate{...})`
          * inside their nearest-first deposit scan. DB-integrity note: this
          * token and its callers were `blocked`/`skip` as generic
-         * "owner/dependent lane not yet reconstructed" -- the real blocker
+         * "owner/dependent type not yet reconstructed" -- the real blocker
          * was that both callers had been recovered with `std::vector`
          * (wrong ABI) instead of `msvc8::vector`, so no source line in the
          * tree actually instantiated this template; fixed by retyping both
@@ -5069,7 +5074,7 @@ namespace msvc8
          * of the fill value, so the element is float-typed at the source
          * level even though the copy moves dwords.
          *
-         * Reached from the recovered insert-and-rebase lane at 0x00852350,
+         * Reached from the recovered insert-and-rebase wrapper at 0x00852350,
          * which captures the index, inserts, then rebuilds the cursor -- the
          * single-element `insert` shape recovered onto this template in
          * f3e3858c.)
@@ -5103,7 +5108,7 @@ namespace msvc8
          * `hash_map<Key,T,Traits>::iterator` -- a 4-byte pointer-wrapper
          * element (`max_size` folds to `0x3FFFFFFF`, matching the 4-byte-
          * pointer family cited elsewhere on this method). This is `mVec`'s
-         * grow lane in `legacy/containers/HashMap.h`'s `hash_map` (the
+         * grow body in `legacy/containers/HashMap.h`'s `hash_map` (the
          * `PathQueue::ImplBase` node-table instantiation): `_Init()`'s
          * `mVec.clear(); mVec.resize(Traits::min_buckets + 1, mList.end())`
          * calls this template's own `resize(n, value)` -> `insert(last_, n,
@@ -5209,7 +5214,7 @@ namespace msvc8
          *     `size()+1` through the `size()` accessor FUN_007BB0E0
          *     (cited as `GetCommandArgCount`, CGpgNetInterface.cpp) when
          *     1.5x is still insufficient, allocates through the checked
-         *     36-byte lane FUN_007BCD70 (`AllocateCheckedElementBlock`,
+         *     36-byte body FUN_007BCD70 (`AllocateCheckedElementBlock`,
          *     the runtime-width `_Allocate` sibling cited on
          *     `allocate_slots_checked` below, Vector.cpp), relocates
          *     `[first,pos)` and `[pos,last)` into the new buffer via two
@@ -5274,7 +5279,7 @@ namespace msvc8
          * weak-release chain at the end is that type's `release()`/
          * `weak_release()`, the same pattern already documented at
          * 0x004229B0); the `0x1FFFFFFF - cur < count` guard throws through
-         * this element's own `throw_too_long` lane FUN_00856100 (cited
+         * this element's own `throw_too_long` body FUN_00856100 (cited
          * below); the in-place branch relocates the tail through this
          * method's own `uninit_move_n` instantiation FUN_00857A90 (reached
          * via the thiscall bridge FUN_008571F0, cited below) and either
@@ -5305,7 +5310,7 @@ namespace msvc8
          * Address: 0x007E6460 (FUN_007E6460, `msvc8::vector<Wm3::Vector3f>::
          * uninit_fill_n` for the 12-byte three-float element -- the same
          * instantiation as the `_Insert_n` core `FUN_008523C0` cited on
-         * `insert` above (`WavePattern`-adjacent `insert-and-rebase` lane).
+         * `insert` above (`WavePattern`-adjacent `insert-and-rebase` wrapper).
          * Reached from `push_back`'s own fast path (`FUN_008522A0`, cited
          * above on `push_back` -- confirmed as this token's real direct
          * caller via the callgraph, filling this member's "no grow-core
@@ -5443,7 +5448,7 @@ namespace msvc8
          * `msvc8::vector<AdapterModeD3D10>::operator=`'s own assign-over
          * step, matching the correction on `operator=` above, but not
          * proven). DB previously listed this token `blocked` ("mixed
-         * POD+subobject copy lane requires dependent type recovery (callee
+         * POD+subobject copy step requires dependent type recovery (callee
          * FUN_008F6DD0)") -- stale: `FUN_008F6DD0` is `recovered`; corrected
          * to `recovered` here.
          * Address: 0x008F70A0 (FUN_008F70A0, this instantiation's
@@ -5468,7 +5473,7 @@ namespace msvc8
          * `FUN_008F70A0` above, for the 112-byte `gpg::gal::AdapterD3D9`
          * element: reverse pointer-walk (`v3 -= 112; v4 -= 112;` per
          * iteration, copying from high addresses down to `a1`) assigning
-         * the two leading `uint32_t` id lanes directly, three
+         * the two leading `uint32_t` id words directly, three
          * `std::string::assign` calls for `driver`/`deviceName`/
          * `description` (real `std::string::assign` per IDA, matching
          * `msvc8::string`'s VC8-ABI-compatible layout), then this element
@@ -5477,7 +5482,7 @@ namespace msvc8
          * `modes` member at `+0x60`/`+96` -- together the compiler-
          * synthesized memberwise `AdapterD3D9::operator=`. Bridged through
          * the thin forwarder `FUN_008F0380` (`return sub_8EFCD0(a1,a2,a3);`,
-         * no logic of its own) from the `_Insert_n`-shaped grow/shift lane
+         * no logic of its own) from the `_Insert_n`-shaped grow/shift body
          * `FUN_008F1890` (that function's own decompile carries IDA's
          * "bad/positive sp value" unreliability warning -- its precise
          * argument wiring was not relied on here, only the `call
@@ -5490,13 +5495,13 @@ namespace msvc8
          * helper -- is what actually gets compiled for `T = AdapterD3D9`.)
          *
          * Address: 0x0092F630 (FUN_0092F630, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::insert(iterator, size_type,
-         * const T&)` for the 12-byte edge-traversal-lane element -- the
+         * ClusterSearchEdge>::insert(iterator, size_type,
+         * const T&)` for the 12-byte edge-traversal element -- the
          * `_Insert_n` core `push_back`'s capacity-full path reaches with
          * `count=1` (via the single-value `insert` at `FUN_00930000`, cited
          * above). Carries the full VC8 shape byte-for-byte matching this
          * member's own control flow: `max_size` guard folds to `357913941`
-         * (`0xFFFFFFFF/12`, throw lane `FUN_0092EFF0`, cited below on
+         * (`0xFFFFFFFF/12`, throw helper `FUN_0092EFF0`, cited below on
          * `throw_too_long`); in-place branch (capacity already covers
          * `size()+count`) tail-shifts via the copy-alias `FUN_0092ED60` ->
          * `FUN_0092D7D0` (cited below on `uninit_move_n`) then
@@ -5521,11 +5526,11 @@ namespace msvc8
          * two calls to `FUN_0092D7D0` (`uninit_move_n`), fills the gap via
          * the advance-returning `FUN_0092E920` -> `FUN_0092DF10` adapter
          * (cited below on `uninit_fill_n`), frees the old block and rebases
-         * `{first_,last_,end_}`. Emitted via `outEdgeLanes.push_back(lane)`
+         * `{first_,last_,end_}`. Emitted via `outEdges.push_back(edge)`
          * in `ExpandClusterSearchFrontierEdges` (Cluster.cpp) once
-         * `edgeLanes` is at capacity.)
+         * `edges` is at capacity.)
          * Address: 0x0092F240 (FUN_0092F240, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchOpenHeapEntryRuntime>::insert(iterator, size_type,
+         * ClusterSearchOpenHeapEntry>::insert(iterator, size_type,
          * const T&)` for the 12-byte open-heap-entry element -- structurally
          * identical to `FUN_0092F630` immediately above (same `357913941`
          * max_size constant, same 1.5x growth, same in-place/reallocate
@@ -5545,7 +5550,7 @@ namespace msvc8
          * index reverse map (`ClusterSearchOpenHeapRuntime::
          * mHandleToHeapIndex`, Cluster.cpp) -- same shape again for the
          * 4-byte element: `max_size` folds to `0x3FFFFFFF`, 1.5x growth,
-         * throw lane `FUN_00444270` (cited below on `throw_too_long`),
+         * throw helper `FUN_00444270` (cited below on `throw_too_long`),
          * allocate `FUN_00445B80` (cited below on `allocate_slots_checked`).
          * Unlike the two 12-byte instantiations above, this element *is*
          * recognized as the STL's trivial-scalar fast-copy candidate, so
@@ -5563,7 +5568,7 @@ namespace msvc8
          * ThreadCtxEntry*>::insert(iterator, size_type, const T&)` --
          * `gpg::ThreadState::mEntries`, `Logging.h`. Same 4-byte-pointer
          * shape again: `max_size` folds to `0x3FFFFFFF`, 1.5x growth
-         * (`v10 = (v7 >> 1) + v7`, confirmed against the `.asm`), throw lane
+         * (`v10 = (v7 >> 1) + v7`, confirmed against the `.asm`), throw helper
          * `FUN_00936DB0`, allocate `FUN_00935B20`, copy/relocate step
          * `FUN_00936990` (cited above on `uninit_move_n`, called three
          * times: twice for the in-place tail-shift, once per half for the
@@ -5584,7 +5589,7 @@ namespace msvc8
          * const T&)` (`_Insert_n`) for the 12-byte intrusive-weak
          * `{WeakPtr<Unit>, float}` element (`SPickUpInfoVectorReflection.cpp`'s
          * `SPickUpInfoVector`). `max_size` folds to 357913941
-         * (`0xFFFFFFFF / 12`, throw lane `FUN_00627B20`). In-place branch
+         * (`0xFFFFFFFF / 12`, throw helper `FUN_00627B20`). In-place branch
          * (`capacity() >= size()+count`): the `tail >= count` sub-branch
          * (not exercised by this instantiation's only confirmed caller,
          * since `push_back` always inserts at `end()` where `tail == 0`)
@@ -5622,7 +5627,7 @@ namespace msvc8
          * `msvc8::vector<const char*>::insert(iterator, size_type, const T&)`
          * (`_Insert_n`) for the 4-byte pointer element (`CAniSkel.cpp`'s
          * `FillSScmBoneNamePointers` scratch vector). `max_size` folds to
-         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw lane `FUN_00537EF0`). This is
+         * 0x3FFFFFFF (`0xFFFFFFFF / 4`, throw helper `FUN_00537EF0`). This is
          * the STL trivial-scalar fast-copy shape (like `FUN_004451A0`
          * above): the in-place branch's tail-shift step is the range-form
          * `uninit_move_n` adapter `FUN_00538040` (cited above), the fill
@@ -5649,7 +5654,7 @@ namespace msvc8
          * (`moho::TerrainEnvironmentLookupPairs`, `CWldMap.cpp`'s
          * `AppendEnvironmentLookupPair`/`IWldTerrainRes::EnumerateEnvLookup`
          * output vector). `max_size` folds to 76695844
-         * (`0xFFFFFFFF / 56`, throw lane `FUN_008A95C0`). Copies the
+         * (`0xFFFFFFFF / 56`, throw helper `FUN_008A95C0`). Copies the
          * inserted value into a local first (`FUN_004D4970`, the pair
          * copy-ctor -- an aliased-element-survives-reallocation guard,
          * matching this member's own `const T localValue(value);` comment
@@ -5835,8 +5840,8 @@ namespace msvc8
          * `insertAt[i] = localValue` lines directly -- no separate template
          * member, the same treatment as the `SSTIArmyVariableData` entry's
          * "own uninit-copy/shift helpers" above. DB-integrity fix: `sub_92D130`
-         * (`FUN_0092D130`) was duplicated as a standalone `FillDwordRangeByEnd
-         * LaneE` orphan free function in `moho/containers/
+         * (`FUN_0092D130`) was duplicated as a standalone lettered copy
+         * `E` orphan free function in `moho/containers/
          * LegacyContainerFillLanesB.cpp` (anonymous-namespace, no
          * source-level caller); removed from there since this member's own
          * `insertAt[i] = localValue` loop is the complete recovery.
@@ -5927,7 +5932,7 @@ namespace msvc8
          * msvc8::vector<moho::ClutterSurfaceElement>::insert for the 16-byte
          * element with `count` folded to 1) -- `Moho::Clutter::Surface::
          * mSeeds` (`Clutter.h`). Max_size guard against 0xFFFFFFF
-         * (`0xFFFFFFFF/16`, throw lane `FUN_007D88B0`); fast path
+         * (`0xFFFFFFFF/16`, throw helper `FUN_007D88B0`); fast path
          * (`capacity > size`): tail-shift branch moves the current last
          * element into the new slot via the count=1 `uninit_move_n`
          * specialization `FUN_007D95C0`, shifts the remaining tail right one
@@ -5942,7 +5947,7 @@ namespace msvc8
          * `FUN_007D9B40` (`uninit_move_n`, called twice -- head then tail;
          * pre-existing citation in `moho/sim/SimRecoveryRuntime.cpp` as
          * `CopyClutterSeedRangeRuntime` uses a generic `ClutterSeedRuntime`
-         * reach-in lane rather than the typed element -- flagged as
+         * reach-in helper rather than the typed element -- flagged as
          * existing RULE ONE debt, not collapsed in this pass), gap-fill via
          * `FUN_007D9970`, old-buffer teardown via `FUN_007D8600`
          * (`msvc8::vector<moho::ClutterSurfaceElement>::destroy_range`,
@@ -5975,7 +5980,7 @@ namespace msvc8
          * CAiReconDBImpl::SNewBlip>::insert for the 12-byte element with
          * `count` folded to 1) -- `CAiReconDBImpl.cpp`'s `pending` staging
          * vector. Max_size guard against 357913941 (`0xFFFFFFFF/12`, throw
-         * lane `FUN_005C7DA0`); fast path: tail-shift branch moves the
+         * body `FUN_005C7DA0`); fast path: tail-shift branch moves the
          * current last element via the count=1 `uninit_move_n` adapter
          * `FUN_005CA0A0` (cited below), shifts the remaining tail right one
          * slot via the backward per-element loop `FUN_005CA0F0`, then
@@ -6039,7 +6044,7 @@ namespace msvc8
          * the same decompiler failure already seen and worked around on
          * this element's `insert(pos,value)` wrapper below and its
          * `push_back` root, both cited here). Max_size guard against
-         * 0x1C71C71B (`0xFFFFFFFF/144`, throw lane `sub_74EEA0`).
+         * 0x1C71C71B (`0xFFFFFFFF/144`, throw helper `sub_74EEA0`).
          * Reallocation path (the only one exercised by this element's real
          * caller, below): growth is 1.5x floored at `cur+count` via
          * `sub_77ACA0` (already recovered, `CDecalTypes.cpp`,
@@ -6083,7 +6088,7 @@ namespace msvc8
          * skinning-palette buffers). Copies `value` onto the stack first
          * (this member's own `const T localValue(value);` alias-safety
          * comment above), max_size folds to 0x0FFFFFFF
-         * (`0xFFFFFFFF/16`, throw lane `sub_7E94E0`, cited below on
+         * (`0xFFFFFFFF/16`, throw helper `sub_7E94E0`, cited below on
          * `throw_too_long`). For this instantiation MSVC factors BOTH the
          * in-place branch's trivial-scalar mechanics out into their own
          * out-of-line bodies rather than inlining `std::memmove`/the
@@ -6125,9 +6130,11 @@ namespace msvc8
          * Address: 0x007027A0 (FUN_007027A0 -- `vector<uint32>::_Insert_n` (`CArmyImpl::Func16` 0x006FE090 and the `resize` at 0x0074DC40); the 0x3FFFFFFF length guard throws through 0x007029C0.)
          * Address: 0x0067D660 (FUN_0067D660 -- `vector<EntId>::_Insert_n`, the slow arm of `push_back` at 0x0067B810.)
          * Address: 0x00933640 (FUN_00933640 -- `_Insert_n` for a 4-byte element (max_size 0x3FFFFFFF, 1.5x growth): the gap-fill arm 0x00932490, the count fill `_Ufill` 0x00932F90, `_Umove` 0x00933250 (ICF twin 0x00933220), `copy_backward` 0x00932940 and `_Xlen` 0x00933470; reached from 0x00934080 / 0x00934010 / 0x00934300 in the cluster/path region. DB previously pointed at Cluster.cpp with no anchor anywhere.)
-         * Address: 0x00932490 (FUN_00932490 -- the `std::fill(where, where + count, value)` gap-overwrite step of the 4-byte `_Insert_n` 0x00933640; formerly `FillDwordRangeByEndLaneF` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x008D9D10 (FUN_008D9D10 -- the `std::fill` gap-overwrite step for the 8-byte `gpg::REnumType::ROptionValue` element of `_Insert_n` 0x008DCB70; formerly `FillDwordPairRangeLaneB` in LegacyContainerFillLanesB.cpp, removed.)
+         * Address: 0x00932490 (FUN_00932490 -- the `std::fill(where, where + count, value)` gap-overwrite step of the 4-byte `_Insert_n` 0x00933640; formerly lettered copy `F` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008D9D10 (FUN_008D9D10 -- the `std::fill` gap-overwrite step for the 8-byte `gpg::REnumType::ROptionValue` element of `_Insert_n` 0x008DCB70; formerly lettered copy `B` in LegacyContainerFillLanesB.cpp, removed.)
          * Address: 0x008D9230 (FUN_008D9230 -- ICF twin of 0x008D9D10 (identical function_sha256): zero callers, no xrefs, unreachable from every seeded root; a linker-retained copy nothing runs.)
+         * Address: 0x00583850 (FUN_00583850 -- the `std::fill(where, where + count, value)` gap-overwrite step of `_Insert_n` for the 20-byte `SAttackVectorGridRow` element: per row, copy the cursor and assign the `vector<int>` through `operator=` 0x00583A20. Formerly the orphan `FillScalarAndIntVectorRangeFromPrototype` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00582380 (FUN_00582380 -- register-order bridge into that same fill step; zero callers, unreachable. Formerly `FillScalarAndIntVectorRangeFromPrototypeSourceFirstAdapter` in CAiBrain.cpp, removed.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6207,16 +6214,16 @@ namespace msvc8
 
     private:
         /**
-         * Address: 0x00519BA0 (FUN_00519BA0, the range-destroy lane for the
+         * Address: 0x00519BA0 (FUN_00519BA0, the `_Destroy_range` body for the
          * 0xCC-byte `Moho::RMeshBlueprintLOD` -- a bare
          * `while (p != end) { p->~RMeshBlueprintLOD(); p += 0xCC; }` walk calling
          * FUN_00519800. Instantiated by `RMeshBlueprint::mLods`
          * (RMeshBlueprint.h:110) and reached from
          * `gpg::RVectorType_RMeshBlueprintLOD::SerLoad`'s cleanup path.)
-         * Address: 0x005617C0 (FUN_005617C0, the range-destroy lane for 568-byte
+         * Address: 0x005617C0 (FUN_005617C0, the `_Destroy_range` body for 568-byte
          * `Moho::SUnitVariableUpdateEntry` -- runs `~SSTIUnitVariableData` on the
          * payload at each slot's +0x08)
-         * Address: 0x005C6F70 (FUN_005C6F70, the range-destroy lane for 52-byte
+         * Address: 0x005C6F70 (FUN_005C6F70, the `_Destroy_range` body for 52-byte
          * `Moho::SPerArmyReconInfo` -- forward `~T()` sweep over `[first, last)`,
          * used by `erase` (FUN_005C6F00) and by `_Insert_n`'s reallocation path
          * (FUN_005C6F90) to tear down the old buffer)
@@ -6226,7 +6233,7 @@ namespace msvc8
          * Address: 0x006DEB80 (FUN_006DEB80,
          * msvc8::vector<Moho::EntityCategorySet>::destroy_range -- for this
          * element the destructor's whole job is releasing the bit-word
-         * fastvector, so the body rebinds each lane's words back to inline
+         * fastvector, so the body rebinds each vector's words back to inline
          * storage, freeing the heap block where one is active.)
          * Address: 0x006DC5E0 (FUN_006DC5E0, register-shape adapter for FUN_006DEB80)
          * Address: 0x0085A1D0 (FUN_0085A1D0 — 0x10-byte element, the
@@ -6283,7 +6290,7 @@ namespace msvc8
          * AdapterD3D10>::destroy_range for the 0x13C-byte polymorphic
          * element -- a vtbl-slot-0 virtual dtor loop, `flag=0` (destroy in
          * place, no `operator delete` per element since the buffer itself
-         * is freed by the caller). Reached from the `_Insert_n` grow lane
+         * is freed by the caller). Reached from the `_Insert_n` grow body
          * FUN_00900630, cited above on `insert`, which destroys the old
          * range after relocating into the reallocated buffer.)
          * Address: 0x008EA5F0 (FUN_008EA5F0, msvc8::vector<gpg::gal::
@@ -6291,7 +6298,7 @@ namespace msvc8
          * element (`gpg::gal::AdapterModeD3D9` -- confirmed via its own
          * vtable symbol referenced in the caller) -- the same vtbl-slot-0
          * virtual dtor loop shape as the `AdapterD3D10` entry above,
-         * `flag=0`. Reached from the `_Insert_n` grow lane FUN_00940D40
+         * `flag=0`. Reached from the `_Insert_n` grow body FUN_00940D40
          * (cited above on `insert`, `PushBackAdapterModeD3D9`
          * modes.push_back, D3D9Interfaces.cpp:3258), which destroys the old
          * range after relocating into the reallocated buffer.)
@@ -6535,7 +6542,7 @@ namespace msvc8
          *     15-instruction function (`.c`-confirmed: `if (a3 != a4) {
          *     v4 = sub_77E8E0(a3); sub_742090(v4, *(a1+8)); *(a1+8) = v4;
          *     } *a2 = a3; return a2;` -- another assign/erase-shaped
-         *     forwarding lane for this element) with the same
+         *     forwarding thunk for this element) with the same
          *     "zero callers anywhere" profile as `sub_77E040` above: empty
          *     in the callgraph index, zero direct call/jmp hits in
          *     `.text`, zero raw-`DWORD` occurrences anywhere in the PE
@@ -6604,6 +6611,7 @@ namespace msvc8
          * `GeomCamera3.cpp` as `DestroyGeomCameraRange` and orphaned.
          * Address: 0x007420F0 (FUN_007420F0 -- `_Destroy` for `SSyncData`'s 12-byte `{{dword, dword, shared-count control}}` element: releases each control block (`~SSyncData` 0x0073FC70, 0x00740E20).)
          * Address: 0x006DBE20 (FUN_006DBE20 -- jump thunk handing an empty `[cursor, cursor)` range to the `moho::SBlackListInfo` `_Destroy_range` 0x006DEAE0 (`WeakPtr<Entity>` unlink per element). Zero callers, no xrefs, unreachable. Formerly `UnlinkBlacklistWeakEntityRangeEmptyAtCursor` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
+         * Address: 0x005837F0 (FUN_005837F0 -- `_Destroy_range` for the 20-byte `SAttackVectorGridRow` element (`{int mNextColumn; msvc8::vector<int> mOccupancyWords;}`, CAiBrain.cpp): zeroes nothing the binary does not, runs the row's `vector<int>` destructor per element. Reached from `CAiBrain::ProcessAttackVectors` 0x0057BDB0's scope exit (the `grid` vector's destructor) and from the row vector's `_Tidy` 0x00580D10. Formerly the orphan `ResetSAttackVectorGridRowRange` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -6639,7 +6647,7 @@ namespace msvc8
          * adapter that zeroes a truncated flag byte before tail-calling this
          * body) from `sub_849250`, a `vector<T>::insert`-growth emission
          * whose allocator (`FUN_0084A560`) is `gpg::core::legacy::
-         * AllocateChecked12ByteLane` (`CheckedArrayAllocationLanes.h`).
+         * the former checked 12-byte allocation (`CheckedArrayAllocationLanes.h`).
          * `FUN_0084B8B0` was previously mis-cited in `CWorldParticles.cpp`
          * as a `TrailRuntimeView` (80+-byte, ref-counted-texture-pointer)
          * range-copy bridge -- disproven by this body's real shape (plain
@@ -6764,7 +6772,7 @@ namespace msvc8
          * vector(const vector& other)`, this template's own copy
          * constructor -- `allocate_slots_checked` (`FUN_005C5530`, which
          * internally calls the already-cited allocator `FUN_005C9F40` and
-         * throw lane `FUN_005C7290`) for exactly `other.size()` slots,
+         * throw helper `FUN_005C7290`) for exactly `other.size()` slots,
          * matching this ctor's `if (n) { reserve(n); ...}` body below,
          * then `uninit_copy_n` via `FUN_005CDAB0`. `FUN_005CA8D0` has the
          * same zero-xrefs profile (`incoming_xrefs`/`data_refs`/
@@ -6831,7 +6839,7 @@ namespace msvc8
          * `{int mValue; const char* mName}` element -- a range-form
          * dword-pair copy loop (`[first,last) -> dst`, `+= 2` stride,
          * returns the advanced `dst`). Reached from the `_Insert_n` grow
-         * lane FUN_008DCB70 (cited above on `insert`), which relocates the
+         * body FUN_008DCB70 (cited above on `insert`), which relocates the
          * existing option slots into the reallocated buffer for
          * `gpg::AppendEnumOptionValue`'s `options.insert(options.end(), 1,
          * value)` on the capacity-full path)
@@ -6845,7 +6853,7 @@ namespace msvc8
          * defensive-null shape already noted on FUN_00549BC0 above; it never
          * observably fires from a real `_Insert_n` call (count > 0 implies a
          * non-null freshly-allocated or in-place destination). Reached from
-         * the `_Insert_n` grow lane FUN_0082DE90 (cited below on `insert`)
+         * the `_Insert_n` grow body FUN_0082DE90 (cited below on `insert`)
          * both directly (head/tail range copies on the reallocation path)
          * and through four calling-convention adapters that reshuffle a
          * stack-passed `(first, last)` pair plus a passed-through `edx`
@@ -6968,7 +6976,7 @@ namespace msvc8
          * uninit_copy_n` for a 4-byte pointer element -- `[first@ecx,
          * last@edx) -> dst@eax`, same shape as `FUN_00832B80` above, a
          * distinct instantiation for `Moho::UICommandGraph`'s "MapC"
-         * hash-bucket vector. Reached from the `_Insert_n` grow lane
+         * hash-bucket vector. Reached from the `_Insert_n` grow body
          * `FUN_0082F210` (`msvc8::vector<void*>::_Insert_n` for `MapC`), and
          * from `assign(9, sentinel)`'s insert step (`FUN_0082F680`, the
          * MapC `assign` emission cited above) via the thin calling-
@@ -6995,7 +7003,7 @@ namespace msvc8
          * Address: 0x00720220 (FUN_00720220, `msvc8::vector<
          * moho::SPositionThreat>::uninit_copy_n` for the 0x10-byte
          * (4-float) element -- `[first@edx,last@ecx) -> dst@eax`, per-slot
-         * 4-dword copy. Reached from the `_Insert_n` grow lane
+         * 4-dword copy. Reached from the `_Insert_n` grow body
          * `FUN_0071BEE0` (already recovered above), which relocates the
          * live range into the reallocated buffer for
          * `InfluenceGrid::mThreats` (CInfluenceMap.cpp).)
@@ -7003,7 +7011,7 @@ namespace msvc8
          * Moho::Sim::DumpUnitsCountEntry>::uninit_copy_n` for the 8-byte
          * `{const RUnitBlueprint* blueprint; int count}` element --
          * `[first@edx,last@ecx) -> dst@eax`, per-slot dword-pair copy.
-         * Reached from the `_Insert_n` grow lane `FUN_0075F810` (already
+         * Reached from the `_Insert_n` grow body `FUN_0075F810` (already
          * recovered above), `Sim::DumpUnits`'s `counts.push_back({blueprint,
          * 1})` capacity-full path. `FUN_0075FCF0` is a thin calling-
          * convention bridge in front of this same address -- zeroes the
@@ -7051,7 +7059,7 @@ namespace msvc8
          * (`FUN_008F6DD0`, cited above on `operator=`) for its two
          * grow-branch uninitialized-copy steps (the capacity-fits
          * excess-tail fill, and the reallocate-and-copy-everything path);
-         * that twin is already recovered as `CopyForward28ByteLaneSourceFirst`
+         * that twin was the former 28-byte source-first copy
          * in `gpg/core/containers/FastVectorInsertLanes.cpp`. Reached from
          * this instantiation's copy constructor (`FUN_008F6D20`, cited above
          * on `vector(const vector&)`), `AdapterD3D10::AdapterD3D10(const
@@ -7128,7 +7136,7 @@ namespace msvc8
          * a per-element pointer-assignment loop that is byte-for-byte
          * equivalent to this member's `memcpy(dst, src, n*4)` trivially-
          * copyable path (same `HashListNode2C*` instantiation `resize`
-         * above already cites via its `_Insert_n` lane FUN_0082F7A0, `skip`'d
+         * above already cites via its `_Insert_n` body FUN_0082F7A0, `skip`'d
          * as a RULE ONE compiler/template emission). Reached from
          * `_Insert_n`'s reallocation copy-the-old-range step for this
          * instantiation (`FUN_0082F7A0`) and, via a thin calling-convention
@@ -7212,7 +7220,7 @@ namespace msvc8
          * BVIntSet.cpp) already performs exactly the sequence the binary's
          * per-element body open-codes (`mFirstWordIndex` copy, then
          * `mWords.ResetFrom(other.mWords)`). Reached from
-         * `moho::CopyAssignArmyLaunchInfoVector`'s grow lane
+         * `moho::CopyAssignArmyLaunchInfoVector`'s grow body
          * (moho/misc/LaunchInfoBase.cpp) via `destination = source;`, which
          * is this member's real source-level instantiation site for
          * `T = moho::ArmyLaunchInfo`.
@@ -7226,15 +7234,15 @@ namespace msvc8
          * calling conventions into the same 0x005454A0 body, one per caller
          * site's register allocation.
          * Address: 0x005457A0 / 0x00545880 (FUN_005457A0, FUN_00545880) --
-         * two more forwarding lanes into 0x005454A0.
+         * two more forwarding thunks into 0x005454A0.
          * Address: 0x00545200 / 0x005445E0 / 0x00544E60 / 0x00545550
          * (FUN_00545200, FUN_005445E0, FUN_00544E60, FUN_00545550) -- four
-         * further register-shape thunks over the two lanes immediately
+         * further register-shape thunks over the two pointers immediately
          * above, completing this specialization's calling-convention bridge
          * family (thirteen addresses in total, including 0x005444B0 and
          * 0x005454A0 above).
          * Address: 0x00545620 / 0x00545270 (FUN_00545620, FUN_00545270) --
-         * a related single-element `BVIntSet` rebind-and-copy lane and its
+         * a related single-element `BVIntSet` rebind-and-copy step and its
          * thin adapter, same 0x20-byte element; behaviourally redundant
          * with `copy_or_move_assign`'s per-element `dst[i] = src[i]`
          * (`ArmyLaunchInfo::operator=`, compiler-synthesized ->
@@ -7374,7 +7382,7 @@ namespace msvc8
          * Address: 0x007F39B0 (FUN_007F39B0, msvc8::vector<moho::SRangeExtractionPayload>::
          * uninit_fill_n for the 0x10-byte trivially-copyable element -- a plain
          * count-driven dword-quad fill loop (`for(;count;--count,dst+=4) copy 4 dwords
-         * from the fixed source`). Used by the `_Insert_n` grow lane FUN_007F1D50
+         * from the fixed source`). Used by the `_Insert_n` grow body FUN_007F1D50
          * (cited above on `insert`) both to fill the reallocated buffer's one-element
          * gap and, via the pure-append dispatcher FUN_007F0D20, to write the new
          * element directly at `mLast` when there is no tail to shift)
@@ -7384,7 +7392,7 @@ namespace msvc8
          * broadcast-fill of `_Insert_n`'s vacated gap)
          * Address: 0x00884330 (FUN_00884330,
          * msvc8::vector<Moho::SSavedGameArmyInfo>::uninit_fill_n -- fills the
-         * reserved tail from a prototype after the resize-with-fill lane has
+         * reserved tail from a prototype after the resize-with-fill body has
          * reserved the exact target capacity)
          * Address: 0x005CC2D0 (FUN_005CC2D0, msvc8::vector<Moho::SPerArmyReconInfo>::
          * uninit_fill_n for the 52-byte element -- copy-constructs `count` copies
@@ -7397,12 +7405,12 @@ namespace msvc8
          * (position/style/depth as raw field copies, `text` zeroed to empty SSO
          * state then `assign`ed), with a trailing EH cleanup loop that destroys the
          * already-constructed prefix and rethrows on a `catch(...)`. Reached via the
-         * thin dispatcher FUN_00653330 from the `_Insert_n` grow lane FUN_00653380,
+         * thin dispatcher FUN_00653330 from the `_Insert_n` grow body FUN_00653380,
          * already cited above)
          * Address: 0x0075FEF0 (FUN_0075FEF0, msvc8::vector<Moho::Sim::
          * DumpUnitsCountEntry>::uninit_fill_n for the 8-byte trivially-copyable
          * element -- a count-driven dword-pair fill loop, reached from both
-         * `Moho::Sim::DumpUnits` (0x0075EE50) and its `push_back` grow lane
+         * `Moho::Sim::DumpUnits` (0x0075EE50) and its `push_back` grow body
          * (0x0075F1A0, cited on `push_back` above))
          * Address: 0x008DA380 (FUN_008DA380, msvc8::vector<gpg::REnumType::
          * ROptionValue>::uninit_fill_n for the 8-byte trivially-copyable
@@ -7426,7 +7434,7 @@ namespace msvc8
          * uninit_fill_n for the 12-byte trivially-copyable element -- a count-driven
          * dword-triple fill loop, reached from QueueCreateEntityParams's
          * `mNewEntities.push_back(params)` in Entity.cpp via its push_back grow
-         * lane FUN_0067B6F0)
+         * body FUN_0067B6F0)
          * Address: 0x0067C730 (FUN_0067C730, the advance-returning `_Ufill`
          * adapter around FUN_00680940 for the same `SCreateEntityParams`
          * instantiation: fills then returns `dst + count*0xC`. Called from
@@ -7478,18 +7486,18 @@ namespace msvc8
          *
          * Address: 0x007B0010 (FUN_007B0010, msvc8::vector<moho::GeomCamera3>::
          * insert(pos, value)'s `_Insert_n` growth core for the same 0x2C8
-         * (712)-byte element -- max_size guard (`0xFFFFFFFF/712`, throw lane
+         * (712)-byte element -- max_size guard (`0xFFFFFFFF/712`, throw helper
          * FUN_007AF4C0, already cited as a typed throw shim above), 1.5x
          * growth (`(cap>>1)+cap`) floored to `size()+1` via `size()` itself
          * (`std::vector_GeomCamera3::size`, inlined), allocation through the
-         * checked 712-byte lane `sub_7419E0`, construct-the-inserted-value
+         * checked 712-byte allocation `sub_7419E0`, construct-the-inserted-value
          * via `sub_7425B0`, tail relocation/destroy-old-buffer via
          * `sub_7B1290`/`sub_7B12E0`/`sub_7B12C0`. Reached from the
          * `insert(pos,val)` wrapper `FUN_007AF450` (already `skip`'d as a
          * RULE ONE compiler/template emission -- its own note already
          * identifies this address as the canonical template home). Its
          * sibling throw-shim `FUN_007B1100` (already `skip`'d) pairs with
-         * this instantiation's own `_Buy` allocation lane the same way
+         * this instantiation's own `_Buy` allocation the same way
          * `FUN_007AF4C0` does above.)
          *
          * Address: 0x0064F9A0 (FUN_0064F9A0, msvc8::vector<moho::SDebugDecal>::
@@ -7497,7 +7505,7 @@ namespace msvc8
          * by-ref prototype `count` times via 12 `fld`/`fstp` float moves (the
          * four corner Vector3s) plus one dword `mov` (the packed colour),
          * source pointer never advanced, no EH cleanup since the element is
-         * trivially copyable. Reached from the `_Insert_n` grow lane
+         * trivially copyable. Reached from the `_Insert_n` grow body
          * FUN_0064E770 (still open; not needed to satisfy this instantiation's
          * own caller evidence) via its advance-returning `_Ufill` adapter
          * FUN_0064E420. Source-level invocation: `canvas->decals.push_back(decal)`
@@ -7669,8 +7677,8 @@ namespace msvc8
          * -- this method's own `if (size() < capacity()) { uninit_fill_n(last_,
          * 1u, value); ++last_; }` branch -- which is `AddDiscoveredGame`'s
          * entire real body, `mGames.push_back(newRecord)`. Previously
-         * mis-recovered as a bespoke free function `FillStride4DwordLaneRuntimeA`
-         * in `SimRecoveryRuntime.cpp` (a `*Lane*`-named per-instantiation
+         * mis-recovered as a bespoke free function
+         * in `SimRecoveryRuntime.cpp` (a per-instantiation
          * reimplementation, the exact RULE ONE anti-pattern this method
          * exists to replace) with zero source-level callers of its own;
          * removed in favor of this citation when `CDiscoveryService::mGames`
@@ -7736,15 +7744,15 @@ namespace msvc8
          * not against that specific caller.)
          *
          * Address: 0x0092D0A0 (FUN_0092D0A0, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::uninit_fill_n` for the
+         * ClusterSearchEdge>::uninit_fill_n` for the
          * 12-byte element -- same per-element 3-dword defensive-null-guarded
          * copy loop shape as `FUN_005CBC70` above. Used directly by the
          * `_Insert_n` in-place branch's "tail >= count" sub-branch (fills the
          * vacated gap after the tail has been moved). Reached from the
          * `_Insert_n` grow core `FUN_0092F630`, cited above on `insert`.)
          * Address: 0x0092DF10 (FUN_0092DF10, a second, byte-distinct emission
-         * of the identical fill loop for the same `ClusterSearchEdgeTraversal
-         * LaneRuntime` instantiation -- not folded with `FUN_0092D0A0` above
+         * of the identical fill loop for the same `ClusterSearchEdge`
+         *  instantiation -- not folded with `FUN_0092D0A0` above
          * despite matching source/shape, reached only through the advance-
          * returning adapter `FUN_0092E920` (`sub_92DF10(a1,a2,a3); return a1
          * + 12*a2;`, this member's own "`_Ufill`" shape), which the
@@ -7752,7 +7760,7 @@ namespace msvc8
          * fill the trailing-gap section. Both `FUN_0092D0A0` and
          * `FUN_0092DF10` model this one member; recovered together.)
          * Address: 0x0092D580 (FUN_0092D580, the sibling `msvc8::vector<gpg::
-         * HaStar::ClusterSearchOpenHeapEntryRuntime>::uninit_fill_n` for the
+         * HaStar::ClusterSearchOpenHeapEntry>::uninit_fill_n` for the
          * 12-byte open-heap-entry element -- same shape as `FUN_0092D0A0`
          * above, reached directly by the `_Insert_n` in-place branch's
          * "tail >= count" sub-branch. Reached from the `_Insert_n` grow core
@@ -7855,7 +7863,7 @@ namespace msvc8
          * 3 string members, `modes` vector at +0x60). `FUN_008EF870` is
          * already `recovered` (`msvc8::vector<AdapterModeD3D9>::
          * operator=`). Previously `blocked` citing "caller integration
-         * lane FUN_008F1890" as unresolved -- that token is now recovered
+         * body FUN_008F1890" as unresolved -- that token is now recovered
          * (cited above on `insert`), clearing the stated blocker.
          *
          * Address: 0x00753A90 (FUN_00753A90, `msvc8::vector<moho::
@@ -7960,7 +7968,7 @@ namespace msvc8
          * obtain the advanced end pointer. DB-integrity fix: was
          * mis-tagged `skip` ("`__noreturn` 1-statement tail-call typed
          * throw shim") -- its only callee, `FUN_0064F910`, is this
-         * project's own `uninit_fill_n` core, not a throw lane; the
+         * project's own `uninit_fill_n` core, not a throw helper; the
          * `__noreturn` tag both functions carry is the same spurious-tag
          * artifact called out above, not evidence of throw-only behavior.
          *
@@ -7998,7 +8006,7 @@ namespace msvc8
          * why MSVC8 emitted them as separate per-instantiation bodies but
          * they read as near-identical `.c` exports. Previously duplicated in
          * `LegacyContainerFillLanes.cpp` as 16 lettered
-         * `FillDwordSpanCountedLane*`/3 `FillDwordSpanByEndLane*` thin
+         * count-based / 3 range-based thin
          * wrappers over a shared generic `FillDwordSpanByCount`/
          * `FillDwordSpanByEnd` implementation (itself byte-identical to this
          * method's body) -- a RULE ONE violation once each wrapper's real
@@ -8006,14 +8014,14 @@ namespace msvc8
          * `_callgraph_index.sqlite` `call_edges`; retired in favor of citing
          * each address here directly. A follow-up sweep (full-population
          * caller scan) resolved six more of the file's previously-
-         * unidentified lettered lanes -- `B` (0x0057F860), `F` (0x006522F0),
+         * unidentified lettered copies -- `B` (0x0057F860), `F` (0x006522F0),
          * `N` (0x007DA1D0), `Q` (0x0084EAD0), `R` (0x008558E0), and `S`
          * (0x00869C80), all cited below -- plus `J` (0x00701FA0), cited
          * inline on `detail::LegacyVectorDwordInsertN` in Vector.cpp instead
          * since that instantiation's fill step is already expressed as part
          * of that helper's own in-place/reallocation arms. `FillDwordSpanByCount`/
-         * `FillDwordSpanByEnd` are kept alive only for lane `X` (0x008B2FD0),
-         * the sole lettered lane still without a confirmed element `T`: its
+         * `FillDwordSpanByEnd` are kept alive only for copy `X` (0x008B2FD0),
+         * the sole lettered copy still without a confirmed element `T`: its
          * grow-path caller `FUN_008B31B0` has two genuine, non-padding call
          * sites (0x008B29CA, 0x008B2F47, hand-verified against the raw PE
          * bytes) that IDA's own function analysis never boxed into named
@@ -8025,7 +8033,7 @@ namespace msvc8
          *
          * Address: 0x00535620 (FUN_00535620, `msvc8::vector<Moho::
          * RBlueprint*>::uninit_fill_n` for the 4-byte pointer element.
-         * Reached from this instantiation's `_Insert_n` grow lane
+         * Reached from this instantiation's `_Insert_n` grow body
          * `FUN_00535D60` (cited above), whose `_Count` is folded to the
          * constant 1; emitted via `rules.mBlueprintsByOrdinal.push_back(...)`
          * in `moho::AppendBlueprintOrdinal`, Sim.cpp:14253.)
@@ -8039,7 +8047,7 @@ namespace msvc8
          * `storedCargo.push_back(storedUnit)` in `Sim::TransferUnit`
          * (Sim.cpp:11097) and `stdCandidates.push_back(unit)` in
          * `moho::FindAvailableFactory` (CAiBrain.cpp). Previously duplicated
-         * here as lettered lane `B`, `FillDwordSpanCountedLaneB`; removed
+         * here as lettered copy `B`; removed
          * from `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x005C5F90 (FUN_005C5F90, `msvc8::vector<moho::
          * ReconBlip*>::uninit_fill_n` for the 4-byte pointer element, filled
@@ -8049,13 +8057,13 @@ namespace msvc8
          * this address is `resize`'s own grow-and-fill step for this `T`.)
          * Address: 0x005DC940 (FUN_005DC940, `msvc8::vector<Moho::
          * UnitWeapon*>::uninit_fill_n` for the 4-byte pointer element.
-         * Reached from this instantiation's `_Insert_n` grow lane
+         * Reached from this instantiation's `_Insert_n` grow body
          * `FUN_005DD120` (cited above, `CAiAttackerImpl::mWeapons`); emitted
          * via `view->mWeapons.push_back(weapon)` in
          * `CAiAttackerImpl::CreateWeapon`, CAiAttackerImpl.cpp:973.)
          * Address: 0x005DCAE0 (FUN_005DCAE0, `msvc8::vector<moho::
          * CAcquireTargetTask*>::uninit_fill_n` for the 4-byte pointer
-         * element. Reached from this instantiation's `_Insert_n` grow lane
+         * element. Reached from this instantiation's `_Insert_n` grow body
          * `FUN_005DD570` (cited above); emitted via the recovered helper
          * `InsertNCopiesCAcquireTargetTaskPtrVector`'s
          * `storage.insert(begin()+offset, count, value)`, IAiAttacker.cpp.)
@@ -8068,8 +8076,8 @@ namespace msvc8
          * `PushBackDebugOverlayClassPtrVector`'s `destination.push_back(
          * value)` (Sim.cpp), called from `CollectPrefixDebugOverlayTypes`'s
          * `PushBackDebugOverlayClassPtrVector(outMatches, overlayClass)`.
-         * Previously duplicated here as lettered lane `F`,
-         * `FillDwordSpanCountedLaneF`; removed from
+         * Previously duplicated here as lettered copy `F`;
+         * removed from
          * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x0066A460 (FUN_0066A460, `msvc8::vector<moho::
          * WCurveEditorPanel*>::uninit_fill_n` for the 4-byte pointer
@@ -8082,21 +8090,21 @@ namespace msvc8
          * Address: 0x0067CB80 (FUN_0067CB80, `msvc8::vector<Moho::
          * Entity*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::Entity::mAttachedEntities` @+0x17C). Reached from this
-         * instantiation's `_Insert_n` grow lane `FUN_0067DB40` (cited
+         * instantiation's `_Insert_n` grow body `FUN_0067DB40` (cited
          * above); emitted via the recovered helper
          * `InsertNCopiesEntityPtrVector`'s `storage.insert(begin()+offset,
          * count, value)` (Entity.cpp), and via `AppendAttachedEntity` on
          * `Moho::Entity::AttachTo`'s (FUN_00679550) capacity-full path.)
          * Address: 0x006F87A0 (FUN_006F87A0, `msvc8::vector<
          * CUnitCommand*>::uninit_fill_n` for the 4-byte pointer element.
-         * Reached from this instantiation's `_Insert_n` grow lane
+         * Reached from this instantiation's `_Insert_n` grow body
          * `FUN_006F88D0` (cited above); emitted via
          * `cfunc_CoordinateAttacksL`'s `commands.push_back(command)`,
          * CCommandLuaFunctionRegistrations.cpp.)
          * Address: 0x0078A2A0 (FUN_0078A2A0, `msvc8::vector<moho::
          * CMauiControl*>::uninit_fill_n` for the 4-byte pointer element.
          * Reached from this instantiation's `insert(end(),1,value)` grow-core
-         * `FUN_0078A330` (cited above); emitted via `RebuildRenderedChildrenLane`'s
+         * `FUN_0078A330` (cited above); emitted via the rendered-children rebuild's
          * `mRenderedChildren.push_back(controlCursor)` (UiRuntimeTypes.cpp),
          * reached from `Moho::CMauiControl::Render` (0x00786FA0).)
          * Address: 0x007AF3B0 (FUN_007AF3B0, `msvc8::vector<Moho::
@@ -8110,7 +8118,7 @@ namespace msvc8
          * as the entry immediately above (`RCamCamera` is the public alias
          * of `CameraImpl`) -- a second, distinct `_Insert_n` emission for
          * this `T` reached via a different call shape. Reached from this
-         * instantiation's `_Insert_n` grow lane `FUN_007B0340` (cited above,
+         * instantiation's `_Insert_n` grow body `FUN_007B0340` (cited above,
          * folded to `_Count=1`); emitted via `Moho::CAM_GetAllRCamCameras`'s
          * (FUN_007AADE0, RCamManager.cpp) `result.push_back(cam)`.)
          * Address: 0x007DA1D0 (FUN_007DA1D0, `msvc8::vector<
@@ -8122,7 +8130,7 @@ namespace msvc8
          * instance)` inside `Moho::MeshRenderer::Batch` (0x007DFA00,
          * Mesh.cpp), which appends into the per-`MeshBatchKey`
          * `MeshBatchInstanceVector` bucket. Previously duplicated here as
-         * lettered lane `N`, `FillDwordSpanCountedLaneN`; removed from
+         * lettered copy `N`; removed from
          * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x007E31E0 (FUN_007E31E0, `msvc8::vector<Moho::
          * MeshLOD*>::uninit_fill_n` for the 4-byte pointer element. Reached
@@ -8146,24 +8154,24 @@ namespace msvc8
          * `suspended[index].push_back(inputWindow->PopEventHandler(false))`
          * -- every call takes the grow path since each per-window inner
          * vector starts default-constructed at capacity 0. Previously
-         * duplicated here as lettered lane `Q`, `FillDwordSpanCountedLaneQ`;
+         * duplicated here as lettered copy `Q`, lettered copy `Q`;
          * removed from `LegacyContainerFillLanes.cpp` in favor of this
          * citation.)
          * Address: 0x008558E0 (FUN_008558E0, `msvc8::vector<
          * std::uint32_t>::uninit_fill_n` for the 4-byte dword element.
          * Reached from this instantiation's `insert(pos,count,value)`
          * grow/shift helper `FUN_008561D0` (uncited -- compiler emission,
-         * no separate source), itself reached from `AppendDwordLaneRuntime`
+         * no separate source), itself reached from the former per-type dword append wrapper
          * (`Address: 0x00855150`, SimRecoveryRuntime.cpp) appending one
-         * dword lane to a reflection-runtime `LegacyVectorStorageRuntime<
+         * dword to a reflection-runtime `LegacyVectorStorageRuntime<
          * std::uint32_t>` on its capacity-exhausted path. Note:
-         * `AppendDwordLaneRuntime`'s current `ReserveTrivialVector` helper
+         * that wrapper's `ReserveTrivialVector` helper
          * grows to exactly the requested size rather than this
          * instantiation's real 1.5x `_Insert_n` growth policy -- a
          * pre-existing simplification in that already-recovered caller, not
          * introduced by this citation and not something this citation
          * depends on being fixed. Previously duplicated here as lettered
-         * lane `R`, `FillDwordSpanCountedLaneR`; removed from
+         * copy `R`, lettered copy `R`; removed from
          * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x00869C80 (FUN_00869C80, `msvc8::vector<Moho::
          * IWldTeardownCallback*>::uninit_fill_n` for the 4-byte pointer
@@ -8172,13 +8180,13 @@ namespace msvc8
          * `FUN_00869D30` (uncited -- compiler emission, no separate
          * source), itself reached from `push_back`'s grow path via
          * `WLD_AddOnTeardownCallback`'s `callbacks->push_back(callback)`
-         * (CWldSession.cpp). Previously duplicated here as lettered lane
-         * `S`, `FillDwordSpanCountedLaneS`; removed from
+         * (CWldSession.cpp). Previously duplicated here as lettered copy
+         * `S`, lettered copy `S`; removed from
          * `LegacyContainerFillLanes.cpp` in favor of this citation.)
          * Address: 0x00879A80 (FUN_00879A80, `msvc8::vector<Moho::
          * CWldTerrainDecal*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mDecals` @+0x10). Reached from this
-         * instantiation's `_Insert_n` grow lane `FUN_0087A830` (cited
+         * instantiation's `_Insert_n` grow body `FUN_0087A830` (cited
          * above); emitted via the recovered helper
          * `InsertNCopiesCWldTerrainDecalPtrVector` (CWldSplat.cpp) and via
          * `AppendDecal` on `CDecalManager::LoadDecal`/`NewSplat`'s
@@ -8186,35 +8194,35 @@ namespace msvc8
          * Address: 0x00879ED0 (FUN_00879ED0, `msvc8::vector<Moho::
          * CDecalGroup*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mDecalGroups`). Reached from this
-         * instantiation's `_Insert_n` grow lane `FUN_0087B1C0` (cited above
+         * instantiation's `_Insert_n` grow body `FUN_0087B1C0` (cited above
          * on `uninit_move_n`).)
          * Address: 0x0087A310 (FUN_0087A310, `msvc8::vector<Moho::
          * CWldSplat*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mSplats` @+0x48). Reached from this
-         * instantiation's `_Insert_n` grow lane `FUN_0087BB40` (cited
+         * instantiation's `_Insert_n` grow body `FUN_0087BB40` (cited
          * above); emitted via the recovered helper
          * `InsertNCopiesCWldSplatPtrVector` (CWldSplat.cpp) and via
          * `AppendSplat` on `CDecalManager::NewSplat`'s capacity-full path.)
          * Address: 0x0088A2E0 (FUN_0088A2E0, `msvc8::vector<Moho::
          * WaveGenerator*>::uninit_fill_n` for the 4-byte pointer element.
-         * Reached from this instantiation's `_Insert_n` grow lane
+         * Reached from this instantiation's `_Insert_n` grow body
          * `FUN_0088A7B0` (cited above on `uninit_move_n`), WaveSystem.cpp.)
          * Address: 0x008D9D50 (FUN_008D9D50, `msvc8::vector<gpg::
          * RType*>::uninit_fill_n` for the 4-byte pointer element, expressed
          * over a `[begin,end)` pointer pair rather than a count at this call
-         * site. Reached from this instantiation's `_Insert_n` grow lane
+         * site. Reached from this instantiation's `_Insert_n` grow body
          * `FUN_008DD050` (cited above, the global reflection `TypeVec`);
          * emitted via `gpg::RType::RegisterType`'s `insert(end(), 1, this)`.)
          * Address: 0x008E9260 (FUN_008E9260, `msvc8::vector<
          * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats2`
          * @+0x60, expressed over a `[begin,end)` pointer pair. Reached from
-         * this instantiation's `_Insert_n` grow lane `FUN_008EF2B0` (cited
+         * this instantiation's `_Insert_n` grow body `FUN_008EF2B0` (cited
          * above); emitted via `gpg::gal::DeviceD3D9::BuildDeviceCapabilities`'s
          * `validFormats2.insert(end(),1,token)`, D3D9Interfaces.cpp.)
          * Address: 0x008E9280 (FUN_008E9280, `msvc8::vector<
          * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats1`
          * @+0x70, the sibling of the entry immediately above. Reached from
-         * this instantiation's `_Insert_n` grow lane `FUN_008EF500` (cited
+         * this instantiation's `_Insert_n` grow body `FUN_008EF500` (cited
          * above); emitted via the same `BuildDeviceCapabilities`'s
          * `validFormats1.insert(end(),1,token)`.)
          *
@@ -8227,7 +8235,7 @@ namespace msvc8
          * the tail-called, count=1 reallocation half of `insert(iterator,
          * const T&)`), itself reached from `push_back`'s capacity-full path
          * via `AppendHeadAdapterMode` (D3D9Interfaces.cpp). DB-integrity fix:
-         * was duplicated as a standalone `FillDwordTripleRangeLaneA` free
+         * was duplicated as a standalone 12-byte fill free
          * function in `moho/containers/LegacyContainerFillLanesB.cpp`
          * (orphan -- anonymous-namespace, no source-level caller); removed
          * from there in favor of this citation.)
@@ -8238,7 +8246,7 @@ namespace msvc8
          * `FUN_00933950` (cited above on `insert`). `[begin,end)`
          * pointer-pair fill loop, verified against the `.asm`; reached from
          * that `_Insert_n` core's in-place gap-fill branch. DB-integrity fix:
-         * was duplicated as `FillDwordRangeByEndLaneG` in
+         * was duplicated as a lettered copy in
          * `LegacyContainerFillLanesB.cpp` (orphan); removed from there.)
          * Address: 0x00936050 (FUN_00936050, `msvc8::vector<gpg::
          * ThreadCtxEntry*>::uninit_fill_n` for the 4-byte pointer element
@@ -8257,7 +8265,7 @@ namespace msvc8
          * `FUN_00936FF0`'s reallocation-branch tail fill. Both
          * `FUN_00936050` and `FUN_00936B00` model this one member; recovered
          * together. DB-integrity fix: both were duplicated as
-         * `FillDwordRangeByEndLaneH`/`FillDwordCountedLaneAA` in
+         * two lettered copies in
          * `LegacyContainerFillLanesB.cpp` (orphans, never reached from that
          * file's own source); removed from there in favor of this citation.)
          * Address: 0x008F9A50 (FUN_008F9A50, `msvc8::vector<void*>::
@@ -8271,7 +8279,7 @@ namespace msvc8
          * the `.asm`; same relationship to `FUN_008F9A50` as `FUN_00936B00`
          * has to `FUN_00936050` above. Reached from `FUN_008FE010`'s
          * reallocation-branch tail fill. DB-integrity fix: both were
-         * duplicated as `FillDwordRangeByEndLaneD`/`FillDwordCountedLaneZ` in
+         * duplicated as two lettered copies in
          * `LegacyContainerFillLanesB.cpp` (orphans); removed from there in
          * favor of this citation.)
          * Address: 0x0094FE90 (FUN_0094FE90, `msvc8::vector<gpg::
@@ -8284,7 +8292,7 @@ namespace msvc8
          * so this fill call is the entire visible effect of the grow path
          * once the allocate/tail-shift steps (`FUN_0094F1B0`/`FUN_00950670`,
          * cited there) are done. DB-integrity fix: was duplicated as
-         * `FillDwordPairRangeLaneA` in `LegacyContainerFillLanesB.cpp`
+         * its `A` copy in `LegacyContainerFillLanesB.cpp`
          * (orphan); removed from there in favor of this citation.)
          *
          * Address: 0x00753AF0 (FUN_00753AF0, `msvc8::vector<moho::
@@ -8352,7 +8360,7 @@ namespace msvc8
          *
          * The `moho::GeomCamera3` fill emissions, previously hand-written in
          * `GeomCamera3.cpp` as `FillGeomCameraRangeFromPrototype` and its
-         * `...LaneA` twin, both orphaned.
+         * `A` twin, both orphaned.
          * Address: 0x0076B0E0 (FUN_0076B0E0 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
          * Address: 0x0075F2B0 (FUN_0075F2B0 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
          * Address: 0x00769D70 (FUN_00769D70 -- `_Uninit_fill_n`/`_Fill_n` for a 12-byte element (`PathTables` 0x007698C0, the `resize` at 0x0075F4B0, 0x00592460, 0x005C7B10); 0x0075F2B0/0x00769D70 pass a zero temporary.)
@@ -8379,7 +8387,7 @@ namespace msvc8
          * Address: 0x004D4F50 (FUN_004D4F50 -- register bridge into the string-triple `_Fill` at 0x004D5390; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x006E2D40 (FUN_006E2D40 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x006E34E0 (FUN_006E34E0 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x008DB390 (FUN_008DB390 -- `_Ufill` (advance-returning `_Uninit_fill_n`) for the 4-byte `gpg::RType*` element of `_Insert_n` 0x008DD050 (`gpg::RType::RegisterType`'s TypeVec insert); formerly `FillDwordCountedLaneY` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008DB390 (FUN_008DB390 -- `_Ufill` (advance-returning `_Uninit_fill_n`) for the 4-byte `gpg::RType*` element of `_Insert_n` 0x008DD050 (`gpg::RType::RegisterType`'s TypeVec insert); formerly lettered copy `Y` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00932F90 (FUN_00932F90 -- `_Ufill` for the 4-byte element of `_Insert_n` 0x00933640; was DB `skip` ("RULE ONE emission") with no anchor.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
@@ -8397,7 +8405,7 @@ namespace msvc8
          * uninit_move_n for the 0x10-byte trivially-copyable element -- a plain
          * forward per-element dword-quad copy loop (`for(;src!=srcEnd;++dst,src+=4)
          * copy 4 dwords`, no destroy pass since the element is POD). Used by the
-         * `_Insert_n` grow lane FUN_007F1D50 (cited above on `insert`) both to move
+         * `_Insert_n` grow body FUN_007F1D50 (cited above on `insert`) both to move
          * the single trailing element past `mLast` on the in-place path (via the
          * count=1 dispatcher FUN_007F3500) and to move the head/tail spans into the
          * reallocated buffer)
@@ -8409,7 +8417,7 @@ namespace msvc8
          * matching `move_if_noexcept` on a non-nothrow-movable T), with a trailing
          * EH cleanup loop that destroys the already-constructed prefix and rethrows.
          * Reached via the thin dispatcher FUN_006539E0 from the `_Insert_n` grow
-         * lane FUN_00653380, already cited above)
+         * body FUN_00653380, already cited above)
          * Address: 0x007FC2F0 (FUN_007FC2F0, msvc8::vector<moho::WRenViewportWorldViewParamRuntime>::
          * uninit_move_n for the 20-byte `{IRenderWorldView* view; int head; int depth;
          * boost::shared_ptr<TerrainCommon> terrain}` element -- range-form loop over
@@ -8421,7 +8429,7 @@ namespace msvc8
          * SDebugWorldText above, matching the binary's copy-with-refcount-bump shape
          * (same family as the SPendingPoseCopy/`shared_ptr<CAniPose>` uninit_copy_n
          * entry above). The `if (result)` null guard sits *inside* the loop for the
-         * same reason as FUN_00549BC0's ResourceDeposit lane: the destination is
+         * same reason as FUN_00549BC0's ResourceDeposit body: the destination is
          * freshly-allocated storage the compiler cannot prove non-null. Reached from
          * `InsertWorldViewParamAt` (0x007FB060, WxRuntimeTypes.cpp)'s
          * `worldViews->push_back(entry)` capacity-full path, whose `insert(end(),1,
@@ -8442,7 +8450,7 @@ namespace msvc8
          * `lock xadd [pn+4]` -- Boost 1.34.1's vendored `shared_ptr` has no
          * move ctor, so `move_if_noexcept` degrades to copy here exactly as
          * for the `shared_ptr<TerrainCommon>` entry above. Called twice from
-         * the `_Insert_n` grow lane FUN_00813900 (cited on `insert(pos,
+         * the `_Insert_n` grow body FUN_00813900 (cited on `insert(pos,
          * count, value)` above): once for the tail>=count branch's
          * `uninit_move_n(oldLast-count, count, oldLast)` step (moving the
          * single trailing element past the old end, `last` supplied by the
@@ -8598,26 +8606,26 @@ namespace msvc8
          * Moho::RBlueprint*>::uninit_move_n` for the trivially-relocatable
          * 4-byte pointer element -- `memmove_s(dst, n*4, src, n*4)` range
          * form, `[Source,a3) -> Destination`. Reached from the `_Insert_n`
-         * grow lane `FUN_00535D60` (already recovered above).)
+         * grow body `FUN_00535D60` (already recovered above).)
          * Address: 0x0087D320 (FUN_0087D320, `msvc8::vector<
          * Moho::CDecalGroup*>::uninit_move_n` for the same 4-byte pointer
-         * shape. Reached from the `_Insert_n` grow lane `FUN_0087B1C0`
+         * shape. Reached from the `_Insert_n` grow body `FUN_0087B1C0`
          * (already recovered above), `Moho::CDecalManager::mDecalGroups`.)
          * Address: 0x0087D3F0 (FUN_0087D3F0, `msvc8::vector<
          * Moho::CWldSplat*>::uninit_move_n` for the same 4-byte pointer
-         * shape. Reached from the `_Insert_n` grow lane `FUN_0087BB40`
+         * shape. Reached from the `_Insert_n` grow body `FUN_0087BB40`
          * (already recovered above), `Moho::CDecalManager::mSplats`.)
          * Address: 0x0088AEE0 (FUN_0088AEE0, `msvc8::vector<
          * Moho::WaveGenerator*>::uninit_move_n` for the same 4-byte pointer
-         * shape. Reached from the `_Insert_n` grow lane `FUN_0088A7B0`
+         * shape. Reached from the `_Insert_n` grow body `FUN_0088A7B0`
          * (already recovered above), `WaveSystem.cpp`.)
          * Address: 0x008DB240 (FUN_008DB240, `msvc8::vector<gpg::RType*>::
          * uninit_move_n` for the same 4-byte pointer shape. Reached from the
-         * `_Insert_n` grow lane `FUN_008DD050` (already recovered above),
+         * `_Insert_n` grow body `FUN_008DD050` (already recovered above),
          * the global reflection TypeVec.)
          * Address: 0x008FA8F0 (FUN_008FA8F0, `msvc8::vector<void*>::
          * uninit_move_n` for the same 4-byte pointer shape, the D3D10
-         * backend swap-chain vector. Reached from the `_Insert_n` grow lane
+         * backend swap-chain vector. Reached from the `_Insert_n` grow body
          * `FUN_008FE010` (already recovered above).)
          * Address: 0x00831730 (FUN_00831730, `msvc8::vector<UICommandGraph::
          * CommandGraphEdge*>::uninit_move_n` for the same 4-byte pointer
@@ -8638,7 +8646,7 @@ namespace msvc8
          * `_InterlockedExchangeAdd`-based refcount bump on `pn` when
          * non-null, matching Boost 1.34.1's copy-degrades-move shape already
          * documented for the other `shared_ptr`/`weak_ptr` entries in this
-         * method. Reached (via FUN_00813E40) from the `_Insert_n` grow lane
+         * method. Reached (via FUN_00813E40) from the `_Insert_n` grow body
          * `FUN_00813900` (already recovered above), `AppendShoreCellRef`'s
          * (Shoreline.cpp) `shorelineCells.push_back(cell)` capacity-full
          * path.)
@@ -8706,7 +8714,7 @@ namespace msvc8
          * Same SSTICommandSource mis-attribution and correction as
          * FUN_007BED70 immediately above.)
          * Address: 0x0092D7D0 (FUN_0092D7D0, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::uninit_move_n` for the
+         * ClusterSearchEdge>::uninit_move_n` for the
          * 12-byte element -- per-element 3-dword copy loop with a defensive
          * `if (result)` null-check per iteration (same "defensive-null"
          * shape documented elsewhere on this member), used both for the
@@ -8716,7 +8724,7 @@ namespace msvc8
          * the `_Insert_n` grow core `FUN_0092F630`, cited above on
          * `insert`.)
          * Address: 0x0092D840 (FUN_0092D840, the sibling `msvc8::vector<gpg::
-         * HaStar::ClusterSearchOpenHeapEntryRuntime>::uninit_move_n` for the
+         * HaStar::ClusterSearchOpenHeapEntry>::uninit_move_n` for the
          * 12-byte open-heap-entry element -- same per-element defensive-null
          * loop shape, reached both directly and via its alias `FUN_0092EEB0`
          * from the `_Insert_n` grow core `FUN_0092F240`, cited above on
@@ -8947,7 +8955,7 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x005C9EF0 (FUN_005C9EF0, the forward `std::copy` lane for
+         * Address: 0x005C9EF0 (FUN_005C9EF0, the forward `std::copy` step for
          * 52-byte `Moho::SPerArmyReconInfo` -- copy-assigns a parallel source run
          * over `[destBegin, destEnd)`; used by FUN_005C6F90 to overwrite the
          * vacated insert gap)
@@ -8976,21 +8984,21 @@ namespace msvc8
          * in the AI brain's point-vector reset)
          * Address: 0x008A9DC0 (FUN_008A9DC0, the `std::copy` emission for
          * `Moho::TerrainEnvironmentLookupPair` -- the pair's two member strings
-         * are copied through their own assign lanes, so this is the
+         * are copied through their own assign steps, so this is the
          * copy-assign form, used by `erase(first, last)` to shift survivors
          * down)
          * Address: 0x005C9E70 (FUN_005C9E70, the `std::copy` emission used by
          * `msvc8::vector<Moho::SPerArmyReconInfo>::operator=` (FUN_005CA980) to
          * assign over the retained prefix; returns the one-past-end destination
          * cursor so the caller can destroy the excess tail)
-         * Address: 0x005261F0 (FUN_005261F0, the `std::copy_backward` lane for
+         * Address: 0x005261F0 (FUN_005261F0, the `std::copy_backward` step for
          * `Moho::RUnitBlueprintWeapon` -- shifts `_Insert_n`'s live tail right
          * by `count` slots on the spare-capacity path)
          * Address: 0x005C9F10 (FUN_005C9F10, the matching `std::copy_backward`
-         * lane -- copy-assigns `[srcBegin, srcEnd)` backward into
+         * body -- copy-assigns `[srcBegin, srcEnd)` backward into
          * `[destEnd - n, destEnd)`; used by FUN_005C6F90's in-place branch to
          * shift the live tail right without overlap corruption)
-         * Address: 0x0076AAD0 (FUN_0076AAD0, the `std::copy_backward` lane for
+         * Address: 0x0076AAD0 (FUN_0076AAD0, the `std::copy_backward` step for
          * `gpg::AStarOpenHeap<TCell>::Entry` (the same 12-byte `{float; AStarNode<TCell>*;
          * std::int32_t}` element as FUN_0076AAB0 above) -- walks two cursors downward
          * together (`dst -= 0x0C; src -= 0x0C;`), copying the trivially-copyable
@@ -9031,7 +9039,7 @@ namespace msvc8
          * payload at `+0x08` to its own `Assign` member, then the trailing
          * dword at `+0x230` — the non-trivial per-field assign this
          * element's `is_trivially_copy_assignable_v<T>` branch takes.
-         * Reached from the `_Insert_n` grow lane FUN_005C68E0, already
+         * Reached from the `_Insert_n` grow body FUN_005C68E0, already
          * cited above.)
          * Address: 0x0084F820 (FUN_0084F820 — 16-byte `msvc8::vector<
          * wxWindowBase*>` element (a nested vector, not a POD struct;
@@ -9135,18 +9143,19 @@ namespace msvc8
          * Address: 0x0064FA40 (FUN_0064FA40 -- `_Copy_opt` for `SDebugScreenText`, the assign step of that vector's `_Insert_n` (0x0064E490).)
          * Address: 0x0064F750 (FUN_0064F750 -- register bridge into the `SDebugScreenText` copy at 0x0064FA40; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007056A0 (FUN_007056A0 -- `_Copy_opt` for `SEntitySetTemplateUnit` (each element `operator=` reduces to `mVec.AddAll`), reached from `operator=` 0x00704D80 and `clear` 0x00703040 through the 0x00704670 bridge.)
-         * Address: 0x00755D30 (FUN_00755D30 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
-         * Address: 0x00754940 (FUN_00754940 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
-         * Address: 0x00754970 (FUN_00754970 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of `FastVectorInsertLanes`' 0x00753680.)
+         * Address: 0x00755D30 (FUN_00755D30 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
+         * Address: 0x00754940 (FUN_00754940 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
+         * Address: 0x00754970 (FUN_00754970 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
          * Address: 0x00755B30 (FUN_00755B30 -- `_Copy_opt` for a 28-byte seven-float element (the loop and its bridge), the copy step of `operator=` 0x007525C0.)
          * Address: 0x00754710 (FUN_00754710 -- `_Copy_opt` for a 28-byte seven-float element (the loop and its bridge), the copy step of `operator=` 0x007525C0.)
          * Address: 0x007548B0 (FUN_007548B0 -- register bridge into the `_Copy_opt` of `SSyncData`'s 12-byte shared-count element (`operator=` 0x00752C50).)
          * Address: 0x008A9B10 (FUN_008A9B10 -- register bridge into the 0x28 string-element `_Copy_opt` at 0x004FB510; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x008D7DC0 (FUN_008D7DC0 -- element-wise forward copy (`_Copy`/`_Ucopy` under VC8's non-scalar pointer category, i.e. a 4-byte class element rather than a memmove'd scalar) for the assign-over/append arms of `operator=` 0x008D76B0; formerly `CopyDwordRangeForwardLaneA` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x008D7E20 (FUN_008D7E20 -- the same element-wise 4-byte forward copy for the `operator=` twin 0x008D77E0; formerly `CopyDwordRangeForwardLaneB`, removed.)
-         * Address: 0x00935BD0 (FUN_00935BD0 -- `_Copy_opt` memmove for a 4-byte scalar element ([first, last) to dest, returns the destination end); zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneA` in LegacyContainerFillLanesB.cpp, removed.)
-         * Address: 0x00936000 (FUN_00936000 -- identical 4-byte `_Copy_opt` memmove copy; zero callers, no xrefs, unreachable. Formerly `CopyDwordRangeWithMemmoveLaneB`, removed.)
+         * Address: 0x008D7DC0 (FUN_008D7DC0 -- element-wise forward copy (`_Copy`/`_Ucopy` under VC8's non-scalar pointer category, i.e. a 4-byte class element rather than a memmove'd scalar) for the assign-over/append arms of `operator=` 0x008D76B0; formerly a per-type free function in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008D7E20 (FUN_008D7E20 -- the same element-wise 4-byte forward copy for the `operator=` twin 0x008D77E0; formerly a sibling per-type free function, removed.)
+         * Address: 0x00935BD0 (FUN_00935BD0 -- `_Copy_opt` memmove for a 4-byte scalar element ([first, last) to dest, returns the destination end); zero callers, no xrefs, unreachable. Formerly a per-type free function in LegacyContainerFillLanesB.cpp, removed.)
+         * Address: 0x00936000 (FUN_00936000 -- identical 4-byte `_Copy_opt` memmove copy; zero callers, no xrefs, unreachable. Formerly a sibling per-type free function, removed.)
          * Address: 0x006DDA00 (FUN_006DDA00 -- argument-order bridge into the element-wise `_Copy` for `moho::SBlackListInfo` (0x006DE7E0), reached only from the dead `operator=` 0x006DE400. Formerly `CopyBlacklistRangeAssignWeakLinksBridgeRuntime` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
+         * Address: 0x00584480 (FUN_00584480 -- `_Copy_opt` memmove for the 4-byte `int` element, the assign-over step of `vector<int>::operator=` 0x00583A20. Formerly the orphan `CopyLegacyIntRangeAndReturnEnd` in CAiBrain.cpp, removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9216,7 +9225,7 @@ namespace msvc8
 
     public:
         /**
-         * The VC8 `vector<T>::_Grow_to(_Count)` lane.
+         * The VC8 `vector<T>::_Grow_to(_Count)` body.
          *
          * MSVC8 grows by **1.5x** (`capacity() + capacity() / 2`), not by
          * doubling, clamping to 0 on max_size overflow and flooring to the
@@ -9307,7 +9316,7 @@ namespace msvc8
          * `ReleaseLuaExportBindingArray` free function.)
          *
          * What it does:
-         * Frees retained heap storage and clears all pointer lanes.
+         * Frees retained heap storage and clears all pointers.
          */
         void deallocate_all() noexcept {
 #if MSVC8_VECTOR_DISABLE_FREE
@@ -9325,7 +9334,7 @@ namespace msvc8
          * Address: 0x004439D0 (FUN_004439D0)
          *
          * What it does:
-         * Returns `this` unchanged in trivial legacy lane wrappers that carry one
+         * Returns `this` unchanged in trivial legacy wrappers that carry one
          * extra ignored tag argument.
          */
         [[nodiscard]] static void* identity_this_with_tag(void* const self, int) noexcept
@@ -9338,7 +9347,7 @@ namespace msvc8
          * Address: 0x004442F0 (FUN_004442F0)
          *
          * What it does:
-         * Returns `this` unchanged in trivial legacy lane wrappers.
+         * Returns `this` unchanged in trivial legacy wrappers.
          */
         [[nodiscard]] static void* identity_this(void* const self) noexcept
         {
@@ -9352,7 +9361,7 @@ namespace msvc8
          * Address: 0x00444D60 (FUN_00444D60)
          *
          * What it does:
-         * Releases one heap block through the legacy VC8 delete lane.
+         * Releases one heap block through the legacy VC8 `operator delete`.
          * Address: 0x00537F70 (FUN_00537F70 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x006DC9C0 (FUN_006DC9C0 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0078A5C0 (FUN_0078A5C0 -- `allocator::deallocate` (one `operator delete`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -9429,7 +9438,7 @@ namespace msvc8
          *
          * sizeof(T) == 28 (`count > 0x0F5C28F5` throws):
          * Address: 0x00883870 (FUN_00883870, `msvc8::vector<msvc8::string>`'s
-         * checked-allocate lane, reached from the `_Insert_n` reallocation path
+         * checked allocation, reached from the `_Insert_n` reallocation path
          * FUN_00882BA0 already cited above on `_Insert_n` -- `reallocate_to`'s
          * `allocate_slots_checked(newCap)` call for this element. Five call
          * sites converge on it (0x00882610/0x00882920/0x00882BA0/0x00882FAF/
@@ -9440,7 +9449,7 @@ namespace msvc8
          * (CSaveGameRequestImpl.cpp:125).)
          *
          * sizeof(T) == 152 (`count > 0x01B4E81A` throws):
-         * Address: 0x0077DD10 (FUN_0077DD10, checked-allocate lane for
+         * Address: 0x0077DD10 (FUN_0077DD10, checked allocation for
          * `msvc8::list<moho::SDecalInfo>`'s internal 0x98-byte node
          * (`_Node{_Next(4), _Prev(4), SDecalInfo(0x90)}` -- `SDecalInfo` is
          * confirmed 0x90 bytes in `CDecalTypes.h`, so 8+0x90=0x98 matches
@@ -9478,18 +9487,18 @@ namespace msvc8
          * Address: 0x008F6040 (FUN_008F6040, 0x74B)
          * Address: 0x00526080 (FUN_00526080, 0x184B, `moho::RUnitBlueprintWeapon`)
          * Address: 0x0092C080 (FUN_0092C080, 12B, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchEdgeTraversalLaneRuntime>::allocate_slots_checked` --
+         * ClusterSearchEdge>::allocate_slots_checked` --
          * reached from the `_Insert_n` grow core `FUN_0092F630`, cited above
          * on `insert`.)
          * Address: 0x0092C0E0 (FUN_0092C0E0, 12B, `msvc8::vector<gpg::HaStar::
-         * ClusterSearchOpenHeapEntryRuntime>::allocate_slots_checked` --
+         * ClusterSearchOpenHeapEntry>::allocate_slots_checked` --
          * reached from the `_Insert_n` grow core `FUN_0092F240`, cited above
          * on `insert`.)
          *
          * sizeof(T) == 56:
          * Address: 0x0044E650 (FUN_0044E650, allocator for one 56-byte
          * intrusive sentinel/head node used by `CD3DFileBatchTexture.cpp`'s
-         * BVSet lanes)
+         * BVSet vectors)
          * Address: 0x00892B00 (FUN_00892B00, second 56-byte-stride emission,
          * same `count > 0xFFFFFFFF/56` guard via the reciprocal-division
          * codegen (`0xFFFFFFFF/count < 0x38`) rather than a folded
@@ -9508,7 +9517,7 @@ namespace msvc8
          * RefreshRate{Num,Denom}/Format/ScanlineOrdering/Scaling):
          * Address: 0x008F5FD0 (FUN_008F5FD0,
          * `msvc8::vector<DXGI_MODE_DESC>::allocate_slots_checked`, reached
-         * from the `_Insert_n` grow lane `FUN_008F6A50` (cited on `insert`
+         * from the `_Insert_n` grow body `FUN_008F6A50` (cited on `insert`
          * above), the display-mode-enumeration vector's capacity-full path)
          *
          * sizeof(T) == 0x14 (20, `count > 0xFFFFFFFF/20` throws, zero-count
@@ -9652,7 +9661,7 @@ namespace msvc8
          * and `0xFFFFFFFF/112 == 0x02492492` exactly). Three callers: one
          * in an IDA-unclassified gap (0x008E9087, likely a third growth
          * call site not independently exported); `FUN_008EEFC0` (corrected
-         * below from a fabricated generic "VisionDB handle teardown lane"
+         * below from a fabricated generic "VisionDB handle teardown"
          * `recovered` note with zero real citation anywhere in `src/sdk`);
          * and `FUN_008F1890`, already cited on `insert` elsewhere in this
          * file as `msvc8::vector<AdapterD3D9>::insert(pos,count,value)` for
@@ -9665,7 +9674,7 @@ namespace msvc8
          * `FUN_0094F990` (already `skip`, trivial 1-arg forwarder, honest
          * note citing this token's then-unresolved status -- now
          * resolved); `FUN_00951EA0` (corrected below from the same
-         * fabricated "VisionDB handle teardown lane" `recovered` note as
+         * fabricated "VisionDB handle teardown" `recovered` note as
          * `FUN_008EEFC0` above -- real body is `reserve(n)`-shaped: zero 3
          * pointer fields, length-check, `v4 = allocate_slots_checked(a2)`,
          * `begin=end=v4, capacityEnd=v4+20*a2`); and `FUN_00952770`,
@@ -9811,7 +9820,7 @@ namespace msvc8
          * Address: 0x00444AB0 (FUN_00444AB0)
          *
          * What it does:
-         * The VC8 `vector<T>::max_size()` lane: `0xFFFFFFFF / sizeof(T)` for the
+         * The VC8 `vector<T>::max_size()` body: `0xFFFFFFFF / sizeof(T)` for the
          * 32-bit target. The addresses above are the `sizeof(T) == 4`
          * specialisation, which MSVC constant-folds to the `0x3FFFFFFF`
          * immediate; every other element width appears inline in its owning
@@ -9832,66 +9841,66 @@ namespace msvc8
          * Address: 0x004445E0 (FUN_004445E0)
          * Address: 0x004449F0 (FUN_004449F0)
          * Address: 0x00444CD0 (FUN_00444CD0)
-         * Address: 0x00830620 (FUN_00830620, the 4-byte-stride throw lane for
+         * Address: 0x00830620 (FUN_00830620, the 4-byte-stride throw helper for
          * UICommandGraph's hash-bucket vector, reached from FUN_0082F210)
-         * Address: 0x005C7290 (FUN_005C7290, the 52-byte-stride throw lane shared
+         * Address: 0x005C7290 (FUN_005C7290, the 52-byte-stride throw helper shared
          * by `BuyVectorStorage52Byte` and the `Moho::SPerArmyReconInfo`
-         * `_Insert_n` grow lane FUN_005C6F90)
+         * `_Insert_n` grow body FUN_005C6F90)
          * Address: 0x00452890 (FUN_00452890, reached from
          * `Moho::CAiSteeringImpl`'s vtable-anchored task chain via
          * `func_DebugLineArrayAppend`, FUN_004524F0)
-         * Address: 0x00540580 (FUN_00540580, the 8-byte-stride throw lane for
+         * Address: 0x00540580 (FUN_00540580, the 8-byte-stride throw helper for
          * `msvc8::vector<Moho::SEjectRequest>`, reached from the `_Insert_n`
-         * grow lane FUN_00540330, already cited above)
-         * Address: 0x00653860 (FUN_00653860, the 48-byte-stride throw lane for
+         * grow body FUN_00540330, already cited above)
+         * Address: 0x00653860 (FUN_00653860, the 48-byte-stride throw helper for
          * `msvc8::vector<moho::SDebugWorldText>`, reached from the
-         * `_Insert_n` grow lane FUN_00653380, already cited above)
-         * Address: 0x00561900 (FUN_00561900, the 0x78-byte-stride throw lane
+         * `_Insert_n` grow body FUN_00653380, already cited above)
+         * Address: 0x00561900 (FUN_00561900, the 0x78-byte-stride throw helper
          * for `msvc8::vector<Moho::SSyncPublishedCommandPacket>`, reached
          * from the `reserve()` guard FUN_00561160, already cited above)
-         * Address: 0x009514A0 (FUN_009514A0, the 8-byte-stride throw lane for
+         * Address: 0x009514A0 (FUN_009514A0, the 8-byte-stride throw helper for
          * `msvc8::vector<gpg::TypeHandle>`, reached from the `_Insert_n`
-         * grow lane FUN_00951F30, already cited above)
-         * Address: 0x00703410 (FUN_00703410, the 40-byte-stride throw lane for
+         * grow body FUN_00951F30, already cited above)
+         * Address: 0x00703410 (FUN_00703410, the 40-byte-stride throw helper for
          * `msvc8::vector<SEntitySetTemplateUnit>`, reached from the
-         * `_Insert_n` grow lane FUN_007030C0 for `CArmyImpl::UnitCategorySets`)
-         * Address: 0x0064EEE0 (FUN_0064EEE0, the 52-byte-stride throw lane for
+         * `_Insert_n` grow body FUN_007030C0 for `CArmyImpl::UnitCategorySets`)
+         * Address: 0x0064EEE0 (FUN_0064EEE0, the 52-byte-stride throw helper for
          * `msvc8::vector<moho::SDebugDecal>`, reached from the `_Insert_n`
-         * grow lane FUN_0064E770's `size() == 0x4EC4EC4` max_size test,
+         * grow body FUN_0064E770's `size() == 0x4EC4EC4` max_size test,
          * already cited above on `insert`)
-         * Address: 0x007BC060 (FUN_007BC060, the 36-byte-stride throw lane
+         * Address: 0x007BC060 (FUN_007BC060, the 36-byte-stride throw helper
          * for `msvc8::vector<Moho::SNetCommandArg>`, reached from the
-         * `_Insert_n` grow lane FUN_007BBD60's `0xFFFFFFFF/36 (=119304647)`
+         * `_Insert_n` grow body FUN_007BBD60's `0xFFFFFFFF/36 (=119304647)`
          * max_size test, already cited above on `insert`. Throws
          * `std::length_error("vector<T> too long")` exactly like the other
-         * per-stride throw lanes in this cluster.)
-         * Address: 0x00856100 (FUN_00856100, the 8-byte-stride throw lane
+         * per-stride throw helpers in this cluster.)
+         * Address: 0x00856100 (FUN_00856100, the 8-byte-stride throw helper
          * for `msvc8::vector<boost::shared_ptr<moho::MeshInstance>>`,
-         * reached from the `_Insert_n` grow lane FUN_00855DF0's
+         * reached from the `_Insert_n` grow body FUN_00855DF0's
          * `0x1FFFFFFF - cur < count` max_size test, already cited above on
          * `insert`. DB previously listed this token `recovered` with no
          * note and no citation anywhere in `src/sdk` -- corrected here.)
-         * Address: 0x008F6890 (FUN_008F6890, the 28-byte-stride throw lane for
+         * Address: 0x008F6890 (FUN_008F6890, the 28-byte-stride throw helper for
          * `msvc8::vector<DXGI_MODE_DESC>`, reached from the ctor/assign fused
          * zero-then-buy helper `FUN_008F69A0` (cited above on `vector(const
-         * vector&)`) and from the `_Insert_n` grow lane `FUN_008F6A50` (cited
+         * vector&)`) and from the `_Insert_n` grow body `FUN_008F6A50` (cited
          * above on `insert`), both guarding the same `count > 0x9249249`
          * (`0xFFFFFFFF/28`) `max_size()` test.)
-         * Address: 0x0092EFF0 (FUN_0092EFF0, the 12-byte-stride throw lane for
-         * `msvc8::vector<gpg::HaStar::ClusterSearchEdgeTraversalLaneRuntime>`,
-         * reached from the `_Insert_n` grow lane `FUN_0092F630`'s
+         * Address: 0x0092EFF0 (FUN_0092EFF0, the 12-byte-stride throw helper for
+         * `msvc8::vector<gpg::HaStar::ClusterSearchEdge>`,
+         * reached from the `_Insert_n` grow body `FUN_0092F630`'s
          * `357913941 - size < count` (`0xFFFFFFFF/12`) max_size test,
          * already cited above on `insert`.)
          * Address: 0x0092F060 (FUN_0092F060, the sibling 12-byte-stride throw
-         * lane for `msvc8::vector<gpg::HaStar::ClusterSearchOpenHeapEntryRuntime>`,
-         * reached from that instantiation's own `_Insert_n` grow lane
+         * helper for `msvc8::vector<gpg::HaStar::ClusterSearchOpenHeapEntry>`,
+         * reached from that instantiation's own `_Insert_n` grow body
          * `FUN_0092F240`, already cited above on `insert`.)
-         * Address: 0x00444270 (FUN_00444270, the 4-byte-stride throw lane for
+         * Address: 0x00444270 (FUN_00444270, the 4-byte-stride throw helper for
          * `msvc8::vector<std::int32_t>`'s `ClusterSearchOpenHeapRuntime::
          * mHandleToHeapIndex` instantiation, reached from the `_Insert_n`
-         * grow lane `FUN_004451A0`'s `0x3FFFFFFF - size < count` max_size
+         * grow body `FUN_004451A0`'s `0x3FFFFFFF - size < count` max_size
          * test, already cited above on `insert`.)
-         * Address: 0x007A5D20 (FUN_007A5D20, the 8-byte-stride throw lane for
+         * Address: 0x007A5D20 (FUN_007A5D20, the 8-byte-stride throw helper for
          * `msvc8::vector<moho::WeakPtr<moho::CMauiControl>>` (`sInputCapture`,
          * UiRuntimeTypes.cpp) -- guards `size() == max_size()`
          * (`0x1FFFFFFF`) before the insert-with-growth core proceeds. DB
@@ -9911,8 +9920,8 @@ namespace msvc8
          * token `recovered` with a blank note and no citation anywhere in
          * `src/sdk` -- corrected here.)
          * Address: 0x0064EE20 (FUN_0064EE20, sub_64EE20) -- the 0x48-byte-
-         * stride throw lane for `msvc8::vector<moho::SDebugScreenText>`,
-         * reached from the `_Insert_n` grow lane `FUN_0064E490`'s
+         * stride throw helper for `msvc8::vector<moho::SDebugScreenText>`,
+         * reached from the `_Insert_n` grow body `FUN_0064E490`'s
          * `size() == 0x38E38E3` (`0xFFFFFFFF/0x48`) `max_size` test, already
          * cited above on `insert(pos,count,value)`. Builds `std::
          * length_error("vector<T> too long")` via the same `std::string` +
@@ -9958,7 +9967,7 @@ namespace msvc8
          */
         void reallocate_to(std::size_t newCap) {
             assert(newCap >= size());
-            // Routes through the VC8 legacy `std::_Allocate<T>` lane so the
+            // Routes through the VC8 legacy `std::_Allocate<T>` body so the
             // recovered decompiler addresses bind by name from their original
             // vector<T> call sites.
             T* newBuf = allocate_slots_checked(newCap);
@@ -10095,7 +10104,7 @@ namespace msvc8
     static_assert(sizeof(vector<int>) == 16, "msvc8::set must be 16 bytes on x86");
     static_assert(
         sizeof(vector<int, false>) == 3 * sizeof(void*),
-        "vector<T,false> (no VC8 debug-iterator lane) must drop to a bare 3-pointer layout"
+        "vector<T,false> (no VC8 debug-iterator proxy) must drop to a bare 3-pointer layout"
     );
 
     /**
@@ -10473,7 +10482,7 @@ namespace msvc8
         }
 
         /**
-         * The VC8 `list<T>::max_size()` lane: `0xFFFFFFFF / sizeof(value_type)`
+         * The VC8 `list<T>::max_size()` body: `0xFFFFFFFF / sizeof(value_type)`
          * for the 32-bit target, folded to a compile-time constant the same
          * way `vector<T>::max_size()` is (above). See `_Incsize`'s
          * `Address:` block (below) for the binary evidence this formula is
@@ -10566,7 +10575,7 @@ namespace msvc8
 
         /**
          * Address: 0x004E32D0 (FUN_004E32D0, `msvc8::list<Moho::CSndParams*>`'s
-         * node-buy lane, called from `func_RegisterCSndParams`/FUN_004DFA50)
+         * node purchase, called from `func_RegisterCSndParams`/FUN_004DFA50)
          * Address: 0x004E3310 (FUN_004E3310, the same list's `_Incsize`-style
          * overflow-checked size increment, called immediately after the node
          * buy in the same caller)
@@ -10579,30 +10588,30 @@ namespace msvc8
          * `_CxxThrowException`, exactly mirroring FUN_004E3310. Reached from
          * `RegisterSndVarInstance`'s (FUN_004DF990) `push_back` call.)
          * Address: 0x00AC2D10 (FUN_00AC2D10, another 12-byte-node
-         * `msvc8::list<T*>` node-buy lane for a 4-byte pointer/scalar T --
+         * `msvc8::list<T*>` node purchase for a 4-byte pointer/scalar T --
          * `operator new(0xC)`, writes `_Next`/`_Prev` from its first two
          * stack args directly and `_Value` from `*arg_8` (the third arg is a
          * pointer to the value, dereferenced once, matching `insert`'s
          * `const value_type&` parameter). Called from FUN_00AC31E0, which
          * matches this method's shape exactly: loads `head=[ebx+4]`, buys
-         * the node via this lane, calls the sibling `_Incsize`-style
+         * the node via this body, calls the sibling `_Incsize`-style
          * overflow check (`sub_AC3140(1)`, same family as FUN_004E3310/
          * FUN_004E3490 above), then links the fresh node as the new list
          * head and fixes up the old head's back-link -- a `push_front`-shape
-         * insert at `begin()`. Two further callers of this node-buy lane
+         * insert at `begin()`. Two further callers of this node purchase
          * (FUN_00AC3220, `recovered`; FUN_00AC3420, `external_dependency`)
          * exist in the same address neighbourhood but are not needed to
          * satisfy this instantiation's caller evidence.)
          *
          * Address: 0x008C5EF0 (FUN_008C5EF0, list<const RUnitBlueprint*>
-         * node-buy lane -- same 12-byte-node, 4-byte-pointer-T shape as
+         * node purchase -- same 12-byte-node, 4-byte-pointer-T shape as
          * FUN_00AC2D10 above: allocator via sub_8C6330(1), _Next/_Prev
          * from the first two args, _Value from one dereference of a
          * const value_type& third arg. Reached from sub_8C1220
          * (Moho::CollectUpgradeCommandTargetBlueprints,
          * moho/unit/core/UserUnit.cpp) via a direct call.)
          * Address: 0x008C5F30 (FUN_008C5F30, sibling overflow-checked
-         * size-increment lane for the same instantiation -- Mysize at
+         * size increment for the same instantiation -- Mysize at
          * +0x08, the 0x3FFFFFFF cap, "list<T> too long", byte-for-byte
          * the same shape as FUN_004E3310/FUN_004E3490/sub_AC3140 above.
          * Called immediately after the node buy in sub_8C1220.)
@@ -10624,7 +10633,7 @@ namespace msvc8
          *
          * What it does:
          * VC8 `std::list<T>::insert(pos, v)`. FUN_004E32D0 allocates one 12-byte
-         * node through the checked 12-byte-element lane (`AllocateChecked12ByteLane`,
+         * node through the checked 12-byte-element body (the former checked 12-byte allocation,
          * FUN_004E4F70, folded onto many other 12-byte instantiations) and writes
          * `_Next`/`_Prev`/`_Value` directly into the fresh block; the recovered
          * form expresses the same net state via placement-new (`_Buynode`) followed
@@ -10656,7 +10665,7 @@ namespace msvc8
          * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>::
          * insert(const_iterator, InputIt, InputIt)` (`gpg/core/algorithms/
          * Cluster.cpp`'s subcluster-key table). Copies `[first, last)` node
-         * by node ahead of `pos`, buying each node through the same lane as
+         * by node ahead of `pos`, buying each node through the same body as
          * the single-value `insert` above (`_Buynode`, FUN_00932FD0) and
          * growing `_Mysize` one element at a time (`_Incsize`, FUN_009333D0)
          * rather than reserving up front. Wrapped in an SEH frame
@@ -10679,7 +10688,7 @@ namespace msvc8
          * calling-convention thunks as the already-tokenized/`skip`-marked
          * `FUN_009344B0` (`jmp FUN_00934300`) two slots later, and
          * immediately follows the already-recovered bucket-vector resize
-         * lane `FUN_00934250`. No further caller of the stub itself is
+         * body `FUN_00934250`. No further caller of the stub itself is
          * indexed (checked: `functions`, `call_edges`, `incoming_xrefs`,
          * `data_refs` in `_callgraph_index.sqlite`), most likely because
          * IDA never chunked it as a function head, so incoming references
@@ -10783,7 +10792,7 @@ namespace msvc8
          * This is the MSVC8 `std::list::splice` primitive. `msvc8::hash_map::_Grow`
          * uses the same-list form to migrate one node to the list tail while the
          * bucket index is being split, which is why the size bookkeeping is skipped
-         * when `&other == this` (the binary's grow lane at 0x007693F4 branches over
+         * when `&other == this` (the binary's grow body at 0x007693F4 branches over
          * its size-transfer helper for exactly that reason).
          */
         void splice(const_iterator where, list& other, const_iterator first, const_iterator last)
@@ -10815,7 +10824,7 @@ namespace msvc8
     private:
         /**
          * Address: 0x00932FD0 (FUN_00932FD0, sub_932FD0) -- the node-buy
-         * lane instantiated for `msvc8::list<std::pair<const
+         * body instantiated for `msvc8::list<std::pair<const
          * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
          * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table).
          *
@@ -10829,7 +10838,7 @@ namespace msvc8
          * (`FUN_009329A0`, already cited elsewhere as the subcluster map
          * value_type's implicit copy ctor) -- the same net effect as
          * `insert(pos, v)`'s placement-new-then-explicit-link-write, just
-         * factored by the compiler into a standalone lane shared between
+         * factored by the compiler into a standalone body shared between
          * the single-value insert and the range-insert copy loop
          * (`FUN_00933CF0`, cited on `insert(pos, first, last)`).
          */
@@ -10845,7 +10854,7 @@ namespace msvc8
 
         /**
          * Address: 0x009333D0 (FUN_009333D0, sub_9333D0) -- the checked
-         * size-increment lane instantiated for `msvc8::list<std::pair<const
+         * size increment instantiated for `msvc8::list<std::pair<const
          * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
          * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table),
          * called from `insert(pos, first, last)`'s copy loop
