@@ -123,6 +123,9 @@ namespace moho
 
   struct SSendStampView
   {
+    /**
+     * Address: 0x0047D290 (FUN_0047D290 -- `SSendStampView::operator=` -- the vector assignment plus the two window lanes; zero callers, unreachable; formerly `CopyStampViewWithWindowMetadata` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+     */
     msvc8::vector<SSendStamp> items; // contiguous vector of copied stamps
     uint64_t windowDurationUs{0};    // (endTimeUs - startTimeUs)
     uint64_t windowEndTimeUs{0};     // end of requested window
