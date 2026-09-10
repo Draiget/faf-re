@@ -11165,6 +11165,10 @@ namespace msvc8
          * and throws `std::length_error("list<T> too long")` before incrementing;
          * the binary performs the node buy *before* this check, so the node is not
          * freed on the overflow path -- preserved here for fidelity.
+         * Address: 0x0092FD40 (FUN_0092FD40 -- `list<T>::insert(pos, value)` for a 32-byte value (40-byte node); zero callers, unreachable; formerly `InsertNode32BeforeAndGrowListRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00930220 (FUN_00930220 -- `list<T>::insert(pos, value)` for a 32-byte value, iterator through the hidden slot; zero callers, unreachable; formerly `InsertNode32BeforeAndGrowListStoreCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00933600 (FUN_00933600 -- `list<T>::insert(pos, value)` for a 24-byte value (32-byte node); zero callers, unreachable; formerly `InsertNode24BeforeAndGrowListRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00934040 (FUN_00934040 -- `list<T>::insert(pos, value)` for a 24-byte value, iterator through the hidden slot; zero callers, unreachable; formerly `InsertNode24BeforeAndGrowListStoreCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, const value_type& v)
         {
@@ -11282,6 +11286,12 @@ namespace msvc8
          * returning the head sentinel itself) when handed the end()
          * sentinel; otherwise unlinks the node, destroys its value, frees
          * it, and decrements size.
+         * Address: 0x00739D80 (FUN_00739D80 -- `list<T>::erase(pos)` (never the head); callers 0x0073ADB0; formerly `EraseIntrusiveListNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007EBB20 (FUN_007EBB20 -- `list<T>::erase(pos)` for the mesh-thumbnail list (payload destroyed); callers 0x007EC160 (unreached); formerly `EraseMeshThumbnailListNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092DE90 (FUN_0092DE90 -- `list<T>::erase(pos)` returning the successor through the hidden slot; callers 0x0092FD80 (unreached); formerly `EraseIntrusiveNodeAndStoreNextRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00932880 (FUN_00932880 -- `list<T>::erase(pos)` returning the successor through the hidden slot; callers 0x00933C40 (unreached); formerly `EraseIntrusiveNodeAndStoreNextRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E640 (FUN_0092E640 -- `list<T>::erase(first, last)` (the whole-list case routed through `clear`); zero callers, unreachable; formerly `EraseIntrusiveNodeRangeAndStoreCursorRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00932D40 (FUN_00932D40 -- `list<T>::erase(first, last)` (the whole-list case routed through `clear`); zero callers, unreachable; formerly `EraseIntrusiveNodeRangeAndStoreCursorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos)
         {
@@ -11363,6 +11373,7 @@ namespace msvc8
          * (`FUN_00933CF0`, cited on `insert(pos, first, last)`).
          * Address: 0x0049A570 (FUN_0049A570 -- `list<ParticleBuffer*>::_Buynode(next, prev, value)` -- `CWorldParticles::Init` (0x004928A0) pushes the 400 pooled buffers through it, `RecycleAndDestroyParticleBucketWorkItems` (0x00493720) returns them; callers 0x004928A0, 0x00492CA0, 0x00493720; formerly `AllocateLegacyIntrusiveListNode` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
          * Address: 0x0049E790 (FUN_0049E790 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(n)` (12-byte node, `bad_alloc` on overflow); callers 0x00497D00, 0x0049A570, 0x0049A670; formerly `AllocateLegacyIntrusiveListNodeStorageArrayOrThrow` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x005D02F0 (FUN_005D02F0 -- `list<T>::_Buynode(next, prev, value)` for a 4-byte value; callers 0x005CEFC0, 0x005CFDEC, 0x005D0020; formerly `AllocateTripleIntNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -11436,6 +11447,7 @@ namespace msvc8
          * Address: 0x007AEFA0 (FUN_007AEFA0 -- `list<T>::_Buynode()` for a 16-byte node (`{next, prev, 8-byte value}`).)
          * Address: 0x00497D00 (FUN_00497D00 -- `list<ParticleBuffer*>::_Buy_head` (12-byte self-linked sentinel bought by the member constructors of `CWorldParticles::mParticleBuffers` / `mAvailableParticleBuffers`; 0x00495E60 is an unreached twin caller); callers 0x004925E0, 0x00495E60; formerly `AllocateParticleBufferPoolHeadNode` in moho/particles/CWorldParticles.cpp, removed 2026-09-10.)
          * Address: 0x0049A670 (FUN_0049A670 -- `allocator<list<ParticleBuffer*>::_Node>::allocate(1)` for the sentinel; zero callers, unreachable; formerly `AllocateSingleLegacyListNodeStorage` in moho/particles/BeamRenderHelpers.cpp, removed 2026-09-10.)
+         * Address: 0x00739E50 (FUN_00739E50 -- `list<T>::_Buynode()` of the self-linked head sentinel; callers 0x00737680, 0x00737B30, 0x00737ED0; formerly `AllocateSelfLinkedPairNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Buy_head()
         {
@@ -11460,6 +11472,8 @@ namespace msvc8
 
         /**
          * Address: 0x00495F30 (FUN_00495F30 -- `list<ParticleBuffer*>::_Tidy` (the clear / destructor walk; reached from `CWorldParticles::CWorldParticles`'s unwind funclet and `~CWorldParticles`); callers 0x004925E0, 0x00492780, 0x00497D23; formerly `ClearLegacyPoolListNodes` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Clears one legacy intrusive list by unlinking the head sentinel and freeing all non-sentinel nodes.)
+         * Address: 0x0092DB40 (FUN_0092DB40 -- `list<T>::clear()` / `_Tidy`; callers 0x0092E640 (unreached); formerly `ClearIntrusiveNodeListRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00932760 (FUN_00932760 -- `list<T>::clear()` / `_Tidy`; callers 0x00932D40 (unreached); formerly `ClearIntrusiveNodeListRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Tidy()
         {

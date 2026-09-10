@@ -491,6 +491,9 @@ namespace moho
      * Rebinds this weak-pointer node to a new owner-link slot, detaches the
      * node from its previous intrusive owner chain when needed, and inserts it
      * at the head of the new owner chain.
+     * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0084E330 (FUN_0084E330 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` with the owner head at `owner + 0x08`; callers 0x0084D000; formerly `RebindIntrusiveOwnerSlotNodeRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00873810 (FUN_00873810 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` with the owner head at `owner + 0x08`; callers 0x008704B0; formerly `RebindIntrusiveOwnerSlotNodeRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetFromOwnerLinkSlot(void* newOwnerLinkSlot) noexcept
     {
