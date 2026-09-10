@@ -23,6 +23,7 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -941,15 +942,24 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
   MultQuadVec(&rotatedRally, &localRally, &transform.orient_);
   const Wm3::Vector3f rallyWorldPos = transform.pos_ + rotatedRally;
 
-  BVSet<EntId, EntIdUniverse> factorySet{};
-  (void)factorySet.mBits.Add(static_cast<unsigned int>(mOwnerUnit->id_));
+  // Sim-internal issue, not the ICommandSink one. 0x0059F1D6 calls
+  // `UNIT_IssueFactoryCommand(issueData, mUnit->mSim, entitySet, 1)` -
+  // `IssueFactoryCommandToSelectedUnits` here - over a locally built
+  // `EntitySetTemplate_Unit` holding just this factory. Routing it through
+  // `Sim::IssueFactoryCommand` instead put it behind `ValidateNewCommandId`,
+  // which reads the network command id this payload never carries: the rally
+  // point was rejected every time with "ignoring issue of cmd id 0xffffffff
+  // ... the id's source (255) is wrong (should be 0)", so a new factory came
+  // up with no rally point at all.
+  SEntitySetTemplateUnit factorySet{};
+  (void)factorySet.AddUnit(mOwnerUnit);
 
   SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Move);
   issueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
   issueData.mTarget.mEntityId = 0xF0000000u;
   issueData.mTarget.mPos = rallyWorldPos;
 
-  mOwnerUnit->SimulationRef->IssueFactoryCommand(factorySet, issueData, true);
+  (void)IssueFactoryCommandToSelectedUnits(mOwnerUnit->SimulationRef, factorySet, issueData, true);
   mFactoryQueueDirty = 1;
 }
 
