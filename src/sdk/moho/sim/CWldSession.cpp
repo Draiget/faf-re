@@ -4383,29 +4383,30 @@ namespace moho
     }
 
     /**
-     * Address: 0x0086EDD0 (FUN_0086EDD0, ??0WeakPtr_UICommandGraph@Moho@@QAE@@Z)
+     * Address: 0x0089AE50 (FUN_0089AE50, Moho::WeakPtr_UICommandGraph::cpy --
+     * the store into `CWldSession`'s lane at session+0x404, reached from
+     * `GetCommandGraph` at 0x00895F34)
      *
-     * NOTE (2026-08-20 audit): despite the `WeakPtr_UICommandGraph` mangled
-     * name, FUN_0086EDD0's own body proves this member is strong-owning, not
-     * weak-observing - exactly the same "WeakPtr_X is really a shared_ptr"
-     * situation already fixed for `WeakPtr_CD3DBatchTexture` in
-     * CD3DPrimBatcher.cpp. Disassembly: the acquire step is
-     * `lock xadd [pi+4],1` (`use_count_` at +0x04, i.e. `add_ref_copy()`, not
-     * `weak_add_ref()`) and the release step calls FUN_004229B0 (manually
-     * verified by displacement calculation: rel32 -0x0044C449 from 0x0086EDF4
-     * resolves to exactly 0x004229B0), which is `sp_counted_base::release()`
-     * (see BoostWrappers.h), not `weak_release()`. `CWldSession`'s
-     * `mUICommandGraphPx`/`mUICommandGraphControl` fields (declared in
-     * CWldSession.h, out of scope for this pass) are therefore a STRONG
-     * owning reference to the session's command graph, not a weak observer -
-     * their header comment ("weak control block for mUICommandGraphPx") is
-     * now known to be wrong and needs a follow-up fix in CWldSession.h. Names
-     * here are kept stable (function-local to this TU either way, but the
-     * fields they mutate are declared externally) and documented instead.
+     * A 2026-08-20 audit read this lane as strong and made both halves of it
+     * `add_ref_copy()`/`release()`. That is the wrong function: it looked at
+     * FUN_0086EDD0, which is the copy into `CRenderWorldView::mComGraph` - a
+     * genuinely strong handle - and not at the store into the session field.
+     * This one is weak, and says so twice in seven instructions: the acquire
+     * at 0x0089AE64 is `lock xadd [edi+8], 1`, `weak_count_` at +0x08, and the
+     * release at 0x0089AE75 decrements the same +0x08 lane and then dispatches
+     * through control-block vtable slot **+0x08** (`destroy()`) at 0x0089AE7D,
+     * not slot +0x04 (`dispose()`). A strong release would touch +0x04 for
+     * both.
+     *
+     * With it strong the session pinned its own command graph for the whole
+     * game. The graph hangs one `UnitPlace` ghost mesh off every draw node and
+     * only `~UICommandGraph` frees them, so every mobile-build order ever
+     * queued left a green ghost on the map - through construction, after
+     * completion and after cancellation.
      *
      * What it does:
-     * Copies one shared command-graph payload into `CWldSession`'s owning
-     * command-graph lane, rebinding control ownership only when the incoming
+     * Copies one shared command-graph payload into `CWldSession`'s weak
+     * command-graph lane, rebinding the observer only when the incoming
      * control block changes.
      */
     void CopySharedToWeakCommandGraph(
@@ -4419,11 +4420,11 @@ namespace moho
 
       if (incomingControl != weakControl) {
         if (incomingControl != nullptr) {
-          incomingControl->add_ref_copy();
+          incomingControl->weak_add_ref();
         }
 
         if (weakControl != nullptr) {
-          weakControl->release();
+          weakControl->weak_release();
         }
 
         weakControl = incomingControl;
@@ -4433,22 +4434,23 @@ namespace moho
     /**
      * Address: 0x00824060 (FUN_00824060, Moho::WeakPtr_UICommandGraph::Release)
      *
-     * NOTE (2026-08-20 audit): FUN_00824060 is byte-shape-identical to
-     * FUN_004229B0 (decrements `use_count_` at +0x04, calls dispose() via
-     * vtable slot +0x04, then decrements `weak_count_` at +0x08 and calls
-     * destroy() via vtable slot +0x08) - it is release(), already cited under
-     * `SharedPtrRaw<T>::release()`'s evidence list in BoostWrappers.h. Session
-     * teardown must release the strong reference `CopySharedToWeakCommandGraph`
-     * establishes (see its note above), not weak-release it.
+     * The 2026-08-20 audit paired this with a strong `release()`, on the same
+     * mistaken reading of the session lane corrected on
+     * `CopySharedToWeakCommandGraph` above. The lane is a weak observer -
+     * 0x0089AE64/0x0089AE75 both work `weak_count_` at +0x08 and the drop
+     * dispatches `destroy()` through vtable slot +0x08 - so its teardown is
+     * the matching weak drop. FUN_00824060 stays the citation for the strong
+     * release on `UICommandDragger::mGraph`, which really does own its
+     * reference.
      *
      * What it does:
-     * Releases `CWldSession`'s owning reference to its command graph on
-     * session teardown.
+     * Drops `CWldSession`'s weak observer of its command graph on session
+     * teardown.
      */
     void ReleaseWeakCommandGraph(UICommandGraph*& px, boost::detail::sp_counted_base*& control)
     {
       if (control) {
-        control->release();
+        control->weak_release();
       }
       px = nullptr;
       control = nullptr;

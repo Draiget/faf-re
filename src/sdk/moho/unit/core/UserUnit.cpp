@@ -3527,7 +3527,12 @@ namespace moho
         &entityRef,
         reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
       );
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(entityRef, RUnitBlueprint::GetPointerType());
+      // The reference `RRef_REntityBlueprint` builds describes the blueprint
+      // *object*, and `upcast.mObj` is used as one below, so the target is the
+      // class descriptor. `GetPointerType()` is the descriptor for
+      // `RUnitBlueprint*`; `REF_UpcastPtr` would walk the object's base list
+      // looking for it, never find it, and hand back a null `mObj`.
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(entityRef, RUnitBlueprint::StaticGetClass());
       if (upcast.mObj != nullptr) {
         out.push_back(static_cast<const RUnitBlueprint*>(upcast.mObj));
       }
@@ -5497,7 +5502,17 @@ bool moho::USERUNIT_CanBeBuiltAt(
       &buildBlueprintRef,
       reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
     );
-    const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::GetPointerType());
+    // Object reference in, object pointer out (it is handed to `GetSkirtRect`
+    // below), so the upcast target is the class descriptor - the same one
+    // `RefreshQueuedBuildGhosts` uses on this exact blueprint lane, and the
+    // one the binary's `RRef::Upcast_RUnitBlueprint` resolves through
+    // `LookupRType(typeid(RUnitBlueprint))`. Aimed at `GetPointerType()` - the
+    // descriptor for `RUnitBlueprint*` - the walk over the object's bases can
+    // never match, so `mObj` came back null for every queued order and this
+    // loop skipped all of them. That is why two queued buildings could be
+    // placed overlapping, or one inside another: the footprint test that
+    // rejects it is right here and was never reached.
+    const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::StaticGetClass());
     const auto* const queuedBuildBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
     if (queuedBuildBlueprint == nullptr) {
       continue;
