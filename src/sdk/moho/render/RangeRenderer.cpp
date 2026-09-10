@@ -1174,8 +1174,29 @@ namespace
       return out;
     }
 
-    out.mNode = const_cast<moho::SRangeRenderCategoryTreeNode*>(lowerBound);
-    out.mInsertOnLeft = true;
+    // The new key belongs immediately before `lowerBound`, but that only means
+    // "left child of lowerBound" when lowerBound has no left child. Otherwise
+    // the slot belongs to lowerBound's in-order predecessor - the rightmost
+    // node of its left subtree - whose right child is the sentinel by
+    // construction. Hanging it off lowerBound->mLeft unconditionally overwrote
+    // a live child pointer and orphaned that whole subtree: mSize kept
+    // counting while an in-order walk could no longer reach the lost nodes
+    // (observed live as 12 registered profiles but only 8 walked, which is why
+    // RangeRenderer::Render silently skipped a third of the range rings).
+    //
+    // The binary makes the same distinction at 0x007F1082-0x007F10B6: it
+    // compares the lower bound against `head->mLeft` (the leftmost node, whose
+    // left child is always free) and inserts left only in that case, otherwise
+    // calling the in-order decrement at 0x007F10B1 and inserting to the right
+    // of the predecessor.
+    auto* const insertBefore = const_cast<moho::SRangeRenderCategoryTreeNode*>(lowerBound);
+    if (insertBefore->mLeft->mIsSentinel != 0u) {
+      out.mNode = insertBefore;
+      out.mInsertOnLeft = true;
+    } else {
+      out.mNode = FindRangeProfileTreeRightmostNode(insertBefore->mLeft);
+      out.mInsertOnLeft = false;
+    }
     out.mShouldInsert = true;
     return out;
   }
