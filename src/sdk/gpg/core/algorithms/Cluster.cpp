@@ -2582,14 +2582,14 @@ namespace
       return result;
     }
 
-    struct InlineBackedU16VectorRuntime
-    {
-      std::uint16_t* mStart;             // +0x00
-      std::uint16_t* mEnd;               // +0x04
-      std::uint16_t* mCapacity;          // +0x08
-      std::uint16_t* mInlineStorageLane; // +0x0C
-    };
-    static_assert(sizeof(InlineBackedU16VectorRuntime) == 0x10, "InlineBackedU16VectorRuntime size must be 0x10");
+    // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
+    // the reset reads the saved capacity back out of the first word of the
+    // inline block, and the append grows by `max(size + 1, capacity * 2)` and
+    // stashes the old capacity there on the first spill -- both are that
+    // template's own behaviour.
+    using PackedNodeVector = gpg::core::FastVectorInline<std::uint16_t>;
+
+    static_assert(sizeof(PackedNodeVector) == 0x10, "PackedNodeVector size must be 0x10");
 
     struct ClusterDataNodeListRuntime
     {
@@ -2602,56 +2602,6 @@ namespace
     static_assert(offsetof(ClusterDataNodeListRuntime, mNodeCount) == 0x0C, "ClusterDataNodeListRuntime::mNodeCount offset must be 0x0C");
     static_assert(offsetof(ClusterDataNodeListRuntime, mNodes) == 0x0D, "ClusterDataNodeListRuntime::mNodes offset must be 0x0D");
 
-    void ResetInlineBackedU16Vector(InlineBackedU16VectorRuntime& vector) noexcept
-    {
-      if (vector.mStart != vector.mInlineStorageLane) {
-        ::operator delete[](vector.mStart);
-        vector.mStart = vector.mInlineStorageLane;
-        vector.mCapacity = *reinterpret_cast<std::uint16_t**>(vector.mInlineStorageLane);
-      }
-      vector.mEnd = vector.mStart;
-    }
-
-    void EnsureInlineBackedU16CapacityForAppend(InlineBackedU16VectorRuntime& vector)
-    {
-      if (vector.mEnd != vector.mCapacity) {
-        return;
-      }
-
-      const std::size_t count = static_cast<std::size_t>(vector.mEnd - vector.mStart);
-      const std::size_t capacity = static_cast<std::size_t>(vector.mCapacity - vector.mStart);
-      std::size_t newCapacity = count + 1;
-      const std::size_t doubled = capacity * 2u;
-      if (newCapacity < doubled) {
-        newCapacity = doubled;
-      }
-
-      auto* const newStorage = static_cast<std::uint16_t*>(::operator new[](newCapacity * sizeof(std::uint16_t)));
-      if (count != 0u) {
-        std::memcpy(newStorage, vector.mStart, count * sizeof(std::uint16_t));
-      }
-
-      if (vector.mStart == vector.mInlineStorageLane) {
-        *reinterpret_cast<std::uint16_t**>(vector.mInlineStorageLane) = vector.mCapacity;
-      }
-      else {
-        ::operator delete[](vector.mStart);
-      }
-
-      vector.mStart = newStorage;
-      vector.mEnd = newStorage + count;
-      vector.mCapacity = newStorage + newCapacity;
-    }
-
-    void AppendPackedU16Node(InlineBackedU16VectorRuntime& vector, const std::uint8_t x, const std::uint8_t z)
-    {
-      EnsureInlineBackedU16CapacityForAppend(vector);
-      if (vector.mEnd != nullptr) {
-        *vector.mEnd = static_cast<std::uint16_t>(static_cast<std::uint16_t>(x) | (static_cast<std::uint16_t>(z) << 8u));
-      }
-      ++vector.mEnd;
-    }
-
     /**
      * Address: 0x0092FE30 (FUN_0092FE30)
      *
@@ -2661,14 +2611,14 @@ namespace
      */
     [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
       const gpg::HaStar::SubclusterData& subcluster,
-      InlineBackedU16VectorRuntime& outNodes
+      PackedNodeVector& outNodes
     )
     {
       const std::int32_t level = subcluster.mLevel;
       const std::uint8_t levelShift = kClusterSizeLog2ByLevel[level];
       const std::uint32_t clusterMask = static_cast<std::uint32_t>(kClusterSizeByLevel[level + 1] - 1);
 
-      ResetInlineBackedU16Vector(outNodes);
+      outNodes.ResetStorageToInline();
 
       std::uint32_t clusterIndex = 0u;
       for (std::uint32_t tileZ = 0u; tileZ < 4u; ++tileZ) {
@@ -2686,24 +2636,22 @@ namespace
             const std::uint32_t nodeX = tileBaseX + nodeXLocal;
             const std::uint32_t nodeZ = tileBaseZ + nodeZLocal;
             if ((nodeX & clusterMask) == 0u || (nodeZ & clusterMask) == 0u) {
-              AppendPackedU16Node(
-                outNodes,
-                static_cast<std::uint8_t>(nodeX),
-                static_cast<std::uint8_t>(nodeZ)
+              outNodes.PushBack(
+                static_cast<std::uint16_t>((nodeX & 0xFFu) | ((nodeZ & 0xFFu) << 8u))
               );
             }
           }
         }
       }
 
-      msvc8::sort(outNodes.mStart, outNodes.mEnd, std::less<std::uint16_t>{});
+      msvc8::sort(outNodes.start_, outNodes.end_, std::less<std::uint16_t>{});
 
-      std::uint16_t* const end = outNodes.mEnd;
-      std::uint16_t* result = outNodes.mStart;
+      std::uint16_t* const end = outNodes.end_;
+      std::uint16_t* result = outNodes.start_;
       std::uint16_t* dedupEnd = end;
-      std::uint16_t* write = outNodes.mStart;
+      std::uint16_t* write = outNodes.start_;
 
-      if (outNodes.mStart != end) {
+      if (outNodes.start_ != end) {
         while (++result != end) {
           if (*write == *result) {
             for (++result; result != end; ++result) {
@@ -2719,7 +2667,7 @@ namespace
       }
 
       if (dedupEnd != end) {
-        outNodes.mEnd = dedupEnd;
+        outNodes.end_ = dedupEnd;
       }
       return result;
     }
