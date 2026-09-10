@@ -118,6 +118,25 @@ namespace moho
      * recycle state for the next beat.
      */
     void PublishSyncData(SSyncData* syncData, bool forceRefresh);
+
+    /**
+     * Address: 0x006E0EC0 (FUN_006E0EC0, ?RemoveCmd@CCommandDB@Moho@@...)
+     *
+     * IDA signature:
+     * int __stdcall Moho::CCommandDB::RemoveCmd(Moho::CCommandDB *a1, Moho::CmdId a2);
+     *
+     * What it does:
+     * Retires one command id: drops its entry from `commands`, returns a
+     * sim-sourced low id to the recycle ring's tail bucket, and queues the id
+     * into `pendingReleasedCmdIds` so the next `PublishSyncData` hands it to
+     * the UI (which then deletes the matching `UserCommandIssueHelper`).
+     *
+     * `~CUnitCommand` (0x006E8500) calls this unconditionally; the
+     * `(cmdId & 0xFF000000) == 0xFF000000` "unresolved id" guard belongs to the
+     * *call sites* that may hold an unissued id (`Moho::UNIT_IssueCommand`,
+     * FUN_006F12C0, guards its call that way), not to this body.
+     */
+    void RemoveCmd(CmdId cmdId);
   };
 
   static_assert(offsetof(CCommandDb, sim) == 0x0000, "CCommandDb::sim offset must be 0x0000");
