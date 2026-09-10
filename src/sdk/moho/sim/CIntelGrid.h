@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Vector.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
@@ -47,6 +48,18 @@ namespace moho
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
+    /**
+     * Address: 0x00508840 (FUN_00508840 -- the compiler-generated copy of this
+     * 20-byte aggregate (three field copies), emitted out of line for
+     * `msvc8::vector<SDelayedSubVizInfo>`'s element-wise copy and fill steps;
+     * no source line, it is the implicit `operator=`. Formerly transcribed as
+     * `CopyDelayedSubVizInfoVariant1` in SDelayedSubVizInfoReflection.cpp,
+     * removed 2026-09-10.)
+     * Address: 0x00508B10 (FUN_00508B10 -- forwarding copy of the same body; formerly `CopyDelayedSubVizInfoVariant2`.)
+     * Address: 0x00509880 (FUN_00509880 -- the same implicit copy, formerly `CopyDelayedSubVizInfoUnchecked`; zero callers, unreachable.)
+     * Address: 0x005098A0 (FUN_005098A0 -- the same implicit copy behind a null guard, formerly `CopyDelayedSubVizInfoIfNotNullVariant1`; zero callers, unreachable.)
+     * Address: 0x00509A40 (FUN_00509A40 -- forwarding copy of 0x005098A0, formerly `CopyDelayedSubVizInfoIfNotNullVariant2`; zero callers, unreachable.)
+     */
     Wm3::Vec3f mLastPos;          // +0x00
     float mRadius;                // +0x0C
     std::int32_t mTicksTilUpdate; // +0x10
@@ -68,19 +81,8 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
-  struct SDelayedSubVizInfoVectorStorage
-  {
-    std::uint32_t mAllocatorProxyOrReserved; // +0x00
-    SDelayedSubVizInfo* mStart;              // +0x04
-    SDelayedSubVizInfo* mFinish;             // +0x08
-    SDelayedSubVizInfo* mCapacity;           // +0x0C
-  };
-
-  using CIntelUpdate = SDelayedSubVizInfo;
-  using CIntelUpdateListStorage = SDelayedSubVizInfoVectorStorage;
-
   static_assert(sizeof(SDelayedSubVizInfo) == 0x14, "SDelayedSubVizInfo size must be 0x14");
-  static_assert(sizeof(SDelayedSubVizInfoVectorStorage) == 0x10, "SDelayedSubVizInfoVectorStorage size must be 0x10");
+  static_assert(sizeof(msvc8::vector<SDelayedSubVizInfo>) == 0x10, "msvc8::vector<SDelayedSubVizInfo> size must be 0x10");
 
   class CIntelGrid
   {
@@ -210,14 +212,13 @@ namespace moho
      */
     void Raster(const Wm3::Vec3f& position, std::uint32_t radiusInCells, bool doAdd);
 
-    void PushDelayedUpdate(const SDelayedSubVizInfo& update);
 
   public:
     STIMap* mMapData;                            // +0x00
     std::int8_t* mGrid;                          // +0x04
     std::uint32_t mWidth;                        // +0x08
     std::uint32_t mHeight;                       // +0x0C
-    SDelayedSubVizInfoVectorStorage mUpdateList; // +0x10
+    msvc8::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
     std::uint32_t mGridSize;                     // +0x20
   };
 

@@ -222,25 +222,6 @@ namespace
   }
 
   /**
-    * Alias of FUN_00508D80 (non-canonical helper lane).
-   */
-  [[maybe_unused]] void DestroyCIntelGridInPlace(moho::CIntelGrid* const intelGrid)
-  {
-    if (!intelGrid) {
-      return;
-    }
-
-    if (intelGrid->mUpdateList.mStart) {
-      ::operator delete(intelGrid->mUpdateList.mStart);
-    }
-    intelGrid->mUpdateList.mStart = nullptr;
-    intelGrid->mUpdateList.mFinish = nullptr;
-    intelGrid->mUpdateList.mCapacity = nullptr;
-
-    ::operator delete[](intelGrid->mGrid);
-  }
-
-  /**
    * Address: 0x00508D40 (FUN_00508D40, CIntelGrid destroy-and-delete helper)
    */
   [[maybe_unused]] [[nodiscard]] moho::CIntelGrid* DestroyCIntelGridAndDeleteSelf(
@@ -251,7 +232,7 @@ namespace
       return nullptr;
     }
 
-    DestroyCIntelGridInPlace(intelGrid);
+    intelGrid->~CIntelGrid();
     ::operator delete(intelGrid);
     return intelGrid;
   }
@@ -286,6 +267,8 @@ namespace moho
    * What it does:
    * Binds map source, allocates byte coverage grid, and sets delayed-update
    * storage to empty.
+   * Address: 0x00507890 (FUN_00507890 -- a linker-retained copy of this constructor's grid allocation (`width * height` bytes, zero-filled) writing a `{data, width, height}` triple; zero callers, unreachable. Formerly `AllocateByteRasterZeroed` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+   * Address: 0x00507F00 (FUN_00507F00 -- the same allocation without the zero fill; zero callers, unreachable. Formerly `AllocateByteRasterUninitialized`, removed.)
    */
   CIntelGrid::CIntelGrid(const STIMap* const map, const std::uint32_t size)
   {
@@ -304,9 +287,6 @@ namespace moho
     mGrid = static_cast<std::int8_t*>(::operator new(cellCount));
     std::memset(mGrid, 0, cellCount);
 
-    mUpdateList.mStart = nullptr;
-    mUpdateList.mFinish = nullptr;
-    mUpdateList.mCapacity = nullptr;
     mGridSize = size;
   }
 
@@ -315,11 +295,16 @@ namespace moho
    */
   CIntelGrid::~CIntelGrid()
   {
-    DestroyCIntelGridInPlace(this);
+    // `mUpdateList`'s destructor (`_Tidy`, 0x00508050 cited on Vector.h) is
+    // compiler-emitted after this body.
+    ::operator delete[](mGrid);
   }
 
   /**
    * Address: 0x005BE150 (FUN_005BE150, ?IsVisible@CIntelGrid@Moho@@QBE_NHH@Z)
+   * Address: 0x00506EA0 (FUN_00506EA0 -- `mWidth - 1` through a grid pointer slot, the bounds arithmetic this method inlines; zero callers, unreachable. Formerly `ByteRasterMaxXFromSlot` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+   * Address: 0x00506EB0 (FUN_00506EB0 -- `mHeight - 1`, likewise; formerly `ByteRasterMaxYFromSlot`.)
+   * Address: 0x00507900 (FUN_00507900 -- `mGrid + x + z * mWidth`, the cell address this method inlines; formerly `ByteRasterAddressAt`.)
    */
   bool CIntelGrid::IsVisible(const std::int32_t x, const std::int32_t z) const
   {
@@ -434,7 +419,8 @@ namespace moho
     update.mLastPos = position;
     update.mRadius = static_cast<float>(radius);
     update.mTicksTilUpdate = 30;
-    PushDelayedUpdate(update);
+    // `msvc8::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
+    mUpdateList.push_back(update);
   }
 
   /**
@@ -442,11 +428,11 @@ namespace moho
    */
   void CIntelGrid::Tick(const std::int32_t dTicks)
   {
-    if (!mUpdateList.mStart || mUpdateList.mStart == mUpdateList.mFinish) {
+    if (mUpdateList.empty()) {
       return;
     }
 
-    for (SDelayedSubVizInfo* update = mUpdateList.mStart; update != mUpdateList.mFinish;) {
+    for (SDelayedSubVizInfo* update = mUpdateList.begin(); update != mUpdateList.end();) {
       update->mTicksTilUpdate -= dTicks;
       if (update->mTicksTilUpdate > 0) {
         ++update;
@@ -456,13 +442,8 @@ namespace moho
       const auto radiusInCells = static_cast<std::uint32_t>(update->mRadius / static_cast<float>(mGridSize));
       Raster(update->mLastPos, radiusInCells, false);
 
-      SDelayedSubVizInfo* const next = update + 1;
-      if (next != mUpdateList.mFinish) {
-        const std::size_t tailCount = static_cast<std::size_t>(mUpdateList.mFinish - next);
-        std::memmove(update, next, tailCount * sizeof(SDelayedSubVizInfo));
-      }
-
-      --mUpdateList.mFinish;
+      // `erase(pos)` (0x00507A50, cited on Vector.h): shift the tail down, drop the end.
+      update = mUpdateList.erase(update);
     }
   }
 
@@ -548,38 +529,6 @@ namespace moho
         cell = static_cast<std::int8_t>(cell + cellDelta);
       }
     }
-  }
-
-  void CIntelGrid::PushDelayedUpdate(const SDelayedSubVizInfo& update)
-  {
-    if (mUpdateList.mStart && mUpdateList.mFinish < mUpdateList.mCapacity) {
-      *mUpdateList.mFinish = update;
-      ++mUpdateList.mFinish;
-      return;
-    }
-
-    const std::size_t count =
-      mUpdateList.mStart ? static_cast<std::size_t>(mUpdateList.mFinish - mUpdateList.mStart) : 0u;
-    const std::size_t oldCapacity =
-      mUpdateList.mStart ? static_cast<std::size_t>(mUpdateList.mCapacity - mUpdateList.mStart) : 0u;
-
-    std::size_t newCapacity = oldCapacity ? (oldCapacity + oldCapacity / 2u) : 1u;
-    if (newCapacity <= count) {
-      newCapacity = count + 1u;
-    }
-
-    auto* const newBuffer = static_cast<SDelayedSubVizInfo*>(::operator new(newCapacity * sizeof(SDelayedSubVizInfo)));
-    if (count != 0u) {
-      std::memcpy(newBuffer, mUpdateList.mStart, count * sizeof(SDelayedSubVizInfo));
-      ::operator delete(mUpdateList.mStart);
-    }
-
-    mUpdateList.mStart = newBuffer;
-    mUpdateList.mFinish = newBuffer + count;
-    mUpdateList.mCapacity = newBuffer + newCapacity;
-
-    *mUpdateList.mFinish = update;
-    ++mUpdateList.mFinish;
   }
 
   /**
