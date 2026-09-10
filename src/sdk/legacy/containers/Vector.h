@@ -1615,6 +1615,7 @@ namespace msvc8
          * Address: 0x0049E720 (FUN_0049E720 -- `_Allocate` for the 0x38-byte `BeamRenderVertexRuntime` element; caller 0x0049A1D0.)
          * Address: 0x0049E460 (FUN_0049E460 -- `allocator<SWorldParticle>::allocate` (140-byte element) for `msvc8::vector<SWorldParticle>`; callers 0x004972A2, 0x00499250, 0x0049960F; formerly `AllocateWorldParticleArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one world-particle array lane (`0x8C` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
          * Address: 0x0049E530 (FUN_0049E530 -- `allocator<TrailRuntimeView>::allocate` (96-byte element) for `msvc8::vector<TrailRuntimeView>`; callers 0x00497451, 0x00499630, 0x004999BF; formerly `AllocateTrailRuntimeArrayOrThrow` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Allocates one trail-runtime array lane (`0x60` bytes per element) and throws `std::bad_alloc` on legacy overflow guard failure.)
+         * Address: 0x0084FA10 (FUN_0084FA10 -- `allocator<T>::allocate` for a 4-byte element (`bad_alloc` when `count * 4` overflows); callers 0x0084F180, 0x0084F200, 0x0084F4D0; formerly `AllocateCheckedDwordStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -2040,6 +2041,7 @@ namespace msvc8
          * Address: 0x005DB610 (FUN_005DB610 -- copy constructor for the 8-byte `moho::WeakPtr<CUnitCommand>` element: null the triple, buy exactly `size()` slots (0x005A1D60), `_Ucopy` 0x005E1840 (each node relinks at its owner's chain head through `WeakPtr`'s copy constructor), `_Tidy` 0x005A07A0 on the throw path. Twelve callers, e.g. 0x005D7340 (CAiAttackerImpl.cpp), 0x005FA340 / 0x005FA550 (CFactoryBuildTask). Formerly `CopyWeakPtrCUnitCommandVector` in moho/unit/CUnitCommandWeakPtrReflection.cpp (RULE ONE); its callers now copy or assign the vector directly.)
          * Address: 0x00508F50 (FUN_00508F50 -- copy constructor for `moho::SDelayedSubVizInfo`: null the triple, allocate exactly `size()` slots (0x005087E0), copy through 0x00508BE0; zero callers, unreachable. Formerly `CopyDelayedSubVizStorageDeep` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00497530 (FUN_00497530 -- copy constructor for the 0xCC-byte `moho::SWorldBeam` element (max_size 0x1414141, buy exactly `size()` slots through 0x0049E630, per-element copy 0x0049BF10); callers 0x00495CC0, 0x0049CFD0 (the beam bucket entry copy, now `::new (&destination->beams) msvc8::vector<SWorldBeam>(source->beams)`). Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084F4D0 (FUN_0084F4D0 -- `vector<T>::vector(const vector&)` for a 4-byte element; callers 0x0084EE20, 0x0084FE00, 0x0084FF00; formerly `CloneDwordVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -2361,6 +2363,7 @@ namespace msvc8
          * Address: 0x00509010 (FUN_00509010 -- `operator=` for `msvc8::vector<moho::SDelayedSubVizInfo>`: the four VC8 arms (`clear()` 0x005091D0, assign-over, assign-then-append through 0x00509850, `_Tidy` 0x00508050 + `assign` 0x005082B0); zero callers, unreachable. Formerly `AssignDelayedSubVizVector` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00496A30 (FUN_00496A30 -- `operator=` for `msvc8::vector<ParticleRenderWorkItemRuntime*>` (clear 0x00496C20, copies 0x0049DEA0 / 0x0049DED0, `_Tidy` + rebuy 0x00498AF0); caller 0x004937E0 (`PruneExpiredParticleBucketWorkItems`). Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00496E70 (FUN_00496E70 -- `operator=` for the particle buckets' `msvc8::vector<std::uint32_t>` (copies 0x0049DF00 / 0x0049DF30); caller 0x00494480 (`PruneExpiredTrailBucketWorkItems`).)
+         * Address: 0x00740F00 (FUN_00740F00 -- `vector<T>::operator=` for the `GeomCamera3` element (assign over the common prefix, destroy the surplus tail); callers 0x0073F630, 0x0074068F; formerly `CopyGeomCameraRangeAndPruneTailRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2516,6 +2519,8 @@ namespace msvc8
          * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly `IsSDecalInfoVectorRuntimeEmpty` over a hand-rolled `SDecalInfoVectorRuntimeView` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00507980 (FUN_00507980 -- `empty()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `IsDelayedSubVizLaneSpanEmpty` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00836E80 (FUN_00836E80 -- `vector<T>::empty()` for a 48-byte element (`_Myfirst == 0 || size() == 0`; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0 reads it); callers 0x00835DF0; formerly `IsElement48RangeEmpty` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x008553A0 (FUN_008553A0 -- `vector<T>::empty()` for a 204-byte element; callers 0x008599D0; formerly `IsElement204VectorEmptyRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007C8EE0 (FUN_007C8EE0 -- `vector<T>::empty()` for a 24-byte element; zero callers, unreachable; formerly `IsElement24VectorEmptyRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] bool empty() const noexcept {
 	        return first_ == last_;
@@ -2584,6 +2589,12 @@ namespace msvc8
          * Address: 0x00889C60 (FUN_00889C60 -- `vector<SRangeRenderProfile>::size()` (136-byte element; `(last - first) / 136` via the 0x1E1E1E1F magic); callers 0x0088A400 (unreached); formerly `CountElement136RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x007FAF90 (FUN_007FAF90 -- `vector<T>::size()` for a 20-byte element (`_Insert_n` 0x007FB060 reads it); callers 0x007FB060; formerly `CountElement20RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x008487F0 (FUN_008487F0 -- `vector<DockCandidate>::size()` (12-byte element; the `push_back` growth path 0x00849250 reads it); callers 0x00849250; formerly `CountElement12RangeEntries` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x007982D0 (FUN_007982D0 -- `vector<T>::size()` for a 20-byte element; callers 0x007984B0 (unreached); formerly `CountElement20VectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006EA190 (FUN_006EA190 -- `vector<T>::size()` for a 60-byte element; callers 0x006EAB90; formerly `CountStride60ElementsRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0074CF40 (FUN_0074CF40 -- `vector<T>::size()` for a 56-byte element; callers 0x008924C0; formerly `CountStride56ElementsRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0085EEA0 (FUN_0085EEA0 -- `vector<T>::size()` for a 52-byte element; callers 0x0085F3F0; formerly `CountElement52VectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00852280 (FUN_00852280 -- `vector<T>::size()` for a 12-byte element; callers 0x008523C0; formerly `CountElement12VectorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008678E0 (FUN_008678E0 -- `vector<T>::size()` for a 12-byte element; callers 0x00868040; formerly `CountElement12VectorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2639,6 +2650,8 @@ namespace msvc8
          * Returns reserved element capacity from retained `[first_, end_)` range.
          * Address: 0x0077AC70 (FUN_0077AC70 -- `capacity()` for `msvc8::vector<moho::SDecalInfo>`. Zero callers, no xrefs, unreachable. Formerly `CountSDecalInfoVectorRuntimeCapacity` in moho/render/CDecalTypes.cpp, removed 2026-09-10.)
          * Address: 0x00507F20 (FUN_00507F20 -- `capacity()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLaneCapacityCount` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x007C9180 (FUN_007C9180 -- `vector<T>::capacity()` for a 36-byte element; zero callers, unreachable; formerly `CountElement36VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007C97B0 (FUN_007C97B0 -- `vector<T>::capacity()` for a 24-byte element; zero callers, unreachable; formerly `CountElement24VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
@@ -2950,6 +2963,8 @@ namespace msvc8
          * caller chain.
          * Address: 0x006EA710 (FUN_006EA710 -- the `_Ufill` grow step of `resize(n)` (`_Insert_n(end(), n - size(), T())`) for `moho::WeakPtr<CUnitCommand>`, materialising the value-initialised temporary; source call `RVectorType<WeakPtr<CUnitCommand>>::SetCount` 0x006E9D10. Zero callers in the index (folded into its caller), unreachable.)
          * Address: 0x00507F40 (FUN_00507F40 -- `resize(n)` (value-initialised fill) for `moho::SDelayedSubVizInfo`, a register-order adapter over 0x005083C0; zero callers, unreachable. Formerly `ResizeDelayedSubVizVectorWithDefaultFill` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x0067DAA0 (FUN_0067DAA0 -- `vector<T>::resize(n)` for a 4-byte pointer / id element (zero-fills the appended tail); callers 0x0067C250, 0x0067CAA0; formerly `ResizePointerVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0067CAA0 (FUN_0067CAA0 -- the `jmp` thunk into `vector<T>::resize(n)` for the 4-byte pointer / id element; zero callers, unreachable; formerly `ResizePointerVectorRuntimeThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3159,6 +3174,8 @@ namespace msvc8
          * instantiation, not external code. This is the `OccupationData`
          * counterpart of the `SubclusterData` emission `FUN_00934130`
          * referenced (but not independently cited) on `insert` above.)
+         * Address: 0x006AF120 (FUN_006AF120 -- `vector<T>::resize(n, value)` for the 4-byte `ReconBlip*` element; callers 0x006AE780, 0x006AF530; formerly `ResizeReconBlipPointerVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00765130 (FUN_00765130 -- `vector<T>::resize(n, value)` for a 4-byte element (shrinks through the erase lane 0x00702730, grows through the fill); callers 0x00764A80, 0x007650E7; formerly `ResizeWordVectorWithFillByteRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3211,6 +3228,9 @@ namespace msvc8
          * Address: 0x00496E00 (FUN_00496E00 -- the same `clear()` reached from the trail upload 0x00493DA0.)
          * Address: 0x00496C20 (FUN_00496C20 -- `clear()` for `msvc8::vector<ParticleRenderWorkItemRuntime*>`, the empty-source arm of `operator=` 0x00496A30.)
          * Address: 0x00498E90 (FUN_00498E90 -- `clear()` for `std::uint32_t`; callers 0x00496E70; formerly `ResetLegacyDwordVectorEndToBegin` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Resets one legacy vector end iterator back to begin when the vector is non-empty.)
+         * Address: 0x00680370 (FUN_00680370 -- `vector<T>::clear()` for a 4-byte element (`_Mylast = _Myfirst`, capacity kept); callers 0x00680210 (unreached); formerly `ResetPointerVectorEndToBeginRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00753430 (FUN_00753430 -- `vector<T>::clear()` for a 4-byte element (`_Mylast = _Myfirst`, capacity kept); callers 0x00752A70 (unreached); formerly `ResetPointerVectorEndToBeginRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008500C0 (FUN_008500C0 -- `vector<T>::clear()` for a 4-byte element; callers 0x0084FF80; formerly `ResetDwordVectorEndToBeginRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void clear() noexcept {
             destroy_all();
@@ -3274,6 +3294,17 @@ namespace msvc8
          * Address: 0x00493D20 (FUN_00493D20 -- `_Tidy` for `msvc8::vector<ParticleRenderIntervalRuntime>` (`ParticleRenderWorkItemRuntime::mIntervals`), the source call `workItem.mIntervals.tidy()` in `ResetParticleRenderWorkItemIntervals`.)
          * Address: 0x00494900 (FUN_00494900 -- ICF-separated copy of that interval `_Tidy`.)
          * Address: 0x004976F0 (FUN_004976F0 -- `_Tidy` for `msvc8::vector<moho::SWorldBeam>` (destroy each beam's counted handles, free, null the triple); caller 0x00497530 (the copy constructor's catch arm). Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740AF0 (FUN_00740AF0 -- `~vector<SSTIArmyConstantData>` / `_Tidy` (element destructors, storage release, null triple); callers 0x0073FC70, 0x00740370; formerly `DestroyArmyConstantDataVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740370 (FUN_00740370 -- the `jmp` thunk into `~vector<SSTIArmyConstantData>` (`SSyncData`'s member destructor); callers 0x0073FC70, 0x00748370; formerly `DestroyArmyConstantDataVectorThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740B40 (FUN_00740B40 -- `~vector<SSTIArmyVariableData>` / `_Tidy`; callers 0x0073FC70, 0x00740380; formerly `DestroyArmyVariableDataVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740380 (FUN_00740380 -- the `jmp` thunk into `~vector<SSTIArmyVariableData>`; callers 0x0073FC70, 0x00748370; formerly `DestroyArmyVariableDataVectorThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740C50 (FUN_00740C50 -- `~vector<SSTIUnitVariableData slot>` / `_Tidy`; callers 0x0073FC70, 0x00740410; formerly `DestroyUnitVariableDataSlotVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740410 (FUN_00740410 -- the `jmp` thunk into `~vector<SSTIUnitVariableData slot>`; callers 0x0073FC70, 0x00748370; formerly `DestroyUnitVariableDataSlotVectorThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740A60 (FUN_00740A60 -- `~vector<vector<msvc8::string>>` / `_Tidy` (each 16-byte inner vector destroyed, then the block freed); callers 0x007409D0; formerly `DestroyStringRangeBlock16OwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740D50 (FUN_00740D50 -- `~vector<SDecalInfo>` / `_Tidy`; callers 0x0077E040 (unreached); formerly `DestroySDecalInfoRangeOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740E20 (FUN_00740E20 -- `~vector<T>` / `_Tidy` for a 12-byte element holding a shared control block (each element released, then the block freed); callers 0x00752BA0 (unreached); formerly `DestroySharedControlRangeOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00740E90 (FUN_00740E90 -- `~vector<msvc8::string>` / `_Tidy`; callers 0x00753020 (unreached); formerly `DestroyStringRangeOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007424A0 (FUN_007424A0 -- `~vector<msvc8::string>` / `_Tidy` (second instantiation); callers 0x00741FC0; formerly `DestroyStringRangeOwnerRuntimeLegacy` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3824,6 +3855,8 @@ namespace msvc8
          * Address: 0x00495DA0 (FUN_00495DA0 -- `vector<BeamRenderVertexRuntime` (0x3C-byte element; `EmitInterpolatedBeamQuadVertices` 0x00491760 pushes four per beam); callers 0x00491760; formerly `AppendBeamRenderVertex` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00495620 (FUN_00495620 -- `vector<SWorldParticle` (0x8C-byte element; the emitters' submit paths and `CWorldParticles::AddWorldParticle` push through it); callers 0x00493AD4, 0x00494930, 0x0065B941; formerly `AppendWorldParticleToVector` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004957C0 (FUN_004957C0 -- `vector<TrailRuntimeView` (0x60-byte element; the trail emitter and `CWorldParticles::AddTrail` push through it); callers 0x00494730, 0x00494C20, 0x00671194; formerly `AppendTrailToVector` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006DB150 (FUN_006DB150 -- `vector<T>::push_back` for the 12-byte `{WeakPtr<CUnitCommand>, dword}` element (callers 0x006D77B0 / 0x006DC070); callers 0x006D77B0, 0x006DC070; formerly `AppendUnitCommandLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007C87E0 (FUN_007C87E0 -- `vector<T>::push_back` for a 16-byte element (in-place when capacity remains, else the `_Insert_n` growth path); callers 0x007BFB70; formerly `Append16ByteLaneWithGrowRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4210,6 +4243,14 @@ namespace msvc8
          * Address: 0x0082DE20 (FUN_0082DE20 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (UICommandGraph's hash-bucket vector, shrink path of `resize` 0x0082CBA0); callers 0x0082CBA0; formerly `MoveDwordTailLaneA` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x0082F1C0 (FUN_0082F1C0 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (second 4-byte instantiation, shrink path of 0x0082D820); callers 0x0082D820; formerly `MoveDwordTailLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x0082F750 (FUN_0082F750 -- `vector<void*>::erase(first, last)` tail memmove + `_Mylast` commit (third 4-byte instantiation, shrink path of 0x0082DB00); callers 0x0082DB00; formerly `MoveDwordTailLaneC` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x0067E960 (FUN_0067E960 -- `vector<T>::erase(first, last)` for a 4-byte element (memmove of the tail + `_Mylast` commit); callers 0x0067DAA0; formerly `ShiftPointerWordRangeLeftRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00767EE0 (FUN_00767EE0 -- `vector<T>::erase(first, last)` for a 4-byte element (memmove of the tail + `_Mylast` commit); callers 0x00769B90; formerly `ShiftPointerWordRangeLeftRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00750E70 (FUN_00750E70 -- `vector<T>::erase(first, last)` for an 8-byte element (the transcription had lost the memmove and only walked the pointers); callers 0x00750A80; formerly `CopyEightByteLaneRangeAndCommitCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00702730 (FUN_00702730 -- `vector<T>::erase(first, last)` for a 4-byte element -- the shrink half of `resize` 0x00765130 (the transcription had lost the memmove); callers 0x00765130; formerly `CopyTailRangeAndUpdateVectorEndRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00855810 (FUN_00855810 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00855750; formerly `ShiftDwordRangeLeftAndStoreCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092EA10 (FUN_0092EA10 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x0092FC60; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00933180 (FUN_00933180 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00934080; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x009331C0 (FUN_009331C0 -- `vector<T>::erase(first, last)` for a 4-byte element; callers 0x00934130; formerly `ShiftDwordRangeLeftAndStoreCursorRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5282,6 +5323,8 @@ namespace msvc8
          * Address: 0x00499A20 (FUN_00499A20 -- single-value `insert(pos, value)` for the 0xCC-byte `moho::SWorldBeam` element (staged copy 0x0049BF10, in-place shift 0x0049E600 / fill 0x0049E5D0, grow arm 0x0049E5A0 with `_Allocate` 0x0049E630 and `_Ufill` 0x00497730); the source call is `bucket.beams.push_back(beam)` in BeamRenderHelpers.cpp. Formerly a per-type free function in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00497640 (FUN_00497640 -- the pointer-argument shell over that insert; zero callers, unreachable.)
          * Address: 0x00497B40 (FUN_00497B40 -- the capacity-full path of `push_back` for the 0x38-byte `BeamRenderVertexRuntime` element (`insert(end(), value)`, 1.5x growth, max_size 0x4444444); caller 0x00495DA0 (`AppendBeamRenderVertex`, `vertices.push_back(vertex)`).)
+         * Address: 0x00692870 (FUN_00692870 -- `vector<T>::insert(pos, value)` for a 28-byte float[7] element (iterator returned through the hidden result slot); callers 0x00692700; formerly `InsertFloat7LaneAndRebaseCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00852350 (FUN_00852350 -- `vector<T>::insert(pos, value)` for a 12-byte element; callers 0x008522A0; formerly `InsertElement12LaneAndStoreRebasedCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6381,6 +6424,9 @@ namespace msvc8
          * Address: 0x0049F980 (FUN_0049F980 -- the `std::fill` seam step of `_Insert_n` for `ParticleRenderIntervalRuntime`; zero callers, unreachable; formerly `FillDwordPairRangeFromSingleValueByEndPointerB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-pair fill helper using destination begin/end pointers.)
          * Address: 0x0049FA00 (FUN_0049FA00 -- the `std::fill` seam step of `_Insert_n` for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueByEndPointerB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword fill helper using destination begin/end pointers.)
          * Address: 0x007F3530 (FUN_007F3530 -- the `std::fill` seam step of `_Insert_n` for a 16-byte element (0x007F1D50); callers 0x007F1D50; formerly `FillQuadWordBlocks` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x00688E20 (FUN_00688E20 -- the `std::fill` seam step of `_Insert_n` for a 20-byte `{WeakPtr, dword...}` element; callers 0x006882E0; formerly `FillPrefixedWeakPtrDwordLaneRangeFromSingleLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084A510 (FUN_0084A510 -- the `std::fill` seam step of `_Insert_n` for a 12-byte element; callers 0x00849250; formerly `FillStride3DwordLaneRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00852700 (FUN_00852700 -- the `std::fill` seam step of `_Insert_n` for a 12-byte float[3] element; callers 0x008523C0; formerly `FillStride3FloatLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7672,6 +7718,32 @@ namespace msvc8
          * Address: 0x004A0D80 (FUN_004A0D80 -- `_Ucopy` (copy-construct a range) for `BeamRenderVertexRuntime`; callers 0x0049A1D0, 0x0049E6B0, 0x0049F770; formerly `CopyFifteenFloatLaneRangeAndReturnEndCore` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Copies one 15-float-lane range into nullable destination storage and returns destination end.)
          * Address: 0x004A0E00 (FUN_004A0E00 -- `_Ucopy` (copy-construct a range) for `ParticleRenderIntervalRuntime`; callers 0x0049ADA0, 0x0049E820, 0x0049F860; formerly `CopyDwordPairRangeNullableAndReturnEndCoreA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Copies one nullable dword-pair range and returns destination end.)
          * Address: 0x004A0E20 (FUN_004A0E20 -- `_Ucopy` (copy-construct a range) for `ParticleRenderIntervalRuntime`; callers 0x0049B450, 0x0049E9B0, 0x0049F960; formerly `CopyDwordPairRangeNullableAndReturnEndCoreB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Copies one nullable dword-pair range and returns destination end.)
+         * Address: 0x00578FE0 (FUN_00578FE0 -- `_Ucopy` for the `LuaObject` element; callers 0x00578650, 0x005788E0, 0x00578980; formerly `CopyConstructLuaObjectRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00549AD0 (FUN_00549AD0 -- `_Ucopy` for a 20-byte element; callers 0x00547FE0, 0x00548AF0, 0x005494C0; formerly `CopyStride5DwordRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00548AF0 (FUN_00548AF0 -- a register-shape entry into the 20-byte `_Ucopy`; callers 0x00547FE0; formerly `CopyStride5DwordRangeRegisterAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00549780 (FUN_00549780 -- a register-shape entry into the 20-byte `_Ucopy`; callers 0x00548ED0 (unreached); formerly `CopyStride5DwordRangeRegisterAdapterLaneB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005494C0 (FUN_005494C0 -- an empty-range entry into the 20-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride5DwordRangeEmptyAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00549920 (FUN_00549920 -- an empty-range entry into the 20-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride5DwordRangeEmptyAdapterLaneB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00549970 (FUN_00549970 -- an empty-range entry into the 20-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride5DwordRangeEmptyAdapterLaneC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00584920 (FUN_00584920 -- `_Ucopy` for a 24-byte float[6] element; callers 0x00580150, 0x00582180, 0x005836B0; formerly `CopyStride6FloatRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005836B0 (FUN_005836B0 -- a register-shape entry into the 24-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride6FloatRangeRegisterAdapterA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00584200 (FUN_00584200 -- a register-shape entry into the 24-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride6FloatRangeRegisterAdapterB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00584420 (FUN_00584420 -- a register-shape entry into the 24-byte `_Ucopy`; zero callers, unreachable; formerly `CopyStride6FloatRangeRegisterAdapterC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00582180 (FUN_00582180 -- a register-shape entry into the 24-byte `_Ucopy`; callers 0x00580150; formerly `CopyStride6FloatRangeRegisterAdapterD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00583960 (FUN_00583960 -- a register-shape entry into the 24-byte `_Ucopy`; callers 0x00582890 (unreached); formerly `CopyStride6FloatRangeRegisterAdapterE` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00518370 (FUN_00518370 -- `_Ucopy` for the emitter curve-key element (installs the key vtable per copy); callers 0x00516310, 0x005171A0, 0x00517CF0; formerly `CopyEmitterCurveKeyRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076D300 (FUN_0076D300 -- `_Ucopy` for the occupy-source binding element; callers 0x0076C490, 0x0076CD00, 0x0076D000; formerly `CopyOccupySourceBindingRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076D290 (FUN_0076D290 -- a register-shape entry into the occupy-source binding `_Ucopy`; zero callers, unreachable; formerly `CopyOccupySourceBindingRangeRuntimeAdapterZeroSource` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00579230 (FUN_00579230 -- a register-shape entry into the occupy-source binding `_Ucopy`; zero callers, unreachable; formerly `CopyOccupySourceBindingRangeRuntimeAdapterZeroSource` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076CD00 (FUN_0076CD00 -- a register-shape entry into the occupy-source binding `_Ucopy`; callers 0x0076C490; formerly `CopyOccupySourceBindingRangeRuntimeTailAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076D000 (FUN_0076D000 -- a register-shape entry into the occupy-source binding `_Ucopy`; zero callers, unreachable; formerly `CopyOccupySourceBindingRangeRuntimeTailAdapterLaneB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076D1C0 (FUN_0076D1C0 -- a register-shape entry into the occupy-source binding `_Ucopy`; zero callers, unreachable; formerly `CopyOccupySourceBindingRangeRuntimeTailAdapterLaneC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005181D0 (FUN_005181D0 -- a register-shape entry into the occupy-source binding `_Ucopy`; zero callers, unreachable; formerly `CopyOccupySourceBindingRangeRuntimeTailAdapterLaneC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D9B40 (FUN_007D9B40 -- `_Ucopy` for the clutter seed element (installs the seed vtable per copy); callers 0x007D8620, 0x007D95C0, 0x007D99C0; formerly `CopyClutterSeedRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D99C0 (FUN_007D99C0 -- a register-shape entry into the clutter seed `_Ucopy`; zero callers, unreachable; formerly `CopyClutterSeedRangeRuntimeAdapterA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D9AA0 (FUN_007D9AA0 -- a register-shape entry into the clutter seed `_Ucopy`; zero callers, unreachable; formerly `CopyClutterSeedRangeRuntimeAdapterB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D9B20 (FUN_007D9B20 -- a register-shape entry into the clutter seed `_Ucopy`; zero callers, unreachable; formerly `CopyClutterSeedRangeRuntimeAdapterC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0088AD60 (FUN_0088AD60 -- `_Ucopy` for the wave-parameters element; callers 0x0088A0C0 (unreached); formerly `CopyWaveParametersRangeForwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8727,6 +8799,20 @@ namespace msvc8
          * Address: 0x004A0BD0 (FUN_004A0BD0 -- `_Ufill` (fill-construct `count` copies) for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueAndReturnRemainingDuplicateE` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range fill helper that writes one source slot value.)
          * Address: 0x004A0BF0 (FUN_004A0BF0 -- `_Ufill` (fill-construct `count` copies) for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueAndReturnRemainingDuplicateF` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range fill helper that writes one source slot value.)
          * Address: 0x008B2FD0 (FUN_008B2FD0 -- `_Ufill` for a 4-byte element, copy `X` of the lettered fill family; its only caller is the `_Insert_n` grow lane 0x008B31B0 (unreached, two hand-verified call sites at 0x008B29CA / 0x008B2F47 that IDA never boxed); formerly `FillDwordSpanCountedLaneX` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x006877F0 (FUN_006877F0 -- `_Ufill` for a 20-byte `{WeakPtr, dword...}` element value-initialised from a zeroed source (the growth fill of `resize(n)`); callers 0x006882E0; formerly `ConstructPrefixedWeakPtrDwordLaneRangeFromZeroRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0069EDB0 (FUN_0069EDB0 -- `_Ufill` for a 12-byte dword-triple element value-initialised from a zeroed source; callers 0x0069F040; formerly `ConstructElement12LaneRangeFromZeroRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00848DA0 (FUN_00848DA0 -- `_Ufill` for the 12-byte `DockCandidate` element (the growth fill of `push_back` 0x00849250); callers 0x00849250; formerly `ConstructElement12LaneRangeFromZeroRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0085A250 (FUN_0085A250 -- `_Ufill` for a 16-byte element value-initialised from a zeroed source; callers 0x0085A2D0; formerly `ConstructElement16LaneRangeFromZeroRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006DBE70 (FUN_006DBE70 -- `_Ufill` for the 12-byte `{WeakPtr<CUnitCommand>, dword}` element value-initialised from a zeroed source (0x006DCC20's growth fill); callers 0x006DCC20; formerly `ConstructWeakPtrDwordPayloadLaneRangeFromZeroRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005CA240 (FUN_005CA240 -- `_Ufill` for a 0x34-byte element (each slot constructed from the one source value); zero callers, unreachable; formerly `ConstructStride52RangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007CCEF0 (FUN_007CCEF0 -- `_Ufill` for the 0x18-byte `{dword, LuaObject}` element; callers 0x007C8F30, 0x007C98E0, 0x007CA300; formerly `FillStride24WordLuaObjectLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007CBF00 (FUN_007CBF00 -- `_Ufill` for the 0x18-byte `{dword, LuaObject}` element; zero callers, unreachable; formerly `FillStride24WordLuaObjectLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084AF60 (FUN_0084AF60 -- `_Ufill` for a 12-byte element; callers 0x00848820, 0x00848DA0, 0x00849250; formerly `FillStride3DwordLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084A440 (FUN_0084A440 -- `_Ufill` for a 12-byte element; zero callers, unreachable; formerly `FillStride3DwordLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0085A920 (FUN_0085A920 -- `_Ufill` for a 16-byte element carrying two intrusive weak-count handles (each copy retains them); callers 0x00859F70, 0x0085A250, 0x0085A2D0; formerly `FillStride4DwordWithDualRefLaneRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0085A7C0 (FUN_0085A7C0 -- a register-shape entry into the same 16-byte `_Ufill`; zero callers, unreachable; formerly `FillStride4DwordWithDualRefLaneRuntimeNullAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076D150 (FUN_0076D150 -- `_Ufill` for the occupy-source binding element (installs the binding vtable per copy); callers 0x0076C490, 0x0076CBA0, 0x0076CEE0; formerly `FillOccupySourceBindingRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0076CEE0 (FUN_0076CEE0 -- a fastcall-shape entry into the occupy-source binding `_Ufill`; zero callers, unreachable; formerly `FillOccupySourceBindingRangeRuntimeAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9503,6 +9589,9 @@ namespace msvc8
          * Address: 0x004A0120 (FUN_004A0120 -- `_Copy_opt` memmove (the tail shift of `erase`) for `std::uint32_t`; zero callers, unreachable; formerly `MoveDwordRangeByCountAndReturnTokenD` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range move-by-count helper that returns caller token.)
          * Address: 0x004A04D0 (FUN_004A04D0 -- `_Copy_opt` memmove (the tail shift of `erase`) for `std::uint32_t`; zero callers, unreachable; formerly `MoveDwordRangeByCountAndReturnDestinationDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Moves one dword range by element count and returns destination begin.)
          * Address: 0x004A0560 (FUN_004A0560 -- `_Copy_opt` memmove (the tail shift of `erase`) for `std::uint32_t`; zero callers, unreachable; formerly `MoveDwordRangeByCountAndReturnDestinationDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range move-by-count helper returning destination begin.)
+         * Address: 0x0067F650 (FUN_0067F650 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x00680210 (unreached); formerly `CopyPointerWordRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006E3580 (FUN_006E3580 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x006E2F30; formerly `CopyWordRangeForwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008503B0 (FUN_008503B0 -- `_Copy_opt` (forward element copy) for a 4-byte element; callers 0x0084FF80; formerly `CopyDwordRangeForwardRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9593,6 +9682,23 @@ namespace msvc8
          * Address: 0x008318B0 (FUN_008318B0 -- `_Copy_backward` for a 4-byte element (the `_Insert_n` seam shift of 0x0082F210); callers 0x0082F210; formerly `CopyDwordRangeBackwardLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x00831960 (FUN_00831960 -- `_Copy_backward` for a 4-byte element (the `_Insert_n` seam shift of 0x0082F7A0); callers 0x0082F7A0; formerly `CopyDwordRangeBackwardLaneC` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x007F3560 (FUN_007F3560 -- `_Copy_backward` for a 16-byte element (the `_Insert_n` seam shift of 0x007F1D50); callers 0x007F1D50; formerly `CopyQuadWordBlocksBackward` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x0067FB40 (FUN_0067FB40 -- `_Copy_backward` for a 4-byte element; callers 0x0067DB40; formerly `CopyPointerWordRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00765540 (FUN_00765540 -- `_Copy_backward` for a 4-byte element; callers 0x007651A0; formerly `CopyPointerWordRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00768E60 (FUN_00768E60 -- `_Copy_backward` for a 4-byte element; callers 0x00768090; formerly `CopyPointerWordRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00688E50 (FUN_00688E50 -- `_Copy_backward` for a 20-byte `{WeakPtr, dword...}` element (relinks each weak node); callers 0x006882E0; formerly `CopyPrefixedWeakPtrDwordLaneRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00693150 (FUN_00693150 -- `_Copy_backward` for a 28-byte float[7] element (argument-shuffling entry); callers 0x00692930; formerly `CopyFloat7RangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084A530 (FUN_0084A530 -- `_Copy_backward` for a 12-byte element; callers 0x00849250; formerly `CopyStride3DwordRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084F980 (FUN_0084F980 -- `_Copy_backward` for a 4-byte element; callers 0x0084F200; formerly `CopyDwordRangeBackwardRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00857300 (FUN_00857300 -- `_Copy_backward` for a 4-byte element; callers 0x008561D0; formerly `CopyDwordRangeBackwardRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0086A0F0 (FUN_0086A0F0 -- `_Copy_backward` for a 4-byte element; callers 0x00869D30; formerly `CopyDwordRangeBackwardRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008FA5C0 (FUN_008FA5C0 -- `_Copy_backward` for a 4-byte element; callers 0x008FE010; formerly `CopyDwordRangeBackwardRuntimeE` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00936330 (FUN_00936330 -- `_Copy_backward` for a 4-byte element; callers 0x00936FF0; formerly `CopyDwordRangeBackwardRuntimeF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092DCB0 (FUN_0092DCB0 -- `_Copy_backward` for a 4-byte element; callers 0x0092F9E0; formerly `CopyDwordRangeBackwardRuntimeG` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00932970 (FUN_00932970 -- `_Copy_backward` for a 4-byte element; callers 0x00933950; formerly `CopyDwordRangeBackwardRuntimeI` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006E2D60 (FUN_006E2D60 -- `_Copy_backward` for a 4-byte element; callers 0x006E24D0; formerly `CopyWordRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00852720 (FUN_00852720 -- `_Copy_backward` for a 12-byte float[3] element; callers 0x008523C0; formerly `CopyStride3FloatRangeBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092DC80 (FUN_0092DC80 -- `_Copy_backward` for a 12-byte element; callers 0x0092F630; formerly `CopyStride3DwordRangeBackwardRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092DFC0 (FUN_0092DFC0 -- `_Copy_backward` for a 12-byte element; callers 0x0092F240; formerly `CopyStride3DwordRangeBackwardRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {

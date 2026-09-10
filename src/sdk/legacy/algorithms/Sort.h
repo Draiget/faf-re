@@ -406,6 +406,16 @@ namespace msvc8
          * Address: 0x00A72840 (FUN_00A72840 -- `_Adjust_heap` for the 8-byte `{float, dword}` instantiation (`make_heap` 0x00A72D40 / `sort_heap` 0x00A73E20); its `_Push_heap` half is 0x00A72360.)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x00760850 (FUN_00760850 -- `_Push_heap` (settle-upward) for an 8-byte `(id, key)` element ordered by the second dword; callers 0x00760720; formerly `SiftElement8LanePairUpBySecondWordRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00760720 (FUN_00760720 -- `_Adjust_heap` for an 8-byte `(id, key)` element ordered by the second dword; callers 0x00760590, 0x007605E0, 0x007607C7; formerly `SiftElement8LanePairDownThenInsertBySecondWordRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00720010 (FUN_00720010 -- `_Adjust_heap` for a 16-byte float[4] element; callers 0x0071F990, 0x0071FA00, 0x007202E0; formerly `SiftDownFloat4HeapAndFinalizeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00720250 (FUN_00720250 -- `_Push_heap` (settle-upward) for a 16-byte float[4] element; callers 0x00720010; formerly `InsertFloat4HeapEntryByPromotingParentsRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084BF30 (FUN_0084BF30 -- `_Adjust_heap` for a 12-byte scored element; callers 0x0084BB20, 0x0084BB90, 0x0084C520; formerly `SiftHeapHoleDownAndReinsertByScoreRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084C280 (FUN_0084C280 -- `_Push_heap` (settle-upward) for a 12-byte scored element; callers 0x0084BF30; formerly `SiftHeapEntry12ByScoreRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0084C460 (FUN_0084C460 -- `_Push_heap` (settle-upward) for a 12-byte element ordered by `(tie, score)`; callers 0x0084C130; formerly `SiftHeapEntry12ByScoreAndTieRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007CEDB0 (FUN_007CEDB0 -- `_Push_heap` (settle-upward) for the 24-byte `(priority, LuaObject)` element; callers 0x007CE9D0; formerly `InsertLuaHeapPairRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
             const std::ptrdiff_t top = hole;
@@ -519,6 +529,12 @@ namespace msvc8
          * Address: 0x00A73F60 (FUN_00A73F60 -- thunks into the `{float, dword}`/`double` `sort_heap` bodies at 0x00A73E20/0x00A73E70; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         template <class T, class Compare>
+        /**
+         * Address: 0x007605E0 (FUN_007605E0 -- `_Sort_heap` for an 8-byte `(id, key)` element; callers 0x0075FDB0, 0x00760290; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00734210 (FUN_00734210 -- `_Sort_heap` for an 8-byte `(id, key)` element; callers 0x00733B40, 0x00733F50; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00733F50 (FUN_00733F50 -- `_Sort_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007608A0 (FUN_007608A0 -- `_Pop_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `PopElement8TailIntoRootAndSiftRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void sort_heap(T* const first, T* last, Compare comp)
         {
             for (std::ptrdiff_t count = last - first; count > 1; --count) {
@@ -778,6 +794,20 @@ namespace msvc8
      * Address: 0x0054DDD0 (FUN_0054DDD0 -- `std::sort` entry for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp): `return _Sort(first, last, (last - first) >> 3, comp)`.)
      */
     template <class T, class Compare>
+    /**
+     * Address: 0x00595D20 (FUN_00595D20 -- `_Med3` for a float[3] element ordered by lane 2; callers 0x00595AC0; formerly `SortThreeFloat3ByLane2AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x005F01C0 (FUN_005F01C0 -- `_Med3` for a float[5] element ordered by lane 4; callers 0x005EF990; formerly `SortThreeFloat5ByLane4AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0071FEE0 (FUN_0071FEE0 -- `_Med3` for a float[4] element ordered by lane 3 descending; callers 0x0071F870; formerly `SortThreeFloat4ByLane3DescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x007342C0 (FUN_007342C0 -- `_Med3` for a float[2] element ordered by lane 1; callers 0x007340C0; formerly `SortThreeFloat2ByLane1AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00760690 (FUN_00760690 -- `_Med3` for an `(id, score)` element ordered by score descending; callers 0x007604A0; formerly `SortThreeDwordPairsByScoreDescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x007604A0 (FUN_007604A0 -- `_Median` (the ninther pivot pick) for an `(id, score)` element ordered by score descending; callers 0x007600A0; formerly `SelectDwordPairScoreDescendingNintherPivotRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0084BE60 (FUN_0084BE60 -- `_Med3` for a float[3] element ordered by lane 1; callers 0x0084BA10; formerly `SortThreeFloat3ByLane1AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0084C050 (FUN_0084C050 -- `_Med3` for a float[3] element ordered by lane 2 descending, lane 1 ascending; callers 0x0084BC50; formerly `SortThreeFloat3ByLane2DescTieLane1AscRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00A727C0 (FUN_00A727C0 -- `_Med3` for a float[2] element ordered by lane 0; callers 0x00A72CB0 (unreached); formerly `SortThreeFloat2ByLane0AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00A728C0 (FUN_00A728C0 -- `_Med3` for a 16-byte element ordered by its leading double; callers 0x00A72D90 (unreached); formerly `SortThreeDword4ByDoubleKeyAscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00A72CB0 (FUN_00A72CB0 -- `_Median` (the ninther pivot pick) for a float[2] element; callers 0x00A730D0 (unreached); formerly `SelectFloat2NintherPivotForIntrosortRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00A72D90 (FUN_00A72D90 -- `_Median` (the ninther pivot pick) for a 16-byte element ordered by its leading double; callers 0x00A73500 (unreached); formerly `SelectDword4NintherPivotForIntrosortRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     */
     void sort(T* const first, T* const last, Compare comp)
     {
         detail::sort_impl(first, last, last - first, comp);

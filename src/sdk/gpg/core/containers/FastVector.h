@@ -1623,6 +1623,7 @@ namespace gpg::core
      * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
      * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
      * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetStorageToInline() noexcept
     {
