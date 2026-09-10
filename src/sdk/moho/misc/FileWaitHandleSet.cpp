@@ -165,58 +165,6 @@ namespace
     return *lockRuntime.mMutex;
   }
 
-  [[nodiscard]]
-  int ComparePathViews(
-    const std::string_view lhs,
-    const std::string_view rhs
-  )
-  {
-    const std::size_t sharedCount = std::min(lhs.size(), rhs.size());
-    const int sharedResult = sharedCount == 0 ? 0 : std::memcmp(lhs.data(), rhs.data(), sharedCount);
-    if (sharedResult != 0) {
-      return sharedResult;
-    }
-    if (lhs.size() == rhs.size()) {
-      return 0;
-    }
-    return lhs.size() < rhs.size() ? -1 : 1;
-  }
-
-  [[nodiscard]]
-  int CompareCanonicalPaths(
-    const msvc8::string& lhs,
-    const msvc8::string& rhs
-  )
-  {
-    return ComparePathViews(lhs.view(), rhs.view());
-  }
-
-  /**
-   * Address: 0x0045F3F0 (FUN_0045F3F0, sub_45F3F0)
-   *
-   * What it does:
-   * Releases one legacy string's heap buffer when present and restores empty
-   * SSO state.
-   */
-  void ResetLegacyStringStorage(
-    msvc8::string& value
-  )
-  {
-    value.tidy(true, 0U);
-  }
-
-  [[nodiscard]]
-  void* AllocateCheckedArrayStorage(
-    const std::uint32_t count,
-    const std::size_t elementSize
-  )
-  {
-    if (count != 0u && static_cast<std::size_t>(count) > (std::numeric_limits<std::size_t>::max() / elementSize)) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(static_cast<std::size_t>(count) * elementSize);
-  }
-
   /**
    * Address: 0x0045F260 (FUN_0045F260, sub_45F260)
    *
@@ -224,16 +172,6 @@ namespace
    * Allocates raw storage for one-or-more zip-entry map nodes with overflow
    * guard semantics.
    */
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* AllocateZipEntryMapNodes(
-    const std::uint32_t count
-  )
-  {
-    return static_cast<moho::FWHSZipEntryMapNode*>(
-      AllocateCheckedArrayStorage(count, sizeof(moho::FWHSZipEntryMapNode))
-    );
-  }
-
   /**
    * Address: 0x0045DD80 (FUN_0045DD80)
    *
@@ -242,11 +180,6 @@ namespace
    * lane into `FUN_0045F260`.
    */
   [[maybe_unused]]
-  moho::FWHSZipEntryMapNode* AllocateOneZipEntryMapNodeThunk()
-  {
-    return AllocateZipEntryMapNodes(1u);
-  }
-
   /**
    * Address: 0x0045F380 (FUN_0045F380, sub_45F380)
    *
@@ -254,44 +187,12 @@ namespace
    * Allocates raw storage for one-or-more file-info map nodes with overflow
    * guard semantics.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* AllocateFileInfoMapNodes(
-    const std::uint32_t count
-  )
-  {
-    return static_cast<moho::FWHSFileInfoMapNode*>(
-      AllocateCheckedArrayStorage(count, sizeof(moho::FWHSFileInfoMapNode))
-    );
-  }
-
   /**
    * Address: 0x0045E320 (FUN_0045E320, sub_45E320)
    *
    * What it does:
    * Allocates raw storage for one file-info map node.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* AllocateOneFileInfoMapNode()
-  {
-    return AllocateFileInfoMapNodes(1u);
-  }
-
-  [[nodiscard]]
-  bool IsZipMapSentinel(
-    const moho::FWHSZipEntryMapNode* const node
-  )
-  {
-    return node == nullptr || node->mIsNil != 0;
-  }
-
-  [[nodiscard]]
-  bool IsFileInfoMapSentinel(
-    const moho::FWHSFileInfoMapNode* const node
-  )
-  {
-    return node == nullptr || node->mIsNil != 0;
-  }
-
   /**
    * Address: 0x0045C8F0 (FUN_0045C8F0, std::map_string_FWHSEntry::_Lbound)
    *
@@ -299,29 +200,6 @@ namespace
    * Returns the first zip-entry node whose key is not less than the canonical
    * path.
    */
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipEntryLowerBound(
-    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSZipEntryMapNode* result = map.mHead;
-    if (result == nullptr) {
-      return nullptr;
-    }
-
-    moho::FWHSZipEntryMapNode* parent = result->mParent;
-    while (!IsZipMapSentinel(parent)) {
-      if (CompareCanonicalPaths(parent->mCanonicalPath, canonicalPath) >= 0) {
-        result = parent;
-        parent = parent->mLeft;
-      } else {
-        parent = parent->mRight;
-      }
-    }
-    return result;
-  }
-
   /**
    * Address: 0x0045AF50 (FUN_0045AF50, std::map_string_FWHSEntry::find)
    *
@@ -329,19 +207,6 @@ namespace
    * Finds one exact canonical-path match in the zip-entry map and returns the
    * map head sentinel when not found.
    */
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipEntryFind(
-    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSZipEntryMapNode* const lowerBound = ZipEntryLowerBound(map, canonicalPath);
-    if (lowerBound == nullptr || lowerBound == map.mHead) {
-      return map.mHead;
-    }
-    return CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) < 0 ? map.mHead : lowerBound;
-  }
-
   /**
    * Address: 0x0045D080 (FUN_0045D080, std::map_string_SDiskFileInfo::_Lbound)
    *
@@ -349,29 +214,6 @@ namespace
    * Returns the first file-info node whose key is not less than the canonical
    * path.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoLowerBound(
-    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSFileInfoMapNode* result = map.mHead;
-    if (result == nullptr) {
-      return nullptr;
-    }
-
-    moho::FWHSFileInfoMapNode* parent = result->mParent;
-    while (!IsFileInfoMapSentinel(parent)) {
-      if (CompareCanonicalPaths(parent->mCanonicalPath, canonicalPath) >= 0) {
-        result = parent;
-        parent = parent->mLeft;
-      } else {
-        parent = parent->mRight;
-      }
-    }
-    return result;
-  }
-
   /**
    * Address: 0x0045B160 (FUN_0045B160, std::map_string_SDiskFileInfo::find)
    *
@@ -379,381 +221,42 @@ namespace
    * Finds one exact canonical-path match in the file-info map and returns the
    * map head sentinel when not found.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoFind(
-    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSFileInfoMapNode* const lowerBound = FileInfoLowerBound(map, canonicalPath);
-    if (lowerBound == nullptr || lowerBound == map.mHead) {
-      return map.mHead;
-    }
-    return CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) < 0 ? map.mHead : lowerBound;
-  }
-
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoMapHead(
-    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
-  )
-  {
-    return map.mHead;
-  }
-
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoMapRoot(
-    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
-  )
-  {
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    if (IsFileInfoMapSentinel(head)) {
-      return head;
-    }
-    return head->mParent;
-  }
-
-  [[nodiscard]]
-  bool IsFileInfoNodeBlack(
-    const moho::FWHSFileInfoMapNode* const node
-  )
-  {
-    return IsFileInfoMapSentinel(node) || node->mColor != 0;
-  }
-
-  [[nodiscard]]
-  bool IsFileInfoNodeRed(
-    const moho::FWHSFileInfoMapNode* const node
-  )
-  {
-    return !IsFileInfoNodeBlack(node);
-  }
-
-  void SetFileInfoNodeBlack(
-    moho::FWHSFileInfoMapNode* const node
-  )
-  {
-    if (!IsFileInfoMapSentinel(node)) {
-      node->mColor = 1;
-    }
-  }
-
-  void SetFileInfoNodeRed(
-    moho::FWHSFileInfoMapNode* const node
-  )
-  {
-    if (!IsFileInfoMapSentinel(node)) {
-      node->mColor = 0;
-    }
-  }
-
-  void SetFileInfoNodeColor(
-    moho::FWHSFileInfoMapNode* const node,
-    const std::uint8_t color
-  )
-  {
-    if (!IsFileInfoMapSentinel(node)) {
-      node->mColor = color;
-    }
-  }
-
-  /**
-   * Address: 0x0045E420 (FUN_0045E420, sub_45E420)
-   *
-   * What it does:
-   * Initializes one file-info map node payload and tree links.
-   */
-  moho::FWHSFileInfoMapNode* InitializeFileInfoMapNode(
-    moho::FWHSFileInfoMapNode* const left,
-    moho::FWHSFileInfoMapNode* const right,
-    moho::FWHSFileInfoMapNode* const parent,
-    moho::FWHSFileInfoMapNode* const node,
-    const msvc8::string& canonicalPath,
-    const moho::SDiskFileInfo& info
-  )
-  {
-    node->mParent = parent;
-    node->mLeft = left;
-    node->mRight = right;
-    node->mUnknown0C = 0;
-    node->mCanonicalPath.assign_owned(canonicalPath.view());
-    node->mUnknown2C = 0;
-    node->mInfo = info;
-    node->mColor = 0;
-    node->mIsNil = 0;
-    node->mUnknown44 = 0;
-    return node;
-  }
-
   /**
    * Address: 0x0045DFA0 (FUN_0045DFA0, sub_45DFA0)
    *
    * What it does:
    * Allocates and initializes one file-info map node for insertion.
    */
-  [[nodiscard]]
-  std::unique_ptr<moho::FWHSFileInfoMapNode> CreateFileInfoMapNode(
-    moho::FWHSFileInfoMapNode* const left,
-    moho::FWHSFileInfoMapNode* const right,
-    moho::FWHSFileInfoMapNode* const parent,
-    const msvc8::string& canonicalPath,
-    const moho::SDiskFileInfo& info
-  )
-  {
-    moho::FWHSFileInfoMapNode* const insertedNode = ::new (AllocateOneFileInfoMapNode()) moho::FWHSFileInfoMapNode();
-    std::unique_ptr<moho::FWHSFileInfoMapNode> insertedNodeOwner(insertedNode);
-    (void)InitializeFileInfoMapNode(left, right, parent, insertedNodeOwner.get(), canonicalPath, info);
-    return insertedNodeOwner;
-  }
-
   /**
    * Address: 0x0045DF60 (FUN_0045DF60, sub_45DF60)
    *
    * What it does:
    * Allocates and initializes one file-info map head/sentinel node.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* CreateFileInfoMapHeadNode()
-  {
-    moho::FWHSFileInfoMapNode* const head = ::new (AllocateOneFileInfoMapNode()) moho::FWHSFileInfoMapNode();
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mColor = 1;
-    head->mIsNil = 1;
-    return head;
-  }
-
-  void EnsureFileInfoMapInitialized(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
-  )
-  {
-    if (map.mHead != nullptr) {
-      return;
-    }
-
-    map.mHead = CreateFileInfoMapHeadNode();
-    map.mSize = 0;
-  }
-
-  /**
-   * Address: 0x0045DE20 (FUN_0045DE20, sub_45DE20)
-   *
-   * What it does:
-   * Performs one file-info map left rotation around `pivot`.
-   */
-  void FileInfoMapRotateLeft(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* const pivot
-  )
-  {
-    if (IsFileInfoMapSentinel(pivot) || IsFileInfoMapSentinel(pivot->mRight)) {
-      return;
-    }
-
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    moho::FWHSFileInfoMapNode* const right = pivot->mRight;
-
-    pivot->mRight = right->mLeft;
-    if (!IsFileInfoMapSentinel(right->mLeft)) {
-      right->mLeft->mParent = pivot;
-    }
-
-    right->mParent = pivot->mParent;
-    if (IsFileInfoMapSentinel(pivot->mParent)) {
-      head->mParent = right;
-    } else if (pivot == pivot->mParent->mLeft) {
-      pivot->mParent->mLeft = right;
-    } else {
-      pivot->mParent->mRight = right;
-    }
-
-    right->mLeft = pivot;
-    pivot->mParent = right;
-  }
-
-  /**
-   * Address: 0x0045DEC0 (FUN_0045DEC0, sub_45DEC0)
-   *
-   * What it does:
-   * Performs one file-info map right rotation around `pivot`.
-   */
-  void FileInfoMapRotateRight(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* const pivot
-  )
-  {
-    if (IsFileInfoMapSentinel(pivot) || IsFileInfoMapSentinel(pivot->mLeft)) {
-      return;
-    }
-
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    moho::FWHSFileInfoMapNode* const left = pivot->mLeft;
-
-    pivot->mLeft = left->mRight;
-    if (!IsFileInfoMapSentinel(left->mRight)) {
-      left->mRight->mParent = pivot;
-    }
-
-    left->mParent = pivot->mParent;
-    if (IsFileInfoMapSentinel(pivot->mParent)) {
-      head->mParent = left;
-    } else if (pivot == pivot->mParent->mRight) {
-      pivot->mParent->mRight = left;
-    } else {
-      pivot->mParent->mLeft = left;
-    }
-
-    left->mRight = pivot;
-    pivot->mParent = left;
-  }
-
-  /**
-   * Address context:
-   * - 0x0045CED0 (FUN_0045CED0, sub_45CED0) insertion rebalance lane.
-   *
-   * What it does:
-   * Restores red-black invariants after linking one file-info map node.
-   */
-  void FileInfoMapInsertFixup(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* node
-  )
-  {
-    while (!IsFileInfoMapSentinel(node->mParent) && node->mParent->mColor == 0) {
-      moho::FWHSFileInfoMapNode* const parent = node->mParent;
-      moho::FWHSFileInfoMapNode* const grandparent = parent->mParent;
-      if (parent == grandparent->mLeft) {
-        moho::FWHSFileInfoMapNode* uncle = grandparent->mRight;
-        if (!IsFileInfoMapSentinel(uncle) && uncle->mColor == 0) {
-          SetFileInfoNodeBlack(parent);
-          SetFileInfoNodeBlack(uncle);
-          SetFileInfoNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            FileInfoMapRotateLeft(map, node);
-          }
-          SetFileInfoNodeBlack(node->mParent);
-          SetFileInfoNodeRed(node->mParent->mParent);
-          FileInfoMapRotateRight(map, node->mParent->mParent);
-        }
-      } else {
-        moho::FWHSFileInfoMapNode* uncle = grandparent->mLeft;
-        if (!IsFileInfoMapSentinel(uncle) && uncle->mColor == 0) {
-          SetFileInfoNodeBlack(parent);
-          SetFileInfoNodeBlack(uncle);
-          SetFileInfoNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            FileInfoMapRotateRight(map, node);
-          }
-          SetFileInfoNodeBlack(node->mParent);
-          SetFileInfoNodeRed(node->mParent->mParent);
-          FileInfoMapRotateLeft(map, node->mParent->mParent);
-        }
-      }
-    }
-
-    moho::FWHSFileInfoMapNode* const root = FileInfoMapRoot(map);
-    SetFileInfoNodeBlack(root);
-    if (!IsFileInfoMapSentinel(root)) {
-      root->mParent = FileInfoMapHead(map);
-    }
-  }
-
   /**
    * Address: 0x0045DE90 (FUN_0045DE90, sub_45DE90)
    *
    * What it does:
    * Returns the left-most descendant from one file-info tree node.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoTreeMinimumFrom(
-    moho::FWHSFileInfoMapNode* node
-  )
-  {
-    while (!IsFileInfoMapSentinel(node) && !IsFileInfoMapSentinel(node->mLeft)) {
-      node = node->mLeft;
-    }
-    return node;
-  }
-
   /**
    * Address: 0x0045DE70 (FUN_0045DE70, sub_45DE70)
    *
    * What it does:
    * Returns the right-most descendant from one file-info tree node.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoTreeMaximumFrom(
-    moho::FWHSFileInfoMapNode* node
-  )
-  {
-    while (!IsFileInfoMapSentinel(node) && !IsFileInfoMapSentinel(node->mRight)) {
-      node = node->mRight;
-    }
-    return node;
-  }
-
   /**
    * Address: 0x0045E3A0 (FUN_0045E3A0, sub_45E3A0)
    *
    * What it does:
    * Moves one file-info iterator node to its in-order successor.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoTreeNextNode(
-    moho::FWHSFileInfoMapNode* node,
-    moho::FWHSFileInfoMapNode* const head
-  )
-  {
-    if (IsFileInfoMapSentinel(node)) {
-      return head;
-    }
-
-    if (!IsFileInfoMapSentinel(node->mRight)) {
-      return FileInfoTreeMinimumFrom(node->mRight);
-    }
-
-    moho::FWHSFileInfoMapNode* parent = node->mParent;
-    while (!IsFileInfoMapSentinel(parent) && node == parent->mRight) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
   /**
    * Address: 0x0045E340 (FUN_0045E340, sub_45E340)
    *
    * What it does:
    * Moves one file-info iterator node to its in-order predecessor.
    */
-  [[nodiscard]] 
-  moho::FWHSFileInfoMapNode* FileInfoTreePreviousNode(
-    moho::FWHSFileInfoMapNode* node,
-    moho::FWHSFileInfoMapNode* const head
-  )
-  {
-    if (IsFileInfoMapSentinel(node)) {
-      return head->mRight;
-    }
-
-    if (!IsFileInfoMapSentinel(node->mLeft)) {
-      return FileInfoTreeMaximumFrom(node->mLeft);
-    }
-
-    moho::FWHSFileInfoMapNode* parent = node->mParent;
-    while (!IsFileInfoMapSentinel(parent) && node == parent->mLeft) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
   /**
    * Address: 0x0045DF10 (FUN_0045DF10, std::map_string_SDiskFileInfo::upper_bound)
    *
@@ -761,29 +264,6 @@ namespace
    * Returns the first file-info node whose key is greater than the canonical
    * path.
    */
-  [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoUpperBound(
-    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSFileInfoMapNode* result = map.mHead;
-    if (result == nullptr) {
-      return nullptr;
-    }
-
-    moho::FWHSFileInfoMapNode* parent = result->mParent;
-    while (!IsFileInfoMapSentinel(parent)) {
-      if (CompareCanonicalPaths(canonicalPath, parent->mCanonicalPath) < 0) {
-        result = parent;
-        parent = parent->mLeft;
-      } else {
-        parent = parent->mRight;
-      }
-    }
-    return result;
-  }
-
   /**
    * Address: 0x0045AFE0 (FUN_0045AFE0, std::map_string_SDiskFileInfo::operator[])
    *
@@ -791,255 +271,6 @@ namespace
    * Finds or creates one file-info cache record for the canonical path and
    * returns a typed reference to the value payload.
    */
-  [[nodiscard]]
-  moho::SDiskFileInfo* FileInfoMapGetOrCreate(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    EnsureFileInfoMapInitialized(map);
-    moho::FWHSFileInfoMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::FWHSFileInfoMapNode* const lowerBound = FileInfoLowerBound(map, canonicalPath);
-    if (
-      lowerBound != nullptr && lowerBound != head &&
-      CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0
-    ) {
-      return &lowerBound->mInfo;
-    }
-
-    std::unique_ptr<moho::FWHSFileInfoMapNode> insertedNodeOwner =
-      CreateFileInfoMapNode(head, head, head, canonicalPath, moho::SDiskFileInfo{});
-    moho::FWHSFileInfoMapNode* const insertedNode = insertedNodeOwner.get();
-    if (insertedNode == nullptr) {
-      return nullptr;
-    }
-
-    moho::FWHSFileInfoMapNode* parent = head;
-    moho::FWHSFileInfoMapNode* node = head->mParent;
-    bool insertAsLeftChild = true;
-    while (!IsFileInfoMapSentinel(node)) {
-      parent = node;
-      if (CompareCanonicalPaths(canonicalPath, node->mCanonicalPath) < 0) {
-        node = node->mLeft;
-        insertAsLeftChild = true;
-      } else {
-        node = node->mRight;
-        insertAsLeftChild = false;
-      }
-    }
-
-    insertedNode->mParent = parent;
-    if (parent == head) {
-      head->mParent = insertedNode;
-      head->mLeft = insertedNode;
-      head->mRight = insertedNode;
-      insertedNode->mParent = head;
-    } else if (insertAsLeftChild) {
-      parent->mLeft = insertedNode;
-      if (
-        head->mLeft == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0
-      ) {
-        head->mLeft = insertedNode;
-      }
-    } else {
-      parent->mRight = insertedNode;
-      if (
-        head->mRight == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0
-      ) {
-        head->mRight = insertedNode;
-      }
-    }
-
-    ++map.mSize;
-    insertedNodeOwner.release();
-    FileInfoMapInsertFixup(map, insertedNode);
-    return &insertedNode->mInfo;
-  }
-
-  void FileInfoMapTransplant(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* const currentNode,
-    moho::FWHSFileInfoMapNode* const replacementNode
-  )
-  {
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    if (IsFileInfoMapSentinel(currentNode->mParent)) {
-      head->mParent = IsFileInfoMapSentinel(replacementNode) ? head : replacementNode;
-    } else if (currentNode == currentNode->mParent->mLeft) {
-      currentNode->mParent->mLeft = replacementNode;
-    } else {
-      currentNode->mParent->mRight = replacementNode;
-    }
-
-    if (!IsFileInfoMapSentinel(replacementNode)) {
-      replacementNode->mParent = currentNode->mParent;
-    }
-  }
-
-  void FileInfoMapRebuildHeadLinks(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
-  )
-  {
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    if (IsFileInfoMapSentinel(head)) {
-      return;
-    }
-
-    moho::FWHSFileInfoMapNode* root = head->mParent;
-    if (IsFileInfoMapSentinel(root)) {
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      return;
-    }
-
-    head->mParent = root;
-    root->mParent = head;
-    head->mLeft = FileInfoTreeMinimumFrom(root);
-    head->mRight = FileInfoTreeMaximumFrom(root);
-  }
-
-  void FileInfoMapDeleteFixup(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* node,
-    moho::FWHSFileInfoMapNode* parent
-  )
-  {
-    while (node != FileInfoMapRoot(map) && IsFileInfoNodeBlack(node)) {
-      if (!IsFileInfoMapSentinel(parent) && node == parent->mLeft) {
-        moho::FWHSFileInfoMapNode* sibling = parent->mRight;
-        if (IsFileInfoNodeRed(sibling)) {
-          SetFileInfoNodeBlack(sibling);
-          SetFileInfoNodeRed(parent);
-          FileInfoMapRotateLeft(map, parent);
-          sibling = parent->mRight;
-        }
-
-        if (
-          IsFileInfoMapSentinel(sibling) ||
-          (IsFileInfoNodeBlack(sibling->mLeft) && IsFileInfoNodeBlack(sibling->mRight))
-        ) {
-          SetFileInfoNodeRed(sibling);
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsFileInfoNodeBlack(sibling->mRight)) {
-          SetFileInfoNodeBlack(sibling->mLeft);
-          SetFileInfoNodeRed(sibling);
-          FileInfoMapRotateRight(map, sibling);
-          sibling = parent->mRight;
-        }
-
-        SetFileInfoNodeColor(sibling, parent->mColor);
-        SetFileInfoNodeBlack(parent);
-        SetFileInfoNodeBlack(sibling->mRight);
-        FileInfoMapRotateLeft(map, parent);
-        node = FileInfoMapRoot(map);
-        parent = FileInfoMapHead(map);
-      } else {
-        moho::FWHSFileInfoMapNode* sibling = IsFileInfoMapSentinel(parent) ? FileInfoMapHead(map) : parent->mLeft;
-        if (IsFileInfoNodeRed(sibling)) {
-          SetFileInfoNodeBlack(sibling);
-          SetFileInfoNodeRed(parent);
-          FileInfoMapRotateRight(map, parent);
-          sibling = parent->mLeft;
-        }
-
-        if (
-          IsFileInfoMapSentinel(sibling) ||
-          (IsFileInfoNodeBlack(sibling->mRight) && IsFileInfoNodeBlack(sibling->mLeft))
-        ) {
-          SetFileInfoNodeRed(sibling);
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsFileInfoNodeBlack(sibling->mLeft)) {
-          SetFileInfoNodeBlack(sibling->mRight);
-          SetFileInfoNodeRed(sibling);
-          FileInfoMapRotateLeft(map, sibling);
-          sibling = parent->mLeft;
-        }
-
-        SetFileInfoNodeColor(sibling, parent->mColor);
-        SetFileInfoNodeBlack(parent);
-        SetFileInfoNodeBlack(sibling->mLeft);
-        FileInfoMapRotateRight(map, parent);
-        node = FileInfoMapRoot(map);
-        parent = FileInfoMapHead(map);
-      }
-    }
-
-    SetFileInfoNodeBlack(node);
-  }
-
-  /**
-   * Address: 0x0045CB80 (FUN_0045CB80, sub_45CB80)
-   *
-   * What it does:
-   * Erases one file-info map node by iterator and rebalances sentinel links.
-   */
-  void FileInfoMapEraseNode(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    moho::FWHSFileInfoMapNode* const nodeToErase
-  )
-  {
-    if (IsFileInfoMapSentinel(nodeToErase)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    moho::FWHSFileInfoMapNode* removedNode = nodeToErase;
-    moho::FWHSFileInfoMapNode* fixupNode = FileInfoMapHead(map);
-    moho::FWHSFileInfoMapNode* fixupParent = FileInfoMapHead(map);
-    bool removedNodeWasBlack = IsFileInfoNodeBlack(removedNode);
-
-    if (IsFileInfoMapSentinel(nodeToErase->mLeft)) {
-      fixupNode = nodeToErase->mRight;
-      fixupParent = nodeToErase->mParent;
-      FileInfoMapTransplant(map, nodeToErase, nodeToErase->mRight);
-    } else if (IsFileInfoMapSentinel(nodeToErase->mRight)) {
-      fixupNode = nodeToErase->mLeft;
-      fixupParent = nodeToErase->mParent;
-      FileInfoMapTransplant(map, nodeToErase, nodeToErase->mLeft);
-    } else {
-      removedNode = FileInfoTreeMinimumFrom(nodeToErase->mRight);
-      removedNodeWasBlack = IsFileInfoNodeBlack(removedNode);
-      fixupNode = removedNode->mRight;
-
-      if (removedNode->mParent == nodeToErase) {
-        fixupParent = removedNode;
-      } else {
-        fixupParent = removedNode->mParent;
-        FileInfoMapTransplant(map, removedNode, removedNode->mRight);
-        removedNode->mRight = nodeToErase->mRight;
-        removedNode->mRight->mParent = removedNode;
-      }
-
-      FileInfoMapTransplant(map, nodeToErase, removedNode);
-      removedNode->mLeft = nodeToErase->mLeft;
-      removedNode->mLeft->mParent = removedNode;
-      removedNode->mColor = nodeToErase->mColor;
-    }
-
-    if (removedNodeWasBlack) {
-      FileInfoMapDeleteFixup(map, fixupNode, fixupParent);
-    }
-
-    ResetLegacyStringStorage(nodeToErase->mCanonicalPath);
-    delete nodeToErase;
-    if (map.mSize != 0) {
-      --map.mSize;
-    }
-    FileInfoMapRebuildHeadLinks(map);
-  }
-
   /**
    * Address: 0x0045B100 (FUN_0045B100, std::map_string_SDiskFileInfo::erase)
    *
@@ -1047,31 +278,6 @@ namespace
    * Removes file-info cache nodes for one canonical key and returns the number
    * of erased nodes.
    */
-  [[nodiscard]]
-  std::uint32_t FileInfoMapRemoveByCanonicalPath(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
-    const msvc8::string& canonicalPath
-  )
-  {
-    moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
-    if (IsFileInfoMapSentinel(head)) {
-      return 0;
-    }
-
-    moho::FWHSFileInfoMapNode* first = FileInfoLowerBound(map, canonicalPath);
-    moho::FWHSFileInfoMapNode* const last = FileInfoUpperBound(map, canonicalPath);
-    std::uint32_t removedCount = 0;
-
-    while (!IsFileInfoMapSentinel(first) && first != last) {
-      moho::FWHSFileInfoMapNode* const next = FileInfoTreeNextNode(first, head);
-      FileInfoMapEraseNode(map, first);
-      first = next;
-      ++removedCount;
-    }
-
-    return removedCount;
-  }
-
   [[nodiscard]]
   bool HasWriteTime(
     const moho::SDiskFileInfo& info
@@ -1254,10 +460,10 @@ namespace
 
     ScopedWaitNotify notifyGuard(waitHandleSet);
 
-    moho::FWHSZipEntryMapNode* const zipNode = ZipEntryFind(waitHandleSet.mZipEntries, canonicalPath);
-    if (zipNode != nullptr && zipNode != waitHandleSet.mZipEntries.mHead) {
-      moho::SFileWaitHandle* const handle = zipNode->mEntry.mHandle;
-      const std::uint32_t zipEntryIndex = zipNode->mEntry.mZipEntryIndex;
+    const moho::FWHSZipEntryMap::iterator zipEntry = waitHandleSet.mZipEntries.find(canonicalPath);
+    if (zipEntry != waitHandleSet.mZipEntries.end()) {
+      moho::SFileWaitHandle* const handle = zipEntry->second.mHandle;
+      const std::uint32_t zipEntryIndex = zipEntry->second.mZipEntryIndex;
       ScopedHandleRef handleRef(handle);
       notifyGuard.NotifyNow();
 
@@ -1273,173 +479,18 @@ namespace
     );
   }
 
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipMapHead(
-    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
-  )
-  {
-    return map.mHead;
-  }
-
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipMapRoot(
-    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
-  )
-  {
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    if (IsZipMapSentinel(head)) {
-      return head;
-    }
-    return head->mParent;
-  }
-
-  [[nodiscard]]
-  bool IsZipNodeBlack(
-    const moho::FWHSZipEntryMapNode* const node
-  )
-  {
-    return IsZipMapSentinel(node) || node->mColor != 0;
-  }
-
-  [[nodiscard]]
-  bool IsZipNodeRed(
-    const moho::FWHSZipEntryMapNode* const node
-  )
-  {
-    return !IsZipNodeBlack(node);
-  }
-
-  void SetZipNodeBlack(
-    moho::FWHSZipEntryMapNode* const node
-  )
-  {
-    if (!IsZipMapSentinel(node)) {
-      node->mColor = 1;
-    }
-  }
-
-  void SetZipNodeRed(
-    moho::FWHSZipEntryMapNode* const node
-  )
-  {
-    if (!IsZipMapSentinel(node)) {
-      node->mColor = 0;
-    }
-  }
-
-  void SetZipNodeColor(
-    moho::FWHSZipEntryMapNode* const node,
-    const std::uint8_t color
-  )
-  {
-    if (!IsZipMapSentinel(node)) {
-      node->mColor = color;
-    }
-  }
-
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipTreeMinimumFrom(
-    moho::FWHSZipEntryMapNode* node
-  )
-  {
-    while (!IsZipMapSentinel(node) && !IsZipMapSentinel(node->mLeft)) {
-      node = node->mLeft;
-    }
-    return node;
-  }
-
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipTreeMaximumFrom(
-    moho::FWHSZipEntryMapNode* node
-  )
-  {
-    while (!IsZipMapSentinel(node) && !IsZipMapSentinel(node->mRight)) {
-      node = node->mRight;
-    }
-    return node;
-  }
-
   /**
    * Address: 0x0045E080 (FUN_0045E080, sub_45E080)
    *
    * What it does:
    * Moves one zip-map iterator node to its in-order predecessor.
    */
-  [[nodiscard]] 
-  moho::FWHSZipEntryMapNode* ZipTreePreviousNode(
-    moho::FWHSZipEntryMapNode* node,
-    moho::FWHSZipEntryMapNode* const head
-  )
-  {
-    if (IsZipMapSentinel(node)) {
-      return head->mRight;
-    }
-
-    if (!IsZipMapSentinel(node->mLeft)) {
-      return ZipTreeMaximumFrom(node->mLeft);
-    }
-
-    moho::FWHSZipEntryMapNode* parent = node->mParent;
-    while (!IsZipMapSentinel(parent) && node == parent->mLeft) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
   /**
    * Address: 0x0045D170 (FUN_0045D170, std::map_string_FWHSEntry::Iterator::inc)
    *
    * What it does:
    * Advances one zip-map node iterator to its in-order successor.
    */
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipTreeNextNode(
-    moho::FWHSZipEntryMapNode* node,
-    moho::FWHSZipEntryMapNode* const head
-  )
-  {
-    if (IsZipMapSentinel(node)) {
-      return head;
-    }
-
-    if (!IsZipMapSentinel(node->mRight)) {
-      return ZipTreeMinimumFrom(node->mRight);
-    }
-
-    moho::FWHSZipEntryMapNode* parent = node->mParent;
-    while (!IsZipMapSentinel(parent) && node == parent->mRight) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
-  /**
-   * Address: 0x0045E1B0 (FUN_0045E1B0, sub_45E1B0)
-   *
-   * What it does:
-   * Initializes one zip-entry map node payload and tree links.
-   */
-  moho::FWHSZipEntryMapNode* InitializeZipEntryMapNode(
-    moho::FWHSZipEntryMapNode* const left,
-    moho::FWHSZipEntryMapNode* const right,
-    moho::FWHSZipEntryMapNode* const parent,
-    moho::FWHSZipEntryMapNode* const node,
-    const msvc8::string& canonicalPath,
-    const moho::FWHSEntry& entry
-  )
-  {
-    node->mParent = parent;
-    node->mLeft = left;
-    node->mRight = right;
-    node->mCanonicalPath.assign_owned(canonicalPath.view());
-    node->mEntry = entry;
-    node->mColor = 0;
-    node->mIsNil = 0;
-    return node;
-  }
-
   /**
    * Address context:
    * - 0x0045E1B0 (FUN_0045E1B0, sub_45E1B0) shared node initializer lane.
@@ -1448,431 +499,12 @@ namespace
    * What it does:
    * Allocates and initializes one zip-entry map node for insertion.
    */
-  [[nodiscard]]
-  std::unique_ptr<moho::FWHSZipEntryMapNode> CreateZipEntryNode(
-    moho::FWHSZipEntryMapNode* const head,
-    const msvc8::string& canonicalPath,
-    moho::SFileWaitHandle* const handle,
-    const std::uint32_t zipEntryIndex
-  )
-  {
-    moho::FWHSZipEntryMapNode* const insertedNode = ::new (AllocateZipEntryMapNodes(1u)) moho::FWHSZipEntryMapNode();
-    std::unique_ptr<moho::FWHSZipEntryMapNode> insertedNodeOwner(insertedNode);
-    const moho::FWHSEntry entry{handle, zipEntryIndex};
-    (void)InitializeZipEntryMapNode(head, head, head, insertedNodeOwner.get(), canonicalPath, entry);
-    return insertedNodeOwner;
-  }
-
-  void ZipMapRotateLeft(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* const pivot
-  )
-  {
-    if (IsZipMapSentinel(pivot) || IsZipMapSentinel(pivot->mRight)) {
-      return;
-    }
-
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    moho::FWHSZipEntryMapNode* const right = pivot->mRight;
-
-    pivot->mRight = right->mLeft;
-    if (!IsZipMapSentinel(right->mLeft)) {
-      right->mLeft->mParent = pivot;
-    }
-
-    right->mParent = pivot->mParent;
-    if (IsZipMapSentinel(pivot->mParent)) {
-      head->mParent = right;
-    } else if (pivot == pivot->mParent->mLeft) {
-      pivot->mParent->mLeft = right;
-    } else {
-      pivot->mParent->mRight = right;
-    }
-
-    right->mLeft = pivot;
-    pivot->mParent = right;
-  }
-
-  void ZipMapRotateRight(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* const pivot
-  )
-  {
-    if (IsZipMapSentinel(pivot) || IsZipMapSentinel(pivot->mLeft)) {
-      return;
-    }
-
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    moho::FWHSZipEntryMapNode* const left = pivot->mLeft;
-
-    pivot->mLeft = left->mRight;
-    if (!IsZipMapSentinel(left->mRight)) {
-      left->mRight->mParent = pivot;
-    }
-
-    left->mParent = pivot->mParent;
-    if (IsZipMapSentinel(pivot->mParent)) {
-      head->mParent = left;
-    } else if (pivot == pivot->mParent->mRight) {
-      pivot->mParent->mRight = left;
-    } else {
-      pivot->mParent->mLeft = left;
-    }
-
-    left->mRight = pivot;
-    pivot->mParent = left;
-  }
-
   /**
    * Address: 0x0045DD20 (FUN_0045DD20, sub_45DD20)
    *
    * What it does:
    * Allocates and initializes one zip-entry map head/sentinel node.
    */
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* CreateZipMapHeadNode()
-  {
-    moho::FWHSZipEntryMapNode* const head = ::new (AllocateZipEntryMapNodes(1u)) moho::FWHSZipEntryMapNode();
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mColor = 1;
-    head->mIsNil = 1;
-    return head;
-  }
-
-  void EnsureZipMapInitialized(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
-  )
-  {
-    if (map.mHead != nullptr) {
-      return;
-    }
-
-    map.mHead = CreateZipMapHeadNode();
-    map.mSize = 0;
-  }
-
-  void ZipMapInsertFixup(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* node
-  )
-  {
-    while (!IsZipMapSentinel(node->mParent) && node->mParent->mColor == 0) {
-      moho::FWHSZipEntryMapNode* const parent = node->mParent;
-      moho::FWHSZipEntryMapNode* const grandparent = parent->mParent;
-      if (parent == grandparent->mLeft) {
-        moho::FWHSZipEntryMapNode* uncle = grandparent->mRight;
-        if (!IsZipMapSentinel(uncle) && uncle->mColor == 0) {
-          SetZipNodeBlack(parent);
-          SetZipNodeBlack(uncle);
-          SetZipNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            ZipMapRotateLeft(map, node);
-          }
-          SetZipNodeBlack(node->mParent);
-          SetZipNodeRed(node->mParent->mParent);
-          ZipMapRotateRight(map, node->mParent->mParent);
-        }
-      } else {
-        moho::FWHSZipEntryMapNode* uncle = grandparent->mLeft;
-        if (!IsZipMapSentinel(uncle) && uncle->mColor == 0) {
-          SetZipNodeBlack(parent);
-          SetZipNodeBlack(uncle);
-          SetZipNodeRed(grandparent);
-          node = grandparent;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            ZipMapRotateRight(map, node);
-          }
-          SetZipNodeBlack(node->mParent);
-          SetZipNodeRed(node->mParent->mParent);
-          ZipMapRotateLeft(map, node->mParent->mParent);
-        }
-      }
-    }
-
-    moho::FWHSZipEntryMapNode* const root = ZipMapRoot(map);
-    SetZipNodeBlack(root);
-    if (!IsZipMapSentinel(root)) {
-      root->mParent = ZipMapHead(map);
-    }
-  }
-
-  /**
-   * Address: 0x0045AB60 (FUN_0045AB60, sub_45AB60)
-   *
-   * What it does:
-   * Inserts one canonical mounted-file key into the zip-entry red-black map
-   * when not already present.
-   */
-  bool ZipMapInsertUniqueEntry(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    const msvc8::string& canonicalPath,
-    moho::SFileWaitHandle* const handle,
-    const std::uint32_t zipEntryIndex
-  )
-  {
-    EnsureZipMapInitialized(map);
-    moho::FWHSZipEntryMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      return false;
-    }
-
-    moho::FWHSZipEntryMapNode* const lowerBound = ZipEntryLowerBound(map, canonicalPath);
-    if (
-      lowerBound != nullptr && lowerBound != head &&
-      CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0
-    ) {
-      return false;
-    }
-
-    std::unique_ptr<moho::FWHSZipEntryMapNode> insertedNodeOwner =
-      CreateZipEntryNode(head, canonicalPath, handle, zipEntryIndex);
-    moho::FWHSZipEntryMapNode* const insertedNode = insertedNodeOwner.get();
-
-    moho::FWHSZipEntryMapNode* parent = head;
-    moho::FWHSZipEntryMapNode* node = head->mParent;
-    bool insertAsLeftChild = true;
-    while (!IsZipMapSentinel(node)) {
-      parent = node;
-      if (CompareCanonicalPaths(canonicalPath, node->mCanonicalPath) < 0) {
-        node = node->mLeft;
-        insertAsLeftChild = true;
-      } else {
-        node = node->mRight;
-        insertAsLeftChild = false;
-      }
-    }
-
-    insertedNode->mParent = parent;
-    if (parent == head) {
-      head->mParent = insertedNode;
-      head->mLeft = insertedNode;
-      head->mRight = insertedNode;
-      insertedNode->mParent = head;
-    } else if (insertAsLeftChild) {
-      parent->mLeft = insertedNode;
-      if (
-        head->mLeft == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0
-      ) {
-        head->mLeft = insertedNode;
-      }
-    } else {
-      parent->mRight = insertedNode;
-      if (
-        head->mRight == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0
-      ) {
-        head->mRight = insertedNode;
-      }
-    }
-
-    ++map.mSize;
-    insertedNodeOwner.release();
-    ZipMapInsertFixup(map, insertedNode);
-    return true;
-  }
-
-  void ZipMapTransplant(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* const currentNode,
-    moho::FWHSZipEntryMapNode* const replacementNode
-  )
-  {
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    if (IsZipMapSentinel(currentNode->mParent)) {
-      head->mParent = IsZipMapSentinel(replacementNode) ? head : replacementNode;
-    } else if (currentNode == currentNode->mParent->mLeft) {
-      currentNode->mParent->mLeft = replacementNode;
-    } else {
-      currentNode->mParent->mRight = replacementNode;
-    }
-
-    if (!IsZipMapSentinel(replacementNode)) {
-      replacementNode->mParent = currentNode->mParent;
-    }
-  }
-
-  void ZipMapRebuildHeadLinks(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
-  )
-  {
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    if (IsZipMapSentinel(head)) {
-      return;
-    }
-
-    moho::FWHSZipEntryMapNode* root = head->mParent;
-    if (IsZipMapSentinel(root)) {
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      return;
-    }
-
-    head->mParent = root;
-    root->mParent = head;
-    head->mLeft = ZipTreeMinimumFrom(root);
-    head->mRight = ZipTreeMaximumFrom(root);
-  }
-
-  void ZipMapDeleteFixup(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* node,
-    moho::FWHSZipEntryMapNode* parent
-  )
-  {
-    while (node != ZipMapRoot(map) && IsZipNodeBlack(node)) {
-      if (!IsZipMapSentinel(parent) && node == parent->mLeft) {
-        moho::FWHSZipEntryMapNode* sibling = parent->mRight;
-        if (IsZipNodeRed(sibling)) {
-          SetZipNodeBlack(sibling);
-          SetZipNodeRed(parent);
-          ZipMapRotateLeft(map, parent);
-          sibling = parent->mRight;
-        }
-
-        if (IsZipMapSentinel(sibling) || (IsZipNodeBlack(sibling->mLeft) && IsZipNodeBlack(sibling->mRight))) {
-          SetZipNodeRed(sibling);
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsZipNodeBlack(sibling->mRight)) {
-          SetZipNodeBlack(sibling->mLeft);
-          SetZipNodeRed(sibling);
-          ZipMapRotateRight(map, sibling);
-          sibling = parent->mRight;
-        }
-
-        SetZipNodeColor(sibling, parent->mColor);
-        SetZipNodeBlack(parent);
-        SetZipNodeBlack(sibling->mRight);
-        ZipMapRotateLeft(map, parent);
-        node = ZipMapRoot(map);
-        parent = ZipMapHead(map);
-      } else {
-        moho::FWHSZipEntryMapNode* sibling = IsZipMapSentinel(parent) ? ZipMapHead(map) : parent->mLeft;
-        if (IsZipNodeRed(sibling)) {
-          SetZipNodeBlack(sibling);
-          SetZipNodeRed(parent);
-          ZipMapRotateRight(map, parent);
-          sibling = parent->mLeft;
-        }
-
-        if (IsZipMapSentinel(sibling) || (IsZipNodeBlack(sibling->mRight) && IsZipNodeBlack(sibling->mLeft))) {
-          SetZipNodeRed(sibling);
-          node = parent;
-          parent = parent->mParent;
-          continue;
-        }
-
-        if (IsZipNodeBlack(sibling->mLeft)) {
-          SetZipNodeBlack(sibling->mRight);
-          SetZipNodeRed(sibling);
-          ZipMapRotateLeft(map, sibling);
-          sibling = parent->mLeft;
-        }
-
-        SetZipNodeColor(sibling, parent->mColor);
-        SetZipNodeBlack(parent);
-        SetZipNodeBlack(sibling->mLeft);
-        ZipMapRotateRight(map, parent);
-        node = ZipMapRoot(map);
-        parent = ZipMapHead(map);
-      }
-    }
-
-    SetZipNodeBlack(node);
-  }
-
-  /**
-   * Address: 0x0045AC70 (FUN_0045AC70, std::map_string_FWHSEntry::remove)
-   *
-   * What it does:
-   * Erases one zip-entry node from the intrusive red-black map and updates
-   * sentinel head links.
-   */
-  void ZipMapEraseNode(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* const nodeToErase
-  )
-  {
-    if (IsZipMapSentinel(nodeToErase)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    moho::FWHSZipEntryMapNode* removedNode = nodeToErase;
-    moho::FWHSZipEntryMapNode* fixupNode = ZipMapHead(map);
-    moho::FWHSZipEntryMapNode* fixupParent = ZipMapHead(map);
-    bool removedNodeWasBlack = IsZipNodeBlack(removedNode);
-
-    if (IsZipMapSentinel(nodeToErase->mLeft)) {
-      fixupNode = nodeToErase->mRight;
-      fixupParent = nodeToErase->mParent;
-      ZipMapTransplant(map, nodeToErase, nodeToErase->mRight);
-    } else if (IsZipMapSentinel(nodeToErase->mRight)) {
-      fixupNode = nodeToErase->mLeft;
-      fixupParent = nodeToErase->mParent;
-      ZipMapTransplant(map, nodeToErase, nodeToErase->mLeft);
-    } else {
-      removedNode = ZipTreeMinimumFrom(nodeToErase->mRight);
-      removedNodeWasBlack = IsZipNodeBlack(removedNode);
-      fixupNode = removedNode->mRight;
-
-      if (removedNode->mParent == nodeToErase) {
-        fixupParent = removedNode;
-      } else {
-        fixupParent = removedNode->mParent;
-        ZipMapTransplant(map, removedNode, removedNode->mRight);
-        removedNode->mRight = nodeToErase->mRight;
-        removedNode->mRight->mParent = removedNode;
-      }
-
-      ZipMapTransplant(map, nodeToErase, removedNode);
-      removedNode->mLeft = nodeToErase->mLeft;
-      removedNode->mLeft->mParent = removedNode;
-      removedNode->mColor = nodeToErase->mColor;
-    }
-
-    if (removedNodeWasBlack) {
-      ZipMapDeleteFixup(map, fixupNode, fixupParent);
-    }
-
-    ResetLegacyStringStorage(nodeToErase->mCanonicalPath);
-    delete nodeToErase;
-    if (map.mSize != 0) {
-      --map.mSize;
-    }
-    ZipMapRebuildHeadLinks(map);
-  }
-
-  /**
-   * Address: 0x0045E280 (FUN_0045E280, sub_45E280)
-   *
-   * What it does:
-   * Recursively destroys one zip-entry map subtree and canonical-path storage.
-   */
-  void DestroyZipSubtreeNodes(
-    moho::FWHSZipEntryMapNode* const node,
-    const moho::FWHSZipEntryMapNode* const head
-  )
-  {
-    moho::FWHSZipEntryMapNode* current = node;
-    while (current != nullptr && current != head && current->mIsNil == 0) {
-      DestroyZipSubtreeNodes(current->mRight, head);
-      moho::FWHSZipEntryMapNode* const left = current->mLeft;
-      ResetLegacyStringStorage(current->mCanonicalPath);
-      delete current;
-      current = left;
-    }
-  }
-
   /**
    * Address: 0x0045C800 (FUN_0045C800, sub_45C800)
    *
@@ -1880,46 +512,26 @@ namespace
    * Erases one half-open zip-map iterator range `[first, last)` and returns
    * the first iterator not erased.
    */
+  /**
+   * Every entry the given archive contributed to the mounted-file index.
+   *
+   * The map is keyed on the path, not on the handle, so unmounting scans it -
+   * which is what the binary does too: `RemoveEntry` and `MountZipFile`'s
+   * failure path both walk from the leftmost node and erase the first match,
+   * over and over, until the walk comes back empty.
+   */
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipMapEraseRange(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
-    moho::FWHSZipEntryMapNode* first,
-    moho::FWHSZipEntryMapNode* const last
-  )
-  {
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    if (head != nullptr && first == head->mLeft && last == head) {
-      DestroyZipSubtreeNodes(head->mParent, head);
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      map.mSize = 0;
-      return head->mLeft;
-    }
-
-    while (!IsZipMapSentinel(first) && first != last) {
-      moho::FWHSZipEntryMapNode* const next = ZipTreeNextNode(first, head);
-      ZipMapEraseNode(map, first);
-      first = next;
-    }
-    return first;
-  }
-
-  [[nodiscard]]
-  moho::FWHSZipEntryMapNode* FindZipNodeByHandle(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+  moho::FWHSZipEntryMap::iterator FindZipEntryByHandle(
+    moho::FWHSZipEntryMap& zipEntries,
     const moho::SFileWaitHandle* const handle
   )
   {
-    moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
-    moho::FWHSZipEntryMapNode* node = ZipTreeMinimumFrom(ZipMapRoot(map));
-    while (!IsZipMapSentinel(node)) {
-      if (node->mEntry.mHandle == handle) {
-        return node;
+    for (moho::FWHSZipEntryMap::iterator it = zipEntries.begin(); it != zipEntries.end(); ++it) {
+      if (it->second.mHandle == handle) {
+        return it;
       }
-      node = ZipTreeNextNode(node, head);
     }
-    return head;
+    return zipEntries.end();
   }
 
   [[nodiscard]]
@@ -1939,7 +551,7 @@ namespace
     moho::SFileWaitHandle* const sentinel = WaitHandleListSentinel(waitHandleSet);
     for (moho::SFileWaitHandle* node = waitHandleSet.mNext; node != sentinel; node = node->mNext) {
       const moho::CZipFile* const zipFile = node != nullptr ? node->mZipFile : nullptr;
-      if (zipFile != nullptr && CompareCanonicalPaths(zipFile->mPath, canonicalPath) == 0) {
+      if (zipFile != nullptr && zipFile->mPath == canonicalPath) {
         return node;
       }
     }
@@ -2033,18 +645,18 @@ namespace
           }
         }
 
-        (void)ZipMapInsertUniqueEntry(
-          waitHandleSet.mZipEntries, mountedEntryPath, mountedHandle.get(), static_cast<std::uint32_t>(entryIndex)
+        (void)waitHandleSet.mZipEntries.insert(
+          {mountedEntryPath, moho::FWHSEntry{mountedHandle.get(), static_cast<std::uint32_t>(entryIndex)}}
         );
       }
     } catch (...) {
       while (true) {
-        moho::FWHSZipEntryMapNode* const danglingNode =
-          FindZipNodeByHandle(waitHandleSet.mZipEntries, mountedHandle.get());
-        if (IsZipMapSentinel(danglingNode)) {
+        const moho::FWHSZipEntryMap::iterator danglingEntry =
+          FindZipEntryByHandle(waitHandleSet.mZipEntries, mountedHandle.get());
+        if (danglingEntry == waitHandleSet.mZipEntries.end()) {
           break;
         }
-        ZipMapEraseNode(waitHandleSet.mZipEntries, danglingNode);
+        (void)waitHandleSet.mZipEntries.erase(danglingEntry);
       }
       delete mountedHandle->mZipFile;
       mountedHandle->mZipFile = nullptr;
@@ -2081,61 +693,6 @@ namespace
   {
     CleanupDiskThreadStateValue(runtime);
     runtime.mTss = nullptr;
-  }
-
-  /**
-   * Address: 0x0045DDB0 (FUN_0045DDB0, sub_45DDB0)
-   *
-   * What it does:
-   * Recursively destroys one file-info map subtree, including per-node
-   * canonical-path string storage.
-   */
-  void DestroyFileInfoSubtreeNodes(
-    moho::FWHSFileInfoMapNode* const node,
-    const moho::FWHSFileInfoMapNode* const head
-  )
-  {
-    moho::FWHSFileInfoMapNode* current = node;
-    while (current != nullptr && current != head && current->mIsNil == 0) {
-      DestroyFileInfoSubtreeNodes(current->mRight, head);
-      moho::FWHSFileInfoMapNode* const left = current->mLeft;
-      ResetLegacyStringStorage(current->mCanonicalPath);
-      delete current;
-      current = left;
-    }
-  }
-
-  void ClearFileInfoMapStorage(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
-  )
-  {
-    moho::FWHSFileInfoMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      map.mSize = 0;
-      return;
-    }
-
-    DestroyFileInfoSubtreeNodes(head->mParent, head);
-    delete head;
-    map.mHead = nullptr;
-    map.mSize = 0;
-  }
-
-  void ClearZipMapStorage(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
-  )
-  {
-    moho::FWHSZipEntryMapNode* const head = map.mHead;
-    if (head == nullptr) {
-      map.mSize = 0;
-      return;
-    }
-
-    (void)ZipMapEraseRange(map, ZipTreeMinimumFrom(ZipMapRoot(map)), head);
-
-    delete head;
-    map.mHead = nullptr;
-    map.mSize = 0;
   }
 
   void UnlinkWaitHandleSetSentinel(
@@ -2206,8 +763,10 @@ namespace
     ReleaseWaitHandleSetVfs(sFWaitHandleSet);
     sPFWaitHandleSet = nullptr;
     ReleaseWaitHandleThreadStateRuntime(sFWaitHandleSet.mThreadStateInd);
-    ClearFileInfoMapStorage(sFWaitHandleSet.mFileInfo);
-    ClearZipMapStorage(sFWaitHandleSet.mZipEntries);
+
+    // The two map teardowns the binary runs between here and the sentinel
+    // unlink are `~map()` on `sFWaitHandleSet`'s own members. MSVC emits them
+    // for a file-static; naming them here would free the same headers twice.
     UnlinkWaitHandleSetSentinel(sFWaitHandleSet);
     DestroyStaticFileWaitHandleSet(sFWaitHandleSet);
   }
@@ -2225,10 +784,8 @@ moho::FWaitHandleSet* moho::FILE_InitWaitHandleSet()
   (void)InitializeStaticFileWaitHandleSet(sFWaitHandleSet);
   sFWaitHandleSet.mPrev = reinterpret_cast<SFileWaitHandle*>(&sFWaitHandleSet.mPrev);
   sFWaitHandleSet.mNext = reinterpret_cast<SFileWaitHandle*>(&sFWaitHandleSet.mPrev);
-  sFWaitHandleSet.mZipEntries = {};
-  sFWaitHandleSet.mFileInfo = {};
-  EnsureZipMapInitialized(sFWaitHandleSet.mZipEntries);
-  EnsureFileInfoMapInitialized(sFWaitHandleSet.mFileInfo);
+  sFWaitHandleSet.mZipEntries.clear();
+  sFWaitHandleSet.mFileInfo.clear();
   sFWaitHandleSet.mHandle = nullptr;
   CreateDiskThreadStateRuntime(sFWaitHandleSet.mThreadStateInd);
   sPFWaitHandleSet = &sFWaitHandleSet;
@@ -3047,11 +1604,11 @@ void moho::FWaitHandleSet::RemoveEntry(
   // `~SFileWaitHandle`, which is what unlinks it. Anything woken by the
   // NotifyAll at the end of this function still sees it on the ring.
   while (true) {
-    FWHSZipEntryMapNode* const nodeToErase = FindZipNodeByHandle(mZipEntries, handle);
-    if (IsZipMapSentinel(nodeToErase)) {
+    const FWHSZipEntryMap::iterator entryToErase = FindZipEntryByHandle(mZipEntries, handle);
+    if (entryToErase == mZipEntries.end()) {
       break;
     }
-    ZipMapEraseNode(mZipEntries, nodeToErase);
+    (void)mZipEntries.erase(entryToErase);
   }
 
   NotifyAll();
@@ -3079,11 +1636,11 @@ bool moho::FWaitHandleSet::GetFileInfo(
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   Wait();
-  FWHSZipEntryMapNode* const zipNode = ZipEntryFind(mZipEntries, canonicalPath);
-  if (zipNode != nullptr && zipNode != mZipEntries.mHead) {
-    SFileWaitHandle* const handle = zipNode->mEntry.mHandle;
+  const FWHSZipEntryMap::iterator zipEntry = mZipEntries.find(canonicalPath);
+  if (zipEntry != mZipEntries.end()) {
+    SFileWaitHandle* const handle = zipEntry->second.mHandle;
     CZipFile* const zipFile = handle != nullptr ? handle->mZipFile : nullptr;
-    const std::uint32_t zipEntryIndex = zipNode->mEntry.mZipEntryIndex;
+    const std::uint32_t zipEntryIndex = zipEntry->second.mZipEntryIndex;
     AddWaitHandleReference(handle);
     Notify();
 
@@ -3102,12 +1659,12 @@ bool moho::FWaitHandleSet::GetFileInfo(
     return false;
   }
 
-  FWHSFileInfoMapNode* const cachedInfoNode = FileInfoFind(mFileInfo, canonicalPath);
-  if (cachedInfoNode != nullptr && cachedInfoNode != mFileInfo.mHead) {
+  const FWHSFileInfoMap::iterator cachedInfo = mFileInfo.find(canonicalPath);
+  if (cachedInfo != mFileInfo.end()) {
     if (outInfo != nullptr) {
-      *outInfo = cachedInfoNode->mInfo;
+      *outInfo = cachedInfo->second;
     }
-    const bool hasCachedWriteTime = HasWriteTime(cachedInfoNode->mInfo);
+    const bool hasCachedWriteTime = HasWriteTime(cachedInfo->second);
     Notify();
     return hasCachedWriteTime;
   }
@@ -3118,9 +1675,7 @@ bool moho::FWaitHandleSet::GetFileInfo(
   const bool queryOk = TryQueryFileAttributes(canonicalPath, &diskInfo);
   if (queryOk) {
     Lock();
-    if (SDiskFileInfo* const cachedInfo = FileInfoMapGetOrCreate(mFileInfo, canonicalPath); cachedInfo != nullptr) {
-      *cachedInfo = diskInfo;
-    }
+    mFileInfo[canonicalPath] = diskInfo;
     NotifyAll();
   }
 
@@ -3181,10 +1736,10 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
 
   ScopedWaitNotify notifyGuard(*this);
 
-  FWHSZipEntryMapNode* const zipNode = ZipEntryFind(mZipEntries, canonicalPath);
-  if (zipNode != nullptr && zipNode != mZipEntries.mHead && zipNode->mEntry.mHandle != nullptr) {
-    SFileWaitHandle* const handle = zipNode->mEntry.mHandle;
-    const std::uint32_t zipEntryIndex = zipNode->mEntry.mZipEntryIndex;
+  const FWHSZipEntryMap::iterator zipEntry = mZipEntries.find(canonicalPath);
+  if (zipEntry != mZipEntries.end() && zipEntry->second.mHandle != nullptr) {
+    SFileWaitHandle* const handle = zipEntry->second.mHandle;
+    const std::uint32_t zipEntryIndex = zipEntry->second.mZipEntryIndex;
     ScopedHandleRef handleRef(handle);
     notifyGuard.NotifyNow();
 
@@ -3255,10 +1810,10 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
 
   ScopedWaitNotify notifyGuard(*this);
 
-  FWHSZipEntryMapNode* const zipNode = ZipEntryFind(mZipEntries, canonicalPath);
-  if (zipNode != nullptr && zipNode != mZipEntries.mHead && zipNode->mEntry.mHandle != nullptr) {
-    SFileWaitHandle* const handle = zipNode->mEntry.mHandle;
-    const std::uint32_t zipEntryIndex = zipNode->mEntry.mZipEntryIndex;
+  const FWHSZipEntryMap::iterator zipEntry = mZipEntries.find(canonicalPath);
+  if (zipEntry != mZipEntries.end() && zipEntry->second.mHandle != nullptr) {
+    SFileWaitHandle* const handle = zipEntry->second.mHandle;
+    const std::uint32_t zipEntryIndex = zipEntry->second.mZipEntryIndex;
     ScopedHandleRef handleRef(handle);
     notifyGuard.NotifyNow();
 
@@ -3326,7 +1881,7 @@ void moho::FWaitHandleSet::InvalidateFileInfoCache(
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   Lock();
-  (void)FileInfoMapRemoveByCanonicalPath(mFileInfo, canonicalPath);
+  (void)mFileInfo.erase(canonicalPath);
   NotifyAll();
 }
 
