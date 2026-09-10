@@ -1,3 +1,4 @@
+#include "legacy/containers/Vector.h"
 #include "moho/path/SNamedFootprint.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
@@ -190,7 +191,7 @@ namespace
       return 0u;
     }
 
-    const auto* const list = static_cast<const std::list<moho::SNamedFootprint>*>(obj);
+    const auto* const list = static_cast<const msvc8::list<moho::SNamedFootprint>*>(obj);
     return list ? list->size() : 0u;
   }
 
@@ -359,7 +360,7 @@ namespace
    */
   void SNamedFootprintListTypeInfo::Init()
   {
-    size_ = sizeof(std::list<moho::SNamedFootprint>);
+    size_ = sizeof(msvc8::list<moho::SNamedFootprint>);
     version_ = 1;
     serLoadFunc_ = &LoadSNamedFootprintList;
     serSaveFunc_ = &SaveSNamedFootprintList;
@@ -403,7 +404,7 @@ namespace
    */
   void LoadSNamedFootprintList(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
   {
-    auto* const list = reinterpret_cast<std::list<moho::SNamedFootprint>*>(objectPtr);
+    auto* const list = reinterpret_cast<msvc8::list<moho::SNamedFootprint>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(list != nullptr);
     if (!archive || !list) {
@@ -413,7 +414,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    std::list<moho::SNamedFootprint> loaded{};
+    msvc8::list<moho::SNamedFootprint> loaded{};
     gpg::RType* const elementType = moho::preregister_SNamedFootprintTypeInfo();
     const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
     for (unsigned int i = 0; i < count; ++i) {
@@ -435,7 +436,7 @@ namespace
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
   )
   {
-    auto* const list = reinterpret_cast<const std::list<moho::SNamedFootprint>*>(objectPtr);
+    auto* const list = reinterpret_cast<const msvc8::list<moho::SNamedFootprint>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
       return;
@@ -528,13 +529,13 @@ namespace moho
    * Address: 0x005149D0 (FUN_005149D0, preregister_SNamedFootprintListTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters startup RTTI storage for `std::list<SNamedFootprint>`.
+   * Constructs and preregisters startup RTTI storage for `msvc8::list<SNamedFootprint>`.
    */
   gpg::RType* preregister_SNamedFootprintListTypeInfo()
   {
     gpg::RType* const typeInfo = AcquireSNamedFootprintListTypeInfo();
     if (!gSNamedFootprintListTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(std::list<SNamedFootprint>), typeInfo);
+      gpg::PreRegisterRType(typeid(msvc8::list<SNamedFootprint>), typeInfo);
       gSNamedFootprintListTypeInfoPreregistered = true;
     }
 
@@ -545,7 +546,7 @@ namespace moho
    * Address: 0x00BF2910 (FUN_00BF2910, cleanup_SNamedFootprintListTypeInfo)
    *
    * What it does:
-   * Tears down startup-owned `std::list<SNamedFootprint>` RTTI storage at process exit.
+   * Tears down startup-owned `msvc8::list<SNamedFootprint>` RTTI storage at process exit.
    */
   void cleanup_SNamedFootprintListTypeInfo()
   {
@@ -562,7 +563,7 @@ namespace moho
    * Address: 0x00BC83A0 (FUN_00BC83A0, register_SNamedFootprintListTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `std::list<SNamedFootprint>` RTTI and installs process-exit cleanup.
+   * Preregisters `msvc8::list<SNamedFootprint>` RTTI and installs process-exit cleanup.
    */
   int register_SNamedFootprintListTypeInfoStartup()
   {
