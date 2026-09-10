@@ -263,6 +263,11 @@ namespace msvc8
          * only then calls the out-of-line `_Rotate` above.
          */
         template <class T>
+        /**
+         * Address: 0x005F06C0 (FUN_005F06C0 -- `rotate` -- the gcd-cycle form for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EEDA0, 0x005EFBE0, 0x005F0480; formerly `RotateAttachPointRangeByGcdCycles` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0480 (FUN_005F0480 -- an adapter over that rotate for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFBE0 (FUN_005EFBE0 -- the guarded adapter over that rotate for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesGuardedAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         */
         void rotate(T* const first, T* const middle, T* const last)
         {
             if (first != middle && middle != last) {
@@ -332,6 +337,7 @@ namespace msvc8
         template <class T, class Compare>
         /**
          * Address: 0x0071F2C0 (FUN_0071F2C0 -- `_Insertion_sort` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200; formerly `InsertionSortFloat4LaneRangeByDescendingW` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EEDA0 (FUN_005EEDA0 -- `insertion_sort` -- the small-range tail of `msvc8::sort` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680; formerly `SortSmallAttachPointRangeByDistance` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          */
         void insertion_sort(T* const first, T* const last, Compare comp)
         {
@@ -423,6 +429,8 @@ namespace msvc8
          * Address: 0x0084C460 (FUN_0084C460 -- `_Push_heap` (settle-upward) for a 12-byte element ordered by `(tie, score)`; callers 0x0084C130; formerly `SiftHeapEntry12ByScoreAndTieRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007CEDB0 (FUN_007CEDB0 -- `_Push_heap` (settle-upward) for the 24-byte `(priority, LuaObject)` element; callers 0x007CE9D0; formerly `InsertLuaHeapPairRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0092D760 (FUN_0092D760 -- `_Adjust_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D89F, 0x0092E1C0, 0x0092E2A0; formerly `SiftDownAndInsertU16HeapTail` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F05E0 (FUN_005F05E0 -- `push_heap`'s sift-up half of `adjust_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005F0330; formerly `InsertAttachPointIntoMaxHeapWindow` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0330 (FUN_005F0330 -- `adjust_heap`'s sift-down half for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFAD0, 0x005F0810; formerly `SiftDownAttachPointHeapAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          */
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -480,6 +488,8 @@ namespace msvc8
          * Address: 0x0092E850 (FUN_0092E850 -- `_Make_heap`'s two-element guard for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `BuildU16HeapIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071F990 (FUN_0071F990 -- `_Make_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200, 0x0071F280; formerly `BuildFloat4MinHeapRangeFromMiddle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071F280 (FUN_0071F280 -- `_Make_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `BuildFloat4HeapIfRangeHasMultipleElements` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFAD0 (FUN_005EFAD0 -- `make_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED50; formerly `BuildAttachPointMaxHeap` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EED50 (FUN_005EED50 -- the size-guarded form of `make_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `BuildAttachPointMaxHeapIfMultiElement` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          */
         void make_heap(T* const first, T* const last, Compare comp)
         {
@@ -557,6 +567,10 @@ namespace msvc8
          * Address: 0x0071FA00 (FUN_0071FA00 -- `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200, 0x0071F2B0; formerly `PopFloat4MinHeapToTailUntilSingle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007202E0 (FUN_007202E0 -- `_Pop_heap` (one root-to-tail step) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x007200D0 (unreached); formerly `PopFloat4MinHeapRootSingleStepWithFinalize` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0071F2B0 (FUN_0071F2B0 -- a register-shape entry into `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `PopFloat4HeapToTailAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0810 (FUN_005F0810 -- `pop_heap` -- swap the root to the tail, then sift down for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFB50, 0x005F0460, 0x005F0680; formerly `PopAttachPointHeapRootAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0680 (FUN_005F0680 -- the adapter over that pop for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootIntoTailSlotAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFB50 (FUN_005EFB50 -- `sort_heap` -- pop until the range is ordered for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED90; formerly `PopAttachPointHeapRootsIntoSortedTail` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EED90 (FUN_005EED90 -- the one-jump thunk into that `sort_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootsIntoSortedTailThunk` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          */
         void sort_heap(T* const first, T* last, Compare comp)
         {
