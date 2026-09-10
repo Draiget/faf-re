@@ -633,6 +633,9 @@ namespace gpg::core
       end_ = ptr_at(start_, n);
     }
 
+    /**
+     * Address: 0x00657900 (FUN_00657900 -- `resize(n, fill)` for `moho::CountedPtr<CParticleTexture>` (4-byte refcounted element): shrinking erases the tail through 0x00657DB0 (each slot's destructor releases its texture), growing reserves and copy-constructs `fill` into the new slots (each retaining the texture). Callers: the `RFastVectorType<CountedPtr<CParticleTexture>>` SerLoad 0x0065A4C0 and `SetCount`. Formerly `ResizeFastVectorCountedPtrCParticleTexture` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
+     */
     void resize(const size_t n, const value_type& value)
     {
       const size_t current = Size();
@@ -664,6 +667,8 @@ namespace gpg::core
      * Address: 0x007535B0 (FUN_007535B0 -- tail relocation of `erase` for a 12-byte element; Copies one 12-byte tail range `[sourceCursor, owner.finish)` into `destinationBegin`, updates `owner.finish`, and stores `destinationBegin` through `outBegin`.)
      * Address: 0x00753680 (FUN_00753680 -- tail relocation of `erase` for a 40-byte element; Copies one 40-byte tail range `[sourceCursor, owner.finish)` into `destinationBegin`, updates `owner.finish`, and stores `destinationBegin` through `outBegin`.)
      * Address: 0x007654F0 (FUN_007654F0 -- tail relocation of `erase` for a 4-byte element (calling-convention bridge); Copies one dword lane range `[sourceBegin, sourceEnd)` into destination storage starting at `sourceEnd`.)
+     * Address: 0x00658800 (FUN_00658800 -- the shift step of `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: per slot a refcounted assignment (release the old texture, retain the new one) rather than a raw copy; its one caller 0x00657DB0 always passes an empty source range. Formerly `RelinkCountedTextureSlotsForward` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00657DB0 (FUN_00657DB0 -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here), release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.)
      */
     iterator erase(iterator first, iterator last)
     {
@@ -1617,6 +1622,7 @@ namespace gpg::core
      * Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active lane is not already inline.)
      * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
      * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetStorageToInline() noexcept
     {
