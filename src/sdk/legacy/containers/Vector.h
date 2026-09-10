@@ -2618,6 +2618,9 @@ namespace msvc8
          * Address: 0x008678E0 (FUN_008678E0 -- `vector<T>::size()` for a 12-byte element; callers 0x00868040; formerly `CountElement12VectorRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00478560 (FUN_00478560 -- `size()` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid); callers 0x00478940; formerly `HeightFieldTierVectorSize` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F8AF0 (FUN_008F8AF0 -- `size()` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x00900630; formerly `CountEntriesStride13C` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A3070 (FUN_004A3070 -- `begin()` written through a caller-supplied slot for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `WriteLegacyByteVectorBeginPointer` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A3080 (FUN_004A3080 -- `end()` written through a caller-supplied slot for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `WriteLegacyByteVectorLastPointer` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A3280 (FUN_004A3280, sub_4A3280 -- `begin() + n`, the iterator arithmetic an insert/resize does when it re-derives a position after a reallocation, written back through a caller slot; zero callers, unreachable; formerly `WritePointerWithByteOffset` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -2675,6 +2678,7 @@ namespace msvc8
          * Address: 0x00507F20 (FUN_00507F20 -- `capacity()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLaneCapacityCount` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x007C9180 (FUN_007C9180 -- `vector<T>::capacity()` for a 36-byte element; zero callers, unreachable; formerly `CountElement36VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007C97B0 (FUN_007C97B0 -- `vector<T>::capacity()` for a 24-byte element; zero callers, unreachable; formerly `CountElement24VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A3290 (FUN_004A3290 -- `capacity()` for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `GetLegacyByteVectorCapacityBytes` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
@@ -2991,6 +2995,7 @@ namespace msvc8
          * Address: 0x0067CAA0 (FUN_0067CAA0 -- the `jmp` thunk into `vector<T>::resize(n)` for the 4-byte pointer / id element; zero callers, unreachable; formerly `ResizePointerVectorRuntimeThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054CA40 (FUN_0054CA40 -- `resize(n)` -- shrink destroys the tail and rebases `mLast`, grow value-initialises for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); callers 0x0054A0A0, 0x0054A390, 0x0054C080; formerly `ResizeAniSkelBoneVector` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054C080 (FUN_0054C080 -- the register-shape adapter over that same `resize(n)` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResizeAniSkelBoneVectorRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A2FE0 (FUN_004A2FE0 -- `resize(n)` -- the zero-filled form for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `ResizeLegacyByteVectorStorageWithZeroFill` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3212,6 +3217,7 @@ namespace msvc8
          * Address: 0x008A7C20 (FUN_008A7C20 -- `resize(n, value)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); zero callers, unreachable; formerly `ResizeNormalMapHandleStorage` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054C190 (FUN_0054C190 -- the default-filled form of that same `resize(n, value)` for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); zero callers, unreachable; formerly `ResizeAniSkelBoneNameIndexVectorWithDefaultFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0054CB80 (FUN_0054CB80 -- `resize(n, value)` -- the shrink is a bare `mLast` rebase because the element is trivially destructible for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); callers 0x0054A0A0, 0x0054A390, 0x0054C190; formerly `ResizeAniSkelBoneNameIndexVectorWithFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A2FF0 (FUN_004A2FF0 -- `resize(n, value)` for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); callers 0x004A1F10, 0x004A2D40, 0x004A2FE0; formerly `ResizeLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3878,6 +3884,7 @@ namespace msvc8
          * Address: 0x00443090 (FUN_00443090 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443290 (FUN_00443290 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443390 (FUN_00443390 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
+         * Address: 0x004A2FD0 (FUN_004A2FD0 -- `release_storage_without_free` -- null the triple without freeing for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `ResetLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         void release_storage_without_free() noexcept {
             first_ = nullptr;
@@ -6488,6 +6495,7 @@ namespace msvc8
          * Address: 0x0047DD80 (FUN_0047DD80 -- `_Insert_n` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `InsertBandwidthSampleCopies` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004ADCE0 (FUN_004ADCE0 -- `_Insert_n`'s reallocating branch (buy, copy the prefix, splice the inserted run, copy the suffix, free the old block) for a 4-byte element; callers 0x004ACD80; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004ACD80 (FUN_004ACD80 -- `insert(pos, first, last)` for a 4-byte element; callers 0x004AA220, 0x004AB780, 0x004AC050; formerly `InsertDwordRangeIntoVectorRuntime` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A30D0 (FUN_004A30D0 -- `insert(pos, count, value)` -- the 1.5x growth, the split copy around the gap and the fill for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); callers 0x004A2FF0; formerly `InsertFillBytesIntoLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -9899,6 +9907,7 @@ namespace msvc8
          * Address: 0x00751A20 (FUN_00751A20 -- `_Copy_backward` for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); callers 0x0074EB00; formerly `CopySSTIArmyVariableDataRangeBackwardAssign` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00753D00 (FUN_00753D00 -- a register-shape entry into `_Copy_backward` for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); zero callers, unreachable; formerly `CopySSTIArmyVariableDataRangeBackwardAssignThunkA` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00755920 (FUN_00755920 -- a register-shape entry into `_Copy_backward` for the 0x160-byte `moho::SSTIArmyVariableData` (`SimDriver::mArmyUpdates`); zero callers, unreachable; formerly `CopySSTIArmyVariableDataRangeBackwardAssignThunkB` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004A3090 (FUN_004A3090 -- `copy_backward_assign` -- the tail move an insert makes before filling the gap for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `MoveLegacyByteVectorTailAndWriteDestination` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
