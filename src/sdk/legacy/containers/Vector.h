@@ -3893,6 +3893,7 @@ namespace msvc8
          * Address: 0x008F7C50 (FUN_008F7C50 -- `push_back` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F7CF0; formerly `AppendAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F7230 (FUN_008F7230 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F7453, 0x008F7CF0; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F65B0 (FUN_008F65B0 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F6650, 0x008F6710, 0x008F7230; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC330 (FUN_004AC330 -- `push_back` for `msvc8::vector<moho::ResourceFactoryBase*, false>` (`CResourceManager::mPendingFactoryRegistrations`, +0x40); callers 0x004A9F30; formerly `AppendPendingFactoryRegistration` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
