@@ -1649,7 +1649,10 @@ namespace moho
    */
   void CWorldParticles::ShutdownBeamBuckets()
   {
-    DestroyBeamTextureBucketMap(mBeams.mBuckets);
+    // The shipped body runs the map's destructor here rather than `clear()`:
+    // the header node is freed and `head_`/`size_` left null, so the buckets
+    // stay dead until the next `BeamBucketContainerRuntime` is constructed.
+    mBeams.mBuckets.~BeamTextureBucketMapRuntime();
 
     if (mBeams.mVertexSheet != nullptr) {
       delete mBeams.mVertexSheet;

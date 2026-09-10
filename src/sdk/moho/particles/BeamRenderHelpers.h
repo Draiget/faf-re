@@ -171,65 +171,8 @@ namespace moho
 
   /**
    * What it does:
-   * Models one red-black tree node runtime lane used by beam texture buckets.
-   */
-  struct BeamBucketTreeNodeRuntime
-  {
-    BeamBucketTreeNodeRuntime* left;      // +0x00
-    BeamBucketTreeNodeRuntime* parent;    // +0x04
-    BeamBucketTreeNodeRuntime* right;     // +0x08
-    std::uint8_t payload[0x28];           // +0x0C (key/value payload lane)
-    std::uint8_t isBlack;                 // +0x34
-    std::uint8_t isNilSentinel;           // +0x35
-    std::uint8_t padding[0x02];           // +0x36
-  };
-
-  static_assert(offsetof(BeamBucketTreeNodeRuntime, left) == 0x00, "BeamBucketTreeNodeRuntime::left offset must be 0x00");
-  static_assert(
-    offsetof(BeamBucketTreeNodeRuntime, parent) == 0x04,
-    "BeamBucketTreeNodeRuntime::parent offset must be 0x04"
-  );
-  static_assert(
-    offsetof(BeamBucketTreeNodeRuntime, right) == 0x08,
-    "BeamBucketTreeNodeRuntime::right offset must be 0x08"
-  );
-  static_assert(
-    offsetof(BeamBucketTreeNodeRuntime, isBlack) == 0x34,
-    "BeamBucketTreeNodeRuntime::isBlack offset must be 0x34"
-  );
-  static_assert(
-    offsetof(BeamBucketTreeNodeRuntime, isNilSentinel) == 0x35,
-    "BeamBucketTreeNodeRuntime::isNilSentinel offset must be 0x35"
-  );
-  static_assert(sizeof(BeamBucketTreeNodeRuntime) == 0x38, "BeamBucketTreeNodeRuntime size must be 0x38");
-
-  /**
-   * What it does:
-   * Models the map-storage header lane used by beam bucket trees.
-   */
-  struct BeamBucketMapStorageRuntime
-  {
-    std::uint32_t allocatorProxy;             // +0x00
-    std::uint32_t comparatorOrReserved;       // +0x04
-    BeamBucketTreeNodeRuntime* head;          // +0x08
-    std::uint32_t size;                       // +0x0C
-  };
-
-  static_assert(
-    offsetof(BeamBucketMapStorageRuntime, allocatorProxy) == 0x00,
-    "BeamBucketMapStorageRuntime::allocatorProxy offset must be 0x00"
-  );
-  static_assert(
-    offsetof(BeamBucketMapStorageRuntime, comparatorOrReserved) == 0x04,
-    "BeamBucketMapStorageRuntime::comparatorOrReserved offset must be 0x04"
-  );
-  static_assert(offsetof(BeamBucketMapStorageRuntime, head) == 0x08, "BeamBucketMapStorageRuntime::head offset must be 0x08");
-  static_assert(offsetof(BeamBucketMapStorageRuntime, size) == 0x0C, "BeamBucketMapStorageRuntime::size offset must be 0x0C");
-  static_assert(sizeof(BeamBucketMapStorageRuntime) == 0x10, "BeamBucketMapStorageRuntime size must be 0x10");
-
-  /**
-   * What it does:
    * Runtime key lane used by beam texture/render buckets.
+   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct BeamTextureBucketKeyRuntime
   {
@@ -266,29 +209,6 @@ namespace moho
   // `CWorldParticles` at 0xDC in every build configuration.
   using BeamTextureBucketMapRuntime =
     msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>, BeamTextureBucketKeyLess>;
-
-  /**
-   * What it does:
-   * Temporary entry lane used when constructing one missing beam bucket.
-   */
-  struct BeamTextureBucketEntryRuntime
-  {
-    BeamTextureBucketKeyRuntime key;      // +0x00
-    std::uint32_t allocatorProxy = 0U;    // +0x14
-    msvc8::vector<SWorldBeam> beams;      // +0x18
-  };
-
-  static_assert(
-    offsetof(BeamTextureBucketEntryRuntime, key) == 0x00, "BeamTextureBucketEntryRuntime::key offset must be 0x00"
-  );
-  static_assert(
-    offsetof(BeamTextureBucketEntryRuntime, allocatorProxy) == 0x14,
-    "BeamTextureBucketEntryRuntime::allocatorProxy offset must be 0x14"
-  );
-  static_assert(
-    offsetof(BeamTextureBucketEntryRuntime, beams) == 0x18, "BeamTextureBucketEntryRuntime::beams offset must be 0x18"
-  );
-  static_assert(sizeof(BeamTextureBucketEntryRuntime) == 0x28, "BeamTextureBucketEntryRuntime size must be 0x28");
 
   /**
    * What it does:
@@ -536,56 +456,6 @@ namespace moho
    * into the caller slot, deleting the old sheet when replaced.
    */
   void RecreateBeamParticleVertexSheet(CD3DVertexSheet*& vertexSheet, CD3DVertexFormat* vertexFormat);
-
-  /**
-   * Address: 0x0049EB80 (FUN_0049EB80, sub_49EB80)
-   *
-   * What it does:
-   * Allocates one array lane of `BeamBucketTreeNodeRuntime` with overflow guard.
-   */
-  BeamBucketTreeNodeRuntime* AllocateBeamBucketTreeNodes(std::uint32_t count);
-
-  /**
-   * Address: 0x0049C4D0 (FUN_0049C4D0, sub_49C4D0)
-   *
-   * What it does:
-   * Allocates and clears one beam bucket tree node, initializing RB-tree flags
-   * for non-sentinel usage.
-   */
-  BeamBucketTreeNodeRuntime* AllocateBeamBucketTreeNode();
-
-  /**
-   * Address: 0x004914B0 (FUN_004914B0, sub_4914B0)
-   *
-   * What it does:
-   * Initializes one beam bucket map storage with a self-linked sentinel head.
-   */
-  BeamBucketMapStorageRuntime* InitializeBeamBucketMapStorage(BeamBucketMapStorageRuntime* storage);
-
-  /**
-   * Address: 0x004921D0 (FUN_004921D0, sub_4921D0)
-   *
-   * What it does:
-   * Initializes the two texture handle lanes used by one beam bucket key.
-   */
-  BeamTextureBucketKeyRuntime* InitializeBeamTextureBucketKeyHandles(BeamTextureBucketKeyRuntime* key);
-
-  /**
-   * Address: 0x00492200 (FUN_00492200, sub_492200)
-   *
-   * What it does:
-   * Releases one temporary beam bucket entry (vector storage + two retained
-   * texture handles).
-   */
-  void DestroyBeamTextureBucketEntry(BeamTextureBucketEntryRuntime* entry);
-
-  /**
-   * Address: 0x004921A0 (FUN_004921A0, sub_4921A0)
-   *
-   * What it does:
-   * Destroys all nodes in one beam texture bucket map and resets storage.
-   */
-  void DestroyBeamTextureBucketMap(BeamTextureBucketMapRuntime& buckets);
 
   /**
    * Address: 0x00491540 (FUN_00491540, sub_491540)
