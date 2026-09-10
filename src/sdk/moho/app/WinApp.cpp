@@ -1604,82 +1604,7 @@ namespace
     return std::strrchr(text, character);
   }
 
-  struct LegacyByteVectorStorageView
-  {
-    std::uint8_t* first = nullptr;
-    std::uint8_t* last = nullptr;
-    std::uint8_t* end = nullptr;
-  };
 
-#if defined(_M_IX86)
-  static_assert(sizeof(LegacyByteVectorStorageView) == 0x0C, "LegacyByteVectorStorageView size must be 0x0C");
-#endif
-
-  [[nodiscard]] std::size_t LegacyByteVectorSizeBytes(const LegacyByteVectorStorageView* const storage) noexcept
-  {
-    if (storage == nullptr || storage->first == nullptr) {
-      return 0;
-    }
-    return static_cast<std::size_t>(storage->last - storage->first);
-  }
-
-  [[nodiscard]] std::size_t LegacyByteVectorCapacityBytes(const LegacyByteVectorStorageView* const storage) noexcept
-  {
-    if (storage == nullptr || storage->first == nullptr) {
-      return 0;
-    }
-    return static_cast<std::size_t>(storage->end - storage->first);
-  }
-
-  /**
-   * Address: 0x004A2FD0 (FUN_004A2FD0, sub_4A2FD0)
-   *
-   * What it does:
-   * Resets one byte-vector storage triplet to null pointers.
-   */
-  [[maybe_unused]] LegacyByteVectorStorageView* ResetLegacyByteVectorStorage(LegacyByteVectorStorageView* const storage)
-    noexcept
-  {
-    if (storage != nullptr) {
-      storage->first = nullptr;
-      storage->last = nullptr;
-      storage->end = nullptr;
-    }
-    return storage;
-  }
-
-  /**
-   * Address: 0x004A3280 (FUN_004A3280, sub_4A3280)
-   *
-   * What it does:
-   * Writes `base + offset` into one output pointer slot.
-   */
-  [[maybe_unused]] std::uint8_t** WritePointerWithByteOffset(
-    std::uint8_t* const base,
-    std::uint8_t** const outPointer,
-    const std::uint32_t offset
-  ) noexcept
-  {
-    if (outPointer != nullptr) {
-      *outPointer = (base != nullptr) ? (base + offset) : nullptr;
-    }
-    return outPointer;
-  }
-
-  /**
-   * Address: 0x004A3290 (FUN_004A3290, sub_4A3290)
-   *
-   * What it does:
-   * Returns capacity bytes (`end - first`) for one byte-vector storage view.
-   */
-  [[maybe_unused]] std::uint32_t GetLegacyByteVectorCapacityBytes(const LegacyByteVectorStorageView* const storage)
-    noexcept
-  {
-    if (storage == nullptr || storage->first == nullptr) {
-      return 0;
-    }
-    return static_cast<std::uint32_t>(storage->end - storage->first);
-  }
 
   /**
    * Address: 0x004A32A0 (FUN_004A32A0, sub_4A32A0)
@@ -1763,70 +1688,6 @@ namespace
       return lhs == rhs;
     }
     return *lhs == *rhs;
-  }
-
-  /**
-   * Address: 0x004A3070 (FUN_004A3070, sub_4A3070)
-   *
-   * What it does:
-   * Writes the current begin pointer into an output pointer slot.
-   */
-  [[maybe_unused]] std::uint8_t** WriteLegacyByteVectorBeginPointer(
-    const LegacyByteVectorStorageView* const storage,
-    std::uint8_t** const outPointer
-  ) noexcept
-  {
-    return WritePointerWithByteOffset(storage != nullptr ? storage->first : nullptr, outPointer, 0);
-  }
-
-  /**
-   * Address: 0x004A3080 (FUN_004A3080, sub_4A3080)
-   *
-   * What it does:
-   * Writes the current end-of-used-range pointer into an output pointer slot.
-   */
-  [[maybe_unused]] std::uint8_t** WriteLegacyByteVectorLastPointer(
-    const LegacyByteVectorStorageView* const storage,
-    std::uint8_t** const outPointer
-  ) noexcept
-  {
-    return WritePointerWithByteOffset(storage != nullptr ? storage->last : nullptr, outPointer, 0);
-  }
-
-  /**
-   * Address: 0x004A3090 (FUN_004A3090, sub_4A3090)
-   *
-   * What it does:
-   * Moves one tail byte range to `destination`, updates `last`, and writes the
-   * destination pointer to the output slot.
-   */
-  [[maybe_unused]] std::uint8_t** MoveLegacyByteVectorTailAndWriteDestination(
-    LegacyByteVectorStorageView* const storage,
-    std::uint8_t** const outPointer,
-    std::uint8_t* const destination,
-    std::uint8_t* const source
-  ) noexcept
-  {
-    if (storage == nullptr) {
-      if (outPointer != nullptr) {
-        *outPointer = destination;
-      }
-      return outPointer;
-    }
-
-    if (destination != source && source != nullptr && storage->last != nullptr) {
-      const std::ptrdiff_t tailSize = storage->last - source;
-      std::uint8_t* const newLast = destination + tailSize;
-      if (tailSize > 0) {
-        std::memmove(destination, source, static_cast<std::size_t>(tailSize));
-      }
-      storage->last = newLast;
-    }
-
-    if (outPointer != nullptr) {
-      *outPointer = destination;
-    }
-    return outPointer;
   }
 
   /**
@@ -2097,142 +1958,6 @@ namespace
     outPair->first = emitter->firstBase + delta;
     outPair->second = emitter->secondValue;
     return outPair;
-  }
-
-  /**
-   * Address: 0x004A30D0 (FUN_004A30D0, sub_4A30D0)
-   *
-   * What it does:
-   * Inserts `count` fill-bytes at `insertPosition` in one legacy byte-vector
-   * storage view and returns the insertion-start pointer.
-   */
-  [[maybe_unused]] std::uint8_t* InsertFillBytesIntoLegacyByteVectorStorage(
-    LegacyByteVectorStorageView* const storage,
-    std::uint8_t* insertPosition,
-    const std::uint32_t count,
-    const std::uint8_t fillValue
-  )
-  {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
-    const std::size_t currentSize = LegacyByteVectorSizeBytes(storage);
-    const std::size_t currentCapacity = LegacyByteVectorCapacityBytes(storage);
-    if (count == 0U) {
-      return storage->last;
-    }
-    if (currentSize > (std::numeric_limits<std::size_t>::max() - static_cast<std::size_t>(count))) {
-      throw std::length_error("LegacyByteVectorStorageView too long");
-    }
-
-    std::size_t insertOffset = 0;
-    if (storage->first != nullptr) {
-      if (insertPosition == nullptr || insertPosition < storage->first) {
-        insertOffset = 0;
-      } else if (insertPosition > storage->last) {
-        insertOffset = currentSize;
-      } else {
-        insertOffset = static_cast<std::size_t>(insertPosition - storage->first);
-      }
-    }
-
-    const std::size_t newSize = currentSize + static_cast<std::size_t>(count);
-    if (newSize > currentCapacity) {
-      std::size_t grownCapacity = 0;
-      if (currentCapacity <= ((std::numeric_limits<std::size_t>::max() - currentCapacity) / 2U)) {
-        grownCapacity = currentCapacity + (currentCapacity / 2U);
-      }
-      if (grownCapacity < newSize) {
-        grownCapacity = newSize;
-      }
-
-      auto* const newBuffer = static_cast<std::uint8_t*>(::operator new(grownCapacity));
-      if (insertOffset != 0U && storage->first != nullptr) {
-        std::memmove(newBuffer, storage->first, insertOffset);
-      }
-
-      std::memset(newBuffer + insertOffset, fillValue, count);
-
-      if (currentSize > insertOffset && storage->first != nullptr) {
-        const std::size_t trailingSize = currentSize - insertOffset;
-        std::memmove(newBuffer + insertOffset + count, storage->first + insertOffset, trailingSize);
-      }
-
-      if (storage->first != nullptr) {
-        ::operator delete(storage->first);
-      }
-      storage->first = newBuffer;
-      storage->last = newBuffer + newSize;
-      storage->end = newBuffer + grownCapacity;
-      return newBuffer + insertOffset;
-    }
-
-    insertPosition = storage->first + insertOffset;
-    const std::size_t trailingSize = currentSize - insertOffset;
-    if (trailingSize != 0U) {
-      std::memmove(insertPosition + count, insertPosition, trailingSize);
-    }
-    std::memset(insertPosition, fillValue, count);
-    storage->last = storage->first + newSize;
-    return insertPosition;
-  }
-
-  /**
-   * Address: 0x004A2FF0 (FUN_004A2FF0, sub_4A2FF0)
-   *
-   * What it does:
-   * Resizes one legacy byte-vector storage view to `requestedSize`, filling
-   * newly-grown bytes with `fillValue`.
-   */
-  [[maybe_unused]] void ResizeLegacyByteVectorStorage(
-    LegacyByteVectorStorageView* const storage,
-    const std::size_t requestedSize,
-    const std::uint8_t fillValue
-  )
-  {
-    if (storage == nullptr) {
-      return;
-    }
-
-    const std::size_t currentSize = LegacyByteVectorSizeBytes(storage);
-    if (currentSize >= requestedSize) {
-      if (storage->first != nullptr && requestedSize < currentSize && (storage->first + requestedSize) != storage->last) {
-        storage->last = storage->first + requestedSize;
-      }
-      return;
-    }
-
-    InsertFillBytesIntoLegacyByteVectorStorage(
-      storage,
-      storage->last,
-      static_cast<std::uint32_t>(requestedSize - currentSize),
-      fillValue
-    );
-  }
-
-  /**
-   * Address: 0x004A2FE0 (FUN_004A2FE0, sub_4A2FE0)
-   *
-   * What it does:
-   * Wrapper that forwards to byte-vector resize helper with zero fill.
-   */
-  [[maybe_unused]] void ResizeLegacyByteVectorStorageWithZeroFill(
-    LegacyByteVectorStorageView* const storage,
-    const std::size_t requestedSize
-  )
-  {
-    ResizeLegacyByteVectorStorage(storage, requestedSize, 0);
-  }
-
-  [[maybe_unused]] void DestroyLegacyByteVectorStorage(LegacyByteVectorStorageView* const storage) noexcept
-  {
-    if (storage != nullptr && storage->first != nullptr) {
-      ::operator delete(storage->first);
-      storage->first = nullptr;
-      storage->last = nullptr;
-      storage->end = nullptr;
-    }
   }
 
   struct ParsedRegistryPathView
@@ -4004,11 +3729,14 @@ bool moho::PLAT_SetRegistryValue(
     return false;
   }
 
-  LegacyByteVectorStorageView keyBuffer{};
-  (void)ResetLegacyByteVectorStorage(&keyBuffer);
-  ResizeLegacyByteVectorStorageWithZeroFill(&keyBuffer, std::strlen(keyPath) + 1U);
+  // The shipped body builds a mutable copy of the path in a byte vector so
+  // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
+  // return path, which is what the explicit teardown calls at each `return`
+  // used to model.
+  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  keyBuffer.resize(std::strlen(keyPath) + 1U);
 
-  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.first);
+  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
   std::strcpy(mutableKeyPath, keyPath);
   const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
 
@@ -4025,7 +3753,6 @@ bool moho::PLAT_SetRegistryValue(
         nullptr
       ) != ERROR_SUCCESS) {
     gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
-    DestroyLegacyByteVectorStorage(&keyBuffer);
     return false;
   }
 
@@ -4039,12 +3766,10 @@ bool moho::PLAT_SetRegistryValue(
       ) != ERROR_SUCCESS) {
     (void)::RegCloseKey(openedKey);
     gpg::Logf("PLAT_SetRegistryValue: Unable to write registry key \"%s\"", keyPath);
-    DestroyLegacyByteVectorStorage(&keyBuffer);
     return false;
   }
 
   (void)::RegCloseKey(openedKey);
-  DestroyLegacyByteVectorStorage(&keyBuffer);
   return true;
 }
 
@@ -4098,18 +3823,20 @@ std::uint32_t moho::PLAT_GetRegistryValue(
     return 0;
   }
 
-  LegacyByteVectorStorageView keyBuffer{};
-  (void)ResetLegacyByteVectorStorage(&keyBuffer);
-  ResizeLegacyByteVectorStorageWithZeroFill(&keyBuffer, std::strlen(keyPath) + 1U);
+  // The shipped body builds a mutable copy of the path in a byte vector so
+  // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
+  // return path, which is what the explicit teardown calls at each `return`
+  // used to model.
+  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  keyBuffer.resize(std::strlen(keyPath) + 1U);
 
-  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.first);
+  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
   std::strcpy(mutableKeyPath, keyPath);
   const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
 
   HKEY openedKey = nullptr;
   if (::RegOpenKeyExA(parsedPath.rootKey, parsedPath.subKey, 0, 0x20019u, &openedKey) != ERROR_SUCCESS) {
     gpg::Logf("PLAT_GetRegistryValue: Unable to open registry key \"%s\"", keyPath);
-    DestroyLegacyByteVectorStorage(&keyBuffer);
     return 0;
   }
 
@@ -4124,12 +3851,10 @@ std::uint32_t moho::PLAT_GetRegistryValue(
       ) != ERROR_SUCCESS) {
     (void)::RegCloseKey(openedKey);
     gpg::Logf("PLAT_GetRegistryValue: Unable to read registry key \"%s\"", keyPath);
-    DestroyLegacyByteVectorStorage(&keyBuffer);
     return 0;
   }
 
   (void)::RegCloseKey(openedKey);
-  DestroyLegacyByteVectorStorage(&keyBuffer);
   return bytesRead;
 }
 
